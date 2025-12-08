@@ -2,7 +2,7 @@
 
 > Create animated graphics with AI using the Model Context Protocol
 
-[![npm version](https://badge.fury.io/js/%40pinepaper%2Fmcp-server.svg)](https://www.npmjs.com/package/@pinepaper/mcp-server)
+[![npm version](https://badge.fury.io/js/%40pinepaper.studio%2Fmcp-server.svg)](https://www.npmjs.com/package/@pinepaper.studio/mcp-server)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Overview
@@ -20,10 +20,10 @@ PinePaper MCP Server enables AI assistants like Claude to create and animate gra
 
 ```bash
 # Using npm
-npm install -g @pinepaper/mcp-server
+npm install -g @pinepaper.studio/mcp-server
 
 # Using bun
-bun add -g @pinepaper/mcp-server
+bun add -g @pinepaper.studio/mcp-server
 ```
 
 ### 2. Configure Claude Desktop
@@ -38,7 +38,7 @@ Add to your `claude_desktop_config.json`:
   "mcpServers": {
     "pinepaper": {
       "command": "npx",
-      "args": ["-y", "@pinepaper/mcp-server"]
+      "args": ["-y", "@pinepaper.studio/mcp-server"]
     }
   }
 }
@@ -326,7 +326,7 @@ Set the `PINEPAPER_LOCALE` environment variable:
   "mcpServers": {
     "pinepaper": {
       "command": "npx",
-      "args": ["-y", "@pinepaper/mcp-server"],
+      "args": ["-y", "@pinepaper.studio/mcp-server"],
       "env": {
         "PINEPAPER_LOCALE": "ja"
       }
@@ -338,7 +338,7 @@ Set the `PINEPAPER_LOCALE` environment variable:
 Or programmatically:
 
 ```typescript
-import { setLocale, t } from '@pinepaper/mcp-server';
+import { setLocale, t } from '@pinepaper.studio/mcp-server';
 
 // Set locale
 setLocale('fr');
