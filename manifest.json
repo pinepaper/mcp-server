@@ -1,0 +1,136 @@
+{
+  "manifest_version": "0.3",
+  "name": "pinepaper-mcp",
+  "version": "1.0.0",
+  "display_name": "PinePaper Studio",
+  "description": "Create animated graphics with AI using PinePaper Studio",
+  "long_description": "PinePaper MCP Server enables Claude to create, animate, and export graphics through PinePaper Studio. Features include shape creation, relation-based animations (orbits, follows, attached_to), procedural generators, visual effects, and SVG export with animations.",
+  "author": {
+    "name": "PinePaper Studio",
+    "url": "https://github.com/pinepaper"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pinepaper/mcp-server"
+  },
+  "homepage": "https://pinepaper.studio",
+  "license": "MIT",
+  "keywords": [
+    "animation",
+    "graphics",
+    "canvas",
+    "paper.js",
+    "design",
+    "creative"
+  ],
+  "server": {
+    "type": "node",
+    "entry_point": "dist/cli.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/dist/cli.js"]
+    }
+  },
+  "tools": [
+    {
+      "name": "pinepaper_create_item",
+      "description": "Create text, shapes, or graphics on the PinePaper canvas"
+    },
+    {
+      "name": "pinepaper_modify_item",
+      "description": "Modify an existing item's properties (color, size, position)"
+    },
+    {
+      "name": "pinepaper_delete_item",
+      "description": "Remove an item from the canvas"
+    },
+    {
+      "name": "pinepaper_add_relation",
+      "description": "Add animation relations between items (orbits, follows, attached_to)"
+    },
+    {
+      "name": "pinepaper_remove_relation",
+      "description": "Remove a relation between items"
+    },
+    {
+      "name": "pinepaper_query_relations",
+      "description": "Query existing relations for an item"
+    },
+    {
+      "name": "pinepaper_animate",
+      "description": "Apply simple loop animations to items"
+    },
+    {
+      "name": "pinepaper_keyframe_animate",
+      "description": "Create timed keyframe animations"
+    },
+    {
+      "name": "pinepaper_play_timeline",
+      "description": "Control animation playback"
+    },
+    {
+      "name": "pinepaper_execute_generator",
+      "description": "Run procedural background generators"
+    },
+    {
+      "name": "pinepaper_list_generators",
+      "description": "List available background generators"
+    },
+    {
+      "name": "pinepaper_apply_effect",
+      "description": "Apply visual effects to items"
+    },
+    {
+      "name": "pinepaper_get_items",
+      "description": "Get all items on the canvas"
+    },
+    {
+      "name": "pinepaper_get_relation_stats",
+      "description": "Get statistics about relations"
+    },
+    {
+      "name": "pinepaper_set_background_color",
+      "description": "Set the canvas background color"
+    },
+    {
+      "name": "pinepaper_set_canvas_size",
+      "description": "Set canvas dimensions"
+    },
+    {
+      "name": "pinepaper_get_canvas_size",
+      "description": "Get current canvas dimensions"
+    },
+    {
+      "name": "pinepaper_clear_canvas",
+      "description": "Remove all items from the canvas"
+    },
+    {
+      "name": "pinepaper_refresh_page",
+      "description": "Refresh the PinePaper page"
+    },
+    {
+      "name": "pinepaper_export_svg",
+      "description": "Export canvas as animated SVG"
+    },
+    {
+      "name": "pinepaper_export_training_data",
+      "description": "Export instruction/code pairs for LLM training"
+    },
+    {
+      "name": "pinepaper_browser_connect",
+      "description": "Connect to PinePaper Studio in browser"
+    },
+    {
+      "name": "pinepaper_browser_disconnect",
+      "description": "Disconnect from browser"
+    },
+    {
+      "name": "pinepaper_browser_screenshot",
+      "description": "Take a screenshot of the canvas"
+    },
+    {
+      "name": "pinepaper_browser_status",
+      "description": "Check browser connection status"
+    }
+  ]
+}

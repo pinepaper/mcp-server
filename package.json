@@ -1,0 +1,79 @@
+{
+  "name": "@pinepaper.studio/mcp-server",
+  "version": "1.0.0",
+  "description": "MCP Server for PinePaper Studio - Create animated graphics with AI",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "pinepaper-mcp": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./tools": {
+      "types": "./dist/tools/index.d.ts",
+      "import": "./dist/tools/index.js"
+    },
+    "./browser": {
+      "types": "./dist/browser/index.d.ts",
+      "import": "./dist/browser/index.js"
+    },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "import": "./dist/server/index.js"
+    }
+  },
+  "scripts": {
+    "build": "bun run tsc",
+    "dev": "bun --watch src/index.ts",
+    "start": "bun run src/index.ts",
+    "start:dist": "bun dist/index.js",
+    "test": "bun test",
+    "test:coverage": "bun test --coverage",
+    "lint": "eslint src/**/*.ts",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "bun run build"
+  },
+  "keywords": [
+    "mcp",
+    "pinepaper",
+    "animation",
+    "graphics",
+    "paper.js",
+    "ai",
+    "claude",
+    "anthropic"
+  ],
+  "author": "PinePaper Studio",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pinepaper/mcp-server"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "bun": ">=1.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "puppeteer": "^23.0.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0",
+    "eslint": "^8.55.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0"
+  },
+  "files": [
+    "dist",
+    "manifest.json",
+    "README.md",
+    "LICENSE"
+  ]
+}

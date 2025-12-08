@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "pinepaper": {
+      "command": "node",
+      "args": ["/Users/primus/Downloads/pinepaper-mcp/dist/cli.js"],
+      "env": {
+        "PINEPAPER_DEBUG": "false"
+      }
+    }
+  }
+}
