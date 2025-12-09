@@ -32,6 +32,14 @@ IMPORTANT:
 - Save the returned itemId! You need it for pinepaper_add_relation, pinepaper_modify_item, pinepaper_delete_item, etc.
 - If there's a welcome template on the canvas, use pinepaper_clear_canvas first
 - Position defaults to canvas center (400, 300). Use position: {x, y} to place elsewhere.
+- DO NOT take screenshots after every create operation. Trust the API response - if it returns success, the item was created. Take ONE screenshot at the end to verify the final result.
+
+⚠️ COMPLEX CHARACTERS/ILLUSTRATIONS:
+For requests like "draw a witch", "draw a cat face", "draw a person", or any detailed characters:
+- These are VERY time-consuming to draw with paths (10-20+ operations per character)
+- Use pinepaper_import_svg instead - import pre-made SVG graphics
+- Or compose from simple shapes (circle for head, triangle for hat, etc.)
+- DO NOT attempt pixel-level character drawing with paths
 
 ITEM TYPES:
 - text: Text content with font styling (properties: content, fontSize, color, fontFamily)
@@ -41,14 +49,20 @@ ITEM TYPES:
 - triangle: Triangular shape (properties: color)
 - polygon: Regular polygon with N sides (properties: sides, radius, color)
 - ellipse: Oval shape (properties: color)
-- path: Custom path with segments or SVG data (properties: segments, pathData, strokeColor)
+- path: Custom path with segments or SVG data (properties: segments, pathData, strokeColor, fillColor, closed, smooth)
 - line: Line between two points (properties: from, to, strokeColor, strokeWidth)
 - arc: Curved arc through three points (properties: from, through, to, strokeColor)
+
+PATH FOR CUSTOM SHAPES:
+Use itemType: "path" with either:
+- segments: Array of [x,y] points for polygons, e.g. [[100,100], [200,50], [300,100]]
+- pathData: SVG path string for curves, e.g. "M 100 100 C 150 50, 250 50, 300 100 Z"
 
 EXAMPLES:
 - "Create red text saying HELLO" → itemType: "text", properties: {content: "HELLO", color: "#ef4444", fontSize: 48}
 - "Add a blue circle" → itemType: "circle", properties: {radius: 50, color: "#3b82f6"}
 - "Create a 5-pointed gold star" → itemType: "star", properties: {radius1: 60, radius2: 30, points: 5, color: "#fbbf24"}
+- "Draw a heart" → itemType: "path", properties: {pathData: "M 300 350 C 300 300, 250 250, 200 250 C 150 250, 100 300, 100 350 C 100 450, 300 550, 300 550 C 300 550, 500 450, 500 350 C 500 300, 450 250, 400 250 C 350 250, 300 300, 300 350 Z", fillColor: "#ef4444"}
 
 WORKFLOW TIP:
 After creating items, use pinepaper_add_relation to animate them (e.g., orbits, follows, attached_to).`,
@@ -664,6 +678,113 @@ IMPORTANT NOTES:
   },
 
   // ---------------------------------------------------------------------------
+  // IMPORT TOOLS
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_import_svg',
+    description: `Import an SVG string or SVG from URL onto the canvas. Returns an itemId for the imported graphic.
+
+USE WHEN:
+- User requests complex illustrations (characters, icons, detailed graphics)
+- Importing pre-made SVG assets
+- Adding logos or vector graphics
+- User mentions SVG files or vector graphics
+
+⚠️ RECOMMENDED FOR COMPLEX CHARACTERS:
+Instead of drawing "a witch" or "a cat" with many path operations, use SVG import:
+1. Describe what you need and use a simple placeholder SVG
+2. Or import from a URL if the user provides one
+
+EXAMPLES:
+- Import a simple star SVG: svgString: '<svg viewBox="0 0 100 100"><polygon points="50,5 61,40 98,40 68,62 79,96 50,75 21,96 32,62 2,40 39,40" fill="#fbbf24"/></svg>'
+- Import from URL: url: "https://example.com/icon.svg"
+
+POSITIONING:
+- Use position to place the imported SVG at specific coordinates
+- Use scale to resize (1.0 = original size)
+
+Returns the itemId of the imported SVG group, which can be used with pinepaper_add_relation for animation.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        svgString: {
+          type: 'string',
+          description: 'SVG markup string to import',
+        },
+        url: {
+          type: 'string',
+          description: 'URL to fetch SVG from (alternative to svgString)',
+        },
+        position: {
+          type: 'object',
+          properties: {
+            x: { type: 'number', description: 'X coordinate' },
+            y: { type: 'number', description: 'Y coordinate' },
+          },
+          description: 'Position to place the imported SVG',
+        },
+        scale: {
+          type: 'number',
+          description: 'Scale factor (1.0 = original size)',
+        },
+      },
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // FILTER TOOLS
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_add_filter',
+    description: `Add a visual filter effect to the canvas. Filters are scene-wide effects that can be stacked.
+
+USE WHEN:
+- User wants visual effects like blur, grayscale, vintage look
+- Creating mood or atmosphere (cinematic, dreamy, noir)
+- Post-processing the entire scene
+- User says "make it look vintage", "add blur", "black and white"
+
+AVAILABLE FILTERS:
+- grayscale: Convert to black and white (params: intensity 0-1)
+- sepia: Warm vintage brownish tone (params: intensity 0-1)
+- blur: Gaussian blur effect (params: radius 0-20)
+- brightness: Adjust brightness (params: value -100 to 100)
+- contrast: Adjust contrast (params: value -100 to 100)
+- saturate: Adjust color saturation (params: value -100 to 100)
+- invert: Invert colors (params: intensity 0-1)
+- noise: Add film grain (params: intensity 0-100, monochrome: true/false)
+- vignette: Darken edges (params: intensity 0-1, radius 0-1)
+- vintage: Preset combining sepia, vignette, noise
+- colorOverlay: Add color tint (params: color, intensity, blendMode)
+- sharpen: Increase sharpness (params: intensity 0-100)
+- posterize: Reduce color levels (params: levels 2-32)
+
+EXAMPLES:
+- "Make it black and white" → filterType: "grayscale"
+- "Add vintage look" → filterType: "vintage", params: {intensity: 0.8}
+- "Blur the background" → filterType: "blur", params: {radius: 5}
+- "Increase contrast" → filterType: "contrast", params: {value: 30}
+
+Filters can be stacked - call multiple times to combine effects.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filterType: {
+          type: 'string',
+          enum: ['grayscale', 'sepia', 'blur', 'brightness', 'contrast', 'saturate', 'invert', 'noise', 'vignette', 'vintage', 'colorOverlay', 'sharpen', 'posterize'],
+          description: 'Type of filter to apply',
+        },
+        params: {
+          type: 'object',
+          description: 'Filter-specific parameters',
+          additionalProperties: true,
+        },
+      },
+      required: ['filterType'],
+    },
+  },
+
+  // ---------------------------------------------------------------------------
   // EXPORT TOOLS
   // ---------------------------------------------------------------------------
   {
@@ -762,9 +883,18 @@ USE WHEN:
     description: `Take a screenshot of the current PinePaper canvas.
 
 USE WHEN:
-- User wants to see the current state
-- Verifying that changes were applied correctly
-- Debugging visual issues
+- User explicitly asks to "see" or "show" the canvas
+- Final verification after completing a creative task
+- Debugging visual issues or unexpected behavior
+- Verifying animations are running (take 2 screenshots with delay)
+
+⚠️ PERFORMANCE BEST PRACTICE:
+Take ONE screenshot per creative task, NOT per operation!
+- BAD: Create circle → screenshot → create text → screenshot → add relation → screenshot
+- GOOD: Create circle → create text → add relation → screenshot (once at end)
+
+Trust the API responses - if a tool returns success, the operation worked.
+Only screenshot when you need visual confirmation of the FINAL result.
 
 Returns a base64-encoded PNG image of the canvas.`,
     inputSchema: {

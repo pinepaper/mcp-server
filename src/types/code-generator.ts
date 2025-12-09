@@ -709,6 +709,72 @@ export class PinePaperCodeGenerator {
   generateClearCanvas(): string {
     return generateClearCanvasCode();
   }
+
+  /**
+   * Generate code for importing SVG
+   */
+  generateImportSVG(
+    svgString?: string,
+    url?: string,
+    position: { x: number; y: number } = { x: 400, y: 300 },
+    scale: number = 1.0
+  ): string {
+    if (url) {
+      return `
+// Import SVG from URL
+const response = await fetch('${url}');
+const svgText = await response.text();
+const imported = app.importSVG(svgText);
+if (imported) {
+  imported.position = new paper.Point(${position.x}, ${position.y});
+  imported.scale(${scale});
+  const itemId = app.registerItem(imported, 'svg-import', { source: 'mcp' });
+  app.historyManager.saveState();
+  ({ success: true, itemId, position: { x: ${position.x}, y: ${position.y} } });
+} else {
+  throw new Error('Failed to import SVG from URL');
+}
+`.trim();
+    }
+
+    if (svgString) {
+      // Escape the SVG string for embedding in code
+      const escapedSvg = svgString.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
+      return `
+// Import SVG string
+const svgString = \`${escapedSvg}\`;
+const imported = app.importSVG(svgString);
+if (imported) {
+  imported.position = new paper.Point(${position.x}, ${position.y});
+  imported.scale(${scale});
+  const itemId = app.registerItem(imported, 'svg-import', { source: 'mcp' });
+  app.historyManager.saveState();
+  ({ success: true, itemId, position: { x: ${position.x}, y: ${position.y} } });
+} else {
+  throw new Error('Failed to import SVG');
+}
+`.trim();
+    }
+
+    return `
+// Error: No SVG source provided
+throw new Error('Either svgString or url must be provided');
+`.trim();
+  }
+
+  /**
+   * Generate code for adding a filter
+   */
+  generateAddFilter(
+    filterType: string,
+    params: Record<string, unknown> = {}
+  ): string {
+    return `
+// Add ${filterType} filter
+const filterId = app.filterSystem.addFilter('${filterType}', ${JSON.stringify(params, null, 2)});
+({ success: true, filterId, filterType: '${filterType}' });
+`.trim();
+  }
 }
 
 // Export singleton instance
