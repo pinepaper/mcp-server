@@ -24,6 +24,8 @@ import {
   SetBackgroundColorInputSchema,
   SetCanvasSizeInputSchema,
   ExportTrainingDataInputSchema,
+  ImportSVGInputSchema,
+  AddFilterInputSchema,
   ErrorCodes,
   RelationType,
   ItemType,
@@ -37,6 +39,33 @@ import {
 } from '../browser/puppeteer-controller.js';
 
 // =============================================================================
+// SCREENSHOT MODE CONFIGURATION
+// =============================================================================
+
+/**
+ * Screenshot modes for performance optimization.
+ * Based on best practices: "Take 1 screenshot per creative task, not per operation"
+ *
+ * - 'on_request': Only take screenshots when explicitly requested via pinepaper_browser_screenshot (RECOMMENDED)
+ * - 'always': Take screenshot after every tool execution (legacy behavior, slower)
+ * - 'never': Never take screenshots automatically
+ */
+export type ScreenshotMode = 'on_request' | 'always' | 'never';
+
+/**
+ * Get screenshot mode from environment variable.
+ * Defaults to 'on_request' for optimal performance.
+ */
+export function getScreenshotMode(): ScreenshotMode {
+  const mode = process.env.PINEPAPER_SCREENSHOT_MODE?.toLowerCase();
+  if (mode === 'always' || mode === 'never' || mode === 'on_request') {
+    return mode;
+  }
+  // Default to 'on_request' for better performance (best practice)
+  return 'on_request';
+}
+
+// =============================================================================
 // HANDLER OPTIONS
 // =============================================================================
 
@@ -46,6 +75,8 @@ export interface HandlerOptions {
   executeInBrowser?: boolean;
   /** Browser controller instance (uses singleton if not provided) */
   browserController?: PinePaperBrowserController;
+  /** Screenshot mode: 'on_request' (default), 'always', or 'never' */
+  screenshotMode?: ScreenshotMode;
 }
 
 // =============================================================================
@@ -148,14 +179,22 @@ function handleValidationError(error: ZodError, i18n?: I18nManager): CallToolRes
 }
 
 /**
- * Execute code in browser if connected, otherwise return generated code
+ * Execute code in browser if connected, otherwise return generated code.
+ *
+ * Screenshot behavior is controlled by PINEPAPER_SCREENSHOT_MODE environment variable:
+ * - 'on_request': No automatic screenshots (use pinepaper_browser_screenshot explicitly)
+ * - 'always': Take screenshot after every execution (legacy, slower)
+ * - 'never': Never take screenshots
+ *
+ * Default is 'on_request' for optimal performance per best practices.
  */
 async function executeOrGenerate(
   code: string,
   description: string,
   options: HandlerOptions
 ): Promise<CallToolResult> {
-  const { executeInBrowser, browserController } = options;
+  const { executeInBrowser, browserController, screenshotMode } = options;
+  const effectiveScreenshotMode = screenshotMode ?? getScreenshotMode();
 
   if (!executeInBrowser) {
     return successResult(code, description);
@@ -170,7 +209,10 @@ async function executeOrGenerate(
     );
   }
 
-  const result = await controller.executeCode(code, true);
+  // Only take screenshot if mode is 'always'
+  // 'on_request' mode means screenshots only via pinepaper_browser_screenshot
+  const shouldTakeScreenshot = effectiveScreenshotMode === 'always';
+  const result = await controller.executeCode(code, shouldTakeScreenshot);
 
   if (!result.success) {
     return errorResult(
@@ -458,6 +500,34 @@ You can now start creating new items on a clean canvas.`,
       }
 
       // -----------------------------------------------------------------------
+      // IMPORT TOOLS
+      // -----------------------------------------------------------------------
+      case 'pinepaper_import_svg': {
+        const input = ImportSVGInputSchema.parse(args);
+        const code = codeGenerator.generateImportSVG(
+          input.svgString,
+          input.url,
+          input.position,
+          input.scale
+        );
+        const description = 'Imports SVG onto the canvas';
+        return executeOrGenerate(code, description, options);
+      }
+
+      // -----------------------------------------------------------------------
+      // FILTER TOOLS
+      // -----------------------------------------------------------------------
+      case 'pinepaper_add_filter': {
+        const input = AddFilterInputSchema.parse(args);
+        const code = codeGenerator.generateAddFilter(
+          input.filterType,
+          input.params as Record<string, unknown>
+        );
+        const description = `Adds ${input.filterType} filter to the canvas`;
+        return executeOrGenerate(code, description, options);
+      }
+
+      // -----------------------------------------------------------------------
       // EXPORT TOOLS
       // -----------------------------------------------------------------------
       case 'pinepaper_export_svg': {
@@ -642,6 +712,8 @@ Browser is ready. You can now use other pinepaper tools to create and animate gr
             'pinepaper_get_canvas_size',
             'pinepaper_clear_canvas',
             'pinepaper_refresh_page',
+            'pinepaper_import_svg',
+            'pinepaper_add_filter',
             'pinepaper_export_svg',
             'pinepaper_export_training_data',
             'pinepaper_browser_connect',
