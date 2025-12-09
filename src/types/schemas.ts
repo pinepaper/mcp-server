@@ -284,8 +284,45 @@ export const BlastParamsSchema = z.object({
 });
 
 // =============================================================================
+// FILTER TYPES
+// =============================================================================
+
+export const FilterTypeSchema = z.enum([
+  'grayscale',
+  'sepia',
+  'blur',
+  'brightness',
+  'contrast',
+  'saturation',
+  'invert',
+  'noise',
+  'vignette',
+  'vintage',
+  'colorOverlay',
+  'sharpen',
+  'emboss',
+  'posterize',
+]).describe('Type of visual filter to apply');
+
+export type FilterType = z.infer<typeof FilterTypeSchema>;
+
+// =============================================================================
 // TOOL INPUT SCHEMAS
 // =============================================================================
+
+// Import SVG
+export const ImportSVGInputSchema = z.object({
+  svgString: z.string().optional().describe('SVG markup string to import'),
+  url: z.string().optional().describe('URL to fetch SVG from'),
+  position: PositionSchema.optional().default({ x: 400, y: 300 }),
+  scale: z.number().optional().default(1.0).describe('Scale factor'),
+});
+
+// Add Filter
+export const AddFilterInputSchema = z.object({
+  filterType: FilterTypeSchema,
+  params: z.record(z.unknown()).optional().default({}),
+});
 
 // Create Item
 export const CreateItemInputSchema = z.object({
