@@ -58,14 +58,24 @@ Use itemType: "path" with either:
 - segments: Array of [x,y] points for polygons, e.g. [[100,100], [200,50], [300,100]]
 - pathData: SVG path string for curves, e.g. "M 100 100 C 150 50, 250 50, 300 100 Z"
 
+ADVANCED STYLING (NEW):
+All shapes support these additional properties:
+- Gradients: color can be an object: {type: "linear"|"radial", stops: [{color: "#fff", offset: 0}, {color: "#000", offset: 1}], origin: [x,y], destination: [x,y]}
+- Shadows: shadowColor, shadowBlur (pixels), shadowOffset: [x, y]
+- Blend modes: blendMode: "multiply"|"screen"|"overlay"|"darken"|"lighten"|etc.
+- Opacity: opacity (0-1)
+
 EXAMPLES:
 - "Create red text saying HELLO" → itemType: "text", properties: {content: "HELLO", color: "#ef4444", fontSize: 48}
 - "Add a blue circle" → itemType: "circle", properties: {radius: 50, color: "#3b82f6"}
 - "Create a 5-pointed gold star" → itemType: "star", properties: {radius1: 60, radius2: 30, points: 5, color: "#fbbf24"}
 - "Draw a heart" → itemType: "path", properties: {pathData: "M 300 350 C 300 300, 250 250, 200 250 C 150 250, 100 300, 100 350 C 100 450, 300 550, 300 550 C 300 550, 500 450, 500 350 C 500 300, 450 250, 400 250 C 350 250, 300 300, 300 350 Z", fillColor: "#ef4444"}
+- "Circle with radial gradient" → itemType: "circle", properties: {radius: 50, color: {type: "radial", stops: [{color: "#ff6b6b", offset: 0}, {color: "#c0392b", offset: 1}]}}
+- "Rectangle with shadow" → itemType: "rectangle", properties: {width: 100, height: 50, color: "#3b82f6", shadowColor: "rgba(0,0,0,0.5)", shadowBlur: 10, shadowOffset: [5, 5]}
 
 WORKFLOW TIP:
-After creating items, use pinepaper_add_relation to animate them (e.g., orbits, follows, attached_to).`,
+After creating items, use pinepaper_add_relation to animate them (e.g., orbits, follows, attached_to).
+For glossy 3D spheres, use pinepaper_create_glossy_sphere instead. For diagonal stripes, use pinepaper_create_diagonal_stripes.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -100,17 +110,25 @@ USE WHEN:
 - Changing color, size, position of an existing item
 - Updating text content
 - Adjusting styling properties
+- Adding/changing gradients, shadows, or blend modes
 
 MODIFIABLE PROPERTIES:
 - position: {x, y} or separate x, y
-- color/fillColor: Fill color
-- strokeColor: Outline color
+- color/fillColor: Fill color (solid string OR gradient object)
+- strokeColor: Outline color (solid string OR gradient object)
 - strokeWidth: Outline thickness
 - fontSize: Text size
 - content: Text content
 - opacity: Transparency (0-1)
 - rotation: Rotation in degrees
-- scale: Size multiplier`,
+- scale: Size multiplier
+- shadowColor: Shadow color
+- shadowBlur: Shadow blur radius
+- shadowOffset: Shadow offset [x, y]
+- blendMode: Blend mode (normal, multiply, screen, overlay, etc.)
+
+GRADIENT OBJECT FORMAT:
+{type: "linear"|"radial", stops: [{color: "#fff", offset: 0}, {color: "#000", offset: 1}], origin: [x,y], destination: [x,y]}`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -158,6 +176,141 @@ Use pinepaper_clear_canvas instead of deleting items one by one.`,
         },
       },
       required: ['itemId'],
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // HIGH-LEVEL DESIGN TOOLS
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_create_glossy_sphere',
+    description: `Create a 3D-looking glossy sphere with realistic lighting effects. This is a HIGH-LEVEL tool that creates a complete glossy sphere with radial gradient, specular highlights, and optional shadow - all in one operation.
+
+USE WHEN:
+- User wants a "3D sphere", "glossy ball", "shiny orb"
+- Creating realistic looking spheres/balls
+- Need a sphere with lighting effects
+- Making glass-like or metallic spheres
+
+DO NOT USE for flat circles - use pinepaper_create_item with itemType: "circle" instead.
+
+PARAMETERS:
+- position: Center point of the sphere {x, y}
+- radius: Sphere radius in pixels
+- baseColor: Main color of the sphere (e.g., "#F97316" for orange)
+- lightDirection: Where the light comes from (top-left, top-right, top, left, right, bottom-left, bottom-right, bottom)
+- glossiness: Shininess level 0-1 (default 0.7)
+- castShadow: Whether to show shadow underneath (default true)
+- shadowIntensity: Shadow darkness 0-1 (default 0.3)
+
+EXAMPLES:
+- "Orange glossy sphere" → baseColor: "#F97316", radius: 60
+- "Purple shiny ball with strong highlight" → baseColor: "#7C3AED", glossiness: 0.9
+- "Matte red sphere" → baseColor: "#DC2626", glossiness: 0.3
+- "Glass-like sphere" → baseColor: "#60A5FA", glossiness: 1.0, opacity via modify later`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        position: {
+          type: 'object',
+          properties: {
+            x: { type: 'number', description: 'X coordinate (default: 400)' },
+            y: { type: 'number', description: 'Y coordinate (default: 300)' },
+          },
+          description: 'Center position of the sphere',
+        },
+        radius: {
+          type: 'number',
+          description: 'Sphere radius in pixels',
+        },
+        baseColor: {
+          type: 'string',
+          description: 'Main sphere color (hex, rgb, or named color)',
+        },
+        lightDirection: {
+          type: 'string',
+          enum: ['top-left', 'top-right', 'top', 'left', 'right', 'bottom-left', 'bottom-right', 'bottom'],
+          description: 'Direction of light source (default: top-left)',
+        },
+        glossiness: {
+          type: 'number',
+          description: 'Shininess level 0-1 (default: 0.7)',
+        },
+        castShadow: {
+          type: 'boolean',
+          description: 'Show shadow underneath (default: true)',
+        },
+        shadowIntensity: {
+          type: 'number',
+          description: 'Shadow darkness 0-1 (default: 0.3)',
+        },
+      },
+      required: ['radius', 'baseColor'],
+    },
+  },
+
+  {
+    name: 'pinepaper_create_diagonal_stripes',
+    description: `Create a diagonal stripe pattern. This is a HIGH-LEVEL tool that creates multiple stripes at an angle with automatic clipping to a rectangular area.
+
+USE WHEN:
+- User wants "diagonal stripes", "angled lines", "striped background"
+- Creating candy-cane or barber-pole style patterns
+- Making geometric stripe designs
+- Need alternating color bands at an angle
+
+PARAMETERS:
+- position: Center point of the stripe area {x, y}
+- width: Total width of the stripe area
+- height: Total height of the stripe area
+- stripeWidth: Width of each stripe (default: 50)
+- colors: Array of colors to alternate (minimum 2), e.g., ["#F97316", "#7C3AED"]
+- angle: Rotation angle in degrees (default: -45, negative = top-right to bottom-left)
+- gap: Space between stripes (default: 0)
+
+EXAMPLES:
+- "Orange and purple diagonal stripes" → colors: ["#F97316", "#7C3AED"], angle: -45
+- "Candy cane stripes" → colors: ["#DC2626", "#FFFFFF"], stripeWidth: 30, angle: -45
+- "Three-color stripes" → colors: ["#3B82F6", "#10B981", "#F59E0B"], stripeWidth: 40
+- "Wide horizontal stripes" → colors: ["#000000", "#FFFFFF"], angle: 0, stripeWidth: 80`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        position: {
+          type: 'object',
+          properties: {
+            x: { type: 'number', description: 'X coordinate (default: 400)' },
+            y: { type: 'number', description: 'Y coordinate (default: 300)' },
+          },
+          description: 'Center position of the stripe area',
+        },
+        width: {
+          type: 'number',
+          description: 'Total width of the stripe area',
+        },
+        height: {
+          type: 'number',
+          description: 'Total height of the stripe area',
+        },
+        stripeWidth: {
+          type: 'number',
+          description: 'Width of each stripe (default: 50)',
+        },
+        colors: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of colors to alternate between (minimum 2)',
+        },
+        angle: {
+          type: 'number',
+          description: 'Rotation angle in degrees (default: -45)',
+        },
+        gap: {
+          type: 'number',
+          description: 'Gap between stripes in pixels (default: 0)',
+        },
+      },
+      required: ['width', 'height', 'colors'],
     },
   },
 

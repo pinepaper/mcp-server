@@ -20,43 +20,170 @@ import {
   SetBackgroundColorInputSchema,
   SetCanvasSizeInputSchema,
   Keyframe,
+  CreateGlossySphereInputSchema,
+  CreateDiagonalStripesInputSchema,
+  LightDirection,
+  Gradient,
 } from './schemas.js';
 import { z } from 'zod';
+
+// =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
+
+/**
+ * Check if a color value is a gradient object
+ */
+function isGradient(color: unknown): color is Gradient {
+  return typeof color === 'object' && color !== null && 'type' in color && 'stops' in color;
+}
+
+/**
+ * Generate Paper.js gradient code for a fill color
+ */
+function generateGradientCode(
+  gradient: Gradient,
+  itemVarName: string,
+  position: { x: number; y: number },
+  propertyName: 'fillColor' | 'strokeColor' = 'fillColor'
+): string {
+  const { type, stops, origin, destination } = gradient;
+
+  // Calculate default origin/destination based on item position
+  const defaultOrigin = origin || [position.x - 50, position.y - 50];
+  const defaultDestination = destination || [position.x + 50, position.y + 50];
+
+  const stopsCode = stops.map(s => `['${s.color}', ${s.offset}]`).join(', ');
+
+  return `
+${itemVarName}.${propertyName} = {
+  gradient: {
+    stops: [${stopsCode}],
+    radial: ${type === 'radial'}
+  },
+  origin: [${defaultOrigin[0]}, ${defaultOrigin[1]}],
+  destination: [${defaultDestination[0]}, ${defaultDestination[1]}]
+};`;
+}
+
+/**
+ * Generate shadow code for an item
+ */
+function generateShadowCode(
+  itemVarName: string,
+  shadowColor?: string,
+  shadowBlur?: number,
+  shadowOffset?: [number, number]
+): string {
+  const lines: string[] = [];
+
+  if (shadowColor) {
+    lines.push(`${itemVarName}.shadowColor = '${shadowColor}';`);
+  }
+  if (shadowBlur !== undefined) {
+    lines.push(`${itemVarName}.shadowBlur = ${shadowBlur};`);
+  }
+  if (shadowOffset) {
+    lines.push(`${itemVarName}.shadowOffset = new paper.Point(${shadowOffset[0]}, ${shadowOffset[1]});`);
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Generate blend mode code for an item
+ */
+function generateBlendModeCode(itemVarName: string, blendMode: string): string {
+  return `${itemVarName}.blendMode = '${blendMode}';`;
+}
 
 // =============================================================================
 // CODE TEMPLATES
 // =============================================================================
 
 /**
- * Template for creating items
+ * Template for creating items with support for gradients, shadows, and blend modes
  */
 function generateCreateItemCode(
   itemType: ItemType,
   position: { x: number; y: number },
   properties: Record<string, unknown>
 ): string {
+  // Extract special properties that need separate handling
+  const {
+    color,
+    fillColor,
+    strokeColor,
+    shadowColor,
+    shadowBlur,
+    shadowOffset,
+    blendMode,
+    opacity,
+    ...baseProperties
+  } = properties;
+
   const params: Record<string, unknown> = {
     x: position.x,
     y: position.y,
-    ...properties,
+    ...baseProperties,
   };
 
-  // Map generic properties to PinePaper-specific ones
-  if (itemType === 'text') {
-    if (params.color) {
-      params.color = params.color;  // PinePaper uses 'color' for text
-    }
+  // Handle simple solid colors in params
+  if (color && !isGradient(color)) {
+    params.color = color;
+  }
+  if (fillColor && !isGradient(fillColor)) {
+    params.fillColor = fillColor;
+  }
+  if (strokeColor && !isGradient(strokeColor)) {
+    params.strokeColor = strokeColor;
   }
 
-  return `
+  // Build the code
+  let code = `
 // Create ${itemType} item
-const item = app.create('${itemType}', ${JSON.stringify(params, null, 2)});
+const item = app.create('${itemType}', ${JSON.stringify(params, null, 2)});`;
+
+  // Add gradient support for colors
+  if (color && isGradient(color)) {
+    code += generateGradientCode(color, 'item', position, 'fillColor');
+  }
+  if (fillColor && isGradient(fillColor)) {
+    code += generateGradientCode(fillColor as Gradient, 'item', position, 'fillColor');
+  }
+  if (strokeColor && isGradient(strokeColor)) {
+    code += generateGradientCode(strokeColor as Gradient, 'item', position, 'strokeColor');
+  }
+
+  // Add shadow support
+  const shadowCode = generateShadowCode(
+    'item',
+    shadowColor as string | undefined,
+    shadowBlur as number | undefined,
+    shadowOffset as [number, number] | undefined
+  );
+  if (shadowCode) {
+    code += '\n' + shadowCode;
+  }
+
+  // Add blend mode support
+  if (blendMode) {
+    code += '\n' + generateBlendModeCode('item', blendMode as string);
+  }
+
+  // Add opacity support
+  if (opacity !== undefined) {
+    code += `\nitem.opacity = ${opacity};`;
+  }
+
+  code += `
 const itemId = item.data.registryId;
 app.historyManager.saveState();
 
 // Return item info
-({ itemId, type: '${itemType}', position: { x: ${position.x}, y: ${position.y} } });
-`.trim();
+({ itemId, type: '${itemType}', position: { x: ${position.x}, y: ${position.y} } });`;
+
+  return code.trim();
 }
 
 /**
@@ -773,6 +900,159 @@ throw new Error('Either svgString or url must be provided');
 // Add ${filterType} filter
 const filterId = app.filterSystem.addFilter('${filterType}', ${JSON.stringify(params, null, 2)});
 ({ success: true, filterId, filterType: '${filterType}' });
+`.trim();
+  }
+
+  /**
+   * Generate code for creating a glossy 3D sphere effect
+   */
+  generateCreateGlossySphere(input: z.infer<typeof CreateGlossySphereInputSchema>): string {
+    const validated = CreateGlossySphereInputSchema.parse(input);
+    const { position, radius, baseColor, lightDirection, glossiness, castShadow, shadowIntensity } = validated;
+
+    // Calculate light offset based on direction
+    const lightOffsets: Record<LightDirection, { x: number; y: number }> = {
+      'top-left': { x: -0.3, y: -0.3 },
+      'top-right': { x: 0.3, y: -0.3 },
+      'top': { x: 0, y: -0.4 },
+      'left': { x: -0.4, y: 0 },
+      'right': { x: 0.4, y: 0 },
+      'bottom-left': { x: -0.3, y: 0.3 },
+      'bottom-right': { x: 0.3, y: 0.3 },
+      'bottom': { x: 0, y: 0.4 },
+    };
+
+    const lightOffset = lightOffsets[lightDirection];
+    const lightX = position.x + radius * lightOffset.x;
+    const lightY = position.y + radius * lightOffset.y;
+
+    // Specular highlight position (opposite of shadow direction)
+    const highlightX = position.x + radius * lightOffset.x * 0.6;
+    const highlightY = position.y + radius * lightOffset.y * 0.6;
+
+    return `
+// Create glossy 3D sphere effect
+const sphereGroup = new paper.Group({ parent: app.textItemGroup });
+const baseColor = new paper.Color('${baseColor}');
+
+${castShadow ? `// Shadow underneath
+const shadow = new paper.Path.Ellipse({
+  center: [${position.x + 10}, ${position.y + radius + 8}],
+  size: [${radius * 1.6}, ${radius * 0.4}],
+  fillColor: 'rgba(0, 0, 0, ${shadowIntensity})',
+  parent: sphereGroup
+});
+shadow.shadowBlur = 15;
+shadow.shadowColor = 'rgba(0, 0, 0, ${shadowIntensity * 0.5})';` : '// Shadow disabled'}
+
+// Base sphere with radial gradient
+const sphere = new paper.Path.Circle({
+  center: [${position.x}, ${position.y}],
+  radius: ${radius},
+  parent: sphereGroup
+});
+
+// Create radial gradient for 3D effect
+const lightColor = baseColor.clone();
+lightColor.lightness = Math.min(1, lightColor.lightness + 0.3);
+const darkColor = baseColor.clone();
+darkColor.lightness = Math.max(0, darkColor.lightness - 0.3);
+
+sphere.fillColor = {
+  gradient: {
+    stops: [
+      [lightColor.toCSS(true), 0.0],
+      [baseColor.toCSS(true), 0.5],
+      [darkColor.toCSS(true), 1.0]
+    ],
+    radial: true
+  },
+  origin: [${lightX}, ${lightY}],
+  destination: [${position.x + radius * 0.8}, ${position.y + radius * 0.8}]
+};
+
+// Specular highlight (glossy shine)
+const highlight = new paper.Path.Ellipse({
+  center: [${highlightX}, ${highlightY}],
+  size: [${radius * 0.5 * glossiness}, ${radius * 0.25 * glossiness}],
+  fillColor: 'rgba(255, 255, 255, ${glossiness * 0.8})',
+  parent: sphereGroup
+});
+highlight.rotate(${lightDirection === 'top-left' ? -30 : lightDirection === 'top-right' ? 30 : 0});
+
+// Secondary highlight for extra realism
+const secondaryHighlight = new paper.Path.Ellipse({
+  center: [${highlightX - radius * 0.1}, ${highlightY + radius * 0.05}],
+  size: [${radius * 0.2 * glossiness}, ${radius * 0.1 * glossiness}],
+  fillColor: 'rgba(255, 255, 255, ${glossiness * 0.4})',
+  parent: sphereGroup
+});
+
+// Register the group
+const itemId = app.registerItem(sphereGroup, 'glossy-sphere', { source: 'mcp' });
+app.historyManager.saveState();
+
+({ itemId, type: 'glossy-sphere', position: { x: ${position.x}, y: ${position.y} }, radius: ${radius} });
+`.trim();
+  }
+
+  /**
+   * Generate code for creating diagonal stripes pattern
+   */
+  generateCreateDiagonalStripes(input: z.infer<typeof CreateDiagonalStripesInputSchema>): string {
+    const validated = CreateDiagonalStripesInputSchema.parse(input);
+    const { position, width, height, stripeWidth, colors, angle, gap } = validated;
+
+    const colorsJson = JSON.stringify(colors);
+
+    return `
+// Create diagonal stripes pattern
+const stripesGroup = new paper.Group({ parent: app.textItemGroup });
+const colors = ${colorsJson};
+const stripeWidth = ${stripeWidth};
+const gap = ${gap};
+const totalStripeWidth = stripeWidth + gap;
+const angle = ${angle};
+
+// Calculate the diagonal length needed to cover the area
+const diagonalLength = Math.sqrt(${width} * ${width} + ${height} * ${height}) * 1.5;
+const numStripes = Math.ceil(diagonalLength / totalStripeWidth) + 2;
+
+// Create a clipping mask for the stripe area
+const clipRect = new paper.Path.Rectangle({
+  point: [${position.x - width / 2}, ${position.y - height / 2}],
+  size: [${width}, ${height}]
+});
+
+// Create stripes
+for (let i = -numStripes; i < numStripes; i++) {
+  const color = colors[((i % colors.length) + colors.length) % colors.length];
+  const stripe = new paper.Path.Rectangle({
+    point: [${position.x} - diagonalLength / 2 + i * totalStripeWidth, ${position.y} - diagonalLength / 2],
+    size: [stripeWidth, diagonalLength],
+    fillColor: color,
+    parent: stripesGroup
+  });
+}
+
+// Rotate the entire group
+stripesGroup.rotate(angle, [${position.x}, ${position.y}]);
+
+// Apply clipping mask
+const clippedGroup = new paper.Group({
+  children: [clipRect, stripesGroup],
+  clipped: true,
+  parent: app.textItemGroup
+});
+
+// Remove the original group since it's now in the clipped group
+// stripesGroup is already a child of clippedGroup
+
+// Register the clipped group
+const itemId = app.registerItem(clippedGroup, 'diagonal-stripes', { source: 'mcp' });
+app.historyManager.saveState();
+
+({ itemId, type: 'diagonal-stripes', position: { x: ${position.x}, y: ${position.y} }, stripeCount: numStripes * 2 });
 `.trim();
   }
 }

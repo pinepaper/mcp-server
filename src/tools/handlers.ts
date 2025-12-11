@@ -26,6 +26,8 @@ import {
   ExportTrainingDataInputSchema,
   ImportSVGInputSchema,
   AddFilterInputSchema,
+  CreateGlossySphereInputSchema,
+  CreateDiagonalStripesInputSchema,
   ErrorCodes,
   RelationType,
   ItemType,
@@ -286,6 +288,23 @@ export async function handleToolCall(
         const description = getLocalizedSuccessMessage(i18n, 'itemDeleted', {
           itemId: input.itemId,
         });
+        return executeOrGenerate(code, description, options);
+      }
+
+      // -----------------------------------------------------------------------
+      // HIGH-LEVEL DESIGN TOOLS
+      // -----------------------------------------------------------------------
+      case 'pinepaper_create_glossy_sphere': {
+        const input = CreateGlossySphereInputSchema.parse(args);
+        const code = codeGenerator.generateCreateGlossySphere(input);
+        const description = `Creates a 3D glossy sphere with ${input.baseColor} color at (${input.position.x}, ${input.position.y})`;
+        return executeOrGenerate(code, description, options);
+      }
+
+      case 'pinepaper_create_diagonal_stripes': {
+        const input = CreateDiagonalStripesInputSchema.parse(args);
+        const code = codeGenerator.generateCreateDiagonalStripes(input);
+        const description = `Creates diagonal stripes pattern at (${input.position.x}, ${input.position.y}) with ${input.colors.length} colors`;
         return executeOrGenerate(code, description, options);
       }
 
@@ -696,6 +715,8 @@ Browser is ready. You can now use other pinepaper tools to create and animate gr
             'pinepaper_create_item',
             'pinepaper_modify_item',
             'pinepaper_delete_item',
+            'pinepaper_create_glossy_sphere',
+            'pinepaper_create_diagonal_stripes',
             'pinepaper_add_relation',
             'pinepaper_remove_relation',
             'pinepaper_query_relations',

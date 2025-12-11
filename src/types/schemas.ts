@@ -21,7 +21,67 @@ export const PositionSchema = z.object({
 
 export const PointArraySchema = z.tuple([z.number(), z.number()]);
 
-export const ColorSchema = z.string().describe('Color value (hex, rgb, or named color)');
+// =============================================================================
+// GRADIENT SCHEMAS
+// =============================================================================
+
+export const GradientStopSchema = z.object({
+  color: z.string().describe('Color at this stop (hex, rgb, or named color)'),
+  offset: z.number().min(0).max(1).describe('Position along gradient (0-1)'),
+});
+
+export type GradientStop = z.infer<typeof GradientStopSchema>;
+
+export const GradientSchema = z.object({
+  type: z.enum(['linear', 'radial']).describe('Gradient type'),
+  stops: z.array(GradientStopSchema).min(2).describe('Array of color stops (minimum 2)'),
+  origin: PointArraySchema.optional().describe('Gradient start point [x, y] (relative to item or absolute)'),
+  destination: PointArraySchema.optional().describe('Gradient end point [x, y] (relative to item or absolute)'),
+});
+
+export type Gradient = z.infer<typeof GradientSchema>;
+
+// Color can be a simple string OR a gradient object
+export const ColorSchema = z.union([
+  z.string().describe('Solid color value (hex, rgb, or named color)'),
+  GradientSchema,
+]).describe('Color value - either a solid color string or a gradient object');
+
+// Simple color schema for cases where only solid colors are allowed
+export const SolidColorSchema = z.string().describe('Color value (hex, rgb, or named color)');
+
+// =============================================================================
+// SHADOW SCHEMAS
+// =============================================================================
+
+export const ShadowPropertiesSchema = z.object({
+  shadowColor: z.string().optional().describe('Shadow color (hex, rgb, or named color)'),
+  shadowBlur: z.number().optional().describe('Shadow blur radius in pixels'),
+  shadowOffset: PointArraySchema.optional().describe('Shadow offset [x, y] in pixels'),
+});
+
+export type ShadowProperties = z.infer<typeof ShadowPropertiesSchema>;
+
+// =============================================================================
+// BLEND MODE SCHEMA
+// =============================================================================
+
+export const BlendModeSchema = z.enum([
+  'normal',
+  'multiply',
+  'screen',
+  'overlay',
+  'darken',
+  'lighten',
+  'color-dodge',
+  'color-burn',
+  'hard-light',
+  'soft-light',
+  'difference',
+  'exclusion',
+]).describe('Blend mode for compositing with background');
+
+export type BlendMode = z.infer<typeof BlendModeSchema>;
 
 export const EasingSchema = z.enum([
   'linear',
@@ -60,36 +120,54 @@ export const TextPropertiesSchema = z.object({
   fontWeight: z.string().optional().describe('Font weight (normal, bold, etc.)'),
 });
 
+// Base visual properties shared by all shapes (shadow, blend mode, opacity)
+export const BaseVisualPropertiesSchema = z.object({
+  shadowColor: z.string().optional().describe('Shadow color (hex, rgb, or named color)'),
+  shadowBlur: z.number().optional().describe('Shadow blur radius in pixels'),
+  shadowOffset: PointArraySchema.optional().describe('Shadow offset [x, y] in pixels'),
+  blendMode: BlendModeSchema.optional().describe('Blend mode for compositing'),
+  opacity: z.number().min(0).max(1).optional().describe('Opacity (0-1)'),
+});
+
 // Circle properties
 export const CirclePropertiesSchema = z.object({
   radius: z.number().describe('Circle radius in pixels'),
-  color: ColorSchema.optional().describe('Fill color'),
+  color: ColorSchema.optional().describe('Fill color (solid or gradient)'),
   strokeColor: ColorSchema.optional().describe('Stroke color'),
   strokeWidth: z.number().optional().describe('Stroke width in pixels'),
-});
+}).merge(BaseVisualPropertiesSchema);
 
 // Star properties
 export const StarPropertiesSchema = z.object({
   radius1: z.number().describe('Outer radius of star'),
   radius2: z.number().describe('Inner radius of star'),
   points: z.number().optional().default(5).describe('Number of star points'),
-  color: ColorSchema.optional().describe('Fill color'),
-});
+  color: ColorSchema.optional().describe('Fill color (solid or gradient)'),
+}).merge(BaseVisualPropertiesSchema);
 
 // Rectangle properties
 export const RectanglePropertiesSchema = z.object({
   width: z.number().describe('Rectangle width'),
   height: z.number().describe('Rectangle height'),
-  color: ColorSchema.optional().describe('Fill color'),
+  color: ColorSchema.optional().describe('Fill color (solid or gradient)'),
   cornerRadius: z.number().optional().describe('Corner radius for rounded rectangles'),
-});
+}).merge(BaseVisualPropertiesSchema);
 
 // Polygon properties
 export const PolygonPropertiesSchema = z.object({
   sides: z.number().min(3).describe('Number of polygon sides'),
   radius: z.number().describe('Polygon radius'),
-  color: ColorSchema.optional().describe('Fill color'),
-});
+  color: ColorSchema.optional().describe('Fill color (solid or gradient)'),
+}).merge(BaseVisualPropertiesSchema);
+
+// Ellipse properties
+export const EllipsePropertiesSchema = z.object({
+  width: z.number().optional().describe('Ellipse width'),
+  height: z.number().optional().describe('Ellipse height'),
+  color: ColorSchema.optional().describe('Fill color (solid or gradient)'),
+  strokeColor: ColorSchema.optional().describe('Stroke color'),
+  strokeWidth: z.number().optional().describe('Stroke width in pixels'),
+}).merge(BaseVisualPropertiesSchema);
 
 // Path properties
 export const PathPropertiesSchema = z.object({
@@ -97,10 +175,10 @@ export const PathPropertiesSchema = z.object({
   pathData: z.string().optional().describe('SVG path data string'),
   strokeColor: ColorSchema.optional().describe('Stroke color'),
   strokeWidth: z.number().optional().describe('Stroke width'),
-  fillColor: ColorSchema.optional().describe('Fill color'),
+  fillColor: ColorSchema.optional().describe('Fill color (solid or gradient)'),
   closed: z.boolean().optional().describe('Whether to close the path'),
   smooth: z.boolean().optional().describe('Whether to smooth the path'),
-});
+}).merge(BaseVisualPropertiesSchema);
 
 // Line properties
 export const LinePropertiesSchema = z.object({
@@ -108,7 +186,7 @@ export const LinePropertiesSchema = z.object({
   to: PointArraySchema.describe('End point [x, y]'),
   strokeColor: ColorSchema.optional().describe('Line color'),
   strokeWidth: z.number().optional().describe('Line width'),
-});
+}).merge(BaseVisualPropertiesSchema);
 
 // Arc properties
 export const ArcPropertiesSchema = z.object({
@@ -117,7 +195,7 @@ export const ArcPropertiesSchema = z.object({
   to: PointArraySchema.describe('End point [x, y]'),
   strokeColor: ColorSchema.optional().describe('Arc color'),
   strokeWidth: z.number().optional().describe('Arc width'),
-});
+}).merge(BaseVisualPropertiesSchema);
 
 // =============================================================================
 // ANIMATION TYPES
@@ -331,6 +409,46 @@ export const CreateItemInputSchema = z.object({
   properties: z.record(z.unknown()).optional().default({}),
 });
 
+// Light direction for 3D effects
+export const LightDirectionSchema = z.enum([
+  'top-left',
+  'top-right',
+  'top',
+  'left',
+  'right',
+  'bottom-left',
+  'bottom-right',
+  'bottom',
+]).describe('Direction of the light source for 3D effects');
+
+export type LightDirection = z.infer<typeof LightDirectionSchema>;
+
+// Create Glossy Sphere - high-level tool for creating 3D-looking spheres
+export const CreateGlossySphereInputSchema = z.object({
+  position: PositionSchema.optional().default({ x: 400, y: 300 }).describe('Center position of the sphere'),
+  radius: z.number().describe('Sphere radius in pixels'),
+  baseColor: z.string().describe('Main sphere color (hex, rgb, or named color)'),
+  lightDirection: LightDirectionSchema.optional().default('top-left').describe('Direction of the light source'),
+  glossiness: z.number().min(0).max(1).optional().default(0.7).describe('Glossiness/shininess level (0-1)'),
+  castShadow: z.boolean().optional().default(true).describe('Whether to cast a shadow underneath'),
+  shadowIntensity: z.number().min(0).max(1).optional().default(0.3).describe('Shadow darkness (0-1)'),
+});
+
+export type CreateGlossySphereInput = z.infer<typeof CreateGlossySphereInputSchema>;
+
+// Create Diagonal Stripes - high-level tool for creating diagonal stripe patterns
+export const CreateDiagonalStripesInputSchema = z.object({
+  position: PositionSchema.optional().default({ x: 400, y: 300 }).describe('Center position of the stripe area'),
+  width: z.number().describe('Total width of the stripe area'),
+  height: z.number().describe('Total height of the stripe area'),
+  stripeWidth: z.number().optional().default(50).describe('Width of each stripe'),
+  colors: z.array(z.string()).min(2).describe('Array of colors to alternate between'),
+  angle: z.number().optional().default(-45).describe('Rotation angle in degrees (negative = top-right to bottom-left)'),
+  gap: z.number().optional().default(0).describe('Gap between stripes in pixels'),
+});
+
+export type CreateDiagonalStripesInput = z.infer<typeof CreateDiagonalStripesInputSchema>;
+
 // Modify Item
 export const ModifyItemInputSchema = z.object({
   itemId: z.string().describe('Registry ID of the item'),
@@ -412,7 +530,7 @@ export const PlayTimelineInputSchema = z.object({
 
 // Canvas Control
 export const SetBackgroundColorInputSchema = z.object({
-  color: ColorSchema.describe('Background color to set'),
+  color: SolidColorSchema.describe('Background color to set (solid colors only)'),
 });
 
 export const SetCanvasSizeInputSchema = z.object({
