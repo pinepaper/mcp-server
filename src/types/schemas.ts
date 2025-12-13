@@ -638,6 +638,45 @@ export interface ExportTrainingDataResult {
 }
 
 // =============================================================================
+// PERFORMANCE METRICS SCHEMAS
+// =============================================================================
+
+export const GetPerformanceMetricsInputSchema = z.object({
+  toolName: z.string().optional().describe('Filter by tool name'),
+  phase: z.enum(['validation', 'code_generation', 'browser_execution', 'screenshot', 'total']).optional().describe('Filter by execution phase'),
+  since: z.number().optional().describe('Unix timestamp - metrics since this time'),
+  limit: z.number().min(1).max(10000).optional().describe('Maximum number of results'),
+  format: z.enum(['summary', 'detailed', 'csv']).optional().describe('Export format'),
+});
+
+export type GetPerformanceMetricsInput = z.infer<typeof GetPerformanceMetricsInputSchema>;
+
+// =============================================================================
+// ASSET SCHEMAS
+// =============================================================================
+
+export const SearchAssetsInputSchema = z.object({
+  query: z.string().describe('Search term (e.g., "rocket", "heart", "user icon")'),
+  repository: z.enum(['all', 'svgrepo', 'openclipart', 'iconify', 'fontawesome']).optional().describe('Which repository to search (default: all)'),
+  limit: z.number().min(1).max(50).optional().describe('Max results to return (default: 10)'),
+});
+
+export type SearchAssetsInput = z.infer<typeof SearchAssetsInputSchema>;
+
+export const ImportAssetInputSchema = z.object({
+  assetId: z.string().optional().describe('Asset ID from search results (e.g., "svgrepo_12345")'),
+  url: z.string().optional().describe('Direct URL to SVG (alternative to assetId)'),
+  position: z.object({
+    x: z.number(),
+    y: z.number(),
+  }).optional().describe('Position on canvas'),
+  scale: z.number().optional().describe('Scale factor (default: 1.0)'),
+  color: z.string().optional().describe('Override color for monochrome icons'),
+});
+
+export type ImportAssetInput = z.infer<typeof ImportAssetInputSchema>;
+
+// =============================================================================
 // ERROR CODES
 // =============================================================================
 

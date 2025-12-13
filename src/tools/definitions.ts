@@ -12,6 +12,140 @@ import { Tool } from '@modelcontextprotocol/sdk/types.js';
 import { I18nManager } from '../i18n/index.js';
 
 // =============================================================================
+// PLANNING GUIDE FOR AI AGENTS
+// =============================================================================
+/*
+📋 DECISION TREE: Which Tool Should I Use?
+
+1. USER WANTS TO ADD GRAPHICS TO CANVAS:
+   ├─ Simple shapes (circle, star, rectangle, text)
+   │  └─> pinepaper_create_item
+   ├─ Multiple similar items (grid, batch)
+   │  ├─ Positioned in a grid → pinepaper_create_grid
+   │  └─ Custom positions → pinepaper_batch_create
+   ├─ Complex illustrations (witch, cat, person)
+   │  ├─ Search for pre-made asset → pinepaper_search_assets
+   │  ├─ Import found asset → pinepaper_import_asset
+   │  └─ Import from URL → pinepaper_import_svg
+   ├─ Glossy 3D sphere
+   │  └─> pinepaper_create_glossy_sphere
+   └─ Diagonal stripes pattern
+      └─> pinepaper_create_diagonal_stripes
+
+2. USER WANTS ANIMATION/MOVEMENT:
+   ├─ Simple looping animation (pulse, spin, bounce)
+   │  └─> pinepaper_animate
+   ├─ Behavior-based (orbit, follow, attach)
+   │  └─> pinepaper_add_relation
+   ├─ Timed keyframe animation
+   │  └─> pinepaper_keyframe_animate
+   └─ Control playback
+      └─> pinepaper_play_timeline
+
+3. USER WANTS BACKGROUND/DECORATIONS:
+   ├─ Solid color background
+   │  └─> pinepaper_set_background_color
+   ├─ Procedural patterns (sunburst, waves, grid, circuit)
+   │  └─> pinepaper_execute_generator
+   └─ Particle effects (sparkle, blast)
+      └─> pinepaper_apply_effect
+
+4. USER WANTS TO MODIFY EXISTING ITEMS:
+   ├─ Single item change → pinepaper_modify_item
+   ├─ Multiple items at once → pinepaper_batch_modify
+   └─ Delete items → pinepaper_delete_item
+
+5. USER WANTS TO EXPORT:
+   ├─ Animated SVG → pinepaper_export_svg
+   ├─ Training data (LLM fine-tuning) → pinepaper_export_training_data
+   └─ Screenshot → pinepaper_browser_screenshot
+
+🎯 WORKFLOW PLANNING:
+
+BEFORE STARTING ANY SCENE:
+1. Check if canvas has welcome template → Call pinepaper_get_items
+2. If items exist and user wants fresh start → Call pinepaper_clear_canvas
+3. Plan your approach:
+   - Complex character? → Search assets first (pinepaper_search_assets)
+   - Many similar items? → Use batch operations or grid
+   - Background needed? → Set background color or generator early
+
+PERFORMANCE OPTIMIZATION:
+1. Batch operations are ~10x faster:
+   - Creating 10 items: pinepaper_batch_create (300ms) vs 10x pinepaper_create_item (1450ms)
+   - Use pinepaper_create_grid for grid layouts (even faster)
+2. Screenshot mode affects speed:
+   - mode='on_request': Fast, screenshots only when explicitly requested
+   - mode='always': Slower, captures after every operation
+3. Query performance metrics to optimize:
+   - Call pinepaper_get_performance_metrics after workflow
+   - Identify bottlenecks and adjust approach
+
+COMMON PATTERNS:
+
+Pattern: Solar System
+1. pinepaper_clear_canvas
+2. pinepaper_set_background_color (black)
+3. pinepaper_create_item (sun - yellow circle, center)
+4. pinepaper_create_item (earth - blue circle)
+5. pinepaper_create_item (moon - gray circle)
+6. pinepaper_add_relation (earth orbits sun)
+7. pinepaper_add_relation (moon orbits earth)
+8. pinepaper_browser_screenshot
+
+Pattern: Animated Logo
+1. pinepaper_clear_canvas
+2. pinepaper_execute_generator (sunburst background)
+3. pinepaper_create_item (text - brand name)
+4. pinepaper_animate (pulse animation)
+5. pinepaper_apply_effect (sparkle)
+6. pinepaper_export_svg
+
+Pattern: Icon Search and Import
+1. User: "Add a rocket icon"
+2. pinepaper_search_assets (query: "rocket")
+3. Review results, pick best match
+4. pinepaper_import_asset (assetId from results)
+5. pinepaper_modify_item (adjust size/position if needed)
+
+Pattern: Grid of Items
+1. pinepaper_create_grid (rows: 5, cols: 5, spacing: 80)
+   → Creates 25 items instantly in grid layout
+2. pinepaper_batch_modify (change colors/properties of all)
+
+⚠️ COMMON MISTAKES TO AVOID:
+
+1. DON'T take screenshots after every operation
+   - Trust API success responses
+   - Take ONE screenshot at the end
+
+2. DON'T draw complex characters with paths
+   - "Draw a witch" = 20+ path operations (slow, poor results)
+   - Use pinepaper_search_assets instead
+
+3. DON'T forget to save itemIds
+   - Create operations return itemIds
+   - You need these for relations, modifications, deletions
+
+4. DON'T use individual creates for many items
+   - 10+ similar items? Use pinepaper_batch_create or pinepaper_create_grid
+
+5. DON'T assume canvas is empty
+   - Always check with pinepaper_get_items first
+   - Clear welcome template with pinepaper_clear_canvas if needed
+
+📊 PERFORMANCE BASELINES:
+- pinepaper_create_item: ~145ms
+- pinepaper_batch_create (10 items): ~298ms (~30ms per item)
+- pinepaper_create_grid (25 items): ~350ms (~14ms per item)
+- pinepaper_add_relation: ~120ms
+- pinepaper_modify_item: ~100ms
+- pinepaper_browser_screenshot: ~200ms (only in 'always' mode)
+
+Use pinepaper_get_performance_metrics to analyze your actual workflow performance.
+*/
+
+// =============================================================================
 // TOOL DEFINITIONS
 // =============================================================================
 
@@ -1220,6 +1354,236 @@ USE WHEN:
     inputSchema: {
       type: 'object',
       properties: {},
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // PERFORMANCE TOOLS
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_get_performance_metrics',
+    description: `Get execution performance metrics to identify bottlenecks and optimize workflows.
+
+USE WHEN:
+- Analyzing tool performance
+- Debugging slow operations
+- Optimizing complex workflows
+- Identifying performance regressions
+
+RETURNS:
+- Per-tool timing breakdown (validation, code gen, execution, screenshot)
+- Aggregate statistics (avg, p50, p95, p99, min, max)
+- Success rates and error counts
+- Historical metrics (configurable retention)
+
+METRICS TRACKED:
+- Validation: Input parsing and validation time
+- Code Generation: Time to generate PinePaper code
+- Browser Execution: Time to execute code in browser via Puppeteer
+- Screenshot: Time to capture and encode screenshots
+- Total: End-to-end execution time
+
+FORMAT OPTIONS:
+- 'summary': Human-readable summary with slowest tools first
+- 'detailed': Full JSON export of all metrics
+- 'csv': CSV format for spreadsheet analysis
+
+FILTER OPTIONS:
+- toolName: Filter by specific tool (e.g., 'pinepaper_create_item')
+- phase: Filter by execution phase
+- since: Unix timestamp - metrics since this time
+- limit: Maximum number of results
+
+EXAMPLES:
+- Get summary of all metrics: {}
+- Get last 50 create_item operations: {toolName: 'pinepaper_create_item', limit: 50}
+- Get recent slow operations: {since: <timestamp>, format: 'summary'}
+- Export all metrics as CSV: {format: 'csv'}
+
+PERFORMANCE OPTIMIZATION WORKFLOW:
+1. Run your workflow normally
+2. Call pinepaper_get_performance_metrics with format='summary'
+3. Identify slowest operations (sorted by avg duration)
+4. Check if batch operations can be used instead
+5. Verify screenshot mode is 'on_request' for best performance
+6. Re-run and compare metrics
+
+TYPICAL PERFORMANCE BASELINES:
+- Validation: 1-5ms (should be very fast)
+- Code Generation: 5-20ms (depends on complexity)
+- Browser Execution: 30-100ms (depends on operation)
+- Screenshot: 100ms (only if mode='always' or explicit request)
+- Total (without screenshot): 40-125ms
+- Total (with screenshot): 140-225ms
+
+If you see significantly higher numbers, investigate:
+- Network latency (browser connection)
+- Complex operations that could be batched
+- Screenshot mode set to 'always' (change to 'on_request')`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        toolName: {
+          type: 'string',
+          description: 'Filter by tool name (optional)',
+        },
+        phase: {
+          type: 'string',
+          enum: ['validation', 'code_generation', 'browser_execution', 'screenshot', 'total'],
+          description: 'Filter by execution phase (optional)',
+        },
+        since: {
+          type: 'number',
+          description: 'Unix timestamp - metrics since this time (optional)',
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum number of results to return (default: 100)',
+        },
+        format: {
+          type: 'string',
+          enum: ['summary', 'detailed', 'csv'],
+          description: 'Export format (default: summary)',
+        },
+      },
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // ASSET TOOLS
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_search_assets',
+    description: `Search for free SVG assets from open repositories (SVGRepo, OpenClipart, Iconify, FontAwesome).
+
+USE WHEN:
+- User wants icons, illustrations, or clipart
+- Need specific symbols (arrows, hearts, animals, rocket, etc.)
+- Want to avoid manual SVG creation
+- Building UI with standard icons
+- Need graphics that are too complex to draw with paths
+
+REPOSITORIES:
+- SVGRepo: 500,000+ icons, various categories and licenses
+- OpenClipart: 150,000+ public domain clipart
+- Iconify: 200,000+ icon sets (various licenses)
+- Font Awesome: 2,000+ free icons (CC BY 4.0)
+
+WORKFLOW:
+1. Search for assets: pinepaper_search_assets(query: "rocket")
+2. Review results (you'll see assetIds, previews, licenses)
+3. Import chosen asset: pinepaper_import_asset(assetId: "svgrepo_rocket_12345")
+
+IMPORTANT NOTES:
+- Always respect license terms (check license field in results)
+- CC-BY licenses require attribution (metadata is tracked automatically)
+- CC0 (Public Domain) assets have no restrictions
+- Search queries work best with simple, specific terms
+- Results include preview URLs (for user reference) and download URLs
+
+EXAMPLES:
+- "rocket icon" → Returns various rocket SVGs
+- "user avatar" → Returns user/profile icons
+- "arrow" → Returns arrow symbols in various styles
+- "cat" → Returns cat illustrations
+- "heart" → Returns heart shapes and icons
+
+PERFORMANCE:
+- Search is asynchronous and may take 1-2 seconds
+- Results are not cached (fresh search each time)
+- Import caches downloaded SVGs for reuse`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Search term (e.g., "rocket", "heart", "user icon")',
+        },
+        repository: {
+          type: 'string',
+          enum: ['all', 'svgrepo', 'openclipart', 'iconify', 'fontawesome'],
+          description: 'Which repository to search (default: all)',
+        },
+        limit: {
+          type: 'number',
+          description: 'Max results to return (default: 10, max: 50)',
+        },
+      },
+      required: ['query'],
+    },
+  },
+
+  {
+    name: 'pinepaper_import_asset',
+    description: `Import an SVG asset from search results or direct URL onto the canvas.
+
+USE WHEN:
+- After searching with pinepaper_search_assets, import the chosen asset
+- User provides a direct URL to an SVG file
+- Need to add pre-made graphics to the scene
+
+WORKFLOW:
+1. Search: pinepaper_search_assets(query: "rocket")
+2. Choose: Review results, pick one with desired license
+3. Import: pinepaper_import_asset(assetId: "svgrepo_rocket_12345", position: {x: 400, y: 300})
+4. Modify: Use pinepaper_modify_item to adjust size, color, etc.
+5. Animate: Use pinepaper_animate or pinepaper_add_relation for motion
+
+PARAMETERS:
+- assetId: From search results (e.g., "svgrepo_12345")
+- url: Alternative to assetId - direct URL to SVG
+- position: Where to place on canvas (default: center)
+- scale: Size multiplier (default: 1.0)
+- color: Override color for monochrome icons (optional)
+
+LICENSE TRACKING:
+- Asset metadata (including license) is automatically tracked
+- CC-BY licenses will have attribution added to canvas metadata
+- Public domain (CC0) assets have no attribution requirement
+- Check license in search results before importing
+
+CACHING:
+- Downloaded SVGs are cached in memory
+- Re-importing same asset is instant (uses cache)
+- Cache persists for session duration
+- No disk storage (memory only)
+
+EXAMPLES:
+- Import from search: {assetId: "svgrepo_rocket_001", position: {x: 400, y: 300}, scale: 2.0}
+- Import from URL: {url: "https://example.com/icon.svg", position: {x: 500, y: 400}}
+- Import with color override: {assetId: "svgrepo_heart_123", position: {x: 400, y: 300}, color: "#ef4444"}
+
+RETURNS:
+- itemId: ID of the imported SVG group (use for further modifications)
+- metadata: Asset information including license`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        assetId: {
+          type: 'string',
+          description: 'Asset ID from search results (e.g., "svgrepo_12345")',
+        },
+        url: {
+          type: 'string',
+          description: 'Direct URL to SVG (alternative to assetId)',
+        },
+        position: {
+          type: 'object',
+          properties: {
+            x: { type: 'number' },
+            y: { type: 'number' },
+          },
+          description: 'Position on canvas',
+        },
+        scale: {
+          type: 'number',
+          description: 'Scale factor (default: 1.0)',
+        },
+        color: {
+          type: 'string',
+          description: 'Override color for monochrome icons',
+        },
+      },
     },
   },
 ];

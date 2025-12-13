@@ -56,6 +56,54 @@ Open Claude Desktop and try:
 
 ## Features
 
+### 🔍 Asset Search & Import (NEW in v1.3.0)
+
+Search and import free SVG assets from multiple repositories:
+
+```
+"Search for a rocket icon"
+"Import a cat illustration"
+"Add a user avatar icon"
+```
+
+**Supported Repositories:**
+- **SVGRepo**: 500,000+ icons with various licenses
+- **OpenClipart**: 150,000+ public domain clipart (CC0)
+- **Iconify**: 200,000+ icons from multiple icon sets
+- **Font Awesome**: 2,000+ free icons (CC BY 4.0)
+
+**Tools:**
+- `pinepaper_search_assets` - Search across all repositories
+- `pinepaper_import_asset` - Import and place on canvas
+
+### 📊 Performance Metrics (NEW in v1.3.0)
+
+Built-in performance tracking helps Claude optimize workflows:
+
+- Automatic timing for all tool operations
+- Phase breakdown (validation, code generation, execution, screenshots)
+- Export formats: summary, detailed JSON, CSV
+- Self-optimization through `pinepaper_get_performance_metrics`
+
+**Example workflow:**
+```
+1. Run your scene creation workflow
+2. Call pinepaper_get_performance_metrics
+3. Identify bottlenecks (e.g., individual creates vs batch)
+4. Adjust approach and re-run
+```
+
+### 🐛 Enhanced Error Messages (NEW in v1.3.0)
+
+Errors now include canvas context for easier debugging:
+
+- Total item count and types
+- Active relations
+- Recent items created
+- Canvas state at time of error
+
+Makes troubleshooting much faster and more precise.
+
 ### 🎨 Item Creation
 
 Create text, shapes, and custom graphics:
@@ -127,6 +175,11 @@ Outputs pairs like:
 | `pinepaper_create_item` | Create text, shapes, graphics |
 | `pinepaper_modify_item` | Change item properties |
 | `pinepaper_delete_item` | Remove an item |
+| `pinepaper_batch_create` | Create multiple items at once |
+| `pinepaper_batch_modify` | Modify multiple items at once |
+| `pinepaper_create_grid` | Create items in a grid layout |
+| `pinepaper_create_glossy_sphere` | Create 3D glossy sphere effect |
+| `pinepaper_create_diagonal_stripes` | Create diagonal stripe pattern |
 
 ### Relation Tools
 | Tool | Description |
@@ -153,11 +206,18 @@ Outputs pairs like:
 |------|-------------|
 | `pinepaper_apply_effect` | Apply sparkle, blast effects |
 
+### Asset Tools (NEW)
+| Tool | Description |
+|------|-------------|
+| `pinepaper_search_assets` | Search for SVG assets across repositories |
+| `pinepaper_import_asset` | Import asset from search results |
+
 ### Query Tools
 | Tool | Description |
 |------|-------------|
 | `pinepaper_get_items` | Get canvas items |
 | `pinepaper_get_relation_stats` | Relation statistics |
+| `pinepaper_get_performance_metrics` | Get execution timing metrics (NEW) |
 
 ### Canvas Tools
 | Tool | Description |
@@ -366,10 +426,57 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 | `PINEPAPER_DEBUG` | Enable debug logging | `false` |
 | `PINEPAPER_LOG_LEVEL` | Log level (error/warn/info/debug) | `info` |
 | `PINEPAPER_LOCALE` | Language locale code | `en` |
+| `PINEPAPER_METRICS_ENABLED` | Enable performance metrics tracking | `true` |
+| `PINEPAPER_METRICS_RETENTION` | Max metrics to retain in memory | `1000` |
+| `PINEPAPER_SCREENSHOT_MODE` | Screenshot mode (on_request/always/never) | `on_request` |
 
-## API Documentation
+### Performance Metrics
 
-Full API documentation available at:
+PinePaper MCP Server includes built-in performance tracking to help Claude optimize workflows by identifying bottlenecks and choosing faster alternatives.
+
+**Key Features:**
+- ⚡ Automatic timing for all tool operations
+- 📊 Phase breakdown (validation, code generation, browser execution, screenshots)
+- 🎯 Real-time query via `pinepaper_get_performance_metrics` tool
+- 📈 Export formats: summary, JSON, CSV
+- 💾 In-memory storage (resets on restart)
+- 🚀 Minimal overhead (~1ms per operation)
+
+**Quick Example:**
+
+```
+Claude: "Let me check if batch operations are faster"
+→ pinepaper_get_performance_metrics(format: 'summary')
+
+Result:
+  - pinepaper_create_item: avg 145ms
+  - pinepaper_batch_create (10 items): avg 298ms (~30ms per item)
+
+Claude: "I'll use batch_create for the next 20 items"
+```
+
+**Configuration:**
+
+```bash
+# Disable metrics if not needed
+export PINEPAPER_METRICS_ENABLED=false
+
+# Increase retention for long sessions
+export PINEPAPER_METRICS_RETENTION=5000
+```
+
+**Learn More:** See [docs/PERFORMANCE_METRICS.md](docs/PERFORMANCE_METRICS.md) for complete documentation.
+
+## Documentation
+
+### Guides
+
+- **[Workflow Guide](docs/WORKFLOW_GUIDE.md)** - Decision trees, multi-step patterns, performance optimization, and troubleshooting
+- **[Performance Metrics](docs/PERFORMANCE_METRICS.md)** - In-memory metrics system for Claude self-optimization
+- **[PinePaper Reference](docs/CLAUDE_Pinepaper_v1_beta.md)** - Complete PinePaper Studio API reference
+
+### External Documentation
+
 - [PinePaper API Docs](https://pinepaper.studio/docs/api)
 - [MCP Tools Specification](https://pinepaper.studio/docs/mcp)
 
