@@ -550,6 +550,53 @@ export const ExportTrainingDataInputSchema = z.object({
 });
 
 // =============================================================================
+// BATCH OPERATION SCHEMAS
+// =============================================================================
+
+// Single item specification for batch create
+export const BatchCreateItemSchema = z.object({
+  type: ItemTypeSchema.describe('Type of item to create'),
+  params: z.record(z.unknown()).describe('Item-specific parameters (position, properties, etc.)'),
+});
+
+export type BatchCreateItem = z.infer<typeof BatchCreateItemSchema>;
+
+// Batch Create Input
+export const BatchCreateInputSchema = z.object({
+  items: z.array(BatchCreateItemSchema).min(1).describe('Array of items to create'),
+});
+
+export type BatchCreateInput = z.infer<typeof BatchCreateInputSchema>;
+
+// Single modification specification for batch modify
+export const BatchModifyItemSchema = z.object({
+  itemId: z.string().describe('Registry ID of the item to modify'),
+  params: z.record(z.unknown()).describe('Properties to update on this item'),
+});
+
+export type BatchModifyItem = z.infer<typeof BatchModifyItemSchema>;
+
+// Batch Modify Input
+export const BatchModifyInputSchema = z.object({
+  modifications: z.array(BatchModifyItemSchema).min(1).describe('Array of modifications to apply'),
+});
+
+export type BatchModifyInput = z.infer<typeof BatchModifyInputSchema>;
+
+// Create Grid Input - convenience method for creating grids
+export const CreateGridInputSchema = z.object({
+  cols: z.number().optional().default(10).describe('Number of columns'),
+  rows: z.number().optional().default(10).describe('Number of rows'),
+  strokeColor: z.string().optional().default('#888888').describe('Line color'),
+  strokeWidth: z.number().optional().default(1).describe('Line thickness'),
+  animated: z.boolean().optional().default(false).describe('Enable wave animation'),
+  waveSpeed: z.number().optional().default(2).describe('Animation speed'),
+  waveAmplitude: z.number().optional().default(2).describe('Wave intensity in pixels'),
+});
+
+export type CreateGridInput = z.infer<typeof CreateGridInputSchema>;
+
+// =============================================================================
 // TOOL OUTPUT TYPES
 // =============================================================================
 

@@ -24,6 +24,11 @@ import {
   CreateDiagonalStripesInputSchema,
   LightDirection,
   Gradient,
+  BatchCreateInputSchema,
+  BatchModifyInputSchema,
+  CreateGridInputSchema,
+  BatchCreateItem,
+  BatchModifyItem,
 } from './schemas.js';
 import { z } from 'zod';
 
@@ -630,6 +635,86 @@ const formatted = generators.map(g => ({
 `.trim();
 }
 
+/**
+ * Template for batch create - creates multiple items with single history save
+ */
+function generateBatchCreateCode(items: BatchCreateItem[]): string {
+  const itemsJson = JSON.stringify(items, null, 2);
+  return `
+// Batch create ${items.length} items
+const itemSpecs = ${itemsJson};
+const createdItems = app.batchCreate(itemSpecs);
+
+// Return created item IDs and info
+const results = createdItems.map(item => ({
+  itemId: item.data?.registryId || item.id,
+  type: item.className || 'unknown',
+  position: item.position ? { x: item.position.x, y: item.position.y } : null
+}));
+
+({ success: true, items: results, count: results.length });
+`.trim();
+}
+
+/**
+ * Template for batch modify - modifies multiple items with single history save
+ */
+function generateBatchModifyCode(modifications: BatchModifyItem[]): string {
+  const modsJson = JSON.stringify(modifications, null, 2);
+  return `
+// Batch modify ${modifications.length} items
+const modifications = ${modsJson};
+const results = app.batchModify(modifications.map(mod => ({
+  item: mod.itemId,
+  params: mod.params
+})));
+
+// Return modification results
+const formatted = results.map(r => ({
+  itemId: r.item?.data?.registryId || r.itemId,
+  success: r.success,
+  error: r.error || null
+}));
+
+({ success: formatted.every(r => r.success), results: formatted, count: formatted.length });
+`.trim();
+}
+
+/**
+ * Template for create grid - convenience method for creating line grids
+ */
+function generateCreateGridCode(
+  cols: number,
+  rows: number,
+  strokeColor: string,
+  strokeWidth: number,
+  animated: boolean,
+  waveSpeed: number,
+  waveAmplitude: number
+): string {
+  return `
+// Create grid with ${cols} columns and ${rows} rows
+const grid = app.createGrid({
+  cols: ${cols},
+  rows: ${rows},
+  strokeColor: '${strokeColor}',
+  strokeWidth: ${strokeWidth},
+  animated: ${animated},
+  waveSpeed: ${waveSpeed},
+  waveAmplitude: ${waveAmplitude}
+});
+
+// Return grid info
+({
+  success: true,
+  lineCount: grid.lines?.length || 0,
+  groupId: grid.group?.data?.registryId || null,
+  callbackId: grid.callbackId || null,
+  animated: ${animated}
+});
+`.trim();
+}
+
 // =============================================================================
 // CODE GENERATOR CLASS
 // =============================================================================
@@ -1054,6 +1139,38 @@ app.historyManager.saveState();
 
 ({ itemId, type: 'diagonal-stripes', position: { x: ${position.x}, y: ${position.y} }, stripeCount: numStripes * 2 });
 `.trim();
+  }
+
+  /**
+   * Generate code for batch creating multiple items
+   */
+  generateBatchCreate(input: z.infer<typeof BatchCreateInputSchema>): string {
+    const validated = BatchCreateInputSchema.parse(input);
+    return generateBatchCreateCode(validated.items);
+  }
+
+  /**
+   * Generate code for batch modifying multiple items
+   */
+  generateBatchModify(input: z.infer<typeof BatchModifyInputSchema>): string {
+    const validated = BatchModifyInputSchema.parse(input);
+    return generateBatchModifyCode(validated.modifications);
+  }
+
+  /**
+   * Generate code for creating a grid
+   */
+  generateCreateGrid(input: z.infer<typeof CreateGridInputSchema>): string {
+    const validated = CreateGridInputSchema.parse(input);
+    return generateCreateGridCode(
+      validated.cols,
+      validated.rows,
+      validated.strokeColor,
+      validated.strokeWidth,
+      validated.animated,
+      validated.waveSpeed,
+      validated.waveAmplitude
+    );
   }
 }
 

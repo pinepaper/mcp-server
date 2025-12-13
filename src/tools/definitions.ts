@@ -315,6 +315,159 @@ EXAMPLES:
   },
 
   // ---------------------------------------------------------------------------
+  // BATCH OPERATION TOOLS
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_batch_create',
+    description: `Create multiple items at once with a single history save. This is more efficient than creating items one by one.
+
+USE WHEN:
+- Creating many items at once (stars, circles, grid elements, etc.)
+- Setting up a scene with multiple shapes
+- Performance-critical batch creation
+
+ADVANTAGES:
+- Single undo step for all items
+- Better performance (one history save)
+- Cleaner code for related items
+
+EXAMPLE:
+items: [
+  { type: "circle", params: { x: 100, y: 100, radius: 30, color: "#ef4444" } },
+  { type: "circle", params: { x: 200, y: 100, radius: 30, color: "#3b82f6" } },
+  { type: "text", params: { content: "Hello", x: 150, y: 200, fontSize: 24 } }
+]`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        items: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              type: {
+                type: 'string',
+                enum: ['text', 'circle', 'star', 'rectangle', 'triangle', 'polygon', 'ellipse', 'path', 'line', 'arc'],
+                description: 'Type of item to create',
+              },
+              params: {
+                type: 'object',
+                description: 'Item parameters including position (x, y) and properties',
+                additionalProperties: true,
+              },
+            },
+            required: ['type', 'params'],
+          },
+          description: 'Array of items to create',
+        },
+      },
+      required: ['items'],
+    },
+  },
+
+  {
+    name: 'pinepaper_batch_modify',
+    description: `Modify multiple items at once with a single history save. This is more efficient than modifying items one by one.
+
+USE WHEN:
+- Changing properties of many items (e.g., changing all colors, resizing multiple items)
+- Applying the same or different changes to multiple items
+- Performance-critical batch updates
+
+ADVANTAGES:
+- Single undo step for all modifications
+- Better performance (one history save)
+- Atomic operation (all or nothing)
+
+EXAMPLE:
+modifications: [
+  { itemId: "item_1", params: { color: "#ef4444", scale: 1.5 } },
+  { itemId: "item_2", params: { x: 200, y: 300 } },
+  { itemId: "item_3", params: { rotation: 45, opacity: 0.8 } }
+]`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        modifications: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              itemId: {
+                type: 'string',
+                description: 'Registry ID of the item to modify',
+              },
+              params: {
+                type: 'object',
+                description: 'Properties to update on this item',
+                additionalProperties: true,
+              },
+            },
+            required: ['itemId', 'params'],
+          },
+          description: 'Array of modifications to apply',
+        },
+      },
+      required: ['modifications'],
+    },
+  },
+
+  {
+    name: 'pinepaper_create_grid',
+    description: `Create a grid of lines on the canvas. This is a convenience method that handles all coordinate calculations automatically.
+
+USE WHEN:
+- User wants a grid background
+- Creating graph paper style layouts
+- Need evenly spaced lines across canvas
+
+PARAMETERS:
+- cols: Number of columns (default: 10)
+- rows: Number of rows (default: 10)
+- strokeColor: Line color (default: '#888888')
+- strokeWidth: Line thickness (default: 1)
+- animated: Enable wave animation (default: false)
+- waveSpeed: Animation speed if animated (default: 2)
+- waveAmplitude: Wave intensity in pixels (default: 2)
+
+EXAMPLE:
+{ cols: 30, rows: 30, strokeColor: "#444444", strokeWidth: 1, animated: true }`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        cols: {
+          type: 'number',
+          description: 'Number of columns (default: 10)',
+        },
+        rows: {
+          type: 'number',
+          description: 'Number of rows (default: 10)',
+        },
+        strokeColor: {
+          type: 'string',
+          description: 'Line color (default: #888888)',
+        },
+        strokeWidth: {
+          type: 'number',
+          description: 'Line thickness (default: 1)',
+        },
+        animated: {
+          type: 'boolean',
+          description: 'Enable wave animation (default: false)',
+        },
+        waveSpeed: {
+          type: 'number',
+          description: 'Animation speed (default: 2)',
+        },
+        waveAmplitude: {
+          type: 'number',
+          description: 'Wave intensity in pixels (default: 2)',
+        },
+      },
+    },
+  },
+
+  // ---------------------------------------------------------------------------
   // RELATION TOOLS (KEY FOR ANIMATION)
   // ---------------------------------------------------------------------------
   {

@@ -28,6 +28,9 @@ import {
   AddFilterInputSchema,
   CreateGlossySphereInputSchema,
   CreateDiagonalStripesInputSchema,
+  BatchCreateInputSchema,
+  BatchModifyInputSchema,
+  CreateGridInputSchema,
   ErrorCodes,
   RelationType,
   ItemType,
@@ -305,6 +308,30 @@ export async function handleToolCall(
         const input = CreateDiagonalStripesInputSchema.parse(args);
         const code = codeGenerator.generateCreateDiagonalStripes(input);
         const description = `Creates diagonal stripes pattern at (${input.position.x}, ${input.position.y}) with ${input.colors.length} colors`;
+        return executeOrGenerate(code, description, options);
+      }
+
+      // -----------------------------------------------------------------------
+      // BATCH OPERATION TOOLS
+      // -----------------------------------------------------------------------
+      case 'pinepaper_batch_create': {
+        const input = BatchCreateInputSchema.parse(args);
+        const code = codeGenerator.generateBatchCreate(input);
+        const description = `Batch creates ${input.items.length} items with single history save`;
+        return executeOrGenerate(code, description, options);
+      }
+
+      case 'pinepaper_batch_modify': {
+        const input = BatchModifyInputSchema.parse(args);
+        const code = codeGenerator.generateBatchModify(input);
+        const description = `Batch modifies ${input.modifications.length} items with single history save`;
+        return executeOrGenerate(code, description, options);
+      }
+
+      case 'pinepaper_create_grid': {
+        const input = CreateGridInputSchema.parse(args);
+        const code = codeGenerator.generateCreateGrid(input);
+        const description = `Creates a ${input.cols}x${input.rows} grid${input.animated ? ' with wave animation' : ''}`;
         return executeOrGenerate(code, description, options);
       }
 
@@ -717,6 +744,9 @@ Browser is ready. You can now use other pinepaper tools to create and animate gr
             'pinepaper_delete_item',
             'pinepaper_create_glossy_sphere',
             'pinepaper_create_diagonal_stripes',
+            'pinepaper_batch_create',
+            'pinepaper_batch_modify',
+            'pinepaper_create_grid',
             'pinepaper_add_relation',
             'pinepaper_remove_relation',
             'pinepaper_query_relations',

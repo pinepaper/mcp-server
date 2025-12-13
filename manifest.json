@@ -1,7 +1,7 @@
 {
   "manifest_version": "0.3",
   "name": "pinepaper-mcp",
-  "version": "1.0.0",
+  "version": "1.2.2",
   "display_name": "PinePaper Studio",
   "description": "Create animated graphics with AI using PinePaper Studio",
   "long_description": "PinePaper MCP Server enables Claude to create, animate, and export graphics through PinePaper Studio. Features include shape creation, relation-based animations (orbits, follows, attached_to), procedural generators, visual effects, and SVG export with animations.",
@@ -43,6 +43,26 @@
     {
       "name": "pinepaper_delete_item",
       "description": "Remove an item from the canvas"
+    },
+    {
+      "name": "pinepaper_create_glossy_sphere",
+      "description": "Create a 3D-looking glossy sphere with lighting effects"
+    },
+    {
+      "name": "pinepaper_create_diagonal_stripes",
+      "description": "Create a diagonal stripe pattern"
+    },
+    {
+      "name": "pinepaper_batch_create",
+      "description": "Create multiple items at once with single history save"
+    },
+    {
+      "name": "pinepaper_batch_modify",
+      "description": "Modify multiple items at once with single history save"
+    },
+    {
+      "name": "pinepaper_create_grid",
+      "description": "Create a grid of lines on the canvas"
     },
     {
       "name": "pinepaper_add_relation",
@@ -107,6 +127,14 @@
     {
       "name": "pinepaper_refresh_page",
       "description": "Refresh the PinePaper page"
+    },
+    {
+      "name": "pinepaper_import_svg",
+      "description": "Import SVG content onto the canvas"
+    },
+    {
+      "name": "pinepaper_add_filter",
+      "description": "Add a visual filter effect to the canvas"
     },
     {
       "name": "pinepaper_export_svg",
