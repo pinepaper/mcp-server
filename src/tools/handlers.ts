@@ -34,6 +34,7 @@ import {
   GetPerformanceMetricsInputSchema,
   SearchAssetsInputSchema,
   ImportAssetInputSchema,
+  P5DrawInputSchema,
   ErrorCodes,
   RelationType,
   ItemType,
@@ -1042,6 +1043,16 @@ Browser is ready. You can now use other pinepaper tools to create and animate gr
             { assetId: input.assetId, url: input.url }
           );
         }
+      }
+
+      // -----------------------------------------------------------------------
+      // P5.JS COMPATIBILITY
+      // -----------------------------------------------------------------------
+      case 'pinepaper_p5_draw': {
+        const input = P5DrawInputSchema.parse(args);
+        const code = codeGenerator.generateP5Draw(input.code);
+        const description = 'Executed p5.js-style drawing code';
+        return executeOrGenerate(code, description, options, 'pinepaper_p5_draw');
       }
 
       // -----------------------------------------------------------------------

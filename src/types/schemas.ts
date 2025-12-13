@@ -677,6 +677,16 @@ export const ImportAssetInputSchema = z.object({
 export type ImportAssetInput = z.infer<typeof ImportAssetInputSchema>;
 
 // =============================================================================
+// P5.JS COMPATIBILITY
+// =============================================================================
+
+export const P5DrawInputSchema = z.object({
+  code: z.string().describe('p5.js-style drawing code to execute'),
+});
+
+export type P5DrawInput = z.infer<typeof P5DrawInputSchema>;
+
+// =============================================================================
 // ERROR CODES
 // =============================================================================
 

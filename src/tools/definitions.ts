@@ -1586,6 +1586,123 @@ RETURNS:
       },
     },
   },
+
+  // ---------------------------------------------------------------------------
+  // P5.JS COMPATIBILITY
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_p5_draw',
+    description: `Execute p5.js-style drawing code on the PinePaper canvas.
+
+Claude can use familiar p5.js syntax - the code is translated to Paper.js automatically.
+This is a SUBSET of p5.js functions optimized for static drawings.
+
+AVAILABLE FUNCTIONS:
+
+Shapes:
+- circle(x, y, diameter) - Draw a circle (note: uses diameter, not radius)
+- ellipse(x, y, width, [height]) - Draw an ellipse
+- rect(x, y, width, height, [cornerRadius]) - Draw a rectangle
+- line(x1, y1, x2, y2) - Draw a line between two points
+- triangle(x1, y1, x2, y2, x3, y3) - Draw a triangle
+- quad(x1, y1, x2, y2, x3, y3, x4, y4) - Draw a quadrilateral
+- arc(x, y, width, height, startAngle, stopAngle) - Draw an arc (angles in radians)
+- point(x, y) - Draw a single point
+
+Style:
+- fill(r, g, b) or fill(gray) or fill('#hex') - Set fill color for subsequent shapes
+- noFill() - Disable fill for subsequent shapes
+- stroke(r, g, b) or stroke('#hex') - Set stroke color
+- noStroke() - Disable stroke
+- strokeWeight(weight) - Set stroke width in pixels
+- background(r, g, b) or background('#hex') - Set canvas background color
+
+Math:
+- random(min, max) or random(max) - Random number in range
+- map(value, start1, stop1, start2, stop2) - Re-map a number from one range to another
+- constrain(value, min, max) - Limit a value to a range
+- dist(x1, y1, x2, y2) - Calculate distance between two points
+- lerp(start, stop, amount) - Linear interpolation between two values
+- radians(degrees) - Convert degrees to radians
+- degrees(radians) - Convert radians to degrees
+
+Canvas Properties:
+- width - Canvas width in pixels
+- height - Canvas height in pixels
+
+Mode Functions:
+- rectMode(CENTER|CORNER) - Set rectangle positioning mode
+- ellipseMode(CENTER|CORNER) - Set ellipse positioning mode
+
+Constants:
+- PI, TWO_PI, HALF_PI, QUARTER_PI - Math constants
+- CENTER, CORNER - Mode constants
+
+NOT SUPPORTED (use native PinePaper tools instead):
+- setup()/draw() animation loop - Use pinepaper_animate or pinepaper_add_relation
+- noise() - Perlin noise not available
+- text() - Use pinepaper_create_item with type: 'text'
+- loadImage()/image() - Use pinepaper_import_svg
+- push()/pop()/translate()/rotate()/scale() - Use pinepaper_modify_item
+- beginShape()/vertex()/endShape() - Use pinepaper_create_item with type: 'path'
+
+USAGE:
+- Code runs directly - NO setup() or draw() wrapper needed
+- Items created are automatically registered with PinePaper's ItemRegistry
+- All items are selectable, animatable, and exportable
+- State (fill, stroke) persists between calls within the same code block
+
+EXAMPLE - Random Circles:
+\`\`\`
+background(30);
+noStroke();
+for (let i = 0; i < 20; i++) {
+  fill(random(255), random(255), random(255));
+  circle(random(width), random(height), random(20, 80));
+}
+\`\`\`
+
+EXAMPLE - Gradient Grid:
+\`\`\`
+background(20);
+noStroke();
+const cols = 10;
+const rows = 10;
+const cellW = width / cols;
+const cellH = height / rows;
+for (let i = 0; i < cols; i++) {
+  for (let j = 0; j < rows; j++) {
+    const r = map(i, 0, cols, 50, 255);
+    const b = map(j, 0, rows, 50, 255);
+    fill(r, 100, b);
+    rect(i * cellW, j * cellH, cellW - 2, cellH - 2);
+  }
+}
+\`\`\`
+
+EXAMPLE - Concentric Circles:
+\`\`\`
+background(240);
+noFill();
+strokeWeight(2);
+const centerX = width / 2;
+const centerY = height / 2;
+for (let i = 10; i > 0; i--) {
+  stroke(map(i, 0, 10, 0, 200), 50, map(i, 0, 10, 200, 50));
+  circle(centerX, centerY, i * 50);
+}
+\`\`\``,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        code: {
+          type: 'string',
+          description: 'p5.js-style drawing code to execute',
+        },
+      },
+      required: ['code'],
+    },
+  },
 ];
 
 /**

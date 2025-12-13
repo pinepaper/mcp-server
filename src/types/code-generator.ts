@@ -1172,6 +1172,15 @@ app.historyManager.saveState();
       validated.waveAmplitude
     );
   }
+
+  /**
+   * Generate code for executing p5.js-style drawing code
+   */
+  generateP5Draw(code: string): string {
+    // Import the p5 helpers generator
+    const { generateP5DrawCode } = require('../tools/p5-compat/p5-helpers.js');
+    return generateP5DrawCode(code);
+  }
 }
 
 // Export singleton instance
