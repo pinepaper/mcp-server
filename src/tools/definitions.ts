@@ -448,6 +448,157 @@ EXAMPLES:
     },
   },
 
+  {
+    name: 'pinepaper_create_scene',
+    description: `Create a complete scene with multiple items, relations, and animations in a single operation. This is the MOST EFFICIENT way to create complex animated scenes.
+
+USE WHEN:
+- Creating a solar system, bouncing balls, or any multi-item animated scene
+- User describes a scene with multiple related elements
+- Performance is important (reduces 4+ tool calls to 1)
+- Setting up multiple items that will interact with each other
+
+ADVANTAGES:
+- 4-8x faster than calling individual tools
+- Single undo step for entire scene
+- Automatic name-to-ID mapping for relations
+- Cleaner, more atomic scene creation
+
+HOW IT WORKS:
+1. Define items with "name" references (e.g., "sun", "earth", "moon")
+2. Define relations using those names (e.g., source: "earth", target: "sun")
+3. Define animations using names (e.g., target: "sun", type: "pulse")
+4. The server creates all items, then establishes relations and animations
+
+EXAMPLE - Solar System:
+{
+  "backgroundColor": "#0a0a0a",
+  "items": [
+    { "name": "sun", "itemType": "circle", "position": {"x": 400, "y": 300}, "properties": {"radius": 50, "color": "#fbbf24"} },
+    { "name": "earth", "itemType": "circle", "position": {"x": 550, "y": 300}, "properties": {"radius": 20, "color": "#3b82f6"} },
+    { "name": "moon", "itemType": "circle", "position": {"x": 590, "y": 300}, "properties": {"radius": 8, "color": "#9ca3af"} }
+  ],
+  "relations": [
+    { "source": "earth", "target": "sun", "type": "orbits", "params": {"radius": 150, "speed": 0.5} },
+    { "source": "moon", "target": "earth", "type": "orbits", "params": {"radius": 40, "speed": 1.5} }
+  ],
+  "animations": [
+    { "target": "sun", "type": "pulse", "speed": 0.3 }
+  ]
+}
+
+EXAMPLE - Bouncing Balls:
+{
+  "backgroundColor": "#1e293b",
+  "items": [
+    { "name": "ball1", "itemType": "circle", "position": {"x": 200, "y": 300}, "properties": {"radius": 30, "color": "#ef4444"} },
+    { "name": "ball2", "itemType": "circle", "position": {"x": 400, "y": 300}, "properties": {"radius": 30, "color": "#22c55e"} },
+    { "name": "ball3", "itemType": "circle", "position": {"x": 600, "y": 300}, "properties": {"radius": 30, "color": "#3b82f6"} }
+  ],
+  "animations": [
+    { "target": "ball1", "type": "bounce", "speed": 1.0 },
+    { "target": "ball2", "type": "bounce", "speed": 0.8 },
+    { "target": "ball3", "type": "bounce", "speed": 1.2 }
+  ]
+}
+
+SUPPORTED ITEM TYPES: text, circle, star, rectangle, triangle, polygon, ellipse, path, line, arc
+SUPPORTED RELATIONS: orbits, follows, attached_to, maintains_distance, points_at, mirrors, parallax, bounds_to
+SUPPORTED ANIMATIONS: pulse, rotate, bounce, fade, wobble, slide, typewriter`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        items: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              name: {
+                type: 'string',
+                description: 'Reference name for this item (used in relations/animations)',
+              },
+              itemType: {
+                type: 'string',
+                enum: ['text', 'circle', 'star', 'rectangle', 'triangle', 'polygon', 'ellipse', 'path', 'line', 'arc'],
+                description: 'Type of item to create',
+              },
+              position: {
+                type: 'object',
+                properties: {
+                  x: { type: 'number' },
+                  y: { type: 'number' },
+                },
+                description: 'Position on canvas',
+              },
+              properties: {
+                type: 'object',
+                description: 'Item-specific properties (color, radius, content, etc.)',
+                additionalProperties: true,
+              },
+            },
+            required: ['name', 'itemType'],
+          },
+          description: 'Array of items to create with reference names',
+        },
+        relations: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              source: { type: 'string', description: 'Name of source item' },
+              target: { type: 'string', description: 'Name of target item' },
+              type: {
+                type: 'string',
+                enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to'],
+              },
+              params: {
+                type: 'object',
+                description: 'Relation parameters (radius, speed, distance, etc.)',
+                additionalProperties: true,
+              },
+            },
+            required: ['source', 'target', 'type'],
+          },
+          description: 'Relations between items',
+        },
+        animations: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              target: { type: 'string', description: 'Name of item to animate' },
+              type: {
+                type: 'string',
+                enum: ['pulse', 'rotate', 'bounce', 'fade', 'wobble', 'slide', 'typewriter'],
+              },
+              speed: { type: 'number', description: 'Animation speed (default: 1.0)' },
+              params: {
+                type: 'object',
+                description: 'Animation-specific parameters',
+                additionalProperties: true,
+              },
+            },
+            required: ['target', 'type'],
+          },
+          description: 'Animations to apply to items',
+        },
+        backgroundColor: {
+          type: 'string',
+          description: 'Background color for the scene (hex, rgb, or named)',
+        },
+        backgroundGenerator: {
+          type: 'string',
+          description: 'Name of generator to use for background (e.g., "drawSunburst")',
+        },
+        clearFirst: {
+          type: 'boolean',
+          description: 'Clear canvas before creating scene (default: true)',
+        },
+      },
+      required: ['items'],
+    },
+  },
+
   // ---------------------------------------------------------------------------
   // BATCH OPERATION TOOLS
   // ---------------------------------------------------------------------------

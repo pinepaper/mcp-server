@@ -31,6 +31,7 @@ import {
   BatchCreateInputSchema,
   BatchModifyInputSchema,
   CreateGridInputSchema,
+  CreateSceneInputSchema,
   GetPerformanceMetricsInputSchema,
   SearchAssetsInputSchema,
   ImportAssetInputSchema,
@@ -471,6 +472,16 @@ export async function handleToolCall(
         const code = codeGenerator.generateCreateDiagonalStripes(input);
         const description = `Creates diagonal stripes pattern at (${input.position.x}, ${input.position.y}) with ${input.colors.length} colors`;
         return executeOrGenerate(code, description, options, 'pinepaper_create_diagonal_stripes');
+      }
+
+      case 'pinepaper_create_scene': {
+        const input = CreateSceneInputSchema.parse(args);
+        const code = codeGenerator.generateCreateScene(input);
+        const itemCount = input.items.length;
+        const relationCount = input.relations?.length || 0;
+        const animationCount = input.animations?.length || 0;
+        const description = `Creates complete scene with ${itemCount} items, ${relationCount} relations, ${animationCount} animations`;
+        return executeOrGenerate(code, description, options, 'pinepaper_create_scene');
       }
 
       // -----------------------------------------------------------------------
