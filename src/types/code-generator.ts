@@ -29,6 +29,8 @@ import {
   CreateGridInputSchema,
   BatchCreateItem,
   BatchModifyItem,
+  CreateSceneInputSchema,
+  CreateSceneInput,
 } from './schemas.js';
 import { z } from 'zod';
 
@@ -1180,6 +1182,196 @@ app.historyManager.saveState();
     // Import the p5 helpers generator
     const { generateP5DrawCode } = require('../tools/p5-compat/p5-helpers.js');
     return generateP5DrawCode(code);
+  }
+
+  /**
+   * Generate code for creating a complete scene with items, relations, and animations
+   */
+  generateCreateScene(input: CreateSceneInput): string {
+    const validated = CreateSceneInputSchema.parse(input);
+    const {
+      items,
+      relations = [],
+      animations = [],
+      backgroundColor,
+      backgroundGenerator,
+      clearFirst = true,
+    } = validated;
+
+    const codeParts: string[] = [];
+
+    // Start with a comment
+    codeParts.push('// Create complete scene');
+    codeParts.push('const nameToId = {};');
+    codeParts.push('const results = { items: [], relations: [], animations: [] };');
+
+    // Clear canvas if requested
+    if (clearFirst) {
+      codeParts.push(`
+// Clear canvas
+(function() {
+  const items = app.itemRegistry.getAll();
+  items.forEach(item => {
+    try { item.remove(); } catch(e) {}
+  });
+  app.itemRegistry.clear();
+})();
+`);
+    }
+
+    // Set background color if provided
+    if (backgroundColor) {
+      codeParts.push(`
+// Set background color
+paper.project.activeLayer.children.forEach(c => {
+  if (c.name === 'background') c.remove();
+});
+const bg = new paper.Path.Rectangle({
+  point: [0, 0],
+  size: [paper.view.size.width, paper.view.size.height],
+  fillColor: '${backgroundColor}',
+  name: 'background'
+});
+bg.sendToBack();
+`);
+    }
+
+    // Execute background generator if provided
+    if (backgroundGenerator) {
+      codeParts.push(`
+// Execute background generator
+if (typeof app.generators !== 'undefined' && app.generators['${backgroundGenerator}']) {
+  app.generators['${backgroundGenerator}']();
+}
+`);
+    }
+
+    // Create all items
+    for (const item of items) {
+      const { name, itemType, position = { x: 400, y: 300 }, properties = {} } = item;
+
+      // Build properties string
+      const propsEntries = Object.entries(properties)
+        .map(([key, value]) => `${key}: ${JSON.stringify(value)}`)
+        .join(', ');
+
+      const propsStr = propsEntries ? `, ${propsEntries}` : '';
+
+      codeParts.push(`
+// Create item: ${name}
+(function() {
+  const itemParams = {
+    type: '${itemType}',
+    position: { x: ${position.x}, y: ${position.y} }${propsStr}
+  };
+
+  let item;
+  switch ('${itemType}') {
+    case 'circle':
+      item = new paper.Path.Circle({
+        center: [${position.x}, ${position.y}],
+        radius: ${properties.radius || 50},
+        fillColor: '${properties.color || properties.fillColor || '#3b82f6'}',
+        parent: app.textItemGroup
+      });
+      break;
+    case 'rectangle':
+      item = new paper.Path.Rectangle({
+        point: [${position.x - ((properties.width as number) || 100) / 2}, ${position.y - ((properties.height as number) || 60) / 2}],
+        size: [${properties.width || 100}, ${properties.height || 60}],
+        fillColor: '${properties.color || properties.fillColor || '#3b82f6'}',
+        parent: app.textItemGroup
+      });
+      break;
+    case 'star':
+      item = new paper.Path.Star({
+        center: [${position.x}, ${position.y}],
+        points: ${properties.points || 5},
+        radius1: ${properties.radius1 || 40},
+        radius2: ${properties.radius2 || 20},
+        fillColor: '${properties.color || properties.fillColor || '#fbbf24'}',
+        parent: app.textItemGroup
+      });
+      break;
+    case 'text':
+      item = new paper.PointText({
+        point: [${position.x}, ${position.y}],
+        content: '${properties.content || 'Text'}',
+        fontSize: ${properties.fontSize || 24},
+        fillColor: '${properties.color || properties.fillColor || '#ffffff'}',
+        fontFamily: '${properties.fontFamily || 'Inter'}',
+        justification: 'center',
+        parent: app.textItemGroup
+      });
+      break;
+    default:
+      item = new paper.Path.Circle({
+        center: [${position.x}, ${position.y}],
+        radius: 30,
+        fillColor: '${properties.color || properties.fillColor || '#3b82f6'}',
+        parent: app.textItemGroup
+      });
+  }
+
+  const itemId = app.registerItem(item, '${name}', { source: 'mcp-scene' });
+  nameToId['${name}'] = itemId;
+  results.items.push({ name: '${name}', itemId, type: '${itemType}' });
+})();
+`);
+    }
+
+    // Establish relations
+    for (const relation of relations) {
+      const { source, target, type, params = {} } = relation;
+      const paramsStr = JSON.stringify(params);
+
+      codeParts.push(`
+// Add relation: ${source} ${type} ${target}
+(function() {
+  const sourceId = nameToId['${source}'];
+  const targetId = nameToId['${target}'];
+  if (sourceId && targetId) {
+    const sourceItem = app.itemRegistry.get(sourceId);
+    const targetItem = app.itemRegistry.get(targetId);
+    if (sourceItem && targetItem) {
+      const params = ${paramsStr};
+      app.relationManager.addRelation(sourceItem, targetItem, '${type}', params);
+      results.relations.push({ source: '${source}', target: '${target}', type: '${type}' });
+    }
+  }
+})();
+`);
+    }
+
+    // Apply animations
+    for (const animation of animations) {
+      const { target, type, speed = 1.0, params = {} } = animation;
+      const paramsStr = JSON.stringify({ ...params, speed });
+
+      codeParts.push(`
+// Apply animation: ${type} to ${target}
+(function() {
+  const targetId = nameToId['${target}'];
+  if (targetId) {
+    const targetItem = app.itemRegistry.get(targetId);
+    if (targetItem) {
+      const params = ${paramsStr};
+      app.animationManager.addAnimation(targetItem, '${type}', params);
+      results.animations.push({ target: '${target}', type: '${type}' });
+    }
+  }
+})();
+`);
+    }
+
+    // Save history and return results
+    codeParts.push(`
+// Save history and return results
+app.historyManager.saveState();
+results;
+`);
+
+    return codeParts.join('\n');
   }
 }
 

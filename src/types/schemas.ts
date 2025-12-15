@@ -687,6 +687,67 @@ export const P5DrawInputSchema = z.object({
 export type P5DrawInput = z.infer<typeof P5DrawInputSchema>;
 
 // =============================================================================
+// COMPOSITE SCENE SCHEMA
+// =============================================================================
+
+/**
+ * Composite scene creation - create multiple items, relations, and animations
+ * in a single operation. This is the most efficient way to create complex scenes.
+ */
+export const SceneItemSchema = z.object({
+  /** Temporary ID for referencing in relations (e.g., "sun", "earth") */
+  name: z.string().describe('Reference name for this item (used in relations)'),
+  /** Item type to create */
+  itemType: z.enum(['text', 'circle', 'star', 'rectangle', 'triangle', 'polygon', 'ellipse', 'path', 'line', 'arc']),
+  /** Position on canvas */
+  position: PositionSchema.optional(),
+  /** Item-specific properties */
+  properties: z.record(z.unknown()).optional().describe('Type-specific properties (color, radius, content, etc.)'),
+});
+
+export const SceneRelationSchema = z.object({
+  /** Reference name of the source item */
+  source: z.string().describe('Name of the item that will be animated'),
+  /** Reference name of the target item */
+  target: z.string().describe('Name of the item to relate to'),
+  /** Type of relation */
+  type: z.enum(['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to']),
+  /** Relation-specific parameters */
+  params: z.record(z.unknown()).optional().describe('Relation parameters (radius, speed, distance, etc.)'),
+});
+
+export const SceneAnimationSchema = z.object({
+  /** Reference name of the item to animate */
+  target: z.string().describe('Name of the item to animate'),
+  /** Type of animation */
+  type: z.enum(['pulse', 'rotate', 'bounce', 'fade', 'wobble', 'slide', 'typewriter']),
+  /** Animation speed (default: 1.0) */
+  speed: z.number().optional(),
+  /** Animation parameters */
+  params: z.record(z.unknown()).optional().describe('Animation-specific parameters'),
+});
+
+export const CreateSceneInputSchema = z.object({
+  /** Items to create in the scene */
+  items: z.array(SceneItemSchema).describe('Array of items to create'),
+  /** Relations between items */
+  relations: z.array(SceneRelationSchema).optional().describe('Array of relations to establish'),
+  /** Animations to apply */
+  animations: z.array(SceneAnimationSchema).optional().describe('Array of animations to apply'),
+  /** Background color (hex, rgb, or named) */
+  backgroundColor: z.string().optional().describe('Background color for the scene'),
+  /** Background generator to use */
+  backgroundGenerator: z.string().optional().describe('Name of generator to use for background'),
+  /** Whether to clear canvas first (default: true) */
+  clearFirst: z.boolean().optional().describe('Clear canvas before creating scene (default: true)'),
+});
+
+export type SceneItem = z.infer<typeof SceneItemSchema>;
+export type SceneRelation = z.infer<typeof SceneRelationSchema>;
+export type SceneAnimation = z.infer<typeof SceneAnimationSchema>;
+export type CreateSceneInput = z.infer<typeof CreateSceneInputSchema>;
+
+// =============================================================================
 // ERROR CODES
 // =============================================================================
 
