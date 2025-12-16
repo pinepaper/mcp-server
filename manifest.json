@@ -1,7 +1,7 @@
 {
   "manifest_version": "0.3",
   "name": "pinepaper-mcp",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "display_name": "PinePaper Studio",
   "description": "Create animated graphics with AI using PinePaper Studio",
   "long_description": "PinePaper MCP Server enables Claude to create, animate, and export graphics through PinePaper Studio. Features include shape creation, relation-based animations (orbits, follows, attached_to), procedural generators, visual effects, SVG export with animations, asset search & import from 4 open repositories (500k+ icons), performance metrics tracking, and enhanced error messages with canvas context.",
@@ -15,6 +15,7 @@
   },
   "homepage": "https://pinepaper.studio",
   "license": "MIT",
+  "privacy_policy": "https://pinepaper.studio/privacy-policy",
   "keywords": [
     "animation",
     "graphics",

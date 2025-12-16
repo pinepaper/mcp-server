@@ -155,6 +155,13 @@ export const PINEPAPER_TOOLS: Tool[] = [
   // ---------------------------------------------------------------------------
   {
     name: 'pinepaper_create_item',
+    annotations: {
+      title: 'Create Item',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
     description: `Create an item on the PinePaper canvas. Returns an itemId (e.g., "item_1") that you MUST save to reference this item later.
 
 USE WHEN:
@@ -238,6 +245,13 @@ For glossy 3D spheres, use pinepaper_create_glossy_sphere instead. For diagonal 
 
   {
     name: 'pinepaper_modify_item',
+    annotations: {
+      title: 'Modify Item',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
     description: `Modify an existing item's properties.
 
 USE WHEN:
@@ -282,6 +296,13 @@ GRADIENT OBJECT FORMAT:
 
   {
     name: 'pinepaper_delete_item',
+    annotations: {
+      title: 'Delete Item',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
     description: `Delete a single item from the canvas by its registry ID.
 
 USE WHEN:
@@ -318,6 +339,13 @@ Use pinepaper_clear_canvas instead of deleting items one by one.`,
   // ---------------------------------------------------------------------------
   {
     name: 'pinepaper_create_glossy_sphere',
+    annotations: {
+      title: 'Create Glossy Sphere',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
     description: `Create a 3D-looking glossy sphere with realistic lighting effects. This is a HIGH-LEVEL tool that creates a complete glossy sphere with radial gradient, specular highlights, and optional shadow - all in one operation.
 
 USE WHEN:
@@ -385,6 +413,13 @@ EXAMPLES:
 
   {
     name: 'pinepaper_create_diagonal_stripes',
+    annotations: {
+      title: 'Create Diagonal Stripes',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
     description: `Create a diagonal stripe pattern. This is a HIGH-LEVEL tool that creates multiple stripes at an angle with automatic clipping to a rectangular area.
 
 USE WHEN:
@@ -450,6 +485,13 @@ EXAMPLES:
 
   {
     name: 'pinepaper_create_scene',
+    annotations: {
+      title: 'Create Scene',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
     description: `Create a complete scene with multiple items, relations, and animations in a single operation. This is the MOST EFFICIENT way to create complex animated scenes.
 
 USE WHEN:
@@ -604,6 +646,13 @@ SUPPORTED ANIMATIONS: pulse, rotate, bounce, fade, wobble, slide, typewriter`,
   // ---------------------------------------------------------------------------
   {
     name: 'pinepaper_batch_create',
+    annotations: {
+      title: 'Batch Create Items',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
     description: `Create multiple items at once with a single history save. This is more efficient than creating items one by one.
 
 USE WHEN:
@@ -652,6 +701,13 @@ items: [
 
   {
     name: 'pinepaper_batch_modify',
+    annotations: {
+      title: 'Batch Modify Items',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
     description: `Modify multiple items at once with a single history save. This is more efficient than modifying items one by one.
 
 USE WHEN:
@@ -699,6 +755,13 @@ modifications: [
 
   {
     name: 'pinepaper_create_grid',
+    annotations: {
+      title: 'Create Grid',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
     description: `Create a grid of lines on the canvas. This is a convenience method that handles all coordinate calculations automatically.
 
 USE WHEN:
@@ -757,6 +820,13 @@ EXAMPLE:
   // ---------------------------------------------------------------------------
   {
     name: 'pinepaper_add_relation',
+    annotations: {
+      title: 'Add Relation',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
     description: `Create a behavior relationship between two items. Relations are the PRIMARY way to add animation in PinePaper - they describe HOW items should behave relative to each other.
 
 USE WHEN:
@@ -815,6 +885,13 @@ Relations are COMPOSITIONAL - an item can have multiple relations that work toge
 
   {
     name: 'pinepaper_remove_relation',
+    annotations: {
+      title: 'Remove Relation',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
     description: `Remove a relationship between items.
 
 USE WHEN:
@@ -838,6 +915,13 @@ USE WHEN:
 
   {
     name: 'pinepaper_query_relations',
+    annotations: {
+      title: 'Query Relations',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
     description: `Query relationships for an item.
 
 USE WHEN:
@@ -868,6 +952,13 @@ USE WHEN:
   // ---------------------------------------------------------------------------
   {
     name: 'pinepaper_animate',
+    annotations: {
+      title: 'Animate Item',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
     description: `Apply a simple LOOP animation to an item. These are continuous animations that repeat infinitely.
 
 USE WHEN:
@@ -912,6 +1003,13 @@ ANIMATION TYPES:
 
   {
     name: 'pinepaper_keyframe_animate',
+    annotations: {
+      title: 'Keyframe Animation',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
     description: `Apply keyframe-based animation with precise timing and property control.
 
 USE WHEN:
@@ -978,6 +1076,13 @@ EASING OPTIONS:
 
   {
     name: 'pinepaper_play_timeline',
+    annotations: {
+      title: 'Play Timeline',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
     description: `Control keyframe animation playback.
 
 USE WHEN:
@@ -1014,6 +1119,13 @@ USE WHEN:
   // ---------------------------------------------------------------------------
   {
     name: 'pinepaper_execute_generator',
+    annotations: {
+      title: 'Execute Generator',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
     description: `Execute a background generator to create procedural patterns.
 
 USE WHEN:
@@ -1051,6 +1163,13 @@ GENERATORS:
 
   {
     name: 'pinepaper_list_generators',
+    annotations: {
+      title: 'List Generators',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
     description: `Get a list of all available background generators with their parameters.
 
 USE WHEN:
@@ -1068,6 +1187,13 @@ USE WHEN:
   // ---------------------------------------------------------------------------
   {
     name: 'pinepaper_apply_effect',
+    annotations: {
+      title: 'Apply Effect',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
     description: `Apply a visual effect to an item.
 
 USE WHEN:
@@ -1102,6 +1228,13 @@ EFFECTS:
   // ---------------------------------------------------------------------------
   {
     name: 'pinepaper_get_items',
+    annotations: {
+      title: 'Get Items',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
     description: `Get all or filtered items from the canvas.
 
 USE WHEN:
@@ -1141,6 +1274,13 @@ USE WHEN:
 
   {
     name: 'pinepaper_get_relation_stats',
+    annotations: {
+      title: 'Get Relation Stats',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
     description: `Get statistics about active relations in the scene.
 
 USE WHEN:
@@ -1158,6 +1298,13 @@ USE WHEN:
   // ---------------------------------------------------------------------------
   {
     name: 'pinepaper_set_background_color',
+    annotations: {
+      title: 'Set Background Color',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
     description: `Set the canvas background color.
 
 USE WHEN:
@@ -1177,6 +1324,13 @@ USE WHEN:
 
   {
     name: 'pinepaper_set_canvas_size',
+    annotations: {
+      title: 'Set Canvas Size',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
     description: `Change the canvas dimensions.
 
 IMPORTANT: Call this BEFORE creating items if you need a specific canvas size. The default canvas is 800x600 which may be too small for complex designs.
@@ -1212,6 +1366,13 @@ For wedding invitations, event cards, or detailed designs, use at least 1080x108
 
   {
     name: 'pinepaper_get_canvas_size',
+    annotations: {
+      title: 'Get Canvas Size',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
     description: `Get the current canvas dimensions.
 
 USE WHEN:
@@ -1226,6 +1387,13 @@ USE WHEN:
 
   {
     name: 'pinepaper_clear_canvas',
+    annotations: {
+      title: 'Clear Canvas',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
     description: `Clear all items from the canvas, removing everything including any welcome template items.
 
 USE WHEN:
@@ -1247,6 +1415,13 @@ IMPORTANT NOTES:
 
   {
     name: 'pinepaper_refresh_page',
+    annotations: {
+      title: 'Refresh Page',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
     description: `Refresh the PinePaper Studio page in the browser. This is the most reliable way to get a completely clean canvas.
 
 USE WHEN:
@@ -1273,6 +1448,13 @@ IMPORTANT NOTES:
   // ---------------------------------------------------------------------------
   {
     name: 'pinepaper_import_svg',
+    annotations: {
+      title: 'Import SVG',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
     description: `Import an SVG string or SVG from URL onto the canvas. Returns an itemId for the imported graphic.
 
 USE WHEN:
@@ -1327,6 +1509,13 @@ Returns the itemId of the imported SVG group, which can be used with pinepaper_a
   // ---------------------------------------------------------------------------
   {
     name: 'pinepaper_add_filter',
+    annotations: {
+      title: 'Add Filter',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
     description: `Add a visual filter effect to the canvas. Filters are scene-wide effects that can be stacked.
 
 USE WHEN:
@@ -1380,6 +1569,13 @@ Filters can be stacked - call multiple times to combine effects.`,
   // ---------------------------------------------------------------------------
   {
     name: 'pinepaper_export_svg',
+    annotations: {
+      title: 'Export SVG',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
     description: `Export the scene as animated SVG.
 
 USE WHEN:
@@ -1399,6 +1595,13 @@ USE WHEN:
 
   {
     name: 'pinepaper_export_training_data',
+    annotations: {
+      title: 'Export Training Data',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
     description: `Export relation data as training pairs for LLM fine-tuning. This generates instruction/code pairs from the current scene's relations.
 
 USE WHEN:
@@ -1430,6 +1633,13 @@ OUTPUT FORMAT:
   // ---------------------------------------------------------------------------
   {
     name: 'pinepaper_browser_connect',
+    annotations: {
+      title: 'Connect to Browser',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
     description: `Connect to PinePaper Studio Editor in a browser. This launches a browser window and navigates to the PinePaper Editor.
 
 USE WHEN:
@@ -1457,6 +1667,13 @@ The browser will open and navigate to https://pinepaper.studio/editor where the 
 
   {
     name: 'pinepaper_browser_disconnect',
+    annotations: {
+      title: 'Disconnect from Browser',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
     description: `Disconnect from the browser and close PinePaper Studio.
 
 USE WHEN:
@@ -1471,6 +1688,13 @@ USE WHEN:
 
   {
     name: 'pinepaper_browser_screenshot',
+    annotations: {
+      title: 'Take Screenshot',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
     description: `Take a screenshot of the current PinePaper canvas.
 
 USE WHEN:
@@ -1496,6 +1720,13 @@ Returns a base64-encoded PNG image of the canvas.`,
 
   {
     name: 'pinepaper_browser_status',
+    annotations: {
+      title: 'Browser Status',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
     description: `Check the current browser connection status.
 
 USE WHEN:
@@ -1513,6 +1744,13 @@ USE WHEN:
   // ---------------------------------------------------------------------------
   {
     name: 'pinepaper_get_performance_metrics',
+    annotations: {
+      title: 'Get Performance Metrics',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
     description: `Get execution performance metrics to identify bottlenecks and optimize workflows.
 
 USE WHEN:
@@ -1605,6 +1843,13 @@ If you see significantly higher numbers, investigate:
   // ---------------------------------------------------------------------------
   {
     name: 'pinepaper_search_assets',
+    annotations: {
+      title: 'Search Assets',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
     description: `Search for free SVG assets from open repositories (SVGRepo, OpenClipart, Iconify, FontAwesome).
 
 USE WHEN:
@@ -1666,6 +1911,13 @@ PERFORMANCE:
 
   {
     name: 'pinepaper_import_asset',
+    annotations: {
+      title: 'Import Asset',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
     description: `Import an SVG asset from search results or direct URL onto the canvas.
 
 USE WHEN:
@@ -1743,6 +1995,13 @@ RETURNS:
   // ---------------------------------------------------------------------------
   {
     name: 'pinepaper_p5_draw',
+    annotations: {
+      title: 'p5.js Draw',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
     description: `Execute p5.js-style drawing code on the PinePaper canvas.
 
 Claude can use familiar p5.js syntax - the code is translated to Paper.js automatically.
