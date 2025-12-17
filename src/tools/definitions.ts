@@ -15,6 +15,32 @@ import { I18nManager } from '../i18n/index.js';
 // PLANNING GUIDE FOR AI AGENTS
 // =============================================================================
 /*
+🎮 EXECUTION MODES:
+
+The MCP server supports two execution modes (set via --mode flag or PINEPAPER_EXECUTION_MODE env):
+
+1. PUPPETEER MODE (default):
+   - Opens a browser window with PinePaper Studio
+   - Executes code automatically - you watch the magic happen
+   - Can take screenshots to see results
+   - User can take control anytime - click buttons, make manual edits
+   - Uses your default browser session (existing cookies/login persist)
+   - Best for: Interactive sessions, live demos, when you want visual feedback
+
+2. CODE GENERATION MODE (--mode code):
+   - No browser window opened
+   - Generates JavaScript code for each tool call
+   - User manually copies code and pastes into PinePaper Studio console
+   - User has full control over execution timing
+   - Best for: Testing code, learning the API, environments where Puppeteer is problematic
+   - Helpful for: Debugging, understanding what code is generated, batch operations
+
+When to use which:
+- "I want to watch AI create graphics live" → Puppeteer mode
+- "I want to test and verify code before running" → Code mode
+- "Multiple browser windows keep opening" → Code mode (avoids the issue)
+- "I want to learn the PinePaper API" → Code mode (see generated code)
+
 📋 DECISION TREE: Which Tool Should I Use?
 
 1. USER WANTS TO ADD GRAPHICS TO CANVAS:
@@ -1640,14 +1666,25 @@ OUTPUT FORMAT:
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: `Connect to PinePaper Studio Editor in a browser. This launches a browser window and navigates to the PinePaper Editor.
+    description: `Connect to PinePaper Studio Editor in a browser (PUPPETEER MODE ONLY).
+
+This launches a browser window and navigates to the PinePaper Editor for live code execution.
 
 USE WHEN:
+- Running in Puppeteer mode (default)
 - Starting a new PinePaper session
-- Need to execute commands in the actual application
 - User wants to see changes live in the browser
+- Need automatic code execution
 
-IMPORTANT: Call this FIRST before using any other pinepaper tools. Without connecting, tools only generate code but don't execute it.
+NOT NEEDED WHEN:
+- Running in Code Generation mode (--mode code)
+- User prefers to copy/paste code manually
+
+IMPORTANT:
+- Call this FIRST before using any other pinepaper tools in Puppeteer mode
+- Without connecting, tools only generate code but don't execute it
+- Uses a fresh Chromium browser session (not your default browser profile)
+- User can take control of the browser window at any time to click buttons or make manual edits
 
 The browser will open and navigate to https://pinepaper.studio/editor where the code console and JavaScript API are available.`,
     inputSchema: {

@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 /**
  * PinePaper MCP Server CLI
- * 
+ *
  * Entry point for running the MCP server from command line.
  */
 
-import { createServer } from './index.js';
+import { createServer, ServerOptions } from './index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { ExecutionMode } from './tools/handlers.js';
 
-const VERSION = '1.0.0';
+const VERSION = '1.4.0';
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
@@ -24,17 +25,36 @@ USAGE:
   pinepaper-mcp [options]
 
 OPTIONS:
-  --help, -h      Show this help message
-  --version, -v   Show version number
+  --help, -h              Show this help message
+  --version, -v           Show version number
+  --mode <mode>           Execution mode: 'puppeteer' or 'code'
+                          - puppeteer: Open browser and execute code (default)
+                          - code: Generate code only for manual paste
+
+ENVIRONMENT VARIABLES:
+  PINEPAPER_EXECUTION_MODE    Set default execution mode ('puppeteer' or 'code')
+  PINEPAPER_SCREENSHOT_MODE   Screenshot behavior ('on_request', 'always', 'never')
+  PINEPAPER_LOCALE            UI locale (e.g., 'en', 'ja', 'zh-CN')
 
 CONFIGURATION:
   Add to your Claude Desktop config (claude_desktop_config.json):
 
+  For Puppeteer mode (default - opens browser):
   {
     "mcpServers": {
       "pinepaper": {
         "command": "npx",
         "args": ["-y", "@pinepaper/mcp-server"]
+      }
+    }
+  }
+
+  For Code Generation mode (no browser, paste code manually):
+  {
+    "mcpServers": {
+      "pinepaper": {
+        "command": "npx",
+        "args": ["-y", "@pinepaper/mcp-server", "--mode", "code"]
       }
     }
   }
@@ -89,16 +109,38 @@ SUPPORT:
     process.exit(0);
   }
 
+  // Parse --mode flag
+  let executionMode: ExecutionMode | undefined;
+  const modeIndex = args.indexOf('--mode');
+  if (modeIndex !== -1 && args[modeIndex + 1]) {
+    const modeArg = args[modeIndex + 1].toLowerCase();
+    if (modeArg === 'puppeteer' || modeArg === 'code') {
+      executionMode = modeArg;
+    } else {
+      console.error(`Invalid mode: ${modeArg}. Use 'puppeteer' or 'code'.`);
+      process.exit(1);
+    }
+  }
+
+  // Build server options
+  const serverOptions: ServerOptions = {};
+  if (executionMode) {
+    serverOptions.executionMode = executionMode;
+  }
+
   // Start the server
   try {
-    const server = await createServer();
+    const server = await createServer(serverOptions);
     const transport = new StdioServerTransport();
 
+    const modeDisplay = executionMode || process.env.PINEPAPER_EXECUTION_MODE || 'puppeteer';
     console.error('╔═══════════════════════════════════════════════════╗');
     console.error('║          PinePaper MCP Server v' + VERSION + '             ║');
     console.error('╠═══════════════════════════════════════════════════╣');
     console.error('║  Create animated graphics with AI                 ║');
     console.error('║  https://pinepaper.studio                         ║');
+    console.error('╠═══════════════════════════════════════════════════╣');
+    console.error(`║  Mode: ${modeDisplay.padEnd(42)}║`);
     console.error('╚═══════════════════════════════════════════════════╝');
     console.error('');
     console.error('Server starting on stdio transport...');
@@ -106,6 +148,13 @@ SUPPORT:
     await server.connect(transport);
 
     console.error('✓ Server connected and ready');
+    console.error('');
+    if (modeDisplay === 'code') {
+      console.error('📋 Code Generation Mode: Tools will output code for manual paste.');
+      console.error('   Open https://pinepaper.studio/editor and paste code in the console.');
+    } else {
+      console.error('🌐 Puppeteer Mode: Tools will execute directly in browser.');
+    }
     console.error('');
     console.error('Waiting for tool calls...');
   } catch (error) {

@@ -20,7 +20,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 
 import { PINEPAPER_TOOLS, getLocalizedTools } from './tools/definitions.js';
-import { handleToolCall } from './tools/handlers.js';
+import { handleToolCall, ExecutionMode, getExecutionMode } from './tools/handlers.js';
 import {
   I18nManager,
   initI18n,
@@ -34,7 +34,7 @@ import {
 
 const SERVER_INFO = {
   name: 'pinepaper-mcp',
-  version: '1.0.0',
+  version: '1.4.0',
   description: 'MCP Server for PinePaper Studio - Create animated graphics with AI',
 };
 
@@ -3221,6 +3221,8 @@ export interface ServerOptions {
   locale?: SupportedLocale;
   /** Enable browser execution mode - executes code in real browser via Puppeteer */
   browserMode?: boolean;
+  /** Execution mode: 'puppeteer' (default) or 'code' (generate only for manual paste) */
+  executionMode?: ExecutionMode;
 }
 
 // =============================================================================
@@ -3254,12 +3256,15 @@ export async function createServer(options: ServerOptions = {}): Promise<Server>
 
   // Handle tool calls with i18n support for errors and success messages
   // Browser mode enables live execution in PinePaper Studio
+  // Execution mode: 'puppeteer' (default) or 'code' (generate only)
   const executeInBrowser = options.browserMode ?? true; // Default to browser mode
+  const executionMode = options.executionMode ?? getExecutionMode();
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
     return handleToolCall(name, args as Record<string, unknown>, {
       i18n,
       executeInBrowser,
+      executionMode,
     });
   });
 

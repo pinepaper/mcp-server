@@ -1,10 +1,10 @@
 {
   "manifest_version": "0.3",
   "name": "pinepaper-mcp",
-  "version": "1.3.4",
+  "version": "1.4.0",
   "display_name": "PinePaper Studio",
   "description": "Create animated graphics with AI using PinePaper Studio",
-  "long_description": "PinePaper MCP Server enables Claude to create, animate, and export graphics through PinePaper Studio. Features include shape creation, relation-based animations (orbits, follows, attached_to), procedural generators, visual effects, SVG export with animations, asset search & import from 4 open repositories (500k+ icons), performance metrics tracking, and enhanced error messages with canvas context.",
+  "long_description": "PinePaper MCP Server enables Claude to create, animate, and export graphics through PinePaper Studio. Features include shape creation, relation-based animations (orbits, follows, attached_to), procedural generators, visual effects, SVG export with animations, asset search & import from 4 open repositories (500k+ icons), performance metrics tracking, and enhanced error messages with canvas context. Supports two execution modes: Puppeteer (live browser execution) and Code (generate code for manual paste).",
   "author": {
     "name": "PinePaper Studio",
     "url": "https://github.com/pinepaper"
@@ -34,6 +34,28 @@
     "mcp_config": {
       "command": "node",
       "args": ["${__dirname}/dist/cli.js"]
+    },
+    "options": {
+      "mode": {
+        "type": "string",
+        "description": "Execution mode: 'puppeteer' (live browser) or 'code' (generate only)",
+        "default": "puppeteer",
+        "enum": ["puppeteer", "code"]
+      }
+    },
+    "env": {
+      "PINEPAPER_EXECUTION_MODE": {
+        "description": "Set default execution mode ('puppeteer' or 'code')",
+        "default": "puppeteer"
+      },
+      "PINEPAPER_SCREENSHOT_MODE": {
+        "description": "Screenshot behavior ('on_request', 'always', 'never')",
+        "default": "on_request"
+      },
+      "PINEPAPER_LOCALE": {
+        "description": "UI locale (e.g., 'en', 'ja', 'zh-CN')",
+        "default": "en"
+      }
     }
   },
   "tools": [

@@ -78,6 +78,37 @@ export function getScreenshotMode(): ScreenshotMode {
 }
 
 // =============================================================================
+// EXECUTION MODE CONFIGURATION
+// =============================================================================
+
+/**
+ * Execution modes for tool behavior.
+ *
+ * - 'puppeteer': Execute code in browser via Puppeteer (default, opens browser window)
+ * - 'code': Generate code only - user copies and pastes code into PinePaper console
+ *
+ * 'code' mode is useful when:
+ * - Multiple browser instances are being opened unnecessarily
+ * - User wants to test/verify generated code before execution
+ * - Running in environments where Puppeteer browser windows are problematic
+ * - User prefers manual control over execution
+ */
+export type ExecutionMode = 'puppeteer' | 'code';
+
+/**
+ * Get execution mode from environment variable.
+ * Defaults to 'puppeteer' for live execution.
+ */
+export function getExecutionMode(): ExecutionMode {
+  const mode = process.env.PINEPAPER_EXECUTION_MODE?.toLowerCase();
+  if (mode === 'puppeteer' || mode === 'code') {
+    return mode;
+  }
+  // Default to 'puppeteer' for live browser execution
+  return 'puppeteer';
+}
+
+// =============================================================================
 // HANDLER OPTIONS
 // =============================================================================
 
@@ -89,6 +120,8 @@ export interface HandlerOptions {
   browserController?: PinePaperBrowserController;
   /** Screenshot mode: 'on_request' (default), 'always', or 'never' */
   screenshotMode?: ScreenshotMode;
+  /** Execution mode: 'puppeteer' (default) or 'code' (generate only) */
+  executionMode?: ExecutionMode;
 }
 
 // =============================================================================
@@ -205,6 +238,10 @@ function handleValidationError(error: ZodError, i18n?: I18nManager): CallToolRes
 /**
  * Execute code in browser if connected, otherwise return generated code.
  *
+ * Execution mode is controlled by PINEPAPER_EXECUTION_MODE environment variable:
+ * - 'puppeteer': Execute code in browser via Puppeteer (default)
+ * - 'code': Generate code only - user copies/pastes into PinePaper console
+ *
  * Screenshot behavior is controlled by PINEPAPER_SCREENSHOT_MODE environment variable:
  * - 'on_request': No automatic screenshots (use pinepaper_browser_screenshot explicitly)
  * - 'always': Take screenshot after every execution (legacy, slower)
@@ -218,13 +255,31 @@ async function executeOrGenerate(
   options: HandlerOptions,
   toolName: string
 ): Promise<CallToolResult> {
-  const { executeInBrowser, browserController, screenshotMode } = options;
+  const { executeInBrowser, browserController, screenshotMode, executionMode } = options;
+  const effectiveExecutionMode = executionMode ?? getExecutionMode();
   const effectiveScreenshotMode = screenshotMode ?? getScreenshotMode();
   const tracker = getPerformanceTracker();
 
   // Start total timer
   const timerId = `${toolName}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   tracker.startTimer(`${timerId}_total`);
+
+  // In 'code' mode, always return generated code without browser execution
+  if (effectiveExecutionMode === 'code') {
+    const totalDuration = tracker.endTimer(`${timerId}_total`);
+    tracker.recordMetric({
+      toolName,
+      phase: 'total',
+      duration: totalDuration,
+      timestamp: Date.now(),
+      success: true,
+      metadata: { executionMode: 'code' },
+    });
+    return successResult(
+      code,
+      `${description}\n\n📋 **Code Generation Mode**: Copy the code above and paste it into the PinePaper Studio console to execute.`
+    );
+  }
 
   if (!executeInBrowser) {
     const totalDuration = tracker.endTimer(`${timerId}_total`);
