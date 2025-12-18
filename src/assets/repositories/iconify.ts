@@ -84,6 +84,7 @@ export class IconifyAdapter implements AssetRepository {
           downloadUrl: `https://api.iconify.design/${iconName}.svg`,
           license,
           tags: [query, collection],
+          author: collectionInfo?.author,
         });
       }
 

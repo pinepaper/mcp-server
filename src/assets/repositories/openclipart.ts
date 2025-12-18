@@ -83,6 +83,7 @@ export class OpenClipartAdapter implements AssetRepository {
           url: 'https://creativecommons.org/publicdomain/zero/1.0/',
         },
         tags: item.tags || [query],
+        author: item.uploader?.name,
       }));
     } catch (error) {
       console.error('[OpenClipartAdapter] Search error:', error);

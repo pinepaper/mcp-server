@@ -659,6 +659,7 @@ export const SearchAssetsInputSchema = z.object({
   query: z.string().describe('Search term (e.g., "rocket", "heart", "user icon")'),
   repository: z.enum(['all', 'svgrepo', 'openclipart', 'iconify', 'fontawesome']).optional().describe('Which repository to search (default: all)'),
   limit: z.number().min(1).max(50).optional().describe('Max results to return (default: 10)'),
+  includeSvgContent: z.boolean().optional().describe('Include actual SVG content for each result (default: false). When true, fetches and returns the SVG string for each asset, enabling AI to display or describe the icons.'),
 });
 
 export type SearchAssetsInput = z.infer<typeof SearchAssetsInputSchema>;
