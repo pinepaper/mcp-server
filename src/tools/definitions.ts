@@ -1924,7 +1924,15 @@ EXAMPLES:
 PERFORMANCE:
 - Search is asynchronous and may take 1-2 seconds
 - Results are not cached (fresh search each time)
-- Import caches downloaded SVGs for reuse`,
+- Import caches downloaded SVGs for reuse
+- When includeSvgContent is true, search takes longer as each SVG must be fetched
+
+SVG CONTENT RETRIEVAL:
+- Set includeSvgContent: true to fetch and include actual SVG strings
+- Each result will include an 'svgContent' field with the SVG markup
+- Useful for AI to display, describe, or analyze the icons before importing
+- Increases response time proportionally to the number of results
+- Consider using a lower limit when includeSvgContent is true`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1940,6 +1948,10 @@ PERFORMANCE:
         limit: {
           type: 'number',
           description: 'Max results to return (default: 10, max: 50)',
+        },
+        includeSvgContent: {
+          type: 'boolean',
+          description: 'Include actual SVG content for each result (default: false). When true, fetches and returns the SVG string for each asset.',
         },
       },
       required: ['query'],

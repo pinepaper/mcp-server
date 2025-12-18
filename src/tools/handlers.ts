@@ -1024,6 +1024,83 @@ Browser is ready. You can now use other pinepaper tools to create and animate gr
             input.limit || 10
           );
 
+          // If includeSvgContent is true, fetch SVG content for each result
+          let resultsWithContent: Array<{
+            id: string;
+            repository: string;
+            title: string;
+            description?: string;
+            previewUrl?: string;
+            license: unknown;
+            tags?: string[];
+            author?: string;
+            svgContent?: string;
+          }> = [];
+
+          if (input.includeSvgContent) {
+            // Fetch SVG content for each result in parallel
+            const svgPromises = results.map(async (r) => {
+              try {
+                const svgContent = await assetManager.download(r.id);
+                return {
+                  id: r.id,
+                  repository: r.repository,
+                  title: r.title,
+                  description: r.description,
+                  previewUrl: r.previewUrl,
+                  license: r.license,
+                  tags: r.tags,
+                  author: r.author,
+                  svgContent: svgContent.svg,
+                };
+              } catch (downloadError) {
+                // If download fails, return result without SVG content
+                console.error(`[search_assets] Failed to download SVG for ${r.id}:`, downloadError);
+                return {
+                  id: r.id,
+                  repository: r.repository,
+                  title: r.title,
+                  description: r.description,
+                  previewUrl: r.previewUrl,
+                  license: r.license,
+                  tags: r.tags,
+                  author: r.author,
+                  svgContent: undefined,
+                };
+              }
+            });
+
+            resultsWithContent = await Promise.all(svgPromises);
+          } else {
+            // Without includeSvgContent, just map the results without SVG content
+            resultsWithContent = results.map((r) => ({
+              id: r.id,
+              repository: r.repository,
+              title: r.title,
+              description: r.description,
+              previewUrl: r.previewUrl,
+              license: r.license,
+              tags: r.tags,
+              author: r.author,
+            }));
+          }
+
+          // Check which results require attribution
+          const requiresAttribution = resultsWithContent.filter(
+            (r) => (r.license as { requiresAttribution?: boolean })?.requiresAttribution
+          );
+
+          // Build attribution notice if needed
+          let attributionNotice: string | undefined;
+          if (requiresAttribution.length > 0) {
+            const attributionItems = requiresAttribution.map((r) => {
+              const license = r.license as { type?: string; name?: string; url?: string };
+              const authorInfo = r.author ? ` by ${r.author}` : '';
+              return `- "${r.title}"${authorInfo} (${license.type || 'Unknown'}) from ${r.repository}`;
+            });
+            attributionNotice = `⚠️ ATTRIBUTION REQUIRED for ${requiresAttribution.length} asset(s):\n${attributionItems.join('\n')}\n\nPlease provide proper attribution when using these assets.`;
+          }
+
           return {
             content: [
               {
@@ -1033,16 +1110,11 @@ Browser is ready. You can now use other pinepaper tools to create and animate gr
                     success: true,
                     query: input.query,
                     repository: input.repository || 'all',
-                    count: results.length,
-                    results: results.map((r) => ({
-                      id: r.id,
-                      repository: r.repository,
-                      title: r.title,
-                      description: r.description,
-                      previewUrl: r.previewUrl,
-                      license: r.license,
-                      tags: r.tags,
-                    })),
+                    count: resultsWithContent.length,
+                    includeSvgContent: input.includeSvgContent || false,
+                    attributionRequired: requiresAttribution.length > 0,
+                    attributionNotice,
+                    results: resultsWithContent,
                   },
                   null,
                   2
