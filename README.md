@@ -473,7 +473,7 @@ export PINEPAPER_METRICS_RETENTION=5000
 
 - **[Workflow Guide](docs/WORKFLOW_GUIDE.md)** - Decision trees, multi-step patterns, performance optimization, and troubleshooting
 - **[Performance Metrics](docs/PERFORMANCE_METRICS.md)** - In-memory metrics system for Claude self-optimization
-- **[PinePaper Reference](docs/CLAUDE_Pinepaper_v1_beta.md)** - Complete PinePaper Studio API reference
+- **[PinePaper Reference](https://pinepaper.studio/docs/)** - Complete PinePaper Studio API reference
 
 ### External Documentation
 

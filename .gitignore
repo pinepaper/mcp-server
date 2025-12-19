@@ -24,7 +24,7 @@ npm-debug.log*
 .env.*.local
 
 # Internal docs (not for public repo)
-docs/
+docs-internal/
 
 # Lock files (optional - uncomment if you want to commit them)
 # package-lock.json
