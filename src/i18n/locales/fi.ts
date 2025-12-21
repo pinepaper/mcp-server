@@ -24,6 +24,16 @@ export const fi = createBaseTranslation({
     pinepaper_set_canvas_size: { name: 'Aseta kankaan koko', description: '' },
     pinepaper_export_svg: { name: 'Vie SVG', description: '' },
     pinepaper_export_training_data: { name: 'Vie harjoitusdata', description: '' },
+    // Diagram Tools
+    pinepaper_create_diagram_shape: { name: 'Luo kaaviomuoto', description: '' },
+    pinepaper_connect: { name: 'Yhdistä kohteet', description: '' },
+    pinepaper_connect_ports: { name: 'Yhdistä portit', description: '' },
+    pinepaper_add_ports: { name: 'Lisää portit', description: '' },
+    pinepaper_auto_layout: { name: 'Automaattinen asettelu', description: '' },
+    pinepaper_get_diagram_shapes: { name: 'Hae kaaviomuodot', description: '' },
+    pinepaper_update_connector: { name: 'Päivitä liitin', description: '' },
+    pinepaper_remove_connector: { name: 'Poista liitin', description: '' },
+    pinepaper_diagram_mode: { name: 'Kaaviotila', description: '' },
   },
 
   errors: {

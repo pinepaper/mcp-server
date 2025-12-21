@@ -24,6 +24,114 @@ export const ptBR = createBaseTranslation({
     pinepaper_set_canvas_size: { name: 'Definir tamanho do canvas', description: '' },
     pinepaper_export_svg: { name: 'Exportar SVG', description: '' },
     pinepaper_export_training_data: { name: 'Exportar dados de treinamento', description: '' },
+    // Diagram Tools
+    pinepaper_create_diagram_shape: {
+      name: 'Criar forma de diagrama',
+      description: `Cria uma forma de diagrama no canvas. Formas de diagrama são especializadas para fluxogramas, diagramas UML, diagramas de rede e desenhos técnicos similares.
+
+USE QUANDO:
+- Criar fluxogramas, diagramas de processo ou workflows
+- Construir diagramas UML de classes, casos de uso ou sequência
+- Desenhar diagramas de topologia de rede
+- Fazer organogramas ou árvores de decisão
+
+TIPOS DE FORMAS:
+- Fluxograma: process, decision, terminal, data, document, database, preparation
+- UML: uml-class, uml-usecase, uml-actor
+- Rede: cloud, server
+- Básicas: rectangle, circle, triangle, star`,
+    },
+    pinepaper_connect: {
+      name: 'Conectar itens',
+      description: `Conecta dois itens com um conector inteligente. Esta é a forma principal de desenhar linhas/setas entre formas de diagrama.
+
+USE QUANDO:
+- Desenhar setas entre etapas de fluxograma
+- Conectar classes UML com associações
+- Criar conexões de rede entre nós
+- Qualquer diagrama que precise de linhas/setas entre elementos
+
+TIPOS DE ROTEAMENTO:
+- orthogonal: Apenas curvas em ângulo reto (padrão)
+- direct: Linha reta entre pontos
+- curved: Curva Bezier com curvatura ajustável`,
+    },
+    pinepaper_connect_ports: {
+      name: 'Conectar portas',
+      description: `Conecta duas portas específicas em itens. Use quando precisar de controle preciso sobre quais portas o conector se conecta.
+
+USE QUANDO:
+- Precisar que o conector se conecte a um lado específico da forma
+- Criar diagramas complexos onde a seleção automática de portas não é ideal
+- Construir diagramas tipo circuito com pontos de entrada/saída específicos`,
+    },
+    pinepaper_add_ports: {
+      name: 'Adicionar portas',
+      description: `Adiciona portas de conexão a um item existente. Portas são pontos de ancoragem onde conectores podem se anexar.
+
+USE QUANDO:
+- Adicionar posições de portas personalizadas às formas
+- Habilitar conexões em itens que não têm portas
+- Criar pontos de conexão especializados para diagramas complexos`,
+    },
+    pinepaper_auto_layout: {
+      name: 'Layout automático',
+      description: `Organiza automaticamente os itens do diagrama usando um algoritmo de layout. Isso reorganiza os itens para diagramas mais limpos e legíveis.
+
+USE QUANDO:
+- Os itens do diagrama estão bagunçados ou sobrepostos
+- Quiser criar um layout de aparência profissional automaticamente
+- Após adicionar muitos itens, precisar organizá-los
+
+TIPOS DE LAYOUT:
+- hierarchical: Melhor para fluxogramas, organogramas
+- force-directed: Melhor para diagramas de rede
+- tree: Melhor para hierarquias
+- radial: Melhor para mapas mentais
+- grid: Melhor para itens de importância igual`,
+    },
+    pinepaper_get_diagram_shapes: {
+      name: 'Obter formas de diagrama',
+      description: `Obtém uma lista de formas de diagrama disponíveis com suas propriedades.
+
+USE QUANDO:
+- Precisar ver quais formas de diagrama estão disponíveis
+- Quiser saber os tamanhos e estilos padrão para formas
+- Construir UI dinâmica que mostra opções de formas`,
+    },
+    pinepaper_update_connector: {
+      name: 'Atualizar conector',
+      description: `Atualiza o estilo ou rótulo de um conector existente.
+
+USE QUANDO:
+- Mudar a aparência do conector após criação
+- Atualizar rótulos do conector
+- Mudar estilos de seta ou cores`,
+    },
+    pinepaper_remove_connector: {
+      name: 'Remover conector',
+      description: `Remove um conector do canvas.
+
+USE QUANDO:
+- Excluir uma conexão entre itens
+- Remover links incorretos
+- Reestruturar conexões do diagrama`,
+    },
+    pinepaper_diagram_mode: {
+      name: 'Modo diagrama',
+      description: `Controla o modo diagrama para edição interativa.
+
+USE QUANDO:
+- Alternar entre modos de desenho e seleção
+- Habilitar/desabilitar UI específica de diagrama
+- Configurar o canvas para criação de diagrama
+
+AÇÕES:
+- activate: Habilitar modo diagrama
+- deactivate: Retornar ao modo canvas normal
+- toggle: Alternar entre modos
+- setMode: Definir modo de ferramenta específico`,
+    },
   },
 
   errors: {

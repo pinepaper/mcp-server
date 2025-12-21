@@ -303,6 +303,16 @@ export const ur: TranslationKeys = {
         includeMetadata: 'تعلقات میٹا ڈیٹا شامل کریں',
       },
     },
+    // Diagram Tools
+    pinepaper_create_diagram_shape: { name: 'ڈایاگرام شکل بنائیں', description: '' },
+    pinepaper_connect: { name: 'آئٹمز جوڑیں', description: '' },
+    pinepaper_connect_ports: { name: 'پورٹس جوڑیں', description: '' },
+    pinepaper_add_ports: { name: 'پورٹس شامل کریں', description: '' },
+    pinepaper_auto_layout: { name: 'خودکار ترتیب', description: '' },
+    pinepaper_get_diagram_shapes: { name: 'ڈایاگرام شکلیں حاصل کریں', description: '' },
+    pinepaper_update_connector: { name: 'کنیکٹر اپ ڈیٹ کریں', description: '' },
+    pinepaper_remove_connector: { name: 'کنیکٹر ہٹائیں', description: '' },
+    pinepaper_diagram_mode: { name: 'ڈایاگرام موڈ', description: '' },
   },
 
   errors: {

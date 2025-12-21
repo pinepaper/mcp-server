@@ -24,6 +24,16 @@ export const ta = createBaseTranslation({
     pinepaper_set_canvas_size: { name: 'கேன்வாஸ் அளவு அமை', description: '' },
     pinepaper_export_svg: { name: 'SVG ஏற்றுமதி', description: '' },
     pinepaper_export_training_data: { name: 'பயிற்சி தரவை ஏற்றுமதி செய்', description: '' },
+    // Diagram Tools
+    pinepaper_create_diagram_shape: { name: 'வரைபட வடிவத்தை உருவாக்கு', description: '' },
+    pinepaper_connect: { name: 'உருப்படிகளை இணை', description: '' },
+    pinepaper_connect_ports: { name: 'போர்ட்களை இணை', description: '' },
+    pinepaper_add_ports: { name: 'போர்ட்களை சேர்', description: '' },
+    pinepaper_auto_layout: { name: 'தானியங்கி அமைப்பு', description: '' },
+    pinepaper_get_diagram_shapes: { name: 'வரைபட வடிவங்களைப் பெறு', description: '' },
+    pinepaper_update_connector: { name: 'இணைப்பியை புதுப்பி', description: '' },
+    pinepaper_remove_connector: { name: 'இணைப்பியை அகற்று', description: '' },
+    pinepaper_diagram_mode: { name: 'வரைபட பயன்முறை', description: '' },
   },
 
   errors: {

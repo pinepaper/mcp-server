@@ -749,6 +749,317 @@ export type SceneAnimation = z.infer<typeof SceneAnimationSchema>;
 export type CreateSceneInput = z.infer<typeof CreateSceneInputSchema>;
 
 // =============================================================================
+// DIAGRAM SCHEMAS
+// =============================================================================
+
+/**
+ * Diagram shape types - available shapes for flowcharts, UML, network diagrams
+ */
+export const DiagramShapeTypeSchema = z.enum([
+  // Flowchart shapes
+  'process',
+  'decision',
+  'terminal',
+  'data',
+  'document',
+  'database',
+  'preparation',
+  // UML shapes
+  'uml-class',
+  'uml-usecase',
+  'uml-actor',
+  // Network shapes
+  'cloud',
+  'server',
+  // Basic shapes
+  'rectangle',
+  'circle',
+  'triangle',
+  'star',
+]).describe('Type of diagram shape');
+
+export type DiagramShapeType = z.infer<typeof DiagramShapeTypeSchema>;
+
+/**
+ * Connector routing styles
+ */
+export const ConnectorRoutingSchema = z.enum([
+  'direct',
+  'orthogonal',
+  'curved',
+]).describe('Connector path routing style');
+
+export type ConnectorRouting = z.infer<typeof ConnectorRoutingSchema>;
+
+/**
+ * Connector line styles
+ */
+export const ConnectorLineStyleSchema = z.enum([
+  'solid',
+  'dashed',
+  'dotted',
+]).describe('Connector line style');
+
+export type ConnectorLineStyle = z.infer<typeof ConnectorLineStyleSchema>;
+
+/**
+ * Arrow head styles
+ */
+export const ArrowHeadStyleSchema = z.enum([
+  'classic',
+  'stealth',
+  'sharp',
+  'open',
+  'diamond',
+  'circle',
+  'none',
+]).describe('Arrowhead style');
+
+export type ArrowHeadStyle = z.infer<typeof ArrowHeadStyleSchema>;
+
+/**
+ * Port positions on items
+ */
+export const PortPositionSchema = z.enum([
+  'top',
+  'bottom',
+  'left',
+  'right',
+  'top-left',
+  'top-right',
+  'bottom-left',
+  'bottom-right',
+  'center',
+  'start',
+  'end',
+]).describe('Port position on item');
+
+export type PortPosition = z.infer<typeof PortPositionSchema>;
+
+/**
+ * Port types for connection direction control
+ */
+export const PortTypeSchema = z.enum([
+  'input',
+  'output',
+  'both',
+]).describe('Port connection type');
+
+export type PortType = z.infer<typeof PortTypeSchema>;
+
+/**
+ * Layout types for auto-layout
+ */
+export const LayoutTypeSchema = z.enum([
+  'hierarchical',
+  'force-directed',
+  'tree',
+  'radial',
+  'grid',
+]).describe('Layout algorithm type');
+
+export type LayoutType = z.infer<typeof LayoutTypeSchema>;
+
+/**
+ * Layout direction for hierarchical/tree layouts
+ */
+export const LayoutDirectionSchema = z.enum([
+  'TB',
+  'BT',
+  'LR',
+  'RL',
+]).describe('Layout direction: TB=Top-Bottom, BT=Bottom-Top, LR=Left-Right, RL=Right-Left');
+
+export type LayoutDirection = z.infer<typeof LayoutDirectionSchema>;
+
+/**
+ * Diagram mode actions
+ */
+export const DiagramModeActionSchema = z.enum([
+  'activate',
+  'deactivate',
+  'toggle',
+  'setMode',
+]).describe('Diagram mode action');
+
+export type DiagramModeAction = z.infer<typeof DiagramModeActionSchema>;
+
+/**
+ * Diagram tool modes
+ */
+export const DiagramToolModeSchema = z.enum([
+  'select',
+  'connect',
+  'shape',
+  'pan',
+]).describe('Diagram tool mode');
+
+export type DiagramToolMode = z.infer<typeof DiagramToolModeSchema>;
+
+// =============================================================================
+// DIAGRAM TOOL INPUT SCHEMAS
+// =============================================================================
+
+/**
+ * Create Diagram Shape input
+ */
+export const CreateDiagramShapeInputSchema = z.object({
+  shapeType: DiagramShapeTypeSchema,
+  position: PositionSchema.optional().default({ x: 400, y: 300 }),
+  width: z.number().optional().describe('Shape width in pixels'),
+  height: z.number().optional().describe('Shape height in pixels'),
+  label: z.string().optional().describe('Text label inside the shape'),
+  style: z.object({
+    fillColor: z.string().optional().describe('Fill color'),
+    strokeColor: z.string().optional().describe('Stroke color'),
+    strokeWidth: z.number().optional().describe('Stroke width'),
+  }).optional(),
+});
+
+export type CreateDiagramShapeInput = z.infer<typeof CreateDiagramShapeInputSchema>;
+
+/**
+ * Connect items input
+ */
+export const ConnectInputSchema = z.object({
+  sourceItemId: z.string().describe('Registry ID of source item'),
+  targetItemId: z.string().describe('Registry ID of target item'),
+  routing: ConnectorRoutingSchema.optional().default('orthogonal'),
+  lineColor: z.string().optional().describe('Connector line color'),
+  lineWidth: z.number().optional().describe('Line width in pixels'),
+  lineStyle: ConnectorLineStyleSchema.optional().default('solid'),
+  headStyle: ArrowHeadStyleSchema.optional().default('classic'),
+  tailStyle: ArrowHeadStyleSchema.optional().default('none'),
+  label: z.string().optional().describe('Label text on connector'),
+  curvature: z.number().min(0.1).max(1.0).optional().default(0.5).describe('Curve intensity for curved routing'),
+  boltEnabled: z.boolean().optional().default(true).describe('Enable animated bolt effect'),
+  boltColor: z.string().optional().default('#fbbf24').describe('Bolt animation color'),
+});
+
+export type ConnectInput = z.infer<typeof ConnectInputSchema>;
+
+/**
+ * Connect specific ports input
+ */
+export const ConnectPortsInputSchema = z.object({
+  sourceItemId: z.string().describe('Registry ID of source item'),
+  sourcePort: PortPositionSchema.describe('Port position on source'),
+  targetItemId: z.string().describe('Registry ID of target item'),
+  targetPort: PortPositionSchema.describe('Port position on target'),
+  config: z.object({
+    routing: ConnectorRoutingSchema.optional(),
+    lineColor: z.string().optional(),
+    lineWidth: z.number().optional(),
+    lineStyle: ConnectorLineStyleSchema.optional(),
+    headStyle: ArrowHeadStyleSchema.optional(),
+    tailStyle: ArrowHeadStyleSchema.optional(),
+    label: z.string().optional(),
+    curvature: z.number().min(0.1).max(1.0).optional(),
+    boltEnabled: z.boolean().optional(),
+    boltColor: z.string().optional(),
+  }).optional(),
+});
+
+export type ConnectPortsInput = z.infer<typeof ConnectPortsInputSchema>;
+
+/**
+ * Port configuration for custom ports
+ */
+export const PortConfigSchema = z.object({
+  position: PortPositionSchema,
+  type: PortTypeSchema.optional().default('both'),
+});
+
+export type PortConfig = z.infer<typeof PortConfigSchema>;
+
+/**
+ * Add ports input
+ */
+export const AddPortsInputSchema = z.object({
+  itemId: z.string().describe('Registry ID of the item'),
+  portType: z.enum(['standard', 'line', 'path', 'custom']).optional().default('standard'),
+  ports: z.array(PortConfigSchema).optional().describe('Custom port definitions'),
+  count: z.number().optional().describe('Number of ports for path type'),
+});
+
+export type AddPortsInput = z.infer<typeof AddPortsInputSchema>;
+
+/**
+ * Auto layout input
+ */
+export const AutoLayoutInputSchema = z.object({
+  layoutType: LayoutTypeSchema,
+  itemIds: z.array(z.string()).optional().describe('Items to include (default: all items with ports)'),
+  options: z.object({
+    direction: LayoutDirectionSchema.optional().default('TB'),
+    levelSpacing: z.number().optional().default(100),
+    nodeSpacing: z.number().optional().default(80),
+    iterations: z.number().optional().default(100),
+    attraction: z.number().optional().default(0.01),
+    repulsion: z.number().optional().default(1000),
+    columns: z.number().optional(),
+    cellWidth: z.number().optional().default(150),
+    cellHeight: z.number().optional().default(100),
+    centerX: z.number().optional(),
+    centerY: z.number().optional(),
+    startRadius: z.number().optional().default(100),
+    radiusStep: z.number().optional().default(80),
+    animate: z.boolean().optional().default(true),
+    animationDuration: z.number().optional().default(300),
+  }).optional(),
+});
+
+export type AutoLayoutInput = z.infer<typeof AutoLayoutInputSchema>;
+
+/**
+ * Get diagram shapes input
+ */
+export const GetDiagramShapesInputSchema = z.object({
+  category: z.enum(['flowchart', 'uml', 'network', 'basic']).optional().describe('Filter by category'),
+});
+
+export type GetDiagramShapesInput = z.infer<typeof GetDiagramShapesInputSchema>;
+
+/**
+ * Update connector input
+ */
+export const UpdateConnectorInputSchema = z.object({
+  connectorId: z.string().describe('Connector ID to update'),
+  style: z.object({
+    lineColor: z.string().optional(),
+    lineWidth: z.number().optional(),
+    headStyle: ArrowHeadStyleSchema.optional(),
+    tailStyle: ArrowHeadStyleSchema.optional(),
+    routing: ConnectorRoutingSchema.optional(),
+    lineStyle: ConnectorLineStyleSchema.optional(),
+  }).optional(),
+  label: z.string().optional().describe('Update connector label'),
+  labelPosition: z.number().min(0).max(1).optional().describe('Label position along path (0-1)'),
+});
+
+export type UpdateConnectorInput = z.infer<typeof UpdateConnectorInputSchema>;
+
+/**
+ * Remove connector input
+ */
+export const RemoveConnectorInputSchema = z.object({
+  connectorId: z.string().describe('Connector ID to remove'),
+});
+
+export type RemoveConnectorInput = z.infer<typeof RemoveConnectorInputSchema>;
+
+/**
+ * Diagram mode input
+ */
+export const DiagramModeInputSchema = z.object({
+  action: DiagramModeActionSchema,
+  mode: DiagramToolModeSchema.optional().describe('Tool mode for setMode action'),
+  shapeType: DiagramShapeTypeSchema.optional().describe('Shape type for shape mode'),
+});
+
+export type DiagramModeInput = z.infer<typeof DiagramModeInputSchema>;
+
+// =============================================================================
 // ERROR CODES
 // =============================================================================
 

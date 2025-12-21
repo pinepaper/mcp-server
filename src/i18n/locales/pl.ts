@@ -24,6 +24,115 @@ export const pl = createBaseTranslation({
     pinepaper_set_canvas_size: { name: 'Ustaw rozmiar płótna', description: '' },
     pinepaper_export_svg: { name: 'Eksportuj SVG', description: '' },
     pinepaper_export_training_data: { name: 'Eksportuj dane treningowe', description: '' },
+
+    // Diagram Tools
+    pinepaper_create_diagram_shape: {
+      name: 'Utwórz kształt diagramu',
+      description: `Utwórz kształt diagramu na płótnie. Kształty diagramów to wyspecjalizowane kształty do schematów blokowych, diagramów UML, diagramów sieciowych i podobnych rysunków technicznych.
+
+UŻYJ KIEDY:
+- Tworzenie schematów blokowych, diagramów procesów lub przepływów pracy
+- Budowanie diagramów klas UML, diagramów przypadków użycia lub diagramów sekwencji
+- Projektowanie diagramów topologii sieci
+- Tworzenie schematów organizacyjnych lub drzew decyzyjnych
+
+TYPY KSZTAŁTÓW:
+- Schematy blokowe: process, decision, terminal, data, document, database, preparation
+- UML: uml-class, uml-usecase, uml-actor
+- Sieć: cloud, server
+- Podstawowe: rectangle, circle, triangle, star`,
+    },
+    pinepaper_connect: {
+      name: 'Połącz elementy',
+      description: `Połącz dwa elementy inteligentnym łącznikiem. To podstawowy sposób rysowania linii/strzałek między kształtami diagramu.
+
+UŻYJ KIEDY:
+- Rysowanie strzałek między krokami schematu blokowego
+- Łączenie klas UML za pomocą asocjacji
+- Tworzenie połączeń sieciowych między węzłami
+- Każdy diagram wymagający linii/strzałek między elementami
+
+TYPY ROUTINGU:
+- orthogonal: Tylko skręty pod kątem prostym (domyślnie)
+- direct: Prosta linia między punktami
+- curved: Krzywa Béziera z regulowaną krzywizną`,
+    },
+    pinepaper_connect_ports: {
+      name: 'Połącz porty',
+      description: `Połącz dwa konkretne porty na elementach. Użyj tego, gdy potrzebujesz precyzyjnej kontroli nad tym, do których portów łącznik się podłącza.
+
+UŻYJ KIEDY:
+- Łącznik musi być podłączony do określonej strony kształtu
+- Tworzenie złożonych diagramów, gdzie automatyczny wybór portu nie jest idealny
+- Budowanie diagramów przypominających obwody z konkretnymi punktami wejścia/wyjścia`,
+    },
+    pinepaper_add_ports: {
+      name: 'Dodaj porty',
+      description: `Dodaj porty połączeń do istniejącego elementu. Porty to punkty kotwiczenia, do których mogą się podłączyć łączniki.
+
+UŻYJ KIEDY:
+- Dodawanie niestandardowych pozycji portów do kształtów
+- Włączanie połączeń na elementach, które nie mają portów
+- Tworzenie wyspecjalizowanych punktów połączeń dla złożonych diagramów`,
+    },
+    pinepaper_auto_layout: {
+      name: 'Automatyczny układ',
+      description: `Automatycznie rozmieść elementy diagramu używając algorytmu układu. To reorganizuje elementy dla czystszych, bardziej czytelnych diagramów.
+
+UŻYJ KIEDY:
+- Elementy diagramu są nieporządne lub nakładają się na siebie
+- Chcesz automatycznie stworzyć profesjonalnie wyglądający układ
+- Po dodaniu wielu elementów, trzeba je uporządkować
+
+TYPY UKŁADÓW:
+- hierarchical: Najlepszy dla schematów blokowych, schematów organizacyjnych
+- force-directed: Najlepszy dla diagramów sieciowych
+- tree: Najlepszy dla hierarchii
+- radial: Najlepszy dla map myśli
+- grid: Najlepszy dla elementów o równej wadze`,
+    },
+    pinepaper_get_diagram_shapes: {
+      name: 'Pobierz kształty diagramu',
+      description: `Pobierz listę dostępnych kształtów diagramu z ich właściwościami.
+
+UŻYJ KIEDY:
+- Potrzebujesz zobaczyć, jakie kształty diagramów są dostępne
+- Chcesz poznać domyślne rozmiary i style kształtów
+- Budowanie dynamicznego interfejsu pokazującego opcje kształtów`,
+    },
+    pinepaper_update_connector: {
+      name: 'Aktualizuj łącznik',
+      description: `Zaktualizuj styl lub etykietę istniejącego łącznika.
+
+UŻYJ KIEDY:
+- Zmiana wyglądu łącznika po utworzeniu
+- Aktualizacja etykiet łączników
+- Zmiana stylów strzałek lub kolorów`,
+    },
+    pinepaper_remove_connector: {
+      name: 'Usuń łącznik',
+      description: `Usuń łącznik z płótna.
+
+UŻYJ KIEDY:
+- Usuwanie połączenia między elementami
+- Usuwanie nieprawidłowych łączy
+- Restrukturyzacja połączeń diagramu`,
+    },
+    pinepaper_diagram_mode: {
+      name: 'Tryb diagramu',
+      description: `Kontroluj tryb diagramu do interaktywnej edycji.
+
+UŻYJ KIEDY:
+- Przełączanie między trybami rysowania i zaznaczania
+- Włączanie/wyłączanie interfejsu specyficznego dla diagramów
+- Przygotowanie płótna do tworzenia diagramów
+
+AKCJE:
+- activate: Włącz tryb diagramu
+- deactivate: Powrót do normalnego trybu płótna
+- toggle: Przełącz między trybami
+- setMode: Ustaw konkretny tryb narzędzia`,
+    },
   },
 
   errors: {

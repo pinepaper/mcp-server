@@ -7,7 +7,7 @@
 
 ## Overview
 
-PinePaper MCP Server enables AI assistants like Claude to create and animate graphics in [PinePaper Studio](https://pinepaper.studio). Using natural language, you can:
+PinePaper MCP Server enables AI assistants to create and animate graphics in [PinePaper Studio](https://pinepaper.studio) via the Model Context Protocol (MCP). Works with any AI that supports MCP tool calling (Claude, GPT, Gemini, local models, etc.). Using natural language, you can:
 
 - Create text, shapes, and complex graphics
 - Animate items with behavior-driven relations
@@ -26,12 +26,13 @@ npm install -g @pinepaper.studio/mcp-server
 bun add -g @pinepaper.studio/mcp-server
 ```
 
-### 2. Configure Claude Desktop
+### 2. Configure Your AI Client
 
-Add to your `claude_desktop_config.json`:
+Add to your MCP client configuration. Examples:
 
-**macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
-**Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+**Claude Desktop** (`claude_desktop_config.json`):
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 
 ```json
 {
@@ -44,9 +45,11 @@ Add to your `claude_desktop_config.json`:
 }
 ```
 
+**Other MCP Clients**: Refer to your AI client's MCP configuration documentation.
+
 ### 3. Start Using
 
-Open Claude Desktop and try:
+Open your AI client and try:
 
 > "Create a red pulsing text that says HELLO"
 
@@ -55,6 +58,46 @@ Open Claude Desktop and try:
 > "Add a sunburst background with blue and purple colors"
 
 ## Features
+
+### 📐 Diagram Tools (NEW in v1.4.3)
+
+Create flowcharts, UML diagrams, network diagrams, and more:
+
+```
+"Create a flowchart for user login process"
+"Make a UML class diagram for the User class"
+"Design a network topology with 3 servers connected to a cloud"
+```
+
+**Shape Types:**
+- **Flowchart**: process, decision, terminal, data, document, database, preparation
+- **UML**: uml-class, uml-usecase, uml-actor
+- **Network**: cloud, server
+- **Basic**: rectangle, circle, triangle, star
+
+**Connector Features:**
+- Smart routing (orthogonal, direct, curved)
+- Arrow styles (classic, stealth, diamond, circle, none)
+- Animated bolt effect for data flow
+- Labels on connectors
+
+**Auto-Layout Algorithms:**
+- Hierarchical (flowcharts, org charts)
+- Force-directed (network diagrams)
+- Tree (hierarchies)
+- Radial (mind maps)
+- Grid (component libraries)
+
+**Tools:**
+- `pinepaper_create_diagram_shape` - Create diagram shapes with ports
+- `pinepaper_connect` - Connect items with smart connectors
+- `pinepaper_connect_ports` - Connect specific ports
+- `pinepaper_add_ports` - Add connection ports to items
+- `pinepaper_auto_layout` - Automatically arrange items
+- `pinepaper_get_diagram_shapes` - List available shapes
+- `pinepaper_update_connector` - Update connector properties
+- `pinepaper_remove_connector` - Remove a connector
+- `pinepaper_diagram_mode` - Control diagram editing mode
 
 ### 🔍 Asset Search & Import (NEW in v1.3.0)
 
@@ -78,7 +121,7 @@ Search and import free SVG assets from multiple repositories:
 
 ### 📊 Performance Metrics (NEW in v1.3.0)
 
-Built-in performance tracking helps Claude optimize workflows:
+Built-in performance tracking helps AI assistants optimize workflows:
 
 - Automatic timing for all tool operations
 - Phase breakdown (validation, code generation, execution, screenshots)
@@ -217,7 +260,20 @@ Outputs pairs like:
 |------|-------------|
 | `pinepaper_get_items` | Get canvas items |
 | `pinepaper_get_relation_stats` | Relation statistics |
-| `pinepaper_get_performance_metrics` | Get execution timing metrics (NEW) |
+| `pinepaper_get_performance_metrics` | Get execution timing metrics |
+
+### Diagram Tools (NEW in v1.4.3)
+| Tool | Description |
+|------|-------------|
+| `pinepaper_create_diagram_shape` | Create flowchart/UML/network shapes with ports |
+| `pinepaper_connect` | Connect items with smart connectors |
+| `pinepaper_connect_ports` | Connect specific ports on items |
+| `pinepaper_add_ports` | Add connection ports to items |
+| `pinepaper_auto_layout` | Auto-arrange items using layout algorithms |
+| `pinepaper_get_diagram_shapes` | List available diagram shapes |
+| `pinepaper_update_connector` | Update connector style/label |
+| `pinepaper_remove_connector` | Remove a connector |
+| `pinepaper_diagram_mode` | Control diagram editing mode |
 
 ### Canvas Tools
 | Tool | Description |
@@ -260,11 +316,36 @@ Outputs pairs like:
 3. Add relation: label follows player with offset [0, -50]
 ```
 
+### Flowchart Diagram (NEW)
+
+```
+1. Create a terminal shape with label "Start"
+2. Create a process shape with label "Get Input"
+3. Create a decision shape with label "Valid?"
+4. Create a terminal shape with label "End"
+5. Connect Start → Get Input
+6. Connect Get Input → Valid?
+7. Connect Valid? → End (label: "Yes")
+8. Connect Valid? → Get Input (label: "No", routing: curved)
+9. Apply hierarchical auto-layout
+```
+
+### Network Diagram (NEW)
+
+```
+1. Create a cloud shape with label "Internet"
+2. Create 3 server shapes with labels "Web", "API", "DB"
+3. Connect Internet → Web (label: "HTTPS")
+4. Connect Web → API (label: "REST")
+5. Connect API → DB (label: "SQL")
+6. Apply force-directed auto-layout
+```
+
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     Claude Desktop                          │
+│                 AI Client (Claude, etc.)                    │
 │                          │                                  │
 │                    MCP Protocol                             │
 │                          │                                  │
@@ -303,7 +384,7 @@ bun install
 bun run build
 ```
 
-### Test with Claude Desktop (Local)
+### Test with MCP Client (Local)
 
 1. Build the server:
    ```bash
@@ -314,7 +395,7 @@ bun run build
    bun run build
    ```
 
-2. Add to Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
+2. Add to your MCP client config (example for Claude Desktop on macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`):
    ```json
    {
      "mcpServers": {
@@ -326,7 +407,7 @@ bun run build
    }
    ```
 
-3. Restart Claude Desktop
+3. Restart your MCP client
 
 4. Test with: "What PinePaper tools do you have available?"
 
@@ -381,7 +462,7 @@ The i18n system provides localized:
 Set the `PINEPAPER_LOCALE` environment variable:
 
 ```bash
-# In Claude Desktop config
+# In MCP client config (example for Claude Desktop)
 {
   "mcpServers": {
     "pinepaper": {
@@ -432,7 +513,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
 ### Performance Metrics
 
-PinePaper MCP Server includes built-in performance tracking to help Claude optimize workflows by identifying bottlenecks and choosing faster alternatives.
+PinePaper MCP Server includes built-in performance tracking to help AI assistants optimize workflows by identifying bottlenecks and choosing faster alternatives.
 
 **Key Features:**
 - ⚡ Automatic timing for all tool operations
@@ -445,14 +526,14 @@ PinePaper MCP Server includes built-in performance tracking to help Claude optim
 **Quick Example:**
 
 ```
-Claude: "Let me check if batch operations are faster"
+AI: "Let me check if batch operations are faster"
 → pinepaper_get_performance_metrics(format: 'summary')
 
 Result:
   - pinepaper_create_item: avg 145ms
   - pinepaper_batch_create (10 items): avg 298ms (~30ms per item)
 
-Claude: "I'll use batch_create for the next 20 items"
+AI: "I'll use batch_create for the next 20 items"
 ```
 
 **Configuration:**
@@ -472,7 +553,7 @@ export PINEPAPER_METRICS_RETENTION=5000
 ### Guides
 
 - **[Workflow Guide](docs/WORKFLOW_GUIDE.md)** - Decision trees, multi-step patterns, performance optimization, and troubleshooting
-- **[Performance Metrics](docs/PERFORMANCE_METRICS.md)** - In-memory metrics system for Claude self-optimization
+- **[Performance Metrics](docs/PERFORMANCE_METRICS.md)** - In-memory metrics system for AI self-optimization
 - **[PinePaper Reference](https://pinepaper.studio/docs/)** - Complete PinePaper Studio API reference
 
 ### External Documentation

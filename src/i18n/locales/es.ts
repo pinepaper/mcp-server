@@ -24,6 +24,113 @@ export const es = createBaseTranslation({
     pinepaper_set_canvas_size: { name: 'Establecer Tamaño del Lienzo', description: '' },
     pinepaper_export_svg: { name: 'Exportar SVG', description: '' },
     pinepaper_export_training_data: { name: 'Exportar Datos de Entrenamiento', description: '' },
+
+    // Diagram Tools
+    pinepaper_create_diagram_shape: {
+      name: 'Crear forma de diagrama',
+      description: `Crea formas especializadas para diagramas técnicos como diagramas de flujo, UML y redes.
+
+USAR CUANDO:
+- Crear diagramas de flujo o procesos
+- Diseñar diagramas UML (clases, casos de uso, actores)
+- Dibujar topologías de red u organigramas
+
+TIPOS DE FORMA:
+- Diagrama de flujo: process, decision, terminal, data, document, database, preparation
+- UML: uml-class, uml-usecase, uml-actor
+- Red: cloud, server
+- Básicas: rectangle, circle, triangle, star`
+    },
+    pinepaper_connect: {
+      name: 'Conectar elementos',
+      description: `Conecta dos elementos con un conector inteligente. Forma principal de dibujar líneas/flechas entre formas.
+
+USAR CUANDO:
+- Dibujar flechas entre pasos de un diagrama de flujo
+- Conectar clases UML con asociaciones
+- Crear conexiones de red entre nodos
+
+TIPOS DE ENRUTAMIENTO:
+- orthogonal: Solo giros en ángulo recto (predeterminado)
+- direct: Línea recta entre puntos
+- curved: Curva Bezier con curvatura ajustable`
+    },
+    pinepaper_connect_ports: {
+      name: 'Conectar puertos',
+      description: `Conecta puertos específicos en dos elementos. Usa esto cuando necesites control preciso sobre qué puertos se conectan.
+
+USAR CUANDO:
+- Necesitas que el conector se adhiera a un lado específico de la forma
+- Crear diagramas complejos donde la selección automática de puertos no es ideal
+- Construir diagramas tipo circuito con puntos de entrada/salida específicos`
+    },
+    pinepaper_add_ports: {
+      name: 'Añadir puertos',
+      description: `Añade puertos de conexión a un elemento existente. Los puertos son puntos de anclaje donde se pueden adjuntar conectores.
+
+USAR CUANDO:
+- Añadir posiciones de puerto personalizadas a formas
+- Habilitar conexiones en elementos que no tienen puertos
+- Crear puntos de conexión especializados para diagramas complejos`
+    },
+    pinepaper_auto_layout: {
+      name: 'Diseño automático',
+      description: `Organiza automáticamente elementos del diagrama usando un algoritmo. Reorganiza elementos para diagramas más limpios y legibles.
+
+USAR CUANDO:
+- Los elementos del diagrama están desordenados o superpuestos
+- Quieres crear un diseño profesional automáticamente
+- Después de añadir muchos elementos, necesitas organizarlos
+
+TIPOS DE DISEÑO:
+- hierarchical: Mejor para diagramas de flujo, organigramas
+- force-directed: Mejor para diagramas de red
+- tree: Mejor para jerarquías
+- radial: Mejor para mapas mentales
+- grid: Mejor para elementos de igual importancia`
+    },
+    pinepaper_get_diagram_shapes: {
+      name: 'Obtener formas de diagrama',
+      description: `Obtiene una lista de formas de diagrama disponibles con sus propiedades.
+
+USAR CUANDO:
+- Necesitas ver qué formas de diagrama están disponibles
+- Quieres conocer tamaños y estilos predeterminados para formas
+- Construir interfaz dinámica que muestre opciones de formas`
+    },
+    pinepaper_update_connector: {
+      name: 'Actualizar conector',
+      description: `Actualiza el estilo o etiqueta de un conector existente.
+
+USAR CUANDO:
+- Cambiar apariencia del conector después de crearlo
+- Actualizar etiquetas del conector
+- Cambiar estilos de flecha o colores`
+    },
+    pinepaper_remove_connector: {
+      name: 'Eliminar conector',
+      description: `Elimina un conector del lienzo.
+
+USAR CUANDO:
+- Eliminar una conexión entre elementos
+- Remover enlaces incorrectos
+- Reestructurar conexiones del diagrama`
+    },
+    pinepaper_diagram_mode: {
+      name: 'Modo diagrama',
+      description: `Controla el modo de diagrama para edición interactiva.
+
+USAR CUANDO:
+- Cambiar entre modos de dibujo y selección
+- Habilitar/deshabilitar interfaz específica de diagramas
+- Configurar el lienzo para creación de diagramas
+
+ACCIONES:
+- activate: Habilitar modo diagrama
+- deactivate: Volver al modo lienzo normal
+- toggle: Alternar entre modos
+- setMode: Establecer modo de herramienta específico`
+    },
   },
 
   errors: {

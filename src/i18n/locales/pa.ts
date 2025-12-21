@@ -24,6 +24,16 @@ export const pa = createBaseTranslation({
     pinepaper_set_canvas_size: { name: 'ਕੈਨਵਸ ਆਕਾਰ ਸੈੱਟ ਕਰੋ', description: '' },
     pinepaper_export_svg: { name: 'SVG ਐਕਸਪੋਰਟ ਕਰੋ', description: '' },
     pinepaper_export_training_data: { name: 'ਸਿਖਲਾਈ ਡਾਟਾ ਐਕਸਪੋਰਟ ਕਰੋ', description: '' },
+    // Diagram Tools
+    pinepaper_create_diagram_shape: { name: 'ਡਾਇਆਗ੍ਰਾਮ ਆਕਾਰ ਬਣਾਓ', description: '' },
+    pinepaper_connect: { name: 'ਆਈਟਮਾਂ ਨੂੰ ਜੋੜੋ', description: '' },
+    pinepaper_connect_ports: { name: 'ਪੋਰਟ ਜੋੜੋ', description: '' },
+    pinepaper_add_ports: { name: 'ਪੋਰਟ ਸ਼ਾਮਲ ਕਰੋ', description: '' },
+    pinepaper_auto_layout: { name: 'ਆਟੋ ਲੇਆਉਟ', description: '' },
+    pinepaper_get_diagram_shapes: { name: 'ਡਾਇਆਗ੍ਰਾਮ ਆਕਾਰ ਪ੍ਰਾਪਤ ਕਰੋ', description: '' },
+    pinepaper_update_connector: { name: 'ਕਨੈਕਟਰ ਅੱਪਡੇਟ ਕਰੋ', description: '' },
+    pinepaper_remove_connector: { name: 'ਕਨੈਕਟਰ ਹਟਾਓ', description: '' },
+    pinepaper_diagram_mode: { name: 'ਡਾਇਆਗ੍ਰਾਮ ਮੋਡ', description: '' },
   },
 
   errors: {

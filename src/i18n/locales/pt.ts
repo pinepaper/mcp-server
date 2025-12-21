@@ -24,6 +24,17 @@ export const pt = createBaseTranslation({
     pinepaper_set_canvas_size: { name: 'Definir tamanho da tela', description: '' },
     pinepaper_export_svg: { name: 'Exportar SVG', description: '' },
     pinepaper_export_training_data: { name: 'Exportar dados de treino', description: '' },
+
+    // Diagram Tools
+    pinepaper_create_diagram_shape: { name: 'Criar forma de diagrama', description: '' },
+    pinepaper_connect: { name: 'Conectar itens', description: '' },
+    pinepaper_connect_ports: { name: 'Conectar portas', description: '' },
+    pinepaper_add_ports: { name: 'Adicionar portas', description: '' },
+    pinepaper_auto_layout: { name: 'Layout automático', description: '' },
+    pinepaper_get_diagram_shapes: { name: 'Obter formas de diagrama', description: '' },
+    pinepaper_update_connector: { name: 'Atualizar conector', description: '' },
+    pinepaper_remove_connector: { name: 'Remover conector', description: '' },
+    pinepaper_diagram_mode: { name: 'Modo diagrama', description: '' },
   },
 
   errors: {

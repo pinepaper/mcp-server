@@ -36,6 +36,16 @@ import {
   SearchAssetsInputSchema,
   ImportAssetInputSchema,
   P5DrawInputSchema,
+  // Diagram schemas
+  CreateDiagramShapeInputSchema,
+  ConnectInputSchema,
+  ConnectPortsInputSchema,
+  AddPortsInputSchema,
+  AutoLayoutInputSchema,
+  GetDiagramShapesInputSchema,
+  UpdateConnectorInputSchema,
+  RemoveConnectorInputSchema,
+  DiagramModeInputSchema,
   ErrorCodes,
   RelationType,
   ItemType,
@@ -1194,6 +1204,72 @@ Browser is ready. You can now use other pinepaper tools to create and animate gr
       }
 
       // -----------------------------------------------------------------------
+      // DIAGRAM TOOLS
+      // -----------------------------------------------------------------------
+      case 'pinepaper_create_diagram_shape': {
+        const input = CreateDiagramShapeInputSchema.parse(args);
+        const code = codeGenerator.generateCreateDiagramShape(input);
+        const description = `Creates ${input.shapeType} diagram shape${input.label ? ` with label "${input.label}"` : ''}`;
+        return executeOrGenerate(code, description, options, 'pinepaper_create_diagram_shape');
+      }
+
+      case 'pinepaper_connect': {
+        const input = ConnectInputSchema.parse(args);
+        const code = codeGenerator.generateConnect(input);
+        const description = `Connects ${input.sourceItemId} → ${input.targetItemId} with ${input.routing || 'orthogonal'} routing`;
+        return executeOrGenerate(code, description, options, 'pinepaper_connect');
+      }
+
+      case 'pinepaper_connect_ports': {
+        const input = ConnectPortsInputSchema.parse(args);
+        const code = codeGenerator.generateConnectPorts(input);
+        const description = `Connects ${input.sourceItemId}:${input.sourcePort} → ${input.targetItemId}:${input.targetPort}`;
+        return executeOrGenerate(code, description, options, 'pinepaper_connect_ports');
+      }
+
+      case 'pinepaper_add_ports': {
+        const input = AddPortsInputSchema.parse(args);
+        const code = codeGenerator.generateAddPorts(input);
+        const description = `Adds ${input.portType || 'standard'} ports to ${input.itemId}`;
+        return executeOrGenerate(code, description, options, 'pinepaper_add_ports');
+      }
+
+      case 'pinepaper_auto_layout': {
+        const input = AutoLayoutInputSchema.parse(args);
+        const code = codeGenerator.generateAutoLayout(input);
+        const description = `Applies ${input.layoutType} auto-layout to diagram items`;
+        return executeOrGenerate(code, description, options, 'pinepaper_auto_layout');
+      }
+
+      case 'pinepaper_get_diagram_shapes': {
+        const input = GetDiagramShapesInputSchema.parse(args);
+        const code = codeGenerator.generateGetDiagramShapes(input);
+        const description = `Gets available diagram shapes${input.category ? ` in category "${input.category}"` : ''}`;
+        return executeOrGenerate(code, description, options, 'pinepaper_get_diagram_shapes');
+      }
+
+      case 'pinepaper_update_connector': {
+        const input = UpdateConnectorInputSchema.parse(args);
+        const code = codeGenerator.generateUpdateConnector(input);
+        const description = `Updates connector ${input.connectorId}`;
+        return executeOrGenerate(code, description, options, 'pinepaper_update_connector');
+      }
+
+      case 'pinepaper_remove_connector': {
+        const input = RemoveConnectorInputSchema.parse(args);
+        const code = codeGenerator.generateRemoveConnector(input);
+        const description = `Removes connector ${input.connectorId}`;
+        return executeOrGenerate(code, description, options, 'pinepaper_remove_connector');
+      }
+
+      case 'pinepaper_diagram_mode': {
+        const input = DiagramModeInputSchema.parse(args);
+        const code = codeGenerator.generateDiagramMode(input);
+        const description = `Diagram mode: ${input.action}${input.mode ? ` (${input.mode})` : ''}`;
+        return executeOrGenerate(code, description, options, 'pinepaper_diagram_mode');
+      }
+
+      // -----------------------------------------------------------------------
       // UNKNOWN TOOL
       // -----------------------------------------------------------------------
       default: {
@@ -1238,6 +1314,17 @@ Browser is ready. You can now use other pinepaper tools to create and animate gr
             'pinepaper_get_performance_metrics',
             'pinepaper_search_assets',
             'pinepaper_import_asset',
+            'pinepaper_p5_draw',
+            // Diagram tools
+            'pinepaper_create_diagram_shape',
+            'pinepaper_connect',
+            'pinepaper_connect_ports',
+            'pinepaper_add_ports',
+            'pinepaper_auto_layout',
+            'pinepaper_get_diagram_shapes',
+            'pinepaper_update_connector',
+            'pinepaper_remove_connector',
+            'pinepaper_diagram_mode',
           ],
         });
       }

@@ -1,10 +1,10 @@
 {
   "manifest_version": "0.3",
   "name": "pinepaper-mcp",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "display_name": "PinePaper Studio",
   "description": "Create animated graphics with AI using PinePaper Studio",
-  "long_description": "PinePaper MCP Server enables Claude to create, animate, and export graphics through PinePaper Studio. Features include shape creation, relation-based animations (orbits, follows, attached_to), procedural generators, visual effects, SVG export with animations, asset search & import from 4 open repositories (500k+ icons), performance metrics tracking, and enhanced error messages with canvas context. Supports two execution modes: Puppeteer (live browser execution) and Code (generate code for manual paste).",
+  "long_description": "PinePaper MCP Server enables Claude to create, animate, and export graphics through PinePaper Studio. Features include shape creation, relation-based animations (orbits, follows, attached_to), procedural generators, visual effects, SVG export with animations, asset search & import from 4 open repositories (500k+ icons), performance metrics tracking, diagram tools for flowcharts/UML/network diagrams with smart connectors and auto-layout, and enhanced error messages with canvas context. Supports two execution modes: Puppeteer (live browser execution) and Code (generate code for manual paste).",
   "author": {
     "name": "PinePaper Studio",
     "url": "https://github.com/pinepaper"
@@ -206,6 +206,42 @@
     {
       "name": "pinepaper_create_scene",
       "description": "Create a complete scene with multiple items, relations, and animations in a single operation"
+    },
+    {
+      "name": "pinepaper_create_diagram_shape",
+      "description": "Create flowchart, UML, or network diagram shapes with built-in connection ports"
+    },
+    {
+      "name": "pinepaper_connect",
+      "description": "Connect two items with a smart connector (arrows, lines) with routing options"
+    },
+    {
+      "name": "pinepaper_connect_ports",
+      "description": "Connect specific ports on items with precise control"
+    },
+    {
+      "name": "pinepaper_add_ports",
+      "description": "Add connection ports to an existing item"
+    },
+    {
+      "name": "pinepaper_auto_layout",
+      "description": "Automatically arrange diagram items using layout algorithms (hierarchical, force-directed, radial, grid)"
+    },
+    {
+      "name": "pinepaper_get_diagram_shapes",
+      "description": "Get available diagram shapes with their default properties"
+    },
+    {
+      "name": "pinepaper_update_connector",
+      "description": "Update connector style, label, or properties"
+    },
+    {
+      "name": "pinepaper_remove_connector",
+      "description": "Remove a connector from the canvas"
+    },
+    {
+      "name": "pinepaper_diagram_mode",
+      "description": "Control diagram mode for interactive editing (activate, deactivate, set tool mode)"
     }
   ]
 }

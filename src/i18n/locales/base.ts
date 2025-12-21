@@ -131,6 +131,56 @@ ANIMATION TYPES: pulse, rotate, bounce, fade, wobble, slide, typewriter`,
         name: overrides.tools?.pinepaper_export_training_data?.name || 'Export Training Data',
         description: 'Export relation data as training pairs for LLM fine-tuning.',
       },
+
+      // Diagram Tools
+      pinepaper_create_diagram_shape: {
+        name: overrides.tools?.pinepaper_create_diagram_shape?.name || 'Create Diagram Shape',
+        description: `Create a diagram shape on the canvas. Shapes for flowcharts, UML, network diagrams.
+
+SHAPE TYPES:
+- Flowchart: process, decision, terminal, data, document, database, preparation
+- UML: uml-class, uml-usecase, uml-actor
+- Network: cloud, server
+- Basic: rectangle, circle, triangle, star`,
+      },
+      pinepaper_connect: {
+        name: overrides.tools?.pinepaper_connect?.name || 'Connect Items',
+        description: `Connect two items with a smart connector. Draw lines/arrows between diagram shapes.
+
+ROUTING: orthogonal (right-angle), direct (straight), curved`,
+      },
+      pinepaper_connect_ports: {
+        name: overrides.tools?.pinepaper_connect_ports?.name || 'Connect Specific Ports',
+        description: 'Connect two specific ports on items with precise control.',
+      },
+      pinepaper_add_ports: {
+        name: overrides.tools?.pinepaper_add_ports?.name || 'Add Ports to Item',
+        description: 'Add connection ports to an existing item. Ports are anchor points for connectors.',
+      },
+      pinepaper_auto_layout: {
+        name: overrides.tools?.pinepaper_auto_layout?.name || 'Auto Layout',
+        description: `Automatically arrange diagram items using a layout algorithm.
+
+LAYOUTS: hierarchical, force-directed, tree, radial, grid`,
+      },
+      pinepaper_get_diagram_shapes: {
+        name: overrides.tools?.pinepaper_get_diagram_shapes?.name || 'Get Diagram Shapes',
+        description: 'Get a list of available diagram shapes with their properties.',
+      },
+      pinepaper_update_connector: {
+        name: overrides.tools?.pinepaper_update_connector?.name || 'Update Connector',
+        description: 'Update the style or label of an existing connector.',
+      },
+      pinepaper_remove_connector: {
+        name: overrides.tools?.pinepaper_remove_connector?.name || 'Remove Connector',
+        description: 'Remove a connector from the canvas.',
+      },
+      pinepaper_diagram_mode: {
+        name: overrides.tools?.pinepaper_diagram_mode?.name || 'Diagram Mode',
+        description: `Control the diagram mode for interactive editing.
+
+ACTIONS: activate, deactivate, toggle, setMode`,
+      },
     },
 
     errors: {

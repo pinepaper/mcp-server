@@ -24,6 +24,115 @@ export const it = createBaseTranslation({
     pinepaper_set_canvas_size: { name: 'Imposta dimensione canvas', description: '' },
     pinepaper_export_svg: { name: 'Esporta SVG', description: '' },
     pinepaper_export_training_data: { name: 'Esporta dati di training', description: '' },
+
+    // Diagram Tools
+    pinepaper_create_diagram_shape: {
+      name: 'Crea forma diagramma',
+      description: `Crea una forma per diagrammi sul canvas. Le forme diagramma sono forme specializzate per diagrammi di flusso, diagrammi UML, diagrammi di rete e disegni tecnici simili.
+
+USARE QUANDO:
+- Creare diagrammi di flusso, diagrammi di processo o workflow
+- Costruire diagrammi UML (classi, casi d'uso, sequenze)
+- Progettare diagrammi di topologia di rete
+- Creare organigrammi o alberi decisionali
+
+TIPI DI FORME:
+- Diagrammi di flusso: process, decision, terminal, data, document, database, preparation
+- UML: uml-class, uml-usecase, uml-actor
+- Rete: cloud, server
+- Base: rectangle, circle, triangle, star`,
+    },
+    pinepaper_connect: {
+      name: 'Connetti elementi',
+      description: `Connetti due elementi con un connettore intelligente. Questo è il modo principale per disegnare linee/frecce tra forme di diagrammi.
+
+USARE QUANDO:
+- Disegnare frecce tra passaggi di diagrammi di flusso
+- Connettere classi UML con associazioni
+- Creare connessioni di rete tra nodi
+- Qualsiasi diagramma che necessita linee/frecce tra elementi
+
+TIPI DI ROUTING:
+- orthogonal: Solo angoli retti (predefinito)
+- direct: Linea retta tra i punti
+- curved: Curva di Bezier con curvatura regolabile`,
+    },
+    pinepaper_connect_ports: {
+      name: 'Connetti porte',
+      description: `Connetti due porte specifiche su elementi. Usare quando serve controllo preciso su quali porte attaccare il connettore.
+
+USARE QUANDO:
+- Il connettore deve attaccarsi a un lato specifico della forma
+- Creare diagrammi complessi dove la selezione automatica delle porte non è ideale
+- Costruire diagrammi tipo circuito con punti specifici di entrata/uscita`,
+    },
+    pinepaper_add_ports: {
+      name: 'Aggiungi porte',
+      description: `Aggiungi porte di connessione a un elemento esistente. Le porte sono punti di ancoraggio dove i connettori possono attaccarsi.
+
+USARE QUANDO:
+- Aggiungere posizioni di porta personalizzate alle forme
+- Abilitare connessioni su elementi che non hanno porte
+- Creare punti di connessione specializzati per diagrammi complessi`,
+    },
+    pinepaper_auto_layout: {
+      name: 'Layout automatico',
+      description: `Disponi automaticamente gli elementi del diagramma usando un algoritmo di layout. Questo riorganizza gli elementi per diagrammi più puliti e leggibili.
+
+USARE QUANDO:
+- Gli elementi del diagramma sono disordinati o sovrapposti
+- Vuoi creare un layout dall'aspetto professionale automaticamente
+- Dopo aver aggiunto molti elementi, serve organizzarli
+
+TIPI DI LAYOUT:
+- hierarchical: Migliore per diagrammi di flusso, organigrammi
+- force-directed: Migliore per diagrammi di rete
+- tree: Migliore per gerarchie
+- radial: Migliore per mappe mentali
+- grid: Migliore per elementi di uguale importanza`,
+    },
+    pinepaper_get_diagram_shapes: {
+      name: 'Ottieni forme diagramma',
+      description: `Ottieni un elenco delle forme diagramma disponibili con le loro proprietà.
+
+USARE QUANDO:
+- Serve vedere quali forme diagramma sono disponibili
+- Vuoi conoscere dimensioni predefinite e stile per le forme
+- Costruire UI dinamica che mostra opzioni di forme`,
+    },
+    pinepaper_update_connector: {
+      name: 'Aggiorna connettore',
+      description: `Aggiorna lo stile o l'etichetta di un connettore esistente.
+
+USARE QUANDO:
+- Cambiare l'aspetto del connettore dopo la creazione
+- Aggiornare etichette dei connettori
+- Cambiare stili di freccia o colori`,
+    },
+    pinepaper_remove_connector: {
+      name: 'Rimuovi connettore',
+      description: `Rimuovi un connettore dal canvas.
+
+USARE QUANDO:
+- Eliminare una connessione tra elementi
+- Rimuovere collegamenti errati
+- Ristrutturare connessioni del diagramma`,
+    },
+    pinepaper_diagram_mode: {
+      name: 'Modalità diagramma',
+      description: `Controlla la modalità diagramma per editing interattivo.
+
+USARE QUANDO:
+- Passare tra modalità disegno e selezione
+- Abilitare/disabilitare UI specifiche per diagrammi
+- Preparare il canvas per creazione di diagrammi
+
+AZIONI:
+- activate: Abilita modalità diagramma
+- deactivate: Ritorna alla modalità canvas normale
+- toggle: Cambia tra le modalità
+- setMode: Imposta modalità strumento specifica`,
+    },
   },
 
   errors: {

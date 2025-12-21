@@ -303,6 +303,16 @@ GAMITIN KAPAG:
         includeMetadata: 'Isama ang relation metadata',
       },
     },
+    // Diagram Tools
+    pinepaper_create_diagram_shape: { name: 'Lumikha ng hugis ng dayagram', description: '' },
+    pinepaper_connect: { name: 'Ikonekta ang mga item', description: '' },
+    pinepaper_connect_ports: { name: 'Ikonekta ang mga port', description: '' },
+    pinepaper_add_ports: { name: 'Magdagdag ng mga port', description: '' },
+    pinepaper_auto_layout: { name: 'Auto na layout', description: '' },
+    pinepaper_get_diagram_shapes: { name: 'Kunin ang mga hugis ng dayagram', description: '' },
+    pinepaper_update_connector: { name: 'I-update ang connector', description: '' },
+    pinepaper_remove_connector: { name: 'Alisin ang connector', description: '' },
+    pinepaper_diagram_mode: { name: 'Mode ng dayagram', description: '' },
   },
 
   errors: {

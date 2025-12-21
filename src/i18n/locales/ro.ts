@@ -24,6 +24,16 @@ export const ro = createBaseTranslation({
     pinepaper_set_canvas_size: { name: 'Setează dimensiunea pânzei', description: '' },
     pinepaper_export_svg: { name: 'Exportă SVG', description: '' },
     pinepaper_export_training_data: { name: 'Exportă date de antrenament', description: '' },
+    // Diagram Tools
+    pinepaper_create_diagram_shape: { name: 'Creează formă diagramă', description: '' },
+    pinepaper_connect: { name: 'Conectare elemente', description: '' },
+    pinepaper_connect_ports: { name: 'Conectare porturi', description: '' },
+    pinepaper_add_ports: { name: 'Adaugă porturi', description: '' },
+    pinepaper_auto_layout: { name: 'Aranjare automată', description: '' },
+    pinepaper_get_diagram_shapes: { name: 'Obține forme diagramă', description: '' },
+    pinepaper_update_connector: { name: 'Actualizează conector', description: '' },
+    pinepaper_remove_connector: { name: 'Elimină conector', description: '' },
+    pinepaper_diagram_mode: { name: 'Mod diagramă', description: '' },
   },
 
   errors: {

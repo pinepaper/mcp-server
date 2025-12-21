@@ -303,6 +303,169 @@ USE WHEN:
         includeMetadata: 'Include relation metadata',
       },
     },
+
+    // Diagram Tools
+    pinepaper_create_diagram_shape: {
+      name: 'Create Diagram Shape',
+      description: `Create a diagram shape on the canvas. Diagram shapes are specialized shapes for flowcharts, UML diagrams, network diagrams, and similar technical drawings.
+
+USE WHEN:
+- Creating flowcharts, process diagrams, or workflows
+- Building UML class diagrams, use case diagrams, or sequence diagrams
+- Designing network topology diagrams
+- Making organizational charts or decision trees
+
+SHAPE TYPES:
+- Flowchart: process, decision, terminal, data, document, database, preparation
+- UML: uml-class, uml-usecase, uml-actor
+- Network: cloud, server
+- Basic: rectangle, circle, triangle, star`,
+      params: {
+        shapeType: 'Type of diagram shape to create',
+        position: 'Position on canvas',
+        width: 'Shape width in pixels',
+        height: 'Shape height in pixels',
+        label: 'Text label inside the shape',
+        style: 'Visual styling options',
+      },
+    },
+    pinepaper_connect: {
+      name: 'Connect Items',
+      description: `Connect two items with a smart connector. This is the primary way to draw lines/arrows between diagram shapes.
+
+USE WHEN:
+- Drawing arrows between flowchart steps
+- Connecting UML classes with associations
+- Creating network connections between nodes
+- Any diagram that needs lines/arrows between elements
+
+ROUTING TYPES:
+- orthogonal: Right-angle turns only (default)
+- direct: Straight line between points
+- curved: Bezier curve with adjustable curvature`,
+      params: {
+        sourceItemId: 'Registry ID of the source item (where arrow starts)',
+        targetItemId: 'Registry ID of the target item (where arrow points)',
+        routing: 'Connector routing style',
+        lineColor: 'Line color',
+        lineWidth: 'Line width in pixels',
+        lineStyle: 'Line style (solid, dashed, dotted)',
+        headStyle: 'Arrow head style at target',
+        tailStyle: 'Arrow style at source',
+        label: 'Text label on the connector',
+      },
+    },
+    pinepaper_connect_ports: {
+      name: 'Connect Specific Ports',
+      description: `Connect two specific ports on items. Use this when you need precise control over which ports the connector attaches to.
+
+USE WHEN:
+- Need connector to attach to specific side of shape
+- Creating complex diagrams where automatic port selection isn't ideal
+- Building circuit-like diagrams with specific entry/exit points`,
+      params: {
+        sourceItemId: 'Registry ID of the source item',
+        sourcePort: 'Port position on source item',
+        targetItemId: 'Registry ID of the target item',
+        targetPort: 'Port position on target item',
+        config: 'Connector configuration options',
+      },
+    },
+    pinepaper_add_ports: {
+      name: 'Add Ports to Item',
+      description: `Add connection ports to an existing item. Ports are anchor points where connectors can attach.
+
+USE WHEN:
+- Adding custom port positions to shapes
+- Enabling connections on items that don't have ports
+- Creating specialized connection points for complex diagrams`,
+      params: {
+        itemId: 'Registry ID of the item to add ports to',
+        portType: 'Type of port configuration',
+        ports: 'Custom port definitions',
+        count: 'Number of ports for path type',
+      },
+    },
+    pinepaper_auto_layout: {
+      name: 'Auto Layout',
+      description: `Automatically arrange diagram items using a layout algorithm. This reorganizes items for cleaner, more readable diagrams.
+
+USE WHEN:
+- Diagram items are messy or overlapping
+- Want to create a professional-looking layout automatically
+- After adding many items, need to organize them
+
+LAYOUT TYPES:
+- hierarchical: Best for flowcharts, org charts
+- force-directed: Best for network diagrams
+- tree: Best for hierarchies
+- radial: Best for mind maps
+- grid: Best for equal-importance items`,
+      params: {
+        layoutType: 'Layout algorithm to use',
+        itemIds: 'Specific items to layout',
+        options: 'Layout-specific options',
+      },
+    },
+    pinepaper_get_diagram_shapes: {
+      name: 'Get Diagram Shapes',
+      description: `Get a list of available diagram shapes with their properties.
+
+USE WHEN:
+- Need to see what diagram shapes are available
+- Want to know default sizes and styling for shapes
+- Building dynamic UI that shows shape options`,
+      params: {
+        category: 'Filter by category (flowchart, uml, network, basic)',
+      },
+    },
+    pinepaper_update_connector: {
+      name: 'Update Connector',
+      description: `Update the style or label of an existing connector.
+
+USE WHEN:
+- Changing connector appearance after creation
+- Updating connector labels
+- Changing arrow styles or colors`,
+      params: {
+        connectorId: 'ID of the connector to update',
+        style: 'Style properties to update',
+        label: 'New label text',
+        labelPosition: 'Label position along path (0-1)',
+      },
+    },
+    pinepaper_remove_connector: {
+      name: 'Remove Connector',
+      description: `Remove a connector from the canvas.
+
+USE WHEN:
+- Deleting a connection between items
+- Removing incorrect links
+- Restructuring diagram connections`,
+      params: {
+        connectorId: 'ID of the connector to remove',
+      },
+    },
+    pinepaper_diagram_mode: {
+      name: 'Diagram Mode',
+      description: `Control the diagram mode for interactive editing.
+
+USE WHEN:
+- Switching between drawing and selection modes
+- Enabling/disabling diagram-specific UI
+- Setting up the canvas for diagram creation
+
+ACTIONS:
+- activate: Enable diagram mode
+- deactivate: Return to normal canvas mode
+- toggle: Switch between modes
+- setMode: Set specific tool mode`,
+      params: {
+        action: 'Action to perform',
+        mode: 'Tool mode (for setMode action)',
+        shapeType: 'Shape type for shape mode',
+      },
+    },
   },
 
   errors: {

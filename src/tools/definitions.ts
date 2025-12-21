@@ -2053,7 +2053,7 @@ RETURNS:
     },
     description: `Execute p5.js-style drawing code on the PinePaper canvas.
 
-Claude can use familiar p5.js syntax - the code is translated to Paper.js automatically.
+AI assistants can use familiar p5.js syntax - the code is translated to Paper.js automatically.
 This is a SUBSET of p5.js functions optimized for static drawings.
 
 AVAILABLE FUNCTIONS:
@@ -2160,6 +2160,694 @@ for (let i = 10; i > 0; i--) {
         },
       },
       required: ['code'],
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // DIAGRAM TOOLS
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_create_diagram_shape',
+    annotations: {
+      title: 'Create Diagram Shape',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Create a diagram shape on the canvas. Diagram shapes are specialized shapes for flowcharts, UML diagrams, network diagrams, and similar technical drawings.
+
+USE WHEN:
+- Creating flowcharts, process diagrams, or workflows
+- Building UML class diagrams, use case diagrams, or sequence diagrams
+- Designing network topology diagrams
+- Making organizational charts or decision trees
+- Any technical or architectural diagram
+
+SHAPE TYPES:
+
+Flowchart shapes:
+- process: Rectangle for process steps (default: 120x60)
+- decision: Diamond for yes/no decisions (default: 100x100)
+- terminal: Rounded rectangle for start/end (default: 120x40)
+- data: Parallelogram for data I/O (default: 120x60)
+- document: Wavy-bottom rectangle for documents (default: 100x80)
+- database: Cylinder for database/storage (default: 80x100)
+- preparation: Hexagon for preparation steps (default: 120x60)
+
+UML shapes:
+- uml-class: Class box with name/attributes/methods sections (default: 150x120)
+- uml-usecase: Ellipse for use case (default: 140x80)
+- uml-actor: Stick figure for actor (default: 60x100)
+
+Network shapes:
+- cloud: Cloud shape for cloud services (default: 140x90)
+- server: Server rack shape (default: 80x100)
+
+Basic shapes (same as pinepaper_create_item but diagram-optimized):
+- rectangle, circle, triangle, star
+
+All shapes:
+- Have connection ports for connectors
+- Support labels inside the shape
+- Can be connected using pinepaper_connect or pinepaper_connect_ports
+
+EXAMPLES:
+- Flowchart start: {shapeType: "terminal", label: "Start", position: {x: 400, y: 100}}
+- Decision node: {shapeType: "decision", label: "Is valid?", position: {x: 400, y: 200}}
+- Database: {shapeType: "database", label: "Users DB", position: {x: 600, y: 200}}
+- UML Class: {shapeType: "uml-class", label: "User", width: 180, height: 150}
+
+WORKFLOW TIP:
+After creating shapes, use pinepaper_connect to draw connectors between them.
+Use pinepaper_auto_layout to automatically arrange shapes in a clean layout.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        shapeType: {
+          type: 'string',
+          enum: ['process', 'decision', 'terminal', 'data', 'document', 'database', 'preparation', 'uml-class', 'uml-usecase', 'uml-actor', 'cloud', 'server', 'rectangle', 'circle', 'triangle', 'star'],
+          description: 'Type of diagram shape to create',
+        },
+        position: {
+          type: 'object',
+          properties: {
+            x: { type: 'number', description: 'X coordinate (default: 400)' },
+            y: { type: 'number', description: 'Y coordinate (default: 300)' },
+          },
+          description: 'Position on canvas',
+        },
+        width: {
+          type: 'number',
+          description: 'Shape width in pixels (uses type-specific default if not specified)',
+        },
+        height: {
+          type: 'number',
+          description: 'Shape height in pixels (uses type-specific default if not specified)',
+        },
+        label: {
+          type: 'string',
+          description: 'Text label inside the shape',
+        },
+        style: {
+          type: 'object',
+          properties: {
+            fillColor: { type: 'string', description: 'Fill color' },
+            strokeColor: { type: 'string', description: 'Stroke color' },
+            strokeWidth: { type: 'number', description: 'Stroke width' },
+          },
+          description: 'Visual styling options',
+        },
+      },
+      required: ['shapeType'],
+    },
+  },
+
+  {
+    name: 'pinepaper_connect',
+    annotations: {
+      title: 'Connect Items',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Connect two items with a smart connector. This is the primary way to draw lines/arrows between diagram shapes.
+
+USE WHEN:
+- Drawing arrows between flowchart steps
+- Connecting UML classes with associations
+- Creating network connections between nodes
+- Any diagram that needs lines/arrows between elements
+
+CONNECTOR FEATURES:
+- Automatic port selection (finds nearest ports)
+- Smart routing to avoid overlapping shapes
+- Animated "bolt" effect for data flow visualization
+- Arrow heads on either or both ends
+- Labels on connectors
+
+ROUTING TYPES:
+- orthogonal: Right-angle turns only (default, best for flowcharts)
+- direct: Straight line between points
+- curved: Bezier curve with adjustable curvature
+
+ARROW STYLES:
+- classic: Standard filled arrow (default for head)
+- stealth: Narrow sharp arrow
+- sharp: Simple pointed arrow
+- open: Outline arrow (not filled)
+- diamond: Diamond shape (for UML aggregation)
+- circle: Circle (for UML composition)
+- none: No arrowhead (default for tail)
+
+LINE STYLES:
+- solid: Continuous line (default)
+- dashed: Dashed line (for optional relationships)
+- dotted: Dotted line (for dependencies)
+
+ANIMATED BOLT:
+Enable boltEnabled: true to show an animated particle traveling along the connector.
+Useful for showing data flow, process direction, or network traffic.
+
+EXAMPLES:
+- Simple arrow: {sourceItemId: "shape_1", targetItemId: "shape_2"}
+- Curved line: {sourceItemId: "a", targetItemId: "b", routing: "curved", curvature: 0.7}
+- Dashed dependency: {sourceItemId: "a", targetItemId: "b", lineStyle: "dashed", headStyle: "open"}
+- Two-way arrow: {sourceItemId: "a", targetItemId: "b", headStyle: "classic", tailStyle: "classic"}
+- Labeled connection: {sourceItemId: "a", targetItemId: "b", label: "1..*"}
+
+RETURNS:
+- connectorId: ID of the connector (use for updates/removal)
+- sourceItemId, targetItemId: Connected items`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        sourceItemId: {
+          type: 'string',
+          description: 'Registry ID of the source item (where arrow starts)',
+        },
+        targetItemId: {
+          type: 'string',
+          description: 'Registry ID of the target item (where arrow points)',
+        },
+        routing: {
+          type: 'string',
+          enum: ['direct', 'orthogonal', 'curved'],
+          description: 'Connector routing style (default: orthogonal)',
+        },
+        lineColor: {
+          type: 'string',
+          description: 'Line color (default: #4B5563)',
+        },
+        lineWidth: {
+          type: 'number',
+          description: 'Line width in pixels (default: 2)',
+        },
+        lineStyle: {
+          type: 'string',
+          enum: ['solid', 'dashed', 'dotted'],
+          description: 'Line style (default: solid)',
+        },
+        headStyle: {
+          type: 'string',
+          enum: ['classic', 'stealth', 'sharp', 'open', 'diamond', 'circle', 'none'],
+          description: 'Arrow head style at target (default: classic)',
+        },
+        tailStyle: {
+          type: 'string',
+          enum: ['classic', 'stealth', 'sharp', 'open', 'diamond', 'circle', 'none'],
+          description: 'Arrow style at source (default: none)',
+        },
+        label: {
+          type: 'string',
+          description: 'Text label on the connector',
+        },
+        curvature: {
+          type: 'number',
+          description: 'Curve intensity for curved routing (0.1-1.0, default: 0.5)',
+        },
+        boltEnabled: {
+          type: 'boolean',
+          description: 'Enable animated bolt effect (default: true)',
+        },
+        boltColor: {
+          type: 'string',
+          description: 'Bolt animation color (default: #fbbf24)',
+        },
+      },
+      required: ['sourceItemId', 'targetItemId'],
+    },
+  },
+
+  {
+    name: 'pinepaper_connect_ports',
+    annotations: {
+      title: 'Connect Specific Ports',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Connect two specific ports on items. Use this when you need precise control over which ports the connector attaches to.
+
+USE WHEN:
+- Need connector to attach to specific side of shape
+- Creating complex diagrams where automatic port selection isn't ideal
+- Building circuit-like diagrams with specific entry/exit points
+- Connecting specific input/output ports
+
+PORT POSITIONS:
+Standard positions:
+- top, bottom, left, right: Center of each edge
+- top-left, top-right, bottom-left, bottom-right: Corners
+- center: Center of the shape
+
+Line/path specific:
+- start: Beginning of path
+- end: End of path
+
+EXAMPLES:
+- Top to bottom: {sourceItemId: "a", sourcePort: "bottom", targetItemId: "b", targetPort: "top"}
+- Left to right: {sourceItemId: "a", sourcePort: "right", targetItemId: "b", targetPort: "left"}
+- Corner connection: {sourceItemId: "a", sourcePort: "bottom-right", targetItemId: "b", targetPort: "top-left"}
+
+CONFIG OPTIONS:
+Same as pinepaper_connect: routing, lineColor, lineWidth, lineStyle, headStyle, tailStyle, label, curvature, boltEnabled, boltColor`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        sourceItemId: {
+          type: 'string',
+          description: 'Registry ID of the source item',
+        },
+        sourcePort: {
+          type: 'string',
+          enum: ['top', 'bottom', 'left', 'right', 'top-left', 'top-right', 'bottom-left', 'bottom-right', 'center', 'start', 'end'],
+          description: 'Port position on source item',
+        },
+        targetItemId: {
+          type: 'string',
+          description: 'Registry ID of the target item',
+        },
+        targetPort: {
+          type: 'string',
+          enum: ['top', 'bottom', 'left', 'right', 'top-left', 'top-right', 'bottom-left', 'bottom-right', 'center', 'start', 'end'],
+          description: 'Port position on target item',
+        },
+        config: {
+          type: 'object',
+          properties: {
+            routing: { type: 'string', enum: ['direct', 'orthogonal', 'curved'] },
+            lineColor: { type: 'string' },
+            lineWidth: { type: 'number' },
+            lineStyle: { type: 'string', enum: ['solid', 'dashed', 'dotted'] },
+            headStyle: { type: 'string', enum: ['classic', 'stealth', 'sharp', 'open', 'diamond', 'circle', 'none'] },
+            tailStyle: { type: 'string', enum: ['classic', 'stealth', 'sharp', 'open', 'diamond', 'circle', 'none'] },
+            label: { type: 'string' },
+            curvature: { type: 'number' },
+            boltEnabled: { type: 'boolean' },
+            boltColor: { type: 'string' },
+          },
+          description: 'Connector configuration options',
+        },
+      },
+      required: ['sourceItemId', 'sourcePort', 'targetItemId', 'targetPort'],
+    },
+  },
+
+  {
+    name: 'pinepaper_add_ports',
+    annotations: {
+      title: 'Add Ports to Item',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Add connection ports to an existing item. Ports are anchor points where connectors can attach.
+
+USE WHEN:
+- Adding custom port positions to shapes
+- Enabling connections on items that don't have ports
+- Creating specialized connection points for complex diagrams
+
+PORT TYPES:
+- standard: Standard 4 ports (top, bottom, left, right)
+- line: 2 ports (start, end) for line-like items
+- path: N ports distributed along a path
+- custom: User-defined port positions
+
+CUSTOM PORTS:
+Define specific ports with position and type:
+- position: where on the item (top, bottom, left, right, corners)
+- type: input (accept incoming), output (start outgoing), or both
+
+EXAMPLES:
+- Standard 4 ports: {itemId: "shape_1", portType: "standard"}
+- Line endpoints: {itemId: "line_1", portType: "line"}
+- Path with 5 ports: {itemId: "path_1", portType: "path", count: 5}
+- Custom ports: {itemId: "shape_1", portType: "custom", ports: [{position: "top", type: "input"}, {position: "bottom", type: "output"}]}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        itemId: {
+          type: 'string',
+          description: 'Registry ID of the item to add ports to',
+        },
+        portType: {
+          type: 'string',
+          enum: ['standard', 'line', 'path', 'custom'],
+          description: 'Type of port configuration (default: standard)',
+        },
+        ports: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              position: {
+                type: 'string',
+                enum: ['top', 'bottom', 'left', 'right', 'top-left', 'top-right', 'bottom-left', 'bottom-right', 'center', 'start', 'end'],
+              },
+              type: {
+                type: 'string',
+                enum: ['input', 'output', 'both'],
+              },
+            },
+          },
+          description: 'Custom port definitions (for portType: "custom")',
+        },
+        count: {
+          type: 'number',
+          description: 'Number of ports for path type',
+        },
+      },
+      required: ['itemId'],
+    },
+  },
+
+  {
+    name: 'pinepaper_auto_layout',
+    annotations: {
+      title: 'Auto Layout',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Automatically arrange diagram items using a layout algorithm. This reorganizes items for cleaner, more readable diagrams.
+
+USE WHEN:
+- Diagram items are messy or overlapping
+- Want to create a professional-looking layout automatically
+- After adding many items, need to organize them
+- Creating hierarchical structures (org charts, trees)
+
+LAYOUT TYPES:
+
+hierarchical:
+- Best for: flowcharts, org charts, dependency graphs
+- Arranges items in levels from top to bottom (or other directions)
+- Respects connector direction for parent-child relationships
+- Options: direction (TB/BT/LR/RL), levelSpacing, nodeSpacing
+
+force-directed:
+- Best for: network diagrams, relationship graphs
+- Uses physics simulation (attraction/repulsion)
+- Good for showing clusters and relationships
+- Options: iterations, attraction, repulsion
+
+tree:
+- Best for: hierarchies, file systems, family trees
+- Similar to hierarchical but optimized for tree structures
+- Options: direction, levelSpacing, nodeSpacing
+
+radial:
+- Best for: mind maps, hub-and-spoke diagrams
+- Places items in concentric circles around a center
+- Options: centerX, centerY, startRadius, radiusStep
+
+grid:
+- Best for: equal-importance items, component libraries
+- Arranges items in rows and columns
+- Options: columns, cellWidth, cellHeight
+
+ANIMATION:
+By default, items animate smoothly to their new positions.
+Set animate: false for instant repositioning.
+
+EXAMPLES:
+- Flowchart layout: {layoutType: "hierarchical", options: {direction: "TB", levelSpacing: 100}}
+- Network diagram: {layoutType: "force-directed", options: {iterations: 200, repulsion: 2000}}
+- Mind map: {layoutType: "radial", options: {centerX: 400, centerY: 300}}
+- Grid of icons: {layoutType: "grid", options: {columns: 4, cellWidth: 120}}
+
+PARTIAL LAYOUT:
+Pass itemIds array to only layout specific items, leaving others in place.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        layoutType: {
+          type: 'string',
+          enum: ['hierarchical', 'force-directed', 'tree', 'radial', 'grid'],
+          description: 'Layout algorithm to use',
+        },
+        itemIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Specific items to layout (default: all diagram items)',
+        },
+        options: {
+          type: 'object',
+          properties: {
+            direction: {
+              type: 'string',
+              enum: ['TB', 'BT', 'LR', 'RL'],
+              description: 'Layout direction (TB=top-to-bottom, LR=left-to-right, etc.)',
+            },
+            levelSpacing: {
+              type: 'number',
+              description: 'Vertical spacing between levels (default: 100)',
+            },
+            nodeSpacing: {
+              type: 'number',
+              description: 'Horizontal spacing between nodes (default: 80)',
+            },
+            iterations: {
+              type: 'number',
+              description: 'Iterations for force-directed layout (default: 100)',
+            },
+            attraction: {
+              type: 'number',
+              description: 'Attraction force for connected nodes (default: 0.01)',
+            },
+            repulsion: {
+              type: 'number',
+              description: 'Repulsion force between all nodes (default: 1000)',
+            },
+            columns: {
+              type: 'number',
+              description: 'Number of columns for grid layout',
+            },
+            cellWidth: {
+              type: 'number',
+              description: 'Cell width for grid layout (default: 150)',
+            },
+            cellHeight: {
+              type: 'number',
+              description: 'Cell height for grid layout (default: 100)',
+            },
+            centerX: {
+              type: 'number',
+              description: 'Center X for radial layout',
+            },
+            centerY: {
+              type: 'number',
+              description: 'Center Y for radial layout',
+            },
+            startRadius: {
+              type: 'number',
+              description: 'Starting radius for radial layout (default: 100)',
+            },
+            radiusStep: {
+              type: 'number',
+              description: 'Radius increment per level for radial layout (default: 80)',
+            },
+            animate: {
+              type: 'boolean',
+              description: 'Animate transition to new positions (default: true)',
+            },
+            animationDuration: {
+              type: 'number',
+              description: 'Animation duration in ms (default: 300)',
+            },
+          },
+          description: 'Layout-specific options',
+        },
+      },
+      required: ['layoutType'],
+    },
+  },
+
+  {
+    name: 'pinepaper_get_diagram_shapes',
+    annotations: {
+      title: 'Get Diagram Shapes',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Get a list of available diagram shapes with their properties.
+
+USE WHEN:
+- Need to see what diagram shapes are available
+- Want to know default sizes and styling for shapes
+- Building dynamic UI that shows shape options
+
+CATEGORIES:
+- flowchart: process, decision, terminal, data, document, database, preparation
+- uml: uml-class, uml-usecase, uml-actor
+- network: cloud, server
+- basic: rectangle, circle, triangle, star
+
+RETURNS:
+Array of shape definitions including:
+- name: Shape identifier
+- category: Category it belongs to
+- defaultWidth, defaultHeight: Default dimensions
+- defaultStyle: Default colors and stroke
+- description: What the shape represents`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        category: {
+          type: 'string',
+          enum: ['flowchart', 'uml', 'network', 'basic'],
+          description: 'Filter by category (optional - returns all if not specified)',
+        },
+      },
+    },
+  },
+
+  {
+    name: 'pinepaper_update_connector',
+    annotations: {
+      title: 'Update Connector',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Update the style or label of an existing connector.
+
+USE WHEN:
+- Changing connector appearance after creation
+- Updating connector labels
+- Changing arrow styles or colors
+
+UPDATABLE PROPERTIES:
+- style: lineColor, lineWidth, headStyle, tailStyle, routing, lineStyle
+- label: Text label on the connector
+- labelPosition: Position along path (0-1, where 0.5 is middle)
+
+EXAMPLES:
+- Change color: {connectorId: "conn_1", style: {lineColor: "#ef4444"}}
+- Add label: {connectorId: "conn_1", label: "data flow"}
+- Change to dashed: {connectorId: "conn_1", style: {lineStyle: "dashed"}}
+- Move label: {connectorId: "conn_1", labelPosition: 0.25}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        connectorId: {
+          type: 'string',
+          description: 'ID of the connector to update',
+        },
+        style: {
+          type: 'object',
+          properties: {
+            lineColor: { type: 'string' },
+            lineWidth: { type: 'number' },
+            headStyle: { type: 'string', enum: ['classic', 'stealth', 'sharp', 'open', 'diamond', 'circle', 'none'] },
+            tailStyle: { type: 'string', enum: ['classic', 'stealth', 'sharp', 'open', 'diamond', 'circle', 'none'] },
+            routing: { type: 'string', enum: ['direct', 'orthogonal', 'curved'] },
+            lineStyle: { type: 'string', enum: ['solid', 'dashed', 'dotted'] },
+          },
+          description: 'Style properties to update',
+        },
+        label: {
+          type: 'string',
+          description: 'New label text',
+        },
+        labelPosition: {
+          type: 'number',
+          description: 'Label position along path (0-1)',
+        },
+      },
+      required: ['connectorId'],
+    },
+  },
+
+  {
+    name: 'pinepaper_remove_connector',
+    annotations: {
+      title: 'Remove Connector',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Remove a connector from the canvas.
+
+USE WHEN:
+- Deleting a connection between items
+- Removing incorrect links
+- Restructuring diagram connections`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        connectorId: {
+          type: 'string',
+          description: 'ID of the connector to remove',
+        },
+      },
+      required: ['connectorId'],
+    },
+  },
+
+  {
+    name: 'pinepaper_diagram_mode',
+    annotations: {
+      title: 'Diagram Mode',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Control the diagram mode for interactive editing.
+
+USE WHEN:
+- Switching between drawing and selection modes
+- Enabling/disabling diagram-specific UI
+- Setting up the canvas for diagram creation
+
+ACTIONS:
+- activate: Enable diagram mode (shows grid, snap, port indicators)
+- deactivate: Return to normal canvas mode
+- toggle: Switch between diagram and normal mode
+- setMode: Set specific tool mode (select, connect, shape, pan)
+
+TOOL MODES (for setMode action):
+- select: Selection and moving items
+- connect: Drawing connectors between items
+- shape: Drawing new shapes (optionally specify shapeType)
+- pan: Panning the canvas
+
+EXAMPLES:
+- Enter diagram mode: {action: "activate"}
+- Exit diagram mode: {action: "deactivate"}
+- Set to connect mode: {action: "setMode", mode: "connect"}
+- Set to draw rectangles: {action: "setMode", mode: "shape", shapeType: "process"}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['activate', 'deactivate', 'toggle', 'setMode'],
+          description: 'Action to perform',
+        },
+        mode: {
+          type: 'string',
+          enum: ['select', 'connect', 'shape', 'pan'],
+          description: 'Tool mode (for setMode action)',
+        },
+        shapeType: {
+          type: 'string',
+          enum: ['process', 'decision', 'terminal', 'data', 'document', 'database', 'preparation', 'uml-class', 'uml-usecase', 'uml-actor', 'cloud', 'server', 'rectangle', 'circle', 'triangle', 'star'],
+          description: 'Shape type for shape mode',
+        },
+      },
+      required: ['action'],
     },
   },
 ];

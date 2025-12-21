@@ -24,6 +24,16 @@ export const da = createBaseTranslation({
     pinepaper_set_canvas_size: { name: 'Indstil lærredstørrelse', description: '' },
     pinepaper_export_svg: { name: 'Eksporter SVG', description: '' },
     pinepaper_export_training_data: { name: 'Eksporter træningsdata', description: '' },
+    // Diagram Tools
+    pinepaper_create_diagram_shape: { name: 'Opret diagramform', description: '' },
+    pinepaper_connect: { name: 'Forbind elementer', description: '' },
+    pinepaper_connect_ports: { name: 'Forbind porte', description: '' },
+    pinepaper_add_ports: { name: 'Tilføj porte', description: '' },
+    pinepaper_auto_layout: { name: 'Automatisk layout', description: '' },
+    pinepaper_get_diagram_shapes: { name: 'Hent diagramformer', description: '' },
+    pinepaper_update_connector: { name: 'Opdater forbindelse', description: '' },
+    pinepaper_remove_connector: { name: 'Fjern forbindelse', description: '' },
+    pinepaper_diagram_mode: { name: 'Diagramtilstand', description: '' },
   },
 
   errors: {

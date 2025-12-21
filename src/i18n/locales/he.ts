@@ -24,6 +24,16 @@ export const he = createBaseTranslation({
     pinepaper_set_canvas_size: { name: 'הגדר גודל בד', description: '' },
     pinepaper_export_svg: { name: 'ייצא SVG', description: '' },
     pinepaper_export_training_data: { name: 'ייצא נתוני אימון', description: '' },
+    // Diagram Tools
+    pinepaper_create_diagram_shape: { name: 'צור צורת דיאגרמה', description: '' },
+    pinepaper_connect: { name: 'חבר פריטים', description: '' },
+    pinepaper_connect_ports: { name: 'חבר יציאות', description: '' },
+    pinepaper_add_ports: { name: 'הוסף יציאות', description: '' },
+    pinepaper_auto_layout: { name: 'פריסה אוטומטית', description: '' },
+    pinepaper_get_diagram_shapes: { name: 'קבל צורות דיאגרמה', description: '' },
+    pinepaper_update_connector: { name: 'עדכן מחבר', description: '' },
+    pinepaper_remove_connector: { name: 'הסר מחבר', description: '' },
+    pinepaper_diagram_mode: { name: 'מצב דיאגרמה', description: '' },
   },
 
   errors: {

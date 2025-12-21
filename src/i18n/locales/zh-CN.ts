@@ -24,6 +24,115 @@ export const zhCN = createBaseTranslation({
     pinepaper_set_canvas_size: { name: '设置画布大小', description: '' },
     pinepaper_export_svg: { name: '导出SVG', description: '' },
     pinepaper_export_training_data: { name: '导出训练数据', description: '' },
+
+    // Diagram Tools
+    pinepaper_create_diagram_shape: {
+      name: '创建图表形状',
+      description: `在画布上创建图表形状。用于流程图、UML图、网络图等技术图表。
+
+使用场景:
+- 创建流程图、过程图或工作流
+- 构建UML类图、用例图或序列图
+- 设计网络拓扑图
+- 制作组织结构图或决策树
+
+形状类型:
+- 流程图: process, decision, terminal, data, document, database, preparation
+- UML: uml-class, uml-usecase, uml-actor
+- 网络: cloud, server
+- 基本: rectangle, circle, triangle, star`,
+    },
+    pinepaper_connect: {
+      name: '连接项目',
+      description: `使用智能连接器连接两个元素。这是在图表形状之间绘制线条/箭头的主要方法。
+
+使用场景:
+- 在流程图步骤之间绘制箭头
+- 用关联连接UML类
+- 在节点之间创建网络连接
+- 任何需要在元素之间绘制线条/箭头的图表
+
+路由类型:
+- orthogonal: 仅直角转弯(默认)
+- direct: 点之间的直线
+- curved: 可调曲率的贝塞尔曲线`,
+    },
+    pinepaper_connect_ports: {
+      name: '连接端口',
+      description: `连接元素上的特定端口。当需要精确控制连接器附着到哪个端口时使用。
+
+使用场景:
+- 需要连接器附着到形状的特定一侧
+- 创建复杂图表,自动端口选择不理想时
+- 构建具有特定进出点的类似电路的图表`,
+    },
+    pinepaper_add_ports: {
+      name: '添加端口',
+      description: `向现有元素添加连接端口。端口是连接器可以附着的锚点。
+
+使用场景:
+- 向形状添加自定义端口位置
+- 在没有端口的元素上启用连接
+- 为复杂图表创建专用连接点`,
+    },
+    pinepaper_auto_layout: {
+      name: '自动布局',
+      description: `使用布局算法自动排列图表元素。重新组织元素以获得更清晰、更易读的图表。
+
+使用场景:
+- 图表元素杂乱或重叠时
+- 想要自动创建专业外观的布局
+- 添加许多元素后需要组织它们
+
+布局类型:
+- hierarchical: 最适合流程图、组织结构图
+- force-directed: 最适合网络图
+- tree: 最适合层次结构
+- radial: 最适合思维导图
+- grid: 最适合同等重要的元素`,
+    },
+    pinepaper_get_diagram_shapes: {
+      name: '获取图表形状',
+      description: `获取可用图表形状及其属性的列表。
+
+使用场景:
+- 需要查看有哪些图表形状可用
+- 想了解形状的默认大小和样式
+- 构建显示形状选项的动态UI`,
+    },
+    pinepaper_update_connector: {
+      name: '更新连接器',
+      description: `更新现有连接器的样式或标签。
+
+使用场景:
+- 创建后更改连接器外观
+- 更新连接器标签
+- 更改箭头样式或颜色`,
+    },
+    pinepaper_remove_connector: {
+      name: '删除连接器',
+      description: `从画布中删除连接器。
+
+使用场景:
+- 删除元素之间的连接
+- 移除错误的链接
+- 重组图表连接`,
+    },
+    pinepaper_diagram_mode: {
+      name: '图表模式',
+      description: `控制交互式编辑的图表模式。
+
+使用场景:
+- 在绘图和选择模式之间切换
+- 启用/禁用图表特定的UI
+- 为图表创建设置画布
+
+操作:
+- activate: 启用图表模式
+- deactivate: 返回正常画布模式
+- toggle: 在模式之间切换
+- setMode: 设置特定工具模式`,
+    },
   },
 
   errors: {

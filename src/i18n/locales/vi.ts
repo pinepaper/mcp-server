@@ -24,6 +24,115 @@ export const vi = createBaseTranslation({
     pinepaper_set_canvas_size: { name: 'Đặt kích thước canvas', description: '' },
     pinepaper_export_svg: { name: 'Xuất SVG', description: '' },
     pinepaper_export_training_data: { name: 'Xuất dữ liệu huấn luyện', description: '' },
+
+    // Diagram Tools
+    pinepaper_create_diagram_shape: {
+      name: 'Tạo hình sơ đồ',
+      description: `Tạo hình sơ đồ chuyên dụng trên canvas. Các hình sơ đồ được thiết kế cho sơ đồ lưu chuyển, sơ đồ UML, sơ đồ mạng và các bản vẽ kỹ thuật tương tự.
+
+SỬ DỤNG KHI:
+- Tạo sơ đồ lưu chuyển, quy trình hoặc luồng công việc
+- Xây dựng sơ đồ lớp UML, sơ đồ use case hoặc sequence diagram
+- Thiết kế sơ đồ topology mạng
+- Làm sơ đồ tổ chức hoặc cây quyết định
+
+LOẠI HÌNH:
+- Flowchart: process, decision, terminal, data, document, database, preparation
+- UML: uml-class, uml-usecase, uml-actor
+- Network: cloud, server
+- Basic: rectangle, circle, triangle, star`,
+    },
+    pinepaper_connect: {
+      name: 'Kết nối mục',
+      description: `Kết nối hai mục với đầu nối thông minh. Đây là cách chính để vẽ đường/mũi tên giữa các hình sơ đồ.
+
+SỬ DỤNG KHI:
+- Vẽ mũi tên giữa các bước trong sơ đồ lưu chuyển
+- Kết nối các lớp UML với quan hệ liên kết
+- Tạo kết nối mạng giữa các nút
+- Bất kỳ sơ đồ nào cần đường nối/mũi tên giữa các phần tử
+
+LOẠI ĐỊNH TUYẾN:
+- orthogonal: Chỉ rẽ góc vuông (mặc định)
+- direct: Đường thẳng giữa các điểm
+- curved: Đường cong Bezier với độ cong tùy chỉnh`,
+    },
+    pinepaper_connect_ports: {
+      name: 'Kết nối cổng',
+      description: `Kết nối hai cổng cụ thể trên các mục. Dùng khi cần kiểm soát chính xác cổng nào mà đầu nối gắn vào.
+
+SỬ DỤNG KHI:
+- Cần đầu nối gắn vào phía cụ thể của hình
+- Tạo sơ đồ phức tạp khi việc chọn cổng tự động không lý tưởng
+- Xây dựng sơ đồ dạng mạch với điểm vào/ra cụ thể`,
+    },
+    pinepaper_add_ports: {
+      name: 'Thêm cổng',
+      description: `Thêm cổng kết nối vào mục hiện có. Cổng là điểm neo mà đầu nối có thể gắn vào.
+
+SỬ DỤNG KHI:
+- Thêm vị trí cổng tùy chỉnh cho hình
+- Bật kết nối cho các mục chưa có cổng
+- Tạo điểm kết nối chuyên biệt cho sơ đồ phức tạp`,
+    },
+    pinepaper_auto_layout: {
+      name: 'Bố cục tự động',
+      description: `Tự động sắp xếp các mục sơ đồ sử dụng thuật toán bố cục. Điều này tổ chức lại các mục để sơ đồ sạch hơn, dễ đọc hơn.
+
+SỬ DỤNG KHI:
+- Các mục sơ đồ lộn xộn hoặc chồng chéo
+- Muốn tạo bố cục chuyên nghiệp tự động
+- Sau khi thêm nhiều mục, cần tổ chức lại
+
+LOẠI BỐ CỤC:
+- hierarchical: Tốt nhất cho sơ đồ lưu chuyển, biểu đồ tổ chức
+- force-directed: Tốt nhất cho sơ đồ mạng
+- tree: Tốt nhất cho cây phân cấp
+- radial: Tốt nhất cho sơ đồ tư duy
+- grid: Tốt nhất cho các mục có tầm quan trọng bằng nhau`,
+    },
+    pinepaper_get_diagram_shapes: {
+      name: 'Lấy hình sơ đồ',
+      description: `Lấy danh sách các hình sơ đồ có sẵn với các thuộc tính của chúng.
+
+SỬ DỤNG KHI:
+- Cần xem hình sơ đồ nào có sẵn
+- Muốn biết kích thước và kiểu dáng mặc định cho các hình
+- Xây dựng giao diện động hiển thị tùy chọn hình`,
+    },
+    pinepaper_update_connector: {
+      name: 'Cập nhật đầu nối',
+      description: `Cập nhật kiểu dáng hoặc nhãn của đầu nối hiện có.
+
+SỬ DỤNG KHI:
+- Thay đổi diện mạo đầu nối sau khi tạo
+- Cập nhật nhãn đầu nối
+- Thay đổi kiểu mũi tên hoặc màu sắc`,
+    },
+    pinepaper_remove_connector: {
+      name: 'Xóa đầu nối',
+      description: `Xóa một đầu nối khỏi canvas.
+
+SỬ DỤNG KHI:
+- Xóa kết nối giữa các mục
+- Loại bỏ liên kết không chính xác
+- Tái cấu trúc kết nối sơ đồ`,
+    },
+    pinepaper_diagram_mode: {
+      name: 'Chế độ sơ đồ',
+      description: `Điều khiển chế độ sơ đồ cho chỉnh sửa tương tác.
+
+SỬ DỤNG KHI:
+- Chuyển đổi giữa chế độ vẽ và chọn
+- Bật/tắt giao diện đặc trưng của sơ đồ
+- Thiết lập canvas cho việc tạo sơ đồ
+
+HÀNH ĐỘNG:
+- activate: Bật chế độ sơ đồ
+- deactivate: Quay lại chế độ canvas thường
+- toggle: Chuyển đổi giữa các chế độ
+- setMode: Đặt chế độ công cụ cụ thể`,
+    },
   },
 
   errors: {

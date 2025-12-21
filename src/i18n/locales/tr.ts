@@ -24,6 +24,114 @@ export const tr = createBaseTranslation({
     pinepaper_set_canvas_size: { name: 'Tuval Boyutu Ayarla', description: '' },
     pinepaper_export_svg: { name: 'SVG Dışa Aktar', description: '' },
     pinepaper_export_training_data: { name: 'Eğitim Verisi Dışa Aktar', description: '' },
+    // Diagram Tools
+    pinepaper_create_diagram_shape: {
+      name: 'Diyagram şekli oluştur',
+      description: `Tuval üzerinde diyagram şekli oluşturur. Diyagram şekilleri, akış şemaları, UML diyagramları, ağ diyagramları ve benzeri teknik çizimler için özelleştirilmiş şekillerdir.
+
+NE ZAMAN KULLANILIR:
+- Akış şemaları, süreç diyagramları veya iş akışları oluştururken
+- UML sınıf diyagramları, kullanım durumu diyagramları veya sıralı diyagramlar tasarlarken
+- Ağ topolojisi diyagramları çizerken
+- Organizasyon şemaları veya karar ağaçları yaparken
+
+ŞEKİL TÜRLERİ:
+- Akış şeması: process, decision, terminal, data, document, database, preparation
+- UML: uml-class, uml-usecase, uml-actor
+- Ağ: cloud, server
+- Temel: rectangle, circle, triangle, star`,
+    },
+    pinepaper_connect: {
+      name: 'Öğeleri bağla',
+      description: `İki öğeyi akıllı bağlayıcı ile bağlar. Bu, diyagram şekilleri arasında çizgi/ok çizmenin birincil yoludur.
+
+NE ZAMAN KULLANILIR:
+- Akış şeması adımları arasında oklar çizerken
+- UML sınıflarını ilişkilerle bağlarken
+- Düğümler arasında ağ bağlantıları oluştururken
+- Öğeler arasında çizgi/ok gerektiren herhangi bir diyagramda
+
+YÖNLENDIRME TÜRLERİ:
+- orthogonal: Sadece dik açılı dönüşler (varsayılan)
+- direct: Noktalar arasında düz çizgi
+- curved: Ayarlanabilir eğrilikli Bezier eğrisi`,
+    },
+    pinepaper_connect_ports: {
+      name: 'Portları bağla',
+      description: `Öğeler üzerindeki belirli portları bağlar. Bağlayıcının hangi portlara takılacağı konusunda hassas kontrol gerektiğinde kullanın.
+
+NE ZAMAN KULLANILIR:
+- Bağlayıcının şeklin belirli bir tarafına takılması gerektiğinde
+- Otomatik port seçiminin ideal olmadığı karmaşık diyagramlar oluştururken
+- Belirli giriş/çıkış noktalarına sahip devre benzeri diyagramlar tasarlarken`,
+    },
+    pinepaper_add_ports: {
+      name: 'Port ekle',
+      description: `Mevcut bir öğeye bağlantı portları ekler. Portlar, bağlayıcıların tutunabileceği bağlantı noktalarıdır.
+
+NE ZAMAN KULLANILIR:
+- Şekillere özel port konumları eklerken
+- Portu olmayan öğelerde bağlantıları etkinleştirirken
+- Karmaşık diyagramlar için özelleştirilmiş bağlantı noktaları oluştururken`,
+    },
+    pinepaper_auto_layout: {
+      name: 'Otomatik düzen',
+      description: `Diyagram öğelerini bir düzen algoritması kullanarak otomatik olarak düzenler. Bu, öğeleri daha temiz, daha okunabilir diyagramlar için yeniden organize eder.
+
+NE ZAMAN KULLANILIR:
+- Diyagram öğeleri dağınık veya üst üste bindiğinde
+- Otomatik olarak profesyonel görünümlü düzen oluşturmak istediğinizde
+- Birçok öğe ekledikten sonra onları organize etmek gerektiğinde
+
+DÜZEN TÜRLERİ:
+- hierarchical: Akış şemaları, organizasyon şemaları için en iyisi
+- force-directed: Ağ diyagramları için en iyisi
+- tree: Hiyerarşiler için en iyisi
+- radial: Zihin haritaları için en iyisi
+- grid: Eşit önem taşıyan öğeler için en iyisi`,
+    },
+    pinepaper_get_diagram_shapes: {
+      name: 'Diyagram şekillerini al',
+      description: `Kullanılabilir diyagram şekillerinin listesini özellikleriyle birlikte alır.
+
+NE ZAMAN KULLANILIR:
+- Hangi diyagram şekillerinin mevcut olduğunu görmek gerektiğinde
+- Şekiller için varsayılan boyutları ve stilleri öğrenmek istediğinizde
+- Şekil seçeneklerini gösteren dinamik kullanıcı arayüzü oluştururken`,
+    },
+    pinepaper_update_connector: {
+      name: 'Bağlayıcıyı güncelle',
+      description: `Mevcut bir bağlayıcının stilini veya etiketini günceller.
+
+NE ZAMAN KULLANILIR:
+- Oluşturulduktan sonra bağlayıcı görünümünü değiştirirken
+- Bağlayıcı etiketlerini güncellerken
+- Ok stillerini veya renklerini değiştirirken`,
+    },
+    pinepaper_remove_connector: {
+      name: 'Bağlayıcıyı kaldır',
+      description: `Bir bağlayıcıyı tuvalden kaldırır.
+
+NE ZAMAN KULLANILIR:
+- Öğeler arasındaki bağlantıyı silerken
+- Yanlış bağlantıları kaldırırken
+- Diyagram bağlantılarını yeniden yapılandırırken`,
+    },
+    pinepaper_diagram_mode: {
+      name: 'Diyagram modu',
+      description: `Etkileşimli düzenleme için diyagram modunu kontrol eder.
+
+NE ZAMAN KULLANILIR:
+- Çizim ve seçim modları arasında geçiş yaparken
+- Diyagrama özgü kullanıcı arayüzünü etkinleştirirken/devre dışı bırakırken
+- Tuvali diyagram oluşturma için hazırlarken
+
+AKSİYONLAR:
+- activate: Diyagram modunu etkinleştir
+- deactivate: Normal tuval moduna geri dön
+- toggle: Modlar arasında geçiş yap
+- setMode: Belirli araç modunu ayarla`,
+    },
   },
 
   errors: {

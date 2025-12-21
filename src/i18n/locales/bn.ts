@@ -24,6 +24,16 @@ export const bn = createBaseTranslation({
     pinepaper_set_canvas_size: { name: 'ক্যানভাস আকার সেট করুন', description: '' },
     pinepaper_export_svg: { name: 'SVG এক্সপোর্ট করুন', description: '' },
     pinepaper_export_training_data: { name: 'ট্রেনিং ডেটা এক্সপোর্ট করুন', description: '' },
+    // Diagram Tools
+    pinepaper_create_diagram_shape: { name: 'ডায়াগ্রাম আকৃতি তৈরি', description: '' },
+    pinepaper_connect: { name: 'আইটেম সংযুক্ত', description: '' },
+    pinepaper_connect_ports: { name: 'পোর্ট সংযুক্ত', description: '' },
+    pinepaper_add_ports: { name: 'পোর্ট যোগ', description: '' },
+    pinepaper_auto_layout: { name: 'স্বয়ংক্রিয় লেআউট', description: '' },
+    pinepaper_get_diagram_shapes: { name: 'ডায়াগ্রাম আকৃতি পান', description: '' },
+    pinepaper_update_connector: { name: 'সংযোগকারী আপডেট', description: '' },
+    pinepaper_remove_connector: { name: 'সংযোগকারী সরান', description: '' },
+    pinepaper_diagram_mode: { name: 'ডায়াগ্রাম মোড', description: '' },
   },
 
   errors: {

@@ -31,6 +31,25 @@ import {
   BatchModifyItem,
   CreateSceneInputSchema,
   CreateSceneInput,
+  // Diagram types
+  CreateDiagramShapeInputSchema,
+  CreateDiagramShapeInput,
+  ConnectInputSchema,
+  ConnectInput,
+  ConnectPortsInputSchema,
+  ConnectPortsInput,
+  AddPortsInputSchema,
+  AddPortsInput,
+  AutoLayoutInputSchema,
+  AutoLayoutInput,
+  GetDiagramShapesInputSchema,
+  GetDiagramShapesInput,
+  UpdateConnectorInputSchema,
+  UpdateConnectorInput,
+  RemoveConnectorInputSchema,
+  RemoveConnectorInput,
+  DiagramModeInputSchema,
+  DiagramModeInput,
 } from './schemas.js';
 import { z } from 'zod';
 
@@ -1372,6 +1391,287 @@ results;
 `);
 
     return codeParts.join('\n');
+  }
+
+  // =============================================================================
+  // DIAGRAM TOOLS
+  // =============================================================================
+
+  /**
+   * Generate code for creating a diagram shape
+   */
+  generateCreateDiagramShape(input: CreateDiagramShapeInput): string {
+    const validated = CreateDiagramShapeInputSchema.parse(input);
+    const { shapeType, position, width, height, label, style } = validated;
+
+    const styleStr = style ? JSON.stringify(style) : '{}';
+    const widthVal = width || 120;
+    const heightVal = height || 60;
+    const labelStr = label ? `'${label.replace(/'/g, "\\'")}'` : 'null';
+
+    return `
+// Create diagram shape: ${shapeType}
+const shapeConfig = {
+  shapeType: '${shapeType}',
+  position: { x: ${position.x}, y: ${position.y} },
+  width: ${widthVal},
+  height: ${heightVal},
+  label: ${labelStr},
+  style: ${styleStr}
+};
+
+const shape = app.diagramManager.createShape(shapeConfig);
+const itemId = shape.data?.registryId || shape.id;
+app.historyManager.saveState();
+
+({ itemId, shapeType: '${shapeType}', position: { x: ${position.x}, y: ${position.y} } });
+`.trim();
+  }
+
+  /**
+   * Generate code for connecting two items
+   */
+  generateConnect(input: ConnectInput): string {
+    const validated = ConnectInputSchema.parse(input);
+    const {
+      sourceItemId,
+      targetItemId,
+      routing,
+      lineColor,
+      lineWidth,
+      lineStyle,
+      headStyle,
+      tailStyle,
+      label,
+      curvature,
+      boltEnabled,
+      boltColor,
+    } = validated;
+
+    const config: Record<string, unknown> = {
+      routing,
+      lineStyle,
+      headStyle,
+      tailStyle,
+      curvature,
+      boltEnabled,
+      boltColor,
+    };
+
+    if (lineColor) config.lineColor = lineColor;
+    if (lineWidth) config.lineWidth = lineWidth;
+    if (label) config.label = label;
+
+    return `
+// Connect items: ${sourceItemId} -> ${targetItemId}
+const sourceItem = app.getItemById('${sourceItemId}');
+const targetItem = app.getItemById('${targetItemId}');
+
+if (!sourceItem) throw new Error('Source item not found: ${sourceItemId}');
+if (!targetItem) throw new Error('Target item not found: ${targetItemId}');
+
+const config = ${JSON.stringify(config, null, 2)};
+const connector = app.diagramManager.connect(sourceItem, targetItem, config);
+const connectorId = connector.data?.registryId || connector.id;
+app.historyManager.saveState();
+
+({ connectorId, sourceItemId: '${sourceItemId}', targetItemId: '${targetItemId}' });
+`.trim();
+  }
+
+  /**
+   * Generate code for connecting specific ports
+   */
+  generateConnectPorts(input: ConnectPortsInput): string {
+    const validated = ConnectPortsInputSchema.parse(input);
+    const { sourceItemId, sourcePort, targetItemId, targetPort, config } = validated;
+
+    const configStr = config ? JSON.stringify(config, null, 2) : '{}';
+
+    return `
+// Connect ports: ${sourceItemId}:${sourcePort} -> ${targetItemId}:${targetPort}
+const sourceItem = app.getItemById('${sourceItemId}');
+const targetItem = app.getItemById('${targetItemId}');
+
+if (!sourceItem) throw new Error('Source item not found: ${sourceItemId}');
+if (!targetItem) throw new Error('Target item not found: ${targetItemId}');
+
+const config = ${configStr};
+const connector = app.diagramManager.connectPorts(
+  sourceItem, '${sourcePort}',
+  targetItem, '${targetPort}',
+  config
+);
+const connectorId = connector.data?.registryId || connector.id;
+app.historyManager.saveState();
+
+({ connectorId, sourceItemId: '${sourceItemId}', sourcePort: '${sourcePort}', targetItemId: '${targetItemId}', targetPort: '${targetPort}' });
+`.trim();
+  }
+
+  /**
+   * Generate code for adding ports to an item
+   */
+  generateAddPorts(input: AddPortsInput): string {
+    const validated = AddPortsInputSchema.parse(input);
+    const { itemId, portType, ports, count } = validated;
+
+    const portsStr = ports ? JSON.stringify(ports, null, 2) : 'undefined';
+    const countVal = count !== undefined ? count : 'undefined';
+
+    return `
+// Add ports to item: ${itemId}
+const item = app.getItemById('${itemId}');
+if (!item) throw new Error('Item not found: ${itemId}');
+
+const result = app.diagramManager.addPorts(item, {
+  portType: '${portType}',
+  ports: ${portsStr},
+  count: ${countVal}
+});
+app.historyManager.saveState();
+
+({ itemId: '${itemId}', portsAdded: result.portsAdded || 0, portType: '${portType}' });
+`.trim();
+  }
+
+  /**
+   * Generate code for auto-layout
+   */
+  generateAutoLayout(input: AutoLayoutInput): string {
+    const validated = AutoLayoutInputSchema.parse(input);
+    const { layoutType, itemIds, options } = validated;
+
+    const itemIdsStr = itemIds ? JSON.stringify(itemIds) : 'null';
+    const optionsStr = options ? JSON.stringify(options, null, 2) : '{}';
+
+    return `
+// Apply auto-layout: ${layoutType}
+const itemIds = ${itemIdsStr};
+const options = ${optionsStr};
+
+const result = app.diagramManager.autoLayout('${layoutType}', itemIds, options);
+app.historyManager.saveState();
+
+({ layoutType: '${layoutType}', itemsAffected: result.itemsAffected || 0, success: result.success });
+`.trim();
+  }
+
+  /**
+   * Generate code for getting available diagram shapes
+   */
+  generateGetDiagramShapes(input: GetDiagramShapesInput): string {
+    const validated = GetDiagramShapesInputSchema.parse(input);
+    const { category } = validated;
+
+    const categoryFilter = category ? `'${category}'` : 'null';
+
+    return `
+// Get available diagram shapes
+const category = ${categoryFilter};
+const shapes = app.diagramManager.getAvailableShapes(category);
+
+({ shapes, count: shapes.length, category: ${categoryFilter} || 'all' });
+`.trim();
+  }
+
+  /**
+   * Generate code for updating a connector
+   */
+  generateUpdateConnector(input: UpdateConnectorInput): string {
+    const validated = UpdateConnectorInputSchema.parse(input);
+    const { connectorId, style, label, labelPosition } = validated;
+
+    const updates: string[] = [];
+
+    if (style) {
+      updates.push(`style: ${JSON.stringify(style)}`);
+    }
+    if (label !== undefined) {
+      updates.push(`label: '${label.replace(/'/g, "\\'")}'`);
+    }
+    if (labelPosition !== undefined) {
+      updates.push(`labelPosition: ${labelPosition}`);
+    }
+
+    const updatesStr = updates.length > 0 ? `{ ${updates.join(', ')} }` : '{}';
+
+    return `
+// Update connector: ${connectorId}
+const connector = app.getItemById('${connectorId}');
+if (!connector) throw new Error('Connector not found: ${connectorId}');
+
+const updates = ${updatesStr};
+app.diagramManager.updateConnector(connector, updates);
+app.historyManager.saveState();
+
+({ connectorId: '${connectorId}', updated: true });
+`.trim();
+  }
+
+  /**
+   * Generate code for removing a connector
+   */
+  generateRemoveConnector(input: RemoveConnectorInput): string {
+    const validated = RemoveConnectorInputSchema.parse(input);
+    const { connectorId } = validated;
+
+    return `
+// Remove connector: ${connectorId}
+const connector = app.getItemById('${connectorId}');
+if (!connector) throw new Error('Connector not found: ${connectorId}');
+
+app.diagramManager.removeConnector(connector);
+app.historyManager.saveState();
+
+({ connectorId: '${connectorId}', removed: true });
+`.trim();
+  }
+
+  /**
+   * Generate code for diagram mode control
+   */
+  generateDiagramMode(input: DiagramModeInput): string {
+    const validated = DiagramModeInputSchema.parse(input);
+    const { action, mode, shapeType } = validated;
+
+    switch (action) {
+      case 'activate':
+        return `
+// Activate diagram mode
+app.diagramManager.activate();
+({ action: 'activate', active: true });
+`.trim();
+
+      case 'deactivate':
+        return `
+// Deactivate diagram mode
+app.diagramManager.deactivate();
+({ action: 'deactivate', active: false });
+`.trim();
+
+      case 'toggle':
+        return `
+// Toggle diagram mode
+const isActive = app.diagramManager.toggle();
+({ action: 'toggle', active: isActive });
+`.trim();
+
+      case 'setMode':
+        const modeStr = mode ? `'${mode}'` : "'select'";
+        const shapeStr = shapeType ? `, '${shapeType}'` : '';
+        return `
+// Set diagram tool mode
+app.diagramManager.setMode(${modeStr}${shapeStr});
+({ action: 'setMode', mode: ${modeStr}${shapeType ? `, shapeType: '${shapeType}'` : ''} });
+`.trim();
+
+      default:
+        return `
+// Unknown diagram mode action
+throw new Error('Unknown diagram mode action: ${action}');
+`.trim();
+    }
   }
 }
 

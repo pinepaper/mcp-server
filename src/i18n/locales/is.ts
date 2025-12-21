@@ -303,6 +303,16 @@ NOTAÐU ÞEGAR:
         includeMetadata: 'Innihalda tengsl metadata',
       },
     },
+    // Diagram Tools
+    pinepaper_create_diagram_shape: { name: 'Búa til línuritsform', description: '' },
+    pinepaper_connect: { name: 'Tengja hluti', description: '' },
+    pinepaper_connect_ports: { name: 'Tengja höfn', description: '' },
+    pinepaper_add_ports: { name: 'Bæta við höfnum', description: '' },
+    pinepaper_auto_layout: { name: 'Sjálfvirk uppröðun', description: '' },
+    pinepaper_get_diagram_shapes: { name: 'Sækja línuritsform', description: '' },
+    pinepaper_update_connector: { name: 'Uppfæra tengi', description: '' },
+    pinepaper_remove_connector: { name: 'Fjarlægja tengi', description: '' },
+    pinepaper_diagram_mode: { name: 'Línuritsstilling', description: '' },
   },
 
   errors: {

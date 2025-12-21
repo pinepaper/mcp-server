@@ -24,6 +24,16 @@ export const hu = createBaseTranslation({
     pinepaper_set_canvas_size: { name: 'Vászonméret beállítása', description: '' },
     pinepaper_export_svg: { name: 'SVG exportálás', description: '' },
     pinepaper_export_training_data: { name: 'Képzési adatok exportálása', description: '' },
+    // Diagram Tools
+    pinepaper_create_diagram_shape: { name: 'Diagramforma létrehozása', description: '' },
+    pinepaper_connect: { name: 'Elemek összekapcsolása', description: '' },
+    pinepaper_connect_ports: { name: 'Portok összekapcsolása', description: '' },
+    pinepaper_add_ports: { name: 'Portok hozzáadása', description: '' },
+    pinepaper_auto_layout: { name: 'Automatikus elrendezés', description: '' },
+    pinepaper_get_diagram_shapes: { name: 'Diagramformák lekérése', description: '' },
+    pinepaper_update_connector: { name: 'Csatlakozó frissítése', description: '' },
+    pinepaper_remove_connector: { name: 'Csatlakozó eltávolítása', description: '' },
+    pinepaper_diagram_mode: { name: 'Diagram mód', description: '' },
   },
 
   errors: {

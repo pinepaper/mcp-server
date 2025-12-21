@@ -24,6 +24,16 @@ export const cs = createBaseTranslation({
     pinepaper_set_canvas_size: { name: 'Nastavit velikost plátna', description: '' },
     pinepaper_export_svg: { name: 'Exportovat SVG', description: '' },
     pinepaper_export_training_data: { name: 'Exportovat tréninková data', description: '' },
+    // Diagram Tools
+    pinepaper_create_diagram_shape: { name: 'Vytvořit tvar diagramu', description: '' },
+    pinepaper_connect: { name: 'Propojit položky', description: '' },
+    pinepaper_connect_ports: { name: 'Propojit porty', description: '' },
+    pinepaper_add_ports: { name: 'Přidat porty', description: '' },
+    pinepaper_auto_layout: { name: 'Automatické rozložení', description: '' },
+    pinepaper_get_diagram_shapes: { name: 'Získat tvary diagramu', description: '' },
+    pinepaper_update_connector: { name: 'Aktualizovat spojení', description: '' },
+    pinepaper_remove_connector: { name: 'Odstranit spojení', description: '' },
+    pinepaper_diagram_mode: { name: 'Režim diagramu', description: '' },
   },
 
   errors: {

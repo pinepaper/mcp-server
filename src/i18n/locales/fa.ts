@@ -24,6 +24,16 @@ export const fa = createBaseTranslation({
     pinepaper_set_canvas_size: { name: 'تنظیم اندازه بوم', description: '' },
     pinepaper_export_svg: { name: 'خروجی SVG', description: '' },
     pinepaper_export_training_data: { name: 'خروجی داده‌های آموزشی', description: '' },
+    // Diagram Tools
+    pinepaper_create_diagram_shape: { name: 'ایجاد شکل نمودار', description: '' },
+    pinepaper_connect: { name: 'اتصال آیتم‌ها', description: '' },
+    pinepaper_connect_ports: { name: 'اتصال پورت‌ها', description: '' },
+    pinepaper_add_ports: { name: 'افزودن پورت‌ها', description: '' },
+    pinepaper_auto_layout: { name: 'چیدمان خودکار', description: '' },
+    pinepaper_get_diagram_shapes: { name: 'دریافت اشکال نمودار', description: '' },
+    pinepaper_update_connector: { name: 'بروزرسانی اتصال‌دهنده', description: '' },
+    pinepaper_remove_connector: { name: 'حذف اتصال‌دهنده', description: '' },
+    pinepaper_diagram_mode: { name: 'حالت نمودار', description: '' },
   },
 
   errors: {

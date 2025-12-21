@@ -24,6 +24,16 @@ export const sv = createBaseTranslation({
     pinepaper_set_canvas_size: { name: 'Ställ in canvasstorlek', description: '' },
     pinepaper_export_svg: { name: 'Exportera SVG', description: '' },
     pinepaper_export_training_data: { name: 'Exportera träningsdata', description: '' },
+    // Diagram Tools
+    pinepaper_create_diagram_shape: { name: 'Skapa diagramform', description: '' },
+    pinepaper_connect: { name: 'Anslut objekt', description: '' },
+    pinepaper_connect_ports: { name: 'Anslut portar', description: '' },
+    pinepaper_add_ports: { name: 'Lägg till portar', description: '' },
+    pinepaper_auto_layout: { name: 'Automatisk layout', description: '' },
+    pinepaper_get_diagram_shapes: { name: 'Hämta diagramformer', description: '' },
+    pinepaper_update_connector: { name: 'Uppdatera koppling', description: '' },
+    pinepaper_remove_connector: { name: 'Ta bort koppling', description: '' },
+    pinepaper_diagram_mode: { name: 'Diagramläge', description: '' },
   },
 
   errors: {

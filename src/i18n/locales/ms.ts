@@ -24,6 +24,16 @@ export const ms = createBaseTranslation({
     pinepaper_set_canvas_size: { name: 'Tetapkan Saiz Kanvas', description: '' },
     pinepaper_export_svg: { name: 'Eksport SVG', description: '' },
     pinepaper_export_training_data: { name: 'Eksport Data Latihan', description: '' },
+    // Diagram Tools
+    pinepaper_create_diagram_shape: { name: 'Cipta bentuk rajah', description: '' },
+    pinepaper_connect: { name: 'Sambung item', description: '' },
+    pinepaper_connect_ports: { name: 'Sambung port', description: '' },
+    pinepaper_add_ports: { name: 'Tambah port', description: '' },
+    pinepaper_auto_layout: { name: 'Susun atur automatik', description: '' },
+    pinepaper_get_diagram_shapes: { name: 'Dapatkan bentuk rajah', description: '' },
+    pinepaper_update_connector: { name: 'Kemas kini penyambung', description: '' },
+    pinepaper_remove_connector: { name: 'Buang penyambung', description: '' },
+    pinepaper_diagram_mode: { name: 'Mod rajah', description: '' },
   },
 
   errors: {

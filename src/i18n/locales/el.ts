@@ -24,6 +24,16 @@ export const el = createBaseTranslation({
     pinepaper_set_canvas_size: { name: 'Ορισμός μεγέθους καμβά', description: '' },
     pinepaper_export_svg: { name: 'Εξαγωγή SVG', description: '' },
     pinepaper_export_training_data: { name: 'Εξαγωγή δεδομένων εκπαίδευσης', description: '' },
+    // Diagram Tools
+    pinepaper_create_diagram_shape: { name: 'Δημιουργία σχήματος διαγράμματος', description: '' },
+    pinepaper_connect: { name: 'Σύνδεση στοιχείων', description: '' },
+    pinepaper_connect_ports: { name: 'Σύνδεση θυρών', description: '' },
+    pinepaper_add_ports: { name: 'Προσθήκη θυρών', description: '' },
+    pinepaper_auto_layout: { name: 'Αυτόματη διάταξη', description: '' },
+    pinepaper_get_diagram_shapes: { name: 'Λήψη σχημάτων διαγράμματος', description: '' },
+    pinepaper_update_connector: { name: 'Ενημέρωση συνδέσμου', description: '' },
+    pinepaper_remove_connector: { name: 'Αφαίρεση συνδέσμου', description: '' },
+    pinepaper_diagram_mode: { name: 'Λειτουργία διαγράμματος', description: '' },
   },
 
   errors: {

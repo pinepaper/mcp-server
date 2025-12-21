@@ -24,6 +24,16 @@ export const gu = createBaseTranslation({
     pinepaper_set_canvas_size: { name: 'કેનવાસ કદ સેટ કરો', description: '' },
     pinepaper_export_svg: { name: 'SVG નિકાસ કરો', description: '' },
     pinepaper_export_training_data: { name: 'તાલીમ ડેટા નિકાસ કરો', description: '' },
+    // Diagram Tools
+    pinepaper_create_diagram_shape: { name: 'ડાયાગ્રામ આકાર બનાવો', description: '' },
+    pinepaper_connect: { name: 'આઇટમ કનેક્ટ કરો', description: '' },
+    pinepaper_connect_ports: { name: 'પોર્ટ કનેક્ટ કરો', description: '' },
+    pinepaper_add_ports: { name: 'પોર્ટ ઉમેરો', description: '' },
+    pinepaper_auto_layout: { name: 'ઓટો લેઆઉટ', description: '' },
+    pinepaper_get_diagram_shapes: { name: 'ડાયાગ્રામ આકારો મેળવો', description: '' },
+    pinepaper_update_connector: { name: 'કનેક્ટર અપડેટ કરો', description: '' },
+    pinepaper_remove_connector: { name: 'કનેક્ટર દૂર કરો', description: '' },
+    pinepaper_diagram_mode: { name: 'ડાયાગ્રામ મોડ', description: '' },
   },
 
   errors: {
