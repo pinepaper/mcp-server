@@ -87,12 +87,14 @@ export class PinePaperBrowserController {
 
     this.config = {
       studioUrl,
-      headless: config.headless ?? false, // Default to visible browser
+      headless: config.headless ?? true, // Default to headless for agent mode
       viewportWidth: config.viewportWidth || 1280,
       viewportHeight: config.viewportHeight || 800,
       timeout: config.timeout || 30000,
-      agentMode: config.agentMode ?? false,
+      agentMode: config.agentMode ?? true, // Default to agent mode
     };
+
+    console.error(`[PinePaper] Controller initialized: agentMode=${this.config.agentMode}, headless=${this.config.headless}`);
   }
 
   /**
@@ -127,9 +129,20 @@ export class PinePaperBrowserController {
   }
 
   /**
-   * Launch browser and navigate to PinePaper Studio
+   * Launch browser and navigate to PinePaper Studio.
+   * When agentMode is enabled (default), this automatically uses connectAgent().
    */
   async connect(): Promise<void> {
+    console.error(`[PinePaper] connect() called - agentMode=${this.config.agentMode}, headless=${this.config.headless}`);
+
+    // If agent mode is configured, delegate to connectAgent()
+    if (this.config.agentMode) {
+      console.error('[PinePaper] Delegating to connectAgent()');
+      return this.connectAgent({ headless: this.config.headless });
+    }
+
+    console.error('[PinePaper] Using standard connect (non-agent mode)');
+
     // Check if already connected and page is still valid
     if (this.isConnected && this.page) {
       try {
@@ -723,12 +736,21 @@ let globalController: PinePaperBrowserController | null = null;
  * IMPORTANT: This is a singleton - only ONE browser controller exists.
  * If a controller already exists, the config parameter is ignored.
  * Call resetBrowserController() first if you need to change config.
+ *
+ * NOTE: Agent mode is ENFORCED by default for optimal MCP server performance.
+ * This uses headless browser with ?agent=1 URL parameter.
  */
 export function getBrowserController(
   config?: BrowserControllerConfig
 ): PinePaperBrowserController {
   if (!globalController) {
-    globalController = new PinePaperBrowserController(config);
+    // Enforce agent mode by default
+    const enforceAgentMode: BrowserControllerConfig = {
+      ...config,
+      agentMode: config?.agentMode ?? true, // Default to agent mode
+      headless: config?.headless ?? true, // Default to headless for agent mode
+    };
+    globalController = new PinePaperBrowserController(enforceAgentMode);
   } else if (config) {
     // Log that config is being ignored since controller already exists
     console.error('[PinePaper] Browser controller already exists, config parameter ignored. Call resetBrowserController() to create a new controller with different config.');

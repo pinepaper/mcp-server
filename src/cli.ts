@@ -153,7 +153,8 @@ SUPPORT:
       console.error('📋 Code Generation Mode: Tools will output code for manual paste.');
       console.error('   Open https://pinepaper.studio/editor and paste code in the console.');
     } else {
-      console.error('🌐 Puppeteer Mode: Tools will execute directly in browser.');
+      console.error('🤖 Agent Mode (Enforced): Headless browser with optimized automation.');
+      console.error('   Sessions auto-start on first tool call for batch operations.');
     }
     console.error('');
     console.error('Waiting for tool calls...');

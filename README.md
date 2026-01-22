@@ -59,24 +59,25 @@ Open your AI client and try:
 
 ## Features
 
-### 🤖 Agent Flow Mode (NEW in v1.5.0)
+### 🤖 Agent Flow Mode (ENFORCED in v1.5.0)
 
-Optimized for content automation pipelines with batch operations and smart exports:
+Agent mode is now **enforced by default** for optimal performance:
+
+- **Auto-Connection**: Browser connects automatically on first tool call (headless mode)
+- **Auto-Session**: Agent sessions start automatically - just start creating!
+- **Batch Operations**: Execute multiple operations in one call (~10x faster)
+- **Smart Exports**: Auto-detect optimal format for Instagram, TikTok, YouTube, etc.
 
 ```
-"Start an agent job for Instagram content"
+"Create a red pulsing text that says HELLO"  # Browser auto-connects
 "Create 5 items in batch, then export for TikTok"
 "Analyze the scene and recommend export format"
 ```
 
-**Features:**
-- **Batch Operations**: Execute multiple operations in one call (~10x faster)
-- **Smart Platform Exports**: Auto-detect optimal format for Instagram, TikTok, YouTube, Twitter, LinkedIn
-- **Job Sessions**: Track items created, get recommendations on job completion
-- **Quick Reset**: Fast canvas reset without page refresh
+**No manual setup required** - just start making tool calls.
 
 **Tools:**
-- `pinepaper_agent_start_job` - Start a content creation job session
+- `pinepaper_agent_start_job` - Start a named job session (optional)
 - `pinepaper_agent_end_job` - End job with summary and export recommendations
 - `pinepaper_agent_reset` - Quick canvas reset
 - `pinepaper_agent_batch_execute` - Execute multiple operations in batch

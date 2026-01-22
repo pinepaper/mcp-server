@@ -1666,27 +1666,21 @@ OUTPUT FORMAT:
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: `Connect to PinePaper Studio Editor in a browser (PUPPETEER MODE ONLY).
+    description: `Connect to PinePaper Studio Editor in a browser.
 
-This launches a browser window and navigates to the PinePaper Editor for live code execution.
+NOTE: With enforced agent mode (v1.5.0+), the browser connects AUTOMATICALLY on the first tool call.
+You typically don't need to call this tool manually - just start creating items!
 
 USE WHEN:
-- Running in Puppeteer mode (default)
-- Starting a new PinePaper session
-- User wants to see changes live in the browser
-- Need automatic code execution
+- You want to explicitly connect with custom settings (e.g., visible browser window)
+- You need to connect to a custom PinePaper URL
 
-NOT NEEDED WHEN:
-- Running in Code Generation mode (--mode code)
-- User prefers to copy/paste code manually
+DEFAULT BEHAVIOR (Agent Mode):
+- Browser runs in headless mode (no visible window)
+- Auto-connects on first tool call
+- Optimized for automation workflows
 
-IMPORTANT:
-- Call this FIRST before using any other pinepaper tools in Puppeteer mode
-- Without connecting, tools only generate code but don't execute it
-- Uses a fresh Chromium browser session (not your default browser profile)
-- User can take control of the browser window at any time to click buttons or make manual edits
-
-The browser will open and navigate to https://pinepaper.studio/editor where the code console and JavaScript API are available.`,
+SET headless: false if you want to see the browser window for debugging or user interaction.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1696,7 +1690,7 @@ The browser will open and navigate to https://pinepaper.studio/editor where the 
         },
         headless: {
           type: 'boolean',
-          description: 'Run browser in headless mode - no visible window (default: false)',
+          description: 'Run browser in headless mode - no visible window (default: true for agent mode)',
         },
       },
     },

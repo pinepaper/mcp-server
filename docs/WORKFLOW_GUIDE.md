@@ -800,20 +800,14 @@ pinepaper_get_performance_metrics({format: 'summary'})
 
 ### Error: "Browser not connected"
 
-**Cause**: MCP server not connected to PinePaper Studio
+**Cause**: Browser connection hasn't been established yet
+
+**Note**: With enforced agent mode (v1.5.0+), the browser connects **automatically** on the first tool call. You should rarely see this error.
 
 **Solutions**:
-1. Connect to browser:
-   ```typescript
-   pinepaper_browser_connect({url: 'https://pinepaper.studio'})
-   ```
-
-2. Check status:
-   ```typescript
-   pinepaper_browser_status()
-   ```
-
-3. Ensure PinePaper Studio is open in browser
+1. Simply make any tool call - the browser will auto-connect in agent mode (headless)
+2. If the error persists, check that Puppeteer is installed correctly
+3. Check server logs for connection errors
 
 ### Error: "Relation not visible"
 

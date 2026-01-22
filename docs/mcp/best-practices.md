@@ -299,9 +299,37 @@ If operations are taking 10-20 minutes, something is wrong:
 
 ---
 
+## Enforced Agent Mode (v1.5.0+)
+
+As of v1.5.0, **agent mode is enforced by default**. This means:
+
+1. **Auto-Connection**: Browser connects automatically on first tool call (no need to call `pinepaper_browser_connect`)
+2. **Headless Mode**: Browser runs headless by default for faster automation
+3. **Auto-Session**: Agent sessions start automatically - no need to call `pinepaper_agent_start_job` manually
+4. **Optimized Screenshots**: Screenshots only taken on request via `pinepaper_browser_screenshot`
+
+This significantly simplifies workflows - just start making tool calls and everything works automatically.
+
+---
+
 ## Agent Configuration Recommendations
 
-### For Speed-Optimized Mode
+### Standard Configuration (Recommended)
+
+```json
+{
+  "mcpServers": {
+    "pinepaper": {
+      "command": "npx",
+      "args": ["-y", "@pinepaper.studio/mcp-server"]
+    }
+  }
+}
+```
+
+Agent mode is enforced by default - no additional configuration needed.
+
+### With Custom Screenshot Mode
 
 ```json
 {
@@ -310,8 +338,7 @@ If operations are taking 10-20 minutes, something is wrong:
       "command": "npx",
       "args": ["-y", "@pinepaper.studio/mcp-server"],
       "env": {
-        "PINEPAPER_SCREENSHOT_MODE": "on_request",
-        "PINEPAPER_BATCH_MODE": "true"
+        "PINEPAPER_SCREENSHOT_MODE": "on_request"
       }
     }
   }
@@ -324,11 +351,12 @@ Add to your agent's system prompt:
 
 ```
 When using PinePaper MCP tools:
-1. DO NOT take screenshots after every operation - only at the end or when debugging
-2. Trust API responses - if success:true, the operation worked
-3. For character/face drawing requests, suggest importing SVG instead
-4. Batch related operations together
-5. Use relations (orbits, follows, attached_to) for animation, not manual position updates
+1. Just start creating - browser connects automatically in agent mode
+2. DO NOT take screenshots after every operation - only at the end or when debugging
+3. Trust API responses - if success:true, the operation worked
+4. For character/face drawing requests, suggest importing SVG instead
+5. Batch related operations together
+6. Use relations (orbits, follows, attached_to) for animation, not manual position updates
 ```
 
 ---

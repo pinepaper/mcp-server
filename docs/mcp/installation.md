@@ -143,11 +143,11 @@ See [Tools Specification](mcp/tools-spec.md) for detailed documentation.
 
 ### Connection Issues
 
-If PinePaper Studio isn't connecting:
+With enforced agent mode (v1.5.0+), the browser connects automatically on the first tool call. If you see connection errors:
 
-1. Open [PinePaper Studio](https://pinepaper.studio/editor) in browser
-2. Check browser console for errors
-3. Ensure no browser extensions block WebSocket connections
+1. Ensure Puppeteer is installed correctly (`npm install puppeteer`)
+2. Check server logs for browser launch errors
+3. Verify network access to https://pinepaper.studio
 
 ## Environment Variables
 

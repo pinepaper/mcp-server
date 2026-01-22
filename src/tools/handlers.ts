@@ -82,6 +82,7 @@ import {
 } from '../browser/puppeteer-controller.js';
 import { getPerformanceTracker, TimingMetric, MetricsExportFormat } from '../metrics/index.js';
 import { ErrorContext, formatErrorContext, captureCanvasState } from '../execution/index.js';
+import { getSessionManager } from '../agent/session-manager.js';
 
 // =============================================================================
 // SCREENSHOT MODE CONFIGURATION
@@ -328,20 +329,38 @@ async function executeOrGenerate(
 
   const controller = browserController || getBrowserController();
 
+  // Auto-connect in agent mode if not connected
   if (!controller.connected) {
-    const totalDuration = tracker.endTimer(`${timerId}_total`);
-    tracker.recordMetric({
-      toolName,
-      phase: 'total',
-      duration: totalDuration,
-      timestamp: Date.now(),
-      success: true,
-      metadata: { browserConnected: false },
+    console.error('[PinePaper] Auto-connecting browser in agent mode...');
+    try {
+      await controller.connect(); // Will use connectAgent() due to enforced agentMode
+      console.error('[PinePaper] Browser auto-connected successfully');
+    } catch (connectError) {
+      const totalDuration = tracker.endTimer(`${timerId}_total`);
+      tracker.recordMetric({
+        toolName,
+        phase: 'total',
+        duration: totalDuration,
+        timestamp: Date.now(),
+        success: false,
+        metadata: { browserConnected: false, autoConnectFailed: true },
+      });
+      return errorResult(
+        'BROWSER_AUTO_CONNECT_FAILED',
+        `Failed to auto-connect browser: ${connectError instanceof Error ? connectError.message : 'Unknown error'}`,
+        { code }
+      );
+    }
+  }
+
+  // Auto-start agent session if not already active (enforced agent mode)
+  const sessionManager = getSessionManager();
+  if (!sessionManager.hasActiveJob()) {
+    sessionManager.startJob({
+      name: 'auto_session',
+      screenshotPolicy: 'on_complete',
     });
-    return successResult(
-      code,
-      `${description}\n\n⚠️ Browser not connected. Call pinepaper_browser_connect first to execute code live.`
-    );
+    console.error('[PinePaper] Auto-started agent session for enforced agent mode');
   }
 
   // Track browser execution time
@@ -864,7 +883,8 @@ You can now start creating new items on a clean canvas.`,
       // -----------------------------------------------------------------------
       case 'pinepaper_browser_connect': {
         const url = (args.url as string) || 'https://pinepaper.studio';
-        const headless = (args.headless as boolean) ?? false;
+        // Default to headless: true for enforced agent mode
+        const headless = (args.headless as boolean) ?? true;
 
         const controller = getBrowserController({ studioUrl: url, headless });
 

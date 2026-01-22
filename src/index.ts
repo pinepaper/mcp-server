@@ -124,14 +124,16 @@ const RESOURCE_CONTENTS: Record<string, string> = {
 
 PinePaper is a canvas-based animation tool. This MCP server lets you create and animate graphics using natural language.
 
-## Quick Start
+## Quick Start (Agent Mode - Enforced)
 
-1. **Connect to browser**: Use \`pinepaper_browser_connect\` to launch PinePaper Studio
-2. **Clear the canvas**: Use \`pinepaper_clear_canvas\` or \`pinepaper_refresh_page\` to start fresh
-3. **Create items**: Use \`pinepaper_create_item\` to add text, shapes, or graphics
-4. **Add animation**: Use \`pinepaper_add_relation\` for behavior-based animation
-5. **Verify**: Use \`pinepaper_browser_screenshot\` to see your work
-6. **Export**: Use \`pinepaper_export_svg\` to save your work
+With enforced agent mode, the browser connects **automatically** on your first tool call. Just start creating!
+
+1. **Create items**: Use \`pinepaper_create_item\` to add text, shapes, or graphics
+2. **Add animation**: Use \`pinepaper_add_relation\` for behavior-based animation
+3. **Verify**: Use \`pinepaper_browser_screenshot\` to see your work
+4. **Export**: Use \`pinepaper_export_svg\` to save your work
+
+No manual connection required - agent mode handles everything automatically.
 
 ## IMPORTANT: Welcome Template
 
@@ -139,10 +141,10 @@ First-time visitors to PinePaper Studio see a **welcome template** with example 
 
 ### To Clear the Welcome Template:
 - **Option 1**: Use \`pinepaper_clear_canvas\` to remove all items
-- **Option 2**: Use \`pinepaper_refresh_page\` to reload the page (most reliable)
+- **Option 2**: Use \`pinepaper_agent_reset\` for quick canvas reset
 - After clearing, verify with \`pinepaper_get_items\` that the canvas is empty
 
-The welcome template only appears once. After refreshing or clearing, it won't appear again.
+The welcome template only appears once. After clearing, it won't appear again.
 
 ## Key Concepts
 
@@ -179,13 +181,12 @@ Procedural backgrounds like sunburst, waves, grid patterns.
 ## Example Workflow
 
 \`\`\`
-1. Connect: pinepaper_browser_connect
-2. Clear canvas: pinepaper_clear_canvas (removes welcome template)
-3. Verify empty: pinepaper_get_items (should return count: 0)
-4. Create sun: pinepaper_create_item type=circle, color=#fbbf24, radius=60
-5. Create earth: pinepaper_create_item type=circle, color=#3b82f6, radius=20
-6. Add orbit: pinepaper_add_relation earth orbits sun, radius=150
-7. Screenshot: pinepaper_browser_screenshot (verify animation)
+1. Clear canvas: pinepaper_clear_canvas (auto-connects, removes welcome template)
+2. Verify empty: pinepaper_get_items (should return count: 0)
+3. Create sun: pinepaper_create_item type=circle, color=#fbbf24, radius=60
+4. Create earth: pinepaper_create_item type=circle, color=#3b82f6, radius=20
+5. Add orbit: pinepaper_add_relation earth orbits sun, radius=150
+6. Screenshot: pinepaper_browser_screenshot (verify animation)
 \`\`\`
 `,
 
@@ -614,8 +615,7 @@ Create an animated solar system featuring custom paths, orbital rings, and plane
 ## Step 1: Canvas Setup
 
 \`\`\`
-pinepaper_browser_connect
-pinepaper_clear_canvas
+pinepaper_clear_canvas  # Browser auto-connects in agent mode
 pinepaper_set_background_color color: "#0a0a1a"
 \`\`\`
 
@@ -2367,8 +2367,7 @@ An animated company logo featuring:
 ## Step 1: Canvas Setup
 
 \`\`\`
-pinepaper_browser_connect
-pinepaper_clear_canvas
+pinepaper_clear_canvas  # Browser auto-connects in agent mode
 pinepaper_set_background_color color: "#0f172a"
 pinepaper_set_canvas_size width: 800 height: 600
 \`\`\`
@@ -2608,8 +2607,7 @@ Create animated charts and infographics that bring data to life.
 
 ### Step 1: Setup
 \`\`\`
-pinepaper_browser_connect
-pinepaper_clear_canvas
+pinepaper_clear_canvas  # Browser auto-connects in agent mode
 pinepaper_set_background_color color: "#1f2937"
 \`\`\`
 
@@ -2931,8 +2929,7 @@ Build dynamic particle effects like fireworks, starfields, snow, and fire.
 
 ### Step 1: Create Background
 \`\`\`
-pinepaper_browser_connect
-pinepaper_clear_canvas
+pinepaper_clear_canvas  # Browser auto-connects in agent mode
 pinepaper_set_background_color color: "#000011"
 \`\`\`
 
