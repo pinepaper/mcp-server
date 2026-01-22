@@ -46,6 +46,29 @@ import {
   UpdateConnectorInputSchema,
   RemoveConnectorInputSchema,
   DiagramModeInputSchema,
+  // Agent flow mode schemas
+  AgentStartJobInputSchema,
+  AgentEndJobInputSchema,
+  AgentResetInputSchema,
+  AgentBatchExecuteInputSchema,
+  AgentExportInputSchema,
+  AgentAnalyzeInputSchema,
+  // Interactive/Trigger schemas
+  AddTriggerInputSchema,
+  RemoveTriggerInputSchema,
+  QueryTriggersInputSchema,
+  // Quiz schemas
+  CreateQuizInputSchema,
+  GetQuizStateInputSchema,
+  ResetQuizInputSchema,
+  // Widget export schemas
+  ExportWidgetInputSchema,
+  // Letter collage schemas
+  CreateLetterCollageInputSchema,
+  AnimateLetterCollageInputSchema,
+  GetLetterCollageOptionsInputSchema,
+  // Canvas presets schemas
+  GetCanvasPresetsInputSchema,
   ErrorCodes,
   RelationType,
   ItemType,
@@ -1270,6 +1293,147 @@ Browser is ready. You can now use other pinepaper tools to create and animate gr
       }
 
       // -----------------------------------------------------------------------
+      // AGENT FLOW MODE TOOLS
+      // -----------------------------------------------------------------------
+      case 'pinepaper_agent_start_job': {
+        const input = AgentStartJobInputSchema.parse(args);
+        const code = codeGenerator.generateAgentStartJob(input);
+        const description = `Started agent job${input.name ? ` "${input.name}"` : ''} with ${input.screenshotPolicy || 'on_complete'} screenshot policy`;
+        return executeOrGenerate(code, description, options, 'pinepaper_agent_start_job');
+      }
+
+      case 'pinepaper_agent_end_job': {
+        const input = AgentEndJobInputSchema.parse(args);
+        const code = codeGenerator.generateAgentEndJob(input);
+        const description = 'Ended agent job with summary and recommendations';
+        return executeOrGenerate(code, description, options, 'pinepaper_agent_end_job');
+      }
+
+      case 'pinepaper_agent_reset': {
+        const input = AgentResetInputSchema.parse(args);
+        const code = codeGenerator.generateAgentReset(input);
+        const description = `Fast canvas reset${input.canvasPreset ? ` to ${input.canvasPreset} preset` : ''}`;
+        return executeOrGenerate(code, description, options, 'pinepaper_agent_reset');
+      }
+
+      case 'pinepaper_agent_batch_execute': {
+        const input = AgentBatchExecuteInputSchema.parse(args);
+        const code = codeGenerator.generateAgentBatchExecute(input);
+        const description = `Batch executed ${input.operations.length} operations${input.atomic !== false ? ' (atomic)' : ''}`;
+        return executeOrGenerate(code, description, options, 'pinepaper_agent_batch_execute');
+      }
+
+      case 'pinepaper_agent_export': {
+        const input = AgentExportInputSchema.parse(args);
+        const code = codeGenerator.generateAgentExport(input);
+        const description = `Smart export for ${input.platform} as ${input.format || 'auto'}`;
+        return executeOrGenerate(code, description, options, 'pinepaper_agent_export');
+      }
+
+      case 'pinepaper_agent_analyze': {
+        const input = AgentAnalyzeInputSchema.parse(args);
+        const code = codeGenerator.generateAgentAnalyze(input);
+        const description = 'Analyzed canvas content for export recommendations';
+        return executeOrGenerate(code, description, options, 'pinepaper_agent_analyze');
+      }
+
+      // -----------------------------------------------------------------------
+      // INTERACTIVE TRIGGER TOOLS
+      // -----------------------------------------------------------------------
+      case 'pinepaper_add_trigger': {
+        const input = AddTriggerInputSchema.parse(args);
+        const code = codeGenerator.generateAddTrigger(input);
+        const description = `Added ${input.event} trigger to ${input.itemId} with ${input.actions.length} actions`;
+        return executeOrGenerate(code, description, options, 'pinepaper_add_trigger');
+      }
+
+      case 'pinepaper_remove_trigger': {
+        const input = RemoveTriggerInputSchema.parse(args);
+        const code = codeGenerator.generateRemoveTrigger(input);
+        const description = input.removeAll
+          ? `Removed all triggers from ${input.itemId}`
+          : `Removed ${input.event} trigger from ${input.itemId}`;
+        return executeOrGenerate(code, description, options, 'pinepaper_remove_trigger');
+      }
+
+      case 'pinepaper_query_triggers': {
+        const input = QueryTriggersInputSchema.parse(args);
+        const code = codeGenerator.generateQueryTriggers(input);
+        const description = input.itemId
+          ? `Queried triggers for ${input.itemId}`
+          : 'Queried all triggers on canvas';
+        return executeOrGenerate(code, description, options, 'pinepaper_query_triggers');
+      }
+
+      // -----------------------------------------------------------------------
+      // QUIZ/LMS TOOLS
+      // -----------------------------------------------------------------------
+      case 'pinepaper_create_quiz': {
+        const input = CreateQuizInputSchema.parse(args);
+        const code = codeGenerator.generateCreateQuiz(input);
+        const description = `Created quiz${input.title ? ` "${input.title}"` : ''} with ${input.questions.length} questions`;
+        return executeOrGenerate(code, description, options, 'pinepaper_create_quiz');
+      }
+
+      case 'pinepaper_get_quiz_state': {
+        const input = GetQuizStateInputSchema.parse(args);
+        const code = codeGenerator.generateGetQuizState(input);
+        const description = input.quizId
+          ? `Got state for quiz ${input.quizId}`
+          : 'Got state for active quiz';
+        return executeOrGenerate(code, description, options, 'pinepaper_get_quiz_state');
+      }
+
+      case 'pinepaper_reset_quiz': {
+        const input = ResetQuizInputSchema.parse(args);
+        const code = codeGenerator.generateResetQuiz(input);
+        const description = input.quizId
+          ? `Reset quiz ${input.quizId}`
+          : 'Reset active quiz';
+        return executeOrGenerate(code, description, options, 'pinepaper_reset_quiz');
+      }
+
+      // -----------------------------------------------------------------------
+      // WIDGET EXPORT TOOLS
+      // -----------------------------------------------------------------------
+      case 'pinepaper_export_widget': {
+        const input = ExportWidgetInputSchema.parse(args);
+        const code = codeGenerator.generateExportWidget(input);
+        const description = `Exported widget as ${input.format} (${input.sizing || 'responsive'}, ${input.interactivity || 'view'})`;
+        return executeOrGenerate(code, description, options, 'pinepaper_export_widget');
+      }
+
+      // -----------------------------------------------------------------------
+      // LETTER COLLAGE TOOLS
+      // -----------------------------------------------------------------------
+      case 'pinepaper_create_letter_collage': {
+        const input = CreateLetterCollageInputSchema.parse(args);
+        const code = codeGenerator.generateCreateLetterCollage(input);
+        const description = `Created ${input.style || 'tile'} letter collage: "${input.text}"`;
+        return executeOrGenerate(code, description, options, 'pinepaper_create_letter_collage');
+      }
+
+      case 'pinepaper_animate_letter_collage': {
+        const input = AnimateLetterCollageInputSchema.parse(args);
+        const code = codeGenerator.generateAnimateLetterCollage(input);
+        const description = `Animated collage ${input.collageId} with ${input.animationType}`;
+        return executeOrGenerate(code, description, options, 'pinepaper_animate_letter_collage');
+      }
+
+      case 'pinepaper_get_letter_collage_options': {
+        const code = codeGenerator.generateGetLetterCollageOptions();
+        return executeOrGenerate(code, 'Gets available letter collage styles and palettes', options, 'pinepaper_get_letter_collage_options');
+      }
+
+      // -----------------------------------------------------------------------
+      // CANVAS PRESETS TOOLS
+      // -----------------------------------------------------------------------
+      case 'pinepaper_get_canvas_presets': {
+        const code = codeGenerator.generateGetCanvasPresets();
+        return executeOrGenerate(code, 'Gets all available canvas presets', options, 'pinepaper_get_canvas_presets');
+      }
+
+      // -----------------------------------------------------------------------
       // UNKNOWN TOOL
       // -----------------------------------------------------------------------
       default: {
@@ -1325,6 +1489,29 @@ Browser is ready. You can now use other pinepaper tools to create and animate gr
             'pinepaper_update_connector',
             'pinepaper_remove_connector',
             'pinepaper_diagram_mode',
+            // Agent flow mode tools
+            'pinepaper_agent_start_job',
+            'pinepaper_agent_end_job',
+            'pinepaper_agent_reset',
+            'pinepaper_agent_batch_execute',
+            'pinepaper_agent_export',
+            'pinepaper_agent_analyze',
+            // Interactive trigger tools
+            'pinepaper_add_trigger',
+            'pinepaper_remove_trigger',
+            'pinepaper_query_triggers',
+            // Quiz/LMS tools
+            'pinepaper_create_quiz',
+            'pinepaper_get_quiz_state',
+            'pinepaper_reset_quiz',
+            // Widget export tools
+            'pinepaper_export_widget',
+            // Letter collage tools
+            'pinepaper_create_letter_collage',
+            'pinepaper_animate_letter_collage',
+            'pinepaper_get_letter_collage_options',
+            // Canvas presets tools
+            'pinepaper_get_canvas_presets',
           ],
         });
       }

@@ -2850,6 +2850,1176 @@ EXAMPLES:
       required: ['action'],
     },
   },
+
+  // ---------------------------------------------------------------------------
+  // AGENT FLOW MODE TOOLS
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_agent_start_job',
+    annotations: {
+      title: 'Start Agent Job',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Start a new agent job/session for optimized batch workflows. Enables agent mode with reduced overhead.
+
+USE WHEN:
+- Beginning a content automation pipeline
+- Starting a batch creation workflow (create → animate → export)
+- Need to track multiple operations as a single job
+- Want to optimize performance with batched execution
+
+AGENT MODE BENEFITS:
+- Batched code execution (multiple operations in single browser call)
+- Automatic item/relation tracking
+- Smart screenshot policy (on_complete, on_error, or never)
+- Fast canvas reset without browser refresh
+- Job-level performance metrics
+
+SCREENSHOT POLICIES:
+- on_complete: Single screenshot at job end (recommended for automation)
+- on_error: Screenshot only when errors occur (debugging)
+- never: No automatic screenshots (fastest)
+- on_request: Manual screenshots only
+
+CANVAS PRESETS:
+- instagram: 1080x1080 (1:1 square)
+- instagram-story: 1080x1920 (9:16 vertical)
+- tiktok: 1080x1920 (9:16 vertical, 60fps)
+- youtube: 1920x1080 (16:9 horizontal)
+- youtube-thumbnail: 1280x720 (16:9 thumbnail)
+- twitter: 1200x675 (16:9 Twitter card)
+- linkedin: 1200x627 (LinkedIn standard)
+- web: Flexible dimensions
+- print-a4: 2480x3508 (A4 at 300dpi)
+- print-letter: 2550x3300 (Letter at 300dpi)
+
+EXAMPLES:
+- Quick social media content: {name: "Instagram Post", screenshotPolicy: "on_complete", canvasPreset: "instagram"}
+- High-volume automation: {screenshotPolicy: "never"}
+- Debug workflow: {name: "Debug Session", screenshotPolicy: "on_error"}
+
+WORKFLOW:
+1. pinepaper_agent_start_job → Start job
+2. Multiple create/animate/relation operations
+3. pinepaper_agent_end_job → End job, get summary`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Optional job name for tracking',
+        },
+        screenshotPolicy: {
+          type: 'string',
+          enum: ['on_complete', 'on_error', 'never', 'on_request'],
+          description: 'When to take screenshots (default: on_complete)',
+        },
+        canvasPreset: {
+          type: 'string',
+          enum: ['instagram', 'instagram-story', 'tiktok', 'youtube', 'youtube-thumbnail', 'twitter', 'linkedin', 'web', 'print-a4', 'print-letter'],
+          description: 'Set canvas size to platform preset',
+        },
+        clearCanvas: {
+          type: 'boolean',
+          description: 'Clear canvas when starting job (default: true)',
+        },
+      },
+    },
+  },
+
+  {
+    name: 'pinepaper_agent_end_job',
+    annotations: {
+      title: 'End Agent Job',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `End the current agent job and get a comprehensive summary with export recommendations.
+
+USE WHEN:
+- Finishing a content automation pipeline
+- Need job summary with items created
+- Want export format recommendations
+- Getting performance metrics for the job
+
+RETURNS:
+- jobId: Unique job identifier
+- duration: Total job time in milliseconds
+- itemsCreated: Array of all item IDs created
+- relationsCreated: Array of all relation IDs created
+- screenshot: Base64 screenshot (if policy was on_complete)
+- recommendations: Smart export recommendations based on content
+
+EXPORT RECOMMENDATIONS:
+The system analyzes your content and suggests optimal formats:
+- Static content with simple colors → SVG (scalable, small file)
+- Static with gradients/images → PNG (high quality)
+- Animated content → WebM/MP4 for video, GIF for social
+- Print-ready content → PDF with high DPI
+
+EXAMPLE RESPONSE:
+{
+  "jobId": "job_1704067200_abc123",
+  "duration": 2500,
+  "itemsCreated": ["item_1", "item_2", "item_3"],
+  "relationsCreated": ["relation_1"],
+  "recommendations": [
+    {"platform": "instagram", "format": "mp4", "confidence": 0.9, "reason": "Animated content works well as video"}
+  ]
+}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        includeScreenshot: {
+          type: 'boolean',
+          description: 'Force include screenshot in response (default: based on policy)',
+        },
+        analyzeContent: {
+          type: 'boolean',
+          description: 'Analyze content and provide export recommendations (default: true)',
+        },
+      },
+    },
+  },
+
+  {
+    name: 'pinepaper_agent_reset',
+    annotations: {
+      title: 'Agent Reset Canvas',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Fast canvas reset without browser refresh. Much faster than pinepaper_refresh_page.
+
+USE WHEN:
+- Starting a new scene in a batch workflow
+- Clearing canvas between job iterations
+- Need fast reset during automation pipelines
+- Preserving browser state while clearing content
+
+PERFORMANCE:
+- pinepaper_agent_reset: ~200ms (recommended)
+- pinepaper_refresh_page: ~3000ms (browser refresh)
+
+OPTIONS:
+- canvasPreset: Set canvas to platform dimensions
+- backgroundColor: Set background color after reset
+- preserveBackground: Keep existing background (don't reset)
+
+EXAMPLES:
+- Quick reset: {} (just clears canvas)
+- Reset for Instagram: {canvasPreset: "instagram", backgroundColor: "#ffffff"}
+- Reset preserving background: {preserveBackground: true}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        canvasPreset: {
+          type: 'string',
+          enum: ['instagram', 'instagram-story', 'tiktok', 'youtube', 'youtube-thumbnail', 'twitter', 'linkedin', 'web', 'print-a4', 'print-letter'],
+          description: 'Set canvas size to platform preset after reset',
+        },
+        backgroundColor: {
+          type: 'string',
+          description: 'Set background color after reset (e.g., "#ffffff")',
+        },
+        preserveBackground: {
+          type: 'boolean',
+          description: 'Keep existing background generator/color',
+        },
+      },
+    },
+  },
+
+  {
+    name: 'pinepaper_agent_batch_execute',
+    annotations: {
+      title: 'Batch Execute Operations',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Execute multiple operations in a single browser call. Dramatically faster than individual tool calls.
+
+USE WHEN:
+- Creating multiple items in one step
+- Applying animations to many items
+- Need maximum performance
+- Building complex scenes efficiently
+
+PERFORMANCE COMPARISON:
+- 10 individual pinepaper_create_item calls: ~1450ms (10 browser round trips)
+- pinepaper_agent_batch_execute with 10 creates: ~300ms (1 browser round trip)
+
+OPERATION TYPES:
+- create: Create an item (itemType, position, properties)
+- modify: Modify an item (itemId, properties)
+- animate: Animate an item (itemId, animationType, animationOptions)
+- relation: Add a relation (sourceId, targetId, relationType, relationOptions)
+- delete: Delete an item (itemId)
+
+ATOMIC MODE:
+When atomic: true (default), all operations succeed or all fail.
+When atomic: false, operations execute independently (partial success possible).
+
+EXAMPLES:
+- Create 3 circles:
+  {operations: [
+    {type: "create", itemType: "circle", position: {x: 200, y: 300}, properties: {radius: 30, color: "#ef4444"}},
+    {type: "create", itemType: "circle", position: {x: 400, y: 300}, properties: {radius: 30, color: "#22c55e"}},
+    {type: "create", itemType: "circle", position: {x: 600, y: 300}, properties: {radius: 30, color: "#3b82f6"}}
+  ]}
+
+- Create and animate:
+  {operations: [
+    {type: "create", itemType: "star", position: {x: 400, y: 300}, properties: {radius1: 50, radius2: 25, points: 5, color: "#fbbf24"}},
+    {type: "animate", itemId: "$0", animationType: "spin", animationOptions: {speed: 2}}
+  ], atomic: true}
+
+VARIABLE REFERENCES:
+Use "$0", "$1", etc. to reference items created in earlier operations within the same batch.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        operations: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              type: {
+                type: 'string',
+                enum: ['create', 'modify', 'animate', 'relation', 'delete'],
+                description: 'Operation type',
+              },
+              itemType: {
+                type: 'string',
+                description: 'For create: type of item to create',
+              },
+              itemId: {
+                type: 'string',
+                description: 'For modify/animate/delete: target item ID or $N reference',
+              },
+              position: {
+                type: 'object',
+                properties: {
+                  x: { type: 'number' },
+                  y: { type: 'number' },
+                },
+                description: 'Position for create operations',
+              },
+              properties: {
+                type: 'object',
+                description: 'Properties for create/modify operations',
+              },
+              animationType: {
+                type: 'string',
+                description: 'For animate: animation type',
+              },
+              animationOptions: {
+                type: 'object',
+                description: 'For animate: animation options',
+              },
+              sourceId: {
+                type: 'string',
+                description: 'For relation: source item ID',
+              },
+              targetId: {
+                type: 'string',
+                description: 'For relation: target item ID',
+              },
+              relationType: {
+                type: 'string',
+                description: 'For relation: relation type',
+              },
+              relationOptions: {
+                type: 'object',
+                description: 'For relation: relation options',
+              },
+            },
+            required: ['type'],
+          },
+          description: 'Array of operations to execute',
+        },
+        atomic: {
+          type: 'boolean',
+          description: 'If true, all operations succeed or all fail (default: true)',
+        },
+      },
+      required: ['operations'],
+    },
+  },
+
+  {
+    name: 'pinepaper_agent_export',
+    annotations: {
+      title: 'Smart Export',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Smart export with automatic format detection and platform optimization.
+
+USE WHEN:
+- Exporting content for a specific social media platform
+- Need optimal format automatically selected
+- Want platform-specific dimensions and quality
+- Exporting for print or web
+
+PLATFORMS & OPTIMAL FORMATS:
+| Platform        | Dimensions | Static | Animated |
+|-----------------|------------|--------|----------|
+| instagram       | 1080x1080  | PNG    | MP4      |
+| instagram-story | 1080x1920  | PNG    | MP4      |
+| tiktok          | 1080x1920  | PNG    | MP4@60fps|
+| youtube         | 1920x1080  | PNG    | MP4      |
+| youtube-thumbnail| 1280x720  | PNG    | PNG      |
+| twitter         | 1200x675   | PNG    | GIF      |
+| linkedin        | 1200x627   | PNG    | GIF      |
+| web             | flexible   | SVG    | SVG      |
+| print-a4        | 2480x3508  | PDF    | PDF      |
+| print-letter    | 2550x3300  | PDF    | PDF      |
+
+FORMAT OVERRIDE:
+You can specify a format to override auto-detection:
+- svg: Scalable vector (best for web, smallest file)
+- png: High quality raster (best for static social media)
+- gif: Animated (limited to 256 colors)
+- mp4: Video (best quality animations)
+- webm: Video (smaller file, modern browsers)
+- pdf: Print-ready document
+
+QUALITY LEVELS:
+- draft: Fast export, lower quality (good for previews)
+- standard: Balanced quality and file size (default)
+- high: Maximum quality (best for final export)
+
+EXAMPLES:
+- Auto-export for Instagram: {platform: "instagram"}
+- Force SVG export: {platform: "web", format: "svg"}
+- High-quality print: {platform: "print-a4", quality: "high"}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        platform: {
+          type: 'string',
+          enum: ['instagram', 'instagram-story', 'tiktok', 'youtube', 'youtube-thumbnail', 'twitter', 'linkedin', 'web', 'print-a4', 'print-letter'],
+          description: 'Target platform for export',
+        },
+        format: {
+          type: 'string',
+          enum: ['svg', 'png', 'gif', 'mp4', 'webm', 'pdf'],
+          description: 'Override format (auto-detected if not specified)',
+        },
+        quality: {
+          type: 'string',
+          enum: ['draft', 'standard', 'high'],
+          description: 'Export quality level (default: standard)',
+        },
+      },
+      required: ['platform'],
+    },
+  },
+
+  {
+    name: 'pinepaper_agent_analyze',
+    annotations: {
+      title: 'Analyze Content',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Analyze canvas content to get export recommendations and content insights.
+
+USE WHEN:
+- Need to know what formats work best for current content
+- Want to understand content complexity
+- Checking if content has animations
+- Getting platform recommendations
+
+ANALYSIS INCLUDES:
+- hasAnimations: Whether content has animations
+- animationTypes: Types of animations used
+- colorComplexity: simple | gradient | complex
+- itemCount: Number of items on canvas
+- canvasSize: Current canvas dimensions
+- hasRelations: Whether items have relationships
+- relationTypes: Types of relations used
+- hasGradients: Whether gradients are used
+- hasShadows: Whether shadows are used
+- hasText: Whether text items exist
+- hasImages: Whether raster images exist
+
+RECOMMENDATIONS:
+Based on analysis, returns optimal:
+- platform: Best target platforms
+- format: Recommended export formats
+- warnings: Any potential issues
+
+EXAMPLE RESPONSE:
+{
+  "analysis": {
+    "hasAnimations": true,
+    "animationTypes": ["orbit", "pulse"],
+    "colorComplexity": "gradient",
+    "itemCount": 8,
+    "canvasSize": {"width": 1080, "height": 1080}
+  },
+  "recommendations": [
+    {"platform": "instagram", "format": "mp4", "confidence": 0.9},
+    {"platform": "web", "format": "webm", "confidence": 0.85}
+  ]
+}`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // INTERACTIVE TRIGGER TOOLS
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_add_trigger',
+    annotations: {
+      title: 'Add Trigger',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Add an interactive trigger to an item. Triggers execute actions when events occur.
+
+USE WHEN:
+- Making items clickable
+- Adding hover effects
+- Creating drag interactions
+- Building interactive tutorials/quizzes
+- Timeline-based triggers
+
+TRIGGER EVENTS:
+- click: When item is clicked
+- hover_enter: When mouse enters item
+- hover_exit: When mouse leaves item
+- drag_start: When item drag begins
+- drag_move: While item is being dragged
+- drag_end: When item drag ends
+- timeline: At specific time in animation
+- scene_enter: When scene becomes active
+- scene_exit: When scene deactivates
+- animation_end: When item's animation completes
+- quiz_answer: When quiz answer is submitted
+
+ACTION TYPES:
+- show: Make target item visible
+- hide: Hide target item
+- toggle_visibility: Toggle target visibility
+- play_animation: Start animation on target
+- stop_animation: Stop animation on target
+- navigate: Navigate to scene or URL
+- update_property: Change item property
+- set_variable: Set a scene variable
+- submit_answer: Submit quiz answer
+- increment_score: Add to quiz score
+- reset_quiz: Reset quiz state
+
+EXAMPLES:
+- Click to show: {itemId: "button_1", event: "click", actions: [{type: "show", targetItemId: "panel_1"}]}
+- Hover to animate: {itemId: "star_1", event: "hover_enter", actions: [{type: "play_animation", targetItemId: "star_1", animationType: "pulse"}]}
+- Click to navigate: {itemId: "next_btn", event: "click", actions: [{type: "navigate", url: "#scene2"}]}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        itemId: {
+          type: 'string',
+          description: 'Item to attach trigger to',
+        },
+        event: {
+          type: 'string',
+          enum: ['click', 'hover_enter', 'hover_exit', 'drag_start', 'drag_move', 'drag_end', 'timeline', 'scene_enter', 'scene_exit', 'animation_end', 'quiz_answer'],
+          description: 'Event that fires the trigger',
+        },
+        actions: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              type: {
+                type: 'string',
+                enum: ['show', 'hide', 'toggle_visibility', 'play_animation', 'stop_animation', 'navigate', 'update_property', 'set_variable', 'submit_answer', 'increment_score', 'reset_quiz'],
+                description: 'Action type',
+              },
+              targetItemId: {
+                type: 'string',
+                description: 'Target item for the action',
+              },
+              animationType: {
+                type: 'string',
+                description: 'Animation type for play_animation',
+              },
+              property: {
+                type: 'string',
+                description: 'Property name for update_property',
+              },
+              value: {
+                description: 'Value for update_property or set_variable',
+              },
+              variableName: {
+                type: 'string',
+                description: 'Variable name for set_variable',
+              },
+              url: {
+                type: 'string',
+                description: 'URL or scene ID for navigate',
+              },
+              points: {
+                type: 'number',
+                description: 'Points for increment_score',
+              },
+            },
+            required: ['type'],
+          },
+          description: 'Actions to execute when triggered',
+        },
+        condition: {
+          type: 'string',
+          description: 'Optional condition expression (e.g., "$score > 10")',
+        },
+        timelineOffset: {
+          type: 'number',
+          description: 'Time offset in ms for timeline triggers',
+        },
+      },
+      required: ['itemId', 'event', 'actions'],
+    },
+  },
+
+  {
+    name: 'pinepaper_remove_trigger',
+    annotations: {
+      title: 'Remove Trigger',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Remove triggers from an item.
+
+USE WHEN:
+- Disabling interactivity on an item
+- Cleaning up triggers before adding new ones
+- Removing specific event handlers
+
+OPTIONS:
+- Remove specific event: {itemId: "button_1", event: "click"}
+- Remove all triggers: {itemId: "button_1", removeAll: true}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        itemId: {
+          type: 'string',
+          description: 'Item to remove triggers from',
+        },
+        event: {
+          type: 'string',
+          enum: ['click', 'hover_enter', 'hover_exit', 'drag_start', 'drag_move', 'drag_end', 'timeline', 'scene_enter', 'scene_exit', 'animation_end', 'quiz_answer'],
+          description: 'Specific event to remove (optional)',
+        },
+        removeAll: {
+          type: 'boolean',
+          description: 'Remove all triggers from item',
+        },
+      },
+      required: ['itemId'],
+    },
+  },
+
+  {
+    name: 'pinepaper_query_triggers',
+    annotations: {
+      title: 'Query Triggers',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `List all triggers on the canvas or for a specific item.
+
+USE WHEN:
+- Inspecting existing interactivity
+- Debugging trigger behavior
+- Understanding scene's interactive elements
+
+EXAMPLES:
+- All triggers: {}
+- Triggers on specific item: {itemId: "button_1"}
+- Filter by event type: {event: "click"}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        itemId: {
+          type: 'string',
+          description: 'Filter triggers by item ID',
+        },
+        event: {
+          type: 'string',
+          enum: ['click', 'hover_enter', 'hover_exit', 'drag_start', 'drag_move', 'drag_end', 'timeline', 'scene_enter', 'scene_exit', 'animation_end', 'quiz_answer'],
+          description: 'Filter by event type',
+        },
+      },
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // QUIZ/LMS TOOLS
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_create_quiz',
+    annotations: {
+      title: 'Create Quiz',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Create an interactive quiz with questions, answers, and scoring.
+
+USE WHEN:
+- Building educational content
+- Creating assessments
+- Adding gamification elements
+- Making interactive learning modules
+
+QUESTION TYPES:
+- multiple-choice: Single correct answer from options
+- multiple-select: Multiple correct answers
+- drag-drop: Drag items to correct zones
+- matching: Match pairs of items
+- sequencing: Put items in correct order
+- hotspot: Click correct area on image
+- true-false: True or false question
+
+FEEDBACK:
+Each question can have:
+- correctFeedback: Message shown on correct answer
+- incorrectFeedback: Message shown on wrong answer
+- partialFeedback: Message for partially correct (multi-select)
+
+SCORING:
+- Each question has a points value
+- passingScore: Minimum score to pass
+- showScore: Display score during quiz
+- allowRetry: Allow retrying incorrect answers
+
+EXAMPLE:
+{
+  "title": "Geography Quiz",
+  "questions": [
+    {
+      "type": "multiple-choice",
+      "prompt": "What is the capital of France?",
+      "options": [
+        {"id": "a", "label": "London"},
+        {"id": "b", "label": "Paris", "isCorrect": true},
+        {"id": "c", "label": "Berlin"}
+      ],
+      "points": 10,
+      "correctFeedback": "Correct! Paris is the capital.",
+      "incorrectFeedback": "Sorry, the correct answer is Paris."
+    }
+  ],
+  "passingScore": 70,
+  "showScore": true
+}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        title: {
+          type: 'string',
+          description: 'Quiz title',
+        },
+        questions: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              type: {
+                type: 'string',
+                enum: ['multiple-choice', 'multiple-select', 'drag-drop', 'matching', 'sequencing', 'hotspot', 'true-false'],
+                description: 'Question type',
+              },
+              prompt: {
+                type: 'string',
+                description: 'Question text',
+              },
+              options: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    label: { type: 'string' },
+                    isCorrect: { type: 'boolean' },
+                  },
+                },
+                description: 'Answer options',
+              },
+              points: {
+                type: 'number',
+                description: 'Points for correct answer',
+              },
+              correctFeedback: {
+                type: 'string',
+                description: 'Feedback for correct answer',
+              },
+              incorrectFeedback: {
+                type: 'string',
+                description: 'Feedback for incorrect answer',
+              },
+              draggableItems: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Item IDs that can be dragged (for drag-drop)',
+              },
+              dropZones: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    correctItems: { type: 'array', items: { type: 'string' } },
+                  },
+                },
+                description: 'Drop zones with correct items (for drag-drop)',
+              },
+            },
+            required: ['type', 'prompt', 'points'],
+          },
+          description: 'Quiz questions',
+        },
+        passingScore: {
+          type: 'number',
+          description: 'Minimum percentage to pass (0-100)',
+        },
+        showScore: {
+          type: 'boolean',
+          description: 'Display score during quiz',
+        },
+        allowRetry: {
+          type: 'boolean',
+          description: 'Allow retrying incorrect answers',
+        },
+        shuffleQuestions: {
+          type: 'boolean',
+          description: 'Randomize question order',
+        },
+        shuffleOptions: {
+          type: 'boolean',
+          description: 'Randomize answer options',
+        },
+      },
+      required: ['questions'],
+    },
+  },
+
+  {
+    name: 'pinepaper_get_quiz_state',
+    annotations: {
+      title: 'Get Quiz State',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Get the current state of an active quiz.
+
+USE WHEN:
+- Checking quiz progress
+- Getting current score
+- Reviewing answered questions
+- Debugging quiz behavior
+
+RETURNS:
+- quizId: Quiz identifier
+- currentQuestion: Current question index
+- totalQuestions: Total number of questions
+- score: Current score
+- maxScore: Maximum possible score
+- answers: Array of submitted answers
+- passed: Whether passing score achieved (if complete)
+- complete: Whether quiz is finished`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        quizId: {
+          type: 'string',
+          description: 'Quiz ID (optional, uses active quiz if not specified)',
+        },
+      },
+    },
+  },
+
+  {
+    name: 'pinepaper_reset_quiz',
+    annotations: {
+      title: 'Reset Quiz',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Reset a quiz to its initial state.
+
+USE WHEN:
+- Restarting a quiz
+- Clearing quiz progress
+- Allowing user to retake quiz`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        quizId: {
+          type: 'string',
+          description: 'Quiz ID (optional, uses active quiz if not specified)',
+        },
+      },
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // WIDGET EXPORT TOOLS
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_export_widget',
+    annotations: {
+      title: 'Export Widget',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Export the current canvas as an embeddable widget (pinewidget).
+
+USE WHEN:
+- Creating embeddable content for websites
+- Exporting for LMS integration
+- Building web components
+- Generating embed codes
+
+EXPORT FORMATS:
+- web-component: <pinepaper-widget> custom element
+- standalone-html: Complete HTML file with bundled runtime
+- iframe-embed: Iframe embed code for any website
+- react-component: React wrapper component
+- vue-component: Vue wrapper component
+
+SIZING OPTIONS:
+- fixed: Exact pixel dimensions
+- responsive: Scales to container width
+- fluid: Fills container completely
+
+INTERACTIVITY LEVELS:
+- none: Static display only
+- view: Can zoom/pan but not edit
+- full: All interactions enabled
+
+LMS FEATURES:
+When lmsEnabled is true:
+- Tracks quiz completion
+- Reports scores to LMS
+- Supports SCORM/xAPI
+
+EXAMPLES:
+- Simple embed: {format: "iframe-embed"}
+- React component: {format: "react-component", sizing: "responsive"}
+- LMS quiz: {format: "standalone-html", interactivity: "full", lmsEnabled: true}
+
+OUTPUT:
+Returns object with:
+- code: Main export code
+- embedCode: Copy-paste snippet
+- sceneData: Serialized scene JSON
+- metadata: Size, interactivity info`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        format: {
+          type: 'string',
+          enum: ['web-component', 'standalone-html', 'iframe-embed', 'react-component', 'vue-component'],
+          description: 'Export format',
+        },
+        sizing: {
+          type: 'string',
+          enum: ['fixed', 'responsive', 'fluid'],
+          description: 'Widget sizing mode (default: responsive)',
+        },
+        interactivity: {
+          type: 'string',
+          enum: ['none', 'view', 'full'],
+          description: 'Interactivity level (default: view)',
+        },
+        autoplay: {
+          type: 'boolean',
+          description: 'Auto-play animations on load (default: true)',
+        },
+        loop: {
+          type: 'boolean',
+          description: 'Loop animations (default: true)',
+        },
+        lmsEnabled: {
+          type: 'boolean',
+          description: 'Enable LMS tracking (SCORM/xAPI)',
+        },
+        width: {
+          type: 'number',
+          description: 'Fixed width in pixels (for fixed sizing)',
+        },
+        height: {
+          type: 'number',
+          description: 'Fixed height in pixels (for fixed sizing)',
+        },
+      },
+      required: ['format'],
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // LETTER COLLAGE TOOLS (Text Design)
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_create_letter_collage',
+    annotations: {
+      title: 'Create Letter Collage',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Create stylized text with per-letter customization. Perfect for word games, ransom notes, gradient text, and creative typography.
+
+USE WHEN:
+- Creating Wordle-style word displays
+- Making magazine cutout/ransom note text
+- Designing gradient-filled text
+- Building creative typography effects
+- Creating paper craft style lettering
+
+STYLE TYPES:
+- tile: Wordle/Scrabble colored backgrounds (use with tile palettes)
+- magazine: Mixed fonts/colors like cutouts
+- paperCut: Shadow/depth like cut paper
+- fold: Origami-style folded letters
+- gradient: Each letter with gradient fill (use with gradient palettes)
+- image: Letters filled with image
+
+TILE PALETTES:
+- Game: wordle, scrabble
+- Vibrant: candy, neon, rainbow
+- Soft: pastel, cotton
+- Natural: earth, ocean, forest, sunset
+- Professional: corporate, minimal, slate
+- Seasonal: christmas, halloween, spring
+- Magazine: magazine, newspaper, vintage
+- Paper Craft: paperCraft, origami, craftPaper
+
+GRADIENT PALETTES:
+rainbow, sunset, ocean, fire, gold, rose, ice, cyberpunk, neonGlow, purplePink
+
+EXAMPLES:
+- Wordle style: {text: "HELLO", style: "tile", palette: "wordle"}
+- Ransom note: {text: "SECRET", style: "magazine", palette: "newspaper"}
+- Gradient text: {text: "RAINBOW", style: "gradient", gradientPalette: "rainbow"}
+- Neon style: {text: "GLOW", style: "tile", palette: "neon"}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        text: {
+          type: 'string',
+          description: 'The text to stylize',
+        },
+        style: {
+          type: 'string',
+          enum: ['tile', 'magazine', 'paperCut', 'fold', 'gradient', 'image'],
+          description: 'Style type (default: tile)',
+        },
+        palette: {
+          type: 'string',
+          enum: [
+            'wordle', 'scrabble',
+            'candy', 'neon', 'rainbow',
+            'pastel', 'cotton',
+            'earth', 'ocean', 'forest', 'sunset',
+            'corporate', 'minimal', 'slate',
+            'christmas', 'halloween', 'spring',
+            'magazine', 'newspaper', 'vintage',
+            'paperCraft', 'origami', 'craftPaper',
+          ],
+          description: 'Color palette for tile/magazine styles',
+        },
+        position: {
+          type: 'object',
+          properties: {
+            x: { type: 'number' },
+            y: { type: 'number' },
+          },
+          description: 'Position on canvas (defaults to center)',
+        },
+        fontSize: {
+          type: 'number',
+          description: 'Base font size in pixels (default: 48)',
+        },
+        fontFamily: {
+          type: 'string',
+          description: 'Font family (default: Inter, sans-serif)',
+        },
+        spacing: {
+          type: 'number',
+          description: 'Letter spacing multiplier (default: 1.1)',
+        },
+        gradientPalette: {
+          type: 'string',
+          enum: ['rainbow', 'sunset', 'ocean', 'fire', 'gold', 'rose', 'ice', 'cyberpunk', 'neonGlow', 'purplePink'],
+          description: 'Gradient palette (for style="gradient")',
+        },
+        gradientDirection: {
+          type: 'string',
+          enum: ['vertical', 'horizontal', 'diagonal', 'radial'],
+          description: 'Gradient direction (default: vertical)',
+        },
+        cornerRadius: {
+          type: 'number',
+          description: 'Corner radius for tile backgrounds (default: 4)',
+        },
+        shadowEnabled: {
+          type: 'boolean',
+          description: 'Enable drop shadows (default: true)',
+        },
+      },
+      required: ['text'],
+    },
+  },
+  {
+    name: 'pinepaper_animate_letter_collage',
+    annotations: {
+      title: 'Animate Letter Collage',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Apply animation to all letters in a collage with staggered timing.
+
+USE WHEN:
+- Adding entrance animations to text
+- Creating typewriter-style reveals
+- Making text bounce or pulse
+- Adding dynamic effects to lettering
+
+ANIMATION TYPES:
+- pulse: Scale up and down rhythmically
+- bounce: Bouncing motion
+- fade: Fade in/out
+- wobble: Side-to-side wobble
+- rotate: Spinning rotation
+
+STAGGER EFFECT:
+Use staggerDelay to create wave-like animations where each letter starts slightly after the previous one. 0.1s is a good default for smooth wave effects.
+
+EXAMPLES:
+- Wave entrance: {collageId: "collage_1", animationType: "bounce", staggerDelay: 0.1}
+- Pulsing text: {collageId: "collage_1", animationType: "pulse", staggerDelay: 0.05}
+- Fast typewriter: {collageId: "collage_1", animationType: "fade", staggerDelay: 0.15}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        collageId: {
+          type: 'string',
+          description: 'Collage ID from create_letter_collage',
+        },
+        animationType: {
+          type: 'string',
+          enum: ['pulse', 'bounce', 'fade', 'wobble', 'rotate'],
+          description: 'Animation type to apply',
+        },
+        staggerDelay: {
+          type: 'number',
+          description: 'Delay between each letter animation start in seconds (default: 0.1)',
+        },
+        animationSpeed: {
+          type: 'number',
+          description: 'Animation speed multiplier (default: 1)',
+        },
+      },
+      required: ['collageId', 'animationType'],
+    },
+  },
+  {
+    name: 'pinepaper_get_letter_collage_options',
+    annotations: {
+      title: 'Get Letter Collage Options',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Get available styles, palettes, and gradient options for letter collages.
+
+USE WHEN:
+- Learning available letter collage styles
+- Discovering palette options
+- Exploring gradient possibilities
+- Building UI for collage creation
+
+RETURNS:
+- styles: All available style types
+- tilePalettes: Grouped by category (game, vibrant, soft, natural, etc.)
+- gradientPalettes: Available gradient color schemes
+- gradientDirections: Direction options for gradients`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // CANVAS PRESETS TOOL
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_get_canvas_presets',
+    annotations: {
+      title: 'Get Canvas Presets',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `List all available canvas presets with their dimensions.
+
+USE WHEN:
+- Setting up canvas for specific platforms (YouTube, Instagram, TikTok, etc.)
+- Discovering available size presets
+- Planning content dimensions
+- Building UI for size selection
+
+PRESETS BY CATEGORY:
+- Video: youtube-thumbnail, youtube-short, tiktok, hd-720p, full-hd-1080p
+- Social: instagram-story, instagram-post, facebook-post, twitter-post, linkedin-post, pinterest-pin
+- Presentation: presentation-16x9, presentation-4x3
+
+RETURNS:
+Array of presets with: key, name, width, height, aspectRatio, category`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
 ];
 
 /**

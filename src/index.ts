@@ -34,7 +34,7 @@ import {
 
 const SERVER_INFO = {
   name: 'pinepaper-mcp',
-  version: '1.4.0',
+  version: '1.5.0',
   description: 'MCP Server for PinePaper Studio - Create animated graphics with AI',
 };
 

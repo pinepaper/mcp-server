@@ -22,6 +22,34 @@ export interface BrowserControllerConfig {
   viewportHeight?: number;
   /** Timeout for page operations in ms (default: 30000) */
   timeout?: number;
+  /** Enable agent mode with ?agent=1 URL parameter */
+  agentMode?: boolean;
+}
+
+export interface AgentConnectOptions {
+  /** Run browser in headless mode (default: true for agent workflows) */
+  headless?: boolean;
+  /** Canvas preset to apply (optional) */
+  canvasPreset?: string;
+  /** Custom viewport width */
+  viewportWidth?: number;
+  /** Custom viewport height */
+  viewportHeight?: number;
+}
+
+export interface BatchExecuteResult {
+  success: boolean;
+  results: Array<{
+    index: number;
+    success: boolean;
+    result?: unknown;
+    itemId?: string;
+    error?: string;
+  }>;
+  itemIds: string[];
+  executionTime: number;
+  error?: string;
+  screenshot?: string;
 }
 
 export interface ExecuteResult {
@@ -48,6 +76,7 @@ export class PinePaperBrowserController {
   private page: Page | null = null;
   private config: Required<BrowserControllerConfig>;
   private isConnected = false;
+  private isAgentMode = false;
 
   constructor(config: BrowserControllerConfig = {}) {
     // Ensure URL points to /editor where the code console and API are available
@@ -62,7 +91,25 @@ export class PinePaperBrowserController {
       viewportWidth: config.viewportWidth || 1280,
       viewportHeight: config.viewportHeight || 800,
       timeout: config.timeout || 30000,
+      agentMode: config.agentMode ?? false,
     };
+  }
+
+  /**
+   * Get URL with agent mode parameter
+   */
+  private getAgentUrl(baseUrl: string): string {
+    const url = new URL(baseUrl);
+    url.searchParams.set('agent', '1');
+    url.searchParams.set('mode', 'agent');
+    return url.toString();
+  }
+
+  /**
+   * Check if in agent mode
+   */
+  get agentMode(): boolean {
+    return this.isAgentMode;
   }
 
   /**
@@ -83,12 +130,32 @@ export class PinePaperBrowserController {
    * Launch browser and navigate to PinePaper Studio
    */
   async connect(): Promise<void> {
-    if (this.isConnected) {
-      console.error('[PinePaper] Already connected');
-      return;
+    // Check if already connected and page is still valid
+    if (this.isConnected && this.page) {
+      try {
+        // Verify the page is still responsive
+        await this.page.evaluate(() => true);
+        console.error('[PinePaper] Already connected');
+        return;
+      } catch {
+        // Page is stale, need to reconnect
+        console.error('[PinePaper] Existing connection stale, reconnecting...');
+        this.isConnected = false;
+      }
     }
 
     try {
+      // Clean up any existing browser instance first to prevent multiple windows
+      if (this.browser) {
+        try {
+          await this.browser.close();
+        } catch {
+          // Ignore close errors
+        }
+        this.browser = null;
+        this.page = null;
+      }
+
       // Dynamic import to avoid issues when puppeteer isn't installed
       const puppeteer = await import('puppeteer');
 
@@ -102,7 +169,18 @@ export class PinePaperBrowserController {
         ],
       });
 
-      this.page = await this.browser.newPage();
+      // Get existing pages first, reuse if available (avoid creating multiple tabs)
+      const pages = await this.browser.pages();
+      if (pages.length > 0) {
+        this.page = pages[0];
+        // Close any extra pages that might have been created
+        for (let i = 1; i < pages.length; i++) {
+          await pages[i].close();
+        }
+      } else {
+        this.page = await this.browser.newPage();
+      }
+
       await this.page.setViewport({
         width: this.config.viewportWidth,
         height: this.config.viewportHeight,
@@ -319,6 +397,318 @@ export class PinePaperBrowserController {
       return false;
     }
   }
+
+  // =============================================================================
+  // AGENT MODE METHODS
+  // =============================================================================
+
+  /**
+   * Connect in agent mode with optimized settings for automation.
+   * Uses headless mode by default and adds ?agent=1 URL parameter.
+   */
+  async connectAgent(options: AgentConnectOptions = {}): Promise<void> {
+    // Check if already connected and page is still valid
+    if (this.isConnected && this.page) {
+      try {
+        // Verify the page is still responsive
+        await this.page.evaluate(() => true);
+
+        // If already connected but not in agent mode, navigate to agent URL
+        if (!this.isAgentMode) {
+          const agentUrl = this.getAgentUrl(this.config.studioUrl);
+          console.error(`[PinePaper] Switching to agent mode: ${agentUrl}`);
+          await this.page.goto(agentUrl, {
+            waitUntil: 'networkidle2',
+            timeout: this.config.timeout,
+          });
+          await this.waitForPinePaper();
+          this.isAgentMode = true;
+        }
+        console.error('[PinePaper] Already connected in agent mode');
+        return;
+      } catch {
+        // Page is stale, need to reconnect
+        console.error('[PinePaper] Existing connection stale, reconnecting...');
+        this.isConnected = false;
+      }
+    }
+
+    try {
+      // Clean up any existing browser instance first to prevent multiple windows
+      if (this.browser) {
+        try {
+          await this.browser.close();
+        } catch {
+          // Ignore close errors
+        }
+        this.browser = null;
+        this.page = null;
+      }
+
+      // Dynamic import to avoid issues when puppeteer isn't installed
+      const puppeteer = await import('puppeteer');
+
+      // Agent mode defaults to headless
+      const headless = options.headless ?? true;
+      const viewportWidth = options.viewportWidth ?? this.config.viewportWidth;
+      const viewportHeight = options.viewportHeight ?? this.config.viewportHeight;
+
+      console.error(`[PinePaper] Launching browser in agent mode (headless: ${headless})...`);
+      this.browser = await puppeteer.default.launch({
+        headless,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          `--window-size=${viewportWidth},${viewportHeight}`,
+          // Additional optimization flags for agent mode
+          '--disable-gpu',
+          '--disable-dev-shm-usage',
+          '--disable-extensions',
+        ],
+      });
+
+      // Get existing pages first, reuse if available (avoid creating multiple tabs)
+      const pages = await this.browser.pages();
+      if (pages.length > 0) {
+        this.page = pages[0];
+        // Close any extra pages that might have been created
+        for (let i = 1; i < pages.length; i++) {
+          await pages[i].close();
+        }
+      } else {
+        this.page = await this.browser.newPage();
+      }
+
+      await this.page.setViewport({
+        width: viewportWidth,
+        height: viewportHeight,
+      });
+
+      // Navigate to agent URL
+      const agentUrl = this.getAgentUrl(this.config.studioUrl);
+      console.error(`[PinePaper] Navigating to agent URL: ${agentUrl}`);
+      await this.page.goto(agentUrl, {
+        waitUntil: 'networkidle2',
+        timeout: this.config.timeout,
+      });
+
+      // Wait for PinePaper to be ready
+      await this.waitForPinePaper();
+
+      this.isConnected = true;
+      this.isAgentMode = true;
+      console.error('[PinePaper] Connected to PinePaper Studio in agent mode');
+    } catch (error) {
+      await this.disconnect();
+      throw new Error(
+        `Failed to connect in agent mode: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  /**
+   * Wait for PinePaper API to be available
+   */
+  private async waitForPinePaper(): Promise<void> {
+    if (!this.page) return;
+
+    console.error('[PinePaper] Waiting for PinePaper Studio to initialize...');
+    await this.page.waitForFunction(
+      () => {
+        return (
+          typeof (window as any).app !== 'undefined' ||
+          typeof (window as any).pinepaper !== 'undefined' ||
+          typeof (window as any).paper !== 'undefined'
+        );
+      },
+      { timeout: this.config.timeout }
+    );
+  }
+
+  /**
+   * Execute multiple code blocks as a batch for optimal performance.
+   * Combines all code into a single execution context.
+   */
+  async executeBatch(
+    codes: string[],
+    options: { takeScreenshot?: boolean; atomic?: boolean } = {}
+  ): Promise<BatchExecuteResult> {
+    const startTime = Date.now();
+
+    if (!this.page || !this.isConnected) {
+      return {
+        success: false,
+        results: [],
+        itemIds: [],
+        executionTime: 0,
+        error: 'Not connected to PinePaper Studio',
+      };
+    }
+
+    const atomic = options.atomic ?? true;
+
+    // Wrap all codes in a single IIFE for batch execution
+    const batchCode = `
+(async function() {
+  const _results = [];
+  const _itemIds = [];
+
+  try {
+${codes.map((code, i) => `
+    // === Operation ${i + 1} ===
+    try {
+      const _result${i} = await (async () => {
+        ${code}
+      })();
+      _results.push({ index: ${i}, success: true, result: _result${i} });
+      if (_result${i} && typeof _result${i} === 'object') {
+        if (_result${i}.itemId) _itemIds.push(_result${i}.itemId);
+        if (_result${i}.registryId) _itemIds.push(_result${i}.registryId);
+      }
+    } catch (e) {
+      _results.push({ index: ${i}, success: false, error: e.message });
+      ${atomic ? 'throw e; // Atomic mode: stop on first error' : '// Continue despite error'}
+    }
+`).join('\n')}
+
+    // Save history once for all operations
+    if (app.historyManager) {
+      app.historyManager.saveState();
+    }
+
+    return { success: true, itemIds: _itemIds, results: _results };
+  } catch (e) {
+    return {
+      success: false,
+      error: e.message,
+      itemIds: _itemIds,
+      results: _results
+    };
+  }
+})();
+    `.trim();
+
+    try {
+      const result = await this.page.evaluate((codeToRun: string) => {
+        try {
+          // eslint-disable-next-line no-eval
+          const evalResult = eval(codeToRun);
+          if (evalResult instanceof Promise) {
+            return evalResult;
+          }
+          return evalResult;
+        } catch (e) {
+          return {
+            success: false,
+            error: e instanceof Error ? e.message : 'Batch execution error',
+            results: [],
+            itemIds: [],
+          };
+        }
+      }, batchCode);
+
+      const executionTime = Date.now() - startTime;
+
+      // Take screenshot if requested
+      let screenshot: string | undefined;
+      if (options.takeScreenshot && result.success) {
+        screenshot = await this.takeScreenshot();
+      }
+
+      return {
+        success: result.success ?? false,
+        results: result.results ?? [],
+        itemIds: result.itemIds ?? [],
+        executionTime,
+        error: result.error,
+        screenshot,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        results: [],
+        itemIds: [],
+        executionTime: Date.now() - startTime,
+        error: error instanceof Error ? error.message : 'Unknown batch error',
+      };
+    }
+  }
+
+  /**
+   * Execute code with a timeout
+   */
+  async executeWithTimeout(
+    code: string,
+    timeoutMs: number,
+    takeScreenshot = false
+  ): Promise<ExecuteResult> {
+    const timeoutPromise = new Promise<ExecuteResult>((_, reject) => {
+      setTimeout(() => reject(new Error('Execution timeout')), timeoutMs);
+    });
+
+    const executePromise = this.executeCode(code, takeScreenshot);
+
+    try {
+      return await Promise.race([executePromise, timeoutPromise]);
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Timeout error',
+      };
+    }
+  }
+
+  /**
+   * Quick reset: Clear canvas without full page refresh
+   */
+  async quickReset(options: { preserveBackground?: boolean } = {}): Promise<ExecuteResult> {
+    const resetCode = `
+(function() {
+  // Clear all items
+  if (app.clearCanvas) {
+    app.clearCanvas();
+  } else {
+    if (app.textItemGroup) app.textItemGroup.removeChildren();
+    if (app.patternGroup) app.patternGroup.removeChildren();
+    if (app.itemRegistry) app.itemRegistry.clear();
+    if (app.relationRegistry) app.relationRegistry.clear();
+  }
+
+  ${!options.preserveBackground ? `
+  // Reset background
+  if (app.setBackgroundColor) {
+    app.setBackgroundColor('#1a1a2e');
+  }
+  ` : ''}
+
+  // Save state
+  if (app.historyManager) {
+    app.historyManager.saveState();
+  }
+
+  return { success: true, reset: true };
+})();
+    `.trim();
+
+    return this.executeCode(resetCode, false);
+  }
+
+  /**
+   * Set canvas size from platform preset
+   */
+  async setCanvasPreset(preset: string): Promise<ExecuteResult> {
+    const code = `
+(function() {
+  if (app.setCanvasSize) {
+    app.setCanvasSize('${preset}');
+    return { success: true, preset: '${preset}' };
+  }
+  return { success: false, error: 'setCanvasSize not available' };
+})();
+    `.trim();
+
+    return this.executeCode(code, false);
+  }
 }
 
 // =============================================================================
@@ -328,21 +718,44 @@ export class PinePaperBrowserController {
 let globalController: PinePaperBrowserController | null = null;
 
 /**
- * Get or create the global browser controller instance
+ * Get or create the global browser controller instance.
+ *
+ * IMPORTANT: This is a singleton - only ONE browser controller exists.
+ * If a controller already exists, the config parameter is ignored.
+ * Call resetBrowserController() first if you need to change config.
  */
 export function getBrowserController(
   config?: BrowserControllerConfig
 ): PinePaperBrowserController {
   if (!globalController) {
     globalController = new PinePaperBrowserController(config);
+  } else if (config) {
+    // Log that config is being ignored since controller already exists
+    console.error('[PinePaper] Browser controller already exists, config parameter ignored. Call resetBrowserController() to create a new controller with different config.');
   }
   return globalController;
 }
 
 /**
- * Reset the global controller (for testing)
+ * Reset the global controller (for testing or when config needs to change).
+ * This will close any existing browser and clear the singleton.
  */
-export function resetBrowserController(): void {
+export async function resetBrowserController(): Promise<void> {
+  if (globalController) {
+    try {
+      await globalController.disconnect();
+    } catch {
+      // Ignore disconnect errors during reset
+    }
+    globalController = null;
+    console.error('[PinePaper] Browser controller reset');
+  }
+}
+
+/**
+ * Synchronous reset for testing (fire and forget)
+ */
+export function resetBrowserControllerSync(): void {
   if (globalController) {
     globalController.disconnect().catch(() => {});
     globalController = null;

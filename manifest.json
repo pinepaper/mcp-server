@@ -1,10 +1,10 @@
 {
   "manifest_version": "0.3",
   "name": "pinepaper-mcp",
-  "version": "1.4.3",
+  "version": "1.5.0",
   "display_name": "PinePaper Studio",
   "description": "Create animated graphics with AI using PinePaper Studio",
-  "long_description": "PinePaper MCP Server enables Claude to create, animate, and export graphics through PinePaper Studio. Features include shape creation, relation-based animations (orbits, follows, attached_to), procedural generators, visual effects, SVG export with animations, asset search & import from 4 open repositories (500k+ icons), performance metrics tracking, diagram tools for flowcharts/UML/network diagrams with smart connectors and auto-layout, and enhanced error messages with canvas context. Supports two execution modes: Puppeteer (live browser execution) and Code (generate code for manual paste).",
+  "long_description": "PinePaper MCP Server enables Claude to create, animate, and export graphics through PinePaper Studio. Features include shape creation, relation-based animations (orbits, follows, attached_to), procedural generators, visual effects, SVG export with animations, asset search & import from 4 open repositories (500k+ icons), performance metrics tracking, diagram tools for flowcharts/UML/network diagrams with smart connectors and auto-layout, enhanced error messages with canvas context, Agent Flow Mode for content automation pipelines with batch operations and smart platform exports (Instagram, TikTok, YouTube, etc.), interactive triggers (click, hover, drag events), quiz/LMS integration with SCORM/xAPI support, embeddable widget export (web-component, iframe, React, Vue), Letter Collage for stylized text with per-letter customization (Wordle, magazine cutout, gradient styles with 24+ palettes), and canvas presets for social media platforms. Supports two execution modes: Puppeteer (live browser execution) and Code (generate code for manual paste).",
   "author": {
     "name": "PinePaper Studio",
     "url": "https://github.com/pinepaper"
@@ -242,6 +242,74 @@
     {
       "name": "pinepaper_diagram_mode",
       "description": "Control diagram mode for interactive editing (activate, deactivate, set tool mode)"
+    },
+    {
+      "name": "pinepaper_agent_start_job",
+      "description": "Start an agent job session for batch content creation workflows"
+    },
+    {
+      "name": "pinepaper_agent_end_job",
+      "description": "End the current agent job and get summary with export recommendations"
+    },
+    {
+      "name": "pinepaper_agent_reset",
+      "description": "Quick canvas reset without full page refresh"
+    },
+    {
+      "name": "pinepaper_agent_batch_execute",
+      "description": "Execute multiple operations in a single batch for optimal performance"
+    },
+    {
+      "name": "pinepaper_agent_export",
+      "description": "Smart export with auto-detection for target platform (Instagram, TikTok, YouTube, etc.)"
+    },
+    {
+      "name": "pinepaper_agent_analyze",
+      "description": "Analyze canvas content for export recommendations"
+    },
+    {
+      "name": "pinepaper_add_trigger",
+      "description": "Add interactive event triggers to items (click, hover, drag)"
+    },
+    {
+      "name": "pinepaper_remove_trigger",
+      "description": "Remove event triggers from an item"
+    },
+    {
+      "name": "pinepaper_query_triggers",
+      "description": "Query existing triggers on the canvas"
+    },
+    {
+      "name": "pinepaper_create_quiz",
+      "description": "Create interactive quizzes with multiple question types"
+    },
+    {
+      "name": "pinepaper_get_quiz_state",
+      "description": "Get current quiz state (score, progress, answers)"
+    },
+    {
+      "name": "pinepaper_reset_quiz",
+      "description": "Reset quiz to initial state"
+    },
+    {
+      "name": "pinepaper_export_widget",
+      "description": "Export as embeddable widget (web-component, iframe, React, Vue)"
+    },
+    {
+      "name": "pinepaper_create_letter_collage",
+      "description": "Create stylized text with per-letter customization (Wordle, magazine cutout, gradient styles)"
+    },
+    {
+      "name": "pinepaper_animate_letter_collage",
+      "description": "Apply staggered animation to letter collage letters"
+    },
+    {
+      "name": "pinepaper_get_letter_collage_options",
+      "description": "Get available letter collage styles, palettes, and options"
+    },
+    {
+      "name": "pinepaper_get_canvas_presets",
+      "description": "List all available canvas size presets (YouTube, Instagram, TikTok, etc.)"
     }
   ]
 }

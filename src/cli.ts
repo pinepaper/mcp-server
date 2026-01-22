@@ -9,7 +9,7 @@ import { createServer, ServerOptions } from './index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { ExecutionMode } from './tools/handlers.js';
 
-const VERSION = '1.4.0';
+const VERSION = '1.5.0';
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);

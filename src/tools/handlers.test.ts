@@ -438,6 +438,576 @@ describe('handleToolCall', () => {
     });
   });
 
+  // -------------------------------------------------------------------------
+  // AGENT FLOW MODE TOOLS
+  // -------------------------------------------------------------------------
+
+  describe('pinepaper_agent_start_job', () => {
+    it('should generate code for starting an agent job', async () => {
+      const result = await handleToolCall('pinepaper_agent_start_job', {
+        name: 'test_job',
+        screenshotPolicy: 'on_complete',
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('agent job');
+      expect(text).toContain('test_job');
+    });
+
+    it('should use default screenshot policy when not provided', async () => {
+      const result = await handleToolCall('pinepaper_agent_start_job', {});
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('on_complete');
+    });
+
+    it('should accept canvas preset', async () => {
+      const result = await handleToolCall('pinepaper_agent_start_job', {
+        name: 'instagram_job',
+        canvasPreset: 'instagram',
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('instagram');
+    });
+  });
+
+  describe('pinepaper_agent_end_job', () => {
+    it('should generate code for ending an agent job', async () => {
+      const result = await handleToolCall('pinepaper_agent_end_job', {});
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('job');
+    });
+
+    it('should include screenshot when requested', async () => {
+      const result = await handleToolCall('pinepaper_agent_end_job', {
+        takeScreenshot: true,
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('screenshot');
+    });
+
+    it('should include recommendations when requested', async () => {
+      const result = await handleToolCall('pinepaper_agent_end_job', {
+        includeRecommendations: true,
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('recommendations');
+    });
+  });
+
+  describe('pinepaper_agent_reset', () => {
+    it('should generate code for resetting canvas', async () => {
+      const result = await handleToolCall('pinepaper_agent_reset', {});
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('clearCanvas');
+    });
+
+    it('should preserve background when requested', async () => {
+      const result = await handleToolCall('pinepaper_agent_reset', {
+        preserveBackground: true,
+      });
+
+      expect(result.isError).toBeFalsy();
+    });
+
+    it('should set new background color', async () => {
+      const result = await handleToolCall('pinepaper_agent_reset', {
+        backgroundColor: '#ff0000',
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('#ff0000');
+    });
+  });
+
+  describe('pinepaper_agent_batch_execute', () => {
+    it('should generate code for batch operations', async () => {
+      const result = await handleToolCall('pinepaper_agent_batch_execute', {
+        operations: [
+          { type: 'create', itemType: 'circle', position: { x: 100, y: 100 } },
+          { type: 'create', itemType: 'rectangle', position: { x: 200, y: 200 } },
+        ],
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('circle');
+      expect(text).toContain('rectangle');
+    });
+
+    it('should support atomic mode', async () => {
+      const result = await handleToolCall('pinepaper_agent_batch_execute', {
+        operations: [
+          { type: 'create', itemType: 'text' },
+        ],
+        atomic: true,
+      });
+
+      expect(result.isError).toBeFalsy();
+    });
+  });
+
+  describe('pinepaper_agent_export', () => {
+    it('should generate code for smart export', async () => {
+      const result = await handleToolCall('pinepaper_agent_export', {
+        platform: 'instagram',
+        format: 'png',
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('export');
+    });
+
+    it('should use auto platform detection', async () => {
+      const result = await handleToolCall('pinepaper_agent_export', {
+        platform: 'auto',
+      });
+
+      expect(result.isError).toBeFalsy();
+    });
+
+    it('should support quality settings', async () => {
+      const result = await handleToolCall('pinepaper_agent_export', {
+        platform: 'web',
+        quality: 'high',
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('high');
+    });
+  });
+
+  describe('pinepaper_agent_analyze', () => {
+    it('should generate code for content analysis', async () => {
+      const result = await handleToolCall('pinepaper_agent_analyze', {});
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('analysis');
+    });
+
+    it('should include recommendations when requested', async () => {
+      const result = await handleToolCall('pinepaper_agent_analyze', {
+        includeRecommendations: true,
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('recommendations');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // INTERACTIVE TRIGGER TOOLS
+  // -------------------------------------------------------------------------
+
+  describe('pinepaper_add_trigger', () => {
+    it('should generate code for adding a click trigger', async () => {
+      const result = await handleToolCall('pinepaper_add_trigger', {
+        itemId: 'button_1',
+        event: 'click',
+        actions: [
+          { type: 'show', targetItemId: 'panel_1' },
+        ],
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('button_1');
+      expect(text).toContain('click');
+      expect(text).toContain('show');
+    });
+
+    it('should support hover triggers', async () => {
+      const result = await handleToolCall('pinepaper_add_trigger', {
+        itemId: 'item_1',
+        event: 'hover_enter',
+        actions: [
+          { type: 'play_animation', targetItemId: 'item_1', animationType: 'pulse' },
+        ],
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('hover_enter');
+    });
+
+    it('should support multiple actions', async () => {
+      const result = await handleToolCall('pinepaper_add_trigger', {
+        itemId: 'item_1',
+        event: 'click',
+        actions: [
+          { type: 'show', targetItemId: 'panel_1' },
+          { type: 'play_animation', targetItemId: 'panel_1', animationType: 'fadeIn' },
+        ],
+      });
+
+      expect(result.isError).toBeFalsy();
+    });
+  });
+
+  describe('pinepaper_remove_trigger', () => {
+    it('should generate code for removing triggers from an item', async () => {
+      const result = await handleToolCall('pinepaper_remove_trigger', {
+        itemId: 'button_1',
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('button_1');
+    });
+
+    it('should remove specific event type', async () => {
+      const result = await handleToolCall('pinepaper_remove_trigger', {
+        itemId: 'button_1',
+        event: 'click',
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('click');
+    });
+  });
+
+  describe('pinepaper_query_triggers', () => {
+    it('should generate code for querying triggers', async () => {
+      const result = await handleToolCall('pinepaper_query_triggers', {});
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('trigger');
+    });
+
+    it('should filter by item', async () => {
+      const result = await handleToolCall('pinepaper_query_triggers', {
+        itemId: 'button_1',
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('button_1');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // QUIZ/LMS TOOLS
+  // -------------------------------------------------------------------------
+
+  describe('pinepaper_create_quiz', () => {
+    it('should generate code for creating a quiz', async () => {
+      const result = await handleToolCall('pinepaper_create_quiz', {
+        title: 'Test Quiz',
+        questions: [
+          {
+            id: 'q1',
+            type: 'multiple-choice',
+            prompt: 'What is 2+2?',
+            points: 10,
+            options: [
+              { id: 'a', label: '3', isCorrect: false },
+              { id: 'b', label: '4', isCorrect: true },
+            ],
+          },
+        ],
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('Test Quiz');
+      expect(text).toContain('multiple-choice');
+    });
+
+    it('should support drag-drop questions', async () => {
+      const result = await handleToolCall('pinepaper_create_quiz', {
+        title: 'Drag Drop Quiz',
+        questions: [
+          {
+            id: 'q1',
+            type: 'drag-drop',
+            prompt: 'Match the items',
+            points: 20,
+          },
+        ],
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('drag-drop');
+    });
+  });
+
+  describe('pinepaper_get_quiz_state', () => {
+    it('should generate code for getting quiz state', async () => {
+      const result = await handleToolCall('pinepaper_get_quiz_state', {});
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('quiz');
+    });
+
+    it('should get state for specific quiz', async () => {
+      const result = await handleToolCall('pinepaper_get_quiz_state', {
+        quizId: 'quiz_1',
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('quiz_1');
+    });
+  });
+
+  describe('pinepaper_reset_quiz', () => {
+    it('should generate code for resetting quiz', async () => {
+      const result = await handleToolCall('pinepaper_reset_quiz', {});
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('reset');
+    });
+
+    it('should reset specific quiz', async () => {
+      const result = await handleToolCall('pinepaper_reset_quiz', {
+        quizId: 'quiz_1',
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('quiz_1');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // WIDGET EXPORT TOOL
+  // -------------------------------------------------------------------------
+
+  describe('pinepaper_export_widget', () => {
+    it('should generate code for web component export', async () => {
+      const result = await handleToolCall('pinepaper_export_widget', {
+        format: 'web-component',
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('web-component');
+    });
+
+    it('should support standalone HTML export', async () => {
+      const result = await handleToolCall('pinepaper_export_widget', {
+        format: 'standalone-html',
+        sizing: 'responsive',
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('standalone-html');
+    });
+
+    it('should support iframe embed export', async () => {
+      const result = await handleToolCall('pinepaper_export_widget', {
+        format: 'iframe-embed',
+        autoplay: true,
+        loop: true,
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('iframe-embed');
+    });
+
+    it('should support LMS integration', async () => {
+      const result = await handleToolCall('pinepaper_export_widget', {
+        format: 'web-component',
+        lmsEnabled: true,
+        lmsType: 'scorm',
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('lmsEnabled = true');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // LETTER COLLAGE TOOLS
+  // -------------------------------------------------------------------------
+
+  describe('pinepaper_create_letter_collage', () => {
+    it('should generate code for creating a tile-style letter collage', async () => {
+      const result = await handleToolCall('pinepaper_create_letter_collage', {
+        text: 'HELLO',
+        style: 'tile',
+        palette: 'wordle',
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('HELLO');
+      expect(text).toContain('tile');
+    });
+
+    it('should generate code for magazine-style letter collage', async () => {
+      const result = await handleToolCall('pinepaper_create_letter_collage', {
+        text: 'RANSOM',
+        style: 'magazine',
+        palette: 'newspaper',
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('RANSOM');
+      expect(text).toContain('magazine');
+    });
+
+    it('should generate code for gradient-style letter collage', async () => {
+      const result = await handleToolCall('pinepaper_create_letter_collage', {
+        text: 'GRADIENT',
+        style: 'gradient',
+        gradientPalette: 'sunset',
+        gradientDirection: 'diagonal',
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('GRADIENT');
+      expect(text).toContain('gradient');
+    });
+
+    it('should use default style when not provided', async () => {
+      const result = await handleToolCall('pinepaper_create_letter_collage', {
+        text: 'DEFAULT',
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('DEFAULT');
+    });
+
+    it('should support custom position and font settings', async () => {
+      const result = await handleToolCall('pinepaper_create_letter_collage', {
+        text: 'CUSTOM',
+        position: { x: 200, y: 300 },
+        fontSize: 64,
+        fontFamily: 'Arial',
+        spacing: 1.5,
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('CUSTOM');
+    });
+
+    it('should require text parameter', async () => {
+      const result = await handleToolCall('pinepaper_create_letter_collage', {});
+
+      expect(result.isError).toBe(true);
+    });
+  });
+
+  describe('pinepaper_animate_letter_collage', () => {
+    it('should generate code for pulse animation', async () => {
+      const result = await handleToolCall('pinepaper_animate_letter_collage', {
+        collageId: 'collage_1',
+        animationType: 'pulse',
+        staggerDelay: 0.15,
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('collage_1');
+      expect(text).toContain('pulse');
+    });
+
+    it('should generate code for fade animation', async () => {
+      const result = await handleToolCall('pinepaper_animate_letter_collage', {
+        collageId: 'collage_2',
+        animationType: 'fade',
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('fade');
+    });
+
+    it('should generate code for bounce animation', async () => {
+      const result = await handleToolCall('pinepaper_animate_letter_collage', {
+        collageId: 'collage_3',
+        animationType: 'bounce',
+        animationSpeed: 2,
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('bounce');
+    });
+
+    it('should generate code for wobble animation', async () => {
+      const result = await handleToolCall('pinepaper_animate_letter_collage', {
+        collageId: 'collage_4',
+        animationType: 'wobble',
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('wobble');
+    });
+
+    it('should generate code for rotate animation', async () => {
+      const result = await handleToolCall('pinepaper_animate_letter_collage', {
+        collageId: 'collage_5',
+        animationType: 'rotate',
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('rotate');
+    });
+
+    it('should require collageId and animationType', async () => {
+      const result = await handleToolCall('pinepaper_animate_letter_collage', {});
+
+      expect(result.isError).toBe(true);
+    });
+  });
+
+  describe('pinepaper_get_letter_collage_options', () => {
+    it('should generate code for getting collage options', async () => {
+      const result = await handleToolCall('pinepaper_get_letter_collage_options', {});
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('getLetterCollageOptions');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // CANVAS PRESETS TOOLS
+  // -------------------------------------------------------------------------
+
+  describe('pinepaper_get_canvas_presets', () => {
+    it('should generate code for getting canvas presets', async () => {
+      const result = await handleToolCall('pinepaper_get_canvas_presets', {});
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('getCanvasPresets');
+    });
+  });
+
   describe('unknown tool', () => {
     it('should return error for unknown tool', async () => {
       const result = await handleToolCall('unknown_tool', {});

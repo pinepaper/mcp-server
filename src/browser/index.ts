@@ -17,6 +17,9 @@ export {
   PinePaperBrowserController,
   getBrowserController,
   resetBrowserController,
+  resetBrowserControllerSync,
   type BrowserControllerConfig,
   type ExecuteResult,
+  type AgentConnectOptions,
+  type BatchExecuteResult,
 } from './puppeteer-controller.js';

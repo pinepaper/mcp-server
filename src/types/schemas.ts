@@ -1071,6 +1071,525 @@ export const ErrorCodes = {
   EXPORT_FAILED: 'EXPORT_FAILED',
   EXECUTION_ERROR: 'EXECUTION_ERROR',
   VALIDATION_ERROR: 'VALIDATION_ERROR',
+  AGENT_JOB_ERROR: 'AGENT_JOB_ERROR',
+  BATCH_EXECUTION_ERROR: 'BATCH_EXECUTION_ERROR',
 } as const;
 
 export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes];
+
+// =============================================================================
+// AGENT FLOW MODE SCHEMAS
+// =============================================================================
+
+/**
+ * Platform presets for export
+ */
+export const AgentPlatformSchema = z.enum([
+  'instagram',
+  'instagram-story',
+  'tiktok',
+  'youtube',
+  'youtube-thumbnail',
+  'twitter',
+  'linkedin',
+  'web',
+  'print-a4',
+  'print-letter',
+]).describe('Target platform for export');
+
+export type AgentPlatform = z.infer<typeof AgentPlatformSchema>;
+
+/**
+ * Export format types
+ */
+export const AgentExportFormatSchema = z.enum([
+  'svg', 'png', 'gif', 'mp4', 'webm', 'pdf',
+]).describe('Export file format');
+
+export type AgentExportFormat = z.infer<typeof AgentExportFormatSchema>;
+
+/**
+ * Screenshot policy for agent jobs
+ */
+export const AgentScreenshotPolicySchema = z.enum([
+  'none', 'on_error', 'on_complete', 'on_request',
+]).describe('When to take screenshots during agent job');
+
+export type AgentScreenshotPolicy = z.infer<typeof AgentScreenshotPolicySchema>;
+
+/**
+ * Start job input schema
+ */
+export const AgentStartJobInputSchema = z.object({
+  name: z.string().optional().describe('Optional job name for tracking'),
+  headless: z.boolean().optional().default(true).describe('Run browser in headless mode'),
+  screenshotPolicy: AgentScreenshotPolicySchema.optional().default('on_complete'),
+  canvasPreset: AgentPlatformSchema.optional().describe('Canvas size preset to apply'),
+  canvasSize: z.object({
+    width: z.number().positive(),
+    height: z.number().positive(),
+  }).optional().describe('Custom canvas dimensions'),
+  backgroundColor: z.string().optional().describe('Background color to set'),
+  clearCanvas: z.boolean().optional().default(true).describe('Clear canvas when starting job'),
+}).describe('Options for starting an agent job');
+
+export type AgentStartJobInput = z.infer<typeof AgentStartJobInputSchema>;
+
+/**
+ * End job input schema
+ */
+export const AgentEndJobInputSchema = z.object({
+  takeScreenshot: z.boolean().optional().default(true).describe('Take final screenshot'),
+  analyzeContent: z.boolean().optional().default(true).describe('Analyze content for export recommendations'),
+}).describe('Options for ending an agent job');
+
+export type AgentEndJobInput = z.infer<typeof AgentEndJobInputSchema>;
+
+/**
+ * Reset input schema
+ */
+export const AgentResetInputSchema = z.object({
+  preserveCanvasSize: z.boolean().optional().default(true).describe('Keep current canvas dimensions'),
+  preserveBackground: z.boolean().optional().default(false).describe('Keep current background color'),
+  canvasPreset: AgentPlatformSchema.optional().describe('New canvas preset to apply'),
+  backgroundColor: z.string().optional().describe('New background color'),
+}).describe('Options for resetting canvas between jobs');
+
+export type AgentResetInput = z.infer<typeof AgentResetInputSchema>;
+
+/**
+ * Batch operation type
+ */
+export const AgentBatchOperationTypeSchema = z.enum([
+  'create', 'modify', 'delete', 'animate', 'relation', 'canvas', 'generator',
+]).describe('Type of batch operation');
+
+/**
+ * Single batch operation
+ */
+export const AgentBatchOperationSchema = z.object({
+  type: z.enum(['create', 'modify', 'animate', 'relation', 'delete']).describe('Operation type'),
+  // Create operation fields
+  itemType: z.string().optional().describe('Item type for create operations'),
+  position: z.object({
+    x: z.number(),
+    y: z.number(),
+  }).optional().describe('Position for create operations'),
+  properties: z.record(z.unknown()).optional().describe('Properties for create/modify operations'),
+  // Modify/Animate/Delete operation fields
+  itemId: z.string().optional().describe('Target item ID or $N reference'),
+  // Animate operation fields
+  animationType: z.string().optional().describe('Animation type for animate operations'),
+  animationOptions: z.record(z.unknown()).optional().describe('Animation options'),
+  // Relation operation fields
+  sourceId: z.string().optional().describe('Source item ID for relations'),
+  targetId: z.string().optional().describe('Target item ID for relations'),
+  relationType: z.string().optional().describe('Relation type'),
+  relationOptions: z.record(z.unknown()).optional().describe('Relation options'),
+}).describe('Single batch operation');
+
+export type AgentBatchOperation = z.infer<typeof AgentBatchOperationSchema>;
+
+/**
+ * Batch execute input schema
+ */
+export const AgentBatchExecuteInputSchema = z.object({
+  operations: z.array(AgentBatchOperationSchema).min(1).describe('Array of operations to execute'),
+  atomic: z.boolean().optional().default(true).describe('Rollback all operations on any failure'),
+}).describe('Batch execution input');
+
+export type AgentBatchExecuteInput = z.infer<typeof AgentBatchExecuteInputSchema>;
+
+/**
+ * Smart export input schema
+ */
+export const AgentExportInputSchema = z.object({
+  platform: z.union([AgentPlatformSchema, z.literal('auto')]).optional().default('auto').describe('Target platform'),
+  format: z.union([AgentExportFormatSchema, z.literal('auto')]).optional().default('auto').describe('Export format'),
+  quality: z.enum(['draft', 'standard', 'high']).optional().default('standard').describe('Export quality level'),
+  includeRecommendations: z.boolean().optional().default(true).describe('Include alternative format recommendations'),
+}).describe('Smart export options');
+
+export type AgentExportInput = z.infer<typeof AgentExportInputSchema>;
+
+/**
+ * Analyze content input schema
+ */
+export const AgentAnalyzeInputSchema = z.object({}).describe('Analyze current canvas content');
+
+export type AgentAnalyzeInput = z.infer<typeof AgentAnalyzeInputSchema>;
+
+// =============================================================================
+// INTERACTIVE / TRIGGER SCHEMAS
+// =============================================================================
+
+/**
+ * Trigger event types
+ */
+export const TriggerEventSchema = z.enum([
+  'click',
+  'hover_enter',
+  'hover_exit',
+  'drag_start',
+  'drag_move',
+  'drag_end',
+  'timeline',
+  'scene_enter',
+  'scene_exit',
+  'animation_end',
+  'quiz_answer',
+  'score_change',
+]).describe('Event type that triggers an action');
+
+export type TriggerEvent = z.infer<typeof TriggerEventSchema>;
+
+/**
+ * Action types
+ */
+export const ActionTypeSchema = z.enum([
+  'show',
+  'hide',
+  'toggle_visibility',
+  'play_animation',
+  'stop_animation',
+  'navigate',
+  'update_property',
+  'set_variable',
+  'play_sound',
+  'emit_event',
+  'add_class',
+  'remove_class',
+  'submit_answer',
+  'increment_score',
+  'reset_quiz',
+  'call_function',
+]).describe('Type of action to perform');
+
+export type ActionType = z.infer<typeof ActionTypeSchema>;
+
+/**
+ * Trigger condition
+ */
+export const TriggerConditionSchema = z.object({
+  property: z.string().describe('Property to check'),
+  operator: z.enum(['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'contains']),
+  value: z.unknown().describe('Value to compare against'),
+}).describe('Condition for trigger');
+
+export type TriggerCondition = z.infer<typeof TriggerConditionSchema>;
+
+/**
+ * Action definition
+ */
+export const TriggerActionSchema = z.object({
+  type: ActionTypeSchema,
+  targetItemId: z.string().optional().describe('Item to act upon'),
+  property: z.string().optional().describe('Property to update'),
+  value: z.unknown().optional().describe('New value'),
+  animationType: z.string().optional().describe('Animation type to play'),
+  duration: z.number().optional().describe('Action duration in ms'),
+  easing: EasingSchema.optional(),
+  sceneId: z.string().optional().describe('Scene to navigate to'),
+  variableName: z.string().optional().describe('Variable name'),
+  soundUrl: z.string().optional().describe('Audio URL'),
+  answerId: z.string().optional().describe('Answer ID for quiz'),
+  points: z.number().optional().describe('Points to add'),
+  delay: z.number().optional().default(0).describe('Delay before action in ms'),
+}).describe('Action to execute');
+
+export type TriggerAction = z.infer<typeof TriggerActionSchema>;
+
+/**
+ * Add trigger input
+ */
+export const AddTriggerInputSchema = z.object({
+  itemId: z.string().describe('Registry ID of the item'),
+  event: TriggerEventSchema,
+  time: z.number().optional().describe('Time in seconds for timeline triggers'),
+  timelineOffset: z.number().optional().describe('Time offset in ms for timeline triggers'),
+  conditions: z.array(TriggerConditionSchema).optional().describe('Conditions that must be met'),
+  condition: z.string().optional().describe('Optional condition expression (e.g., "$score > 10")'),
+  actions: z.array(TriggerActionSchema).min(1).describe('Actions to execute'),
+  once: z.boolean().optional().default(false).describe('Fire only once'),
+}).describe('Add trigger to item');
+
+export type AddTriggerInput = z.infer<typeof AddTriggerInputSchema>;
+
+/**
+ * Remove trigger input
+ */
+export const RemoveTriggerInputSchema = z.object({
+  itemId: z.string().describe('Registry ID of the item'),
+  triggerId: z.string().optional().describe('Specific trigger ID to remove'),
+  event: TriggerEventSchema.optional().describe('Remove all triggers of this event type'),
+  removeAll: z.boolean().optional().describe('Remove all triggers from item'),
+}).describe('Remove triggers from item');
+
+export type RemoveTriggerInput = z.infer<typeof RemoveTriggerInputSchema>;
+
+/**
+ * Query triggers input
+ */
+export const QueryTriggersInputSchema = z.object({
+  itemId: z.string().optional().describe('Filter by item ID'),
+  event: TriggerEventSchema.optional().describe('Filter by event type'),
+}).describe('Query triggers');
+
+export type QueryTriggersInput = z.infer<typeof QueryTriggersInputSchema>;
+
+// =============================================================================
+// QUIZ / LMS SCHEMAS
+// =============================================================================
+
+/**
+ * Quiz question types
+ */
+export const QuizQuestionTypeSchema = z.enum([
+  'multiple-choice',
+  'multiple-select',
+  'drag-drop',
+  'matching',
+  'sequencing',
+  'hotspot',
+  'fill-blank',
+  'true-false',
+]).describe('Type of quiz question');
+
+export type QuizQuestionType = z.infer<typeof QuizQuestionTypeSchema>;
+
+/**
+ * Quiz answer option
+ */
+export const QuizAnswerOptionSchema = z.object({
+  id: z.string().describe('Unique answer ID'),
+  itemId: z.string().optional().describe('Associated canvas item ID'),
+  label: z.string().describe('Answer text'),
+  isCorrect: z.boolean().describe('Is this the correct answer'),
+  feedback: z.string().optional().describe('Feedback when selected'),
+  points: z.number().optional().default(1).describe('Points for this answer'),
+}).describe('Quiz answer option');
+
+export type QuizAnswerOption = z.infer<typeof QuizAnswerOptionSchema>;
+
+/**
+ * Drop zone for drag-drop
+ */
+export const DropZoneSchema = z.object({
+  id: z.string().describe('Zone ID'),
+  itemId: z.string().describe('Canvas item that is the drop zone'),
+  acceptsItems: z.array(z.string()).describe('Item IDs that can be dropped here'),
+  label: z.string().optional(),
+}).describe('Drag-drop zone');
+
+export type DropZone = z.infer<typeof DropZoneSchema>;
+
+/**
+ * Quiz question definition
+ */
+export const QuizQuestionSchema = z.object({
+  id: z.string().describe('Question ID'),
+  type: QuizQuestionTypeSchema,
+  prompt: z.string().describe('Question text'),
+  promptItemId: z.string().optional().describe('Canvas item showing prompt'),
+  options: z.array(QuizAnswerOptionSchema).optional(),
+  maxSelections: z.number().optional().describe('Max selections for multi-select'),
+  draggableItems: z.array(z.string()).optional().describe('Draggable item IDs'),
+  dropZones: z.array(DropZoneSchema).optional(),
+  correctSequence: z.array(z.string()).optional().describe('Correct order for sequencing'),
+  points: z.number().optional().default(1).describe('Points for question'),
+  partialCredit: z.boolean().optional().default(false),
+  attempts: z.number().optional().describe('Max attempts'),
+  correctFeedback: z.string().optional(),
+  incorrectFeedback: z.string().optional(),
+  onCorrectActions: z.array(TriggerActionSchema).optional(),
+  onIncorrectActions: z.array(TriggerActionSchema).optional(),
+}).describe('Quiz question');
+
+export type QuizQuestion = z.infer<typeof QuizQuestionSchema>;
+
+/**
+ * Create quiz input
+ */
+export const CreateQuizInputSchema = z.object({
+  id: z.string().optional().describe('Quiz ID'),
+  title: z.string().optional().describe('Quiz title'),
+  questions: z.array(QuizQuestionSchema).min(1),
+  shuffleQuestions: z.boolean().optional().default(false),
+  shuffleOptions: z.boolean().optional().default(false),
+  showFeedback: z.enum(['immediate', 'after-submit', 'never']).optional().default('immediate'),
+  showScore: z.boolean().optional().default(true).describe('Display score during quiz'),
+  passingScore: z.number().optional().describe('Minimum score to pass (percentage)'),
+  allowRetry: z.boolean().optional().default(true),
+  trackProgress: z.boolean().optional().default(true),
+}).describe('Create quiz input');
+
+export type CreateQuizInput = z.infer<typeof CreateQuizInputSchema>;
+
+/**
+ * Get quiz state input
+ */
+export const GetQuizStateInputSchema = z.object({
+  quizId: z.string().optional().describe('Quiz ID (uses active quiz if not specified)'),
+}).describe('Get quiz state');
+
+export type GetQuizStateInput = z.infer<typeof GetQuizStateInputSchema>;
+
+/**
+ * Reset quiz input
+ */
+export const ResetQuizInputSchema = z.object({
+  quizId: z.string().optional().describe('Quiz ID to reset (uses active quiz if not specified)'),
+}).describe('Reset quiz');
+
+export type ResetQuizInput = z.infer<typeof ResetQuizInputSchema>;
+
+// =============================================================================
+// WIDGET EXPORT SCHEMAS
+// =============================================================================
+
+/**
+ * Widget export format
+ */
+export const WidgetExportFormatSchema = z.enum([
+  'web-component',
+  'standalone-html',
+  'iframe-embed',
+  'react-component',
+  'vue-component',
+]).describe('Widget export format');
+
+export type WidgetExportFormat = z.infer<typeof WidgetExportFormatSchema>;
+
+/**
+ * Widget sizing mode
+ */
+export const WidgetSizingSchema = z.enum([
+  'fixed',
+  'responsive',
+  'fluid',
+]).describe('How widget sizes itself');
+
+export type WidgetSizing = z.infer<typeof WidgetSizingSchema>;
+
+/**
+ * Widget interactivity level
+ */
+export const WidgetInteractivitySchema = z.enum([
+  'none',
+  'view',
+  'full',
+]).describe('Interactivity level');
+
+export type WidgetInteractivity = z.infer<typeof WidgetInteractivitySchema>;
+
+/**
+ * Export widget input
+ */
+export const ExportWidgetInputSchema = z.object({
+  format: WidgetExportFormatSchema,
+  sizing: WidgetSizingSchema.optional().default('responsive'),
+  interactivity: WidgetInteractivitySchema.optional().default('full'),
+  width: z.number().optional().describe('Fixed width in pixels'),
+  height: z.number().optional().describe('Fixed height in pixels'),
+  aspectRatio: z.string().optional().describe('Aspect ratio (e.g., "16:9")'),
+  backgroundColor: z.string().optional().describe('Background color'),
+  showControls: z.boolean().optional().default(true).describe('Show playback controls'),
+  autoplay: z.boolean().optional().default(false),
+  loop: z.boolean().optional().default(true),
+  lazyLoad: z.boolean().optional().default(true).describe('Load assets lazily'),
+  lmsEnabled: z.boolean().optional().default(false).describe('Enable LMS tracking'),
+  allowedDomains: z.array(z.string()).optional().describe('Allowed embed domains'),
+}).describe('Export widget options');
+
+export type ExportWidgetInput = z.infer<typeof ExportWidgetInputSchema>;
+
+// =============================================================================
+// LETTER COLLAGE SCHEMAS
+// =============================================================================
+
+export const LetterCollageStyleSchema = z.enum([
+  'tile',
+  'magazine',
+  'paperCut',
+  'fold',
+  'gradient',
+  'image',
+]).describe('Style type for letter collage');
+
+export type LetterCollageStyle = z.infer<typeof LetterCollageStyleSchema>;
+
+export const TilePaletteSchema = z.enum([
+  // Game
+  'wordle', 'scrabble',
+  // Vibrant
+  'candy', 'neon', 'rainbow',
+  // Soft
+  'pastel', 'cotton',
+  // Natural
+  'earth', 'ocean', 'forest', 'sunset',
+  // Professional
+  'corporate', 'minimal', 'slate',
+  // Seasonal
+  'christmas', 'halloween', 'spring',
+  // Magazine
+  'magazine', 'newspaper', 'vintage',
+  // Paper Craft
+  'paperCraft', 'origami', 'craftPaper',
+]).describe('Color palette for tile style');
+
+export type TilePalette = z.infer<typeof TilePaletteSchema>;
+
+export const GradientPaletteSchema = z.enum([
+  'rainbow', 'sunset', 'ocean', 'fire', 'gold', 'rose', 'ice', 'cyberpunk', 'neonGlow', 'purplePink',
+]).describe('Gradient palette for gradient style');
+
+export type GradientPalette = z.infer<typeof GradientPaletteSchema>;
+
+export const GradientDirectionSchema = z.enum([
+  'vertical', 'horizontal', 'diagonal', 'radial',
+]).describe('Direction for gradient style');
+
+export type GradientDirection = z.infer<typeof GradientDirectionSchema>;
+
+export const LetterCollageAnimationSchema = z.enum([
+  'pulse', 'bounce', 'fade', 'wobble', 'rotate',
+]).describe('Animation type for letter collage');
+
+export type LetterCollageAnimation = z.infer<typeof LetterCollageAnimationSchema>;
+
+export const CreateLetterCollageInputSchema = z.object({
+  text: z.string().min(1).describe('The text to stylize'),
+  style: LetterCollageStyleSchema.optional().default('tile').describe('Style type for the letter collage'),
+  palette: TilePaletteSchema.optional().describe('Color palette name for tile/magazine styles'),
+  position: PositionSchema.optional().describe('Position on canvas (defaults to center)'),
+  fontSize: z.number().optional().default(48).describe('Base font size in pixels'),
+  fontFamily: z.string().optional().default('Inter, sans-serif').describe('Font family to use'),
+  spacing: z.number().optional().default(1.1).describe('Letter spacing multiplier'),
+  gradientPalette: GradientPaletteSchema.optional().describe('Gradient palette name (for style="gradient")'),
+  gradientDirection: GradientDirectionSchema.optional().default('vertical').describe('Gradient direction (for style="gradient")'),
+  cornerRadius: z.number().optional().default(4).describe('Corner radius for tile backgrounds'),
+  shadowEnabled: z.boolean().optional().default(true).describe('Enable drop shadows'),
+}).describe('Create letter collage input');
+
+export type CreateLetterCollageInput = z.infer<typeof CreateLetterCollageInputSchema>;
+
+export const AnimateLetterCollageInputSchema = z.object({
+  collageId: z.string().describe('Collage ID from create_letter_collage'),
+  animationType: LetterCollageAnimationSchema.describe('Animation type to apply'),
+  staggerDelay: z.number().optional().default(0.1).describe('Delay between each letter animation start (seconds)'),
+  animationSpeed: z.number().optional().default(1).describe('Animation speed multiplier'),
+}).describe('Animate letter collage input');
+
+export type AnimateLetterCollageInput = z.infer<typeof AnimateLetterCollageInputSchema>;
+
+export const GetLetterCollageOptionsInputSchema = z.object({}).describe('Get letter collage options input (no parameters)');
+
+export type GetLetterCollageOptionsInput = z.infer<typeof GetLetterCollageOptionsInputSchema>;
+
+// =============================================================================
+// CANVAS PRESETS SCHEMA
+// =============================================================================
+
+export const GetCanvasPresetsInputSchema = z.object({}).describe('Get canvas presets input (no parameters)');
+
+export type GetCanvasPresetsInput = z.infer<typeof GetCanvasPresetsInputSchema>;

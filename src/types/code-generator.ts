@@ -50,6 +50,46 @@ import {
   RemoveConnectorInput,
   DiagramModeInputSchema,
   DiagramModeInput,
+  // Agent flow mode types
+  AgentStartJobInputSchema,
+  AgentStartJobInput,
+  AgentEndJobInputSchema,
+  AgentEndJobInput,
+  AgentResetInputSchema,
+  AgentResetInput,
+  AgentBatchExecuteInputSchema,
+  AgentBatchExecuteInput,
+  AgentExportInputSchema,
+  AgentExportInput,
+  AgentAnalyzeInputSchema,
+  AgentAnalyzeInput,
+  // Interactive/Trigger types
+  AddTriggerInputSchema,
+  AddTriggerInput,
+  RemoveTriggerInputSchema,
+  RemoveTriggerInput,
+  QueryTriggersInputSchema,
+  QueryTriggersInput,
+  // Quiz types
+  CreateQuizInputSchema,
+  CreateQuizInput,
+  GetQuizStateInputSchema,
+  GetQuizStateInput,
+  ResetQuizInputSchema,
+  ResetQuizInput,
+  // Widget export types
+  ExportWidgetInputSchema,
+  ExportWidgetInput,
+  // Letter collage types
+  CreateLetterCollageInputSchema,
+  CreateLetterCollageInput,
+  AnimateLetterCollageInputSchema,
+  AnimateLetterCollageInput,
+  GetLetterCollageOptionsInputSchema,
+  GetLetterCollageOptionsInput,
+  // Canvas presets types
+  GetCanvasPresetsInputSchema,
+  GetCanvasPresetsInput,
 } from './schemas.js';
 import { z } from 'zod';
 
@@ -1672,6 +1712,1235 @@ app.diagramManager.setMode(${modeStr}${shapeStr});
 throw new Error('Unknown diagram mode action: ${action}');
 `.trim();
     }
+  }
+
+  // ===========================================================================
+  // AGENT FLOW MODE CODE GENERATORS
+  // ===========================================================================
+
+  /**
+   * Generate code for starting an agent job
+   */
+  generateAgentStartJob(input: AgentStartJobInput): string {
+    const validated = AgentStartJobInputSchema.parse(input);
+    const { name, screenshotPolicy, canvasPreset, clearCanvas } = validated;
+
+    const nameStr = name ? `'${name.replace(/'/g, "\\'")}'` : 'null';
+    const policyStr = screenshotPolicy || 'on_complete';
+    const shouldClear = clearCanvas !== false;
+
+    let code = `
+// Start agent job
+const jobOptions = {
+  name: ${nameStr},
+  screenshotPolicy: '${policyStr}',
+  agentMode: true
+};
+`;
+
+    if (shouldClear) {
+      code += `
+// Clear canvas
+if (app.clearCanvas) {
+  app.clearCanvas();
+} else {
+  if (app.textItemGroup) app.textItemGroup.removeChildren();
+  if (app.patternGroup) app.patternGroup.removeChildren();
+  if (app.itemRegistry) app.itemRegistry.clear();
+  if (app.relationRegistry) app.relationRegistry.clear();
+}
+`;
+    }
+
+    if (canvasPreset) {
+      code += `
+// Set canvas size to preset
+app.setCanvasSize('${canvasPreset}');
+`;
+    }
+
+    code += `
+// Return job context
+({
+  success: true,
+  jobStarted: true,
+  name: ${nameStr},
+  screenshotPolicy: '${policyStr}',
+  canvasPreset: ${canvasPreset ? `'${canvasPreset}'` : 'null'},
+  canvasCleared: ${shouldClear}
+});
+`;
+
+    return code.trim();
+  }
+
+  /**
+   * Generate code for ending an agent job
+   */
+  generateAgentEndJob(input: AgentEndJobInput): string {
+    const validated = AgentEndJobInputSchema.parse(input);
+    const { takeScreenshot, analyzeContent } = validated;
+
+    const shouldAnalyze = analyzeContent !== false;
+
+    let code = `
+// End agent job
+(async function() {
+  const result = {
+    success: true,
+    jobEnded: true
+  };
+`;
+
+    if (shouldAnalyze) {
+      code += `
+  // Analyze content
+  const analysis = {
+    hasAnimations: false,
+    animationTypes: [],
+    colorComplexity: 'simple',
+    itemCount: 0,
+    canvasSize: { width: 0, height: 0 },
+    hasRelations: false,
+    relationTypes: [],
+    hasGradients: false,
+    hasShadows: false,
+    hasText: false,
+    hasImages: false,
+  };
+
+  // Get canvas size
+  if (app.canvasEl) {
+    analysis.canvasSize = { width: app.canvasEl.width, height: app.canvasEl.height };
+  } else if (paper.view) {
+    analysis.canvasSize = { width: paper.view.size.width, height: paper.view.size.height };
+  }
+
+  // Count items and analyze
+  const items = app.itemRegistry ? app.itemRegistry.getAll() : [];
+  analysis.itemCount = items.length;
+
+  const animationSet = new Set();
+  const relationSet = new Set();
+
+  items.forEach(entry => {
+    const item = entry.item;
+    const data = item.data || {};
+
+    if (entry.type === 'text' || item.className === 'PointText') analysis.hasText = true;
+    if (item.className === 'Raster') analysis.hasImages = true;
+    if (data.animationType) {
+      analysis.hasAnimations = true;
+      animationSet.add(data.animationType);
+    }
+    if (item.fillColor && item.fillColor.gradient) analysis.hasGradients = true;
+    if (item.shadowColor || item.shadowBlur) analysis.hasShadows = true;
+  });
+
+  analysis.animationTypes = Array.from(animationSet);
+
+  // Check relations
+  if (app.relationRegistry) {
+    const relations = app.relationRegistry.getAll ? app.relationRegistry.getAll() : [];
+    analysis.hasRelations = relations.length > 0;
+    relations.forEach(rel => {
+      if (rel.relationType) relationSet.add(rel.relationType);
+    });
+    analysis.relationTypes = Array.from(relationSet);
+    if (analysis.hasRelations) analysis.hasAnimations = true;
+  }
+
+  // Determine color complexity
+  if (analysis.hasGradients) {
+    analysis.colorComplexity = 'gradient';
+  } else if (analysis.itemCount > 20 || analysis.hasShadows) {
+    analysis.colorComplexity = 'complex';
+  }
+
+  result.analysis = analysis;
+
+  // Generate recommendations
+  const recommendations = [];
+  if (analysis.hasAnimations) {
+    if (analysis.hasGradients || analysis.colorComplexity === 'complex') {
+      recommendations.push({ platform: 'web', format: 'webm', confidence: 0.9, reason: 'Animated content with gradients' });
+      recommendations.push({ platform: 'instagram', format: 'mp4', confidence: 0.85, reason: 'Social media video' });
+    } else {
+      recommendations.push({ platform: 'web', format: 'svg', confidence: 0.95, reason: 'Simple animations as SVG' });
+      recommendations.push({ platform: 'twitter', format: 'gif', confidence: 0.8, reason: 'Social media GIF' });
+    }
+  } else {
+    if (analysis.colorComplexity === 'simple' && !analysis.hasImages) {
+      recommendations.push({ platform: 'web', format: 'svg', confidence: 0.95, reason: 'Vector graphics' });
+    } else {
+      recommendations.push({ platform: 'instagram', format: 'png', confidence: 0.9, reason: 'High quality static' });
+    }
+  }
+  result.recommendations = recommendations;
+`;
+    }
+
+    if (takeScreenshot) {
+      code += `
+  // Capture screenshot
+  const canvas = document.querySelector('canvas');
+  if (canvas) {
+    result.screenshot = canvas.toDataURL('image/png');
+  }
+`;
+    }
+
+    code += `
+  return result;
+})();
+`;
+
+    return code.trim();
+  }
+
+  /**
+   * Generate code for fast canvas reset
+   */
+  generateAgentReset(input: AgentResetInput): string {
+    const validated = AgentResetInputSchema.parse(input);
+    const { canvasPreset, backgroundColor, preserveBackground } = validated;
+
+    let code = `
+// Fast canvas reset
+`;
+
+    if (!preserveBackground) {
+      code += `
+// Clear canvas completely
+if (app.clearCanvas) {
+  app.clearCanvas();
+} else {
+  if (app.textItemGroup) app.textItemGroup.removeChildren();
+  if (app.patternGroup) app.patternGroup.removeChildren();
+  if (app.itemRegistry) app.itemRegistry.clear();
+  if (app.relationRegistry) app.relationRegistry.clear();
+}
+`;
+    } else {
+      code += `
+// Clear items but preserve background
+if (app.textItemGroup) app.textItemGroup.removeChildren();
+if (app.itemRegistry) app.itemRegistry.clear();
+if (app.relationRegistry) app.relationRegistry.clear();
+`;
+    }
+
+    if (canvasPreset) {
+      code += `
+// Set canvas to preset
+app.setCanvasSize('${canvasPreset}');
+`;
+    }
+
+    if (backgroundColor && !preserveBackground) {
+      code += `
+// Set background color
+app.setBackgroundColor('${backgroundColor}');
+`;
+    }
+
+    code += `
+// Save state
+if (app.historyManager) app.historyManager.saveState();
+({ success: true, reset: true, canvasPreset: ${canvasPreset ? `'${canvasPreset}'` : 'null'} });
+`;
+
+    return code.trim();
+  }
+
+  /**
+   * Generate code for batch execute
+   */
+  generateAgentBatchExecute(input: AgentBatchExecuteInput): string {
+    const validated = AgentBatchExecuteInputSchema.parse(input);
+    const { operations, atomic } = validated;
+    const isAtomic = atomic !== false;
+
+    let code = `
+// Batch execute ${operations.length} operations
+(async function() {
+  const results = [];
+  const itemIds = [];
+  let success = true;
+
+  try {
+`;
+
+    operations.forEach((op, index) => {
+      const opCode = this.generateBatchOperationCode(op, index);
+      code += `
+    // Operation ${index}: ${op.type}
+    try {
+      const result${index} = await (async () => {
+        ${opCode}
+      })();
+      results.push({ index: ${index}, success: true, result: result${index} });
+      if (result${index} && result${index}.itemId) {
+        itemIds.push(result${index}.itemId);
+      }
+    } catch (opError) {
+      results.push({ index: ${index}, success: false, error: opError.message });
+      ${isAtomic ? 'throw opError;' : 'success = false;'}
+    }
+`;
+    });
+
+    code += `
+    // Save state
+    if (app.historyManager) app.historyManager.saveState();
+
+    return { success, itemIds, results, operationCount: ${operations.length} };
+  } catch (e) {
+    return { success: false, error: e.message, itemIds, results, operationCount: ${operations.length} };
+  }
+})();
+`;
+
+    return code.trim();
+  }
+
+  /**
+   * Generate code for a single batch operation
+   */
+  private generateBatchOperationCode(op: z.infer<typeof AgentBatchExecuteInputSchema>['operations'][0], index: number): string {
+    switch (op.type) {
+      case 'create':
+        const pos = op.position || { x: 400, y: 300 };
+        const props = JSON.stringify(op.properties || {});
+        return `
+const item = app.createItem('${op.itemType}', { x: ${pos.x}, y: ${pos.y} }, ${props});
+const itemId = app.itemRegistry.register(item, '${op.itemType}');
+return { itemId };
+`;
+
+      case 'modify':
+        const itemRef = op.itemId?.startsWith('$')
+          ? `itemIds[${op.itemId.substring(1)}]`
+          : `'${op.itemId}'`;
+        const modifyProps = JSON.stringify(op.properties || {});
+        return `
+const targetId = ${itemRef};
+const item = app.getItemById(targetId);
+if (!item) throw new Error('Item not found: ' + targetId);
+Object.assign(item, ${modifyProps});
+return { itemId: targetId, modified: true };
+`;
+
+      case 'animate':
+        const animItemRef = op.itemId?.startsWith('$')
+          ? `itemIds[${op.itemId.substring(1)}]`
+          : `'${op.itemId}'`;
+        const animOpts = JSON.stringify(op.animationOptions || {});
+        return `
+const targetId = ${animItemRef};
+const item = app.getItemById(targetId);
+if (!item) throw new Error('Item not found: ' + targetId);
+app.animateItem(item, '${op.animationType}', ${animOpts});
+return { itemId: targetId, animationType: '${op.animationType}' };
+`;
+
+      case 'relation':
+        const srcRef = op.sourceId?.startsWith('$')
+          ? `itemIds[${op.sourceId.substring(1)}]`
+          : `'${op.sourceId}'`;
+        const tgtRef = op.targetId?.startsWith('$')
+          ? `itemIds[${op.targetId.substring(1)}]`
+          : `'${op.targetId}'`;
+        const relOpts = JSON.stringify(op.relationOptions || {});
+        return `
+const sourceId = ${srcRef};
+const targetId = ${tgtRef};
+const source = app.getItemById(sourceId);
+const target = app.getItemById(targetId);
+if (!source) throw new Error('Source not found: ' + sourceId);
+if (!target) throw new Error('Target not found: ' + targetId);
+const relationId = app.addRelation(source, target, '${op.relationType}', ${relOpts});
+return { relationId, sourceId, targetId, relationType: '${op.relationType}' };
+`;
+
+      case 'delete':
+        const delRef = op.itemId?.startsWith('$')
+          ? `itemIds[${op.itemId.substring(1)}]`
+          : `'${op.itemId}'`;
+        return `
+const targetId = ${delRef};
+const item = app.getItemById(targetId);
+if (!item) throw new Error('Item not found: ' + targetId);
+item.remove();
+if (app.itemRegistry) app.itemRegistry.unregister(targetId);
+return { itemId: targetId, deleted: true };
+`;
+
+      default:
+        return `throw new Error('Unknown operation type');`;
+    }
+  }
+
+  /**
+   * Generate code for smart export
+   */
+  generateAgentExport(input: AgentExportInput): string {
+    const validated = AgentExportInputSchema.parse(input);
+    const { platform, format, quality } = validated;
+    const qualityLevel = quality || 'standard';
+
+    // Quality settings
+    const qualitySettings = {
+      draft: { compression: 0.6, fps: 15, dpi: 72 },
+      standard: { compression: 0.85, fps: 30, dpi: 150 },
+      high: { compression: 0.95, fps: 60, dpi: 300 },
+    }[qualityLevel];
+
+    // Platform presets
+    const platformPresets: Record<string, { width: number; height: number; staticFormat: string; animatedFormat: string }> = {
+      'instagram': { width: 1080, height: 1080, staticFormat: 'png', animatedFormat: 'mp4' },
+      'instagram-story': { width: 1080, height: 1920, staticFormat: 'png', animatedFormat: 'mp4' },
+      'tiktok': { width: 1080, height: 1920, staticFormat: 'png', animatedFormat: 'mp4' },
+      'youtube': { width: 1920, height: 1080, staticFormat: 'png', animatedFormat: 'mp4' },
+      'youtube-thumbnail': { width: 1280, height: 720, staticFormat: 'png', animatedFormat: 'png' },
+      'twitter': { width: 1200, height: 675, staticFormat: 'png', animatedFormat: 'gif' },
+      'linkedin': { width: 1200, height: 627, staticFormat: 'png', animatedFormat: 'gif' },
+      'web': { width: 800, height: 600, staticFormat: 'svg', animatedFormat: 'svg' },
+      'print-a4': { width: 2480, height: 3508, staticFormat: 'pdf', animatedFormat: 'pdf' },
+      'print-letter': { width: 2550, height: 3300, staticFormat: 'pdf', animatedFormat: 'pdf' },
+    };
+
+    const preset = platformPresets[platform] || platformPresets['web'];
+    const exportFormat = format || preset.staticFormat;
+
+    return `
+// Smart export for ${platform}
+(async function() {
+  const platform = '${platform}';
+  const format = '${exportFormat}';
+  const quality = '${qualityLevel}';
+  const settings = ${JSON.stringify(qualitySettings)};
+  const dimensions = ${JSON.stringify({ width: preset.width, height: preset.height })};
+
+  let result = { success: false, platform, format, quality };
+
+  try {
+    switch (format) {
+      case 'svg':
+        const svgString = app.exportAnimatedSVG ? app.exportAnimatedSVG() : app.exportSVG();
+        result = {
+          success: true,
+          platform,
+          format: 'svg',
+          data: svgString,
+          mimeType: 'image/svg+xml',
+          size: new Blob([svgString]).size,
+          hasAnimations: svgString.includes('<animate') || svgString.includes('@keyframes')
+        };
+        break;
+
+      case 'png':
+        const canvas = document.querySelector('canvas');
+        if (canvas) {
+          const dataUrl = canvas.toDataURL('image/png');
+          result = {
+            success: true,
+            platform,
+            format: 'png',
+            data: dataUrl,
+            mimeType: 'image/png',
+            size: Math.round(dataUrl.length * 0.75)
+          };
+        }
+        break;
+
+      case 'gif':
+        if (app.exportGIF) {
+          const blob = await app.exportGIF({ fps: settings.fps, quality: settings.compression, duration: 5 });
+          const reader = new FileReader();
+          const dataUrl = await new Promise(resolve => {
+            reader.onloadend = () => resolve(reader.result);
+            reader.readAsDataURL(blob);
+          });
+          result = { success: true, platform, format: 'gif', data: dataUrl, mimeType: 'image/gif', size: blob.size };
+        } else {
+          result = { success: false, error: 'GIF export not available' };
+        }
+        break;
+
+      case 'mp4':
+      case 'webm':
+        const exportMethod = format === 'mp4' ? 'exportMP4' : 'exportWebM';
+        const mimeType = format === 'mp4' ? 'video/mp4' : 'video/webm';
+        if (app[exportMethod]) {
+          const blob = await app[exportMethod]({ fps: settings.fps, duration: 5, ...dimensions });
+          const reader = new FileReader();
+          const dataUrl = await new Promise(resolve => {
+            reader.onloadend = () => resolve(reader.result);
+            reader.readAsDataURL(blob);
+          });
+          result = { success: true, platform, format, data: dataUrl, mimeType, size: blob.size };
+        } else {
+          result = { success: false, error: format.toUpperCase() + ' export not available' };
+        }
+        break;
+
+      case 'pdf':
+        if (app.exportPDF) {
+          const blob = await app.exportPDF({ dpi: settings.dpi });
+          const reader = new FileReader();
+          const dataUrl = await new Promise(resolve => {
+            reader.onloadend = () => resolve(reader.result);
+            reader.readAsDataURL(blob);
+          });
+          result = { success: true, platform, format: 'pdf', data: dataUrl, mimeType: 'application/pdf', size: blob.size, dpi: settings.dpi };
+        } else {
+          result = { success: false, error: 'PDF export not available' };
+        }
+        break;
+
+      default:
+        result = { success: false, error: 'Unknown format: ' + format };
+    }
+  } catch (e) {
+    result = { success: false, error: e.message, platform, format };
+  }
+
+  return result;
+})();
+`.trim();
+  }
+
+  /**
+   * Generate code for content analysis
+   */
+  generateAgentAnalyze(input: AgentAnalyzeInput): string {
+    AgentAnalyzeInputSchema.parse(input);
+
+    return `
+// Analyze canvas content
+(function() {
+  const analysis = {
+    hasAnimations: false,
+    animationTypes: [],
+    colorComplexity: 'simple',
+    itemCount: 0,
+    canvasSize: { width: 0, height: 0 },
+    hasRelations: false,
+    relationTypes: [],
+    hasGradients: false,
+    hasShadows: false,
+    hasText: false,
+    hasImages: false,
+  };
+
+  // Get canvas size
+  if (app.canvasEl) {
+    analysis.canvasSize = { width: app.canvasEl.width, height: app.canvasEl.height };
+  } else if (paper.view) {
+    analysis.canvasSize = { width: paper.view.size.width, height: paper.view.size.height };
+  }
+
+  // Count items and analyze types
+  const items = app.itemRegistry ? app.itemRegistry.getAll() : [];
+  analysis.itemCount = items.length;
+
+  const animationSet = new Set();
+  const relationSet = new Set();
+  let hasGradient = false;
+  let hasShadow = false;
+
+  items.forEach(entry => {
+    const item = entry.item;
+    const data = item.data || {};
+
+    if (entry.type === 'text' || item.className === 'PointText') analysis.hasText = true;
+    if (item.className === 'Raster') analysis.hasImages = true;
+
+    if (data.animationType) {
+      analysis.hasAnimations = true;
+      animationSet.add(data.animationType);
+    }
+
+    if (item.fillColor && item.fillColor.gradient) hasGradient = true;
+    if (item.strokeColor && item.strokeColor.gradient) hasGradient = true;
+    if (item.shadowColor || item.shadowBlur) hasShadow = true;
+  });
+
+  analysis.animationTypes = Array.from(animationSet);
+  analysis.hasGradients = hasGradient;
+  analysis.hasShadows = hasShadow;
+
+  // Check relations
+  if (app.relationRegistry) {
+    const relations = app.relationRegistry.getAll ? app.relationRegistry.getAll() : [];
+    analysis.hasRelations = relations.length > 0;
+    relations.forEach(rel => {
+      if (rel.relationType) relationSet.add(rel.relationType);
+    });
+    analysis.relationTypes = Array.from(relationSet);
+    if (analysis.hasRelations) analysis.hasAnimations = true;
+  }
+
+  // Determine color complexity
+  if (hasGradient) {
+    analysis.colorComplexity = 'gradient';
+  } else if (analysis.itemCount > 20 || hasShadow) {
+    analysis.colorComplexity = 'complex';
+  }
+
+  // Generate recommendations
+  const recommendations = [];
+  const { width, height } = analysis.canvasSize;
+  const aspectRatio = width / height;
+
+  if (analysis.hasAnimations) {
+    if (analysis.hasGradients || analysis.colorComplexity === 'complex') {
+      recommendations.push({ platform: 'web', format: 'webm', confidence: 0.9, reason: 'Animated content with gradients renders best as WebM' });
+      recommendations.push({ platform: 'instagram', format: 'mp4', confidence: 0.85, reason: 'MP4 for social media compatibility' });
+    } else {
+      recommendations.push({ platform: 'web', format: 'svg', confidence: 0.95, reason: 'Simple animations export well as animated SVG' });
+      recommendations.push({ platform: 'twitter', format: 'gif', confidence: 0.8, reason: 'GIF for social media', warnings: ['Limited to 256 colors'] });
+    }
+  } else {
+    if (analysis.colorComplexity === 'simple' && !analysis.hasImages) {
+      recommendations.push({ platform: 'web', format: 'svg', confidence: 0.95, reason: 'Vector graphics best as SVG for scalability' });
+    } else {
+      recommendations.push({ platform: 'instagram', format: 'png', confidence: 0.9, reason: 'High quality static export as PNG' });
+    }
+  }
+
+  // Platform suggestions based on aspect ratio
+  const suggestedPlatforms = [];
+  if (Math.abs(aspectRatio - 1) < 0.1) suggestedPlatforms.push('instagram');
+  if (aspectRatio < 0.7) suggestedPlatforms.push('instagram-story', 'tiktok');
+  if (aspectRatio > 1.5) suggestedPlatforms.push('youtube', 'twitter', 'linkedin');
+  suggestedPlatforms.push('web');
+
+  return {
+    success: true,
+    analysis,
+    recommendations,
+    suggestedPlatforms
+  };
+})();
+`.trim();
+  }
+
+  // ===========================================================================
+  // INTERACTIVE TRIGGER CODE GENERATORS
+  // ===========================================================================
+
+  /**
+   * Generate code for adding a trigger
+   */
+  generateAddTrigger(input: AddTriggerInput): string {
+    const validated = AddTriggerInputSchema.parse(input);
+    const { itemId, event, actions, condition, timelineOffset } = validated;
+
+    const actionsStr = JSON.stringify(actions);
+    const conditionStr = condition ? `'${condition.replace(/'/g, "\\'")}'` : 'null';
+    const offsetStr = timelineOffset !== undefined ? timelineOffset : 'null';
+
+    return `
+// Add trigger to ${itemId}
+const item = app.getItemById('${itemId}');
+if (!item) throw new Error('Item not found: ${itemId}');
+
+const trigger = {
+  event: '${event}',
+  actions: ${actionsStr},
+  condition: ${conditionStr},
+  timelineOffset: ${offsetStr}
+};
+
+// Initialize triggers array if needed
+if (!item.data) item.data = {};
+if (!item.data.triggers) item.data.triggers = [];
+
+// Add trigger
+item.data.triggers.push(trigger);
+
+// Register event handler
+if (app.triggerManager) {
+  app.triggerManager.registerTrigger(item, trigger);
+}
+
+app.historyManager.saveState();
+({ success: true, itemId: '${itemId}', event: '${event}', triggerId: item.data.triggers.length - 1 });
+`.trim();
+  }
+
+  /**
+   * Generate code for removing a trigger
+   */
+  generateRemoveTrigger(input: RemoveTriggerInput): string {
+    const validated = RemoveTriggerInputSchema.parse(input);
+    const { itemId, event, removeAll } = validated;
+
+    if (removeAll) {
+      return `
+// Remove all triggers from ${itemId}
+const item = app.getItemById('${itemId}');
+if (!item) throw new Error('Item not found: ${itemId}');
+
+const removedCount = item.data?.triggers?.length || 0;
+if (item.data) item.data.triggers = [];
+
+if (app.triggerManager) {
+  app.triggerManager.unregisterAll(item);
+}
+
+app.historyManager.saveState();
+({ success: true, itemId: '${itemId}', removedCount, removeAll: true });
+`.trim();
+    }
+
+    return `
+// Remove ${event} trigger from ${itemId}
+const item = app.getItemById('${itemId}');
+if (!item) throw new Error('Item not found: ${itemId}');
+
+let removedCount = 0;
+if (item.data?.triggers) {
+  const before = item.data.triggers.length;
+  item.data.triggers = item.data.triggers.filter(t => t.event !== '${event}');
+  removedCount = before - item.data.triggers.length;
+}
+
+if (app.triggerManager) {
+  app.triggerManager.unregisterEvent(item, '${event}');
+}
+
+app.historyManager.saveState();
+({ success: true, itemId: '${itemId}', event: '${event}', removedCount });
+`.trim();
+  }
+
+  /**
+   * Generate code for querying triggers
+   */
+  generateQueryTriggers(input: QueryTriggersInput): string {
+    const validated = QueryTriggersInputSchema.parse(input);
+    const { itemId, event } = validated;
+
+    if (itemId) {
+      return `
+// Query triggers for ${itemId}
+const item = app.getItemById('${itemId}');
+if (!item) throw new Error('Item not found: ${itemId}');
+
+let triggers = item.data?.triggers || [];
+${event ? `triggers = triggers.filter(t => t.event === '${event}');` : ''}
+
+({ success: true, itemId: '${itemId}', triggers, count: triggers.length });
+`.trim();
+    }
+
+    return `
+// Query all triggers
+const allTriggers = [];
+const items = app.itemRegistry ? app.itemRegistry.getAll() : [];
+
+items.forEach(entry => {
+  const item = entry.item;
+  if (item.data?.triggers?.length > 0) {
+    let triggers = item.data.triggers;
+    ${event ? `triggers = triggers.filter(t => t.event === '${event}');` : ''}
+    triggers.forEach((trigger, idx) => {
+      allTriggers.push({
+        itemId: entry.id,
+        triggerId: idx,
+        ...trigger
+      });
+    });
+  }
+});
+
+({ success: true, triggers: allTriggers, count: allTriggers.length${event ? `, event: '${event}'` : ''} });
+`.trim();
+  }
+
+  // ===========================================================================
+  // QUIZ CODE GENERATORS
+  // ===========================================================================
+
+  /**
+   * Generate code for creating a quiz
+   */
+  generateCreateQuiz(input: CreateQuizInput): string {
+    const validated = CreateQuizInputSchema.parse(input);
+    const { title, questions, passingScore, showScore, allowRetry, shuffleQuestions, shuffleOptions } = validated;
+
+    const quizConfig = JSON.stringify({
+      title: title || 'Untitled Quiz',
+      questions,
+      passingScore: passingScore || 70,
+      showScore: showScore !== false,
+      allowRetry: allowRetry !== false,
+      shuffleQuestions: shuffleQuestions || false,
+      shuffleOptions: shuffleOptions || false,
+    }, null, 2);
+
+    return `
+// Create quiz
+const quizConfig = ${quizConfig};
+
+// Initialize quiz manager if needed
+if (!app.quizManager) {
+  app.quizManager = {
+    quizzes: [],
+    activeQuiz: null,
+    createQuiz: function(config) {
+      const quiz = {
+        id: 'quiz_' + Date.now(),
+        ...config,
+        state: {
+          currentQuestion: 0,
+          answers: [],
+          score: 0,
+          maxScore: config.questions.reduce((sum, q) => sum + q.points, 0),
+          complete: false
+        }
+      };
+      this.quizzes.push(quiz);
+      this.activeQuiz = quiz;
+      return quiz;
+    }
+  };
+}
+
+const quiz = app.quizManager.createQuiz(quizConfig);
+app.historyManager.saveState();
+
+({
+  success: true,
+  quizId: quiz.id,
+  title: quiz.title,
+  questionCount: quiz.questions.length,
+  maxScore: quiz.state.maxScore,
+  passingScore: quiz.passingScore
+});
+`.trim();
+  }
+
+  /**
+   * Generate code for getting quiz state
+   */
+  generateGetQuizState(input: GetQuizStateInput): string {
+    const validated = GetQuizStateInputSchema.parse(input);
+    const { quizId } = validated;
+
+    const quizRef = quizId
+      ? `app.quizManager.quizzes.find(q => q.id === '${quizId}')`
+      : 'app.quizManager?.activeQuiz';
+
+    return `
+// Get quiz state
+if (!app.quizManager) {
+  return { success: false, error: 'No quiz manager initialized' };
+}
+
+const quiz = ${quizRef};
+if (!quiz) {
+  return { success: false, error: 'Quiz not found' };
+}
+
+({
+  success: true,
+  quizId: quiz.id,
+  title: quiz.title,
+  currentQuestion: quiz.state.currentQuestion,
+  totalQuestions: quiz.questions.length,
+  score: quiz.state.score,
+  maxScore: quiz.state.maxScore,
+  answers: quiz.state.answers,
+  complete: quiz.state.complete,
+  passed: quiz.state.complete ? (quiz.state.score / quiz.state.maxScore * 100) >= quiz.passingScore : null
+});
+`.trim();
+  }
+
+  /**
+   * Generate code for resetting a quiz
+   */
+  generateResetQuiz(input: ResetQuizInput): string {
+    const validated = ResetQuizInputSchema.parse(input);
+    const { quizId } = validated;
+
+    const quizRef = quizId
+      ? `app.quizManager.quizzes.find(q => q.id === '${quizId}')`
+      : 'app.quizManager?.activeQuiz';
+
+    return `
+// Reset quiz
+if (!app.quizManager) {
+  return { success: false, error: 'No quiz manager initialized' };
+}
+
+const quiz = ${quizRef};
+if (!quiz) {
+  return { success: false, error: 'Quiz not found' };
+}
+
+// Reset state
+quiz.state = {
+  currentQuestion: 0,
+  answers: [],
+  score: 0,
+  maxScore: quiz.questions.reduce((sum, q) => sum + q.points, 0),
+  complete: false
+};
+
+app.historyManager.saveState();
+
+({ success: true, quizId: quiz.id, reset: true });
+`.trim();
+  }
+
+  // ===========================================================================
+  // WIDGET EXPORT CODE GENERATORS
+  // ===========================================================================
+
+  /**
+   * Generate code for exporting widget
+   */
+  generateExportWidget(input: ExportWidgetInput): string {
+    const validated = ExportWidgetInputSchema.parse(input);
+    const { format, sizing, interactivity, autoplay, loop, lmsEnabled, width, height } = validated;
+
+    const sizingMode = sizing || 'responsive';
+    const interactivityLevel = interactivity || 'view';
+    const shouldAutoplay = autoplay !== false;
+    const shouldLoop = loop !== false;
+    const hasLms = lmsEnabled || false;
+
+    return `
+// Export widget as ${format}
+(async function() {
+  const format = '${format}';
+  const sizing = '${sizingMode}';
+  const interactivity = '${interactivityLevel}';
+  const autoplay = ${shouldAutoplay};
+  const loop = ${shouldLoop};
+  const lmsEnabled = ${hasLms};
+  const fixedWidth = ${width || 'null'};
+  const fixedHeight = ${height || 'null'};
+
+  // Capture scene data
+  const sceneData = app.exportSceneData ? JSON.stringify(app.exportSceneData()) : '{}';
+
+  // Get canvas dimensions
+  let canvasWidth = fixedWidth || (app.canvasEl ? app.canvasEl.width : 800);
+  let canvasHeight = fixedHeight || (app.canvasEl ? app.canvasEl.height : 600);
+
+  // Check for animations
+  const items = app.itemRegistry ? app.itemRegistry.getAll() : [];
+  const hasAnimations = items.some(e => e.item.data?.animationType);
+  const hasRelations = app.relationRegistry && app.relationRegistry.getAll().length > 0;
+  const hasQuiz = app.quizManager && app.quizManager.quizzes.length > 0;
+  const hasTriggers = items.some(e => e.item.data?.triggers?.length > 0);
+
+  const metadata = {
+    hasInteractivity: hasTriggers || interactivity === 'full',
+    hasAnimations: hasAnimations || hasRelations,
+    hasQuiz,
+    width: canvasWidth,
+    height: canvasHeight,
+    sizing,
+    interactivity
+  };
+
+  let code = '';
+  let embedCode = '';
+
+  switch (format) {
+    case 'web-component':
+      code = \`<script src="https://cdn.pinepaper.io/widget.js"></script>
+<pinepaper-widget
+  data-scene='\${sceneData}'
+  data-sizing="\${sizing}"
+  data-interactivity="\${interactivity}"
+  data-autoplay="\${autoplay}"
+  data-loop="\${loop}"
+  \${fixedWidth ? 'width="' + canvasWidth + '"' : ''}
+  \${fixedHeight ? 'height="' + canvasHeight + '"' : ''}
+></pinepaper-widget>\`;
+      embedCode = code;
+      break;
+
+    case 'standalone-html':
+      code = \`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PinePaper Widget</title>
+  <script src="https://cdn.pinepaper.io/runtime.js"></script>
+  <style>
+    body { margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #f5f5f5; }
+    .pinepaper-container { \${sizing === 'responsive' ? 'width: 100%; max-width: ' + canvasWidth + 'px;' : sizing === 'fluid' ? 'width: 100%; height: 100%;' : 'width: ' + canvasWidth + 'px; height: ' + canvasHeight + 'px;'} }
+  </style>
+</head>
+<body>
+  <div class="pinepaper-container" id="pinepaper-widget"></div>
+  <script>
+    PinePaper.init('#pinepaper-widget', {
+      scene: \${sceneData},
+      autoplay: \${autoplay},
+      loop: \${loop},
+      interactivity: '\${interactivity}'\${hasLms ? ',\\n      lms: true' : ''}
+    });
+  </script>
+</body>
+</html>\`;
+      embedCode = \`<iframe src="[URL_TO_HOSTED_FILE]" width="\${canvasWidth}" height="\${canvasHeight}" frameborder="0"></iframe>\`;
+      break;
+
+    case 'iframe-embed':
+      const dataUri = 'data:text/html;base64,' + btoa(\`<!DOCTYPE html><html><head><script src="https://cdn.pinepaper.io/runtime.js"></script></head><body><div id="w"></div><script>PinePaper.init('#w',{scene:\${sceneData},autoplay:\${autoplay},loop:\${loop}});</script></body></html>\`);
+      code = dataUri;
+      embedCode = \`<iframe src="\${dataUri}" width="\${canvasWidth}" height="\${canvasHeight}" frameborder="0" allowfullscreen></iframe>\`;
+      break;
+
+    case 'react-component':
+      code = \`import { useEffect, useRef } from 'react';
+
+export function PinepaperWidget({ className }) {
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    if (containerRef.current && window.PinePaper) {
+      window.PinePaper.init(containerRef.current, {
+        scene: \${sceneData},
+        autoplay: \${autoplay},
+        loop: \${loop},
+        interactivity: '\${interactivity}'
+      });
+    }
+  }, []);
+
+  return <div ref={containerRef} className={className} style={{ width: '\${sizing === 'fixed' ? canvasWidth + 'px' : '100%'}', height: '\${sizing === 'fixed' ? canvasHeight + 'px' : 'auto'}' }} />;
+}
+
+// Usage: <PinepaperWidget className="my-widget" />\`;
+      embedCode = '<PinepaperWidget />';
+      break;
+
+    case 'vue-component':
+      code = \`<template>
+  <div ref="container" :class="className" :style="containerStyle"></div>
+</template>
+
+<script setup>
+import { ref, onMounted, computed } from 'vue';
+
+const props = defineProps({ className: String });
+const container = ref(null);
+
+const containerStyle = computed(() => ({
+  width: '\${sizing === 'fixed' ? canvasWidth + 'px' : '100%'}',
+  height: '\${sizing === 'fixed' ? canvasHeight + 'px' : 'auto'}'
+}));
+
+onMounted(() => {
+  if (container.value && window.PinePaper) {
+    window.PinePaper.init(container.value, {
+      scene: \${sceneData},
+      autoplay: \${autoplay},
+      loop: \${loop},
+      interactivity: '\${interactivity}'
+    });
+  }
+});
+</script>
+
+<!-- Usage: <PinepaperWidget class="my-widget" /> -->\`;
+      embedCode = '<PinepaperWidget />';
+      break;
+  }
+
+  return {
+    success: true,
+    format,
+    code,
+    embedCode,
+    sceneData,
+    metadata
+  };
+})();
+`.trim();
+  }
+
+  // ===========================================================================
+  // LETTER COLLAGE CODE GENERATORS
+  // ===========================================================================
+
+  /**
+   * Generate code to create a letter collage
+   */
+  generateCreateLetterCollage(input: CreateLetterCollageInput): string {
+    const validated = CreateLetterCollageInputSchema.parse(input);
+    const {
+      text,
+      style = 'tile',
+      palette,
+      position,
+      fontSize = 48,
+      fontFamily = 'Inter, sans-serif',
+      spacing = 1.1,
+      gradientPalette,
+      gradientDirection = 'vertical',
+      cornerRadius = 4,
+      shadowEnabled = true,
+    } = validated;
+
+    // Build options object
+    const options: Record<string, unknown> = {
+      style,
+      fontSize,
+      fontFamily,
+      spacing,
+      cornerRadius,
+      shadowEnabled,
+    };
+
+    if (palette) options.palette = palette;
+    if (position) options.position = position;
+    if (gradientPalette) options.gradientPalette = gradientPalette;
+    if (gradientDirection) options.gradientDirection = gradientDirection;
+
+    return `
+// Create letter collage: "${text}"
+(function() {
+  const text = ${JSON.stringify(text)};
+  const options = ${JSON.stringify(options, null, 2)};
+
+  if (!app.createLetterCollage) {
+    return { success: false, error: 'Letter collage feature not available' };
+  }
+
+  const result = app.createLetterCollage(text, options);
+
+  if (app.historyManager) {
+    app.historyManager.saveState('create_letter_collage');
+  }
+
+  return result;
+})();
+`.trim();
+  }
+
+  /**
+   * Generate code to animate a letter collage
+   */
+  generateAnimateLetterCollage(input: AnimateLetterCollageInput): string {
+    const validated = AnimateLetterCollageInputSchema.parse(input);
+    const {
+      collageId,
+      animationType,
+      staggerDelay = 0.1,
+      animationSpeed = 1,
+    } = validated;
+
+    return `
+// Animate letter collage: ${collageId}
+(function() {
+  const collageId = ${JSON.stringify(collageId)};
+  const animationType = ${JSON.stringify(animationType)};
+  const staggerDelay = ${staggerDelay};
+  const animationSpeed = ${animationSpeed};
+
+  if (!app.animateLetterCollage) {
+    return { success: false, error: 'Letter collage animation not available' };
+  }
+
+  const result = app.animateLetterCollage(collageId, {
+    animationType,
+    staggerDelay,
+    animationSpeed
+  });
+
+  return result;
+})();
+`.trim();
+  }
+
+  /**
+   * Generate code to get letter collage options
+   */
+  generateGetLetterCollageOptions(): string {
+    return `
+// Get letter collage options
+(function() {
+  if (!app.getLetterCollageOptions) {
+    // Return static options if function not available
+    return {
+      success: true,
+      styles: ['tile', 'magazine', 'paperCut', 'fold', 'gradient', 'image'],
+      tilePalettes: {
+        game: ['wordle', 'scrabble'],
+        vibrant: ['candy', 'neon', 'rainbow'],
+        soft: ['pastel', 'cotton'],
+        natural: ['earth', 'ocean', 'forest', 'sunset'],
+        professional: ['corporate', 'minimal', 'slate'],
+        seasonal: ['christmas', 'halloween', 'spring'],
+        magazine: ['magazine', 'newspaper', 'vintage'],
+        paperCraft: ['paperCraft', 'origami', 'craftPaper']
+      },
+      gradientPalettes: ['rainbow', 'sunset', 'ocean', 'fire', 'gold', 'rose', 'ice', 'cyberpunk', 'neonGlow', 'purplePink'],
+      gradientDirections: ['vertical', 'horizontal', 'diagonal', 'radial']
+    };
+  }
+
+  return app.getLetterCollageOptions();
+})();
+`.trim();
+  }
+
+  // ===========================================================================
+  // CANVAS PRESETS CODE GENERATORS
+  // ===========================================================================
+
+  /**
+   * Generate code to get canvas presets
+   */
+  generateGetCanvasPresets(): string {
+    return `
+// Get canvas presets
+(function() {
+  if (app.getCanvasPresets) {
+    return app.getCanvasPresets();
+  }
+
+  // Return static presets if function not available
+  return {
+    success: true,
+    presets: [
+      { key: 'youtube-thumbnail', name: 'YouTube Thumbnail', width: 1280, height: 720, aspectRatio: '16:9', category: 'video' },
+      { key: 'youtube-short', name: 'YouTube Shorts', width: 1080, height: 1920, aspectRatio: '9:16', category: 'video' },
+      { key: 'tiktok', name: 'TikTok', width: 1080, height: 1920, aspectRatio: '9:16', category: 'video' },
+      { key: 'instagram-story', name: 'Instagram Story', width: 1080, height: 1920, aspectRatio: '9:16', category: 'social' },
+      { key: 'instagram-post', name: 'Instagram Post (Square)', width: 1080, height: 1080, aspectRatio: '1:1', category: 'social' },
+      { key: 'instagram-landscape', name: 'Instagram Landscape', width: 1080, height: 566, aspectRatio: '1.91:1', category: 'social' },
+      { key: 'instagram-portrait', name: 'Instagram Portrait', width: 1080, height: 1350, aspectRatio: '4:5', category: 'social' },
+      { key: 'facebook-post', name: 'Facebook Post', width: 1200, height: 630, aspectRatio: '1.91:1', category: 'social' },
+      { key: 'facebook-cover', name: 'Facebook Cover', width: 820, height: 312, aspectRatio: '2.63:1', category: 'social' },
+      { key: 'facebook-story', name: 'Facebook Story', width: 1080, height: 1920, aspectRatio: '9:16', category: 'social' },
+      { key: 'twitter-post', name: 'Twitter/X Post', width: 1200, height: 675, aspectRatio: '16:9', category: 'social' },
+      { key: 'twitter-header', name: 'Twitter/X Header', width: 1500, height: 500, aspectRatio: '3:1', category: 'social' },
+      { key: 'linkedin-post', name: 'LinkedIn Post', width: 1200, height: 627, aspectRatio: '1.91:1', category: 'social' },
+      { key: 'linkedin-banner', name: 'LinkedIn Banner', width: 1584, height: 396, aspectRatio: '4:1', category: 'social' },
+      { key: 'pinterest-pin', name: 'Pinterest Pin', width: 1000, height: 1500, aspectRatio: '2:3', category: 'social' },
+      { key: 'presentation-16x9', name: 'Presentation 16:9', width: 1920, height: 1080, aspectRatio: '16:9', category: 'presentation' },
+      { key: 'presentation-4x3', name: 'Presentation 4:3', width: 1024, height: 768, aspectRatio: '4:3', category: 'presentation' },
+      { key: 'hd-720p', name: 'HD 720p', width: 1280, height: 720, aspectRatio: '16:9', category: 'video' },
+      { key: 'full-hd-1080p', name: 'Full HD 1080p', width: 1920, height: 1080, aspectRatio: '16:9', category: 'video' },
+      { key: 'default', name: 'Default', width: 800, height: 600, aspectRatio: '4:3', category: 'general' }
+    ]
+  };
+})();
+`.trim();
   }
 }
 

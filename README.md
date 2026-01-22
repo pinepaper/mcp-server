@@ -59,6 +59,90 @@ Open your AI client and try:
 
 ## Features
 
+### 🤖 Agent Flow Mode (NEW in v1.5.0)
+
+Optimized for content automation pipelines with batch operations and smart exports:
+
+```
+"Start an agent job for Instagram content"
+"Create 5 items in batch, then export for TikTok"
+"Analyze the scene and recommend export format"
+```
+
+**Features:**
+- **Batch Operations**: Execute multiple operations in one call (~10x faster)
+- **Smart Platform Exports**: Auto-detect optimal format for Instagram, TikTok, YouTube, Twitter, LinkedIn
+- **Job Sessions**: Track items created, get recommendations on job completion
+- **Quick Reset**: Fast canvas reset without page refresh
+
+**Tools:**
+- `pinepaper_agent_start_job` - Start a content creation job session
+- `pinepaper_agent_end_job` - End job with summary and export recommendations
+- `pinepaper_agent_reset` - Quick canvas reset
+- `pinepaper_agent_batch_execute` - Execute multiple operations in batch
+- `pinepaper_agent_export` - Smart export with platform auto-detection
+- `pinepaper_agent_analyze` - Analyze content for export recommendations
+
+### 🎯 Interactive Triggers (NEW in v1.5.0)
+
+Add click, hover, and drag interactions to items:
+
+```
+"Make the button show a panel when clicked"
+"Add a hover effect that plays an animation"
+"Create a drag-and-drop quiz"
+```
+
+**Event Types:**
+- `click`, `hover_enter`, `hover_exit`
+- `drag_start`, `drag_move`, `drag_end`
+- `timeline`, `animation_end`
+
+**Tools:**
+- `pinepaper_add_trigger` - Add event triggers with actions
+- `pinepaper_remove_trigger` - Remove triggers from items
+- `pinepaper_query_triggers` - List all triggers
+
+### 📝 Quiz/LMS Integration (NEW in v1.5.0)
+
+Create interactive quizzes with SCORM/xAPI support:
+
+```
+"Create a multiple choice quiz about planets"
+"Add a drag-and-drop matching exercise"
+"Track quiz score and progress"
+```
+
+**Question Types:**
+- Multiple choice, Multiple select
+- Drag-and-drop, Matching, Sequencing
+- Hotspot, True/False, Fill-in-blank
+
+**Tools:**
+- `pinepaper_create_quiz` - Create interactive quizzes
+- `pinepaper_get_quiz_state` - Get score, progress, answers
+- `pinepaper_reset_quiz` - Reset quiz state
+
+### 📦 Widget Export (NEW in v1.5.0)
+
+Export as embeddable widgets for websites and LMS:
+
+```
+"Export as a web component"
+"Create an iframe embed code"
+"Generate a React component"
+```
+
+**Export Formats:**
+- `web-component` - `<pinepaper-widget>` custom element
+- `standalone-html` - Complete HTML file
+- `iframe-embed` - Iframe embed code
+- `react-component` - React wrapper
+- `vue-component` - Vue wrapper
+
+**Tool:**
+- `pinepaper_export_widget` - Export with LMS support (SCORM/xAPI)
+
 ### 📐 Diagram Tools (NEW in v1.4.3)
 
 Create flowcharts, UML diagrams, network diagrams, and more:
@@ -274,6 +358,35 @@ Outputs pairs like:
 | `pinepaper_update_connector` | Update connector style/label |
 | `pinepaper_remove_connector` | Remove a connector |
 | `pinepaper_diagram_mode` | Control diagram editing mode |
+
+### Agent Flow Mode Tools (NEW in v1.5.0)
+| Tool | Description |
+|------|-------------|
+| `pinepaper_agent_start_job` | Start content creation job session |
+| `pinepaper_agent_end_job` | End job with summary and recommendations |
+| `pinepaper_agent_reset` | Quick canvas reset without page refresh |
+| `pinepaper_agent_batch_execute` | Execute multiple operations in batch |
+| `pinepaper_agent_export` | Smart export with platform auto-detection |
+| `pinepaper_agent_analyze` | Analyze content for export recommendations |
+
+### Interactive Trigger Tools (NEW in v1.5.0)
+| Tool | Description |
+|------|-------------|
+| `pinepaper_add_trigger` | Add event triggers (click, hover, drag) |
+| `pinepaper_remove_trigger` | Remove triggers from items |
+| `pinepaper_query_triggers` | List all triggers on canvas |
+
+### Quiz/LMS Tools (NEW in v1.5.0)
+| Tool | Description |
+|------|-------------|
+| `pinepaper_create_quiz` | Create interactive quizzes |
+| `pinepaper_get_quiz_state` | Get quiz score, progress, answers |
+| `pinepaper_reset_quiz` | Reset quiz to initial state |
+
+### Widget Export Tools (NEW in v1.5.0)
+| Tool | Description |
+|------|-------------|
+| `pinepaper_export_widget` | Export as embeddable widget (web-component, iframe, React, Vue) |
 
 ### Canvas Tools
 | Tool | Description |
