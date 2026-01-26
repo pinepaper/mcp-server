@@ -193,6 +193,89 @@ describe('handleToolCall', () => {
     });
   });
 
+  describe('pinepaper_register_custom_relation', () => {
+    it('should generate code for registering a repels relation', async () => {
+      const result = await handleToolCall('pinepaper_register_custom_relation', {
+        name: 'repels',
+        description: 'Item moves away from target',
+        params: {
+          force: { type: 'number', default: 50 },
+          maxDistance: { type: 'number', default: 200 },
+        },
+        computeFunction: `
+          const dx = fromPosition.x - toPosition.x;
+          const dy = fromPosition.y - toPosition.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist > params.maxDistance) return fromPosition;
+          const force = (params.maxDistance - dist) / params.maxDistance * params.force;
+          return { x: fromPosition.x + (dx/dist) * force * delta, y: fromPosition.y + (dy/dist) * force * delta };
+        `,
+        applyFunction: `
+          if (computed) { item.position.x = computed.x; item.position.y = computed.y; }
+        `,
+        templates: ['{item} repels from {target}'],
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain("registerRelationRule('repels'");
+      expect(text).toContain('compute');
+      expect(text).toContain('apply');
+    });
+
+    it('should generate code for a simple wobble relation', async () => {
+      const result = await handleToolCall('pinepaper_register_custom_relation', {
+        name: 'wobbles_with',
+        computeFunction: `
+          const angle = time * params.frequency * Math.PI * 2;
+          return { offsetX: Math.sin(angle) * params.amplitude, offsetY: Math.cos(angle) * params.amplitude * 0.5 };
+        `,
+        applyFunction: `
+          if (computed) { item.position.x += computed.offsetX; item.position.y += computed.offsetY; }
+        `,
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain("registerRelationRule('wobbles_with'");
+    });
+  });
+
+  describe('pinepaper_execute_custom_code', () => {
+    it('should generate code for executing custom JavaScript', async () => {
+      const result = await handleToolCall('pinepaper_execute_custom_code', {
+        code: `
+          const outer = new paper.Path.Circle({ center: [400, 300], radius: 80 });
+          const inner = new paper.Path.Circle({ center: [400, 300], radius: 40 });
+          const ring = outer.subtract(inner);
+          ring.fillColor = '#8b5cf6';
+          const id = app.registerItem(ring, 'ring');
+          outer.remove();
+          inner.remove();
+          return { success: true, itemId: id };
+        `,
+        description: 'Create a ring shape using boolean subtraction',
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('paper.Path.Circle');
+      expect(text).toContain('subtract');
+      expect(text).toContain('registerItem');
+    });
+
+    it('should generate code for simple custom code', async () => {
+      const result = await handleToolCall('pinepaper_execute_custom_code', {
+        code: `return { canvasSize: paper.view.size, itemCount: app.itemRegistry.getAll().length };`,
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('paper.view.size');
+      expect(text).toContain('itemRegistry');
+    });
+  });
+
   describe('pinepaper_animate', () => {
     it('should generate code for pulse animation', async () => {
       const result = await handleToolCall('pinepaper_animate', {
@@ -1005,6 +1088,395 @@ describe('handleToolCall', () => {
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
       expect(text).toContain('getCanvasPresets');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // MAP TOOLS
+  // -------------------------------------------------------------------------
+
+  describe('pinepaper_load_map', () => {
+    it('should generate code for loading world map', async () => {
+      const result = await handleToolCall('pinepaper_load_map', {
+        mapId: 'world',
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('loadMap');
+      expect(text).toContain('world');
+    });
+
+    it('should generate code with projection options', async () => {
+      const result = await handleToolCall('pinepaper_load_map', {
+        mapId: 'usa',
+        options: {
+          projection: 'albers',
+          quality: 'professional',
+        },
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('loadMap');
+      expect(text).toContain('usa');
+      expect(text).toContain('albers');
+    });
+
+    it('should require mapId', async () => {
+      const result = await handleToolCall('pinepaper_load_map', {});
+
+      expect(result.isError).toBe(true);
+    });
+  });
+
+  describe('pinepaper_highlight_regions', () => {
+    it('should generate code for highlighting regions', async () => {
+      const result = await handleToolCall('pinepaper_highlight_regions', {
+        regionIds: ['CA', 'TX', 'NY'],
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('highlightRegions');
+      expect(text).toContain('CA');
+    });
+
+    it('should generate code with styling options', async () => {
+      const result = await handleToolCall('pinepaper_highlight_regions', {
+        regionIds: ['United States of America'],
+        options: {
+          fillColor: '#3b82f6',
+          animate: true,
+        },
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('highlightRegions');
+      expect(text).toContain('#3b82f6');
+    });
+  });
+
+  describe('pinepaper_unhighlight_regions', () => {
+    it('should generate code to unhighlight all regions', async () => {
+      const result = await handleToolCall('pinepaper_unhighlight_regions', {
+        regionIds: 'all',
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('unhighlightRegions');
+      expect(text).toContain('all');
+    });
+  });
+
+  describe('pinepaper_apply_data_colors', () => {
+    it('should generate code for choropleth coloring', async () => {
+      const result = await handleToolCall('pinepaper_apply_data_colors', {
+        data: { CA: 85, TX: 72, NY: 90 },
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('applyDataColors');
+    });
+
+    it('should generate code with color scale options', async () => {
+      const result = await handleToolCall('pinepaper_apply_data_colors', {
+        data: { 'United States of America': 330 },
+        options: {
+          colorScale: 'blues',
+          showLegend: true,
+        },
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('applyDataColors');
+      expect(text).toContain('blues');
+    });
+  });
+
+  describe('pinepaper_add_marker', () => {
+    it('should generate code to add a marker', async () => {
+      const result = await handleToolCall('pinepaper_add_marker', {
+        lat: 37.7749,
+        lon: -122.4194,
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('addMarker');
+      expect(text).toContain('37.7749');
+    });
+
+    it('should generate code with label and pulse', async () => {
+      const result = await handleToolCall('pinepaper_add_marker', {
+        lat: 40.7128,
+        lon: -74.006,
+        label: 'New York',
+        pulse: true,
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('addMarker');
+      expect(text).toContain('New York');
+      expect(text).toContain('pulse');
+    });
+  });
+
+  describe('pinepaper_add_map_labels', () => {
+    it('should generate code to add map labels', async () => {
+      const result = await handleToolCall('pinepaper_add_map_labels', {
+        options: {
+          fontSize: 12,
+          labelType: 'name',
+        },
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('addLabels');
+    });
+  });
+
+  describe('pinepaper_pan_map', () => {
+    it('should generate code to pan the map', async () => {
+      const result = await handleToolCall('pinepaper_pan_map', {
+        lat: 50,
+        lon: 10,
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('panTo');
+    });
+  });
+
+  describe('pinepaper_zoom_map', () => {
+    it('should generate code to zoom the map', async () => {
+      const result = await handleToolCall('pinepaper_zoom_map', {
+        level: 2,
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('zoomTo');
+      expect(text).toContain('2');
+    });
+  });
+
+  describe('pinepaper_export_map', () => {
+    it('should generate code to export map', async () => {
+      const result = await handleToolCall('pinepaper_export_map', {});
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('exportMap');
+    });
+  });
+
+  describe('pinepaper_import_custom_map', () => {
+    it('should generate code to import from URL', async () => {
+      const result = await handleToolCall('pinepaper_import_custom_map', {
+        url: 'https://example.com/custom.geojson',
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('importCustomMap');
+      expect(text).toContain('example.com');
+    });
+  });
+
+  describe('pinepaper_get_region_at_point', () => {
+    it('should generate code for hit testing', async () => {
+      const result = await handleToolCall('pinepaper_get_region_at_point', {
+        x: 400,
+        y: 300,
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('getRegionAtPoint');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // MAP ANIMATION/CSV TOOLS
+  // -------------------------------------------------------------------------
+
+  describe('pinepaper_animate_map_regions', () => {
+    it('should generate code for region keyframe animation', async () => {
+      const result = await handleToolCall('pinepaper_animate_map_regions', {
+        duration: 5,
+        loop: true,
+        regions: {
+          USA: [
+            { time: 0, fillColor: '#ef4444' },
+            { time: 5, fillColor: '#22c55e' },
+          ],
+        },
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('animateRegions');
+      expect(text).toContain('USA');
+    });
+
+    it('should require regions parameter', async () => {
+      const result = await handleToolCall('pinepaper_animate_map_regions', {});
+
+      expect(result.isError).toBe(true);
+    });
+  });
+
+  describe('pinepaper_animate_map_wave', () => {
+    it('should generate code for wave animation', async () => {
+      const result = await handleToolCall('pinepaper_animate_map_wave', {
+        duration: 10,
+        waveDirection: 'horizontal',
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('animateWave');
+      expect(text).toContain('horizontal');
+    });
+
+    it('should work with custom colors', async () => {
+      const result = await handleToolCall('pinepaper_animate_map_wave', {
+        colors: ['#ff0000', '#00ff00', '#0000ff'],
+        waveDirection: 'radial',
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('radial');
+    });
+  });
+
+  describe('pinepaper_stop_map_animations', () => {
+    it('should generate code to stop all animations', async () => {
+      const result = await handleToolCall('pinepaper_stop_map_animations', {});
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('stopAnimations');
+    });
+
+    it('should generate code to stop specific regions', async () => {
+      const result = await handleToolCall('pinepaper_stop_map_animations', {
+        regions: ['USA', 'France'],
+        resetColors: true,
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('stopAnimations');
+      expect(text).toContain('USA');
+    });
+  });
+
+  describe('pinepaper_get_animated_map_regions', () => {
+    it('should generate code to get animated regions', async () => {
+      const result = await handleToolCall('pinepaper_get_animated_map_regions', {});
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('getAnimatedRegions');
+    });
+  });
+
+  describe('pinepaper_export_map_region_csv', () => {
+    it('should generate code to export CSV', async () => {
+      const result = await handleToolCall('pinepaper_export_map_region_csv', {});
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('exportRegionCSV');
+    });
+
+    it('should generate code with options', async () => {
+      const result = await handleToolCall('pinepaper_export_map_region_csv', {
+        includeHighlighted: true,
+        download: true,
+        filename: 'my-map.csv',
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('my-map.csv');
+    });
+  });
+
+  describe('pinepaper_import_map_region_csv', () => {
+    it('should generate code to import CSV', async () => {
+      const result = await handleToolCall('pinepaper_import_map_region_csv', {
+        csvText: 'regionId,fillColor\nUSA,#22c55e',
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('importRegionCSV');
+    });
+
+    it('should require csvText', async () => {
+      const result = await handleToolCall('pinepaper_import_map_region_csv', {});
+
+      expect(result.isError).toBe(true);
+    });
+  });
+
+  describe('pinepaper_select_map_regions', () => {
+    it('should generate code to select regions', async () => {
+      const result = await handleToolCall('pinepaper_select_map_regions', {
+        regionIds: ['USA', 'Canada', 'Mexico'],
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('selectRegions');
+      expect(text).toContain('USA');
+    });
+
+    it('should require regionIds', async () => {
+      const result = await handleToolCall('pinepaper_select_map_regions', {});
+
+      expect(result.isError).toBe(true);
+    });
+  });
+
+  describe('pinepaper_deselect_map_regions', () => {
+    it('should generate code to deselect all regions', async () => {
+      const result = await handleToolCall('pinepaper_deselect_map_regions', {});
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('deselectRegions');
+    });
+
+    it('should generate code to deselect specific regions', async () => {
+      const result = await handleToolCall('pinepaper_deselect_map_regions', {
+        regionIds: ['USA', 'France'],
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('deselectRegions');
+    });
+  });
+
+  describe('pinepaper_get_highlighted_map_regions', () => {
+    it('should generate code to get highlighted regions', async () => {
+      const result = await handleToolCall('pinepaper_get_highlighted_map_regions', {});
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('getHighlightedRegions');
     });
   });
 

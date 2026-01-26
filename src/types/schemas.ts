@@ -236,6 +236,14 @@ export const RelationTypeSchema = z.enum([
   'parallax',
   'bounds_to',
   'animates',
+  // Manim-inspired animation relations
+  'grows_from',
+  'staggered_with',
+  'indicates',
+  'circumscribes',
+  'wave_through',
+  'camera_follows',
+  'morphs_to',
 ]).describe('Type of relationship between items');
 
 export type RelationType = z.infer<typeof RelationTypeSchema>;
@@ -289,6 +297,103 @@ export const AnimatesParamsSchema = z.object({
   duration: z.number().describe('Total animation duration in seconds'),
   loop: z.boolean().optional().default(false).describe('Whether to loop the animation'),
 });
+
+// Manim-inspired relation parameter schemas
+export const GrowsFromParamsSchema = z.object({
+  origin: z.enum(['center', 'top', 'bottom', 'left', 'right', 'topLeft', 'topRight', 'bottomLeft', 'bottomRight']).optional().default('center').describe('Growth origin point'),
+  duration: z.number().optional().default(1).describe('Growth duration in seconds'),
+  delay: z.number().optional().default(0).describe('Delay before starting'),
+  easing: z.string().optional().default('easeOutCubic').describe('Easing function'),
+});
+
+export const StaggeredWithParamsSchema = z.object({
+  index: z.number().describe('0-based position in the stagger sequence'),
+  stagger: z.number().optional().default(0.1).describe('Delay between items in seconds'),
+  effect: z.enum(['fadeIn', 'fadeOut', 'growIn', 'slideIn', 'popIn']).optional().default('fadeIn').describe('Stagger effect type'),
+});
+
+export const IndicatesParamsSchema = z.object({
+  scale: z.number().optional().default(1.3).describe('Max scale during indication'),
+  color: ColorSchema.optional().describe('Highlight color'),
+  duration: z.number().optional().default(0.5).describe('Indication duration in seconds'),
+  delay: z.number().optional().default(0).describe('Delay before starting'),
+  repeat: z.number().optional().default(1).describe('Number of indication cycles'),
+});
+
+export const CircumscribesParamsSchema = z.object({
+  shape: z.enum(['rectangle', 'circle', 'ellipse']).optional().default('rectangle').describe('Circumscribe shape'),
+  color: ColorSchema.optional().default('#ef4444').describe('Stroke color'),
+  strokeWidth: z.number().optional().default(2).describe('Stroke width'),
+  padding: z.number().optional().default(10).describe('Padding around target'),
+  duration: z.number().optional().default(1).describe('Draw duration in seconds'),
+  fadeOut: z.boolean().optional().default(true).describe('Fade out after drawing'),
+});
+
+export const WaveThroughParamsSchema = z.object({
+  amplitude: z.number().optional().default(20).describe('Wave amplitude in pixels'),
+  frequency: z.number().optional().default(2).describe('Number of wave cycles'),
+  direction: z.enum(['horizontal', 'vertical']).optional().default('horizontal').describe('Wave direction'),
+  duration: z.number().optional().default(1).describe('Wave duration in seconds'),
+  delay: z.number().optional().default(0).describe('Delay before starting'),
+});
+
+export const CameraFollowsParamsSchema = z.object({
+  smoothing: z.number().min(0).max(1).optional().default(0.1).describe('Camera movement smoothing'),
+  offset: PointArraySchema.optional().default([0, 0]).describe('Camera offset from target'),
+  zoom: z.number().optional().default(1).describe('Zoom level'),
+  deadzone: z.number().optional().default(50).describe('Deadzone radius in pixels'),
+  bounds: z.object({
+    minX: z.number().optional(),
+    maxX: z.number().optional(),
+    minY: z.number().optional(),
+    maxY: z.number().optional(),
+  }).optional().describe('Camera bounds'),
+});
+
+export const MorphsToParamsSchema = z.object({
+  duration: z.number().optional().default(1.5).describe('Morph duration in seconds'),
+  delay: z.number().optional().default(0).describe('Delay before starting'),
+  easing: z.string().optional().default('easeInOutCubic').describe('Easing function'),
+  morphColor: z.boolean().optional().default(true).describe('Also morph color'),
+  morphSize: z.boolean().optional().default(true).describe('Also morph size'),
+});
+
+// =============================================================================
+// CUSTOM RELATION REGISTRATION
+// =============================================================================
+
+export const CustomRelationParamDefSchema = z.object({
+  type: z.enum(['number', 'string', 'boolean', 'array', 'object']).describe('Parameter type'),
+  default: z.any().optional().describe('Default value'),
+  description: z.string().optional().describe('Parameter description'),
+  options: z.array(z.string()).optional().describe('Valid options for string type'),
+  min: z.number().optional().describe('Minimum value for number type'),
+  max: z.number().optional().describe('Maximum value for number type'),
+});
+
+export const RegisterCustomRelationInputSchema = z.object({
+  name: z.string().describe('Unique relation type name'),
+  description: z.string().optional().describe('Human-readable description'),
+  params: z.record(z.string(), CustomRelationParamDefSchema).optional().describe('Parameter schema'),
+  computeFunction: z.string().describe('Compute function body (pure JS, receives ctx with fromPosition, toPosition, params, delta, time)'),
+  applyFunction: z.string().describe('Apply function body (can use Paper.js, receives item, target, computed, params)'),
+  templates: z.array(z.string()).optional().describe('Natural language templates for training data'),
+  continuous: z.boolean().optional().default(true).describe('Update every frame'),
+  priority: z.number().optional().default(0).describe('Execution order (lower = first)'),
+}).describe('Register a custom relation type');
+
+export type RegisterCustomRelationInput = z.infer<typeof RegisterCustomRelationInputSchema>;
+
+// =============================================================================
+// EXECUTE CUSTOM CODE
+// =============================================================================
+
+export const ExecuteCustomCodeInputSchema = z.object({
+  code: z.string().describe('JavaScript code to execute in PinePaper context'),
+  description: z.string().optional().describe('Description of what the code does'),
+}).describe('Execute custom JavaScript code');
+
+export type ExecuteCustomCodeInput = z.infer<typeof ExecuteCustomCodeInputSchema>;
 
 // =============================================================================
 // GENERATOR TYPES
@@ -1593,3 +1698,240 @@ export type GetLetterCollageOptionsInput = z.infer<typeof GetLetterCollageOption
 export const GetCanvasPresetsInputSchema = z.object({}).describe('Get canvas presets input (no parameters)');
 
 export type GetCanvasPresetsInput = z.infer<typeof GetCanvasPresetsInputSchema>;
+
+// =============================================================================
+// MAP SCHEMAS
+// =============================================================================
+
+export const MapIdSchema = z.enum(['world', 'worldHighRes', 'usa']).describe('Available map types');
+
+export type MapId = z.infer<typeof MapIdSchema>;
+
+export const MapProjectionSchema = z.enum([
+  'mercator', 'equalEarth', 'naturalEarth', 'orthographic', 'albers', 'stereographic',
+]).describe('Map projection types');
+
+export type MapProjection = z.infer<typeof MapProjectionSchema>;
+
+export const MapQualitySchema = z.enum(['fast', 'balanced', 'professional']).describe('Map rendering quality');
+
+export type MapQuality = z.infer<typeof MapQualitySchema>;
+
+export const ColorScaleSchema = z.enum([
+  'blues', 'greens', 'reds', 'oranges', 'purples', 'heat',
+]).describe('Color scale for choropleth maps');
+
+export type ColorScale = z.infer<typeof ColorScaleSchema>;
+
+export const LegendPositionSchema = z.enum([
+  'top-left', 'top-right', 'bottom-left', 'bottom-right',
+]).describe('Legend position on map');
+
+export type LegendPosition = z.infer<typeof LegendPositionSchema>;
+
+export const MarkerShapeSchema = z.enum(['circle', 'pin', 'star']).describe('Marker shape types');
+
+export type MarkerShape = z.infer<typeof MarkerShapeSchema>;
+
+export const LabelTypeSchema = z.enum(['name', 'code', 'value']).describe('Label content type');
+
+export type LabelType = z.infer<typeof LabelTypeSchema>;
+
+export const LoadMapInputSchema = z.object({
+  mapId: MapIdSchema.describe('Map to load'),
+  options: z.object({
+    projection: MapProjectionSchema.optional().describe('Map projection type'),
+    quality: MapQualitySchema.optional().describe('Rendering quality'),
+    fillColor: z.string().optional().describe('Default fill color for regions'),
+    strokeColor: z.string().optional().describe('Border color'),
+    strokeWidth: z.number().optional().describe('Border width'),
+    scale: z.number().optional().describe('Scale multiplier'),
+    center: z.tuple([z.number(), z.number()]).optional().describe('Center coordinates [lon, lat]'),
+    rotate: z.tuple([z.number(), z.number(), z.number()]).optional().describe('Rotation angles [x, y, z]'),
+    enableHover: z.boolean().optional().describe('Enable hover effects'),
+    enableClick: z.boolean().optional().describe('Enable click events'),
+    hoverFill: z.string().optional().describe('Hover fill color'),
+    hoverStroke: z.string().optional().describe('Hover stroke color'),
+  }).optional().describe('Map options'),
+}).describe('Load map input');
+
+export type LoadMapInput = z.infer<typeof LoadMapInputSchema>;
+
+export const HighlightRegionsInputSchema = z.object({
+  regionIds: z.array(z.string()).describe('Array of region IDs to highlight'),
+  options: z.object({
+    fillColor: z.string().optional().describe('Highlight fill color'),
+    strokeColor: z.string().optional().describe('Highlight stroke color'),
+    strokeWidth: z.number().optional().describe('Highlight stroke width'),
+    animate: z.boolean().optional().describe('Animate the highlight'),
+  }).optional().describe('Highlight options'),
+}).describe('Highlight regions input');
+
+export type HighlightRegionsInput = z.infer<typeof HighlightRegionsInputSchema>;
+
+export const UnhighlightRegionsInputSchema = z.object({
+  regionIds: z.union([
+    z.array(z.string()),
+    z.literal('all'),
+  ]).describe('Region IDs to unhighlight, or "all"'),
+}).describe('Unhighlight regions input');
+
+export type UnhighlightRegionsInput = z.infer<typeof UnhighlightRegionsInputSchema>;
+
+export const ApplyDataColorsInputSchema = z.object({
+  data: z.record(z.string(), z.number()).describe('Object mapping region IDs to values'),
+  options: z.object({
+    colorScale: ColorScaleSchema.optional().describe('Color scale to use'),
+    minValue: z.number().optional().describe('Minimum value for scale'),
+    maxValue: z.number().optional().describe('Maximum value for scale'),
+    showLegend: z.boolean().optional().describe('Display color legend'),
+    legendPosition: LegendPositionSchema.optional().describe('Legend position'),
+    legendTitle: z.string().optional().describe('Title for the legend'),
+  }).optional().describe('Choropleth options'),
+}).describe('Apply data colors input');
+
+export type ApplyDataColorsInput = z.infer<typeof ApplyDataColorsInputSchema>;
+
+export const AddMarkerInputSchema = z.object({
+  lat: z.number().describe('Latitude'),
+  lon: z.number().describe('Longitude'),
+  label: z.string().optional().describe('Marker label text'),
+  color: z.string().optional().describe('Marker color'),
+  size: z.number().optional().describe('Marker size in pixels'),
+  pulse: z.boolean().optional().describe('Enable pulse animation'),
+  shape: MarkerShapeSchema.optional().describe('Marker shape'),
+}).describe('Add marker input');
+
+export type AddMarkerInput = z.infer<typeof AddMarkerInputSchema>;
+
+export const AddMapLabelsInputSchema = z.object({
+  regions: z.array(z.string()).optional().describe('Specific regions to label (null for all)'),
+  options: z.object({
+    fontSize: z.number().optional().describe('Label font size'),
+    fontColor: z.string().optional().describe('Label text color'),
+    labelType: LabelTypeSchema.optional().describe('Type of label content'),
+    backgroundColor: z.string().optional().describe('Label background color'),
+  }).optional().describe('Label options'),
+}).describe('Add map labels input');
+
+export type AddMapLabelsInput = z.infer<typeof AddMapLabelsInputSchema>;
+
+export const PanMapInputSchema = z.object({
+  lat: z.number().describe('Target latitude'),
+  lon: z.number().describe('Target longitude'),
+  animate: z.boolean().optional().describe('Animate the pan'),
+  duration: z.number().optional().describe('Animation duration in seconds'),
+}).describe('Pan map input');
+
+export type PanMapInput = z.infer<typeof PanMapInputSchema>;
+
+export const ZoomMapInputSchema = z.object({
+  level: z.number().describe('Zoom level (1 = full view)'),
+  animate: z.boolean().optional().describe('Animate the zoom'),
+  duration: z.number().optional().describe('Animation duration in seconds'),
+}).describe('Zoom map input');
+
+export type ZoomMapInput = z.infer<typeof ZoomMapInputSchema>;
+
+export const ExportMapInputSchema = z.object({}).describe('Export map input (no parameters)');
+
+export type ExportMapInput = z.infer<typeof ExportMapInputSchema>;
+
+export const ImportCustomMapInputSchema = z.object({
+  url: z.string().optional().describe('URL to GeoJSON/TopoJSON file'),
+  geoJson: z.object({}).passthrough().optional().describe('GeoJSON object to import'),
+  options: z.object({
+    projection: MapProjectionSchema.optional().describe('Projection to use'),
+    fillColor: z.string().optional().describe('Default fill color'),
+    strokeColor: z.string().optional().describe('Default stroke color'),
+    strokeWidth: z.number().optional().describe('Default stroke width'),
+  }).optional().describe('Import options'),
+}).describe('Import custom map input');
+
+export type ImportCustomMapInput = z.infer<typeof ImportCustomMapInputSchema>;
+
+export const GetRegionAtPointInputSchema = z.object({
+  x: z.number().describe('Canvas X coordinate'),
+  y: z.number().describe('Canvas Y coordinate'),
+}).describe('Get region at point input');
+
+export type GetRegionAtPointInput = z.infer<typeof GetRegionAtPointInputSchema>;
+
+// Map Animation Schemas
+export const MapRegionKeyframeSchema = z.object({
+  time: z.number().describe('Time in seconds'),
+  fillColor: z.string().describe('Fill color at this keyframe'),
+  strokeColor: z.string().optional().describe('Stroke color (optional)'),
+  opacity: z.number().optional().describe('Opacity 0-1 (optional)'),
+}).describe('Map region keyframe');
+
+export type MapRegionKeyframe = z.infer<typeof MapRegionKeyframeSchema>;
+
+export const WaveDirectionSchema = z.enum(['horizontal', 'vertical', 'radial']).describe('Wave animation direction');
+
+export type WaveDirection = z.infer<typeof WaveDirectionSchema>;
+
+export const AnimateMapRegionsInputSchema = z.object({
+  duration: z.number().optional().default(5).describe('Total animation duration in seconds'),
+  loop: z.boolean().optional().default(true).describe('Loop the animation'),
+  regions: z.record(z.string(), z.array(MapRegionKeyframeSchema)).describe('Map of region IDs to keyframe arrays'),
+}).describe('Animate map regions input');
+
+export type AnimateMapRegionsInput = z.infer<typeof AnimateMapRegionsInputSchema>;
+
+export const AnimateMapWaveInputSchema = z.object({
+  duration: z.number().optional().default(10).describe('Total wave duration in seconds'),
+  loop: z.boolean().optional().default(true).describe('Loop the animation'),
+  colors: z.array(z.string()).optional().describe('Array of colors for the wave'),
+  waveDirection: WaveDirectionSchema.optional().default('horizontal').describe('Direction of wave effect'),
+}).describe('Animate map wave input');
+
+export type AnimateMapWaveInput = z.infer<typeof AnimateMapWaveInputSchema>;
+
+export const StopMapAnimationsInputSchema = z.object({
+  regions: z.array(z.string()).optional().describe('Specific region IDs to stop (omit for all)'),
+  resetColors: z.boolean().optional().default(true).describe('Reset regions to default colors'),
+}).describe('Stop map animations input');
+
+export type StopMapAnimationsInput = z.infer<typeof StopMapAnimationsInputSchema>;
+
+export const GetAnimatedMapRegionsInputSchema = z.object({}).describe('Get animated map regions input (no parameters)');
+
+export type GetAnimatedMapRegionsInput = z.infer<typeof GetAnimatedMapRegionsInputSchema>;
+
+// Map CSV Schemas
+export const ExportMapRegionCSVInputSchema = z.object({
+  includeHighlighted: z.boolean().optional().default(true).describe('Include highlight status column'),
+  includeSelected: z.boolean().optional().default(true).describe('Include selection status column'),
+  includeColors: z.boolean().optional().default(true).describe('Include fill/stroke color columns'),
+  download: z.boolean().optional().default(false).describe('Auto-download the CSV file'),
+  filename: z.string().optional().default('map-regions.csv').describe('Filename for download'),
+}).describe('Export map region CSV input');
+
+export type ExportMapRegionCSVInput = z.infer<typeof ExportMapRegionCSVInputSchema>;
+
+export const ImportMapRegionCSVInputSchema = z.object({
+  csvText: z.string().describe('CSV text content to import'),
+  applyColors: z.boolean().optional().default(true).describe('Apply fill/stroke colors from CSV'),
+  applyHighlight: z.boolean().optional().default(true).describe('Update highlight status from CSV'),
+  applySelection: z.boolean().optional().default(true).describe('Update selection status from CSV'),
+}).describe('Import map region CSV input');
+
+export type ImportMapRegionCSVInput = z.infer<typeof ImportMapRegionCSVInputSchema>;
+
+// Map Selection Schemas
+export const SelectMapRegionsInputSchema = z.object({
+  regionIds: z.array(z.string()).describe('Array of region IDs to select'),
+}).describe('Select map regions input');
+
+export type SelectMapRegionsInput = z.infer<typeof SelectMapRegionsInputSchema>;
+
+export const DeselectMapRegionsInputSchema = z.object({
+  regionIds: z.array(z.string()).optional().describe('Array of region IDs to deselect (omit for all)'),
+}).describe('Deselect map regions input');
+
+export type DeselectMapRegionsInput = z.infer<typeof DeselectMapRegionsInputSchema>;
+
+export const GetHighlightedMapRegionsInputSchema = z.object({}).describe('Get highlighted map regions input (no parameters)');
+
+export type GetHighlightedMapRegionsInput = z.infer<typeof GetHighlightedMapRegionsInputSchema>;

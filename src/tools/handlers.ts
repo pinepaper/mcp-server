@@ -69,6 +69,31 @@ import {
   GetLetterCollageOptionsInputSchema,
   // Canvas presets schemas
   GetCanvasPresetsInputSchema,
+  // Map schemas
+  LoadMapInputSchema,
+  HighlightRegionsInputSchema,
+  UnhighlightRegionsInputSchema,
+  ApplyDataColorsInputSchema,
+  AddMarkerInputSchema,
+  AddMapLabelsInputSchema,
+  PanMapInputSchema,
+  ZoomMapInputSchema,
+  ExportMapInputSchema,
+  ImportCustomMapInputSchema,
+  GetRegionAtPointInputSchema,
+  // Map animation/CSV schemas
+  AnimateMapRegionsInputSchema,
+  AnimateMapWaveInputSchema,
+  StopMapAnimationsInputSchema,
+  GetAnimatedMapRegionsInputSchema,
+  ExportMapRegionCSVInputSchema,
+  ImportMapRegionCSVInputSchema,
+  SelectMapRegionsInputSchema,
+  DeselectMapRegionsInputSchema,
+  GetHighlightedMapRegionsInputSchema,
+  // Custom relation/code schemas
+  RegisterCustomRelationInputSchema,
+  ExecuteCustomCodeInputSchema,
   ErrorCodes,
   RelationType,
   ItemType,
@@ -655,6 +680,28 @@ export async function handleToolCall(
           `Queries ${input.direction || 'all'} relations for ${input.itemId}`,
           options,
           'pinepaper_query_relations'
+        );
+      }
+
+      case 'pinepaper_register_custom_relation': {
+        const input = RegisterCustomRelationInputSchema.parse(args);
+        const code = codeGenerator.generateRegisterCustomRelation(input);
+        return executeOrGenerate(
+          code,
+          `Registers custom relation type: ${input.name}`,
+          options,
+          'pinepaper_register_custom_relation'
+        );
+      }
+
+      case 'pinepaper_execute_custom_code': {
+        const input = ExecuteCustomCodeInputSchema.parse(args);
+        const code = codeGenerator.generateExecuteCustomCode(input);
+        return executeOrGenerate(
+          code,
+          input.description || 'Executes custom JavaScript code',
+          options,
+          'pinepaper_execute_custom_code'
         );
       }
 
@@ -1454,6 +1501,142 @@ Browser is ready. You can now use other pinepaper tools to create and animate gr
       }
 
       // -----------------------------------------------------------------------
+      // MAP TOOLS
+      // -----------------------------------------------------------------------
+      case 'pinepaper_load_map': {
+        const input = LoadMapInputSchema.parse(args);
+        const code = codeGenerator.generateLoadMap(input);
+        const description = `Loads ${input.mapId} map with ${input.options?.projection || 'default'} projection`;
+        return executeOrGenerate(code, description, options, 'pinepaper_load_map');
+      }
+
+      case 'pinepaper_highlight_regions': {
+        const input = HighlightRegionsInputSchema.parse(args);
+        const code = codeGenerator.generateHighlightRegions(input);
+        const description = `Highlights ${input.regionIds.length} region(s) on the map`;
+        return executeOrGenerate(code, description, options, 'pinepaper_highlight_regions');
+      }
+
+      case 'pinepaper_unhighlight_regions': {
+        const input = UnhighlightRegionsInputSchema.parse(args);
+        const code = codeGenerator.generateUnhighlightRegions(input);
+        return executeOrGenerate(code, 'Removes region highlights', options, 'pinepaper_unhighlight_regions');
+      }
+
+      case 'pinepaper_apply_data_colors': {
+        const input = ApplyDataColorsInputSchema.parse(args);
+        const code = codeGenerator.generateApplyDataColors(input);
+        const regionCount = Object.keys(input.data).length;
+        const description = `Applies choropleth coloring to ${regionCount} region(s)`;
+        return executeOrGenerate(code, description, options, 'pinepaper_apply_data_colors');
+      }
+
+      case 'pinepaper_add_marker': {
+        const input = AddMarkerInputSchema.parse(args);
+        const code = codeGenerator.generateAddMarker(input);
+        const description = `Adds marker at [${input.lat}, ${input.lon}]${input.label ? `: ${input.label}` : ''}`;
+        return executeOrGenerate(code, description, options, 'pinepaper_add_marker');
+      }
+
+      case 'pinepaper_add_map_labels': {
+        const input = AddMapLabelsInputSchema.parse(args);
+        const code = codeGenerator.generateAddMapLabels(input);
+        return executeOrGenerate(code, 'Adds labels to map regions', options, 'pinepaper_add_map_labels');
+      }
+
+      case 'pinepaper_pan_map': {
+        const input = PanMapInputSchema.parse(args);
+        const code = codeGenerator.generatePanMap(input);
+        const description = `Pans map to [${input.lat}, ${input.lon}]`;
+        return executeOrGenerate(code, description, options, 'pinepaper_pan_map');
+      }
+
+      case 'pinepaper_zoom_map': {
+        const input = ZoomMapInputSchema.parse(args);
+        const code = codeGenerator.generateZoomMap(input);
+        const description = `Sets map zoom level to ${input.level}`;
+        return executeOrGenerate(code, description, options, 'pinepaper_zoom_map');
+      }
+
+      case 'pinepaper_export_map': {
+        const code = codeGenerator.generateExportMap();
+        return executeOrGenerate(code, 'Exports map configuration', options, 'pinepaper_export_map');
+      }
+
+      case 'pinepaper_import_custom_map': {
+        const input = ImportCustomMapInputSchema.parse(args);
+        const code = codeGenerator.generateImportCustomMap(input);
+        const description = input.url ? `Imports custom map from URL` : 'Imports custom GeoJSON map';
+        return executeOrGenerate(code, description, options, 'pinepaper_import_custom_map');
+      }
+
+      case 'pinepaper_get_region_at_point': {
+        const input = GetRegionAtPointInputSchema.parse(args);
+        const code = codeGenerator.generateGetRegionAtPoint(input);
+        const description = `Gets region at point [${input.x}, ${input.y}]`;
+        return executeOrGenerate(code, description, options, 'pinepaper_get_region_at_point');
+      }
+
+      // -----------------------------------------------------------------------
+      // MAP ANIMATION/CSV TOOLS
+      // -----------------------------------------------------------------------
+      case 'pinepaper_animate_map_regions': {
+        const input = AnimateMapRegionsInputSchema.parse(args);
+        const code = codeGenerator.generateAnimateMapRegions(input);
+        const regionCount = Object.keys(input.regions).length;
+        const description = `Animates ${regionCount} map region(s) over ${input.duration || 5}s`;
+        return executeOrGenerate(code, description, options, 'pinepaper_animate_map_regions');
+      }
+
+      case 'pinepaper_animate_map_wave': {
+        const input = AnimateMapWaveInputSchema.parse(args);
+        const code = codeGenerator.generateAnimateMapWave(input);
+        const description = `Creates ${input.waveDirection || 'horizontal'} wave animation`;
+        return executeOrGenerate(code, description, options, 'pinepaper_animate_map_wave');
+      }
+
+      case 'pinepaper_stop_map_animations': {
+        const input = StopMapAnimationsInputSchema.parse(args);
+        const code = codeGenerator.generateStopMapAnimations(input);
+        return executeOrGenerate(code, 'Stops map region animations', options, 'pinepaper_stop_map_animations');
+      }
+
+      case 'pinepaper_get_animated_map_regions': {
+        const code = codeGenerator.generateGetAnimatedMapRegions();
+        return executeOrGenerate(code, 'Gets list of animated map regions', options, 'pinepaper_get_animated_map_regions');
+      }
+
+      case 'pinepaper_export_map_region_csv': {
+        const input = ExportMapRegionCSVInputSchema.parse(args);
+        const code = codeGenerator.generateExportMapRegionCSV(input);
+        return executeOrGenerate(code, 'Exports map region data as CSV', options, 'pinepaper_export_map_region_csv');
+      }
+
+      case 'pinepaper_import_map_region_csv': {
+        const input = ImportMapRegionCSVInputSchema.parse(args);
+        const code = codeGenerator.generateImportMapRegionCSV(input);
+        return executeOrGenerate(code, 'Imports CSV data to update map regions', options, 'pinepaper_import_map_region_csv');
+      }
+
+      case 'pinepaper_select_map_regions': {
+        const input = SelectMapRegionsInputSchema.parse(args);
+        const code = codeGenerator.generateSelectMapRegions(input);
+        const description = `Selects ${input.regionIds.length} map region(s)`;
+        return executeOrGenerate(code, description, options, 'pinepaper_select_map_regions');
+      }
+
+      case 'pinepaper_deselect_map_regions': {
+        const input = DeselectMapRegionsInputSchema.parse(args);
+        const code = codeGenerator.generateDeselectMapRegions(input);
+        return executeOrGenerate(code, 'Deselects map regions', options, 'pinepaper_deselect_map_regions');
+      }
+
+      case 'pinepaper_get_highlighted_map_regions': {
+        const code = codeGenerator.generateGetHighlightedMapRegions();
+        return executeOrGenerate(code, 'Gets list of highlighted map regions', options, 'pinepaper_get_highlighted_map_regions');
+      }
+
+      // -----------------------------------------------------------------------
       // UNKNOWN TOOL
       // -----------------------------------------------------------------------
       default: {
@@ -1474,6 +1657,8 @@ Browser is ready. You can now use other pinepaper tools to create and animate gr
             'pinepaper_add_relation',
             'pinepaper_remove_relation',
             'pinepaper_query_relations',
+            'pinepaper_register_custom_relation',
+            'pinepaper_execute_custom_code',
             'pinepaper_animate',
             'pinepaper_keyframe_animate',
             'pinepaper_play_timeline',
@@ -1532,6 +1717,28 @@ Browser is ready. You can now use other pinepaper tools to create and animate gr
             'pinepaper_get_letter_collage_options',
             // Canvas presets tools
             'pinepaper_get_canvas_presets',
+            // Map tools
+            'pinepaper_load_map',
+            'pinepaper_highlight_regions',
+            'pinepaper_unhighlight_regions',
+            'pinepaper_apply_data_colors',
+            'pinepaper_add_marker',
+            'pinepaper_add_map_labels',
+            'pinepaper_pan_map',
+            'pinepaper_zoom_map',
+            'pinepaper_export_map',
+            'pinepaper_import_custom_map',
+            'pinepaper_get_region_at_point',
+            // Map animation/CSV tools
+            'pinepaper_animate_map_regions',
+            'pinepaper_animate_map_wave',
+            'pinepaper_stop_map_animations',
+            'pinepaper_get_animated_map_regions',
+            'pinepaper_export_map_region_csv',
+            'pinepaper_import_map_region_csv',
+            'pinepaper_select_map_regions',
+            'pinepaper_deselect_map_regions',
+            'pinepaper_get_highlighted_map_regions',
           ],
         });
       }
