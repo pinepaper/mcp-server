@@ -115,6 +115,30 @@ const RESOURCES = [
     description: 'Build particle effects like fireworks, snow, and starfields',
     mimeType: 'text/markdown',
   },
+  {
+    uri: 'pinepaper://docs/map-tools',
+    name: 'Map Tools Guide',
+    description: 'Create geographic visualizations with world maps, choropleth coloring, markers, and labels',
+    mimeType: 'text/markdown',
+  },
+  {
+    uri: 'pinepaper://examples/world-population-map',
+    name: 'World Population Map Example',
+    description: 'Create an animated choropleth map showing world population data',
+    mimeType: 'text/markdown',
+  },
+  {
+    uri: 'pinepaper://examples/us-election-map',
+    name: 'US Election Map Example',
+    description: 'Build an interactive US election results visualization',
+    mimeType: 'text/markdown',
+  },
+  {
+    uri: 'pinepaper://examples/travel-route-map',
+    name: 'Travel Route Map Example',
+    description: 'Visualize a travel itinerary with markers and animated connections',
+    mimeType: 'text/markdown',
+  },
 ];
 
 const RESOURCE_CONTENTS: Record<string, string> = {
@@ -3207,6 +3231,1067 @@ pinepaper_animate_item itemId: "bubble4" animationType: "wobble" speed: 0.7
 | Rain | Lines at angle, fast bounce, blue tints |
 | Dust | Tiny circles, slow fade, random positions |
 | Confetti | Small rectangles, rotate + bounce, rainbow colors |
+`,
+  'pinepaper://docs/map-tools': `# Map Tools Guide
+
+Create geographic visualizations with world maps, choropleth coloring, markers, and labels.
+
+## Available Maps
+
+| Map | Description | Region ID Format |
+|-----|-------------|------------------|
+| \`world\` | World countries (110m) | Full names: "United States of America", "France" |
+| \`worldHighRes\` | World countries (50m, detailed) | Full names |
+| \`usa\` | US states | State codes: "CA", "TX", "NY" |
+
+## Projections
+
+| Projection | Best For |
+|------------|----------|
+| \`naturalEarth\` | World maps (recommended) |
+| \`mercator\` | Web-style maps |
+| \`equalEarth\` | Equal-area comparisons |
+| \`orthographic\` | Globe/3D sphere view |
+| \`albers\` | USA maps (recommended) |
+| \`stereographic\` | Polar regions |
+
+## Loading Maps
+
+\`\`\`
+// Load world map with Natural Earth projection
+pinepaper_load_map mapId: "world"
+  options:
+    projection: "naturalEarth"
+    quality: "balanced"
+    fillColor: "#e5e7eb"
+    strokeColor: "#9ca3af"
+    enableHover: true
+
+// Load USA with Albers projection
+pinepaper_load_map mapId: "usa"
+  options:
+    projection: "albers"
+    quality: "professional"
+\`\`\`
+
+## Highlighting Regions
+
+\`\`\`
+// Highlight countries (use full names for world map)
+pinepaper_highlight_regions
+  regionIds: ["United States of America", "Canada", "Mexico"]
+  options:
+    fillColor: "#3b82f6"
+    strokeColor: "#1d4ed8"
+    animate: true
+
+// Highlight US states (use state codes)
+pinepaper_highlight_regions
+  regionIds: ["CA", "TX", "NY", "FL"]
+  options:
+    fillColor: "#22c55e"
+
+// Remove highlights
+pinepaper_unhighlight_regions regionIds: "all"
+\`\`\`
+
+## Choropleth (Data-Driven Colors)
+
+\`\`\`
+// Population data visualization
+pinepaper_apply_data_colors
+  data:
+    "California": 39538223
+    "Texas": 29145505
+    "Florida": 21538187
+    "New York": 20201249
+  options:
+    colorScale: "blues"
+    showLegend: true
+    legendPosition: "bottom-right"
+    legendTitle: "Population"
+\`\`\`
+
+### Color Scales
+- \`blues\` - Light to dark blue
+- \`greens\` - Light to dark green
+- \`reds\` - Light to dark red
+- \`oranges\` - Light to dark orange
+- \`purples\` - Light to dark purple
+- \`heat\` - Yellow to red heat map
+
+## Map Markers
+
+\`\`\`
+// Add marker at coordinates
+pinepaper_add_marker
+  lat: 37.7749
+  lon: -122.4194
+  label: "San Francisco"
+  color: "#ef4444"
+  size: 8
+  pulse: true
+
+// Add marker with different shape
+pinepaper_add_marker
+  lat: 40.7128
+  lon: -74.0060
+  label: "New York"
+  shape: "pin"
+\`\`\`
+
+### Marker Shapes
+- \`circle\` - Simple circle (default)
+- \`pin\` - Map pin icon
+- \`star\` - Star shape
+
+## Map Labels
+
+\`\`\`
+// Add labels to all visible regions
+pinepaper_add_map_labels
+  options:
+    fontSize: 10
+    fontColor: "#374151"
+    labelType: "name"
+
+// Add labels to specific regions
+pinepaper_add_map_labels
+  regions: ["California", "Texas"]
+  options:
+    labelType: "code"
+\`\`\`
+
+### Label Types
+- \`name\` - Full region name
+- \`code\` - Region code (e.g., "CA")
+- \`value\` - Data value (after applyDataColors)
+
+## Map Navigation
+
+\`\`\`
+// Pan to coordinates
+pinepaper_pan_map lat: 50 lon: 10 animate: true duration: 1
+
+// Zoom in
+pinepaper_zoom_map level: 2 animate: true
+\`\`\`
+
+## Importing Custom Maps
+
+\`\`\`
+// Import from URL
+pinepaper_import_custom_map
+  url: "https://example.com/custom-boundaries.geojson"
+  options:
+    projection: "mercator"
+
+// Import GeoJSON directly
+pinepaper_import_custom_map
+  geoJson: { "type": "FeatureCollection", "features": [...] }
+  options:
+    projection: "naturalEarth"
+\`\`\`
+
+## Example: US Population Map
+
+\`\`\`
+// 1. Load USA map
+pinepaper_load_map mapId: "usa"
+  options:
+    projection: "albers"
+    quality: "professional"
+    fillColor: "#e5e7eb"
+    strokeColor: "#9ca3af"
+    strokeWidth: 0.5
+    enableHover: true
+
+// 2. Apply population data
+pinepaper_apply_data_colors
+  data:
+    "CA": 39538223
+    "TX": 29145505
+    "FL": 21538187
+    "NY": 20201249
+    "PA": 13002700
+    "IL": 12812508
+    "OH": 11799448
+    "GA": 10711908
+  options:
+    colorScale: "blues"
+    showLegend: true
+    legendTitle: "Population"
+
+// 3. Add major city markers
+pinepaper_add_marker lat: 34.0522 lon: -118.2437 label: "Los Angeles" pulse: true
+pinepaper_add_marker lat: 40.7128 lon: -74.0060 label: "New York" pulse: true
+pinepaper_add_marker lat: 41.8781 lon: -87.6298 label: "Chicago" pulse: true
+
+// 4. Export final map
+pinepaper_export_map
+\`\`\`
+
+## Example: World Comparison
+
+\`\`\`
+// 1. Load world map
+pinepaper_load_map mapId: "worldHighRes"
+  options:
+    projection: "naturalEarth"
+    quality: "balanced"
+    fillColor: "#f3f4f6"
+    strokeColor: "#d1d5db"
+
+// 2. Highlight regions of interest
+pinepaper_highlight_regions
+  regionIds: ["United States of America", "China", "Japan", "Germany", "United Kingdom"]
+  options:
+    fillColor: "#3b82f6"
+    animate: true
+
+// 3. Add capital markers
+pinepaper_add_marker lat: 38.9072 lon: -77.0369 label: "Washington DC"
+pinepaper_add_marker lat: 39.9042 lon: 116.4074 label: "Beijing"
+pinepaper_add_marker lat: 35.6762 lon: 139.6503 label: "Tokyo"
+pinepaper_add_marker lat: 52.5200 lon: 13.4050 label: "Berlin"
+pinepaper_add_marker lat: 51.5074 lon: -0.1278 label: "London"
+\`\`\`
+
+## Hit Testing
+
+\`\`\`
+// Find region at canvas coordinates
+pinepaper_get_region_at_point x: 400 y: 300
+// Returns: { regionId, regionName, properties }
+\`\`\`
+
+## Region Animations
+
+Animate map regions with keyframe-based color transitions:
+
+\`\`\`
+// Animate specific regions with keyframes
+pinepaper_animate_map_regions
+  duration: 8
+  loop: true
+  regions:
+    "USA":
+      - time: 0, fillColor: "#ef4444"
+      - time: 4, fillColor: "#22c55e"
+      - time: 8, fillColor: "#ef4444"
+    "France":
+      - time: 0, fillColor: "#3b82f6"
+      - time: 8, fillColor: "#fbbf24"
+
+// Wave animation across all regions
+pinepaper_animate_map_wave
+  duration: 10
+  loop: true
+  colors: ["#ef4444", "#fbbf24", "#22c55e", "#3b82f6"]
+  waveDirection: "horizontal"
+
+// Stop animations
+pinepaper_stop_map_animations
+pinepaper_stop_map_animations regions: ["USA", "France"] resetColors: true
+
+// Query animated regions
+pinepaper_get_animated_map_regions
+\`\`\`
+
+## CSV Export & Import
+
+Export and import map state via CSV for data-driven workflows:
+
+\`\`\`
+// Export region data as CSV
+pinepaper_export_map_region_csv
+  includeHighlighted: true
+  includeColors: true
+  download: true
+  filename: "map-export.csv"
+
+// Import CSV to update regions
+pinepaper_import_map_region_csv
+  csvText: "regionId,fillColor,highlighted\\nUSA,#22c55e,1\\nFrance,#3b82f6,0"
+  applyColors: true
+  applyHighlight: true
+\`\`\`
+
+## Programmatic Selection
+
+Control region selection programmatically:
+
+\`\`\`
+// Select regions
+pinepaper_select_map_regions regionIds: ["USA", "Canada", "Mexico"]
+
+// Deselect specific regions
+pinepaper_deselect_map_regions regionIds: ["USA"]
+
+// Deselect all
+pinepaper_deselect_map_regions
+
+// Query highlighted regions
+pinepaper_get_highlighted_map_regions
+\`\`\`
+`,
+  'pinepaper://examples/world-population-map': `# World Population Map Example
+
+Create an animated choropleth map showing world population data with country highlights and major city markers.
+
+## Final Result
+
+A beautiful world map showing population density by color intensity, with pulsing markers on major capitals.
+
+---
+
+## Step 1: Set Up Canvas and Background
+
+\`\`\`
+// Set dark background for contrast
+pinepaper_set_background_color color: "#1a1a2e"
+
+// Set canvas size for presentation
+pinepaper_set_canvas_size preset: "presentation-16x9"
+\`\`\`
+
+---
+
+## Step 2: Load World Map
+
+\`\`\`
+pinepaper_load_map mapId: "worldHighRes"
+  options:
+    projection: "naturalEarth"
+    quality: "professional"
+    fillColor: "#374151"
+    strokeColor: "#4b5563"
+    strokeWidth: 0.3
+    enableHover: true
+    hoverFill: "#6b7280"
+\`\`\`
+
+---
+
+## Step 3: Apply Population Data (Choropleth)
+
+\`\`\`
+pinepaper_apply_data_colors
+  data:
+    "China": 1412
+    "India": 1408
+    "United States of America": 332
+    "Indonesia": 276
+    "Pakistan": 229
+    "Brazil": 215
+    "Nigeria": 218
+    "Bangladesh": 169
+    "Russia": 144
+    "Mexico": 130
+    "Japan": 125
+    "Ethiopia": 120
+    "Philippines": 113
+    "Egypt": 104
+    "Vietnam": 99
+    "Germany": 84
+    "Turkey": 85
+    "Iran": 87
+    "Thailand": 70
+    "United Kingdom": 67
+    "France": 68
+    "Italy": 59
+    "South Africa": 60
+    "Tanzania": 63
+    "Kenya": 54
+    "South Korea": 52
+    "Colombia": 51
+    "Spain": 47
+    "Argentina": 46
+    "Algeria": 45
+    "Sudan": 45
+    "Ukraine": 41
+    "Iraq": 42
+    "Poland": 38
+    "Canada": 38
+    "Morocco": 37
+    "Saudi Arabia": 35
+    "Peru": 33
+    "Malaysia": 33
+    "Australia": 26
+  options:
+    colorScale: "blues"
+    showLegend: true
+    legendPosition: "bottom-right"
+    legendTitle: "Population (millions)"
+\`\`\`
+
+---
+
+## Step 4: Highlight Top 5 Countries
+
+\`\`\`
+pinepaper_highlight_regions
+  regionIds: ["China", "India", "United States of America", "Indonesia", "Pakistan"]
+  options:
+    strokeColor: "#fbbf24"
+    strokeWidth: 2
+    animate: true
+\`\`\`
+
+---
+
+## Step 5: Add Capital City Markers
+
+\`\`\`
+// Beijing - China
+pinepaper_add_marker lat: 39.9042 lon: 116.4074
+  label: "Beijing"
+  color: "#ef4444"
+  size: 10
+  pulse: true
+
+// New Delhi - India
+pinepaper_add_marker lat: 28.6139 lon: 77.2090
+  label: "New Delhi"
+  color: "#ef4444"
+  size: 10
+  pulse: true
+
+// Washington DC - USA
+pinepaper_add_marker lat: 38.9072 lon: -77.0369
+  label: "Washington DC"
+  color: "#ef4444"
+  size: 8
+  pulse: true
+
+// Jakarta - Indonesia
+pinepaper_add_marker lat: -6.2088 lon: 106.8456
+  label: "Jakarta"
+  color: "#f59e0b"
+  size: 8
+  pulse: true
+
+// Islamabad - Pakistan
+pinepaper_add_marker lat: 33.6844 lon: 73.0479
+  label: "Islamabad"
+  color: "#f59e0b"
+  size: 8
+  pulse: true
+\`\`\`
+
+---
+
+## Step 6: Add Title
+
+\`\`\`
+pinepaper_create_item itemType: "text"
+  position: {x: 640, y: 50}
+  properties:
+    content: "World Population 2024"
+    fontSize: 36
+    fontFamily: "Inter, sans-serif"
+    fontWeight: "bold"
+    color: "#ffffff"
+\`\`\`
+
+---
+
+## Step 7: Export
+
+\`\`\`
+pinepaper_export_svg
+pinepaper_export_map
+\`\`\`
+
+---
+
+## Variations
+
+### Heat Map Version
+\`\`\`
+pinepaper_apply_data_colors
+  data: { ... }
+  options:
+    colorScale: "heat"
+    showLegend: true
+\`\`\`
+
+### Regional Focus (Asia)
+\`\`\`
+pinepaper_pan_map lat: 35 lon: 100 animate: true duration: 2
+pinepaper_zoom_map level: 2.5 animate: true
+\`\`\`
+`,
+  'pinepaper://examples/us-election-map': `# US Election Map Example
+
+Build an interactive US election results visualization with state-by-state coloring and key battleground state highlights.
+
+## Final Result
+
+A classic red/blue election map with swing states highlighted and electoral vote counts.
+
+---
+
+## Step 1: Set Up Canvas
+
+\`\`\`
+pinepaper_set_background_color color: "#f8fafc"
+pinepaper_set_canvas_size preset: "presentation-16x9"
+\`\`\`
+
+---
+
+## Step 2: Load USA Map
+
+\`\`\`
+pinepaper_load_map mapId: "usa"
+  options:
+    projection: "albers"
+    quality: "professional"
+    fillColor: "#e2e8f0"
+    strokeColor: "#94a3b8"
+    strokeWidth: 1
+    enableHover: true
+    enableClick: true
+\`\`\`
+
+---
+
+## Step 3: Color Democratic States (Blue)
+
+\`\`\`
+pinepaper_highlight_regions
+  regionIds: ["CA", "WA", "OR", "NV", "CO", "NM", "MN", "IL", "VA", "MD", "DE", "NJ", "CT", "RI", "MA", "VT", "NH", "ME", "NY", "HI"]
+  options:
+    fillColor: "#2563eb"
+    strokeColor: "#1d4ed8"
+\`\`\`
+
+---
+
+## Step 4: Color Republican States (Red)
+
+\`\`\`
+pinepaper_highlight_regions
+  regionIds: ["TX", "OK", "KS", "NE", "SD", "ND", "MT", "WY", "ID", "UT", "AZ", "AK", "MO", "AR", "LA", "MS", "AL", "TN", "KY", "WV", "IN", "OH", "SC", "FL"]
+  options:
+    fillColor: "#dc2626"
+    strokeColor: "#b91c1c"
+\`\`\`
+
+---
+
+## Step 5: Highlight Swing States
+
+\`\`\`
+// Key battleground states with gold border
+pinepaper_highlight_regions
+  regionIds: ["PA", "MI", "WI", "GA", "NC", "AZ"]
+  options:
+    strokeColor: "#fbbf24"
+    strokeWidth: 3
+    animate: true
+\`\`\`
+
+---
+
+## Step 6: Add Electoral Vote Labels
+
+\`\`\`
+// California - 54 votes
+pinepaper_add_marker lat: 36.7783 lon: -119.4179
+  label: "54"
+  color: "#2563eb"
+  size: 12
+
+// Texas - 40 votes
+pinepaper_add_marker lat: 31.9686 lon: -99.9018
+  label: "40"
+  color: "#dc2626"
+  size: 12
+
+// Florida - 30 votes
+pinepaper_add_marker lat: 27.6648 lon: -81.5158
+  label: "30"
+  color: "#dc2626"
+  size: 10
+
+// New York - 28 votes
+pinepaper_add_marker lat: 42.1657 lon: -74.9481
+  label: "28"
+  color: "#2563eb"
+  size: 10
+
+// Pennsylvania - 19 votes (swing)
+pinepaper_add_marker lat: 41.2033 lon: -77.1945
+  label: "19"
+  color: "#fbbf24"
+  size: 10
+  pulse: true
+
+// Michigan - 15 votes (swing)
+pinepaper_add_marker lat: 44.3148 lon: -85.6024
+  label: "15"
+  color: "#fbbf24"
+  size: 9
+  pulse: true
+
+// Georgia - 16 votes (swing)
+pinepaper_add_marker lat: 32.1656 lon: -82.9001
+  label: "16"
+  color: "#fbbf24"
+  size: 9
+  pulse: true
+\`\`\`
+
+---
+
+## Step 7: Add Title and Legend
+
+\`\`\`
+// Title
+pinepaper_create_item itemType: "text"
+  position: {x: 640, y: 40}
+  properties:
+    content: "US Presidential Election Results"
+    fontSize: 32
+    fontWeight: "bold"
+    color: "#1e293b"
+
+// Legend - Democratic
+pinepaper_create_item itemType: "rectangle"
+  position: {x: 100, y: 550}
+  properties:
+    width: 20
+    height: 20
+    color: "#2563eb"
+
+pinepaper_create_item itemType: "text"
+  position: {x: 130, y: 550}
+  properties:
+    content: "Democratic"
+    fontSize: 14
+    color: "#1e293b"
+
+// Legend - Republican
+pinepaper_create_item itemType: "rectangle"
+  position: {x: 250, y: 550}
+  properties:
+    width: 20
+    height: 20
+    color: "#dc2626"
+
+pinepaper_create_item itemType: "text"
+  position: {x: 280, y: 550}
+  properties:
+    content: "Republican"
+    fontSize: 14
+    color: "#1e293b"
+
+// Legend - Swing State
+pinepaper_create_item itemType: "rectangle"
+  position: {x: 400, y: 550}
+  properties:
+    width: 20
+    height: 20
+    color: "#fbbf24"
+
+pinepaper_create_item itemType: "text"
+  position: {x: 430, y: 550}
+  properties:
+    content: "Swing State"
+    fontSize: 14
+    color: "#1e293b"
+\`\`\`
+
+---
+
+## Step 8: Add Vote Totals
+
+\`\`\`
+// Electoral vote boxes
+pinepaper_create_item itemType: "rectangle"
+  position: {x: 200, y: 100}
+  properties:
+    width: 150
+    height: 80
+    color: "#2563eb"
+    cornerRadius: 8
+
+pinepaper_create_item itemType: "text"
+  position: {x: 200, y: 90}
+  properties:
+    content: "270"
+    fontSize: 36
+    fontWeight: "bold"
+    color: "#ffffff"
+
+pinepaper_create_item itemType: "text"
+  position: {x: 200, y: 120}
+  properties:
+    content: "Electoral Votes"
+    fontSize: 12
+    color: "#bfdbfe"
+
+// Republican votes
+pinepaper_create_item itemType: "rectangle"
+  position: {x: 1080, y: 100}
+  properties:
+    width: 150
+    height: 80
+    color: "#dc2626"
+    cornerRadius: 8
+
+pinepaper_create_item itemType: "text"
+  position: {x: 1080, y: 90}
+  properties:
+    content: "268"
+    fontSize: 36
+    fontWeight: "bold"
+    color: "#ffffff"
+
+pinepaper_create_item itemType: "text"
+  position: {x: 1080, y: 120}
+  properties:
+    content: "Electoral Votes"
+    fontSize: 12
+    color: "#fecaca"
+\`\`\`
+
+---
+
+## Step 9: Export
+
+\`\`\`
+pinepaper_export_svg
+\`\`\`
+`,
+  'pinepaper://examples/travel-route-map': `# Travel Route Map Example
+
+Visualize a travel itinerary across Europe with city markers, connecting routes, and animated journey highlights.
+
+## Final Result
+
+An elegant travel map showing a European tour with cities connected by animated paths.
+
+---
+
+## Step 1: Set Up Canvas
+
+\`\`\`
+pinepaper_set_background_color color: "#0f172a"
+pinepaper_set_canvas_size preset: "presentation-16x9"
+\`\`\`
+
+---
+
+## Step 2: Load World Map (Focused on Europe)
+
+\`\`\`
+pinepaper_load_map mapId: "worldHighRes"
+  options:
+    projection: "mercator"
+    quality: "professional"
+    fillColor: "#1e293b"
+    strokeColor: "#334155"
+    strokeWidth: 0.5
+    center: [10, 50]
+    enableHover: true
+\`\`\`
+
+---
+
+## Step 3: Zoom to Europe
+
+\`\`\`
+pinepaper_pan_map lat: 48 lon: 10 animate: true duration: 1
+pinepaper_zoom_map level: 4 animate: true duration: 1
+\`\`\`
+
+---
+
+## Step 4: Highlight Countries on Itinerary
+
+\`\`\`
+pinepaper_highlight_regions
+  regionIds: ["United Kingdom", "France", "Germany", "Italy", "Spain"]
+  options:
+    fillColor: "#334155"
+    strokeColor: "#60a5fa"
+    strokeWidth: 1
+    animate: true
+\`\`\`
+
+---
+
+## Step 5: Add City Markers (The Journey)
+
+\`\`\`
+// Day 1-3: London
+pinepaper_add_marker lat: 51.5074 lon: -0.1278
+  label: "London"
+  color: "#f59e0b"
+  size: 12
+  shape: "pin"
+  pulse: true
+
+// Day 4-5: Paris
+pinepaper_add_marker lat: 48.8566 lon: 2.3522
+  label: "Paris"
+  color: "#f59e0b"
+  size: 12
+  shape: "pin"
+  pulse: true
+
+// Day 6-7: Berlin
+pinepaper_add_marker lat: 52.5200 lon: 13.4050
+  label: "Berlin"
+  color: "#f59e0b"
+  size: 12
+  shape: "pin"
+  pulse: true
+
+// Day 8-10: Rome
+pinepaper_add_marker lat: 41.9028 lon: 12.4964
+  label: "Rome"
+  color: "#f59e0b"
+  size: 12
+  shape: "pin"
+  pulse: true
+
+// Day 11-12: Barcelona
+pinepaper_add_marker lat: 41.3851 lon: 2.1734
+  label: "Barcelona"
+  color: "#f59e0b"
+  size: 12
+  shape: "pin"
+  pulse: true
+\`\`\`
+
+---
+
+## Step 6: Draw Route Lines
+
+\`\`\`
+// London to Paris
+pinepaper_create_item itemType: "line"
+  properties:
+    from: {x: 380, y: 180}
+    to: {x: 420, y: 220}
+    strokeColor: "#60a5fa"
+    strokeWidth: 2
+    dashArray: [5, 5]
+→ route1
+
+// Paris to Berlin
+pinepaper_create_item itemType: "line"
+  properties:
+    from: {x: 420, y: 220}
+    to: {x: 520, y: 180}
+    strokeColor: "#60a5fa"
+    strokeWidth: 2
+    dashArray: [5, 5]
+→ route2
+
+// Berlin to Rome
+pinepaper_create_item itemType: "line"
+  properties:
+    from: {x: 520, y: 180}
+    to: {x: 500, y: 340}
+    strokeColor: "#60a5fa"
+    strokeWidth: 2
+    dashArray: [5, 5]
+→ route3
+
+// Rome to Barcelona
+pinepaper_create_item itemType: "line"
+  properties:
+    from: {x: 500, y: 340}
+    to: {x: 380, y: 330}
+    strokeColor: "#60a5fa"
+    strokeWidth: 2
+    dashArray: [5, 5]
+→ route4
+\`\`\`
+
+---
+
+## Step 7: Animate Routes
+
+\`\`\`
+pinepaper_animate_item itemId: "route1" animationType: "pulse" speed: 2
+pinepaper_animate_item itemId: "route2" animationType: "pulse" speed: 2
+pinepaper_animate_item itemId: "route3" animationType: "pulse" speed: 2
+pinepaper_animate_item itemId: "route4" animationType: "pulse" speed: 2
+\`\`\`
+
+---
+
+## Step 8: Add Day Numbers
+
+\`\`\`
+// London days
+pinepaper_create_item itemType: "text"
+  position: {x: 360, y: 160}
+  properties:
+    content: "Days 1-3"
+    fontSize: 10
+    color: "#94a3b8"
+
+// Paris days
+pinepaper_create_item itemType: "text"
+  position: {x: 440, y: 235}
+  properties:
+    content: "Days 4-5"
+    fontSize: 10
+    color: "#94a3b8"
+
+// Berlin days
+pinepaper_create_item itemType: "text"
+  position: {x: 540, y: 165}
+  properties:
+    content: "Days 6-7"
+    fontSize: 10
+    color: "#94a3b8"
+
+// Rome days
+pinepaper_create_item itemType: "text"
+  position: {x: 520, y: 355}
+  properties:
+    content: "Days 8-10"
+    fontSize: 10
+    color: "#94a3b8"
+
+// Barcelona days
+pinepaper_create_item itemType: "text"
+  position: {x: 360, y: 345}
+  properties:
+    content: "Days 11-12"
+    fontSize: 10
+    color: "#94a3b8"
+\`\`\`
+
+---
+
+## Step 9: Add Title and Decorations
+
+\`\`\`
+// Title
+pinepaper_create_item itemType: "text"
+  position: {x: 640, y: 40}
+  properties:
+    content: "European Adventure 2024"
+    fontSize: 28
+    fontWeight: "bold"
+    color: "#f8fafc"
+
+// Subtitle
+pinepaper_create_item itemType: "text"
+  position: {x: 640, y: 70}
+  properties:
+    content: "12 Days • 5 Cities • 1 Amazing Journey"
+    fontSize: 14
+    color: "#94a3b8"
+
+// Airplane icon at start
+pinepaper_create_item itemType: "text"
+  position: {x: 340, y: 180}
+  properties:
+    content: "✈️"
+    fontSize: 20
+\`\`\`
+
+---
+
+## Step 10: Add Summary Box
+
+\`\`\`
+// Summary background
+pinepaper_create_item itemType: "rectangle"
+  position: {x: 1100, y: 300}
+  properties:
+    width: 180
+    height: 200
+    color: "#1e293b"
+    cornerRadius: 12
+    strokeColor: "#334155"
+    strokeWidth: 1
+
+// Summary title
+pinepaper_create_item itemType: "text"
+  position: {x: 1100, y: 230}
+  properties:
+    content: "Trip Summary"
+    fontSize: 14
+    fontWeight: "bold"
+    color: "#f8fafc"
+
+// Stats
+pinepaper_create_item itemType: "text"
+  position: {x: 1100, y: 260}
+  properties:
+    content: "📍 5 Cities"
+    fontSize: 12
+    color: "#94a3b8"
+
+pinepaper_create_item itemType: "text"
+  position: {x: 1100, y: 285}
+  properties:
+    content: "📅 12 Days"
+    fontSize: 12
+    color: "#94a3b8"
+
+pinepaper_create_item itemType: "text"
+  position: {x: 1100, y: 310}
+  properties:
+    content: "🛫 4 Flights"
+    fontSize: 12
+    color: "#94a3b8"
+
+pinepaper_create_item itemType: "text"
+  position: {x: 1100, y: 335}
+  properties:
+    content: "🏨 11 Nights"
+    fontSize: 12
+    color: "#94a3b8"
+\`\`\`
+
+---
+
+## Step 11: Export
+
+\`\`\`
+pinepaper_export_svg
+\`\`\`
+
+---
+
+## Variations
+
+### Animated Route Reveal
+Use keyframe animations to reveal the route step by step:
+\`\`\`
+pinepaper_keyframe_animate itemId: "route1"
+  keyframes:
+    - time: 0, properties: {opacity: 0}
+    - time: 1, properties: {opacity: 1}
+
+pinepaper_keyframe_animate itemId: "route2"
+  keyframes:
+    - time: 1, properties: {opacity: 0}
+    - time: 2, properties: {opacity: 1}
+\`\`\`
+
+### Distance Labels
+Add distance between cities:
+\`\`\`
+pinepaper_create_item itemType: "text"
+  position: {x: 400, y: 200}
+  properties:
+    content: "344 km"
+    fontSize: 8
+    color: "#60a5fa"
+\`\`\`
 `,
 };
 

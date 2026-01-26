@@ -90,6 +90,53 @@ import {
   // Canvas presets types
   GetCanvasPresetsInputSchema,
   GetCanvasPresetsInput,
+  // Map types
+  LoadMapInputSchema,
+  LoadMapInput,
+  HighlightRegionsInputSchema,
+  HighlightRegionsInput,
+  UnhighlightRegionsInputSchema,
+  UnhighlightRegionsInput,
+  ApplyDataColorsInputSchema,
+  ApplyDataColorsInput,
+  AddMarkerInputSchema,
+  AddMarkerInput,
+  AddMapLabelsInputSchema,
+  AddMapLabelsInput,
+  PanMapInputSchema,
+  PanMapInput,
+  ZoomMapInputSchema,
+  ZoomMapInput,
+  ExportMapInputSchema,
+  ExportMapInput,
+  ImportCustomMapInputSchema,
+  ImportCustomMapInput,
+  GetRegionAtPointInputSchema,
+  GetRegionAtPointInput,
+  // Map animation/CSV types
+  AnimateMapRegionsInputSchema,
+  AnimateMapRegionsInput,
+  AnimateMapWaveInputSchema,
+  AnimateMapWaveInput,
+  StopMapAnimationsInputSchema,
+  StopMapAnimationsInput,
+  GetAnimatedMapRegionsInputSchema,
+  GetAnimatedMapRegionsInput,
+  ExportMapRegionCSVInputSchema,
+  ExportMapRegionCSVInput,
+  ImportMapRegionCSVInputSchema,
+  ImportMapRegionCSVInput,
+  SelectMapRegionsInputSchema,
+  SelectMapRegionsInput,
+  DeselectMapRegionsInputSchema,
+  DeselectMapRegionsInput,
+  GetHighlightedMapRegionsInputSchema,
+  GetHighlightedMapRegionsInput,
+  // Custom relation/code types
+  RegisterCustomRelationInputSchema,
+  RegisterCustomRelationInput,
+  ExecuteCustomCodeInputSchema,
+  ExecuteCustomCodeInput,
 } from './schemas.js';
 import { z } from 'zod';
 
@@ -2939,6 +2986,607 @@ onMounted(() => {
       { key: 'default', name: 'Default', width: 800, height: 600, aspectRatio: '4:3', category: 'general' }
     ]
   };
+})();
+`.trim();
+  }
+
+  // ===========================================================================
+  // MAP CODE GENERATORS
+  // ===========================================================================
+
+  /**
+   * Generate code to load a geographic map
+   */
+  generateLoadMap(input: LoadMapInput): string {
+    const validated = LoadMapInputSchema.parse(input);
+    const optionsStr = validated.options ? JSON.stringify(validated.options) : '{}';
+
+    return `
+// Load geographic map
+(async function() {
+  if (!app.mapSystem) {
+    return { success: false, error: 'Map system not available' };
+  }
+
+  try {
+    const result = await app.mapSystem.loadMap('${validated.mapId}', ${optionsStr});
+    return {
+      success: true,
+      mapId: result.mapId || '${validated.mapId}',
+      regions: result.regions?.length || 0,
+      bounds: result.bounds,
+      center: result.center
+    };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+})();
+`.trim();
+  }
+
+  /**
+   * Generate code to highlight map regions
+   */
+  generateHighlightRegions(input: HighlightRegionsInput): string {
+    const validated = HighlightRegionsInputSchema.parse(input);
+    const regionIds = JSON.stringify(validated.regionIds);
+    const optionsStr = validated.options ? JSON.stringify(validated.options) : '{}';
+
+    return `
+// Highlight map regions
+(function() {
+  if (!app.mapSystem) {
+    return { success: false, error: 'Map system not available' };
+  }
+
+  try {
+    app.mapSystem.highlightRegions(${regionIds}, ${optionsStr});
+    return { success: true, highlighted: ${regionIds} };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+})();
+`.trim();
+  }
+
+  /**
+   * Generate code to unhighlight map regions
+   */
+  generateUnhighlightRegions(input: UnhighlightRegionsInput): string {
+    const validated = UnhighlightRegionsInputSchema.parse(input);
+    const regionIds = validated.regionIds === 'all' ? "'all'" : JSON.stringify(validated.regionIds);
+
+    return `
+// Unhighlight map regions
+(function() {
+  if (!app.mapSystem) {
+    return { success: false, error: 'Map system not available' };
+  }
+
+  try {
+    app.mapSystem.unhighlightRegions(${regionIds});
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+})();
+`.trim();
+  }
+
+  /**
+   * Generate code to apply data-driven colors (choropleth)
+   */
+  generateApplyDataColors(input: ApplyDataColorsInput): string {
+    const validated = ApplyDataColorsInputSchema.parse(input);
+    const dataStr = JSON.stringify(validated.data);
+    const optionsStr = validated.options ? JSON.stringify(validated.options) : '{}';
+
+    return `
+// Apply choropleth data colors
+(function() {
+  if (!app.mapSystem) {
+    return { success: false, error: 'Map system not available' };
+  }
+
+  try {
+    app.mapSystem.applyDataColors(${dataStr}, ${optionsStr});
+    return { success: true, regionsColored: ${Object.keys(validated.data).length} };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+})();
+`.trim();
+  }
+
+  /**
+   * Generate code to add a map marker
+   */
+  generateAddMarker(input: AddMarkerInput): string {
+    const validated = AddMarkerInputSchema.parse(input);
+    const options: Record<string, unknown> = {
+      lat: validated.lat,
+      lon: validated.lon,
+    };
+    if (validated.label) options.label = validated.label;
+    if (validated.color) options.color = validated.color;
+    if (validated.size) options.size = validated.size;
+    if (validated.pulse !== undefined) options.pulse = validated.pulse;
+    if (validated.shape) options.shape = validated.shape;
+
+    return `
+// Add map marker
+(function() {
+  if (!app.mapSystem) {
+    return { success: false, error: 'Map system not available' };
+  }
+
+  try {
+    const marker = app.mapSystem.addMarker(${JSON.stringify(options)});
+    return { success: true, markerId: marker?.id || 'marker_added' };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+})();
+`.trim();
+  }
+
+  /**
+   * Generate code to add map labels
+   */
+  generateAddMapLabels(input: AddMapLabelsInput): string {
+    const validated = AddMapLabelsInputSchema.parse(input);
+    const regionsStr = validated.regions ? JSON.stringify(validated.regions) : 'null';
+    const optionsStr = validated.options ? JSON.stringify(validated.options) : '{}';
+
+    return `
+// Add map labels
+(function() {
+  if (!app.mapSystem) {
+    return { success: false, error: 'Map system not available' };
+  }
+
+  try {
+    app.mapSystem.addLabels({ regions: ${regionsStr}, ...${optionsStr} });
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+})();
+`.trim();
+  }
+
+  /**
+   * Generate code to pan the map
+   */
+  generatePanMap(input: PanMapInput): string {
+    const validated = PanMapInputSchema.parse(input);
+    const options: Record<string, unknown> = {};
+    if (validated.animate !== undefined) options.animate = validated.animate;
+    if (validated.duration !== undefined) options.duration = validated.duration;
+
+    return `
+// Pan map to coordinates
+(function() {
+  if (!app.mapSystem) {
+    return { success: false, error: 'Map system not available' };
+  }
+
+  try {
+    app.mapSystem.panTo(${validated.lat}, ${validated.lon}${Object.keys(options).length > 0 ? ', ' + JSON.stringify(options) : ''});
+    return { success: true, panTo: [${validated.lat}, ${validated.lon}] };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+})();
+`.trim();
+  }
+
+  /**
+   * Generate code to zoom the map
+   */
+  generateZoomMap(input: ZoomMapInput): string {
+    const validated = ZoomMapInputSchema.parse(input);
+    const options: Record<string, unknown> = {};
+    if (validated.animate !== undefined) options.animate = validated.animate;
+    if (validated.duration !== undefined) options.duration = validated.duration;
+
+    return `
+// Set map zoom level
+(function() {
+  if (!app.mapSystem) {
+    return { success: false, error: 'Map system not available' };
+  }
+
+  try {
+    app.mapSystem.zoomTo(${validated.level}${Object.keys(options).length > 0 ? ', ' + JSON.stringify(options) : ''});
+    return { success: true, zoomLevel: ${validated.level} };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+})();
+`.trim();
+  }
+
+  /**
+   * Generate code to export map configuration
+   */
+  generateExportMap(): string {
+    return `
+// Export map configuration
+(function() {
+  if (!app.mapSystem) {
+    return { success: false, error: 'Map system not available' };
+  }
+
+  try {
+    const mapData = app.mapSystem.exportMap();
+    return { success: true, ...mapData };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+})();
+`.trim();
+  }
+
+  /**
+   * Generate code to import a custom map
+   */
+  generateImportCustomMap(input: ImportCustomMapInput): string {
+    const validated = ImportCustomMapInputSchema.parse(input);
+    const optionsStr = validated.options ? JSON.stringify(validated.options) : '{}';
+
+    if (validated.url) {
+      return `
+// Import custom map from URL
+(async function() {
+  if (!app.mapSystem) {
+    return { success: false, error: 'Map system not available' };
+  }
+
+  try {
+    const result = await app.mapSystem.importCustomMap('${validated.url}', ${optionsStr});
+    return { success: true, ...result };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+})();
+`.trim();
+    } else if (validated.geoJson) {
+      return `
+// Import custom GeoJSON map
+(async function() {
+  if (!app.mapSystem) {
+    return { success: false, error: 'Map system not available' };
+  }
+
+  try {
+    const result = await app.mapSystem.importCustomMap(${JSON.stringify(validated.geoJson)}, ${optionsStr});
+    return { success: true, ...result };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+})();
+`.trim();
+    }
+
+    return `
+// Import custom map - no source provided
+(function() {
+  return { success: false, error: 'Either url or geoJson must be provided' };
+})();
+`.trim();
+  }
+
+  /**
+   * Generate code to get region at a point (hit testing)
+   */
+  generateGetRegionAtPoint(input: GetRegionAtPointInput): string {
+    const validated = GetRegionAtPointInputSchema.parse(input);
+
+    return `
+// Get region at canvas point
+(function() {
+  if (!app.mapSystem) {
+    return { success: false, error: 'Map system not available' };
+  }
+
+  try {
+    const region = app.mapSystem.getRegionAtPoint({ x: ${validated.x}, y: ${validated.y} });
+    if (region) {
+      return { success: true, regionId: region.id, regionName: region.name, properties: region.properties };
+    }
+    return { success: true, regionId: null, message: 'No region at this point' };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+})();
+`.trim();
+  }
+
+  // ===========================================================================
+  // MAP ANIMATION/CSV CODE GENERATORS
+  // ===========================================================================
+
+  /**
+   * Generate code to animate map regions with keyframes
+   */
+  generateAnimateMapRegions(input: AnimateMapRegionsInput): string {
+    const validated = AnimateMapRegionsInputSchema.parse(input);
+    const regionsStr = JSON.stringify(validated.regions);
+
+    return `
+// Animate map regions with keyframes
+(function() {
+  if (!app.mapSystem) {
+    return { success: false, error: 'Map system not available' };
+  }
+
+  try {
+    const result = app.mapSystem.animateRegions({
+      duration: ${validated.duration || 5},
+      loop: ${validated.loop !== false},
+      regions: ${regionsStr}
+    });
+    return { success: true, animatedRegions: Object.keys(${regionsStr}), duration: ${validated.duration || 5}, errors: result?.errors || [] };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+})();
+`.trim();
+  }
+
+  /**
+   * Generate code to create wave animation across map regions
+   */
+  generateAnimateMapWave(input: AnimateMapWaveInput): string {
+    const validated = AnimateMapWaveInputSchema.parse(input);
+    const colorsStr = validated.colors ? JSON.stringify(validated.colors) : '["#ef4444", "#fbbf24", "#22c55e", "#3b82f6"]';
+
+    return `
+// Create wave animation across map regions
+(function() {
+  if (!app.mapSystem) {
+    return { success: false, error: 'Map system not available' };
+  }
+
+  try {
+    const result = app.mapSystem.animateWave({
+      duration: ${validated.duration || 10},
+      loop: ${validated.loop !== false},
+      colors: ${colorsStr},
+      waveDirection: '${validated.waveDirection || 'horizontal'}'
+    });
+    return { success: true, animatedRegions: result?.animatedRegions || [], totalRegions: result?.totalRegions || 0 };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+})();
+`.trim();
+  }
+
+  /**
+   * Generate code to stop map animations
+   */
+  generateStopMapAnimations(input: StopMapAnimationsInput): string {
+    const validated = StopMapAnimationsInputSchema.parse(input);
+    const regionsStr = validated.regions ? JSON.stringify(validated.regions) : 'null';
+
+    return `
+// Stop map region animations
+(function() {
+  if (!app.mapSystem) {
+    return { success: false, error: 'Map system not available' };
+  }
+
+  try {
+    app.mapSystem.stopAnimations({
+      regions: ${regionsStr},
+      resetColors: ${validated.resetColors !== false}
+    });
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+})();
+`.trim();
+  }
+
+  /**
+   * Generate code to get animated map regions
+   */
+  generateGetAnimatedMapRegions(): string {
+    return `
+// Get animated map regions
+(function() {
+  if (!app.mapSystem) {
+    return { success: false, error: 'Map system not available' };
+  }
+
+  try {
+    const result = app.mapSystem.getAnimatedRegions();
+    return { animatedRegions: result?.animatedRegions || [], count: result?.count || 0 };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+})();
+`.trim();
+  }
+
+  /**
+   * Generate code to export map region data as CSV
+   */
+  generateExportMapRegionCSV(input: ExportMapRegionCSVInput): string {
+    const validated = ExportMapRegionCSVInputSchema.parse(input);
+
+    return `
+// Export map region data as CSV
+(function() {
+  if (!app.mapSystem) {
+    return { success: false, error: 'Map system not available' };
+  }
+
+  try {
+    const result = app.mapSystem.exportRegionCSV({
+      includeHighlighted: ${validated.includeHighlighted !== false},
+      includeSelected: ${validated.includeSelected !== false},
+      includeColors: ${validated.includeColors !== false},
+      download: ${validated.download === true},
+      filename: '${validated.filename || 'map-regions.csv'}'
+    });
+    return { success: true, csv: result?.csv || '', regionCount: result?.regionCount || 0 };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+})();
+`.trim();
+  }
+
+  /**
+   * Generate code to import CSV data to update map regions
+   */
+  generateImportMapRegionCSV(input: ImportMapRegionCSVInput): string {
+    const validated = ImportMapRegionCSVInputSchema.parse(input);
+    // Escape the CSV text for JavaScript string
+    const escapedCsv = validated.csvText.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
+
+    return `
+// Import CSV data to update map regions
+(function() {
+  if (!app.mapSystem) {
+    return { success: false, error: 'Map system not available' };
+  }
+
+  try {
+    const result = app.mapSystem.importRegionCSV({
+      csvText: \`${escapedCsv}\`,
+      applyColors: ${validated.applyColors !== false},
+      applyHighlight: ${validated.applyHighlight !== false},
+      applySelection: ${validated.applySelection !== false}
+    });
+    return { success: true, updatedRegions: result?.updatedRegions || 0, notFound: result?.notFound || [], errors: result?.errors || [] };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+})();
+`.trim();
+  }
+
+  /**
+   * Generate code to select map regions
+   */
+  generateSelectMapRegions(input: SelectMapRegionsInput): string {
+    const validated = SelectMapRegionsInputSchema.parse(input);
+    const regionIds = JSON.stringify(validated.regionIds);
+
+    return `
+// Select map regions
+(function() {
+  if (!app.mapSystem) {
+    return { success: false, error: 'Map system not available' };
+  }
+
+  try {
+    app.mapSystem.selectRegions(${regionIds});
+    return { success: true, selected: ${regionIds} };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+})();
+`.trim();
+  }
+
+  /**
+   * Generate code to deselect map regions
+   */
+  generateDeselectMapRegions(input: DeselectMapRegionsInput): string {
+    const validated = DeselectMapRegionsInputSchema.parse(input);
+    const regionIds = validated.regionIds ? JSON.stringify(validated.regionIds) : 'null';
+
+    return `
+// Deselect map regions
+(function() {
+  if (!app.mapSystem) {
+    return { success: false, error: 'Map system not available' };
+  }
+
+  try {
+    app.mapSystem.deselectRegions(${regionIds});
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+})();
+`.trim();
+  }
+
+  /**
+   * Generate code to get highlighted map regions
+   */
+  generateGetHighlightedMapRegions(): string {
+    return `
+// Get highlighted map regions
+(function() {
+  if (!app.mapSystem) {
+    return { success: false, error: 'Map system not available' };
+  }
+
+  try {
+    const result = app.mapSystem.getHighlightedRegions();
+    return { highlighted: result?.highlighted || [], count: result?.count || 0 };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+})();
+`.trim();
+  }
+
+  // =============================================================================
+  // CUSTOM RELATION & CODE GENERATORS
+  // =============================================================================
+
+  generateRegisterCustomRelation(input: RegisterCustomRelationInput): string {
+    const validated = RegisterCustomRelationInputSchema.parse(input);
+    const paramsStr = validated.params ? JSON.stringify(validated.params) : '{}';
+    const templatesStr = validated.templates ? JSON.stringify(validated.templates) : '[]';
+
+    return `
+// Register custom relation: ${validated.name}
+(function() {
+  try {
+    app.registerRelationRule('${validated.name}', {
+      description: ${JSON.stringify(validated.description || '')},
+      params: ${paramsStr},
+      compute: (ctx) => {
+        const { fromPosition, toPosition, params, delta, time } = ctx;
+        ${validated.computeFunction}
+      },
+      apply: (item, target, computed, params) => {
+        ${validated.applyFunction}
+      },
+      templates: ${templatesStr},
+      continuous: ${validated.continuous !== false},
+      priority: ${validated.priority || 0}
+    });
+    return { success: true, relationName: '${validated.name}', message: 'Custom relation registered successfully' };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+})();
+`.trim();
+  }
+
+  generateExecuteCustomCode(input: ExecuteCustomCodeInput): string {
+    const validated = ExecuteCustomCodeInputSchema.parse(input);
+    const description = validated.description || 'Execute custom code';
+
+    return `
+// ${description}
+(function() {
+  try {
+    ${validated.code}
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
 })();
 `.trim();
   }

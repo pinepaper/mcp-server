@@ -617,7 +617,7 @@ SUPPORTED ANIMATIONS: pulse, rotate, bounce, fade, wobble, slide, typewriter`,
               target: { type: 'string', description: 'Name of target item' },
               type: {
                 type: 'string',
-                enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to'],
+                enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'morphs_to'],
               },
               params: {
                 type: 'object',
@@ -896,7 +896,7 @@ Relations are COMPOSITIONAL - an item can have multiple relations that work toge
         },
         relationType: {
           type: 'string',
-          enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to'],
+          enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'morphs_to'],
           description: 'Type of relationship',
         },
         params: {
@@ -931,7 +931,7 @@ USE WHEN:
         targetId: { type: 'string', description: 'Target item ID' },
         relationType: {
           type: 'string',
-          enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to'],
+          enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'morphs_to'],
           description: 'Specific relation type to remove (optional - removes all if not specified)',
         },
       },
@@ -960,7 +960,7 @@ USE WHEN:
         itemId: { type: 'string', description: 'Item to query relations for' },
         relationType: {
           type: 'string',
-          enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to'],
+          enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'morphs_to'],
           description: 'Filter by relation type (optional)',
         },
         direction: {
@@ -970,6 +970,127 @@ USE WHEN:
         },
       },
       required: ['itemId'],
+    },
+  },
+
+  {
+    name: 'pinepaper_register_custom_relation',
+    annotations: {
+      title: 'Register Custom Relation',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Register a custom relation type with compute and apply functions.
+
+USE WHEN:
+- Creating physics-based behaviors (attraction, repulsion, collision)
+- Building custom animation effects not covered by built-in relations
+- Implementing game mechanics (health bars following characters, damage indicators)
+- Creating procedural animations (wobble, shake, spring physics)
+
+COMPUTE FUNCTION (runs in Web Worker - pure math only):
+- Receives: ctx = { fromPosition: {x,y}, toPosition: {x,y}, params, delta, time }
+- Must return: object with computed values (e.g., { x, y, rotation, scale, opacity })
+- No DOM access, no Paper.js - pure JavaScript only
+- Must be stateless
+
+APPLY FUNCTION (runs on main thread - can use Paper.js):
+- Receives: item (paper.Item), target (paper.Item), computed (from compute), params
+- Updates actual Paper.js item properties
+- Can access full Paper.js API
+
+EXAMPLE - Repulsion:
+computeFunction: \`
+  const dx = fromPosition.x - toPosition.x;
+  const dy = fromPosition.y - toPosition.y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist > params.maxDistance) return fromPosition;
+  const force = (params.maxDistance - dist) / params.maxDistance * params.force;
+  return { x: fromPosition.x + (dx/dist) * force * delta, y: fromPosition.y + (dy/dist) * force * delta };
+\`
+applyFunction: \`
+  if (computed) { item.position.x = computed.x; item.position.y = computed.y; }
+\``,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Unique name for the relation type (e.g., "repels", "attracts", "wobbles_with")' },
+        description: { type: 'string', description: 'Human-readable description' },
+        params: {
+          type: 'object',
+          description: 'Parameter schema with defaults. Keys are param names, values are { type, default, description }',
+          additionalProperties: {
+            type: 'object',
+            properties: {
+              type: { type: 'string', enum: ['number', 'string', 'boolean', 'array', 'object'] },
+              default: { description: 'Default value' },
+              description: { type: 'string' },
+              options: { type: 'array', items: { type: 'string' }, description: 'Valid options for string type' },
+              min: { type: 'number', description: 'Minimum for number type' },
+              max: { type: 'number', description: 'Maximum for number type' },
+            },
+          },
+        },
+        computeFunction: { type: 'string', description: 'Compute function body (pure JS). Context: fromPosition, toPosition, params, delta, time' },
+        applyFunction: { type: 'string', description: 'Apply function body (Paper.js). Params: item, target, computed, params' },
+        templates: { type: 'array', items: { type: 'string' }, description: 'Natural language templates (e.g., "{item} repels from {target}")' },
+        continuous: { type: 'boolean', description: 'Update every frame (default: true)' },
+        priority: { type: 'number', description: 'Execution order - lower runs first (default: 0)' },
+      },
+      required: ['name', 'computeFunction', 'applyFunction'],
+    },
+  },
+
+  {
+    name: 'pinepaper_execute_custom_code',
+    annotations: {
+      title: 'Execute Custom Code',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+    description: `Execute arbitrary JavaScript code in the PinePaper context.
+
+USE WHEN:
+- Advanced Paper.js operations not covered by other tools
+- Complex mathematical calculations
+- Custom item registration
+- Accessing PinePaper APIs directly
+- Prototyping new features
+
+AVAILABLE GLOBALS:
+- app: PinePaper application instance
+  - app.create(type, params): Create items
+  - app.addRelation(sourceId, targetId, type, params): Add relations
+  - app.registerRelationRule(name, definition): Register custom relations
+  - app.itemRegistry: Access all registered items
+  - app.relationRegistry: Access relation definitions
+- paper: Full Paper.js library
+  - paper.Path, paper.Shape, paper.PointText, etc.
+  - paper.view: Current view/canvas
+  - paper.project: Active project
+
+EXAMPLE - Boolean operation:
+code: \`
+const outer = new paper.Path.Circle({ center: [400, 300], radius: 80 });
+const inner = new paper.Path.Circle({ center: [400, 300], radius: 40 });
+const ring = outer.subtract(inner);
+ring.fillColor = '#8b5cf6';
+const id = app.registerItem(ring, 'ring', { source: 'mcp' });
+outer.remove();
+inner.remove();
+return { success: true, itemId: id };
+\``,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        code: { type: 'string', description: 'JavaScript code to execute. Use return statement for results.' },
+        description: { type: 'string', description: 'What the code does (for logging/debugging)' },
+      },
+      required: ['code'],
     },
   },
 
@@ -3976,6 +4097,888 @@ RETURNS:
 - tilePalettes: Grouped by category (game, vibrant, soft, natural, etc.)
 - gradientPalettes: Available gradient color schemes
 - gradientDirections: Direction options for gradients`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // MAP TOOLS
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_load_map',
+    annotations: {
+      title: 'Load Map',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Load a geographic map onto the canvas with specified projection and styling.
+
+USE WHEN:
+- Creating world maps or country visualizations
+- Building choropleth data visualizations
+- Making infographics with geographic data
+- Creating animated map reveals
+
+AVAILABLE MAPS:
+- world: World countries (110m resolution, faster)
+- worldHighRes: World countries (50m resolution, more detailed)
+- usa: US states map
+
+PROJECTIONS:
+- naturalEarth: Natural Earth projection (recommended for world maps)
+- mercator: Standard web mercator
+- equalEarth: Equal-area projection
+- orthographic: Globe/3D sphere view
+- albers: Conic projection (good for USA)
+- stereographic: Stereographic projection
+
+QUALITY SETTINGS:
+- fast: Aggressive simplification (prototyping)
+- balanced: Moderate detail (most uses)
+- professional: No simplification (publications)
+
+EXAMPLES:
+- World map: {mapId: "world", options: {projection: "naturalEarth", quality: "balanced"}}
+- USA map: {mapId: "usa", options: {projection: "albers", quality: "professional"}}
+- Globe view: {mapId: "worldHighRes", options: {projection: "orthographic", rotate: [0, -30, 0]}}
+
+RETURNS:
+- mapId: Reference ID for the loaded map
+- group: Paper.js group containing all regions
+- regions: Array of region info
+- bounds: Map bounding box`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        mapId: {
+          type: 'string',
+          enum: ['world', 'worldHighRes', 'usa'],
+          description: 'Map to load',
+        },
+        options: {
+          type: 'object',
+          properties: {
+            projection: {
+              type: 'string',
+              enum: ['mercator', 'equalEarth', 'naturalEarth', 'orthographic', 'albers', 'stereographic'],
+              description: 'Map projection type',
+            },
+            quality: {
+              type: 'string',
+              enum: ['fast', 'balanced', 'professional'],
+              description: 'Rendering quality',
+            },
+            fillColor: { type: 'string', description: 'Default fill color for regions' },
+            strokeColor: { type: 'string', description: 'Border color' },
+            strokeWidth: { type: 'number', description: 'Border width' },
+            scale: { type: 'number', description: 'Scale multiplier' },
+            center: {
+              type: 'array',
+              items: { type: 'number' },
+              description: 'Center coordinates [lon, lat]',
+            },
+            rotate: {
+              type: 'array',
+              items: { type: 'number' },
+              description: 'Rotation angles [x, y, z] for orthographic projection',
+            },
+            enableHover: { type: 'boolean', description: 'Enable hover effects' },
+            enableClick: { type: 'boolean', description: 'Enable click events' },
+            hoverFill: { type: 'string', description: 'Hover fill color' },
+            hoverStroke: { type: 'string', description: 'Hover stroke color' },
+          },
+          description: 'Map styling and projection options',
+        },
+      },
+      required: ['mapId'],
+    },
+  },
+  {
+    name: 'pinepaper_highlight_regions',
+    annotations: {
+      title: 'Highlight Regions',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Highlight specific regions on a loaded map with custom styling.
+
+USE WHEN:
+- Emphasizing specific countries or states
+- Creating interactive map highlights
+- Building step-by-step map reveals
+- Showing geographic data points
+
+REGION ID FORMATS:
+- World maps: Full country names ("United States of America", "France", "Japan")
+- USA map: State codes ("CA", "TX", "NY", "FL")
+
+STYLING OPTIONS:
+- fillColor: Highlight fill color
+- strokeColor: Highlight stroke color
+- strokeWidth: Border width for highlighted regions
+- animate: Whether to animate the highlight transition
+
+EXAMPLES:
+- Highlight countries: {regionIds: ["United States of America", "Canada", "Mexico"], options: {fillColor: "#3b82f6"}}
+- Highlight US states: {regionIds: ["CA", "TX", "NY"], options: {fillColor: "#22c55e", animate: true}}
+- Custom styling: {regionIds: ["Japan"], options: {fillColor: "#ef4444", strokeColor: "#dc2626", strokeWidth: 2}}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        regionIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of region IDs to highlight (country names or state codes)',
+        },
+        options: {
+          type: 'object',
+          properties: {
+            fillColor: { type: 'string', description: 'Highlight fill color' },
+            strokeColor: { type: 'string', description: 'Highlight stroke color' },
+            strokeWidth: { type: 'number', description: 'Highlight stroke width' },
+            animate: { type: 'boolean', description: 'Animate the highlight transition' },
+          },
+          description: 'Highlight styling options',
+        },
+      },
+      required: ['regionIds'],
+    },
+  },
+  {
+    name: 'pinepaper_unhighlight_regions',
+    annotations: {
+      title: 'Unhighlight Regions',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Remove highlights from specific regions or all regions on the map.
+
+USE WHEN:
+- Resetting map to original state
+- Removing specific region highlights
+- Cycling through different highlight states
+
+EXAMPLES:
+- Remove all highlights: {regionIds: "all"}
+- Remove specific: {regionIds: ["CA", "TX"]}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        regionIds: {
+          oneOf: [
+            { type: 'array', items: { type: 'string' } },
+            { type: 'string', enum: ['all'] },
+          ],
+          description: 'Region IDs to unhighlight, or "all" for all regions',
+        },
+      },
+      required: ['regionIds'],
+    },
+  },
+  {
+    name: 'pinepaper_apply_data_colors',
+    annotations: {
+      title: 'Apply Data Colors',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Apply data-driven coloring to map regions (choropleth visualization).
+
+USE WHEN:
+- Visualizing statistics by region (population, GDP, etc.)
+- Creating heat maps
+- Showing data distribution across geography
+- Building infographics with data overlays
+
+COLOR SCALES:
+- blues: Light to dark blue gradient
+- greens: Light to dark green gradient
+- reds: Light to dark red gradient
+- oranges: Light to dark orange gradient
+- purples: Light to dark purple gradient
+- heat: Yellow to red heat map gradient
+
+DATA FORMAT:
+Keys must match region IDs exactly (country names for world maps, state codes for USA).
+
+EXAMPLES:
+- Population data: {data: {"California": 39538223, "Texas": 29145505, "New York": 20201249}, options: {colorScale: "blues", showLegend: true}}
+- GDP heat map: {data: {"United States of America": 21000, "China": 15000, "Japan": 5000}, options: {colorScale: "heat"}}
+- Custom range: {data: {"CA": 85, "TX": 72}, options: {colorScale: "greens", minValue: 0, maxValue: 100}}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'object',
+          additionalProperties: { type: 'number' },
+          description: 'Object mapping region IDs to numeric values',
+        },
+        options: {
+          type: 'object',
+          properties: {
+            colorScale: {
+              type: 'string',
+              enum: ['blues', 'greens', 'reds', 'oranges', 'purples', 'heat'],
+              description: 'Color scale to use',
+            },
+            minValue: { type: 'number', description: 'Minimum value for scale' },
+            maxValue: { type: 'number', description: 'Maximum value for scale' },
+            showLegend: { type: 'boolean', description: 'Display color legend' },
+            legendPosition: {
+              type: 'string',
+              enum: ['top-left', 'top-right', 'bottom-left', 'bottom-right'],
+              description: 'Legend position',
+            },
+            legendTitle: { type: 'string', description: 'Title for the legend' },
+          },
+          description: 'Choropleth styling options',
+        },
+      },
+      required: ['data'],
+    },
+  },
+  {
+    name: 'pinepaper_add_marker',
+    annotations: {
+      title: 'Add Map Marker',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Add a marker to the map at specified coordinates.
+
+USE WHEN:
+- Marking cities or points of interest
+- Creating location-based visualizations
+- Adding data points with geographic coordinates
+- Building interactive map annotations
+
+MARKER OPTIONS:
+- lat, lon: Geographic coordinates (required)
+- label: Text label for the marker
+- color: Marker color
+- size: Marker size in pixels
+- pulse: Enable animated pulse effect
+- shape: Marker shape (circle, pin, star)
+
+EXAMPLES:
+- City marker: {lat: 37.7749, lon: -122.4194, label: "San Francisco", color: "#ef4444", pulse: true}
+- Simple point: {lat: 40.7128, lon: -74.0060, size: 8, color: "#3b82f6"}
+- Pin marker: {lat: 51.5074, lon: -0.1278, label: "London", shape: "pin"}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        lat: { type: 'number', description: 'Latitude' },
+        lon: { type: 'number', description: 'Longitude' },
+        label: { type: 'string', description: 'Marker label text' },
+        color: { type: 'string', description: 'Marker color' },
+        size: { type: 'number', description: 'Marker size in pixels' },
+        pulse: { type: 'boolean', description: 'Enable pulse animation' },
+        shape: {
+          type: 'string',
+          enum: ['circle', 'pin', 'star'],
+          description: 'Marker shape',
+        },
+      },
+      required: ['lat', 'lon'],
+    },
+  },
+  {
+    name: 'pinepaper_add_map_labels',
+    annotations: {
+      title: 'Add Map Labels',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Add text labels to map regions.
+
+USE WHEN:
+- Labeling countries or states
+- Adding region names to visualizations
+- Creating annotated maps
+- Showing data values on regions
+
+LABEL TYPES:
+- name: Full region name
+- code: Region code (e.g., "CA" for California)
+- value: Data value (if applyDataColors was used)
+
+EXAMPLES:
+- Label all visible: {options: {fontSize: 10, fontColor: "#374151"}}
+- Label specific regions: {regions: ["California", "Texas"], options: {labelType: "code"}}
+- Show data values: {options: {labelType: "value", fontSize: 12}}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        regions: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Specific regions to label (null for all visible)',
+        },
+        options: {
+          type: 'object',
+          properties: {
+            fontSize: { type: 'number', description: 'Label font size' },
+            fontColor: { type: 'string', description: 'Label text color' },
+            labelType: {
+              type: 'string',
+              enum: ['name', 'code', 'value'],
+              description: 'Type of label content',
+            },
+            backgroundColor: { type: 'string', description: 'Label background color' },
+          },
+          description: 'Label styling options',
+        },
+      },
+    },
+  },
+  {
+    name: 'pinepaper_pan_map',
+    annotations: {
+      title: 'Pan Map',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Pan the map view to center on specific coordinates.
+
+USE WHEN:
+- Navigating to a specific location
+- Creating animated map transitions
+- Focusing on a region of interest
+
+EXAMPLES:
+- Pan to New York: {lat: 40.7128, lon: -74.0060}
+- Pan to Europe: {lat: 50, lon: 10}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        lat: { type: 'number', description: 'Target latitude' },
+        lon: { type: 'number', description: 'Target longitude' },
+        animate: { type: 'boolean', description: 'Animate the pan transition' },
+        duration: { type: 'number', description: 'Animation duration in seconds' },
+      },
+      required: ['lat', 'lon'],
+    },
+  },
+  {
+    name: 'pinepaper_zoom_map',
+    annotations: {
+      title: 'Zoom Map',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Set the map zoom level.
+
+USE WHEN:
+- Zooming in on specific areas
+- Creating zoom animations
+- Adjusting map scale
+
+ZOOM LEVELS:
+- 1: Full view (default)
+- 2-5: Moderate zoom
+- 5+: Close-up view
+
+EXAMPLES:
+- Zoom in: {level: 2}
+- Animated zoom: {level: 3, animate: true, duration: 1}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        level: { type: 'number', description: 'Zoom level (1 = full view)' },
+        animate: { type: 'boolean', description: 'Animate the zoom transition' },
+        duration: { type: 'number', description: 'Animation duration in seconds' },
+      },
+      required: ['level'],
+    },
+  },
+  {
+    name: 'pinepaper_export_map',
+    annotations: {
+      title: 'Export Map',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Export the current map configuration and state.
+
+USE WHEN:
+- Saving map state for later restoration
+- Exporting map data for external use
+- Creating shareable map configurations
+
+RETURNS:
+- mapId: Current map identifier
+- projection: Active projection
+- regions: Region states and highlights
+- markers: All added markers
+- dataColors: Applied data coloring configuration`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'pinepaper_import_custom_map',
+    annotations: {
+      title: 'Import Custom Map',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+    description: `Import a custom GeoJSON or TopoJSON map.
+
+USE WHEN:
+- Loading custom geographic boundaries
+- Using detailed country/region maps from GADM
+- Importing custom shapes or territories
+- Working with non-standard geographic data
+
+SUPPORTED FORMATS:
+- GeoJSON: Standard geographic JSON format
+- TopoJSON: Compressed topology format
+
+SOURCES:
+- GADM: Detailed country subdivisions (gadm.org)
+- Natural Earth: Public domain maps (naturalearthdata.com)
+- Census: Official boundary files
+- Custom: Your own GeoJSON files
+
+EXAMPLES:
+- Import from URL: {url: "https://example.com/custom.geojson", options: {projection: "mercator"}}
+- Import GeoJSON object: {geoJson: {...}, options: {projection: "naturalEarth"}}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'URL to GeoJSON/TopoJSON file' },
+        geoJson: {
+          type: 'object',
+          description: 'GeoJSON object to import directly',
+        },
+        options: {
+          type: 'object',
+          properties: {
+            projection: {
+              type: 'string',
+              enum: ['mercator', 'equalEarth', 'naturalEarth', 'orthographic', 'albers', 'stereographic'],
+              description: 'Projection to use for rendering',
+            },
+            fillColor: { type: 'string' },
+            strokeColor: { type: 'string' },
+            strokeWidth: { type: 'number' },
+          },
+          description: 'Import options',
+        },
+      },
+    },
+  },
+  {
+    name: 'pinepaper_get_region_at_point',
+    annotations: {
+      title: 'Get Region at Point',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Get the region at a specific canvas point (hit testing).
+
+USE WHEN:
+- Implementing click interactions
+- Finding which region is at a coordinate
+- Building interactive map features
+
+EXAMPLES:
+- Check point: {x: 400, y: 300}
+
+RETURNS:
+- regionId: ID of the region at point (or null)
+- regionName: Display name
+- properties: Region properties from GeoJSON`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        x: { type: 'number', description: 'Canvas X coordinate' },
+        y: { type: 'number', description: 'Canvas Y coordinate' },
+      },
+      required: ['x', 'y'],
+    },
+  },
+  {
+    name: 'pinepaper_animate_map_regions',
+    annotations: {
+      title: 'Animate Map Regions',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Animate specific map regions with timeline-integrated keyframe color animations.
+
+USE WHEN:
+- Creating animated choropleth transitions
+- Showing data changes over time
+- Building story-based map visualizations
+- Adding visual emphasis to regions
+
+KEYFRAME PROPERTIES:
+- time: Time in seconds for this keyframe
+- fillColor: Fill color at this keyframe (required)
+- strokeColor: Optional stroke color
+- opacity: Optional opacity (0-1)
+
+EXAMPLES:
+- Simple color transition: {duration: 5, loop: true, regions: {"USA": [{"time": 0, "fillColor": "#ef4444"}, {"time": 5, "fillColor": "#22c55e"}]}}
+- Multi-region animation: {duration: 8, regions: {"USA": [...], "France": [...], "Japan": [...]}}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        duration: {
+          type: 'number',
+          description: 'Total animation duration in seconds (default: 5)',
+        },
+        loop: {
+          type: 'boolean',
+          description: 'Loop the animation (default: true)',
+        },
+        regions: {
+          type: 'object',
+          additionalProperties: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                time: { type: 'number', description: 'Time in seconds' },
+                fillColor: { type: 'string', description: 'Fill color at this keyframe' },
+                strokeColor: { type: 'string', description: 'Stroke color (optional)' },
+                opacity: { type: 'number', description: 'Opacity 0-1 (optional)' },
+              },
+              required: ['time', 'fillColor'],
+            },
+          },
+          description: 'Object mapping region IDs to arrays of keyframes',
+        },
+      },
+      required: ['regions'],
+    },
+  },
+  {
+    name: 'pinepaper_animate_map_wave',
+    annotations: {
+      title: 'Animate Map Wave',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Create a wave animation across all map regions based on geographic position.
+
+USE WHEN:
+- Creating dramatic visual effects
+- Showing global spread patterns
+- Adding ambient map animations
+- Building attention-grabbing transitions
+
+WAVE DIRECTIONS:
+- horizontal: Wave sweeps left to right
+- vertical: Wave sweeps top to bottom
+- radial: Wave radiates from center outward
+
+EXAMPLES:
+- Rainbow wave: {duration: 10, colors: ["#ef4444", "#fbbf24", "#22c55e", "#3b82f6"], waveDirection: "horizontal"}
+- Fast radial pulse: {duration: 3, colors: ["#ffffff", "#3b82f6"], waveDirection: "radial", loop: true}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        duration: {
+          type: 'number',
+          description: 'Total wave duration in seconds (default: 10)',
+        },
+        loop: {
+          type: 'boolean',
+          description: 'Loop the animation (default: true)',
+        },
+        colors: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of colors for the wave (default: red, yellow, green, blue)',
+        },
+        waveDirection: {
+          type: 'string',
+          enum: ['horizontal', 'vertical', 'radial'],
+          description: 'Direction of the wave effect (default: horizontal)',
+        },
+      },
+    },
+  },
+  {
+    name: 'pinepaper_stop_map_animations',
+    annotations: {
+      title: 'Stop Map Animations',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Stop all or specific map region animations.
+
+USE WHEN:
+- Ending animated sequences
+- Resetting map to static state
+- Pausing for user interaction
+- Transitioning to different visualization
+
+EXAMPLES:
+- Stop all: {}
+- Stop specific regions: {regions: ["USA", "France"]}
+- Stop and reset colors: {resetColors: true}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        regions: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Specific region IDs to stop (omit for all)',
+        },
+        resetColors: {
+          type: 'boolean',
+          description: 'Reset regions to default colors (default: true)',
+        },
+      },
+    },
+  },
+  {
+    name: 'pinepaper_get_animated_map_regions',
+    annotations: {
+      title: 'Get Animated Map Regions',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Get list of currently animated map regions with their animation data.
+
+USE WHEN:
+- Debugging animations
+- Checking animation state
+- Building animation controls
+- Inspecting current timeline
+
+RETURNS:
+- animatedRegions: Array of region animation info
+- count: Total number of animated regions`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'pinepaper_export_map_region_csv',
+    annotations: {
+      title: 'Export Map Region CSV',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Export map region data as CSV including colors, highlight, and selection status.
+
+USE WHEN:
+- Saving map state for later
+- Creating data-driven workflows
+- Integrating with spreadsheet tools
+- Building export features
+
+CSV COLUMNS:
+- regionId: Region identifier
+- name: Display name
+- highlighted: 1 or 0
+- selected: 1 or 0
+- fillColor: Current fill color
+- strokeColor: Current stroke color
+
+EXAMPLES:
+- Full export: {}
+- Colors only: {includeHighlighted: false, includeSelected: false}
+- Auto-download: {download: true, filename: "map-export.csv"}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        includeHighlighted: {
+          type: 'boolean',
+          description: 'Include highlight status column (default: true)',
+        },
+        includeSelected: {
+          type: 'boolean',
+          description: 'Include selection status column (default: true)',
+        },
+        includeColors: {
+          type: 'boolean',
+          description: 'Include fill/stroke color columns (default: true)',
+        },
+        download: {
+          type: 'boolean',
+          description: 'Auto-download the CSV file (default: false)',
+        },
+        filename: {
+          type: 'string',
+          description: 'Filename for download (default: map-regions.csv)',
+        },
+      },
+    },
+  },
+  {
+    name: 'pinepaper_import_map_region_csv',
+    annotations: {
+      title: 'Import Map Region CSV',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Import CSV data to update map region states (colors, highlight, selection).
+
+USE WHEN:
+- Restoring saved map state
+- Applying data from spreadsheets
+- Batch updating region properties
+- Building data-driven visualizations
+
+CSV FORMAT:
+Must have 'regionId' column. Optional columns:
+- fillColor: Hex color for fill
+- strokeColor: Hex color for stroke
+- highlighted: 1 or 0
+- selected: 1 or 0
+
+EXAMPLES:
+- Import full CSV: {csvText: "regionId,fillColor,highlighted\\nUSA,#22c55e,1\\nFrance,#3b82f6,0"}
+- Colors only: {csvText: "...", applyHighlight: false, applySelection: false}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        csvText: {
+          type: 'string',
+          description: 'CSV text content to import',
+        },
+        applyColors: {
+          type: 'boolean',
+          description: 'Apply fill/stroke colors from CSV (default: true)',
+        },
+        applyHighlight: {
+          type: 'boolean',
+          description: 'Update highlight status from CSV (default: true)',
+        },
+        applySelection: {
+          type: 'boolean',
+          description: 'Update selection status from CSV (default: true)',
+        },
+      },
+      required: ['csvText'],
+    },
+  },
+  {
+    name: 'pinepaper_select_map_regions',
+    annotations: {
+      title: 'Select Map Regions',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Programmatically select map regions.
+
+USE WHEN:
+- Building interactive map features
+- Responding to user input
+- Creating selection-based workflows
+- Highlighting user choices
+
+EXAMPLES:
+- Select countries: {regionIds: ["USA", "Canada", "Mexico"]}
+- Select US states: {regionIds: ["CA", "TX", "NY"]}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        regionIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of region IDs to select',
+        },
+      },
+      required: ['regionIds'],
+    },
+  },
+  {
+    name: 'pinepaper_deselect_map_regions',
+    annotations: {
+      title: 'Deselect Map Regions',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Programmatically deselect map regions.
+
+USE WHEN:
+- Clearing user selections
+- Resetting map state
+- Implementing toggle behavior
+- Building selection management
+
+EXAMPLES:
+- Deselect specific: {regionIds: ["USA", "France"]}
+- Deselect all: {} (omit regionIds)`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        regionIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of region IDs to deselect (omit for all)',
+        },
+      },
+    },
+  },
+  {
+    name: 'pinepaper_get_highlighted_map_regions',
+    annotations: {
+      title: 'Get Highlighted Map Regions',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Get list of currently highlighted map regions.
+
+USE WHEN:
+- Checking current highlight state
+- Building conditional logic
+- Creating highlight summaries
+- Debugging map state
+
+RETURNS:
+- highlighted: Array of highlighted region IDs
+- count: Total number of highlighted regions`,
     inputSchema: {
       type: 'object',
       properties: {},
