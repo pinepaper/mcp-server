@@ -1371,6 +1371,226 @@ EFFECTS:
   },
 
   // ---------------------------------------------------------------------------
+  // MASK TOOLS
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_apply_animated_mask',
+    annotations: {
+      title: 'Apply Animated Mask',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Apply an animated mask reveal to an item. Supports three usage modes:
+
+MODE 1 - PRESET: Use built-in animation presets
+- Quick and easy reveal effects
+- Example: wipeLeft, iris, curtainHorizontal
+
+MODE 2 - FULL CONTROL: Define exact keyframes
+- Complete control over mask animation
+- Specify maskType + keyframes array
+
+MODE 3 - HYBRID: Preset with keyframe override
+- Start from preset, customize timing
+- Combine preset + keyframes
+
+ANIMATION PRESETS:
+- wipeLeft/wipeRight/wipeUp/wipeDown: Directional reveals
+- iris/irisOut: Circle expands/shrinks from center
+- star/heart: Shape scales up
+- curtainHorizontal/curtainVertical: Opens from center
+- cinematic: Letterbox bars animate
+- diagonalWipe: Angled reveal from corner
+- revealUp/revealDown: Text slides within mask
+
+MASK TYPES: rectangle, circle, ellipse, star, triangle, hexagon, heart, rounded`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        itemId: { type: 'string', description: 'Registry ID of the item to mask' },
+        preset: {
+          type: 'string',
+          enum: ['wipeLeft', 'wipeRight', 'wipeUp', 'wipeDown', 'iris', 'irisOut', 'star', 'heart', 'curtainHorizontal', 'curtainVertical', 'cinematic', 'diagonalWipe', 'revealUp', 'revealDown'],
+          description: 'Animation preset name (Mode 1 & 3)',
+        },
+        maskType: {
+          type: 'string',
+          enum: ['rectangle', 'circle', 'ellipse', 'star', 'triangle', 'hexagon', 'heart', 'rounded'],
+          description: 'Mask shape type (Mode 2)',
+        },
+        keyframes: {
+          type: 'array',
+          description: 'Custom keyframes (Mode 2 & 3)',
+          items: {
+            type: 'object',
+            properties: {
+              time: { type: 'number', description: 'Normalized time (0-1)' },
+              properties: { type: 'object', description: 'Mask properties (x, y, width, height, radius, scale, rotation, opacity)' },
+              easing: { type: 'string', enum: ['linear', 'easeIn', 'easeOut', 'easeInOut', 'bounce', 'elastic'] },
+            },
+            required: ['time', 'properties'],
+          },
+        },
+        options: {
+          type: 'object',
+          description: 'Animation options (Mode 1)',
+          properties: {
+            startTime: { type: 'number', description: 'Start time in seconds', default: 0 },
+            duration: { type: 'number', description: 'Duration in seconds', default: 0.8 },
+            easing: { type: 'string', enum: ['linear', 'easeIn', 'easeOut', 'easeInOut', 'bounce'], default: 'easeOut' },
+            reversed: { type: 'boolean', description: 'Reverse animation (hide instead of reveal)', default: false },
+            loop: { type: 'boolean', description: 'Loop the animation', default: false },
+          },
+        },
+        maskOptions: {
+          type: 'object',
+          description: 'Mask shape options',
+          properties: {
+            points: { type: 'number', description: 'Number of points (star mask)' },
+            innerRadius: { type: 'number', description: 'Inner radius ratio (star mask)' },
+          },
+        },
+      },
+      required: ['itemId'],
+    },
+  },
+
+  {
+    name: 'pinepaper_apply_custom_mask',
+    annotations: {
+      title: 'Apply Custom Mask',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Direct helper for applying custom keyframe-based masks.
+
+USE WHEN:
+- You need full control over mask animation
+- Creating complex reveal sequences
+- Building custom transitions
+
+Requires maskType and keyframes array.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        itemId: { type: 'string', description: 'Registry ID of the item to mask' },
+        maskType: {
+          type: 'string',
+          enum: ['rectangle', 'circle', 'ellipse', 'star', 'triangle', 'hexagon', 'heart', 'rounded'],
+          description: 'Mask shape type',
+        },
+        keyframes: {
+          type: 'array',
+          description: 'Keyframes defining the animation',
+          items: {
+            type: 'object',
+            properties: {
+              time: { type: 'number' },
+              properties: { type: 'object' },
+              easing: { type: 'string' },
+            },
+          },
+        },
+        maskOptions: {
+          type: 'object',
+          properties: {
+            points: { type: 'number' },
+            innerRadius: { type: 'number' },
+          },
+        },
+      },
+      required: ['itemId', 'maskType', 'keyframes'],
+    },
+  },
+
+  {
+    name: 'pinepaper_remove_mask',
+    annotations: {
+      title: 'Remove Mask',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Remove mask from an item, restoring original appearance.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        itemId: { type: 'string', description: 'Registry ID of the masked item' },
+      },
+      required: ['itemId'],
+    },
+  },
+
+  {
+    name: 'pinepaper_get_animatable_properties',
+    annotations: {
+      title: 'Get Animatable Properties',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Get animatable properties for each mask type. Useful for building custom keyframe animations.`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+
+  {
+    name: 'pinepaper_get_available_easings',
+    annotations: {
+      title: 'Get Available Easings',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Get list of available easing functions for mask animations.`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+
+  {
+    name: 'pinepaper_get_mask_types',
+    annotations: {
+      title: 'Get Mask Types',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Get available mask shape types.`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+
+  {
+    name: 'pinepaper_get_mask_animations',
+    annotations: {
+      title: 'Get Mask Animations',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Get available mask animation presets.`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+
+  // ---------------------------------------------------------------------------
   // QUERY TOOLS
   // ---------------------------------------------------------------------------
   {
@@ -1772,6 +1992,35 @@ OUTPUT FORMAT:
           description: 'Include relation metadata (default: true)',
         },
       },
+    },
+  },
+
+  {
+    name: 'pinepaper_export_scene',
+    annotations: {
+      title: 'Export Scene',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Export the complete scene state including all items, relations, and settings.
+
+USE WHEN:
+- Saving a complete scene for later restoration
+- Creating scene backups
+- Debugging scene composition
+- Generating scene snapshots for version control
+
+RETURNS:
+- items: Array of all canvas items with properties
+- relations: Array of active relations
+- decorative: Array of decorative (non-interactive) items
+- backgroundColor: Current background color
+- canvasSize: Canvas dimensions`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
     },
   },
 
@@ -4984,6 +5233,116 @@ RETURNS:
       properties: {},
     },
   },
+  {
+    name: 'pinepaper_export_map_geojson',
+    annotations: {
+      title: 'Export Map GeoJSON',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Export the current map as GeoJSON (with current colors/modifications).
+
+USE WHEN:
+- Saving map state with custom styling
+- Exporting for use in other mapping tools
+- Creating styled GeoJSON for external applications
+- Archiving map customizations
+
+EXAMPLES:
+- Export with styles: {includeStyles: true}
+- Selected regions only: {selectedOnly: true}
+- Auto-download: {download: true, filename: "my-map.geojson"}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        includeStyles: {
+          type: 'boolean',
+          description: 'Include fill/stroke colors as properties (default: true)',
+        },
+        includeMetadata: {
+          type: 'boolean',
+          description: 'Include region names and IDs (default: true)',
+        },
+        selectedOnly: {
+          type: 'boolean',
+          description: 'Only export selected regions (default: false)',
+        },
+        download: {
+          type: 'boolean',
+          description: 'Auto-download the file (default: false)',
+        },
+        filename: {
+          type: 'string',
+          description: 'Filename for download (default: "map-export.geojson")',
+        },
+      },
+    },
+  },
+  {
+    name: 'pinepaper_export_original_map_geojson',
+    annotations: {
+      title: 'Export Original Map GeoJSON',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Export the original source GeoJSON (unmodified boundaries). Returns the exact data used to load the map, allowing users to edit boundaries externally and re-import.
+
+USE WHEN:
+- Extracting original map data for external editing
+- Getting clean boundaries without customizations
+- Creating a baseline for map modifications
+- Re-importing after external boundary edits
+
+EXAMPLES:
+- Get original data: {}
+- Auto-download: {download: true, filename: "map-source.geojson"}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        download: {
+          type: 'boolean',
+          description: 'Auto-download the file (default: false)',
+        },
+        filename: {
+          type: 'string',
+          description: 'Filename for download (default: "map-source.geojson")',
+        },
+      },
+    },
+  },
+  {
+    name: 'pinepaper_get_map_source_info',
+    annotations: {
+      title: 'Get Map Source Info',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Get information about the currently loaded map source.
+
+USE WHEN:
+- Checking what map is currently loaded
+- Debugging map loading issues
+- Getting map metadata
+- Verifying map configuration
+
+RETURNS:
+- source: Map source identifier (e.g., "world", "worldHighRes", "usa", or custom)
+- projection: Current projection type
+- quality: Rendering quality setting
+- regionCount: Total number of regions
+- hasOriginalGeoJSON: Whether original GeoJSON is available
+- isCustomImport: Whether this is a custom imported map`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
 
   // ---------------------------------------------------------------------------
   // CANVAS PRESETS TOOL
@@ -5015,6 +5374,49 @@ Array of presets with: key, name, width, height, aspectRatio, category`,
     inputSchema: {
       type: 'object',
       properties: {},
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // PAPER.JS DIRECT ACCESS TOOLS
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_register_item',
+    annotations: {
+      title: 'Register Item',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Register a Paper.js item created externally. This allows items created via custom code or imported Paper.js JSON to be tracked in the registry for use with relations, animations, and other tools.
+
+USE WHEN:
+- Registering items created via pinepaper_execute_custom_code
+- Importing Paper.js items from external sources
+- Integrating programmatically created graphics
+- Adding custom items to the registry for relation tracking
+
+EXAMPLES:
+- Register custom item: {itemJson: {...}, itemType: "custom-shape"}
+- With properties: {itemJson: {...}, itemType: "logo", properties: {source: "external"}}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        itemJson: {
+          type: 'object',
+          description: 'Paper.js item JSON (from item.exportJSON())',
+        },
+        itemType: {
+          type: 'string',
+          description: 'Type name for registry (e.g., "custom-shape", "logo")',
+        },
+        properties: {
+          type: 'object',
+          description: 'Custom properties to store with the item',
+        },
+      },
+      required: ['itemJson', 'itemType'],
     },
   },
 ];

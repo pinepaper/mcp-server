@@ -94,6 +94,10 @@ import {
   // Custom relation/code schemas
   RegisterCustomRelationInputSchema,
   ExecuteCustomCodeInputSchema,
+  // Mask schemas
+  ApplyAnimatedMaskInputSchema,
+  ApplyCustomMaskInputSchema,
+  RemoveMaskInputSchema,
   ErrorCodes,
   RelationType,
   ItemType,
@@ -771,6 +775,58 @@ export async function handleToolCall(
       }
 
       // -----------------------------------------------------------------------
+      // MASK TOOLS
+      // -----------------------------------------------------------------------
+      case 'pinepaper_apply_animated_mask': {
+        const input = ApplyAnimatedMaskInputSchema.parse(args);
+        const code = codeGenerator.generateApplyAnimatedMask(input);
+        const mode = input.preset && input.keyframes ? 'hybrid' : input.preset ? 'preset' : 'custom';
+        return executeOrGenerate(
+          code,
+          `Applies ${mode} animated mask to ${input.itemId}`,
+          options,
+          'pinepaper_apply_animated_mask'
+        );
+      }
+
+      case 'pinepaper_apply_custom_mask': {
+        const input = ApplyCustomMaskInputSchema.parse(args);
+        const code = codeGenerator.generateApplyCustomMask(input);
+        return executeOrGenerate(
+          code,
+          `Applies custom ${input.maskType} mask with ${input.keyframes.length} keyframes to ${input.itemId}`,
+          options,
+          'pinepaper_apply_custom_mask'
+        );
+      }
+
+      case 'pinepaper_remove_mask': {
+        const input = RemoveMaskInputSchema.parse(args);
+        const code = codeGenerator.generateRemoveMask(input);
+        return executeOrGenerate(code, `Removes mask from ${input.itemId}`, options, 'pinepaper_remove_mask');
+      }
+
+      case 'pinepaper_get_animatable_properties': {
+        const code = codeGenerator.generateGetAnimatableProperties();
+        return executeOrGenerate(code, 'Gets animatable properties for mask types', options, 'pinepaper_get_animatable_properties');
+      }
+
+      case 'pinepaper_get_available_easings': {
+        const code = codeGenerator.generateGetAvailableEasings();
+        return executeOrGenerate(code, 'Gets available easing functions', options, 'pinepaper_get_available_easings');
+      }
+
+      case 'pinepaper_get_mask_types': {
+        const code = codeGenerator.generateGetMaskTypes();
+        return executeOrGenerate(code, 'Gets available mask types', options, 'pinepaper_get_mask_types');
+      }
+
+      case 'pinepaper_get_mask_animations': {
+        const code = codeGenerator.generateGetMaskAnimations();
+        return executeOrGenerate(code, 'Gets available mask animation presets', options, 'pinepaper_get_mask_animations');
+      }
+
+      // -----------------------------------------------------------------------
       // QUERY TOOLS
       // -----------------------------------------------------------------------
       case 'pinepaper_get_items': {
@@ -923,6 +979,11 @@ You can now start creating new items on a clean canvas.`,
           format: input.format?.toUpperCase() || 'JSON',
         });
         return executeOrGenerate(code, description, options, 'pinepaper_export_training_data');
+      }
+
+      case 'pinepaper_export_scene': {
+        const code = codeGenerator.generateExportScene();
+        return executeOrGenerate(code, 'Exports complete scene state', options, 'pinepaper_export_scene');
       }
 
       // -----------------------------------------------------------------------
@@ -1636,6 +1697,39 @@ Browser is ready. You can now use other pinepaper tools to create and animate gr
         return executeOrGenerate(code, 'Gets list of highlighted map regions', options, 'pinepaper_get_highlighted_map_regions');
       }
 
+      case 'pinepaper_export_map_geojson': {
+        const code = codeGenerator.generateExportMapGeoJson({
+          includeStyles: args.includeStyles as boolean | undefined,
+          includeMetadata: args.includeMetadata as boolean | undefined,
+          selectedOnly: args.selectedOnly as boolean | undefined,
+          download: args.download as boolean | undefined,
+          filename: args.filename as string | undefined,
+        });
+        return executeOrGenerate(code, 'Exports map as GeoJSON', options, 'pinepaper_export_map_geojson');
+      }
+
+      case 'pinepaper_export_original_map_geojson': {
+        const code = codeGenerator.generateExportOriginalMapGeoJson({
+          download: args.download as boolean | undefined,
+          filename: args.filename as string | undefined,
+        });
+        return executeOrGenerate(code, 'Exports original map GeoJSON', options, 'pinepaper_export_original_map_geojson');
+      }
+
+      case 'pinepaper_get_map_source_info': {
+        const code = codeGenerator.generateGetMapSourceInfo();
+        return executeOrGenerate(code, 'Gets map source information', options, 'pinepaper_get_map_source_info');
+      }
+
+      case 'pinepaper_register_item': {
+        const code = codeGenerator.generateRegisterItem({
+          itemJson: args.itemJson as object,
+          itemType: args.itemType as string,
+          properties: args.properties as Record<string, unknown> | undefined,
+        });
+        return executeOrGenerate(code, 'Registers Paper.js item', options, 'pinepaper_register_item');
+      }
+
       // -----------------------------------------------------------------------
       // UNKNOWN TOOL
       // -----------------------------------------------------------------------
@@ -1665,6 +1759,13 @@ Browser is ready. You can now use other pinepaper tools to create and animate gr
             'pinepaper_execute_generator',
             'pinepaper_list_generators',
             'pinepaper_apply_effect',
+            'pinepaper_apply_animated_mask',
+            'pinepaper_apply_custom_mask',
+            'pinepaper_remove_mask',
+            'pinepaper_get_animatable_properties',
+            'pinepaper_get_available_easings',
+            'pinepaper_get_mask_types',
+            'pinepaper_get_mask_animations',
             'pinepaper_get_items',
             'pinepaper_get_relation_stats',
             'pinepaper_set_background_color',
@@ -1676,6 +1777,7 @@ Browser is ready. You can now use other pinepaper tools to create and animate gr
             'pinepaper_add_filter',
             'pinepaper_export_svg',
             'pinepaper_export_training_data',
+            'pinepaper_export_scene',
             'pinepaper_browser_connect',
             'pinepaper_browser_disconnect',
             'pinepaper_browser_screenshot',
@@ -1739,6 +1841,11 @@ Browser is ready. You can now use other pinepaper tools to create and animate gr
             'pinepaper_select_map_regions',
             'pinepaper_deselect_map_regions',
             'pinepaper_get_highlighted_map_regions',
+            'pinepaper_export_map_geojson',
+            'pinepaper_export_original_map_geojson',
+            'pinepaper_get_map_source_info',
+            // Paper.js direct access tools
+            'pinepaper_register_item',
           ],
         });
       }

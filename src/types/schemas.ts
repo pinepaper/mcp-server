@@ -1183,6 +1183,93 @@ export const ErrorCodes = {
 export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes];
 
 // =============================================================================
+// MASK TOOL SCHEMAS
+// =============================================================================
+
+export const MaskPresetSchema = z.enum([
+  'wipeLeft', 'wipeRight', 'wipeUp', 'wipeDown',
+  'iris', 'irisOut',
+  'star', 'heart',
+  'curtainHorizontal', 'curtainVertical', 'cinematic',
+  'diagonalWipe',
+  'revealUp', 'revealDown',
+]).describe('Mask animation preset');
+
+export type MaskPreset = z.infer<typeof MaskPresetSchema>;
+
+export const MaskTypeSchema = z.enum([
+  'rectangle', 'circle', 'ellipse', 'star', 'triangle', 'hexagon', 'heart', 'rounded',
+]).describe('Mask shape type');
+
+export type MaskType = z.infer<typeof MaskTypeSchema>;
+
+export const MaskEasingSchema = z.enum([
+  'linear', 'easeIn', 'easeOut', 'easeInOut', 'bounce', 'elastic',
+]).describe('Mask animation easing function');
+
+export type MaskEasing = z.infer<typeof MaskEasingSchema>;
+
+export const MaskKeyframePropertiesSchema = z.object({
+  x: z.number().optional(),
+  y: z.number().optional(),
+  width: z.number().optional(),
+  height: z.number().optional(),
+  radius: z.number().optional(),
+  radiusX: z.number().optional(),
+  radiusY: z.number().optional(),
+  scale: z.number().optional(),
+  rotation: z.number().optional(),
+  opacity: z.number().optional(),
+}).describe('Mask keyframe properties');
+
+export const MaskKeyframeSchema = z.object({
+  time: z.number().min(0).max(1).describe('Normalized time (0-1)'),
+  properties: MaskKeyframePropertiesSchema.describe('Mask properties at this keyframe'),
+  easing: MaskEasingSchema.optional().describe('Easing function for this keyframe'),
+}).describe('Mask animation keyframe');
+
+export type MaskKeyframe = z.infer<typeof MaskKeyframeSchema>;
+
+export const MaskOptionsSchema = z.object({
+  startTime: z.number().optional().default(0).describe('Start time in seconds'),
+  duration: z.number().optional().default(0.8).describe('Duration in seconds'),
+  easing: MaskEasingSchema.optional().default('easeOut').describe('Overall easing'),
+  reversed: z.boolean().optional().default(false).describe('Reverse animation (hide instead of reveal)'),
+  loop: z.boolean().optional().default(false).describe('Loop the animation'),
+}).describe('Mask animation options');
+
+export const MaskShapeOptionsSchema = z.object({
+  points: z.number().optional().describe('Number of points (star mask)'),
+  innerRadius: z.number().optional().describe('Inner radius ratio (star mask)'),
+}).describe('Mask shape-specific options');
+
+export const ApplyAnimatedMaskInputSchema = z.object({
+  itemId: z.string().describe('Registry ID of the item to mask'),
+  preset: MaskPresetSchema.optional().describe('Animation preset (Mode 1 & 3)'),
+  maskType: MaskTypeSchema.optional().describe('Mask shape type (Mode 2)'),
+  keyframes: z.array(MaskKeyframeSchema).optional().describe('Custom keyframes (Mode 2 & 3)'),
+  options: MaskOptionsSchema.optional().describe('Animation options (Mode 1)'),
+  maskOptions: MaskShapeOptionsSchema.optional().describe('Mask shape options'),
+}).describe('Apply animated mask input');
+
+export type ApplyAnimatedMaskInput = z.infer<typeof ApplyAnimatedMaskInputSchema>;
+
+export const ApplyCustomMaskInputSchema = z.object({
+  itemId: z.string().describe('Registry ID of the item to mask'),
+  maskType: MaskTypeSchema.describe('Mask shape type'),
+  keyframes: z.array(MaskKeyframeSchema).describe('Keyframes defining the animation'),
+  maskOptions: MaskShapeOptionsSchema.optional().describe('Mask shape options'),
+}).describe('Apply custom mask input');
+
+export type ApplyCustomMaskInput = z.infer<typeof ApplyCustomMaskInputSchema>;
+
+export const RemoveMaskInputSchema = z.object({
+  itemId: z.string().describe('Registry ID of the masked item'),
+}).describe('Remove mask input');
+
+export type RemoveMaskInput = z.infer<typeof RemoveMaskInputSchema>;
+
+// =============================================================================
 // AGENT FLOW MODE SCHEMAS
 // =============================================================================
 

@@ -1,6 +1,6 @@
 # MCP Server Test Parameters
 
-Quick reference for testing all 85 tools with sample parameters.
+Quick reference for testing all 97 tools with sample parameters.
 
 ---
 
@@ -756,6 +756,84 @@ Quick reference for testing all 85 tools with sample parameters.
 ```
 
 ### pinepaper_get_highlighted_map_regions
+```json
+{}
+```
+
+---
+
+## Map Export Tools (3 tools)
+
+### pinepaper_export_map_geojson
+```json
+{}
+{"includeStyles": true, "includeMetadata": true}
+{"selectedOnly": true, "download": true, "filename": "my-map.geojson"}
+```
+
+### pinepaper_export_original_map_geojson
+```json
+{}
+{"download": true, "filename": "source-map.geojson"}
+```
+
+### pinepaper_get_map_source_info
+```json
+{}
+```
+
+---
+
+## Paper.js Direct Access (1 tool)
+
+### pinepaper_register_item
+```json
+{"itemJson": ["Path", {"segments": [[100, 100], [200, 50], [300, 100]], "closed": true}], "itemType": "customTriangle"}
+{"itemJson": ["Shape", {"type": "circle", "center": [200, 200], "radius": 50}], "itemType": "customCircle", "properties": {"source": "mcp"}}
+```
+
+---
+
+## Mask Tools (7 tools)
+
+### pinepaper_apply_animated_mask
+```json
+{"itemId": "item_1", "preset": "wipeLeft", "options": {"duration": 0.5, "easing": "easeOut"}}
+{"itemId": "item_1", "preset": "iris", "options": {"startTime": 0.5, "duration": 1, "loop": true}}
+{"itemId": "item_1", "preset": "curtainHorizontal", "options": {"reversed": true}}
+{"itemId": "item_1", "preset": "star", "maskOptions": {"points": 6, "innerRadius": 0.4}}
+{"itemId": "item_1", "maskType": "rectangle", "keyframes": [{"time": 0, "properties": {"x": 200, "y": 250, "width": 0, "height": 100}}, {"time": 1, "properties": {"x": 200, "y": 250, "width": 200, "height": 100}}]}
+{"itemId": "item_1", "preset": "iris", "keyframes": [{"time": 0, "properties": {"scale": 0}, "easing": "linear"}, {"time": 0.5, "properties": {"scale": 0.5}, "easing": "easeIn"}, {"time": 1, "properties": {"scale": 1}, "easing": "bounce"}]}
+```
+
+### pinepaper_apply_custom_mask
+```json
+{"itemId": "item_1", "maskType": "circle", "keyframes": [{"time": 0, "properties": {"radius": 0}}, {"time": 1, "properties": {"radius": 100}}]}
+{"itemId": "item_1", "maskType": "star", "keyframes": [{"time": 0, "properties": {"scale": 0}}, {"time": 0.5, "properties": {"scale": 0.5}}, {"time": 1, "properties": {"scale": 1}}], "maskOptions": {"points": 5, "innerRadius": 0.5}}
+{"itemId": "item_1", "maskType": "heart", "keyframes": [{"time": 0, "properties": {"scale": 0, "opacity": 0}}, {"time": 1, "properties": {"scale": 1, "opacity": 1}}]}
+```
+
+### pinepaper_remove_mask
+```json
+{"itemId": "item_1"}
+```
+
+### pinepaper_get_animatable_properties
+```json
+{}
+```
+
+### pinepaper_get_available_easings
+```json
+{}
+```
+
+### pinepaper_get_mask_types
+```json
+{}
+```
+
+### pinepaper_get_mask_animations
 ```json
 {}
 ```

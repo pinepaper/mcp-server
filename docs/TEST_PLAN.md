@@ -2,13 +2,13 @@
 
 ## Overview
 
-This document outlines the test plan for the PinePaper MCP Server (85 tools, 16 resources).
+This document outlines the test plan for the PinePaper MCP Server (97 tools, 16 resources).
 
 ---
 
 ## 1. Automated Testing
 
-### 1.1 Unit Tests (Current: 248 tests)
+### 1.1 Unit Tests (Current: 262 tests)
 
 Run with: `bun test`
 
@@ -140,7 +140,7 @@ describe('Code Generation', () => {
     const tools = [
       { name: 'pinepaper_create_item', args: { type: 'circle', params: { x: 100, y: 100, radius: 50 } } },
       { name: 'pinepaper_load_map', args: { mapId: 'world' } },
-      // ... all 85 tools
+      // ... all 97 tools
     ];
 
     for (const tool of tools) {
