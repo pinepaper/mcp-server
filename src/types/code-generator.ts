@@ -137,6 +137,13 @@ import {
   RegisterCustomRelationInput,
   ExecuteCustomCodeInputSchema,
   ExecuteCustomCodeInput,
+  // Mask types
+  ApplyAnimatedMaskInputSchema,
+  ApplyAnimatedMaskInput,
+  ApplyCustomMaskInputSchema,
+  ApplyCustomMaskInput,
+  RemoveMaskInputSchema,
+  RemoveMaskInput,
 } from './schemas.js';
 import { z } from 'zod';
 
@@ -3540,6 +3547,234 @@ onMounted(() => {
 `.trim();
   }
 
+  /**
+   * Generate code to export the complete scene state
+   */
+  generateExportScene(): string {
+    return `
+// Export complete scene state
+(function() {
+  try {
+    const items = [];
+    const relations = [];
+    const decorative = [];
+
+    // Collect items from registry
+    if (app.itemRegistry) {
+      for (const [id, item] of app.itemRegistry.entries()) {
+        const itemData = {
+          id: id,
+          type: item.data?.type || item.className?.toLowerCase() || 'unknown',
+          position: item.position ? { x: item.position.x, y: item.position.y } : null,
+          bounds: item.bounds ? {
+            x: item.bounds.x,
+            y: item.bounds.y,
+            width: item.bounds.width,
+            height: item.bounds.height
+          } : null,
+          properties: {}
+        };
+
+        // Collect common properties
+        if (item.fillColor) itemData.properties.fillColor = item.fillColor.toCSS ? item.fillColor.toCSS() : item.fillColor;
+        if (item.strokeColor) itemData.properties.strokeColor = item.strokeColor.toCSS ? item.strokeColor.toCSS() : item.strokeColor;
+        if (item.strokeWidth) itemData.properties.strokeWidth = item.strokeWidth;
+        if (item.opacity !== undefined) itemData.properties.opacity = item.opacity;
+        if (item.rotation) itemData.properties.rotation = item.rotation;
+        if (item.data?.content) itemData.properties.content = item.data.content;
+
+        if (item.data?.isDecorative) {
+          decorative.push(itemData);
+        } else {
+          items.push(itemData);
+        }
+      }
+    }
+
+    // Collect relations
+    if (app.getRelations) {
+      const activeRelations = app.getRelations();
+      for (const rel of activeRelations) {
+        relations.push({
+          sourceId: rel.sourceId,
+          targetId: rel.targetId,
+          type: rel.type,
+          params: rel.params
+        });
+      }
+    }
+
+    // Get background color and canvas size
+    const backgroundColor = app.getBackgroundColor ? app.getBackgroundColor() : null;
+    const canvasSize = app.getCanvasSize ? app.getCanvasSize() : { width: 800, height: 600 };
+
+    return {
+      success: true,
+      items: items,
+      relations: relations,
+      decorative: decorative,
+      backgroundColor: backgroundColor,
+      canvasSize: canvasSize,
+      itemCount: items.length,
+      relationCount: relations.length
+    };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+})();
+`.trim();
+  }
+
+  /**
+   * Generate code to export map as GeoJSON with current styling
+   */
+  generateExportMapGeoJson(options: {
+    includeStyles?: boolean;
+    includeMetadata?: boolean;
+    selectedOnly?: boolean;
+    download?: boolean;
+    filename?: string;
+  } = {}): string {
+    const includeStyles = options.includeStyles !== false;
+    const includeMetadata = options.includeMetadata !== false;
+    const selectedOnly = options.selectedOnly || false;
+    const download = options.download || false;
+    const filename = options.filename || 'map-export.geojson';
+
+    return `
+// Export map as GeoJSON
+(function() {
+  if (!app.mapSystem) {
+    return { success: false, error: 'Map system not available' };
+  }
+
+  try {
+    const result = app.mapSystem.exportGeoJSON({
+      includeStyles: ${includeStyles},
+      includeMetadata: ${includeMetadata},
+      selectedOnly: ${selectedOnly},
+      download: ${download},
+      filename: ${JSON.stringify(filename)}
+    });
+    return result;
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+})();
+`.trim();
+  }
+
+  /**
+   * Generate code to export original map GeoJSON (unmodified boundaries)
+   */
+  generateExportOriginalMapGeoJson(options: {
+    download?: boolean;
+    filename?: string;
+  } = {}): string {
+    const download = options.download || false;
+    const filename = options.filename || 'map-source.geojson';
+
+    return `
+// Export original map GeoJSON
+(function() {
+  if (!app.mapSystem) {
+    return { success: false, error: 'Map system not available' };
+  }
+
+  try {
+    const result = app.mapSystem.exportOriginalGeoJSON({
+      download: ${download},
+      filename: ${JSON.stringify(filename)}
+    });
+    return result;
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+})();
+`.trim();
+  }
+
+  /**
+   * Generate code to get map source info
+   */
+  generateGetMapSourceInfo(): string {
+    return `
+// Get map source info
+(function() {
+  if (!app.mapSystem) {
+    return { success: false, error: 'Map system not available' };
+  }
+
+  try {
+    const result = app.mapSystem.getSourceInfo();
+    return result;
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+})();
+`.trim();
+  }
+
+  /**
+   * Generate code to register a Paper.js item
+   */
+  generateRegisterItem(input: {
+    itemJson: object;
+    itemType: string;
+    properties?: Record<string, unknown>;
+  }): string {
+    const itemJsonStr = JSON.stringify(input.itemJson);
+    const propertiesStr = input.properties ? JSON.stringify(input.properties) : '{}';
+
+    return `
+// Register Paper.js item
+(function() {
+  try {
+    // Import the Paper.js item from JSON
+    const item = paper.project.importJSON(${itemJsonStr});
+    if (!item) {
+      return { success: false, error: 'Failed to import item from JSON' };
+    }
+
+    // Register in item registry
+    const itemId = app.itemRegistry ? 'item_' + (app.itemRegistry.size + 1) : 'item_1';
+    item.data = item.data || {};
+    item.data.registryId = itemId;
+    item.data.type = ${JSON.stringify(input.itemType)};
+
+    // Merge custom properties
+    const customProps = ${propertiesStr};
+    Object.assign(item.data, customProps);
+
+    // Add to registry
+    if (app.itemRegistry) {
+      app.itemRegistry.set(itemId, item);
+    }
+
+    // Add to appropriate group
+    if (app.textItemGroup) {
+      app.textItemGroup.addChild(item);
+    }
+
+    return {
+      success: true,
+      itemId: itemId,
+      type: ${JSON.stringify(input.itemType)},
+      position: item.position ? { x: item.position.x, y: item.position.y } : null,
+      bounds: item.bounds ? {
+        x: item.bounds.x,
+        y: item.bounds.y,
+        width: item.bounds.width,
+        height: item.bounds.height
+      } : null
+    };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+})();
+`.trim();
+  }
+
   // =============================================================================
   // CUSTOM RELATION & CODE GENERATORS
   // =============================================================================
@@ -3587,6 +3822,175 @@ onMounted(() => {
   } catch (error) {
     return { success: false, error: error.message };
   }
+})();
+`.trim();
+  }
+
+  // =============================================================================
+  // MASK GENERATORS
+  // =============================================================================
+
+  generateApplyAnimatedMask(input: ApplyAnimatedMaskInput): string {
+    const validated = ApplyAnimatedMaskInputSchema.parse(input);
+    const optionsStr = validated.options ? JSON.stringify(validated.options) : '{}';
+    const keyframesStr = validated.keyframes ? JSON.stringify(validated.keyframes) : 'null';
+    const maskOptionsStr = validated.maskOptions ? JSON.stringify(validated.maskOptions) : '{}';
+
+    return `
+// Apply animated mask to ${validated.itemId}
+(function() {
+  if (!app.maskSystem) {
+    return { success: false, error: 'Mask system not available' };
+  }
+
+  try {
+    const result = app.maskSystem.applyAnimatedMask('${validated.itemId}', {
+      preset: ${validated.preset ? `'${validated.preset}'` : 'null'},
+      maskType: ${validated.maskType ? `'${validated.maskType}'` : 'null'},
+      keyframes: ${keyframesStr},
+      options: ${optionsStr},
+      maskOptions: ${maskOptionsStr}
+    });
+    return result;
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+})();
+`.trim();
+  }
+
+  generateApplyCustomMask(input: ApplyCustomMaskInput): string {
+    const validated = ApplyCustomMaskInputSchema.parse(input);
+    const keyframesStr = JSON.stringify(validated.keyframes);
+    const maskOptionsStr = validated.maskOptions ? JSON.stringify(validated.maskOptions) : '{}';
+
+    return `
+// Apply custom mask to ${validated.itemId}
+(function() {
+  if (!app.maskSystem) {
+    return { success: false, error: 'Mask system not available' };
+  }
+
+  try {
+    const result = app.maskSystem.applyCustomMask('${validated.itemId}', {
+      maskType: '${validated.maskType}',
+      keyframes: ${keyframesStr},
+      maskOptions: ${maskOptionsStr}
+    });
+    return result;
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+})();
+`.trim();
+  }
+
+  generateRemoveMask(input: RemoveMaskInput): string {
+    const validated = RemoveMaskInputSchema.parse(input);
+
+    return `
+// Remove mask from ${validated.itemId}
+(function() {
+  if (!app.maskSystem) {
+    return { success: false, error: 'Mask system not available' };
+  }
+
+  try {
+    const result = app.maskSystem.removeMask('${validated.itemId}');
+    return { success: true, itemId: '${validated.itemId}', message: 'Mask removed' };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+})();
+`.trim();
+  }
+
+  generateGetAnimatableProperties(): string {
+    return `
+// Get animatable properties for mask types
+(function() {
+  return {
+    rectangle: {
+      properties: ['x', 'y', 'width', 'height', 'rotation', 'opacity'],
+      description: 'Rectangular mask with position and size'
+    },
+    circle: {
+      properties: ['x', 'y', 'radius', 'scale', 'opacity'],
+      description: 'Circular mask with center and radius'
+    },
+    ellipse: {
+      properties: ['x', 'y', 'radiusX', 'radiusY', 'rotation', 'scale', 'opacity'],
+      description: 'Elliptical mask with separate radii'
+    },
+    star: {
+      properties: ['x', 'y', 'radius', 'scale', 'rotation', 'opacity'],
+      description: 'Star mask with configurable points'
+    },
+    triangle: {
+      properties: ['x', 'y', 'scale', 'rotation', 'opacity'],
+      description: 'Triangular mask'
+    },
+    hexagon: {
+      properties: ['x', 'y', 'scale', 'rotation', 'opacity'],
+      description: 'Hexagonal mask'
+    },
+    heart: {
+      properties: ['x', 'y', 'scale', 'rotation', 'opacity'],
+      description: 'Heart-shaped mask'
+    },
+    rounded: {
+      properties: ['x', 'y', 'width', 'height', 'cornerRadius', 'rotation', 'opacity'],
+      description: 'Rounded rectangle mask'
+    }
+  };
+})();
+`.trim();
+  }
+
+  generateGetAvailableEasings(): string {
+    return `
+// Get available easing functions
+(function() {
+  return {
+    easings: ['linear', 'easeIn', 'easeOut', 'easeInOut', 'bounce', 'elastic'],
+    descriptions: {
+      linear: 'Constant speed',
+      easeIn: 'Slow start, fast end',
+      easeOut: 'Fast start, slow end',
+      easeInOut: 'Slow start and end',
+      bounce: 'Bouncing effect at end',
+      elastic: 'Spring-like overshoot'
+    }
+  };
+})();
+`.trim();
+  }
+
+  generateGetMaskTypes(): string {
+    return `
+// Get available mask types
+(function() {
+  return {
+    maskTypes: ['rectangle', 'circle', 'ellipse', 'star', 'triangle', 'hexagon', 'heart', 'rounded', 'custom']
+  };
+})();
+`.trim();
+  }
+
+  generateGetMaskAnimations(): string {
+    return `
+// Get available mask animation presets
+(function() {
+  return {
+    animations: [
+      'wipeLeft', 'wipeRight', 'wipeUp', 'wipeDown',
+      'iris', 'irisOut',
+      'star', 'heart',
+      'curtainHorizontal', 'curtainVertical', 'cinematic',
+      'diagonalWipe',
+      'revealUp', 'revealDown'
+    ]
+  };
 })();
 `.trim();
   }

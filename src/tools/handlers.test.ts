@@ -1480,6 +1480,196 @@ describe('handleToolCall', () => {
     });
   });
 
+  describe('pinepaper_export_map_geojson', () => {
+    it('should generate code to export map as GeoJSON', async () => {
+      const result = await handleToolCall('pinepaper_export_map_geojson', {
+        includeStyles: true,
+        includeMetadata: true,
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('exportGeoJSON');
+    });
+
+    it('should support download option', async () => {
+      const result = await handleToolCall('pinepaper_export_map_geojson', {
+        download: true,
+        filename: 'my-map.geojson',
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('download: true');
+      expect(text).toContain('my-map.geojson');
+    });
+  });
+
+  describe('pinepaper_export_original_map_geojson', () => {
+    it('should generate code to export original map GeoJSON', async () => {
+      const result = await handleToolCall('pinepaper_export_original_map_geojson', {});
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('exportOriginalGeoJSON');
+    });
+  });
+
+  describe('pinepaper_get_map_source_info', () => {
+    it('should generate code to get map source info', async () => {
+      const result = await handleToolCall('pinepaper_get_map_source_info', {});
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('getSourceInfo');
+    });
+  });
+
+  describe('pinepaper_register_item', () => {
+    it('should generate code to register a Paper.js item', async () => {
+      const result = await handleToolCall('pinepaper_register_item', {
+        itemJson: { type: 'Path', data: {} },
+        itemType: 'customShape',
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('importJSON');
+      expect(text).toContain('customShape');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // MASK TOOL TESTS
+  // -------------------------------------------------------------------------
+  describe('pinepaper_apply_animated_mask', () => {
+    it('should generate code for preset mode mask', async () => {
+      const result = await handleToolCall('pinepaper_apply_animated_mask', {
+        itemId: 'item_1',
+        preset: 'wipeLeft',
+        options: { duration: 0.5, easing: 'easeOut' },
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('applyAnimatedMask');
+      expect(text).toContain('wipeLeft');
+    });
+
+    it('should generate code for custom keyframe mode', async () => {
+      const result = await handleToolCall('pinepaper_apply_animated_mask', {
+        itemId: 'item_1',
+        maskType: 'rectangle',
+        keyframes: [
+          { time: 0, properties: { width: 0 } },
+          { time: 1, properties: { width: 200 } },
+        ],
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('rectangle');
+      expect(text).toContain('keyframes');
+    });
+
+    it('should generate code for hybrid mode', async () => {
+      const result = await handleToolCall('pinepaper_apply_animated_mask', {
+        itemId: 'item_1',
+        preset: 'iris',
+        keyframes: [
+          { time: 0, properties: { scale: 0 }, easing: 'linear' },
+          { time: 1, properties: { scale: 1 }, easing: 'bounce' },
+        ],
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('iris');
+      expect(text).toContain('keyframes');
+    });
+  });
+
+  describe('pinepaper_apply_custom_mask', () => {
+    it('should generate code for custom mask with star shape', async () => {
+      const result = await handleToolCall('pinepaper_apply_custom_mask', {
+        itemId: 'item_1',
+        maskType: 'star',
+        keyframes: [
+          { time: 0, properties: { scale: 0 } },
+          { time: 1, properties: { scale: 1 } },
+        ],
+        maskOptions: { points: 6, innerRadius: 0.4 },
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('applyCustomMask');
+      expect(text).toContain('star');
+      expect(text).toContain('points');
+    });
+  });
+
+  describe('pinepaper_remove_mask', () => {
+    it('should generate code to remove mask', async () => {
+      const result = await handleToolCall('pinepaper_remove_mask', {
+        itemId: 'item_1',
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('removeMask');
+      expect(text).toContain('item_1');
+    });
+  });
+
+  describe('pinepaper_get_animatable_properties', () => {
+    it('should return animatable properties for all mask types', async () => {
+      const result = await handleToolCall('pinepaper_get_animatable_properties', {});
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('rectangle');
+      expect(text).toContain('circle');
+      expect(text).toContain('properties');
+    });
+  });
+
+  describe('pinepaper_get_available_easings', () => {
+    it('should return available easing functions', async () => {
+      const result = await handleToolCall('pinepaper_get_available_easings', {});
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('easings');
+      expect(text).toContain('linear');
+      expect(text).toContain('easeInOut');
+    });
+  });
+
+  describe('pinepaper_get_mask_types', () => {
+    it('should return available mask types', async () => {
+      const result = await handleToolCall('pinepaper_get_mask_types', {});
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('maskTypes');
+      expect(text).toContain('rectangle');
+      expect(text).toContain('circle');
+    });
+  });
+
+  describe('pinepaper_get_mask_animations', () => {
+    it('should return available mask animation presets', async () => {
+      const result = await handleToolCall('pinepaper_get_mask_animations', {});
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('animations');
+      expect(text).toContain('wipeLeft');
+      expect(text).toContain('iris');
+    });
+  });
+
   describe('unknown tool', () => {
     it('should return error for unknown tool', async () => {
       const result = await handleToolCall('unknown_tool', {});
