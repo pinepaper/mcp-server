@@ -81,9 +81,18 @@ export class PinePaperBrowserController {
   constructor(config: BrowserControllerConfig = {}) {
     // Ensure URL points to /editor where the code console and API are available
     let studioUrl = config.studioUrl || 'https://pinepaper.studio';
+    const originalUrl = studioUrl;
+
     if (!studioUrl.includes('/editor')) {
       studioUrl = studioUrl.replace(/\/$/, '') + '/editor';
     }
+
+    // MCP server ALWAYS uses agent mode - add agent parameter to URL
+    // This is critical for proper PinePaper agent integration
+    const url = new URL(studioUrl);
+    url.searchParams.set('agent', '1');
+    url.searchParams.set('mode', 'agent');
+    studioUrl = url.toString();
 
     this.config = {
       studioUrl,
@@ -91,10 +100,13 @@ export class PinePaperBrowserController {
       viewportWidth: config.viewportWidth || 1280,
       viewportHeight: config.viewportHeight || 800,
       timeout: config.timeout || 30000,
-      agentMode: config.agentMode ?? true, // Default to agent mode
+      agentMode: true, // MCP server always uses agent mode
     };
 
-    console.error(`[PinePaper] Controller initialized: agentMode=${this.config.agentMode}, headless=${this.config.headless}`);
+    console.error(`[PinePaper] Controller initialized:`);
+    console.error(`[PinePaper]   Original URL: ${originalUrl}`);
+    console.error(`[PinePaper]   Agent URL: ${studioUrl}`);
+    console.error(`[PinePaper]   Headless: ${this.config.headless}`);
   }
 
   /**
@@ -122,9 +134,16 @@ export class PinePaperBrowserController {
   }
 
   /**
-   * Get current studio URL
+   * Get current studio URL (always includes agent parameters for MCP server)
    */
   get studioUrl(): string {
+    return this.config.studioUrl;
+  }
+
+  /**
+   * Get the actual URL being used (same as studioUrl since MCP always uses agent mode)
+   */
+  get actualUrl(): string {
     return this.config.studioUrl;
   }
 
@@ -462,13 +481,13 @@ export class PinePaperBrowserController {
       const puppeteer = await import('puppeteer');
 
       // Agent mode defaults to headless
-      const headless = options.headless ?? true;
+      const useHeadless = options.headless ?? true;
       const viewportWidth = options.viewportWidth ?? this.config.viewportWidth;
       const viewportHeight = options.viewportHeight ?? this.config.viewportHeight;
 
-      console.error(`[PinePaper] Launching browser in agent mode (headless: ${headless})...`);
+      console.error(`[PinePaper] Launching browser in agent mode (headless: ${useHeadless})...`);
       this.browser = await puppeteer.default.launch({
-        headless,
+        headless: useHeadless,
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
@@ -482,11 +501,17 @@ export class PinePaperBrowserController {
 
       // Get existing pages first, reuse if available (avoid creating multiple tabs)
       const pages = await this.browser.pages();
+
+      // Use the first page (about:blank) and close ALL others
       if (pages.length > 0) {
         this.page = pages[0];
-        // Close any extra pages that might have been created
+        // Close ALL extra pages
         for (let i = 1; i < pages.length; i++) {
-          await pages[i].close();
+          try {
+            await pages[i].close();
+          } catch {
+            // Ignore close errors
+          }
         }
       } else {
         this.page = await this.browser.newPage();
@@ -497,10 +522,15 @@ export class PinePaperBrowserController {
         height: viewportHeight,
       });
 
-      // Navigate to agent URL
-      const agentUrl = this.getAgentUrl(this.config.studioUrl);
-      console.error(`[PinePaper] Navigating to agent URL: ${agentUrl}`);
-      await this.page.goto(agentUrl, {
+      // Ensure URL has agent parameters (double-check)
+      const targetUrl = this.config.studioUrl.includes('agent=')
+        ? this.config.studioUrl
+        : this.getAgentUrl(this.config.studioUrl);
+
+      console.error(`[PinePaper] Navigating to agent URL: ${targetUrl}`);
+
+      // Navigate the existing page to PinePaper (converts about:blank to PinePaper)
+      await this.page.goto(targetUrl, {
         waitUntil: 'networkidle2',
         timeout: this.config.timeout,
       });
@@ -737,20 +767,19 @@ let globalController: PinePaperBrowserController | null = null;
  * If a controller already exists, the config parameter is ignored.
  * Call resetBrowserController() first if you need to change config.
  *
- * NOTE: Agent mode is ENFORCED by default for optimal MCP server performance.
- * This uses headless browser with ?agent=1 URL parameter.
+ * NOTE: MCP server ALWAYS uses agent mode with ?agent=1&mode=agent URL parameters.
+ * This uses headless browser by default for optimal performance.
  */
 export function getBrowserController(
   config?: BrowserControllerConfig
 ): PinePaperBrowserController {
   if (!globalController) {
-    // Enforce agent mode by default
-    const enforceAgentMode: BrowserControllerConfig = {
+    // MCP server always uses headless by default
+    const mcpConfig: BrowserControllerConfig = {
       ...config,
-      agentMode: config?.agentMode ?? true, // Default to agent mode
-      headless: config?.headless ?? true, // Default to headless for agent mode
+      headless: config?.headless ?? true,
     };
-    globalController = new PinePaperBrowserController(enforceAgentMode);
+    globalController = new PinePaperBrowserController(mcpConfig);
   } else if (config) {
     // Log that config is being ignored since controller already exists
     console.error('[PinePaper] Browser controller already exists, config parameter ignored. Call resetBrowserController() to create a new controller with different config.');
