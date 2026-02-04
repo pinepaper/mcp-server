@@ -61,8 +61,6 @@ import {
   CreateQuizInputSchema,
   GetQuizStateInputSchema,
   ResetQuizInputSchema,
-  // Widget export schemas
-  ExportWidgetInputSchema,
   // Letter collage schemas
   CreateLetterCollageInputSchema,
   AnimateLetterCollageInputSchema,
@@ -338,10 +336,32 @@ async function executeOrGenerate(
       success: true,
       metadata: { executionMode: 'code' },
     });
-    return successResult(
-      code,
-      `${description}\n\n📋 **Code Generation Mode**: Copy the code above and paste it into the PinePaper Studio console to execute.`
-    );
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `✅ **Code Generated Successfully**
+
+**Tool:** ${toolName}
+**Action:** ${description}
+
+## Generated Code
+
+\`\`\`javascript
+${code}
+\`\`\`
+
+## How to Execute
+
+1. Open **PinePaper Studio**: https://pinepaper.studio/editor?agent=1&mode=agent
+2. Click the **Code Console** button (</> icon) in the toolbar
+3. Paste the code above into the console
+4. Click **Run** to execute
+
+The code is ready to use. Each subsequent tool call will also generate code you can paste.`,
+        },
+      ],
+    };
   }
 
   if (!executeInBrowser) {
@@ -372,13 +392,49 @@ async function executeOrGenerate(
         duration: totalDuration,
         timestamp: Date.now(),
         success: false,
-        metadata: { browserConnected: false, autoConnectFailed: true },
+        metadata: { browserConnected: false, autoConnectFailed: true, fallbackToCode: true },
       });
-      return errorResult(
-        'BROWSER_AUTO_CONNECT_FAILED',
-        `Failed to auto-connect browser: ${connectError instanceof Error ? connectError.message : 'Unknown error'}`,
-        { code }
-      );
+
+      // FALLBACK: Return code for manual paste instead of failing
+      const errorMessage = connectError instanceof Error ? connectError.message : 'Unknown error';
+      console.error(`[PinePaper] Browser connection failed: ${errorMessage}. Falling back to code-only mode.`);
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `⚠️ **Browser Connection Failed** - Falling back to code mode
+
+**Error:** ${errorMessage}
+
+**Don't worry!** You can still use PinePaper by copying the code below and pasting it into the PinePaper Code Console.
+
+## How to use the code manually:
+
+1. Open **PinePaper Studio**: https://pinepaper.studio/editor?agent=1&mode=agent
+2. Click the **Code Console** button (</> icon) in the toolbar
+3. Paste the code below into the console
+4. Click **Run** to execute
+
+---
+
+## Generated Code for: ${toolName}
+
+\`\`\`javascript
+${code}
+\`\`\`
+
+---
+
+**${description}**
+
+💡 **Tip:** If browser connection keeps failing, check:
+- Is Chrome/Chromium installed?
+- Are there firewall restrictions?
+- Try setting \`headless: false\` in browser_connect to see the browser window`,
+          },
+        ],
+      };
     }
   }
 
@@ -653,7 +709,7 @@ export async function handleToolCall(
         const description = getLocalizedSuccessMessage(i18n, 'relationAdded', {
           relationType: input.relationType,
           sourceId: input.sourceId,
-          targetId: input.targetId,
+          targetId: input.targetId || 'self',
         });
         return executeOrGenerate(code, description, options, 'pinepaper_add_relation');
       }
@@ -824,6 +880,204 @@ export async function handleToolCall(
       case 'pinepaper_get_mask_animations': {
         const code = codeGenerator.generateGetMaskAnimations();
         return executeOrGenerate(code, 'Gets available mask animation presets', options, 'pinepaper_get_mask_animations');
+      }
+
+      // -----------------------------------------------------------------------
+      // CAMERA TOOLS
+      // -----------------------------------------------------------------------
+      case 'pinepaper_camera_animate': {
+        const keyframes = args.keyframes as Array<{
+          time: number;
+          zoom?: number;
+          center?: [number, number];
+          easing?: string;
+        }>;
+        const duration = args.duration as number;
+        const loop = (args.loop as boolean) ?? false;
+        const delay = (args.delay as number) ?? 0;
+
+        const keyframesStr = JSON.stringify(keyframes);
+        const code = `app.camera && app.camera.animate ? app.camera.animate(${keyframesStr}, ${duration}, ${loop}, ${delay}) : app.addRelation('camera', 'camera', 'camera_animates', { keyframes: ${keyframesStr}, duration: ${duration}, loop: ${loop}, delay: ${delay} });`;
+        return executeOrGenerate(code, `Animates camera with ${keyframes.length} keyframes over ${duration}s`, options, 'pinepaper_camera_animate');
+      }
+
+      case 'pinepaper_camera_zoom': {
+        const direction = args.direction as 'in' | 'out';
+        const level = (args.level as number) ?? (direction === 'in' ? 2 : 0.5);
+        const duration = (args.duration as number) ?? 0.5;
+
+        const method = direction === 'in' ? 'zoomIn' : 'zoomOut';
+        const code = `app.camera && app.camera.${method} ? app.camera.${method}(${level}, ${duration}) : null;`;
+        return executeOrGenerate(code, `Camera zoom ${direction} to ${level}x`, options, 'pinepaper_camera_zoom');
+      }
+
+      case 'pinepaper_camera_pan': {
+        const direction = args.direction as 'left' | 'right' | 'up' | 'down' | undefined;
+        const amount = (args.amount as number) ?? 100;
+        const x = args.x as number | undefined;
+        const y = args.y as number | undefined;
+        const duration = (args.duration as number) ?? 0.5;
+
+        let code: string;
+        let description: string;
+
+        if (x !== undefined && y !== undefined) {
+          code = `app.camera && app.camera.panTo ? app.camera.panTo(${x}, ${y}, ${duration}) : null;`;
+          description = `Camera pan to (${x}, ${y})`;
+        } else if (direction) {
+          const methodMap = { left: 'panLeft', right: 'panRight', up: 'panUp', down: 'panDown' };
+          const method = methodMap[direction];
+          code = `app.camera && app.camera.${method} ? app.camera.${method}(${amount}, ${duration}) : null;`;
+          description = `Camera pan ${direction} by ${amount}px`;
+        } else {
+          code = `// No direction or coordinates specified`;
+          description = 'Camera pan (no parameters)';
+        }
+
+        return executeOrGenerate(code, description, options, 'pinepaper_camera_pan');
+      }
+
+      case 'pinepaper_camera_move_to': {
+        const x = args.x as number;
+        const y = args.y as number;
+        const zoom = args.zoom as number;
+        const duration = (args.duration as number) ?? 0.5;
+
+        const code = `app.camera && app.camera.moveTo ? app.camera.moveTo(${x}, ${y}, ${zoom}, ${duration}) : null;`;
+        return executeOrGenerate(code, `Camera move to (${x}, ${y}) at ${zoom}x zoom`, options, 'pinepaper_camera_move_to');
+      }
+
+      case 'pinepaper_camera_reset': {
+        const duration = (args.duration as number) ?? 0.5;
+
+        const code = `app.camera && app.camera.reset ? app.camera.reset(${duration}) : null;`;
+        return executeOrGenerate(code, 'Reset camera to default state', options, 'pinepaper_camera_reset');
+      }
+
+      case 'pinepaper_camera_stop': {
+        const code = `app.camera && app.camera.stop ? app.camera.stop() : null;`;
+        return executeOrGenerate(code, 'Stop camera animation', options, 'pinepaper_camera_stop');
+      }
+
+      case 'pinepaper_camera_state': {
+        const code = `app.camera && app.camera.getState ? app.camera.getState() : { zoom: 1, center: [400, 300], isAnimating: false };`;
+        return executeOrGenerate(code, 'Get current camera state', options, 'pinepaper_camera_state');
+      }
+
+      // -----------------------------------------------------------------------
+      // FONT TOOLS
+      // -----------------------------------------------------------------------
+      case 'pinepaper_font_show_studio': {
+        const code = `app.fontStudio && app.fontStudio.show ? app.fontStudio.show() : null;`;
+        return executeOrGenerate(code, 'Opens Font Studio UI', options, 'pinepaper_font_show_studio');
+      }
+
+      case 'pinepaper_font_set_name': {
+        const { name } = args as { name: string };
+        const code = `app.fontStudio.setName(${JSON.stringify(name)});`;
+        return executeOrGenerate(code, `Set font name to "${name}"`, options, 'pinepaper_font_set_name');
+      }
+
+      case 'pinepaper_font_get_required_chars': {
+        const { set } = args as { set?: string };
+        const setArg = set ? JSON.stringify(set) : '"minimum"';
+        const code = `app.fontStudio.getRequiredChars(${setArg});`;
+        return executeOrGenerate(code, `Get required characters (${set || 'minimum'} set)`, options, 'pinepaper_font_get_required_chars');
+      }
+
+      case 'pinepaper_font_get_status': {
+        const code = `app.fontStudio.getStatus();`;
+        return executeOrGenerate(code, 'Get font completion status', options, 'pinepaper_font_get_status');
+      }
+
+      case 'pinepaper_font_create_glyph': {
+        const { character, pathId } = args as { character: string; pathId: string };
+        const code = `app.fontStudio.createGlyph(${JSON.stringify(character)}, ${JSON.stringify(pathId)});`;
+        return executeOrGenerate(code, `Create glyph for "${character}" from path ${pathId}`, options, 'pinepaper_font_create_glyph');
+      }
+
+      case 'pinepaper_font_create_space': {
+        const { width } = args as { width?: number };
+        const code = width !== undefined
+          ? `app.fontStudio.createSpace(${width});`
+          : `app.fontStudio.createSpace();`;
+        return executeOrGenerate(code, `Create space glyph${width ? ` (width: ${width})` : ''}`, options, 'pinepaper_font_create_space');
+      }
+
+      case 'pinepaper_font_remove_glyph': {
+        const { character } = args as { character: string };
+        const code = `app.fontStudio.removeGlyph(${JSON.stringify(character)});`;
+        return executeOrGenerate(code, `Remove glyph for "${character}"`, options, 'pinepaper_font_remove_glyph');
+      }
+
+      case 'pinepaper_font_set_metrics': {
+        const metrics = args as { unitsPerEm?: number; ascender?: number; descender?: number; xHeight?: number; capHeight?: number };
+        const code = `app.fontStudio.setMetrics(${JSON.stringify(metrics)});`;
+        return executeOrGenerate(code, 'Set font metrics', options, 'pinepaper_font_set_metrics');
+      }
+
+      case 'pinepaper_font_export': {
+        const { download } = args as { download?: boolean };
+        const code = download === false
+          ? `app.fontStudio.export({ download: false });`
+          : `app.fontStudio.export();`;
+        return executeOrGenerate(code, 'Export font as OTF', options, 'pinepaper_font_export');
+      }
+
+      case 'pinepaper_font_load_into_document': {
+        const code = `app.fontStudio.loadIntoDocument();`;
+        return executeOrGenerate(code, 'Load font into document', options, 'pinepaper_font_load_into_document');
+      }
+
+      case 'pinepaper_font_export_data': {
+        const { download } = args as { download?: boolean };
+        const code = download === false
+          ? `app.fontStudio.exportData({ download: false });`
+          : `app.fontStudio.exportData();`;
+        return executeOrGenerate(code, 'Export font data as JSON', options, 'pinepaper_font_export_data');
+      }
+
+      case 'pinepaper_font_import_data': {
+        const { data } = args as { data: object };
+        const code = `app.fontStudio.importData(${JSON.stringify(data)});`;
+        return executeOrGenerate(code, 'Import font data from JSON', options, 'pinepaper_font_import_data');
+      }
+
+      case 'pinepaper_font_clear': {
+        const code = `app.fontStudio.clear();`;
+        return executeOrGenerate(code, 'Clear all glyphs and reset font', options, 'pinepaper_font_clear');
+      }
+
+      case 'pinepaper_font_remove_overlap': {
+        const { pathId } = args as { pathId: string };
+        const code = `app.fontStudio.removeOverlap(${JSON.stringify(pathId)});`;
+        return executeOrGenerate(code, `Remove overlaps from path ${pathId}`, options, 'pinepaper_font_remove_overlap');
+      }
+
+      case 'pinepaper_font_correct_direction': {
+        const { pathId } = args as { pathId: string };
+        const code = `app.fontStudio.correctDirection(${JSON.stringify(pathId)});`;
+        return executeOrGenerate(code, `Correct path direction for ${pathId}`, options, 'pinepaper_font_correct_direction');
+      }
+
+      case 'pinepaper_font_cleanup_path': {
+        const { pathId, removeOverlap, correctDirection, smooth, smoothTolerance } = args as {
+          pathId: string;
+          removeOverlap?: boolean;
+          correctDirection?: boolean;
+          smooth?: boolean;
+          smoothTolerance?: number;
+        };
+        const optsObj: Record<string, unknown> = {};
+        if (removeOverlap !== undefined) optsObj.removeOverlap = removeOverlap;
+        if (correctDirection !== undefined) optsObj.correctDirection = correctDirection;
+        if (smooth !== undefined) optsObj.smooth = smooth;
+        if (smoothTolerance !== undefined) optsObj.smoothTolerance = smoothTolerance;
+        const hasOpts = Object.keys(optsObj).length > 0;
+        const code = hasOpts
+          ? `app.fontStudio.cleanupPath(${JSON.stringify(pathId)}, ${JSON.stringify(optsObj)});`
+          : `app.fontStudio.cleanupPath(${JSON.stringify(pathId)});`;
+        return executeOrGenerate(code, `Cleanup path ${pathId}`, options, 'pinepaper_font_cleanup_path');
       }
 
       // -----------------------------------------------------------------------
@@ -1001,7 +1255,7 @@ You can now start creating new items on a clean canvas.`,
             content: [
               {
                 type: 'text',
-                text: `Already connected to PinePaper Studio at ${controller.studioUrl}`,
+                text: `Already connected to PinePaper Studio at ${controller.actualUrl}`,
               },
             ],
           };
@@ -1024,8 +1278,9 @@ You can now start creating new items on a clean canvas.`,
           const content: (TextContent | ImageContent)[] = [
             {
               type: 'text',
-              text: `✅ Connected to PinePaper Studio at ${url}
+              text: `✅ Connected to PinePaper Studio at ${controller.actualUrl}
 
+**Agent mode enabled** (agent=1&mode=agent parameters added automatically)
 **Current canvas size: ${canvasSize.width}x${canvasSize.height}**
 
 ⚠️ IMPORTANT NOTES:
@@ -1047,11 +1302,40 @@ Browser is ready. You can now use other pinepaper tools to create and animate gr
 
           return { content };
         } catch (error) {
-          return errorResult(
-            'BROWSER_CONNECTION_ERROR',
-            error instanceof Error ? error.message : 'Failed to connect to browser',
-            { url }
-          );
+          const errorMessage = error instanceof Error ? error.message : 'Failed to connect to browser';
+
+          // Provide helpful fallback instructions instead of just failing
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `⚠️ **Browser Connection Failed**
+
+**Error:** ${errorMessage}
+
+## Don't worry! You can still use PinePaper manually:
+
+### Option 1: Manual Browser Mode
+1. Open **PinePaper Studio** in your browser: https://pinepaper.studio/editor?agent=1&mode=agent
+2. Continue using PinePaper tools - the MCP server will generate code for each action
+3. Copy the generated code and paste it into the **Code Console** (</> icon in toolbar)
+
+### Option 2: Troubleshoot Browser Connection
+- **Check Chrome/Chromium**: Puppeteer requires Chrome or Chromium installed
+- **Try headless: false**: Call \`pinepaper_browser_connect\` with \`headless: false\` to see the browser window
+- **Check permissions**: Ensure the process has permission to launch browsers
+- **Firewall**: Check if firewall is blocking browser launch
+
+### What happens now?
+All PinePaper tools will work in **code-only mode**:
+- Each tool generates JavaScript code
+- You copy the code and paste it in PinePaper's Code Console
+- The code executes and creates your graphics
+
+**The MCP server is fully functional** - just without automatic browser control.`,
+              },
+            ],
+          };
         }
       }
 
@@ -1121,7 +1405,8 @@ Browser is ready. You can now use other pinepaper tools to create and animate gr
               text: JSON.stringify(
                 {
                   connected: controller.connected,
-                  studioUrl: controller.studioUrl,
+                  studioUrl: controller.actualUrl,
+                  agentMode: controller.agentMode,
                 },
                 null,
                 2
@@ -1522,16 +1807,6 @@ Browser is ready. You can now use other pinepaper tools to create and animate gr
       }
 
       // -----------------------------------------------------------------------
-      // WIDGET EXPORT TOOLS
-      // -----------------------------------------------------------------------
-      case 'pinepaper_export_widget': {
-        const input = ExportWidgetInputSchema.parse(args);
-        const code = codeGenerator.generateExportWidget(input);
-        const description = `Exported widget as ${input.format} (${input.sizing || 'responsive'}, ${input.interactivity || 'view'})`;
-        return executeOrGenerate(code, description, options, 'pinepaper_export_widget');
-      }
-
-      // -----------------------------------------------------------------------
       // LETTER COLLAGE TOOLS
       // -----------------------------------------------------------------------
       case 'pinepaper_create_letter_collage': {
@@ -1567,7 +1842,7 @@ Browser is ready. You can now use other pinepaper tools to create and animate gr
       case 'pinepaper_load_map': {
         const input = LoadMapInputSchema.parse(args);
         const code = codeGenerator.generateLoadMap(input);
-        const description = `Loads ${input.mapId} map with ${input.options?.projection || 'default'} projection`;
+        const description = `Loads ${input.mapId} map with ${input.projection || 'default'} projection`;
         return executeOrGenerate(code, description, options, 'pinepaper_load_map');
       }
 
@@ -1766,6 +2041,13 @@ Browser is ready. You can now use other pinepaper tools to create and animate gr
             'pinepaper_get_available_easings',
             'pinepaper_get_mask_types',
             'pinepaper_get_mask_animations',
+            'pinepaper_camera_animate',
+            'pinepaper_camera_zoom',
+            'pinepaper_camera_pan',
+            'pinepaper_camera_move_to',
+            'pinepaper_camera_reset',
+            'pinepaper_camera_stop',
+            'pinepaper_camera_state',
             'pinepaper_get_items',
             'pinepaper_get_relation_stats',
             'pinepaper_set_background_color',
@@ -1811,8 +2093,6 @@ Browser is ready. You can now use other pinepaper tools to create and animate gr
             'pinepaper_create_quiz',
             'pinepaper_get_quiz_state',
             'pinepaper_reset_quiz',
-            // Widget export tools
-            'pinepaper_export_widget',
             // Letter collage tools
             'pinepaper_create_letter_collage',
             'pinepaper_animate_letter_collage',
@@ -1844,6 +2124,23 @@ Browser is ready. You can now use other pinepaper tools to create and animate gr
             'pinepaper_export_map_geojson',
             'pinepaper_export_original_map_geojson',
             'pinepaper_get_map_source_info',
+            // Font tools
+            'pinepaper_font_show_studio',
+            'pinepaper_font_set_name',
+            'pinepaper_font_get_required_chars',
+            'pinepaper_font_get_status',
+            'pinepaper_font_create_glyph',
+            'pinepaper_font_create_space',
+            'pinepaper_font_remove_glyph',
+            'pinepaper_font_set_metrics',
+            'pinepaper_font_export',
+            'pinepaper_font_load_into_document',
+            'pinepaper_font_export_data',
+            'pinepaper_font_import_data',
+            'pinepaper_font_clear',
+            'pinepaper_font_remove_overlap',
+            'pinepaper_font_correct_direction',
+            'pinepaper_font_cleanup_path',
             // Paper.js direct access tools
             'pinepaper_register_item',
           ],

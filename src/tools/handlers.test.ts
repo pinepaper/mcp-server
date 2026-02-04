@@ -66,7 +66,7 @@ describe('handleToolCall', () => {
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
-      expect(text).toContain("app.getItemById('item_1')");
+      expect(text).toContain("app.select('item_1')");
       expect(text).toContain('app.modify');
       expect(text).toContain('#00ff00');
     });
@@ -317,8 +317,8 @@ describe('handleToolCall', () => {
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
-      expect(text).toContain('keyframes');
-      expect(text).toContain('app.playKeyframeTimeline');
+      expect(text).toContain('app.addAnimation');
+      expect(text).toContain('opacity');
     });
   });
 
@@ -471,7 +471,7 @@ describe('handleToolCall', () => {
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
-      expect(text).toContain('app.setCanvasSize(1920, 1080)');
+      expect(text).toContain('app.setCanvasSize({ width: 1920, height: 1080 })');
     });
 
     it('should include preset when provided', async () => {
@@ -875,57 +875,6 @@ describe('handleToolCall', () => {
   });
 
   // -------------------------------------------------------------------------
-  // WIDGET EXPORT TOOL
-  // -------------------------------------------------------------------------
-
-  describe('pinepaper_export_widget', () => {
-    it('should generate code for web component export', async () => {
-      const result = await handleToolCall('pinepaper_export_widget', {
-        format: 'web-component',
-      });
-
-      expect(result.isError).toBeFalsy();
-      const text = (result.content[0] as { type: string; text: string }).text;
-      expect(text).toContain('web-component');
-    });
-
-    it('should support standalone HTML export', async () => {
-      const result = await handleToolCall('pinepaper_export_widget', {
-        format: 'standalone-html',
-        sizing: 'responsive',
-      });
-
-      expect(result.isError).toBeFalsy();
-      const text = (result.content[0] as { type: string; text: string }).text;
-      expect(text).toContain('standalone-html');
-    });
-
-    it('should support iframe embed export', async () => {
-      const result = await handleToolCall('pinepaper_export_widget', {
-        format: 'iframe-embed',
-        autoplay: true,
-        loop: true,
-      });
-
-      expect(result.isError).toBeFalsy();
-      const text = (result.content[0] as { type: string; text: string }).text;
-      expect(text).toContain('iframe-embed');
-    });
-
-    it('should support LMS integration', async () => {
-      const result = await handleToolCall('pinepaper_export_widget', {
-        format: 'web-component',
-        lmsEnabled: true,
-        lmsType: 'scorm',
-      });
-
-      expect(result.isError).toBeFalsy();
-      const text = (result.content[0] as { type: string; text: string }).text;
-      expect(text).toContain('lmsEnabled = true');
-    });
-  });
-
-  // -------------------------------------------------------------------------
   // LETTER COLLAGE TOOLS
   // -------------------------------------------------------------------------
 
@@ -1110,10 +1059,8 @@ describe('handleToolCall', () => {
     it('should generate code with projection options', async () => {
       const result = await handleToolCall('pinepaper_load_map', {
         mapId: 'usa',
-        options: {
-          projection: 'albers',
-          quality: 'professional',
-        },
+        projection: 'albers',
+        quality: 'professional',
       });
 
       expect(result.isError).toBeFalsy();

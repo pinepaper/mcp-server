@@ -243,6 +243,7 @@ export const RelationTypeSchema = z.enum([
   'circumscribes',
   'wave_through',
   'camera_follows',
+  'camera_animates',
   'morphs_to',
 ]).describe('Type of relationship between items');
 
@@ -568,7 +569,7 @@ export const DeleteItemInputSchema = z.object({
 // Add Relation
 export const AddRelationInputSchema = z.object({
   sourceId: z.string().describe('Registry ID of the source item'),
-  targetId: z.string().describe('Registry ID of the target item'),
+  targetId: z.string().optional().describe('Registry ID of the target item (can be null for self-animations)'),
   relationType: RelationTypeSchema,
   params: z.record(z.unknown()).optional().default({}),
 });
@@ -1826,20 +1827,18 @@ export type LabelType = z.infer<typeof LabelTypeSchema>;
 
 export const LoadMapInputSchema = z.object({
   mapId: MapIdSchema.describe('Map to load'),
-  options: z.object({
-    projection: MapProjectionSchema.optional().describe('Map projection type'),
-    quality: MapQualitySchema.optional().describe('Rendering quality'),
-    fillColor: z.string().optional().describe('Default fill color for regions'),
-    strokeColor: z.string().optional().describe('Border color'),
-    strokeWidth: z.number().optional().describe('Border width'),
-    scale: z.number().optional().describe('Scale multiplier'),
-    center: z.tuple([z.number(), z.number()]).optional().describe('Center coordinates [lon, lat]'),
-    rotate: z.tuple([z.number(), z.number(), z.number()]).optional().describe('Rotation angles [x, y, z]'),
-    enableHover: z.boolean().optional().describe('Enable hover effects'),
-    enableClick: z.boolean().optional().describe('Enable click events'),
-    hoverFill: z.string().optional().describe('Hover fill color'),
-    hoverStroke: z.string().optional().describe('Hover stroke color'),
-  }).optional().describe('Map options'),
+  projection: MapProjectionSchema.optional().describe('Map projection type'),
+  quality: MapQualitySchema.optional().describe('Rendering quality'),
+  fillColor: z.string().optional().describe('Default fill color for regions'),
+  strokeColor: z.string().optional().describe('Border color'),
+  strokeWidth: z.number().optional().describe('Border width'),
+  scale: z.number().optional().describe('Scale multiplier'),
+  center: z.tuple([z.number(), z.number()]).optional().describe('Center coordinates [lon, lat]'),
+  rotate: z.tuple([z.number(), z.number(), z.number()]).optional().describe('Rotation angles [x, y, z]'),
+  enableHover: z.boolean().optional().describe('Enable hover effects'),
+  enableClick: z.boolean().optional().describe('Enable click events'),
+  hoverFill: z.string().optional().describe('Hover fill color'),
+  hoverStroke: z.string().optional().describe('Hover stroke color'),
 }).describe('Load map input');
 
 export type LoadMapInput = z.infer<typeof LoadMapInputSchema>;

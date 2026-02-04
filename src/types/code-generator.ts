@@ -144,6 +144,12 @@ import {
   ApplyCustomMaskInput,
   RemoveMaskInputSchema,
   RemoveMaskInput,
+  // Template types
+  ApplyTemplateInputSchema,
+  ApplyTemplateInput,
+  // Image import types
+  ImportImageInputSchema,
+  ImportImageInput,
 } from './schemas.js';
 import { z } from 'zod';
 
@@ -315,11 +321,8 @@ function generateModifyItemCode(
 ): string {
   return `
 // Modify item ${itemId}
-const item = app.getItemById('${itemId}');
-if (!item) {
-  throw new Error('Item not found: ${itemId}');
-}
-app.modify(item, ${JSON.stringify(properties, null, 2)});
+app.select('${itemId}');
+app.modify(${JSON.stringify(properties, null, 2)});
 app.historyManager.saveState();
 
 // Return success
@@ -467,18 +470,7 @@ function generateKeyframeAnimateCode(
   
   return `
 // Apply keyframe animation to ${itemId}
-const item = app.getItemById('${itemId}');
-if (!item) {
-  throw new Error('Item not found: ${itemId}');
-}
-
-app.modify(item, {
-  animationType: 'keyframe',
-  keyframes: ${keyframesJson}
-});
-
-// Start playback
-app.playKeyframeTimeline(${calculatedDuration}, ${loop});
+app.addAnimation('${itemId}', ${keyframesJson}, { duration: ${calculatedDuration}, loop: ${loop} });
 
 ({ success: true, itemId: '${itemId}', duration: ${calculatedDuration}, loop: ${loop} });
 `.trim();
@@ -624,9 +616,12 @@ function generateSetCanvasSizeCode(
   height: number,
   preset?: string
 ): string {
+  const sizeArg = preset
+    ? `'${preset}'`
+    : `{ width: ${width}, height: ${height} }`;
   return `
 // Set canvas size
-app.setCanvasSize(${width}, ${height}${preset ? `, '${preset}'` : ''});
+app.setCanvasSize(${sizeArg});
 app.historyManager.saveState();
 ({ success: true, width: ${width}, height: ${height} });
 `.trim();
@@ -872,7 +867,7 @@ export class PinePaperCodeGenerator {
     const validated = AddRelationInputSchema.parse(input);
     return generateAddRelationCode(
       validated.sourceId,
-      validated.targetId,
+      validated.targetId || validated.sourceId,
       validated.relationType,
       validated.params as Record<string, unknown>
     );
@@ -3006,7 +3001,8 @@ onMounted(() => {
    */
   generateLoadMap(input: LoadMapInput): string {
     const validated = LoadMapInputSchema.parse(input);
-    const optionsStr = validated.options ? JSON.stringify(validated.options) : '{}';
+    const { mapId, ...mapOptions } = validated;
+    const optionsStr = Object.keys(mapOptions).length > 0 ? JSON.stringify(mapOptions) : '{}';
 
     return `
 // Load geographic map
@@ -3016,10 +3012,10 @@ onMounted(() => {
   }
 
   try {
-    const result = await app.mapSystem.loadMap('${validated.mapId}', ${optionsStr});
+    const result = await app.mapSystem.loadMap('${mapId}', ${optionsStr});
     return {
       success: true,
-      mapId: result.mapId || '${validated.mapId}',
+      mapId: result.mapId || '${mapId}',
       regions: result.regions?.length || 0,
       bounds: result.bounds,
       center: result.center
@@ -3991,6 +3987,85 @@ onMounted(() => {
       'revealUp', 'revealDown'
     ]
   };
+})();
+`.trim();
+  }
+
+  generateApplyTemplate(input: ApplyTemplateInput): string {
+    const { templateId, category, listOnly } = input;
+
+    if (listOnly || !templateId) {
+      // List mode: return available templates, optionally filtered by category
+      const categoryFilter = category ? `'${category}'` : 'null';
+      return `
+// List available templates
+(function() {
+  if (!app.templateManager) {
+    return { error: 'Template manager not available. Make sure PinePaper Studio is loaded.' };
+  }
+  const allTemplates = app.templateManager.getAllTemplates();
+  const category = ${categoryFilter};
+  const filtered = category
+    ? allTemplates.filter(t => t.category === category)
+    : allTemplates;
+  return {
+    templates: filtered.map(t => ({
+      id: t.id,
+      name: t.name,
+      category: t.category,
+      description: t.description || ''
+    })),
+    count: filtered.length,
+    categories: [...new Set(allTemplates.map(t => t.category))]
+  };
+})();
+`.trim();
+    }
+
+    // Load mode: apply a specific template
+    return `
+// Apply template: ${templateId}
+(async function() {
+  if (!app.templateManager) {
+    return { error: 'Template manager not available. Make sure PinePaper Studio is loaded.' };
+  }
+  try {
+    await app.templateManager.loadTemplate('${templateId}', true);
+    return { success: true, templateId: '${templateId}', message: 'Template applied successfully. Canvas has been replaced with template content.' };
+  } catch (e) {
+    return { error: 'Failed to apply template: ' + e.message };
+  }
+})();
+`.trim();
+  }
+
+  generateImportImage(input: ImportImageInput): string {
+    const { url, position, maxWidth, maxHeight, mask } = input;
+
+    const positionOpts = position ? `, position: { x: ${position.x}, y: ${position.y} }` : '';
+    const maxWidthOpt = maxWidth !== undefined ? `, maxWidth: ${maxWidth}` : '';
+    const maxHeightOpt = maxHeight !== undefined ? `, maxHeight: ${maxHeight}` : '';
+
+    return `
+// Import image from URL
+(async function() {
+  if (!app.imageTools) {
+    return { error: 'Image tools not available. Make sure PinePaper Studio is loaded.' };
+  }
+  try {
+    const entry = await app.imageTools.uploadFromURL('${url}');
+    const opts = {${positionOpts}${maxWidthOpt}${maxHeightOpt} };
+    const raster = await app.imageTools.placeImage(entry.id, Object.keys(opts).length > 0 ? opts : undefined);
+${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    const itemId = raster.data?.itemId || raster.name || raster.id;
+    return {
+      success: true,
+      itemId: itemId,
+      message: 'Image imported and placed on canvas.',
+      bounds: { x: raster.bounds.x, y: raster.bounds.y, width: raster.bounds.width, height: raster.bounds.height }${mask ? `,\n      mask: '${mask}'` : ''}
+    };
+  } catch (e) {
+    return { error: 'Failed to import image: ' + e.message };
+  }
 })();
 `.trim();
   }

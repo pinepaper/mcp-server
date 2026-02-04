@@ -86,6 +86,14 @@ When to use which:
    ├─ Training data (LLM fine-tuning) → pinepaper_export_training_data
    └─ Screenshot → pinepaper_browser_screenshot
 
+6. USER WANTS CUSTOM FONTS:
+   ├─ Open Font Studio → pinepaper_font_show_studio
+   ├─ Create glyph from path → pinepaper_font_create_glyph
+   ├─ Clean up path first → pinepaper_font_cleanup_path
+   ├─ Check progress → pinepaper_font_get_status
+   ├─ Export as OTF → pinepaper_font_export
+   └─ Use in document → pinepaper_font_load_into_document
+
 🎯 WORKFLOW PLANNING:
 
 BEFORE STARTING ANY SCENE:
@@ -264,6 +272,35 @@ For glossy 3D spheres, use pinepaper_create_glossy_sphere instead. For diagonal 
           description: 'Type-specific properties (content, radius, color, fontSize, etc.)',
           additionalProperties: true,
         },
+        data: {
+          type: 'object',
+          description: 'Item data flags for selection and behavior control',
+          properties: {
+            selectable: { type: 'boolean', description: 'Whether item can be selected (default: true for text layer items)' },
+            isDraggable: { type: 'boolean', description: 'Whether item can be dragged (default: true for text layer items)' },
+            isDecorative: { type: 'boolean', description: 'Mark as decorative/non-interactive (skipped by selection)' },
+          },
+        },
+        animationType: {
+          type: 'string',
+          description: "Animation type to apply on creation (e.g., 'pulse', 'bounce', 'rotate', 'fade', 'wobble', 'slide', 'typewriter', 'keyframe')",
+        },
+        animationSpeed: {
+          type: 'number',
+          description: 'Animation speed multiplier (for simple animations, default: 1.0)',
+        },
+        keyframes: {
+          type: 'array',
+          description: "Keyframe array for inline keyframe animation (requires animationType: 'keyframe')",
+          items: {
+            type: 'object',
+            properties: {
+              time: { type: 'number', description: 'Time in seconds' },
+              properties: { type: 'object', description: 'Animatable properties (x, y, scale, opacity, rotation, fillColor, etc.)' },
+              easing: { type: 'string', description: 'Easing function: linear, easeIn, easeOut, easeInOut, bounce, elastic' },
+            },
+          },
+        },
       },
       required: ['itemType'],
     },
@@ -312,8 +349,17 @@ GRADIENT OBJECT FORMAT:
         },
         properties: {
           type: 'object',
-          description: 'Properties to update',
+          description: 'Properties to update (x, y, width, height, scale, scaleX, scaleY, rotation, opacity, color, strokeColor, strokeWidth, fontSize, content, animationType, animationSpeed)',
           additionalProperties: true,
+        },
+        data: {
+          type: 'object',
+          description: 'Update item data flags',
+          properties: {
+            selectable: { type: 'boolean', description: 'Whether item can be selected' },
+            isDraggable: { type: 'boolean', description: 'Whether item can be dragged' },
+            isDecorative: { type: 'boolean', description: 'Mark as decorative/non-interactive' },
+          },
         },
       },
       required: ['itemId', 'properties'],
@@ -571,7 +617,7 @@ EXAMPLE - Bouncing Balls:
 }
 
 SUPPORTED ITEM TYPES: text, circle, star, rectangle, triangle, polygon, ellipse, path, line, arc
-SUPPORTED RELATIONS: orbits, follows, attached_to, maintains_distance, points_at, mirrors, parallax, bounds_to
+SUPPORTED RELATIONS: orbits, follows, attached_to, maintains_distance, points_at, mirrors, parallax, bounds_to, animates, grows_from, staggered_with, indicates, circumscribes, wave_through, camera_follows, camera_animates, morphs_to
 SUPPORTED ANIMATIONS: pulse, rotate, bounce, fade, wobble, slide, typewriter`,
     inputSchema: {
       type: 'object',
@@ -617,7 +663,7 @@ SUPPORTED ANIMATIONS: pulse, rotate, bounce, fade, wobble, slide, typewriter`,
               target: { type: 'string', description: 'Name of target item' },
               type: {
                 type: 'string',
-                enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'morphs_to'],
+                enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'camera_animates', 'morphs_to'],
               },
               params: {
                 type: 'object',
@@ -892,11 +938,11 @@ Relations are COMPOSITIONAL - an item can have multiple relations that work toge
         },
         targetId: {
           type: 'string',
-          description: 'Registry ID of the target item (the item being related to)',
+          description: 'Registry ID of the target item (the item being related to, can be null for self-animations like animates)',
         },
         relationType: {
           type: 'string',
-          enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'morphs_to'],
+          enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'camera_animates', 'morphs_to'],
           description: 'Type of relationship',
         },
         params: {
@@ -905,7 +951,7 @@ Relations are COMPOSITIONAL - an item can have multiple relations that work toge
           additionalProperties: true,
         },
       },
-      required: ['sourceId', 'targetId', 'relationType'],
+      required: ['sourceId', 'relationType'],
     },
   },
 
@@ -931,7 +977,7 @@ USE WHEN:
         targetId: { type: 'string', description: 'Target item ID' },
         relationType: {
           type: 'string',
-          enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'morphs_to'],
+          enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'camera_animates', 'morphs_to'],
           description: 'Specific relation type to remove (optional - removes all if not specified)',
         },
       },
@@ -960,7 +1006,7 @@ USE WHEN:
         itemId: { type: 'string', description: 'Item to query relations for' },
         relationType: {
           type: 'string',
-          enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'morphs_to'],
+          enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'camera_animates', 'morphs_to'],
           description: 'Filter by relation type (optional)',
         },
         direction: {
@@ -1587,6 +1633,654 @@ Requires maskType and keyframes array.`,
     inputSchema: {
       type: 'object',
       properties: {},
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // CAMERA TOOLS
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_camera_animate',
+    annotations: {
+      title: 'Camera Animate',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Animate camera with keyframe-based zoom and pan sequence for cinematic effects.
+
+USE WHEN:
+- Creating cinematic camera movements
+- Building presentation zoom sequences
+- Making dramatic reveals with camera motion
+- Tour animations showing different parts of canvas
+
+KEYFRAME PROPERTIES:
+- time: Time in seconds
+- zoom: Zoom level (1=normal, 2=2x zoom in, 0.5=zoom out)
+- center: View center [x, y]
+- easing: Timing function (linear, easeIn, easeOut, easeInOut, bounce, elastic)
+
+EXAMPLE:
+{
+  "duration": 6,
+  "loop": true,
+  "keyframes": [
+    { "time": 0, "zoom": 1, "center": [400, 300] },
+    { "time": 2, "zoom": 2, "center": [400, 300], "easing": "easeInOut" },
+    { "time": 4, "zoom": 2, "center": [600, 300], "easing": "easeOut" },
+    { "time": 6, "zoom": 1, "center": [400, 300], "easing": "easeInOut" }
+  ]
+}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        keyframes: {
+          type: 'array',
+          description: 'Array of camera keyframes',
+          items: {
+            type: 'object',
+            properties: {
+              time: { type: 'number', description: 'Time in seconds' },
+              zoom: { type: 'number', description: 'Zoom level (1=normal, 2=2x zoom in)' },
+              center: {
+                type: 'array',
+                items: { type: 'number' },
+                description: 'View center [x, y]',
+              },
+              easing: {
+                type: 'string',
+                enum: ['linear', 'easeIn', 'easeOut', 'easeInOut', 'bounce', 'elastic'],
+              },
+            },
+          },
+        },
+        duration: { type: 'number', description: 'Total animation duration in seconds' },
+        loop: { type: 'boolean', description: 'Loop the animation' },
+        delay: { type: 'number', description: 'Delay before animation starts' },
+      },
+      required: ['keyframes', 'duration'],
+    },
+  },
+  {
+    name: 'pinepaper_camera_zoom',
+    annotations: {
+      title: 'Camera Zoom',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Simple camera zoom animation.
+
+USE WHEN:
+- Quick zoom in to focus on something
+- Zoom out to show full canvas
+- Simple zoom effects without complex keyframes`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        direction: {
+          type: 'string',
+          enum: ['in', 'out'],
+          description: 'Zoom direction',
+        },
+        level: {
+          type: 'number',
+          description: 'Target zoom level (default: 2 for in, 0.5 for out)',
+        },
+        duration: {
+          type: 'number',
+          description: 'Animation duration in seconds (default: 0.5)',
+        },
+      },
+      required: ['direction'],
+    },
+  },
+  {
+    name: 'pinepaper_camera_pan',
+    annotations: {
+      title: 'Camera Pan',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Pan camera in a direction or to specific coordinates.
+
+USE WHEN:
+- Moving view to different part of canvas
+- Directional panning (left, right, up, down)
+- Centering on specific coordinates
+
+EXAMPLES:
+// Pan left 200 pixels
+{ "direction": "left", "amount": 200 }
+
+// Pan to specific coordinates
+{ "x": 200, "y": 200, "duration": 1 }`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        direction: {
+          type: 'string',
+          enum: ['left', 'right', 'up', 'down'],
+          description: 'Pan direction (use with amount)',
+        },
+        amount: {
+          type: 'number',
+          description: 'Pixels to pan (default: 100)',
+        },
+        x: {
+          type: 'number',
+          description: 'Target X coordinate (use with y for panTo)',
+        },
+        y: {
+          type: 'number',
+          description: 'Target Y coordinate (use with x for panTo)',
+        },
+        duration: {
+          type: 'number',
+          description: 'Animation duration in seconds (default: 0.5)',
+        },
+      },
+    },
+  },
+  {
+    name: 'pinepaper_camera_move_to',
+    annotations: {
+      title: 'Camera Move To',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Combined camera zoom and pan to a specific location.
+
+USE WHEN:
+- Moving to and zooming on a specific point in one motion
+- Focusing on an item with appropriate zoom level`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        x: { type: 'number', description: 'Target X coordinate' },
+        y: { type: 'number', description: 'Target Y coordinate' },
+        zoom: { type: 'number', description: 'Target zoom level' },
+        duration: { type: 'number', description: 'Animation duration in seconds (default: 0.5)' },
+      },
+      required: ['x', 'y', 'zoom'],
+    },
+  },
+  {
+    name: 'pinepaper_camera_reset',
+    annotations: {
+      title: 'Camera Reset',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Reset camera to default state (center of canvas, zoom 1).
+
+USE WHEN:
+- Returning to default view after camera movements
+- Resetting before starting new sequence`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        duration: { type: 'number', description: 'Animation duration in seconds (default: 0.5)' },
+      },
+    },
+  },
+  {
+    name: 'pinepaper_camera_stop',
+    annotations: {
+      title: 'Camera Stop',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Stop current camera animation.`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'pinepaper_camera_state',
+    annotations: {
+      title: 'Camera State',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Get current camera state (zoom level, center position, animation status).`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // FONT TOOLS
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_font_show_studio',
+    annotations: {
+      title: 'Font Show Studio',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Open the Font Studio UI for interactive font creation.
+
+USE WHEN:
+- Starting a custom font creation workflow
+- Need the interactive Font Studio interface with guide lines
+- Want to create a hand-drawn font from scratch
+
+WORKFLOW:
+1. Open Font Studio → pinepaper_font_show_studio
+2. Set font name → pinepaper_font_set_name
+3. Check required chars → pinepaper_font_get_required_chars
+4. For each character: draw path, cleanup, create glyph
+5. Check progress → pinepaper_font_get_status
+6. Export when complete → pinepaper_font_export`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'pinepaper_font_set_name',
+    annotations: {
+      title: 'Font Set Name',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Set the font family name for the current font being created.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: "Font family name (e.g., 'MyHandwriting')",
+        },
+      },
+      required: ['name'],
+    },
+  },
+  {
+    name: 'pinepaper_font_get_required_chars',
+    annotations: {
+      title: 'Font Get Required Chars',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Get the list of characters needed for a complete font.
+
+CHARACTER SETS:
+- minimum: A-Z, a-z, 0-9, space (63 chars) - enough for basic text
+- standard: adds punctuation and symbols (90+ chars) - full typography`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        set: {
+          type: 'string',
+          enum: ['minimum', 'standard'],
+          description: 'minimum: A-Z, a-z, 0-9, space (63 chars). standard: adds punctuation (90+ chars)',
+        },
+      },
+    },
+  },
+  {
+    name: 'pinepaper_font_get_status',
+    annotations: {
+      title: 'Font Get Status',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Get font completion status including progress percentage, completed/pending characters.
+
+USE WHEN:
+- Checking progress during font creation
+- Determining which characters still need to be drawn
+- Verifying font is complete before export`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'pinepaper_font_create_glyph',
+    annotations: {
+      title: 'Font Create Glyph',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Create a glyph from a Paper.js path. Converts a drawn path into an OpenType glyph with calculated advance width.
+
+USE WHEN:
+- Converting a drawn character path to a font glyph
+- Adding a new character to the font
+
+WORKFLOW:
+1. Draw the character as a Paper.js path on the canvas
+2. Optionally clean up the path (pinepaper_font_cleanup_path)
+3. Use the path's registry ID to create the glyph`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        character: {
+          type: 'string',
+          description: "Single character (e.g., 'A', 'a', '1', ' ')",
+        },
+        pathId: {
+          type: 'string',
+          description: 'Registry ID of the Paper.js path to use as glyph shape',
+        },
+      },
+      required: ['character', 'pathId'],
+    },
+  },
+  {
+    name: 'pinepaper_font_create_space',
+    annotations: {
+      title: 'Font Create Space',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Create the space glyph (no visible shape, just advance width).
+
+USE WHEN:
+- Adding the space character to the font
+- Space needs no drawn path, only a width value`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        width: {
+          type: 'number',
+          description: 'Space width in font units (default: 250)',
+        },
+      },
+    },
+  },
+  {
+    name: 'pinepaper_font_remove_glyph',
+    annotations: {
+      title: 'Font Remove Glyph',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Remove a glyph from the font. Use when a character needs to be redrawn.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        character: {
+          type: 'string',
+          description: 'Character to remove',
+        },
+      },
+      required: ['character'],
+    },
+  },
+  {
+    name: 'pinepaper_font_set_metrics',
+    annotations: {
+      title: 'Font Set Metrics',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Set font metrics (advanced). Controls the coordinate grid and vertical measurements.
+
+METRICS:
+- unitsPerEm: Coordinate grid size (default: 1000)
+- ascender: Height above baseline (default: 800)
+- descender: Depth below baseline, negative (default: -200)
+- xHeight: Lowercase letter height (default: 500)
+- capHeight: Capital letter height (default: 700)`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        unitsPerEm: {
+          type: 'number',
+          description: 'Coordinate grid size (default: 1000)',
+        },
+        ascender: {
+          type: 'number',
+          description: 'Height above baseline (default: 800)',
+        },
+        descender: {
+          type: 'number',
+          description: 'Depth below baseline, negative (default: -200)',
+        },
+        xHeight: {
+          type: 'number',
+          description: 'Lowercase letter height (default: 500)',
+        },
+        capHeight: {
+          type: 'number',
+          description: 'Capital letter height (default: 700)',
+        },
+      },
+    },
+  },
+  {
+    name: 'pinepaper_font_export',
+    annotations: {
+      title: 'Font Export',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Export the font as an OTF file. Triggers browser download of the completed font.
+
+USE WHEN:
+- Font is complete and ready for download
+- User wants to save the font as a file`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        download: {
+          type: 'boolean',
+          description: 'Trigger browser download (default: true)',
+        },
+      },
+    },
+  },
+  {
+    name: 'pinepaper_font_load_into_document',
+    annotations: {
+      title: 'Font Load Into Document',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Load the custom font into the document for immediate use in PinePaper text items.
+
+USE WHEN:
+- Want to use the created font immediately in the current document
+- Testing how the font looks in actual text items`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'pinepaper_font_export_data',
+    annotations: {
+      title: 'Font Export Data',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Export font data as JSON for saving progress. Use to save work-in-progress fonts.
+
+USE WHEN:
+- Saving font progress for later continuation
+- Backing up font data`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        download: {
+          type: 'boolean',
+          description: 'Trigger browser download (default: true)',
+        },
+      },
+    },
+  },
+  {
+    name: 'pinepaper_font_import_data',
+    annotations: {
+      title: 'Font Import Data',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Import font data from previously saved JSON. Restores a font from exported data.
+
+USE WHEN:
+- Resuming work on a previously saved font
+- Loading font data exported with pinepaper_font_export_data`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'object',
+          description: 'Font data object from pinepaper_font_export_data',
+        },
+      },
+      required: ['data'],
+    },
+  },
+  {
+    name: 'pinepaper_font_clear',
+    annotations: {
+      title: 'Font Clear',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Clear all glyphs and reset the font. Removes all drawn characters.
+
+WARNING: This is destructive - all glyph progress will be lost.`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'pinepaper_font_remove_overlap',
+    annotations: {
+      title: 'Font Remove Overlap',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Remove overlapping areas from a path (like FontForge's RemoveOverlap). Merges multiple overlapping paths into a single clean outline.
+
+USE WHEN:
+- Path has overlapping strokes that need merging
+- Preparing a glyph path for clean font output`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        pathId: {
+          type: 'string',
+          description: 'Registry ID of the Paper.js path to process',
+        },
+      },
+      required: ['pathId'],
+    },
+  },
+  {
+    name: 'pinepaper_font_correct_direction',
+    annotations: {
+      title: 'Font Correct Direction',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Correct path winding direction for proper fill rendering (like FontForge's CorrectDirection). Ensures outer contours are clockwise and inner holes are counter-clockwise.
+
+USE WHEN:
+- Glyph fills are rendering incorrectly (holes appear filled)
+- Preparing paths for font export`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        pathId: {
+          type: 'string',
+          description: 'Registry ID of the Paper.js path to process',
+        },
+      },
+      required: ['pathId'],
+    },
+  },
+  {
+    name: 'pinepaper_font_cleanup_path',
+    annotations: {
+      title: 'Font Cleanup Path',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Apply all path cleanup operations in the correct order: removeOverlap -> correctDirection -> smooth. Convenience tool that combines all path preparation steps.
+
+USE WHEN:
+- Preparing a drawn path before creating a glyph
+- Quick one-step path cleanup instead of calling individual operations`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        pathId: {
+          type: 'string',
+          description: 'Registry ID of the Paper.js path to process',
+        },
+        removeOverlap: {
+          type: 'boolean',
+          description: 'Merge overlapping strokes (default: true)',
+        },
+        correctDirection: {
+          type: 'boolean',
+          description: 'Fix winding direction for fills (default: true)',
+        },
+        smooth: {
+          type: 'boolean',
+          description: 'Apply path smoothing (default: true)',
+        },
+        smoothTolerance: {
+          type: 'number',
+          description: 'Smoothing tolerance - higher = more simplification (default: 2.5)',
+        },
+      },
+      required: ['pathId'],
     },
   },
 
@@ -4058,103 +4752,6 @@ USE WHEN:
   },
 
   // ---------------------------------------------------------------------------
-  // WIDGET EXPORT TOOLS
-  // ---------------------------------------------------------------------------
-  {
-    name: 'pinepaper_export_widget',
-    annotations: {
-      title: 'Export Widget',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Export the current canvas as an embeddable widget (pinewidget).
-
-USE WHEN:
-- Creating embeddable content for websites
-- Exporting for LMS integration
-- Building web components
-- Generating embed codes
-
-EXPORT FORMATS:
-- web-component: <pinepaper-widget> custom element
-- standalone-html: Complete HTML file with bundled runtime
-- iframe-embed: Iframe embed code for any website
-- react-component: React wrapper component
-- vue-component: Vue wrapper component
-
-SIZING OPTIONS:
-- fixed: Exact pixel dimensions
-- responsive: Scales to container width
-- fluid: Fills container completely
-
-INTERACTIVITY LEVELS:
-- none: Static display only
-- view: Can zoom/pan but not edit
-- full: All interactions enabled
-
-LMS FEATURES:
-When lmsEnabled is true:
-- Tracks quiz completion
-- Reports scores to LMS
-- Supports SCORM/xAPI
-
-EXAMPLES:
-- Simple embed: {format: "iframe-embed"}
-- React component: {format: "react-component", sizing: "responsive"}
-- LMS quiz: {format: "standalone-html", interactivity: "full", lmsEnabled: true}
-
-OUTPUT:
-Returns object with:
-- code: Main export code
-- embedCode: Copy-paste snippet
-- sceneData: Serialized scene JSON
-- metadata: Size, interactivity info`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        format: {
-          type: 'string',
-          enum: ['web-component', 'standalone-html', 'iframe-embed', 'react-component', 'vue-component'],
-          description: 'Export format',
-        },
-        sizing: {
-          type: 'string',
-          enum: ['fixed', 'responsive', 'fluid'],
-          description: 'Widget sizing mode (default: responsive)',
-        },
-        interactivity: {
-          type: 'string',
-          enum: ['none', 'view', 'full'],
-          description: 'Interactivity level (default: view)',
-        },
-        autoplay: {
-          type: 'boolean',
-          description: 'Auto-play animations on load (default: true)',
-        },
-        loop: {
-          type: 'boolean',
-          description: 'Loop animations (default: true)',
-        },
-        lmsEnabled: {
-          type: 'boolean',
-          description: 'Enable LMS tracking (SCORM/xAPI)',
-        },
-        width: {
-          type: 'number',
-          description: 'Fixed width in pixels (for fixed sizing)',
-        },
-        height: {
-          type: 'number',
-          description: 'Fixed height in pixels (for fixed sizing)',
-        },
-      },
-      required: ['format'],
-    },
-  },
-
-  // ---------------------------------------------------------------------------
   // LETTER COLLAGE TOOLS (Text Design)
   // ---------------------------------------------------------------------------
   {
@@ -4391,9 +4988,9 @@ QUALITY SETTINGS:
 - professional: No simplification (publications)
 
 EXAMPLES:
-- World map: {mapId: "world", options: {projection: "naturalEarth", quality: "balanced"}}
-- USA map: {mapId: "usa", options: {projection: "albers", quality: "professional"}}
-- Globe view: {mapId: "worldHighRes", options: {projection: "orthographic", rotate: [0, -30, 0]}}
+- World map: {mapId: "world", projection: "naturalEarth", quality: "balanced"}
+- USA map: {mapId: "usa", projection: "albers", quality: "professional"}
+- Globe view: {mapId: "worldHighRes", projection: "orthographic", rotate: [0, -30, 0]}
 
 RETURNS:
 - mapId: Reference ID for the loaded map
@@ -4406,42 +5003,36 @@ RETURNS:
         mapId: {
           type: 'string',
           enum: ['world', 'worldHighRes', 'usa'],
-          description: 'Map to load',
+          description: 'Map to load (world=110m, worldHighRes=50m professional quality, usa=US states)',
         },
-        options: {
-          type: 'object',
-          properties: {
-            projection: {
-              type: 'string',
-              enum: ['mercator', 'equalEarth', 'naturalEarth', 'orthographic', 'albers', 'stereographic'],
-              description: 'Map projection type',
-            },
-            quality: {
-              type: 'string',
-              enum: ['fast', 'balanced', 'professional'],
-              description: 'Rendering quality',
-            },
-            fillColor: { type: 'string', description: 'Default fill color for regions' },
-            strokeColor: { type: 'string', description: 'Border color' },
-            strokeWidth: { type: 'number', description: 'Border width' },
-            scale: { type: 'number', description: 'Scale multiplier' },
-            center: {
-              type: 'array',
-              items: { type: 'number' },
-              description: 'Center coordinates [lon, lat]',
-            },
-            rotate: {
-              type: 'array',
-              items: { type: 'number' },
-              description: 'Rotation angles [x, y, z] for orthographic projection',
-            },
-            enableHover: { type: 'boolean', description: 'Enable hover effects' },
-            enableClick: { type: 'boolean', description: 'Enable click events' },
-            hoverFill: { type: 'string', description: 'Hover fill color' },
-            hoverStroke: { type: 'string', description: 'Hover stroke color' },
-          },
-          description: 'Map styling and projection options',
+        projection: {
+          type: 'string',
+          enum: ['mercator', 'equalEarth', 'naturalEarth', 'orthographic', 'albers', 'stereographic'],
+          description: 'Map projection type',
         },
+        quality: {
+          type: 'string',
+          enum: ['fast', 'balanced', 'professional'],
+          description: 'Rendering quality (professional=no simplification)',
+        },
+        fillColor: { type: 'string', description: 'Default fill color for regions' },
+        strokeColor: { type: 'string', description: 'Border/stroke color' },
+        strokeWidth: { type: 'number', description: 'Border width in pixels' },
+        scale: { type: 'number', description: 'Scale multiplier' },
+        center: {
+          type: 'array',
+          items: { type: 'number' },
+          description: 'Center coordinates [longitude, latitude]',
+        },
+        rotate: {
+          type: 'array',
+          items: { type: 'number' },
+          description: 'Rotation angles [x, y, z]',
+        },
+        enableHover: { type: 'boolean', description: 'Enable hover effects on regions' },
+        enableClick: { type: 'boolean', description: 'Enable click events on regions' },
+        hoverFill: { type: 'string', description: 'Fill color on hover' },
+        hoverStroke: { type: 'string', description: 'Stroke color on hover' },
       },
       required: ['mapId'],
     },

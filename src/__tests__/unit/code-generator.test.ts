@@ -69,20 +69,20 @@ describe('PinePaperCodeGenerator', () => {
         properties: { color: '#ff0000', opacity: 0.5 },
       });
 
-      expect(code).toContain("app.getItemById('item_1')");
-      expect(code).toContain('app.modify(item');
+      expect(code).toContain("app.select('item_1')");
+      expect(code).toContain('app.modify(');
       expect(code).toContain('#ff0000');
       expect(code).toContain('0.5');
     });
 
-    it('should include error handling for missing item', () => {
+    it('should use select then modify pattern', () => {
       const code = codeGenerator.generateModifyItem({
         itemId: 'item_1',
         properties: { color: '#ff0000' },
       });
 
-      expect(code).toContain('if (!item)');
-      expect(code).toContain('throw new Error');
+      expect(code).toContain("app.select('item_1')");
+      expect(code).toContain('app.modify(');
     });
   });
 
@@ -174,10 +174,11 @@ describe('PinePaperCodeGenerator', () => {
     it('should generate keyframe animation code', () => {
       const code = codeGenerator.generateKeyframeAnimate(mockFadeInKeyframes);
 
-      expect(code).toContain("animationType: 'keyframe'");
-      expect(code).toContain('keyframes:');
+      expect(code).toContain('app.addAnimation');
+      expect(code).toContain("'item_1'");
       expect(code).toContain('opacity');
-      expect(code).toContain('app.playKeyframeTimeline');
+      expect(code).toContain('duration:');
+      expect(code).toContain('loop:');
     });
 
     it('should calculate duration from keyframes if not provided', () => {
@@ -292,7 +293,7 @@ describe('PinePaperCodeGenerator', () => {
         height: 1080,
       });
 
-      expect(code).toContain('app.setCanvasSize(1920, 1080)');
+      expect(code).toContain('app.setCanvasSize({ width: 1920, height: 1080 })');
     });
 
     it('should include preset if provided', () => {

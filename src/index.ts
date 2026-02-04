@@ -43,100 +43,110 @@ const SERVER_INFO = {
 // =============================================================================
 
 const RESOURCES = [
+  // === CORE GUIDES (Start here) ===
   {
     uri: 'pinepaper://docs/getting-started',
-    name: 'Getting Started Guide',
-    description: 'Introduction to PinePaper MCP tools',
+    name: '🚀 Getting Started',
+    description: 'START HERE: Tool categories, quick examples, and how to find the right tools',
+    mimeType: 'text/markdown',
+  },
+  {
+    uri: 'pinepaper://docs/templates',
+    name: '📋 Templates Guide',
+    description: 'Pre-built templates with animations ready - just change content. Check here first!',
+    mimeType: 'text/markdown',
+  },
+  // === FEATURE GUIDES (How to use each feature) ===
+  {
+    uri: 'pinepaper://docs/map-tools',
+    name: '🗺️ Maps Guide',
+    description: 'Create USA state maps, world maps, choropleth coloring, and animated map regions',
+    mimeType: 'text/markdown',
+  },
+  {
+    uri: 'pinepaper://docs/diagrams',
+    name: '📊 Diagrams Guide',
+    description: 'Create flowcharts, UML diagrams, network diagrams, and auto-layout',
+    mimeType: 'text/markdown',
+  },
+  {
+    uri: 'pinepaper://docs/masks',
+    name: '🎭 Masks Guide',
+    description: 'Create reveal effects: wipes, iris, curtains, and custom animated masks',
     mimeType: 'text/markdown',
   },
   {
     uri: 'pinepaper://docs/relations',
-    name: 'Relations Guide',
-    description: 'How to use relations for behavior-driven animation',
+    name: '🔄 Animation Guide',
+    description: 'Animate with relations: orbit, follow, attached, bounce, and more',
     mimeType: 'text/markdown',
   },
   {
     uri: 'pinepaper://docs/generators',
-    name: 'Background Generators',
-    description: 'Available procedural background generators',
-    mimeType: 'text/markdown',
-  },
-  {
-    uri: 'pinepaper://docs/custom-paths',
-    name: 'Custom Paths Guide',
-    description: 'Advanced path creation with SVG, Paper.js paths, and animations',
-    mimeType: 'text/markdown',
-  },
-  {
-    uri: 'pinepaper://docs/mathematical-patterns',
-    name: 'Mathematical Patterns',
-    description: 'Create spirals, waves, fractals, geometric patterns, and physics simulations',
+    name: '🎨 Backgrounds Guide',
+    description: 'Create procedural backgrounds: sunburst, grid, waves, patterns',
     mimeType: 'text/markdown',
   },
   {
     uri: 'pinepaper://docs/effects-and-filters',
-    name: 'Effects & Filters Guide',
-    description: 'Complete reference for visual effects, filters, and post-processing',
+    name: '✨ Effects Guide',
+    description: 'Add visual effects: sparkle, blast, filters, and post-processing',
     mimeType: 'text/markdown',
   },
   {
-    uri: 'pinepaper://docs/interactive-animations',
-    name: 'Interactive Animations',
-    description: 'Create game-like behaviors with follows, bounds, and dynamic interactions',
+    uri: 'pinepaper://docs/customization',
+    name: '🔧 Customization Guide',
+    description: 'How to adapt templates, create custom designs, and handle any user request',
     mimeType: 'text/markdown',
   },
+  // === EXAMPLES (Copy-paste workflows) ===
   {
-    uri: 'pinepaper://docs/paperjs-in-pinepaper',
-    name: 'Paper.js in PinePaper',
-    description: 'Write Paper.js code directly in PinePaper - API reference and examples',
-    mimeType: 'text/markdown',
-  },
-  {
-    uri: 'pinepaper://examples/solar-system',
-    name: 'Solar System Example',
-    description: 'Create an animated solar system with custom paths, orbital rings, and planetary details',
-    mimeType: 'text/markdown',
-  },
-  {
-    uri: 'pinepaper://examples/logo-animation',
-    name: 'Logo Animation Example',
-    description: 'Animate a company logo with entrance effects and continuous motion',
-    mimeType: 'text/markdown',
-  },
-  {
-    uri: 'pinepaper://examples/data-visualization',
-    name: 'Data Visualization Example',
-    description: 'Create animated charts, graphs, and infographics',
-    mimeType: 'text/markdown',
-  },
-  {
-    uri: 'pinepaper://examples/particle-systems',
-    name: 'Particle Systems Example',
-    description: 'Build particle effects like fireworks, snow, and starfields',
-    mimeType: 'text/markdown',
-  },
-  {
-    uri: 'pinepaper://docs/map-tools',
-    name: 'Map Tools Guide',
-    description: 'Create geographic visualizations with world maps, choropleth coloring, markers, and labels',
+    uri: 'pinepaper://examples/us-states-animated',
+    name: '🇺🇸 US States Animated',
+    description: 'EXAMPLE: Create a US map with random colors that animate in a loop',
     mimeType: 'text/markdown',
   },
   {
     uri: 'pinepaper://examples/world-population-map',
-    name: 'World Population Map Example',
-    description: 'Create an animated choropleth map showing world population data',
+    name: '🌍 World Population Map',
+    description: 'EXAMPLE: Choropleth map with population data and color scale',
     mimeType: 'text/markdown',
   },
   {
-    uri: 'pinepaper://examples/us-election-map',
-    name: 'US Election Map Example',
-    description: 'Build an interactive US election results visualization',
+    uri: 'pinepaper://examples/flowchart',
+    name: '📋 Flowchart Example',
+    description: 'EXAMPLE: Create a decision flowchart with auto-layout',
     mimeType: 'text/markdown',
   },
   {
-    uri: 'pinepaper://examples/travel-route-map',
-    name: 'Travel Route Map Example',
-    description: 'Visualize a travel itinerary with markers and animated connections',
+    uri: 'pinepaper://examples/solar-system',
+    name: '🪐 Solar System',
+    description: 'EXAMPLE: Orbiting planets with relations',
+    mimeType: 'text/markdown',
+  },
+  {
+    uri: 'pinepaper://examples/reveal-animation',
+    name: '🎬 Reveal Animation',
+    description: 'EXAMPLE: Text reveal with mask animations',
+    mimeType: 'text/markdown',
+  },
+  {
+    uri: 'pinepaper://docs/fonts',
+    name: 'Guide: Font Studio',
+    description: 'Create custom hand-drawn fonts with Font Studio tools',
+    mimeType: 'text/markdown',
+  },
+  // === ADVANCED (For developers) ===
+  {
+    uri: 'pinepaper://docs/custom-paths',
+    name: 'Advanced: Custom Paths',
+    description: 'SVG paths, Paper.js paths, and path animations',
+    mimeType: 'text/markdown',
+  },
+  {
+    uri: 'pinepaper://docs/paperjs-in-pinepaper',
+    name: 'Advanced: Paper.js API',
+    description: 'Write Paper.js code directly for full control',
     mimeType: 'text/markdown',
   },
 ];
@@ -146,72 +156,530 @@ const RESOURCE_CONTENTS: Record<string, string> = {
 
 ## Overview
 
-PinePaper is a canvas-based animation tool. This MCP server lets you create and animate graphics using natural language.
+PinePaper is a canvas-based animation tool with 120 tools for creating animated graphics, custom fonts, maps, diagrams, and more. This guide helps you find the right tools.
 
-## Quick Start (Agent Mode - Enforced)
+## FIRST: Check Templates
 
-With enforced agent mode, the browser connects **automatically** on your first tool call. Just start creating!
+PinePaper Studio includes pre-built templates for common use cases. **Templates already have animations configured** - you just change the content!
 
-1. **Create items**: Use \`pinepaper_create_item\` to add text, shapes, or graphics
-2. **Add animation**: Use \`pinepaper_add_relation\` for behavior-based animation
-3. **Verify**: Use \`pinepaper_browser_screenshot\` to see your work
-4. **Export**: Use \`pinepaper_export_svg\` to save your work
+**Before building from scratch, consider:**
+- Is there a template that matches this use case?
+- Can I modify an existing template instead of building new?
+- Templates save time: just update text, colors, or data
 
-No manual connection required - agent mode handles everything automatically.
+**Use \`pinepaper_create_scene\` for complex animated scenes** - it's 4-8x faster than individual tool calls:
+
+\`\`\`
+pinepaper_create_scene
+  backgroundColor: "#0a0a0a"
+  items:
+    - name: "sun", itemType: "circle", position: {x: 400, y: 300}, properties: {radius: 50, color: "#fbbf24"}
+    - name: "earth", itemType: "circle", position: {x: 550, y: 300}, properties: {radius: 20, color: "#3b82f6"}
+  relations:
+    - source: "earth", target: "sun", type: "orbits", params: {radius: 150, speed: 0.5}
+  animations:
+    - target: "sun", type: "pulse", speed: 0.3
+\`\`\`
+
+## Tool Categories at a Glance
+
+| Category | Use When | Key Tools |
+|----------|----------|-----------|
+| **Scenes** | Multi-item animated scenes | \`pinepaper_create_scene\` (FASTEST) |
+| **Maps** | US states, world maps, choropleth | \`pinepaper_load_map\`, \`pinepaper_apply_data_colors\`, \`pinepaper_animate_map_regions\` |
+| **Shapes** | Circles, stars, text, rectangles | \`pinepaper_create_item\` |
+| **Animation** | Orbiting, following, pulsing | \`pinepaper_add_relation\`, \`pinepaper_animate\` |
+| **Masks** | Reveal effects, wipes, transitions | \`pinepaper_apply_animated_mask\` |
+| **Diagrams** | Flowcharts, UML, connections | \`pinepaper_create_diagram_shape\`, \`pinepaper_connect\` |
+| **Backgrounds** | Patterns, gradients, generators | \`pinepaper_execute_generator\` |
+
+## Quick Examples
+
+### Create a US Map with Animated Colors
+\`\`\`
+1. pinepaper_load_map mapId: "usa", options: { projection: "albers" }
+2. pinepaper_apply_data_colors data: { "CA": 100, "TX": 80, "NY": 70 }, options: { colorScale: "blues" }
+3. pinepaper_animate_map_wave duration: 10, loop: true, colors: ["#ef4444", "#22c55e", "#3b82f6"]
+\`\`\`
+
+### Create Orbiting Animation (Using create_scene - Recommended)
+\`\`\`
+pinepaper_create_scene
+  items:
+    - name: "sun", itemType: "circle", position: {x: 400, y: 300}, properties: {radius: 50, color: "#fbbf24"}
+    - name: "planet", itemType: "circle", position: {x: 550, y: 300}, properties: {radius: 15, color: "#3b82f6"}
+  relations:
+    - source: "planet", target: "sun", type: "orbits"
+\`\`\`
+
+### Create Reveal Animation
+\`\`\`
+1. pinepaper_create_item type: "text", params: { x: 400, y: 300, content: "Hello", fontSize: 48 }
+2. pinepaper_apply_animated_mask itemId: "item_1", preset: "wipeLeft", options: { duration: 0.5 }
+\`\`\`
+
+## Quick Start
+
+Agent mode connects automatically on first tool call. Just start creating!
+
+1. **Check templates first** - existing designs just need content changes
+2. **Use \`pinepaper_create_scene\`** for multi-item animated scenes (fastest)
+3. **Or create items individually**: \`pinepaper_create_item\` for shapes/text
+4. **Add animation**: \`pinepaper_add_relation\` for behavior-based animation
+5. **Verify**: \`pinepaper_browser_screenshot\` to see your work
+6. **Export**: \`pinepaper_export_svg\` to save
 
 ## IMPORTANT: Welcome Template
 
-First-time visitors to PinePaper Studio see a **welcome template** with example items on the canvas. Before creating your own content:
-
-### To Clear the Welcome Template:
-- **Option 1**: Use \`pinepaper_clear_canvas\` to remove all items
-- **Option 2**: Use \`pinepaper_agent_reset\` for quick canvas reset
-- After clearing, verify with \`pinepaper_get_items\` that the canvas is empty
-
-The welcome template only appears once. After clearing, it won't appear again.
+First-time visitors see a welcome template. Clear it with:
+- \`pinepaper_clear_canvas\` - removes all items
+- \`pinepaper_agent_reset\` - quick reset
 
 ## Key Concepts
 
 ### Items
-Everything on the canvas is an item with a registry ID (e.g., "item_1"). Use this ID to reference items in other operations.
+Everything on canvas has a registry ID (e.g., "item_1"). Use this ID for animations and modifications.
 
-**Creating Items:**
-- Use \`pinepaper_create_item\` with \`itemType\` (text, circle, star, rectangle, etc.)
-- Specify \`position\` as {x, y} coordinates
-- Add \`properties\` for styling (color, fontSize, radius, etc.)
+### Relations (Animation)
+Describe behavior between items:
+- \`orbits\`: Circular motion around target
+- \`follows\`: Move toward target with smoothing
+- \`attached_to\`: Fixed offset from parent
+- \`points_at\`: Rotate to face target
 
-### Relations (Primary Animation Method)
-Relations describe HOW items behave relative to each other. This is the **recommended way** to create animations:
-- \`orbits\`: Circular motion around another item
-- \`follows\`: Move toward another item with smoothing
-- \`attached_to\`: Fixed offset from parent item
-- \`points_at\`: Rotate to face another item
-- \`maintains_distance\`: Keep fixed distance from target
+### Maps
+Built-in maps: \`world\`, \`worldHighRes\`, \`usa\` (US states)
+Load with \`pinepaper_load_map\`, animate with \`pinepaper_animate_map_regions\` or \`pinepaper_animate_map_wave\`
 
-**Verifying Animations:**
-After adding a relation, use \`pinepaper_browser_screenshot\` to verify the animation is working. Check that:
-1. Items are positioned correctly
-2. Animation is visibly moving (take multiple screenshots at intervals)
-3. The relation appears in \`pinepaper_query_relations\`
+### Masks
+Reveal effects: wipeLeft, wipeRight, iris, curtain, star, heart
+Apply with \`pinepaper_apply_animated_mask\`
 
-### Deleting Items
-- Use \`pinepaper_delete_item\` with the item's registry ID
-- Use \`pinepaper_get_items\` first to find item IDs
-- If deletion fails, try \`pinepaper_clear_canvas\` to remove everything
+## Detailed Guides
 
-### Generators
-Procedural backgrounds like sunburst, waves, grid patterns.
+- Maps: Read \`pinepaper://docs/map-tools\`
+- Diagrams: Read \`pinepaper://docs/diagrams\`
+- Masks: Read \`pinepaper://docs/masks\`
+- Relations: Read \`pinepaper://docs/relations\`
+- Generators: Read \`pinepaper://docs/generators\`
+- Fonts: Read \`pinepaper://docs/fonts\`
+- Customization: Read \`pinepaper://docs/customization\`
+`,
 
-## Example Workflow
+  'pinepaper://docs/customization': `# Customization Guide
+
+**Intent:** Learn how to handle any user design request by combining tools, adapting templates, and creating custom solutions.
+
+## Understanding User Requests
+
+Users will ask for varied graphics. Here's how to approach any request:
+
+### Step 1: Identify the Category
+
+| Request Type | Primary Tools | Example |
+|-------------|---------------|---------|
+| Map visualization | \`load_map\`, \`apply_data_colors\` | "Show sales by state" |
+| Animated logo | \`create_item\`, \`add_relation\` | "Make my logo pulse" |
+| Infographic | \`create_diagram_shape\`, \`connect\` | "Create a flowchart" |
+| Social media | \`set_canvas_size\`, \`create_item\` | "Instagram post" |
+| Data chart | \`create_item\` (rectangles for bars) | "Bar chart of values" |
+| Reveal/intro | \`apply_animated_mask\` | "Text wipe animation" |
+
+### Step 2: Choose Your Approach
+
+| Complexity | Approach | When |
+|------------|----------|------|
+| Simple | Single tools | One shape, one animation |
+| Medium | \`create_scene\` | Multiple items with relations |
+| Complex | Step-by-step tools | Custom logic, conditional design |
+
+## Customization Patterns
+
+### Pattern 1: Color Scheme Changes
+
+User: "Make it blue instead of red"
 
 \`\`\`
-1. Clear canvas: pinepaper_clear_canvas (auto-connects, removes welcome template)
-2. Verify empty: pinepaper_get_items (should return count: 0)
-3. Create sun: pinepaper_create_item type=circle, color=#fbbf24, radius=60
-4. Create earth: pinepaper_create_item type=circle, color=#3b82f6, radius=20
-5. Add orbit: pinepaper_add_relation earth orbits sun, radius=150
-6. Screenshot: pinepaper_browser_screenshot (verify animation)
+// Original
+pinepaper_create_item itemType: "circle" properties: {color: "#ef4444"}
+
+// Customized - change color property
+pinepaper_create_item itemType: "circle" properties: {color: "#3b82f6"}
 \`\`\`
+
+**Common color palettes:**
+| Theme | Colors |
+|-------|--------|
+| Professional | #1e293b, #3b82f6, #f8fafc |
+| Vibrant | #ef4444, #fbbf24, #22c55e, #3b82f6 |
+| Pastel | #fecaca, #fef08a, #bbf7d0, #bfdbfe |
+| Dark mode | #0f172a, #1e293b, #334155, #f8fafc |
+
+### Pattern 2: Size and Position Adjustments
+
+User: "Make it bigger" or "Center it"
+
+\`\`\`
+// Get canvas size first
+pinepaper_get_canvas_size → {width: 800, height: 600}
+
+// Center position = (width/2, height/2)
+pinepaper_create_item itemType: "text" position: {x: 400, y: 300}
+  properties: {content: "Centered", fontSize: 48}
+
+// Make bigger - increase radius, fontSize, width/height
+pinepaper_modify_item itemId: "item_1" properties: {scale: 1.5}
+\`\`\`
+
+### Pattern 3: Animation Speed/Style Changes
+
+User: "Make it faster" or "Smoother animation"
+
+\`\`\`
+// Faster orbit
+pinepaper_add_relation sourceId: "item_1" targetId: "item_2" relationType: "orbits"
+  params: {speed: 2.0}  // Higher = faster
+
+// Smoother following
+pinepaper_add_relation sourceId: "item_1" targetId: "item_2" relationType: "follows"
+  params: {smoothing: 0.95}  // Higher = smoother (0-1)
+
+// Different easing for masks
+pinepaper_apply_animated_mask itemId: "item_1" preset: "wipeLeft"
+  options: {easing: "easeInOut"}  // linear, easeIn, easeOut, easeInOut, bounce
+\`\`\`
+
+### Pattern 4: Adding Text to Any Design
+
+User: "Add a title" or "Label the items"
+
+\`\`\`
+// Title at top
+pinepaper_create_item itemType: "text" position: {x: 400, y: 50}
+  properties: {content: "My Title", fontSize: 36, fontWeight: "bold", color: "#ffffff"}
+
+// Label attached to item (moves with it)
+pinepaper_create_item itemType: "text" position: {x: 400, y: 280}
+  properties: {content: "Earth", fontSize: 14, color: "#94a3b8"}
+→ label_1
+
+pinepaper_add_relation sourceId: "label_1" targetId: "earth" relationType: "attached_to"
+  params: {offset: [0, -30]}  // Above the item
+\`\`\`
+
+### Pattern 5: Creating Data-Driven Graphics
+
+User: "Show these numbers as a chart"
+
+\`\`\`
+// Bar chart from data
+// Data: [10, 25, 15, 30, 20]
+
+// Bar 1 (height proportional to value)
+pinepaper_create_item itemType: "rectangle" position: {x: 150, y: 350}
+  properties: {width: 40, height: 100, color: "#3b82f6"}  // height = value * scale
+
+// Bar 2
+pinepaper_create_item itemType: "rectangle" position: {x: 210, y: 275}
+  properties: {width: 40, height: 250, color: "#3b82f6"}
+
+// Continue for each data point...
+// Position x increases by spacing, height = value * multiplier
+\`\`\`
+
+### Pattern 6: Responsive Canvas Sizes
+
+User: "Make it for Instagram" or "YouTube thumbnail"
+
+\`\`\`
+// Set canvas FIRST, then position items relative to it
+pinepaper_set_canvas_size preset: "instagram-post"  // 1080x1080
+
+// Now center = (540, 540)
+pinepaper_create_item itemType: "text" position: {x: 540, y: 540}
+  properties: {content: "Centered!", fontSize: 64}
+\`\`\`
+
+**Common presets:**
+| Preset | Size | Use |
+|--------|------|-----|
+| instagram-post | 1080x1080 | Square posts |
+| instagram-story | 1080x1920 | Stories, Reels |
+| youtube-thumbnail | 1280x720 | Video thumbnails |
+| twitter-post | 1200x675 | Twitter/X images |
+
+### Pattern 7: Complex Animations with Multiple Relations
+
+User: "Make planets orbit the sun with moons"
+
+\`\`\`
+pinepaper_create_scene
+  backgroundColor: "#0a0a0a"
+  items:
+    - name: "sun", itemType: "circle", position: {x: 400, y: 300}
+      properties: {radius: 50, color: "#fbbf24"}
+    - name: "earth", itemType: "circle", position: {x: 550, y: 300}
+      properties: {radius: 20, color: "#3b82f6"}
+    - name: "moon", itemType: "circle", position: {x: 580, y: 300}
+      properties: {radius: 6, color: "#9ca3af"}
+    - name: "mars", itemType: "circle", position: {x: 650, y: 300}
+      properties: {radius: 15, color: "#ef4444"}
+  relations:
+    - source: "earth", target: "sun", type: "orbits", params: {radius: 150, speed: 0.5}
+    - source: "moon", target: "earth", type: "orbits", params: {radius: 30, speed: 2}
+    - source: "mars", target: "sun", type: "orbits", params: {radius: 250, speed: 0.3}
+  animations:
+    - target: "sun", type: "pulse", speed: 0.3
+\`\`\`
+
+## Handling Edge Cases
+
+### User Provides Specific Colors
+Always use their exact hex codes:
+\`\`\`
+User: "Use #FF5733 for the background"
+→ properties: {color: "#FF5733"}
+\`\`\`
+
+### User Wants Something Not Directly Supported
+Combine tools creatively:
+\`\`\`
+User: "3D cube effect"
+→ Create 3 parallelograms with offset positions and colors
+   Use paths with segments to draw isometric shapes
+\`\`\`
+
+### User Changes Mind Mid-Design
+Use modify and delete:
+\`\`\`
+pinepaper_modify_item itemId: "item_1" properties: {color: "#new_color"}
+pinepaper_delete_item itemId: "item_2"
+\`\`\`
+
+### Performance with Many Items
+Use batch operations:
+\`\`\`
+pinepaper_batch_create items: [{...}, {...}, {...}]  // Instead of multiple create_item calls
+\`\`\`
+
+## Decision Tree for Any Request
+
+\`\`\`
+Is it a MAP? → pinepaper_load_map
+Is it a DIAGRAM/FLOWCHART? → pinepaper_create_diagram_shape + pinepaper_connect
+Is it ANIMATED? → pinepaper_add_relation or pinepaper_animate
+Is it a REVEAL/INTRO? → pinepaper_apply_animated_mask
+Is it DATA VISUALIZATION? → Create shapes proportional to data values
+Is it a BACKGROUND? → pinepaper_execute_generator
+Otherwise → pinepaper_create_item for shapes/text
+\`\`\`
+
+## Example: Complete Custom Request
+
+User: "Create an animated infographic showing 3 steps with arrows"
+
+\`\`\`
+// 1. Set canvas
+pinepaper_set_canvas_size preset: "presentation-16x9"
+
+// 2. Create step boxes
+pinepaper_create_diagram_shape shapeType: "process" position: {x: 300, y: 400}
+  label: "Step 1: Research" style: {fillColor: "#3b82f6"} → item_1
+
+pinepaper_create_diagram_shape shapeType: "process" position: {x: 600, y: 400}
+  label: "Step 2: Design" style: {fillColor: "#8b5cf6"} → item_2
+
+pinepaper_create_diagram_shape shapeType: "process" position: {x: 900, y: 400}
+  label: "Step 3: Build" style: {fillColor: "#22c55e"} → item_3
+
+// 3. Connect with arrows
+pinepaper_connect sourceItemId: "item_1" targetItemId: "item_2"
+  routing: "direct" animated: true
+
+pinepaper_connect sourceItemId: "item_2" targetItemId: "item_3"
+  routing: "direct" animated: true
+
+// 4. Add title
+pinepaper_create_item itemType: "text" position: {x: 600, y: 150}
+  properties: {content: "Our Process", fontSize: 48, fontWeight: "bold"}
+
+// 5. Apply reveal animations
+pinepaper_apply_animated_mask itemId: "item_1" preset: "wipeLeft"
+  options: {startTime: 0, duration: 0.4}
+
+pinepaper_apply_animated_mask itemId: "item_2" preset: "wipeLeft"
+  options: {startTime: 0.3, duration: 0.4}
+
+pinepaper_apply_animated_mask itemId: "item_3" preset: "wipeLeft"
+  options: {startTime: 0.6, duration: 0.4}
+\`\`\`
+
+## Key Principles
+
+1. **Understand first** - What is the user trying to achieve?
+2. **Start simple** - Use the most direct tool for the job
+3. **Build incrementally** - Add complexity one step at a time
+4. **Verify with screenshots** - \`pinepaper_browser_screenshot\` after each major step
+5. **Offer alternatives** - If something can't be done exactly, suggest similar approaches
+`,
+
+  'pinepaper://docs/templates': `# Templates Guide
+
+**Intent:** Use pre-built templates instead of building from scratch. Templates have animations already configured - just change the content.
+
+## Why Use Templates?
+
+Templates save significant time:
+- **Animations already work** - no need to set up relations or keyframes
+- **Professional designs** - tested layouts and color schemes
+- **Just change content** - update text, colors, or data values
+- **Consistent quality** - proven visual results
+
+## When to Use Templates
+
+**ALWAYS check templates first when:**
+- Creating social media graphics (Instagram, TikTok, YouTube)
+- Making data visualizations with maps
+- Building presentation slides
+- Creating animated logos or intros
+- Designing infographics
+
+## Available Template Categories
+
+### Map Templates
+| Template | Description |
+|----------|-------------|
+| US Election Map | State-by-state with color coding |
+| World Data Map | Choropleth with legend |
+| Travel Route | Multi-city route visualization |
+
+### Animation Templates
+| Template | Description |
+|----------|-------------|
+| Solar System | Orbiting planets animation |
+| Logo Reveal | Animated logo intro |
+| Text Intro | Staggered text reveal |
+| Particle Burst | Explosion effect |
+
+### Diagram Templates
+| Template | Description |
+|----------|-------------|
+| Process Flowchart | Decision flow with connectors |
+| Org Chart | Hierarchical structure |
+| Network Diagram | Server/cloud architecture |
+
+### Social Media Templates
+| Template | Description |
+|----------|-------------|
+| YouTube Thumbnail | 1280x720 with text |
+| Instagram Story | 1080x1920 vertical |
+| TikTok Video | Animated background |
+
+## How to Modify Templates
+
+### Step 1: Use pinepaper_create_scene
+
+Templates can be recreated using \`pinepaper_create_scene\`:
+
+\`\`\`
+pinepaper_create_scene
+  backgroundColor: "#0a0a0a"
+  items:
+    - name: "title", itemType: "text", position: {x: 400, y: 100}
+      properties: {content: "YOUR TEXT HERE", fontSize: 48, color: "#ffffff"}
+    - name: "icon", itemType: "circle", position: {x: 400, y: 300}
+      properties: {radius: 50, color: "#3b82f6"}
+  animations:
+    - target: "title", type: "typewriter"
+    - target: "icon", type: "pulse"
+\`\`\`
+
+### Step 2: Change Only What's Needed
+
+Most template modifications are simple property updates:
+
+| Change | What to Modify |
+|--------|----------------|
+| Text content | \`properties.content\` |
+| Colors | \`properties.color\`, \`backgroundColor\` |
+| Sizes | \`properties.radius\`, \`properties.fontSize\` |
+| Positions | \`position.x\`, \`position.y\` |
+| Data values | \`data\` object for maps |
+
+### Step 3: Keep Animations Intact
+
+**DO NOT modify:**
+- \`relations\` array (keeps animations working)
+- \`animations\` array (keeps effects working)
+- Item \`name\` values (relations reference these)
+
+## Template: Solar System
+
+\`\`\`
+pinepaper_create_scene
+  backgroundColor: "#0a0a0a"
+  items:
+    - name: "sun", itemType: "circle", position: {x: 400, y: 300}
+      properties: {radius: 50, color: "#fbbf24"}
+    - name: "earth", itemType: "circle", position: {x: 550, y: 300}
+      properties: {radius: 20, color: "#3b82f6"}
+    - name: "moon", itemType: "circle", position: {x: 580, y: 300}
+      properties: {radius: 8, color: "#9ca3af"}
+  relations:
+    - source: "earth", target: "sun", type: "orbits", params: {radius: 150, speed: 0.5}
+    - source: "moon", target: "earth", type: "orbits", params: {radius: 30, speed: 1.5}
+  animations:
+    - target: "sun", type: "pulse", speed: 0.3
+\`\`\`
+
+**To customize:** Change colors, add more planets with different radii/speeds.
+
+## Template: Text Reveal Intro
+
+\`\`\`
+pinepaper_create_scene
+  backgroundColor: "#1e293b"
+  items:
+    - name: "line1", itemType: "text", position: {x: 400, y: 250}
+      properties: {content: "YOUR HEADLINE", fontSize: 48, fontWeight: "bold", color: "#ffffff"}
+    - name: "line2", itemType: "text", position: {x: 400, y: 320}
+      properties: {content: "Your subtitle here", fontSize: 24, color: "#94a3b8"}
+\`\`\`
+
+Then apply mask reveals:
+\`\`\`
+pinepaper_apply_animated_mask itemId: "item_1" preset: "wipeLeft" options: {duration: 0.5}
+pinepaper_apply_animated_mask itemId: "item_2" preset: "wipeLeft" options: {startTime: 0.3, duration: 0.5}
+\`\`\`
+
+**To customize:** Change text content, colors, timing.
+
+## Template: Bouncing Balls
+
+\`\`\`
+pinepaper_create_scene
+  backgroundColor: "#0f172a"
+  items:
+    - name: "ball1", itemType: "circle", position: {x: 200, y: 300}
+      properties: {radius: 30, color: "#ef4444"}
+    - name: "ball2", itemType: "circle", position: {x: 400, y: 300}
+      properties: {radius: 30, color: "#22c55e"}
+    - name: "ball3", itemType: "circle", position: {x: 600, y: 300}
+      properties: {radius: 30, color: "#3b82f6"}
+  animations:
+    - target: "ball1", type: "bounce", speed: 1.0
+    - target: "ball2", type: "bounce", speed: 0.8
+    - target: "ball3", type: "bounce", speed: 1.2
+\`\`\`
+
+**To customize:** Add more balls, change colors, adjust speeds.
+
+## Best Practices
+
+1. **Start with templates** - modify existing rather than building from scratch
+2. **Preserve animation structure** - don't change relation/animation arrays unless necessary
+3. **Test with screenshots** - use \`pinepaper_browser_screenshot\` after modifications
+4. **Use create_scene** - it's the fastest way to build complex animated graphics
 `,
 
   'pinepaper://docs/relations': `# Relations Guide
@@ -269,6 +737,101 @@ Stay within target's bounds.
 - \`padding\`: Inner padding
 - \`bounce\`: Bounce off edges
 
+### morphs_to
+Smoothly transform source shape into target shape over time.
+- \`duration\`: Morph duration in seconds (default: 1)
+- \`hideTarget\`: Hide target item since it's just a shape reference (default: true)
+- \`removeTargetOnComplete\`: Delete target after morph completes (default: false)
+- \`easing\`: Timing function ('linear', 'easeIn', 'easeOut', 'easeInOut')
+
+**Usage patterns:**
+\`\`\`
+// Default: Circle morphs to star's shape, star stays hidden
+pinepaper_add_relation sourceId: "circle" targetId: "star" relationType: "morphs_to"
+  params: {duration: 1}
+
+// Clean up: Delete star after morph completes
+pinepaper_add_relation sourceId: "circle" targetId: "star" relationType: "morphs_to"
+  params: {duration: 1, removeTargetOnComplete: true}
+
+// Both visible: Keep star visible (you'll see two stars at end)
+pinepaper_add_relation sourceId: "circle" targetId: "star" relationType: "morphs_to"
+  params: {duration: 1, hideTarget: false}
+\`\`\`
+
+**Great for:** Logo animations, shape transitions, loading indicators, morphing icons
+
+### camera_follows
+Camera pans to follow a target item (like Manim MovingCameraScene).
+- \`smoothing\`: 0-1 (higher = smoother following)
+- \`offset\`: [x, y] offset from target
+- \`zoom\`: Zoom level to maintain
+- \`deadzone\`: Pixels before camera starts moving
+- \`bounds\`: {minX, maxX, minY, maxY} camera movement limits
+
+\`\`\`
+// Camera follows the player character
+pinepaper_add_relation sourceId: "camera" targetId: "player" relationType: "camera_follows"
+  params: {smoothing: 0.9, zoom: 1.5, deadzone: 50}
+\`\`\`
+
+**Great for:** Game-like scenes, following animations, focus tracking
+
+### camera_animates
+Keyframe-based camera zoom and pan animations. Use the special "camera" virtual item.
+- \`keyframes\`: Array of keyframe objects with time, zoom, center, easing
+- \`duration\`: Total animation duration in seconds
+- \`loop\`: Whether to loop the animation
+- \`delay\`: Delay before starting
+
+**Keyframe properties:**
+- \`time\`: Normalized time 0-1
+- \`zoom\`: Zoom level (1 = normal, 2 = 2x zoom in)
+- \`center\`: [x, y] pan center position
+- \`easing\`: Easing function for this keyframe
+
+\`\`\`
+// Cinematic zoom and pan sequence
+pinepaper_add_relation sourceId: "camera" targetId: "camera" relationType: "camera_animates"
+  params:
+    duration: 5
+    loop: false
+    keyframes:
+      - time: 0, zoom: 1, center: [400, 300], easing: "easeOut"
+      - time: 0.3, zoom: 1.5, center: [200, 200], easing: "easeInOut"
+      - time: 0.7, zoom: 2, center: [600, 400], easing: "easeInOut"
+      - time: 1, zoom: 1, center: [400, 300], easing: "easeIn"
+\`\`\`
+
+**Great for:** Cinematic intros, presentations, dramatic reveals, tour animations
+
+## Camera API (Direct Code)
+
+For simpler camera control, use the \`app.camera\` helper API:
+
+\`\`\`javascript
+// Zoom
+app.camera.zoomIn(1.5, 0.5);    // Zoom to 1.5x over 0.5 seconds
+app.camera.zoomOut(0.5, 0.5);   // Zoom out to 0.5x
+
+// Pan
+app.camera.panTo(200, 300, 1);   // Pan to coordinates
+app.camera.panBy(100, 0, 0.5);   // Pan right by 100px
+app.camera.panLeft(50, 0.3);     // Pan left
+app.camera.panRight(50, 0.3);    // Pan right
+app.camera.panUp(50, 0.3);       // Pan up
+app.camera.panDown(50, 0.3);     // Pan down
+
+// Combined
+app.camera.moveTo(200, 300, 2, 1);  // Pan to (200,300) and zoom to 2x
+
+// Control
+app.camera.reset(0.5);          // Reset to default
+app.camera.stop();              // Stop current animation
+app.camera.getState();          // Returns { zoom, center: [x, y] }
+app.camera.isAnimating();       // Check if animating
+\`\`\`
+
 ## Verifying Animations Are Working
 
 After adding a relation, **always verify** that the animation is actually running:
@@ -312,44 +875,212 @@ addRelation(label, planet, 'attached_to', { offset: [0, -30] })
 The label will follow the planet as it orbits the star!
 `,
 
-  'pinepaper://docs/generators': `# Background Generators
+  'pinepaper://docs/generators': `# Background Generators Guide
 
-Procedural backgrounds that create dynamic patterns.
+**Intent:** Create procedural backgrounds with animated patterns, gradients, and effects using built-in generators.
+
+## When to Use Generators
+
+Use generators when you need:
+- Animated background patterns (sunburst, waves, circuits)
+- Scenic backgrounds (sunset, starfield)
+- Geometric patterns (grids, dots, lines)
+- Dynamic textures that respond to animation
+
+## Key Tool
+
+\`\`\`
+pinepaper_execute_generator
+  generatorName: "drawSunburst"
+  params: { rayCount: 16, colors: ["#fbbf24", "#f59e0b"], animated: true }
+\`\`\`
 
 ## Available Generators
 
 ### drawSunburst
-Radial rays from center.
-- \`rayCount\`: Number of rays (default: 16)
-- \`colors\`: Array of ray colors
-- \`bgColor\`: Background color
-- \`animated\`: Enable rotation
+Radial rays emanating from center - perfect for energy, attention-grabbing backgrounds.
+
+\`\`\`
+pinepaper_execute_generator
+  generatorName: "drawSunburst"
+  params:
+    rayCount: 16              // Number of rays (default: 16)
+    colors: ["#fbbf24", "#f59e0b"]  // Alternating ray colors
+    bgColor: "#0f172a"        // Background behind rays
+    animated: true            // Enable rotation animation
+    speed: 0.5                // Rotation speed (1 = normal)
+\`\`\`
+
+**Use cases:** Promotional graphics, announcements, retro designs, attention focus
 
 ### drawSunsetScene
-Animated sunset with clouds.
-- \`sunColor\`: Sun fill color
-- \`skyColors\`: Array for gradient
-- \`cloudCount\`: Number of clouds
+Scenic sunset with animated sky and clouds - great for calm, atmospheric backgrounds.
+
+\`\`\`
+pinepaper_execute_generator
+  generatorName: "drawSunsetScene"
+  params:
+    sunColor: "#fbbf24"       // Sun fill color
+    skyColors: ["#f97316", "#ec4899", "#8b5cf6"]  // Gradient from horizon up
+    cloudCount: 5             // Number of clouds
+    animated: true            // Animate clouds drifting
+\`\`\`
+
+**Use cases:** Relaxation themes, nature scenes, time-of-day visualizations
 
 ### drawGrid
-Geometric grid patterns.
-- \`gridType\`: 'lines', 'dots', or 'squares'
-- \`spacing\`: Cell size
-- \`lineColor\`: Grid color
+Geometric grid patterns - clean, technical, modern look.
+
+\`\`\`
+pinepaper_execute_generator
+  generatorName: "drawGrid"
+  params:
+    gridType: "lines"         // 'lines', 'dots', or 'squares'
+    spacing: 40               // Cell size in pixels
+    lineColor: "#374151"      // Grid line/dot color
+    lineWidth: 1              // Line thickness
+    bgColor: "#0f172a"        // Background color
+\`\`\`
+
+**Grid Types:**
+| Type | Description |
+|------|-------------|
+| \`lines\` | Intersecting horizontal/vertical lines |
+| \`dots\` | Grid of dots at intersections |
+| \`squares\` | Filled square pattern |
+
+**Use cases:** Technical diagrams, graph paper, data visualization backgrounds
 
 ### drawWaves
-Layered wave pattern.
-- \`waveCount\`: Number of layers
-- \`colors\`: Wave colors
-- \`amplitude\`: Wave height
-- \`animated\`: Animate waves
+Layered wave pattern - organic, flowing, dynamic.
+
+\`\`\`
+pinepaper_execute_generator
+  generatorName: "drawWaves"
+  params:
+    waveCount: 4              // Number of wave layers
+    colors: ["#3b82f6", "#6366f1", "#8b5cf6", "#a855f7"]  // Wave colors (front to back)
+    amplitude: 50             // Wave height in pixels
+    frequency: 2              // Number of wave peaks
+    animated: true            // Animate wave motion
+    speed: 1.0                // Animation speed
+\`\`\`
+
+**Use cases:** Ocean themes, audio visualizers, flowing backgrounds
 
 ### drawCircuit
-Tech circuit board.
-- \`lineColor\`: Circuit lines
-- \`nodeColor\`: Junction color
-- \`density\`: 0-1 complexity
-- \`animated\`: Enable bolt effect
+Tech circuit board pattern - futuristic, digital, tech-themed.
+
+\`\`\`
+pinepaper_execute_generator
+  generatorName: "drawCircuit"
+  params:
+    lineColor: "#22c55e"      // Circuit line color
+    nodeColor: "#4ade80"      // Junction node color
+    bgColor: "#0a0a0a"        // Dark background
+    density: 0.6              // 0-1 complexity (higher = more lines)
+    animated: true            // Enable bolt/pulse effect
+    glowColor: "#22c55e"      // Glow effect color
+\`\`\`
+
+**Use cases:** Tech presentations, hacker themes, digital/cyber aesthetics
+
+### drawStarfield
+Animated starfield - space themes, night sky.
+
+\`\`\`
+pinepaper_execute_generator
+  generatorName: "drawStarfield"
+  params:
+    starCount: 200            // Number of stars
+    colors: ["#ffffff", "#fef3c7", "#e0f2fe"]  // Star color variations
+    bgColor: "#0a0a1a"        // Deep space background
+    animated: true            // Twinkling animation
+    depth: true               // Parallax depth effect
+\`\`\`
+
+**Use cases:** Space themes, night scenes, dreamy backgrounds
+
+### drawGradient
+Smooth color gradient - versatile base for any design.
+
+\`\`\`
+pinepaper_execute_generator
+  generatorName: "drawGradient"
+  params:
+    colors: ["#3b82f6", "#8b5cf6", "#ec4899"]  // Gradient colors
+    direction: "diagonal"     // 'horizontal', 'vertical', 'diagonal', 'radial'
+    animated: true            // Animate color shift
+\`\`\`
+
+**Directions:**
+| Direction | Description |
+|-----------|-------------|
+| \`horizontal\` | Left to right |
+| \`vertical\` | Top to bottom |
+| \`diagonal\` | Corner to corner |
+| \`radial\` | Center outward |
+
+## Combining Generators with Items
+
+Generators create backgrounds - add items on top:
+
+\`\`\`
+// Step 1: Create background
+pinepaper_execute_generator
+  generatorName: "drawSunburst"
+  params: {rayCount: 12, colors: ["#fbbf24", "#f59e0b"], animated: true}
+
+// Step 2: Add items on top
+pinepaper_create_item itemType: "text" position: {x: 400, y: 250}
+  properties: {content: "SALE!", fontSize: 72, fontWeight: "bold", color: "#ffffff"}
+
+pinepaper_create_item itemType: "text" position: {x: 400, y: 330}
+  properties: {content: "50% OFF", fontSize: 36, color: "#fef3c7"}
+\`\`\`
+
+## Generator + Animation Example
+
+\`\`\`
+// Animated tech background with orbiting logo
+pinepaper_execute_generator
+  generatorName: "drawCircuit"
+  params: {lineColor: "#22c55e", bgColor: "#0a0a0a", animated: true}
+
+pinepaper_create_item itemType: "circle" position: {x: 400, y: 300}
+  properties: {radius: 60, color: "#22c55e"}
+→ item_1
+
+pinepaper_create_item itemType: "circle" position: {x: 500, y: 300}
+  properties: {radius: 15, color: "#4ade80"}
+→ item_2
+
+pinepaper_add_relation sourceId: "item_2" targetId: "item_1" relationType: "orbits"
+  params: {radius: 100, speed: 0.5}
+\`\`\`
+
+## List All Generators
+
+\`\`\`
+pinepaper_list_generators
+\`\`\`
+
+Returns all available generator names and their descriptions.
+
+## Customizing Generator Output
+
+Generators create background items. To modify after creation:
+
+1. **Change colors**: Generators use the background layer - modify with \`pinepaper_set_background_color\`
+2. **Clear and regenerate**: Use \`pinepaper_clear_canvas\` then call generator again with new params
+3. **Layer items**: Items created after generator appear on top
+
+## Best Practices
+
+1. **Call generator first** - before creating items
+2. **Use complementary colors** - items should contrast with background
+3. **Consider animation performance** - animated generators + many animated items can slow down
+4. **Match themes** - sunburst for energy, waves for calm, circuit for tech
 `,
 
   'pinepaper://docs/custom-paths': `# Custom Paths Guide
@@ -4292,6 +5023,888 @@ pinepaper_create_item itemType: "text"
     fontSize: 8
     color: "#60a5fa"
 \`\`\`
+`,
+
+  'pinepaper://docs/diagrams': `# Diagrams Guide
+
+**Intent:** Create flowcharts, UML diagrams, network architectures, and connect any visual elements with smart arrows.
+
+## When to Use Diagrams
+
+Use diagram tools when you need to:
+- Build flowcharts with decision logic
+- Create UML diagrams (class, use case)
+- Design network/architecture diagrams
+- Connect any items (images, shapes, text) with arrows
+- Show process flows with animated connectors
+
+## Key Tools
+
+| Tool | Purpose |
+|------|---------|
+| \`pinepaper_create_diagram_shape\` | Create flowchart/UML/network shapes |
+| \`pinepaper_connect\` | Connect items with smart arrows |
+| \`pinepaper_auto_layout\` | Automatically arrange connected shapes |
+| \`pinepaper_get_diagram_shapes\` | List available shape types |
+| \`pinepaper_diagram_mode\` | Enable/disable diagram editing mode |
+
+## Shape Types
+
+### Flowchart Shapes
+| Shape | Use For |
+|-------|---------|
+| \`process\` | Actions, steps (rectangle) |
+| \`decision\` | Yes/No branching (diamond) |
+| \`terminal\` | Start/End points (rounded) |
+| \`data\` | Input/Output (parallelogram) |
+| \`document\` | Documents (wavy bottom) |
+| \`database\` | Data storage (cylinder) |
+| \`preparation\` | Setup steps (hexagon) |
+
+### UML Shapes
+| Shape | Use For |
+|-------|---------|
+| \`uml-class\` | Class definitions |
+| \`uml-usecase\` | Use case ellipse |
+| \`uml-actor\` | Stick figure actor |
+
+### Network Shapes
+| Shape | Use For |
+|-------|---------|
+| \`cloud\` | Cloud services |
+| \`server\` | Server/computer |
+
+## Creating a Flowchart
+
+\`\`\`
+// Step 1: Create shapes
+pinepaper_create_diagram_shape
+  shapeType: "terminal"
+  position: {x: 400, y: 100}
+  label: "Start"
+  style: {fillColor: "#22c55e"}
+→ item_1
+
+pinepaper_create_diagram_shape
+  shapeType: "process"
+  position: {x: 400, y: 200}
+  label: "Process Data"
+→ item_2
+
+pinepaper_create_diagram_shape
+  shapeType: "decision"
+  position: {x: 400, y: 320}
+  label: "Valid?"
+  style: {fillColor: "#fbbf24"}
+→ item_3
+
+pinepaper_create_diagram_shape
+  shapeType: "terminal"
+  position: {x: 400, y: 440}
+  label: "End"
+  style: {fillColor: "#ef4444"}
+→ item_4
+
+// Step 2: Connect shapes
+pinepaper_connect
+  sourceItemId: "item_1"
+  targetItemId: "item_2"
+  routing: "orthogonal"
+
+pinepaper_connect
+  sourceItemId: "item_2"
+  targetItemId: "item_3"
+
+pinepaper_connect
+  sourceItemId: "item_3"
+  targetItemId: "item_4"
+  label: "Yes"
+\`\`\`
+
+## Connector Options
+
+### Routing Styles
+| Style | Description |
+|-------|-------------|
+| \`orthogonal\` | Right-angle paths (default, best for flowcharts) |
+| \`curved\` | Smooth curved paths |
+| \`direct\` | Straight line |
+
+### Arrow Styles
+| Style | Description |
+|-------|-------------|
+| \`classic\` | Standard arrow (default) |
+| \`stealth\` | Sleek pointed arrow |
+| \`sharp\` | Sharp angular arrow |
+| \`open\` | Outlined arrow |
+| \`diamond\` | Diamond shape |
+| \`circle\` | Circle endpoint |
+| \`none\` | No arrowhead |
+
+### Line Styles
+| Style | Description |
+|-------|-------------|
+| \`solid\` | Continuous line |
+| \`dashed\` | Dashed line |
+| \`dotted\` | Dotted line |
+
+## Connector Example
+
+\`\`\`
+pinepaper_connect
+  sourceItemId: "item_1"
+  targetItemId: "item_2"
+  routing: "curved"
+  lineColor: "#3b82f6"
+  lineWidth: 2
+  lineStyle: "dashed"
+  headStyle: "stealth"
+  label: "Yes"
+  animated: true    // Bolt effect shows direction
+\`\`\`
+
+## Connecting Any Items
+
+Diagram connectors work with ANY canvas items, not just diagram shapes:
+
+\`\`\`
+// Connect images
+pinepaper_import_svg url: "https://example.com/icon1.svg" → item_1
+pinepaper_import_svg url: "https://example.com/icon2.svg" → item_2
+pinepaper_connect sourceItemId: "item_1" targetItemId: "item_2"
+
+// Connect text labels
+pinepaper_create_item itemType: "text" properties: {content: "A"} → item_3
+pinepaper_create_item itemType: "text" properties: {content: "B"} → item_4
+pinepaper_connect sourceItemId: "item_3" targetItemId: "item_4"
+\`\`\`
+
+## Auto Layout
+
+Automatically arrange connected shapes:
+
+\`\`\`
+pinepaper_auto_layout
+  direction: "TB"           // TB, BT, LR, RL
+  spacing: {horizontal: 80, vertical: 60}
+\`\`\`
+
+| Direction | Description |
+|-----------|-------------|
+| \`TB\` | Top to Bottom |
+| \`BT\` | Bottom to Top |
+| \`LR\` | Left to Right |
+| \`RL\` | Right to Left |
+`,
+
+  'pinepaper://docs/masks': `# Masks Guide
+
+**Intent:** Create reveal animations and transitions using animated clipping masks (wipes, iris, curtains, custom shapes).
+
+## When to Use Masks
+
+Use mask tools when you need to:
+- Reveal text or images with wipe effects
+- Create iris/zoom reveal animations
+- Build curtain-style transitions
+- Design custom reveal sequences
+- Add cinematic letterbox effects
+
+## Key Tools
+
+| Tool | Purpose |
+|------|---------|
+| \`pinepaper_apply_animated_mask\` | Apply reveal animation (preset or custom) |
+| \`pinepaper_apply_custom_mask\` | Full keyframe control |
+| \`pinepaper_remove_mask\` | Remove mask from item |
+| \`pinepaper_get_mask_animations\` | List available presets |
+| \`pinepaper_get_mask_types\` | List mask shapes |
+| \`pinepaper_get_animatable_properties\` | Get keyframeable properties |
+| \`pinepaper_get_available_easings\` | List easing functions |
+
+## Animation Presets
+
+### Wipe Effects
+| Preset | Effect |
+|--------|--------|
+| \`wipeLeft\` | Reveal from left to right |
+| \`wipeRight\` | Reveal from right to left |
+| \`wipeUp\` | Reveal from bottom to top |
+| \`wipeDown\` | Reveal from top to bottom |
+| \`diagonalWipe\` | Angled reveal from corner |
+
+### Iris Effects
+| Preset | Effect |
+|--------|--------|
+| \`iris\` | Circle expands from center |
+| \`irisOut\` | Circle shrinks to center (hide) |
+
+### Shape Reveals
+| Preset | Effect |
+|--------|--------|
+| \`star\` | Star shape scales up |
+| \`heart\` | Heart shape scales up |
+
+### Curtain Effects
+| Preset | Effect |
+|--------|--------|
+| \`curtainHorizontal\` | Opens from center horizontally |
+| \`curtainVertical\` | Opens from center vertically |
+| \`cinematic\` | Letterbox bars animate away |
+
+### Text Reveals
+| Preset | Effect |
+|--------|--------|
+| \`revealUp\` | Text slides up within mask |
+| \`revealDown\` | Text slides down within mask |
+
+## Quick Start: Preset Mode
+
+\`\`\`
+// Create an item
+pinepaper_create_item
+  itemType: "text"
+  position: {x: 400, y: 300}
+  properties: {content: "Hello World", fontSize: 48, color: "#ffffff"}
+→ item_1
+
+// Apply wipe reveal
+pinepaper_apply_animated_mask
+  itemId: "item_1"
+  preset: "wipeLeft"
+  options:
+    duration: 0.5
+    easing: "easeOut"
+\`\`\`
+
+## Preset Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| \`startTime\` | number | 0 | Delay before animation starts (seconds) |
+| \`duration\` | number | 0.8 | Animation duration (seconds) |
+| \`easing\` | string | "easeOut" | Timing function |
+| \`reversed\` | boolean | false | Play in reverse (hide instead of reveal) |
+| \`loop\` | boolean | false | Loop the animation |
+
+## Easing Functions
+
+| Easing | Description |
+|--------|-------------|
+| \`linear\` | Constant speed |
+| \`easeIn\` | Slow start, fast end |
+| \`easeOut\` | Fast start, slow end |
+| \`easeInOut\` | Slow start and end |
+| \`bounce\` | Bouncing effect at end |
+| \`elastic\` | Spring-like overshoot |
+
+## Custom Keyframe Animation
+
+For full control, define keyframes manually:
+
+\`\`\`
+pinepaper_apply_animated_mask
+  itemId: "item_1"
+  maskType: "rectangle"
+  keyframes:
+    - time: 0
+      properties: {x: 200, y: 250, width: 0, height: 100}
+      easing: "linear"
+    - time: 0.5
+      properties: {x: 200, y: 250, width: 100, height: 100}
+      easing: "easeIn"
+    - time: 1
+      properties: {x: 200, y: 250, width: 200, height: 100}
+      easing: "easeOut"
+\`\`\`
+
+## Mask Types
+
+| Type | Animatable Properties |
+|------|----------------------|
+| \`rectangle\` | x, y, width, height, rotation, opacity |
+| \`circle\` | x, y, radius, scale, opacity |
+| \`ellipse\` | x, y, radiusX, radiusY, rotation, scale, opacity |
+| \`star\` | x, y, radius, scale, rotation, opacity |
+| \`triangle\` | x, y, scale, rotation, opacity |
+| \`hexagon\` | x, y, scale, rotation, opacity |
+| \`heart\` | x, y, scale, rotation, opacity |
+| \`rounded\` | x, y, width, height, cornerRadius, opacity |
+
+## Hybrid Mode: Preset + Custom Keyframes
+
+Combine preset behavior with custom timing:
+
+\`\`\`
+pinepaper_apply_animated_mask
+  itemId: "item_1"
+  preset: "iris"
+  keyframes:
+    - time: 0
+      properties: {scale: 0.01}
+      easing: "linear"
+    - time: 0.3
+      properties: {scale: 0.3}
+      easing: "easeIn"
+    - time: 0.7
+      properties: {scale: 0.8}
+      easing: "easeOut"
+    - time: 1
+      properties: {scale: 1}
+      easing: "bounce"
+\`\`\`
+
+## Staggered Text Reveal
+
+Reveal multiple words with delays:
+
+\`\`\`
+// Create words
+pinepaper_create_item itemType: "text" position: {x: 200, y: 300}
+  properties: {content: "Hello", fontSize: 36} → item_1
+
+pinepaper_create_item itemType: "text" position: {x: 350, y: 300}
+  properties: {content: "Beautiful", fontSize: 36} → item_2
+
+pinepaper_create_item itemType: "text" position: {x: 550, y: 300}
+  properties: {content: "World", fontSize: 36} → item_3
+
+// Apply staggered reveals
+pinepaper_apply_animated_mask itemId: "item_1" preset: "wipeUp"
+  options: {startTime: 0, duration: 0.3}
+
+pinepaper_apply_animated_mask itemId: "item_2" preset: "wipeUp"
+  options: {startTime: 0.2, duration: 0.3}
+
+pinepaper_apply_animated_mask itemId: "item_3" preset: "wipeUp"
+  options: {startTime: 0.4, duration: 0.3}
+\`\`\`
+
+## Removing Masks
+
+\`\`\`
+pinepaper_remove_mask itemId: "item_1"
+\`\`\`
+`,
+
+  'pinepaper://docs/fonts': `# Font Studio Guide
+
+**Intent:** Create custom hand-drawn fonts by drawing glyphs on a dedicated canvas, then export as OTF files or use directly in PinePaper documents.
+
+## Overview
+
+Font Studio provides 16 tools for creating custom fonts programmatically. You draw each character as a Paper.js path, clean it up, and convert it to a font glyph.
+
+## Key Tools
+
+| Tool | Purpose |
+|------|---------|
+| \`pinepaper_font_show_studio\` | Open the Font Studio UI with guide lines |
+| \`pinepaper_font_set_name\` | Set font family name |
+| \`pinepaper_font_get_required_chars\` | Get list of characters needed |
+| \`pinepaper_font_get_status\` | Check completion progress |
+| \`pinepaper_font_create_glyph\` | Convert a drawn path to a glyph |
+| \`pinepaper_font_create_space\` | Create the space character |
+| \`pinepaper_font_remove_glyph\` | Remove a glyph for redrawing |
+| \`pinepaper_font_set_metrics\` | Configure font metrics (advanced) |
+| \`pinepaper_font_export\` | Export as OTF file |
+| \`pinepaper_font_load_into_document\` | Use font in current document |
+| \`pinepaper_font_export_data\` | Save progress as JSON |
+| \`pinepaper_font_import_data\` | Resume from saved data |
+| \`pinepaper_font_clear\` | Reset all glyphs |
+| \`pinepaper_font_remove_overlap\` | Merge overlapping path strokes |
+| \`pinepaper_font_correct_direction\` | Fix path winding for fills |
+| \`pinepaper_font_cleanup_path\` | All-in-one path preparation |
+
+## Workflow
+
+### Step 1: Open Font Studio
+\`\`\`
+pinepaper_font_show_studio
+\`\`\`
+
+Opens the interactive Font Studio UI with typography guide lines:
+- **Cap Height** (Red): Top of capital letters (H, T, A)
+- **x-Height** (Cyan): Top of lowercase letters (a, e, x)
+- **Baseline** (Green): Where letters sit
+- **Descender** (Purple): Below baseline for g, p, y, j
+
+### Step 2: Set Font Name
+\`\`\`
+pinepaper_font_set_name name: "MyHandwriting"
+\`\`\`
+
+### Step 3: Check Required Characters
+\`\`\`
+pinepaper_font_get_required_chars set: "minimum"
+\`\`\`
+
+Two character sets available:
+- **minimum**: A-Z, a-z, 0-9, space (63 chars) - enough for basic text
+- **standard**: adds punctuation and symbols (90+ chars)
+
+### Step 4: Draw and Create Glyphs
+
+For each character:
+
+1. **Draw the character** as a Paper.js path on the canvas
+2. **Clean up the path** (recommended):
+\`\`\`
+pinepaper_font_cleanup_path pathId: "item_42"
+\`\`\`
+3. **Create the glyph**:
+\`\`\`
+pinepaper_font_create_glyph character: "A" pathId: "item_42"
+\`\`\`
+
+For the space character (no visible path needed):
+\`\`\`
+pinepaper_font_create_space width: 250
+\`\`\`
+
+### Step 5: Check Progress
+\`\`\`
+pinepaper_font_get_status
+\`\`\`
+
+Returns: font name, total/completed/pending counts, percentage, and character lists.
+
+### Step 6: Export
+
+Export as OTF file:
+\`\`\`
+pinepaper_font_export
+\`\`\`
+
+Or load directly into the document:
+\`\`\`
+pinepaper_font_load_into_document
+\`\`\`
+
+## Path Cleanup Tools
+
+Before converting a drawn path to a glyph, clean it up for best results:
+
+| Tool | What It Does |
+|------|-------------|
+| \`pinepaper_font_remove_overlap\` | Merges overlapping strokes into one outline |
+| \`pinepaper_font_correct_direction\` | Fixes winding so fills render correctly |
+| \`pinepaper_font_cleanup_path\` | Does all cleanup in one call (overlap + direction + smooth) |
+
+The \`cleanup_path\` tool accepts options:
+\`\`\`
+pinepaper_font_cleanup_path
+  pathId: "item_42"
+  removeOverlap: true
+  correctDirection: true
+  smooth: true
+  smoothTolerance: 2.5
+\`\`\`
+
+## Font Metrics (Advanced)
+
+Configure the font's coordinate system:
+\`\`\`
+pinepaper_font_set_metrics
+  unitsPerEm: 1000
+  ascender: 800
+  descender: -200
+  xHeight: 500
+  capHeight: 700
+\`\`\`
+
+## Save and Resume Progress
+
+Save work-in-progress:
+\`\`\`
+pinepaper_font_export_data
+\`\`\`
+
+Resume later:
+\`\`\`
+pinepaper_font_import_data data: { ... }
+\`\`\`
+
+## Best Practices
+
+- Keep stroke width consistent across all characters
+- Uppercase letters should touch the cap height line
+- Lowercase (except b, d, f, h, k, l, t) stay within x-height
+- Letters g, j, p, q, y extend below baseline to descender
+- Always run \`cleanup_path\` before \`create_glyph\` for cleanest results
+- Use \`get_status\` frequently to track progress
+- Save progress with \`export_data\` periodically
+`,
+
+  'pinepaper://examples/us-states-animated': `# US States Animated Map Example
+
+**Intent:** Create a US map with animated color transitions that loop continuously.
+
+## What You'll Build
+
+A USA map where states randomly change colors in a flowing wave animation.
+
+## Step 1: Load the Map
+
+\`\`\`
+pinepaper_load_map
+  mapId: "usa"
+  options:
+    projection: "albers"
+    quality: "balanced"
+    fillColor: "#e5e7eb"
+    strokeColor: "#9ca3af"
+\`\`\`
+
+## Step 2: Apply Wave Animation
+
+\`\`\`
+pinepaper_animate_map_wave
+  duration: 10
+  loop: true
+  colors: ["#ef4444", "#f97316", "#fbbf24", "#22c55e", "#3b82f6", "#8b5cf6"]
+  options:
+    delayBetween: 0.1
+    easing: "easeInOut"
+\`\`\`
+
+## Result
+
+States will animate through the color palette in a wave pattern, creating a mesmerizing continuous animation.
+
+## Alternative: Data-Driven Colors
+
+Apply colors based on data values:
+
+\`\`\`
+pinepaper_apply_data_colors
+  data:
+    "CA": 100
+    "TX": 85
+    "FL": 70
+    "NY": 65
+    "PA": 50
+    "IL": 45
+    "OH": 40
+  options:
+    colorScale: "blues"
+    legend: true
+    legendPosition: "bottom-right"
+\`\`\`
+
+## Alternative: Highlight Specific States
+
+\`\`\`
+pinepaper_highlight_regions
+  regionIds: ["CA", "OR", "WA"]
+  options:
+    fillColor: "#22c55e"
+    strokeColor: "#16a34a"
+    animated: true
+\`\`\`
+
+## Key Tools Used
+
+| Tool | Purpose |
+|------|---------|
+| \`pinepaper_load_map\` | Load USA map with Albers projection |
+| \`pinepaper_animate_map_wave\` | Create looping color animation |
+| \`pinepaper_apply_data_colors\` | Color by numeric values |
+| \`pinepaper_highlight_regions\` | Highlight specific states |
+
+## Region ID Format
+
+For USA maps, use 2-letter state codes:
+- CA, TX, NY, FL, WA, OR, etc.
+
+## Export
+
+\`\`\`
+pinepaper_export_svg animated: true
+\`\`\`
+`,
+
+  'pinepaper://examples/flowchart': `# Flowchart Example
+
+**Intent:** Create a decision flowchart with auto-layout and animated connectors.
+
+## What You'll Build
+
+A simple decision flowchart: Start → Process → Decision → End
+
+## Step 1: Create Shapes
+
+\`\`\`
+// Start terminal
+pinepaper_create_diagram_shape
+  shapeType: "terminal"
+  position: {x: 400, y: 80}
+  label: "Start"
+  style: {fillColor: "#22c55e", strokeColor: "#16a34a"}
+→ item_1
+
+// Process step
+pinepaper_create_diagram_shape
+  shapeType: "process"
+  position: {x: 400, y: 180}
+  label: "Check Input"
+  style: {fillColor: "#3b82f6", strokeColor: "#2563eb"}
+→ item_2
+
+// Decision diamond
+pinepaper_create_diagram_shape
+  shapeType: "decision"
+  position: {x: 400, y: 300}
+  label: "Valid?"
+  style: {fillColor: "#fbbf24", strokeColor: "#f59e0b"}
+→ item_3
+
+// Success path
+pinepaper_create_diagram_shape
+  shapeType: "process"
+  position: {x: 250, y: 420}
+  label: "Process Data"
+  style: {fillColor: "#3b82f6", strokeColor: "#2563eb"}
+→ item_4
+
+// Error path
+pinepaper_create_diagram_shape
+  shapeType: "process"
+  position: {x: 550, y: 420}
+  label: "Show Error"
+  style: {fillColor: "#ef4444", strokeColor: "#dc2626"}
+→ item_5
+
+// End terminal
+pinepaper_create_diagram_shape
+  shapeType: "terminal"
+  position: {x: 400, y: 540}
+  label: "End"
+  style: {fillColor: "#6b7280", strokeColor: "#4b5563"}
+→ item_6
+\`\`\`
+
+## Step 2: Connect Shapes
+
+\`\`\`
+// Start to Check
+pinepaper_connect
+  sourceItemId: "item_1"
+  targetItemId: "item_2"
+  routing: "orthogonal"
+  lineColor: "#374151"
+
+// Check to Decision
+pinepaper_connect
+  sourceItemId: "item_2"
+  targetItemId: "item_3"
+  routing: "orthogonal"
+  lineColor: "#374151"
+
+// Decision Yes path
+pinepaper_connect
+  sourceItemId: "item_3"
+  targetItemId: "item_4"
+  routing: "orthogonal"
+  lineColor: "#22c55e"
+  label: "Yes"
+
+// Decision No path
+pinepaper_connect
+  sourceItemId: "item_3"
+  targetItemId: "item_5"
+  routing: "orthogonal"
+  lineColor: "#ef4444"
+  label: "No"
+
+// Process to End
+pinepaper_connect
+  sourceItemId: "item_4"
+  targetItemId: "item_6"
+  routing: "orthogonal"
+  lineColor: "#374151"
+
+// Error to End
+pinepaper_connect
+  sourceItemId: "item_5"
+  targetItemId: "item_6"
+  routing: "orthogonal"
+  lineColor: "#374151"
+\`\`\`
+
+## Step 3: Apply Auto-Layout (Optional)
+
+\`\`\`
+pinepaper_auto_layout
+  direction: "TB"
+  spacing: {horizontal: 100, vertical: 80}
+\`\`\`
+
+## Adding Animation
+
+Make connectors animated to show flow direction:
+
+\`\`\`
+pinepaper_connect
+  sourceItemId: "item_1"
+  targetItemId: "item_2"
+  animated: true          // Bolt effect shows direction
+  lineColor: "#3b82f6"
+\`\`\`
+
+## Key Tools Used
+
+| Tool | Purpose |
+|------|---------|
+| \`pinepaper_create_diagram_shape\` | Create flowchart symbols |
+| \`pinepaper_connect\` | Draw smart connectors |
+| \`pinepaper_auto_layout\` | Automatic arrangement |
+
+## Shape Reference
+
+| Shape | Symbol | Use For |
+|-------|--------|---------|
+| \`terminal\` | Rounded rectangle | Start/End |
+| \`process\` | Rectangle | Actions |
+| \`decision\` | Diamond | Yes/No branching |
+| \`data\` | Parallelogram | Input/Output |
+| \`document\` | Wavy rectangle | Documents |
+`,
+
+  'pinepaper://examples/reveal-animation': `# Reveal Animation Example
+
+**Intent:** Create a text reveal animation using mask effects.
+
+## What You'll Build
+
+Text that reveals with a smooth wipe animation, perfect for intros and titles.
+
+## Method 1: Simple Preset
+
+\`\`\`
+// Create text
+pinepaper_create_item
+  itemType: "text"
+  position: {x: 400, y: 300}
+  properties:
+    content: "Welcome"
+    fontSize: 64
+    fontWeight: "bold"
+    color: "#ffffff"
+→ item_1
+
+// Apply wipe reveal
+pinepaper_apply_animated_mask
+  itemId: "item_1"
+  preset: "wipeLeft"
+  options:
+    duration: 0.6
+    easing: "easeOut"
+\`\`\`
+
+## Method 2: Staggered Word Reveal
+
+\`\`\`
+// Word 1
+pinepaper_create_item itemType: "text" position: {x: 200, y: 300}
+  properties: {content: "Create", fontSize: 48, color: "#3b82f6"}
+→ item_1
+
+// Word 2
+pinepaper_create_item itemType: "text" position: {x: 370, y: 300}
+  properties: {content: "Beautiful", fontSize: 48, color: "#8b5cf6"}
+→ item_2
+
+// Word 3
+pinepaper_create_item itemType: "text" position: {x: 580, y: 300}
+  properties: {content: "Graphics", fontSize: 48, color: "#ec4899"}
+→ item_3
+
+// Staggered reveals
+pinepaper_apply_animated_mask itemId: "item_1" preset: "wipeUp"
+  options: {startTime: 0, duration: 0.4, easing: "easeOut"}
+
+pinepaper_apply_animated_mask itemId: "item_2" preset: "wipeUp"
+  options: {startTime: 0.15, duration: 0.4, easing: "easeOut"}
+
+pinepaper_apply_animated_mask itemId: "item_3" preset: "wipeUp"
+  options: {startTime: 0.3, duration: 0.4, easing: "easeOut"}
+\`\`\`
+
+## Method 3: Iris Reveal for Images
+
+\`\`\`
+// Create a shape or import image
+pinepaper_create_item itemType: "circle" position: {x: 400, y: 300}
+  properties: {radius: 100, color: "#3b82f6"}
+→ item_1
+
+// Iris reveal from center
+pinepaper_apply_animated_mask
+  itemId: "item_1"
+  preset: "iris"
+  options:
+    duration: 0.8
+    easing: "easeOut"
+\`\`\`
+
+## Method 4: Cinematic Letterbox
+
+\`\`\`
+// Create main content
+pinepaper_create_item itemType: "rectangle" position: {x: 400, y: 300}
+  properties: {width: 600, height: 300, color: "#1e40af"}
+→ item_1
+
+// Cinematic reveal (letterbox bars animate away)
+pinepaper_apply_animated_mask
+  itemId: "item_1"
+  preset: "cinematic"
+  options:
+    duration: 1.2
+    easing: "easeInOut"
+\`\`\`
+
+## Available Presets
+
+| Preset | Effect | Best For |
+|--------|--------|----------|
+| \`wipeLeft\` | Left to right | Text, titles |
+| \`wipeRight\` | Right to left | Text |
+| \`wipeUp\` | Bottom to top | Credits, lists |
+| \`wipeDown\` | Top to bottom | Headers |
+| \`iris\` | Circle from center | Images, focus |
+| \`irisOut\` | Circle shrinks | Transitions out |
+| \`star\` | Star shape reveal | Fun, playful |
+| \`heart\` | Heart shape reveal | Love themes |
+| \`curtainHorizontal\` | Opens from center | Stage, dramatic |
+| \`curtainVertical\` | Opens vertically | Reveals |
+| \`cinematic\` | Letterbox effect | Film style |
+| \`diagonalWipe\` | Angled wipe | Dynamic |
+
+## Combining with Other Animations
+
+\`\`\`
+// Create text
+pinepaper_create_item itemType: "text" position: {x: 400, y: 300}
+  properties: {content: "Animated!", fontSize: 48}
+→ item_1
+
+// Apply mask reveal
+pinepaper_apply_animated_mask itemId: "item_1" preset: "wipeLeft"
+  options: {duration: 0.5}
+
+// Add pulse animation after reveal
+pinepaper_animate_item itemId: "item_1" animationType: "pulse" speed: 0.5
+\`\`\`
+
+## Key Tools
+
+| Tool | Purpose |
+|------|---------|
+| \`pinepaper_apply_animated_mask\` | Apply reveal preset |
+| \`pinepaper_get_mask_animations\` | List all presets |
+| \`pinepaper_remove_mask\` | Remove mask effect |
 `,
 };
 
