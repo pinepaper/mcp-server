@@ -637,6 +637,18 @@ export async function handleToolCall(
 
       case 'pinepaper_modify_item': {
         const input = ModifyItemInputSchema.parse(args);
+
+        // Guard: reject animation properties — they don't work via modify
+        const animProps = ['animationType', 'animationSpeed', 'keyframes', 'animation'];
+        const passedAnimProps = animProps.filter(p => p in (input.properties || {}));
+        if (passedAnimProps.length > 0) {
+          return errorResult('INVALID_PROPERTIES',
+            `Animation properties (${passedAnimProps.join(', ')}) cannot be set via pinepaper_modify_item — they will be silently ignored. ` +
+            `Use pinepaper_animate for loop animations (pulse, rotate, bounce, fade, wobble, slide) ` +
+            `or pinepaper_keyframe_animate for timed/sequenced animations with precise control.`
+          );
+        }
+
         const code = codeGenerator.generateModifyItem(input);
         const description = getLocalizedSuccessMessage(i18n, 'itemModified', {
           itemId: input.itemId,
