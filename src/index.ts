@@ -523,163 +523,80 @@ pinepaper_apply_animated_mask itemId: "item_3" preset: "wipeLeft"
 5. **Offer alternatives** - If something can't be done exactly, suggest similar approaches
 `,
 
-  'pinepaper://docs/templates': `# Templates Guide
+  'pinepaper://docs/templates': `# Templates & Timed Animation Guide
 
-**Intent:** Use pre-built templates instead of building from scratch. Templates have animations already configured - just change the content.
+## Apply a Template
 
-## Why Use Templates?
+\`pinepaper_list_templates\` — browse available pre-built templates.
+\`pinepaper_apply_template\` — load a template by name. Animations are pre-configured.
+After applying: modify text/colors with \`pinepaper_modify_item\`, then export.
 
-Templates save significant time:
-- **Animations already work** - no need to set up relations or keyframes
-- **Professional designs** - tested layouts and color schemes
-- **Just change content** - update text, colors, or data values
-- **Consistent quality** - proven visual results
+## Template Categories
 
-## When to Use Templates
+| Category | Examples |
+|----------|----------|
+| Map | US Election, World Data, Travel Route |
+| Animation | Solar System, Logo Reveal, Text Intro, Particle Burst |
+| Diagram | Flowchart, Org Chart, Network |
+| Social Media | YouTube Thumbnail (1280x720), Instagram Story (1080x1920), TikTok |
 
-**ALWAYS check templates first when:**
-- Creating social media graphics (Instagram, TikTok, YouTube)
-- Making data visualizations with maps
-- Building presentation slides
-- Creating animated logos or intros
-- Designing infographics
+## Modifying Templates
 
-## Available Template Categories
+Change safely: \`properties.content\`, \`properties.color\`, \`backgroundColor\`, positions, sizes.
+Preserve: \`relations\` array, \`animations\` array, item \`name\` values (relations reference these).
 
-### Map Templates
-| Template | Description |
-|----------|-------------|
-| US Election Map | State-by-state with color coding |
-| World Data Map | Choropleth with legend |
-| Travel Route | Multi-city route visualization |
+## Building Timed Animations (4 steps)
 
-### Animation Templates
-| Template | Description |
-|----------|-------------|
-| Solar System | Orbiting planets animation |
-| Logo Reveal | Animated logo intro |
-| Text Intro | Staggered text reveal |
-| Particle Burst | Explosion effect |
+For invitations, intros, promos, reveals — any timed animation:
 
-### Diagram Templates
-| Template | Description |
-|----------|-------------|
-| Process Flowchart | Decision flow with connectors |
-| Org Chart | Hierarchical structure |
-| Network Diagram | Server/cloud architecture |
+**1. Create items** — \`pinepaper_create_scene\` with all items. Timed reveals: set \`opacity: 0\`.
+Items get sequential IDs: first = \`item_1\`, second = \`item_2\`, etc.
 
-### Social Media Templates
-| Template | Description |
-|----------|-------------|
-| YouTube Thumbnail | 1280x720 with text |
-| Instagram Story | 1080x1920 vertical |
-| TikTok Video | Animated background |
-
-## How to Modify Templates
-
-### Step 1: Use pinepaper_create_scene
-
-Templates can be recreated using \`pinepaper_create_scene\`:
-
+**2. Animate items** — ONE \`pinepaper_execute_custom_code\` call with all animations:
 \`\`\`
-pinepaper_create_scene
-  backgroundColor: "#0a0a0a"
-  items:
-    - name: "title", itemType: "text", position: {x: 400, y: 100}
-      properties: {content: "YOUR TEXT HERE", fontSize: 48, color: "#ffffff"}
-    - name: "icon", itemType: "circle", position: {x: 400, y: 300}
-      properties: {radius: 50, color: "#3b82f6"}
-  animations:
-    - target: "title", type: "typewriter"
-    - target: "icon", type: "pulse"
+app.addAnimation(registryId, keyframes, options)
+  registryId: 'item_1'
+  keyframes:  [{time: 0, properties: {opacity: 0}, easing: 'easeInOut'},
+               {time: 1, properties: {opacity: 1}}]
+  options:    {duration: number, loop?: boolean, pingPong?: boolean}
+\`\`\`
+Animatable properties: \`opacity\`, \`scale\`, \`x\`, \`y\`, \`rotation\`.
+Stagger items by offsetting \`time\` values across items.
+
+**3. Play** — \`pinepaper_play_timeline\`
+
+**4. Export** — \`pinepaper_export_video\` (MP4/WebM)
+
+## Text Reveal Pattern
+
+Create text items, then apply mask reveals with staggered start times:
+\`\`\`
+pinepaper_apply_animated_mask  itemId: "item_1"  preset: "wipeLeft"  options: {duration: 0.5}
+pinepaper_apply_animated_mask  itemId: "item_2"  preset: "wipeLeft"  options: {startTime: 0.3, duration: 0.5}
+\`\`\`
+Mask presets: wipe, iris, fade, curtain, star, heart, cinematic.
+
+## Advanced Capabilities (via execute_custom_code)
+
+**Time-scoped relations** — relation active only during a time window:
+\`\`\`
+app.addRelation(sourceId, targetId, type, {startTime: 2, endTime: 5, autoRemove: true, ...params})
 \`\`\`
 
-### Step 2: Change Only What's Needed
-
-Most template modifications are simple property updates:
-
-| Change | What to Modify |
-|--------|----------------|
-| Text content | \`properties.content\` |
-| Colors | \`properties.color\`, \`backgroundColor\` |
-| Sizes | \`properties.radius\`, \`properties.fontSize\` |
-| Positions | \`position.x\`, \`position.y\` |
-| Data values | \`data\` object for maps |
-
-### Step 3: Keep Animations Intact
-
-**DO NOT modify:**
-- \`relations\` array (keeps animations working)
-- \`animations\` array (keeps effects working)
-- Item \`name\` values (relations reference these)
-
-## Template: Solar System
-
+**Keyframe priority** — when keyframes and relations target the same property:
 \`\`\`
-pinepaper_create_scene
-  backgroundColor: "#0a0a0a"
-  items:
-    - name: "sun", itemType: "circle", position: {x: 400, y: 300}
-      properties: {radius: 50, color: "#fbbf24"}
-    - name: "earth", itemType: "circle", position: {x: 550, y: 300}
-      properties: {radius: 20, color: "#3b82f6"}
-    - name: "moon", itemType: "circle", position: {x: 580, y: 300}
-      properties: {radius: 8, color: "#9ca3af"}
-  relations:
-    - source: "earth", target: "sun", type: "orbits", params: {radius: 150, speed: 0.5}
-    - source: "moon", target: "earth", type: "orbits", params: {radius: 30, speed: 1.5}
-  animations:
-    - target: "sun", type: "pulse", speed: 0.3
+app.addRelation(sourceId, targetId, type, {relationBehavior: 'keyframeFirst', ...params})
 \`\`\`
 
-**To customize:** Change colors, add more planets with different radii/speeds.
-
-## Template: Text Reveal Intro
-
+**Per-item timing** — offset an item into the global timeline:
 \`\`\`
-pinepaper_create_scene
-  backgroundColor: "#1e293b"
-  items:
-    - name: "line1", itemType: "text", position: {x: 400, y: 250}
-      properties: {content: "YOUR HEADLINE", fontSize: 48, fontWeight: "bold", color: "#ffffff"}
-    - name: "line2", itemType: "text", position: {x: 400, y: 320}
-      properties: {content: "Your subtitle here", fontSize: 24, color: "#94a3b8"}
+app.setTimeOffset(registryId, offsetSeconds)
 \`\`\`
 
-Then apply mask reveals:
+**Atomic relation replace** — swap relation params without remove+add:
 \`\`\`
-pinepaper_apply_animated_mask itemId: "item_1" preset: "wipeLeft" options: {duration: 0.5}
-pinepaper_apply_animated_mask itemId: "item_2" preset: "wipeLeft" options: {startTime: 0.3, duration: 0.5}
+app.replaceRelation(sourceId, targetId, type, newParams)
 \`\`\`
-
-**To customize:** Change text content, colors, timing.
-
-## Template: Bouncing Balls
-
-\`\`\`
-pinepaper_create_scene
-  backgroundColor: "#0f172a"
-  items:
-    - name: "ball1", itemType: "circle", position: {x: 200, y: 300}
-      properties: {radius: 30, color: "#ef4444"}
-    - name: "ball2", itemType: "circle", position: {x: 400, y: 300}
-      properties: {radius: 30, color: "#22c55e"}
-    - name: "ball3", itemType: "circle", position: {x: 600, y: 300}
-      properties: {radius: 30, color: "#3b82f6"}
-  animations:
-    - target: "ball1", type: "bounce", speed: 1.0
-    - target: "ball2", type: "bounce", speed: 0.8
-    - target: "ball3", type: "bounce", speed: 1.2
-\`\`\`
-
-**To customize:** Add more balls, change colors, adjust speeds.
-
-## Best Practices
-
-1. **Start with templates** - modify existing rather than building from scratch
-2. **Preserve animation structure** - don't change relation/animation arrays unless necessary
-3. **Test with screenshots** - use \`pinepaper_browser_screenshot\` after modifications
-4. **Use create_scene** - it's the fastest way to build complex animated graphics
 `,
 
   'pinepaper://docs/relations': `# Relations Guide
