@@ -96,7 +96,7 @@ export class PinePaperBrowserController {
 
     this.config = {
       studioUrl,
-      headless: config.headless ?? true, // Default to headless for agent mode
+      headless: config.headless ?? false, // Default to visible browser so user can see PinePaper Studio
       viewportWidth: config.viewportWidth || 1280,
       viewportHeight: config.viewportHeight || 800,
       timeout: config.timeout || 30000,
@@ -480,8 +480,8 @@ export class PinePaperBrowserController {
       // Dynamic import to avoid issues when puppeteer isn't installed
       const puppeteer = await import('puppeteer');
 
-      // Agent mode defaults to headless
-      const useHeadless = options.headless ?? true;
+      // Agent mode defaults to visible browser so user can see PinePaper Studio
+      const useHeadless = options.headless ?? this.config.headless;
       const viewportWidth = options.viewportWidth ?? this.config.viewportWidth;
       const viewportHeight = options.viewportHeight ?? this.config.viewportHeight;
 
