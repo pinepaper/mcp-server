@@ -12,188 +12,108 @@ import { Tool } from '@modelcontextprotocol/sdk/types.js';
 import { I18nManager } from '../i18n/index.js';
 
 // =============================================================================
-// PLANNING GUIDE FOR AI AGENTS — PROLOG ARCHITECTURE
+// AI AGENT GUIDE
 // =============================================================================
 /*
-🏗️ PINEPAPER ARCHITECTURE:
+RULES (violating these wastes the conversation):
+1. ONE design per conversation — complex designs exhaust context on the second attempt.
+2. Read docs once, then EXECUTE — re-reading burns tokens for no gain.
+3. NEVER use pinepaper_modify_item for animations — it cannot set keyframes.
+4. Take ONE screenshot at the end — not after every operation.
+5. Use pinepaper_create_scene for 3+ items — individual create calls are 4-8x slower.
 
-PinePaper follows a Prolog-inspired declarative architecture. Think of it as:
-- Items are ATOMS (facts) — the ground truth of what exists on canvas
-- Relations are RULES (behavioral bindings) — how items interact
-- Animations are PROPERTIES — visual behavior applied to atoms
-- Scenes are COMPOSITIONS — declarative multi-item assembly
-- Templates are BLUEPRINTS — pre-built designs you can load
+BUILD ORDER: Canvas size → Items → Animate items → Export
 
-Build BOTTOM-UP: Items → Relations/Animations → Scenes → Templates
+─── ITEMS (first-class citizens) ───
 
-🎮 EXECUTION MODES:
+Everything is a registered item with a registryId. Items are the atoms — all animation
+mechanisms act ON items. create_scene assigns sequential IDs: item_1, item_2, item_3, ...
 
-The MCP server supports two execution modes (set via --mode flag or PINEPAPER_EXECUTION_MODE env):
+Create:
+  pinepaper_create_item       Single item (circle, rectangle, star, text, line, polygon)
+  pinepaper_batch_create      Multiple items at custom positions
+  pinepaper_create_scene      Items + relations + loops in one atomic call (PREFERRED for 3+)
 
-1. PUPPETEER MODE (default):
-   - Opens a browser window with PinePaper Studio
-   - Executes code automatically - you watch the magic happen
-   - Can take screenshots to see results
-   - Best for: Interactive sessions, live demos, visual feedback
+Import (become registered items — get itemIds, participate in all animations):
+  pinepaper_search_assets + pinepaper_import_asset   SVG icons from 850k+ repository
+  pinepaper_import_svg        SVG from URL
+  pinepaper_import_image      Raster image from URL
+Assets available: icons, arrows, animals, vehicles, food, flags, UI elements.
+NOT available: specific people, brand logos, photographs. If search fails → build with shapes.
 
-2. CODE GENERATION MODE (--mode code):
-   - No browser window opened
-   - Generates JavaScript code for each tool call
-   - Best for: Testing code, learning the API, debugging
+Modify: pinepaper_modify_item (position, color, size, opacity, rotation, text — NOT animations)
+Delete: pinepaper_delete_item | Batch: pinepaper_batch_modify
+Text:   pinepaper_create_item(type:'text') | pinepaper_create_letter_collage (per-letter styles)
 
-📋 DECISION TREE — LAYERED BY ARCHITECTURE:
+─── ANIMATE ITEMS (5 mechanisms — they compose on the same item) ───
 
-LAYER 1 — ATOMS (Canvas Setup + Items):
-   Canvas setup:
-   ├─ Set canvas size/format → pinepaper_set_canvas_size or pinepaper_get_canvas_presets
-   ├─ Set background color → pinepaper_set_background_color
-   └─ Clear canvas → pinepaper_clear_canvas
+1. Relations (behavioral — items interact):
+   pinepaper_add_relation — orbits, follows, attached_to, points_at, mirrors, parallax,
+     animates, grows_from, staggered_with, wave_through, circumscribes, morphs_to
+   Also: pinepaper_remove_relation, pinepaper_query_relations, pinepaper_register_custom_relation
 
-   Single items:
-   ├─ Simple shapes (circle, star, rectangle, text) → pinepaper_create_item
-   ├─ Glossy 3D sphere → pinepaper_create_glossy_sphere
-   └─ Diagonal stripes pattern → pinepaper_create_diagonal_stripes
+2. Loop presets (continuous, infinite — single item):
+   pinepaper_animate — pulse, rotate, bounce, fade, wobble, slide, typewriter
 
-   Bulk creation:
-   ├─ Grid layout → pinepaper_create_grid
-   └─ Custom positions → pinepaper_batch_create
+3. Keyframe animations (timed, precise — properties at specific times):
+   pinepaper_keyframe_animate — single item: [{time, properties, easing}]
+   pinepaper_execute_custom_code — batch multiple items in ONE call:
+     app.addAnimation(registryId, keyframes[], {duration, loop?, pingPong?})
+   Animatable properties: opacity, scale, x, y, rotation
 
-   Imports (become full items participating in relations/animations):
-   ├─ SVG from URL → pinepaper_import_svg
-   ├─ Image from URL → pinepaper_import_image ← NEW
-   └─ Pre-made asset → pinepaper_search_assets + pinepaper_import_asset
+4. Mask reveals (animated shape reveals):
+   pinepaper_apply_animated_mask — wipe, iris, fade, curtain, star, heart, cinematic
+   pinepaper_apply_custom_mask — custom mask shape
 
-   Modify/delete:
-   ├─ Single item → pinepaper_modify_item / pinepaper_delete_item
-   └─ Multiple items → pinepaper_batch_modify
+5. Camera (viewport choreography):
+   pinepaper_camera_animate, pinepaper_camera_zoom, pinepaper_camera_pan
 
-LAYER 2 — RULES (Relations = behavioral bindings):
-   ├─ Add behavioral relation → pinepaper_add_relation
-   │  Universal (position-based, ALL item types): orbits, follows, attached_to,
-   │    maintains_distance, points_at, mirrors, parallax, bounds_to
-   │  Self-animations: animates, grows_from, indicates, wave_through
-   │  Group coordination: staggered_with
-   │  Visual effects: circumscribes, morphs_to (see compatibility note below)
-   │  Camera: camera_follows, camera_animates
-   ├─ Register custom relation → pinepaper_register_custom_relation
-   ├─ Remove relation → pinepaper_remove_relation
-   └─ Query relations → pinepaper_query_relations [Utility]
+Composability: mechanisms compose freely on the same item. One item can have a relation,
+a loop preset, keyframes, AND a mask reveal simultaneously.
 
-LAYER 3 — PROPERTIES (Animations, Masks, Camera):
-   Simple animations:
-   ├─ Looping (pulse, spin, bounce, fade, wobble) → pinepaper_animate
-   └─ Timed keyframes → pinepaper_keyframe_animate / pinepaper_play_timeline
+Keyframe priority: when keyframes and relations target the same property on one item,
+use relationBehavior:'keyframeFirst' via execute_custom_code to let keyframes win.
 
-   Masks (animated reveals):
-   ├─ Apply preset mask → pinepaper_apply_animated_mask
-   ├─ Apply custom mask → pinepaper_apply_custom_mask
-   └─ Remove mask → pinepaper_remove_mask
+Time-scoped relations: relations can have startTime/endTime/autoRemove via execute_custom_code
+so they activate only during a specific time window.
 
-   Camera controls:
-   ├─ Animate camera → pinepaper_camera_animate
-   ├─ Zoom/Pan/Move → pinepaper_camera_zoom / pinepaper_camera_pan / pinepaper_camera_move_to
-   └─ Reset/Stop → pinepaper_camera_reset / pinepaper_camera_stop
+Per-item timing: timeOffset via execute_custom_code lets each item offset into the timeline.
 
-LAYER 4 — COMPOSITIONS (Scenes):
-   └─ Create complete scene → pinepaper_create_scene (RECOMMENDED for multi-item)
-      Defines items, relations, animations in a single atomic operation (4-8x faster)
+What create_scene includes: items, relations, loop animations (atomic).
+What's added AFTER: keyframes (keyframe_animate or execute_custom_code), masks, camera.
 
-LAYER 5 — BLUEPRINTS (Templates):
-   └─ Load pre-built design → pinepaper_apply_template ← NEW
-      Categories: social-media, meme, business, education, creative, tech, global,
-      indigenous, seasonal, masking, scenes, diagrams, maps
+─── DECIDE: Which workflow? ───
 
-SPECIALIZED DOMAINS:
-   ├─ Flowcharts/UML → pinepaper_create_diagram_shape, pinepaper_connect, etc.
-   ├─ Geographic maps → pinepaper_load_map, pinepaper_highlight_regions, etc.
-   ├─ Custom fonts → pinepaper_font_show_studio, pinepaper_font_create_glyph, etc.
-   ├─ Letter collages → pinepaper_create_letter_collage
-   ├─ Procedural backgrounds → pinepaper_execute_generator
-   ├─ Particle effects → pinepaper_apply_effect
-   ├─ Visual filters → pinepaper_add_filter
-   ├─ Interactive triggers → pinepaper_add_trigger
-   ├─ Quizzes/LMS → pinepaper_create_quiz
-   └─ P5.js drawing → pinepaper_p5_draw
+Static (poster, diagram):
+  → create_scene (items + relations) → screenshot
 
-INFRASTRUCTURE:
-   ├─ Query/inspect → pinepaper_get_items, pinepaper_get_relation_stats
-   ├─ Export → pinepaper_export_svg, pinepaper_export_training_data, pinepaper_export_scene
-   ├─ Browser → pinepaper_browser_connect, pinepaper_browser_screenshot
-   ├─ Performance → pinepaper_get_performance_metrics
-   ├─ Agent workflow → pinepaper_agent_start_job, pinepaper_agent_batch_execute
-   └─ Paper.js escape hatch → pinepaper_register_item
+Loop (logo spin, orbiting planets):
+  → create_scene (items + relations + loops) → screenshot
 
-🎯 WORKFLOW PLANNING:
+Timed (invitation, intro, promo):
+  → create_scene (all items, timed reveals start opacity:0)
+  → ONE execute_custom_code with all app.addAnimation() calls
+  → Add masks/camera as needed
+  → play_timeline → export_video
 
-BEFORE STARTING ANY SCENE:
-1. Check if canvas has welcome template → Call pinepaper_get_items
-2. If items exist and user wants fresh start → Call pinepaper_clear_canvas
-3. Plan your approach:
-   - Complex character? → Search assets first (pinepaper_search_assets)
-   - Many similar items? → Use batch operations or grid
-   - Background needed? → Set background color or generator early
+Timing templates — stagger reveals across total duration:
+  5s:  bg 0s → elements 1-2s → text 2.5-3.5s → final 4-5s
+  10s: bg 0-1s → elements 1-4s → main 4-7s → details 7-9s → finale 9-10s
+  15s: intro 0-2s → build 2-6s → primary 6-9s → secondary 9-12s → outro 12-15s
+  30s: opening 0-4s → act1 4-12s → act2 12-20s → act3 20-26s → closing 26-30s
 
-ITEM PROVENANCE:
-Items on the canvas can originate from multiple sources:
-- pinepaper_create_item: Direct shape creation
-- pinepaper_import_svg: SVG file import (becomes a full item)
-- pinepaper_import_image: Raster image import (becomes a full item)
-- pinepaper_import_asset: Pre-made asset import (becomes a full item)
-All imported items are first-class citizens — they get itemIds and can participate
-in the relation and animation systems just like natively created items.
+Easing: easeInOut, easeIn, easeOut, easeInCubic, easeOutCubic, easeInOutCubic,
+  easeInBack, easeOutBack, easeInOutBack, easeOutBounce, linear
 
-RELATION COMPATIBILITY:
-- Universal relations (position-based) work with ALL item types including imported SVGs/images:
-  orbits, follows, attached_to, maintains_distance, points_at, mirrors, parallax, bounds_to
-- morphs_to has type-specific behavior:
-  Path→Path: point interpolation
-  Circle→Circle: radius interpolation
-  Text→Text: font blend
-  Cross-type: particle denoising transition
+─── CANVAS & EXPORT ───
 
-PERFORMANCE OPTIMIZATION:
-1. Batch operations are ~10x faster:
-   - Creating 10 items: pinepaper_batch_create (300ms) vs 10x pinepaper_create_item (1450ms)
-   - Use pinepaper_create_grid for grid layouts (even faster)
-2. Screenshot mode affects speed:
-   - mode='on_request': Fast, screenshots only when explicitly requested
-   - mode='always': Slower, captures after every operation
-3. Query performance metrics to optimize:
-   - Call pinepaper_get_performance_metrics after workflow
+Canvas: pinepaper_set_canvas_size, pinepaper_set_background_color, pinepaper_clear_canvas
+  Gradient backgrounds: create a full-canvas rectangle with gradient fill.
+Export: pinepaper_export_svg, pinepaper_export_video (MP4/WebM), pinepaper_browser_screenshot
+Templates: pinepaper_list_templates, pinepaper_apply_template (pre-built animated designs)
 
-COMMON PATTERNS:
-
-Pattern: Solar System (use create_scene for best performance)
-1. pinepaper_create_scene with items: [sun, earth, moon], relations: [earth orbits sun, moon orbits earth]
-
-Pattern: Animated Logo
-1. pinepaper_clear_canvas
-2. pinepaper_execute_generator (sunburst background)
-3. pinepaper_create_item (text - brand name)
-4. pinepaper_animate (pulse animation)
-5. pinepaper_apply_effect (sparkle)
-6. pinepaper_export_svg
-
-Pattern: Icon Search and Import
-1. pinepaper_search_assets (query: "rocket")
-2. pinepaper_import_asset (assetId from results)
-3. pinepaper_modify_item (adjust size/position if needed)
-
-⚠️ COMMON MISTAKES TO AVOID:
-
-1. DON'T take screenshots after every operation — take ONE at the end
-2. DON'T draw complex characters with paths — use pinepaper_search_assets
-3. DON'T forget to save itemIds — you need them for relations/modifications
-4. DON'T use individual creates for 10+ items — use batch/grid
-5. DON'T assume canvas is empty — check with pinepaper_get_items first
-
-📊 PERFORMANCE BASELINES:
-- pinepaper_create_item: ~145ms
-- pinepaper_batch_create (10 items): ~298ms (~30ms per item)
-- pinepaper_create_grid (25 items): ~350ms (~14ms per item)
-- pinepaper_add_relation: ~120ms
-- pinepaper_modify_item: ~100ms
-- pinepaper_browser_screenshot: ~200ms (only in 'always' mode)
+More tools: maps, diagrams, fonts, effects, filters, triggers — see individual tool descriptions.
+Guides: read pinepaper://docs/* resources (list with list_resources).
 */
 
 // =============================================================================
@@ -493,6 +413,11 @@ For glossy 3D spheres, use pinepaper_create_glossy_sphere instead. For diagonal 
     },
     description: `Modify an existing item's properties.
 
+DO NOT USE FOR ANIMATIONS:
+- For looping animations → pinepaper_animate
+- For keyframe/timed animations → pinepaper_keyframe_animate
+- animationType passed here will be IGNORED
+
 USE WHEN:
 - Changing color, size, position of an existing item
 - Updating text content
@@ -525,7 +450,7 @@ GRADIENT OBJECT FORMAT:
         },
         properties: {
           type: 'object',
-          description: 'Properties to update (x, y, width, height, scale, scaleX, scaleY, rotation, opacity, color, strokeColor, strokeWidth, fontSize, content, animationType, animationSpeed)',
+          description: 'Properties to update: x, y, width, height, scale, scaleX, scaleY, rotation, opacity, color, strokeColor, strokeWidth, fontSize, content. DO NOT pass animationType here — use pinepaper_animate or pinepaper_keyframe_animate instead.',
           additionalProperties: true,
         },
         data: {
