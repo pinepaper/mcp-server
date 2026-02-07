@@ -2021,3 +2021,41 @@ export type DeselectMapRegionsInput = z.infer<typeof DeselectMapRegionsInputSche
 export const GetHighlightedMapRegionsInputSchema = z.object({}).describe('Get highlighted map regions input (no parameters)');
 
 export type GetHighlightedMapRegionsInput = z.infer<typeof GetHighlightedMapRegionsInputSchema>;
+
+// =============================================================================
+// TEMPLATE SCHEMAS
+// =============================================================================
+
+export const TemplateCategorySchema = z.enum([
+  'social-media', 'meme', 'business', 'education', 'creative',
+  'tech', 'global', 'indigenous', 'seasonal', 'masking',
+  'scenes', 'diagrams', 'maps',
+]).describe('Template category');
+
+export type TemplateCategory = z.infer<typeof TemplateCategorySchema>;
+
+export const ApplyTemplateInputSchema = z.object({
+  templateId: z.string().optional().describe('Template ID to load (omit to list templates)'),
+  category: TemplateCategorySchema.optional().describe('Filter templates by category'),
+  listOnly: z.boolean().optional().default(false).describe('If true, only list available templates without loading'),
+}).describe('Apply template input');
+
+export type ApplyTemplateInput = z.infer<typeof ApplyTemplateInputSchema>;
+
+// =============================================================================
+// IMAGE IMPORT SCHEMAS
+// =============================================================================
+
+export const ImageMaskSchema = z.enum(['circle', 'rounded', 'hexagon', 'star']).describe('Mask shape to apply to imported image');
+
+export type ImageMask = z.infer<typeof ImageMaskSchema>;
+
+export const ImportImageInputSchema = z.object({
+  url: z.string().describe('URL of the image to import'),
+  position: PositionSchema.optional().describe('Position on canvas (defaults to center)'),
+  maxWidth: z.number().optional().describe('Maximum width constraint in pixels'),
+  maxHeight: z.number().optional().describe('Maximum height constraint in pixels'),
+  mask: ImageMaskSchema.optional().describe('Optional mask shape to apply to the image'),
+}).describe('Import image input');
+
+export type ImportImageInput = z.infer<typeof ImportImageInputSchema>;

@@ -12,9 +12,20 @@ import { Tool } from '@modelcontextprotocol/sdk/types.js';
 import { I18nManager } from '../i18n/index.js';
 
 // =============================================================================
-// PLANNING GUIDE FOR AI AGENTS
+// PLANNING GUIDE FOR AI AGENTS — PROLOG ARCHITECTURE
 // =============================================================================
 /*
+🏗️ PINEPAPER ARCHITECTURE:
+
+PinePaper follows a Prolog-inspired declarative architecture. Think of it as:
+- Items are ATOMS (facts) — the ground truth of what exists on canvas
+- Relations are RULES (behavioral bindings) — how items interact
+- Animations are PROPERTIES — visual behavior applied to atoms
+- Scenes are COMPOSITIONS — declarative multi-item assembly
+- Templates are BLUEPRINTS — pre-built designs you can load
+
+Build BOTTOM-UP: Items → Relations/Animations → Scenes → Templates
+
 🎮 EXECUTION MODES:
 
 The MCP server supports two execution modes (set via --mode flag or PINEPAPER_EXECUTION_MODE env):
@@ -23,76 +34,94 @@ The MCP server supports two execution modes (set via --mode flag or PINEPAPER_EX
    - Opens a browser window with PinePaper Studio
    - Executes code automatically - you watch the magic happen
    - Can take screenshots to see results
-   - User can take control anytime - click buttons, make manual edits
-   - Uses your default browser session (existing cookies/login persist)
-   - Best for: Interactive sessions, live demos, when you want visual feedback
+   - Best for: Interactive sessions, live demos, visual feedback
 
 2. CODE GENERATION MODE (--mode code):
    - No browser window opened
    - Generates JavaScript code for each tool call
-   - User manually copies code and pastes into PinePaper Studio console
-   - User has full control over execution timing
-   - Best for: Testing code, learning the API, environments where Puppeteer is problematic
-   - Helpful for: Debugging, understanding what code is generated, batch operations
+   - Best for: Testing code, learning the API, debugging
 
-When to use which:
-- "I want to watch AI create graphics live" → Puppeteer mode
-- "I want to test and verify code before running" → Code mode
-- "Multiple browser windows keep opening" → Code mode (avoids the issue)
-- "I want to learn the PinePaper API" → Code mode (see generated code)
+📋 DECISION TREE — LAYERED BY ARCHITECTURE:
 
-📋 DECISION TREE: Which Tool Should I Use?
+LAYER 1 — ATOMS (Canvas Setup + Items):
+   Canvas setup:
+   ├─ Set canvas size/format → pinepaper_set_canvas_size or pinepaper_get_canvas_presets
+   ├─ Set background color → pinepaper_set_background_color
+   └─ Clear canvas → pinepaper_clear_canvas
 
-1. USER WANTS TO ADD GRAPHICS TO CANVAS:
-   ├─ Simple shapes (circle, star, rectangle, text)
-   │  └─> pinepaper_create_item
-   ├─ Multiple similar items (grid, batch)
-   │  ├─ Positioned in a grid → pinepaper_create_grid
-   │  └─ Custom positions → pinepaper_batch_create
-   ├─ Complex illustrations (witch, cat, person)
-   │  ├─ Search for pre-made asset → pinepaper_search_assets
-   │  ├─ Import found asset → pinepaper_import_asset
-   │  └─ Import from URL → pinepaper_import_svg
-   ├─ Glossy 3D sphere
-   │  └─> pinepaper_create_glossy_sphere
-   └─ Diagonal stripes pattern
-      └─> pinepaper_create_diagonal_stripes
+   Single items:
+   ├─ Simple shapes (circle, star, rectangle, text) → pinepaper_create_item
+   ├─ Glossy 3D sphere → pinepaper_create_glossy_sphere
+   └─ Diagonal stripes pattern → pinepaper_create_diagonal_stripes
 
-2. USER WANTS ANIMATION/MOVEMENT:
-   ├─ Simple looping animation (pulse, spin, bounce)
-   │  └─> pinepaper_animate
-   ├─ Behavior-based (orbit, follow, attach)
-   │  └─> pinepaper_add_relation
-   ├─ Timed keyframe animation
-   │  └─> pinepaper_keyframe_animate
-   └─ Control playback
-      └─> pinepaper_play_timeline
+   Bulk creation:
+   ├─ Grid layout → pinepaper_create_grid
+   └─ Custom positions → pinepaper_batch_create
 
-3. USER WANTS BACKGROUND/DECORATIONS:
-   ├─ Solid color background
-   │  └─> pinepaper_set_background_color
-   ├─ Procedural patterns (sunburst, waves, grid, circuit)
-   │  └─> pinepaper_execute_generator
-   └─ Particle effects (sparkle, blast)
-      └─> pinepaper_apply_effect
+   Imports (become full items participating in relations/animations):
+   ├─ SVG from URL → pinepaper_import_svg
+   ├─ Image from URL → pinepaper_import_image ← NEW
+   └─ Pre-made asset → pinepaper_search_assets + pinepaper_import_asset
 
-4. USER WANTS TO MODIFY EXISTING ITEMS:
-   ├─ Single item change → pinepaper_modify_item
-   ├─ Multiple items at once → pinepaper_batch_modify
-   └─ Delete items → pinepaper_delete_item
+   Modify/delete:
+   ├─ Single item → pinepaper_modify_item / pinepaper_delete_item
+   └─ Multiple items → pinepaper_batch_modify
 
-5. USER WANTS TO EXPORT:
-   ├─ Animated SVG → pinepaper_export_svg
-   ├─ Training data (LLM fine-tuning) → pinepaper_export_training_data
-   └─ Screenshot → pinepaper_browser_screenshot
+LAYER 2 — RULES (Relations = behavioral bindings):
+   ├─ Add behavioral relation → pinepaper_add_relation
+   │  Universal (position-based, ALL item types): orbits, follows, attached_to,
+   │    maintains_distance, points_at, mirrors, parallax, bounds_to
+   │  Self-animations: animates, grows_from, indicates, wave_through
+   │  Group coordination: staggered_with
+   │  Visual effects: circumscribes, morphs_to (see compatibility note below)
+   │  Camera: camera_follows, camera_animates
+   ├─ Register custom relation → pinepaper_register_custom_relation
+   ├─ Remove relation → pinepaper_remove_relation
+   └─ Query relations → pinepaper_query_relations [Utility]
 
-6. USER WANTS CUSTOM FONTS:
-   ├─ Open Font Studio → pinepaper_font_show_studio
-   ├─ Create glyph from path → pinepaper_font_create_glyph
-   ├─ Clean up path first → pinepaper_font_cleanup_path
-   ├─ Check progress → pinepaper_font_get_status
-   ├─ Export as OTF → pinepaper_font_export
-   └─ Use in document → pinepaper_font_load_into_document
+LAYER 3 — PROPERTIES (Animations, Masks, Camera):
+   Simple animations:
+   ├─ Looping (pulse, spin, bounce, fade, wobble) → pinepaper_animate
+   └─ Timed keyframes → pinepaper_keyframe_animate / pinepaper_play_timeline
+
+   Masks (animated reveals):
+   ├─ Apply preset mask → pinepaper_apply_animated_mask
+   ├─ Apply custom mask → pinepaper_apply_custom_mask
+   └─ Remove mask → pinepaper_remove_mask
+
+   Camera controls:
+   ├─ Animate camera → pinepaper_camera_animate
+   ├─ Zoom/Pan/Move → pinepaper_camera_zoom / pinepaper_camera_pan / pinepaper_camera_move_to
+   └─ Reset/Stop → pinepaper_camera_reset / pinepaper_camera_stop
+
+LAYER 4 — COMPOSITIONS (Scenes):
+   └─ Create complete scene → pinepaper_create_scene (RECOMMENDED for multi-item)
+      Defines items, relations, animations in a single atomic operation (4-8x faster)
+
+LAYER 5 — BLUEPRINTS (Templates):
+   └─ Load pre-built design → pinepaper_apply_template ← NEW
+      Categories: social-media, meme, business, education, creative, tech, global,
+      indigenous, seasonal, masking, scenes, diagrams, maps
+
+SPECIALIZED DOMAINS:
+   ├─ Flowcharts/UML → pinepaper_create_diagram_shape, pinepaper_connect, etc.
+   ├─ Geographic maps → pinepaper_load_map, pinepaper_highlight_regions, etc.
+   ├─ Custom fonts → pinepaper_font_show_studio, pinepaper_font_create_glyph, etc.
+   ├─ Letter collages → pinepaper_create_letter_collage
+   ├─ Procedural backgrounds → pinepaper_execute_generator
+   ├─ Particle effects → pinepaper_apply_effect
+   ├─ Visual filters → pinepaper_add_filter
+   ├─ Interactive triggers → pinepaper_add_trigger
+   ├─ Quizzes/LMS → pinepaper_create_quiz
+   └─ P5.js drawing → pinepaper_p5_draw
+
+INFRASTRUCTURE:
+   ├─ Query/inspect → pinepaper_get_items, pinepaper_get_relation_stats
+   ├─ Export → pinepaper_export_svg, pinepaper_export_training_data, pinepaper_export_scene
+   ├─ Browser → pinepaper_browser_connect, pinepaper_browser_screenshot
+   ├─ Performance → pinepaper_get_performance_metrics
+   ├─ Agent workflow → pinepaper_agent_start_job, pinepaper_agent_batch_execute
+   └─ Paper.js escape hatch → pinepaper_register_item
 
 🎯 WORKFLOW PLANNING:
 
@@ -104,6 +133,24 @@ BEFORE STARTING ANY SCENE:
    - Many similar items? → Use batch operations or grid
    - Background needed? → Set background color or generator early
 
+ITEM PROVENANCE:
+Items on the canvas can originate from multiple sources:
+- pinepaper_create_item: Direct shape creation
+- pinepaper_import_svg: SVG file import (becomes a full item)
+- pinepaper_import_image: Raster image import (becomes a full item)
+- pinepaper_import_asset: Pre-made asset import (becomes a full item)
+All imported items are first-class citizens — they get itemIds and can participate
+in the relation and animation systems just like natively created items.
+
+RELATION COMPATIBILITY:
+- Universal relations (position-based) work with ALL item types including imported SVGs/images:
+  orbits, follows, attached_to, maintains_distance, points_at, mirrors, parallax, bounds_to
+- morphs_to has type-specific behavior:
+  Path→Path: point interpolation
+  Circle→Circle: radius interpolation
+  Text→Text: font blend
+  Cross-type: particle denoising transition
+
 PERFORMANCE OPTIMIZATION:
 1. Batch operations are ~10x faster:
    - Creating 10 items: pinepaper_batch_create (300ms) vs 10x pinepaper_create_item (1450ms)
@@ -113,19 +160,11 @@ PERFORMANCE OPTIMIZATION:
    - mode='always': Slower, captures after every operation
 3. Query performance metrics to optimize:
    - Call pinepaper_get_performance_metrics after workflow
-   - Identify bottlenecks and adjust approach
 
 COMMON PATTERNS:
 
-Pattern: Solar System
-1. pinepaper_clear_canvas
-2. pinepaper_set_background_color (black)
-3. pinepaper_create_item (sun - yellow circle, center)
-4. pinepaper_create_item (earth - blue circle)
-5. pinepaper_create_item (moon - gray circle)
-6. pinepaper_add_relation (earth orbits sun)
-7. pinepaper_add_relation (moon orbits earth)
-8. pinepaper_browser_screenshot
+Pattern: Solar System (use create_scene for best performance)
+1. pinepaper_create_scene with items: [sun, earth, moon], relations: [earth orbits sun, moon orbits earth]
 
 Pattern: Animated Logo
 1. pinepaper_clear_canvas
@@ -136,37 +175,17 @@ Pattern: Animated Logo
 6. pinepaper_export_svg
 
 Pattern: Icon Search and Import
-1. User: "Add a rocket icon"
-2. pinepaper_search_assets (query: "rocket")
-3. Review results, pick best match
-4. pinepaper_import_asset (assetId from results)
-5. pinepaper_modify_item (adjust size/position if needed)
-
-Pattern: Grid of Items
-1. pinepaper_create_grid (rows: 5, cols: 5, spacing: 80)
-   → Creates 25 items instantly in grid layout
-2. pinepaper_batch_modify (change colors/properties of all)
+1. pinepaper_search_assets (query: "rocket")
+2. pinepaper_import_asset (assetId from results)
+3. pinepaper_modify_item (adjust size/position if needed)
 
 ⚠️ COMMON MISTAKES TO AVOID:
 
-1. DON'T take screenshots after every operation
-   - Trust API success responses
-   - Take ONE screenshot at the end
-
-2. DON'T draw complex characters with paths
-   - "Draw a witch" = 20+ path operations (slow, poor results)
-   - Use pinepaper_search_assets instead
-
-3. DON'T forget to save itemIds
-   - Create operations return itemIds
-   - You need these for relations, modifications, deletions
-
-4. DON'T use individual creates for many items
-   - 10+ similar items? Use pinepaper_batch_create or pinepaper_create_grid
-
-5. DON'T assume canvas is empty
-   - Always check with pinepaper_get_items first
-   - Clear welcome template with pinepaper_clear_canvas if needed
+1. DON'T take screenshots after every operation — take ONE at the end
+2. DON'T draw complex characters with paths — use pinepaper_search_assets
+3. DON'T forget to save itemIds — you need them for relations/modifications
+4. DON'T use individual creates for 10+ items — use batch/grid
+5. DON'T assume canvas is empty — check with pinepaper_get_items first
 
 📊 PERFORMANCE BASELINES:
 - pinepaper_create_item: ~145ms
@@ -175,8 +194,6 @@ Pattern: Grid of Items
 - pinepaper_add_relation: ~120ms
 - pinepaper_modify_item: ~100ms
 - pinepaper_browser_screenshot: ~200ms (only in 'always' mode)
-
-Use pinepaper_get_performance_metrics to analyze your actual workflow performance.
 */
 
 // =============================================================================
@@ -184,8 +201,159 @@ Use pinepaper_get_performance_metrics to analyze your actual workflow performanc
 // =============================================================================
 
 export const PINEPAPER_TOOLS: Tool[] = [
+
   // ---------------------------------------------------------------------------
-  // ITEM TOOLS
+  // LAYER 1 — ATOMS: CANVAS TOOLS
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_set_background_color',
+    annotations: {
+      title: 'Set Background Color',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Set the canvas background color.
+
+USE WHEN:
+- Changing scene background
+- Setting up canvas before adding items`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        color: {
+          type: 'string',
+          description: 'Background color (hex, rgb, or named)',
+        },
+      },
+      required: ['color'],
+    },
+  },
+
+  {
+    name: 'pinepaper_set_canvas_size',
+    annotations: {
+      title: 'Set Canvas Size',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Change the canvas dimensions.
+
+IMPORTANT: Call this BEFORE creating items if you need a specific canvas size. The default canvas is 800x600 which may be too small for complex designs.
+
+USE WHEN:
+- Starting a new design - SET SIZE FIRST before adding items
+- Setting up for specific format (Instagram, YouTube, etc.)
+- Custom canvas size requirements
+- Design elements extend beyond current canvas bounds
+
+COMMON PRESETS:
+- instagram-square: 1080x1080
+- instagram-story: 1080x1920
+- youtube-thumbnail: 1280x720
+- twitter-post: 1200x675
+- hd-landscape: 1920x1080
+- hd-portrait: 1080x1920
+
+For wedding invitations, event cards, or detailed designs, use at least 1080x1080 or larger.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        width: { type: 'number', description: 'Canvas width in pixels' },
+        height: { type: 'number', description: 'Canvas height in pixels' },
+        preset: {
+          type: 'string',
+          description: 'Optional preset name',
+        },
+      },
+      required: ['width', 'height'],
+    },
+  },
+
+  {
+    name: 'pinepaper_get_canvas_size',
+    annotations: {
+      title: 'Get Canvas Size',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `[Utility] Get the current canvas dimensions.
+
+USE WHEN:
+- Need to know current canvas size before positioning items
+- Checking if canvas needs to be resized
+- Calculating positions relative to canvas bounds`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+
+  {
+    name: 'pinepaper_clear_canvas',
+    annotations: {
+      title: 'Clear Canvas',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Clear all items from the canvas, removing everything including any welcome template items.
+
+USE WHEN:
+- User wants to start fresh with an empty canvas
+- Need to remove all existing items before creating new ones
+- Clearing the welcome template that appears for first-time visitors
+- User says "clear everything", "start over", "reset canvas", "remove all items"
+
+IMPORTANT NOTES:
+- This removes ALL items from the canvas permanently
+- The welcome template (shown to first-time visitors) will be cleared
+- After clearing, use pinepaper_get_items to verify the canvas is empty
+- If items persist after clearing, try pinepaper_refresh_page instead`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+
+  {
+    name: 'pinepaper_refresh_page',
+    annotations: {
+      title: 'Refresh Page',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: `Refresh the PinePaper Studio page in the browser. This is the most reliable way to get a completely clean canvas.
+
+USE WHEN:
+- pinepaper_clear_canvas didn't fully remove all items
+- Need a guaranteed clean slate
+- Want to remove the welcome template completely
+- Troubleshooting issues with the canvas state
+- User explicitly asks to "refresh" or "reload"
+
+IMPORTANT NOTES:
+- This reloads the entire page, which resets everything
+- The welcome template will NOT appear after refresh (only shows for first-time visitors)
+- After refresh, the canvas will be completely empty
+- All unsaved work will be lost
+- You may need to wait a moment after refresh before executing other commands`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // LAYER 1 — ATOMS: ITEM TOOLS
   // ---------------------------------------------------------------------------
   {
     name: 'pinepaper_create_item',
@@ -247,6 +415,14 @@ EXAMPLES:
 - "Draw a heart" → itemType: "path", properties: {pathData: "M 300 350 C 300 300, 250 250, 200 250 C 150 250, 100 300, 100 350 C 100 450, 300 550, 300 550 C 300 550, 500 450, 500 350 C 500 300, 450 250, 400 250 C 350 250, 300 300, 300 350 Z", fillColor: "#ef4444"}
 - "Circle with radial gradient" → itemType: "circle", properties: {radius: 50, color: {type: "radial", stops: [{color: "#ff6b6b", offset: 0}, {color: "#c0392b", offset: 1}]}}
 - "Rectangle with shadow" → itemType: "rectangle", properties: {width: 100, height: 50, color: "#3b82f6", shadowColor: "rgba(0,0,0,0.5)", shadowBlur: 10, shadowOffset: [5, 5]}
+
+ITEM PROVENANCE:
+Items on the canvas can originate from multiple sources — all become first-class items with itemIds:
+- pinepaper_create_item: Direct shape creation (this tool)
+- pinepaper_import_svg: SVG file import → becomes a full item
+- pinepaper_import_image: Raster image import → becomes a full item
+- pinepaper_import_asset: Pre-made asset import → becomes a full item
+All imported items participate in the relation and animation systems just like natively created items.
 
 WORKFLOW TIP:
 After creating items, use pinepaper_add_relation to animate them (e.g., orbits, follows, attached_to).
@@ -407,7 +583,7 @@ Use pinepaper_clear_canvas instead of deleting items one by one.`,
   },
 
   // ---------------------------------------------------------------------------
-  // HIGH-LEVEL DESIGN TOOLS
+  // LAYER 1 — ATOMS: HIGH-LEVEL DESIGN TOOLS
   // ---------------------------------------------------------------------------
   {
     name: 'pinepaper_create_glossy_sphere',
@@ -555,166 +731,302 @@ EXAMPLES:
     },
   },
 
+  // ---------------------------------------------------------------------------
+  // LAYER 1 — ATOMS: IMPORT TOOLS
+  // ---------------------------------------------------------------------------
   {
-    name: 'pinepaper_create_scene',
+    name: 'pinepaper_import_svg',
     annotations: {
-      title: 'Create Scene',
+      title: 'Import SVG',
       readOnlyHint: false,
       destructiveHint: false,
       idempotentHint: false,
-      openWorldHint: false,
+      openWorldHint: true,
     },
-    description: `Create a complete scene with multiple items, relations, and animations in a single operation. This is the MOST EFFICIENT way to create complex animated scenes.
+    description: `Import an SVG string or SVG from URL onto the canvas. Returns an itemId for the imported graphic.
 
 USE WHEN:
-- Creating a solar system, bouncing balls, or any multi-item animated scene
-- User describes a scene with multiple related elements
-- Performance is important (reduces 4+ tool calls to 1)
-- Setting up multiple items that will interact with each other
+- User requests complex illustrations (characters, icons, detailed graphics)
+- Importing pre-made SVG assets
+- Adding logos or vector graphics
+- User mentions SVG files or vector graphics
 
-ADVANTAGES:
-- 4-8x faster than calling individual tools
-- Single undo step for entire scene
-- Automatic name-to-ID mapping for relations
-- Cleaner, more atomic scene creation
+⚠️ RECOMMENDED FOR COMPLEX CHARACTERS:
+Instead of drawing "a witch" or "a cat" with many path operations, use SVG import:
+1. Describe what you need and use a simple placeholder SVG
+2. Or import from a URL if the user provides one
 
-HOW IT WORKS:
-1. Define items with "name" references (e.g., "sun", "earth", "moon")
-2. Define relations using those names (e.g., source: "earth", target: "sun")
-3. Define animations using names (e.g., target: "sun", type: "pulse")
-4. The server creates all items, then establishes relations and animations
+EXAMPLES:
+- Import a simple star SVG: svgString: '<svg viewBox="0 0 100 100"><polygon points="50,5 61,40 98,40 68,62 79,96 50,75 21,96 32,62 2,40 39,40" fill="#fbbf24"/></svg>'
+- Import from URL: url: "https://example.com/icon.svg"
 
-EXAMPLE - Solar System:
-{
-  "backgroundColor": "#0a0a0a",
-  "items": [
-    { "name": "sun", "itemType": "circle", "position": {"x": 400, "y": 300}, "properties": {"radius": 50, "color": "#fbbf24"} },
-    { "name": "earth", "itemType": "circle", "position": {"x": 550, "y": 300}, "properties": {"radius": 20, "color": "#3b82f6"} },
-    { "name": "moon", "itemType": "circle", "position": {"x": 590, "y": 300}, "properties": {"radius": 8, "color": "#9ca3af"} }
-  ],
-  "relations": [
-    { "source": "earth", "target": "sun", "type": "orbits", "params": {"radius": 150, "speed": 0.5} },
-    { "source": "moon", "target": "earth", "type": "orbits", "params": {"radius": 40, "speed": 1.5} }
-  ],
-  "animations": [
-    { "target": "sun", "type": "pulse", "speed": 0.3 }
-  ]
-}
+POSITIONING:
+- Use position to place the imported SVG at specific coordinates
+- Use scale to resize (1.0 = original size)
 
-EXAMPLE - Bouncing Balls:
-{
-  "backgroundColor": "#1e293b",
-  "items": [
-    { "name": "ball1", "itemType": "circle", "position": {"x": 200, "y": 300}, "properties": {"radius": 30, "color": "#ef4444"} },
-    { "name": "ball2", "itemType": "circle", "position": {"x": 400, "y": 300}, "properties": {"radius": 30, "color": "#22c55e"} },
-    { "name": "ball3", "itemType": "circle", "position": {"x": 600, "y": 300}, "properties": {"radius": 30, "color": "#3b82f6"} }
-  ],
-  "animations": [
-    { "target": "ball1", "type": "bounce", "speed": 1.0 },
-    { "target": "ball2", "type": "bounce", "speed": 0.8 },
-    { "target": "ball3", "type": "bounce", "speed": 1.2 }
-  ]
-}
-
-SUPPORTED ITEM TYPES: text, circle, star, rectangle, triangle, polygon, ellipse, path, line, arc
-SUPPORTED RELATIONS: orbits, follows, attached_to, maintains_distance, points_at, mirrors, parallax, bounds_to, animates, grows_from, staggered_with, indicates, circumscribes, wave_through, camera_follows, camera_animates, morphs_to
-SUPPORTED ANIMATIONS: pulse, rotate, bounce, fade, wobble, slide, typewriter`,
+Returns the itemId of the imported SVG group, which can be used with pinepaper_add_relation for animation.`,
     inputSchema: {
       type: 'object',
       properties: {
-        items: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              name: {
-                type: 'string',
-                description: 'Reference name for this item (used in relations/animations)',
-              },
-              itemType: {
-                type: 'string',
-                enum: ['text', 'circle', 'star', 'rectangle', 'triangle', 'polygon', 'ellipse', 'path', 'line', 'arc'],
-                description: 'Type of item to create',
-              },
-              position: {
-                type: 'object',
-                properties: {
-                  x: { type: 'number' },
-                  y: { type: 'number' },
-                },
-                description: 'Position on canvas',
-              },
-              properties: {
-                type: 'object',
-                description: 'Item-specific properties (color, radius, content, etc.)',
-                additionalProperties: true,
-              },
-            },
-            required: ['name', 'itemType'],
-          },
-          description: 'Array of items to create with reference names',
-        },
-        relations: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              source: { type: 'string', description: 'Name of source item' },
-              target: { type: 'string', description: 'Name of target item' },
-              type: {
-                type: 'string',
-                enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'camera_animates', 'morphs_to'],
-              },
-              params: {
-                type: 'object',
-                description: 'Relation parameters (radius, speed, distance, etc.)',
-                additionalProperties: true,
-              },
-            },
-            required: ['source', 'target', 'type'],
-          },
-          description: 'Relations between items',
-        },
-        animations: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              target: { type: 'string', description: 'Name of item to animate' },
-              type: {
-                type: 'string',
-                enum: ['pulse', 'rotate', 'bounce', 'fade', 'wobble', 'slide', 'typewriter'],
-              },
-              speed: { type: 'number', description: 'Animation speed (default: 1.0)' },
-              params: {
-                type: 'object',
-                description: 'Animation-specific parameters',
-                additionalProperties: true,
-              },
-            },
-            required: ['target', 'type'],
-          },
-          description: 'Animations to apply to items',
-        },
-        backgroundColor: {
+        svgString: {
           type: 'string',
-          description: 'Background color for the scene (hex, rgb, or named)',
+          description: 'SVG markup string to import',
         },
-        backgroundGenerator: {
+        url: {
           type: 'string',
-          description: 'Name of generator to use for background (e.g., "drawSunburst")',
+          description: 'URL to fetch SVG from (alternative to svgString)',
         },
-        clearFirst: {
-          type: 'boolean',
-          description: 'Clear canvas before creating scene (default: true)',
+        position: {
+          type: 'object',
+          properties: {
+            x: { type: 'number', description: 'X coordinate' },
+            y: { type: 'number', description: 'Y coordinate' },
+          },
+          description: 'Position to place the imported SVG',
+        },
+        scale: {
+          type: 'number',
+          description: 'Scale factor (1.0 = original size)',
         },
       },
-      required: ['items'],
+    },
+  },
+
+  {
+    name: 'pinepaper_import_image',
+    annotations: {
+      title: 'Import Image',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+    description: `Import a raster image from a URL onto the canvas. Returns an itemId for the imported image.
+
+USE WHEN:
+- User wants to add a photo, PNG, JPG, or other raster image
+- Importing images from URLs
+- Adding backgrounds or reference images
+- User provides an image URL
+
+IMPORTANT - IMPORTED IMAGES ARE FULL ITEMS:
+The imported image becomes a first-class item in PinePaper's registry. It gets an itemId and
+can participate in the full relation and animation system — you can orbit it, attach things to it,
+apply masks, animate it with keyframes, etc., just like any natively created shape.
+
+OPTIONAL MASK:
+Apply a mask shape during import to clip the image:
+- circle: Circular crop
+- rounded: Rounded rectangle crop
+- hexagon: Hexagonal crop
+- star: Star-shaped crop
+
+SIZE CONSTRAINTS:
+Use maxWidth/maxHeight to constrain the image dimensions while preserving aspect ratio.
+
+EXAMPLES:
+- Import photo: url: "https://example.com/photo.jpg"
+- Import with mask: url: "https://example.com/avatar.png", mask: "circle"
+- Import at position: url: "https://example.com/bg.jpg", position: {x: 400, y: 300}, maxWidth: 800`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: {
+          type: 'string',
+          description: 'URL of the image to import',
+        },
+        position: {
+          type: 'object',
+          properties: {
+            x: { type: 'number', description: 'X coordinate' },
+            y: { type: 'number', description: 'Y coordinate' },
+          },
+          description: 'Position to place the imported image (defaults to center)',
+        },
+        maxWidth: {
+          type: 'number',
+          description: 'Maximum width constraint in pixels',
+        },
+        maxHeight: {
+          type: 'number',
+          description: 'Maximum height constraint in pixels',
+        },
+        mask: {
+          type: 'string',
+          enum: ['circle', 'rounded', 'hexagon', 'star'],
+          description: 'Optional mask shape to apply to the image',
+        },
+      },
+      required: ['url'],
     },
   },
 
   // ---------------------------------------------------------------------------
-  // BATCH OPERATION TOOLS
+  // LAYER 1 — ATOMS: ASSET TOOLS
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_search_assets',
+    annotations: {
+      title: 'Search Assets',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: `Search for free SVG assets from open repositories (SVGRepo, OpenClipart, Iconify, FontAwesome).
+
+USE WHEN:
+- User wants icons, illustrations, or clipart
+- Need specific symbols (arrows, hearts, animals, rocket, etc.)
+- Want to avoid manual SVG creation
+- Building UI with standard icons
+- Need graphics that are too complex to draw with paths
+
+REPOSITORIES:
+- SVGRepo: 500,000+ icons, various categories and licenses
+- OpenClipart: 150,000+ public domain clipart
+- Iconify: 200,000+ icon sets (various licenses)
+- Font Awesome: 2,000+ free icons (CC BY 4.0)
+
+WORKFLOW:
+1. Search for assets: pinepaper_search_assets(query: "rocket")
+2. Review results (you'll see assetIds, previews, licenses)
+3. Import chosen asset: pinepaper_import_asset(assetId: "svgrepo_rocket_12345")
+
+IMPORTANT NOTES:
+- Always respect license terms (check license field in results)
+- CC-BY licenses require attribution (metadata is tracked automatically)
+- CC0 (Public Domain) assets have no restrictions
+- Search queries work best with simple, specific terms
+- Results include preview URLs (for user reference) and download URLs
+
+EXAMPLES:
+- "rocket icon" → Returns various rocket SVGs
+- "user avatar" → Returns user/profile icons
+- "arrow" → Returns arrow symbols in various styles
+- "cat" → Returns cat illustrations
+- "heart" → Returns heart shapes and icons
+
+PERFORMANCE:
+- Search is asynchronous and may take 1-2 seconds
+- Results are not cached (fresh search each time)
+- Import caches downloaded SVGs for reuse
+- When includeSvgContent is true, search takes longer as each SVG must be fetched
+
+SVG CONTENT RETRIEVAL:
+- Set includeSvgContent: true to fetch and include actual SVG strings
+- Each result will include an 'svgContent' field with the SVG markup
+- Useful for AI to display, describe, or analyze the icons before importing
+- Increases response time proportionally to the number of results
+- Consider using a lower limit when includeSvgContent is true`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Search term (e.g., "rocket", "heart", "user icon")',
+        },
+        repository: {
+          type: 'string',
+          enum: ['all', 'svgrepo', 'openclipart', 'iconify', 'fontawesome'],
+          description: 'Which repository to search (default: all)',
+        },
+        limit: {
+          type: 'number',
+          description: 'Max results to return (default: 10, max: 50)',
+        },
+        includeSvgContent: {
+          type: 'boolean',
+          description: 'Include actual SVG content for each result (default: false). When true, fetches and returns the SVG string for each asset.',
+        },
+      },
+      required: ['query'],
+    },
+  },
+
+  {
+    name: 'pinepaper_import_asset',
+    annotations: {
+      title: 'Import Asset',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+    description: `Import an SVG asset from search results or direct URL onto the canvas.
+
+USE WHEN:
+- After searching with pinepaper_search_assets, import the chosen asset
+- User provides a direct URL to an SVG file
+- Need to add pre-made graphics to the scene
+
+WORKFLOW:
+1. Search: pinepaper_search_assets(query: "rocket")
+2. Choose: Review results, pick one with desired license
+3. Import: pinepaper_import_asset(assetId: "svgrepo_rocket_12345", position: {x: 400, y: 300})
+4. Modify: Use pinepaper_modify_item to adjust size, color, etc.
+5. Animate: Use pinepaper_animate or pinepaper_add_relation for motion
+
+PARAMETERS:
+- assetId: From search results (e.g., "svgrepo_12345")
+- url: Alternative to assetId - direct URL to SVG
+- position: Where to place on canvas (default: center)
+- scale: Size multiplier (default: 1.0)
+- color: Override color for monochrome icons (optional)
+
+LICENSE TRACKING:
+- Asset metadata (including license) is automatically tracked
+- CC-BY licenses will have attribution added to canvas metadata
+- Public domain (CC0) assets have no attribution requirement
+- Check license in search results before importing
+
+CACHING:
+- Downloaded SVGs are cached in memory
+- Re-importing same asset is instant (uses cache)
+- Cache persists for session duration
+- No disk storage (memory only)
+
+EXAMPLES:
+- Import from search: {assetId: "svgrepo_rocket_001", position: {x: 400, y: 300}, scale: 2.0}
+- Import from URL: {url: "https://example.com/icon.svg", position: {x: 500, y: 400}}
+- Import with color override: {assetId: "svgrepo_heart_123", position: {x: 400, y: 300}, color: "#ef4444"}
+
+RETURNS:
+- itemId: ID of the imported SVG group (use for further modifications)
+- metadata: Asset information including license`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        assetId: {
+          type: 'string',
+          description: 'Asset ID from search results (e.g., "svgrepo_12345")',
+        },
+        url: {
+          type: 'string',
+          description: 'Direct URL to SVG (alternative to assetId)',
+        },
+        position: {
+          type: 'object',
+          properties: {
+            x: { type: 'number' },
+            y: { type: 'number' },
+          },
+          description: 'Position on canvas',
+        },
+        scale: {
+          type: 'number',
+          description: 'Scale factor (default: 1.0)',
+        },
+        color: {
+          type: 'string',
+          description: 'Override color for monochrome icons',
+        },
+      },
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // LAYER 1 — ATOMS: BATCH OPERATION TOOLS
   // ---------------------------------------------------------------------------
   {
     name: 'pinepaper_batch_create',
@@ -888,7 +1200,7 @@ EXAMPLE:
   },
 
   // ---------------------------------------------------------------------------
-  // RELATION TOOLS (KEY FOR ANIMATION)
+  // LAYER 2 — RULES: RELATION TOOLS (KEY FOR ANIMATION)
   // ---------------------------------------------------------------------------
   {
     name: 'pinepaper_add_relation',
@@ -921,6 +1233,15 @@ RELATION TYPES:
 - mirrors: Mirror position across axis (params: axis, center)
 - parallax: Move relative by depth (params: depth, origin)
 - bounds_to: Stay within bounds (params: padding, bounce)
+
+RELATION COMPATIBILITY:
+- Universal relations (position-based) work with ALL item types including imported SVGs/images:
+  orbits, follows, attached_to, maintains_distance, points_at, mirrors, parallax, bounds_to
+- morphs_to has type-specific behavior:
+  Path→Path: point interpolation
+  Circle→Circle: radius interpolation
+  Text→Text: font blend
+  Cross-type: particle denoising transition
 
 VERIFYING ANIMATION WORKS:
 After adding a relation, verify the animation is running:
@@ -994,7 +1315,7 @@ USE WHEN:
       idempotentHint: true,
       openWorldHint: false,
     },
-    description: `Query relationships for an item.
+    description: `[Utility] Query relationships for an item.
 
 USE WHEN:
 - Finding what items orbit a central object
@@ -1141,7 +1462,7 @@ return { success: true, itemId: id };
   },
 
   // ---------------------------------------------------------------------------
-  // ANIMATION TOOLS
+  // LAYER 3 — PROPERTIES: ANIMATION TOOLS
   // ---------------------------------------------------------------------------
   {
     name: 'pinepaper_animate',
@@ -1308,116 +1629,7 @@ USE WHEN:
   },
 
   // ---------------------------------------------------------------------------
-  // GENERATOR TOOLS
-  // ---------------------------------------------------------------------------
-  {
-    name: 'pinepaper_execute_generator',
-    annotations: {
-      title: 'Execute Generator',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: false,
-      openWorldHint: false,
-    },
-    description: `Execute a background generator to create procedural patterns.
-
-USE WHEN:
-- "add a sunburst background"
-- "create wave pattern"
-- "grid background"
-- "circuit board pattern"
-- Creating dynamic procedural backgrounds
-
-GENERATORS:
-- drawSunburst: Radial rays from center (rayCount, colors, bgColor)
-- drawSunsetScene: Animated sunset with clouds (sunColor, skyColors, cloudCount)
-- drawGrid: Lines, dots, or squares (gridType, spacing, lineColor)
-- drawStackedCircles: Overlapping circles (count, colors, distribution)
-- drawCircuit: Tech circuit board (lineColor, nodeColor, density)
-- drawWaves: Layered wave pattern (waveCount, colors, amplitude)
-- drawPattern: Geometric shapes in orbit`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        generatorName: {
-          type: 'string',
-          enum: ['drawSunburst', 'drawSunsetScene', 'drawGrid', 'drawStackedCircles', 'drawCircuit', 'drawWaves', 'drawPattern'],
-          description: 'Generator name',
-        },
-        params: {
-          type: 'object',
-          description: 'Generator-specific parameters',
-          additionalProperties: true,
-        },
-      },
-      required: ['generatorName'],
-    },
-  },
-
-  {
-    name: 'pinepaper_list_generators',
-    annotations: {
-      title: 'List Generators',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Get a list of all available background generators with their parameters.
-
-USE WHEN:
-- User asks "what backgrounds are available?"
-- Need to show generator options
-- Discovering generator capabilities`,
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
-  },
-
-  // ---------------------------------------------------------------------------
-  // EFFECT TOOLS
-  // ---------------------------------------------------------------------------
-  {
-    name: 'pinepaper_apply_effect',
-    annotations: {
-      title: 'Apply Effect',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: false,
-      openWorldHint: false,
-    },
-    description: `Apply a visual effect to an item.
-
-USE WHEN:
-- Adding sparkle/glitter effects
-- Creating burst/explosion effects
-- Enhancing visual impact
-
-EFFECTS:
-- sparkle: Glitter/sparkle particles (color, speed, size)
-- blast: Explosion burst effect (color, radius, count)`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        itemId: { type: 'string', description: 'Registry ID of the item' },
-        effectType: {
-          type: 'string',
-          enum: ['sparkle', 'blast'],
-          description: 'Type of effect',
-        },
-        params: {
-          type: 'object',
-          description: 'Effect parameters',
-          additionalProperties: true,
-        },
-      },
-      required: ['itemId', 'effectType'],
-    },
-  },
-
-  // ---------------------------------------------------------------------------
-  // MASK TOOLS
+  // LAYER 3 — PROPERTIES: MASK TOOLS
   // ---------------------------------------------------------------------------
   {
     name: 'pinepaper_apply_animated_mask',
@@ -1581,7 +1793,7 @@ Requires maskType and keyframes array.`,
       idempotentHint: true,
       openWorldHint: false,
     },
-    description: `Get animatable properties for each mask type. Useful for building custom keyframe animations.`,
+    description: `[Utility] Get animatable properties for each mask type. Useful for building custom keyframe animations.`,
     inputSchema: {
       type: 'object',
       properties: {},
@@ -1597,7 +1809,7 @@ Requires maskType and keyframes array.`,
       idempotentHint: true,
       openWorldHint: false,
     },
-    description: `Get list of available easing functions for mask animations.`,
+    description: `[Utility] Get list of available easing functions for mask animations.`,
     inputSchema: {
       type: 'object',
       properties: {},
@@ -1613,7 +1825,7 @@ Requires maskType and keyframes array.`,
       idempotentHint: true,
       openWorldHint: false,
     },
-    description: `Get available mask shape types.`,
+    description: `[Utility] Get available mask shape types.`,
     inputSchema: {
       type: 'object',
       properties: {},
@@ -1629,7 +1841,7 @@ Requires maskType and keyframes array.`,
       idempotentHint: true,
       openWorldHint: false,
     },
-    description: `Get available mask animation presets.`,
+    description: `[Utility] Get available mask animation presets.`,
     inputSchema: {
       type: 'object',
       properties: {},
@@ -1637,7 +1849,7 @@ Requires maskType and keyframes array.`,
   },
 
   // ---------------------------------------------------------------------------
-  // CAMERA TOOLS
+  // LAYER 3 — PROPERTIES: CAMERA TOOLS
   // ---------------------------------------------------------------------------
   {
     name: 'pinepaper_camera_animate',
@@ -1865,1364 +2077,234 @@ USE WHEN:
   },
 
   // ---------------------------------------------------------------------------
-  // FONT TOOLS
+  // LAYER 4 — COMPOSITIONS: SCENE TOOLS
   // ---------------------------------------------------------------------------
   {
-    name: 'pinepaper_font_show_studio',
+    name: 'pinepaper_create_scene',
     annotations: {
-      title: 'Font Show Studio',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Open the Font Studio UI for interactive font creation.
-
-USE WHEN:
-- Starting a custom font creation workflow
-- Need the interactive Font Studio interface with guide lines
-- Want to create a hand-drawn font from scratch
-
-WORKFLOW:
-1. Open Font Studio → pinepaper_font_show_studio
-2. Set font name → pinepaper_font_set_name
-3. Check required chars → pinepaper_font_get_required_chars
-4. For each character: draw path, cleanup, create glyph
-5. Check progress → pinepaper_font_get_status
-6. Export when complete → pinepaper_font_export`,
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
-  },
-  {
-    name: 'pinepaper_font_set_name',
-    annotations: {
-      title: 'Font Set Name',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Set the font family name for the current font being created.`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        name: {
-          type: 'string',
-          description: "Font family name (e.g., 'MyHandwriting')",
-        },
-      },
-      required: ['name'],
-    },
-  },
-  {
-    name: 'pinepaper_font_get_required_chars',
-    annotations: {
-      title: 'Font Get Required Chars',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Get the list of characters needed for a complete font.
-
-CHARACTER SETS:
-- minimum: A-Z, a-z, 0-9, space (63 chars) - enough for basic text
-- standard: adds punctuation and symbols (90+ chars) - full typography`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        set: {
-          type: 'string',
-          enum: ['minimum', 'standard'],
-          description: 'minimum: A-Z, a-z, 0-9, space (63 chars). standard: adds punctuation (90+ chars)',
-        },
-      },
-    },
-  },
-  {
-    name: 'pinepaper_font_get_status',
-    annotations: {
-      title: 'Font Get Status',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Get font completion status including progress percentage, completed/pending characters.
-
-USE WHEN:
-- Checking progress during font creation
-- Determining which characters still need to be drawn
-- Verifying font is complete before export`,
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
-  },
-  {
-    name: 'pinepaper_font_create_glyph',
-    annotations: {
-      title: 'Font Create Glyph',
+      title: 'Create Scene',
       readOnlyHint: false,
       destructiveHint: false,
       idempotentHint: false,
       openWorldHint: false,
     },
-    description: `Create a glyph from a Paper.js path. Converts a drawn path into an OpenType glyph with calculated advance width.
+    description: `Create a complete scene with multiple items, relations, and animations in a single operation. This is the MOST EFFICIENT way to create complex animated scenes.
 
 USE WHEN:
-- Converting a drawn character path to a font glyph
-- Adding a new character to the font
-
-WORKFLOW:
-1. Draw the character as a Paper.js path on the canvas
-2. Optionally clean up the path (pinepaper_font_cleanup_path)
-3. Use the path's registry ID to create the glyph`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        character: {
-          type: 'string',
-          description: "Single character (e.g., 'A', 'a', '1', ' ')",
-        },
-        pathId: {
-          type: 'string',
-          description: 'Registry ID of the Paper.js path to use as glyph shape',
-        },
-      },
-      required: ['character', 'pathId'],
-    },
-  },
-  {
-    name: 'pinepaper_font_create_space',
-    annotations: {
-      title: 'Font Create Space',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Create the space glyph (no visible shape, just advance width).
-
-USE WHEN:
-- Adding the space character to the font
-- Space needs no drawn path, only a width value`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        width: {
-          type: 'number',
-          description: 'Space width in font units (default: 250)',
-        },
-      },
-    },
-  },
-  {
-    name: 'pinepaper_font_remove_glyph',
-    annotations: {
-      title: 'Font Remove Glyph',
-      readOnlyHint: false,
-      destructiveHint: true,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Remove a glyph from the font. Use when a character needs to be redrawn.`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        character: {
-          type: 'string',
-          description: 'Character to remove',
-        },
-      },
-      required: ['character'],
-    },
-  },
-  {
-    name: 'pinepaper_font_set_metrics',
-    annotations: {
-      title: 'Font Set Metrics',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Set font metrics (advanced). Controls the coordinate grid and vertical measurements.
-
-METRICS:
-- unitsPerEm: Coordinate grid size (default: 1000)
-- ascender: Height above baseline (default: 800)
-- descender: Depth below baseline, negative (default: -200)
-- xHeight: Lowercase letter height (default: 500)
-- capHeight: Capital letter height (default: 700)`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        unitsPerEm: {
-          type: 'number',
-          description: 'Coordinate grid size (default: 1000)',
-        },
-        ascender: {
-          type: 'number',
-          description: 'Height above baseline (default: 800)',
-        },
-        descender: {
-          type: 'number',
-          description: 'Depth below baseline, negative (default: -200)',
-        },
-        xHeight: {
-          type: 'number',
-          description: 'Lowercase letter height (default: 500)',
-        },
-        capHeight: {
-          type: 'number',
-          description: 'Capital letter height (default: 700)',
-        },
-      },
-    },
-  },
-  {
-    name: 'pinepaper_font_export',
-    annotations: {
-      title: 'Font Export',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Export the font as an OTF file. Triggers browser download of the completed font.
-
-USE WHEN:
-- Font is complete and ready for download
-- User wants to save the font as a file`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        download: {
-          type: 'boolean',
-          description: 'Trigger browser download (default: true)',
-        },
-      },
-    },
-  },
-  {
-    name: 'pinepaper_font_load_into_document',
-    annotations: {
-      title: 'Font Load Into Document',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Load the custom font into the document for immediate use in PinePaper text items.
-
-USE WHEN:
-- Want to use the created font immediately in the current document
-- Testing how the font looks in actual text items`,
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
-  },
-  {
-    name: 'pinepaper_font_export_data',
-    annotations: {
-      title: 'Font Export Data',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Export font data as JSON for saving progress. Use to save work-in-progress fonts.
-
-USE WHEN:
-- Saving font progress for later continuation
-- Backing up font data`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        download: {
-          type: 'boolean',
-          description: 'Trigger browser download (default: true)',
-        },
-      },
-    },
-  },
-  {
-    name: 'pinepaper_font_import_data',
-    annotations: {
-      title: 'Font Import Data',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: false,
-      openWorldHint: false,
-    },
-    description: `Import font data from previously saved JSON. Restores a font from exported data.
-
-USE WHEN:
-- Resuming work on a previously saved font
-- Loading font data exported with pinepaper_font_export_data`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        data: {
-          type: 'object',
-          description: 'Font data object from pinepaper_font_export_data',
-        },
-      },
-      required: ['data'],
-    },
-  },
-  {
-    name: 'pinepaper_font_clear',
-    annotations: {
-      title: 'Font Clear',
-      readOnlyHint: false,
-      destructiveHint: true,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Clear all glyphs and reset the font. Removes all drawn characters.
-
-WARNING: This is destructive - all glyph progress will be lost.`,
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
-  },
-  {
-    name: 'pinepaper_font_remove_overlap',
-    annotations: {
-      title: 'Font Remove Overlap',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Remove overlapping areas from a path (like FontForge's RemoveOverlap). Merges multiple overlapping paths into a single clean outline.
-
-USE WHEN:
-- Path has overlapping strokes that need merging
-- Preparing a glyph path for clean font output`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        pathId: {
-          type: 'string',
-          description: 'Registry ID of the Paper.js path to process',
-        },
-      },
-      required: ['pathId'],
-    },
-  },
-  {
-    name: 'pinepaper_font_correct_direction',
-    annotations: {
-      title: 'Font Correct Direction',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Correct path winding direction for proper fill rendering (like FontForge's CorrectDirection). Ensures outer contours are clockwise and inner holes are counter-clockwise.
-
-USE WHEN:
-- Glyph fills are rendering incorrectly (holes appear filled)
-- Preparing paths for font export`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        pathId: {
-          type: 'string',
-          description: 'Registry ID of the Paper.js path to process',
-        },
-      },
-      required: ['pathId'],
-    },
-  },
-  {
-    name: 'pinepaper_font_cleanup_path',
-    annotations: {
-      title: 'Font Cleanup Path',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Apply all path cleanup operations in the correct order: removeOverlap -> correctDirection -> smooth. Convenience tool that combines all path preparation steps.
-
-USE WHEN:
-- Preparing a drawn path before creating a glyph
-- Quick one-step path cleanup instead of calling individual operations`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        pathId: {
-          type: 'string',
-          description: 'Registry ID of the Paper.js path to process',
-        },
-        removeOverlap: {
-          type: 'boolean',
-          description: 'Merge overlapping strokes (default: true)',
-        },
-        correctDirection: {
-          type: 'boolean',
-          description: 'Fix winding direction for fills (default: true)',
-        },
-        smooth: {
-          type: 'boolean',
-          description: 'Apply path smoothing (default: true)',
-        },
-        smoothTolerance: {
-          type: 'number',
-          description: 'Smoothing tolerance - higher = more simplification (default: 2.5)',
-        },
-      },
-      required: ['pathId'],
-    },
-  },
-
-  // ---------------------------------------------------------------------------
-  // QUERY TOOLS
-  // ---------------------------------------------------------------------------
-  {
-    name: 'pinepaper_get_items',
-    annotations: {
-      title: 'Get Items',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Get all or filtered items from the canvas.
-
-USE WHEN:
-- Listing what's on the canvas
-- Finding items by type
-- Checking animated items
-- Scene inspection`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        filter: {
-          type: 'object',
-          properties: {
-            type: {
-              type: 'string',
-              enum: ['text', 'circle', 'star', 'rectangle', 'triangle', 'polygon', 'ellipse', 'path', 'line', 'arc'],
-              description: 'Filter by item type',
-            },
-            source: {
-              type: 'string',
-              enum: ['user', 'generator', 'import'],
-              description: 'Filter by item source',
-            },
-            hasAnimation: {
-              type: 'boolean',
-              description: 'Filter by animation status',
-            },
-            hasRelation: {
-              type: 'boolean',
-              description: 'Filter by relation status',
-            },
-          },
-        },
-      },
-    },
-  },
-
-  {
-    name: 'pinepaper_get_relation_stats',
-    annotations: {
-      title: 'Get Relation Stats',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Get statistics about active relations in the scene.
-
-USE WHEN:
-- Debugging relation system
-- Understanding scene complexity
-- Analytics and reporting`,
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
-  },
-
-  // ---------------------------------------------------------------------------
-  // CANVAS TOOLS
-  // ---------------------------------------------------------------------------
-  {
-    name: 'pinepaper_set_background_color',
-    annotations: {
-      title: 'Set Background Color',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Set the canvas background color.
-
-USE WHEN:
-- Changing scene background
-- Setting up canvas before adding items`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        color: {
-          type: 'string',
-          description: 'Background color (hex, rgb, or named)',
-        },
-      },
-      required: ['color'],
-    },
-  },
-
-  {
-    name: 'pinepaper_set_canvas_size',
-    annotations: {
-      title: 'Set Canvas Size',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Change the canvas dimensions.
-
-IMPORTANT: Call this BEFORE creating items if you need a specific canvas size. The default canvas is 800x600 which may be too small for complex designs.
-
-USE WHEN:
-- Starting a new design - SET SIZE FIRST before adding items
-- Setting up for specific format (Instagram, YouTube, etc.)
-- Custom canvas size requirements
-- Design elements extend beyond current canvas bounds
-
-COMMON PRESETS:
-- instagram-square: 1080x1080
-- instagram-story: 1080x1920
-- youtube-thumbnail: 1280x720
-- twitter-post: 1200x675
-- hd-landscape: 1920x1080
-- hd-portrait: 1080x1920
-
-For wedding invitations, event cards, or detailed designs, use at least 1080x1080 or larger.`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        width: { type: 'number', description: 'Canvas width in pixels' },
-        height: { type: 'number', description: 'Canvas height in pixels' },
-        preset: {
-          type: 'string',
-          description: 'Optional preset name',
-        },
-      },
-      required: ['width', 'height'],
-    },
-  },
-
-  {
-    name: 'pinepaper_get_canvas_size',
-    annotations: {
-      title: 'Get Canvas Size',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Get the current canvas dimensions.
-
-USE WHEN:
-- Need to know current canvas size before positioning items
-- Checking if canvas needs to be resized
-- Calculating positions relative to canvas bounds`,
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
-  },
-
-  {
-    name: 'pinepaper_clear_canvas',
-    annotations: {
-      title: 'Clear Canvas',
-      readOnlyHint: false,
-      destructiveHint: true,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Clear all items from the canvas, removing everything including any welcome template items.
-
-USE WHEN:
-- User wants to start fresh with an empty canvas
-- Need to remove all existing items before creating new ones
-- Clearing the welcome template that appears for first-time visitors
-- User says "clear everything", "start over", "reset canvas", "remove all items"
-
-IMPORTANT NOTES:
-- This removes ALL items from the canvas permanently
-- The welcome template (shown to first-time visitors) will be cleared
-- After clearing, use pinepaper_get_items to verify the canvas is empty
-- If items persist after clearing, try pinepaper_refresh_page instead`,
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
-  },
-
-  {
-    name: 'pinepaper_refresh_page',
-    annotations: {
-      title: 'Refresh Page',
-      readOnlyHint: false,
-      destructiveHint: true,
-      idempotentHint: true,
-      openWorldHint: true,
-    },
-    description: `Refresh the PinePaper Studio page in the browser. This is the most reliable way to get a completely clean canvas.
-
-USE WHEN:
-- pinepaper_clear_canvas didn't fully remove all items
-- Need a guaranteed clean slate
-- Want to remove the welcome template completely
-- Troubleshooting issues with the canvas state
-- User explicitly asks to "refresh" or "reload"
-
-IMPORTANT NOTES:
-- This reloads the entire page, which resets everything
-- The welcome template will NOT appear after refresh (only shows for first-time visitors)
-- After refresh, the canvas will be completely empty
-- All unsaved work will be lost
-- You may need to wait a moment after refresh before executing other commands`,
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
-  },
-
-  // ---------------------------------------------------------------------------
-  // IMPORT TOOLS
-  // ---------------------------------------------------------------------------
-  {
-    name: 'pinepaper_import_svg',
-    annotations: {
-      title: 'Import SVG',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: false,
-      openWorldHint: true,
-    },
-    description: `Import an SVG string or SVG from URL onto the canvas. Returns an itemId for the imported graphic.
-
-USE WHEN:
-- User requests complex illustrations (characters, icons, detailed graphics)
-- Importing pre-made SVG assets
-- Adding logos or vector graphics
-- User mentions SVG files or vector graphics
-
-⚠️ RECOMMENDED FOR COMPLEX CHARACTERS:
-Instead of drawing "a witch" or "a cat" with many path operations, use SVG import:
-1. Describe what you need and use a simple placeholder SVG
-2. Or import from a URL if the user provides one
-
-EXAMPLES:
-- Import a simple star SVG: svgString: '<svg viewBox="0 0 100 100"><polygon points="50,5 61,40 98,40 68,62 79,96 50,75 21,96 32,62 2,40 39,40" fill="#fbbf24"/></svg>'
-- Import from URL: url: "https://example.com/icon.svg"
-
-POSITIONING:
-- Use position to place the imported SVG at specific coordinates
-- Use scale to resize (1.0 = original size)
-
-Returns the itemId of the imported SVG group, which can be used with pinepaper_add_relation for animation.`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        svgString: {
-          type: 'string',
-          description: 'SVG markup string to import',
-        },
-        url: {
-          type: 'string',
-          description: 'URL to fetch SVG from (alternative to svgString)',
-        },
-        position: {
-          type: 'object',
-          properties: {
-            x: { type: 'number', description: 'X coordinate' },
-            y: { type: 'number', description: 'Y coordinate' },
-          },
-          description: 'Position to place the imported SVG',
-        },
-        scale: {
-          type: 'number',
-          description: 'Scale factor (1.0 = original size)',
-        },
-      },
-    },
-  },
-
-  // ---------------------------------------------------------------------------
-  // FILTER TOOLS
-  // ---------------------------------------------------------------------------
-  {
-    name: 'pinepaper_add_filter',
-    annotations: {
-      title: 'Add Filter',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: false,
-      openWorldHint: false,
-    },
-    description: `Add a visual filter effect to the canvas. Filters are scene-wide effects that can be stacked.
-
-USE WHEN:
-- User wants visual effects like blur, grayscale, vintage look
-- Creating mood or atmosphere (cinematic, dreamy, noir)
-- Post-processing the entire scene
-- User says "make it look vintage", "add blur", "black and white"
-
-AVAILABLE FILTERS:
-- grayscale: Convert to black and white (params: intensity 0-1)
-- sepia: Warm vintage brownish tone (params: intensity 0-1)
-- blur: Gaussian blur effect (params: radius 0-20)
-- brightness: Adjust brightness (params: value -100 to 100)
-- contrast: Adjust contrast (params: value -100 to 100)
-- saturate: Adjust color saturation (params: value -100 to 100)
-- invert: Invert colors (params: intensity 0-1)
-- noise: Add film grain (params: intensity 0-100, monochrome: true/false)
-- vignette: Darken edges (params: intensity 0-1, radius 0-1)
-- vintage: Preset combining sepia, vignette, noise
-- colorOverlay: Add color tint (params: color, intensity, blendMode)
-- sharpen: Increase sharpness (params: intensity 0-100)
-- posterize: Reduce color levels (params: levels 2-32)
-
-EXAMPLES:
-- "Make it black and white" → filterType: "grayscale"
-- "Add vintage look" → filterType: "vintage", params: {intensity: 0.8}
-- "Blur the background" → filterType: "blur", params: {radius: 5}
-- "Increase contrast" → filterType: "contrast", params: {value: 30}
-
-Filters can be stacked - call multiple times to combine effects.`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        filterType: {
-          type: 'string',
-          enum: ['grayscale', 'sepia', 'blur', 'brightness', 'contrast', 'saturate', 'invert', 'noise', 'vignette', 'vintage', 'colorOverlay', 'sharpen', 'posterize'],
-          description: 'Type of filter to apply',
-        },
-        params: {
-          type: 'object',
-          description: 'Filter-specific parameters',
-          additionalProperties: true,
-        },
-      },
-      required: ['filterType'],
-    },
-  },
-
-  // ---------------------------------------------------------------------------
-  // EXPORT TOOLS
-  // ---------------------------------------------------------------------------
-  {
-    name: 'pinepaper_export_svg',
-    annotations: {
-      title: 'Export SVG',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Export the scene as animated SVG.
-
-USE WHEN:
-- Saving work as SVG file
-- Generating shareable graphics
-- Final export`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        animated: {
-          type: 'boolean',
-          description: 'Include CSS animations (default: true)',
-        },
-      },
-    },
-  },
-
-  {
-    name: 'pinepaper_export_training_data',
-    annotations: {
-      title: 'Export Training Data',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Export relation data as training pairs for LLM fine-tuning. This generates instruction/code pairs from the current scene's relations.
-
-USE WHEN:
-- Generating training data for fine-tuning
-- Creating examples from current scene
-- Building custom animation model training sets
-
-OUTPUT FORMAT:
-- json: Array of {instruction, code, relation, params}
-- jsonl: JSONL format with messages array for chat fine-tuning`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        format: {
-          type: 'string',
-          enum: ['json', 'jsonl'],
-          description: 'Output format (default: json)',
-        },
-        includeMetadata: {
-          type: 'boolean',
-          description: 'Include relation metadata (default: true)',
-        },
-      },
-    },
-  },
-
-  {
-    name: 'pinepaper_export_scene',
-    annotations: {
-      title: 'Export Scene',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Export the complete scene state including all items, relations, and settings.
-
-USE WHEN:
-- Saving a complete scene for later restoration
-- Creating scene backups
-- Debugging scene composition
-- Generating scene snapshots for version control
-
-RETURNS:
-- items: Array of all canvas items with properties
-- relations: Array of active relations
-- decorative: Array of decorative (non-interactive) items
-- backgroundColor: Current background color
-- canvasSize: Canvas dimensions`,
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
-  },
-
-  // ---------------------------------------------------------------------------
-  // BROWSER CONTROL TOOLS
-  // ---------------------------------------------------------------------------
-  {
-    name: 'pinepaper_browser_connect',
-    annotations: {
-      title: 'Connect to Browser',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: true,
-    },
-    description: `Connect to PinePaper Studio Editor in a browser.
-
-NOTE: With enforced agent mode (v1.5.0+), the browser connects AUTOMATICALLY on the first tool call.
-You typically don't need to call this tool manually - just start creating items!
-
-USE WHEN:
-- You want to explicitly connect with custom settings (e.g., visible browser window)
-- You need to connect to a custom PinePaper URL
-
-DEFAULT BEHAVIOR (Agent Mode):
-- Browser runs in headless mode (no visible window)
-- Auto-connects on first tool call
-- Optimized for automation workflows
-
-SET headless: false if you want to see the browser window for debugging or user interaction.`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        url: {
-          type: 'string',
-          description: 'Custom PinePaper Studio URL (default: https://pinepaper.studio/editor)',
-        },
-        headless: {
-          type: 'boolean',
-          description: 'Run browser in headless mode - no visible window (default: true for agent mode)',
-        },
-      },
-    },
-  },
-
-  {
-    name: 'pinepaper_browser_disconnect',
-    annotations: {
-      title: 'Disconnect from Browser',
-      readOnlyHint: false,
-      destructiveHint: true,
-      idempotentHint: true,
-      openWorldHint: true,
-    },
-    description: `Disconnect from the browser and close PinePaper Studio.
-
-USE WHEN:
-- Done working with PinePaper
-- Need to clean up browser resources
-- Switching to a different project`,
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
-  },
-
-  {
-    name: 'pinepaper_browser_screenshot',
-    annotations: {
-      title: 'Take Screenshot',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: true,
-    },
-    description: `Take a screenshot of the current PinePaper canvas.
-
-USE WHEN:
-- User explicitly asks to "see" or "show" the canvas
-- Final verification after completing a creative task
-- Debugging visual issues or unexpected behavior
-- Verifying animations are running (take 2 screenshots with delay)
-
-⚠️ PERFORMANCE BEST PRACTICE:
-Take ONE screenshot per creative task, NOT per operation!
-- BAD: Create circle → screenshot → create text → screenshot → add relation → screenshot
-- GOOD: Create circle → create text → add relation → screenshot (once at end)
-
-Trust the API responses - if a tool returns success, the operation worked.
-Only screenshot when you need visual confirmation of the FINAL result.
-
-Returns a base64-encoded PNG image of the canvas.`,
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
-  },
-
-  {
-    name: 'pinepaper_browser_status',
-    annotations: {
-      title: 'Browser Status',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: true,
-    },
-    description: `Check the current browser connection status.
-
-USE WHEN:
-- Need to verify if connected to PinePaper
-- Debugging connection issues
-- Before executing commands`,
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
-  },
-
-  // ---------------------------------------------------------------------------
-  // PERFORMANCE TOOLS
-  // ---------------------------------------------------------------------------
-  {
-    name: 'pinepaper_get_performance_metrics',
-    annotations: {
-      title: 'Get Performance Metrics',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Get execution performance metrics to identify bottlenecks and optimize workflows.
-
-USE WHEN:
-- Analyzing tool performance
-- Debugging slow operations
-- Optimizing complex workflows
-- Identifying performance regressions
-
-RETURNS:
-- Per-tool timing breakdown (validation, code gen, execution, screenshot)
-- Aggregate statistics (avg, p50, p95, p99, min, max)
-- Success rates and error counts
-- Historical metrics (configurable retention)
-
-METRICS TRACKED:
-- Validation: Input parsing and validation time
-- Code Generation: Time to generate PinePaper code
-- Browser Execution: Time to execute code in browser via Puppeteer
-- Screenshot: Time to capture and encode screenshots
-- Total: End-to-end execution time
-
-FORMAT OPTIONS:
-- 'summary': Human-readable summary with slowest tools first
-- 'detailed': Full JSON export of all metrics
-- 'csv': CSV format for spreadsheet analysis
-
-FILTER OPTIONS:
-- toolName: Filter by specific tool (e.g., 'pinepaper_create_item')
-- phase: Filter by execution phase
-- since: Unix timestamp - metrics since this time
-- limit: Maximum number of results
-
-EXAMPLES:
-- Get summary of all metrics: {}
-- Get last 50 create_item operations: {toolName: 'pinepaper_create_item', limit: 50}
-- Get recent slow operations: {since: <timestamp>, format: 'summary'}
-- Export all metrics as CSV: {format: 'csv'}
-
-PERFORMANCE OPTIMIZATION WORKFLOW:
-1. Run your workflow normally
-2. Call pinepaper_get_performance_metrics with format='summary'
-3. Identify slowest operations (sorted by avg duration)
-4. Check if batch operations can be used instead
-5. Verify screenshot mode is 'on_request' for best performance
-6. Re-run and compare metrics
-
-TYPICAL PERFORMANCE BASELINES:
-- Validation: 1-5ms (should be very fast)
-- Code Generation: 5-20ms (depends on complexity)
-- Browser Execution: 30-100ms (depends on operation)
-- Screenshot: 100ms (only if mode='always' or explicit request)
-- Total (without screenshot): 40-125ms
-- Total (with screenshot): 140-225ms
-
-If you see significantly higher numbers, investigate:
-- Network latency (browser connection)
-- Complex operations that could be batched
-- Screenshot mode set to 'always' (change to 'on_request')`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        toolName: {
-          type: 'string',
-          description: 'Filter by tool name (optional)',
-        },
-        phase: {
-          type: 'string',
-          enum: ['validation', 'code_generation', 'browser_execution', 'screenshot', 'total'],
-          description: 'Filter by execution phase (optional)',
-        },
-        since: {
-          type: 'number',
-          description: 'Unix timestamp - metrics since this time (optional)',
-        },
-        limit: {
-          type: 'number',
-          description: 'Maximum number of results to return (default: 100)',
-        },
-        format: {
-          type: 'string',
-          enum: ['summary', 'detailed', 'csv'],
-          description: 'Export format (default: summary)',
-        },
-      },
-    },
-  },
-
-  // ---------------------------------------------------------------------------
-  // ASSET TOOLS
-  // ---------------------------------------------------------------------------
-  {
-    name: 'pinepaper_search_assets',
-    annotations: {
-      title: 'Search Assets',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: true,
-    },
-    description: `Search for free SVG assets from open repositories (SVGRepo, OpenClipart, Iconify, FontAwesome).
-
-USE WHEN:
-- User wants icons, illustrations, or clipart
-- Need specific symbols (arrows, hearts, animals, rocket, etc.)
-- Want to avoid manual SVG creation
-- Building UI with standard icons
-- Need graphics that are too complex to draw with paths
-
-REPOSITORIES:
-- SVGRepo: 500,000+ icons, various categories and licenses
-- OpenClipart: 150,000+ public domain clipart
-- Iconify: 200,000+ icon sets (various licenses)
-- Font Awesome: 2,000+ free icons (CC BY 4.0)
-
-WORKFLOW:
-1. Search for assets: pinepaper_search_assets(query: "rocket")
-2. Review results (you'll see assetIds, previews, licenses)
-3. Import chosen asset: pinepaper_import_asset(assetId: "svgrepo_rocket_12345")
-
-IMPORTANT NOTES:
-- Always respect license terms (check license field in results)
-- CC-BY licenses require attribution (metadata is tracked automatically)
-- CC0 (Public Domain) assets have no restrictions
-- Search queries work best with simple, specific terms
-- Results include preview URLs (for user reference) and download URLs
-
-EXAMPLES:
-- "rocket icon" → Returns various rocket SVGs
-- "user avatar" → Returns user/profile icons
-- "arrow" → Returns arrow symbols in various styles
-- "cat" → Returns cat illustrations
-- "heart" → Returns heart shapes and icons
-
-PERFORMANCE:
-- Search is asynchronous and may take 1-2 seconds
-- Results are not cached (fresh search each time)
-- Import caches downloaded SVGs for reuse
-- When includeSvgContent is true, search takes longer as each SVG must be fetched
-
-SVG CONTENT RETRIEVAL:
-- Set includeSvgContent: true to fetch and include actual SVG strings
-- Each result will include an 'svgContent' field with the SVG markup
-- Useful for AI to display, describe, or analyze the icons before importing
-- Increases response time proportionally to the number of results
-- Consider using a lower limit when includeSvgContent is true`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        query: {
-          type: 'string',
-          description: 'Search term (e.g., "rocket", "heart", "user icon")',
-        },
-        repository: {
-          type: 'string',
-          enum: ['all', 'svgrepo', 'openclipart', 'iconify', 'fontawesome'],
-          description: 'Which repository to search (default: all)',
-        },
-        limit: {
-          type: 'number',
-          description: 'Max results to return (default: 10, max: 50)',
-        },
-        includeSvgContent: {
-          type: 'boolean',
-          description: 'Include actual SVG content for each result (default: false). When true, fetches and returns the SVG string for each asset.',
-        },
-      },
-      required: ['query'],
-    },
-  },
-
-  {
-    name: 'pinepaper_import_asset',
-    annotations: {
-      title: 'Import Asset',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: false,
-      openWorldHint: true,
-    },
-    description: `Import an SVG asset from search results or direct URL onto the canvas.
-
-USE WHEN:
-- After searching with pinepaper_search_assets, import the chosen asset
-- User provides a direct URL to an SVG file
-- Need to add pre-made graphics to the scene
-
-WORKFLOW:
-1. Search: pinepaper_search_assets(query: "rocket")
-2. Choose: Review results, pick one with desired license
-3. Import: pinepaper_import_asset(assetId: "svgrepo_rocket_12345", position: {x: 400, y: 300})
-4. Modify: Use pinepaper_modify_item to adjust size, color, etc.
-5. Animate: Use pinepaper_animate or pinepaper_add_relation for motion
-
-PARAMETERS:
-- assetId: From search results (e.g., "svgrepo_12345")
-- url: Alternative to assetId - direct URL to SVG
-- position: Where to place on canvas (default: center)
-- scale: Size multiplier (default: 1.0)
-- color: Override color for monochrome icons (optional)
-
-LICENSE TRACKING:
-- Asset metadata (including license) is automatically tracked
-- CC-BY licenses will have attribution added to canvas metadata
-- Public domain (CC0) assets have no attribution requirement
-- Check license in search results before importing
-
-CACHING:
-- Downloaded SVGs are cached in memory
-- Re-importing same asset is instant (uses cache)
-- Cache persists for session duration
-- No disk storage (memory only)
-
-EXAMPLES:
-- Import from search: {assetId: "svgrepo_rocket_001", position: {x: 400, y: 300}, scale: 2.0}
-- Import from URL: {url: "https://example.com/icon.svg", position: {x: 500, y: 400}}
-- Import with color override: {assetId: "svgrepo_heart_123", position: {x: 400, y: 300}, color: "#ef4444"}
-
-RETURNS:
-- itemId: ID of the imported SVG group (use for further modifications)
-- metadata: Asset information including license`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        assetId: {
-          type: 'string',
-          description: 'Asset ID from search results (e.g., "svgrepo_12345")',
-        },
-        url: {
-          type: 'string',
-          description: 'Direct URL to SVG (alternative to assetId)',
-        },
-        position: {
-          type: 'object',
-          properties: {
-            x: { type: 'number' },
-            y: { type: 'number' },
-          },
-          description: 'Position on canvas',
-        },
-        scale: {
-          type: 'number',
-          description: 'Scale factor (default: 1.0)',
-        },
-        color: {
-          type: 'string',
-          description: 'Override color for monochrome icons',
-        },
-      },
-    },
-  },
-
-  // ---------------------------------------------------------------------------
-  // P5.JS COMPATIBILITY
-  // ---------------------------------------------------------------------------
-  {
-    name: 'pinepaper_p5_draw',
-    annotations: {
-      title: 'p5.js Draw',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: false,
-      openWorldHint: false,
-    },
-    description: `Execute p5.js-style drawing code on the PinePaper canvas.
-
-AI assistants can use familiar p5.js syntax - the code is translated to Paper.js automatically.
-This is a SUBSET of p5.js functions optimized for static drawings.
-
-AVAILABLE FUNCTIONS:
-
-Shapes:
-- circle(x, y, diameter) - Draw a circle (note: uses diameter, not radius)
-- ellipse(x, y, width, [height]) - Draw an ellipse
-- rect(x, y, width, height, [cornerRadius]) - Draw a rectangle
-- line(x1, y1, x2, y2) - Draw a line between two points
-- triangle(x1, y1, x2, y2, x3, y3) - Draw a triangle
-- quad(x1, y1, x2, y2, x3, y3, x4, y4) - Draw a quadrilateral
-- arc(x, y, width, height, startAngle, stopAngle) - Draw an arc (angles in radians)
-- point(x, y) - Draw a single point
-
-Style:
-- fill(r, g, b) or fill(gray) or fill('#hex') - Set fill color for subsequent shapes
-- noFill() - Disable fill for subsequent shapes
-- stroke(r, g, b) or stroke('#hex') - Set stroke color
-- noStroke() - Disable stroke
-- strokeWeight(weight) - Set stroke width in pixels
-- background(r, g, b) or background('#hex') - Set canvas background color
-
-Math:
-- random(min, max) or random(max) - Random number in range
-- map(value, start1, stop1, start2, stop2) - Re-map a number from one range to another
-- constrain(value, min, max) - Limit a value to a range
-- dist(x1, y1, x2, y2) - Calculate distance between two points
-- lerp(start, stop, amount) - Linear interpolation between two values
-- radians(degrees) - Convert degrees to radians
-- degrees(radians) - Convert radians to degrees
-
-Canvas Properties:
-- width - Canvas width in pixels
-- height - Canvas height in pixels
-
-Mode Functions:
-- rectMode(CENTER|CORNER) - Set rectangle positioning mode
-- ellipseMode(CENTER|CORNER) - Set ellipse positioning mode
-
-Constants:
-- PI, TWO_PI, HALF_PI, QUARTER_PI - Math constants
-- CENTER, CORNER - Mode constants
-
-NOT SUPPORTED (use native PinePaper tools instead):
-- setup()/draw() animation loop - Use pinepaper_animate or pinepaper_add_relation
-- noise() - Perlin noise not available
-- text() - Use pinepaper_create_item with type: 'text'
-- loadImage()/image() - Use pinepaper_import_svg
-- push()/pop()/translate()/rotate()/scale() - Use pinepaper_modify_item
-- beginShape()/vertex()/endShape() - Use pinepaper_create_item with type: 'path'
-
-USAGE:
-- Code runs directly - NO setup() or draw() wrapper needed
-- Items created are automatically registered with PinePaper's ItemRegistry
-- All items are selectable, animatable, and exportable
-- State (fill, stroke) persists between calls within the same code block
-
-EXAMPLE - Random Circles:
-\`\`\`
-background(30);
-noStroke();
-for (let i = 0; i < 20; i++) {
-  fill(random(255), random(255), random(255));
-  circle(random(width), random(height), random(20, 80));
+- Creating a solar system, bouncing balls, or any multi-item animated scene
+- User describes a scene with multiple related elements
+- Performance is important (reduces 4+ tool calls to 1)
+- Setting up multiple items that will interact with each other
+
+ADVANTAGES:
+- 4-8x faster than calling individual tools
+- Single undo step for entire scene
+- Automatic name-to-ID mapping for relations
+- Cleaner, more atomic scene creation
+
+HOW IT WORKS:
+1. Define items with "name" references (e.g., "sun", "earth", "moon")
+2. Define relations using those names (e.g., source: "earth", target: "sun")
+3. Define animations using names (e.g., target: "sun", type: "pulse")
+4. The server creates all items, then establishes relations and animations
+
+EXAMPLE - Solar System:
+{
+  "backgroundColor": "#0a0a0a",
+  "items": [
+    { "name": "sun", "itemType": "circle", "position": {"x": 400, "y": 300}, "properties": {"radius": 50, "color": "#fbbf24"} },
+    { "name": "earth", "itemType": "circle", "position": {"x": 550, "y": 300}, "properties": {"radius": 20, "color": "#3b82f6"} },
+    { "name": "moon", "itemType": "circle", "position": {"x": 590, "y": 300}, "properties": {"radius": 8, "color": "#9ca3af"} }
+  ],
+  "relations": [
+    { "source": "earth", "target": "sun", "type": "orbits", "params": {"radius": 150, "speed": 0.5} },
+    { "source": "moon", "target": "earth", "type": "orbits", "params": {"radius": 40, "speed": 1.5} }
+  ],
+  "animations": [
+    { "target": "sun", "type": "pulse", "speed": 0.3 }
+  ]
 }
-\`\`\`
 
-EXAMPLE - Gradient Grid:
-\`\`\`
-background(20);
-noStroke();
-const cols = 10;
-const rows = 10;
-const cellW = width / cols;
-const cellH = height / rows;
-for (let i = 0; i < cols; i++) {
-  for (let j = 0; j < rows; j++) {
-    const r = map(i, 0, cols, 50, 255);
-    const b = map(j, 0, rows, 50, 255);
-    fill(r, 100, b);
-    rect(i * cellW, j * cellH, cellW - 2, cellH - 2);
-  }
+EXAMPLE - Bouncing Balls:
+{
+  "backgroundColor": "#1e293b",
+  "items": [
+    { "name": "ball1", "itemType": "circle", "position": {"x": 200, "y": 300}, "properties": {"radius": 30, "color": "#ef4444"} },
+    { "name": "ball2", "itemType": "circle", "position": {"x": 400, "y": 300}, "properties": {"radius": 30, "color": "#22c55e"} },
+    { "name": "ball3", "itemType": "circle", "position": {"x": 600, "y": 300}, "properties": {"radius": 30, "color": "#3b82f6"} }
+  ],
+  "animations": [
+    { "target": "ball1", "type": "bounce", "speed": 1.0 },
+    { "target": "ball2", "type": "bounce", "speed": 0.8 },
+    { "target": "ball3", "type": "bounce", "speed": 1.2 }
+  ]
 }
-\`\`\`
 
-EXAMPLE - Concentric Circles:
-\`\`\`
-background(240);
-noFill();
-strokeWeight(2);
-const centerX = width / 2;
-const centerY = height / 2;
-for (let i = 10; i > 0; i--) {
-  stroke(map(i, 0, 10, 0, 200), 50, map(i, 0, 10, 200, 50));
-  circle(centerX, centerY, i * 50);
-}
-\`\`\``,
+SUPPORTED ITEM TYPES: text, circle, star, rectangle, triangle, polygon, ellipse, path, line, arc
+SUPPORTED RELATIONS: orbits, follows, attached_to, maintains_distance, points_at, mirrors, parallax, bounds_to, animates, grows_from, staggered_with, indicates, circumscribes, wave_through, camera_follows, camera_animates, morphs_to
+SUPPORTED ANIMATIONS: pulse, rotate, bounce, fade, wobble, slide, typewriter`,
     inputSchema: {
       type: 'object',
       properties: {
-        code: {
+        items: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              name: {
+                type: 'string',
+                description: 'Reference name for this item (used in relations/animations)',
+              },
+              itemType: {
+                type: 'string',
+                enum: ['text', 'circle', 'star', 'rectangle', 'triangle', 'polygon', 'ellipse', 'path', 'line', 'arc'],
+                description: 'Type of item to create',
+              },
+              position: {
+                type: 'object',
+                properties: {
+                  x: { type: 'number' },
+                  y: { type: 'number' },
+                },
+                description: 'Position on canvas',
+              },
+              properties: {
+                type: 'object',
+                description: 'Item-specific properties (color, radius, content, etc.)',
+                additionalProperties: true,
+              },
+            },
+            required: ['name', 'itemType'],
+          },
+          description: 'Array of items to create with reference names',
+        },
+        relations: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              source: { type: 'string', description: 'Name of source item' },
+              target: { type: 'string', description: 'Name of target item' },
+              type: {
+                type: 'string',
+                enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'camera_animates', 'morphs_to'],
+              },
+              params: {
+                type: 'object',
+                description: 'Relation parameters (radius, speed, distance, etc.)',
+                additionalProperties: true,
+              },
+            },
+            required: ['source', 'target', 'type'],
+          },
+          description: 'Relations between items',
+        },
+        animations: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              target: { type: 'string', description: 'Name of item to animate' },
+              type: {
+                type: 'string',
+                enum: ['pulse', 'rotate', 'bounce', 'fade', 'wobble', 'slide', 'typewriter'],
+              },
+              speed: { type: 'number', description: 'Animation speed (default: 1.0)' },
+              params: {
+                type: 'object',
+                description: 'Animation-specific parameters',
+                additionalProperties: true,
+              },
+            },
+            required: ['target', 'type'],
+          },
+          description: 'Animations to apply to items',
+        },
+        backgroundColor: {
           type: 'string',
-          description: 'p5.js-style drawing code to execute',
+          description: 'Background color for the scene (hex, rgb, or named)',
+        },
+        backgroundGenerator: {
+          type: 'string',
+          description: 'Name of generator to use for background (e.g., "drawSunburst")',
+        },
+        clearFirst: {
+          type: 'boolean',
+          description: 'Clear canvas before creating scene (default: true)',
         },
       },
-      required: ['code'],
+      required: ['items'],
     },
   },
 
   // ---------------------------------------------------------------------------
-  // DIAGRAM TOOLS
+  // LAYER 5 — BLUEPRINTS: TEMPLATE TOOLS
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_apply_template',
+    annotations: {
+      title: 'Apply Template',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Load a pre-built template design onto the canvas, or list available templates.
+
+USE WHEN:
+- User wants to start from a pre-made design
+- User asks for a template, preset, or starter layout
+- User wants to see what templates are available
+- Need a quick starting point for social media, presentations, etc.
+
+⚠️ DESTRUCTIVE: Loading a template replaces the current canvas content.
+
+MODES:
+1. LIST MODE: Set listOnly: true (or omit templateId) to browse available templates
+   - Optionally filter by category
+2. LOAD MODE: Provide a templateId to apply that template
+
+TEMPLATE CATEGORIES (13):
+- social-media: Social media post/story layouts
+- meme: Meme templates and formats
+- business: Business cards, letterheads, presentations
+- education: Educational diagrams, worksheets
+- creative: Artistic and creative compositions
+- tech: Technology-themed designs
+- global: International and multicultural designs
+- indigenous: Indigenous art-inspired patterns
+- seasonal: Holiday and seasonal themes
+- masking: Mask reveal effect demonstrations
+- scenes: Pre-built animated scenes
+- diagrams: Flowchart and diagram starters
+- maps: Geographic visualization templates
+
+EXAMPLES:
+- List all templates: { "listOnly": true }
+- List by category: { "category": "social-media", "listOnly": true }
+- Load template: { "templateId": "solar-system" }`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        templateId: {
+          type: 'string',
+          description: 'Template ID to load (omit to list templates)',
+        },
+        category: {
+          type: 'string',
+          enum: ['social-media', 'meme', 'business', 'education', 'creative', 'tech', 'global', 'indigenous', 'seasonal', 'masking', 'scenes', 'diagrams', 'maps'],
+          description: 'Filter templates by category',
+        },
+        listOnly: {
+          type: 'boolean',
+          description: 'If true, only list available templates without loading (default: false)',
+        },
+      },
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // DOMAIN: DIAGRAM TOOLS
   // ---------------------------------------------------------------------------
   {
     name: 'pinepaper_create_diagram_shape',
@@ -3736,7 +2818,7 @@ Pass itemIds array to only layout specific items, leaving others in place.`,
       idempotentHint: true,
       openWorldHint: false,
     },
-    description: `Get a list of available diagram shapes with their properties.
+    description: `[Utility] Get a list of available diagram shapes with their properties.
 
 USE WHEN:
 - Need to see what diagram shapes are available
@@ -3910,1047 +2992,7 @@ EXAMPLES:
   },
 
   // ---------------------------------------------------------------------------
-  // AGENT FLOW MODE TOOLS
-  // ---------------------------------------------------------------------------
-  {
-    name: 'pinepaper_agent_start_job',
-    annotations: {
-      title: 'Start Agent Job',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: false,
-      openWorldHint: false,
-    },
-    description: `Start a new agent job/session for optimized batch workflows. Enables agent mode with reduced overhead.
-
-USE WHEN:
-- Beginning a content automation pipeline
-- Starting a batch creation workflow (create → animate → export)
-- Need to track multiple operations as a single job
-- Want to optimize performance with batched execution
-
-AGENT MODE BENEFITS:
-- Batched code execution (multiple operations in single browser call)
-- Automatic item/relation tracking
-- Smart screenshot policy (on_complete, on_error, or never)
-- Fast canvas reset without browser refresh
-- Job-level performance metrics
-
-SCREENSHOT POLICIES:
-- on_complete: Single screenshot at job end (recommended for automation)
-- on_error: Screenshot only when errors occur (debugging)
-- never: No automatic screenshots (fastest)
-- on_request: Manual screenshots only
-
-CANVAS PRESETS:
-- instagram: 1080x1080 (1:1 square)
-- instagram-story: 1080x1920 (9:16 vertical)
-- tiktok: 1080x1920 (9:16 vertical, 60fps)
-- youtube: 1920x1080 (16:9 horizontal)
-- youtube-thumbnail: 1280x720 (16:9 thumbnail)
-- twitter: 1200x675 (16:9 Twitter card)
-- linkedin: 1200x627 (LinkedIn standard)
-- web: Flexible dimensions
-- print-a4: 2480x3508 (A4 at 300dpi)
-- print-letter: 2550x3300 (Letter at 300dpi)
-
-EXAMPLES:
-- Quick social media content: {name: "Instagram Post", screenshotPolicy: "on_complete", canvasPreset: "instagram"}
-- High-volume automation: {screenshotPolicy: "never"}
-- Debug workflow: {name: "Debug Session", screenshotPolicy: "on_error"}
-
-WORKFLOW:
-1. pinepaper_agent_start_job → Start job
-2. Multiple create/animate/relation operations
-3. pinepaper_agent_end_job → End job, get summary`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        name: {
-          type: 'string',
-          description: 'Optional job name for tracking',
-        },
-        screenshotPolicy: {
-          type: 'string',
-          enum: ['on_complete', 'on_error', 'never', 'on_request'],
-          description: 'When to take screenshots (default: on_complete)',
-        },
-        canvasPreset: {
-          type: 'string',
-          enum: ['instagram', 'instagram-story', 'tiktok', 'youtube', 'youtube-thumbnail', 'twitter', 'linkedin', 'web', 'print-a4', 'print-letter'],
-          description: 'Set canvas size to platform preset',
-        },
-        clearCanvas: {
-          type: 'boolean',
-          description: 'Clear canvas when starting job (default: true)',
-        },
-      },
-    },
-  },
-
-  {
-    name: 'pinepaper_agent_end_job',
-    annotations: {
-      title: 'End Agent Job',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: false,
-      openWorldHint: false,
-    },
-    description: `End the current agent job and get a comprehensive summary with export recommendations.
-
-USE WHEN:
-- Finishing a content automation pipeline
-- Need job summary with items created
-- Want export format recommendations
-- Getting performance metrics for the job
-
-RETURNS:
-- jobId: Unique job identifier
-- duration: Total job time in milliseconds
-- itemsCreated: Array of all item IDs created
-- relationsCreated: Array of all relation IDs created
-- screenshot: Base64 screenshot (if policy was on_complete)
-- recommendations: Smart export recommendations based on content
-
-EXPORT RECOMMENDATIONS:
-The system analyzes your content and suggests optimal formats:
-- Static content with simple colors → SVG (scalable, small file)
-- Static with gradients/images → PNG (high quality)
-- Animated content → WebM/MP4 for video, GIF for social
-- Print-ready content → PDF with high DPI
-
-EXAMPLE RESPONSE:
-{
-  "jobId": "job_1704067200_abc123",
-  "duration": 2500,
-  "itemsCreated": ["item_1", "item_2", "item_3"],
-  "relationsCreated": ["relation_1"],
-  "recommendations": [
-    {"platform": "instagram", "format": "mp4", "confidence": 0.9, "reason": "Animated content works well as video"}
-  ]
-}`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        includeScreenshot: {
-          type: 'boolean',
-          description: 'Force include screenshot in response (default: based on policy)',
-        },
-        analyzeContent: {
-          type: 'boolean',
-          description: 'Analyze content and provide export recommendations (default: true)',
-        },
-      },
-    },
-  },
-
-  {
-    name: 'pinepaper_agent_reset',
-    annotations: {
-      title: 'Agent Reset Canvas',
-      readOnlyHint: false,
-      destructiveHint: true,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Fast canvas reset without browser refresh. Much faster than pinepaper_refresh_page.
-
-USE WHEN:
-- Starting a new scene in a batch workflow
-- Clearing canvas between job iterations
-- Need fast reset during automation pipelines
-- Preserving browser state while clearing content
-
-PERFORMANCE:
-- pinepaper_agent_reset: ~200ms (recommended)
-- pinepaper_refresh_page: ~3000ms (browser refresh)
-
-OPTIONS:
-- canvasPreset: Set canvas to platform dimensions
-- backgroundColor: Set background color after reset
-- preserveBackground: Keep existing background (don't reset)
-
-EXAMPLES:
-- Quick reset: {} (just clears canvas)
-- Reset for Instagram: {canvasPreset: "instagram", backgroundColor: "#ffffff"}
-- Reset preserving background: {preserveBackground: true}`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        canvasPreset: {
-          type: 'string',
-          enum: ['instagram', 'instagram-story', 'tiktok', 'youtube', 'youtube-thumbnail', 'twitter', 'linkedin', 'web', 'print-a4', 'print-letter'],
-          description: 'Set canvas size to platform preset after reset',
-        },
-        backgroundColor: {
-          type: 'string',
-          description: 'Set background color after reset (e.g., "#ffffff")',
-        },
-        preserveBackground: {
-          type: 'boolean',
-          description: 'Keep existing background generator/color',
-        },
-      },
-    },
-  },
-
-  {
-    name: 'pinepaper_agent_batch_execute',
-    annotations: {
-      title: 'Batch Execute Operations',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: false,
-      openWorldHint: false,
-    },
-    description: `Execute multiple operations in a single browser call. Dramatically faster than individual tool calls.
-
-USE WHEN:
-- Creating multiple items in one step
-- Applying animations to many items
-- Need maximum performance
-- Building complex scenes efficiently
-
-PERFORMANCE COMPARISON:
-- 10 individual pinepaper_create_item calls: ~1450ms (10 browser round trips)
-- pinepaper_agent_batch_execute with 10 creates: ~300ms (1 browser round trip)
-
-OPERATION TYPES:
-- create: Create an item (itemType, position, properties)
-- modify: Modify an item (itemId, properties)
-- animate: Animate an item (itemId, animationType, animationOptions)
-- relation: Add a relation (sourceId, targetId, relationType, relationOptions)
-- delete: Delete an item (itemId)
-
-ATOMIC MODE:
-When atomic: true (default), all operations succeed or all fail.
-When atomic: false, operations execute independently (partial success possible).
-
-EXAMPLES:
-- Create 3 circles:
-  {operations: [
-    {type: "create", itemType: "circle", position: {x: 200, y: 300}, properties: {radius: 30, color: "#ef4444"}},
-    {type: "create", itemType: "circle", position: {x: 400, y: 300}, properties: {radius: 30, color: "#22c55e"}},
-    {type: "create", itemType: "circle", position: {x: 600, y: 300}, properties: {radius: 30, color: "#3b82f6"}}
-  ]}
-
-- Create and animate:
-  {operations: [
-    {type: "create", itemType: "star", position: {x: 400, y: 300}, properties: {radius1: 50, radius2: 25, points: 5, color: "#fbbf24"}},
-    {type: "animate", itemId: "$0", animationType: "spin", animationOptions: {speed: 2}}
-  ], atomic: true}
-
-VARIABLE REFERENCES:
-Use "$0", "$1", etc. to reference items created in earlier operations within the same batch.`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        operations: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              type: {
-                type: 'string',
-                enum: ['create', 'modify', 'animate', 'relation', 'delete'],
-                description: 'Operation type',
-              },
-              itemType: {
-                type: 'string',
-                description: 'For create: type of item to create',
-              },
-              itemId: {
-                type: 'string',
-                description: 'For modify/animate/delete: target item ID or $N reference',
-              },
-              position: {
-                type: 'object',
-                properties: {
-                  x: { type: 'number' },
-                  y: { type: 'number' },
-                },
-                description: 'Position for create operations',
-              },
-              properties: {
-                type: 'object',
-                description: 'Properties for create/modify operations',
-              },
-              animationType: {
-                type: 'string',
-                description: 'For animate: animation type',
-              },
-              animationOptions: {
-                type: 'object',
-                description: 'For animate: animation options',
-              },
-              sourceId: {
-                type: 'string',
-                description: 'For relation: source item ID',
-              },
-              targetId: {
-                type: 'string',
-                description: 'For relation: target item ID',
-              },
-              relationType: {
-                type: 'string',
-                description: 'For relation: relation type',
-              },
-              relationOptions: {
-                type: 'object',
-                description: 'For relation: relation options',
-              },
-            },
-            required: ['type'],
-          },
-          description: 'Array of operations to execute',
-        },
-        atomic: {
-          type: 'boolean',
-          description: 'If true, all operations succeed or all fail (default: true)',
-        },
-      },
-      required: ['operations'],
-    },
-  },
-
-  {
-    name: 'pinepaper_agent_export',
-    annotations: {
-      title: 'Smart Export',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Smart export with automatic format detection and platform optimization.
-
-USE WHEN:
-- Exporting content for a specific social media platform
-- Need optimal format automatically selected
-- Want platform-specific dimensions and quality
-- Exporting for print or web
-
-PLATFORMS & OPTIMAL FORMATS:
-| Platform        | Dimensions | Static | Animated |
-|-----------------|------------|--------|----------|
-| instagram       | 1080x1080  | PNG    | MP4      |
-| instagram-story | 1080x1920  | PNG    | MP4      |
-| tiktok          | 1080x1920  | PNG    | MP4@60fps|
-| youtube         | 1920x1080  | PNG    | MP4      |
-| youtube-thumbnail| 1280x720  | PNG    | PNG      |
-| twitter         | 1200x675   | PNG    | GIF      |
-| linkedin        | 1200x627   | PNG    | GIF      |
-| web             | flexible   | SVG    | SVG      |
-| print-a4        | 2480x3508  | PDF    | PDF      |
-| print-letter    | 2550x3300  | PDF    | PDF      |
-
-FORMAT OVERRIDE:
-You can specify a format to override auto-detection:
-- svg: Scalable vector (best for web, smallest file)
-- png: High quality raster (best for static social media)
-- gif: Animated (limited to 256 colors)
-- mp4: Video (best quality animations)
-- webm: Video (smaller file, modern browsers)
-- pdf: Print-ready document
-
-QUALITY LEVELS:
-- draft: Fast export, lower quality (good for previews)
-- standard: Balanced quality and file size (default)
-- high: Maximum quality (best for final export)
-
-EXAMPLES:
-- Auto-export for Instagram: {platform: "instagram"}
-- Force SVG export: {platform: "web", format: "svg"}
-- High-quality print: {platform: "print-a4", quality: "high"}`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        platform: {
-          type: 'string',
-          enum: ['instagram', 'instagram-story', 'tiktok', 'youtube', 'youtube-thumbnail', 'twitter', 'linkedin', 'web', 'print-a4', 'print-letter'],
-          description: 'Target platform for export',
-        },
-        format: {
-          type: 'string',
-          enum: ['svg', 'png', 'gif', 'mp4', 'webm', 'pdf'],
-          description: 'Override format (auto-detected if not specified)',
-        },
-        quality: {
-          type: 'string',
-          enum: ['draft', 'standard', 'high'],
-          description: 'Export quality level (default: standard)',
-        },
-      },
-      required: ['platform'],
-    },
-  },
-
-  {
-    name: 'pinepaper_agent_analyze',
-    annotations: {
-      title: 'Analyze Content',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Analyze canvas content to get export recommendations and content insights.
-
-USE WHEN:
-- Need to know what formats work best for current content
-- Want to understand content complexity
-- Checking if content has animations
-- Getting platform recommendations
-
-ANALYSIS INCLUDES:
-- hasAnimations: Whether content has animations
-- animationTypes: Types of animations used
-- colorComplexity: simple | gradient | complex
-- itemCount: Number of items on canvas
-- canvasSize: Current canvas dimensions
-- hasRelations: Whether items have relationships
-- relationTypes: Types of relations used
-- hasGradients: Whether gradients are used
-- hasShadows: Whether shadows are used
-- hasText: Whether text items exist
-- hasImages: Whether raster images exist
-
-RECOMMENDATIONS:
-Based on analysis, returns optimal:
-- platform: Best target platforms
-- format: Recommended export formats
-- warnings: Any potential issues
-
-EXAMPLE RESPONSE:
-{
-  "analysis": {
-    "hasAnimations": true,
-    "animationTypes": ["orbit", "pulse"],
-    "colorComplexity": "gradient",
-    "itemCount": 8,
-    "canvasSize": {"width": 1080, "height": 1080}
-  },
-  "recommendations": [
-    {"platform": "instagram", "format": "mp4", "confidence": 0.9},
-    {"platform": "web", "format": "webm", "confidence": 0.85}
-  ]
-}`,
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
-  },
-
-  // ---------------------------------------------------------------------------
-  // INTERACTIVE TRIGGER TOOLS
-  // ---------------------------------------------------------------------------
-  {
-    name: 'pinepaper_add_trigger',
-    annotations: {
-      title: 'Add Trigger',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: false,
-      openWorldHint: false,
-    },
-    description: `Add an interactive trigger to an item. Triggers execute actions when events occur.
-
-USE WHEN:
-- Making items clickable
-- Adding hover effects
-- Creating drag interactions
-- Building interactive tutorials/quizzes
-- Timeline-based triggers
-
-TRIGGER EVENTS:
-- click: When item is clicked
-- hover_enter: When mouse enters item
-- hover_exit: When mouse leaves item
-- drag_start: When item drag begins
-- drag_move: While item is being dragged
-- drag_end: When item drag ends
-- timeline: At specific time in animation
-- scene_enter: When scene becomes active
-- scene_exit: When scene deactivates
-- animation_end: When item's animation completes
-- quiz_answer: When quiz answer is submitted
-
-ACTION TYPES:
-- show: Make target item visible
-- hide: Hide target item
-- toggle_visibility: Toggle target visibility
-- play_animation: Start animation on target
-- stop_animation: Stop animation on target
-- navigate: Navigate to scene or URL
-- update_property: Change item property
-- set_variable: Set a scene variable
-- submit_answer: Submit quiz answer
-- increment_score: Add to quiz score
-- reset_quiz: Reset quiz state
-
-EXAMPLES:
-- Click to show: {itemId: "button_1", event: "click", actions: [{type: "show", targetItemId: "panel_1"}]}
-- Hover to animate: {itemId: "star_1", event: "hover_enter", actions: [{type: "play_animation", targetItemId: "star_1", animationType: "pulse"}]}
-- Click to navigate: {itemId: "next_btn", event: "click", actions: [{type: "navigate", url: "#scene2"}]}`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        itemId: {
-          type: 'string',
-          description: 'Item to attach trigger to',
-        },
-        event: {
-          type: 'string',
-          enum: ['click', 'hover_enter', 'hover_exit', 'drag_start', 'drag_move', 'drag_end', 'timeline', 'scene_enter', 'scene_exit', 'animation_end', 'quiz_answer'],
-          description: 'Event that fires the trigger',
-        },
-        actions: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              type: {
-                type: 'string',
-                enum: ['show', 'hide', 'toggle_visibility', 'play_animation', 'stop_animation', 'navigate', 'update_property', 'set_variable', 'submit_answer', 'increment_score', 'reset_quiz'],
-                description: 'Action type',
-              },
-              targetItemId: {
-                type: 'string',
-                description: 'Target item for the action',
-              },
-              animationType: {
-                type: 'string',
-                description: 'Animation type for play_animation',
-              },
-              property: {
-                type: 'string',
-                description: 'Property name for update_property',
-              },
-              value: {
-                description: 'Value for update_property or set_variable',
-              },
-              variableName: {
-                type: 'string',
-                description: 'Variable name for set_variable',
-              },
-              url: {
-                type: 'string',
-                description: 'URL or scene ID for navigate',
-              },
-              points: {
-                type: 'number',
-                description: 'Points for increment_score',
-              },
-            },
-            required: ['type'],
-          },
-          description: 'Actions to execute when triggered',
-        },
-        condition: {
-          type: 'string',
-          description: 'Optional condition expression (e.g., "$score > 10")',
-        },
-        timelineOffset: {
-          type: 'number',
-          description: 'Time offset in ms for timeline triggers',
-        },
-      },
-      required: ['itemId', 'event', 'actions'],
-    },
-  },
-
-  {
-    name: 'pinepaper_remove_trigger',
-    annotations: {
-      title: 'Remove Trigger',
-      readOnlyHint: false,
-      destructiveHint: true,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Remove triggers from an item.
-
-USE WHEN:
-- Disabling interactivity on an item
-- Cleaning up triggers before adding new ones
-- Removing specific event handlers
-
-OPTIONS:
-- Remove specific event: {itemId: "button_1", event: "click"}
-- Remove all triggers: {itemId: "button_1", removeAll: true}`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        itemId: {
-          type: 'string',
-          description: 'Item to remove triggers from',
-        },
-        event: {
-          type: 'string',
-          enum: ['click', 'hover_enter', 'hover_exit', 'drag_start', 'drag_move', 'drag_end', 'timeline', 'scene_enter', 'scene_exit', 'animation_end', 'quiz_answer'],
-          description: 'Specific event to remove (optional)',
-        },
-        removeAll: {
-          type: 'boolean',
-          description: 'Remove all triggers from item',
-        },
-      },
-      required: ['itemId'],
-    },
-  },
-
-  {
-    name: 'pinepaper_query_triggers',
-    annotations: {
-      title: 'Query Triggers',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `List all triggers on the canvas or for a specific item.
-
-USE WHEN:
-- Inspecting existing interactivity
-- Debugging trigger behavior
-- Understanding scene's interactive elements
-
-EXAMPLES:
-- All triggers: {}
-- Triggers on specific item: {itemId: "button_1"}
-- Filter by event type: {event: "click"}`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        itemId: {
-          type: 'string',
-          description: 'Filter triggers by item ID',
-        },
-        event: {
-          type: 'string',
-          enum: ['click', 'hover_enter', 'hover_exit', 'drag_start', 'drag_move', 'drag_end', 'timeline', 'scene_enter', 'scene_exit', 'animation_end', 'quiz_answer'],
-          description: 'Filter by event type',
-        },
-      },
-    },
-  },
-
-  // ---------------------------------------------------------------------------
-  // QUIZ/LMS TOOLS
-  // ---------------------------------------------------------------------------
-  {
-    name: 'pinepaper_create_quiz',
-    annotations: {
-      title: 'Create Quiz',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: false,
-      openWorldHint: false,
-    },
-    description: `Create an interactive quiz with questions, answers, and scoring.
-
-USE WHEN:
-- Building educational content
-- Creating assessments
-- Adding gamification elements
-- Making interactive learning modules
-
-QUESTION TYPES:
-- multiple-choice: Single correct answer from options
-- multiple-select: Multiple correct answers
-- drag-drop: Drag items to correct zones
-- matching: Match pairs of items
-- sequencing: Put items in correct order
-- hotspot: Click correct area on image
-- true-false: True or false question
-
-FEEDBACK:
-Each question can have:
-- correctFeedback: Message shown on correct answer
-- incorrectFeedback: Message shown on wrong answer
-- partialFeedback: Message for partially correct (multi-select)
-
-SCORING:
-- Each question has a points value
-- passingScore: Minimum score to pass
-- showScore: Display score during quiz
-- allowRetry: Allow retrying incorrect answers
-
-EXAMPLE:
-{
-  "title": "Geography Quiz",
-  "questions": [
-    {
-      "type": "multiple-choice",
-      "prompt": "What is the capital of France?",
-      "options": [
-        {"id": "a", "label": "London"},
-        {"id": "b", "label": "Paris", "isCorrect": true},
-        {"id": "c", "label": "Berlin"}
-      ],
-      "points": 10,
-      "correctFeedback": "Correct! Paris is the capital.",
-      "incorrectFeedback": "Sorry, the correct answer is Paris."
-    }
-  ],
-  "passingScore": 70,
-  "showScore": true
-}`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        title: {
-          type: 'string',
-          description: 'Quiz title',
-        },
-        questions: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              type: {
-                type: 'string',
-                enum: ['multiple-choice', 'multiple-select', 'drag-drop', 'matching', 'sequencing', 'hotspot', 'true-false'],
-                description: 'Question type',
-              },
-              prompt: {
-                type: 'string',
-                description: 'Question text',
-              },
-              options: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    id: { type: 'string' },
-                    label: { type: 'string' },
-                    isCorrect: { type: 'boolean' },
-                  },
-                },
-                description: 'Answer options',
-              },
-              points: {
-                type: 'number',
-                description: 'Points for correct answer',
-              },
-              correctFeedback: {
-                type: 'string',
-                description: 'Feedback for correct answer',
-              },
-              incorrectFeedback: {
-                type: 'string',
-                description: 'Feedback for incorrect answer',
-              },
-              draggableItems: {
-                type: 'array',
-                items: { type: 'string' },
-                description: 'Item IDs that can be dragged (for drag-drop)',
-              },
-              dropZones: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    id: { type: 'string' },
-                    correctItems: { type: 'array', items: { type: 'string' } },
-                  },
-                },
-                description: 'Drop zones with correct items (for drag-drop)',
-              },
-            },
-            required: ['type', 'prompt', 'points'],
-          },
-          description: 'Quiz questions',
-        },
-        passingScore: {
-          type: 'number',
-          description: 'Minimum percentage to pass (0-100)',
-        },
-        showScore: {
-          type: 'boolean',
-          description: 'Display score during quiz',
-        },
-        allowRetry: {
-          type: 'boolean',
-          description: 'Allow retrying incorrect answers',
-        },
-        shuffleQuestions: {
-          type: 'boolean',
-          description: 'Randomize question order',
-        },
-        shuffleOptions: {
-          type: 'boolean',
-          description: 'Randomize answer options',
-        },
-      },
-      required: ['questions'],
-    },
-  },
-
-  {
-    name: 'pinepaper_get_quiz_state',
-    annotations: {
-      title: 'Get Quiz State',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Get the current state of an active quiz.
-
-USE WHEN:
-- Checking quiz progress
-- Getting current score
-- Reviewing answered questions
-- Debugging quiz behavior
-
-RETURNS:
-- quizId: Quiz identifier
-- currentQuestion: Current question index
-- totalQuestions: Total number of questions
-- score: Current score
-- maxScore: Maximum possible score
-- answers: Array of submitted answers
-- passed: Whether passing score achieved (if complete)
-- complete: Whether quiz is finished`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        quizId: {
-          type: 'string',
-          description: 'Quiz ID (optional, uses active quiz if not specified)',
-        },
-      },
-    },
-  },
-
-  {
-    name: 'pinepaper_reset_quiz',
-    annotations: {
-      title: 'Reset Quiz',
-      readOnlyHint: false,
-      destructiveHint: true,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Reset a quiz to its initial state.
-
-USE WHEN:
-- Restarting a quiz
-- Clearing quiz progress
-- Allowing user to retake quiz`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        quizId: {
-          type: 'string',
-          description: 'Quiz ID (optional, uses active quiz if not specified)',
-        },
-      },
-    },
-  },
-
-  // ---------------------------------------------------------------------------
-  // LETTER COLLAGE TOOLS (Text Design)
-  // ---------------------------------------------------------------------------
-  {
-    name: 'pinepaper_create_letter_collage',
-    annotations: {
-      title: 'Create Letter Collage',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: false,
-      openWorldHint: false,
-    },
-    description: `Create stylized text with per-letter customization. Perfect for word games, ransom notes, gradient text, and creative typography.
-
-USE WHEN:
-- Creating Wordle-style word displays
-- Making magazine cutout/ransom note text
-- Designing gradient-filled text
-- Building creative typography effects
-- Creating paper craft style lettering
-
-STYLE TYPES:
-- tile: Wordle/Scrabble colored backgrounds (use with tile palettes)
-- magazine: Mixed fonts/colors like cutouts
-- paperCut: Shadow/depth like cut paper
-- fold: Origami-style folded letters
-- gradient: Each letter with gradient fill (use with gradient palettes)
-- image: Letters filled with image
-
-TILE PALETTES:
-- Game: wordle, scrabble
-- Vibrant: candy, neon, rainbow
-- Soft: pastel, cotton
-- Natural: earth, ocean, forest, sunset
-- Professional: corporate, minimal, slate
-- Seasonal: christmas, halloween, spring
-- Magazine: magazine, newspaper, vintage
-- Paper Craft: paperCraft, origami, craftPaper
-
-GRADIENT PALETTES:
-rainbow, sunset, ocean, fire, gold, rose, ice, cyberpunk, neonGlow, purplePink
-
-EXAMPLES:
-- Wordle style: {text: "HELLO", style: "tile", palette: "wordle"}
-- Ransom note: {text: "SECRET", style: "magazine", palette: "newspaper"}
-- Gradient text: {text: "RAINBOW", style: "gradient", gradientPalette: "rainbow"}
-- Neon style: {text: "GLOW", style: "tile", palette: "neon"}`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        text: {
-          type: 'string',
-          description: 'The text to stylize',
-        },
-        style: {
-          type: 'string',
-          enum: ['tile', 'magazine', 'paperCut', 'fold', 'gradient', 'image'],
-          description: 'Style type (default: tile)',
-        },
-        palette: {
-          type: 'string',
-          enum: [
-            'wordle', 'scrabble',
-            'candy', 'neon', 'rainbow',
-            'pastel', 'cotton',
-            'earth', 'ocean', 'forest', 'sunset',
-            'corporate', 'minimal', 'slate',
-            'christmas', 'halloween', 'spring',
-            'magazine', 'newspaper', 'vintage',
-            'paperCraft', 'origami', 'craftPaper',
-          ],
-          description: 'Color palette for tile/magazine styles',
-        },
-        position: {
-          type: 'object',
-          properties: {
-            x: { type: 'number' },
-            y: { type: 'number' },
-          },
-          description: 'Position on canvas (defaults to center)',
-        },
-        fontSize: {
-          type: 'number',
-          description: 'Base font size in pixels (default: 48)',
-        },
-        fontFamily: {
-          type: 'string',
-          description: 'Font family (default: Inter, sans-serif)',
-        },
-        spacing: {
-          type: 'number',
-          description: 'Letter spacing multiplier (default: 1.1)',
-        },
-        gradientPalette: {
-          type: 'string',
-          enum: ['rainbow', 'sunset', 'ocean', 'fire', 'gold', 'rose', 'ice', 'cyberpunk', 'neonGlow', 'purplePink'],
-          description: 'Gradient palette (for style="gradient")',
-        },
-        gradientDirection: {
-          type: 'string',
-          enum: ['vertical', 'horizontal', 'diagonal', 'radial'],
-          description: 'Gradient direction (default: vertical)',
-        },
-        cornerRadius: {
-          type: 'number',
-          description: 'Corner radius for tile backgrounds (default: 4)',
-        },
-        shadowEnabled: {
-          type: 'boolean',
-          description: 'Enable drop shadows (default: true)',
-        },
-      },
-      required: ['text'],
-    },
-  },
-  {
-    name: 'pinepaper_animate_letter_collage',
-    annotations: {
-      title: 'Animate Letter Collage',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Apply animation to all letters in a collage with staggered timing.
-
-USE WHEN:
-- Adding entrance animations to text
-- Creating typewriter-style reveals
-- Making text bounce or pulse
-- Adding dynamic effects to lettering
-
-ANIMATION TYPES:
-- pulse: Scale up and down rhythmically
-- bounce: Bouncing motion
-- fade: Fade in/out
-- wobble: Side-to-side wobble
-- rotate: Spinning rotation
-
-STAGGER EFFECT:
-Use staggerDelay to create wave-like animations where each letter starts slightly after the previous one. 0.1s is a good default for smooth wave effects.
-
-EXAMPLES:
-- Wave entrance: {collageId: "collage_1", animationType: "bounce", staggerDelay: 0.1}
-- Pulsing text: {collageId: "collage_1", animationType: "pulse", staggerDelay: 0.05}
-- Fast typewriter: {collageId: "collage_1", animationType: "fade", staggerDelay: 0.15}`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        collageId: {
-          type: 'string',
-          description: 'Collage ID from create_letter_collage',
-        },
-        animationType: {
-          type: 'string',
-          enum: ['pulse', 'bounce', 'fade', 'wobble', 'rotate'],
-          description: 'Animation type to apply',
-        },
-        staggerDelay: {
-          type: 'number',
-          description: 'Delay between each letter animation start in seconds (default: 0.1)',
-        },
-        animationSpeed: {
-          type: 'number',
-          description: 'Animation speed multiplier (default: 1)',
-        },
-      },
-      required: ['collageId', 'animationType'],
-    },
-  },
-  {
-    name: 'pinepaper_get_letter_collage_options',
-    annotations: {
-      title: 'Get Letter Collage Options',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Get available styles, palettes, and gradient options for letter collages.
-
-USE WHEN:
-- Learning available letter collage styles
-- Discovering palette options
-- Exploring gradient possibilities
-- Building UI for collage creation
-
-RETURNS:
-- styles: All available style types
-- tilePalettes: Grouped by category (game, vibrant, soft, natural, etc.)
-- gradientPalettes: Available gradient color schemes
-- gradientDirections: Direction options for gradients`,
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
-  },
-
-  // ---------------------------------------------------------------------------
-  // MAP TOOLS
+  // DOMAIN: MAP TOOLS
   // ---------------------------------------------------------------------------
   {
     name: 'pinepaper_load_map',
@@ -5440,7 +3482,7 @@ EXAMPLES:
       idempotentHint: true,
       openWorldHint: false,
     },
-    description: `Get the region at a specific canvas point (hit testing).
+    description: `[Utility] Get the region at a specific canvas point (hit testing).
 
 USE WHEN:
 - Implementing click interactions
@@ -5615,7 +3657,7 @@ EXAMPLES:
       idempotentHint: true,
       openWorldHint: false,
     },
-    description: `Get list of currently animated map regions with their animation data.
+    description: `[Utility] Get list of currently animated map regions with their animation data.
 
 USE WHEN:
 - Debugging animations
@@ -5808,7 +3850,7 @@ EXAMPLES:
       idempotentHint: true,
       openWorldHint: false,
     },
-    description: `Get list of currently highlighted map regions.
+    description: `[Utility] Get list of currently highlighted map regions.
 
 USE WHEN:
 - Checking current highlight state
@@ -5914,7 +3956,7 @@ EXAMPLES:
       idempotentHint: true,
       openWorldHint: false,
     },
-    description: `Get information about the currently loaded map source.
+    description: `[Utility] Get information about the currently loaded map source.
 
 USE WHEN:
 - Checking what map is currently loaded
@@ -5936,7 +3978,2014 @@ RETURNS:
   },
 
   // ---------------------------------------------------------------------------
-  // CANVAS PRESETS TOOL
+  // DOMAIN: FONT TOOLS
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_font_show_studio',
+    annotations: {
+      title: 'Font Show Studio',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Open the Font Studio UI for interactive font creation.
+
+USE WHEN:
+- Starting a custom font creation workflow
+- Need the interactive Font Studio interface with guide lines
+- Want to create a hand-drawn font from scratch
+
+WORKFLOW:
+1. Open Font Studio → pinepaper_font_show_studio
+2. Set font name → pinepaper_font_set_name
+3. Check required chars → pinepaper_font_get_required_chars
+4. For each character: draw path, cleanup, create glyph
+5. Check progress → pinepaper_font_get_status
+6. Export when complete → pinepaper_font_export`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'pinepaper_font_set_name',
+    annotations: {
+      title: 'Font Set Name',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Set the font family name for the current font being created.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: "Font family name (e.g., 'MyHandwriting')",
+        },
+      },
+      required: ['name'],
+    },
+  },
+  {
+    name: 'pinepaper_font_get_required_chars',
+    annotations: {
+      title: 'Font Get Required Chars',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Get the list of characters needed for a complete font.
+
+CHARACTER SETS:
+- minimum: A-Z, a-z, 0-9, space (63 chars) - enough for basic text
+- standard: adds punctuation and symbols (90+ chars) - full typography`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        set: {
+          type: 'string',
+          enum: ['minimum', 'standard'],
+          description: 'minimum: A-Z, a-z, 0-9, space (63 chars). standard: adds punctuation (90+ chars)',
+        },
+      },
+    },
+  },
+  {
+    name: 'pinepaper_font_get_status',
+    annotations: {
+      title: 'Font Get Status',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Get font completion status including progress percentage, completed/pending characters.
+
+USE WHEN:
+- Checking progress during font creation
+- Determining which characters still need to be drawn
+- Verifying font is complete before export`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'pinepaper_font_create_glyph',
+    annotations: {
+      title: 'Font Create Glyph',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Create a glyph from a Paper.js path. Converts a drawn path into an OpenType glyph with calculated advance width.
+
+USE WHEN:
+- Converting a drawn character path to a font glyph
+- Adding a new character to the font
+
+WORKFLOW:
+1. Draw the character as a Paper.js path on the canvas
+2. Optionally clean up the path (pinepaper_font_cleanup_path)
+3. Use the path's registry ID to create the glyph`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        character: {
+          type: 'string',
+          description: "Single character (e.g., 'A', 'a', '1', ' ')",
+        },
+        pathId: {
+          type: 'string',
+          description: 'Registry ID of the Paper.js path to use as glyph shape',
+        },
+      },
+      required: ['character', 'pathId'],
+    },
+  },
+  {
+    name: 'pinepaper_font_create_space',
+    annotations: {
+      title: 'Font Create Space',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Create the space glyph (no visible shape, just advance width).
+
+USE WHEN:
+- Adding the space character to the font
+- Space needs no drawn path, only a width value`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        width: {
+          type: 'number',
+          description: 'Space width in font units (default: 250)',
+        },
+      },
+    },
+  },
+  {
+    name: 'pinepaper_font_remove_glyph',
+    annotations: {
+      title: 'Font Remove Glyph',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Remove a glyph from the font. Use when a character needs to be redrawn.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        character: {
+          type: 'string',
+          description: 'Character to remove',
+        },
+      },
+      required: ['character'],
+    },
+  },
+  {
+    name: 'pinepaper_font_set_metrics',
+    annotations: {
+      title: 'Font Set Metrics',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Set font metrics (advanced). Controls the coordinate grid and vertical measurements.
+
+METRICS:
+- unitsPerEm: Coordinate grid size (default: 1000)
+- ascender: Height above baseline (default: 800)
+- descender: Depth below baseline, negative (default: -200)
+- xHeight: Lowercase letter height (default: 500)
+- capHeight: Capital letter height (default: 700)`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        unitsPerEm: {
+          type: 'number',
+          description: 'Coordinate grid size (default: 1000)',
+        },
+        ascender: {
+          type: 'number',
+          description: 'Height above baseline (default: 800)',
+        },
+        descender: {
+          type: 'number',
+          description: 'Depth below baseline, negative (default: -200)',
+        },
+        xHeight: {
+          type: 'number',
+          description: 'Lowercase letter height (default: 500)',
+        },
+        capHeight: {
+          type: 'number',
+          description: 'Capital letter height (default: 700)',
+        },
+      },
+    },
+  },
+  {
+    name: 'pinepaper_font_export',
+    annotations: {
+      title: 'Font Export',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Export the font as an OTF file. Triggers browser download of the completed font.
+
+USE WHEN:
+- Font is complete and ready for download
+- User wants to save the font as a file`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        download: {
+          type: 'boolean',
+          description: 'Trigger browser download (default: true)',
+        },
+      },
+    },
+  },
+  {
+    name: 'pinepaper_font_load_into_document',
+    annotations: {
+      title: 'Font Load Into Document',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Load the custom font into the document for immediate use in PinePaper text items.
+
+USE WHEN:
+- Want to use the created font immediately in the current document
+- Testing how the font looks in actual text items`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'pinepaper_font_export_data',
+    annotations: {
+      title: 'Font Export Data',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Export font data as JSON for saving progress. Use to save work-in-progress fonts.
+
+USE WHEN:
+- Saving font progress for later continuation
+- Backing up font data`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        download: {
+          type: 'boolean',
+          description: 'Trigger browser download (default: true)',
+        },
+      },
+    },
+  },
+  {
+    name: 'pinepaper_font_import_data',
+    annotations: {
+      title: 'Font Import Data',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Import font data from previously saved JSON. Restores a font from exported data.
+
+USE WHEN:
+- Resuming work on a previously saved font
+- Loading font data exported with pinepaper_font_export_data`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'object',
+          description: 'Font data object from pinepaper_font_export_data',
+        },
+      },
+      required: ['data'],
+    },
+  },
+  {
+    name: 'pinepaper_font_clear',
+    annotations: {
+      title: 'Font Clear',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Clear all glyphs and reset the font. Removes all drawn characters.
+
+WARNING: This is destructive - all glyph progress will be lost.`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'pinepaper_font_remove_overlap',
+    annotations: {
+      title: 'Font Remove Overlap',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Remove overlapping areas from a path (like FontForge's RemoveOverlap). Merges multiple overlapping paths into a single clean outline.
+
+USE WHEN:
+- Path has overlapping strokes that need merging
+- Preparing a glyph path for clean font output`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        pathId: {
+          type: 'string',
+          description: 'Registry ID of the Paper.js path to process',
+        },
+      },
+      required: ['pathId'],
+    },
+  },
+  {
+    name: 'pinepaper_font_correct_direction',
+    annotations: {
+      title: 'Font Correct Direction',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Correct path winding direction for proper fill rendering (like FontForge's CorrectDirection). Ensures outer contours are clockwise and inner holes are counter-clockwise.
+
+USE WHEN:
+- Glyph fills are rendering incorrectly (holes appear filled)
+- Preparing paths for font export`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        pathId: {
+          type: 'string',
+          description: 'Registry ID of the Paper.js path to process',
+        },
+      },
+      required: ['pathId'],
+    },
+  },
+  {
+    name: 'pinepaper_font_cleanup_path',
+    annotations: {
+      title: 'Font Cleanup Path',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Apply all path cleanup operations in the correct order: removeOverlap -> correctDirection -> smooth. Convenience tool that combines all path preparation steps.
+
+USE WHEN:
+- Preparing a drawn path before creating a glyph
+- Quick one-step path cleanup instead of calling individual operations`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        pathId: {
+          type: 'string',
+          description: 'Registry ID of the Paper.js path to process',
+        },
+        removeOverlap: {
+          type: 'boolean',
+          description: 'Merge overlapping strokes (default: true)',
+        },
+        correctDirection: {
+          type: 'boolean',
+          description: 'Fix winding direction for fills (default: true)',
+        },
+        smooth: {
+          type: 'boolean',
+          description: 'Apply path smoothing (default: true)',
+        },
+        smoothTolerance: {
+          type: 'number',
+          description: 'Smoothing tolerance - higher = more simplification (default: 2.5)',
+        },
+      },
+      required: ['pathId'],
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // DOMAIN: LETTER COLLAGE TOOLS (Text Design)
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_create_letter_collage',
+    annotations: {
+      title: 'Create Letter Collage',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Create stylized text with per-letter customization. Perfect for word games, ransom notes, gradient text, and creative typography.
+
+USE WHEN:
+- Creating Wordle-style word displays
+- Making magazine cutout/ransom note text
+- Designing gradient-filled text
+- Building creative typography effects
+- Creating paper craft style lettering
+
+STYLE TYPES:
+- tile: Wordle/Scrabble colored backgrounds (use with tile palettes)
+- magazine: Mixed fonts/colors like cutouts
+- paperCut: Shadow/depth like cut paper
+- fold: Origami-style folded letters
+- gradient: Each letter with gradient fill (use with gradient palettes)
+- image: Letters filled with image
+
+TILE PALETTES:
+- Game: wordle, scrabble
+- Vibrant: candy, neon, rainbow
+- Soft: pastel, cotton
+- Natural: earth, ocean, forest, sunset
+- Professional: corporate, minimal, slate
+- Seasonal: christmas, halloween, spring
+- Magazine: magazine, newspaper, vintage
+- Paper Craft: paperCraft, origami, craftPaper
+
+GRADIENT PALETTES:
+rainbow, sunset, ocean, fire, gold, rose, ice, cyberpunk, neonGlow, purplePink
+
+EXAMPLES:
+- Wordle style: {text: "HELLO", style: "tile", palette: "wordle"}
+- Ransom note: {text: "SECRET", style: "magazine", palette: "newspaper"}
+- Gradient text: {text: "RAINBOW", style: "gradient", gradientPalette: "rainbow"}
+- Neon style: {text: "GLOW", style: "tile", palette: "neon"}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        text: {
+          type: 'string',
+          description: 'The text to stylize',
+        },
+        style: {
+          type: 'string',
+          enum: ['tile', 'magazine', 'paperCut', 'fold', 'gradient', 'image'],
+          description: 'Style type (default: tile)',
+        },
+        palette: {
+          type: 'string',
+          enum: [
+            'wordle', 'scrabble',
+            'candy', 'neon', 'rainbow',
+            'pastel', 'cotton',
+            'earth', 'ocean', 'forest', 'sunset',
+            'corporate', 'minimal', 'slate',
+            'christmas', 'halloween', 'spring',
+            'magazine', 'newspaper', 'vintage',
+            'paperCraft', 'origami', 'craftPaper',
+          ],
+          description: 'Color palette for tile/magazine styles',
+        },
+        position: {
+          type: 'object',
+          properties: {
+            x: { type: 'number' },
+            y: { type: 'number' },
+          },
+          description: 'Position on canvas (defaults to center)',
+        },
+        fontSize: {
+          type: 'number',
+          description: 'Base font size in pixels (default: 48)',
+        },
+        fontFamily: {
+          type: 'string',
+          description: 'Font family (default: Inter, sans-serif)',
+        },
+        spacing: {
+          type: 'number',
+          description: 'Letter spacing multiplier (default: 1.1)',
+        },
+        gradientPalette: {
+          type: 'string',
+          enum: ['rainbow', 'sunset', 'ocean', 'fire', 'gold', 'rose', 'ice', 'cyberpunk', 'neonGlow', 'purplePink'],
+          description: 'Gradient palette (for style="gradient")',
+        },
+        gradientDirection: {
+          type: 'string',
+          enum: ['vertical', 'horizontal', 'diagonal', 'radial'],
+          description: 'Gradient direction (default: vertical)',
+        },
+        cornerRadius: {
+          type: 'number',
+          description: 'Corner radius for tile backgrounds (default: 4)',
+        },
+        shadowEnabled: {
+          type: 'boolean',
+          description: 'Enable drop shadows (default: true)',
+        },
+      },
+      required: ['text'],
+    },
+  },
+  {
+    name: 'pinepaper_animate_letter_collage',
+    annotations: {
+      title: 'Animate Letter Collage',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Apply animation to all letters in a collage with staggered timing.
+
+USE WHEN:
+- Adding entrance animations to text
+- Creating typewriter-style reveals
+- Making text bounce or pulse
+- Adding dynamic effects to lettering
+
+ANIMATION TYPES:
+- pulse: Scale up and down rhythmically
+- bounce: Bouncing motion
+- fade: Fade in/out
+- wobble: Side-to-side wobble
+- rotate: Spinning rotation
+
+STAGGER EFFECT:
+Use staggerDelay to create wave-like animations where each letter starts slightly after the previous one. 0.1s is a good default for smooth wave effects.
+
+EXAMPLES:
+- Wave entrance: {collageId: "collage_1", animationType: "bounce", staggerDelay: 0.1}
+- Pulsing text: {collageId: "collage_1", animationType: "pulse", staggerDelay: 0.05}
+- Fast typewriter: {collageId: "collage_1", animationType: "fade", staggerDelay: 0.15}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        collageId: {
+          type: 'string',
+          description: 'Collage ID from create_letter_collage',
+        },
+        animationType: {
+          type: 'string',
+          enum: ['pulse', 'bounce', 'fade', 'wobble', 'rotate'],
+          description: 'Animation type to apply',
+        },
+        staggerDelay: {
+          type: 'number',
+          description: 'Delay between each letter animation start in seconds (default: 0.1)',
+        },
+        animationSpeed: {
+          type: 'number',
+          description: 'Animation speed multiplier (default: 1)',
+        },
+      },
+      required: ['collageId', 'animationType'],
+    },
+  },
+  {
+    name: 'pinepaper_get_letter_collage_options',
+    annotations: {
+      title: 'Get Letter Collage Options',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `[Utility] Get available styles, palettes, and gradient options for letter collages.
+
+USE WHEN:
+- Learning available letter collage styles
+- Discovering palette options
+- Exploring gradient possibilities
+- Building UI for collage creation
+
+RETURNS:
+- styles: All available style types
+- tilePalettes: Grouped by category (game, vibrant, soft, natural, etc.)
+- gradientPalettes: Available gradient color schemes
+- gradientDirections: Direction options for gradients`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // DOMAIN: GENERATOR TOOLS
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_execute_generator',
+    annotations: {
+      title: 'Execute Generator',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Execute a background generator to create procedural patterns.
+
+USE WHEN:
+- "add a sunburst background"
+- "create wave pattern"
+- "grid background"
+- "circuit board pattern"
+- Creating dynamic procedural backgrounds
+
+GENERATORS:
+- drawSunburst: Radial rays from center (rayCount, colors, bgColor)
+- drawSunsetScene: Animated sunset with clouds (sunColor, skyColors, cloudCount)
+- drawGrid: Lines, dots, or squares (gridType, spacing, lineColor)
+- drawStackedCircles: Overlapping circles (count, colors, distribution)
+- drawCircuit: Tech circuit board (lineColor, nodeColor, density)
+- drawWaves: Layered wave pattern (waveCount, colors, amplitude)
+- drawPattern: Geometric shapes in orbit`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        generatorName: {
+          type: 'string',
+          enum: ['drawSunburst', 'drawSunsetScene', 'drawGrid', 'drawStackedCircles', 'drawCircuit', 'drawWaves', 'drawPattern'],
+          description: 'Generator name',
+        },
+        params: {
+          type: 'object',
+          description: 'Generator-specific parameters',
+          additionalProperties: true,
+        },
+      },
+      required: ['generatorName'],
+    },
+  },
+
+  {
+    name: 'pinepaper_list_generators',
+    annotations: {
+      title: 'List Generators',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `[Utility] Get a list of all available background generators with their parameters.
+
+USE WHEN:
+- User asks "what backgrounds are available?"
+- Need to show generator options
+- Discovering generator capabilities`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // DOMAIN: EFFECT TOOLS
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_apply_effect',
+    annotations: {
+      title: 'Apply Effect',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Apply a visual effect to an item.
+
+USE WHEN:
+- Adding sparkle/glitter effects
+- Creating burst/explosion effects
+- Enhancing visual impact
+
+EFFECTS:
+- sparkle: Glitter/sparkle particles (color, speed, size)
+- blast: Explosion burst effect (color, radius, count)`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        itemId: { type: 'string', description: 'Registry ID of the item' },
+        effectType: {
+          type: 'string',
+          enum: ['sparkle', 'blast'],
+          description: 'Type of effect',
+        },
+        params: {
+          type: 'object',
+          description: 'Effect parameters',
+          additionalProperties: true,
+        },
+      },
+      required: ['itemId', 'effectType'],
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // DOMAIN: FILTER TOOLS
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_add_filter',
+    annotations: {
+      title: 'Add Filter',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Add a visual filter effect to the canvas. Filters are scene-wide effects that can be stacked.
+
+USE WHEN:
+- User wants visual effects like blur, grayscale, vintage look
+- Creating mood or atmosphere (cinematic, dreamy, noir)
+- Post-processing the entire scene
+- User says "make it look vintage", "add blur", "black and white"
+
+AVAILABLE FILTERS:
+- grayscale: Convert to black and white (params: intensity 0-1)
+- sepia: Warm vintage brownish tone (params: intensity 0-1)
+- blur: Gaussian blur effect (params: radius 0-20)
+- brightness: Adjust brightness (params: value -100 to 100)
+- contrast: Adjust contrast (params: value -100 to 100)
+- saturate: Adjust color saturation (params: value -100 to 100)
+- invert: Invert colors (params: intensity 0-1)
+- noise: Add film grain (params: intensity 0-100, monochrome: true/false)
+- vignette: Darken edges (params: intensity 0-1, radius 0-1)
+- vintage: Preset combining sepia, vignette, noise
+- colorOverlay: Add color tint (params: color, intensity, blendMode)
+- sharpen: Increase sharpness (params: intensity 0-100)
+- posterize: Reduce color levels (params: levels 2-32)
+
+EXAMPLES:
+- "Make it black and white" → filterType: "grayscale"
+- "Add vintage look" → filterType: "vintage", params: {intensity: 0.8}
+- "Blur the background" → filterType: "blur", params: {radius: 5}
+- "Increase contrast" → filterType: "contrast", params: {value: 30}
+
+Filters can be stacked - call multiple times to combine effects.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filterType: {
+          type: 'string',
+          enum: ['grayscale', 'sepia', 'blur', 'brightness', 'contrast', 'saturate', 'invert', 'noise', 'vignette', 'vintage', 'colorOverlay', 'sharpen', 'posterize'],
+          description: 'Type of filter to apply',
+        },
+        params: {
+          type: 'object',
+          description: 'Filter-specific parameters',
+          additionalProperties: true,
+        },
+      },
+      required: ['filterType'],
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // DOMAIN: INTERACTIVE TRIGGER TOOLS
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_add_trigger',
+    annotations: {
+      title: 'Add Trigger',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Add an interactive trigger to an item. Triggers execute actions when events occur.
+
+USE WHEN:
+- Making items clickable
+- Adding hover effects
+- Creating drag interactions
+- Building interactive tutorials/quizzes
+- Timeline-based triggers
+
+TRIGGER EVENTS:
+- click: When item is clicked
+- hover_enter: When mouse enters item
+- hover_exit: When mouse leaves item
+- drag_start: When item drag begins
+- drag_move: While item is being dragged
+- drag_end: When item drag ends
+- timeline: At specific time in animation
+- scene_enter: When scene becomes active
+- scene_exit: When scene deactivates
+- animation_end: When item's animation completes
+- quiz_answer: When quiz answer is submitted
+
+ACTION TYPES:
+- show: Make target item visible
+- hide: Hide target item
+- toggle_visibility: Toggle target visibility
+- play_animation: Start animation on target
+- stop_animation: Stop animation on target
+- navigate: Navigate to scene or URL
+- update_property: Change item property
+- set_variable: Set a scene variable
+- submit_answer: Submit quiz answer
+- increment_score: Add to quiz score
+- reset_quiz: Reset quiz state
+
+EXAMPLES:
+- Click to show: {itemId: "button_1", event: "click", actions: [{type: "show", targetItemId: "panel_1"}]}
+- Hover to animate: {itemId: "star_1", event: "hover_enter", actions: [{type: "play_animation", targetItemId: "star_1", animationType: "pulse"}]}
+- Click to navigate: {itemId: "next_btn", event: "click", actions: [{type: "navigate", url: "#scene2"}]}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        itemId: {
+          type: 'string',
+          description: 'Item to attach trigger to',
+        },
+        event: {
+          type: 'string',
+          enum: ['click', 'hover_enter', 'hover_exit', 'drag_start', 'drag_move', 'drag_end', 'timeline', 'scene_enter', 'scene_exit', 'animation_end', 'quiz_answer'],
+          description: 'Event that fires the trigger',
+        },
+        actions: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              type: {
+                type: 'string',
+                enum: ['show', 'hide', 'toggle_visibility', 'play_animation', 'stop_animation', 'navigate', 'update_property', 'set_variable', 'submit_answer', 'increment_score', 'reset_quiz'],
+                description: 'Action type',
+              },
+              targetItemId: {
+                type: 'string',
+                description: 'Target item for the action',
+              },
+              animationType: {
+                type: 'string',
+                description: 'Animation type for play_animation',
+              },
+              property: {
+                type: 'string',
+                description: 'Property name for update_property',
+              },
+              value: {
+                description: 'Value for update_property or set_variable',
+              },
+              variableName: {
+                type: 'string',
+                description: 'Variable name for set_variable',
+              },
+              url: {
+                type: 'string',
+                description: 'URL or scene ID for navigate',
+              },
+              points: {
+                type: 'number',
+                description: 'Points for increment_score',
+              },
+            },
+            required: ['type'],
+          },
+          description: 'Actions to execute when triggered',
+        },
+        condition: {
+          type: 'string',
+          description: 'Optional condition expression (e.g., "$score > 10")',
+        },
+        timelineOffset: {
+          type: 'number',
+          description: 'Time offset in ms for timeline triggers',
+        },
+      },
+      required: ['itemId', 'event', 'actions'],
+    },
+  },
+
+  {
+    name: 'pinepaper_remove_trigger',
+    annotations: {
+      title: 'Remove Trigger',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Remove triggers from an item.
+
+USE WHEN:
+- Disabling interactivity on an item
+- Cleaning up triggers before adding new ones
+- Removing specific event handlers
+
+OPTIONS:
+- Remove specific event: {itemId: "button_1", event: "click"}
+- Remove all triggers: {itemId: "button_1", removeAll: true}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        itemId: {
+          type: 'string',
+          description: 'Item to remove triggers from',
+        },
+        event: {
+          type: 'string',
+          enum: ['click', 'hover_enter', 'hover_exit', 'drag_start', 'drag_move', 'drag_end', 'timeline', 'scene_enter', 'scene_exit', 'animation_end', 'quiz_answer'],
+          description: 'Specific event to remove (optional)',
+        },
+        removeAll: {
+          type: 'boolean',
+          description: 'Remove all triggers from item',
+        },
+      },
+      required: ['itemId'],
+    },
+  },
+
+  {
+    name: 'pinepaper_query_triggers',
+    annotations: {
+      title: 'Query Triggers',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `[Utility] List all triggers on the canvas or for a specific item.
+
+USE WHEN:
+- Inspecting existing interactivity
+- Debugging trigger behavior
+- Understanding scene's interactive elements
+
+EXAMPLES:
+- All triggers: {}
+- Triggers on specific item: {itemId: "button_1"}
+- Filter by event type: {event: "click"}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        itemId: {
+          type: 'string',
+          description: 'Filter triggers by item ID',
+        },
+        event: {
+          type: 'string',
+          enum: ['click', 'hover_enter', 'hover_exit', 'drag_start', 'drag_move', 'drag_end', 'timeline', 'scene_enter', 'scene_exit', 'animation_end', 'quiz_answer'],
+          description: 'Filter by event type',
+        },
+      },
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // DOMAIN: QUIZ/LMS TOOLS
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_create_quiz',
+    annotations: {
+      title: 'Create Quiz',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Create an interactive quiz with questions, answers, and scoring.
+
+USE WHEN:
+- Building educational content
+- Creating assessments
+- Adding gamification elements
+- Making interactive learning modules
+
+QUESTION TYPES:
+- multiple-choice: Single correct answer from options
+- multiple-select: Multiple correct answers
+- drag-drop: Drag items to correct zones
+- matching: Match pairs of items
+- sequencing: Put items in correct order
+- hotspot: Click correct area on image
+- true-false: True or false question
+
+FEEDBACK:
+Each question can have:
+- correctFeedback: Message shown on correct answer
+- incorrectFeedback: Message shown on wrong answer
+- partialFeedback: Message for partially correct (multi-select)
+
+SCORING:
+- Each question has a points value
+- passingScore: Minimum score to pass
+- showScore: Display score during quiz
+- allowRetry: Allow retrying incorrect answers
+
+EXAMPLE:
+{
+  "title": "Geography Quiz",
+  "questions": [
+    {
+      "type": "multiple-choice",
+      "prompt": "What is the capital of France?",
+      "options": [
+        {"id": "a", "label": "London"},
+        {"id": "b", "label": "Paris", "isCorrect": true},
+        {"id": "c", "label": "Berlin"}
+      ],
+      "points": 10,
+      "correctFeedback": "Correct! Paris is the capital.",
+      "incorrectFeedback": "Sorry, the correct answer is Paris."
+    }
+  ],
+  "passingScore": 70,
+  "showScore": true
+}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        title: {
+          type: 'string',
+          description: 'Quiz title',
+        },
+        questions: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              type: {
+                type: 'string',
+                enum: ['multiple-choice', 'multiple-select', 'drag-drop', 'matching', 'sequencing', 'hotspot', 'true-false'],
+                description: 'Question type',
+              },
+              prompt: {
+                type: 'string',
+                description: 'Question text',
+              },
+              options: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    label: { type: 'string' },
+                    isCorrect: { type: 'boolean' },
+                  },
+                },
+                description: 'Answer options',
+              },
+              points: {
+                type: 'number',
+                description: 'Points for correct answer',
+              },
+              correctFeedback: {
+                type: 'string',
+                description: 'Feedback for correct answer',
+              },
+              incorrectFeedback: {
+                type: 'string',
+                description: 'Feedback for incorrect answer',
+              },
+              draggableItems: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Item IDs that can be dragged (for drag-drop)',
+              },
+              dropZones: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    correctItems: { type: 'array', items: { type: 'string' } },
+                  },
+                },
+                description: 'Drop zones with correct items (for drag-drop)',
+              },
+            },
+            required: ['type', 'prompt', 'points'],
+          },
+          description: 'Quiz questions',
+        },
+        passingScore: {
+          type: 'number',
+          description: 'Minimum percentage to pass (0-100)',
+        },
+        showScore: {
+          type: 'boolean',
+          description: 'Display score during quiz',
+        },
+        allowRetry: {
+          type: 'boolean',
+          description: 'Allow retrying incorrect answers',
+        },
+        shuffleQuestions: {
+          type: 'boolean',
+          description: 'Randomize question order',
+        },
+        shuffleOptions: {
+          type: 'boolean',
+          description: 'Randomize answer options',
+        },
+      },
+      required: ['questions'],
+    },
+  },
+
+  {
+    name: 'pinepaper_get_quiz_state',
+    annotations: {
+      title: 'Get Quiz State',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `[Utility] Get the current state of an active quiz.
+
+USE WHEN:
+- Checking quiz progress
+- Getting current score
+- Reviewing answered questions
+- Debugging quiz behavior
+
+RETURNS:
+- quizId: Quiz identifier
+- currentQuestion: Current question index
+- totalQuestions: Total number of questions
+- score: Current score
+- maxScore: Maximum possible score
+- answers: Array of submitted answers
+- passed: Whether passing score achieved (if complete)
+- complete: Whether quiz is finished`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        quizId: {
+          type: 'string',
+          description: 'Quiz ID (optional, uses active quiz if not specified)',
+        },
+      },
+    },
+  },
+
+  {
+    name: 'pinepaper_reset_quiz',
+    annotations: {
+      title: 'Reset Quiz',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Reset a quiz to its initial state.
+
+USE WHEN:
+- Restarting a quiz
+- Clearing quiz progress
+- Allowing user to retake quiz`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        quizId: {
+          type: 'string',
+          description: 'Quiz ID (optional, uses active quiz if not specified)',
+        },
+      },
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // INFRASTRUCTURE: QUERY TOOLS
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_get_items',
+    annotations: {
+      title: 'Get Items',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `[Utility] Get all or filtered items from the canvas.
+
+USE WHEN:
+- Listing what's on the canvas
+- Finding items by type
+- Checking animated items
+- Scene inspection`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filter: {
+          type: 'object',
+          properties: {
+            type: {
+              type: 'string',
+              enum: ['text', 'circle', 'star', 'rectangle', 'triangle', 'polygon', 'ellipse', 'path', 'line', 'arc'],
+              description: 'Filter by item type',
+            },
+            source: {
+              type: 'string',
+              enum: ['user', 'generator', 'import'],
+              description: 'Filter by item source',
+            },
+            hasAnimation: {
+              type: 'boolean',
+              description: 'Filter by animation status',
+            },
+            hasRelation: {
+              type: 'boolean',
+              description: 'Filter by relation status',
+            },
+          },
+        },
+      },
+    },
+  },
+
+  {
+    name: 'pinepaper_get_relation_stats',
+    annotations: {
+      title: 'Get Relation Stats',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `[Utility] Get statistics about active relations in the scene.
+
+USE WHEN:
+- Debugging relation system
+- Understanding scene complexity
+- Analytics and reporting`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // INFRASTRUCTURE: EXPORT TOOLS
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_export_svg',
+    annotations: {
+      title: 'Export SVG',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Export the scene as animated SVG.
+
+USE WHEN:
+- Saving work as SVG file
+- Generating shareable graphics
+- Final export`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        animated: {
+          type: 'boolean',
+          description: 'Include CSS animations (default: true)',
+        },
+      },
+    },
+  },
+
+  {
+    name: 'pinepaper_export_training_data',
+    annotations: {
+      title: 'Export Training Data',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Export relation data as training pairs for LLM fine-tuning. This generates instruction/code pairs from the current scene's relations.
+
+USE WHEN:
+- Generating training data for fine-tuning
+- Creating examples from current scene
+- Building custom animation model training sets
+
+OUTPUT FORMAT:
+- json: Array of {instruction, code, relation, params}
+- jsonl: JSONL format with messages array for chat fine-tuning`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        format: {
+          type: 'string',
+          enum: ['json', 'jsonl'],
+          description: 'Output format (default: json)',
+        },
+        includeMetadata: {
+          type: 'boolean',
+          description: 'Include relation metadata (default: true)',
+        },
+      },
+    },
+  },
+
+  {
+    name: 'pinepaper_export_scene',
+    annotations: {
+      title: 'Export Scene',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Export the complete scene state including all items, relations, and settings.
+
+USE WHEN:
+- Saving a complete scene for later restoration
+- Creating scene backups
+- Debugging scene composition
+- Generating scene snapshots for version control
+
+RETURNS:
+- items: Array of all canvas items with properties
+- relations: Array of active relations
+- decorative: Array of decorative (non-interactive) items
+- backgroundColor: Current background color
+- canvasSize: Canvas dimensions`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // INFRASTRUCTURE: BROWSER CONTROL TOOLS
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_browser_connect',
+    annotations: {
+      title: 'Connect to Browser',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: `Connect to PinePaper Studio Editor in a browser.
+
+NOTE: With enforced agent mode (v1.5.0+), the browser connects AUTOMATICALLY on the first tool call.
+You typically don't need to call this tool manually - just start creating items!
+
+USE WHEN:
+- You want to explicitly connect with custom settings (e.g., visible browser window)
+- You need to connect to a custom PinePaper URL
+
+DEFAULT BEHAVIOR (Agent Mode):
+- Browser runs in headless mode (no visible window)
+- Auto-connects on first tool call
+- Optimized for automation workflows
+
+SET headless: false if you want to see the browser window for debugging or user interaction.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: {
+          type: 'string',
+          description: 'Custom PinePaper Studio URL (default: https://pinepaper.studio/editor)',
+        },
+        headless: {
+          type: 'boolean',
+          description: 'Run browser in headless mode - no visible window (default: false - browser window is visible)',
+        },
+      },
+    },
+  },
+
+  {
+    name: 'pinepaper_browser_disconnect',
+    annotations: {
+      title: 'Disconnect from Browser',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: `Disconnect from the browser and close PinePaper Studio.
+
+USE WHEN:
+- Done working with PinePaper
+- Need to clean up browser resources
+- Switching to a different project`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+
+  {
+    name: 'pinepaper_browser_screenshot',
+    annotations: {
+      title: 'Take Screenshot',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: `Take a screenshot of the current PinePaper canvas.
+
+USE WHEN:
+- User explicitly asks to "see" or "show" the canvas
+- Final verification after completing a creative task
+- Debugging visual issues or unexpected behavior
+- Verifying animations are running (take 2 screenshots with delay)
+
+⚠️ PERFORMANCE BEST PRACTICE:
+Take ONE screenshot per creative task, NOT per operation!
+- BAD: Create circle → screenshot → create text → screenshot → add relation → screenshot
+- GOOD: Create circle → create text → add relation → screenshot (once at end)
+
+Trust the API responses - if a tool returns success, the operation worked.
+Only screenshot when you need visual confirmation of the FINAL result.
+
+Returns a base64-encoded PNG image of the canvas.`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+
+  {
+    name: 'pinepaper_browser_status',
+    annotations: {
+      title: 'Browser Status',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: `Check the current browser connection status.
+
+USE WHEN:
+- Need to verify if connected to PinePaper
+- Debugging connection issues
+- Before executing commands`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // INFRASTRUCTURE: PERFORMANCE TOOLS
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_get_performance_metrics',
+    annotations: {
+      title: 'Get Performance Metrics',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `[Utility] Get execution performance metrics to identify bottlenecks and optimize workflows.
+
+USE WHEN:
+- Analyzing tool performance
+- Debugging slow operations
+- Optimizing complex workflows
+- Identifying performance regressions
+
+RETURNS:
+- Per-tool timing breakdown (validation, code gen, execution, screenshot)
+- Aggregate statistics (avg, p50, p95, p99, min, max)
+- Success rates and error counts
+- Historical metrics (configurable retention)
+
+METRICS TRACKED:
+- Validation: Input parsing and validation time
+- Code Generation: Time to generate PinePaper code
+- Browser Execution: Time to execute code in browser via Puppeteer
+- Screenshot: Time to capture and encode screenshots
+- Total: End-to-end execution time
+
+FORMAT OPTIONS:
+- 'summary': Human-readable summary with slowest tools first
+- 'detailed': Full JSON export of all metrics
+- 'csv': CSV format for spreadsheet analysis
+
+FILTER OPTIONS:
+- toolName: Filter by specific tool (e.g., 'pinepaper_create_item')
+- phase: Filter by execution phase
+- since: Unix timestamp - metrics since this time
+- limit: Maximum number of results
+
+EXAMPLES:
+- Get summary of all metrics: {}
+- Get last 50 create_item operations: {toolName: 'pinepaper_create_item', limit: 50}
+- Get recent slow operations: {since: <timestamp>, format: 'summary'}
+- Export all metrics as CSV: {format: 'csv'}
+
+PERFORMANCE OPTIMIZATION WORKFLOW:
+1. Run your workflow normally
+2. Call pinepaper_get_performance_metrics with format='summary'
+3. Identify slowest operations (sorted by avg duration)
+4. Check if batch operations can be used instead
+5. Verify screenshot mode is 'on_request' for best performance
+6. Re-run and compare metrics
+
+TYPICAL PERFORMANCE BASELINES:
+- Validation: 1-5ms (should be very fast)
+- Code Generation: 5-20ms (depends on complexity)
+- Browser Execution: 30-100ms (depends on operation)
+- Screenshot: 100ms (only if mode='always' or explicit request)
+- Total (without screenshot): 40-125ms
+- Total (with screenshot): 140-225ms
+
+If you see significantly higher numbers, investigate:
+- Network latency (browser connection)
+- Complex operations that could be batched
+- Screenshot mode set to 'always' (change to 'on_request')`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        toolName: {
+          type: 'string',
+          description: 'Filter by tool name (optional)',
+        },
+        phase: {
+          type: 'string',
+          enum: ['validation', 'code_generation', 'browser_execution', 'screenshot', 'total'],
+          description: 'Filter by execution phase (optional)',
+        },
+        since: {
+          type: 'number',
+          description: 'Unix timestamp - metrics since this time (optional)',
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum number of results to return (default: 100)',
+        },
+        format: {
+          type: 'string',
+          enum: ['summary', 'detailed', 'csv'],
+          description: 'Export format (default: summary)',
+        },
+      },
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // INFRASTRUCTURE: AGENT FLOW MODE TOOLS
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_agent_start_job',
+    annotations: {
+      title: 'Start Agent Job',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Start a new agent job/session for optimized batch workflows. Enables agent mode with reduced overhead.
+
+USE WHEN:
+- Beginning a content automation pipeline
+- Starting a batch creation workflow (create → animate → export)
+- Need to track multiple operations as a single job
+- Want to optimize performance with batched execution
+
+AGENT MODE BENEFITS:
+- Batched code execution (multiple operations in single browser call)
+- Automatic item/relation tracking
+- Smart screenshot policy (on_complete, on_error, or never)
+- Fast canvas reset without browser refresh
+- Job-level performance metrics
+
+SCREENSHOT POLICIES:
+- on_complete: Single screenshot at job end (recommended for automation)
+- on_error: Screenshot only when errors occur (debugging)
+- never: No automatic screenshots (fastest)
+- on_request: Manual screenshots only
+
+CANVAS PRESETS:
+- instagram: 1080x1080 (1:1 square)
+- instagram-story: 1080x1920 (9:16 vertical)
+- tiktok: 1080x1920 (9:16 vertical, 60fps)
+- youtube: 1920x1080 (16:9 horizontal)
+- youtube-thumbnail: 1280x720 (16:9 thumbnail)
+- twitter: 1200x675 (16:9 Twitter card)
+- linkedin: 1200x627 (LinkedIn standard)
+- web: Flexible dimensions
+- print-a4: 2480x3508 (A4 at 300dpi)
+- print-letter: 2550x3300 (Letter at 300dpi)
+
+EXAMPLES:
+- Quick social media content: {name: "Instagram Post", screenshotPolicy: "on_complete", canvasPreset: "instagram"}
+- High-volume automation: {screenshotPolicy: "never"}
+- Debug workflow: {name: "Debug Session", screenshotPolicy: "on_error"}
+
+WORKFLOW:
+1. pinepaper_agent_start_job → Start job
+2. Multiple create/animate/relation operations
+3. pinepaper_agent_end_job → End job, get summary`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Optional job name for tracking',
+        },
+        screenshotPolicy: {
+          type: 'string',
+          enum: ['on_complete', 'on_error', 'never', 'on_request'],
+          description: 'When to take screenshots (default: on_complete)',
+        },
+        canvasPreset: {
+          type: 'string',
+          enum: ['instagram', 'instagram-story', 'tiktok', 'youtube', 'youtube-thumbnail', 'twitter', 'linkedin', 'web', 'print-a4', 'print-letter'],
+          description: 'Set canvas size to platform preset',
+        },
+        clearCanvas: {
+          type: 'boolean',
+          description: 'Clear canvas when starting job (default: true)',
+        },
+      },
+    },
+  },
+
+  {
+    name: 'pinepaper_agent_end_job',
+    annotations: {
+      title: 'End Agent Job',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `End the current agent job and get a comprehensive summary with export recommendations.
+
+USE WHEN:
+- Finishing a content automation pipeline
+- Need job summary with items created
+- Want export format recommendations
+- Getting performance metrics for the job
+
+RETURNS:
+- jobId: Unique job identifier
+- duration: Total job time in milliseconds
+- itemsCreated: Array of all item IDs created
+- relationsCreated: Array of all relation IDs created
+- screenshot: Base64 screenshot (if policy was on_complete)
+- recommendations: Smart export recommendations based on content
+
+EXPORT RECOMMENDATIONS:
+The system analyzes your content and suggests optimal formats:
+- Static content with simple colors → SVG (scalable, small file)
+- Static with gradients/images → PNG (high quality)
+- Animated content → WebM/MP4 for video, GIF for social
+- Print-ready content → PDF with high DPI
+
+EXAMPLE RESPONSE:
+{
+  "jobId": "job_1704067200_abc123",
+  "duration": 2500,
+  "itemsCreated": ["item_1", "item_2", "item_3"],
+  "relationsCreated": ["relation_1"],
+  "recommendations": [
+    {"platform": "instagram", "format": "mp4", "confidence": 0.9, "reason": "Animated content works well as video"}
+  ]
+}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        includeScreenshot: {
+          type: 'boolean',
+          description: 'Force include screenshot in response (default: based on policy)',
+        },
+        analyzeContent: {
+          type: 'boolean',
+          description: 'Analyze content and provide export recommendations (default: true)',
+        },
+      },
+    },
+  },
+
+  {
+    name: 'pinepaper_agent_reset',
+    annotations: {
+      title: 'Agent Reset Canvas',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Fast canvas reset without browser refresh. Much faster than pinepaper_refresh_page.
+
+USE WHEN:
+- Starting a new scene in a batch workflow
+- Clearing canvas between job iterations
+- Need fast reset during automation pipelines
+- Preserving browser state while clearing content
+
+PERFORMANCE:
+- pinepaper_agent_reset: ~200ms (recommended)
+- pinepaper_refresh_page: ~3000ms (browser refresh)
+
+OPTIONS:
+- canvasPreset: Set canvas to platform dimensions
+- backgroundColor: Set background color after reset
+- preserveBackground: Keep existing background (don't reset)
+
+EXAMPLES:
+- Quick reset: {} (just clears canvas)
+- Reset for Instagram: {canvasPreset: "instagram", backgroundColor: "#ffffff"}
+- Reset preserving background: {preserveBackground: true}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        canvasPreset: {
+          type: 'string',
+          enum: ['instagram', 'instagram-story', 'tiktok', 'youtube', 'youtube-thumbnail', 'twitter', 'linkedin', 'web', 'print-a4', 'print-letter'],
+          description: 'Set canvas size to platform preset after reset',
+        },
+        backgroundColor: {
+          type: 'string',
+          description: 'Set background color after reset (e.g., "#ffffff")',
+        },
+        preserveBackground: {
+          type: 'boolean',
+          description: 'Keep existing background generator/color',
+        },
+      },
+    },
+  },
+
+  {
+    name: 'pinepaper_agent_batch_execute',
+    annotations: {
+      title: 'Batch Execute Operations',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Execute multiple operations in a single browser call. Dramatically faster than individual tool calls.
+
+USE WHEN:
+- Creating multiple items in one step
+- Applying animations to many items
+- Need maximum performance
+- Building complex scenes efficiently
+
+PERFORMANCE COMPARISON:
+- 10 individual pinepaper_create_item calls: ~1450ms (10 browser round trips)
+- pinepaper_agent_batch_execute with 10 creates: ~300ms (1 browser round trip)
+
+OPERATION TYPES:
+- create: Create an item (itemType, position, properties)
+- modify: Modify an item (itemId, properties)
+- animate: Animate an item (itemId, animationType, animationOptions)
+- relation: Add a relation (sourceId, targetId, relationType, relationOptions)
+- delete: Delete an item (itemId)
+
+ATOMIC MODE:
+When atomic: true (default), all operations succeed or all fail.
+When atomic: false, operations execute independently (partial success possible).
+
+EXAMPLES:
+- Create 3 circles:
+  {operations: [
+    {type: "create", itemType: "circle", position: {x: 200, y: 300}, properties: {radius: 30, color: "#ef4444"}},
+    {type: "create", itemType: "circle", position: {x: 400, y: 300}, properties: {radius: 30, color: "#22c55e"}},
+    {type: "create", itemType: "circle", position: {x: 600, y: 300}, properties: {radius: 30, color: "#3b82f6"}}
+  ]}
+
+- Create and animate:
+  {operations: [
+    {type: "create", itemType: "star", position: {x: 400, y: 300}, properties: {radius1: 50, radius2: 25, points: 5, color: "#fbbf24"}},
+    {type: "animate", itemId: "$0", animationType: "spin", animationOptions: {speed: 2}}
+  ], atomic: true}
+
+VARIABLE REFERENCES:
+Use "$0", "$1", etc. to reference items created in earlier operations within the same batch.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        operations: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              type: {
+                type: 'string',
+                enum: ['create', 'modify', 'animate', 'relation', 'delete'],
+                description: 'Operation type',
+              },
+              itemType: {
+                type: 'string',
+                description: 'For create: type of item to create',
+              },
+              itemId: {
+                type: 'string',
+                description: 'For modify/animate/delete: target item ID or $N reference',
+              },
+              position: {
+                type: 'object',
+                properties: {
+                  x: { type: 'number' },
+                  y: { type: 'number' },
+                },
+                description: 'Position for create operations',
+              },
+              properties: {
+                type: 'object',
+                description: 'Properties for create/modify operations',
+              },
+              animationType: {
+                type: 'string',
+                description: 'For animate: animation type',
+              },
+              animationOptions: {
+                type: 'object',
+                description: 'For animate: animation options',
+              },
+              sourceId: {
+                type: 'string',
+                description: 'For relation: source item ID',
+              },
+              targetId: {
+                type: 'string',
+                description: 'For relation: target item ID',
+              },
+              relationType: {
+                type: 'string',
+                description: 'For relation: relation type',
+              },
+              relationOptions: {
+                type: 'object',
+                description: 'For relation: relation options',
+              },
+            },
+            required: ['type'],
+          },
+          description: 'Array of operations to execute',
+        },
+        atomic: {
+          type: 'boolean',
+          description: 'If true, all operations succeed or all fail (default: true)',
+        },
+      },
+      required: ['operations'],
+    },
+  },
+
+  {
+    name: 'pinepaper_agent_export',
+    annotations: {
+      title: 'Smart Export',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Smart export with automatic format detection and platform optimization.
+
+USE WHEN:
+- Exporting content for a specific social media platform
+- Need optimal format automatically selected
+- Want platform-specific dimensions and quality
+- Exporting for print or web
+
+PLATFORMS & OPTIMAL FORMATS:
+| Platform        | Dimensions | Static | Animated |
+|-----------------|------------|--------|----------|
+| instagram       | 1080x1080  | PNG    | MP4      |
+| instagram-story | 1080x1920  | PNG    | MP4      |
+| tiktok          | 1080x1920  | PNG    | MP4@60fps|
+| youtube         | 1920x1080  | PNG    | MP4      |
+| youtube-thumbnail| 1280x720  | PNG    | PNG      |
+| twitter         | 1200x675   | PNG    | GIF      |
+| linkedin        | 1200x627   | PNG    | GIF      |
+| web             | flexible   | SVG    | SVG      |
+| print-a4        | 2480x3508  | PDF    | PDF      |
+| print-letter    | 2550x3300  | PDF    | PDF      |
+
+FORMAT OVERRIDE:
+You can specify a format to override auto-detection:
+- svg: Scalable vector (best for web, smallest file)
+- png: High quality raster (best for static social media)
+- gif: Animated (limited to 256 colors)
+- mp4: Video (best quality animations)
+- webm: Video (smaller file, modern browsers)
+- pdf: Print-ready document
+
+QUALITY LEVELS:
+- draft: Fast export, lower quality (good for previews)
+- standard: Balanced quality and file size (default)
+- high: Maximum quality (best for final export)
+
+EXAMPLES:
+- Auto-export for Instagram: {platform: "instagram"}
+- Force SVG export: {platform: "web", format: "svg"}
+- High-quality print: {platform: "print-a4", quality: "high"}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        platform: {
+          type: 'string',
+          enum: ['instagram', 'instagram-story', 'tiktok', 'youtube', 'youtube-thumbnail', 'twitter', 'linkedin', 'web', 'print-a4', 'print-letter'],
+          description: 'Target platform for export',
+        },
+        format: {
+          type: 'string',
+          enum: ['svg', 'png', 'gif', 'mp4', 'webm', 'pdf'],
+          description: 'Override format (auto-detected if not specified)',
+        },
+        quality: {
+          type: 'string',
+          enum: ['draft', 'standard', 'high'],
+          description: 'Export quality level (default: standard)',
+        },
+      },
+      required: ['platform'],
+    },
+  },
+
+  {
+    name: 'pinepaper_agent_analyze',
+    annotations: {
+      title: 'Analyze Content',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Analyze canvas content to get export recommendations and content insights.
+
+USE WHEN:
+- Need to know what formats work best for current content
+- Want to understand content complexity
+- Checking if content has animations
+- Getting platform recommendations
+
+ANALYSIS INCLUDES:
+- hasAnimations: Whether content has animations
+- animationTypes: Types of animations used
+- colorComplexity: simple | gradient | complex
+- itemCount: Number of items on canvas
+- canvasSize: Current canvas dimensions
+- hasRelations: Whether items have relationships
+- relationTypes: Types of relations used
+- hasGradients: Whether gradients are used
+- hasShadows: Whether shadows are used
+- hasText: Whether text items exist
+- hasImages: Whether raster images exist
+
+RECOMMENDATIONS:
+Based on analysis, returns optimal:
+- platform: Best target platforms
+- format: Recommended export formats
+- warnings: Any potential issues
+
+EXAMPLE RESPONSE:
+{
+  "analysis": {
+    "hasAnimations": true,
+    "animationTypes": ["orbit", "pulse"],
+    "colorComplexity": "gradient",
+    "itemCount": 8,
+    "canvasSize": {"width": 1080, "height": 1080}
+  },
+  "recommendations": [
+    {"platform": "instagram", "format": "mp4", "confidence": 0.9},
+    {"platform": "web", "format": "webm", "confidence": 0.85}
+  ]
+}`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // LAYER 1 — ATOMS: CANVAS PRESETS TOOL
   // ---------------------------------------------------------------------------
   {
     name: 'pinepaper_get_canvas_presets',
@@ -5947,7 +5996,7 @@ RETURNS:
       idempotentHint: true,
       openWorldHint: false,
     },
-    description: `List all available canvas presets with their dimensions.
+    description: `[Utility] List all available canvas presets with their dimensions.
 
 USE WHEN:
 - Setting up canvas for specific platforms (YouTube, Instagram, TikTok, etc.)
@@ -5969,7 +6018,131 @@ Array of presets with: key, name, width, height, aspectRatio, category`,
   },
 
   // ---------------------------------------------------------------------------
-  // PAPER.JS DIRECT ACCESS TOOLS
+  // COMPATIBILITY: P5.JS TOOLS
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_p5_draw',
+    annotations: {
+      title: 'p5.js Draw',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Execute p5.js-style drawing code on the PinePaper canvas.
+
+AI assistants can use familiar p5.js syntax - the code is translated to Paper.js automatically.
+This is a SUBSET of p5.js functions optimized for static drawings.
+
+AVAILABLE FUNCTIONS:
+
+Shapes:
+- circle(x, y, diameter) - Draw a circle (note: uses diameter, not radius)
+- ellipse(x, y, width, [height]) - Draw an ellipse
+- rect(x, y, width, height, [cornerRadius]) - Draw a rectangle
+- line(x1, y1, x2, y2) - Draw a line between two points
+- triangle(x1, y1, x2, y2, x3, y3) - Draw a triangle
+- quad(x1, y1, x2, y2, x3, y3, x4, y4) - Draw a quadrilateral
+- arc(x, y, width, height, startAngle, stopAngle) - Draw an arc (angles in radians)
+- point(x, y) - Draw a single point
+
+Style:
+- fill(r, g, b) or fill(gray) or fill('#hex') - Set fill color for subsequent shapes
+- noFill() - Disable fill for subsequent shapes
+- stroke(r, g, b) or stroke('#hex') - Set stroke color
+- noStroke() - Disable stroke
+- strokeWeight(weight) - Set stroke width in pixels
+- background(r, g, b) or background('#hex') - Set canvas background color
+
+Math:
+- random(min, max) or random(max) - Random number in range
+- map(value, start1, stop1, start2, stop2) - Re-map a number from one range to another
+- constrain(value, min, max) - Limit a value to a range
+- dist(x1, y1, x2, y2) - Calculate distance between two points
+- lerp(start, stop, amount) - Linear interpolation between two values
+- radians(degrees) - Convert degrees to radians
+- degrees(radians) - Convert radians to degrees
+
+Canvas Properties:
+- width - Canvas width in pixels
+- height - Canvas height in pixels
+
+Mode Functions:
+- rectMode(CENTER|CORNER) - Set rectangle positioning mode
+- ellipseMode(CENTER|CORNER) - Set ellipse positioning mode
+
+Constants:
+- PI, TWO_PI, HALF_PI, QUARTER_PI - Math constants
+- CENTER, CORNER - Mode constants
+
+NOT SUPPORTED (use native PinePaper tools instead):
+- setup()/draw() animation loop - Use pinepaper_animate or pinepaper_add_relation
+- noise() - Perlin noise not available
+- text() - Use pinepaper_create_item with type: 'text'
+- loadImage()/image() - Use pinepaper_import_svg
+- push()/pop()/translate()/rotate()/scale() - Use pinepaper_modify_item
+- beginShape()/vertex()/endShape() - Use pinepaper_create_item with type: 'path'
+
+USAGE:
+- Code runs directly - NO setup() or draw() wrapper needed
+- Items created are automatically registered with PinePaper's ItemRegistry
+- All items are selectable, animatable, and exportable
+- State (fill, stroke) persists between calls within the same code block
+
+EXAMPLE - Random Circles:
+\`\`\`
+background(30);
+noStroke();
+for (let i = 0; i < 20; i++) {
+  fill(random(255), random(255), random(255));
+  circle(random(width), random(height), random(20, 80));
+}
+\`\`\`
+
+EXAMPLE - Gradient Grid:
+\`\`\`
+background(20);
+noStroke();
+const cols = 10;
+const rows = 10;
+const cellW = width / cols;
+const cellH = height / rows;
+for (let i = 0; i < cols; i++) {
+  for (let j = 0; j < rows; j++) {
+    const r = map(i, 0, cols, 50, 255);
+    const b = map(j, 0, rows, 50, 255);
+    fill(r, 100, b);
+    rect(i * cellW, j * cellH, cellW - 2, cellH - 2);
+  }
+}
+\`\`\`
+
+EXAMPLE - Concentric Circles:
+\`\`\`
+background(240);
+noFill();
+strokeWeight(2);
+const centerX = width / 2;
+const centerY = height / 2;
+for (let i = 10; i > 0; i--) {
+  stroke(map(i, 0, 10, 0, 200), 50, map(i, 0, 10, 200, 50));
+  circle(centerX, centerY, i * 50);
+}
+\`\`\``,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        code: {
+          type: 'string',
+          description: 'p5.js-style drawing code to execute',
+        },
+      },
+      required: ['code'],
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // ESCAPE HATCH: PAPER.JS DIRECT ACCESS TOOLS
   // ---------------------------------------------------------------------------
   {
     name: 'pinepaper_register_item',
@@ -6010,6 +6183,7 @@ EXAMPLES:
       required: ['itemJson', 'itemType'],
     },
   },
+
 ];
 
 /**

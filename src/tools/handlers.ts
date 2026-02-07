@@ -96,6 +96,10 @@ import {
   ApplyAnimatedMaskInputSchema,
   ApplyCustomMaskInputSchema,
   RemoveMaskInputSchema,
+  // Template schemas
+  ApplyTemplateInputSchema,
+  // Image import schemas
+  ImportImageInputSchema,
   ErrorCodes,
   RelationType,
   ItemType,
@@ -2006,6 +2010,26 @@ All PinePaper tools will work in **code-only mode**:
       }
 
       // -----------------------------------------------------------------------
+      // TEMPLATE TOOLS
+      // -----------------------------------------------------------------------
+
+      case 'pinepaper_apply_template': {
+        const parsed = ApplyTemplateInputSchema.parse(args);
+        const code = codeGenerator.generateApplyTemplate(parsed);
+        return executeOrGenerate(code, 'Applies template', options, 'pinepaper_apply_template');
+      }
+
+      // -----------------------------------------------------------------------
+      // IMAGE IMPORT TOOLS
+      // -----------------------------------------------------------------------
+
+      case 'pinepaper_import_image': {
+        const parsed = ImportImageInputSchema.parse(args);
+        const code = codeGenerator.generateImportImage(parsed);
+        return executeOrGenerate(code, 'Imports image', options, 'pinepaper_import_image');
+      }
+
+      // -----------------------------------------------------------------------
       // UNKNOWN TOOL
       // -----------------------------------------------------------------------
       default: {
@@ -2141,6 +2165,10 @@ All PinePaper tools will work in **code-only mode**:
             'pinepaper_font_remove_overlap',
             'pinepaper_font_correct_direction',
             'pinepaper_font_cleanup_path',
+            // Template tools
+            'pinepaper_apply_template',
+            // Image import tools
+            'pinepaper_import_image',
             // Paper.js direct access tools
             'pinepaper_register_item',
           ],
