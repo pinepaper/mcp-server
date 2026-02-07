@@ -1464,7 +1464,7 @@ if (typeof app.generators !== 'undefined' && app.generators['${backgroundGenerat
     const targetItem = app.itemRegistry.get(targetId);
     if (targetItem) {
       const params = ${paramsStr};
-      app.animationManager.addAnimation(targetItem, '${type}', params);
+      app.animate(targetItem, { animationType: '${type}', ...params });
       results.animations.push({ target: '${target}', type: '${type}' });
     }
   }
@@ -2062,8 +2062,8 @@ if (app.historyManager) app.historyManager.saveState();
         const pos = op.position || { x: 400, y: 300 };
         const props = JSON.stringify(op.properties || {});
         return `
-const item = app.createItem('${op.itemType}', { x: ${pos.x}, y: ${pos.y} }, ${props});
-const itemId = app.itemRegistry.register(item, '${op.itemType}');
+const item = app.create('${op.itemType}', { position: { x: ${pos.x}, y: ${pos.y} }, ...${props} });
+const itemId = item.data && item.data.id ? item.data.id : app.registerItem(item, '${op.itemType}', { source: 'mcp-batch' });
 return { itemId };
 `;
 
@@ -2074,9 +2074,8 @@ return { itemId };
         const modifyProps = JSON.stringify(op.properties || {});
         return `
 const targetId = ${itemRef};
-const item = app.getItemById(targetId);
-if (!item) throw new Error('Item not found: ' + targetId);
-Object.assign(item, ${modifyProps});
+app.select(targetId);
+app.modify(${modifyProps});
 return { itemId: targetId, modified: true };
 `;
 
@@ -2089,7 +2088,7 @@ return { itemId: targetId, modified: true };
 const targetId = ${animItemRef};
 const item = app.getItemById(targetId);
 if (!item) throw new Error('Item not found: ' + targetId);
-app.animateItem(item, '${op.animationType}', ${animOpts});
+app.animate(item, { animationType: '${op.animationType}', ...${animOpts} });
 return { itemId: targetId, animationType: '${op.animationType}' };
 `;
 
