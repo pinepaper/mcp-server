@@ -33,6 +33,7 @@ To fix mistakes: use modify/delete operations, or start a NEW job with clearCanv
 RULES:
 - NEVER restart the pipeline — one start_job, one batch_execute, one end_job
 - ALL operations go in batch_execute — canvas, background, items, animation, masks, effects, playback
+- EXCEPTION: Diagrams (flowcharts, UML) use pinepaper_create_diagram_shape + pinepaper_connect, NOT batch_execute
 - Use generators for rich backgrounds — the built-in templates are limited, generators create much better visuals
 - Use "$0", "$1" to reference items by creation order within the batch
 
@@ -84,11 +85,18 @@ Color: dark bg (#0f172a) + bright accents (#f472b6, #818cf8, #fbbf24)
 Scale: main subject 40-60% of canvas, supporting elements smaller
 Spacing: distribute across canvas with breathing room, don't cluster
 
+─── DIAGRAMS (flowcharts, UML — do NOT use batch_execute) ───
+
+Diagrams use their own tools, not batch_execute:
+  pinepaper_create_diagram_shape → pinepaper_connect → pinepaper_auto_layout
+Shapes: process (rect), decision (diamond), terminal (rounded), data, document, database, cloud, server
+Workflow: create shapes with positions → connect with arrows → optional auto_layout
+See pinepaper://docs/diagrams for full examples.
+
 ─── CANVAS & EXPORT ───
 
 Presets: instagram (1080x1080), youtube (1920x1080), tiktok (1080x1920), twitter (1200x675)
 Export: pinepaper_agent_export (SVG/PNG/GIF/MP4/WebM/PDF), pinepaper_export_svg
-More: maps, diagrams, fonts, filters, triggers — see individual tool descriptions.
 */
 
 // =============================================================================
@@ -5629,7 +5637,9 @@ EXAMPLES:
       idempotentHint: false,
       openWorldHint: false,
     },
-    description: `Execute ALL operations in a single call. This is the ONLY tool needed for building scenes — canvas setup, backgrounds, items, animations, masks, effects, and playback all go here.
+    description: `Execute ALL operations in a single call for building animated scenes — canvas setup, backgrounds, items, animations, masks, effects, and playback.
+
+NOTE: For diagrams (flowcharts, UML), use pinepaper_create_diagram_shape + pinepaper_connect instead.
 
 ⚠️ EVERY operation executes LIVE on the canvas. Calling this twice DOUBLES all items. Call ONCE per pipeline.
 
