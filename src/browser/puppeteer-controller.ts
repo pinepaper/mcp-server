@@ -77,6 +77,7 @@ export class PinePaperBrowserController {
   private config: Required<BrowserControllerConfig>;
   private isConnected = false;
   private isAgentMode = false;
+  private connectingPromise: Promise<void> | null = null;
 
   constructor(config: BrowserControllerConfig = {}) {
     // Ensure URL points to /editor where the code console and API are available
@@ -152,12 +153,20 @@ export class PinePaperBrowserController {
    * When agentMode is enabled (default), this automatically uses connectAgent().
    */
   async connect(): Promise<void> {
+    // Prevent concurrent connection attempts (race condition when multiple tools fire at once)
+    if (this.connectingPromise) {
+      console.error('[PinePaper] Connection already in progress, waiting...');
+      return this.connectingPromise;
+    }
+
     console.error(`[PinePaper] connect() called - agentMode=${this.config.agentMode}, headless=${this.config.headless}`);
 
     // If agent mode is configured, delegate to connectAgent()
     if (this.config.agentMode) {
       console.error('[PinePaper] Delegating to connectAgent()');
-      return this.connectAgent({ headless: this.config.headless });
+      this.connectingPromise = this.connectAgent({ headless: this.config.headless })
+        .finally(() => { this.connectingPromise = null; });
+      return this.connectingPromise;
     }
 
     console.error('[PinePaper] Using standard connect (non-agent mode)');
@@ -262,6 +271,7 @@ export class PinePaperBrowserController {
     this.browser = null;
     this.page = null;
     this.isConnected = false;
+    this.connectingPromise = null;
     console.error('[PinePaper] Disconnected from browser');
   }
 

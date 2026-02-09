@@ -85,6 +85,92 @@ export const mockPatternGenerator = {
   },
 };
 
+// Phase 2: New generators
+
+export const mockBokehGenerator = {
+  generatorName: 'drawBokeh' as const,
+  params: {
+    count: 30,
+    colors: ['#f472b6', '#818cf8', '#34d399', '#fbbf24'],
+    bgColor: '#0f172a',
+    minRadius: 10,
+    maxRadius: 60,
+    shadowBlur: 20,
+    distribution: 'poisson' as const,
+    driftAnimation: true,
+  },
+};
+
+export const mockGradientMeshGenerator = {
+  generatorName: 'drawGradientMesh' as const,
+  params: {
+    colors: ['#ec4899', '#8b5cf6', '#06b6d4'],
+    bgColor: '#0f0f23',
+    blobCount: 5,
+    blendMode: 'screen',
+    drift: true,
+  },
+};
+
+export const mockGeometricAbstractGenerator = {
+  generatorName: 'drawGeometricAbstract' as const,
+  params: {
+    colors: ['#f43f5e', '#3b82f6', '#10b981', '#f59e0b'],
+    bgColor: '#1e1b4b',
+    shapeCount: 12,
+    blendMode: 'multiply',
+    rotation: true,
+  },
+};
+
+export const mockWindFieldGenerator = {
+  generatorName: 'drawWindField' as const,
+  params: {
+    particleCount: 200,
+    colors: ['#e0f2fe', '#bae6fd', '#7dd3fc'],
+    bgColor: '#0c4a6e',
+    direction: 45,
+    turbulence: 0.5,
+    trailLength: 30,
+    speed: 1.5,
+  },
+};
+
+export const mockFluidFlowGenerator = {
+  generatorName: 'drawFluidFlow' as const,
+  params: {
+    streamCount: 8,
+    colors: ['#67e8f9', '#a78bfa', '#f9a8d4'],
+    bgColor: '#0f172a',
+    depthLayers: 3,
+    speed: 0.8,
+  },
+};
+
+export const mockOrganicFlowGenerator = {
+  generatorName: 'drawOrganicFlow' as const,
+  params: {
+    layerCount: 4,
+    colors: ['#34d399', '#6ee7b7', '#a7f3d0', '#d1fae5'],
+    bgColor: '#064e3b',
+    blendMode: 'screen',
+    fillToBottom: true,
+    animated: true,
+  },
+};
+
+export const mockNoiseTextureGenerator = {
+  generatorName: 'drawNoiseTexture' as const,
+  params: {
+    noiseType: 'perlin' as const,
+    colors: ['#94a3b8', '#64748b'],
+    bgColor: '#1e293b',
+    scale: 0.01,
+    density: 0.7,
+    animated: true,
+  },
+};
+
 // Collection of all mock generators
 export const allMockGenerators = [
   mockSunburstGenerator,
@@ -95,4 +181,11 @@ export const allMockGenerators = [
   mockCircuitGenerator,
   mockStackedCirclesGenerator,
   mockPatternGenerator,
+  mockBokehGenerator,
+  mockGradientMeshGenerator,
+  mockGeometricAbstractGenerator,
+  mockWindFieldGenerator,
+  mockFluidFlowGenerator,
+  mockOrganicFlowGenerator,
+  mockNoiseTextureGenerator,
 ];
