@@ -269,6 +269,8 @@ For AI agents, use the batch pipeline for maximum efficiency:
 
 See the \`pinepaper_agent_batch_execute\` tool description for full operation reference.
 
+**Note:** Diagrams (flowcharts, UML) use their own tools — \`pinepaper_create_diagram_shape\` + \`pinepaper_connect\` — not batch_execute. See \`pinepaper://docs/diagrams\`.
+
 ## Detailed Guides
 
 - Maps: Read \`pinepaper://docs/map-tools\`
