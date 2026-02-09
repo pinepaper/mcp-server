@@ -401,6 +401,7 @@ export type ExecuteCustomCodeInput = z.infer<typeof ExecuteCustomCodeInputSchema
 // =============================================================================
 
 export const GeneratorNameSchema = z.enum([
+  // Original generators (Phase 1 — enhanced)
   'drawSunburst',
   'drawSunsetScene',
   'drawGrid',
@@ -408,16 +409,30 @@ export const GeneratorNameSchema = z.enum([
   'drawCircuit',
   'drawWaves',
   'drawPattern',
+  // New generators (Phase 2)
+  'drawBokeh',
+  'drawGradientMesh',
+  'drawGeometricAbstract',
+  'drawWindField',
+  'drawFluidFlow',
+  'drawOrganicFlow',
+  'drawNoiseTexture',
 ]).describe('Background generator name');
 
 export type GeneratorName = z.infer<typeof GeneratorNameSchema>;
 
-// Generator parameter schemas
+// ---------------------------------------------------------------------------
+// Generator parameter schemas — Phase 1 (enhanced existing)
+// ---------------------------------------------------------------------------
+
 export const SunburstParamsSchema = z.object({
   rayCount: z.number().optional().default(16).describe('Number of rays'),
   colors: z.array(ColorSchema).optional().default(['#FF6B6B', '#4ECDC4']).describe('Ray colors'),
   bgColor: ColorSchema.optional().default('#1a1a2e').describe('Background color'),
   animated: z.boolean().optional().default(true).describe('Enable rotation animation'),
+  opacity: z.number().min(0).max(1).optional().describe('Overall opacity'),
+  rayGap: z.number().optional().describe('Gap between rays in degrees'),
+  gradientRays: z.boolean().optional().describe('Radial gradient per ray'),
 });
 
 export const GridParamsSchema = z.object({
@@ -426,6 +441,12 @@ export const GridParamsSchema = z.object({
   lineColor: ColorSchema.optional().default('#374151').describe('Line/dot color'),
   bgColor: ColorSchema.optional().default('#1f2937').describe('Background color'),
   lineWidth: z.number().optional().default(1).describe('Line thickness'),
+  opacity: z.number().min(0).max(1).optional().describe('Overall opacity'),
+  gap: z.number().optional().describe('Pixel gap between cells'),
+  randomRotation: z.boolean().optional().describe('Random rotation per cell'),
+  colorMode: z.enum(['checkerboard', 'gradient', 'random', 'rows', 'columns']).optional().describe('Cell coloring mode'),
+  strokeColor: ColorSchema.optional().describe('Cell stroke color'),
+  strokeWidth: z.number().optional().describe('Cell stroke width'),
 });
 
 export const WavesParamsSchema = z.object({
@@ -435,6 +456,11 @@ export const WavesParamsSchema = z.object({
   frequency: z.number().optional().default(2).describe('Wave frequency'),
   bgColor: ColorSchema.optional().default('#0f172a').describe('Background color'),
   animated: z.boolean().optional().default(true).describe('Animate waves'),
+  opacity: z.number().min(0).max(1).optional().describe('Overall opacity'),
+  fill: z.boolean().optional().describe('Fill between adjacent waves'),
+  fillOpacity: z.number().min(0).max(1).optional().describe('Fill opacity between waves'),
+  amplitudeVariation: z.number().optional().describe('Amplitude variation between waves'),
+  blendMode: z.string().optional().describe('CSS blend mode (e.g. screen, multiply)'),
 });
 
 export const CircuitParamsSchema = z.object({
@@ -444,6 +470,119 @@ export const CircuitParamsSchema = z.object({
   density: z.number().min(0).max(1).optional().default(0.5).describe('Circuit complexity'),
   animated: z.boolean().optional().default(true).describe('Enable bolt animation'),
   boltColor: ColorSchema.optional().default('#fbbf24').describe('Animated bolt color'),
+  traceOpacity: z.number().min(0).max(1).optional().describe('Trace line opacity'),
+  nodeOpacity: z.number().min(0).max(1).optional().describe('Node opacity'),
+  diagonalPaths: z.boolean().optional().describe('Allow 45-degree trace paths'),
+  chipDensity: z.enum(['auto', 'none', 'low', 'medium', 'high']).optional().describe('IC chip density'),
+});
+
+export const StackedCirclesParamsSchema = z.object({
+  count: z.number().optional().default(8).describe('Number of circles'),
+  colors: z.array(ColorSchema).optional().describe('Circle colors'),
+  distribution: z.enum(['random', 'poisson', 'golden']).optional().default('random').describe('Circle distribution algorithm'),
+  opacityMin: z.number().min(0).max(1).optional().describe('Minimum per-circle opacity'),
+  opacityMax: z.number().min(0).max(1).optional().describe('Maximum per-circle opacity'),
+  blendMode: z.string().optional().describe('CSS blend mode (e.g. screen, multiply)'),
+  strokeWidth: z.number().optional().describe('Circle stroke width'),
+  strokeColor: ColorSchema.optional().describe('Circle stroke color'),
+  sizeGradient: z.boolean().optional().describe('Gradually decrease circle size'),
+  animationType: z.enum(['pulse', 'float', 'none']).optional().describe('Circle animation type'),
+});
+
+export const SunsetSceneParamsSchema = z.object({
+  sunColor: ColorSchema.optional().describe('Sun color'),
+  skyColors: z.array(ColorSchema).optional().describe('Sky gradient colors'),
+  cloudCount: z.number().optional().describe('Number of clouds'),
+  skyOpacity: z.number().min(0).max(1).optional().describe('Sky layer opacity'),
+  starCount: z.number().optional().describe('Number of stars'),
+  starColor: ColorSchema.optional().describe('Star color'),
+  reflectionEnabled: z.boolean().optional().describe('Enable water reflection'),
+  reflectionOpacity: z.number().min(0).max(1).optional().describe('Reflection opacity'),
+});
+
+export const PatternParamsSchema = z.object({
+  patternType: z.string().optional().describe('Pattern type (e.g. hexagon)'),
+  size: z.number().optional().describe('Pattern element size'),
+  color: ColorSchema.optional().describe('Pattern color'),
+  bgColor: ColorSchema.optional().describe('Background color'),
+  opacity: z.number().min(0).max(1).optional().describe('Overall opacity'),
+  blendMode: z.string().optional().describe('CSS blend mode'),
+  layers: z.number().min(1).max(5).optional().describe('Concentric orbit ring count (1-5)'),
+  layerScaleDecay: z.number().optional().describe('Scale decay factor between layers'),
+});
+
+// ---------------------------------------------------------------------------
+// Generator parameter schemas — Phase 2 (new generators)
+// ---------------------------------------------------------------------------
+
+export const BokehParamsSchema = z.object({
+  count: z.number().optional().describe('Number of bokeh circles'),
+  colors: z.array(ColorSchema).optional().describe('Circle colors'),
+  bgColor: ColorSchema.optional().describe('Background color'),
+  minRadius: z.number().optional().describe('Minimum circle radius'),
+  maxRadius: z.number().optional().describe('Maximum circle radius'),
+  shadowBlur: z.number().optional().describe('Soft-focus blur amount'),
+  distribution: z.enum(['random', 'poisson']).optional().describe('Circle distribution'),
+  driftAnimation: z.boolean().optional().describe('Enable slow drift animation'),
+  opacity: z.number().min(0).max(1).optional().describe('Overall opacity'),
+});
+
+export const GradientMeshParamsSchema = z.object({
+  colors: z.array(ColorSchema).optional().describe('Gradient blob colors'),
+  bgColor: ColorSchema.optional().describe('Background color'),
+  blobCount: z.number().optional().describe('Number of gradient blobs'),
+  blendMode: z.string().optional().describe('CSS blend mode (default: screen)'),
+  drift: z.boolean().optional().describe('Enable slow drift animation'),
+  opacity: z.number().min(0).max(1).optional().describe('Overall opacity'),
+});
+
+export const GeometricAbstractParamsSchema = z.object({
+  colors: z.array(ColorSchema).optional().describe('Shape colors'),
+  bgColor: ColorSchema.optional().describe('Background color'),
+  shapeCount: z.number().optional().describe('Number of shapes'),
+  blendMode: z.string().optional().describe('CSS blend mode'),
+  rotation: z.boolean().optional().describe('Enable rotation animation'),
+  opacity: z.number().min(0).max(1).optional().describe('Overall opacity'),
+});
+
+export const WindFieldParamsSchema = z.object({
+  particleCount: z.number().optional().describe('Number of wind particles'),
+  colors: z.array(ColorSchema).optional().describe('Particle colors'),
+  bgColor: ColorSchema.optional().describe('Background color'),
+  direction: z.number().optional().describe('Wind direction in degrees'),
+  turbulence: z.number().optional().describe('Noise turbulence amount'),
+  trailLength: z.number().optional().describe('Particle trail length'),
+  speed: z.number().optional().describe('Particle speed'),
+  opacity: z.number().min(0).max(1).optional().describe('Overall opacity'),
+});
+
+export const FluidFlowParamsSchema = z.object({
+  streamCount: z.number().optional().describe('Number of fluid streams'),
+  colors: z.array(ColorSchema).optional().describe('Stream colors'),
+  bgColor: ColorSchema.optional().describe('Background color'),
+  depthLayers: z.number().optional().describe('Number of depth layers'),
+  speed: z.number().optional().describe('Flow animation speed'),
+  opacity: z.number().min(0).max(1).optional().describe('Overall opacity'),
+});
+
+export const OrganicFlowParamsSchema = z.object({
+  layerCount: z.number().optional().describe('Number of aurora/silk layers'),
+  colors: z.array(ColorSchema).optional().describe('Layer colors'),
+  bgColor: ColorSchema.optional().describe('Background color'),
+  blendMode: z.string().optional().describe('CSS blend mode (default: screen)'),
+  fillToBottom: z.boolean().optional().describe('Fill layers to bottom edge'),
+  animated: z.boolean().optional().describe('Enable flow animation'),
+  opacity: z.number().min(0).max(1).optional().describe('Overall opacity'),
+});
+
+export const NoiseTextureParamsSchema = z.object({
+  noiseType: z.enum(['perlin', 'grain', 'stipple']).optional().describe('Noise algorithm'),
+  colors: z.array(ColorSchema).optional().describe('Noise colors'),
+  bgColor: ColorSchema.optional().describe('Background color'),
+  scale: z.number().optional().describe('Noise scale'),
+  density: z.number().optional().describe('Noise density'),
+  animated: z.boolean().optional().describe('Enable animated opacity shift'),
+  opacity: z.number().min(0).max(1).optional().describe('Overall opacity'),
 });
 
 // =============================================================================
@@ -1354,14 +1493,18 @@ export type AgentResetInput = z.infer<typeof AgentResetInputSchema>;
  * Batch operation type
  */
 export const AgentBatchOperationTypeSchema = z.enum([
-  'create', 'modify', 'delete', 'animate', 'relation', 'canvas', 'generator',
+  'set_canvas_size', 'set_background', 'execute_generator',
+  'create', 'modify', 'delete',
+  'animate', 'keyframe_animate', 'relation',
+  'apply_mask', 'apply_effect',
+  'play_timeline',
 ]).describe('Type of batch operation');
 
 /**
- * Single batch operation
+ * Single batch operation — all fields optional, used per operation type
  */
 export const AgentBatchOperationSchema = z.object({
-  type: z.enum(['create', 'modify', 'animate', 'relation', 'delete']).describe('Operation type'),
+  type: AgentBatchOperationTypeSchema,
   // Create operation fields
   itemType: z.string().optional().describe('Item type for create operations'),
   position: z.object({
@@ -1369,7 +1512,7 @@ export const AgentBatchOperationSchema = z.object({
     y: z.number(),
   }).optional().describe('Position for create operations'),
   properties: z.record(z.unknown()).optional().describe('Properties for create/modify operations'),
-  // Modify/Animate/Delete operation fields
+  // Modify/Animate/Delete/Keyframe/Mask/Effect target
   itemId: z.string().optional().describe('Target item ID or $N reference'),
   // Animate operation fields
   animationType: z.string().optional().describe('Animation type for animate operations'),
@@ -1379,6 +1522,33 @@ export const AgentBatchOperationSchema = z.object({
   targetId: z.string().optional().describe('Target item ID for relations'),
   relationType: z.string().optional().describe('Relation type'),
   relationOptions: z.record(z.unknown()).optional().describe('Relation options'),
+  // Set background fields
+  backgroundColor: z.string().optional().describe('Background color for set_background'),
+  // Execute generator fields
+  generatorName: z.string().optional().describe('Generator name for execute_generator'),
+  generatorParams: z.record(z.unknown()).optional().describe('Generator parameters'),
+  // Set canvas size fields
+  width: z.number().optional().describe('Canvas width for set_canvas_size'),
+  height: z.number().optional().describe('Canvas height for set_canvas_size'),
+  preset: z.string().optional().describe('Canvas preset for set_canvas_size (e.g. instagram, youtube)'),
+  // Keyframe animate fields
+  keyframes: z.array(z.object({
+    time: z.number(),
+    properties: z.record(z.unknown()),
+    easing: z.string().optional(),
+  })).optional().describe('Keyframes for keyframe_animate [{time, properties, easing}]'),
+  duration: z.number().optional().describe('Duration in seconds for keyframe_animate or play_timeline'),
+  loop: z.boolean().optional().describe('Loop for keyframe_animate or play_timeline'),
+  // Apply mask fields
+  maskPreset: z.string().optional().describe('Mask preset for apply_mask (wipeLeft, wipeRight, wipeUp, wipeDown, iris, irisOut, star, heart, curtainHorizontal, curtainVertical, cinematic, diagonalWipe, revealUp, revealDown)'),
+  maskType: z.string().optional().describe('Mask shape for apply_mask (rectangle, circle, ellipse, star, triangle, hexagon, heart, rounded)'),
+  maskOptions: z.record(z.unknown()).optional().describe('Mask options'),
+  // Apply effect fields
+  effectType: z.string().optional().describe('Effect type for apply_effect (sparkle, blast)'),
+  effectParams: z.record(z.unknown()).optional().describe('Effect parameters'),
+  // Play timeline fields
+  action: z.string().optional().describe('Timeline action for play_timeline (play, stop, seek)'),
+  time: z.number().optional().describe('Seek time for play_timeline'),
 }).describe('Single batch operation');
 
 export type AgentBatchOperation = z.infer<typeof AgentBatchOperationSchema>;

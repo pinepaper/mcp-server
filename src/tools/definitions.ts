@@ -15,105 +15,80 @@ import { I18nManager } from '../i18n/index.js';
 // AI AGENT GUIDE
 // =============================================================================
 /*
-RULES (violating these wastes the conversation):
-1. ONE design per conversation — complex designs exhaust context on the second attempt.
-2. Read docs once, then EXECUTE — re-reading burns tokens for no gain.
-3. NEVER use pinepaper_modify_item for animations — it cannot set keyframes.
-4. Take ONE screenshot at the end — not after every operation.
-5. Use pinepaper_create_scene for 3+ items — individual create calls are 4-8x slower.
+WORKFLOW — Create → Validate → Iterate:
 
-BUILD ORDER: Canvas size → Items → Animate items → Export
+1. pinepaper_agent_start_job (clearCanvas: true, canvasPreset)
+2. pinepaper_agent_batch_execute — ONE call with ALL operations:
+     set_canvas_size → set_background / execute_generator → create items → animate / keyframe_animate → relation → apply_mask → apply_effect → play_timeline
+3. pinepaper_agent_end_job — returns screenshot
+4. Show screenshot to user for validation
+5. If user wants changes → modify specific items or start a new job
 
-─── ITEMS (first-class citizens) ───
+⚠️ CRITICAL — Every operation is LIVE on the canvas:
+Every create, animate, relation, or generator call IMMEDIATELY executes on the connected browser canvas.
+Calling the same operation twice creates DUPLICATE elements. There is no "preview" — it's all live.
+If you restart the pipeline or re-call batch_execute, you DOUBLE every item on the canvas.
+To fix mistakes: use modify/delete operations, or start a NEW job with clearCanvas: true.
 
-Everything is a registered item with a registryId. Items are the atoms — all animation
-mechanisms act ON items. create_scene assigns sequential IDs: item_1, item_2, item_3, ...
+RULES:
+- NEVER restart the pipeline — one start_job, one batch_execute, one end_job
+- ALL operations go in batch_execute — canvas, background, items, animation, masks, effects, playback
+- Use generators for rich backgrounds — the built-in templates are limited, generators create much better visuals
+- Use "$0", "$1" to reference items by creation order within the batch
 
-Create:
-  pinepaper_create_item       Single item (circle, rectangle, star, text, line, polygon)
-  pinepaper_batch_create      Multiple items at custom positions
-  pinepaper_create_scene      Items + relations + loops in one atomic call (PREFERRED for 3+)
+─── BATCH OPERATIONS (12 types, in order) ───
 
-Import (become registered items — get itemIds, participate in all animations):
-  pinepaper_search_assets + pinepaper_import_asset   SVG icons from 850k+ repository
-  pinepaper_import_svg        SVG from URL
-  pinepaper_import_image      Raster image from URL
-Assets available: icons, arrows, animals, vehicles, food, flags, UI elements.
-NOT available: specific people, brand logos, photographs. If search fails → build with shapes.
+CANVAS:  set_canvas_size (width/height or preset) → set_background (color) → execute_generator (procedural art)
+ITEMS:   create (itemType, position, properties) → modify (itemId, properties) → delete (itemId)
+ANIMATE: animate (loop presets) → keyframe_animate (timed reveals) → relation (behavioral links)
+EFFECTS: apply_mask (reveal animations) → apply_effect (sparkle/blast)
+PLAY:    play_timeline (start playback)
 
-Modify: pinepaper_modify_item (position, color, size, opacity, rotation, text — NOT animations)
-Delete: pinepaper_delete_item | Batch: pinepaper_batch_modify
-Text:   pinepaper_create_item(type:'text') | pinepaper_create_letter_collage (per-letter styles)
+─── GENERATORS (prefer these for backgrounds) ───
 
-─── ANIMATE ITEMS (5 mechanisms — they compose on the same item) ───
+Generators fill the canvas with procedural art — much richer than solid colors.
+Choose based on mood:
+  Dreamy/soft:  drawBokeh, drawGradientMesh, drawOrganicFlow
+  Techy/modern: drawCircuit, drawGrid, drawWindField
+  Nature/warm:  drawSunsetScene, drawSunburst, drawWaves
+  Abstract:     drawGeometricAbstract, drawFluidFlow, drawNoiseTexture
+  Decorative:   drawPattern, drawStackedCircles
 
-1. Relations (behavioral — items interact):
-   pinepaper_add_relation — orbits, follows, attached_to, points_at, mirrors, parallax,
-     animates, grows_from, staggered_with, wave_through, circumscribes, morphs_to
-   Also: pinepaper_remove_relation, pinepaper_query_relations, pinepaper_register_custom_relation
+─── ITEMS ───
 
-2. Loop presets (continuous, infinite — single item):
-   pinepaper_animate — pulse, rotate, bounce, fade, wobble, slide, typewriter
+Shapes: circle, rectangle, star, ellipse, triangle, polygon, line, arc, path
+Text: text (content, fontSize, fontFamily, color, fontWeight)
+All items: opacity, shadowColor, shadowBlur, blendMode, strokeColor, strokeWidth
 
-3. Keyframe animations (timed, precise — properties at specific times):
-   pinepaper_keyframe_animate — single item: [{time, properties, easing}]
-   pinepaper_execute_custom_code — batch multiple items in ONE call:
-     app.addAnimation(registryId, keyframes[], {duration, loop?, pingPong?})
-   Animatable properties: opacity, scale, x, y, rotation
+SVG imports for recognizable objects (planes, cars, animals, buildings):
+  pinepaper_search_assets → pinepaper_import_asset (850k+ SVG icons)
 
-4. Mask reveals (animated shape reveals):
-   pinepaper_apply_animated_mask — wipe, iris, fade, curtain, star, heart, cinematic
-   pinepaper_apply_custom_mask — custom mask shape
+─── ANIMATION (all in batch) ───
 
-5. Camera (viewport choreography):
-   pinepaper_camera_animate, pinepaper_camera_zoom, pinepaper_camera_pan
+Loop presets (animate): pulse, rotate, bounce, fade, wobble, slide, typewriter
+Keyframe (keyframe_animate): [{time, properties, easing}] → opacity, scale, scaleX, scaleY, x, y, rotation, fillColor, strokeColor, fontSize
+Relations (relation): orbits, follows, attached_to, points_at, mirrors, parallax, wave_through, morphs_to (+ 9 more in batch_execute schema)
+Masks (apply_mask): wipeLeft, wipeRight, wipeUp, wipeDown, iris, irisOut, star, heart, curtainHorizontal, curtainVertical, cinematic, diagonalWipe, revealUp, revealDown
+Effects (apply_effect): sparkle, blast
 
-Composability: mechanisms compose freely on the same item. One item can have a relation,
-a loop preset, keyframes, AND a mask reveal simultaneously.
+Composability: one item can have loop + keyframe + relation + mask simultaneously.
 
-Keyframe priority: when keyframes and relations target the same property on one item,
-use relationBehavior:'keyframeFirst' via execute_custom_code to let keyframes win.
-
-Time-scoped relations: relations can have startTime/endTime/autoRemove via execute_custom_code
-so they activate only during a specific time window.
-
-Per-item timing: timeOffset via execute_custom_code lets each item offset into the timeline.
-
-What create_scene includes: items, relations, loop animations (atomic).
-What's added AFTER: keyframes (keyframe_animate or execute_custom_code), masks, camera.
-
-─── DECIDE: Which workflow? ───
-
-Static (poster, diagram):
-  → create_scene (items + relations) → screenshot
-
-Loop (logo spin, orbiting planets):
-  → create_scene (items + relations + loops) → screenshot
-
-Timed (invitation, intro, promo):
-  → create_scene (all items, timed reveals start opacity:0)
-  → ONE execute_custom_code with all app.addAnimation() calls
-  → Add masks/camera as needed
-  → play_timeline → export_video
-
-Timing templates — stagger reveals across total duration:
+Timing templates (stagger reveals across duration):
   5s:  bg 0s → elements 1-2s → text 2.5-3.5s → final 4-5s
   10s: bg 0-1s → elements 1-4s → main 4-7s → details 7-9s → finale 9-10s
-  15s: intro 0-2s → build 2-6s → primary 6-9s → secondary 9-12s → outro 12-15s
-  30s: opening 0-4s → act1 4-12s → act2 12-20s → act3 20-26s → closing 26-30s
 
-Easing: easeInOut, easeIn, easeOut, easeInCubic, easeOutCubic, easeInOutCubic,
-  easeInBack, easeOutBack, easeInOutBack, easeOutBounce, linear
+─── VISUAL COMPOSITION ───
+
+Layer order: background → large shapes (low opacity) → main subjects → text on top
+Color: dark bg (#0f172a) + bright accents (#f472b6, #818cf8, #fbbf24)
+Scale: main subject 40-60% of canvas, supporting elements smaller
+Spacing: distribute across canvas with breathing room, don't cluster
 
 ─── CANVAS & EXPORT ───
 
-Canvas: pinepaper_set_canvas_size, pinepaper_set_background_color, pinepaper_clear_canvas
-  Gradient backgrounds: create a full-canvas rectangle with gradient fill.
-Export: pinepaper_export_svg, pinepaper_export_video (MP4/WebM), pinepaper_browser_screenshot
-Templates: pinepaper_list_templates, pinepaper_apply_template (pre-built animated designs)
-
-More tools: maps, diagrams, fonts, effects, filters, triggers — see individual tool descriptions.
-Guides: read pinepaper://docs/* resources (list with list_resources).
+Presets: instagram (1080x1080), youtube (1920x1080), tiktok (1080x1920), twitter (1200x675)
+Export: pinepaper_agent_export (SVG/PNG/GIF/MP4/WebM/PDF), pinepaper_export_svg
+More: maps, diagrams, fonts, filters, triggers — see individual tool descriptions.
 */
 
 // =============================================================================
@@ -4535,26 +4510,49 @@ RETURNS:
     description: `Execute a background generator to create procedural patterns.
 
 USE WHEN:
-- "add a sunburst background"
-- "create wave pattern"
-- "grid background"
-- "circuit board pattern"
+- "add a sunburst background", "bokeh effect", "gradient mesh"
+- "create wave pattern", "wind field", "fluid flow"
+- "grid background", "geometric abstract", "noise texture"
 - Creating dynamic procedural backgrounds
 
-GENERATORS:
-- drawSunburst: Radial rays from center (rayCount, colors, bgColor)
-- drawSunsetScene: Animated sunset with clouds (sunColor, skyColors, cloudCount)
-- drawGrid: Lines, dots, or squares (gridType, spacing, lineColor)
-- drawStackedCircles: Overlapping circles (count, colors, distribution)
-- drawCircuit: Tech circuit board (lineColor, nodeColor, density)
-- drawWaves: Layered wave pattern (waveCount, colors, amplitude)
-- drawPattern: Geometric shapes in orbit`,
+GENERATORS (14 total):
+
+Classic:
+- drawSunburst: Radial rays from center (rayCount, colors, bgColor, opacity, rayGap, gradientRays)
+- drawSunsetScene: Animated sunset with clouds (sunColor, skyColors, cloudCount, skyOpacity, starCount, starColor, reflectionEnabled, reflectionOpacity)
+- drawGrid: Lines/dots/squares (gridType, spacing, lineColor, opacity, gap, randomRotation, colorMode: checkerboard|gradient|random|rows|columns, strokeColor, strokeWidth)
+- drawStackedCircles: Overlapping circles (count, colors, distribution: random|poisson|golden, opacityMin, opacityMax, blendMode, strokeWidth, strokeColor, sizeGradient, animationType: pulse|float|none)
+- drawCircuit: Tech circuit board (lineColor, nodeColor, density, traceOpacity, nodeOpacity, diagonalPaths, chipDensity: auto|none|low|medium|high)
+- drawWaves: Layered wave pattern (waveCount, colors, amplitude, frequency, opacity, fill, fillOpacity, amplitudeVariation, blendMode)
+- drawPattern: Geometric shapes in orbit (patternType, size, color, opacity, blendMode, layers: 1-5, layerScaleDecay)
+
+New — Effects:
+- drawBokeh: Soft-focus circles (count, colors, minRadius, maxRadius, shadowBlur, distribution: random|poisson, driftAnimation)
+
+New — Organic:
+- drawGradientMesh: Radial gradient blobs with screen blending (colors, blobCount, blendMode, drift)
+- drawFluidFlow: Sinusoidal stream paths with depth (streamCount, colors, depthLayers, speed)
+- drawOrganicFlow: Aurora/silk layers with fill-to-bottom (layerCount, colors, blendMode, fillToBottom)
+
+New — Geometric:
+- drawGeometricAbstract: Mixed translucent shapes (colors, shapeCount, blendMode, rotation)
+
+New — Particles:
+- drawWindField: Directional wind particles with noise turbulence (particleCount, colors, direction, turbulence, trailLength, speed)
+
+New — Textures:
+- drawNoiseTexture: Perlin/grain/stipple noise (noiseType: perlin|grain|stipple, colors, scale, density, animated)`,
     inputSchema: {
       type: 'object',
       properties: {
         generatorName: {
           type: 'string',
-          enum: ['drawSunburst', 'drawSunsetScene', 'drawGrid', 'drawStackedCircles', 'drawCircuit', 'drawWaves', 'drawPattern'],
+          enum: [
+            'drawSunburst', 'drawSunsetScene', 'drawGrid', 'drawStackedCircles',
+            'drawCircuit', 'drawWaves', 'drawPattern',
+            'drawBokeh', 'drawGradientMesh', 'drawGeometricAbstract', 'drawWindField',
+            'drawFluidFlow', 'drawOrganicFlow', 'drawNoiseTexture',
+          ],
           description: 'Generator name',
         },
         params: {
@@ -5275,19 +5273,12 @@ RETURNS:
     },
     description: `Connect to PinePaper Studio Editor in a browser.
 
-NOTE: With enforced agent mode (v1.5.0+), the browser connects AUTOMATICALLY on the first tool call.
-You typically don't need to call this tool manually - just start creating items!
+⚠️ USUALLY NOT NEEDED — the browser auto-connects on the first tool call. Do NOT call this tool unless you need custom settings.
 
-USE WHEN:
-- You want to explicitly connect with custom settings (e.g., visible browser window)
-- You need to connect to a custom PinePaper URL
+Call this ONLY when: you need a custom URL, or you need headless: false to see the browser window.
+Call this AT MOST once — never call it again after connected.
 
-DEFAULT BEHAVIOR (Agent Mode):
-- Browser runs in headless mode (no visible window)
-- Auto-connects on first tool call
-- Optimized for automation workflows
-
-SET headless: false if you want to see the browser window for debugging or user interaction.`,
+For normal workflows, skip this tool and go directly to pinepaper_agent_start_job.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -5488,48 +5479,13 @@ If you see significantly higher numbers, investigate:
       idempotentHint: false,
       openWorldHint: false,
     },
-    description: `Start a new agent job/session for optimized batch workflows. Enables agent mode with reduced overhead.
+    description: `Start a new agent job. Then batch_execute ALL operations, then end_job to get a screenshot for user validation.
 
-USE WHEN:
-- Beginning a content automation pipeline
-- Starting a batch creation workflow (create → animate → export)
-- Need to track multiple operations as a single job
-- Want to optimize performance with batched execution
+⚠️ Call ONCE per pipeline. NEVER restart — creates duplicates.
 
-AGENT MODE BENEFITS:
-- Batched code execution (multiple operations in single browser call)
-- Automatic item/relation tracking
-- Smart screenshot policy (on_complete, on_error, or never)
-- Fast canvas reset without browser refresh
-- Job-level performance metrics
+WORKFLOW: start_job → batch_execute (everything in ONE call) → end_job (screenshot) → show user → iterate if needed.
 
-SCREENSHOT POLICIES:
-- on_complete: Single screenshot at job end (recommended for automation)
-- on_error: Screenshot only when errors occur (debugging)
-- never: No automatic screenshots (fastest)
-- on_request: Manual screenshots only
-
-CANVAS PRESETS:
-- instagram: 1080x1080 (1:1 square)
-- instagram-story: 1080x1920 (9:16 vertical)
-- tiktok: 1080x1920 (9:16 vertical, 60fps)
-- youtube: 1920x1080 (16:9 horizontal)
-- youtube-thumbnail: 1280x720 (16:9 thumbnail)
-- twitter: 1200x675 (16:9 Twitter card)
-- linkedin: 1200x627 (LinkedIn standard)
-- web: Flexible dimensions
-- print-a4: 2480x3508 (A4 at 300dpi)
-- print-letter: 2550x3300 (Letter at 300dpi)
-
-EXAMPLES:
-- Quick social media content: {name: "Instagram Post", screenshotPolicy: "on_complete", canvasPreset: "instagram"}
-- High-volume automation: {screenshotPolicy: "never"}
-- Debug workflow: {name: "Debug Session", screenshotPolicy: "on_error"}
-
-WORKFLOW:
-1. pinepaper_agent_start_job → Start job
-2. Multiple create/animate/relation operations
-3. pinepaper_agent_end_job → End job, get summary`,
+CANVAS PRESETS: instagram (1080x1080), instagram-story (1080x1920), tiktok (1080x1920), youtube (1920x1080), youtube-thumbnail (1280x720), twitter (1200x675), linkedin (1200x627), web, print-a4, print-letter`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -5564,13 +5520,15 @@ WORKFLOW:
       idempotentHint: false,
       openWorldHint: false,
     },
-    description: `End the current agent job and get a comprehensive summary with export recommendations.
+    description: `End the current agent job, get summary + screenshot for user validation.
+
+After calling this, SHOW the screenshot to the user and ask if they want changes.
+If user wants changes: modify specific items or start a new job.
 
 USE WHEN:
-- Finishing a content automation pipeline
-- Need job summary with items created
+- Finishing batch_execute — ready to show user the result
+- Need screenshot to validate the design with user
 - Want export format recommendations
-- Getting performance metrics for the job
 
 RETURNS:
 - jobId: Unique job identifier
@@ -5671,45 +5629,71 @@ EXAMPLES:
       idempotentHint: false,
       openWorldHint: false,
     },
-    description: `Execute multiple operations in a single browser call. Dramatically faster than individual tool calls.
+    description: `Execute ALL operations in a single call. This is the ONLY tool needed for building scenes — canvas setup, backgrounds, items, animations, masks, effects, and playback all go here.
 
-USE WHEN:
-- Creating multiple items in one step
-- Applying animations to many items
-- Need maximum performance
-- Building complex scenes efficiently
+⚠️ EVERY operation executes LIVE on the canvas. Calling this twice DOUBLES all items. Call ONCE per pipeline.
 
-PERFORMANCE COMPARISON:
-- 10 individual pinepaper_create_item calls: ~1450ms (10 browser round trips)
-- pinepaper_agent_batch_execute with 10 creates: ~300ms (1 browser round trip)
+WORKFLOW:
+1. pinepaper_agent_start_job → 2. pinepaper_agent_batch_execute (everything) → 3. pinepaper_agent_end_job (screenshot for validation)
+After validation: user reviews screenshot → feedback → modify/recreate as needed.
 
-OPERATION TYPES:
-- create: Create an item (itemType, position, properties)
-- modify: Modify an item (itemId, properties)
-- animate: Animate an item (itemId, animationType, animationOptions)
-- relation: Add a relation (sourceId, targetId, relationType, relationOptions)
-- delete: Delete an item (itemId)
+OPERATION TYPES (12) — use in this order:
 
-ATOMIC MODE:
-When atomic: true (default), all operations succeed or all fail.
-When atomic: false, operations execute independently (partial success possible).
+CANVAS SETUP:
+  set_canvas_size — {width, height} or {preset: "instagram"|"youtube"|"tiktok"|...}
+  set_background — {backgroundColor: "#hex"}
+  execute_generator — {generatorName, generatorParams} → fills canvas with procedural art
+    Generators: drawBokeh, drawGradientMesh, drawWaves, drawSunburst, drawSunsetScene, drawGrid, drawCircuit, drawPattern, drawStackedCircles, drawGeometricAbstract, drawWindField, drawFluidFlow, drawOrganicFlow, drawNoiseTexture
 
-EXAMPLES:
-- Create 3 circles:
-  {operations: [
-    {type: "create", itemType: "circle", position: {x: 200, y: 300}, properties: {radius: 30, color: "#ef4444"}},
-    {type: "create", itemType: "circle", position: {x: 400, y: 300}, properties: {radius: 30, color: "#22c55e"}},
-    {type: "create", itemType: "circle", position: {x: 600, y: 300}, properties: {radius: 30, color: "#3b82f6"}}
-  ]}
+ITEMS:
+  create — {itemType, position: {x,y}, properties}
+    itemType: text, circle, rectangle, star, triangle, polygon, ellipse, path, line, arc
+    Properties per type:
+      text: {content, fontSize, fontFamily, color, fontWeight}
+      circle: {radius, color, strokeColor, strokeWidth}
+      rectangle: {width, height, color, cornerRadius}
+      star: {radius1, radius2, points, color}
+      ellipse: {radiusX, radiusY, color}
+      triangle/polygon: {width/sides, height/radius, color}
+    All: opacity, shadowColor, shadowBlur, blendMode, strokeColor, strokeWidth
+  modify — {itemId, properties}
+  delete — {itemId}
 
-- Create and animate:
-  {operations: [
-    {type: "create", itemType: "star", position: {x: 400, y: 300}, properties: {radius1: 50, radius2: 25, points: 5, color: "#fbbf24"}},
-    {type: "animate", itemId: "$0", animationType: "spin", animationOptions: {speed: 2}}
-  ], atomic: true}
+ANIMATION:
+  animate — Loop animation: {itemId, animationType, animationOptions}
+    animationType: pulse, rotate, bounce, fade, wobble, slide, typewriter
+  keyframe_animate — Timed animation: {itemId, keyframes: [{time, properties, easing}], duration, loop}
+    Animatable properties: opacity, scale, scaleX, scaleY, x, y, rotation, fillColor, strokeColor, fontSize
+    Easing: easeInOut, easeIn, easeOut, easeInCubic, easeOutCubic, easeOutBounce, linear
+  relation — Behavioral link: {sourceId, targetId, relationType, relationOptions}
+    relationType: orbits, follows, attached_to, points_at, mirrors, parallax, wave_through, morphs_to (+ 9 more in schema)
 
-VARIABLE REFERENCES:
-Use "$0", "$1", etc. to reference items created in earlier operations within the same batch.`,
+EFFECTS:
+  apply_mask — Reveal effect: {itemId, maskPreset, maskOptions}
+    maskPreset: wipeLeft, wipeRight, wipeUp, wipeDown, iris, irisOut, star, heart, curtainHorizontal, curtainVertical, cinematic, diagonalWipe, revealUp, revealDown
+  apply_effect — Visual effect: {itemId, effectType, effectParams}
+    effectType: sparkle, blast
+
+PLAYBACK:
+  play_timeline — {action: "play"|"stop"|"seek", duration, loop}
+
+VARIABLE REFERENCES: "$0", "$1" etc. reference items by creation order within the batch.
+
+EXAMPLE — Animated sky scene with timed reveals:
+{operations: [
+  {type: "set_canvas_size", preset: "youtube"},
+  {type: "execute_generator", generatorName: "drawGradientMesh", generatorParams: {colors: ["#1e3a5f", "#87CEEB", "#fbbf24"], bgColor: "#0c1445", blobCount: 4}},
+  {type: "create", itemType: "circle", position: {x: 1600, y: 150}, properties: {radius: 80, color: "#fbbf24", shadowColor: "#fbbf24", shadowBlur: 40}},
+  {type: "create", itemType: "ellipse", position: {x: 400, y: 180}, properties: {radiusX: 100, radiusY: 35, color: "#ffffff", opacity: 0.8}},
+  {type: "create", itemType: "ellipse", position: {x: 900, y: 120}, properties: {radiusX: 120, radiusY: 40, color: "#ffffff", opacity: 0.7}},
+  {type: "create", itemType: "text", position: {x: 960, y: 500}, properties: {content: "Dream Big", fontSize: 96, color: "#ffffff", fontWeight: "bold"}},
+  {type: "animate", itemId: "$0", animationType: "pulse", animationOptions: {speed: 0.3}},
+  {type: "animate", itemId: "$1", animationType: "slide", animationOptions: {speed: 0.2, direction: "left"}},
+  {type: "animate", itemId: "$2", animationType: "slide", animationOptions: {speed: 0.15, direction: "left"}},
+  {type: "keyframe_animate", itemId: "$3", keyframes: [{time: 0, properties: {opacity: 0, scale: 0.8}}, {time: 2, properties: {opacity: 1, scale: 1}, easing: "easeOutBack"}], duration: 3},
+  {type: "apply_mask", itemId: "$3", maskPreset: "wipeLeft"},
+  {type: "play_timeline", action: "play", duration: 5, loop: true}
+]}`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -5720,57 +5704,90 @@ Use "$0", "$1", etc. to reference items created in earlier operations within the
             properties: {
               type: {
                 type: 'string',
-                enum: ['create', 'modify', 'animate', 'relation', 'delete'],
+                enum: ['set_canvas_size', 'set_background', 'execute_generator', 'create', 'modify', 'delete', 'animate', 'keyframe_animate', 'relation', 'apply_mask', 'apply_effect', 'play_timeline'],
                 description: 'Operation type',
               },
+              // Canvas setup
+              width: { type: 'number', description: 'Canvas width for set_canvas_size' },
+              height: { type: 'number', description: 'Canvas height for set_canvas_size' },
+              preset: { type: 'string', description: 'Canvas preset for set_canvas_size' },
+              backgroundColor: { type: 'string', description: 'For set_background: hex color' },
+              generatorName: {
+                type: 'string',
+                enum: ['drawSunburst', 'drawSunsetScene', 'drawGrid', 'drawWaves', 'drawCircuit', 'drawStackedCircles', 'drawPattern', 'drawBokeh', 'drawGradientMesh', 'drawGeometricAbstract', 'drawWindField', 'drawFluidFlow', 'drawOrganicFlow', 'drawNoiseTexture'],
+                description: 'For execute_generator: generator name',
+              },
+              generatorParams: { type: 'object', description: 'For execute_generator: parameters' },
+              // Items
               itemType: {
                 type: 'string',
-                description: 'For create: type of item to create',
-              },
-              itemId: {
-                type: 'string',
-                description: 'For modify/animate/delete: target item ID or $N reference',
+                enum: ['text', 'circle', 'rectangle', 'star', 'triangle', 'polygon', 'ellipse', 'path', 'line', 'arc'],
+                description: 'For create: item type',
               },
               position: {
                 type: 'object',
-                properties: {
-                  x: { type: 'number' },
-                  y: { type: 'number' },
-                },
-                description: 'Position for create operations',
+                properties: { x: { type: 'number' }, y: { type: 'number' } },
+                description: 'For create: position {x, y}',
               },
-              properties: {
-                type: 'object',
-                description: 'Properties for create/modify operations',
-              },
+              properties: { type: 'object', description: 'For create/modify: item properties' },
+              itemId: { type: 'string', description: 'Target item ID or $N reference' },
+              // Loop animation
               animationType: {
                 type: 'string',
-                description: 'For animate: animation type',
+                enum: ['pulse', 'rotate', 'bounce', 'fade', 'wobble', 'slide', 'typewriter'],
+                description: 'For animate: loop animation type',
               },
-              animationOptions: {
-                type: 'object',
-                description: 'For animate: animation options',
+              animationOptions: { type: 'object', description: 'For animate: {speed, amplitude, direction}' },
+              // Keyframe animation
+              keyframes: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    time: { type: 'number' },
+                    properties: { type: 'object' },
+                    easing: { type: 'string' },
+                  },
+                },
+                description: 'For keyframe_animate: [{time, properties, easing}]',
               },
-              sourceId: {
-                type: 'string',
-                description: 'For relation: source item ID',
-              },
-              targetId: {
-                type: 'string',
-                description: 'For relation: target item ID',
-              },
+              duration: { type: 'number', description: 'Duration in seconds for keyframe_animate or play_timeline' },
+              loop: { type: 'boolean', description: 'Loop for keyframe_animate or play_timeline' },
+              // Relations
+              sourceId: { type: 'string', description: 'For relation: source item ID or $N' },
+              targetId: { type: 'string', description: 'For relation: target item ID or $N' },
               relationType: {
                 type: 'string',
-                description: 'For relation: relation type',
+                enum: ['orbits', 'follows', 'attached_to', 'points_at', 'mirrors', 'parallax', 'animates', 'grows_from', 'staggered_with', 'wave_through', 'circumscribes', 'morphs_to', 'maintains_distance', 'bounds_to', 'indicates', 'camera_follows', 'camera_animates'],
+                description: 'For relation: type',
               },
-              relationOptions: {
-                type: 'object',
-                description: 'For relation: relation options',
+              relationOptions: { type: 'object', description: 'For relation: options' },
+              // Masks
+              maskPreset: {
+                type: 'string',
+                enum: ['wipeLeft', 'wipeRight', 'wipeUp', 'wipeDown', 'iris', 'irisOut', 'star', 'heart', 'curtainHorizontal', 'curtainVertical', 'cinematic', 'diagonalWipe', 'revealUp', 'revealDown'],
+                description: 'For apply_mask: preset',
               },
+              maskType: { type: 'string', description: 'For apply_mask: mask shape' },
+              maskOptions: { type: 'object', description: 'For apply_mask: options' },
+              // Effects
+              effectType: {
+                type: 'string',
+                enum: ['sparkle', 'blast'],
+                description: 'For apply_effect: effect type',
+              },
+              effectParams: { type: 'object', description: 'For apply_effect: parameters' },
+              // Timeline
+              action: {
+                type: 'string',
+                enum: ['play', 'stop', 'seek'],
+                description: 'For play_timeline: action',
+              },
+              time: { type: 'number', description: 'For play_timeline seek: time in seconds' },
             },
             required: ['type'],
           },
-          description: 'Array of operations to execute',
+          description: 'Array of operations to execute in order',
         },
         atomic: {
           type: 'boolean',

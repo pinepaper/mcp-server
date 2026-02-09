@@ -1271,7 +1271,7 @@ You can now start creating new items on a clean canvas.`,
             content: [
               {
                 type: 'text',
-                text: `Already connected to PinePaper Studio at ${controller.actualUrl}`,
+                text: `Already connected to PinePaper Studio at ${controller.actualUrl}. Do NOT call this tool again — proceed directly with pinepaper_agent_start_job.`,
               },
             ],
           };
@@ -1726,6 +1726,25 @@ All PinePaper tools will work in **code-only mode**:
       // -----------------------------------------------------------------------
       case 'pinepaper_agent_start_job': {
         const input = AgentStartJobInputSchema.parse(args);
+
+        // Guard against pipeline restarts — warn loudly if a job is already active
+        const session = getSessionManager();
+        if (session.hasActiveJob()) {
+          const currentJob = session.getCurrentJob();
+          const itemCount = currentJob?.itemsCreated.length ?? 0;
+          if (itemCount > 0) {
+            // Job has items — this is almost certainly a pipeline restart bug
+            console.error(`[PinePaper] WARNING: Starting new job while ${itemCount} items exist from active job ${currentJob?.jobId}`);
+            const code = codeGenerator.generateAgentStartJob(input);
+            const result = await executeOrGenerate(code, `Restarted job (previous had ${itemCount} items)`, options, 'pinepaper_agent_start_job');
+            // Prepend a strong warning to the result text
+            if (result.content && result.content.length > 0 && result.content[0].type === 'text') {
+              result.content[0].text = `⚠️ WARNING: A job was already active with ${itemCount} items created. Starting a new job will create DUPLICATE items on the canvas. If you already created items, do NOT recreate them — continue from where you left off or call pinepaper_agent_end_job instead.\n\n${result.content[0].text}`;
+            }
+            return result;
+          }
+        }
+
         const code = codeGenerator.generateAgentStartJob(input);
         const description = `Started agent job${input.name ? ` "${input.name}"` : ''} with ${input.screenshotPolicy || 'on_complete'} screenshot policy`;
         return executeOrGenerate(code, description, options, 'pinepaper_agent_start_job');
@@ -2114,6 +2133,8 @@ All PinePaper tools will work in **code-only mode**:
             'pinepaper_update_connector',
             'pinepaper_remove_connector',
             'pinepaper_diagram_mode',
+            // Scene tools
+            'pinepaper_create_scene',
             // Agent flow mode tools
             'pinepaper_agent_start_job',
             'pinepaper_agent_end_job',

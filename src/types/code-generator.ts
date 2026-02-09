@@ -5,6 +5,7 @@
  * This code is designed to run in the browser context where window.PinePaper is available.
  */
 
+import { generateP5DrawCode } from '../tools/p5-compat/p5-helpers.js';
 import {
   ItemType,
   SimpleAnimationType,
@@ -485,9 +486,10 @@ function generateExecuteGeneratorCode(
 ): string {
   return `
 // Execute ${generatorName} generator
-await app.executeGenerator('${generatorName}', ${JSON.stringify(params, null, 2)});
-
-({ success: true, generator: '${generatorName}' });
+(async function() {
+  await app.executeGenerator('${generatorName}', ${JSON.stringify(params, null, 2)});
+  return { success: true, generator: '${generatorName}' };
+})();
 `.trim();
 }
 
@@ -1287,8 +1289,6 @@ app.historyManager.saveState();
    * Generate code for executing p5.js-style drawing code
    */
   generateP5Draw(code: string): string {
-    // Import the p5 helpers generator
-    const { generateP5DrawCode } = require('../tools/p5-compat/p5-helpers.js');
     return generateP5DrawCode(code);
   }
 
@@ -2124,8 +2124,101 @@ if (app.itemRegistry) app.itemRegistry.unregister(targetId);
 return { itemId: targetId, deleted: true };
 `;
 
+      case 'set_background':
+        const bgColor = op.backgroundColor || (op.properties as any)?.color || '#000000';
+        return `
+app.setBackgroundColor('${bgColor}');
+return { success: true, backgroundColor: '${bgColor}' };
+`;
+
+      case 'execute_generator':
+        const genName = op.generatorName || 'drawSunburst';
+        const genParams = JSON.stringify(op.generatorParams || {});
+        return `
+await app.executeGenerator('${genName}', ${genParams});
+return { success: true, generator: '${genName}' };
+`;
+
+      case 'set_canvas_size': {
+        const w = op.width || 1080;
+        const h = op.height || 1080;
+        const sizeArg = op.preset ? `'${op.preset}'` : `{ width: ${w}, height: ${h} }`;
+        return `
+app.setCanvasSize(${sizeArg});
+return { success: true, width: ${w}, height: ${h} };
+`;
+      }
+
+      case 'keyframe_animate': {
+        const kfItemRef = op.itemId?.startsWith('$')
+          ? `itemIds[${op.itemId.substring(1)}]`
+          : `'${op.itemId}'`;
+        const kfJson = JSON.stringify(op.keyframes || []);
+        const kfDuration = op.duration || (op.keyframes?.length ? Math.max(...op.keyframes.map(k => k.time)) : 5);
+        const kfLoop = op.loop ?? false;
+        return `
+const targetId = ${kfItemRef};
+app.addAnimation(targetId, ${kfJson}, { duration: ${kfDuration}, loop: ${kfLoop} });
+return { itemId: targetId, duration: ${kfDuration}, loop: ${kfLoop} };
+`;
+      }
+
+      case 'apply_mask': {
+        const maskItemRef = op.itemId?.startsWith('$')
+          ? `itemIds[${op.itemId.substring(1)}]`
+          : `'${op.itemId}'`;
+        const maskOpts = JSON.stringify(op.maskOptions || {});
+        return `
+const targetId = ${maskItemRef};
+if (!app.maskSystem) throw new Error('Mask system not available');
+const result = app.maskSystem.applyAnimatedMask(targetId, {
+  preset: ${op.maskPreset ? `'${op.maskPreset}'` : 'null'},
+  maskType: ${op.maskType ? `'${op.maskType}'` : 'null'},
+  options: ${maskOpts},
+  maskOptions: ${maskOpts}
+});
+return result;
+`;
+      }
+
+      case 'apply_effect': {
+        const effItemRef = op.itemId?.startsWith('$')
+          ? `itemIds[${op.itemId.substring(1)}]`
+          : `'${op.itemId}'`;
+        const effParams = JSON.stringify(op.effectParams || {});
+        return `
+const targetId = ${effItemRef};
+const item = app.getItemById(targetId);
+if (!item) throw new Error('Item not found: ' + targetId);
+app.applyEffect(item, '${op.effectType || 'sparkle'}', ${effParams});
+return { itemId: targetId, effectType: '${op.effectType || 'sparkle'}' };
+`;
+      }
+
+      case 'play_timeline': {
+        const ptAction = op.action || 'play';
+        const ptDuration = op.duration || 5;
+        const ptLoop = op.loop ?? false;
+        if (ptAction === 'play') {
+          return `
+app.playKeyframeTimeline(${ptDuration}, ${ptLoop});
+return { success: true, action: 'play', duration: ${ptDuration}, loop: ${ptLoop} };
+`;
+        } else if (ptAction === 'stop') {
+          return `
+app.stopKeyframeTimeline();
+return { success: true, action: 'stop' };
+`;
+        } else {
+          return `
+app.setPlaybackTime(${op.time || 0});
+return { success: true, action: 'seek', time: ${op.time || 0} };
+`;
+        }
+      }
+
       default:
-        return `throw new Error('Unknown operation type');`;
+        return `throw new Error('Unknown operation type: ${(op as any).type}');`;
     }
   }
 
@@ -2159,7 +2252,8 @@ return { itemId: targetId, deleted: true };
     };
 
     const preset = platformPresets[platform] || platformPresets['web'];
-    const exportFormat = format || preset.staticFormat;
+    // Resolve "auto" format to the platform's recommended format
+    const exportFormat = (!format || format === 'auto') ? preset.staticFormat : format;
 
     return `
 // Smart export for ${platform}
@@ -2188,9 +2282,8 @@ return { itemId: targetId, deleted: true };
         break;
 
       case 'png':
-        const canvas = document.querySelector('canvas');
-        if (canvas) {
-          const dataUrl = canvas.toDataURL('image/png');
+        if (app.exportEngine && app.exportEngine.exportPNG) {
+          const dataUrl = await app.exportEngine.exportPNG({ dpi: settings.dpi });
           result = {
             success: true,
             platform,
@@ -2199,12 +2292,25 @@ return { itemId: targetId, deleted: true };
             mimeType: 'image/png',
             size: Math.round(dataUrl.length * 0.75)
           };
+        } else {
+          const canvas = document.querySelector('canvas');
+          if (canvas) {
+            const dataUrl = canvas.toDataURL('image/png');
+            result = {
+              success: true,
+              platform,
+              format: 'png',
+              data: dataUrl,
+              mimeType: 'image/png',
+              size: Math.round(dataUrl.length * 0.75)
+            };
+          }
         }
         break;
 
       case 'gif':
-        if (app.exportGIF) {
-          const blob = await app.exportGIF({ fps: settings.fps, quality: settings.compression, duration: 5 });
+        if (app.exportEngine && app.exportEngine.exportGIF) {
+          const blob = await app.exportEngine.exportGIF({ fps: settings.fps, quality: settings.compression, duration: 5 });
           const reader = new FileReader();
           const dataUrl = await new Promise(resolve => {
             reader.onloadend = () => resolve(reader.result);
@@ -2220,8 +2326,8 @@ return { itemId: targetId, deleted: true };
       case 'webm':
         const exportMethod = format === 'mp4' ? 'exportMP4' : 'exportWebM';
         const mimeType = format === 'mp4' ? 'video/mp4' : 'video/webm';
-        if (app[exportMethod]) {
-          const blob = await app[exportMethod]({ fps: settings.fps, duration: 5, ...dimensions });
+        if (app.exportEngine && app.exportEngine[exportMethod]) {
+          const blob = await app.exportEngine[exportMethod]({ fps: settings.fps, duration: 5, ...dimensions });
           const reader = new FileReader();
           const dataUrl = await new Promise(resolve => {
             reader.onloadend = () => resolve(reader.result);
@@ -2234,8 +2340,8 @@ return { itemId: targetId, deleted: true };
         break;
 
       case 'pdf':
-        if (app.exportPDF) {
-          const blob = await app.exportPDF({ dpi: settings.dpi });
+        if (app.exportEngine && app.exportEngine.exportPDF) {
+          const blob = await app.exportEngine.exportPDF({ dpi: settings.dpi });
           const reader = new FileReader();
           const dataUrl = await new Promise(resolve => {
             reader.onloadend = () => resolve(reader.result);
