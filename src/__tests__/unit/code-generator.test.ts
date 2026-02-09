@@ -347,4 +347,178 @@ describe('PinePaperCodeGenerator', () => {
       expect(code).toContain('app.getAvailableBackgroundGenerators()');
     });
   });
+
+  describe('generateAgentBatchExecute', () => {
+    it('should generate code for create operation', () => {
+      const code = codeGenerator.generateAgentBatchExecute({
+        operations: [{ type: 'create', itemType: 'circle', position: { x: 100, y: 200 }, properties: { radius: 50, color: '#ff0000' } }],
+      });
+      expect(code).toContain("app.create('circle'");
+      expect(code).toContain('100');
+      expect(code).toContain('200');
+      expect(code).toContain('#ff0000');
+    });
+
+    it('should generate code for modify operation', () => {
+      const code = codeGenerator.generateAgentBatchExecute({
+        operations: [{ type: 'modify', itemId: 'item_1', properties: { color: '#00ff00' } }],
+      });
+      expect(code).toContain("'item_1'");
+      expect(code).toContain('app.select(targetId)');
+      expect(code).toContain('app.modify(');
+      expect(code).toContain('#00ff00');
+    });
+
+    it('should generate code for delete operation', () => {
+      const code = codeGenerator.generateAgentBatchExecute({
+        operations: [{ type: 'delete', itemId: 'item_5' }],
+      });
+      expect(code).toContain("'item_5'");
+      expect(code).toContain('app.getItemById(targetId)');
+      expect(code).toContain('item.remove()');
+    });
+
+    it('should generate code for animate operation', () => {
+      const code = codeGenerator.generateAgentBatchExecute({
+        operations: [{ type: 'animate', itemId: '$0', animationType: 'pulse', animationOptions: { speed: 0.5 } }],
+      });
+      expect(code).toContain('itemIds[0]');
+      expect(code).toContain("animationType: 'pulse'");
+      expect(code).toContain('0.5');
+    });
+
+    it('should generate code for keyframe_animate operation', () => {
+      const code = codeGenerator.generateAgentBatchExecute({
+        operations: [{
+          type: 'keyframe_animate',
+          itemId: 'item_1',
+          keyframes: [{ time: 0, properties: { opacity: 0 } }, { time: 2, properties: { opacity: 1 } }],
+          duration: 3,
+          loop: true,
+        }],
+      });
+      expect(code).toContain('app.addAnimation');
+      expect(code).toContain('opacity');
+      expect(code).toContain('duration: 3');
+      expect(code).toContain('loop: true');
+    });
+
+    it('should generate code for relation operation', () => {
+      const code = codeGenerator.generateAgentBatchExecute({
+        operations: [{ type: 'relation', sourceId: '$1', targetId: '$0', relationType: 'orbits', relationOptions: { radius: 150 } }],
+      });
+      expect(code).toContain('itemIds[1]');
+      expect(code).toContain('itemIds[0]');
+      expect(code).toContain("app.addRelation(source, target, 'orbits'");
+      expect(code).toContain('150');
+    });
+
+    it('should generate code for set_background operation', () => {
+      const code = codeGenerator.generateAgentBatchExecute({
+        operations: [{ type: 'set_background', backgroundColor: '#0f172a' }],
+      });
+      expect(code).toContain("app.setBackgroundColor('#0f172a')");
+    });
+
+    it('should generate code for execute_generator operation', () => {
+      const code = codeGenerator.generateAgentBatchExecute({
+        operations: [{ type: 'execute_generator', generatorName: 'drawBokeh', generatorParams: { count: 30 } }],
+      });
+      expect(code).toContain("app.executeGenerator('drawBokeh'");
+      expect(code).toContain('30');
+    });
+
+    it('should generate code for set_canvas_size with dimensions', () => {
+      const code = codeGenerator.generateAgentBatchExecute({
+        operations: [{ type: 'set_canvas_size', width: 1920, height: 1080 }],
+      });
+      expect(code).toContain('app.setCanvasSize({ width: 1920, height: 1080 })');
+    });
+
+    it('should generate code for set_canvas_size with preset', () => {
+      const code = codeGenerator.generateAgentBatchExecute({
+        operations: [{ type: 'set_canvas_size', preset: 'youtube' }],
+      });
+      expect(code).toContain("app.setCanvasSize('youtube')");
+    });
+
+    it('should generate code for apply_mask operation', () => {
+      const code = codeGenerator.generateAgentBatchExecute({
+        operations: [{ type: 'apply_mask', itemId: '$0', maskPreset: 'wipeLeft', maskOptions: { duration: 0.5 } }],
+      });
+      expect(code).toContain('app.maskSystem.applyAnimatedMask');
+      expect(code).toContain("'wipeLeft'");
+    });
+
+    it('should generate code for apply_effect operation', () => {
+      const code = codeGenerator.generateAgentBatchExecute({
+        operations: [{ type: 'apply_effect', itemId: 'item_1', effectType: 'sparkle', effectParams: { color: '#fbbf24' } }],
+      });
+      expect(code).toContain("app.applyEffect(item, 'sparkle'");
+      expect(code).toContain('#fbbf24');
+    });
+
+    it('should generate code for play_timeline operation', () => {
+      const code = codeGenerator.generateAgentBatchExecute({
+        operations: [{ type: 'play_timeline', action: 'play', duration: 5, loop: true }],
+      });
+      expect(code).toContain('app.playKeyframeTimeline(5, true)');
+    });
+
+    it('should resolve $N variable references to itemIds array', () => {
+      const code = codeGenerator.generateAgentBatchExecute({
+        operations: [
+          { type: 'create', itemType: 'circle', position: { x: 100, y: 100 }, properties: { radius: 50 } },
+          { type: 'animate', itemId: '$0', animationType: 'pulse' },
+        ],
+      });
+      expect(code).toContain('itemIds[0]');
+    });
+
+    it('should use literal ID when not a $N reference', () => {
+      const code = codeGenerator.generateAgentBatchExecute({
+        operations: [{ type: 'modify', itemId: 'item_42', properties: { opacity: 0.5 } }],
+      });
+      expect(code).toContain("'item_42'");
+      expect(code).not.toContain('itemIds[');
+    });
+
+    it('should preserve operation order in generated code', () => {
+      const code = codeGenerator.generateAgentBatchExecute({
+        operations: [
+          { type: 'set_canvas_size', width: 1080, height: 1080 },
+          { type: 'set_background', backgroundColor: '#000000' },
+          { type: 'create', itemType: 'text', position: { x: 400, y: 300 }, properties: { content: 'Hi' } },
+        ],
+      });
+      const canvasIdx = code.indexOf('Operation 0: set_canvas_size');
+      const bgIdx = code.indexOf('Operation 1: set_background');
+      const createIdx = code.indexOf('Operation 2: create');
+      expect(canvasIdx).toBeLessThan(bgIdx);
+      expect(bgIdx).toBeLessThan(createIdx);
+    });
+
+    it('should throw on atomic failure (default)', () => {
+      const code = codeGenerator.generateAgentBatchExecute({
+        operations: [{ type: 'create', itemType: 'circle', position: { x: 0, y: 0 }, properties: {} }],
+      });
+      expect(code).toContain('throw opError');
+    });
+
+    it('should not throw on non-atomic failure', () => {
+      const code = codeGenerator.generateAgentBatchExecute({
+        operations: [{ type: 'create', itemType: 'circle', position: { x: 0, y: 0 }, properties: {} }],
+        atomic: false,
+      });
+      expect(code).toContain('success = false');
+      expect(code).not.toContain('throw opError');
+    });
+
+    it('should generate stop timeline code', () => {
+      const code = codeGenerator.generateAgentBatchExecute({
+        operations: [{ type: 'play_timeline', action: 'stop' }],
+      });
+      expect(code).toContain('app.stopKeyframeTimeline()');
+    });
+  });
 });

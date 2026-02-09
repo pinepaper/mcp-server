@@ -17,6 +17,8 @@ import {
   ListToolsRequestSchema,
   ListResourcesRequestSchema,
   ReadResourceRequestSchema,
+  ListPromptsRequestSchema,
+  GetPromptRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 
 import { PINEPAPER_TOOLS, getLocalizedTools } from './tools/definitions.js';
@@ -27,6 +29,7 @@ import {
   SupportedLocale,
   DEFAULT_LOCALE,
 } from './i18n/index.js';
+import { PROMPTS, getPromptMessages } from './prompts/index.js';
 
 // =============================================================================
 // SERVER INFO
@@ -84,7 +87,7 @@ const RESOURCES = [
   {
     uri: 'pinepaper://docs/generators',
     name: '🎨 Backgrounds Guide',
-    description: 'Create procedural backgrounds: sunburst, grid, waves, patterns',
+    description: 'Create procedural backgrounds: 14 generators including sunburst, grid, waves, bokeh, gradient mesh, wind field, noise textures',
     mimeType: 'text/markdown',
   },
   {
@@ -156,7 +159,7 @@ const RESOURCE_CONTENTS: Record<string, string> = {
 
 ## Overview
 
-PinePaper is a canvas-based animation tool with 120 tools for creating animated graphics, custom fonts, maps, diagrams, and more. This guide helps you find the right tools.
+PinePaper is a canvas-based animation tool with 121 tools for creating animated graphics, custom fonts, maps, diagrams, and more. This guide helps you find the right tools.
 
 ## FIRST: Check Templates
 
@@ -252,8 +255,19 @@ Built-in maps: \`world\`, \`worldHighRes\`, \`usa\` (US states)
 Load with \`pinepaper_load_map\`, animate with \`pinepaper_animate_map_regions\` or \`pinepaper_animate_map_wave\`
 
 ### Masks
-Reveal effects: wipeLeft, wipeRight, iris, curtain, star, heart
+Reveal effects: wipeLeft, wipeRight, wipeUp, wipeDown, iris, irisOut, star, heart, curtainHorizontal, curtainVertical, cinematic, diagonalWipe, revealUp, revealDown
 Apply with \`pinepaper_apply_animated_mask\`
+
+## Agent Workflow (Recommended)
+
+For AI agents, use the batch pipeline for maximum efficiency:
+
+1. \`pinepaper_agent_start_job\` — clear canvas, set preset
+2. \`pinepaper_agent_batch_execute\` — ONE call with ALL operations (12 types: canvas, background, generators, items, animations, keyframes, relations, masks, effects, playback)
+3. \`pinepaper_agent_end_job\` — returns screenshot for user validation
+4. User reviews → modify specific items or start new job
+
+See the \`pinepaper_agent_batch_execute\` tool description for full operation reference.
 
 ## Detailed Guides
 
@@ -560,12 +574,12 @@ app.addAnimation(registryId, keyframes, options)
                {time: 1, properties: {opacity: 1}}]
   options:    {duration: number, loop?: boolean, pingPong?: boolean}
 \`\`\`
-Animatable properties: \`opacity\`, \`scale\`, \`x\`, \`y\`, \`rotation\`.
+Animatable properties: \`opacity\`, \`scale\`, \`scaleX\`, \`scaleY\`, \`x\`, \`y\`, \`rotation\`, \`fillColor\`, \`strokeColor\`, \`fontSize\`.
 Stagger items by offsetting \`time\` values across items.
 
 **3. Play** — \`pinepaper_play_timeline\`
 
-**4. Export** — \`pinepaper_export_video\` (MP4/WebM)
+**4. Export** — \`pinepaper_agent_export\` (SVG/PNG/GIF/MP4/WebM/PDF)
 
 ## Text Reveal Pattern
 
@@ -574,7 +588,7 @@ Create text items, then apply mask reveals with staggered start times:
 pinepaper_apply_animated_mask  itemId: "item_1"  preset: "wipeLeft"  options: {duration: 0.5}
 pinepaper_apply_animated_mask  itemId: "item_2"  preset: "wipeLeft"  options: {startTime: 0.3, duration: 0.5}
 \`\`\`
-Mask presets: wipe, iris, fade, curtain, star, heart, cinematic.
+Mask presets: wipeLeft, wipeRight, wipeUp, wipeDown, iris, irisOut, star, heart, curtainHorizontal, curtainVertical, cinematic, diagonalWipe, revealUp, revealDown.
 
 ## Advanced Capabilities (via execute_custom_code)
 
@@ -794,15 +808,7 @@ The label will follow the planet as it orbits the star!
 
   'pinepaper://docs/generators': `# Background Generators Guide
 
-**Intent:** Create procedural backgrounds with animated patterns, gradients, and effects using built-in generators.
-
-## When to Use Generators
-
-Use generators when you need:
-- Animated background patterns (sunburst, waves, circuits)
-- Scenic backgrounds (sunset, starfield)
-- Geometric patterns (grids, dots, lines)
-- Dynamic textures that respond to animation
+**Intent:** Create procedural backgrounds with 14 generators covering patterns, effects, organic flows, particles, and textures.
 
 ## Key Tool
 
@@ -812,192 +818,124 @@ pinepaper_execute_generator
   params: { rayCount: 16, colors: ["#fbbf24", "#f59e0b"], animated: true }
 \`\`\`
 
-## Available Generators
+## Classic Generators (7)
 
 ### drawSunburst
-Radial rays emanating from center - perfect for energy, attention-grabbing backgrounds.
-
-\`\`\`
-pinepaper_execute_generator
-  generatorName: "drawSunburst"
-  params:
-    rayCount: 16              // Number of rays (default: 16)
-    colors: ["#fbbf24", "#f59e0b"]  // Alternating ray colors
-    bgColor: "#0f172a"        // Background behind rays
-    animated: true            // Enable rotation animation
-    speed: 0.5                // Rotation speed (1 = normal)
-\`\`\`
-
-**Use cases:** Promotional graphics, announcements, retro designs, attention focus
+Radial rays from center — energy, attention-grabbing backgrounds.
+- **Core:** rayCount (16), colors, bgColor, animated
+- **Enhanced:** opacity, rayGap (degrees between rays), gradientRays (radial gradient per ray)
 
 ### drawSunsetScene
-Scenic sunset with animated sky and clouds - great for calm, atmospheric backgrounds.
-
-\`\`\`
-pinepaper_execute_generator
-  generatorName: "drawSunsetScene"
-  params:
-    sunColor: "#fbbf24"       // Sun fill color
-    skyColors: ["#f97316", "#ec4899", "#8b5cf6"]  // Gradient from horizon up
-    cloudCount: 5             // Number of clouds
-    animated: true            // Animate clouds drifting
-\`\`\`
-
-**Use cases:** Relaxation themes, nature scenes, time-of-day visualizations
+Animated sunset with clouds — calm, atmospheric.
+- **Core:** sunColor, skyColors, cloudCount
+- **Enhanced:** skyOpacity, starCount, starColor, reflectionEnabled, reflectionOpacity
 
 ### drawGrid
-Geometric grid patterns - clean, technical, modern look.
-
-\`\`\`
-pinepaper_execute_generator
-  generatorName: "drawGrid"
-  params:
-    gridType: "lines"         // 'lines', 'dots', or 'squares'
-    spacing: 40               // Cell size in pixels
-    lineColor: "#374151"      // Grid line/dot color
-    lineWidth: 1              // Line thickness
-    bgColor: "#0f172a"        // Background color
-\`\`\`
-
-**Grid Types:**
-| Type | Description |
-|------|-------------|
-| \`lines\` | Intersecting horizontal/vertical lines |
-| \`dots\` | Grid of dots at intersections |
-| \`squares\` | Filled square pattern |
-
-**Use cases:** Technical diagrams, graph paper, data visualization backgrounds
+Lines, dots, or squares — clean, technical, modern.
+- **Core:** gridType (lines|dots|squares), spacing (40), lineColor, bgColor, lineWidth
+- **Enhanced:** opacity, gap (pixel gap), randomRotation, colorMode (checkerboard|gradient|random|rows|columns), strokeColor, strokeWidth
 
 ### drawWaves
-Layered wave pattern - organic, flowing, dynamic.
-
-\`\`\`
-pinepaper_execute_generator
-  generatorName: "drawWaves"
-  params:
-    waveCount: 4              // Number of wave layers
-    colors: ["#3b82f6", "#6366f1", "#8b5cf6", "#a855f7"]  // Wave colors (front to back)
-    amplitude: 50             // Wave height in pixels
-    frequency: 2              // Number of wave peaks
-    animated: true            // Animate wave motion
-    speed: 1.0                // Animation speed
-\`\`\`
-
-**Use cases:** Ocean themes, audio visualizers, flowing backgrounds
+Layered wave pattern — organic, flowing.
+- **Core:** waveCount (5), colors, amplitude (50), frequency (2), bgColor, animated
+- **Enhanced:** opacity, fill (fill between waves), fillOpacity, amplitudeVariation, blendMode
 
 ### drawCircuit
-Tech circuit board pattern - futuristic, digital, tech-themed.
+Circuit board pattern — futuristic, digital.
+- **Core:** lineColor, nodeColor, bgColor, density (0-1), animated, boltColor
+- **Enhanced:** traceOpacity, nodeOpacity, diagonalPaths (45-degree traces), chipDensity (auto|none|low|medium|high)
 
+### drawStackedCircles
+Overlapping circles with distribution algorithms.
+- **Core:** count (8), colors, distribution (random|poisson|golden)
+- **Enhanced:** opacityMin/opacityMax, blendMode, strokeWidth, strokeColor, sizeGradient, animationType (pulse|float|none)
+
+### drawPattern
+Geometric shapes in orbit rings.
+- **Core:** patternType, size, color, bgColor
+- **Enhanced:** opacity, blendMode, layers (1-5 concentric rings), layerScaleDecay
+
+## New Generators (7)
+
+### drawBokeh (effects)
+Soft-focus circles — dreamy, photographic depth-of-field.
 \`\`\`
-pinepaper_execute_generator
-  generatorName: "drawCircuit"
-  params:
-    lineColor: "#22c55e"      // Circuit line color
-    nodeColor: "#4ade80"      // Junction node color
-    bgColor: "#0a0a0a"        // Dark background
-    density: 0.6              // 0-1 complexity (higher = more lines)
-    animated: true            // Enable bolt/pulse effect
-    glowColor: "#22c55e"      // Glow effect color
-\`\`\`
-
-**Use cases:** Tech presentations, hacker themes, digital/cyber aesthetics
-
-### drawStarfield
-Animated starfield - space themes, night sky.
-
-\`\`\`
-pinepaper_execute_generator
-  generatorName: "drawStarfield"
-  params:
-    starCount: 200            // Number of stars
-    colors: ["#ffffff", "#fef3c7", "#e0f2fe"]  // Star color variations
-    bgColor: "#0a0a1a"        // Deep space background
-    animated: true            // Twinkling animation
-    depth: true               // Parallax depth effect
+params: { count: 30, colors: ["#f472b6", "#818cf8", "#34d399"], bgColor: "#0f172a",
+  shadowBlur: 20, distribution: "poisson", driftAnimation: true }
 \`\`\`
 
-**Use cases:** Space themes, night scenes, dreamy backgrounds
-
-### drawGradient
-Smooth color gradient - versatile base for any design.
-
+### drawGradientMesh (organic)
+Radial gradient blobs with screen blending — modern, vibrant.
 \`\`\`
-pinepaper_execute_generator
-  generatorName: "drawGradient"
-  params:
-    colors: ["#3b82f6", "#8b5cf6", "#ec4899"]  // Gradient colors
-    direction: "diagonal"     // 'horizontal', 'vertical', 'diagonal', 'radial'
-    animated: true            // Animate color shift
+params: { colors: ["#ec4899", "#8b5cf6", "#06b6d4"], blobCount: 5,
+  blendMode: "screen", drift: true }
 \`\`\`
 
-**Directions:**
-| Direction | Description |
-|-----------|-------------|
-| \`horizontal\` | Left to right |
-| \`vertical\` | Top to bottom |
-| \`diagonal\` | Corner to corner |
-| \`radial\` | Center outward |
+### drawGeometricAbstract (geometric)
+Mixed translucent shapes with blend modes — artistic, contemporary.
+\`\`\`
+params: { colors: ["#f43f5e", "#3b82f6", "#10b981"], shapeCount: 12,
+  blendMode: "multiply", rotation: true }
+\`\`\`
+
+### drawWindField (particles)
+Directional wind particles with noise turbulence — weather, motion.
+\`\`\`
+params: { particleCount: 200, colors: ["#e0f2fe", "#bae6fd"], direction: 45,
+  turbulence: 0.5, trailLength: 30, speed: 1.5 }
+\`\`\`
+
+### drawFluidFlow (organic)
+Sinusoidal stream paths with depth layering — liquid, flowing.
+\`\`\`
+params: { streamCount: 8, colors: ["#67e8f9", "#a78bfa", "#f9a8d4"],
+  depthLayers: 3, speed: 0.8 }
+\`\`\`
+
+### drawOrganicFlow (organic)
+Aurora/silk layers — natural, ethereal glow.
+\`\`\`
+params: { layerCount: 4, colors: ["#34d399", "#6ee7b7", "#a7f3d0"],
+  blendMode: "screen", fillToBottom: true, animated: true }
+\`\`\`
+
+### drawNoiseTexture (textures)
+Perlin/grain/stipple noise — subtle, textured.
+\`\`\`
+params: { noiseType: "perlin", colors: ["#94a3b8", "#64748b"],
+  scale: 0.01, density: 0.7, animated: true }
+\`\`\`
+noiseType options: perlin, grain, stipple
+
+## Quick Mood Guide
+
+| Mood | Generators |
+|------|-----------|
+| Dreamy/soft | drawBokeh, drawGradientMesh, drawOrganicFlow |
+| Techy/modern | drawCircuit, drawGrid, drawWindField |
+| Nature/warm | drawSunsetScene, drawSunburst, drawWaves |
+| Abstract | drawGeometricAbstract, drawFluidFlow, drawNoiseTexture |
+| Decorative | drawPattern, drawStackedCircles |
 
 ## Combining Generators with Items
 
-Generators create backgrounds - add items on top:
-
 \`\`\`
-// Step 1: Create background
+// Background + content on top
 pinepaper_execute_generator
-  generatorName: "drawSunburst"
-  params: {rayCount: 12, colors: ["#fbbf24", "#f59e0b"], animated: true}
+  generatorName: "drawBokeh"
+  params: {count: 20, colors: ["#f472b6", "#818cf8"], shadowBlur: 25}
 
-// Step 2: Add items on top
-pinepaper_create_item itemType: "text" position: {x: 400, y: 250}
-  properties: {content: "SALE!", fontSize: 72, fontWeight: "bold", color: "#ffffff"}
-
-pinepaper_create_item itemType: "text" position: {x: 400, y: 330}
-  properties: {content: "50% OFF", fontSize: 36, color: "#fef3c7"}
+pinepaper_create_item itemType: "text" position: {x: 400, y: 300}
+  properties: {content: "Welcome", fontSize: 72, color: "#ffffff"}
 \`\`\`
-
-## Generator + Animation Example
-
-\`\`\`
-// Animated tech background with orbiting logo
-pinepaper_execute_generator
-  generatorName: "drawCircuit"
-  params: {lineColor: "#22c55e", bgColor: "#0a0a0a", animated: true}
-
-pinepaper_create_item itemType: "circle" position: {x: 400, y: 300}
-  properties: {radius: 60, color: "#22c55e"}
-→ item_1
-
-pinepaper_create_item itemType: "circle" position: {x: 500, y: 300}
-  properties: {radius: 15, color: "#4ade80"}
-→ item_2
-
-pinepaper_add_relation sourceId: "item_2" targetId: "item_1" relationType: "orbits"
-  params: {radius: 100, speed: 0.5}
-\`\`\`
-
-## List All Generators
-
-\`\`\`
-pinepaper_list_generators
-\`\`\`
-
-Returns all available generator names and their descriptions.
-
-## Customizing Generator Output
-
-Generators create background items. To modify after creation:
-
-1. **Change colors**: Generators use the background layer - modify with \`pinepaper_set_background_color\`
-2. **Clear and regenerate**: Use \`pinepaper_clear_canvas\` then call generator again with new params
-3. **Layer items**: Items created after generator appear on top
 
 ## Best Practices
 
-1. **Call generator first** - before creating items
-2. **Use complementary colors** - items should contrast with background
-3. **Consider animation performance** - animated generators + many animated items can slow down
-4. **Match themes** - sunburst for energy, waves for calm, circuit for tech
+1. **Call generator first** — before creating items
+2. **Use complementary colors** — items should contrast with background
+3. **Consider animation performance** — animated generators + many animated items can slow down
+4. **Match themes** — sunburst for energy, waves for calm, circuit for tech, bokeh for elegance, noise for texture
+5. **Use blendMode** — "screen" brightens, "multiply" darkens, great for layered effects
 `,
 
   'pinepaper://docs/custom-paths': `# Custom Paths Guide
@@ -5850,6 +5788,7 @@ export async function createServer(options: ServerOptions = {}): Promise<Server>
     capabilities: {
       tools: {},
       resources: {},
+      prompts: {},
     },
   });
 
@@ -5909,6 +5848,19 @@ export async function createServer(options: ServerOptions = {}): Promise<Server>
         },
       ],
     };
+  });
+
+  // ---------------------------------------------------------------------------
+  // PROMPT HANDLERS
+  // ---------------------------------------------------------------------------
+
+  server.setRequestHandler(ListPromptsRequestSchema, async () => {
+    return { prompts: PROMPTS };
+  });
+
+  server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+    const { name, arguments: args } = request.params;
+    return getPromptMessages(name, args);
   });
 
   return server;
@@ -6020,8 +5972,15 @@ async function main(): Promise<void> {
   console.error('PinePaper MCP Server running on stdio');
 }
 
-// Run if executed directly
-main().catch((error) => {
-  console.error('Fatal error:', error);
-  process.exit(1);
-});
+// Run if executed directly (not when imported by cli.ts or other modules)
+// Check: Node uses process.argv[1], Bun supports import.meta.main
+const isDirectExecution = typeof (import.meta as any).main === 'boolean'
+  ? (import.meta as any).main
+  : process.argv[1]?.replace(/\\/g, '/').endsWith('index.js');
+
+if (isDirectExecution) {
+  main().catch((error) => {
+    console.error('Fatal error:', error);
+    process.exit(1);
+  });
+}

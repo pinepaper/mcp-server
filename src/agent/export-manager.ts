@@ -364,11 +364,11 @@ export class SmartExportManager {
   private generateGIFExportCode(fps: number, quality: number): string {
     return `
 (async function() {
-  if (!app.exportGIF) {
+  if (!app.exportEngine || !app.exportEngine.exportGIF) {
     return { success: false, error: 'GIF export not available' };
   }
 
-  const blob = await app.exportGIF({
+  const blob = await app.exportEngine.exportGIF({
     fps: ${fps},
     quality: ${quality},
     duration: 5
@@ -404,11 +404,11 @@ export class SmartExportManager {
 
     return `
 (async function() {
-  if (!app.${exportMethod}) {
+  if (!app.exportEngine || !app.exportEngine.${exportMethod}) {
     return { success: false, error: '${format.toUpperCase()} export not available' };
   }
 
-  const blob = await app.${exportMethod}({
+  const blob = await app.exportEngine.${exportMethod}({
     fps: ${fps},
     duration: 5,
     width: ${dimensions.width},
@@ -438,11 +438,11 @@ export class SmartExportManager {
   private generatePDFExportCode(dpi: number): string {
     return `
 (async function() {
-  if (!app.exportPDF) {
+  if (!app.exportEngine || !app.exportEngine.exportPDF) {
     return { success: false, error: 'PDF export not available' };
   }
 
-  const blob = await app.exportPDF({
+  const blob = await app.exportEngine.exportPDF({
     dpi: ${dpi},
     includeBleed: false
   });

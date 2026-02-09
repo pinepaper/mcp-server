@@ -16,6 +16,7 @@ import {
   SetBackgroundColorInputSchema,
   SetCanvasSizeInputSchema,
   ExportTrainingDataInputSchema,
+  AgentBatchExecuteInputSchema,
   ItemTypeSchema,
   RelationTypeSchema,
   SimpleAnimationTypeSchema,
@@ -408,6 +409,74 @@ describe('Schema Validation', () => {
       const result = ExportTrainingDataInputSchema.parse({});
       expect(result.format).toBe('json');
       expect(result.includeMetadata).toBe(true);
+    });
+  });
+
+  describe('AgentBatchExecuteInputSchema', () => {
+    it('should validate all 12 operation types', () => {
+      const ops = [
+        { type: 'set_canvas_size', width: 1920, height: 1080 },
+        { type: 'set_background', backgroundColor: '#000000' },
+        { type: 'execute_generator', generatorName: 'drawBokeh', generatorParams: { count: 20 } },
+        { type: 'create', itemType: 'circle', position: { x: 100, y: 200 }, properties: { radius: 50 } },
+        { type: 'modify', itemId: 'item_1', properties: { color: '#ff0000' } },
+        { type: 'delete', itemId: 'item_2' },
+        { type: 'animate', itemId: '$0', animationType: 'pulse' },
+        { type: 'keyframe_animate', itemId: '$0', keyframes: [{ time: 0, properties: { opacity: 0 } }], duration: 3 },
+        { type: 'relation', sourceId: '$0', targetId: 'item_1', relationType: 'orbits' },
+        { type: 'apply_mask', itemId: '$0', maskPreset: 'wipeLeft' },
+        { type: 'apply_effect', itemId: '$0', effectType: 'sparkle' },
+        { type: 'play_timeline', action: 'play', duration: 5, loop: true },
+      ];
+      const result = AgentBatchExecuteInputSchema.safeParse({ operations: ops });
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject empty operations array', () => {
+      const result = AgentBatchExecuteInputSchema.safeParse({ operations: [] });
+      expect(result.success).toBe(false);
+    });
+
+    it('should validate keyframes structure', () => {
+      const result = AgentBatchExecuteInputSchema.safeParse({
+        operations: [{
+          type: 'keyframe_animate',
+          itemId: 'item_1',
+          keyframes: [
+            { time: 0, properties: { opacity: 0, scale: 0.5 } },
+            { time: 1, properties: { opacity: 1, scale: 1 }, easing: 'easeOut' },
+          ],
+          duration: 2,
+          loop: false,
+        }],
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should validate mixed operation batch', () => {
+      const result = AgentBatchExecuteInputSchema.safeParse({
+        operations: [
+          { type: 'set_background', backgroundColor: '#1a1a2e' },
+          { type: 'create', itemType: 'text', position: { x: 400, y: 300 }, properties: { content: 'Hello', fontSize: 48 } },
+          { type: 'animate', itemId: '$0', animationType: 'fade' },
+        ],
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should default atomic to true', () => {
+      const result = AgentBatchExecuteInputSchema.parse({
+        operations: [{ type: 'set_background', backgroundColor: '#000' }],
+      });
+      expect(result.atomic).toBe(true);
+    });
+
+    it('should accept atomic false', () => {
+      const result = AgentBatchExecuteInputSchema.parse({
+        operations: [{ type: 'set_background', backgroundColor: '#000' }],
+        atomic: false,
+      });
+      expect(result.atomic).toBe(false);
     });
   });
 });
