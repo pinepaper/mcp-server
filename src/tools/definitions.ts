@@ -85,6 +85,14 @@ Color: dark bg (#0f172a) + bright accents (#f472b6, #818cf8, #fbbf24)
 Scale: main subject 40-60% of canvas, supporting elements smaller
 Spacing: distribute across canvas with breathing room, don't cluster
 
+⚠️ SIZING — All positions and sizes MUST fit within the canvas:
+  Default canvas is 800x600. For infographics/social media, SET A PRESET FIRST.
+  start_job returns canvasSize — use it to calculate positions.
+  Keep all items within 5%-95% of canvas width/height (leave margins).
+  Font sizes relative to canvas: titles ≤ 5% of canvas width, body ≤ 3%.
+  Example for 1080x1080: title fontSize ≤ 54, body ≤ 32, positions 54-1026.
+  Example for 800x600: title fontSize ≤ 40, body ≤ 24, positions 40-760.
+
 ─── DIAGRAMS (flowcharts, UML — do NOT use batch_execute) ───
 
 Diagrams use their own tools, not batch_execute:
@@ -5492,6 +5500,8 @@ If you see significantly higher numbers, investigate:
 ⚠️ Call ONCE per pipeline. NEVER restart — creates duplicates.
 
 WORKFLOW: start_job → batch_execute (everything in ONE call) → end_job (screenshot) → show user → iterate if needed.
+
+RETURNS: canvasSize {width, height} — use this to position items within bounds.
 
 CANVAS PRESETS: instagram (1080x1080), instagram-story (1080x1920), tiktok (1080x1920), youtube (1920x1080), youtube-thumbnail (1280x720), twitter (1200x675), linkedin (1200x627), web, print-a4, print-letter`,
     inputSchema: {
