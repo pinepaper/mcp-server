@@ -12,6 +12,12 @@ import { PINEPAPER_TOOLS } from '../../tools/definitions.js';
 // All valid tool names from the definitions
 const VALID_TOOLS = new Set(PINEPAPER_TOOLS.map(t => t.name));
 
+// Visual templates use batch_execute with layer labels
+const VISUAL_PROMPTS = ['motivational-quote', 'text-reveal-up', 'solar-system-education', 'cinema-titles'];
+
+// Diagram templates use dedicated diagram tools
+const DIAGRAM_PROMPTS = ['simple-decision-flow'];
+
 // Helper: extract all pinepaper_\w+ references from message text
 function extractToolNames(text: string): string[] {
   const matches = text.match(/pinepaper_\w+/g) || [];
@@ -82,13 +88,25 @@ describe('Message Structure', () => {
     }
   });
 
-  it('every prompt has an assistant message with batch workflow', () => {
-    for (const prompt of PROMPTS) {
-      const result = getPromptMessages(prompt.name, { description: 'test' });
+  it('visual prompts have batch_execute workflow', () => {
+    for (const name of VISUAL_PROMPTS) {
+      const result = getPromptMessages(name, { description: 'test' });
       const assistantMsgs = result.messages.filter(m => m.role === 'assistant');
       expect(assistantMsgs.length).toBeGreaterThanOrEqual(1);
       const text = assistantMsgs.map(m => m.content.text).join('\n');
       expect(text).toContain('batch_execute');
+    }
+  });
+
+  it('diagram prompts have diagram tool workflow', () => {
+    for (const name of DIAGRAM_PROMPTS) {
+      const result = getPromptMessages(name, { description: 'test' });
+      const assistantMsgs = result.messages.filter(m => m.role === 'assistant');
+      expect(assistantMsgs.length).toBeGreaterThanOrEqual(1);
+      const text = assistantMsgs.map(m => m.content.text).join('\n');
+      expect(text).toContain('create_diagram_shape');
+      expect(text).toContain('connect');
+      expect(text).toContain('auto_layout');
     }
   });
 
@@ -117,13 +135,22 @@ describe('Tool Name Validation', () => {
     }
   });
 
-  it('lists all referenced tools per prompt for auditing', () => {
-    for (const prompt of PROMPTS) {
-      const text = getAllMessageText(prompt.name, { description: 'test' });
-      // Prompts now use short names (start_job, batch_execute, end_job) instead of pinepaper_* prefixes
-      // to avoid verbose tool lists that cause pipeline restarts
+  it('visual prompts reference batch pipeline workflow', () => {
+    for (const name of VISUAL_PROMPTS) {
+      const text = getAllMessageText(name, { description: 'test' });
       expect(text).toContain('start_job');
       expect(text).toContain('batch_execute');
+      expect(text).toContain('end_job');
+    }
+  });
+
+  it('diagram prompts reference diagram tool workflow', () => {
+    for (const name of DIAGRAM_PROMPTS) {
+      const text = getAllMessageText(name, { description: 'test' });
+      expect(text).toContain('start_job');
+      expect(text).toContain('create_diagram_shape');
+      expect(text).toContain('connect');
+      expect(text).toContain('auto_layout');
       expect(text).toContain('end_job');
     }
   });
@@ -176,74 +203,95 @@ describe('Argument Substitution', () => {
 });
 
 // =============================================================================
-// 5. Per-Prompt Tool Call Verification
+// 5. Per-Prompt Pipeline Verification
 // =============================================================================
 
-describe('Per-Prompt Single-Pass Pipeline', () => {
-  // All prompts now use the batch-first pattern: start_job → batch_execute → end_job
-  // Individual tool names are NOT listed as pinepaper_* references (to prevent LLM re-planning)
-
-  it('every prompt references the pipeline workflow', () => {
-    for (const prompt of PROMPTS) {
-      const text = getAllMessageText(prompt.name, { description: 'test' });
-      expect(text).toContain('start_job');
-      expect(text).toContain('batch_execute');
-      expect(text).toContain('end_job');
+describe('Visual Template Layer Labels', () => {
+  it('every visual prompt has layer labels (CANVAS, ITEMS, ANIMATE, PLAY)', () => {
+    for (const name of VISUAL_PROMPTS) {
+      const text = getAllMessageText(name, { description: 'test' });
+      expect(text).toContain('CANVAS:');
+      expect(text).toContain('ITEMS:');
+      expect(text).toContain('ANIMATE:');
+      expect(text).toContain('PLAY:');
     }
   });
 
-  it('every prompt includes NEVER restart rule', () => {
-    for (const prompt of PROMPTS) {
-      const text = getAllMessageText(prompt.name, { description: 'test' });
+  it('every visual prompt includes NEVER restart rule', () => {
+    for (const name of VISUAL_PROMPTS) {
+      const text = getAllMessageText(name, { description: 'test' });
       expect(text).toContain('NEVER restart the pipeline');
     }
   });
 
-  it('every prompt includes validation workflow', () => {
-    for (const prompt of PROMPTS) {
-      const text = getAllMessageText(prompt.name, { description: 'test' });
-      expect(text).toContain('show');
-    }
-  });
-
-  it('motivational-quote: mentions batch operations for quote workflow', () => {
+  it('motivational-quote: layer-labeled operations for quote workflow', () => {
     const text = getAllMessageText('motivational-quote');
-    expect(text).toContain('execute_generator');
-    expect(text).toContain('create');
-    expect(text).toContain('animate');
-    expect(text).toContain('play_timeline');
+    expect(text).toContain('CANVAS: execute_generator');
+    expect(text).toContain('ITEMS: create text');
+    expect(text).toContain('ANIMATE: keyframe_animate');
+    expect(text).toContain('EFFECTS: apply_mask');
+    expect(text).toContain('PLAY: play_timeline');
   });
 
-  it('text-reveal-up: mentions batch operations for text reveal', () => {
+  it('text-reveal-up: layer-labeled operations for text reveal', () => {
     const text = getAllMessageText('text-reveal-up');
-    expect(text).toContain('execute_generator');
-    expect(text).toContain('create text');
-    expect(text).toContain('apply_mask');
+    expect(text).toContain('CANVAS: execute_generator');
+    expect(text).toContain('ITEMS: create text');
+    expect(text).toContain('EFFECTS: apply_mask');
     expect(text).toContain('wipeUp');
+    expect(text).toContain('PLAY: play_timeline');
   });
 
-  it('simple-decision-flow: mentions batch operations for flowcharts', () => {
-    const text = getAllMessageText('simple-decision-flow');
-    expect(text).toContain('set_background');
-    expect(text).toContain('create');
-    expect(text).toContain('relation');
-  });
-
-  it('solar-system-education: mentions batch operations for solar system', () => {
+  it('solar-system-education: layer-labeled operations for solar system', () => {
     const text = getAllMessageText('solar-system-education');
-    expect(text).toContain('set_background');
+    expect(text).toContain('CANVAS: set_background');
     expect(text).toContain('execute_generator');
-    expect(text).toContain('orbits');
+    expect(text).toContain('ITEMS: create');
+    expect(text).toContain('ANIMATE: animate');
     expect(text).toContain('relation');
+    expect(text).toContain('PLAY: play_timeline');
   });
 
-  it('cinema-titles: mentions batch operations for cinematic sequence', () => {
+  it('cinema-titles: layer-labeled operations for cinematic sequence', () => {
     const text = getAllMessageText('cinema-titles');
-    expect(text).toContain('set_background');
-    expect(text).toContain('create text');
-    expect(text).toContain('keyframe_animate');
-    expect(text).toContain('apply_mask');
-    expect(text).toContain('play_timeline');
+    expect(text).toContain('CANVAS: set_background');
+    expect(text).toContain('ITEMS: create text');
+    expect(text).toContain('ANIMATE: keyframe_animate');
+    expect(text).toContain('EFFECTS: apply_mask');
+    expect(text).toContain('PLAY: play_timeline');
+  });
+});
+
+describe('Diagram Template Workflow', () => {
+  it('simple-decision-flow: uses diagram tools, not batch_execute', () => {
+    const text = getAllMessageText('simple-decision-flow');
+    expect(text).toContain('create_diagram_shape');
+    expect(text).toContain('connect');
+    expect(text).toContain('auto_layout');
+    expect(text).not.toContain('batch_execute');
+  });
+
+  it('simple-decision-flow: includes NEVER restart rule', () => {
+    const text = getAllMessageText('simple-decision-flow');
+    expect(text).toContain('NEVER restart the pipeline');
+  });
+
+  it('simple-decision-flow: references shape types', () => {
+    const text = getAllMessageText('simple-decision-flow');
+    expect(text).toContain('terminal');
+    expect(text).toContain('process');
+    expect(text).toContain('decision');
+  });
+
+  it('simple-decision-flow: auto_layout is optional, not mandatory', () => {
+    const text = getAllMessageText('simple-decision-flow');
+    expect(text).toContain('optionally auto_layout');
+    expect(text).toContain('Position shapes explicitly');
+  });
+
+  it('simple-decision-flow: includes show/review step', () => {
+    const text = getAllMessageText('simple-decision-flow');
+    expect(text).toContain('SHOW the screenshot');
   });
 });
 

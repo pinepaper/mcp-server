@@ -9,9 +9,10 @@
  *
  * Rules:
  * - User message: frames the request with the user's description
- * - Assistant message: short commitment to single-pass batch execution
- * - NEVER list individual tools — use pinepaper_agent_batch_execute
- * - NEVER restart the pipeline — one start_job, one batch, one end_job
+ * - Assistant message: short commitment to single-pass execution
+ * - Visual templates: use SINGLE_PASS_RULES (batch_execute) with layer labels (CANVAS/ITEMS/ANIMATE/EFFECTS/PLAY)
+ * - Diagram templates: use DIAGRAM_RULES (create_diagram_shape + connect + auto_layout)
+ * - NEVER restart the pipeline
  */
 
 // -----------------------------------------------------------------------------
@@ -44,6 +45,15 @@ const SINGLE_PASS_RULES = `RULES — follow exactly:
 - batch_execute supports: set_canvas_size, set_background, execute_generator, create, modify, delete, animate, keyframe_animate, relation, apply_mask, apply_effect, play_timeline
 - Use execute_generator for rich backgrounds (drawBokeh, drawGradientMesh, drawWaves, etc.) — much better than solid colors
 - NEVER restart the pipeline — if user wants changes, modify items or start a new job
+- After end_job, SHOW the screenshot and ask user if the design looks good`;
+
+const DIAGRAM_RULES = `RULES — follow exactly:
+- start_job → create shapes (pinepaper_create_diagram_shape) → connect (pinepaper_connect) → optionally auto_layout → end_job
+- Analyze the description to infer ALL shapes, decisions, and connections
+- Shape types: terminal (start/end), process (steps), decision (branches), data (I/O), document, database
+- Position shapes explicitly when layout matters; use auto_layout only for tree/hierarchical flows
+- Curved connectors follow source→target regardless of positioning, so manual placement works fine
+- NEVER restart the pipeline
 - After end_job, SHOW the screenshot and ask user if the design looks good`;
 
 // -----------------------------------------------------------------------------
@@ -150,7 +160,7 @@ function buildMotivationalQuote(args: Record<string, string> = {}): PromptMessag
 
 ${SINGLE_PASS_RULES}
 
-Batch: execute_generator (rich background) → create text items → animate → keyframe_animate (timed reveals) → apply_mask → play_timeline.
+CANVAS: execute_generator (match mood) / ITEMS: create text (quote + attribution) / ANIMATE: keyframe_animate (staggered reveals) / EFFECTS: apply_mask (wipeUp or iris) / PLAY: play_timeline.
 
 Starting now.`,
       },
@@ -177,7 +187,7 @@ function buildTextRevealUp(args: Record<string, string> = {}): PromptMessage[] {
 
 ${SINGLE_PASS_RULES}
 
-Batch: execute_generator (background) → create text items (one per word) → keyframe_animate (staggered fade-in) → apply_mask (wipeUp per item) → play_timeline.
+CANVAS: execute_generator (match style) / ITEMS: create text (one per word, stacked) / ANIMATE: keyframe_animate (staggered fade-in) / EFFECTS: apply_mask (wipeUp per item) / PLAY: play_timeline.
 
 Starting now.`,
       },
@@ -200,11 +210,11 @@ function buildSimpleDecisionFlow(args: Record<string, string> = {}): PromptMessa
       role: 'assistant',
       content: {
         type: 'text',
-        text: `I'll create this. All operations in one batch_execute call, then show you the result.
+        text: `I'll create this flowchart using diagram tools, then show you the result.
 
-${SINGLE_PASS_RULES}
+${DIAGRAM_RULES}
 
-Batch: set_background → create (diagram shapes: terminal, process, decision, data) → relation (connectors) → play_timeline.
+DESIGN: Analyze description → identify shapes (terminal, process, decision) → create_diagram_shape each (position explicitly or let auto_layout arrange) → connect with arrows.
 
 Starting now.`,
       },
@@ -231,7 +241,7 @@ function buildSolarSystem(args: Record<string, string> = {}): PromptMessage[] {
 
 ${SINGLE_PASS_RULES}
 
-Batch: set_background (#0a0a2e) → execute_generator (drawBokeh for starfield) → create (sun, orbit paths, planets) → animate (sun: pulse) → relation (planets: orbits sun) → keyframe_animate (comet trail) → play_timeline.
+CANVAS: set_background (#0a0a2e) + execute_generator (drawBokeh starfield) / ITEMS: create (sun, orbits, planets) / ANIMATE: animate (sun pulse) + relation (orbits) + keyframe_animate (comet) / PLAY: play_timeline.
 
 Starting now.`,
       },
@@ -258,7 +268,7 @@ function buildCinemaTitles(args: Record<string, string> = {}): PromptMessage[] {
 
 ${SINGLE_PASS_RULES}
 
-Batch: set_background (#000000) → create text (title + subtitle, opacity:0) → keyframe_animate (fade in + scale, staggered) → apply_mask (cinematic letterbox) → play_timeline.
+CANVAS: set_background (#000000) / ITEMS: create text (title + subtitle, opacity:0) / ANIMATE: keyframe_animate (fade in + scale, staggered) / EFFECTS: apply_mask (cinematic letterbox) / PLAY: play_timeline.
 
 Starting now.`,
       },
