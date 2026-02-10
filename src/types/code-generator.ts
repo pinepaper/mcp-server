@@ -1809,14 +1809,16 @@ app.setCanvasSize('${canvasPreset}');
     }
 
     code += `
-// Return job context
+// Return job context with canvas size
+const _cs = app.getCanvasSize ? app.getCanvasSize() : { width: 800, height: 600 };
 ({
   success: true,
   jobStarted: true,
   name: ${nameStr},
   screenshotPolicy: '${policyStr}',
   canvasPreset: ${canvasPreset ? `'${canvasPreset}'` : 'null'},
-  canvasCleared: ${shouldClear}
+  canvasCleared: ${shouldClear},
+  canvasSize: { width: _cs.width || 800, height: _cs.height || 600 }
 });
 `;
 
@@ -1996,7 +1998,8 @@ app.setBackgroundColor('${backgroundColor}');
     code += `
 // Save state
 if (app.historyManager) app.historyManager.saveState();
-({ success: true, reset: true, canvasPreset: ${canvasPreset ? `'${canvasPreset}'` : 'null'} });
+const _cs = app.getCanvasSize ? app.getCanvasSize() : { width: 800, height: 600 };
+({ success: true, reset: true, canvasPreset: ${canvasPreset ? `'${canvasPreset}'` : 'null'}, canvasSize: { width: _cs.width || 800, height: _cs.height || 600 } });
 `;
 
     return code.trim();
@@ -2043,9 +2046,11 @@ if (app.historyManager) app.historyManager.saveState();
     // Save state
     if (app.historyManager) app.historyManager.saveState();
 
-    return { success, itemIds, results, operationCount: ${operations.length} };
+    const _cs = app.getCanvasSize ? app.getCanvasSize() : { width: 800, height: 600 };
+    return { success, itemIds, results, operationCount: ${operations.length}, canvasSize: { width: _cs.width || 800, height: _cs.height || 600 } };
   } catch (e) {
-    return { success: false, error: e.message, itemIds, results, operationCount: ${operations.length} };
+    const _cs = app.getCanvasSize ? app.getCanvasSize() : { width: 800, height: 600 };
+    return { success: false, error: e.message, itemIds, results, operationCount: ${operations.length}, canvasSize: { width: _cs.width || 800, height: _cs.height || 600 } };
   }
 })();
 `;

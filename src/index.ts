@@ -262,7 +262,7 @@ Apply with \`pinepaper_apply_animated_mask\`
 
 For AI agents, use the batch pipeline for maximum efficiency:
 
-1. \`pinepaper_agent_start_job\` — clear canvas, set preset
+1. \`pinepaper_agent_start_job\` — clear canvas, set preset → returns canvasSize {width, height} for positioning
 2. \`pinepaper_agent_batch_execute\` — ONE call with ALL operations (12 types: canvas, background, generators, items, animations, keyframes, relations, masks, effects, playback)
 3. \`pinepaper_agent_end_job\` — returns screenshot for user validation
 4. User reviews → modify specific items or start new job
