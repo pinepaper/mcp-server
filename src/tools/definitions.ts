@@ -10,6 +10,7 @@
 
 import { Tool } from '@modelcontextprotocol/sdk/types.js';
 import { I18nManager } from '../i18n/index.js';
+import { COMPACT_DESCRIPTIONS } from './compact-descriptions.js';
 
 // =============================================================================
 // AI AGENT GUIDE
@@ -93,6 +94,11 @@ Spacing: distribute across canvas with breathing room, don't cluster
   Example for 1080x1080: title fontSize ≤ 54, body ≤ 32, positions 54-1026.
   Example for 800x600: title fontSize ≤ 40, body ≤ 24, positions 40-760.
 
+⚠️ TEXT OVERLAP — NEVER place multiple text items at the same position:
+  Each text item MUST have a unique Y position. Stack vertically with spacing ≥ fontSize × 1.4.
+  For N words stacked vertically: startY = centerY - (N-1) × spacing / 2, then increment Y by spacing.
+  Example for 5 words at fontSize 48 on 800x600: spacing=67, startY=166, positions: 166, 233, 300, 367, 434.
+
 ─── DIAGRAMS (flowcharts, UML — do NOT use batch_execute) ───
 
 Diagrams use their own tools, not batch_execute:
@@ -169,12 +175,12 @@ COMMON PRESETS:
 - hd-landscape: 1920x1080
 - hd-portrait: 1080x1920
 
-For wedding invitations, event cards, or detailed designs, use at least 1080x1080 or larger.`,
+Max canvas size: 4096x4096. For wedding invitations, event cards, or detailed designs, use at least 1080x1080 or larger.`,
     inputSchema: {
       type: 'object',
       properties: {
-        width: { type: 'number', description: 'Canvas width in pixels' },
-        height: { type: 'number', description: 'Canvas height in pixels' },
+        width: { type: 'number', description: 'Canvas width in pixels (100-4096)' },
+        height: { type: 'number', description: 'Canvas height in pixels (100-4096)' },
         preset: {
           type: 'string',
           description: 'Optional preset name',
@@ -5653,6 +5659,8 @@ NOTE: For diagrams (flowcharts, UML), use pinepaper_create_diagram_shape + pinep
 
 ⚠️ EVERY operation executes LIVE on the canvas. Calling this twice DOUBLES all items. Call ONCE per pipeline.
 
+⚠️ SIZING: All positions/sizes MUST fit within the canvas. start_job returns canvasSize. Keep items within 5%-95% of canvas width/height. Max canvas: 4096x4096.
+
 WORKFLOW:
 1. pinepaper_agent_start_job → 2. pinepaper_agent_batch_execute (everything) → 3. pinepaper_agent_end_job (screenshot for validation)
 After validation: user reviews screenshot → feedback → modify/recreate as needed.
@@ -5728,8 +5736,8 @@ EXAMPLE — Animated sky scene with timed reveals:
                 description: 'Operation type',
               },
               // Canvas setup
-              width: { type: 'number', description: 'Canvas width for set_canvas_size' },
-              height: { type: 'number', description: 'Canvas height for set_canvas_size' },
+              width: { type: 'number', description: 'Canvas width for set_canvas_size (100-4096)' },
+              height: { type: 'number', description: 'Canvas height for set_canvas_size (100-4096)' },
               preset: { type: 'string', description: 'Canvas preset for set_canvas_size' },
               backgroundColor: { type: 'string', description: 'For set_background: hex color' },
               generatorName: {
@@ -6173,4 +6181,24 @@ export function getLocalizedTools(i18n: I18nManager): Tool[] {
     // The i18n manager provides translated tool names for UI purposes
     description: i18n.getToolDescription(tool.name) || tool.description,
   }));
+}
+
+/**
+ * Tool description verbosity level.
+ * - 'verbose': Full descriptions (default, ~42K tokens)
+ * - 'compact': Trimmed descriptions for the 13 largest tools (~37K tokens)
+ */
+export type ToolVerbosity = 'verbose' | 'compact';
+
+/**
+ * Get tools with the specified verbosity level.
+ * Compact mode swaps in shorter descriptions for the 13 largest tools,
+ * reducing context usage by ~5K tokens while preserving critical guidance.
+ */
+export function getToolsForVerbosity(verbosity: ToolVerbosity): Tool[] {
+  if (verbosity === 'verbose') return PINEPAPER_TOOLS;
+  return PINEPAPER_TOOLS.map(tool => {
+    const compact = COMPACT_DESCRIPTIONS[tool.name];
+    return compact ? { ...tool, description: compact } : tool;
+  });
 }
