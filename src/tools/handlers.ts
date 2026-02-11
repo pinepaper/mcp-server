@@ -105,6 +105,9 @@ import {
   ItemType,
 } from '../types/schemas.js';
 import { ZodError } from 'zod';
+import { writeFile, mkdir } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { I18nManager, getI18n } from '../i18n/index.js';
 import {
   PinePaperBrowserController,
@@ -140,6 +143,47 @@ export function getScreenshotMode(): ScreenshotMode {
   }
   // Default to 'on_request' for better performance (best practice)
   return 'on_request';
+}
+
+// =============================================================================
+// EXPORT FILE SAVE HELPERS
+// =============================================================================
+
+function getExportDir(): string {
+  return process.env.PINEPAPER_EXPORT_DIR || join(tmpdir(), 'pinepaper-exports');
+}
+
+const ALWAYS_SAVE_FORMATS = new Set(['mp4', 'webm', 'gif', 'pdf']);
+const SAVE_THRESHOLD_BYTES = 500_000; // ~500KB base64 ≈ 375KB decoded
+
+function getFileExtension(format: string): string {
+  const extMap: Record<string, string> = { mp4: 'mp4', webm: 'webm', gif: 'gif', pdf: 'pdf', png: 'png', svg: 'svg' };
+  return extMap[format] || format;
+}
+
+async function saveExportToFile(
+  data: string,
+  format: string,
+  platform: string
+): Promise<{ filePath: string; fileSize: number }> {
+  const exportDir = getExportDir();
+  await mkdir(exportDir, { recursive: true });
+
+  const ext = getFileExtension(format);
+  const timestamp = Date.now();
+  const fileName = `pinepaper_${platform}_${timestamp}.${ext}`;
+  const filePath = join(exportDir, fileName);
+
+  if (data.startsWith('data:')) {
+    const base64Data = data.split(',')[1];
+    const buffer = Buffer.from(base64Data, 'base64');
+    await writeFile(filePath, buffer);
+    return { filePath, fileSize: buffer.length };
+  } else {
+    // Plain text (SVG)
+    await writeFile(filePath, data, 'utf-8');
+    return { filePath, fileSize: Buffer.byteLength(data, 'utf-8') };
+  }
 }
 
 // =============================================================================
@@ -1754,7 +1798,71 @@ All PinePaper tools will work in **code-only mode**:
         const input = AgentEndJobInputSchema.parse(args);
         const code = codeGenerator.generateAgentEndJob(input);
         const description = 'Ended agent job with summary and recommendations';
-        return executeOrGenerate(code, description, options, 'pinepaper_agent_end_job');
+
+        // In code mode or non-browser mode, return as usual
+        const endJobExecMode = options.executionMode ?? getExecutionMode();
+        if (endJobExecMode === 'code' || !options.executeInBrowser) {
+          return executeOrGenerate(code, description, options, 'pinepaper_agent_end_job');
+        }
+
+        // Execute in browser and intercept result to save large screenshots to disk
+        const endJobController = options.browserController || getBrowserController();
+        if (!endJobController.connected) {
+          return executeOrGenerate(code, description, options, 'pinepaper_agent_end_job');
+        }
+
+        // Auto-start agent session if not active
+        const endJobSessionMgr = getSessionManager();
+        if (!endJobSessionMgr.hasActiveJob()) {
+          endJobSessionMgr.startJob({ name: 'auto_session', screenshotPolicy: 'on_complete' });
+        }
+
+        const endJobBrowserResult = await endJobController.executeCode(code, false);
+
+        if (!endJobBrowserResult.success) {
+          const canvasState = await captureCanvasState(endJobController);
+          return errorResult(
+            ErrorCodes.EXECUTION_ERROR,
+            endJobBrowserResult.error || 'End job failed',
+            { code },
+            { toolName: 'pinepaper_agent_end_job', canvasState: canvasState || undefined }
+          );
+        }
+
+        const endJobResult = endJobBrowserResult.result as Record<string, any>;
+
+        // Check if result contains a large screenshot data URL
+        if (endJobResult?.screenshot && typeof endJobResult.screenshot === 'string' && endJobResult.screenshot.length > SAVE_THRESHOLD_BYTES) {
+          try {
+            const { filePath, fileSize } = await saveExportToFile(endJobResult.screenshot, 'png', 'screenshot');
+            const cleanResult = { ...endJobResult, screenshot: undefined, screenshotPath: filePath, screenshotSize: fileSize };
+
+            // Take a smaller Puppeteer viewport screenshot to show the user inline
+            const previewScreenshot = await endJobController.takeScreenshot();
+
+            const content: (TextContent | ImageContent)[] = [{
+              type: 'text' as const,
+              text: `Executed PinePaper code:\n\n\`\`\`javascript\n${code}\n\`\`\`\n\nFull screenshot saved to: ${filePath} (${(fileSize / 1024).toFixed(1)} KB)\n\nResult: ${JSON.stringify(cleanResult, null, 2)}`,
+            }];
+
+            if (previewScreenshot) {
+              content.push({
+                type: 'image' as const,
+                data: previewScreenshot,
+                mimeType: 'image/png',
+              } as ImageContent);
+            }
+
+            return { content };
+          } catch (saveError) {
+            console.error('[PinePaper] Failed to save end_job screenshot to file:', saveError);
+            // Fall through to inline result but strip the screenshot to avoid oversized response
+            const strippedResult = { ...endJobResult, screenshot: '[screenshot too large for inline — save failed]' };
+            return executedResult(code, strippedResult, undefined, description);
+          }
+        }
+
+        return executedResult(code, endJobResult, endJobBrowserResult.screenshot, description);
       }
 
       case 'pinepaper_agent_reset': {
@@ -1768,14 +1876,112 @@ All PinePaper tools will work in **code-only mode**:
         const input = AgentBatchExecuteInputSchema.parse(args);
         const code = codeGenerator.generateAgentBatchExecute(input);
         const description = `Batch executed ${input.operations.length} operations${input.atomic !== false ? ' (atomic)' : ''}`;
-        return executeOrGenerate(code, description, options, 'pinepaper_agent_batch_execute');
+
+        // Check for out-of-bounds items before execution
+        let boundsWarning = '';
+        const sizeOp = input.operations.find((op: any) => op.type === 'set_canvas_size');
+        if (sizeOp) {
+          const cw = (sizeOp as any).width || 1920;
+          const ch = (sizeOp as any).height || 1080;
+          const oobItems: string[] = [];
+          input.operations.forEach((op: any, idx: number) => {
+            if (op.type === 'create' && op.position) {
+              const { x, y } = op.position;
+              if (x < 0 || y < 0 || x > cw || y > ch) {
+                oobItems.push(`op[${idx}] ${op.itemType || 'item'} at (${x},${y})`);
+              }
+            }
+          });
+          if (oobItems.length > 0) {
+            boundsWarning = `\n\nWARNING: ${oobItems.length} item(s) positioned outside canvas bounds (${cw}x${ch}): ${oobItems.join(', ')}. Items may be clipped or invisible.`;
+          }
+        }
+
+        const batchResult = await executeOrGenerate(code, description, options, 'pinepaper_agent_batch_execute');
+
+        // Append bounds warning if any
+        if (boundsWarning && batchResult.content && batchResult.content.length > 0) {
+          const firstContent = batchResult.content[0] as TextContent;
+          if (firstContent.type === 'text') {
+            firstContent.text += boundsWarning;
+          }
+        }
+
+        return batchResult;
       }
 
       case 'pinepaper_agent_export': {
         const input = AgentExportInputSchema.parse(args);
         const code = codeGenerator.generateAgentExport(input);
         const description = `Smart export for ${input.platform} as ${input.format || 'auto'}`;
-        return executeOrGenerate(code, description, options, 'pinepaper_agent_export');
+
+        // In code mode, return generated code as usual
+        const effectiveExecMode = options.executionMode ?? getExecutionMode();
+        if (effectiveExecMode === 'code' || !options.executeInBrowser) {
+          return executeOrGenerate(code, description, options, 'pinepaper_agent_export');
+        }
+
+        // Execute in browser and intercept result for file saving
+        const controller = options.browserController || getBrowserController();
+
+        // Auto-connect if needed
+        if (!controller.connected) {
+          console.error('[PinePaper] Auto-connecting browser for export...');
+          try {
+            await controller.connect();
+          } catch (connectError) {
+            // Fall back to executeOrGenerate which handles the fallback gracefully
+            return executeOrGenerate(code, description, options, 'pinepaper_agent_export');
+          }
+        }
+
+        // Auto-start agent session if not active
+        const exportSessionManager = getSessionManager();
+        if (!exportSessionManager.hasActiveJob()) {
+          exportSessionManager.startJob({ name: 'auto_session', screenshotPolicy: 'on_complete' });
+        }
+
+        const exportBrowserResult = await controller.executeCode(code, false);
+
+        if (!exportBrowserResult.success) {
+          const canvasState = await captureCanvasState(controller);
+          return errorResult(
+            ErrorCodes.EXECUTION_ERROR,
+            exportBrowserResult.error || 'Export failed',
+            { code },
+            { toolName: 'pinepaper_agent_export', canvasState: canvasState || undefined }
+          );
+        }
+
+        const exportResult = exportBrowserResult.result as Record<string, any>;
+        const format = exportResult?.format || input.format || 'png';
+        const data = exportResult?.data;
+
+        const shouldSaveToFile = data && typeof data === 'string' && (
+          ALWAYS_SAVE_FORMATS.has(format) ||
+          data.length > SAVE_THRESHOLD_BYTES
+        );
+
+        if (shouldSaveToFile) {
+          try {
+            const { filePath, fileSize } = await saveExportToFile(data, format, input.platform || 'auto');
+            const cleanResult = { ...exportResult, data: undefined, filePath, fileSize };
+            return {
+              content: [{
+                type: 'text' as const,
+                text: `Export saved to file:\n\nFile: ${filePath}\nFormat: ${format}\nSize: ${(fileSize / 1024).toFixed(1)} KB\nPlatform: ${input.platform}\n\nResult: ${JSON.stringify(cleanResult, null, 2)}`,
+              }],
+            };
+          } catch (saveError) {
+            console.error('[PinePaper] Failed to save export to file:', saveError);
+            // Strip the massive data to prevent oversized response
+            const strippedResult = { ...exportResult, data: `[${format} export data — file save failed: ${saveError instanceof Error ? saveError.message : 'unknown error'}]` };
+            return executedResult(code, strippedResult, exportBrowserResult.screenshot, description);
+          }
+        }
+
+        // Small export — return inline (existing behavior)
+        return executedResult(code, exportResult, exportBrowserResult.screenshot, description);
       }
 
       case 'pinepaper_agent_analyze': {

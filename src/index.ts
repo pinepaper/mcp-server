@@ -21,7 +21,8 @@ import {
   GetPromptRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 
-import { PINEPAPER_TOOLS, getLocalizedTools } from './tools/definitions.js';
+import { PINEPAPER_TOOLS, getLocalizedTools, getToolsForVerbosity } from './tools/definitions.js';
+import type { ToolVerbosity } from './tools/definitions.js';
 import { handleToolCall, ExecutionMode, getExecutionMode } from './tools/handlers.js';
 import {
   I18nManager,
@@ -5775,6 +5776,8 @@ export interface ServerOptions {
   browserMode?: boolean;
   /** Execution mode: 'puppeteer' (default) or 'code' (generate only for manual paste) */
   executionMode?: ExecutionMode;
+  /** Tool description verbosity: 'verbose' (default) or 'compact' (saves ~5K tokens) */
+  verbosity?: ToolVerbosity;
 }
 
 // =============================================================================
@@ -5784,7 +5787,9 @@ export interface ServerOptions {
 export async function createServer(options: ServerOptions = {}): Promise<Server> {
   // Initialize i18n with specified locale
   const locale = options.locale || detectLocaleFromEnvironment();
+  const verbosity = options.verbosity || detectVerbosityFromEnvironment();
   const i18n = await initI18n(locale);
+  const tools = getToolsForVerbosity(verbosity);
 
   const server = new Server(SERVER_INFO, {
     capabilities: {
@@ -5798,12 +5803,12 @@ export async function createServer(options: ServerOptions = {}): Promise<Server>
   // TOOL HANDLERS
   // ---------------------------------------------------------------------------
 
-  // List available tools (with optional localization)
+  // List available tools (with optional localization and verbosity)
   server.setRequestHandler(ListToolsRequestSchema, async () => {
     // Tool descriptions are kept in English for AI understanding
-    // but can be localized if needed for UI display
+    // Compact mode trims the 13 largest descriptions to save ~5K tokens
     return {
-      tools: PINEPAPER_TOOLS,
+      tools,
     };
   });
 
@@ -5905,6 +5910,14 @@ function detectLocaleFromEnvironment(): SupportedLocale {
 }
 
 /**
+ * Detect tool description verbosity from environment.
+ * Set PINEPAPER_TOOL_VERBOSITY=compact to use trimmed descriptions (~5K tokens saved).
+ */
+function detectVerbosityFromEnvironment(): ToolVerbosity {
+  return process.env.PINEPAPER_TOOL_VERBOSITY === 'compact' ? 'compact' : 'verbose';
+}
+
+/**
  * Check if a string is a valid supported locale
  */
 function isValidLocale(locale: string): boolean {
@@ -5960,12 +5973,14 @@ function isValidLocale(locale: string): boolean {
 
 async function main(): Promise<void> {
   const locale = detectLocaleFromEnvironment();
-  const server = await createServer({ locale });
+  const verbosity = detectVerbosityFromEnvironment();
+  const server = await createServer({ locale, verbosity });
   const transport = new StdioServerTransport();
 
   console.error('PinePaper MCP Server starting...');
   console.error(`Version: ${SERVER_INFO.version}`);
   console.error(`Locale: ${locale}`);
+  console.error(`Verbosity: ${verbosity}`);
   console.error(`Tools: ${PINEPAPER_TOOLS.length}`);
   console.error(`Resources: ${RESOURCES.length}`);
 

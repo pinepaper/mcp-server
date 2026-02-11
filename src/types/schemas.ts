@@ -779,8 +779,8 @@ export const SetBackgroundColorInputSchema = z.object({
 });
 
 export const SetCanvasSizeInputSchema = z.object({
-  width: z.number().describe('Canvas width'),
-  height: z.number().describe('Canvas height'),
+  width: z.number().min(100).max(4096).describe('Canvas width (100-4096)'),
+  height: z.number().min(100).max(4096).describe('Canvas height (100-4096)'),
   preset: z.string().optional().describe('Optional preset name'),
 });
 
@@ -1528,8 +1528,8 @@ export const AgentBatchOperationSchema = z.object({
   generatorName: z.string().optional().describe('Generator name for execute_generator'),
   generatorParams: z.record(z.unknown()).optional().describe('Generator parameters'),
   // Set canvas size fields
-  width: z.number().optional().describe('Canvas width for set_canvas_size'),
-  height: z.number().optional().describe('Canvas height for set_canvas_size'),
+  width: z.number().min(100).max(4096).optional().describe('Canvas width for set_canvas_size (100-4096)'),
+  height: z.number().min(100).max(4096).optional().describe('Canvas height for set_canvas_size (100-4096)'),
   preset: z.string().optional().describe('Canvas preset for set_canvas_size (e.g. instagram, youtube)'),
   // Keyframe animate fields
   keyframes: z.array(z.object({

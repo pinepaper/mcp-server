@@ -303,6 +303,9 @@ const item = app.create('${itemType}', ${JSON.stringify(params, null, 2)});`;
     code += `\nitem.opacity = ${opacity};`;
   }
 
+  // Ensure item is visible above backgrounds/generators
+  code += `\nif (item.bringToFront) item.bringToFront();`;
+
   code += `
 const itemId = item.data.registryId;
 app.historyManager.saveState();
@@ -1422,6 +1425,7 @@ if (typeof app.generators !== 'undefined' && app.generators['${backgroundGenerat
   }
 
   const itemId = app.registerItem(item, '${name}', { source: 'mcp-scene' });
+  if (item.bringToFront) item.bringToFront();
   nameToId['${name}'] = itemId;
   results.items.push({ name: '${name}', itemId, type: '${itemType}' });
 })();
@@ -1780,46 +1784,50 @@ throw new Error('Unknown diagram mode action: ${action}');
 
     let code = `
 // Start agent job
-const jobOptions = {
-  name: ${nameStr},
-  screenshotPolicy: '${policyStr}',
-  agentMode: true
-};
+(async function() {
+  const jobOptions = {
+    name: ${nameStr},
+    screenshotPolicy: '${policyStr}',
+    agentMode: true
+  };
 `;
 
     if (shouldClear) {
       code += `
-// Clear canvas
-if (app.clearCanvas) {
-  app.clearCanvas();
-} else {
-  if (app.textItemGroup) app.textItemGroup.removeChildren();
-  if (app.patternGroup) app.patternGroup.removeChildren();
-  if (app.itemRegistry) app.itemRegistry.clear();
-  if (app.relationRegistry) app.relationRegistry.clear();
-}
+  // Clear canvas
+  if (app.clearCanvas) {
+    app.clearCanvas();
+  } else {
+    if (app.textItemGroup) app.textItemGroup.removeChildren();
+    if (app.patternGroup) app.patternGroup.removeChildren();
+    if (app.itemRegistry) app.itemRegistry.clear();
+    if (app.relationRegistry) app.relationRegistry.clear();
+  }
 `;
     }
 
     if (canvasPreset) {
       code += `
-// Set canvas size to preset
-app.setCanvasSize('${canvasPreset}');
+  // Set canvas size to preset
+  app.setCanvasSize('${canvasPreset}');
+  // Allow canvas resize to take effect
+  await new Promise(r => setTimeout(r, 50));
 `;
     }
 
     code += `
-// Return job context with canvas size
-const _cs = app.getCanvasSize ? app.getCanvasSize() : { width: 800, height: 600 };
-({
-  success: true,
-  jobStarted: true,
-  name: ${nameStr},
-  screenshotPolicy: '${policyStr}',
-  canvasPreset: ${canvasPreset ? `'${canvasPreset}'` : 'null'},
-  canvasCleared: ${shouldClear},
-  canvasSize: { width: _cs.width || 800, height: _cs.height || 600 }
-});
+  // Return job context with canvas size
+  const _cs = app.getCanvasSize ? app.getCanvasSize() : { width: 800, height: 600 };
+  return {
+    success: true,
+    jobStarted: true,
+    name: ${nameStr},
+    screenshotPolicy: '${policyStr}',
+    canvasPreset: ${canvasPreset ? `'${canvasPreset}'` : 'null'},
+    canvasCleared: ${shouldClear},
+    canvasSize: { width: _cs.width || 800, height: _cs.height || 600 }
+  };
+})();
 `;
 
     return code.trim();
@@ -1884,9 +1892,28 @@ const _cs = app.getCanvasSize ? app.getCanvasSize() : { width: 800, height: 600 
       analysis.hasAnimations = true;
       animationSet.add(data.animationType);
     }
+    // Detect keyframe animations (added via app.addAnimation with keyframes array)
+    if (data.keyframes || data.animation || data.keyframeAnimation) {
+      analysis.hasAnimations = true;
+      animationSet.add('keyframe');
+    }
     if (item.fillColor && item.fillColor.gradient) analysis.hasGradients = true;
     if (item.shadowColor || item.shadowBlur) analysis.hasShadows = true;
   });
+
+  // Check animation manager for registered animations
+  if (app.animationManager) {
+    const animations = app.animationManager.getAll ? app.animationManager.getAll() : (app.animationManager.animations || []);
+    if (animations.length > 0) {
+      analysis.hasAnimations = true;
+      animationSet.add('managed');
+    }
+  }
+  // Check timeline for active animations
+  if (app.timeline && (app.timeline.isPlaying || app.timeline.animations?.length > 0)) {
+    analysis.hasAnimations = true;
+    animationSet.add('timeline');
+  }
 
   analysis.animationTypes = Array.from(animationSet);
 
@@ -1958,48 +1985,52 @@ const _cs = app.getCanvasSize ? app.getCanvasSize() : { width: 800, height: 600 
 
     let code = `
 // Fast canvas reset
+(async function() {
 `;
 
     if (!preserveBackground) {
       code += `
-// Clear canvas completely
-if (app.clearCanvas) {
-  app.clearCanvas();
-} else {
-  if (app.textItemGroup) app.textItemGroup.removeChildren();
-  if (app.patternGroup) app.patternGroup.removeChildren();
-  if (app.itemRegistry) app.itemRegistry.clear();
-  if (app.relationRegistry) app.relationRegistry.clear();
-}
+  // Clear canvas completely
+  if (app.clearCanvas) {
+    app.clearCanvas();
+  } else {
+    if (app.textItemGroup) app.textItemGroup.removeChildren();
+    if (app.patternGroup) app.patternGroup.removeChildren();
+    if (app.itemRegistry) app.itemRegistry.clear();
+    if (app.relationRegistry) app.relationRegistry.clear();
+  }
 `;
     } else {
       code += `
-// Clear items but preserve background
-if (app.textItemGroup) app.textItemGroup.removeChildren();
-if (app.itemRegistry) app.itemRegistry.clear();
-if (app.relationRegistry) app.relationRegistry.clear();
+  // Clear items but preserve background
+  if (app.textItemGroup) app.textItemGroup.removeChildren();
+  if (app.itemRegistry) app.itemRegistry.clear();
+  if (app.relationRegistry) app.relationRegistry.clear();
 `;
     }
 
     if (canvasPreset) {
       code += `
-// Set canvas to preset
-app.setCanvasSize('${canvasPreset}');
+  // Set canvas to preset
+  app.setCanvasSize('${canvasPreset}');
+  // Allow canvas resize to take effect
+  await new Promise(r => setTimeout(r, 50));
 `;
     }
 
     if (backgroundColor && !preserveBackground) {
       code += `
-// Set background color
-app.setBackgroundColor('${backgroundColor}');
+  // Set background color
+  app.setBackgroundColor('${backgroundColor}');
 `;
     }
 
     code += `
-// Save state
-if (app.historyManager) app.historyManager.saveState();
-const _cs = app.getCanvasSize ? app.getCanvasSize() : { width: 800, height: 600 };
-({ success: true, reset: true, canvasPreset: ${canvasPreset ? `'${canvasPreset}'` : 'null'}, canvasSize: { width: _cs.width || 800, height: _cs.height || 600 } });
+  // Save state
+  if (app.historyManager) app.historyManager.saveState();
+  const _cs = app.getCanvasSize ? app.getCanvasSize() : { width: 800, height: 600 };
+  return { success: true, reset: true, canvasPreset: ${canvasPreset ? `'${canvasPreset}'` : 'null'}, canvasSize: { width: _cs.width || 800, height: _cs.height || 600 } };
+})();
 `;
 
     return code.trim();
@@ -2069,6 +2100,8 @@ const _cs = app.getCanvasSize ? app.getCanvasSize() : { width: 800, height: 600 
         return `
 const item = app.create('${op.itemType}', { position: { x: ${pos.x}, y: ${pos.y} }, ...${props} });
 const itemId = item.data && item.data.id ? item.data.id : app.registerItem(item, '${op.itemType}', { source: 'mcp-batch' });
+// Ensure item is visible above backgrounds/generators
+if (item.bringToFront) item.bringToFront();
 return { itemId };
 `;
 
@@ -2150,6 +2183,7 @@ return { success: true, generator: '${genName}' };
         const sizeArg = op.preset ? `'${op.preset}'` : `{ width: ${w}, height: ${h} }`;
         return `
 app.setCanvasSize(${sizeArg});
+await new Promise(r => setTimeout(r, 50));
 return { success: true, width: ${w}, height: ${h} };
 `;
       }
@@ -2420,11 +2454,30 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
       analysis.hasAnimations = true;
       animationSet.add(data.animationType);
     }
+    // Detect keyframe animations (added via app.addAnimation with keyframes array)
+    if (data.keyframes || data.animation || data.keyframeAnimation) {
+      analysis.hasAnimations = true;
+      animationSet.add('keyframe');
+    }
 
     if (item.fillColor && item.fillColor.gradient) hasGradient = true;
     if (item.strokeColor && item.strokeColor.gradient) hasGradient = true;
     if (item.shadowColor || item.shadowBlur) hasShadow = true;
   });
+
+  // Check animation manager for registered animations
+  if (app.animationManager) {
+    const animations = app.animationManager.getAll ? app.animationManager.getAll() : (app.animationManager.animations || []);
+    if (animations.length > 0) {
+      analysis.hasAnimations = true;
+      animationSet.add('managed');
+    }
+  }
+  // Check timeline for active animations
+  if (app.timeline && (app.timeline.isPlaying || app.timeline.animations?.length > 0)) {
+    analysis.hasAnimations = true;
+    animationSet.add('timeline');
+  }
 
   analysis.animationTypes = Array.from(animationSet);
   analysis.hasGradients = hasGradient;

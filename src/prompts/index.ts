@@ -187,7 +187,7 @@ function buildTextRevealUp(args: Record<string, string> = {}): PromptMessage[] {
 
 ${SINGLE_PASS_RULES}
 
-CANVAS: execute_generator (match style) / ITEMS: create text (one per word, stacked) / ANIMATE: keyframe_animate (staggered fade-in) / EFFECTS: apply_mask (wipeUp per item) / PLAY: play_timeline.
+CANVAS: execute_generator (match style) / ITEMS: create text (one per word, each on its own line — stack vertically with Y spacing ≥ fontSize × 1.4, NEVER same position) / ANIMATE: keyframe_animate (staggered fade-in, each word 0.3s after previous) / EFFECTS: apply_mask (wipeUp per item) / PLAY: play_timeline.
 
 Starting now.`,
       },
