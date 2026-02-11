@@ -1807,66 +1807,6 @@ export const ResetQuizInputSchema = z.object({
 export type ResetQuizInput = z.infer<typeof ResetQuizInputSchema>;
 
 // =============================================================================
-// WIDGET EXPORT SCHEMAS
-// =============================================================================
-
-/**
- * Widget export format
- */
-export const WidgetExportFormatSchema = z.enum([
-  'web-component',
-  'standalone-html',
-  'iframe-embed',
-  'react-component',
-  'vue-component',
-]).describe('Widget export format');
-
-export type WidgetExportFormat = z.infer<typeof WidgetExportFormatSchema>;
-
-/**
- * Widget sizing mode
- */
-export const WidgetSizingSchema = z.enum([
-  'fixed',
-  'responsive',
-  'fluid',
-]).describe('How widget sizes itself');
-
-export type WidgetSizing = z.infer<typeof WidgetSizingSchema>;
-
-/**
- * Widget interactivity level
- */
-export const WidgetInteractivitySchema = z.enum([
-  'none',
-  'view',
-  'full',
-]).describe('Interactivity level');
-
-export type WidgetInteractivity = z.infer<typeof WidgetInteractivitySchema>;
-
-/**
- * Export widget input
- */
-export const ExportWidgetInputSchema = z.object({
-  format: WidgetExportFormatSchema,
-  sizing: WidgetSizingSchema.optional().default('responsive'),
-  interactivity: WidgetInteractivitySchema.optional().default('full'),
-  width: z.number().optional().describe('Fixed width in pixels'),
-  height: z.number().optional().describe('Fixed height in pixels'),
-  aspectRatio: z.string().optional().describe('Aspect ratio (e.g., "16:9")'),
-  backgroundColor: z.string().optional().describe('Background color'),
-  showControls: z.boolean().optional().default(true).describe('Show playback controls'),
-  autoplay: z.boolean().optional().default(false),
-  loop: z.boolean().optional().default(true),
-  lazyLoad: z.boolean().optional().default(true).describe('Load assets lazily'),
-  lmsEnabled: z.boolean().optional().default(false).describe('Enable LMS tracking'),
-  allowedDomains: z.array(z.string()).optional().describe('Allowed embed domains'),
-}).describe('Export widget options');
-
-export type ExportWidgetInput = z.infer<typeof ExportWidgetInputSchema>;
-
-// =============================================================================
 // LETTER COLLAGE SCHEMAS
 // =============================================================================
 

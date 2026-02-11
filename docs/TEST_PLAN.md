@@ -27,7 +27,6 @@ Run with: `bun test`
 | **Agent Flow Tools** | agent_start_job, agent_end_job, agent_reset, agent_batch_execute, agent_export, agent_analyze | Job lifecycle, batch operations, analysis |
 | **Interactive Tools** | add_trigger, remove_trigger, query_triggers | Event types, action types, conditions |
 | **Quiz Tools** | create_quiz, get_quiz_state, reset_quiz | Quiz creation, state management |
-| **Widget Export** | export_widget | Format options, sizing, interactivity |
 | **Letter Collage** | create_letter_collage, animate_letter_collage, get_letter_collage_options | All styles, palettes, animations |
 | **Canvas Presets** | get_canvas_presets | All platform presets |
 | **Map Tools** | load_map, highlight_regions, apply_data_colors, add_marker, etc. | All maps, projections, choropleth |

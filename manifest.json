@@ -4,7 +4,7 @@
   "version": "1.5.0",
   "display_name": "PinePaper Studio",
   "description": "Create animated graphics with AI using PinePaper Studio",
-  "long_description": "PinePaper MCP Server enables Claude to create, animate, and export graphics through PinePaper Studio. Features include shape creation, relation-based animations (orbits, follows, attached_to), procedural generators, visual effects, SVG export with animations, asset search & import from 4 open repositories (500k+ icons), performance metrics tracking, diagram tools for flowcharts/UML/network diagrams with smart connectors and auto-layout, enhanced error messages with canvas context, Agent Flow Mode for content automation pipelines with batch operations and smart platform exports (Instagram, TikTok, YouTube, etc.), interactive triggers (click, hover, drag events), quiz/LMS integration with SCORM/xAPI support, embeddable widget export (web-component, iframe, React, Vue), Letter Collage for stylized text with per-letter customization (Wordle, magazine cutout, gradient styles with 24+ palettes), and canvas presets for social media platforms. Supports two execution modes: Puppeteer (live browser execution) and Code (generate code for manual paste).",
+  "long_description": "PinePaper MCP Server enables Claude to create, animate, and export graphics through PinePaper Studio. Features include shape creation, relation-based animations (orbits, follows, attached_to), procedural generators, visual effects, SVG export with animations, asset search & import from 4 open repositories (500k+ icons), performance metrics tracking, diagram tools for flowcharts/UML/network diagrams with smart connectors and auto-layout, enhanced error messages with canvas context, Agent Flow Mode for content automation pipelines with batch operations and smart platform exports (Instagram, TikTok, YouTube, etc.), interactive triggers (click, hover, drag events), quiz/LMS integration with SCORM/xAPI support, Letter Collage for stylized text with per-letter customization (Wordle, magazine cutout, gradient styles with 24+ palettes), and canvas presets for social media platforms. Supports two execution modes: Puppeteer (live browser execution) and Code (generate code for manual paste).",
   "author": {
     "name": "PinePaper Studio",
     "url": "https://github.com/pinepaper"
@@ -290,10 +290,6 @@
     {
       "name": "pinepaper_reset_quiz",
       "description": "Reset quiz to initial state"
-    },
-    {
-      "name": "pinepaper_export_widget",
-      "description": "Export as embeddable widget (web-component, iframe, React, Vue)"
     },
     {
       "name": "pinepaper_create_letter_collage",

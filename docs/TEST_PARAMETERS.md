@@ -559,17 +559,6 @@ Quick reference for testing all 97 tools with sample parameters.
 
 ---
 
-## Widget Export Tools (1 tool)
-
-### pinepaper_export_widget
-```json
-{"format": "webcomponent", "name": "my-animation"}
-{"format": "standalone", "sizing": "fixed", "interactivity": "full"}
-{"format": "iframe", "responsive": true}
-```
-
----
-
 ## Letter Collage Tools (3 tools)
 
 ### pinepaper_create_letter_collage
