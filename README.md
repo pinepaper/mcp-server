@@ -124,26 +124,6 @@ Create interactive quizzes with SCORM/xAPI support:
 - `pinepaper_get_quiz_state` - Get score, progress, answers
 - `pinepaper_reset_quiz` - Reset quiz state
 
-### 📦 Widget Export (NEW in v1.5.0)
-
-Export as embeddable widgets for websites and LMS:
-
-```
-"Export as a web component"
-"Create an iframe embed code"
-"Generate a React component"
-```
-
-**Export Formats:**
-- `web-component` - `<pinepaper-widget>` custom element
-- `standalone-html` - Complete HTML file
-- `iframe-embed` - Iframe embed code
-- `react-component` - React wrapper
-- `vue-component` - Vue wrapper
-
-**Tool:**
-- `pinepaper_export_widget` - Export with LMS support (SCORM/xAPI)
-
 ### 📐 Diagram Tools (NEW in v1.4.3)
 
 Create flowcharts, UML diagrams, network diagrams, and more:
@@ -383,11 +363,6 @@ Outputs pairs like:
 | `pinepaper_create_quiz` | Create interactive quizzes |
 | `pinepaper_get_quiz_state` | Get quiz score, progress, answers |
 | `pinepaper_reset_quiz` | Reset quiz to initial state |
-
-### Widget Export Tools (NEW in v1.5.0)
-| Tool | Description |
-|------|-------------|
-| `pinepaper_export_widget` | Export as embeddable widget (web-component, iframe, React, Vue) |
 
 ### Canvas Tools
 | Tool | Description |
