@@ -2345,35 +2345,36 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
         break;
 
       case 'gif':
-        if (app.exportEngine && app.exportEngine.exportGIF) {
-          const blob = await app.exportEngine.exportGIF({ fps: settings.fps, quality: settings.compression, duration: 5 });
-          const reader = new FileReader();
-          const dataUrl = await new Promise(resolve => {
-            reader.onloadend = () => resolve(reader.result);
-            reader.readAsDataURL(blob);
-          });
-          result = { success: true, platform, format: 'gif', data: dataUrl, mimeType: 'image/gif', size: blob.size };
-        } else {
-          result = { success: false, error: 'GIF export not available' };
-        }
-        break;
-
       case 'mp4':
-      case 'webm':
-        const exportMethod = format === 'mp4' ? 'exportMP4' : 'exportWebM';
-        const mimeType = format === 'mp4' ? 'video/mp4' : 'video/webm';
-        if (app.exportEngine && app.exportEngine[exportMethod]) {
-          const blob = await app.exportEngine[exportMethod]({ fps: settings.fps, duration: 5, ...dimensions });
+      case 'webm': {
+        const videoMimeType = { mp4: 'video/mp4', webm: 'video/webm', gif: 'image/gif' }[format];
+        // Use _quickExportVideo (delegates to VideoExporter.export internally)
+        if (app.exportEngine && app.exportEngine._quickExportVideo) {
+          const videoResult = await app.exportEngine._quickExportVideo(format, { fps: settings.fps, duration: 5 }, false);
+          if (videoResult && videoResult.blob) {
+            const reader = new FileReader();
+            const dataUrl = await new Promise(resolve => {
+              reader.onloadend = () => resolve(reader.result);
+              reader.readAsDataURL(videoResult.blob);
+            });
+            result = { success: true, platform, format, data: dataUrl, mimeType: videoMimeType, size: videoResult.blob.size };
+          } else {
+            result = { success: false, error: format.toUpperCase() + ' export returned no data' };
+          }
+        } else if (app.exportEngine && app.exportEngine.videoExporter) {
+          // Fallback: call VideoExporter.export directly
+          const blob = await app.exportEngine.videoExporter.export({ format, fps: settings.fps, duration: 5 });
           const reader = new FileReader();
           const dataUrl = await new Promise(resolve => {
             reader.onloadend = () => resolve(reader.result);
             reader.readAsDataURL(blob);
           });
-          result = { success: true, platform, format, data: dataUrl, mimeType, size: blob.size };
+          result = { success: true, platform, format, data: dataUrl, mimeType: videoMimeType, size: blob.size };
         } else {
           result = { success: false, error: format.toUpperCase() + ' export not available' };
         }
         break;
+      }
 
       case 'pdf':
         if (app.exportEngine && app.exportEngine.exportPDF) {
@@ -2385,7 +2386,7 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
           });
           result = { success: true, platform, format: 'pdf', data: dataUrl, mimeType: 'application/pdf', size: blob.size, dpi: settings.dpi };
         } else {
-          result = { success: false, error: 'PDF export not available' };
+          result = { success: false, error: 'PDF export failed' };
         }
         break;
 

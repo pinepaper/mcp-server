@@ -33,6 +33,7 @@ import {
   CreateGridInputSchema,
   CreateSceneInputSchema,
   GetPerformanceMetricsInputSchema,
+  DiagnosticReportInputSchema,
   SearchAssetsInputSchema,
   ImportAssetInputSchema,
   P5DrawInputSchema,
@@ -100,6 +101,8 @@ import {
   ApplyTemplateInputSchema,
   // Image import schemas
   ImportImageInputSchema,
+  // Tool guide schema
+  ToolGuideInputSchema,
   ErrorCodes,
   RelationType,
   ItemType,
@@ -143,6 +146,46 @@ export function getScreenshotMode(): ScreenshotMode {
   }
   // Default to 'on_request' for better performance (best practice)
   return 'on_request';
+}
+
+// =============================================================================
+// SMART DESIGN GUIDANCE — detect if user prompt has specific design direction
+// =============================================================================
+
+const COLOR_KEYWORDS = /(?:#[0-9a-f]{3,8}|rgb\(|hsl\(|\b(?:red|blue|green|purple|pink|gold|silver|orange|yellow|cyan|magenta|indigo|teal|coral|crimson|navy|maroon|turquoise|violet|amber|emerald|scarlet)\b)/i;
+const STYLE_KEYWORDS = /\b(?:gradient|bokeh|geometric|circuit|wave|sunset|sunrise|minimal|modern|retro|vintage|elegant|playful|abstract|organic|neon|pastel|watercolor|grunge|futuristic|cosmic|dreamy|glossy)\b/i;
+const LAYOUT_KEYWORDS = /\b(?:centered|left-aligned|right-aligned|grid|stacked|scattered|radial|circular|diagonal|symmetrical|horizontal|vertical)\b/i;
+const ANIMATION_KEYWORDS = /\b(?:orbit|follow|pulse|bounce|fade|rotate|wobble|slide|wipe|reveal|parallax|wave|morph|float|glow|sparkle|burst|spiral)\b/i;
+
+/**
+ * Detect if a prompt has enough design specificity to skip guidance injection.
+ * Returns true if the prompt is design-specific (skip guidance).
+ * Returns false if vague (inject guidance).
+ */
+function detectDesignSpecificity(prompt: string): boolean {
+  if (!prompt || prompt.trim().length === 0) return false;
+
+  let specificityScore = 0;
+
+  // Color mentions: strong signal of specificity
+  if (COLOR_KEYWORDS.test(prompt)) specificityScore += 2;
+
+  // Style/mood keywords
+  if (STYLE_KEYWORDS.test(prompt)) specificityScore += 2;
+
+  // Layout direction
+  if (LAYOUT_KEYWORDS.test(prompt)) specificityScore += 1;
+
+  // Animation specifics
+  if (ANIMATION_KEYWORDS.test(prompt)) specificityScore += 1;
+
+  // Word count: detailed prompts tend to be longer
+  const wordCount = prompt.trim().split(/\s+/).length;
+  if (wordCount >= 20) specificityScore += 1;
+  if (wordCount >= 35) specificityScore += 1;
+
+  // Threshold: 3+ = specific enough, skip guidance
+  return specificityScore >= 3;
 }
 
 // =============================================================================
@@ -632,14 +675,57 @@ async function executeToolWithTracking<T>(
 // TOOL HANDLERS
 // =============================================================================
 
+/**
+ * Measure the approximate byte size of a CallToolResult payload.
+ * Text content is measured directly; image content estimates base64 overhead.
+ */
+function measureResponseBytes(result: CallToolResult): number {
+  let bytes = 0;
+  if (result.content) {
+    for (const item of result.content) {
+      if (item.type === 'text') {
+        bytes += Buffer.byteLength((item as TextContent).text, 'utf-8');
+      } else if (item.type === 'image') {
+        // Base64 image data
+        bytes += ((item as ImageContent).data?.length ?? 0);
+      }
+    }
+  }
+  return bytes;
+}
+
 export async function handleToolCall(
   toolName: string,
   args: Record<string, unknown>,
   options: HandlerOptions = {}
 ): Promise<CallToolResult> {
-  const { i18n } = options;
   const tracker = getPerformanceTracker();
   const baseTimerId = `${toolName}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+  const result = await handleToolCallInner(toolName, args, options, tracker, baseTimerId);
+
+  // Record response payload size for token estimation
+  const responseBytes = measureResponseBytes(result);
+  tracker.recordMetric({
+    toolName,
+    phase: 'response_size',
+    duration: 0,
+    timestamp: Date.now(),
+    success: !result.isError,
+    responseBytes,
+  });
+
+  return result;
+}
+
+async function handleToolCallInner(
+  toolName: string,
+  args: Record<string, unknown>,
+  options: HandlerOptions,
+  tracker: ReturnType<typeof getPerformanceTracker>,
+  baseTimerId: string
+): Promise<CallToolResult> {
+  const { i18n } = options;
 
   try {
     switch (toolName) {
@@ -1516,6 +1602,324 @@ All PinePaper tools will work in **code-only mode**:
       }
 
       // -----------------------------------------------------------------------
+      // DIAGNOSTIC REPORT
+      // -----------------------------------------------------------------------
+      case 'pinepaper_diagnostic_report': {
+        const input = DiagnosticReportInputSchema.parse(args);
+        const includeMetrics = input.includeMetrics !== false;
+        const includeCanvas = input.includeCanvas !== false;
+        const metricsLimit = input.metricsLimit ?? 100;
+
+        // --- Server info ---
+        const { detectToolkitFromEnvironment: detectToolkit, detectVerbosityFromEnvironment: detectVerbosity } = await import('./toolkits.js');
+        const serverSection = {
+          version: '1.5.1',
+          toolkit: detectToolkit(),
+          verbosity: detectVerbosity(),
+          locale: process.env.PINEPAPER_LOCALE || 'en',
+          executionMode: options.executionMode || getExecutionMode(),
+          screenshotMode: options.screenshotMode || getScreenshotMode(),
+        };
+
+        // --- Browser state ---
+        let browserSection: Record<string, unknown> = { connected: false };
+        try {
+          const ctrl = options.browserController || getBrowserController();
+          browserSection = {
+            connected: ctrl.connected,
+            agentMode: ctrl.agentMode,
+            studioUrl: ctrl.studioUrl,
+          };
+        } catch { /* browser not initialized */ }
+
+        // --- Session state ---
+        let sessionSection: Record<string, unknown> = {};
+        try {
+          const session = getSessionManager();
+          sessionSection = session.getStats();
+        } catch { /* session not initialized */ }
+
+        // --- Canvas state ---
+        let canvasSection: Record<string, unknown> | null = null;
+        if (includeCanvas) {
+          try {
+            const ctrl = options.browserController || getBrowserController();
+            if (ctrl.connected) {
+              canvasSection = await captureCanvasState(ctrl) as Record<string, unknown> | null;
+            }
+          } catch { /* canvas capture failed */ }
+        }
+
+        // --- Performance metrics ---
+        let metricsSection: Record<string, unknown> | null = null;
+        if (includeMetrics) {
+          try {
+            const perfTracker = getPerformanceTracker();
+            const recentMetrics = perfTracker.exportMetrics('json' as MetricsExportFormat, { limit: metricsLimit });
+            const stats = perfTracker.getStats();
+            metricsSection = { entries: recentMetrics, stats };
+          } catch { /* metrics not available */ }
+        }
+
+        // --- Tool definitions overhead (fixed cost per API turn) ---
+        let toolDefsSection: Record<string, unknown> | null = null;
+        try {
+          const { PINEPAPER_TOOLS, getToolsForVerbosity } = await import('./definitions.js');
+          const { getToolsForToolkit } = await import('./toolkits.js');
+
+          const toolkit = detectToolkit();
+          const verbosity = detectVerbosity();
+
+          // Measure what actually gets sent to the LLM
+          const activeTools = getToolsForToolkit(getToolsForVerbosity(verbosity), toolkit);
+
+          const activeJson = JSON.stringify(activeTools);
+          const activeBytes = Buffer.byteLength(activeJson, 'utf-8');
+          const activeTokens = Math.ceil(activeBytes / 4);
+
+          // Also measure full set for comparison
+          const fullJson = JSON.stringify(PINEPAPER_TOOLS);
+          const fullBytes = Buffer.byteLength(fullJson, 'utf-8');
+          const fullTokens = Math.ceil(fullBytes / 4);
+
+          // Measure other profiles for comparison recommendations
+          const agentCompactTools = getToolsForToolkit(getToolsForVerbosity('compact'), 'agent');
+          const agentCompactTokens = Math.ceil(Buffer.byteLength(JSON.stringify(agentCompactTools), 'utf-8') / 4);
+
+          const agentMinimalTools = getToolsForToolkit(getToolsForVerbosity('minimal'), 'agent');
+          const agentMinimalTokens = Math.ceil(Buffer.byteLength(JSON.stringify(agentMinimalTools), 'utf-8') / 4);
+
+          // Per-tool breakdown of active set (top 10 heaviest)
+          const perToolDef = activeTools.map((t: { name: string; description?: string; inputSchema?: unknown }) => ({
+            tool: t.name,
+            bytes: Buffer.byteLength(JSON.stringify(t), 'utf-8'),
+            descBytes: Buffer.byteLength(t.description || '', 'utf-8'),
+          })).sort((a: { bytes: number }, b: { bytes: number }) => b.bytes - a.bytes);
+
+          const totalDescBytes = perToolDef.reduce((s: number, t: { descBytes: number }) => s + t.descBytes, 0);
+
+          toolDefsSection = {
+            toolkit,
+            verbosity,
+            activeToolCount: activeTools.length,
+            activeBytes,
+            activeTokens,
+            fullToolCount: PINEPAPER_TOOLS.length,
+            fullBytes,
+            fullTokens,
+            descriptionBytes: totalDescBytes,
+            descriptionPct: ((totalDescBytes / activeBytes) * 100).toFixed(1) + '%',
+            top10: perToolDef.slice(0, 10).map((t: { tool: string; bytes: number }) => ({
+              tool: t.tool,
+              bytes: t.bytes,
+              tokens: Math.ceil(t.bytes / 4),
+            })),
+            profiles: {
+              'full+verbose': fullTokens,
+              'agent+compact': agentCompactTokens,
+              'agent+minimal': agentMinimalTokens,
+            },
+            recommendations: [] as string[],
+          };
+
+          // Add actionable recommendations
+          const recs = toolDefsSection.recommendations as string[];
+          if (toolkit === 'full') {
+            recs.push(`Switch to PINEPAPER_TOOLKIT=agent to reduce to ~${agentCompactTokens.toLocaleString()} tokens/turn (agent+compact)`);
+          }
+          if (verbosity === 'verbose') {
+            recs.push(`Set PINEPAPER_VERBOSITY=compact to reduce tool definitions overhead`);
+          }
+          if (verbosity !== 'minimal') {
+            recs.push(`Set PINEPAPER_VERBOSITY=minimal for maximum savings (~${agentMinimalTokens.toLocaleString()} tokens with agent toolkit) — use pinepaper_tool_guide for on-demand docs`);
+          }
+          if (activeTokens > 20000) {
+            recs.push(`Tool definitions alone consume ~${activeTokens.toLocaleString()} tokens per API turn — this is a major context budget item`);
+          }
+        } catch { /* definitions not available */ }
+
+        // --- Token usage estimate (response payloads) ---
+        let tokenSection: Record<string, unknown> | null = null;
+        try {
+          const perfTracker = getPerformanceTracker();
+          const responseSizeMetrics = perfTracker.getMetrics({ phase: 'response_size' as any });
+
+          // Aggregate per-tool response sizes
+          const perTool = new Map<string, { calls: number; totalBytes: number }>();
+          let totalResponseBytes = 0;
+
+          for (const m of responseSizeMetrics) {
+            const bytes = m.responseBytes ?? 0;
+            totalResponseBytes += bytes;
+            const entry = perTool.get(m.toolName) ?? { calls: 0, totalBytes: 0 };
+            entry.calls++;
+            entry.totalBytes += bytes;
+            perTool.set(m.toolName, entry);
+          }
+
+          // ~4 chars per token is a common estimate for English text
+          const estimatedTokens = Math.ceil(totalResponseBytes / 4);
+
+          // Sort by totalBytes descending
+          const perToolSorted = [...perTool.entries()]
+            .sort((a, b) => b[1].totalBytes - a[1].totalBytes)
+            .map(([tool, data]) => ({
+              tool,
+              calls: data.calls,
+              totalBytes: data.totalBytes,
+              estimatedTokens: Math.ceil(data.totalBytes / 4),
+              avgBytesPerCall: Math.round(data.totalBytes / data.calls),
+            }));
+
+          tokenSection = {
+            totalToolCalls: responseSizeMetrics.length,
+            totalResponseBytes,
+            estimatedResponseTokens: estimatedTokens,
+            perTool: perToolSorted,
+          };
+        } catch { /* metrics not available */ }
+
+        // --- Assemble report ---
+        const report = {
+          timestamp: new Date().toISOString(),
+          server: serverSection,
+          browser: browserSection,
+          session: sessionSection,
+          canvas: canvasSection,
+          metrics: metricsSection,
+          toolDefinitions: toolDefsSection,
+          tokenUsage: tokenSection,
+        };
+
+        // --- Save to disk ---
+        const exportDir = getExportDir();
+        await mkdir(exportDir, { recursive: true });
+        const fileName = `pinepaper_diagnostic_${Date.now()}.json`;
+        const filePath = join(exportDir, fileName);
+        const jsonContent = JSON.stringify(report, null, 2);
+        await writeFile(filePath, jsonContent, 'utf-8');
+
+        // --- Build summary (token budget first — it's what matters most) ---
+        const lines: string[] = [
+          `Diagnostic report saved to: ${filePath}`,
+          ``,
+        ];
+
+        // Token budget section — prominent at top
+        if (toolDefsSection) {
+          const td = toolDefsSection as {
+            toolkit: string; verbosity: string; activeToolCount: number;
+            activeTokens: number; activeBytes: number; fullTokens: number;
+            descriptionPct: string;
+            top10: { tool: string; tokens: number }[];
+            recommendations: string[];
+          };
+          lines.push(`TOKEN BUDGET`);
+          lines.push(`  Tool definitions: ~${td.activeTokens.toLocaleString()} tokens/turn (${td.activeToolCount} tools, ${(td.activeBytes / 1024).toFixed(0)} KB)`);
+          lines.push(`  Descriptions are ${td.descriptionPct} of that overhead`);
+          lines.push(`  Config: toolkit=${td.toolkit}, verbosity=${td.verbosity}`);
+
+          if (tokenSection) {
+            const tk = tokenSection as { totalToolCalls: number; totalResponseBytes: number; estimatedResponseTokens: number };
+            lines.push(`  Response payloads: ~${tk.estimatedResponseTokens.toLocaleString()} tokens across ${tk.totalToolCalls} tool calls (${(tk.totalResponseBytes / 1024).toFixed(1)} KB)`);
+            const totalPerTurn = td.activeTokens + Math.ceil(tk.estimatedResponseTokens / Math.max(tk.totalToolCalls, 1));
+            lines.push(`  Estimated per-turn cost: ~${totalPerTurn.toLocaleString()} tokens (definitions + avg response)`);
+          }
+
+          // Top 3 heaviest tool definitions
+          const topDefs = td.top10.slice(0, 3);
+          if (topDefs.length > 0) {
+            lines.push(`  Heaviest definitions: ${topDefs.map(t => `${t.tool} (~${t.tokens.toLocaleString()}t)`).join(', ')}`);
+          }
+
+          // Top 3 heaviest response consumers
+          if (tokenSection) {
+            const tk = tokenSection as { perTool: { tool: string; calls: number; estimatedTokens: number }[] };
+            const topResp = tk.perTool.slice(0, 3);
+            if (topResp.length > 0) {
+              lines.push(`  Heaviest responses: ${topResp.map(t => `${t.tool} (${t.calls}x, ~${t.estimatedTokens.toLocaleString()}t)`).join(', ')}`);
+            }
+          }
+
+          if (td.recommendations.length > 0) {
+            lines.push(``);
+            lines.push(`RECOMMENDATIONS`);
+            for (const rec of td.recommendations) {
+              lines.push(`  - ${rec}`);
+            }
+          }
+          lines.push(``);
+        }
+
+        // Brief state summary
+        lines.push(`Server: v${serverSection.version} | toolkit=${serverSection.toolkit} | mode=${serverSection.executionMode}`);
+        lines.push(`Browser: ${browserSection.connected ? 'connected' : 'disconnected'}`);
+        lines.push(`Session: ${sessionSection.activeJob ? `active job (${sessionSection.currentJobId})` : 'no active job'} | ${sessionSection.completedJobs ?? 0} completed | ${sessionSection.totalItemsCreated ?? 0} items total`);
+        if (canvasSection) {
+          const cs = canvasSection as Record<string, unknown>;
+          lines.push(`Canvas: ${cs.itemCount ?? 0} items | ${JSON.stringify(cs.canvasSize ?? {})}`);
+        }
+
+        return {
+          content: [{ type: 'text', text: lines.join('\n') }],
+        };
+      }
+
+      // -----------------------------------------------------------------------
+      // TOOL GUIDE (on-demand documentation)
+      // -----------------------------------------------------------------------
+      case 'pinepaper_tool_guide': {
+        const input = ToolGuideInputSchema.parse(args);
+        const { PINEPAPER_TOOLS, AI_AGENT_GUIDE } = await import('./definitions.js');
+        const { TOOL_TAGS } = await import('./toolkits.js');
+
+        // No args → full AI Agent Guide
+        if (!input.tool && !input.category) {
+          return {
+            content: [{ type: 'text', text: AI_AGENT_GUIDE }],
+          };
+        }
+
+        // Specific tool → full verbose description
+        if (input.tool) {
+          const tool = PINEPAPER_TOOLS.find((t: { name: string }) => t.name === input.tool);
+          if (!tool) {
+            return {
+              content: [{ type: 'text', text: `Unknown tool: ${input.tool}. Use pinepaper_tool_guide with no args to see the AI Agent Guide.` }],
+              isError: true,
+            };
+          }
+          return {
+            content: [{ type: 'text', text: `# ${tool.name}\n\n${tool.description}` }],
+          };
+        }
+
+        // Category → all tools in that tag with descriptions
+        if (input.category) {
+          const toolNames = TOOL_TAGS[input.category];
+          if (!toolNames) {
+            const available = Object.keys(TOOL_TAGS).join(', ');
+            return {
+              content: [{ type: 'text', text: `Unknown category: ${input.category}. Available: ${available}` }],
+              isError: true,
+            };
+          }
+          const lines: string[] = [`# Category: ${input.category}\n`];
+          for (const name of toolNames) {
+            const tool = PINEPAPER_TOOLS.find((t: { name: string }) => t.name === name);
+            if (tool) {
+              lines.push(`## ${tool.name}\n${tool.description}\n`);
+            }
+          }
+          return {
+            content: [{ type: 'text', text: lines.join('\n') }],
+          };
+        }
+
+        return { content: [{ type: 'text', text: AI_AGENT_GUIDE }] };
+      }
+
+      // -----------------------------------------------------------------------
       // ASSET TOOLS
       // -----------------------------------------------------------------------
       case 'pinepaper_search_assets': {
@@ -1790,8 +2194,41 @@ All PinePaper tools will work in **code-only mode**:
         }
 
         const code = codeGenerator.generateAgentStartJob(input);
-        const description = `Started agent job${input.name ? ` "${input.name}"` : ''} with ${input.screenshotPolicy || 'on_complete'} screenshot policy`;
-        return executeOrGenerate(code, description, options, 'pinepaper_agent_start_job');
+        const descriptionText = `Started agent job${input.name ? ` "${input.name}"` : ''} with ${input.screenshotPolicy || 'on_complete'} screenshot policy`;
+        const result = await executeOrGenerate(code, descriptionText, options, 'pinepaper_agent_start_job');
+
+        // --- Smart design guidance injection ---
+        if (result.content && result.content.length > 0 && result.content[0].type === 'text') {
+          const prompt = (input.description || input.name || '').toLowerCase();
+          const isDesignSpecific = detectDesignSpecificity(prompt);
+
+          // Always include workflow hint
+          let guidance = `\n\nNEXT: Call pinepaper_agent_batch_execute with ALL operations in one call:` +
+            `\n  1. set_canvas_size / set_background / execute_generator (canvas setup)` +
+            `\n  2. create (items — text, shapes, etc.)` +
+            `\n  3. animate / keyframe_animate / relation (REQUIRED for animation — add for EACH item)` +
+            `\n  4. play_timeline (REQUIRED — starts playback)` +
+            `\nThen: pinepaper_agent_end_job (returns screenshot for validation)`;
+
+          // Inject design inspiration when the prompt is vague
+          if (!isDesignSpecific) {
+            guidance += `\n\n─── DESIGN INSPIRATION (your prompt is open-ended — use these for creative direction) ───` +
+              `\nBACKGROUND: Use execute_generator for rich visuals:` +
+              `\n  Dreamy/soft: drawBokeh, drawGradientMesh, drawOrganicFlow` +
+              `\n  Energetic: drawSunburst, drawSunsetScene, drawGeometricAbstract` +
+              `\n  Tech/modern: drawCircuit, drawGrid, drawWindField` +
+              `\n  Calm/organic: drawWaves, drawFluidFlow, drawNoiseTexture` +
+              `\nCOLORS: dark bg (#0f172a, #1a1a2e) + bright accents (#f472b6 pink, #818cf8 purple, #fbbf24 gold, #34d399 green)` +
+              `\nCOMPOSITION: generator bg → large decorative shapes (low opacity 0.3-0.5) → main text → small accents on top` +
+              `\nANIMATION: Use "relation" ops for dynamic motion:` +
+              `\n  orbits (items circle around center), follows (items trail each other), wave_through (ripple effect)` +
+              `\n  Plus: keyframe_animate for timed reveals (fade in, scale up), animate for loops (pulse, rotate, bounce)` +
+              `\n5s TIMING: bg 0s → shapes fade-in 0.5-1.5s → main text 2-3s → accents 3-4s → play_timeline`;
+          }
+
+          result.content[0].text += guidance;
+        }
+        return result;
       }
 
       case 'pinepaper_agent_end_job': {
@@ -2326,6 +2763,7 @@ All PinePaper tools will work in **code-only mode**:
             'pinepaper_browser_screenshot',
             'pinepaper_browser_status',
             'pinepaper_get_performance_metrics',
+            'pinepaper_diagnostic_report',
             'pinepaper_search_assets',
             'pinepaper_import_asset',
             'pinepaper_p5_draw',
@@ -2410,6 +2848,9 @@ All PinePaper tools will work in **code-only mode**:
             'pinepaper_import_image',
             // Paper.js direct access tools
             'pinepaper_register_item',
+            // On-demand guide & runtime config
+            'pinepaper_tool_guide',
+            'pinepaper_set_toolkit',
           ],
         });
       }

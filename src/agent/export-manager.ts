@@ -364,15 +364,21 @@ export class SmartExportManager {
   private generateGIFExportCode(fps: number, quality: number): string {
     return `
 (async function() {
-  if (!app.exportEngine || !app.exportEngine.exportGIF) {
+  if (!app.exportEngine) {
     return { success: false, error: 'GIF export not available' };
   }
 
-  const blob = await app.exportEngine.exportGIF({
-    fps: ${fps},
-    quality: ${quality},
-    duration: 5
-  });
+  let blob;
+  if (app.exportEngine._quickExportVideo) {
+    const result = await app.exportEngine._quickExportVideo('gif', { fps: ${fps}, duration: 5 }, false);
+    blob = result && result.blob ? result.blob : null;
+  } else if (app.exportEngine.videoExporter) {
+    blob = await app.exportEngine.videoExporter.export({ format: 'gif', fps: ${fps}, duration: 5 });
+  }
+
+  if (!blob) {
+    return { success: false, error: 'GIF export returned no data' };
+  }
 
   return new Promise((resolve) => {
     const reader = new FileReader();
@@ -399,21 +405,25 @@ export class SmartExportManager {
     fps: number,
     dimensions: { width: number; height: number }
   ): string {
-    const exportMethod = format === 'mp4' ? 'exportMP4' : 'exportWebM';
     const mimeType = format === 'mp4' ? 'video/mp4' : 'video/webm';
 
     return `
 (async function() {
-  if (!app.exportEngine || !app.exportEngine.${exportMethod}) {
+  if (!app.exportEngine) {
     return { success: false, error: '${format.toUpperCase()} export not available' };
   }
 
-  const blob = await app.exportEngine.${exportMethod}({
-    fps: ${fps},
-    duration: 5,
-    width: ${dimensions.width},
-    height: ${dimensions.height}
-  });
+  let blob;
+  if (app.exportEngine._quickExportVideo) {
+    const result = await app.exportEngine._quickExportVideo('${format}', { fps: ${fps}, duration: 5 }, false);
+    blob = result && result.blob ? result.blob : null;
+  } else if (app.exportEngine.videoExporter) {
+    blob = await app.exportEngine.videoExporter.export({ format: '${format}', fps: ${fps}, duration: 5 });
+  }
+
+  if (!blob) {
+    return { success: false, error: '${format.toUpperCase()} export returned no data' };
+  }
 
   return new Promise((resolve) => {
     const reader = new FileReader();

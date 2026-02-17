@@ -11,12 +11,13 @@
 import { Tool } from '@modelcontextprotocol/sdk/types.js';
 import { I18nManager } from '../i18n/index.js';
 import { COMPACT_DESCRIPTIONS } from './compact-descriptions.js';
+import { MINIMAL_DESCRIPTIONS } from './minimal-descriptions.js';
 
 // =============================================================================
-// AI AGENT GUIDE
+// AI AGENT GUIDE (exported for pinepaper_tool_guide)
 // =============================================================================
-/*
-WORKFLOW — Create → Validate → Iterate:
+
+export const AI_AGENT_GUIDE = `WORKFLOW — Create → Validate → Iterate:
 
 1. pinepaper_agent_start_job (clearCanvas: true, canvasPreset)
 2. pinepaper_agent_batch_execute — ONE call with ALL operations:
@@ -110,8 +111,12 @@ See pinepaper://docs/diagrams for full examples.
 ─── CANVAS & EXPORT ───
 
 Presets: instagram (1080x1080), youtube (1920x1080), tiktok (1080x1920), twitter (1200x675)
-Export: pinepaper_agent_export (SVG/PNG/GIF/MP4/WebM/PDF), pinepaper_export_svg
-*/
+Export: pinepaper_agent_export (SVG/PNG/GIF/MP4/WebM/PDF), pinepaper_export_svg`;
+
+/*
+ * The AI_AGENT_GUIDE constant above is included as a comment in verbose/compact modes
+ * and served on-demand via pinepaper_tool_guide in minimal mode.
+ */
 
 // =============================================================================
 // TOOL DEFINITIONS
@@ -5469,7 +5474,7 @@ If you see significantly higher numbers, investigate:
         },
         phase: {
           type: 'string',
-          enum: ['validation', 'code_generation', 'browser_execution', 'screenshot', 'total'],
+          enum: ['validation', 'code_generation', 'browser_execution', 'screenshot', 'total', 'response_size'],
           description: 'Filter by execution phase (optional)',
         },
         since: {
@@ -5484,6 +5489,51 @@ If you see significantly higher numbers, investigate:
           type: 'string',
           enum: ['summary', 'detailed', 'csv'],
           description: 'Export format (default: summary)',
+        },
+      },
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // INFRASTRUCTURE: DIAGNOSTIC REPORT
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_diagnostic_report',
+    annotations: {
+      title: 'Generate Diagnostic Report',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `[Utility] Generate a diagnostic report for bug reporting. Collects server config, browser state, session history, canvas snapshot, performance metrics, and token usage estimates into a JSON file.
+
+USE WHEN:
+- User encounters an error or unexpected behavior
+- Filing a bug report and need debugging context
+- Troubleshooting performance or connection issues
+- Checking token consumption per tool call to optimize costs
+
+RETURNS:
+- JSON file saved to disk with full diagnostic data
+- Summary text with key state information
+- Token usage breakdown: estimated response tokens per tool, top consumers, total payload size
+
+PRIVACY: No screenshots, no tool call arguments, no user content — only structural/timing data.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        includeMetrics: {
+          type: 'boolean',
+          description: 'Include performance metrics (default: true)',
+        },
+        includeCanvas: {
+          type: 'boolean',
+          description: 'Include canvas state snapshot (default: true)',
+        },
+        metricsLimit: {
+          type: 'number',
+          description: 'Max metrics entries to include (default: 100)',
         },
       },
     },
@@ -5516,6 +5566,10 @@ CANVAS PRESETS: instagram (1080x1080), instagram-story (1080x1920), tiktok (1080
         name: {
           type: 'string',
           description: 'Optional job name for tracking',
+        },
+        description: {
+          type: 'string',
+          description: 'Pass the user\'s request/prompt here — the server returns contextual design guidance when the prompt is vague',
         },
         screenshotPolicy: {
           type: 'string',
@@ -5837,12 +5891,6 @@ EXAMPLE — Animated sky scene with timed reveals:
     },
     description: `Smart export with automatic format detection and platform optimization.
 
-USE WHEN:
-- Exporting content for a specific social media platform
-- Need optimal format automatically selected
-- Want platform-specific dimensions and quality
-- Exporting for print or web
-
 PLATFORMS & OPTIMAL FORMATS:
 | Platform        | Dimensions | Static | Animated |
 |-----------------|------------|--------|----------|
@@ -5850,31 +5898,19 @@ PLATFORMS & OPTIMAL FORMATS:
 | instagram-story | 1080x1920  | PNG    | MP4      |
 | tiktok          | 1080x1920  | PNG    | MP4@60fps|
 | youtube         | 1920x1080  | PNG    | MP4      |
-| youtube-thumbnail| 1280x720  | PNG    | PNG      |
 | twitter         | 1200x675   | PNG    | GIF      |
-| linkedin        | 1200x627   | PNG    | GIF      |
 | web             | flexible   | SVG    | SVG      |
-| print-a4        | 2480x3508  | PDF    | PDF      |
-| print-letter    | 2550x3300  | PDF    | PDF      |
 
-FORMAT OVERRIDE:
-You can specify a format to override auto-detection:
-- svg: Scalable vector (best for web, smallest file)
-- png: High quality raster (best for static social media)
-- gif: Animated (limited to 256 colors)
-- mp4: Video (best quality animations)
-- webm: Video (smaller file, modern browsers)
-- pdf: Print-ready document
+FORMATS: svg, png, gif, mp4, webm, pdf.
+QUALITY: draft, standard, high.
 
-QUALITY LEVELS:
-- draft: Fast export, lower quality (good for previews)
-- standard: Balanced quality and file size (default)
-- high: Maximum quality (best for final export)
+⚠️ If export fails, do NOT retry with different formats — report the error to the user.
+⚠️ When user asks for "video", always use format: "mp4".
 
 EXAMPLES:
-- Auto-export for Instagram: {platform: "instagram"}
-- Force SVG export: {platform: "web", format: "svg"}
-- High-quality print: {platform: "print-a4", quality: "high"}`,
+- {platform: "instagram"} — auto-selects best format
+- {platform: "instagram", format: "mp4"} — force MP4
+- {platform: "web", format: "svg"} — animated SVG`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -6154,6 +6190,91 @@ EXAMPLES:
     },
   },
 
+  // ---------------------------------------------------------------------------
+  // ON-DEMAND TOOL GUIDE (RLM-inspired — query detailed docs in minimal mode)
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_tool_guide',
+    annotations: {
+      title: 'Tool Guide',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Get detailed guidance for PinePaper tools on demand.
+
+USE WHEN: You need full parameter docs, examples, or workflow guidance — especially in minimal verbosity mode where tool descriptions are short summaries.
+
+MODES:
+- No args → returns the full AI Agent Guide (workflow, rules, batch operations, visual composition tips)
+- tool: "pinepaper_agent_batch_execute" → returns that tool's full verbose description
+- category: "animation" → returns all tools in that category with full descriptions
+
+CATEGORIES: agent, browser, canvas, core, import, assets, batch, relations, animation, masks, camera, generators, effects, filters, scene, template, query, export, diagram, map, font, letter_collage, triggers, quiz, performance, custom_code, p5, register, guide`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        tool: {
+          type: 'string',
+          description: 'Tool name to get detailed description for (e.g., "pinepaper_agent_batch_execute")',
+        },
+        category: {
+          type: 'string',
+          description: 'Category/tag name to list all tools with descriptions (e.g., "animation", "map")',
+        },
+      },
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // RUNTIME TOOLKIT SWITCHING
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_set_toolkit',
+    annotations: {
+      title: 'Set Toolkit',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Switch the active toolkit profile and/or verbosity level at runtime. The tools/list updates immediately.
+
+USE WHEN:
+- You need diagram tools but are on the 'agent' profile → switch to 'diagram' or 'full'
+- You need map tools → switch to 'map' or 'full'
+- You want more/less detail in tool descriptions → switch verbosity
+
+PROFILES:
+- full: All 120+ tools
+- agent: Core creative tools (~50 tools) — default
+- diagram: Diagram/flowchart tools
+- map: Map/choropleth tools
+- font: Font creation tools
+- minimal: Bare essentials (~15 tools)
+
+VERBOSITY:
+- verbose: Full descriptions
+- compact: Shorter descriptions for 13 largest tools — default
+- minimal: 1-line summaries (use pinepaper_tool_guide for details)`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        toolkit: {
+          type: 'string',
+          description: 'Toolkit profile: full, agent, diagram, map, font, minimal',
+          enum: ['full', 'agent', 'diagram', 'map', 'font', 'minimal'],
+        },
+        verbosity: {
+          type: 'string',
+          description: 'Description verbosity: verbose, compact, minimal',
+          enum: ['verbose', 'compact', 'minimal'],
+        },
+      },
+    },
+  },
+
 ];
 
 /**
@@ -6185,20 +6306,23 @@ export function getLocalizedTools(i18n: I18nManager): Tool[] {
 
 /**
  * Tool description verbosity level.
- * - 'verbose': Full descriptions (default, ~42K tokens)
+ * - 'verbose': Full descriptions (~42K tokens for full toolkit)
  * - 'compact': Trimmed descriptions for the 13 largest tools (~37K tokens)
+ * - 'minimal': 1-line summaries for all tools (~22K tokens). Use pinepaper_tool_guide for details.
  */
-export type ToolVerbosity = 'verbose' | 'compact';
+export type ToolVerbosity = 'verbose' | 'compact' | 'minimal';
 
 /**
  * Get tools with the specified verbosity level.
- * Compact mode swaps in shorter descriptions for the 13 largest tools,
- * reducing context usage by ~5K tokens while preserving critical guidance.
+ * Compact mode swaps in shorter descriptions for the 13 largest tools.
+ * Minimal mode swaps in 1-line summaries for ALL tools (on-demand guide available).
  */
 export function getToolsForVerbosity(verbosity: ToolVerbosity): Tool[] {
   if (verbosity === 'verbose') return PINEPAPER_TOOLS;
+
+  const descMap = verbosity === 'minimal' ? MINIMAL_DESCRIPTIONS : COMPACT_DESCRIPTIONS;
   return PINEPAPER_TOOLS.map(tool => {
-    const compact = COMPACT_DESCRIPTIONS[tool.name];
-    return compact ? { ...tool, description: compact } : tool;
-  });
+    const replacement = descMap[tool.name];
+    return replacement ? { ...tool, description: replacement } : tool;
+  }) as Tool[];
 }
