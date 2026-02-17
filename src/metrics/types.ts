@@ -12,7 +12,8 @@ export type MetricPhase =
   | 'code_generation'   // Code generation from inputs
   | 'browser_execution' // Browser code execution via Puppeteer
   | 'screenshot'        // Screenshot capture
-  | 'total';            // Total execution time
+  | 'total'             // Total execution time
+  | 'response_size';    // Response payload measurement (responseBytes field populated)
 
 /**
  * A single timing metric for a tool execution phase
@@ -35,6 +36,9 @@ export interface TimingMetric {
 
   /** Error message if operation failed */
   error?: string;
+
+  /** Response payload size in bytes (for token estimation) */
+  responseBytes?: number;
 
   /** Additional metadata about the operation */
   metadata?: Record<string, unknown>;

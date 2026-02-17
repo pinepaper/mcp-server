@@ -572,7 +572,7 @@ fi
 ## Bug Report
 
 **Tool**: pinepaper_[tool_name]
-**Version**: 1.5.0
+**Version**: 1.5.1
 **Mode**: Puppeteer / Code Generation
 
 ### Input

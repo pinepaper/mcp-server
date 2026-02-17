@@ -888,13 +888,47 @@ export interface ExportTrainingDataResult {
 
 export const GetPerformanceMetricsInputSchema = z.object({
   toolName: z.string().optional().describe('Filter by tool name'),
-  phase: z.enum(['validation', 'code_generation', 'browser_execution', 'screenshot', 'total']).optional().describe('Filter by execution phase'),
+  phase: z.enum(['validation', 'code_generation', 'browser_execution', 'screenshot', 'total', 'response_size']).optional().describe('Filter by execution phase'),
   since: z.number().optional().describe('Unix timestamp - metrics since this time'),
   limit: z.number().min(1).max(10000).optional().describe('Maximum number of results'),
   format: z.enum(['summary', 'detailed', 'csv']).optional().describe('Export format'),
 });
 
 export type GetPerformanceMetricsInput = z.infer<typeof GetPerformanceMetricsInputSchema>;
+
+// =============================================================================
+// DIAGNOSTIC REPORT SCHEMA
+// =============================================================================
+
+export const DiagnosticReportInputSchema = z.object({
+  includeMetrics: z.boolean().optional().describe('Include performance metrics (default: true)'),
+  includeCanvas: z.boolean().optional().describe('Include canvas state snapshot (default: true)'),
+  metricsLimit: z.number().min(1).max(1000).optional().describe('Max metrics entries to include (default: 100)'),
+});
+
+export type DiagnosticReportInput = z.infer<typeof DiagnosticReportInputSchema>;
+
+// =============================================================================
+// TOOL GUIDE SCHEMA
+// =============================================================================
+
+export const ToolGuideInputSchema = z.object({
+  tool: z.string().optional().describe('Tool name to get detailed description for'),
+  category: z.string().optional().describe('Category/tag name to list all tools with descriptions'),
+});
+
+export type ToolGuideInput = z.infer<typeof ToolGuideInputSchema>;
+
+// =============================================================================
+// SET TOOLKIT SCHEMA
+// =============================================================================
+
+export const SetToolkitInputSchema = z.object({
+  toolkit: z.enum(['full', 'agent', 'diagram', 'map', 'font', 'minimal']).optional().describe('Toolkit profile to switch to'),
+  verbosity: z.enum(['verbose', 'compact', 'minimal']).optional().describe('Verbosity level to switch to'),
+});
+
+export type SetToolkitInput = z.infer<typeof SetToolkitInputSchema>;
 
 // =============================================================================
 // ASSET SCHEMAS
@@ -1454,6 +1488,7 @@ export type AgentScreenshotPolicy = z.infer<typeof AgentScreenshotPolicySchema>;
  */
 export const AgentStartJobInputSchema = z.object({
   name: z.string().optional().describe('Optional job name for tracking'),
+  description: z.string().optional().describe('User prompt or task description — pass the user request here for contextual design guidance'),
   headless: z.boolean().optional().default(true).describe('Run browser in headless mode'),
   screenshotPolicy: AgentScreenshotPolicySchema.optional().default('on_complete'),
   canvasPreset: AgentPlatformSchema.optional().describe('Canvas size preset to apply'),

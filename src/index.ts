@@ -23,6 +23,15 @@ import {
 
 import { PINEPAPER_TOOLS, getLocalizedTools, getToolsForVerbosity } from './tools/definitions.js';
 import type { ToolVerbosity } from './tools/definitions.js';
+import {
+  getToolsForToolkit,
+  detectToolkitFromEnvironment,
+  detectVerbosityFromEnvironment,
+  isToolkitExplicitlySet,
+  isVerbosityExplicitlySet,
+  getClientProfile,
+} from './tools/toolkits.js';
+import type { ToolkitProfile } from './tools/toolkits.js';
 import { handleToolCall, ExecutionMode, getExecutionMode } from './tools/handlers.js';
 import {
   I18nManager,
@@ -38,7 +47,7 @@ import { PROMPTS, getPromptMessages } from './prompts/index.js';
 
 const SERVER_INFO = {
   name: 'pinepaper-mcp',
-  version: '1.5.0',
+  version: '1.5.1',
   description: 'MCP Server for PinePaper Studio - Create animated graphics with AI',
 };
 
@@ -5776,8 +5785,10 @@ export interface ServerOptions {
   browserMode?: boolean;
   /** Execution mode: 'puppeteer' (default) or 'code' (generate only for manual paste) */
   executionMode?: ExecutionMode;
-  /** Tool description verbosity: 'verbose' (default) or 'compact' (saves ~5K tokens) */
+  /** Tool description verbosity: 'verbose', 'compact', or 'minimal' */
   verbosity?: ToolVerbosity;
+  /** Toolkit profile: controls which tools are exposed via tools/list */
+  toolkit?: ToolkitProfile;
 }
 
 // =============================================================================
@@ -5787,28 +5798,58 @@ export interface ServerOptions {
 export async function createServer(options: ServerOptions = {}): Promise<Server> {
   // Initialize i18n with specified locale
   const locale = options.locale || detectLocaleFromEnvironment();
-  const verbosity = options.verbosity || detectVerbosityFromEnvironment();
   const i18n = await initI18n(locale);
-  const tools = getToolsForVerbosity(verbosity);
+
+  // Mutable effective settings — may be upgraded by client auto-detection
+  let effectiveVerbosity: ToolVerbosity = options.verbosity || detectVerbosityFromEnvironment();
+  let effectiveToolkit: ToolkitProfile = options.toolkit || detectToolkitFromEnvironment();
+
+  /** Compute the current filtered tools list (sub-ms, called per tools/list request). */
+  const getEffectiveTools = () => getToolsForToolkit(getToolsForVerbosity(effectiveVerbosity), effectiveToolkit);
 
   const server = new Server(SERVER_INFO, {
     capabilities: {
-      tools: {},
+      tools: { listChanged: true },
       resources: {},
       prompts: {},
     },
   });
 
+  // Client auto-detection: upgrade toolkit/verbosity based on MCP client identity
+  server.oninitialized = () => {
+    const clientVersion = server.getClientVersion();
+    if (!clientVersion?.name) return;
+
+    const profile = getClientProfile(clientVersion.name);
+    if (!profile) return;
+
+    let changed = false;
+    // Only upgrade if env vars / CLI flags weren't explicitly set
+    if (!options.toolkit && !isToolkitExplicitlySet() && profile.toolkit !== effectiveToolkit) {
+      console.error(`[auto-select] Client "${clientVersion.name}" → toolkit=${profile.toolkit}`);
+      effectiveToolkit = profile.toolkit;
+      changed = true;
+    }
+    if (!options.verbosity && !isVerbosityExplicitlySet() && profile.verbosity !== effectiveVerbosity) {
+      console.error(`[auto-select] Client "${clientVersion.name}" → verbosity=${profile.verbosity}`);
+      effectiveVerbosity = profile.verbosity;
+      changed = true;
+    }
+
+    if (changed) {
+      // Notify client that tool list has changed
+      server.sendToolListChanged().catch(() => {});
+    }
+  };
+
   // ---------------------------------------------------------------------------
   // TOOL HANDLERS
   // ---------------------------------------------------------------------------
 
-  // List available tools (with optional localization and verbosity)
+  // List available tools — dynamic, recomputed each request (sub-ms)
   server.setRequestHandler(ListToolsRequestSchema, async () => {
-    // Tool descriptions are kept in English for AI understanding
-    // Compact mode trims the 13 largest descriptions to save ~5K tokens
     return {
-      tools,
+      tools: getEffectiveTools(),
     };
   });
 
@@ -5819,6 +5860,37 @@ export async function createServer(options: ServerOptions = {}): Promise<Server>
   const executionMode = options.executionMode ?? getExecutionMode();
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
+
+    // Runtime toolkit/verbosity switching — handled here because it needs
+    // direct access to mutable effectiveToolkit/effectiveVerbosity state
+    if (name === 'pinepaper_set_toolkit') {
+      const { SetToolkitInputSchema } = await import('./types/schemas.js');
+      const { TOOLKIT_PROFILES_LIST } = await import('./tools/toolkits.js');
+      const input = SetToolkitInputSchema.parse(args);
+
+      let changed = false;
+      if (input.toolkit && input.toolkit !== effectiveToolkit) {
+        effectiveToolkit = input.toolkit;
+        changed = true;
+      }
+      if (input.verbosity && input.verbosity !== effectiveVerbosity) {
+        effectiveVerbosity = input.verbosity;
+        changed = true;
+      }
+
+      if (changed) {
+        server.sendToolListChanged().catch(() => {});
+      }
+
+      const tools = getEffectiveTools();
+      return {
+        content: [{
+          type: 'text' as const,
+          text: `Toolkit: ${effectiveToolkit}, Verbosity: ${effectiveVerbosity}, Tools: ${tools.length}${changed ? ' (updated)' : ' (no change)'}`,
+        }],
+      };
+    }
+
     return handleToolCall(name, args as Record<string, unknown>, {
       i18n,
       executeInBrowser,
@@ -5910,14 +5982,6 @@ function detectLocaleFromEnvironment(): SupportedLocale {
 }
 
 /**
- * Detect tool description verbosity from environment.
- * Set PINEPAPER_TOOL_VERBOSITY=compact to use trimmed descriptions (~5K tokens saved).
- */
-function detectVerbosityFromEnvironment(): ToolVerbosity {
-  return process.env.PINEPAPER_TOOL_VERBOSITY === 'compact' ? 'compact' : 'verbose';
-}
-
-/**
  * Check if a string is a valid supported locale
  */
 function isValidLocale(locale: string): boolean {
@@ -5974,14 +6038,17 @@ function isValidLocale(locale: string): boolean {
 async function main(): Promise<void> {
   const locale = detectLocaleFromEnvironment();
   const verbosity = detectVerbosityFromEnvironment();
-  const server = await createServer({ locale, verbosity });
+  const toolkit = detectToolkitFromEnvironment();
+  const server = await createServer({ locale, verbosity, toolkit });
   const transport = new StdioServerTransport();
 
   console.error('PinePaper MCP Server starting...');
   console.error(`Version: ${SERVER_INFO.version}`);
   console.error(`Locale: ${locale}`);
   console.error(`Verbosity: ${verbosity}`);
-  console.error(`Tools: ${PINEPAPER_TOOLS.length}`);
+  console.error(`Toolkit: ${toolkit}`);
+  const toolCount = getToolsForToolkit(getToolsForVerbosity(verbosity), toolkit).length;
+  console.error(`Tools: ${toolCount}/${PINEPAPER_TOOLS.length}`);
   console.error(`Resources: ${RESOURCES.length}`);
 
   await server.connect(transport);

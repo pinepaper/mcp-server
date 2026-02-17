@@ -1,7 +1,7 @@
 {
   "manifest_version": "0.3",
   "name": "pinepaper-mcp",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "display_name": "PinePaper Studio",
   "description": "Create animated graphics with AI using PinePaper Studio",
   "long_description": "PinePaper MCP Server enables Claude to create, animate, and export graphics through PinePaper Studio. Features include shape creation, relation-based animations (orbits, follows, attached_to), procedural generators, visual effects, SVG export with animations, asset search & import from 4 open repositories (500k+ icons), performance metrics tracking, diagram tools for flowcharts/UML/network diagrams with smart connectors and auto-layout, enhanced error messages with canvas context, Agent Flow Mode for content automation pipelines with batch operations and smart platform exports (Instagram, TikTok, YouTube, etc.), interactive triggers (click, hover, drag events), quiz/LMS integration with SCORM/xAPI support, Letter Collage for stylized text with per-letter customization (Wordle, magazine cutout, gradient styles with 24+ palettes), and canvas presets for social media platforms. Supports two execution modes: Puppeteer (live browser execution) and Code (generate code for manual paste).",
@@ -41,12 +41,32 @@
         "description": "Execution mode: 'puppeteer' (live browser) or 'code' (generate only)",
         "default": "puppeteer",
         "enum": ["puppeteer", "code"]
+      },
+      "toolkit": {
+        "type": "string",
+        "description": "Tool visibility profile controlling which tools are exposed",
+        "default": "agent",
+        "enum": ["full", "agent", "diagram", "map", "font", "minimal"]
+      },
+      "verbosity": {
+        "type": "string",
+        "description": "Tool description detail level. 'minimal' uses 1-line summaries with on-demand guide tool",
+        "default": "compact",
+        "enum": ["verbose", "compact", "minimal"]
       }
     },
     "env": {
       "PINEPAPER_EXECUTION_MODE": {
         "description": "Set default execution mode ('puppeteer' or 'code')",
         "default": "puppeteer"
+      },
+      "PINEPAPER_TOOLKIT": {
+        "description": "Tool visibility profile: 'full', 'agent', 'diagram', 'map', 'font', 'minimal'",
+        "default": "agent"
+      },
+      "PINEPAPER_VERBOSITY": {
+        "description": "Tool description detail: 'verbose', 'compact', 'minimal'",
+        "default": "compact"
       },
       "PINEPAPER_SCREENSHOT_MODE": {
         "description": "Screenshot behavior ('on_request', 'always', 'never')",
@@ -306,6 +326,14 @@
     {
       "name": "pinepaper_get_canvas_presets",
       "description": "List all available canvas size presets (YouTube, Instagram, TikTok, etc.)"
+    },
+    {
+      "name": "pinepaper_tool_guide",
+      "description": "Get detailed guidance for any tool, category, or the full AI Agent Guide"
+    },
+    {
+      "name": "pinepaper_set_toolkit",
+      "description": "Switch toolkit profile and/or verbosity level at runtime"
     }
   ]
 }
