@@ -103,6 +103,10 @@ import {
   ImportImageInputSchema,
   // Tool guide schema
   ToolGuideInputSchema,
+  // Ontology schemas
+  AnalyzeDesignInputSchema,
+  ValidateDesignInputSchema,
+  QueryOntologyInputSchema,
   ErrorCodes,
   RelationType,
   ItemType,
@@ -115,6 +119,7 @@ import { I18nManager, getI18n } from '../i18n/index.js';
 import {
   PinePaperBrowserController,
   getBrowserController,
+  resetBrowserController,
   type BrowserControllerConfig,
 } from '../browser/puppeteer-controller.js';
 import { getPerformanceTracker, TimingMetric, MetricsExportFormat } from '../metrics/index.js';
@@ -146,46 +151,6 @@ export function getScreenshotMode(): ScreenshotMode {
   }
   // Default to 'on_request' for better performance (best practice)
   return 'on_request';
-}
-
-// =============================================================================
-// SMART DESIGN GUIDANCE — detect if user prompt has specific design direction
-// =============================================================================
-
-const COLOR_KEYWORDS = /(?:#[0-9a-f]{3,8}|rgb\(|hsl\(|\b(?:red|blue|green|purple|pink|gold|silver|orange|yellow|cyan|magenta|indigo|teal|coral|crimson|navy|maroon|turquoise|violet|amber|emerald|scarlet)\b)/i;
-const STYLE_KEYWORDS = /\b(?:gradient|bokeh|geometric|circuit|wave|sunset|sunrise|minimal|modern|retro|vintage|elegant|playful|abstract|organic|neon|pastel|watercolor|grunge|futuristic|cosmic|dreamy|glossy)\b/i;
-const LAYOUT_KEYWORDS = /\b(?:centered|left-aligned|right-aligned|grid|stacked|scattered|radial|circular|diagonal|symmetrical|horizontal|vertical)\b/i;
-const ANIMATION_KEYWORDS = /\b(?:orbit|follow|pulse|bounce|fade|rotate|wobble|slide|wipe|reveal|parallax|wave|morph|float|glow|sparkle|burst|spiral)\b/i;
-
-/**
- * Detect if a prompt has enough design specificity to skip guidance injection.
- * Returns true if the prompt is design-specific (skip guidance).
- * Returns false if vague (inject guidance).
- */
-function detectDesignSpecificity(prompt: string): boolean {
-  if (!prompt || prompt.trim().length === 0) return false;
-
-  let specificityScore = 0;
-
-  // Color mentions: strong signal of specificity
-  if (COLOR_KEYWORDS.test(prompt)) specificityScore += 2;
-
-  // Style/mood keywords
-  if (STYLE_KEYWORDS.test(prompt)) specificityScore += 2;
-
-  // Layout direction
-  if (LAYOUT_KEYWORDS.test(prompt)) specificityScore += 1;
-
-  // Animation specifics
-  if (ANIMATION_KEYWORDS.test(prompt)) specificityScore += 1;
-
-  // Word count: detailed prompts tend to be longer
-  const wordCount = prompt.trim().split(/\s+/).length;
-  if (wordCount >= 20) specificityScore += 1;
-  if (wordCount >= 35) specificityScore += 1;
-
-  // Threshold: 3+ = specific enough, skip guidance
-  return specificityScore >= 3;
 }
 
 // =============================================================================
@@ -304,19 +269,13 @@ function executedResult(
   screenshot?: string,
   description?: string
 ): CallToolResult {
-  const content: (TextContent | ImageContent)[] = [
-    {
-      type: 'text',
-      text: `Executed PinePaper code:\n\n\`\`\`javascript\n${code}\n\`\`\`\n\nResult: ${JSON.stringify(result, null, 2)}`,
-    },
-  ];
+  const resultObj: Record<string, unknown> = { success: true, result };
+  if (description) resultObj.description = description;
 
-  if (description) {
-    content.push({
-      type: 'text',
-      text: `\n${description}`,
-    });
-  }
+  const content: (TextContent | ImageContent)[] = [
+    { type: 'text', text: JSON.stringify(resultObj, null, 2) },
+    { type: 'text', text: `Generated code:\n\`\`\`javascript\n${code}\n\`\`\`` },
+  ];
 
   if (screenshot) {
     content.push({
@@ -1390,28 +1349,28 @@ You can now start creating new items on a clean canvas.`,
       // BROWSER CONTROL TOOLS
       // -----------------------------------------------------------------------
       case 'pinepaper_browser_connect': {
-        const url = (args.url as string) || 'https://pinepaper.studio';
-        // Default to headless: true for enforced agent mode
-        const headless = (args.headless as boolean) ?? true;
+        // Default to headless: false — if you explicitly call browser_connect, you likely want to see it
+        const headless = (args.headless as boolean) ?? false;
 
-        const controller = getBrowserController({ studioUrl: url, headless });
+        const controller = getBrowserController({ headless });
 
-        if (controller.connected) {
+        // Already connected with same headless mode → nothing to do
+        if (controller.connected && controller.isHeadless === headless) {
           return {
-            content: [
-              {
-                type: 'text',
-                text: `Already connected to PinePaper Studio at ${controller.actualUrl}. Do NOT call this tool again — proceed directly with pinepaper_agent_start_job.`,
-              },
-            ],
+            content: [{ type: 'text', text: `Already connected to PinePaper Studio (headless: ${headless}).` }],
           };
         }
 
-        try {
-          await controller.connect();
+        // Already connected but different headless mode → reconnect
+        if (controller.connected && controller.isHeadless !== headless) {
+          await resetBrowserController();
+        }
 
-          // Get canvas size info to help agent understand the workspace
-          const canvasSizeResult = await controller.executeCode(
+        try {
+          const newController = controller.connected ? controller : getBrowserController({ headless });
+          if (!newController.connected) await newController.connect();
+
+          const canvasSizeResult = await newController.executeCode(
             `const size = app.getCanvasSize ? app.getCanvasSize() : { width: 800, height: 600 }; ({ width: size.width || 800, height: size.height || 600 });`,
             false
           );
@@ -1419,68 +1378,13 @@ You can now start creating new items on a clean canvas.`,
             ? (canvasSizeResult.result as { width: number; height: number })
             : { width: 800, height: 600 };
 
-          const screenshot = await controller.takeScreenshot();
-
-          const content: (TextContent | ImageContent)[] = [
-            {
-              type: 'text',
-              text: `✅ Connected to PinePaper Studio at ${controller.actualUrl}
-
-**Agent mode enabled** (agent=1&mode=agent parameters added automatically)
-**Current canvas size: ${canvasSize.width}x${canvasSize.height}**
-
-⚠️ IMPORTANT NOTES:
-1. **Welcome Template**: First-time visitors see a welcome template with example items. Use \`pinepaper_clear_canvas\` or \`pinepaper_refresh_page\` to start with an empty canvas.
-2. **Canvas Size**: For complex designs (cards, invitations, detailed graphics), call \`pinepaper_set_canvas_size\` FIRST to set an appropriate size like 1080x1080 or larger. The default 800x600 may be too small.
-3. **Verify with Screenshots**: After making changes, use \`pinepaper_browser_screenshot\` to confirm your work.
-
-Browser is ready. You can now use other pinepaper tools to create and animate graphics.`,
-            },
-          ];
-
-          if (screenshot) {
-            content.push({
-              type: 'image',
-              data: screenshot,
-              mimeType: 'image/png',
-            });
-          }
-
-          return { content };
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : 'Failed to connect to browser';
-
-          // Provide helpful fallback instructions instead of just failing
           return {
-            content: [
-              {
-                type: 'text',
-                text: `⚠️ **Browser Connection Failed**
-
-**Error:** ${errorMessage}
-
-## Don't worry! You can still use PinePaper manually:
-
-### Option 1: Manual Browser Mode
-1. Open **PinePaper Studio** in your browser: https://pinepaper.studio/editor?agent=1&mode=agent
-2. Continue using PinePaper tools - the MCP server will generate code for each action
-3. Copy the generated code and paste it into the **Code Console** (</> icon in toolbar)
-
-### Option 2: Troubleshoot Browser Connection
-- **Check Chrome/Chromium**: Puppeteer requires Chrome or Chromium installed
-- **Try headless: false**: Call \`pinepaper_browser_connect\` with \`headless: false\` to see the browser window
-- **Check permissions**: Ensure the process has permission to launch browsers
-- **Firewall**: Check if firewall is blocking browser launch
-
-### What happens now?
-All PinePaper tools will work in **code-only mode**:
-- Each tool generates JavaScript code
-- You copy the code and paste it in PinePaper's Code Console
-- The code executes and creates your graphics
-
-**The MCP server is fully functional** - just without automatic browser control.`,
-              },
-            ],
+            content: [{ type: 'text', text: `Connected to PinePaper Studio (headless: ${headless}, canvas: ${canvasSize.width}x${canvasSize.height}).` }],
+          };
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Failed to connect';
+          return {
+            content: [{ type: 'text', text: `Browser connection failed: ${errorMessage}` }],
           };
         }
       }
@@ -2197,36 +2101,9 @@ All PinePaper tools will work in **code-only mode**:
         const descriptionText = `Started agent job${input.name ? ` "${input.name}"` : ''} with ${input.screenshotPolicy || 'on_complete'} screenshot policy`;
         const result = await executeOrGenerate(code, descriptionText, options, 'pinepaper_agent_start_job');
 
-        // --- Smart design guidance injection ---
+        // Append a 1-line workflow hint
         if (result.content && result.content.length > 0 && result.content[0].type === 'text') {
-          const prompt = (input.description || input.name || '').toLowerCase();
-          const isDesignSpecific = detectDesignSpecificity(prompt);
-
-          // Always include workflow hint
-          let guidance = `\n\nNEXT: Call pinepaper_agent_batch_execute with ALL operations in one call:` +
-            `\n  1. set_canvas_size / set_background / execute_generator (canvas setup)` +
-            `\n  2. create (items — text, shapes, etc.)` +
-            `\n  3. animate / keyframe_animate / relation (REQUIRED for animation — add for EACH item)` +
-            `\n  4. play_timeline (REQUIRED — starts playback)` +
-            `\nThen: pinepaper_agent_end_job (returns screenshot for validation)`;
-
-          // Inject design inspiration when the prompt is vague
-          if (!isDesignSpecific) {
-            guidance += `\n\n─── DESIGN INSPIRATION (your prompt is open-ended — use these for creative direction) ───` +
-              `\nBACKGROUND: Use execute_generator for rich visuals:` +
-              `\n  Dreamy/soft: drawBokeh, drawGradientMesh, drawOrganicFlow` +
-              `\n  Energetic: drawSunburst, drawSunsetScene, drawGeometricAbstract` +
-              `\n  Tech/modern: drawCircuit, drawGrid, drawWindField` +
-              `\n  Calm/organic: drawWaves, drawFluidFlow, drawNoiseTexture` +
-              `\nCOLORS: dark bg (#0f172a, #1a1a2e) + bright accents (#f472b6 pink, #818cf8 purple, #fbbf24 gold, #34d399 green)` +
-              `\nCOMPOSITION: generator bg → large decorative shapes (low opacity 0.3-0.5) → main text → small accents on top` +
-              `\nANIMATION: Use "relation" ops for dynamic motion:` +
-              `\n  orbits (items circle around center), follows (items trail each other), wave_through (ripple effect)` +
-              `\n  Plus: keyframe_animate for timed reveals (fade in, scale up), animate for loops (pulse, rotate, bounce)` +
-              `\n5s TIMING: bg 0s → shapes fade-in 0.5-1.5s → main text 2-3s → accents 3-4s → play_timeline`;
-          }
-
-          result.content[0].text += guidance;
+          result.content[0].text += `\n\nNEXT: Call batch_execute with all operations, then end_job.`;
         }
         return result;
       }
@@ -2704,6 +2581,169 @@ All PinePaper tools will work in **code-only mode**:
       }
 
       // -----------------------------------------------------------------------
+      // ONTOLOGY TOOLS
+      // -----------------------------------------------------------------------
+      case 'pinepaper_analyze_design': {
+        const input = AnalyzeDesignInputSchema.parse(args);
+        const { DesignGraph } = await import('../ontology/index.js');
+        const dg = new DesignGraph();
+        const graph = dg.extractFromDefinition(input.definition as any);
+        const jsonLd = dg.toJsonLd(graph);
+        return {
+          content: [{
+            type: 'text' as const,
+            text: JSON.stringify({
+              templateId: graph.templateId,
+              templateName: graph.templateName,
+              category: graph.category,
+              dimensions: graph.dimensions,
+              duration: graph.duration,
+              nodeCount: graph.nodes.length,
+              edgeCount: graph.edges.length,
+              nodeTypes: Object.fromEntries(
+                Object.entries(graph.fingerprint?.nodeTypeCounts || {}).sort((a, b) => b[1] - a[1])
+              ),
+              edgeTypes: Object.fromEntries(
+                Object.entries(graph.fingerprint?.edgeTypeCounts || {}).sort((a, b) => b[1] - a[1])
+              ),
+              patterns: graph.patterns,
+              mathFunctions: graph.mathFunctions,
+              generator: graph.generator,
+              semantics: graph.semantics,
+              fingerprint: graph.fingerprint,
+              jsonLd,
+            }, null, 2),
+          }],
+        };
+      }
+
+      case 'pinepaper_validate_design': {
+        const input = ValidateDesignInputSchema.parse(args);
+        const { DesignGraph, KnowledgeGraphValidator } = await import('../ontology/index.js');
+        const dg = new DesignGraph();
+        const validator = new KnowledgeGraphValidator();
+        const definition = input.definition as any;
+        const validation = validator.validateTemplate(definition);
+        let quality = null;
+        if (validation.valid) {
+          const graph = dg.extractFromDefinition(definition);
+          quality = validator.scoreQuality(definition, graph);
+        }
+        return {
+          content: [{
+            type: 'text' as const,
+            text: JSON.stringify({
+              validation,
+              quality,
+            }, null, 2),
+          }],
+        };
+      }
+
+      // -----------------------------------------------------------------------
+      // ONTOLOGY QUERY (read-only graph navigation)
+      // -----------------------------------------------------------------------
+      case 'pinepaper_query_ontology': {
+        const input = QueryOntologyInputSchema.parse(args);
+        const { PP_VOCABULARY, ITEM_TYPE_MAP, RELATION_TYPE_MAP } = await import('../ontology/vocabulary.js');
+        const { DesignGraph } = await import('../ontology/design-graph.js');
+        const dg = new DesignGraph();
+
+        let result: unknown;
+        switch (input.query) {
+          case 'list_types': {
+            const entries = Object.entries(PP_VOCABULARY.types);
+            const filtered = entries.filter(([key, def]) => {
+              if (input.category && (def as any).category !== input.category) return false;
+              if (!input.includeAbstract && (def as any).abstract) return false;
+              return true;
+            });
+            result = Object.fromEntries(filtered);
+            break;
+          }
+          case 'list_edges': {
+            const entries = Object.entries(PP_VOCABULARY.edges);
+            const filtered = input.category
+              ? entries.filter(([, def]) => (def as any).category === input.category)
+              : entries;
+            result = Object.fromEntries(filtered);
+            break;
+          }
+          case 'list_generators': {
+            const entries = Object.entries(PP_VOCABULARY.generators);
+            const filtered = input.category
+              ? entries.filter(([, def]) => (def as any).category === input.category)
+              : entries;
+            result = Object.fromEntries(filtered);
+            break;
+          }
+          case 'list_effects': {
+            result = ['sparkle', 'blast', 'smoke', 'fire', 'rain', 'snow', 'confetti', 'ripple', 'glow', 'electric'];
+            break;
+          }
+          case 'list_patterns': {
+            result = PP_VOCABULARY.patterns;
+            break;
+          }
+          case 'list_math_functions': {
+            result = PP_VOCABULARY.mathFunctions;
+            break;
+          }
+          case 'type_hierarchy': {
+            if (!input.ppType) return errorResult('INVALID_INPUT', 'ppType is required for type_hierarchy');
+            result = dg.getTypeHierarchy(input.ppType);
+            break;
+          }
+          case 'type_children': {
+            if (!input.ppType) return errorResult('INVALID_INPUT', 'ppType is required for type_children');
+            result = dg.getTypeChildren(input.ppType);
+            break;
+          }
+          case 'type_properties': {
+            if (!input.ppType) return errorResult('INVALID_INPUT', 'ppType is required for type_properties');
+            result = dg.getPropertiesFor(input.ppType);
+            break;
+          }
+          case 'animatable_properties': {
+            if (!input.ppType) return errorResult('INVALID_INPUT', 'ppType is required for animatable_properties');
+            result = dg.getAnimatableProperties(input.ppType);
+            break;
+          }
+          case 'is_subtype': {
+            if (!input.typeA || !input.typeB) return errorResult('INVALID_INPUT', 'typeA and typeB are required for is_subtype');
+            result = { isSubtype: dg.isSubtypeOf(input.typeA, input.typeB) };
+            break;
+          }
+          case 'edge_info': {
+            const edgeName = input.relationName || input.ppType;
+            if (!edgeName) return errorResult('INVALID_INPUT', 'relationName or ppType is required for edge_info');
+            const ppEdge = PP_VOCABULARY.edges[edgeName] || PP_VOCABULARY.edges[RELATION_TYPE_MAP[edgeName] || ''];
+            result = ppEdge || { error: `Unknown edge: ${edgeName}` };
+            break;
+          }
+          case 'node_type': {
+            if (!input.itemType) return errorResult('INVALID_INPUT', 'itemType is required for node_type');
+            result = { ppType: dg.getNodeType(input.itemType) };
+            break;
+          }
+          case 'edge_type': {
+            if (!input.relationName) return errorResult('INVALID_INPUT', 'relationName is required for edge_type');
+            result = { ppEdge: dg.getEdgeType(input.relationName) };
+            break;
+          }
+          default:
+            return errorResult('INVALID_INPUT', `Unknown query: ${input.query}`);
+        }
+
+        return {
+          content: [{
+            type: 'text' as const,
+            text: JSON.stringify(result, null, 2),
+          }],
+        };
+      }
+
+      // -----------------------------------------------------------------------
       // UNKNOWN TOOL
       // -----------------------------------------------------------------------
       default: {
@@ -2851,6 +2891,10 @@ All PinePaper tools will work in **code-only mode**:
             // On-demand guide & runtime config
             'pinepaper_tool_guide',
             'pinepaper_set_toolkit',
+            // Ontology tools
+            'pinepaper_analyze_design',
+            'pinepaper_validate_design',
+            'pinepaper_query_ontology',
           ],
         });
       }

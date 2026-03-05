@@ -117,8 +117,19 @@ describe('Schema Validation', () => {
       expect(result.success).toBe(true);
     });
 
+    it('should validate new effects (smoke, fire, glow, etc.)', () => {
+      expect(EffectTypeSchema.safeParse('smoke').success).toBe(true);
+      expect(EffectTypeSchema.safeParse('fire').success).toBe(true);
+      expect(EffectTypeSchema.safeParse('rain').success).toBe(true);
+      expect(EffectTypeSchema.safeParse('snow').success).toBe(true);
+      expect(EffectTypeSchema.safeParse('confetti').success).toBe(true);
+      expect(EffectTypeSchema.safeParse('ripple').success).toBe(true);
+      expect(EffectTypeSchema.safeParse('glow').success).toBe(true);
+      expect(EffectTypeSchema.safeParse('electric').success).toBe(true);
+    });
+
     it('should reject invalid effect', () => {
-      const result = EffectTypeSchema.safeParse('glow');
+      const result = EffectTypeSchema.safeParse('laser');
       expect(result.success).toBe(false);
     });
   });

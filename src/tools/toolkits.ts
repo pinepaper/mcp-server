@@ -219,6 +219,13 @@ export const TOOL_TAGS: Record<string, string[]> = {
     'pinepaper_register_item',
   ],
 
+  // --- Ontology (Design Knowledge Graph) ---
+  ontology: [
+    'pinepaper_analyze_design',
+    'pinepaper_validate_design',
+    'pinepaper_query_ontology',
+  ],
+
   // --- On-demand guide & runtime config (included in ALL profiles) ---
   guide: [
     'pinepaper_tool_guide',
@@ -240,7 +247,7 @@ export const TOOLKIT_PROFILES: Record<ToolkitProfile, string[]> = {
     'generators', 'effects',
     'scene',
     'query', 'export',
-    'p5', 'guide',
+    'p5', 'ontology', 'guide',
   ],
 
   diagram: [
