@@ -417,6 +417,7 @@ export const GeneratorNameSchema = z.enum([
   'drawFluidFlow',
   'drawOrganicFlow',
   'drawNoiseTexture',
+  'drawGlobeWireframe',
 ]).describe('Background generator name');
 
 export type GeneratorName = z.infer<typeof GeneratorNameSchema>;
@@ -592,6 +593,14 @@ export const NoiseTextureParamsSchema = z.object({
 export const EffectTypeSchema = z.enum([
   'sparkle',
   'blast',
+  'smoke',
+  'fire',
+  'rain',
+  'snow',
+  'confetti',
+  'ripple',
+  'glow',
+  'electric',
 ]).describe('Visual effect type');
 
 export const SparkleParamsSchema = z.object({
@@ -1488,7 +1497,7 @@ export type AgentScreenshotPolicy = z.infer<typeof AgentScreenshotPolicySchema>;
  */
 export const AgentStartJobInputSchema = z.object({
   name: z.string().optional().describe('Optional job name for tracking'),
-  description: z.string().optional().describe('User prompt or task description — pass the user request here for contextual design guidance'),
+  description: z.string().optional().describe('User prompt or task description for creative direction'),
   headless: z.boolean().optional().default(true).describe('Run browser in headless mode'),
   screenshotPolicy: AgentScreenshotPolicySchema.optional().default('on_complete'),
   canvasPreset: AgentPlatformSchema.optional().describe('Canvas size preset to apply'),
@@ -2204,3 +2213,37 @@ export const ImportImageInputSchema = z.object({
 }).describe('Import image input');
 
 export type ImportImageInput = z.infer<typeof ImportImageInputSchema>;
+
+// =============================================================================
+// ONTOLOGY SCHEMAS
+// =============================================================================
+
+export const AnalyzeDesignInputSchema = z.object({
+  definition: z.object({}).passthrough().describe('A template or scene definition object (same shape as batch_execute operations or template definitions with id, name, category, data: {items, relations})'),
+}).describe('Analyze design input');
+
+export type AnalyzeDesignInput = z.infer<typeof AnalyzeDesignInputSchema>;
+
+export const ValidateDesignInputSchema = z.object({
+  definition: z.object({}).passthrough().describe('A template or scene definition object to validate and score'),
+}).describe('Validate design input');
+
+export type ValidateDesignInput = z.infer<typeof ValidateDesignInputSchema>;
+
+export const QueryOntologyInputSchema = z.object({
+  query: z.enum([
+    'list_types', 'list_edges', 'list_generators', 'list_effects',
+    'list_patterns', 'list_math_functions',
+    'type_hierarchy', 'type_children', 'type_properties', 'animatable_properties',
+    'is_subtype', 'edge_info', 'node_type', 'edge_type',
+  ]),
+  ppType: z.string().optional(),
+  itemType: z.string().optional(),
+  relationName: z.string().optional(),
+  typeA: z.string().optional(),
+  typeB: z.string().optional(),
+  category: z.string().optional(),
+  includeAbstract: z.boolean().optional().default(false),
+});
+
+export type QueryOntologyInput = z.infer<typeof QueryOntologyInputSchema>;

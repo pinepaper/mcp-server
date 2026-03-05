@@ -126,11 +126,11 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_get_letter_collage_options: 'List available collage styles, palettes, and options.',
 
   // --- Generators ---
-  pinepaper_execute_generator: 'Run generator. name: drawBokeh|drawGrid|drawWaves|drawCircuit|drawSunburst|drawGradientMesh|drawPattern|... params: {colors, ...}.',
+  pinepaper_execute_generator: 'Run generator. name: drawBokeh|drawGrid|drawWaves|drawCircuit|drawSunburst|drawGradientMesh|drawPattern|drawGlobeWireframe|... params: {colors, ...}.',
   pinepaper_list_generators: 'List available background generators with parameters.',
 
   // --- Effects & Filters ---
-  pinepaper_apply_effect: 'Apply visual effect to an item (sparkle, blast).',
+  pinepaper_apply_effect: 'Apply visual effect. effectType: sparkle|blast|smoke|fire|rain|snow|confetti|ripple|glow|electric. params: {color, speed, ...}.',
   pinepaper_add_filter: 'Add SVG filter to canvas (blur, glow, shadow, etc.).',
 
   // --- Triggers ---
@@ -174,6 +174,11 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_get_canvas_presets: 'List canvas size presets (YouTube, Instagram, TikTok, etc.).',
   pinepaper_p5_draw: 'Execute p5.js-style drawing code on canvas.',
   pinepaper_register_item: 'Register an existing Paper.js item in the PinePaper registry.',
+
+  // --- Ontology ---
+  pinepaper_analyze_design: 'Analyze template definition → typed graph, patterns, math functions, semantics, fingerprint, JSON-LD.',
+  pinepaper_validate_design: 'Validate + score template definition. 5-dimension quality scoring: completeness, animation, semantics, composition, structure.',
+  pinepaper_query_ontology: 'Query design knowledge graph. query: list_types|list_edges|list_generators|list_effects|type_hierarchy|type_properties|animatable_properties|is_subtype|node_type|edge_type.',
 
   // --- Guide & runtime config ---
   pinepaper_tool_guide: 'Get detailed guidance for any tool, category, or the full AI Agent Guide.',
