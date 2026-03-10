@@ -148,6 +148,11 @@ import {
   // Image import types
   ImportImageInputSchema,
   ImportImageInput,
+  // Scene management types
+  ManageScenesInputSchema,
+  ManageScenesInput,
+  ScenePlaybackInputSchema,
+  ScenePlaybackInput,
 } from './schemas.js';
 import { z } from 'zod';
 
@@ -2266,11 +2271,11 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
     const { platform, format, quality } = validated;
     const qualityLevel = quality || 'standard';
 
-    // Quality settings
+    // Quality settings (bitrate in bps for VideoEncoder)
     const qualitySettings = {
-      draft: { compression: 0.6, fps: 15, dpi: 72 },
-      standard: { compression: 0.85, fps: 30, dpi: 150 },
-      high: { compression: 0.95, fps: 60, dpi: 300 },
+      draft: { compression: 0.6, fps: 15, dpi: 72, bitrate: 2_000_000 },
+      standard: { compression: 0.85, fps: 30, dpi: 150, bitrate: 5_000_000 },
+      high: { compression: 0.95, fps: 60, dpi: 300, bitrate: 8_000_000 },
     }[qualityLevel];
 
     // Platform presets
@@ -2350,7 +2355,7 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
         const videoMimeType = { mp4: 'video/mp4', webm: 'video/webm', gif: 'image/gif' }[format];
         // Use _quickExportVideo (delegates to VideoExporter.export internally)
         if (app.exportEngine && app.exportEngine._quickExportVideo) {
-          const videoResult = await app.exportEngine._quickExportVideo(format, { fps: settings.fps, duration: 5 }, false);
+          const videoResult = await app.exportEngine._quickExportVideo(format, { fps: settings.fps, bitrate: settings.bitrate, duration: 5 }, false);
           if (videoResult && videoResult.blob) {
             const reader = new FileReader();
             const dataUrl = await new Promise(resolve => {
@@ -2363,7 +2368,7 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
           }
         } else if (app.exportEngine && app.exportEngine.videoExporter) {
           // Fallback: call VideoExporter.export directly
-          const blob = await app.exportEngine.videoExporter.export({ format, fps: settings.fps, duration: 5 });
+          const blob = await app.exportEngine.videoExporter.export({ format, fps: settings.fps, bitrate: settings.bitrate, duration: 5 });
           const reader = new FileReader();
           const dataUrl = await new Promise(resolve => {
             reader.onloadend = () => resolve(reader.result);
@@ -4055,6 +4060,223 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    const ite
   }
 })();
 `.trim();
+  }
+  generateManageScenes(input: ManageScenesInput): string {
+    const guard = `if (!app.sceneManager) return { error: 'SceneManager not available' };`;
+
+    switch (input.action) {
+      case 'save':
+        return `
+// Save current canvas as scene
+(async function() {
+  ${guard}
+  try {
+    const result = await app.sceneManager.saveCurrentAsScene(${JSON.stringify(input.name || 'Untitled Scene')});
+    return { success: true, action: 'save', sceneId: result?.id || result, name: ${JSON.stringify(input.name || 'Untitled Scene')} };
+  } catch (e) {
+    return { error: 'Failed to save scene: ' + e.message };
+  }
+})();
+`.trim();
+
+      case 'load':
+        return `
+// Load scene
+(async function() {
+  ${guard}
+  try {
+    await app.sceneManager.loadScene(${JSON.stringify(input.sceneId)}${input.transition ? `, { transition: ${JSON.stringify(input.transition)} }` : ''});
+    return { success: true, action: 'load', sceneId: ${JSON.stringify(input.sceneId)}${input.transition ? `, transition: ${JSON.stringify(input.transition)}` : ''} };
+  } catch (e) {
+    return { error: 'Failed to load scene: ' + e.message };
+  }
+})();
+`.trim();
+
+      case 'list':
+        return `
+// List all scenes
+(function() {
+  ${guard}
+  const scenes = app.sceneManager.listScenes();
+  return { success: true, action: 'list', scenes: scenes, count: scenes.length };
+})();
+`.trim();
+
+      case 'delete':
+        return `
+// Delete scene
+(function() {
+  ${guard}
+  app.sceneManager.deleteScene(${JSON.stringify(input.sceneId)});
+  return { success: true, action: 'delete', sceneId: ${JSON.stringify(input.sceneId)} };
+})();
+`.trim();
+
+      case 'rename':
+        return `
+// Rename scene
+(function() {
+  ${guard}
+  app.sceneManager.renameScene(${JSON.stringify(input.sceneId)}, ${JSON.stringify(input.name)});
+  return { success: true, action: 'rename', sceneId: ${JSON.stringify(input.sceneId)}, name: ${JSON.stringify(input.name)} };
+})();
+`.trim();
+
+      case 'duplicate':
+        return `
+// Duplicate scene
+(function() {
+  ${guard}
+  const result = app.sceneManager.duplicateScene(${JSON.stringify(input.sceneId)});
+  return { success: true, action: 'duplicate', originalId: ${JSON.stringify(input.sceneId)}, newScene: result };
+})();
+`.trim();
+
+      case 'reorder':
+        return `
+// Reorder scenes
+(function() {
+  ${guard}
+  app.sceneManager.reorderScenes(${JSON.stringify(input.sceneIds)});
+  return { success: true, action: 'reorder', order: ${JSON.stringify(input.sceneIds)} };
+})();
+`.trim();
+
+      case 'info':
+        return `
+// Get scene info
+(function() {
+  ${guard}
+  const scene = app.sceneManager.getScene(${JSON.stringify(input.sceneId)});
+  if (!scene) return { error: 'Scene not found: ${input.sceneId}' };
+  return { success: true, action: 'info', scene: scene };
+})();
+`.trim();
+
+      case 'export':
+        return `
+// Export all scenes
+(function() {
+  ${guard}
+  const data = app.sceneManager.exportScenes();
+  return { success: true, action: 'export', data: data };
+})();
+`.trim();
+
+      case 'import':
+        return `
+// Import scenes
+(function() {
+  ${guard}
+  try {
+    const json = ${JSON.stringify(input.scenesJson)};
+    app.sceneManager.importScenes(json${input.merge !== undefined ? `, { merge: ${input.merge} }` : ''});
+    return { success: true, action: 'import'${input.merge !== undefined ? `, merge: ${input.merge}` : ''} };
+  } catch (e) {
+    return { error: 'Failed to import scenes: ' + e.message };
+  }
+})();
+`.trim();
+
+      default:
+        return `(function() { return { error: 'Unknown manage_scenes action: ${(input as any).action}' }; })();`;
+    }
+  }
+
+  generateScenePlayback(input: ScenePlaybackInput): string {
+    const guard = `if (!app.sceneManager) return { error: 'SceneManager not available' };`;
+
+    switch (input.action) {
+      case 'create_chain': {
+        const opts: string[] = [];
+        if (input.loop !== undefined) opts.push(`loop: ${input.loop}`);
+        if (input.autoPlay !== undefined) opts.push(`autoPlay: ${input.autoPlay}`);
+        if (input.defaultDuration !== undefined) opts.push(`defaultDuration: ${input.defaultDuration * 1000}`);
+        if (input.defaultTransition !== undefined) opts.push(`defaultTransition: ${JSON.stringify(input.defaultTransition)}`);
+        if (input.transitionDuration !== undefined) opts.push(`transitionDuration: ${input.transitionDuration * 1000}`);
+        const optsStr = opts.length > 0 ? `, { ${opts.join(', ')} }` : '';
+        return `
+// Create scene chain for sequential playback
+(function() {
+  ${guard}
+  app.sceneManager.createChain(${JSON.stringify(input.sceneIds)}${optsStr});
+  return { success: true, action: 'create_chain', sceneIds: ${JSON.stringify(input.sceneIds)}${input.loop !== undefined ? `, loop: ${input.loop}` : ''}${input.defaultDuration !== undefined ? `, defaultDuration: ${input.defaultDuration}` : ''} };
+})();
+`.trim();
+      }
+
+      case 'play':
+        return `
+// Play scene chain
+(async function() {
+  ${guard}
+  try {
+    await app.sceneManager.playChain();
+    return { success: true, action: 'play' };
+  } catch (e) {
+    return { error: 'Failed to play chain: ' + e.message };
+  }
+})();
+`.trim();
+
+      case 'pause':
+        return `
+// Pause scene chain
+(function() {
+  ${guard}
+  app.sceneManager.pauseChain();
+  return { success: true, action: 'pause' };
+})();
+`.trim();
+
+      case 'resume':
+        return `
+// Resume scene chain
+(function() {
+  ${guard}
+  app.sceneManager.resumeChain();
+  return { success: true, action: 'resume' };
+})();
+`.trim();
+
+      case 'stop':
+        return `
+// Stop scene chain
+(function() {
+  ${guard}
+  app.sceneManager.stopChain();
+  return { success: true, action: 'stop' };
+})();
+`.trim();
+
+      case 'toggle_loop':
+        return `
+// Toggle loop mode
+(function() {
+  ${guard}
+  app.sceneManager.setLoop(${input.enabled ?? true});
+  return { success: true, action: 'toggle_loop', enabled: ${input.enabled ?? true} };
+})();
+`.trim();
+
+      case 'jump':
+        return `
+// Jump to scene index
+(async function() {
+  ${guard}
+  try {
+    await app.sceneManager.jumpToChainIndex(${input.index ?? 0});
+    return { success: true, action: 'jump', index: ${input.index ?? 0} };
+  } catch (e) {
+    return { error: 'Failed to jump to index: ' + e.message };
+  }
+})();
+`.trim();
+
+      default:
+        return `(function() { return { error: 'Unknown scene_playback action: ${(input as any).action}' }; })();`;
+    }
   }
 }
 

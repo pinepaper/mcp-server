@@ -2247,3 +2247,33 @@ export const QueryOntologyInputSchema = z.object({
 });
 
 export type QueryOntologyInput = z.infer<typeof QueryOntologyInputSchema>;
+
+// =============================================================================
+// SCENE MANAGEMENT SCHEMAS
+// =============================================================================
+
+export const ManageScenesInputSchema = z.object({
+  action: z.enum(['save', 'load', 'list', 'delete', 'rename', 'duplicate', 'reorder', 'info', 'export', 'import']),
+  name: z.string().optional(),
+  sceneId: z.string().optional(),
+  transition: z.enum(['none', 'fade', 'zoom-in', 'zoom-out']).optional(),
+  sceneIds: z.array(z.string()).optional(),
+  scenesJson: z.string().optional(),
+  merge: z.boolean().optional(),
+});
+
+export type ManageScenesInput = z.infer<typeof ManageScenesInputSchema>;
+
+export const ScenePlaybackInputSchema = z.object({
+  action: z.enum(['create_chain', 'play', 'pause', 'resume', 'stop', 'toggle_loop', 'jump']),
+  sceneIds: z.array(z.string()).optional(),
+  loop: z.boolean().optional(),
+  autoPlay: z.boolean().optional(),
+  defaultDuration: z.number().optional(),
+  defaultTransition: z.enum(['none', 'fade', 'zoom-in', 'zoom-out']).optional(),
+  transitionDuration: z.number().optional(),
+  enabled: z.boolean().optional(),
+  index: z.number().optional(),
+});
+
+export type ScenePlaybackInput = z.infer<typeof ScenePlaybackInputSchema>;

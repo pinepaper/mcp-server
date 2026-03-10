@@ -109,6 +109,8 @@ export const TOOL_TAGS: Record<string, string[]> = {
   // --- Compositions ---
   scene: [
     'pinepaper_create_scene',
+    'pinepaper_manage_scenes',
+    'pinepaper_scene_playback',
   ],
   template: [
     'pinepaper_apply_template',

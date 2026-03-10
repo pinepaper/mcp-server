@@ -64,6 +64,8 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
 
   // --- Scenes & Templates ---
   pinepaper_create_scene: 'Create scene. items: [{name, itemType, position, properties}], relations: [{source, target, type}], animations: [{target, type}].',
+  pinepaper_manage_scenes: 'Scene CRUD. action: save|load|list|delete|rename|duplicate|reorder|info|export|import. name, sceneId, transition: none|fade|zoom-in|zoom-out.',
+  pinepaper_scene_playback: 'Scene chain playback. action: create_chain|play|pause|resume|stop|toggle_loop|jump. sceneIds, defaultDuration (secs), loop.',
   pinepaper_apply_template: 'Apply a pre-built template to the canvas.',
 
   // --- Diagrams ---

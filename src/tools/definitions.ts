@@ -2172,6 +2172,116 @@ SUPPORTED ANIMATIONS: pulse, rotate, bounce, fade, wobble, slide, typewriter`,
     },
   },
 
+  // --- Scene Management ---
+  {
+    name: 'pinepaper_manage_scenes',
+    annotations: {
+      title: 'Manage Scenes',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Manage multiple saved scenes (canvas snapshots). Save, load, organize, and transfer scenes for multi-scene storyboards and presentations.
+
+ACTIONS:
+- save: Save current canvas state as a named scene. Params: name (string)
+- load: Load a saved scene onto canvas. Params: sceneId, transition (none|fade|zoom-in|zoom-out)
+- list: List all saved scenes with metadata
+- delete: Delete a scene. Params: sceneId
+- rename: Rename a scene. Params: sceneId, name
+- duplicate: Clone a scene. Params: sceneId
+- reorder: Reorder scenes. Params: sceneIds (ordered array)
+- info: Get scene details. Params: sceneId
+- export: Export all scenes as JSON
+- import: Import scenes from JSON. Params: scenesJson, merge (boolean)
+
+WORKFLOW — Multi-Scene Storyboard:
+1. Create your first scene → save(name: "Intro")
+2. Clear canvas, create second scene → save(name: "Chapter 1")
+3. Repeat for all scenes
+4. Use pinepaper_scene_playback to play them as a slideshow`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['save', 'load', 'list', 'delete', 'rename', 'duplicate', 'reorder', 'info', 'export', 'import'],
+          description: 'Scene management action',
+        },
+        name: { type: 'string', description: 'Scene name (for save, rename)' },
+        sceneId: { type: 'string', description: 'Scene identifier (for load, delete, rename, duplicate, info)' },
+        transition: {
+          type: 'string',
+          enum: ['none', 'fade', 'zoom-in', 'zoom-out'],
+          description: 'Transition effect when loading a scene',
+        },
+        sceneIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Ordered array of scene IDs (for reorder)',
+        },
+        scenesJson: { type: 'string', description: 'JSON string of scenes to import' },
+        merge: { type: 'boolean', description: 'Merge with existing scenes on import (default: replace)' },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'pinepaper_scene_playback',
+    annotations: {
+      title: 'Scene Playback',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Control sequential scene chain playback — play saved scenes as a slideshow presentation.
+
+ACTIONS:
+- create_chain: Create a playback chain from scene IDs. Params: sceneIds (array), loop (bool), autoPlay (bool), defaultDuration (seconds), defaultTransition (none|fade|zoom-in|zoom-out), transitionDuration (seconds)
+- play: Start playing the chain
+- pause: Pause playback
+- resume: Resume paused playback
+- stop: Stop playback and reset
+- toggle_loop: Enable/disable looping. Params: enabled (bool)
+- jump: Jump to specific scene index. Params: index (0-based)
+
+NOTE: defaultDuration and transitionDuration are in SECONDS (converted to ms internally).
+
+EXAMPLE — Slideshow:
+1. Save 3 scenes with pinepaper_manage_scenes
+2. create_chain with sceneIds, defaultDuration: 5, loop: true
+3. play`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['create_chain', 'play', 'pause', 'resume', 'stop', 'toggle_loop', 'jump'],
+          description: 'Playback control action',
+        },
+        sceneIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Scene IDs for the chain (create_chain)',
+        },
+        loop: { type: 'boolean', description: 'Loop the chain (create_chain)' },
+        autoPlay: { type: 'boolean', description: 'Start playing immediately (create_chain)' },
+        defaultDuration: { type: 'number', description: 'Duration per scene in seconds (create_chain)' },
+        defaultTransition: {
+          type: 'string',
+          enum: ['none', 'fade', 'zoom-in', 'zoom-out'],
+          description: 'Default transition between scenes',
+        },
+        transitionDuration: { type: 'number', description: 'Transition duration in seconds (create_chain)' },
+        enabled: { type: 'boolean', description: 'Enable/disable loop (toggle_loop)' },
+        index: { type: 'number', description: '0-based scene index (jump)' },
+      },
+      required: ['action'],
+    },
+  },
+
   // ---------------------------------------------------------------------------
   // LAYER 5 — BLUEPRINTS: TEMPLATE TOOLS
   // ---------------------------------------------------------------------------
