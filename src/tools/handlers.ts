@@ -107,6 +107,9 @@ import {
   AnalyzeDesignInputSchema,
   ValidateDesignInputSchema,
   QueryOntologyInputSchema,
+  // Scene management schemas
+  ManageScenesInputSchema,
+  ScenePlaybackInputSchema,
   ErrorCodes,
   RelationType,
   ItemType,
@@ -779,6 +782,18 @@ async function handleToolCallInner(
         const animationCount = input.animations?.length || 0;
         const description = `Creates complete scene with ${itemCount} items, ${relationCount} relations, ${animationCount} animations`;
         return executeOrGenerate(code, description, options, 'pinepaper_create_scene');
+      }
+
+      case 'pinepaper_manage_scenes': {
+        const input = ManageScenesInputSchema.parse(args);
+        const code = codeGenerator.generateManageScenes(input);
+        return executeOrGenerate(code, `Scene: ${input.action}`, options, 'pinepaper_manage_scenes');
+      }
+
+      case 'pinepaper_scene_playback': {
+        const input = ScenePlaybackInputSchema.parse(args);
+        const code = codeGenerator.generateScenePlayback(input);
+        return executeOrGenerate(code, `Scene playback: ${input.action}`, options, 'pinepaper_scene_playback');
       }
 
       // -----------------------------------------------------------------------
@@ -2819,6 +2834,8 @@ You can now start creating new items on a clean canvas.`,
             'pinepaper_diagram_mode',
             // Scene tools
             'pinepaper_create_scene',
+            'pinepaper_manage_scenes',
+            'pinepaper_scene_playback',
             // Agent flow mode tools
             'pinepaper_agent_start_job',
             'pinepaper_agent_end_job',
