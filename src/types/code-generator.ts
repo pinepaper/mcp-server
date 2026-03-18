@@ -983,15 +983,12 @@ export class PinePaperCodeGenerator {
    * Generate code for timeline control
    */
   generatePlayTimeline(
-    actionOrInput: 'play' | 'pause' | 'stop' | 'seek' | { action: 'play' | 'pause' | 'stop' | 'seek'; duration?: number; loop?: boolean; time?: number },
+    action: 'play' | 'pause' | 'stop' | 'seek',
     duration?: number,
     loop?: boolean,
     time?: number
   ): string {
-    if (typeof actionOrInput === 'object') {
-      return generatePlayTimelineCode(actionOrInput.action, actionOrInput.duration, actionOrInput.loop, actionOrInput.time);
-    }
-    return generatePlayTimelineCode(actionOrInput, duration, loop, time);
+    return generatePlayTimelineCode(action, duration, loop, time);
   }
 
   /**
@@ -4368,8 +4365,8 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    const ite
   generateTransform(input: TransformInput): string {
     switch (input.action) {
       case 'nudge': {
-        const dx = input.dx || 0;
-        const dy = input.dy || 0;
+        const dx = input.dx ?? 0;
+        const dy = input.dy ?? 0;
         return `
 // Nudge item position
 (function() {
@@ -4401,15 +4398,24 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    const ite
         };
         const method = methodMap[order] || 'bringToFront';
         const needsSibling = order === 'moveUp' || order === 'moveDown';
+        if (needsSibling) {
+          const siblingExpr = order === 'moveUp' ? 'entry.item.nextSibling' : 'entry.item.previousSibling';
+          return `
+// Reorder item: ${order}
+(function() {
+  const entry = app.itemRegistry.get(${JSON.stringify(input.itemId || '')});
+  if (!entry || !entry.item) return { error: 'Item not found: ${input.itemId}' };
+  const sibling = ${siblingExpr};
+  if (sibling) entry.item.${method}(sibling);
+  return { success: true, action: 'reorder', itemId: '${input.itemId}', order: '${order}' };
+})();`.trim();
+        }
         return `
 // Reorder item: ${order}
 (function() {
   const entry = app.itemRegistry.get(${JSON.stringify(input.itemId || '')});
   if (!entry || !entry.item) return { error: 'Item not found: ${input.itemId}' };
-  ${needsSibling
-    ? `const sibling = order === 'moveUp' ? entry.item.nextSibling : entry.item.previousSibling;
-  if (sibling) entry.item.${method}(sibling);`
-    : `entry.item.${method}();`}
+  entry.item.${method}();
   return { success: true, action: 'reorder', itemId: '${input.itemId}', order: '${order}' };
 })();`.trim();
       }
