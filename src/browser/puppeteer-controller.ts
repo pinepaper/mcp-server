@@ -14,7 +14,7 @@ import type { Browser, Page } from 'puppeteer';
 export interface BrowserControllerConfig {
   /** PinePaper Studio URL (default: https://pinepaper.studio) */
   studioUrl?: string;
-  /** Whether to run browser in headless mode (default: false for visibility) */
+  /** Whether to run browser in headless mode (default: true) */
   headless?: boolean;
   /** Browser viewport width (default: 1280) */
   viewportWidth?: number;
@@ -97,7 +97,7 @@ export class PinePaperBrowserController {
 
     this.config = {
       studioUrl,
-      headless: config.headless ?? false, // Default to visible browser so user can see PinePaper Studio
+      headless: config.headless ?? true, // Default to headless for MCP server performance
       viewportWidth: config.viewportWidth || 1280,
       viewportHeight: config.viewportHeight || 800,
       timeout: config.timeout || 30000,
@@ -146,6 +146,13 @@ export class PinePaperBrowserController {
    */
   get actualUrl(): string {
     return this.config.studioUrl;
+  }
+
+  /**
+   * Whether the browser is running in headless mode
+   */
+  get isHeadless(): boolean {
+    return this.config.headless;
   }
 
   /**
@@ -784,10 +791,12 @@ export function getBrowserController(
   config?: BrowserControllerConfig
 ): PinePaperBrowserController {
   if (!globalController) {
-    // MCP server always uses headless by default
+    // Resolve headless: explicit config > env var > default (true)
+    const envHeadless = process.env.PINEPAPER_HEADLESS;
+    const headless = config?.headless ?? (envHeadless !== undefined ? envHeadless !== 'false' : true);
     const mcpConfig: BrowserControllerConfig = {
       ...config,
-      headless: config?.headless ?? true,
+      headless,
     };
     globalController = new PinePaperBrowserController(mcpConfig);
   } else if (config) {
