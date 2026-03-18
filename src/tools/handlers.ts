@@ -110,6 +110,17 @@ import {
   // Scene management schemas
   ManageScenesInputSchema,
   ScenePlaybackInputSchema,
+  // New consolidated tool schemas
+  SelectionInputSchema,
+  TransformInputSchema,
+  HistoryInputSchema,
+  ImageFilterInputSchema,
+  LassoInputSchema,
+  CutoutStyleInputSchema,
+  PrecompInputSchema,
+  ViewInputSchema,
+  BackgroundInputSchema,
+  QueryInputSchema,
   ErrorCodes,
   RelationType,
   ItemType,
@@ -794,6 +805,78 @@ async function handleToolCallInner(
         const input = ScenePlaybackInputSchema.parse(args);
         const code = codeGenerator.generateScenePlayback(input);
         return executeOrGenerate(code, `Scene playback: ${input.action}`, options, 'pinepaper_scene_playback');
+      }
+
+      // -----------------------------------------------------------------------
+      // SELECTION, TRANSFORM & HISTORY TOOLS
+      // -----------------------------------------------------------------------
+      case 'pinepaper_selection': {
+        const input = SelectionInputSchema.parse(args);
+        const code = codeGenerator.generateSelection(input);
+        return executeOrGenerate(code, `Selection: ${input.action}`, options, 'pinepaper_selection');
+      }
+
+      case 'pinepaper_transform': {
+        const input = TransformInputSchema.parse(args);
+        const code = codeGenerator.generateTransform(input);
+        return executeOrGenerate(code, `Transform: ${input.action}`, options, 'pinepaper_transform');
+      }
+
+      case 'pinepaper_history': {
+        const input = HistoryInputSchema.parse(args);
+        const code = codeGenerator.generateHistory(input);
+        return executeOrGenerate(code, `History: ${input.action}`, options, 'pinepaper_history');
+      }
+
+      // -----------------------------------------------------------------------
+      // IMAGE PROCESSING TOOLS
+      // -----------------------------------------------------------------------
+      case 'pinepaper_image_filter': {
+        const input = ImageFilterInputSchema.parse(args);
+        const code = codeGenerator.generateImageFilter(input);
+        return executeOrGenerate(code, `Image filter: ${input.action}`, options, 'pinepaper_image_filter');
+      }
+
+      case 'pinepaper_lasso': {
+        const input = LassoInputSchema.parse(args);
+        const code = codeGenerator.generateLasso(input);
+        return executeOrGenerate(code, `Lasso: ${input.action}`, options, 'pinepaper_lasso');
+      }
+
+      case 'pinepaper_cutout_style': {
+        const input = CutoutStyleInputSchema.parse(args);
+        const code = codeGenerator.generateCutoutStyle(input);
+        return executeOrGenerate(code, `Cutout style: ${input.action}`, options, 'pinepaper_cutout_style');
+      }
+
+      // -----------------------------------------------------------------------
+      // COMPOSITION & VIEW TOOLS
+      // -----------------------------------------------------------------------
+      case 'pinepaper_precomp': {
+        const input = PrecompInputSchema.parse(args);
+        const code = codeGenerator.generatePrecomp(input);
+        return executeOrGenerate(code, `Precomp: ${input.action}`, options, 'pinepaper_precomp');
+      }
+
+      case 'pinepaper_view': {
+        const input = ViewInputSchema.parse(args);
+        const code = codeGenerator.generateView(input);
+        return executeOrGenerate(code, `View: ${input.action}`, options, 'pinepaper_view');
+      }
+
+      case 'pinepaper_background': {
+        const input = BackgroundInputSchema.parse(args);
+        const code = codeGenerator.generateBackground(input);
+        return executeOrGenerate(code, `Background: ${input.action}`, options, 'pinepaper_background');
+      }
+
+      // -----------------------------------------------------------------------
+      // CANVAS QUERY TOOLS
+      // -----------------------------------------------------------------------
+      case 'pinepaper_query': {
+        const input = QueryInputSchema.parse(args);
+        const code = codeGenerator.generateQuery(input);
+        return executeOrGenerate(code, `Query: ${input.action}`, options, 'pinepaper_query');
       }
 
       // -----------------------------------------------------------------------
@@ -2912,6 +2995,20 @@ You can now start creating new items on a clean canvas.`,
             'pinepaper_analyze_design',
             'pinepaper_validate_design',
             'pinepaper_query_ontology',
+            // Selection, transform & history tools
+            'pinepaper_selection',
+            'pinepaper_transform',
+            'pinepaper_history',
+            // Image processing tools
+            'pinepaper_image_filter',
+            'pinepaper_lasso',
+            'pinepaper_cutout_style',
+            // Composition & view tools
+            'pinepaper_precomp',
+            'pinepaper_view',
+            'pinepaper_background',
+            // Canvas query tools
+            'pinepaper_query',
           ],
         });
       }
