@@ -1535,7 +1535,7 @@ EASING OPTIONS:
     description: `Control keyframe animation playback.
 
 USE WHEN:
-- Starting/stopping timeline playback
+- Starting/stopping/pausing timeline playback
 - Seeking to specific time
 - Controlling animation state`,
     inputSchema: {
@@ -1543,7 +1543,7 @@ USE WHEN:
       properties: {
         action: {
           type: 'string',
-          enum: ['play', 'stop', 'seek'],
+          enum: ['play', 'pause', 'stop', 'seek'],
           description: 'Playback action',
         },
         duration: {
@@ -2277,6 +2277,367 @@ EXAMPLE — Slideshow:
         transitionDuration: { type: 'number', description: 'Transition duration in seconds (create_chain)' },
         enabled: { type: 'boolean', description: 'Enable/disable loop (toggle_loop)' },
         index: { type: 'number', description: '0-based scene index (jump)' },
+      },
+      required: ['action'],
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // LAYER 4 — COMPOSITIONS: SELECTION, TRANSFORM & HISTORY TOOLS
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_selection',
+    annotations: {
+      title: 'Selection',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Manage item selection on canvas.
+
+ACTIONS:
+- select: Select items by ID. Params: itemIds (string[]), mode (replace|add|remove)
+- select_all: Select all items on canvas
+- deselect_all: Clear selection
+- get: Get currently selected items with bounds
+- delete_selected: Delete all selected items`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['select', 'select_all', 'deselect_all', 'get', 'delete_selected'],
+          description: 'Selection action',
+        },
+        itemIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Item IDs to select (for select action)',
+        },
+        mode: {
+          type: 'string',
+          enum: ['replace', 'add', 'remove'],
+          description: 'Selection mode: replace (default), add to, or remove from current selection',
+        },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'pinepaper_transform',
+    annotations: {
+      title: 'Transform',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Transform items: nudge position, flip, or change z-order.
+
+ACTIONS:
+- nudge: Move item by dx/dy offset. Params: itemId, dx, dy
+- flip: Mirror item. Params: itemId, direction (horizontal|vertical)
+- reorder: Change z-order. Params: itemId, order (bringToFront|sendToBack|moveUp|moveDown)`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['nudge', 'flip', 'reorder'],
+          description: 'Transform action',
+        },
+        itemId: { type: 'string', description: 'Target item ID' },
+        dx: { type: 'number', description: 'Horizontal offset (for nudge)' },
+        dy: { type: 'number', description: 'Vertical offset (for nudge)' },
+        direction: {
+          type: 'string',
+          enum: ['horizontal', 'vertical'],
+          description: 'Flip direction',
+        },
+        order: {
+          type: 'string',
+          enum: ['bringToFront', 'sendToBack', 'moveUp', 'moveDown'],
+          description: 'Z-order operation',
+        },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'pinepaper_history',
+    annotations: {
+      title: 'History',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Undo/redo and history state inspection.
+
+ACTIONS:
+- undo: Undo last canvas action
+- redo: Redo last undone action
+- get_state: Get history stack state (canUndo, canRedo, count)`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['undo', 'redo', 'get_state'],
+          description: 'History action',
+        },
+      },
+      required: ['action'],
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // LAYER 4 — COMPOSITIONS: IMAGE PROCESSING TOOLS
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_image_filter',
+    annotations: {
+      title: 'Image Filter',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Apply GPU-accelerated image filters to raster items.
+
+ACTIONS:
+- apply: Apply a single filter. Params: itemId, filterName, params
+- chain: Apply multiple filters in sequence. Params: itemId, filters (array of {name, params})
+
+Available filters: blur, brightness, contrast, saturate, grayscale, sepia, invert, hue-rotate, sharpen, emboss, edge-detect.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['apply', 'chain'],
+          description: 'Filter action',
+        },
+        itemId: { type: 'string', description: 'Target raster item ID' },
+        filterName: { type: 'string', description: 'Filter name (for apply)' },
+        params: {
+          type: 'object',
+          description: 'Filter parameters (e.g. {amount: 5} for blur)',
+        },
+        filters: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string' },
+              params: { type: 'object' },
+            },
+            required: ['name'],
+          },
+          description: 'Filter chain (for chain action)',
+        },
+      },
+      required: ['action', 'itemId'],
+    },
+  },
+  {
+    name: 'pinepaper_lasso',
+    annotations: {
+      title: 'Lasso',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Freeform lasso selection for image items.
+
+ACTIONS:
+- activate: Start lasso mode on an image item. Params: itemId
+- apply: Confirm and apply the lasso selection`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['activate', 'apply'],
+          description: 'Lasso action',
+        },
+        itemId: { type: 'string', description: 'Target image item ID (for activate)' },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'pinepaper_cutout_style',
+    annotations: {
+      title: 'Cutout Style',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Apply decorative cutout styles to image items (sticker effects, torn edges, etc.).
+
+ACTIONS:
+- apply: Apply a cutout preset. Params: itemId, preset, options
+- list: List available cutout style presets`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['apply', 'list'],
+          description: 'Cutout style action',
+        },
+        itemId: { type: 'string', description: 'Target image item ID (for apply)' },
+        preset: { type: 'string', description: 'Cutout style preset name' },
+        options: { type: 'object', description: 'Additional style options' },
+      },
+      required: ['action'],
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // LAYER 4 — COMPOSITIONS: PRECOMP, VIEW & BACKGROUND TOOLS
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_precomp',
+    annotations: {
+      title: 'Precomp',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Nested compositions — group items into reusable animated precomps.
+
+ACTIONS:
+- create: Create precomp from items. Params: itemIds (string[]), name, loop (bool), duration (seconds)
+- add: Add item to existing precomp. Params: precompId, itemId
+- remove: Remove item from precomp. Params: precompId, itemId`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['create', 'add', 'remove'],
+          description: 'Precomp action',
+        },
+        itemIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Item IDs to group (for create)',
+        },
+        name: { type: 'string', description: 'Precomp name' },
+        loop: { type: 'boolean', description: 'Loop precomp animation' },
+        duration: { type: 'number', description: 'Precomp duration in seconds' },
+        precompId: { type: 'string', description: 'Target precomp ID (for add/remove)' },
+        itemId: { type: 'string', description: 'Item to add/remove' },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'pinepaper_view',
+    annotations: {
+      title: 'View',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `View control — fit view to content or get current view state.
+
+ACTIONS:
+- fit: Fit view to content or canvas bounds. Params: mode (content|canvas), padding (number)
+- get_state: Get current view state (zoom, center, bounds)`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['fit', 'get_state'],
+          description: 'View action',
+        },
+        mode: {
+          type: 'string',
+          enum: ['content', 'canvas'],
+          description: 'Fit mode (for fit action)',
+        },
+        padding: { type: 'number', description: 'Padding around content in pixels (default: 20)' },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'pinepaper_background',
+    annotations: {
+      title: 'Background',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Set, clear, or query the canvas background.
+
+ACTIONS:
+- set: Set background. Params: mode (color|pattern|generator), color, pattern, generator, generatorParams
+- clear: Remove background entirely
+- get: Get current background settings`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['set', 'clear', 'get'],
+          description: 'Background action',
+        },
+        mode: {
+          type: 'string',
+          enum: ['color', 'pattern', 'generator'],
+          description: 'Background type (for set)',
+        },
+        color: { type: 'string', description: 'Hex color (for color mode)' },
+        pattern: { type: 'string', description: 'Pattern name (for pattern mode)' },
+        generator: { type: 'string', description: 'Generator name (for generator mode)' },
+        generatorParams: { type: 'object', description: 'Generator parameters' },
+      },
+      required: ['action'],
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // LAYER 4 — COMPOSITIONS: CANVAS QUERY TOOLS
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_query',
+    annotations: {
+      title: 'Canvas Query',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Query canvas items and spatial information.
+
+ACTIONS:
+- get_by_id: Get detailed item info. Params: itemId
+- hit_test: Find items at coordinates. Params: x, y, tolerance, all (bool)
+- is_empty: Check if canvas has any items`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['get_by_id', 'hit_test', 'is_empty'],
+          description: 'Query action',
+        },
+        itemId: { type: 'string', description: 'Item ID (for get_by_id)' },
+        x: { type: 'number', description: 'X coordinate (for hit_test)' },
+        y: { type: 'number', description: 'Y coordinate (for hit_test)' },
+        all: { type: 'boolean', description: 'Return all hits (default: first only)' },
+        tolerance: { type: 'number', description: 'Hit test tolerance in pixels (default: 5)' },
       },
       required: ['action'],
     },

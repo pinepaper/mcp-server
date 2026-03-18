@@ -39,6 +39,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
     'pinepaper_clear_canvas',
     'pinepaper_refresh_page',
     'pinepaper_get_canvas_presets',
+    'pinepaper_background',
   ],
 
   // --- Item creation & modification ---
@@ -92,6 +93,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
     'pinepaper_camera_reset',
     'pinepaper_camera_stop',
     'pinepaper_camera_state',
+    'pinepaper_view',
   ],
 
   // --- Generators & effects ---
@@ -112,6 +114,23 @@ export const TOOL_TAGS: Record<string, string[]> = {
     'pinepaper_manage_scenes',
     'pinepaper_scene_playback',
   ],
+  selection: [
+    'pinepaper_selection',
+  ],
+  transform: [
+    'pinepaper_transform',
+  ],
+  history: [
+    'pinepaper_history',
+  ],
+  image_processing: [
+    'pinepaper_image_filter',
+    'pinepaper_lasso',
+    'pinepaper_cutout_style',
+  ],
+  precomp: [
+    'pinepaper_precomp',
+  ],
   template: [
     'pinepaper_apply_template',
   ],
@@ -120,6 +139,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
   query: [
     'pinepaper_get_items',
     'pinepaper_get_relation_stats',
+    'pinepaper_query',
   ],
   export: [
     'pinepaper_export_svg',
@@ -248,6 +268,8 @@ export const TOOLKIT_PROFILES: Record<ToolkitProfile, string[]> = {
     'relations', 'animation', 'masks',
     'generators', 'effects',
     'scene',
+    'selection', 'transform', 'history',
+    'image_processing', 'precomp',
     'query', 'export',
     'p5', 'ontology', 'guide',
   ],

@@ -182,6 +182,24 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_validate_design: 'Validate + score template definition. 5-dimension quality scoring: completeness, animation, semantics, composition, structure.',
   pinepaper_query_ontology: 'Query design knowledge graph. query: list_types|list_edges|list_generators|list_effects|type_hierarchy|type_properties|animatable_properties|is_subtype|node_type|edge_type.',
 
+  // --- Selection, Transform & History ---
+  pinepaper_selection: 'Manage selection. action: select|select_all|deselect_all|get|delete_selected. itemIds, mode: replace|add|remove.',
+  pinepaper_transform: 'Transform items. action: nudge|flip|reorder. dx,dy. direction: horizontal|vertical. order: bringToFront|sendToBack|moveUp|moveDown.',
+  pinepaper_history: 'Undo/redo. action: undo|redo|get_state.',
+
+  // --- Image Processing ---
+  pinepaper_image_filter: 'GPU image filters. action: apply|chain. itemId, filterName, params, filters[].',
+  pinepaper_lasso: 'Lasso selection. action: activate|apply. itemId.',
+  pinepaper_cutout_style: 'Style cutouts. action: apply|list. itemId, preset, options.',
+
+  // --- Composition & View ---
+  pinepaper_precomp: 'Nested compositions. action: create|add|remove. itemIds, name, precompId, itemId.',
+  pinepaper_view: 'View control. action: fit|get_state. mode: content|canvas, padding.',
+  pinepaper_background: 'Background. action: set|clear|get. mode: color|pattern|generator.',
+
+  // --- Canvas Query ---
+  pinepaper_query: 'Canvas queries. action: get_by_id|hit_test|is_empty. itemId, x, y, tolerance.',
+
   // --- Guide & runtime config ---
   pinepaper_tool_guide: 'Get detailed guidance for any tool, category, or the full AI Agent Guide.',
   pinepaper_set_toolkit: 'Switch toolkit (full|agent|diagram|map|font|minimal) and/or verbosity (verbose|compact|minimal) at runtime.',

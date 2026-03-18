@@ -153,6 +153,17 @@ import {
   ManageScenesInput,
   ScenePlaybackInputSchema,
   ScenePlaybackInput,
+  // New consolidated tool types
+  SelectionInput,
+  TransformInput,
+  HistoryInput,
+  ImageFilterInput,
+  LassoInput,
+  CutoutStyleInput,
+  PrecompInput,
+  ViewInput,
+  BackgroundInput,
+  QueryInput,
 } from './schemas.js';
 import { z } from 'zod';
 
@@ -577,7 +588,7 @@ const items = filtered.map(entry => ({
  * Template for timeline control
  */
 function generatePlayTimelineCode(
-  action: 'play' | 'stop' | 'seek',
+  action: 'play' | 'pause' | 'stop' | 'seek',
   duration?: number,
   loop?: boolean,
   time?: number
@@ -588,6 +599,12 @@ function generatePlayTimelineCode(
 // Play keyframe timeline
 app.playKeyframeTimeline(${duration || 5}, ${loop ?? false});
 ({ success: true, action: 'play', duration: ${duration || 5}, loop: ${loop ?? false} });
+`.trim();
+    case 'pause':
+      return `
+// Pause keyframe timeline
+app.pauseKeyframeTimeline();
+({ success: true, action: 'pause' });
 `.trim();
     case 'stop':
       return `
@@ -966,12 +983,15 @@ export class PinePaperCodeGenerator {
    * Generate code for timeline control
    */
   generatePlayTimeline(
-    action: 'play' | 'stop' | 'seek',
+    actionOrInput: 'play' | 'pause' | 'stop' | 'seek' | { action: 'play' | 'pause' | 'stop' | 'seek'; duration?: number; loop?: boolean; time?: number },
     duration?: number,
     loop?: boolean,
     time?: number
   ): string {
-    return generatePlayTimelineCode(action, duration, loop, time);
+    if (typeof actionOrInput === 'object') {
+      return generatePlayTimelineCode(actionOrInput.action, actionOrInput.duration, actionOrInput.loop, actionOrInput.time);
+    }
+    return generatePlayTimelineCode(actionOrInput, duration, loop, time);
   }
 
   /**
@@ -4276,6 +4296,429 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    const ite
 
       default:
         return `(function() { return { error: 'Unknown scene_playback action: ${(input as any).action}' }; })();`;
+    }
+  }
+
+  // ===========================================================================
+  // SELECTION, TRANSFORM & HISTORY
+  // ===========================================================================
+
+  generateSelection(input: SelectionInput): string {
+    switch (input.action) {
+      case 'select': {
+        const ids = JSON.stringify(input.itemIds || []);
+        const mode = input.mode || 'replace';
+        return `
+// Select items
+(function() {
+  const ids = ${ids};
+  if (ids.length === 0) return { error: 'No itemIds provided' };
+  ${mode === 'replace' ? 'app.deselectAll();' : ''}
+  const selected = [];
+  for (const id of ids) {
+    const entry = app.itemRegistry.get(id);
+    if (entry && entry.item) {
+      ${mode === 'remove' ? 'entry.item.selected = false;' : 'app.select(entry.item);'}
+      selected.push(id);
+    }
+  }
+  return { success: true, action: 'select', mode: '${mode}', selected };
+})();`.trim();
+      }
+      case 'select_all':
+        return `
+// Select all items
+(function() {
+  app.selectAll();
+  const items = app.getSelection().map(i => i.data?.itemId || i.name || i.id);
+  return { success: true, action: 'select_all', count: items.length, items };
+})();`.trim();
+      case 'deselect_all':
+        return `
+// Deselect all items
+(function() {
+  app.deselectAll();
+  return { success: true, action: 'deselect_all' };
+})();`.trim();
+      case 'get':
+        return `
+// Get current selection
+(function() {
+  const items = app.getSelection().map(i => ({
+    itemId: i.data?.itemId || i.name || i.id,
+    type: i.data?.itemType || i.className,
+    bounds: i.bounds ? { x: i.bounds.x, y: i.bounds.y, width: i.bounds.width, height: i.bounds.height } : null
+  }));
+  return { success: true, action: 'get', count: items.length, items };
+})();`.trim();
+      case 'delete_selected':
+        return `
+// Delete selected items
+(function() {
+  const selection = app.getSelection();
+  const deleted = selection.map(i => i.data?.itemId || i.name || i.id);
+  app.deleteSelected();
+  return { success: true, action: 'delete_selected', deleted, count: deleted.length };
+})();`.trim();
+      default:
+        return `(function() { return { error: 'Unknown selection action: ${(input as any).action}' }; })();`;
+    }
+  }
+
+  generateTransform(input: TransformInput): string {
+    switch (input.action) {
+      case 'nudge': {
+        const dx = input.dx || 0;
+        const dy = input.dy || 0;
+        return `
+// Nudge item position
+(function() {
+  const entry = app.itemRegistry.get(${JSON.stringify(input.itemId || '')});
+  if (!entry || !entry.item) return { error: 'Item not found: ${input.itemId}' };
+  entry.item.position.x += ${dx};
+  entry.item.position.y += ${dy};
+  return { success: true, action: 'nudge', itemId: '${input.itemId}', dx: ${dx}, dy: ${dy}, position: { x: entry.item.position.x, y: entry.item.position.y } };
+})();`.trim();
+      }
+      case 'flip': {
+        const dir = input.direction || 'horizontal';
+        return `
+// Flip item ${dir}ly
+(function() {
+  const entry = app.itemRegistry.get(${JSON.stringify(input.itemId || '')});
+  if (!entry || !entry.item) return { error: 'Item not found: ${input.itemId}' };
+  ${dir === 'horizontal' ? 'entry.item.scale(-1, 1);' : 'entry.item.scale(1, -1);'}
+  return { success: true, action: 'flip', itemId: '${input.itemId}', direction: '${dir}' };
+})();`.trim();
+      }
+      case 'reorder': {
+        const order = input.order || 'bringToFront';
+        const methodMap: Record<string, string> = {
+          bringToFront: 'bringToFront',
+          sendToBack: 'sendToBack',
+          moveUp: 'moveAbove',
+          moveDown: 'moveBelow',
+        };
+        const method = methodMap[order] || 'bringToFront';
+        const needsSibling = order === 'moveUp' || order === 'moveDown';
+        return `
+// Reorder item: ${order}
+(function() {
+  const entry = app.itemRegistry.get(${JSON.stringify(input.itemId || '')});
+  if (!entry || !entry.item) return { error: 'Item not found: ${input.itemId}' };
+  ${needsSibling
+    ? `const sibling = order === 'moveUp' ? entry.item.nextSibling : entry.item.previousSibling;
+  if (sibling) entry.item.${method}(sibling);`
+    : `entry.item.${method}();`}
+  return { success: true, action: 'reorder', itemId: '${input.itemId}', order: '${order}' };
+})();`.trim();
+      }
+      default:
+        return `(function() { return { error: 'Unknown transform action: ${(input as any).action}' }; })();`;
+    }
+  }
+
+  generateHistory(input: HistoryInput): string {
+    const guard = `if (!app.historyManager) return { error: 'HistoryManager not available' };`;
+    switch (input.action) {
+      case 'undo':
+        return `
+// Undo last action
+(function() {
+  ${guard}
+  app.historyManager.undo();
+  return { success: true, action: 'undo' };
+})();`.trim();
+      case 'redo':
+        return `
+// Redo last undone action
+(function() {
+  ${guard}
+  app.historyManager.redo();
+  return { success: true, action: 'redo' };
+})();`.trim();
+      case 'get_state':
+        return `
+// Get history state
+(function() {
+  ${guard}
+  const state = app.historyManager.getState();
+  return { success: true, action: 'get_state', ...state };
+})();`.trim();
+      default:
+        return `(function() { return { error: 'Unknown history action: ${(input as any).action}' }; })();`;
+    }
+  }
+
+  // ===========================================================================
+  // IMAGE PROCESSING
+  // ===========================================================================
+
+  generateImageFilter(input: ImageFilterInput): string {
+    const guard = `if (!app.imageTools) return { error: 'ImageTools not available' };`;
+    switch (input.action) {
+      case 'apply':
+        return `
+// Apply image filter
+(async function() {
+  ${guard}
+  try {
+    const result = await app.imageTools.applyFilter(${JSON.stringify(input.itemId)}, ${JSON.stringify(input.filterName || '')}, ${JSON.stringify(input.params || {})});
+    return { success: true, action: 'apply', itemId: ${JSON.stringify(input.itemId)}, filter: ${JSON.stringify(input.filterName || '')} };
+  } catch (e) {
+    return { error: 'Failed to apply filter: ' + e.message };
+  }
+})();`.trim();
+      case 'chain':
+        return `
+// Apply filter chain
+(async function() {
+  ${guard}
+  try {
+    const filters = ${JSON.stringify(input.filters || [])};
+    const result = await app.imageTools.applyFilterChain(${JSON.stringify(input.itemId)}, filters);
+    return { success: true, action: 'chain', itemId: ${JSON.stringify(input.itemId)}, filterCount: filters.length };
+  } catch (e) {
+    return { error: 'Failed to apply filter chain: ' + e.message };
+  }
+})();`.trim();
+      default:
+        return `(function() { return { error: 'Unknown image_filter action: ${(input as any).action}' }; })();`;
+    }
+  }
+
+  generateLasso(input: LassoInput): string {
+    const guard = `if (!app.imageTools) return { error: 'ImageTools not available' };`;
+    switch (input.action) {
+      case 'activate':
+        return `
+// Activate lasso selection
+(async function() {
+  ${guard}
+  try {
+    await app.imageTools.activateLasso(${JSON.stringify(input.itemId || '')});
+    return { success: true, action: 'activate', itemId: ${JSON.stringify(input.itemId || '')} };
+  } catch (e) {
+    return { error: 'Failed to activate lasso: ' + e.message };
+  }
+})();`.trim();
+      case 'apply':
+        return `
+// Apply lasso selection
+(async function() {
+  ${guard}
+  try {
+    const result = await app.imageTools.applyLasso();
+    return { success: true, action: 'apply' };
+  } catch (e) {
+    return { error: 'Failed to apply lasso: ' + e.message };
+  }
+})();`.trim();
+      default:
+        return `(function() { return { error: 'Unknown lasso action: ${(input as any).action}' }; })();`;
+    }
+  }
+
+  generateCutoutStyle(input: CutoutStyleInput): string {
+    const guard = `if (!app.imageTools) return { error: 'ImageTools not available' };`;
+    switch (input.action) {
+      case 'apply':
+        return `
+// Apply cutout style
+(async function() {
+  ${guard}
+  try {
+    const result = await app.imageTools.applyCutoutStyle(${JSON.stringify(input.itemId || '')}, ${JSON.stringify(input.preset || '')}, ${JSON.stringify(input.options || {})});
+    return { success: true, action: 'apply', itemId: ${JSON.stringify(input.itemId || '')}, preset: ${JSON.stringify(input.preset || '')} };
+  } catch (e) {
+    return { error: 'Failed to apply cutout style: ' + e.message };
+  }
+})();`.trim();
+      case 'list':
+        return `
+// List available cutout styles
+(function() {
+  ${guard}
+  const styles = app.imageTools.getCutoutStyles();
+  return { success: true, action: 'list', styles };
+})();`.trim();
+      default:
+        return `(function() { return { error: 'Unknown cutout_style action: ${(input as any).action}' }; })();`;
+    }
+  }
+
+  // ===========================================================================
+  // COMPOSITION & VIEW
+  // ===========================================================================
+
+  generatePrecomp(input: PrecompInput): string {
+    switch (input.action) {
+      case 'create': {
+        const opts: Record<string, unknown> = {};
+        if (input.name) opts.name = input.name;
+        if (input.loop !== undefined) opts.loop = input.loop;
+        if (input.duration !== undefined) opts.duration = input.duration;
+        return `
+// Create precomp from items
+(function() {
+  const itemIds = ${JSON.stringify(input.itemIds || [])};
+  const opts = ${JSON.stringify(opts)};
+  const precomp = app.createPrecomp(itemIds, opts);
+  return { success: true, action: 'create', precompId: precomp?.id || precomp, name: ${JSON.stringify(input.name || '')} };
+})();`.trim();
+      }
+      case 'add':
+        return `
+// Add item to precomp
+(function() {
+  app.addToPrecomp(${JSON.stringify(input.precompId || '')}, ${JSON.stringify(input.itemId || '')});
+  return { success: true, action: 'add', precompId: ${JSON.stringify(input.precompId || '')}, itemId: ${JSON.stringify(input.itemId || '')} };
+})();`.trim();
+      case 'remove':
+        return `
+// Remove item from precomp
+(function() {
+  app.removeFromPrecomp(${JSON.stringify(input.precompId || '')}, ${JSON.stringify(input.itemId || '')});
+  return { success: true, action: 'remove', precompId: ${JSON.stringify(input.precompId || '')}, itemId: ${JSON.stringify(input.itemId || '')} };
+})();`.trim();
+      default:
+        return `(function() { return { error: 'Unknown precomp action: ${(input as any).action}' }; })();`;
+    }
+  }
+
+  generateView(input: ViewInput): string {
+    switch (input.action) {
+      case 'fit': {
+        const mode = input.mode || 'content';
+        const padding = input.padding ?? 20;
+        return `
+// Fit view to ${mode}
+(function() {
+  app.fitView('${mode}', ${padding});
+  return { success: true, action: 'fit', mode: '${mode}', padding: ${padding} };
+})();`.trim();
+      }
+      case 'get_state':
+        return `
+// Get current view state
+(function() {
+  const state = app.getViewState();
+  return { success: true, action: 'get_state', ...state };
+})();`.trim();
+      default:
+        return `(function() { return { error: 'Unknown view action: ${(input as any).action}' }; })();`;
+    }
+  }
+
+  generateBackground(input: BackgroundInput): string {
+    switch (input.action) {
+      case 'set': {
+        const mode = input.mode || 'color';
+        if (mode === 'generator') {
+          return `
+// Set background via generator
+(async function() {
+  try {
+    await app.executeGenerator(${JSON.stringify(input.generator || '')}, ${JSON.stringify(input.generatorParams || {})});
+    return { success: true, action: 'set', mode: 'generator', generator: ${JSON.stringify(input.generator || '')} };
+  } catch (e) {
+    return { error: 'Failed to set generator background: ' + e.message };
+  }
+})();`.trim();
+        }
+        if (mode === 'pattern') {
+          return `
+// Set background pattern
+(function() {
+  app.setBackgroundPattern(${JSON.stringify(input.pattern || '')});
+  return { success: true, action: 'set', mode: 'pattern', pattern: ${JSON.stringify(input.pattern || '')} };
+})();`.trim();
+        }
+        // default: color
+        return `
+// Set background color
+(function() {
+  app.setBackgroundColor(${JSON.stringify(input.color || '#ffffff')});
+  return { success: true, action: 'set', mode: 'color', color: ${JSON.stringify(input.color || '#ffffff')} };
+})();`.trim();
+      }
+      case 'clear':
+        return `
+// Clear background
+(function() {
+  app.clearBackground();
+  return { success: true, action: 'clear' };
+})();`.trim();
+      case 'get':
+        return `
+// Get background info
+(function() {
+  const bg = app.getBackground();
+  return { success: true, action: 'get', ...bg };
+})();`.trim();
+      default:
+        return `(function() { return { error: 'Unknown background action: ${(input as any).action}' }; })();`;
+    }
+  }
+
+  // ===========================================================================
+  // CANVAS QUERIES
+  // ===========================================================================
+
+  generateQuery(input: QueryInput): string {
+    switch (input.action) {
+      case 'get_by_id':
+        return `
+// Get item details by ID
+(function() {
+  const entry = app.itemRegistry.get(${JSON.stringify(input.itemId || '')});
+  if (!entry || !entry.item) return { error: 'Item not found: ${input.itemId}' };
+  const item = entry.item;
+  return {
+    success: true, action: 'get_by_id',
+    itemId: ${JSON.stringify(input.itemId || '')},
+    type: item.data?.itemType || item.className,
+    position: { x: item.position.x, y: item.position.y },
+    bounds: item.bounds ? { x: item.bounds.x, y: item.bounds.y, width: item.bounds.width, height: item.bounds.height } : null,
+    visible: item.visible,
+    opacity: item.opacity,
+    rotation: item.rotation,
+    selected: item.selected,
+  };
+})();`.trim();
+      case 'hit_test': {
+        const tolerance = input.tolerance ?? 5;
+        const all = input.all ?? false;
+        return `
+// Hit test at point
+(function() {
+  const point = new paper.Point(${input.x ?? 0}, ${input.y ?? 0});
+  ${all
+    ? `const results = app.hitTestAll(point, { tolerance: ${tolerance} });
+  const hits = results.map(r => ({
+    itemId: r.item?.data?.itemId || r.item?.name || r.item?.id,
+    type: r.item?.data?.itemType || r.item?.className,
+    point: { x: r.point?.x, y: r.point?.y }
+  }));
+  return { success: true, action: 'hit_test', x: ${input.x ?? 0}, y: ${input.y ?? 0}, hits, count: hits.length };`
+    : `const result = app.hitTest(point, { tolerance: ${tolerance} });
+  if (!result) return { success: true, action: 'hit_test', x: ${input.x ?? 0}, y: ${input.y ?? 0}, hit: null };
+  return {
+    success: true, action: 'hit_test',
+    x: ${input.x ?? 0}, y: ${input.y ?? 0},
+    hit: { itemId: result.item?.data?.itemId || result.item?.name || result.item?.id, type: result.item?.data?.itemType || result.item?.className }
+  };`}
+})();`.trim();
+      }
+      case 'is_empty':
+        return `
+// Check if canvas is empty
+(function() {
+  const items = app.itemRegistry.getAll();
+  return { success: true, action: 'is_empty', empty: items.length === 0, count: items.length };
+})();`.trim();
+      default:
+        return `(function() { return { error: 'Unknown query action: ${(input as any).action}' }; })();`;
     }
   }
 }

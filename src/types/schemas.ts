@@ -776,7 +776,7 @@ export const GetItemsInputSchema = z.object({
 
 // Play Timeline
 export const PlayTimelineInputSchema = z.object({
-  action: z.enum(['play', 'stop', 'seek']),
+  action: z.enum(['play', 'pause', 'stop', 'seek']),
   duration: z.number().optional().describe('Duration for play action'),
   loop: z.boolean().optional(),
   time: z.number().optional().describe('Time to seek to'),
@@ -2277,3 +2277,105 @@ export const ScenePlaybackInputSchema = z.object({
 });
 
 export type ScenePlaybackInput = z.infer<typeof ScenePlaybackInputSchema>;
+
+// =============================================================================
+// SELECTION, TRANSFORM & HISTORY TOOLS
+// =============================================================================
+
+export const SelectionInputSchema = z.object({
+  action: z.enum(['select', 'select_all', 'deselect_all', 'get', 'delete_selected']),
+  itemIds: z.array(z.string()).optional(),
+  mode: z.enum(['replace', 'add', 'remove']).optional(),
+});
+export type SelectionInput = z.infer<typeof SelectionInputSchema>;
+
+export const TransformInputSchema = z.object({
+  action: z.enum(['nudge', 'flip', 'reorder']),
+  itemId: z.string().optional(),
+  dx: z.number().optional(),
+  dy: z.number().optional(),
+  direction: z.enum(['horizontal', 'vertical']).optional(),
+  order: z.enum(['bringToFront', 'sendToBack', 'moveUp', 'moveDown']).optional(),
+});
+export type TransformInput = z.infer<typeof TransformInputSchema>;
+
+export const HistoryInputSchema = z.object({
+  action: z.enum(['undo', 'redo', 'get_state']),
+});
+export type HistoryInput = z.infer<typeof HistoryInputSchema>;
+
+// =============================================================================
+// IMAGE PROCESSING TOOLS
+// =============================================================================
+
+export const ImageFilterInputSchema = z.object({
+  action: z.enum(['apply', 'chain']),
+  itemId: z.string(),
+  filterName: z.string().optional(),
+  params: z.record(z.unknown()).optional(),
+  filters: z.array(z.object({
+    name: z.string(),
+    params: z.record(z.unknown()).optional(),
+  })).optional(),
+});
+export type ImageFilterInput = z.infer<typeof ImageFilterInputSchema>;
+
+export const LassoInputSchema = z.object({
+  action: z.enum(['activate', 'apply']),
+  itemId: z.string().optional(),
+});
+export type LassoInput = z.infer<typeof LassoInputSchema>;
+
+export const CutoutStyleInputSchema = z.object({
+  action: z.enum(['apply', 'list']),
+  itemId: z.string().optional(),
+  preset: z.string().optional(),
+  options: z.record(z.unknown()).optional(),
+});
+export type CutoutStyleInput = z.infer<typeof CutoutStyleInputSchema>;
+
+// =============================================================================
+// COMPOSITION & VIEW TOOLS
+// =============================================================================
+
+export const PrecompInputSchema = z.object({
+  action: z.enum(['create', 'add', 'remove']),
+  itemIds: z.array(z.string()).optional(),
+  name: z.string().optional(),
+  loop: z.boolean().optional(),
+  duration: z.number().optional(),
+  precompId: z.string().optional(),
+  itemId: z.string().optional(),
+});
+export type PrecompInput = z.infer<typeof PrecompInputSchema>;
+
+export const ViewInputSchema = z.object({
+  action: z.enum(['fit', 'get_state']),
+  mode: z.enum(['content', 'canvas']).optional(),
+  padding: z.number().optional(),
+});
+export type ViewInput = z.infer<typeof ViewInputSchema>;
+
+export const BackgroundInputSchema = z.object({
+  action: z.enum(['set', 'clear', 'get']),
+  mode: z.enum(['color', 'pattern', 'generator']).optional(),
+  color: z.string().optional(),
+  pattern: z.string().optional(),
+  generator: z.string().optional(),
+  generatorParams: z.record(z.unknown()).optional(),
+});
+export type BackgroundInput = z.infer<typeof BackgroundInputSchema>;
+
+// =============================================================================
+// CANVAS QUERY TOOLS
+// =============================================================================
+
+export const QueryInputSchema = z.object({
+  action: z.enum(['get_by_id', 'hit_test', 'is_empty']),
+  itemId: z.string().optional(),
+  x: z.number().optional(),
+  y: z.number().optional(),
+  all: z.boolean().optional(),
+  tolerance: z.number().optional(),
+});
+export type QueryInput = z.infer<typeof QueryInputSchema>;
