@@ -21,7 +21,7 @@ import {
 } from '../../types/schemas.js';
 import { codeGenerator } from '../../types/code-generator.js';
 import { PINEPAPER_TOOLS } from '../../tools/definitions.js';
-import { TOOL_TAGS } from '../../tools/toolkits.js';
+import { TOOL_TAGS, getToolsForToolkit } from '../../tools/toolkits.js';
 import { MINIMAL_DESCRIPTIONS } from '../../tools/minimal-descriptions.js';
 
 // =============================================================================
@@ -35,7 +35,7 @@ describe('PlayTimelineInputSchema — pause enhancement', () => {
   });
 
   it('generates pauseKeyframeTimeline code', () => {
-    const code = codeGenerator.generatePlayTimeline({ action: 'pause' });
+    const code = codeGenerator.generatePlayTimeline('pause');
     expect(code).toContain('app.pauseKeyframeTimeline()');
     expect(code).toContain("action: 'pause'");
   });
@@ -175,6 +175,20 @@ describe('Transform code generation', () => {
   it('reorder sendToBack calls sendToBack()', () => {
     const code = codeGenerator.generateTransform({ action: 'reorder', itemId: 'item_1', order: 'sendToBack' });
     expect(code).toContain('entry.item.sendToBack()');
+  });
+
+  it('reorder moveUp resolves sibling at codegen time', () => {
+    const code = codeGenerator.generateTransform({ action: 'reorder', itemId: 'item_1', order: 'moveUp' });
+    expect(code).toContain('entry.item.nextSibling');
+    expect(code).toContain('entry.item.moveAbove(sibling)');
+    expect(code).not.toContain("order === 'moveUp'");
+  });
+
+  it('reorder moveDown resolves sibling at codegen time', () => {
+    const code = codeGenerator.generateTransform({ action: 'reorder', itemId: 'item_1', order: 'moveDown' });
+    expect(code).toContain('entry.item.previousSibling');
+    expect(code).toContain('entry.item.moveBelow(sibling)');
+    expect(code).not.toContain("order === 'moveUp'");
   });
 });
 
@@ -605,8 +619,8 @@ describe('Integration — tag groups', () => {
     expect(TOOL_TAGS.precomp).toContain('pinepaper_precomp');
   });
 
-  it('camera tag group contains pinepaper_view', () => {
-    expect(TOOL_TAGS.camera).toContain('pinepaper_view');
+  it('canvas tag group contains pinepaper_view', () => {
+    expect(TOOL_TAGS.canvas).toContain('pinepaper_view');
   });
 
   it('canvas tag group contains pinepaper_background', () => {
@@ -615,5 +629,13 @@ describe('Integration — tag groups', () => {
 
   it('query tag group contains pinepaper_query', () => {
     expect(TOOL_TAGS.query).toContain('pinepaper_query');
+  });
+
+  it('all 10 new tools are reachable via agent profile', () => {
+    const agentTools = getToolsForToolkit(PINEPAPER_TOOLS, 'agent');
+    const agentNames = agentTools.map(t => t.name);
+    for (const name of NEW_TOOL_NAMES) {
+      expect(agentNames).toContain(name);
+    }
   });
 });

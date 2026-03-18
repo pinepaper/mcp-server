@@ -2290,7 +2290,7 @@ EXAMPLE — Slideshow:
     annotations: {
       title: 'Selection',
       readOnlyHint: false,
-      destructiveHint: false,
+      destructiveHint: true,
       idempotentHint: false,
       openWorldHint: false,
     },

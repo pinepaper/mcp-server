@@ -40,6 +40,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
     'pinepaper_refresh_page',
     'pinepaper_get_canvas_presets',
     'pinepaper_background',
+    'pinepaper_view',
   ],
 
   // --- Item creation & modification ---
@@ -93,7 +94,6 @@ export const TOOL_TAGS: Record<string, string[]> = {
     'pinepaper_camera_reset',
     'pinepaper_camera_stop',
     'pinepaper_camera_state',
-    'pinepaper_view',
   ],
 
   // --- Generators & effects ---
