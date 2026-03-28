@@ -69,6 +69,7 @@ Choose based on mood:
 
 Shapes: circle, rectangle, star, ellipse, triangle, polygon, line, arc, path
 Text: text (content, fontSize, fontFamily, color, fontWeight)
+  Dynamic text: set contentType on text items → clock (live time), timer (elapsed), countdown (from N seconds), stopwatch (pauseable)
 All items: opacity, shadowColor, shadowBlur, blendMode, strokeColor, strokeWidth
 
 SVG imports for recognizable objects (planes, cars, animals, buildings):
@@ -116,10 +117,26 @@ Shapes: process (rect), decision (diamond), terminal (rounded), data, document, 
 Workflow: create shapes with positions → connect with arrows → optional auto_layout
 See pinepaper://docs/diagrams for full examples.
 
+─── STANDALONE TOOLS (not batch — call directly) ───
+
+Deformation: pinepaper_deform — vertex-level presets (fold, squeeze, twist, ripple, wave, breathe, wobble...)
+  Phase-driven animation: sin, blink, pingpong, elastic, heartbeat, stepped
+  Use for organic motion that keyframes can't achieve.
+
+Sprite Sheets: pinepaper_sprite_sheet — generate from skeleton poses, play, export (PNG + atlas)
+  For character animation and game sprite pipelines.
+
+Interaction: pinepaper_interaction — continuous physics behaviors (repel, attract, follow, orbit, slingshot)
+  For interactive storytelling, quizzes, games. trigger_action for state changes (incrementScore, navigate, showFeedback).
+
+Storage: pinepaper_storage — save/load/list/delete projects (IndexedDB persistence)
+  For multi-project workflows and session recovery.
+
 ─── CANVAS & EXPORT ───
 
 Presets: instagram (1080x1080), youtube (1920x1080), tiktok (1080x1920), twitter (1200x675)
-Export: pinepaper_agent_export (SVG/PNG/GIF/MP4/WebM/PDF), pinepaper_export_svg`;
+Export: pinepaper_agent_export (SVG/PNG/GIF/MP4/WebM/PDF), pinepaper_export_svg
+Widget: pinepaper_export_widget (pp:PinePaper ontology JSON), pinepaper_export_widget_html (self-contained HTML with tree-shaken runtime)`;
 
 /*
  * The AI_AGENT_GUIDE constant above is included as a comment in verbose/compact modes
@@ -1795,29 +1812,38 @@ Requires maskType and keyframes array.`,
       idempotentHint: false,
       openWorldHint: false,
     },
-    description: `Animate camera with keyframe-based zoom and pan sequence for cinematic effects.
+    description: `Animate camera with keyframe-based zoom, pan, and 3D tilt sequence for cinematic effects.
 
 USE WHEN:
 - Creating cinematic camera movements
 - Building presentation zoom sequences
 - Making dramatic reveals with camera motion
 - Tour animations showing different parts of canvas
+- 3D perspective effects (pitch/yaw tilt via equirectangular projection)
+
+MODES:
+- keyframes (default): Manual keyframe array with full control
+- fly_to: Shorthand — fly to target position with zoom
+- orbit: Revolve camera around a point
 
 KEYFRAME PROPERTIES:
 - time: Time in seconds
 - zoom: Zoom level (1=normal, 2=2x zoom in, 0.5=zoom out)
 - center: View center [x, y]
+- pitch: 3D tilt in degrees (0=flat, positive=tilt forward). Uses equirectangular projection
+- yaw: 3D rotation in degrees. Uses equirectangular projection
 - easing: Timing function (linear, easeIn, easeOut, easeInOut, bounce, elastic)
 
-EXAMPLE:
+EXAMPLE (with 3D tilt):
 {
   "duration": 6,
   "loop": true,
+  "fov": 60,
   "keyframes": [
-    { "time": 0, "zoom": 1, "center": [400, 300] },
-    { "time": 2, "zoom": 2, "center": [400, 300], "easing": "easeInOut" },
-    { "time": 4, "zoom": 2, "center": [600, 300], "easing": "easeOut" },
-    { "time": 6, "zoom": 1, "center": [400, 300], "easing": "easeInOut" }
+    { "time": 0, "zoom": 1, "center": [400, 300], "pitch": 0, "yaw": 0 },
+    { "time": 2, "zoom": 2, "center": [400, 300], "pitch": 12, "yaw": -5, "easing": "easeInOut" },
+    { "time": 4, "zoom": 2, "center": [600, 300], "pitch": 8, "yaw": 3, "easing": "easeOut" },
+    { "time": 6, "zoom": 1, "center": [400, 300], "pitch": 0, "yaw": 0, "easing": "easeInOut" }
   ]
 }`,
     inputSchema: {
@@ -1836,6 +1862,8 @@ EXAMPLE:
                 items: { type: 'number' },
                 description: 'View center [x, y]',
               },
+              pitch: { type: 'number', description: '3D tilt in degrees (0=flat, positive=forward tilt)' },
+              yaw: { type: 'number', description: '3D rotation in degrees' },
               easing: {
                 type: 'string',
                 enum: ['linear', 'easeIn', 'easeOut', 'easeInOut', 'bounce', 'elastic'],
@@ -1846,6 +1874,17 @@ EXAMPLE:
         duration: { type: 'number', description: 'Total animation duration in seconds' },
         loop: { type: 'boolean', description: 'Loop the animation' },
         delay: { type: 'number', description: 'Delay before animation starts' },
+        fov: { type: 'number', description: 'Field of view in degrees for 3D perspective (default: 60)' },
+        mode: {
+          type: 'string',
+          enum: ['keyframes', 'fly_to', 'orbit'],
+          description: 'Camera mode: keyframes (manual), fly_to (shorthand to target), orbit (revolve)',
+        },
+        target: {
+          type: 'object',
+          properties: { x: { type: 'number' }, y: { type: 'number' } },
+          description: 'Target position for fly_to mode',
+        },
       },
       required: ['keyframes', 'duration'],
     },
@@ -2640,6 +2679,251 @@ ACTIONS:
         tolerance: { type: 'number', description: 'Hit test tolerance in pixels (default: 5)' },
       },
       required: ['action'],
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // DEFORMATION, SPRITE SHEETS, STORAGE, INTERACTION
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_deform',
+    annotations: {
+      title: 'Deformation',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Apply vertex deformation presets to items for organic motion effects.
+
+ACTIONS:
+- apply: Apply looping deformation. Params: itemId, preset, frequency, amplitude (0-1), phase, loop, axis, turns, waves, maxDisplacement, speed, steps
+- trigger: One-shot deformation (auto-removes). Params: itemId, preset, amplitude, speed
+- remove: Restore original geometry. Params: itemId
+
+PRESETS: fold, squeeze, squash, pinch, bulge, twist, ripple, wave, breathe, melt, shear, inflate, wobble
+
+PHASES: sin, blink, linear, pingpong, once, elastic, heartbeat, stepped`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['apply', 'trigger', 'remove'],
+          description: 'Deformation action',
+        },
+        itemId: { type: 'string', description: 'Target item ID' },
+        preset: {
+          type: 'string',
+          enum: ['fold', 'squeeze', 'squash', 'pinch', 'bulge', 'twist', 'ripple', 'wave', 'breathe', 'melt', 'shear', 'inflate', 'wobble'],
+          description: 'Deformation preset name',
+        },
+        frequency: { type: 'number', description: 'Oscillation speed (default: 1)' },
+        amplitude: { type: 'number', description: 'Deformation strength 0-1 (default: 1)' },
+        phase: {
+          type: 'string',
+          enum: ['sin', 'blink', 'linear', 'pingpong', 'once', 'elastic', 'heartbeat', 'stepped'],
+          description: 'Phase driver for animation timing',
+        },
+        loop: { type: 'boolean', description: 'Loop the deformation (default: true)' },
+        axis: { type: 'string', enum: ['horizontal', 'vertical'], description: 'Axis for fold/wave presets' },
+        turns: { type: 'number', description: 'Rotation amount for twist preset' },
+        waves: { type: 'number', description: 'Wave count for ripple/wave presets' },
+        maxDisplacement: { type: 'number', description: 'Maximum displacement in pixels' },
+        speed: { type: 'number', description: 'Animation speed multiplier' },
+        steps: { type: 'number', description: 'Quantization levels for stepped phase' },
+      },
+      required: ['action'],
+    },
+  },
+
+  {
+    name: 'pinepaper_sprite_sheet',
+    annotations: {
+      title: 'Sprite Sheet',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Generate, play, and export sprite sheets from skeleton poses.
+
+ACTIONS:
+- generate: Create sprite sheet from skeleton. Params: skeletonId, poses, transition, bakedAnimation, animations, padding, name
+- play: Play sprite animation on canvas. Params: spriteSheetId, x, y, animation, fps, scale
+- export: Export sprite sheet as image + metadata. Params: spriteSheetId, format (png|webp)`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['generate', 'play', 'export'],
+          description: 'Sprite sheet action',
+        },
+        skeletonId: { type: 'string', description: 'Skeleton ID (for generate)' },
+        spriteSheetId: { type: 'string', description: 'Sprite sheet ID (for play/export)' },
+        name: { type: 'string', description: 'Sheet name' },
+        poses: {
+          type: 'array',
+          items: { type: 'object', properties: { name: { type: 'string' }, poseId: { type: 'string' } }, required: ['name', 'poseId'] },
+          description: 'Explicit pose list',
+        },
+        transition: {
+          type: 'object',
+          properties: { poseIdA: { type: 'string' }, poseIdB: { type: 'string' }, frameCount: { type: 'number' }, name: { type: 'string' } },
+          description: 'Interpolate between two poses',
+        },
+        bakedAnimation: {
+          type: 'object',
+          properties: { duration: { type: 'number' }, fps: { type: 'number' }, name: { type: 'string' } },
+          description: 'Bake timeline animation into frames',
+        },
+        animations: {
+          type: 'object',
+          additionalProperties: { type: 'object', properties: { frames: { type: 'array', items: { type: 'string' } }, fps: { type: 'number' }, loop: { type: 'boolean' } } },
+          description: 'Animation definitions mapping name to frame sequences',
+        },
+        padding: { type: 'number', description: 'Padding between frames (default: 1)' },
+        x: { type: 'number', description: 'X position for playback' },
+        y: { type: 'number', description: 'Y position for playback' },
+        animation: { type: 'string', description: 'Animation name to play' },
+        fps: { type: 'number', description: 'Frame rate (default: 12)' },
+        scale: { type: 'number', description: 'Scale factor (default: 1)' },
+        format: { type: 'string', enum: ['png', 'webp'], description: 'Export format (default: png)' },
+      },
+      required: ['action'],
+    },
+  },
+
+  {
+    name: 'pinepaper_storage',
+    annotations: {
+      title: 'Storage',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Persistent project storage via IndexedDB.
+
+ACTIONS:
+- save: Save current project. Params: name, thumbnail (bool)
+- load: Load project onto canvas. Params: projectId
+- list: List all saved projects
+- delete: Delete a saved project. Params: projectId`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['save', 'load', 'list', 'delete'],
+          description: 'Storage action',
+        },
+        projectId: { type: 'string', description: 'Project ID (for load/delete)' },
+        name: { type: 'string', description: 'Project name (for save)' },
+        thumbnail: { type: 'boolean', description: 'Auto-capture thumbnail on save' },
+      },
+      required: ['action'],
+    },
+  },
+
+  {
+    name: 'pinepaper_interaction',
+    annotations: {
+      title: 'Interaction',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Add continuous physics behaviors and trigger interaction actions.
+
+ACTIONS:
+- add_behavior: Attach a continuous behavior. Params: itemId, behaviorType, params
+- remove_behavior: Remove a behavior. Params: itemId, behaviorId
+- trigger_action: Fire an interaction action. Params: actionType, params
+- get_state: Get interaction state (score, progress, step)
+
+BEHAVIOR TYPES: repel, attract, follow, orbit, slingshot, physics_body, draggable_constrained
+
+ACTION TYPES: navigate, show, hide, animate, stopAnimation, setState, incrementScore, playTimeline, pauseTimeline, seekTimeline, showFeedback, complete`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['add_behavior', 'remove_behavior', 'trigger_action', 'get_state'],
+          description: 'Interaction action',
+        },
+        itemId: { type: 'string', description: 'Target item ID' },
+        behaviorType: {
+          type: 'string',
+          enum: ['repel', 'attract', 'follow', 'orbit', 'slingshot', 'physics_body', 'draggable_constrained'],
+          description: 'Continuous behavior type',
+        },
+        behaviorId: { type: 'string', description: 'Behavior ID (for remove_behavior)' },
+        actionType: {
+          type: 'string',
+          enum: ['navigate', 'show', 'hide', 'animate', 'stopAnimation', 'setState', 'incrementScore', 'playTimeline', 'pauseTimeline', 'seekTimeline', 'showFeedback', 'complete'],
+          description: 'Interaction action type (for trigger_action)',
+        },
+        params: {
+          type: 'object',
+          description: 'Action-specific or behavior-specific parameters',
+        },
+      },
+      required: ['action'],
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // WIDGET EXPORT
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_export_widget',
+    annotations: {
+      title: 'Export Widget',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Export current scene as a PineWidget (pp:PinePaper ontology JSON v0.4.3).
+
+Returns portable scene data with items, relations, animations, masks, and interactions serialized in the pp:PinePaper semantic format. Includes embed code snippet for external sites.
+
+Params: download (bool), filename, includeInteractions (bool, default true), minify (bool)`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        download: { type: 'boolean', description: 'Trigger browser download (default: false)' },
+        filename: { type: 'string', description: 'Output filename (default: widget-scene.json)' },
+        includeInteractions: { type: 'boolean', description: 'Include interaction triggers (default: true)' },
+        minify: { type: 'boolean', description: 'Minify JSON output (default: false)' },
+      },
+    },
+  },
+
+  {
+    name: 'pinepaper_export_widget_html',
+    annotations: {
+      title: 'Export Widget HTML',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Export current scene as a self-contained HTML page with tree-shaken PineWidget runtime.
+
+Generates a single HTML file (<20KB typical) with inline scene data and only the JavaScript code needed for the specific items, relations, and features used. No external dependencies.
+
+Params: title (page title), download (bool)`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'HTML page title (default: PinePaper Widget)' },
+        download: { type: 'boolean', description: 'Trigger browser download (default: false)' },
+      },
     },
   },
 

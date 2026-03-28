@@ -131,6 +131,18 @@ export const TOOL_TAGS: Record<string, string[]> = {
   precomp: [
     'pinepaper_precomp',
   ],
+  deform: [
+    'pinepaper_deform',
+  ],
+  sprite: [
+    'pinepaper_sprite_sheet',
+  ],
+  storage: [
+    'pinepaper_storage',
+  ],
+  interaction: [
+    'pinepaper_interaction',
+  ],
   template: [
     'pinepaper_apply_template',
   ],
@@ -145,6 +157,8 @@ export const TOOL_TAGS: Record<string, string[]> = {
     'pinepaper_export_svg',
     'pinepaper_export_training_data',
     'pinepaper_export_scene',
+    'pinepaper_export_widget',
+    'pinepaper_export_widget_html',
   ],
 
   // --- Domain: Diagrams ---
@@ -270,6 +284,7 @@ export const TOOLKIT_PROFILES: Record<ToolkitProfile, string[]> = {
     'scene',
     'selection', 'transform', 'history',
     'image_processing', 'precomp',
+    'deform', 'sprite', 'storage', 'interaction',
     'query', 'export',
     'p5', 'ontology', 'guide',
   ],

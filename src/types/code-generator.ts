@@ -164,6 +164,13 @@ import {
   ViewInput,
   BackgroundInput,
   QueryInput,
+  // New parity tools
+  DeformInput,
+  SpriteSheetInput,
+  StorageInput,
+  InteractionInput,
+  ExportWidgetInput,
+  ExportWidgetHtmlInput,
 } from './schemas.js';
 import { z } from 'zod';
 
@@ -259,6 +266,10 @@ function generateCreateItemCode(
     shadowOffset,
     blendMode,
     opacity,
+    contentType,
+    contentFormat,
+    countdownTarget,
+    countdownEndText,
     ...baseProperties
   } = properties;
 
@@ -319,6 +330,15 @@ const item = app.create('${itemType}', ${JSON.stringify(params, null, 2)});`;
   // Ensure item is visible above backgrounds/generators
   code += `\nif (item.bringToFront) item.bringToFront();`;
 
+  // Add dynamic content support for text items
+  if (contentType && itemType === 'text') {
+    const opts: Record<string, unknown> = {};
+    if (contentFormat) opts.format = contentFormat;
+    if (countdownTarget !== undefined) opts.countdownTarget = countdownTarget;
+    if (countdownEndText) opts.countdownEndText = countdownEndText;
+    code += `\nif (app.setDynamicContent) app.setDynamicContent(item, '${contentType}', ${JSON.stringify(opts)});`;
+  }
+
   code += `
 const itemId = item.data.registryId;
 app.historyManager.saveState();
@@ -336,15 +356,43 @@ function generateModifyItemCode(
   itemId: string,
   properties: Record<string, unknown>
 ): string {
-  return `
+  const { contentType, contentFormat, countdownTarget, countdownEndText, ...restProperties } = properties;
+
+  let code = `
 // Modify item ${itemId}
-app.select('${itemId}');
-app.modify(${JSON.stringify(properties, null, 2)});
+app.select('${itemId}');`;
+
+  // Pass non-dynamic-content properties to app.modify
+  if (Object.keys(restProperties).length > 0) {
+    code += `\napp.modify(${JSON.stringify(restProperties, null, 2)});`;
+  }
+
+  // Handle dynamic content type changes
+  if (contentType !== undefined) {
+    if (contentType === null || contentType === 'none' || contentType === '') {
+      // Remove dynamic content
+      code += `
+const entry = app.itemRegistry.get('${itemId}');
+if (entry && entry.item && app.removeDynamicContent) app.removeDynamicContent(entry.item);`;
+    } else {
+      // Set dynamic content
+      const opts: Record<string, unknown> = {};
+      if (contentFormat) opts.format = contentFormat;
+      if (countdownTarget !== undefined) opts.countdownTarget = countdownTarget;
+      if (countdownEndText) opts.countdownEndText = countdownEndText;
+      code += `
+const entry = app.itemRegistry.get('${itemId}');
+if (entry && entry.item && app.setDynamicContent) app.setDynamicContent(entry.item, '${contentType}', ${JSON.stringify(opts)});`;
+    }
+  }
+
+  code += `
 app.historyManager.saveState();
 
 // Return success
-({ success: true, itemId: '${itemId}' });
-`.trim();
+({ success: true, itemId: '${itemId}' });`;
+
+  return code.trim();
 }
 
 /**
@@ -4726,6 +4774,269 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    const ite
       default:
         return `(function() { return { error: 'Unknown query action: ${(input as any).action}' }; })();`;
     }
+  }
+
+  // ===========================================================================
+  // DEFORMATION
+  // ===========================================================================
+
+  generateDeform(input: DeformInput): string {
+    const guard = `if (!app.deformPresets) return { error: 'DeformPresets not available' };`;
+    switch (input.action) {
+      case 'apply': {
+        if (!input.itemId) return `(function() { return { error: 'itemId is required for deform apply' }; })();`;
+        if (!input.preset) return `(function() { return { error: 'preset is required for deform apply' }; })();`;
+        const params: Record<string, unknown> = {};
+        if (input.frequency !== undefined) params.frequency = input.frequency;
+        if (input.amplitude !== undefined) params.amplitude = input.amplitude;
+        if (input.phase) params.phase = input.phase;
+        if (input.loop !== undefined) params.loop = input.loop;
+        if (input.axis) params.axis = input.axis;
+        if (input.turns !== undefined) params.turns = input.turns;
+        if (input.waves !== undefined) params.waves = input.waves;
+        if (input.maxDisplacement !== undefined) params.maxDisplacement = input.maxDisplacement;
+        if (input.speed !== undefined) params.speed = input.speed;
+        if (input.steps !== undefined) params.steps = input.steps;
+        const itemIdStr = JSON.stringify(input.itemId);
+        return `
+// Apply deformation preset
+(function() {
+  ${guard}
+  const entry = app.itemRegistry.get(${itemIdStr});
+  if (!entry || !entry.item) return { error: 'Item not found: ' + ${itemIdStr} };
+  app.deformPresets.apply(entry.item, '${input.preset}', ${JSON.stringify(params)});
+  return { success: true, action: 'apply', itemId: ${itemIdStr}, preset: '${input.preset}' };
+})();`.trim();
+      }
+      case 'trigger': {
+        if (!input.itemId) return `(function() { return { error: 'itemId is required for deform trigger' }; })();`;
+        if (!input.preset) return `(function() { return { error: 'preset is required for deform trigger' }; })();`;
+        const params: Record<string, unknown> = {};
+        if (input.amplitude !== undefined) params.amplitude = input.amplitude;
+        if (input.speed !== undefined) params.speed = input.speed;
+        const itemIdStr = JSON.stringify(input.itemId);
+        return `
+// Trigger one-shot deformation
+(function() {
+  ${guard}
+  const entry = app.itemRegistry.get(${itemIdStr});
+  if (!entry || !entry.item) return { error: 'Item not found: ' + ${itemIdStr} };
+  app.deformPresets.trigger(entry.item, '${input.preset}', ${JSON.stringify(params)});
+  return { success: true, action: 'trigger', itemId: ${itemIdStr}, preset: '${input.preset}' };
+})();`.trim();
+      }
+      case 'remove': {
+        if (!input.itemId) return `(function() { return { error: 'itemId is required for deform remove' }; })();`;
+        const itemIdStr = JSON.stringify(input.itemId);
+        return `
+// Remove deformation and restore geometry
+(function() {
+  ${guard}
+  const entry = app.itemRegistry.get(${itemIdStr});
+  if (!entry || !entry.item) return { error: 'Item not found: ' + ${itemIdStr} };
+  app.deformPresets.remove(entry.item);
+  return { success: true, action: 'remove', itemId: ${itemIdStr} };
+})();`.trim();
+      }
+      default:
+        return `(function() { return { error: 'Unknown deform action: ${(input as any).action}' }; })();`;
+    }
+  }
+
+  // ===========================================================================
+  // SPRITE SHEETS
+  // ===========================================================================
+
+  generateSpriteSheet(input: SpriteSheetInput): string {
+    const guard = `if (!app.spriteSheetSystem) return { error: 'SpriteSheetSystem not available' };`;
+    switch (input.action) {
+      case 'generate': {
+        const opts: Record<string, unknown> = {};
+        if (input.poses) opts.poses = input.poses;
+        if (input.transition) opts.transition = input.transition;
+        if (input.bakedAnimation) opts.bakedAnimation = input.bakedAnimation;
+        if (input.animations) opts.animations = input.animations;
+        if (input.padding !== undefined) opts.padding = input.padding;
+        if (input.name) opts.name = input.name;
+        return `
+// Generate sprite sheet from skeleton
+(async function() {
+  ${guard}
+  const sheet = await app.spriteSheetSystem.generateSpriteSheet(${JSON.stringify(input.skeletonId || '')}, ${JSON.stringify(opts)});
+  return { success: true, action: 'generate', spriteSheetId: sheet.id, name: sheet.name, width: sheet.atlasWidth, height: sheet.atlasHeight, frameCount: sheet.frames?.size ?? sheet.frames?.length ?? 0 };
+})();`.trim();
+      }
+      case 'play': {
+        const opts: Record<string, unknown> = {};
+        if (input.x !== undefined) opts.x = input.x;
+        if (input.y !== undefined) opts.y = input.y;
+        if (input.animation) opts.animation = input.animation;
+        if (input.fps !== undefined) opts.fps = input.fps;
+        if (input.scale !== undefined) opts.scale = input.scale;
+        return `
+// Play sprite sheet animation
+(async function() {
+  ${guard}
+  const player = await app.spriteSheetSystem.playSpriteSheet(${JSON.stringify(input.spriteSheetId || '')}, ${JSON.stringify(opts)});
+  return { success: true, action: 'play', playerId: player.id };
+})();`.trim();
+      }
+      case 'export':
+        return `
+// Export sprite sheet
+(async function() {
+  ${guard}
+  const result = await app.spriteSheetSystem.exportSpriteSheet(${JSON.stringify(input.spriteSheetId || '')}, { format: '${input.format || 'png'}', download: true, includeMetadata: true });
+  return { success: true, action: 'export', format: '${input.format || 'png'}' };
+})();`.trim();
+      default:
+        return `(function() { return { error: 'Unknown sprite sheet action: ${(input as any).action}' }; })();`;
+    }
+  }
+
+  // ===========================================================================
+  // STORAGE
+  // ===========================================================================
+
+  generateStorage(input: StorageInput): string {
+    const guard = `if (!app.storageManager) return { error: 'StorageManager not available' };`;
+    switch (input.action) {
+      case 'save': {
+        const name = input.name ? JSON.stringify(input.name) : "'Untitled Project'";
+        const thumbnailCode = input.thumbnail
+          ? `const thumbnail = app.exportThumbnail ? app.exportThumbnail() : null;\n  if (thumbnail) project.thumbnail = thumbnail;`
+          : '';
+        return `
+// Save project
+(async function() {
+  ${guard}
+  const project = { name: ${name}, data: app.serialize() };
+  ${thumbnailCode}
+  const projectId = await app.storageManager.saveProject(project);
+  return { success: true, action: 'save', projectId, name: ${name} };
+})();`.trim();
+      }
+      case 'load': {
+        const projId = JSON.stringify(input.projectId || '');
+        return `
+// Load project
+(async function() {
+  ${guard}
+  const project = await app.storageManager.loadProject(${projId});
+  if (!project) return { error: 'Project not found: ' + ${projId} };
+  app.deserialize(project.data);
+  return { success: true, action: 'load', projectId: ${projId}, name: project.name };
+})();`.trim();
+      }
+      case 'list':
+        return `
+// List saved projects
+(async function() {
+  ${guard}
+  const projects = await app.storageManager.listProjects();
+  return { success: true, action: 'list', projects: projects.map(p => ({ id: p.id, name: p.name, updatedAt: p.updatedAt })), count: projects.length };
+})();`.trim();
+      case 'delete': {
+        const projId = JSON.stringify(input.projectId || '');
+        return `
+// Delete project
+(async function() {
+  ${guard}
+  await app.storageManager.deleteProject(${projId});
+  return { success: true, action: 'delete', projectId: ${projId} };
+})();`.trim();
+      }
+      default:
+        return `(function() { return { error: 'Unknown storage action: ${(input as any).action}' }; })();`;
+    }
+  }
+
+  // ===========================================================================
+  // INTERACTION
+  // ===========================================================================
+
+  generateInteraction(input: InteractionInput): string {
+    const guard = `if (!app.interactionSystem) return { error: 'InteractionSystem not available' };`;
+    switch (input.action) {
+      case 'add_behavior': {
+        const itemIdStr = JSON.stringify(input.itemId || '');
+        const params = JSON.stringify(input.params || {});
+        return `
+// Add behavior to item
+(function() {
+  ${guard}
+  const entry = app.itemRegistry.get(${itemIdStr});
+  if (!entry || !entry.item) return { error: 'Item not found: ' + ${itemIdStr} };
+  const behaviorId = app.interactionSystem.addContinuousBehavior(entry.item, '${input.behaviorType}', ${params});
+  return { success: true, action: 'add_behavior', itemId: ${itemIdStr}, behaviorType: '${input.behaviorType}', behaviorId };
+})();`.trim();
+      }
+      case 'remove_behavior': {
+        const itemIdStr = JSON.stringify(input.itemId || '');
+        const behaviorIdStr = JSON.stringify(input.behaviorId || '');
+        return `
+// Remove behavior from item
+(function() {
+  ${guard}
+  const entry = app.itemRegistry.get(${itemIdStr});
+  if (!entry || !entry.item) return { error: 'Item not found: ' + ${itemIdStr} };
+  app.interactionSystem.removeContinuousBehavior(entry.item, ${behaviorIdStr});
+  return { success: true, action: 'remove_behavior', itemId: ${itemIdStr}, behaviorId: ${behaviorIdStr} };
+})();`.trim();
+      }
+      case 'trigger_action': {
+        const params = JSON.stringify(input.params || {});
+        return `
+// Trigger interaction action
+(function() {
+  ${guard}
+  app.interactionSystem.triggerAction('${input.actionType}', ${params});
+  return { success: true, action: 'trigger_action', actionType: '${input.actionType}' };
+})();`.trim();
+      }
+      case 'get_state':
+        return `
+// Get interaction state
+(function() {
+  ${guard}
+  const state = app.interactionSystem.getState ? app.interactionSystem.getState() : {};
+  return { success: true, action: 'get_state', ...state };
+})();`.trim();
+      default:
+        return `(function() { return { error: 'Unknown interaction action: ${(input as any).action}' }; })();`;
+    }
+  }
+
+  // ===========================================================================
+  // WIDGET EXPORT
+  // ===========================================================================
+
+  generateExportWidget(input: ExportWidgetInput): string {
+    const opts: Record<string, unknown> = {};
+    if (input.download !== undefined) opts.download = input.download;
+    if (input.filename) opts.filename = input.filename;
+    if (input.includeInteractions !== undefined) opts.includeInteractions = input.includeInteractions;
+    if (input.minify !== undefined) opts.minify = input.minify;
+    return `
+// Export widget (pp:PinePaper ontology JSON)
+(async function() {
+  if (!app.exportWidget) return { error: 'Widget export not available' };
+  const result = await app.exportWidget(${JSON.stringify(opts)});
+  return { success: true, json: result.json, filename: result.filename, embedCode: result.embedCode, metadata: result.data?.metadata };
+})();`.trim();
+  }
+
+  generateExportWidgetHtml(input: ExportWidgetHtmlInput): string {
+    const opts: Record<string, unknown> = {};
+    if (input.title) opts.title = input.title;
+    if (input.download !== undefined) opts.download = input.download;
+    return `
+// Export widget as self-contained HTML
+(async function() {
+  if (!app.exportWidgetHTML) return { error: 'Widget HTML export not available' };
+  const result = await app.exportWidgetHTML(${JSON.stringify(opts)});
+  return { success: true, html: result.html, estimatedSize: result.estimatedSize, analysis: { itemTypes: [...result.analysis.itemTypes], relationTypes: [...result.analysis.relationTypes], hasSimpleAnimations: result.analysis.hasSimpleAnimations, hasKeyframeAnimations: result.analysis.hasKeyframeAnimations, hasMasks: result.analysis.hasMasks } };
+})();`.trim();
   }
 }
 

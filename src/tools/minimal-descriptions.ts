@@ -54,7 +54,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_get_available_easings: 'List available easing functions.',
 
   // --- Camera ---
-  pinepaper_camera_animate: 'Animate camera with keyframes (zoom, pan, rotate).',
+  pinepaper_camera_animate: 'Animate camera with keyframes (zoom, pan, 3D pitch/yaw tilt). mode: keyframes|fly_to|orbit. fov, target.',
   pinepaper_camera_zoom: 'Set camera zoom level.',
   pinepaper_camera_pan: 'Pan camera to offset.',
   pinepaper_camera_move_to: 'Move camera to center on a point or item.',
@@ -199,6 +199,16 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
 
   // --- Canvas Query ---
   pinepaper_query: 'Canvas queries. action: get_by_id|hit_test|is_empty. itemId, x, y, tolerance.',
+
+  // --- Deformation, Sprite Sheets, Storage, Interaction ---
+  pinepaper_deform: 'Vertex deformation. action: apply|trigger|remove. itemId, preset: fold|squeeze|squash|twist|ripple|wave|breathe|wobble..., phase, amplitude.',
+  pinepaper_sprite_sheet: 'Sprite sheets. action: generate|play|export. skeletonId, spriteSheetId, poses, animations, format.',
+  pinepaper_storage: 'Project storage. action: save|load|list|delete. name, projectId, thumbnail.',
+  pinepaper_interaction: 'Physics behaviors. action: add_behavior|remove_behavior|trigger_action|get_state. behaviorType: repel|attract|follow|orbit|slingshot.',
+
+  // --- Widget Export ---
+  pinepaper_export_widget: 'Export scene as pp:PinePaper ontology JSON. download, filename, includeInteractions, minify.',
+  pinepaper_export_widget_html: 'Export scene as self-contained HTML with tree-shaken runtime. title, download.',
 
   // --- Guide & runtime config ---
   pinepaper_tool_guide: 'Get detailed guidance for any tool, category, or the full AI Agent Guide.',

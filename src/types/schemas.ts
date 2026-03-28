@@ -118,6 +118,10 @@ export const TextPropertiesSchema = z.object({
   fontFamily: z.string().optional().default('Arial, sans-serif').describe('Font family'),
   color: ColorSchema.optional().default('#ffffff').describe('Text color'),
   fontWeight: z.string().optional().describe('Font weight (normal, bold, etc.)'),
+  contentType: z.enum(['clock', 'timer', 'countdown', 'stopwatch']).optional().describe('Dynamic content type — makes text auto-update. clock: current time, timer: elapsed time, countdown: counts down from countdownTarget, stopwatch: pauseable timer'),
+  contentFormat: z.string().optional().describe('Time format for dynamic content (HH:MM:SS, MM:SS, SS, SS.ms). Default: HH:MM:SS'),
+  countdownTarget: z.number().optional().describe('Countdown duration in seconds (countdown contentType only). Default: 60'),
+  countdownEndText: z.string().optional().describe('Text shown when countdown reaches zero. Default: 00:00'),
 });
 
 // Base visual properties shared by all shapes (shadow, blend mode, opacity)
@@ -351,6 +355,26 @@ export const CameraFollowsParamsSchema = z.object({
   }).optional().describe('Camera bounds'),
 });
 
+export const CameraAnimatesParamsSchema = z.object({
+  keyframes: z.array(z.object({
+    time: z.number().describe('Time in seconds'),
+    zoom: z.number().optional().describe('Zoom level (1=normal)'),
+    center: PointArraySchema.optional().describe('View center [x, y]'),
+    pitch: z.number().optional().describe('3D tilt in degrees (0=flat, positive=forward tilt)'),
+    yaw: z.number().optional().describe('3D rotation in degrees'),
+    easing: z.string().optional().describe('Easing function'),
+  })).optional().describe('Camera keyframes'),
+  duration: z.number().optional().default(2).describe('Total animation duration in seconds'),
+  loop: z.boolean().optional().default(false).describe('Loop animation'),
+  delay: z.number().optional().default(0).describe('Delay before starting'),
+  fov: z.number().optional().default(60).describe('Field of view in degrees for 3D perspective'),
+  mode: z.enum(['keyframes', 'fly_to', 'orbit']).optional().default('keyframes').describe('Camera mode'),
+  target: z.object({
+    x: z.number(),
+    y: z.number(),
+  }).optional().describe('Target position for fly_to mode'),
+});
+
 export const MorphsToParamsSchema = z.object({
   duration: z.number().optional().default(1.5).describe('Morph duration in seconds'),
   delay: z.number().optional().default(0).describe('Delay before starting'),
@@ -429,7 +453,7 @@ export type GeneratorName = z.infer<typeof GeneratorNameSchema>;
 export const SunburstParamsSchema = z.object({
   rayCount: z.number().optional().default(16).describe('Number of rays'),
   colors: z.array(ColorSchema).optional().default(['#FF6B6B', '#4ECDC4']).describe('Ray colors'),
-  bgColor: ColorSchema.optional().default('#1a1a2e').describe('Background color'),
+  bgColor: ColorSchema.optional().default('#1a1a2e').describe('Background color (use "none" or "transparent" for no background)'),
   animated: z.boolean().optional().default(true).describe('Enable rotation animation'),
   opacity: z.number().min(0).max(1).optional().describe('Overall opacity'),
   rayGap: z.number().optional().describe('Gap between rays in degrees'),
@@ -440,7 +464,7 @@ export const GridParamsSchema = z.object({
   gridType: z.enum(['lines', 'dots', 'squares']).optional().default('lines'),
   spacing: z.number().optional().default(40).describe('Grid cell size'),
   lineColor: ColorSchema.optional().default('#374151').describe('Line/dot color'),
-  bgColor: ColorSchema.optional().default('#1f2937').describe('Background color'),
+  bgColor: ColorSchema.optional().default('#1f2937').describe('Background color (use "none" or "transparent" for no background)'),
   lineWidth: z.number().optional().default(1).describe('Line thickness'),
   opacity: z.number().min(0).max(1).optional().describe('Overall opacity'),
   gap: z.number().optional().describe('Pixel gap between cells'),
@@ -455,7 +479,7 @@ export const WavesParamsSchema = z.object({
   colors: z.array(ColorSchema).optional().describe('Wave colors'),
   amplitude: z.number().optional().default(50).describe('Wave height'),
   frequency: z.number().optional().default(2).describe('Wave frequency'),
-  bgColor: ColorSchema.optional().default('#0f172a').describe('Background color'),
+  bgColor: ColorSchema.optional().default('#0f172a').describe('Background color (use "none" or "transparent" for no background)'),
   animated: z.boolean().optional().default(true).describe('Animate waves'),
   opacity: z.number().min(0).max(1).optional().describe('Overall opacity'),
   fill: z.boolean().optional().describe('Fill between adjacent waves'),
@@ -467,7 +491,7 @@ export const WavesParamsSchema = z.object({
 export const CircuitParamsSchema = z.object({
   lineColor: ColorSchema.optional().default('#60a5fa').describe('Circuit line color'),
   nodeColor: ColorSchema.optional().default('#3b82f6').describe('Node/junction color'),
-  bgColor: ColorSchema.optional().default('#0f172a').describe('Background color'),
+  bgColor: ColorSchema.optional().default('#0f172a').describe('Background color (use "none" or "transparent" for no background)'),
   density: z.number().min(0).max(1).optional().default(0.5).describe('Circuit complexity'),
   animated: z.boolean().optional().default(true).describe('Enable bolt animation'),
   boltColor: ColorSchema.optional().default('#fbbf24').describe('Animated bolt color'),
@@ -505,7 +529,7 @@ export const PatternParamsSchema = z.object({
   patternType: z.string().optional().describe('Pattern type (e.g. hexagon)'),
   size: z.number().optional().describe('Pattern element size'),
   color: ColorSchema.optional().describe('Pattern color'),
-  bgColor: ColorSchema.optional().describe('Background color'),
+  bgColor: ColorSchema.optional().describe('Background color (use "none" or "transparent" for no background)'),
   opacity: z.number().min(0).max(1).optional().describe('Overall opacity'),
   blendMode: z.string().optional().describe('CSS blend mode'),
   layers: z.number().min(1).max(5).optional().describe('Concentric orbit ring count (1-5)'),
@@ -519,7 +543,7 @@ export const PatternParamsSchema = z.object({
 export const BokehParamsSchema = z.object({
   count: z.number().optional().describe('Number of bokeh circles'),
   colors: z.array(ColorSchema).optional().describe('Circle colors'),
-  bgColor: ColorSchema.optional().describe('Background color'),
+  bgColor: ColorSchema.optional().describe('Background color (use "none" or "transparent" for no background)'),
   minRadius: z.number().optional().describe('Minimum circle radius'),
   maxRadius: z.number().optional().describe('Maximum circle radius'),
   shadowBlur: z.number().optional().describe('Soft-focus blur amount'),
@@ -530,7 +554,7 @@ export const BokehParamsSchema = z.object({
 
 export const GradientMeshParamsSchema = z.object({
   colors: z.array(ColorSchema).optional().describe('Gradient blob colors'),
-  bgColor: ColorSchema.optional().describe('Background color'),
+  bgColor: ColorSchema.optional().describe('Background color (use "none" or "transparent" for no background)'),
   blobCount: z.number().optional().describe('Number of gradient blobs'),
   blendMode: z.string().optional().describe('CSS blend mode (default: screen)'),
   drift: z.boolean().optional().describe('Enable slow drift animation'),
@@ -539,7 +563,7 @@ export const GradientMeshParamsSchema = z.object({
 
 export const GeometricAbstractParamsSchema = z.object({
   colors: z.array(ColorSchema).optional().describe('Shape colors'),
-  bgColor: ColorSchema.optional().describe('Background color'),
+  bgColor: ColorSchema.optional().describe('Background color (use "none" or "transparent" for no background)'),
   shapeCount: z.number().optional().describe('Number of shapes'),
   blendMode: z.string().optional().describe('CSS blend mode'),
   rotation: z.boolean().optional().describe('Enable rotation animation'),
@@ -549,7 +573,7 @@ export const GeometricAbstractParamsSchema = z.object({
 export const WindFieldParamsSchema = z.object({
   particleCount: z.number().optional().describe('Number of wind particles'),
   colors: z.array(ColorSchema).optional().describe('Particle colors'),
-  bgColor: ColorSchema.optional().describe('Background color'),
+  bgColor: ColorSchema.optional().describe('Background color (use "none" or "transparent" for no background)'),
   direction: z.number().optional().describe('Wind direction in degrees'),
   turbulence: z.number().optional().describe('Noise turbulence amount'),
   trailLength: z.number().optional().describe('Particle trail length'),
@@ -560,7 +584,7 @@ export const WindFieldParamsSchema = z.object({
 export const FluidFlowParamsSchema = z.object({
   streamCount: z.number().optional().describe('Number of fluid streams'),
   colors: z.array(ColorSchema).optional().describe('Stream colors'),
-  bgColor: ColorSchema.optional().describe('Background color'),
+  bgColor: ColorSchema.optional().describe('Background color (use "none" or "transparent" for no background)'),
   depthLayers: z.number().optional().describe('Number of depth layers'),
   speed: z.number().optional().describe('Flow animation speed'),
   opacity: z.number().min(0).max(1).optional().describe('Overall opacity'),
@@ -569,7 +593,7 @@ export const FluidFlowParamsSchema = z.object({
 export const OrganicFlowParamsSchema = z.object({
   layerCount: z.number().optional().describe('Number of aurora/silk layers'),
   colors: z.array(ColorSchema).optional().describe('Layer colors'),
-  bgColor: ColorSchema.optional().describe('Background color'),
+  bgColor: ColorSchema.optional().describe('Background color (use "none" or "transparent" for no background)'),
   blendMode: z.string().optional().describe('CSS blend mode (default: screen)'),
   fillToBottom: z.boolean().optional().describe('Fill layers to bottom edge'),
   animated: z.boolean().optional().describe('Enable flow animation'),
@@ -579,7 +603,7 @@ export const OrganicFlowParamsSchema = z.object({
 export const NoiseTextureParamsSchema = z.object({
   noiseType: z.enum(['perlin', 'grain', 'stipple']).optional().describe('Noise algorithm'),
   colors: z.array(ColorSchema).optional().describe('Noise colors'),
-  bgColor: ColorSchema.optional().describe('Background color'),
+  bgColor: ColorSchema.optional().describe('Background color (use "none" or "transparent" for no background)'),
   scale: z.number().optional().describe('Noise scale'),
   density: z.number().optional().describe('Noise density'),
   animated: z.boolean().optional().describe('Enable animated opacity shift'),
@@ -2379,3 +2403,114 @@ export const QueryInputSchema = z.object({
   tolerance: z.number().optional(),
 });
 export type QueryInput = z.infer<typeof QueryInputSchema>;
+
+// =============================================================================
+// DEFORMATION TOOLS
+// =============================================================================
+
+export const DeformInputSchema = z.object({
+  action: z.enum(['apply', 'trigger', 'remove']),
+  itemId: z.string().optional(),
+  preset: z.enum([
+    'fold', 'squeeze', 'squash', 'pinch', 'bulge', 'twist',
+    'ripple', 'wave', 'breathe', 'melt', 'shear', 'inflate', 'wobble',
+  ]).optional(),
+  frequency: z.number().optional(),
+  amplitude: z.number().min(0).max(1).optional(),
+  phase: z.enum(['sin', 'blink', 'linear', 'pingpong', 'once', 'elastic', 'heartbeat', 'stepped']).optional(),
+  loop: z.boolean().optional(),
+  axis: z.enum(['horizontal', 'vertical']).optional(),
+  turns: z.number().optional(),
+  waves: z.number().optional(),
+  maxDisplacement: z.number().optional(),
+  speed: z.number().optional(),
+  steps: z.number().optional(),
+});
+export type DeformInput = z.infer<typeof DeformInputSchema>;
+
+// =============================================================================
+// SPRITE SHEET TOOLS
+// =============================================================================
+
+export const SpriteSheetInputSchema = z.object({
+  action: z.enum(['generate', 'play', 'export']),
+  skeletonId: z.string().optional(),
+  spriteSheetId: z.string().optional(),
+  name: z.string().optional(),
+  poses: z.array(z.object({ name: z.string(), poseId: z.string() })).optional(),
+  transition: z.object({
+    poseIdA: z.string(),
+    poseIdB: z.string(),
+    frameCount: z.number(),
+    name: z.string().optional(),
+  }).optional(),
+  bakedAnimation: z.object({
+    duration: z.number(),
+    fps: z.number().optional(),
+    name: z.string().optional(),
+  }).optional(),
+  animations: z.record(z.object({
+    frames: z.array(z.string()),
+    fps: z.number().optional(),
+    loop: z.boolean().optional(),
+  })).optional(),
+  padding: z.number().optional(),
+  x: z.number().optional(),
+  y: z.number().optional(),
+  animation: z.string().optional(),
+  fps: z.number().optional(),
+  scale: z.number().optional(),
+  format: z.enum(['png', 'webp']).optional(),
+});
+export type SpriteSheetInput = z.infer<typeof SpriteSheetInputSchema>;
+
+// =============================================================================
+// STORAGE TOOLS
+// =============================================================================
+
+export const StorageInputSchema = z.object({
+  action: z.enum(['save', 'load', 'list', 'delete']),
+  projectId: z.string().optional(),
+  name: z.string().optional(),
+  thumbnail: z.boolean().optional(),
+});
+export type StorageInput = z.infer<typeof StorageInputSchema>;
+
+// =============================================================================
+// INTERACTION TOOLS
+// =============================================================================
+
+export const InteractionInputSchema = z.object({
+  action: z.enum(['add_behavior', 'remove_behavior', 'trigger_action', 'get_state']),
+  itemId: z.string().optional(),
+  behaviorType: z.enum([
+    'repel', 'attract', 'follow', 'orbit',
+    'slingshot', 'physics_body', 'draggable_constrained',
+  ]).optional(),
+  behaviorId: z.string().optional(),
+  actionType: z.enum([
+    'navigate', 'show', 'hide', 'animate', 'stopAnimation',
+    'setState', 'incrementScore', 'playTimeline', 'pauseTimeline',
+    'seekTimeline', 'showFeedback', 'complete',
+  ]).optional(),
+  params: z.record(z.unknown()).optional(),
+});
+export type InteractionInput = z.infer<typeof InteractionInputSchema>;
+
+// =============================================================================
+// WIDGET EXPORT TOOLS
+// =============================================================================
+
+export const ExportWidgetInputSchema = z.object({
+  download: z.boolean().optional(),
+  filename: z.string().optional(),
+  includeInteractions: z.boolean().optional(),
+  minify: z.boolean().optional(),
+});
+export type ExportWidgetInput = z.infer<typeof ExportWidgetInputSchema>;
+
+export const ExportWidgetHtmlInputSchema = z.object({
+  title: z.string().optional(),
+  download: z.boolean().optional(),
+});
+export type ExportWidgetHtmlInput = z.infer<typeof ExportWidgetHtmlInputSchema>;
