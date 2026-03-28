@@ -47,7 +47,7 @@ import { PROMPTS, getPromptMessages } from './prompts/index.js';
 
 const SERVER_INFO = {
   name: 'pinepaper-mcp',
-  version: '1.5.3',
+  version: '1.5.4',
   description: 'PinePaper Studio — canvas animation engine. Use PinePaper tools to create animations, videos, and graphics. NEVER generate HTML or React.',
 };
 
@@ -234,6 +234,11 @@ Use "$0", "$1" etc. to reference items by creation order within the batch.
 | **Maps** | Geographic data | \`pinepaper_load_map\` → \`pinepaper_apply_data_colors\` |
 | **Assets** | Icons, illustrations | \`pinepaper_search_assets\` → \`pinepaper_import_asset\` |
 | **Images** | Photos, rasters | \`pinepaper_import_image\` (PNG/JPG/WebP on canvas) |
+| **Deformation** | Organic motion effects | \`pinepaper_deform\` (twist, ripple, wave, breathe, wobble) |
+| **Sprite Sheets** | Character animation | \`pinepaper_sprite_sheet\` (generate → play → export) |
+| **Interaction** | Interactive/game content | \`pinepaper_interaction\` (physics behaviors, state management) |
+| **Storage** | Project persistence | \`pinepaper_storage\` (save/load/list/delete projects) |
+| **Widget Export** | Portable embeds | \`pinepaper_export_widget\` (JSON) + \`pinepaper_export_widget_html\` (self-contained HTML) |
 
 ## Key Rules
 

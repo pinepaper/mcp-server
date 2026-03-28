@@ -121,6 +121,12 @@ import {
   ViewInputSchema,
   BackgroundInputSchema,
   QueryInputSchema,
+  DeformInputSchema,
+  SpriteSheetInputSchema,
+  StorageInputSchema,
+  InteractionInputSchema,
+  ExportWidgetInputSchema,
+  ExportWidgetHtmlInputSchema,
   ErrorCodes,
   RelationType,
   ItemType,
@@ -880,6 +886,45 @@ async function handleToolCallInner(
       }
 
       // -----------------------------------------------------------------------
+      // DEFORMATION, SPRITE SHEETS, STORAGE, INTERACTION
+      // -----------------------------------------------------------------------
+      case 'pinepaper_deform': {
+        const input = DeformInputSchema.parse(args);
+        const code = codeGenerator.generateDeform(input);
+        return executeOrGenerate(code, `Deform: ${input.action}`, options, 'pinepaper_deform');
+      }
+
+      case 'pinepaper_sprite_sheet': {
+        const input = SpriteSheetInputSchema.parse(args);
+        const code = codeGenerator.generateSpriteSheet(input);
+        return executeOrGenerate(code, `Sprite sheet: ${input.action}`, options, 'pinepaper_sprite_sheet');
+      }
+
+      case 'pinepaper_storage': {
+        const input = StorageInputSchema.parse(args);
+        const code = codeGenerator.generateStorage(input);
+        return executeOrGenerate(code, `Storage: ${input.action}`, options, 'pinepaper_storage');
+      }
+
+      case 'pinepaper_interaction': {
+        const input = InteractionInputSchema.parse(args);
+        const code = codeGenerator.generateInteraction(input);
+        return executeOrGenerate(code, `Interaction: ${input.action}`, options, 'pinepaper_interaction');
+      }
+
+      case 'pinepaper_export_widget': {
+        const input = ExportWidgetInputSchema.parse(args);
+        const code = codeGenerator.generateExportWidget(input);
+        return executeOrGenerate(code, 'Export widget JSON', options, 'pinepaper_export_widget');
+      }
+
+      case 'pinepaper_export_widget_html': {
+        const input = ExportWidgetHtmlInputSchema.parse(args);
+        const code = codeGenerator.generateExportWidgetHtml(input);
+        return executeOrGenerate(code, 'Export widget HTML', options, 'pinepaper_export_widget_html');
+      }
+
+      // -----------------------------------------------------------------------
       // BATCH OPERATION TOOLS
       // -----------------------------------------------------------------------
       case 'pinepaper_batch_create': {
@@ -1093,14 +1138,22 @@ async function handleToolCallInner(
           time: number;
           zoom?: number;
           center?: [number, number];
+          pitch?: number;
+          yaw?: number;
           easing?: string;
         }>;
         const duration = args.duration as number;
         const loop = (args.loop as boolean) ?? false;
         const delay = (args.delay as number) ?? 0;
+        const fov = (args.fov as number) ?? 60;
+        const mode = (args.mode as string) ?? 'keyframes';
+        const target = args.target as { x: number; y: number } | undefined;
 
         const keyframesStr = JSON.stringify(keyframes);
-        const code = `app.camera && app.camera.animate ? app.camera.animate(${keyframesStr}, ${duration}, ${loop}, ${delay}) : app.addRelation('camera', 'camera', 'camera_animates', { keyframes: ${keyframesStr}, duration: ${duration}, loop: ${loop}, delay: ${delay} });`;
+        const relParams: Record<string, unknown> = { keyframes: JSON.parse(keyframesStr), duration, loop, delay, fov, mode };
+        if (target) relParams.target = target;
+        const relParamsStr = JSON.stringify(relParams);
+        const code = `app.camera && app.camera.animate ? app.camera.animate(${keyframesStr}, ${duration}, ${loop}, ${delay}, { fov: ${fov}, mode: '${mode}'${target ? `, target: ${JSON.stringify(target)}` : ''} }) : app.addRelation('camera', 'camera', 'camera_animates', ${relParamsStr});`;
         return executeOrGenerate(code, `Animates camera with ${keyframes.length} keyframes over ${duration}s`, options, 'pinepaper_camera_animate');
       }
 
@@ -3009,6 +3062,14 @@ You can now start creating new items on a clean canvas.`,
             'pinepaper_background',
             // Canvas query tools
             'pinepaper_query',
+            // Deformation, sprite sheets, storage, interaction
+            'pinepaper_deform',
+            'pinepaper_sprite_sheet',
+            'pinepaper_storage',
+            'pinepaper_interaction',
+            // Widget export
+            'pinepaper_export_widget',
+            'pinepaper_export_widget_html',
           ],
         });
       }

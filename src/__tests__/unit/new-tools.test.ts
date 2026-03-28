@@ -1,7 +1,7 @@
 /**
  * New Consolidated MCP Tools Tests
  *
- * Tests for the 10 new action-based tools plus the PlayTimeline pause enhancement.
+ * Tests for the 14 action-based tools plus the PlayTimeline pause enhancement.
  * Covers schema validation, code generation, and integration checks.
  */
 
@@ -18,6 +18,13 @@ import {
   BackgroundInputSchema,
   QueryInputSchema,
   PlayTimelineInputSchema,
+  DeformInputSchema,
+  SpriteSheetInputSchema,
+  StorageInputSchema,
+  InteractionInputSchema,
+  TextPropertiesSchema,
+  ExportWidgetInputSchema,
+  ExportWidgetHtmlInputSchema,
 } from '../../types/schemas.js';
 import { codeGenerator } from '../../types/code-generator.js';
 import { PINEPAPER_TOOLS } from '../../tools/definitions.js';
@@ -550,7 +557,398 @@ describe('Query code generation', () => {
 });
 
 // =============================================================================
-// INTEGRATION — All 10 tools in PINEPAPER_TOOLS, tag groups, minimal descs
+// DYNAMIC CONTENT (create_item / modify_item enhancement)
+// =============================================================================
+
+describe('TextPropertiesSchema — dynamic content', () => {
+  it('accepts contentType field', () => {
+    const result = TextPropertiesSchema.parse({ content: 'Hello', contentType: 'clock' });
+    expect(result.contentType).toBe('clock');
+  });
+
+  it('accepts all 4 content types', () => {
+    for (const ct of ['clock', 'timer', 'countdown', 'stopwatch'] as const) {
+      expect(() => TextPropertiesSchema.parse({ content: 'x', contentType: ct })).not.toThrow();
+    }
+  });
+
+  it('rejects invalid contentType', () => {
+    expect(() => TextPropertiesSchema.parse({ content: 'x', contentType: 'invalid' })).toThrow();
+  });
+
+  it('contentType is optional', () => {
+    const result = TextPropertiesSchema.parse({ content: 'Hello' });
+    expect(result.contentType).toBeUndefined();
+  });
+
+  it('accepts countdown options', () => {
+    const result = TextPropertiesSchema.parse({
+      content: '60', contentType: 'countdown',
+      countdownTarget: 60, countdownEndText: 'Done!', contentFormat: 'MM:SS',
+    });
+    expect(result.countdownTarget).toBe(60);
+    expect(result.countdownEndText).toBe('Done!');
+    expect(result.contentFormat).toBe('MM:SS');
+  });
+});
+
+describe('Dynamic content code generation', () => {
+  it('create_item with contentType generates setDynamicContent call', () => {
+    const code = codeGenerator.generateCreateItem({
+      itemType: 'text', position: { x: 100, y: 100 },
+      properties: { content: '00:00', contentType: 'clock' },
+    });
+    expect(code).toContain('app.setDynamicContent');
+    expect(code).toContain("'clock'");
+  });
+
+  it('create_item without contentType skips setDynamicContent', () => {
+    const code = codeGenerator.generateCreateItem({
+      itemType: 'text', position: { x: 100, y: 100 },
+      properties: { content: 'Hello' },
+    });
+    expect(code).not.toContain('setDynamicContent');
+  });
+
+  it('modify_item with contentType generates setDynamicContent', () => {
+    const code = codeGenerator.generateModifyItem({
+      itemId: 'item_1', properties: { contentType: 'timer' },
+    });
+    expect(code).toContain('app.setDynamicContent');
+    expect(code).toContain("'timer'");
+  });
+
+  it('modify_item with contentType null generates removeDynamicContent', () => {
+    // contentType: null is the internal sentinel for removal — callers use 'none' or '' via properties
+    const code = codeGenerator.generateModifyItem({
+      itemId: 'item_1', properties: { contentType: null },
+    });
+    expect(code).toContain('app.removeDynamicContent');
+  });
+
+  it('modify_item with contentType "none" generates removeDynamicContent', () => {
+    const code = codeGenerator.generateModifyItem({
+      itemId: 'item_1', properties: { contentType: 'none' },
+    });
+    expect(code).toContain('app.removeDynamicContent');
+  });
+
+  it('modify_item with contentType "" generates removeDynamicContent', () => {
+    const code = codeGenerator.generateModifyItem({
+      itemId: 'item_1', properties: { contentType: '' },
+    });
+    expect(code).toContain('app.removeDynamicContent');
+  });
+});
+
+// =============================================================================
+// DEFORMATION
+// =============================================================================
+
+describe('DeformInputSchema', () => {
+  it('accepts apply with preset', () => {
+    const result = DeformInputSchema.parse({ action: 'apply', itemId: 'item_1', preset: 'twist' });
+    expect(result.action).toBe('apply');
+    expect(result.preset).toBe('twist');
+  });
+
+  it('accepts all 3 actions', () => {
+    for (const action of ['apply', 'trigger', 'remove'] as const) {
+      expect(() => DeformInputSchema.parse({ action })).not.toThrow();
+    }
+  });
+
+  it('accepts all 13 presets', () => {
+    const presets = ['fold', 'squeeze', 'squash', 'pinch', 'bulge', 'twist', 'ripple', 'wave', 'breathe', 'melt', 'shear', 'inflate', 'wobble'];
+    for (const preset of presets) {
+      expect(() => DeformInputSchema.parse({ action: 'apply', preset })).not.toThrow();
+    }
+  });
+
+  it('accepts all 8 phases', () => {
+    const phases = ['sin', 'blink', 'linear', 'pingpong', 'once', 'elastic', 'heartbeat', 'stepped'];
+    for (const phase of phases) {
+      expect(() => DeformInputSchema.parse({ action: 'apply', phase })).not.toThrow();
+    }
+  });
+
+  it('rejects invalid preset', () => {
+    expect(() => DeformInputSchema.parse({ action: 'apply', preset: 'stretch' })).toThrow();
+  });
+});
+
+describe('Deform code generation', () => {
+  it('apply generates deformPresets.apply call', () => {
+    const code = codeGenerator.generateDeform({ action: 'apply', itemId: 'item_1', preset: 'ripple', amplitude: 0.5, phase: 'elastic' });
+    expect(code).toContain("app.deformPresets.apply");
+    expect(code).toContain("'ripple'");
+    expect(code).toContain('"amplitude":0.5');
+    expect(code).toContain('"phase":"elastic"');
+  });
+
+  it('trigger generates deformPresets.trigger call', () => {
+    const code = codeGenerator.generateDeform({ action: 'trigger', itemId: 'item_1', preset: 'squeeze' });
+    expect(code).toContain('app.deformPresets.trigger');
+    expect(code).toContain("'squeeze'");
+  });
+
+  it('remove generates deformPresets.remove call', () => {
+    const code = codeGenerator.generateDeform({ action: 'remove', itemId: 'item_1' });
+    expect(code).toContain('app.deformPresets.remove');
+  });
+
+  it('includes deformPresets guard', () => {
+    const code = codeGenerator.generateDeform({ action: 'apply', itemId: 'x', preset: 'fold' });
+    expect(code).toContain("if (!app.deformPresets) return { error: 'DeformPresets not available' }");
+  });
+
+  it('is sync IIFE', () => {
+    const code = codeGenerator.generateDeform({ action: 'apply', itemId: 'x', preset: 'fold' });
+    expect(code).toContain('(function()');
+    expect(code).not.toContain('async');
+  });
+
+  it('apply without preset returns error', () => {
+    const code = codeGenerator.generateDeform({ action: 'apply', itemId: 'item_1' });
+    expect(code).toContain('preset is required');
+    expect(code).not.toContain("'undefined'");
+  });
+
+  it('apply without itemId returns error', () => {
+    const code = codeGenerator.generateDeform({ action: 'apply', preset: 'fold' });
+    expect(code).toContain('itemId is required');
+  });
+
+  it('return values use safe string embedding', () => {
+    const code = codeGenerator.generateDeform({ action: 'apply', itemId: "test'inject", preset: 'fold' });
+    expect(code).not.toContain("itemId: 'test'inject'");
+    expect(code).toContain(JSON.stringify("test'inject"));
+  });
+});
+
+// =============================================================================
+// SPRITE SHEET
+// =============================================================================
+
+describe('SpriteSheetInputSchema', () => {
+  it('accepts generate with skeletonId', () => {
+    const result = SpriteSheetInputSchema.parse({ action: 'generate', skeletonId: 'skel_1' });
+    expect(result.action).toBe('generate');
+    expect(result.skeletonId).toBe('skel_1');
+  });
+
+  it('accepts all 3 actions', () => {
+    for (const action of ['generate', 'play', 'export'] as const) {
+      expect(() => SpriteSheetInputSchema.parse({ action })).not.toThrow();
+    }
+  });
+
+  it('accepts generate with poses', () => {
+    const result = SpriteSheetInputSchema.parse({
+      action: 'generate', skeletonId: 'skel_1',
+      poses: [{ name: 'idle', poseId: 'pose_1' }],
+    });
+    expect(result.poses).toHaveLength(1);
+  });
+});
+
+describe('Sprite sheet code generation', () => {
+  it('generate is async IIFE with spriteSheetSystem guard', () => {
+    const code = codeGenerator.generateSpriteSheet({ action: 'generate', skeletonId: 'skel_1' });
+    expect(code).toContain('async function');
+    expect(code).toContain("if (!app.spriteSheetSystem) return { error: 'SpriteSheetSystem not available' }");
+    expect(code).toContain('app.spriteSheetSystem.generateSpriteSheet');
+  });
+
+  it('play generates playSpriteSheet call', () => {
+    const code = codeGenerator.generateSpriteSheet({ action: 'play', spriteSheetId: 'sheet_1', x: 50, y: 50 });
+    expect(code).toContain('app.spriteSheetSystem.playSpriteSheet');
+    expect(code).toContain('sheet_1');
+  });
+
+  it('export generates exportSpriteSheet call', () => {
+    const code = codeGenerator.generateSpriteSheet({ action: 'export', spriteSheetId: 'sheet_1', format: 'webp' });
+    expect(code).toContain('app.spriteSheetSystem.exportSpriteSheet');
+    expect(code).toContain("'webp'");
+  });
+});
+
+// =============================================================================
+// STORAGE
+// =============================================================================
+
+describe('StorageInputSchema', () => {
+  it('accepts save with name', () => {
+    const result = StorageInputSchema.parse({ action: 'save', name: 'My Project' });
+    expect(result.action).toBe('save');
+    expect(result.name).toBe('My Project');
+  });
+
+  it('accepts all 4 actions', () => {
+    for (const action of ['save', 'load', 'list', 'delete'] as const) {
+      expect(() => StorageInputSchema.parse({ action })).not.toThrow();
+    }
+  });
+});
+
+describe('Storage code generation', () => {
+  it('save is async IIFE with storageManager guard', () => {
+    const code = codeGenerator.generateStorage({ action: 'save', name: 'Test' });
+    expect(code).toContain('async function');
+    expect(code).toContain("if (!app.storageManager) return { error: 'StorageManager not available' }");
+    expect(code).toContain('app.storageManager.saveProject');
+  });
+
+  it('load generates loadProject call', () => {
+    const code = codeGenerator.generateStorage({ action: 'load', projectId: 'proj_1' });
+    expect(code).toContain('app.storageManager.loadProject');
+    expect(code).toContain('proj_1');
+  });
+
+  it('list generates listProjects call', () => {
+    const code = codeGenerator.generateStorage({ action: 'list' });
+    expect(code).toContain('app.storageManager.listProjects');
+  });
+
+  it('delete generates deleteProject call', () => {
+    const code = codeGenerator.generateStorage({ action: 'delete', projectId: 'proj_1' });
+    expect(code).toContain('app.storageManager.deleteProject');
+    expect(code).toContain('proj_1');
+  });
+
+  it('load with special chars in projectId uses safe embedding', () => {
+    const code = codeGenerator.generateStorage({ action: 'load', projectId: "proj'inject" });
+    expect(code).not.toContain("projectId: 'proj'inject'");
+    expect(code).toContain(JSON.stringify("proj'inject"));
+  });
+});
+
+// =============================================================================
+// INTERACTION
+// =============================================================================
+
+describe('InteractionInputSchema', () => {
+  it('accepts add_behavior', () => {
+    const result = InteractionInputSchema.parse({ action: 'add_behavior', itemId: 'item_1', behaviorType: 'repel' });
+    expect(result.action).toBe('add_behavior');
+    expect(result.behaviorType).toBe('repel');
+  });
+
+  it('accepts all 4 actions', () => {
+    for (const action of ['add_behavior', 'remove_behavior', 'trigger_action', 'get_state'] as const) {
+      expect(() => InteractionInputSchema.parse({ action })).not.toThrow();
+    }
+  });
+
+  it('accepts all 7 behavior types', () => {
+    const types = ['repel', 'attract', 'follow', 'orbit', 'slingshot', 'physics_body', 'draggable_constrained'];
+    for (const bt of types) {
+      expect(() => InteractionInputSchema.parse({ action: 'add_behavior', behaviorType: bt })).not.toThrow();
+    }
+  });
+
+  it('rejects invalid behavior type', () => {
+    expect(() => InteractionInputSchema.parse({ action: 'add_behavior', behaviorType: 'teleport' })).toThrow();
+  });
+});
+
+describe('Interaction code generation', () => {
+  it('add_behavior generates addContinuousBehavior call', () => {
+    const code = codeGenerator.generateInteraction({ action: 'add_behavior', itemId: 'item_1', behaviorType: 'orbit', params: { radius: 50 } });
+    expect(code).toContain('app.interactionSystem.addContinuousBehavior');
+    expect(code).toContain("'orbit'");
+  });
+
+  it('remove_behavior generates removeContinuousBehavior call', () => {
+    const code = codeGenerator.generateInteraction({ action: 'remove_behavior', itemId: 'item_1', behaviorId: 'beh_1' });
+    expect(code).toContain('app.interactionSystem.removeContinuousBehavior');
+    expect(code).toContain('beh_1');
+  });
+
+  it('trigger_action generates triggerAction call', () => {
+    const code = codeGenerator.generateInteraction({ action: 'trigger_action', actionType: 'incrementScore', params: { points: 10 } });
+    expect(code).toContain('app.interactionSystem.triggerAction');
+    expect(code).toContain("'incrementScore'");
+  });
+
+  it('get_state returns interaction state', () => {
+    const code = codeGenerator.generateInteraction({ action: 'get_state' });
+    expect(code).toContain('app.interactionSystem.getState');
+  });
+
+  it('includes interactionSystem guard', () => {
+    const code = codeGenerator.generateInteraction({ action: 'get_state' });
+    expect(code).toContain("if (!app.interactionSystem) return { error: 'InteractionSystem not available' }");
+  });
+
+  it('is sync IIFE (not async)', () => {
+    const code = codeGenerator.generateInteraction({ action: 'get_state' });
+    expect(code).toContain('(function()');
+    expect(code).not.toContain('async');
+  });
+});
+
+// =============================================================================
+// WIDGET EXPORT
+// =============================================================================
+
+describe('ExportWidgetInputSchema', () => {
+  it('accepts empty input (all optional)', () => {
+    const result = ExportWidgetInputSchema.parse({});
+    expect(result).toBeDefined();
+  });
+
+  it('accepts all options', () => {
+    const result = ExportWidgetInputSchema.parse({
+      download: true, filename: 'my-widget.json', includeInteractions: false, minify: true,
+    });
+    expect(result.download).toBe(true);
+    expect(result.filename).toBe('my-widget.json');
+    expect(result.minify).toBe(true);
+  });
+});
+
+describe('ExportWidgetHtmlInputSchema', () => {
+  it('accepts empty input (all optional)', () => {
+    const result = ExportWidgetHtmlInputSchema.parse({});
+    expect(result).toBeDefined();
+  });
+
+  it('accepts title and download', () => {
+    const result = ExportWidgetHtmlInputSchema.parse({ title: 'My Animation', download: true });
+    expect(result.title).toBe('My Animation');
+  });
+});
+
+describe('Widget export code generation', () => {
+  it('export_widget generates async IIFE with exportWidget guard', () => {
+    const code = codeGenerator.generateExportWidget({});
+    expect(code).toContain('async function');
+    expect(code).toContain("if (!app.exportWidget) return { error: 'Widget export not available' }");
+    expect(code).toContain('app.exportWidget');
+  });
+
+  it('export_widget passes options through', () => {
+    const code = codeGenerator.generateExportWidget({ minify: true, filename: 'test.json' });
+    expect(code).toContain('"minify":true');
+    expect(code).toContain('"filename":"test.json"');
+  });
+
+  it('export_widget_html generates async IIFE with exportWidgetHTML guard', () => {
+    const code = codeGenerator.generateExportWidgetHtml({});
+    expect(code).toContain('async function');
+    expect(code).toContain("if (!app.exportWidgetHTML) return { error: 'Widget HTML export not available' }");
+    expect(code).toContain('app.exportWidgetHTML');
+  });
+
+  it('export_widget_html passes title option', () => {
+    const code = codeGenerator.generateExportWidgetHtml({ title: 'My Page' });
+    expect(code).toContain('"title":"My Page"');
+  });
+});
+
+// =============================================================================
+// INTEGRATION — All 16 tools in PINEPAPER_TOOLS, tag groups, minimal descs
 // =============================================================================
 
 const NEW_TOOL_NAMES = [
@@ -564,6 +962,12 @@ const NEW_TOOL_NAMES = [
   'pinepaper_view',
   'pinepaper_background',
   'pinepaper_query',
+  'pinepaper_deform',
+  'pinepaper_sprite_sheet',
+  'pinepaper_storage',
+  'pinepaper_interaction',
+  'pinepaper_export_widget',
+  'pinepaper_export_widget_html',
 ];
 
 describe('Integration — tool definitions', () => {
@@ -631,7 +1035,28 @@ describe('Integration — tag groups', () => {
     expect(TOOL_TAGS.query).toContain('pinepaper_query');
   });
 
-  it('all 10 new tools are reachable via agent profile', () => {
+  it('deform tag group contains pinepaper_deform', () => {
+    expect(TOOL_TAGS.deform).toContain('pinepaper_deform');
+  });
+
+  it('sprite tag group contains pinepaper_sprite_sheet', () => {
+    expect(TOOL_TAGS.sprite).toContain('pinepaper_sprite_sheet');
+  });
+
+  it('storage tag group contains pinepaper_storage', () => {
+    expect(TOOL_TAGS.storage).toContain('pinepaper_storage');
+  });
+
+  it('interaction tag group contains pinepaper_interaction', () => {
+    expect(TOOL_TAGS.interaction).toContain('pinepaper_interaction');
+  });
+
+  it('export tag group contains widget export tools', () => {
+    expect(TOOL_TAGS.export).toContain('pinepaper_export_widget');
+    expect(TOOL_TAGS.export).toContain('pinepaper_export_widget_html');
+  });
+
+  it('all 16 new tools are reachable via agent profile', () => {
     const agentTools = getToolsForToolkit(PINEPAPER_TOOLS, 'agent');
     const agentNames = agentTools.map(t => t.name);
     for (const name of NEW_TOOL_NAMES) {
