@@ -425,7 +425,7 @@ export type ExecuteCustomCodeInput = z.infer<typeof ExecuteCustomCodeInputSchema
 // =============================================================================
 
 export const GeneratorNameSchema = z.enum([
-  // Original generators (Phase 1 — enhanced)
+  // Classic generators
   'drawSunburst',
   'drawSunsetScene',
   'drawGrid',
@@ -433,7 +433,7 @@ export const GeneratorNameSchema = z.enum([
   'drawCircuit',
   'drawWaves',
   'drawPattern',
-  // New generators (Phase 2)
+  // Visual generators
   'drawBokeh',
   'drawGradientMesh',
   'drawGeometricAbstract',
@@ -442,6 +442,46 @@ export const GeneratorNameSchema = z.enum([
   'drawOrganicFlow',
   'drawNoiseTexture',
   'drawGlobeWireframe',
+  // Scene generators
+  'drawPerspectiveGrid',
+  'drawPoissonDisk',
+  'drawPoissonShapesAsync',
+  'drawGoldenSpiral',
+  'drawFibonacci',
+  'createShape',
+  'createGradientCircle',
+  'drawStarfield',
+  'drawSolarSystem',
+  'drawDayNightCycle',
+  'drawCosmosSpace',
+  'drawTadpoles',
+  'drawMetaballs',
+  'drawKaleidoscope',
+  'drawFlowField',
+  'drawNeonGrid',
+  'drawConstellation',
+  'drawTessellation',
+  // Decorative generators
+  'drawSunburstLines',
+  'drawGlowOrbs',
+  'drawConcentricRings',
+  'drawCornerAccents',
+  'drawFlowCurves',
+  'drawFallingPetals',
+  'drawFireflies',
+  'drawFloatingLeaves',
+  'drawVoronoi',
+  // Map generators
+  'drawWorldMap',
+  'drawUSAMap',
+  'drawCountryMap',
+  'drawChoroplethMap',
+  // PineMath generators
+  'drawFunctionPlot',
+  'drawParametricCurve',
+  'drawSimulation',
+  'drawSpectrumAnalyzer',
+  'draw3DSurface',
 ]).describe('Background generator name');
 
 export type GeneratorName = z.infer<typeof GeneratorNameSchema>;
@@ -625,6 +665,11 @@ export const EffectTypeSchema = z.enum([
   'ripple',
   'glow',
   'electric',
+  'bubbles',
+  'dust',
+  'fireflies',
+  'shockwave',
+  'trail',
 ]).describe('Visual effect type');
 
 export const SparkleParamsSchema = z.object({
@@ -2514,3 +2559,63 @@ export const ExportWidgetHtmlInputSchema = z.object({
   download: z.boolean().optional(),
 });
 export type ExportWidgetHtmlInput = z.infer<typeof ExportWidgetHtmlInputSchema>;
+
+// =============================================================================
+// DATA VISUALIZATION (CHARTS)
+// =============================================================================
+
+export const CreateChartInputSchema = z.object({
+  action: z.enum(['create', 'update', 'reconfigure', 'remove']),
+  chartType: z.enum(['bar', 'line', 'scatter', 'area']).optional(),
+  chartId: z.string().optional(),
+  data: z.array(z.record(z.unknown())).optional(),
+  options: z.record(z.unknown()).optional(),
+});
+export type CreateChartInput = z.infer<typeof CreateChartInputSchema>;
+
+// =============================================================================
+// MAGIC SYSTEM (AUTO-ANIMATE + REMIX)
+// =============================================================================
+
+export const MagicInputSchema = z.object({
+  action: z.enum(['animate', 'remix']),
+  mood: z.enum(['calm', 'professional', 'energetic', 'dramatic', 'whimsical']).optional(),
+  selectionOnly: z.boolean().optional(),
+});
+export type MagicInput = z.infer<typeof MagicInputSchema>;
+
+// =============================================================================
+// PHYSICS (RIGID BODY SIMULATION)
+// =============================================================================
+
+export const PhysicsInputSchema = z.object({
+  action: z.enum(['init', 'add_body', 'remove_body', 'apply_force', 'apply_impulse', 'set_velocity', 'get_state', 'create_ground', 'create_joint']),
+  itemId: z.string().optional(),
+  gravity: z.object({ x: z.number(), y: z.number() }).optional(),
+  bodyType: z.enum(['static', 'dynamic', 'kinematic']).optional(),
+  mass: z.number().optional(),
+  friction: z.number().optional(),
+  restitution: z.number().optional(),
+  fixedRotation: z.boolean().optional(),
+  shape: z.enum(['auto', 'circle', 'rect']).optional(),
+  force: z.object({ x: z.number(), y: z.number() }).optional(),
+  impulse: z.object({ x: z.number(), y: z.number() }).optional(),
+  velocity: z.object({ x: z.number(), y: z.number() }).optional(),
+  y: z.number().optional(),
+  width: z.number().optional(),
+  targetItemId: z.string().optional(),
+  jointType: z.enum(['revolute', 'distance', 'weld', 'prismatic']).optional(),
+  jointParams: z.record(z.unknown()).optional(),
+});
+export type PhysicsInput = z.infer<typeof PhysicsInputSchema>;
+
+// =============================================================================
+// MEASUREMENT SYSTEM (RULERS, GRID, DIMENSIONS)
+// =============================================================================
+
+export const MeasurementInputSchema = z.object({
+  action: z.enum(['set_rulers', 'set_grid', 'get_dimensions', 'set_snap']),
+  enabled: z.boolean().optional(),
+  itemId: z.string().optional(),
+});
+export type MeasurementInput = z.infer<typeof MeasurementInputSchema>;

@@ -54,7 +54,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_get_available_easings: 'List available easing functions.',
 
   // --- Camera ---
-  pinepaper_camera_animate: 'Animate camera with keyframes (zoom, pan, 3D pitch/yaw tilt). mode: keyframes|fly_to|orbit. fov, target.',
+  pinepaper_camera_animate: 'Camera keyframes. Per-kf: zoom, focus ([x,y]|id|{item,offset}), pitch, yaw, easing; curved via pathOut/pathIn or pathMode:arc+pivot / custom+path. mode: keyframes|fly_to|orbit.',
   pinepaper_camera_zoom: 'Set camera zoom level.',
   pinepaper_camera_pan: 'Pan camera to offset.',
   pinepaper_camera_move_to: 'Move camera to center on a point or item.',
@@ -128,11 +128,11 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_get_letter_collage_options: 'List available collage styles, palettes, and options.',
 
   // --- Generators ---
-  pinepaper_execute_generator: 'Run generator. name: drawBokeh|drawGrid|drawWaves|drawCircuit|drawSunburst|drawGradientMesh|drawPattern|drawGlobeWireframe|... params: {colors, ...}.',
+  pinepaper_execute_generator: 'Run generator. name: drawBokeh|drawGrid|drawWaves|drawSunburst|drawFunctionPlot|drawSimulation|draw3DSurface|... params: {colors, interactive}.',
   pinepaper_list_generators: 'List available background generators with parameters.',
 
   // --- Effects & Filters ---
-  pinepaper_apply_effect: 'Apply visual effect. effectType: sparkle|blast|smoke|fire|rain|snow|confetti|ripple|glow|electric. params: {color, speed, ...}.',
+  pinepaper_apply_effect: 'Apply visual effect. effectType: sparkle|blast|smoke|fire|rain|snow|confetti|ripple|glow|electric|bubbles|dust|fireflies|shockwave|trail. params: {color, speed, ...}.',
   pinepaper_add_filter: 'Add SVG filter to canvas (blur, glow, shadow, etc.).',
 
   // --- Triggers ---
@@ -209,6 +209,12 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   // --- Widget Export ---
   pinepaper_export_widget: 'Export scene as pp:PinePaper ontology JSON. download, filename, includeInteractions, minify.',
   pinepaper_export_widget_html: 'Export scene as self-contained HTML with tree-shaken runtime. title, download.',
+
+  // --- Data Visualization, Magic, Physics, Measurement ---
+  pinepaper_create_chart: 'Charts. action: create|update|reconfigure|remove. chartType: bar|line|scatter|area. data, options, chartId. Bar opts: orient:"horizontal", labelArrangement: auto|slanted|vertical|truncate|wrap.',
+  pinepaper_magic: 'Auto-animation. action: animate|remix. mood: calm|professional|energetic|dramatic|whimsical. selectionOnly.',
+  pinepaper_physics: 'Rigid body sim. action: init|add_body|remove_body|apply_force|apply_impulse|set_velocity|get_state|create_ground|create_joint. gravity, bodyType, mass, friction.',
+  pinepaper_measurement: 'Rulers/grid. action: set_rulers|set_grid|get_dimensions|set_snap. enabled, itemId.',
 
   // --- Guide & runtime config ---
   pinepaper_tool_guide: 'Get detailed guidance for any tool, category, or the full AI Agent Guide.',

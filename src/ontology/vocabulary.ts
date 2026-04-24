@@ -85,6 +85,12 @@ export const PP_VOCABULARY: PinePaperVocabulary = {
     'pp:MaskedItem':    { anchor: null, description: 'Item with clipping mask', parentType: 'pp:CanvasElement' },
     'pp:Image':         { anchor: 'schema:ImageObject', description: 'Raster/bitmap image', parentType: 'pp:CanvasElement' },
     'pp:CompoundPath':  { anchor: null, description: 'Multiple sub-paths as single item (SVG imports, boolean ops)', parentType: 'pp:CanvasShape' },
+    // Data Visualization
+    'pp:DataVizElement': { anchor: null, description: 'Abstract data visualization element', abstract: true, parentType: 'pp:CanvasElement' },
+    'pp:BarChart':       { anchor: null, description: 'Bar chart — rectangular marks on Cartesian axes', parentType: 'pp:DataVizElement', mcpTool: 'pinepaper_create_chart' },
+    'pp:LineChart':      { anchor: null, description: 'Line chart — connected trajectory marks', parentType: 'pp:DataVizElement', mcpTool: 'pinepaper_create_chart' },
+    'pp:ScatterPlot':    { anchor: null, description: 'Scatter plot — point marks encoding two quantitative variables', parentType: 'pp:DataVizElement', mcpTool: 'pinepaper_create_chart' },
+    'pp:AreaChart':      { anchor: null, description: 'Area chart — filled region under a line', parentType: 'pp:DataVizElement', mcpTool: 'pinepaper_create_chart' },
     // Escape hatch — items that don't match any vocabulary type
     'pp:Unclassified':  { anchor: null, description: 'Item type not expressible in current vocabulary.', parentType: 'pp:CanvasElement' },
   },
@@ -198,6 +204,15 @@ export const PP_VOCABULARY: PinePaperVocabulary = {
     'timedCycling':             { category: 'timing', formula: 'mode[floor(t/cycleDur) % n]' },
     'trimPath':                 { category: 'path', formula: 'dashArray/dashOffset trimming' },
     'staggerDelay':             { category: 'timing', formula: 'index × delay' },
+    // PineMath
+    'expression':               { category: 'expression', formula: 'math.js compiled expression evaluation' },
+    'ode':                      { category: 'solver', formula: 'Ordinary Differential Equation numerical integration' },
+    'rk4':                      { category: 'solver', formula: 'y(n+1) = y(n) + (k1+2k2+2k3+k4)/6' },
+    'dynamicSystem':            { category: 'solver', formula: 'dx/dt = f(x,t,params)' },
+    'fft':                      { category: 'signal', formula: 'Cooley-Tukey radix-2 Fast Fourier Transform' },
+    'signalProcessing':         { category: 'signal', formula: 'Signal generation, windowing, filtering' },
+    'parametricSurface':        { category: 'parametric', formula: 'S(u,v) = (x(u,v), y(u,v), z(u,v))' },
+    'projection3d':             { category: 'projection', formula: '2D = 3D × fov/(fov+z)' },
   },
 
   // --- Design Patterns (structural archetypes) ---
@@ -223,6 +238,7 @@ export const PP_VOCABULARY: PinePaperVocabulary = {
     'cameraAnimation':       { description: 'Animated viewport zoom/pan', requiredEdges: ['pp:cameraFollows', 'pp:cameraAnimates'] },
     'proceduralNoise':       { description: 'Noise-driven procedural motion', requiredEdges: ['pp:wiggle'] },
     'expressionDriven':      { description: 'Math expression controlling properties', requiredEdges: ['pp:timeExpression'] },
+    'dataVisualization':     { description: 'Chart-based data visualization', nodeTypes: ['pp:DataVizElement'] },
   },
 
   // --- Generator Types ---
@@ -249,6 +265,13 @@ export const PP_VOCABULARY: PinePaperVocabulary = {
     'drawOrganicFlow':       { category: 'organic',       mathFunctions: ['sinOscillation', 'perlinNoise'], parentType: 'pp:FieldGenerator' },
     'drawNoiseTexture':      { category: 'textures',      mathFunctions: ['perlinNoise', 'fbm'], parentType: 'pp:PatternGenerator' },
     'drawGlobeWireframe':    { category: 'tech',          mathFunctions: ['sinCos', 'parametricCircle'], parentType: 'pp:SceneGenerator' },
+    // PineMath generators
+    'pp:MathGenerator':      { category: 'abstract', description: 'Math/science generator', abstract: true, parentType: 'pp:ProceduralGenerator', mathFunctions: [] },
+    'drawFunctionPlot':      { category: 'math',          mathFunctions: ['expression', 'keyframeLerp'], parentType: 'pp:MathGenerator' },
+    'drawParametricCurve':   { category: 'math',          mathFunctions: ['parametricCircle', 'sinCos'], parentType: 'pp:MathGenerator' },
+    'drawSimulation':        { category: 'math',          mathFunctions: ['ode', 'rk4', 'dynamicSystem'], parentType: 'pp:MathGenerator' },
+    'drawSpectrumAnalyzer':  { category: 'math',          mathFunctions: ['fft', 'signalProcessing'], parentType: 'pp:MathGenerator' },
+    'draw3DSurface':         { category: 'math',          mathFunctions: ['parametricSurface', 'projection3d'], parentType: 'pp:MathGenerator' },
   },
 
   // --- Formal Properties ---
@@ -344,6 +367,11 @@ export const ITEM_TYPE_MAP: Record<string, string> = {
   'diagram-shape':  'pp:DiagramShape',
   'connector':      'pp:Connector',
   'unclassified':   'pp:Unclassified',
+  // Data visualization
+  'barChart':       'pp:BarChart',
+  'lineChart':      'pp:LineChart',
+  'scatterPlot':    'pp:ScatterPlot',
+  'areaChart':      'pp:AreaChart',
 };
 
 /** Maps ShapeLibrary shapeType strings to specific pp: diagram shape types. */

@@ -52,7 +52,7 @@ RULES:
 CANVAS:  set_canvas_size (width/height or preset) → set_background (color) → execute_generator (procedural art)
 ITEMS:   create (itemType, position, properties) → modify (itemId, properties) → delete (itemId)
 ANIMATE: animate (loop presets) → keyframe_animate (timed reveals) → relation (behavioral links)
-EFFECTS: apply_mask (reveal animations) → apply_effect (sparkle/blast)
+EFFECTS: apply_mask (reveal animations) → apply_effect (sparkle/blast/bubbles/fireflies/trail...)
 PLAY:    play_timeline (start playback)
 
 ─── GENERATORS (prefer these for backgrounds) ───
@@ -131,6 +131,18 @@ Interaction: pinepaper_interaction — continuous physics behaviors (repel, attr
 
 Storage: pinepaper_storage — save/load/list/delete projects (IndexedDB persistence)
   For multi-project workflows and session recovery.
+
+Data Viz: pinepaper_create_chart — create/update/reconfigure/remove charts (bar, line, scatter, area)
+  Pass data as array of objects + options. Auto-animated with expression-driven oscillation.
+
+Magic: pinepaper_magic — ontology-aware auto-animation + style remix
+  One-click animate (mood: calm/professional/energetic/dramatic/whimsical) or remix (cycle colors/fonts).
+
+Physics: pinepaper_physics — rigid body simulation (init, add_body, apply_force, create_joint)
+  For interactive simulations, gravity, collisions. Based on Box2D/Planck.js.
+
+Measurement: pinepaper_measurement — rulers, grid, snap-to-grid, get item dimensions
+  For precise layouts and alignment.
 
 ─── CANVAS & EXPORT ───
 
@@ -1829,10 +1841,22 @@ MODES:
 KEYFRAME PROPERTIES:
 - time: Time in seconds
 - zoom: Zoom level (1=normal, 2=2x zoom in, 0.5=zoom out)
-- center: View center [x, y]
+- focus: Camera target, resolved live against the scene graph. Accepts:
+    [x, y]                         literal position
+    'item-id'                      itemRegistry lookup → item bounds center (tracks the item as it moves)
+    { item: 'id', offset: [dx, dy] } item center + offset
+- center: [x, y] — legacy alias, honored only when focus is absent
 - pitch: 3D tilt in degrees (0=flat, positive=tilt forward). Uses equirectangular projection
 - yaw: 3D rotation in degrees. Uses equirectangular projection
 - easing: Timing function (linear, easeIn, easeOut, easeInOut, bounce, elastic)
+
+CURVED INTER-KEYFRAME PATHS (optional; default is linear):
+- pathOut: [dx, dy] — bezier tangent handle when LEAVING this keyframe
+- pathIn:  [dx, dy] — bezier tangent handle when ARRIVING at this keyframe
+    Either handle alone promotes the segment to a cubic bezier.
+- pathMode: 'arc' — arc around a pivot. Requires pivot: [x, y]; optional arcDirection: 'ccw'|'cw'
+- pathMode: 'custom' + path: 'M x y C ...' — sample any SVG path string (falls back to linear when Paper.js is unavailable)
+Endpoints always match the resolved focus of each keyframe — handles only shape the curve between them.
 
 EXAMPLE (with 3D tilt):
 {
@@ -1840,10 +1864,20 @@ EXAMPLE (with 3D tilt):
   "loop": true,
   "fov": 60,
   "keyframes": [
-    { "time": 0, "zoom": 1, "center": [400, 300], "pitch": 0, "yaw": 0 },
-    { "time": 2, "zoom": 2, "center": [400, 300], "pitch": 12, "yaw": -5, "easing": "easeInOut" },
-    { "time": 4, "zoom": 2, "center": [600, 300], "pitch": 8, "yaw": 3, "easing": "easeOut" },
-    { "time": 6, "zoom": 1, "center": [400, 300], "pitch": 0, "yaw": 0, "easing": "easeInOut" }
+    { "time": 0, "zoom": 1, "focus": [400, 300], "pitch": 0, "yaw": 0 },
+    { "time": 2, "zoom": 2, "focus": "hero-character", "pitch": 12, "yaw": -5, "easing": "easeInOut" },
+    { "time": 4, "zoom": 2, "focus": { "item": "villain", "offset": [0, -40] }, "pitch": 8, "yaw": 3, "easing": "easeOut" },
+    { "time": 6, "zoom": 1, "focus": [400, 300], "pitch": 0, "yaw": 0, "easing": "easeInOut" }
+  ]
+}
+
+EXAMPLE (curved arc between waypoints):
+{
+  "duration": 4,
+  "keyframes": [
+    { "time": 0, "zoom": 1, "focus": [200, 300], "pathOut": [120, -60] },
+    { "time": 2, "zoom": 1.5, "focus": [800, 300], "pathIn": [-120, -60], "pathMode": "arc", "pivot": [500, 450], "arcDirection": "ccw" },
+    { "time": 4, "zoom": 1, "focus": [200, 300] }
   ]
 }`,
     inputSchema: {
@@ -1857,16 +1891,48 @@ EXAMPLE (with 3D tilt):
             properties: {
               time: { type: 'number', description: 'Time in seconds' },
               zoom: { type: 'number', description: 'Zoom level (1=normal, 2=2x zoom in)' },
+              focus: {
+                description: 'Camera target, resolved live against the scene graph. Accepts [x, y], an item id string, or { item: "id", offset: [dx, dy] }. Takes precedence over center.',
+              },
               center: {
                 type: 'array',
                 items: { type: 'number' },
-                description: 'View center [x, y]',
+                description: 'Legacy view center [x, y] — honored only when focus is absent',
               },
               pitch: { type: 'number', description: '3D tilt in degrees (0=flat, positive=forward tilt)' },
               yaw: { type: 'number', description: '3D rotation in degrees' },
               easing: {
                 type: 'string',
                 enum: ['linear', 'easeIn', 'easeOut', 'easeInOut', 'bounce', 'elastic'],
+              },
+              pathOut: {
+                type: 'array',
+                items: { type: 'number' },
+                description: 'Bezier tangent handle [dx, dy] when leaving this keyframe. Promotes segment to cubic bezier.',
+              },
+              pathIn: {
+                type: 'array',
+                items: { type: 'number' },
+                description: 'Bezier tangent handle [dx, dy] when arriving at this keyframe. Promotes segment to cubic bezier.',
+              },
+              pathMode: {
+                type: 'string',
+                enum: ['arc', 'custom'],
+                description: 'arc: curve around pivot (requires pivot). custom: sample an SVG path (requires path).',
+              },
+              pivot: {
+                type: 'array',
+                items: { type: 'number' },
+                description: 'Arc center [x, y] when pathMode is "arc"',
+              },
+              arcDirection: {
+                type: 'string',
+                enum: ['ccw', 'cw'],
+                description: 'Arc sweep direction when pathMode is "arc" (default: ccw)',
+              },
+              path: {
+                type: 'string',
+                description: 'SVG path string (e.g. "M 100 200 C 150 100 350 100 400 200") when pathMode is "custom"',
               },
             },
           },
@@ -5334,7 +5400,19 @@ New — Textures:
 - drawNoiseTexture: Perlin/grain/stipple noise (noiseType: perlin|grain|stipple, colors, scale, density, animated)
 
 New — Tech:
-- drawGlobeWireframe: Vercel-style wireframe globe (bgColor, wireColor, glowColor, highlightColor, meridianCount, latitudeCount, globeRadius, nodeCount, nodeSize, animationEnabled, animationSpeed, strokeWidth, gridOpacity)`,
+- drawGlobeWireframe: Vercel-style wireframe globe (bgColor, wireColor, glowColor, highlightColor, meridianCount, latitudeCount, globeRadius, nodeCount, nodeSize, animationEnabled, animationSpeed, strokeWidth, gridOpacity)
+
+PineMath — Math/Science:
+- drawFunctionPlot: Plot y=f(x) (expression, xMin, xMax, yMin, yMax, color, lineWidth, showAxes, showGrid, steps, animate: none|scroll-right|scroll-left|oscillate|bounce|wipe|custom)
+- drawParametricCurve: Plot (x(t),y(t)) Lissajous/spirals/roses (xExpression, yExpression, tMin, tMax, color, steps, scale, animate: none|linear|slow|fast|wave|bounce, trailFade)
+- drawSimulation: Dynamic systems with ODE solvers (preset: pendulum|springMass|lorenz|doublePendulum|vanderpol, solver: euler|rk4|rk45, timeScale, showTrail, trailLength, trailColor, objectColor)
+- drawSpectrumAnalyzer: FFT signal visualization (waveform: sine|square|sawtooth|triangle|noise|composite, frequency, amplitude, sampleRate, window: none|hann|hamming|blackman, waveColor, spectrumColor)
+- draw3DSurface: 3D surfaces from equations (preset: torus|sphere|wave|klein|mobius|custom, xExpr, yExpr, zExpr, uSteps, vSteps, scale, rotateSpeed)
+
+COMMON PARAMS (all generators):
+- bgColor: Background color ("none"/"transparent" for no background)
+- interactive: Make generated items selectable/draggable (default false)
+- clipToCanvas: Clip output to canvas bounds (default true, set false for overflow)`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -5346,6 +5424,8 @@ New — Tech:
             'drawBokeh', 'drawGradientMesh', 'drawGeometricAbstract', 'drawWindField',
             'drawFluidFlow', 'drawOrganicFlow', 'drawNoiseTexture',
             'drawGlobeWireframe',
+            'drawFunctionPlot', 'drawParametricCurve', 'drawSimulation',
+            'drawSpectrumAnalyzer', 'draw3DSurface',
           ],
           description: 'Generator name',
         },
@@ -5401,7 +5481,7 @@ USE WHEN:
 - Celebration effects (confetti)
 - Enhancing visual impact (ripple, glow, electric)
 
-EFFECTS (10 total):
+EFFECTS (15 total):
 - sparkle: Glitter/sparkle particles (color, speed, size)
 - blast: Explosion burst effect (color, radius, count)
 - smoke: Rising smoke plumes (color, speed, size, drift, height, growthRate)
@@ -5411,14 +5491,19 @@ EFFECTS (10 total):
 - confetti: Celebration confetti (colors, count, radius, gravity, size, spread, interval, repeat)
 - ripple: Expanding ring ripples (color, speed, maxRadius, ringCount, strokeWidth)
 - glow: Pulsing glow aura (color, speed, intensity, size)
-- electric: Lightning bolts (color, speed, boltCount, length, flickerRate)`,
+- electric: Lightning bolts (color, speed, boltCount, length, flickerRate)
+- bubbles: Rising transparent bubbles (color, count, speed, size, spread)
+- dust: Ambient drifting motes (color, count, speed, size, spread)
+- fireflies: Glowing wandering dots (color, count, speed, size, spread)
+- shockwave: Expanding concentric rings — burst type (speed, maxRadius, count, thickness)
+- trail: Fading afterimages following movement (speed, count, size, fadeRate)`,
     inputSchema: {
       type: 'object',
       properties: {
         itemId: { type: 'string', description: 'Registry ID of the item' },
         effectType: {
           type: 'string',
-          enum: ['sparkle', 'blast', 'smoke', 'fire', 'rain', 'snow', 'confetti', 'ripple', 'glow', 'electric'],
+          enum: ['sparkle', 'blast', 'smoke', 'fire', 'rain', 'snow', 'confetti', 'ripple', 'glow', 'electric', 'bubbles', 'dust', 'fireflies', 'shockwave', 'trail'],
           description: 'Type of effect',
         },
         params: {
@@ -6491,7 +6576,8 @@ CANVAS SETUP:
   set_canvas_size — {width, height} or {preset: "instagram"|"youtube"|"tiktok"|...}
   set_background — {backgroundColor: "#hex"}
   execute_generator — {generatorName, generatorParams} → fills canvas with procedural art
-    Generators: drawBokeh, drawGradientMesh, drawWaves, drawSunburst, drawSunsetScene, drawGrid, drawCircuit, drawPattern, drawStackedCircles, drawGeometricAbstract, drawWindField, drawFluidFlow, drawOrganicFlow, drawNoiseTexture
+    Generators: drawBokeh, drawGradientMesh, drawWaves, drawSunburst, drawSunsetScene, drawGrid, drawCircuit, drawPattern, drawStackedCircles, drawGeometricAbstract, drawWindField, drawFluidFlow, drawOrganicFlow, drawNoiseTexture, drawGlobeWireframe
+    PineMath: drawFunctionPlot (y=f(x) plots), drawParametricCurve (x(t),y(t)), drawSimulation (pendulum, Lorenz, spring-mass), drawSpectrumAnalyzer (FFT), draw3DSurface (torus, sphere, Klein bottle)
 
 ITEMS:
   create — {itemType, position: {x,y}, properties}
@@ -6621,7 +6707,7 @@ EXAMPLE — Animated sky scene with timed reveals:
               // Effects
               effectType: {
                 type: 'string',
-                enum: ['sparkle', 'blast', 'smoke', 'fire', 'rain', 'snow', 'confetti', 'ripple', 'glow', 'electric'],
+                enum: ['sparkle', 'blast', 'smoke', 'fire', 'rain', 'snow', 'confetti', 'ripple', 'glow', 'electric', 'bubbles', 'dust', 'fireflies', 'shockwave', 'trail'],
                 description: 'For apply_effect: effect type',
               },
               effectParams: { type: 'object', description: 'For apply_effect: parameters' },
@@ -7170,6 +7256,228 @@ VERBOSITY:
           enum: ['verbose', 'compact', 'minimal'],
         },
       },
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // DATA VISUALIZATION (CHARTS)
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_create_chart',
+    annotations: {
+      title: 'Create Chart',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Create and manage data visualizations on the canvas.
+
+ACTIONS:
+- create: Create a chart. Params: chartType, data (array of objects), options
+- update: Update chart data. Params: chartId, data, options
+- reconfigure: Change chart styling. Params: chartId, options
+- remove: Delete a chart. Params: chartId
+
+CHART TYPES: bar, line, scatter, area
+
+DATA FORMAT: Array of objects, e.g. [{category: "A", value: 10}, {category: "B", value: 20}]
+
+OPTIONS (vary by chart type):
+- Common: title, width, height, x, y, colors, animation, axisColor, labelColor, labelFontSize
+- Bar: barWidth, barGap, xLabel, yLabel
+    orient: 'horizontal' flips bars to grow rightward from a left Y-axis — best for long category names
+    labelArrangement: 'auto'|'horizontal'|'slanted'|'vertical'|'truncate'|'wrap'
+      auto      — smart: measures widest label and picks horizontal → slanted (−45°) → vertical (−90°) by slot width
+      slanted   — force −45° rotation
+      vertical  — force −90° rotation
+      truncate  — ellipsis when label exceeds slot (uses ctx.measureText; override char cap with labelTruncateMaxChars)
+      wrap      — split on last space before midpoint, up to two lines
+    Bottom-margin is capped at 25% (slanted) / 35% (vertical) of chart height, so changing labelFontSize shifts labels inside a stable budget rather than shrinking the bars.
+- Line: lineColor, lineWidth, xLabel, yLabel
+- Scatter: dotColor, dotRadius
+- Area: fillColor, lineColor, lineWidth
+
+Data field mapping: use xField/yField in options to specify which data keys to use for axes.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['create', 'update', 'reconfigure', 'remove'],
+          description: 'Chart action',
+        },
+        chartType: {
+          type: 'string',
+          enum: ['bar', 'line', 'scatter', 'area'],
+          description: 'Chart type (for create)',
+        },
+        chartId: { type: 'string', description: 'Chart ID (for update/reconfigure/remove)' },
+        data: {
+          type: 'array',
+          items: { type: 'object' },
+          description: 'Data array of objects (for create/update)',
+        },
+        options: {
+          type: 'object',
+          description: 'Chart options (colors, title, dimensions, field mapping, animation)',
+        },
+      },
+      required: ['action'],
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // MAGIC SYSTEM
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_magic',
+    annotations: {
+      title: 'Magic',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Ontology-aware auto-animation and style remixing.
+
+ACTIONS:
+- animate: Apply mood-driven animations, effects, and deformations. Params: mood, selectionOnly
+- remix: Non-destructive style cycling (colors, fonts, shadows). Params: selectionOnly
+
+MOODS: calm, professional, energetic, dramatic, whimsical
+
+The magic system analyzes canvas content via the design graph, selects type-appropriate treatments (animations for shapes, collage for text, filters for images), and tracks provenance.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['animate', 'remix'],
+          description: 'Magic action',
+        },
+        mood: {
+          type: 'string',
+          enum: ['calm', 'professional', 'energetic', 'dramatic', 'whimsical'],
+          description: 'Energy/mood for animation selection',
+        },
+        selectionOnly: { type: 'boolean', description: 'Only affect selected items (default: false)' },
+      },
+      required: ['action'],
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // PHYSICS (RIGID BODY SIMULATION)
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_physics',
+    annotations: {
+      title: 'Physics',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Rigid body physics simulation (Box2D/Planck.js).
+
+ACTIONS:
+- init: Start physics world. Params: gravity ({x, y}, default {x:0, y:980})
+- add_body: Register item as physics body. Params: itemId, bodyType (static|dynamic|kinematic), mass, friction, restitution, fixedRotation, shape (auto|circle|rect)
+- remove_body: Remove from physics. Params: itemId
+- apply_force: Continuous force in px/s². Params: itemId, force ({x, y})
+- apply_impulse: Instant velocity change. Params: itemId, impulse ({x, y})
+- set_velocity: Set linear velocity. Params: itemId, velocity ({x, y})
+- get_state: Get body position/velocity/rotation. Params: itemId
+- create_ground: Static floor plane. Params: y, width
+- create_joint: Connect two bodies. Params: itemId, targetItemId, jointType (revolute|distance|weld|prismatic), jointParams`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['init', 'add_body', 'remove_body', 'apply_force', 'apply_impulse', 'set_velocity', 'get_state', 'create_ground', 'create_joint'],
+          description: 'Physics action',
+        },
+        itemId: { type: 'string', description: 'Target item ID' },
+        gravity: {
+          type: 'object',
+          properties: { x: { type: 'number' }, y: { type: 'number' } },
+          description: 'Gravity vector (for init)',
+        },
+        bodyType: {
+          type: 'string',
+          enum: ['static', 'dynamic', 'kinematic'],
+          description: 'Physics body type',
+        },
+        mass: { type: 'number', description: 'Body mass (default: 1)' },
+        friction: { type: 'number', description: 'Surface friction (default: 0.3)' },
+        restitution: { type: 'number', description: 'Bounciness 0-1 (default: 0.3)' },
+        fixedRotation: { type: 'boolean', description: 'Prevent rotation' },
+        shape: { type: 'string', enum: ['auto', 'circle', 'rect'], description: 'Collision shape (default: auto)' },
+        force: {
+          type: 'object',
+          properties: { x: { type: 'number' }, y: { type: 'number' } },
+          description: 'Force vector in px/s²',
+        },
+        impulse: {
+          type: 'object',
+          properties: { x: { type: 'number' }, y: { type: 'number' } },
+          description: 'Impulse vector',
+        },
+        velocity: {
+          type: 'object',
+          properties: { x: { type: 'number' }, y: { type: 'number' } },
+          description: 'Velocity vector',
+        },
+        y: { type: 'number', description: 'Ground Y position' },
+        width: { type: 'number', description: 'Ground width' },
+        targetItemId: { type: 'string', description: 'Second item for joint' },
+        jointType: {
+          type: 'string',
+          enum: ['revolute', 'distance', 'weld', 'prismatic'],
+          description: 'Joint type',
+        },
+        jointParams: {
+          type: 'object',
+          description: 'Joint-specific parameters (anchor, enableMotor, motorSpeed, etc.)',
+        },
+      },
+      required: ['action'],
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // MEASUREMENT SYSTEM
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_measurement',
+    annotations: {
+      title: 'Measurement',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Rulers, grid overlay, snap-to-grid, and dimension readout.
+
+ACTIONS:
+- set_rulers: Show/hide rulers. Params: enabled (bool)
+- set_grid: Show/hide unit grid. Params: enabled (bool)
+- get_dimensions: Get item bounds. Params: itemId → returns {x, y, width, height, rotation}
+- set_snap: Enable/disable snap-to-grid. Params: enabled (bool)`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['set_rulers', 'set_grid', 'get_dimensions', 'set_snap'],
+          description: 'Measurement action',
+        },
+        enabled: { type: 'boolean', description: 'Enable/disable (for set_rulers, set_grid, set_snap)' },
+        itemId: { type: 'string', description: 'Item ID (for get_dimensions)' },
+      },
+      required: ['action'],
     },
   },
 

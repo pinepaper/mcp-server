@@ -171,6 +171,10 @@ import {
   InteractionInput,
   ExportWidgetInput,
   ExportWidgetHtmlInput,
+  CreateChartInput,
+  MagicInput,
+  PhysicsInput,
+  MeasurementInput,
 } from './schemas.js';
 import { z } from 'zod';
 
@@ -5037,6 +5041,290 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    const ite
   const result = await app.exportWidgetHTML(${JSON.stringify(opts)});
   return { success: true, html: result.html, estimatedSize: result.estimatedSize, analysis: { itemTypes: [...result.analysis.itemTypes], relationTypes: [...result.analysis.relationTypes], hasSimpleAnimations: result.analysis.hasSimpleAnimations, hasKeyframeAnimations: result.analysis.hasKeyframeAnimations, hasMasks: result.analysis.hasMasks } };
 })();`.trim();
+  }
+  // ===========================================================================
+  // DATA VISUALIZATION (CHARTS)
+  // ===========================================================================
+
+  generateChart(input: CreateChartInput): string {
+    const guard = `if (!app.chartSystem) return { error: 'ChartSystem not available' };`;
+    switch (input.action) {
+      case 'create': {
+        if (!input.chartType) return `(function() { return { error: 'chartType is required for create' }; })();`;
+        if (!input.data) return `(function() { return { error: 'data is required for create' }; })();`;
+        const dataStr = JSON.stringify(input.data);
+        const optsStr = JSON.stringify(input.options || {});
+        return `
+// Create chart
+(function() {
+  ${guard}
+  const group = app.createChart(${JSON.stringify(input.chartType)}, ${dataStr}, ${optsStr});
+  if (!group) return { error: 'Failed to create chart' };
+  const chartId = app.chartSystem.getLastChartId();
+  return { success: true, action: 'create', chartType: ${JSON.stringify(input.chartType)}, chartId, dataPoints: ${input.data.length} };
+})();`.trim();
+      }
+      case 'update': {
+        if (!input.chartId) return `(function() { return { error: 'chartId is required for update' }; })();`;
+        const chartIdStr = JSON.stringify(input.chartId);
+        const dataStr = JSON.stringify(input.data || []);
+        const optsStr = JSON.stringify(input.options || {});
+        return `
+// Update chart data
+(function() {
+  ${guard}
+  const chart = app.chartSystem.getChart(${chartIdStr});
+  if (!chart) return { error: 'Chart not found: ' + ${chartIdStr} };
+  app.chartSystem.update(${chartIdStr}, ${dataStr}, ${optsStr});
+  return { success: true, action: 'update', chartId: ${chartIdStr} };
+})();`.trim();
+      }
+      case 'reconfigure': {
+        if (!input.chartId) return `(function() { return { error: 'chartId is required for reconfigure' }; })();`;
+        const chartIdStr = JSON.stringify(input.chartId);
+        const optsStr = JSON.stringify(input.options || {});
+        return `
+// Reconfigure chart styling
+(function() {
+  ${guard}
+  const chart = app.chartSystem.getChart(${chartIdStr});
+  if (!chart) return { error: 'Chart not found: ' + ${chartIdStr} };
+  app.chartSystem.reconfigure(${chartIdStr}, ${optsStr});
+  return { success: true, action: 'reconfigure', chartId: ${chartIdStr} };
+})();`.trim();
+      }
+      case 'remove': {
+        if (!input.chartId) return `(function() { return { error: 'chartId is required for remove' }; })();`;
+        const chartIdStr = JSON.stringify(input.chartId);
+        return `
+// Remove chart
+(function() {
+  ${guard}
+  app.chartSystem.remove(${chartIdStr});
+  return { success: true, action: 'remove', chartId: ${chartIdStr} };
+})();`.trim();
+      }
+      default:
+        return `(function() { return { error: 'Unknown chart action: ${(input as any).action}' }; })();`;
+    }
+  }
+
+  // ===========================================================================
+  // MAGIC SYSTEM
+  // ===========================================================================
+
+  generateMagic(input: MagicInput): string {
+    const guard = `if (!app.magicSystem) return { error: 'MagicSystem not available' };`;
+    switch (input.action) {
+      case 'animate': {
+        const opts: Record<string, unknown> = {};
+        if (input.mood) opts.energy = input.mood;
+        if (input.selectionOnly !== undefined) opts.selectionOnly = input.selectionOnly;
+        return `
+// Magic auto-animate
+(async function() {
+  ${guard}
+  const result = await app.magicSystem.autoAnimate(${JSON.stringify(opts)});
+  return { success: true, action: 'animate', itemsAnimated: result.count, mood: result.energy, type: result.type };
+})();`.trim();
+      }
+      case 'remix': {
+        const opts: Record<string, unknown> = {};
+        if (input.selectionOnly !== undefined) opts.selectionOnly = input.selectionOnly;
+        return `
+// Magic style remix
+(async function() {
+  ${guard}
+  const result = await app.magicSystem.remixStyle(${JSON.stringify(opts)});
+  return { success: true, action: 'remix', itemsRemixed: result.count, palette: result.palette };
+})();`.trim();
+      }
+      default:
+        return `(function() { return { error: 'Unknown magic action: ${(input as any).action}' }; })();`;
+    }
+  }
+
+  // ===========================================================================
+  // PHYSICS (RIGID BODY SIMULATION)
+  // ===========================================================================
+
+  generatePhysics(input: PhysicsInput): string {
+    const guard = `if (!app.physicsWorld) return { error: 'PhysicsWorld not available' };`;
+    switch (input.action) {
+      case 'init': {
+        const gravity = JSON.stringify(input.gravity || { x: 0, y: 980 });
+        return `
+// Initialize physics world
+(function() {
+  ${guard}
+  app.physicsWorld.init({ gravity: ${gravity} });
+  return { success: true, action: 'init', gravity: ${gravity} };
+})();`.trim();
+      }
+      case 'add_body': {
+        if (!input.itemId) return `(function() { return { error: 'itemId is required for add_body' }; })();`;
+        const itemIdStr = JSON.stringify(input.itemId);
+        const config: Record<string, unknown> = {};
+        if (input.bodyType) config.type = input.bodyType;
+        if (input.mass !== undefined) config.mass = input.mass;
+        if (input.friction !== undefined) config.friction = input.friction;
+        if (input.restitution !== undefined) config.restitution = input.restitution;
+        if (input.fixedRotation !== undefined) config.fixedRotation = input.fixedRotation;
+        if (input.shape) config.shape = input.shape;
+        return `
+// Add physics body
+(function() {
+  ${guard}
+  const entry = app.itemRegistry.get(${itemIdStr});
+  if (!entry || !entry.item) return { error: 'Item not found: ' + ${itemIdStr} };
+  const ok = app.physicsWorld.addBody(${itemIdStr}, ${JSON.stringify(config)});
+  return { success: ok, action: 'add_body', itemId: ${itemIdStr}, bodyType: ${JSON.stringify(input.bodyType || 'dynamic')} };
+})();`.trim();
+      }
+      case 'remove_body': {
+        if (!input.itemId) return `(function() { return { error: 'itemId is required for remove_body' }; })();`;
+        const itemIdStr = JSON.stringify(input.itemId);
+        return `
+// Remove physics body
+(function() {
+  ${guard}
+  app.physicsWorld.removeBody(${itemIdStr});
+  return { success: true, action: 'remove_body', itemId: ${itemIdStr} };
+})();`.trim();
+      }
+      case 'apply_force': {
+        if (!input.itemId) return `(function() { return { error: 'itemId is required for apply_force' }; })();`;
+        if (!input.force) return `(function() { return { error: 'force is required for apply_force' }; })();`;
+        const itemIdStr = JSON.stringify(input.itemId);
+        return `
+// Apply continuous force
+(function() {
+  ${guard}
+  app.physicsWorld.applyForce(${itemIdStr}, ${JSON.stringify(input.force)});
+  return { success: true, action: 'apply_force', itemId: ${itemIdStr}, force: ${JSON.stringify(input.force)} };
+})();`.trim();
+      }
+      case 'apply_impulse': {
+        if (!input.itemId) return `(function() { return { error: 'itemId is required for apply_impulse' }; })();`;
+        if (!input.impulse) return `(function() { return { error: 'impulse is required for apply_impulse' }; })();`;
+        const itemIdStr = JSON.stringify(input.itemId);
+        return `
+// Apply instant impulse
+(function() {
+  ${guard}
+  app.physicsWorld.applyImpulse(${itemIdStr}, ${JSON.stringify(input.impulse)});
+  return { success: true, action: 'apply_impulse', itemId: ${itemIdStr}, impulse: ${JSON.stringify(input.impulse)} };
+})();`.trim();
+      }
+      case 'set_velocity': {
+        if (!input.itemId) return `(function() { return { error: 'itemId is required for set_velocity' }; })();`;
+        if (!input.velocity) return `(function() { return { error: 'velocity is required for set_velocity' }; })();`;
+        const itemIdStr = JSON.stringify(input.itemId);
+        return `
+// Set body velocity
+(function() {
+  ${guard}
+  app.physicsWorld.setVelocity(${itemIdStr}, ${JSON.stringify(input.velocity)});
+  return { success: true, action: 'set_velocity', itemId: ${itemIdStr}, velocity: ${JSON.stringify(input.velocity)} };
+})();`.trim();
+      }
+      case 'get_state': {
+        if (!input.itemId) return `(function() { return { error: 'itemId is required for get_state' }; })();`;
+        const itemIdStr = JSON.stringify(input.itemId);
+        return `
+// Get physics body state
+(function() {
+  ${guard}
+  const state = app.physicsWorld.getBodyState(${itemIdStr});
+  if (!state) return { error: 'No physics body for item: ' + ${itemIdStr} };
+  return { success: true, action: 'get_state', itemId: ${itemIdStr}, ...state };
+})();`.trim();
+      }
+      case 'create_ground': {
+        const y = input.y !== undefined ? input.y : 500;
+        const w = input.width !== undefined ? input.width : 2000;
+        return `
+// Create ground plane
+(function() {
+  ${guard}
+  const groundId = app.physicsWorld.createGround(${y}, ${w});
+  return { success: true, action: 'create_ground', groundId, y: ${y}, width: ${w} };
+})();`.trim();
+      }
+      case 'create_joint': {
+        if (!input.itemId) return `(function() { return { error: 'itemId is required for create_joint' }; })();`;
+        if (!input.targetItemId) return `(function() { return { error: 'targetItemId is required for create_joint' }; })();`;
+        if (!input.jointType) return `(function() { return { error: 'jointType is required for create_joint' }; })();`;
+        const itemIdStr = JSON.stringify(input.itemId);
+        const targetStr = JSON.stringify(input.targetItemId);
+        const params = JSON.stringify({ type: input.jointType, ...(input.jointParams || {}) });
+        return `
+// Create physics joint
+(function() {
+  ${guard}
+  const joint = app.physicsWorld.createJoint(${itemIdStr}, ${targetStr}, ${params});
+  if (!joint) return { error: 'Failed to create joint between ' + ${itemIdStr} + ' and ' + ${targetStr} };
+  return { success: true, action: 'create_joint', itemId: ${itemIdStr}, targetItemId: ${targetStr}, jointType: ${JSON.stringify(input.jointType)} };
+})();`.trim();
+      }
+      default:
+        return `(function() { return { error: 'Unknown physics action: ${(input as any).action}' }; })();`;
+    }
+  }
+
+  // ===========================================================================
+  // MEASUREMENT SYSTEM
+  // ===========================================================================
+
+  generateMeasurement(input: MeasurementInput): string {
+    const guard = `if (!app.measurementSystem) return { error: 'MeasurementSystem not available' };`;
+    switch (input.action) {
+      case 'set_rulers': {
+        const enabled = input.enabled !== false;
+        return `
+// Toggle rulers
+(function() {
+  ${guard}
+  app.measurementSystem.setRulersVisible(${enabled});
+  return { success: true, action: 'set_rulers', enabled: ${enabled} };
+})();`.trim();
+      }
+      case 'set_grid': {
+        const enabled = input.enabled !== false;
+        return `
+// Toggle grid
+(function() {
+  ${guard}
+  app.measurementSystem.setGridVisible(${enabled});
+  return { success: true, action: 'set_grid', enabled: ${enabled} };
+})();`.trim();
+      }
+      // No measurementSystem guard — reads from itemRegistry directly
+      case 'get_dimensions': {
+        if (!input.itemId) return `(function() { return { error: 'itemId is required for get_dimensions' }; })();`;
+        const itemIdStr = JSON.stringify(input.itemId);
+        return `
+// Get item dimensions
+(function() {
+  const entry = app.itemRegistry.get(${itemIdStr});
+  if (!entry || !entry.item) return { error: 'Item not found: ' + ${itemIdStr} };
+  const b = entry.item.bounds;
+  return { success: true, action: 'get_dimensions', itemId: ${itemIdStr}, x: b.x, y: b.y, width: b.width, height: b.height, rotation: entry.item.rotation || 0 };
+})();`.trim();
+      }
+      case 'set_snap': {
+        const enabled = input.enabled !== false;
+        return `
+// Toggle snap to grid
+(function() {
+  ${guard}
+  app.measurementSystem.setSnapToUnitEnabled(${enabled});
+  return { success: true, action: 'set_snap', enabled: ${enabled} };
+})();`.trim();
+      }
+      default:
+        return `(function() { return { error: 'Unknown measurement action: ${(input as any).action}' }; })();`;
+    }
   }
 }
 
