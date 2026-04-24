@@ -41,8 +41,8 @@ describe('PP_VOCABULARY', () => {
     expect(Object.keys(PP_VOCABULARY.edges).length).toBeGreaterThanOrEqual(37);
   });
 
-  it('has expected number of generators (20)', () => {
-    expect(Object.keys(PP_VOCABULARY.generators).length).toBe(20);
+  it('has expected number of generators (26)', () => {
+    expect(Object.keys(PP_VOCABULARY.generators).length).toBe(26);
   });
 
   it('has expected number of math functions (38+)', () => {
@@ -165,8 +165,8 @@ describe('Mapping Tables', () => {
     }
   });
 
-  it('ITEM_TYPE_MAP has 20 entries', () => {
-    expect(Object.keys(ITEM_TYPE_MAP).length).toBe(20);
+  it('ITEM_TYPE_MAP has 24 entries', () => {
+    expect(Object.keys(ITEM_TYPE_MAP).length).toBe(24);
   });
 
   it('RELATION_TYPE_MAP has 24 entries', () => {

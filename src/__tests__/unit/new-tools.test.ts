@@ -25,6 +25,11 @@ import {
   TextPropertiesSchema,
   ExportWidgetInputSchema,
   ExportWidgetHtmlInputSchema,
+  CreateChartInputSchema,
+  MagicInputSchema,
+  PhysicsInputSchema,
+  MeasurementInputSchema,
+  EffectTypeSchema,
 } from '../../types/schemas.js';
 import { codeGenerator } from '../../types/code-generator.js';
 import { PINEPAPER_TOOLS } from '../../tools/definitions.js';
@@ -948,7 +953,330 @@ describe('Widget export code generation', () => {
 });
 
 // =============================================================================
-// INTEGRATION — All 16 tools in PINEPAPER_TOOLS, tag groups, minimal descs
+// EFFECTS — 5 new particle effects
+// =============================================================================
+
+describe('EffectTypeSchema — 15 effects', () => {
+  it('accepts all 15 effect types', () => {
+    const effects = ['sparkle', 'blast', 'smoke', 'fire', 'rain', 'snow', 'confetti', 'ripple', 'glow', 'electric', 'bubbles', 'dust', 'fireflies', 'shockwave', 'trail'];
+    for (const e of effects) {
+      expect(() => EffectTypeSchema.parse(e)).not.toThrow();
+    }
+  });
+
+  it('rejects invalid effect', () => {
+    expect(() => EffectTypeSchema.parse('laser')).toThrow();
+  });
+});
+
+// =============================================================================
+// DATA VISUALIZATION (CHARTS)
+// =============================================================================
+
+describe('CreateChartInputSchema', () => {
+  it('accepts create with chart type and data', () => {
+    const result = CreateChartInputSchema.parse({
+      action: 'create',
+      chartType: 'bar',
+      data: [{ category: 'A', value: 10 }],
+    });
+    expect(result.action).toBe('create');
+    expect(result.chartType).toBe('bar');
+  });
+
+  it('accepts all 4 actions', () => {
+    for (const action of ['create', 'update', 'reconfigure', 'remove'] as const) {
+      expect(() => CreateChartInputSchema.parse({ action })).not.toThrow();
+    }
+  });
+
+  it('accepts all 4 chart types', () => {
+    for (const chartType of ['bar', 'line', 'scatter', 'area'] as const) {
+      expect(() => CreateChartInputSchema.parse({ action: 'create', chartType })).not.toThrow();
+    }
+  });
+
+  it('rejects invalid chart type', () => {
+    expect(() => CreateChartInputSchema.parse({ action: 'create', chartType: 'pie' })).toThrow();
+  });
+});
+
+describe('Chart code generation', () => {
+  it('create generates createChart call', () => {
+    const code = codeGenerator.generateChart({
+      action: 'create',
+      chartType: 'bar',
+      data: [{ x: 'A', y: 10 }],
+    });
+    expect(code).toContain('app.createChart("bar"');
+    expect(code).toContain('app.chartSystem.getLastChartId');
+  });
+
+  it('update generates chartSystem.update call', () => {
+    const code = codeGenerator.generateChart({
+      action: 'update',
+      chartId: 'chart_1',
+      data: [{ x: 'B', y: 20 }],
+    });
+    expect(code).toContain('app.chartSystem.update');
+    expect(code).toContain('"chart_1"');
+  });
+
+  it('reconfigure generates chartSystem.reconfigure call', () => {
+    const code = codeGenerator.generateChart({
+      action: 'reconfigure',
+      chartId: 'chart_1',
+      options: { colors: ['#f00'] },
+    });
+    expect(code).toContain('app.chartSystem.reconfigure');
+  });
+
+  it('remove generates chartSystem.remove call', () => {
+    const code = codeGenerator.generateChart({ action: 'remove', chartId: 'chart_1' });
+    expect(code).toContain('app.chartSystem.remove');
+  });
+
+  it('includes chartSystem guard', () => {
+    const code = codeGenerator.generateChart({ action: 'create', chartType: 'line', data: [] });
+    expect(code).toContain("if (!app.chartSystem) return { error: 'ChartSystem not available' }");
+  });
+
+  it('create without chartType returns error', () => {
+    const code = codeGenerator.generateChart({ action: 'create' });
+    expect(code).toContain('chartType is required');
+  });
+
+  it('create without data returns error', () => {
+    const code = codeGenerator.generateChart({ action: 'create', chartType: 'bar' });
+    expect(code).toContain('data is required');
+  });
+});
+
+// =============================================================================
+// MAGIC SYSTEM
+// =============================================================================
+
+describe('MagicInputSchema', () => {
+  it('accepts animate with mood', () => {
+    const result = MagicInputSchema.parse({ action: 'animate', mood: 'energetic' });
+    expect(result.action).toBe('animate');
+    expect(result.mood).toBe('energetic');
+  });
+
+  it('accepts all 5 moods', () => {
+    for (const mood of ['calm', 'professional', 'energetic', 'dramatic', 'whimsical'] as const) {
+      expect(() => MagicInputSchema.parse({ action: 'animate', mood })).not.toThrow();
+    }
+  });
+
+  it('accepts remix action', () => {
+    expect(() => MagicInputSchema.parse({ action: 'remix' })).not.toThrow();
+  });
+
+  it('rejects invalid mood', () => {
+    expect(() => MagicInputSchema.parse({ action: 'animate', mood: 'angry' })).toThrow();
+  });
+});
+
+describe('Magic code generation', () => {
+  it('animate generates magicSystem.autoAnimate call', () => {
+    const code = codeGenerator.generateMagic({ action: 'animate', mood: 'dramatic' });
+    expect(code).toContain('app.magicSystem.autoAnimate');
+    expect(code).toContain('"energy":"dramatic"');
+  });
+
+  it('remix generates magicSystem.remixStyle call', () => {
+    const code = codeGenerator.generateMagic({ action: 'remix' });
+    expect(code).toContain('app.magicSystem.remixStyle');
+  });
+
+  it('remix with selectionOnly passes the option', () => {
+    const code = codeGenerator.generateMagic({ action: 'remix', selectionOnly: true });
+    expect(code).toContain('"selectionOnly":true');
+  });
+
+  it('includes magicSystem guard', () => {
+    const code = codeGenerator.generateMagic({ action: 'animate' });
+    expect(code).toContain("if (!app.magicSystem) return { error: 'MagicSystem not available' }");
+  });
+
+  it('is async IIFE', () => {
+    const code = codeGenerator.generateMagic({ action: 'animate' });
+    expect(code).toContain('(async function()');
+  });
+});
+
+// =============================================================================
+// PHYSICS
+// =============================================================================
+
+describe('PhysicsInputSchema', () => {
+  it('accepts init with gravity', () => {
+    const result = PhysicsInputSchema.parse({ action: 'init', gravity: { x: 0, y: 500 } });
+    expect(result.action).toBe('init');
+    expect(result.gravity?.y).toBe(500);
+  });
+
+  it('accepts all 9 actions', () => {
+    for (const action of ['init', 'add_body', 'remove_body', 'apply_force', 'apply_impulse', 'set_velocity', 'get_state', 'create_ground', 'create_joint'] as const) {
+      expect(() => PhysicsInputSchema.parse({ action })).not.toThrow();
+    }
+  });
+
+  it('accepts all 3 body types', () => {
+    for (const bodyType of ['static', 'dynamic', 'kinematic'] as const) {
+      expect(() => PhysicsInputSchema.parse({ action: 'add_body', bodyType })).not.toThrow();
+    }
+  });
+
+  it('accepts all 4 joint types', () => {
+    for (const jointType of ['revolute', 'distance', 'weld', 'prismatic'] as const) {
+      expect(() => PhysicsInputSchema.parse({ action: 'create_joint', jointType })).not.toThrow();
+    }
+  });
+});
+
+describe('Physics code generation', () => {
+  it('init generates physicsWorld.init call', () => {
+    const code = codeGenerator.generatePhysics({ action: 'init', gravity: { x: 0, y: 980 } });
+    expect(code).toContain('app.physicsWorld.init');
+    expect(code).toContain('"y":980');
+  });
+
+  it('add_body generates physicsWorld.addBody call', () => {
+    const code = codeGenerator.generatePhysics({ action: 'add_body', itemId: 'item_1', bodyType: 'dynamic', mass: 2 });
+    expect(code).toContain('app.physicsWorld.addBody');
+    expect(code).toContain('"item_1"');
+    expect(code).toContain('"mass":2');
+  });
+
+  it('apply_force generates physicsWorld.applyForce call', () => {
+    const code = codeGenerator.generatePhysics({ action: 'apply_force', itemId: 'item_1', force: { x: 100, y: 0 } });
+    expect(code).toContain('app.physicsWorld.applyForce');
+  });
+
+  it('create_joint generates physicsWorld.createJoint call', () => {
+    const code = codeGenerator.generatePhysics({ action: 'create_joint', itemId: 'a', targetItemId: 'b', jointType: 'revolute' });
+    expect(code).toContain('app.physicsWorld.createJoint');
+    expect(code).toContain('"revolute"');
+  });
+
+  it('includes physicsWorld guard', () => {
+    const code = codeGenerator.generatePhysics({ action: 'init' });
+    expect(code).toContain("if (!app.physicsWorld) return { error: 'PhysicsWorld not available' }");
+  });
+
+  it('add_body without itemId returns error', () => {
+    const code = codeGenerator.generatePhysics({ action: 'add_body' });
+    expect(code).toContain('itemId is required');
+  });
+
+  it('apply_force without itemId returns error', () => {
+    const code = codeGenerator.generatePhysics({ action: 'apply_force', force: { x: 1, y: 0 } });
+    expect(code).toContain('itemId is required');
+  });
+
+  it('apply_impulse without itemId returns error', () => {
+    const code = codeGenerator.generatePhysics({ action: 'apply_impulse', impulse: { x: 0, y: -100 } });
+    expect(code).toContain('itemId is required');
+  });
+
+  it('set_velocity without itemId returns error', () => {
+    const code = codeGenerator.generatePhysics({ action: 'set_velocity', velocity: { x: 0, y: 0 } });
+    expect(code).toContain('itemId is required');
+  });
+
+  it('create_joint without targetItemId returns error', () => {
+    const code = codeGenerator.generatePhysics({ action: 'create_joint', itemId: 'a', jointType: 'weld' });
+    expect(code).toContain('targetItemId is required');
+  });
+
+  it('create_ground uses default y and width', () => {
+    const code = codeGenerator.generatePhysics({ action: 'create_ground' });
+    expect(code).toContain('app.physicsWorld.createGround(500, 2000)');
+  });
+
+  it('is sync IIFE', () => {
+    const code = codeGenerator.generatePhysics({ action: 'init' });
+    expect(code).toContain('(function()');
+    expect(code).not.toContain('async');
+  });
+});
+
+// =============================================================================
+// MEASUREMENT SYSTEM
+// =============================================================================
+
+describe('MeasurementInputSchema', () => {
+  it('accepts set_rulers with enabled', () => {
+    const result = MeasurementInputSchema.parse({ action: 'set_rulers', enabled: true });
+    expect(result.action).toBe('set_rulers');
+    expect(result.enabled).toBe(true);
+  });
+
+  it('accepts all 4 actions', () => {
+    for (const action of ['set_rulers', 'set_grid', 'get_dimensions', 'set_snap'] as const) {
+      expect(() => MeasurementInputSchema.parse({ action })).not.toThrow();
+    }
+  });
+
+});
+
+describe('Measurement code generation', () => {
+  it('set_rulers generates setRulersVisible call', () => {
+    const code = codeGenerator.generateMeasurement({ action: 'set_rulers', enabled: true });
+    expect(code).toContain('app.measurementSystem.setRulersVisible(true)');
+  });
+
+  it('set_grid generates setGridVisible call', () => {
+    const code = codeGenerator.generateMeasurement({ action: 'set_grid', enabled: false });
+    expect(code).toContain('app.measurementSystem.setGridVisible(false)');
+  });
+
+  it('get_dimensions returns bounds info', () => {
+    const code = codeGenerator.generateMeasurement({ action: 'get_dimensions', itemId: 'item_1' });
+    expect(code).toContain('entry.item.bounds');
+    expect(code).toContain('"item_1"');
+  });
+
+  it('set_snap generates setSnapToUnitEnabled call', () => {
+    const code = codeGenerator.generateMeasurement({ action: 'set_snap', enabled: true });
+    expect(code).toContain('app.measurementSystem.setSnapToUnitEnabled(true)');
+  });
+
+  it('includes measurementSystem guard', () => {
+    const code = codeGenerator.generateMeasurement({ action: 'set_rulers' });
+    expect(code).toContain("if (!app.measurementSystem) return { error: 'MeasurementSystem not available' }");
+  });
+
+  it('get_dimensions without itemId returns error', () => {
+    const code = codeGenerator.generateMeasurement({ action: 'get_dimensions' });
+    expect(code).toContain('itemId is required');
+  });
+
+  it('get_dimensions does not need measurementSystem guard', () => {
+    const code = codeGenerator.generateMeasurement({ action: 'get_dimensions', itemId: 'item_1' });
+    expect(code).not.toContain('measurementSystem');
+  });
+
+  it('set_rulers with enabled: false generates false', () => {
+    const code = codeGenerator.generateMeasurement({ action: 'set_rulers', enabled: false });
+    expect(code).toContain('setRulersVisible(false)');
+  });
+
+  it('set_grid with enabled: false generates false', () => {
+    const code = codeGenerator.generateMeasurement({ action: 'set_grid', enabled: false });
+    expect(code).toContain('setGridVisible(false)');
+  });
+
+  it('set_snap with enabled: false generates false', () => {
+    const code = codeGenerator.generateMeasurement({ action: 'set_snap', enabled: false });
+    expect(code).toContain('setSnapToUnitEnabled(false)');
+  });
+});
+
+// =============================================================================
+// INTEGRATION — All 20 tools in PINEPAPER_TOOLS, tag groups, minimal descs
 // =============================================================================
 
 const NEW_TOOL_NAMES = [
@@ -968,6 +1296,10 @@ const NEW_TOOL_NAMES = [
   'pinepaper_interaction',
   'pinepaper_export_widget',
   'pinepaper_export_widget_html',
+  'pinepaper_create_chart',
+  'pinepaper_magic',
+  'pinepaper_physics',
+  'pinepaper_measurement',
 ];
 
 describe('Integration — tool definitions', () => {
@@ -1056,7 +1388,23 @@ describe('Integration — tag groups', () => {
     expect(TOOL_TAGS.export).toContain('pinepaper_export_widget_html');
   });
 
-  it('all 16 new tools are reachable via agent profile', () => {
+  it('dataviz tag group contains pinepaper_create_chart', () => {
+    expect(TOOL_TAGS.dataviz).toContain('pinepaper_create_chart');
+  });
+
+  it('magic tag group contains pinepaper_magic', () => {
+    expect(TOOL_TAGS.magic).toContain('pinepaper_magic');
+  });
+
+  it('physics tag group contains pinepaper_physics', () => {
+    expect(TOOL_TAGS.physics).toContain('pinepaper_physics');
+  });
+
+  it('measurement tag group contains pinepaper_measurement', () => {
+    expect(TOOL_TAGS.measurement).toContain('pinepaper_measurement');
+  });
+
+  it('all 20 new tools are reachable via agent profile', () => {
     const agentTools = getToolsForToolkit(PINEPAPER_TOOLS, 'agent');
     const agentNames = agentTools.map(t => t.name);
     for (const name of NEW_TOOL_NAMES) {

@@ -143,6 +143,18 @@ export const TOOL_TAGS: Record<string, string[]> = {
   interaction: [
     'pinepaper_interaction',
   ],
+  dataviz: [
+    'pinepaper_create_chart',
+  ],
+  magic: [
+    'pinepaper_magic',
+  ],
+  physics: [
+    'pinepaper_physics',
+  ],
+  measurement: [
+    'pinepaper_measurement',
+  ],
   template: [
     'pinepaper_apply_template',
   ],
@@ -285,6 +297,7 @@ export const TOOLKIT_PROFILES: Record<ToolkitProfile, string[]> = {
     'selection', 'transform', 'history',
     'image_processing', 'precomp',
     'deform', 'sprite', 'storage', 'interaction',
+    'dataviz', 'magic', 'physics', 'measurement',
     'query', 'export',
     'p5', 'ontology', 'guide',
   ],

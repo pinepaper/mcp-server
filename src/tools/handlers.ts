@@ -127,6 +127,10 @@ import {
   InteractionInputSchema,
   ExportWidgetInputSchema,
   ExportWidgetHtmlInputSchema,
+  CreateChartInputSchema,
+  MagicInputSchema,
+  PhysicsInputSchema,
+  MeasurementInputSchema,
   ErrorCodes,
   RelationType,
   ItemType,
@@ -922,6 +926,33 @@ async function handleToolCallInner(
         const input = ExportWidgetHtmlInputSchema.parse(args);
         const code = codeGenerator.generateExportWidgetHtml(input);
         return executeOrGenerate(code, 'Export widget HTML', options, 'pinepaper_export_widget_html');
+      }
+
+      // -----------------------------------------------------------------------
+      // DATA VISUALIZATION, MAGIC, PHYSICS, MEASUREMENT
+      // -----------------------------------------------------------------------
+      case 'pinepaper_create_chart': {
+        const input = CreateChartInputSchema.parse(args);
+        const code = codeGenerator.generateChart(input);
+        return executeOrGenerate(code, `Chart: ${input.action}`, options, 'pinepaper_create_chart');
+      }
+
+      case 'pinepaper_magic': {
+        const input = MagicInputSchema.parse(args);
+        const code = codeGenerator.generateMagic(input);
+        return executeOrGenerate(code, `Magic: ${input.action}`, options, 'pinepaper_magic');
+      }
+
+      case 'pinepaper_physics': {
+        const input = PhysicsInputSchema.parse(args);
+        const code = codeGenerator.generatePhysics(input);
+        return executeOrGenerate(code, `Physics: ${input.action}`, options, 'pinepaper_physics');
+      }
+
+      case 'pinepaper_measurement': {
+        const input = MeasurementInputSchema.parse(args);
+        const code = codeGenerator.generateMeasurement(input);
+        return executeOrGenerate(code, `Measurement: ${input.action}`, options, 'pinepaper_measurement');
       }
 
       // -----------------------------------------------------------------------
@@ -3070,6 +3101,11 @@ You can now start creating new items on a clean canvas.`,
             // Widget export
             'pinepaper_export_widget',
             'pinepaper_export_widget_html',
+            // Data visualization, magic, physics, measurement
+            'pinepaper_create_chart',
+            'pinepaper_magic',
+            'pinepaper_physics',
+            'pinepaper_measurement',
           ],
         });
       }
