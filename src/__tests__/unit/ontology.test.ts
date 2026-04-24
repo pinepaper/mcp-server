@@ -169,8 +169,8 @@ describe('Mapping Tables', () => {
     expect(Object.keys(ITEM_TYPE_MAP).length).toBe(24);
   });
 
-  it('RELATION_TYPE_MAP has 24 entries', () => {
-    expect(Object.keys(RELATION_TYPE_MAP).length).toBe(24);
+  it('RELATION_TYPE_MAP has 25 entries', () => {
+    expect(Object.keys(RELATION_TYPE_MAP).length).toBe(25);
   });
 });
 

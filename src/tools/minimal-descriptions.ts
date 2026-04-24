@@ -4,7 +4,24 @@
  * Activated via PINEPAPER_VERBOSITY=minimal env var.
  * Each tool gets a single-line summary (~40-100 chars).
  * Full descriptions available on-demand via pinepaper_tool_guide.
+ *
+ * Vocabulary enumerations (item/relation/shape/generator types) are derived
+ * from the ontology + Zod schemas at module load, so the descriptions here
+ * stay in sync with what the server actually validates.
  */
+
+import { ItemTypeSchema, RelationTypeSchema } from '../types/schemas.js';
+import { DIAGRAM_SHAPE_MAP } from '../ontology/vocabulary.js';
+
+/** Joins a vocabulary list; truncates to `maxShown` with a pointer to the ontology query tool. */
+function shortList(items: readonly string[], maxShown: number): string {
+  if (items.length <= maxShown) return items.join('|');
+  return `${items.slice(0, maxShown).join('|')}…(${items.length} total via pinepaper_query_ontology)`;
+}
+
+const ITEM_TYPES = shortList(ItemTypeSchema.options, 10);
+const RELATION_TYPES = shortList(RelationTypeSchema.options, 8);
+const DIAGRAM_SHAPES = shortList(Object.keys(DIAGRAM_SHAPE_MAP), 12);
 
 export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   // --- Canvas ---
@@ -15,7 +32,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_refresh_page: 'Reload the PinePaper browser page.',
 
   // --- Item CRUD ---
-  pinepaper_create_item: 'Create item. itemType: text|circle|rectangle|star|triangle|polygon|ellipse|path|line|arc. position: {x,y}. properties: {color, radius, ...}.',
+  pinepaper_create_item: `Create item. itemType: ${ITEM_TYPES}. position: {x,y}. properties: {color, radius, ...}.`,
   pinepaper_modify_item: 'Modify item. itemId: string. properties: {color, opacity, x, y, scaleX, scaleY, rotation, ...}.',
   pinepaper_delete_item: 'Remove item by itemId.',
   pinepaper_create_glossy_sphere: 'Create a 3D-looking glossy sphere with lighting.',
@@ -29,7 +46,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_create_grid: 'Create a grid of lines on canvas.',
 
   // --- Relations ---
-  pinepaper_add_relation: 'Add relation. sourceId, targetId, type: orbits|follows|attached_to|points_at|mirrors|parallax|wave_through|morphs_to. params: {speed, ...}.',
+  pinepaper_add_relation: `Add relation. sourceId, targetId, type: ${RELATION_TYPES}. params: {speed, ...}.`,
   pinepaper_remove_relation: 'Remove relation. sourceId, targetId, type.',
   pinepaper_query_relations: 'Query relations for itemId.',
   pinepaper_register_custom_relation: 'Register a custom relation type with JavaScript update function.',
@@ -69,7 +86,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_apply_template: 'Apply a pre-built template to the canvas.',
 
   // --- Diagrams ---
-  pinepaper_create_diagram_shape: 'Create diagram shape. shapeType: process|decision|terminal|data|document|database|cloud|server. position: {x,y}. text: string.',
+  pinepaper_create_diagram_shape: `Create diagram shape. shapeType: ${DIAGRAM_SHAPES}. position: {x,y}. text: string.`,
   pinepaper_connect: 'Connect items. sourceId, targetId. style: arrow|line. routing: orthogonal|straight|curved.',
   pinepaper_connect_ports: 'Connect specific ports on items.',
   pinepaper_add_ports: 'Add connection ports to an existing item.',

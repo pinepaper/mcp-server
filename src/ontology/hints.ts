@@ -1,0 +1,102 @@
+/**
+ * Vocabulary hints — ontology-aware suggestions for failed enum validations.
+ *
+ * Exposed to handlers.ts so that when Zod rejects an itemType / relationType /
+ * generatorName / shapeType, the resulting error includes a typo suggestion and
+ * the canonical valid list — making the next LLM call self-correcting without
+ * needing a separate ontology query.
+ */
+
+import {
+  ItemTypeSchema,
+  RelationTypeSchema,
+  GeneratorNameSchema,
+  EffectTypeSchema,
+} from '../types/schemas.js';
+import { ITEM_TYPE_MAP, RELATION_TYPE_MAP, DIAGRAM_SHAPE_MAP } from './vocabulary.js';
+
+/**
+ * Known vocabulary field names → canonical valid-value list.
+ * Path segments from Zod errors are matched against these keys.
+ */
+const VOCABULARY_FIELDS: Record<string, { values: readonly string[]; ppMap?: Record<string, string>; label: string }> = {
+  itemType:      { values: ItemTypeSchema.options, ppMap: ITEM_TYPE_MAP, label: 'item type' },
+  relationType:  { values: RelationTypeSchema.options, ppMap: RELATION_TYPE_MAP, label: 'relation type' },
+  generatorName: { values: GeneratorNameSchema.options, label: 'generator name' },
+  effectType:    { values: EffectTypeSchema.options, label: 'effect type' },
+  shapeType:     { values: Object.keys(DIAGRAM_SHAPE_MAP), ppMap: DIAGRAM_SHAPE_MAP, label: 'diagram shape type' },
+};
+
+/** Classic Levenshtein edit distance. */
+function editDistance(a: string, b: string): number {
+  const m = a.length, n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+  const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
+    }
+  }
+  return dp[m][n];
+}
+
+/** Case-insensitive nearest match within edit distance ≤ 2. */
+export function suggestTypo(bad: string, candidates: readonly string[]): string | null {
+  if (!bad || typeof bad !== 'string') return null;
+  const lower = bad.toLowerCase();
+  let best: { value: string; dist: number } | null = null;
+  for (const c of candidates) {
+    const d = editDistance(lower, c.toLowerCase());
+    if (d <= 2 && (!best || d < best.dist)) best = { value: c, dist: d };
+  }
+  return best?.value ?? null;
+}
+
+/**
+ * Returns an ontology-enriched hint for a failed enum validation, or null if
+ * the path isn't a recognized vocabulary field.
+ *
+ * Keeps the shape machine-readable so LLM callers can parse it:
+ *   {
+ *     field: 'relationType',
+ *     validValues: [...],     // authoritative list
+ *     suggestion: 'orbits',   // best typo match, if any
+ *     ppType: 'pp:orbits',    // canonical ontology key for the suggestion
+ *     reference: 'pinepaper_query_ontology?query=list_edges for descriptions'
+ *   }
+ */
+export interface VocabularyHint {
+  field: string;
+  label: string;
+  validValues: readonly string[];
+  received: unknown;
+  suggestion: string | null;
+  ppType?: string;
+  reference: string;
+}
+
+export function vocabularyHintForPath(path: string, received: unknown): VocabularyHint | null {
+  const segments = path.split('.');
+  const field = segments.find((s) => s in VOCABULARY_FIELDS);
+  if (!field) return null;
+  const spec = VOCABULARY_FIELDS[field];
+  const suggestion = typeof received === 'string' ? suggestTypo(received, spec.values) : null;
+  const ppType = suggestion && spec.ppMap ? spec.ppMap[suggestion] : undefined;
+  const queryKind = field === 'relationType' ? 'list_edges' : field === 'generatorName' ? 'list_generators' : field === 'effectType' ? 'list_effects' : 'list_types';
+  return {
+    field,
+    label: spec.label,
+    validValues: spec.values,
+    received,
+    suggestion,
+    ppType,
+    reference: `pinepaper_query_ontology { query: "${queryKind}" }`,
+  };
+}
+
+/** Exposed for tests + description-parity checks. */
+export const VOCABULARY_FIELD_NAMES = Object.keys(VOCABULARY_FIELDS);

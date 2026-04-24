@@ -4,7 +4,18 @@
  * Activated via PINEPAPER_VERBOSITY=compact env var.
  * Each description says ONLY what the tool does in 1-2 sentences.
  * Workflow instructions belong in pinepaper_tool_guide, not here.
+ *
+ * Vocabulary enumerations are derived from the ontology + Zod schemas so the
+ * lists below never drift from what the server actually validates.
  */
+
+import { ItemTypeSchema, RelationTypeSchema, GeneratorNameSchema } from '../types/schemas.js';
+import { DIAGRAM_SHAPE_MAP } from '../ontology/vocabulary.js';
+
+const ITEM_TYPES = ItemTypeSchema.options.join(', ');
+const RELATION_TYPES = RelationTypeSchema.options.join(', ');
+const DIAGRAM_SHAPES = Object.keys(DIAGRAM_SHAPE_MAP).join(', ');
+const GENERATORS = GeneratorNameSchema.options.join(', ');
 
 export const COMPACT_DESCRIPTIONS: Record<string, string> = {
 
@@ -59,7 +70,7 @@ VARIABLE REFERENCES: "$0", "$1" etc. reference items by creation order within th
   // -------------------------------------------------------------------------
   pinepaper_create_item: `Create a text, shape, or graphic on the canvas. Returns an itemId for later reference.
 
-ITEM TYPES: text, circle, rectangle, star, triangle, polygon, ellipse, path, line, arc.
+ITEM TYPES: ${ITEM_TYPES}.
 STYLING: gradients (color object with stops), shadows, blend modes, opacity. See inputSchema for properties.`,
 
   // -------------------------------------------------------------------------
@@ -75,16 +86,16 @@ NOT SUPPORTED: setup()/draw() loop, noise(), text(), loadImage(), transforms, be
   // -------------------------------------------------------------------------
   pinepaper_create_scene: `Create a complete scene with items, relations, and animations in one call. Define items with name references, then use those names in relations and animations.
 
-Item types: text, circle, star, rectangle, triangle, polygon, ellipse, path, line, arc.
-Relations: orbits, follows, attached_to, maintains_distance, points_at, mirrors, parallax, bounds_to, morphs_to.
+Item types: ${ITEM_TYPES}.
+Relations: ${RELATION_TYPES}.
 Animations: pulse, rotate, bounce, fade, wobble, slide, typewriter.`,
 
   // -------------------------------------------------------------------------
   // execute_generator
   // -------------------------------------------------------------------------
-  pinepaper_execute_generator: `Run a procedural background generator (sunburst, bokeh, gradient mesh, etc.).
+  pinepaper_execute_generator: `Run a procedural background generator (sunburst, bokeh, gradient mesh, PineMath plots, etc.).
 
-GENERATORS (14): drawSunburst, drawSunsetScene, drawGrid, drawStackedCircles, drawCircuit, drawWaves, drawPattern, drawBokeh, drawGradientMesh, drawGeometricAbstract, drawWindField, drawFluidFlow, drawOrganicFlow, drawNoiseTexture.`,
+GENERATORS (${GeneratorNameSchema.options.length}): ${GENERATORS}.`,
 
   // -------------------------------------------------------------------------
   // get_performance_metrics
@@ -96,14 +107,14 @@ GENERATORS (14): drawSunburst, drawSunsetScene, drawGrid, drawStackedCircles, dr
   // -------------------------------------------------------------------------
   pinepaper_add_relation: `Add a behavior relation between two items (orbits, follows, attached_to, etc.). Relations are compositional — an item can have multiple.
 
-RELATION TYPES: orbits, follows, attached_to, maintains_distance, points_at, mirrors, parallax, bounds_to, morphs_to (+ more in inputSchema).`,
+RELATION TYPES: ${RELATION_TYPES}.`,
 
   // -------------------------------------------------------------------------
   // create_diagram_shape
   // -------------------------------------------------------------------------
   pinepaper_create_diagram_shape: `Create a diagram shape (process, decision, terminal, etc.) for flowcharts and UML.
 
-SHAPE TYPES — Flowchart: process, decision, terminal, data, document, database, preparation. UML: uml-class, uml-usecase, uml-actor. Network: cloud, server. Basic: rectangle, circle, triangle, star.`,
+SHAPE TYPES: ${DIAGRAM_SHAPES}.`,
 
   // -------------------------------------------------------------------------
   // search_assets

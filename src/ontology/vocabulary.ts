@@ -116,6 +116,7 @@ export const PP_VOCABULARY: PinePaperVocabulary = {
     'pp:parallax':          { category: 'spatial',    behaviorType: 'constraint', mathFunctions: ['depthScaledTranslation'], parentType: 'pp:SpatialRelation', mcpToolRef: 'pinepaper_add_relation' },
     'pp:boundsTo':          { category: 'spatial',    behaviorType: 'constraint', mathFunctions: ['rectClamp'], parentType: 'pp:SpatialRelation', mcpToolRef: 'pinepaper_add_relation' },
     // Animation relations
+    'pp:animates':          { category: 'animation',  behaviorType: 'trigger', description: 'Self-animation preset attached to an item (pulse, rotate, bounce, fade, wobble, slide, typewriter).', mathFunctions: ['keyframeLerp'], parentType: 'pp:AnimationRelation', mcpToolRef: 'pinepaper_add_relation' },
     'pp:growsFrom':         { category: 'animation',  behaviorType: 'trigger', mathFunctions: ['scaleInterpolation'], parentType: 'pp:TransformRelation', mcpToolRef: 'pinepaper_add_relation' },
     'pp:staggeredWith':     { category: 'animation',  behaviorType: 'trigger', cardinality: 'group', description: 'Stored as pairwise edges with index param to reconstruct group ordering.', mathFunctions: ['delayOffset'], parentType: 'pp:AnimationRelation', mcpToolRef: 'pinepaper_add_relation' },
     'pp:waveThrough':       { category: 'animation',  behaviorType: 'constraint', cardinality: 'group', description: 'Stored as pairwise edges with index param for phase offset.', mathFunctions: ['phaseOffsetSinusoid'], parentType: 'pp:AnimationRelation', mcpToolRef: 'pinepaper_add_relation' },
@@ -407,6 +408,7 @@ export const RELATION_TYPE_MAP: Record<string, string> = {
   'mirrors':            'pp:mirrors',
   'parallax':           'pp:parallax',
   'bounds_to':          'pp:boundsTo',
+  'animates':           'pp:animates',
   'grows_from':         'pp:growsFrom',
   'staggered_with':     'pp:staggeredWith',
   'wave_through':       'pp:waveThrough',

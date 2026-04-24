@@ -149,6 +149,7 @@ import {
 import { getPerformanceTracker, TimingMetric, MetricsExportFormat } from '../metrics/index.js';
 import { ErrorContext, formatErrorContext, captureCanvasState } from '../execution/index.js';
 import { getSessionManager } from '../agent/session-manager.js';
+import { vocabularyHintForPath } from '../ontology/hints.js';
 
 // =============================================================================
 // SCREENSHOT MODE CONFIGURATION
@@ -360,14 +361,22 @@ function handleValidationError(error: ZodError, i18n?: I18nManager): CallToolRes
     ? i18n.getError('validationError', { message: 'Invalid input parameters' })
     : 'Invalid input parameters';
 
-  return errorResult(
-    ErrorCodes.VALIDATION_ERROR,
-    message,
-    error.errors.map((e) => ({
-      path: e.path.join('.'),
-      message: e.message,
-    }))
-  );
+  const details = error.errors.map((e) => {
+    const path = e.path.join('.');
+    const detail: {
+      path: string;
+      message: string;
+      vocabulary?: ReturnType<typeof vocabularyHintForPath>;
+    } = { path, message: e.message };
+    if (e.code === 'invalid_enum_value') {
+      const received = (e as unknown as { received?: unknown }).received;
+      const hint = vocabularyHintForPath(path, received);
+      if (hint) detail.vocabulary = hint;
+    }
+    return detail;
+  });
+
+  return errorResult(ErrorCodes.VALIDATION_ERROR, message, details);
 }
 
 /**
