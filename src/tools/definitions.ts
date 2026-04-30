@@ -776,6 +776,66 @@ Returns the itemId of the imported SVG group, which can be used with pinepaper_a
   },
 
   {
+    name: 'pinepaper_import_mermaid',
+    annotations: {
+      title: 'Import Mermaid Diagram',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Import a Mermaid diagram source string and render it onto the canvas as native diagram shapes + connectors. Faster than building a flowchart shape-by-shape with pinepaper_create_diagram_shape + pinepaper_connect.
+
+USE WHEN:
+- User asks for a flowchart, sequence diagram, ER diagram, class diagram, or state machine
+- You have Mermaid source from another tool / docs / the user's clipboard
+- You want to author multi-node diagrams in one call instead of N create+connect operations
+
+SUPPORTED DIAGRAM TYPES (auto-detected from the first non-blank line):
+- flowchart / graph: shapes + edges + subgraphs + chained edges (TD, LR, RL, BT directions)
+- stateDiagram(-v2): states, transitions, [*] start/end, stereotypes, nested states
+- sequenceDiagram: participants, messages, activations / lifelines
+- erDiagram: entities + relationships + attributes
+- classDiagram: classes, fields, methods, visibility, inheritance / association
+
+OPTIONS:
+- autoLayout (default true): run hierarchical/force layout after import. Set false to keep coordinates exactly as parsed.
+- clearExisting (default false): remove existing canvas items first. Default is additive — diagram is appended.
+
+EXAMPLE (flowchart):
+{
+  "mermaidText": "flowchart TD\\n  A[Start] --> B{Decision}\\n  B -->|Yes| C[Action]\\n  B -->|No| D[End]"
+}
+
+EXAMPLE (sequenceDiagram):
+{
+  "mermaidText": "sequenceDiagram\\n  Alice->>Bob: Hello\\n  Bob-->>Alice: Hi back\\n  Note right of Bob: Thinking..."
+}
+
+Returns { success, nodeCount, edgeCount, nodes, edges, errors }. The created shapes participate in the relation/animation systems just like natively created items — you can grab their ids from \`nodes\` and feed them into pinepaper_add_relation, pinepaper_animate, etc.
+
+NOTE: Import-only — there is no MCP equivalent of FxTool's exportMermaid. Mermaid lacks animation primitives, so a round-trip would silently drop animations.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        mermaidText: {
+          type: 'string',
+          description: 'Mermaid diagram source. First line picks the type (flowchart, stateDiagram, sequenceDiagram, erDiagram, classDiagram).',
+        },
+        autoLayout: {
+          type: 'boolean',
+          description: 'Run auto-layout after import (default: true).',
+        },
+        clearExisting: {
+          type: 'boolean',
+          description: 'Clear existing canvas items first (default: false).',
+        },
+      },
+      required: ['mermaidText'],
+    },
+  },
+
+  {
     name: 'pinepaper_import_image',
     annotations: {
       title: 'Import Image',

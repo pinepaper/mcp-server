@@ -38,6 +38,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_create_glossy_sphere: 'Create a 3D-looking glossy sphere with lighting.',
   pinepaper_create_diagonal_stripes: 'Create a diagonal stripe pattern.',
   pinepaper_import_svg: 'Import SVG markup onto the canvas.',
+  pinepaper_import_mermaid: 'Import a Mermaid diagram (flowchart|graph|stateDiagram|sequenceDiagram|erDiagram|classDiagram). mermaidText, autoLayout, clearExisting.',
   pinepaper_import_image: 'Import a raster image (PNG/JPG/WebP) onto the canvas.',
   pinepaper_search_assets: 'Search 850k+ SVG icons from SVGRepo, Iconify, FontAwesome, OpenClipart.',
   pinepaper_import_asset: 'Place a search result asset onto the canvas.',

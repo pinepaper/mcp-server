@@ -25,6 +25,7 @@ import {
   SetCanvasSizeInputSchema,
   ExportTrainingDataInputSchema,
   ImportSVGInputSchema,
+  ImportMermaidInputSchema,
   AddFilterInputSchema,
   CreateGlossySphereInputSchema,
   CreateDiagonalStripesInputSchema,
@@ -1493,6 +1494,16 @@ You can now start creating new items on a clean canvas.`,
         );
         const description = 'Imports SVG onto the canvas';
         return executeOrGenerate(code, description, options, 'pinepaper_import_svg');
+      }
+
+      case 'pinepaper_import_mermaid': {
+        const input = ImportMermaidInputSchema.parse(args);
+        const code = codeGenerator.generateImportMermaid(input.mermaidText, {
+          autoLayout: input.autoLayout,
+          clearExisting: input.clearExisting,
+        });
+        const description = 'Imports a Mermaid diagram onto the canvas';
+        return executeOrGenerate(code, description, options, 'pinepaper_import_mermaid');
       }
 
       // -----------------------------------------------------------------------
@@ -2985,6 +2996,7 @@ You can now start creating new items on a clean canvas.`,
             'pinepaper_clear_canvas',
             'pinepaper_refresh_page',
             'pinepaper_import_svg',
+            'pinepaper_import_mermaid',
             'pinepaper_add_filter',
             'pinepaper_export_svg',
             'pinepaper_export_training_data',

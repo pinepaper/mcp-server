@@ -1176,6 +1176,34 @@ throw new Error('Either svgString or url must be provided');
   }
 
   /**
+   * Generate code for importing a Mermaid diagram (flowchart, stateDiagram,
+   * sequenceDiagram, erDiagram, classDiagram).
+   */
+  generateImportMermaid(
+    mermaidText: string,
+    options: { autoLayout?: boolean; clearExisting?: boolean } = {}
+  ): string {
+    const escaped = mermaidText.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
+    const optsJson = JSON.stringify(options);
+    return `
+// Import Mermaid diagram
+(function() {
+  if (!app.importMermaid) return { success: false, error: 'importMermaid not available — diagramSystem missing' };
+  const mermaidText = \`${escaped}\`;
+  const result = app.importMermaid(mermaidText, ${optsJson});
+  return {
+    success: !!result.success,
+    nodeCount: result.nodes ? result.nodes.length : 0,
+    edgeCount: result.edges ? result.edges.length : 0,
+    nodes: result.nodes || [],
+    edges: result.edges || [],
+    errors: result.errors || [],
+  };
+})();
+`.trim();
+  }
+
+  /**
    * Generate code for adding a filter
    */
   generateAddFilter(
