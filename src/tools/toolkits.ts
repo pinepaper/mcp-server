@@ -184,6 +184,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
     'pinepaper_update_connector',
     'pinepaper_remove_connector',
     'pinepaper_diagram_mode',
+    'pinepaper_import_mermaid',
   ],
 
   // --- Domain: Maps ---

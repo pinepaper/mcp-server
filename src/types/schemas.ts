@@ -728,6 +728,14 @@ export const ImportSVGInputSchema = z.object({
   scale: z.number().optional().default(1.0).describe('Scale factor'),
 });
 
+// Import Mermaid (flowchart, stateDiagram, sequenceDiagram, erDiagram, classDiagram)
+export const ImportMermaidInputSchema = z.object({
+  mermaidText: z.string().min(1).describe('Mermaid diagram source. First line determines type: "flowchart"/"graph", "stateDiagram(-v2)", "sequenceDiagram", "erDiagram", "classDiagram".'),
+  autoLayout: z.boolean().optional().default(true).describe('Run auto-layout after import (default: true). Disable to keep nodes at parsed coordinates only.'),
+  clearExisting: z.boolean().optional().default(false).describe('Remove existing canvas items before importing (default: false — additive).'),
+});
+export type ImportMermaidInput = z.infer<typeof ImportMermaidInputSchema>;
+
 // Add Filter
 export const AddFilterInputSchema = z.object({
   filterType: FilterTypeSchema,

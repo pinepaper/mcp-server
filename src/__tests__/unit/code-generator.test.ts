@@ -600,4 +600,46 @@ describe('PinePaperCodeGenerator', () => {
       expect(code).toContain('app.stopKeyframeTimeline()');
     });
   });
+
+  describe('generateImportMermaid', () => {
+    it('emits app.importMermaid with the source text', () => {
+      const code = codeGenerator.generateImportMermaid(
+        'flowchart TD\n  A[Start] --> B[End]'
+      );
+      expect(code).toContain('app.importMermaid');
+      expect(code).toContain('flowchart TD');
+      expect(code).toContain('A[Start] --> B[End]');
+    });
+
+    it('passes options through (autoLayout, clearExisting)', () => {
+      const code = codeGenerator.generateImportMermaid('graph LR\nA-->B', {
+        autoLayout: false,
+        clearExisting: true,
+      });
+      expect(code).toContain('"autoLayout":false');
+      expect(code).toContain('"clearExisting":true');
+    });
+
+    it('escapes backticks and dollar signs to keep template-literal valid', () => {
+      const code = codeGenerator.generateImportMermaid(
+        'flowchart TD\n  A["a `quoted` ${expr} label"] --> B'
+      );
+      // Backticks must be escaped so the template literal terminates correctly
+      expect(code).toContain('\\`quoted\\`');
+      // Dollar signs must be escaped so the template literal does not interpolate
+      expect(code).toContain('\\${expr}');
+    });
+
+    it('returns a result shape with success / counts / arrays / errors', () => {
+      const code = codeGenerator.generateImportMermaid('flowchart TD\nA-->B');
+      expect(code).toContain('nodeCount:');
+      expect(code).toContain('edgeCount:');
+      expect(code).toContain('errors:');
+    });
+
+    it('guards against missing diagramSystem', () => {
+      const code = codeGenerator.generateImportMermaid('flowchart TD\nA-->B');
+      expect(code).toContain('importMermaid not available');
+    });
+  });
 });

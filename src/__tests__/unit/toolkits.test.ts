@@ -138,7 +138,7 @@ describe('getToolsForToolkit', () => {
   it('agent profile returns a mid-range tool count', () => {
     const result = getToolsForToolkit(PINEPAPER_TOOLS, 'agent');
     expect(result.length).toBeGreaterThan(30);
-    expect(result.length).toBeLessThan(80);
+    expect(result.length).toBeLessThan(90);
   });
 
   it('diagram profile returns fewer tools than agent', () => {
