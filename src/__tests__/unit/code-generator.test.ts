@@ -60,6 +60,42 @@ describe('PinePaperCodeGenerator', () => {
       const code = codeGenerator.generateCreateItem(mockTextItem);
       expect(code).toContain('app.historyManager.saveState()');
     });
+
+    it('accepts position as [x, y] array and normalizes to {x, y}', () => {
+      const code = codeGenerator.generateCreateItem({
+        itemType: 'circle',
+        position: [250, 350] as unknown as { x: number; y: number },
+        properties: { radius: 25 },
+      });
+      expect(code).toContain('x: 250');
+      expect(code).toContain('y: 350');
+    });
+
+    it('passes inline animationType + animationSpeed through to app.create params', () => {
+      const code = codeGenerator.generateCreateItem({
+        itemType: 'circle',
+        position: { x: 200, y: 200 },
+        properties: { radius: 30, color: '#3b82f6' },
+        animationType: 'pulse',
+        animationSpeed: 2,
+      });
+      expect(code).toContain('"animationType": "pulse"');
+      expect(code).toContain('"animationSpeed": 2');
+    });
+
+    it('passes inline keyframe animation through to app.create params', () => {
+      const code = codeGenerator.generateCreateItem({
+        itemType: 'text',
+        properties: { content: 'Hi', fontSize: 32 },
+        animationType: 'keyframe',
+        keyframes: [
+          { time: 0, properties: { opacity: 0 } },
+          { time: 1, properties: { opacity: 1 } },
+        ],
+      });
+      expect(code).toContain('"animationType": "keyframe"');
+      expect(code).toContain('"keyframes"');
+    });
   });
 
   describe('generateModifyItem', () => {

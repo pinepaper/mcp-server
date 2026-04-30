@@ -919,10 +919,14 @@ export class PinePaperCodeGenerator {
    */
   generateCreateItem(input: z.infer<typeof CreateItemInputSchema>): string {
     const validated = CreateItemInputSchema.parse(input);
+    const properties = { ...(validated.properties as Record<string, unknown>) };
+    if (validated.animationType !== undefined) properties.animationType = validated.animationType;
+    if (validated.animationSpeed !== undefined) properties.animationSpeed = validated.animationSpeed;
+    if (validated.keyframes !== undefined) properties.keyframes = validated.keyframes;
     return generateCreateItemCode(
       validated.itemType,
       validated.position,
-      validated.properties as Record<string, unknown>
+      properties
     );
   }
 

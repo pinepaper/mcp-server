@@ -14,10 +14,19 @@ import { z } from 'zod';
 // COMMON SCHEMAS
 // =============================================================================
 
-export const PositionSchema = z.object({
-  x: z.number().describe('X coordinate on canvas'),
-  y: z.number().describe('Y coordinate on canvas'),
-});
+/**
+ * Position on canvas. Accepts either the object form {x, y} or the array
+ * form [x, y] (matches FxTool's PinePaper.create() normalization, fix
+ * 3574992). Both forms normalize to {x, y} after parse, so downstream code
+ * that reads position.x / position.y is unaffected.
+ */
+export const PositionSchema = z.union([
+  z.object({
+    x: z.number().describe('X coordinate on canvas'),
+    y: z.number().describe('Y coordinate on canvas'),
+  }),
+  z.tuple([z.number(), z.number()]).transform(([x, y]) => ({ x, y })),
+]);
 
 export const PointArraySchema = z.tuple([z.number(), z.number()]);
 
@@ -730,6 +739,9 @@ export const CreateItemInputSchema = z.object({
   itemType: ItemTypeSchema,
   position: PositionSchema.optional().default({ x: 400, y: 300 }),
   properties: z.record(z.unknown()).optional().default({}),
+  animationType: z.string().optional().describe('Inline animation to apply on creation. Loop presets (pulse, rotate, bounce, fade, wobble, slide, typewriter) or "keyframe" with keyframes array. Equivalent to a follow-up pinepaper_animate / pinepaper_keyframe_animate call.'),
+  animationSpeed: z.number().optional().describe('Speed multiplier for loop animations (default: 1.0). Ignored when animationType is "keyframe".'),
+  keyframes: z.array(KeyframeSchema).optional().describe('Required when animationType is "keyframe". Inline keyframe array attached at creation.'),
 });
 
 // Light direction for 3D effects
