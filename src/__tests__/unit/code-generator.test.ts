@@ -192,6 +192,49 @@ describe('PinePaperCodeGenerator', () => {
 
       expect(code).toContain('5'); // Max time from keyframes
     });
+
+    it('omits clip-window options when none are passed', () => {
+      const code = codeGenerator.generateKeyframeAnimate({
+        itemId: 'item_1',
+        keyframes: [
+          { time: 0, properties: { opacity: 0 } },
+          { time: 1, properties: { opacity: 1 } },
+        ],
+      });
+      expect(code).not.toContain('timeOffset');
+      expect(code).not.toContain('clipInPoint');
+      expect(code).not.toContain('clipOutPoint');
+    });
+
+    it('passes clip-window options through to app.addAnimation', () => {
+      const code = codeGenerator.generateKeyframeAnimate({
+        itemId: 'item_1',
+        keyframes: [
+          { time: 0, properties: { opacity: 0 } },
+          { time: 4, properties: { opacity: 1 } },
+        ],
+        timeOffset: 2,
+        clipInPoint: 1,
+        clipOutPoint: 4,
+      });
+      expect(code).toContain('"timeOffset":2');
+      expect(code).toContain('"clipInPoint":1');
+      expect(code).toContain('"clipOutPoint":4');
+    });
+
+    it('emits clip params individually when only some are set', () => {
+      const code = codeGenerator.generateKeyframeAnimate({
+        itemId: 'item_1',
+        keyframes: [
+          { time: 0, properties: { opacity: 0 } },
+          { time: 1, properties: { opacity: 1 } },
+        ],
+        timeOffset: 2,
+      });
+      expect(code).toContain('"timeOffset":2');
+      expect(code).not.toContain('"clipInPoint"');
+      expect(code).not.toContain('"clipOutPoint"');
+    });
   });
 
   describe('generateExecuteGenerator', () => {

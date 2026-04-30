@@ -818,6 +818,9 @@ export const KeyframeAnimateInputSchema = z.object({
   keyframes: z.array(KeyframeSchema),
   duration: z.number().optional().describe('Total animation duration'),
   loop: z.boolean().optional().default(false),
+  timeOffset: z.number().optional().describe('Shift the whole clip in canvas time (seconds). The animation only runs while canvas time is in [timeOffset, timeOffset + (clipOutPoint - clipInPoint)].'),
+  clipInPoint: z.number().optional().describe('Skip the first N seconds of keyframe data — clip head trim.'),
+  clipOutPoint: z.number().optional().describe('Stop at N seconds into the keyframe data — clip tail trim. Default: lastKeyframeTime.'),
 });
 
 // Execute Generator

@@ -532,16 +532,24 @@ function generateKeyframeAnimateCode(
   itemId: string,
   keyframes: Keyframe[],
   duration?: number,
-  loop: boolean = false
+  loop: boolean = false,
+  timeOffset?: number,
+  clipInPoint?: number,
+  clipOutPoint?: number
 ): string {
   const keyframesJson = JSON.stringify(keyframes, null, 2);
   const calculatedDuration = duration || Math.max(...keyframes.map(k => k.time));
-  
+
+  const opts: Record<string, unknown> = { duration: calculatedDuration, loop };
+  if (timeOffset !== undefined) opts.timeOffset = timeOffset;
+  if (clipInPoint !== undefined) opts.clipInPoint = clipInPoint;
+  if (clipOutPoint !== undefined) opts.clipOutPoint = clipOutPoint;
+
   return `
 // Apply keyframe animation to ${itemId}
-app.addAnimation('${itemId}', ${keyframesJson}, { duration: ${calculatedDuration}, loop: ${loop} });
+app.addAnimation('${itemId}', ${keyframesJson}, ${JSON.stringify(opts)});
 
-({ success: true, itemId: '${itemId}', duration: ${calculatedDuration}, loop: ${loop} });
+({ success: true, itemId: '${itemId}', duration: ${calculatedDuration}, loop: ${loop}${timeOffset !== undefined ? `, timeOffset: ${timeOffset}` : ''}${clipInPoint !== undefined ? `, clipInPoint: ${clipInPoint}` : ''}${clipOutPoint !== undefined ? `, clipOutPoint: ${clipOutPoint}` : ''} });
 `.trim();
 }
 
@@ -992,7 +1000,10 @@ export class PinePaperCodeGenerator {
       validated.itemId,
       validated.keyframes,
       validated.duration,
-      validated.loop
+      validated.loop,
+      validated.timeOffset,
+      validated.clipInPoint,
+      validated.clipOutPoint
     );
   }
 
