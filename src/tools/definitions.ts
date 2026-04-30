@@ -333,7 +333,7 @@ USE WHEN:
 IMPORTANT:
 - Save the returned itemId! You need it for pinepaper_add_relation, pinepaper_modify_item, pinepaper_delete_item, etc.
 - If there's a welcome template on the canvas, use pinepaper_clear_canvas first
-- Position defaults to canvas center (400, 300). Use position: {x, y} to place elsewhere.
+- Position defaults to canvas center (400, 300). Use position: {x, y} or [x, y] (both forms accepted) to place elsewhere.
 - DO NOT take screenshots after every create operation. Trust the API response - if it returns success, the item was created. Take ONE screenshot at the end to verify the final result.
 
 ⚠️ COMPLEX CHARACTERS/ILLUSTRATIONS:
@@ -395,12 +395,23 @@ For glossy 3D spheres, use pinepaper_create_glossy_sphere instead. For diagonal 
           description: 'Type of item to create',
         },
         position: {
-          type: 'object',
-          properties: {
-            x: { type: 'number', description: 'X coordinate (default: 400)' },
-            y: { type: 'number', description: 'Y coordinate (default: 300)' },
-          },
-          description: 'Position on canvas',
+          oneOf: [
+            {
+              type: 'object',
+              properties: {
+                x: { type: 'number', description: 'X coordinate (default: 400)' },
+                y: { type: 'number', description: 'Y coordinate (default: 300)' },
+              },
+            },
+            {
+              type: 'array',
+              items: { type: 'number' },
+              minItems: 2,
+              maxItems: 2,
+              description: '[x, y] tuple — array shorthand for position',
+            },
+          ],
+          description: 'Position on canvas. Either {x, y} object or [x, y] array.',
         },
         properties: {
           type: 'object',
