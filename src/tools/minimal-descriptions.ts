@@ -33,7 +33,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
 
   // --- Item CRUD ---
   pinepaper_create_item: `Create item. itemType: ${ITEM_TYPES}. position: {x,y}. properties: {color, radius, ...}.`,
-  pinepaper_modify_item: 'Modify item. itemId: string. properties: {color, opacity, x, y, scaleX, scaleY, rotation, ...}.',
+  pinepaper_modify_item: 'Modify item. itemId, properties: {color, opacity, x, y, scaleX, scaleY, rotation, ...}. Letter-collage non-destructive: palette, collageStyle, bgColor, textColor.',
   pinepaper_delete_item: 'Remove item by itemId.',
   pinepaper_create_glossy_sphere: 'Create a 3D-looking glossy sphere with lighting.',
   pinepaper_create_diagonal_stripes: 'Create a diagonal stripe pattern.',
@@ -56,7 +56,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
 
   // --- Animation ---
   pinepaper_animate: 'Animate item. itemId, type: pulse|rotate|bounce|fade|wobble|slide|typewriter. speed, amplitude optional.',
-  pinepaper_keyframe_animate: 'Keyframe animate. itemId, keyframes: [{time, properties: {opacity,scale,x,y,rotation,...}, easing}], duration.',
+  pinepaper_keyframe_animate: 'Keyframe animate. itemId, keyframes: [{time, properties:{opacity,scale,x,y,rotation,...}, easing}], duration. Clip window: timeOffset, clipInPoint, clipOutPoint.',
   pinepaper_play_timeline: 'Control playback. action: play|pause|stop|seek. position (seconds) for seek.',
 
   // --- Masks ---

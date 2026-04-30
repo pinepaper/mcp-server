@@ -479,7 +479,15 @@ MODIFIABLE PROPERTIES:
 - blendMode: Blend mode (normal, multiply, screen, overlay, etc.)
 
 GRADIENT OBJECT FORMAT:
-{type: "linear"|"radial", stops: [{color: "#fff", offset: 0}, {color: "#000", offset: 1}], origin: [x,y], destination: [x,y]}`,
+{type: "linear"|"radial", stops: [{color: "#fff", offset: 0}, {color: "#000", offset: 1}], origin: [x,y], destination: [x,y]}
+
+LETTER-COLLAGE PROPS (non-destructive — registry ids, animations, relations, effects, deformations all preserved):
+- palette (collage group): Swap palette name in-place. e.g. "wordle", "spring", "sunset", "magazine". Walks existing letters, rewrites tile + text fills. No geometry change.
+- collageStyle (collage group): Swap visual style — "tile" | "magazine" | "paperCut" | "fold" | "gradient" | "image". Geometry rebuilds; every registryId is preserved via graft.
+- palette + collageStyle (collage group): Combine in one call to apply both atomically.
+- bgColor (single letter group, child of a collage): Tile/background fill for that one letter.
+- textColor (single letter group): PointText fill for that one letter.
+Use the collage group's id for palette/collageStyle; use a child letter's id for bgColor/textColor. Prefer this over destructive recreation.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -489,7 +497,7 @@ GRADIENT OBJECT FORMAT:
         },
         properties: {
           type: 'object',
-          description: 'Properties to update: x, y, width, height, scale, scaleX, scaleY, rotation, opacity, color, strokeColor, strokeWidth, fontSize, content. DO NOT pass animationType here — use pinepaper_animate or pinepaper_keyframe_animate instead.',
+          description: 'Properties to update: x, y, width, height, scale, scaleX, scaleY, rotation, opacity, color, strokeColor, strokeWidth, fontSize, content. Letter-collage non-destructive props (preserve ids/animations/relations): palette, collageStyle (collage group); bgColor, textColor (single letter). DO NOT pass animationType here — use pinepaper_animate or pinepaper_keyframe_animate instead.',
           additionalProperties: true,
         },
         data: {
@@ -1514,7 +1522,17 @@ EASING OPTIONS:
 - easeOut: Slow end
 - easeInOut: Slow start and end
 - bounce: Bounce effect
-- elastic: Elastic overshoot`,
+- elastic: Elastic overshoot
+
+CLIP WINDOW (optional — Premiere/Canva-style clip behavior):
+- timeOffset: Shift the whole clip in canvas time (seconds). The animation only runs while canvas time is in [timeOffset, timeOffset + (clipOutPoint - clipInPoint)].
+- clipInPoint: Skip the first N seconds of keyframe data (head trim).
+- clipOutPoint: Stop at N seconds into the keyframe data (tail trim). Default: lastKeyframeTime.
+Outside the clip window the item is hidden via item.visible=false (opacity is left alone, so opacity-keyframes still work inside the window).
+
+EXAMPLE — Reveal at 2s, skip first second of keyframe data, end at 4s of keyframe data:
+{ itemId, timeOffset: 2, clipInPoint: 1, clipOutPoint: 4, keyframes: [...] }
+// Item visible during canvas time 2..5s; keyframes shifted so kf time=1 plays at canvas 2s.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1546,6 +1564,18 @@ EASING OPTIONS:
         loop: {
           type: 'boolean',
           description: 'Whether to loop the animation',
+        },
+        timeOffset: {
+          type: 'number',
+          description: 'Shift the whole clip in canvas time (seconds). Item is hidden outside [timeOffset, timeOffset+window].',
+        },
+        clipInPoint: {
+          type: 'number',
+          description: 'Skip the first N seconds of keyframe data (head trim).',
+        },
+        clipOutPoint: {
+          type: 'number',
+          description: 'Stop at N seconds into the keyframe data (tail trim). Default: lastKeyframeTime.',
         },
       },
       required: ['itemId', 'keyframes'],
@@ -5490,13 +5520,16 @@ EFFECTS (15 total):
 - snow: Falling snowflakes (color, count, speed, spread, particleLife)
 - confetti: Celebration confetti (colors, count, radius, gravity, size, spread, interval, repeat)
 - ripple: Expanding ring ripples (color, speed, maxRadius, ringCount, strokeWidth)
-- glow: Pulsing glow aura (color, speed, intensity, size)
+- glow: Pulsing glow aura (color drives the shadow halo; speed, intensity, size; optional fill — interior tint decoupled from color; fillOpacity 0..1 multiplies intensity opacity)
 - electric: Lightning bolts (color, speed, boltCount, length, flickerRate)
-- bubbles: Rising transparent bubbles (color, count, speed, size, spread)
+- bubbles: Rising transparent bubbles (color drives the rim; count, speed, size, spread; optional fill — interior tint, default null = outlined-only; fillOpacity 0..1, default 0.25 when fill is set)
 - dust: Ambient drifting motes (color, count, speed, size, spread)
 - fireflies: Glowing wandering dots (color, count, speed, size, spread)
 - shockwave: Expanding concentric rings — burst type (speed, maxRadius, count, thickness)
-- trail: Fading afterimages following movement (speed, count, size, fadeRate)`,
+- trail: Fading afterimages following movement (speed, count, size, fadeRate)
+
+EXAMPLE — bubbles with magenta interior over a blue rim:
+{ effectType: "bubbles", params: { color: "#93c5fd", fill: "#ff00aa", fillOpacity: 0.4 } }`,
     inputSchema: {
       type: 'object',
       properties: {
