@@ -1707,6 +1707,7 @@ export const AgentExportInputSchema = z.object({
   format: z.union([AgentExportFormatSchema, z.literal('auto')]).optional().default('auto').describe('Export format'),
   quality: z.enum(['draft', 'standard', 'high']).optional().default('standard').describe('Export quality level'),
   includeRecommendations: z.boolean().optional().default(true).describe('Include alternative format recommendations'),
+  framing: z.enum(['canvas', 'camera']).optional().default('canvas').describe('Output framing: "canvas" (full canvas, default) or "camera" (camera_animates first-keyframe viewport — fails if no walkthrough exists). Camera animation still drives motion within the fixed output frame.'),
 }).describe('Smart export options');
 
 export type AgentExportInput = z.infer<typeof AgentExportInputSchema>;

@@ -139,6 +139,6 @@ SHAPE TYPES: ${DIAGRAM_SHAPES}.`,
   // -------------------------------------------------------------------------
   // agent_export
   // -------------------------------------------------------------------------
-  pinepaper_agent_export: `Export as MP4, GIF, PNG, SVG, or PDF. Formats: svg, png, gif, mp4, webm, pdf. Quality: draft, standard, high.`,
+  pinepaper_agent_export: `Export as MP4, GIF, PNG, SVG, or PDF. Formats: svg, png, gif, mp4, webm, pdf. Quality: draft, standard, high. Framing: canvas (default) or camera (camera_animates viewport — video formats only).`,
 
 };

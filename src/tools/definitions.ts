@@ -6859,6 +6859,7 @@ PLATFORMS & OPTIMAL FORMATS:
 
 FORMATS: svg, png, gif, mp4, webm, pdf.
 QUALITY: draft, standard, high.
+FRAMING: canvas (default, full canvas) | camera (camera_animates first-keyframe viewport — video formats only, requires a keyframe-mode walkthrough on the canvas; camera animation still drives motion within the fixed output frame).
 
 ⚠️ If export fails, do NOT retry with different formats — report the error to the user.
 ⚠️ When user asks for "video", always use format: "mp4".
@@ -6866,7 +6867,8 @@ QUALITY: draft, standard, high.
 EXAMPLES:
 - {platform: "instagram"} — auto-selects best format
 - {platform: "instagram", format: "mp4"} — force MP4
-- {platform: "web", format: "svg"} — animated SVG`,
+- {platform: "web", format: "svg"} — animated SVG
+- {platform: "youtube", format: "mp4", framing: "camera"} — render only what the camera frames during the walkthrough`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -6884,6 +6886,11 @@ EXAMPLES:
           type: 'string',
           enum: ['draft', 'standard', 'high'],
           description: 'Export quality level (default: standard)',
+        },
+        framing: {
+          type: 'string',
+          enum: ['canvas', 'camera'],
+          description: 'Output framing. "canvas" (default) renders the full canvas. "camera" renders only the first-keyframe viewport of a camera_animates walkthrough — video formats only.',
         },
       },
       required: ['platform'],
