@@ -2380,7 +2380,7 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
    */
   generateAgentExport(input: AgentExportInput): string {
     const validated = AgentExportInputSchema.parse(input);
-    const { platform, format, quality } = validated;
+    const { platform, format, quality, framing } = validated;
     const qualityLevel = quality || 'standard';
 
     // Quality settings (bitrate in bps for VideoEncoder)
@@ -2414,10 +2414,38 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
   const platform = '${platform}';
   const format = '${exportFormat}';
   const quality = '${qualityLevel}';
+  const framing = '${framing}';
   const settings = ${JSON.stringify(qualitySettings)};
   const dimensions = ${JSON.stringify({ width: preset.width, height: preset.height })};
 
-  let result = { success: false, platform, format, quality };
+  // Resolve camera-view framing dims when requested. Reads the first
+  // camera_animates keyframe's zoom and divides the canvas dims by it
+  // (mirrors FxTool ExportEngine.js:466-485). Camera animation still
+  // drives motion during export — framing only fixes the output frame.
+  let cameraDims = null;
+  if (framing === 'camera') {
+    if (!['gif', 'mp4', 'webm'].includes(format)) {
+      return { success: false, platform, format, framing, error: 'framing: "camera" is only supported for video formats (gif, mp4, webm). Use format: "mp4" / "gif" / "webm" or omit framing.' };
+    }
+    const rr = app.relationRegistry;
+    const hasWalkthrough = rr && typeof rr.hasCameraAnimation === 'function' && rr.hasCameraAnimation();
+    if (!hasWalkthrough) {
+      return { success: false, platform, format, framing, error: 'framing: "camera" requires a camera_animates walkthrough on the canvas. Add one or omit framing.' };
+    }
+    const params = rr.getCameraAnimationParams ? rr.getCameraAnimationParams() : null;
+    if (!params || (params.mode || 'keyframes') !== 'keyframes' || !params.keyframes || !params.keyframes.length) {
+      return { success: false, platform, format, framing, error: 'framing: "camera" requires a keyframe-mode camera walkthrough with at least one keyframe.' };
+    }
+    const firstKf = params.keyframes[0];
+    const firstZoom = firstKf && firstKf.zoom > 0 ? firstKf.zoom : 1;
+    const canvasEl = document.querySelector('canvas');
+    cameraDims = {
+      width: Math.round((canvasEl ? canvasEl.width : dimensions.width) / firstZoom),
+      height: Math.round((canvasEl ? canvasEl.height : dimensions.height) / firstZoom),
+    };
+  }
+
+  let result = { success: false, platform, format, quality, framing };
 
   try {
     switch (format) {
@@ -2465,28 +2493,38 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
       case 'mp4':
       case 'webm': {
         const videoMimeType = { mp4: 'video/mp4', webm: 'video/webm', gif: 'image/gif' }[format];
-        // Use _quickExportVideo (delegates to VideoExporter.export internally)
-        if (app.exportEngine && app.exportEngine._quickExportVideo) {
-          const videoResult = await app.exportEngine._quickExportVideo(format, { fps: settings.fps, bitrate: settings.bitrate, duration: 5 }, false);
+        const baseVideoSettings = { format, fps: settings.fps, bitrate: settings.bitrate, duration: 5 };
+        // Camera framing requires going direct to videoExporter so width/height
+        // pass through — _quickExportVideo strips dim fields.
+        if (cameraDims && app.exportEngine && app.exportEngine.videoExporter) {
+          const blob = await app.exportEngine.videoExporter.export({ ...baseVideoSettings, width: cameraDims.width, height: cameraDims.height });
+          const reader = new FileReader();
+          const dataUrl = await new Promise(resolve => {
+            reader.onloadend = () => resolve(reader.result);
+            reader.readAsDataURL(blob);
+          });
+          result = { success: true, platform, format, framing, data: dataUrl, mimeType: videoMimeType, size: blob.size, dimensions: cameraDims };
+        } else if (app.exportEngine && app.exportEngine._quickExportVideo) {
+          const videoResult = await app.exportEngine._quickExportVideo(format, baseVideoSettings, false);
           if (videoResult && videoResult.blob) {
             const reader = new FileReader();
             const dataUrl = await new Promise(resolve => {
               reader.onloadend = () => resolve(reader.result);
               reader.readAsDataURL(videoResult.blob);
             });
-            result = { success: true, platform, format, data: dataUrl, mimeType: videoMimeType, size: videoResult.blob.size };
+            result = { success: true, platform, format, framing, data: dataUrl, mimeType: videoMimeType, size: videoResult.blob.size };
           } else {
             result = { success: false, error: format.toUpperCase() + ' export returned no data' };
           }
         } else if (app.exportEngine && app.exportEngine.videoExporter) {
           // Fallback: call VideoExporter.export directly
-          const blob = await app.exportEngine.videoExporter.export({ format, fps: settings.fps, bitrate: settings.bitrate, duration: 5 });
+          const blob = await app.exportEngine.videoExporter.export(baseVideoSettings);
           const reader = new FileReader();
           const dataUrl = await new Promise(resolve => {
             reader.onloadend = () => resolve(reader.result);
             reader.readAsDataURL(blob);
           });
-          result = { success: true, platform, format, data: dataUrl, mimeType: videoMimeType, size: blob.size };
+          result = { success: true, platform, format, framing, data: dataUrl, mimeType: videoMimeType, size: blob.size };
         } else {
           result = { success: false, error: format.toUpperCase() + ' export not available' };
         }

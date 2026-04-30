@@ -187,7 +187,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_agent_end_job: 'End job and get summary with screenshot.',
   pinepaper_agent_reset: 'Quick canvas reset without page refresh.',
   pinepaper_agent_batch_execute: 'ALL ops in one call. Pattern: set_canvas_size → set_background/execute_generator → create → animate/keyframe_animate EACH item ("$0","$1") → play_timeline (REQUIRED).',
-  pinepaper_agent_export: 'Export. format: svg|png|gif|mp4|webm|pdf. "video"→mp4. platform: instagram|tiktok|youtube|twitter. Do NOT retry on fail.',
+  pinepaper_agent_export: 'Export. format: svg|png|gif|mp4|webm|pdf. "video"→mp4. platform: instagram|tiktok|youtube|twitter. framing: canvas|camera (video only). Do NOT retry on fail.',
   pinepaper_agent_analyze: 'Analyze canvas content for export recommendations.',
 
   // --- Misc ---

@@ -601,6 +601,49 @@ describe('PinePaperCodeGenerator', () => {
     });
   });
 
+  describe('generateAgentExport — framing', () => {
+    it('emits framing="canvas" by default', () => {
+      const code = codeGenerator.generateAgentExport({
+        platform: 'youtube',
+        format: 'mp4',
+      });
+      expect(code).toContain("const framing = 'canvas'");
+      expect(code).toContain('cameraDims = null');
+    });
+
+    it('routes camera framing through videoExporter directly with computed dims', () => {
+      const code = codeGenerator.generateAgentExport({
+        platform: 'youtube',
+        format: 'mp4',
+        framing: 'camera',
+      });
+      expect(code).toContain("const framing = 'camera'");
+      expect(code).toContain('hasCameraAnimation');
+      expect(code).toContain('getCameraAnimationParams');
+      expect(code).toContain('Math.round(');
+      // Direct videoExporter path is taken when cameraDims is set
+      expect(code).toContain('app.exportEngine.videoExporter.export({ ...baseVideoSettings, width: cameraDims.width, height: cameraDims.height })');
+    });
+
+    it('errors out when framing="camera" with a non-video format', () => {
+      const code = codeGenerator.generateAgentExport({
+        platform: 'instagram',
+        format: 'png',
+        framing: 'camera',
+      });
+      expect(code).toContain('framing: "camera" is only supported for video formats');
+    });
+
+    it('errors out when framing="camera" but no walkthrough exists', () => {
+      const code = codeGenerator.generateAgentExport({
+        platform: 'youtube',
+        format: 'mp4',
+        framing: 'camera',
+      });
+      expect(code).toContain('framing: "camera" requires a camera_animates walkthrough');
+    });
+  });
+
   describe('generateImportMermaid', () => {
     it('emits app.importMermaid with the source text', () => {
       const code = codeGenerator.generateImportMermaid(
