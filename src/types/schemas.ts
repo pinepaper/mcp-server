@@ -1616,6 +1616,7 @@ export const AgentStartJobInputSchema = z.object({
   }).optional().describe('Custom canvas dimensions'),
   backgroundColor: z.string().optional().describe('Background color to set'),
   clearCanvas: z.boolean().optional().default(true).describe('Clear canvas when starting job'),
+  includeOntology: z.boolean().optional().default(true).describe('Include canvas ontology snapshot in the result. Tiny payload when clearCanvas is true (empty canvas) — captures existing state when clearCanvas is false. Set false to skip; reset to true if rerunning against an older FxTool that lacks exportCanvasOntology.'),
 }).describe('Options for starting an agent job');
 
 export type AgentStartJobInput = z.infer<typeof AgentStartJobInputSchema>;
