@@ -153,6 +153,9 @@ import { getSessionManager } from '../agent/session-manager.js';
 import { vocabularyHintForPath, validateBatchVocabulary } from '../ontology/hints.js';
 import { cameraHandlers } from './handlers/camera.js';
 import { fontHandlers } from './handlers/font.js';
+import { toolGuideHandlers } from './handlers/tool-guide.js';
+import { mapHandlers } from './handlers/maps.js';
+import { ontologyHandlers } from './handlers/ontology.js';
 
 /**
  * Registry of per-domain handler maps. Tools listed here short-circuit the
@@ -162,6 +165,9 @@ import { fontHandlers } from './handlers/font.js';
 const DOMAIN_HANDLERS: Array<Record<string, (args: Record<string, unknown>, options: HandlerOptions) => Promise<CallToolResult>>> = [
   cameraHandlers,
   fontHandlers,
+  toolGuideHandlers,
+  mapHandlers,
+  ontologyHandlers,
 ];
 
 // =============================================================================
@@ -338,7 +344,7 @@ function screenshotResult(screenshot: string): CallToolResult {
   };
 }
 
-function errorResult(
+export function errorResult(
   code: string,
   message: string,
   details?: unknown,
@@ -1794,58 +1800,8 @@ You can now start creating new items on a clean canvas.`,
       }
 
       // -----------------------------------------------------------------------
-      // TOOL GUIDE (on-demand documentation)
+      // TOOL GUIDE — extracted to src/tools/handlers/tool-guide.ts
       // -----------------------------------------------------------------------
-      case 'pinepaper_tool_guide': {
-        const input = ToolGuideInputSchema.parse(args);
-        const { PINEPAPER_TOOLS, AI_AGENT_GUIDE } = await import('./definitions.js');
-        const { TOOL_TAGS } = await import('./toolkits.js');
-
-        // No args → full AI Agent Guide
-        if (!input.tool && !input.category) {
-          return {
-            content: [{ type: 'text', text: AI_AGENT_GUIDE }],
-          };
-        }
-
-        // Specific tool → full verbose description
-        if (input.tool) {
-          const tool = PINEPAPER_TOOLS.find((t: { name: string }) => t.name === input.tool);
-          if (!tool) {
-            return {
-              content: [{ type: 'text', text: `Unknown tool: ${input.tool}. Use pinepaper_tool_guide with no args to see the AI Agent Guide.` }],
-              isError: true,
-            };
-          }
-          return {
-            content: [{ type: 'text', text: `# ${tool.name}\n\n${tool.description}` }],
-          };
-        }
-
-        // Category → all tools in that tag with descriptions
-        if (input.category) {
-          const toolNames = TOOL_TAGS[input.category];
-          if (!toolNames) {
-            const available = Object.keys(TOOL_TAGS).join(', ');
-            return {
-              content: [{ type: 'text', text: `Unknown category: ${input.category}. Available: ${available}` }],
-              isError: true,
-            };
-          }
-          const lines: string[] = [`# Category: ${input.category}\n`];
-          for (const name of toolNames) {
-            const tool = PINEPAPER_TOOLS.find((t: { name: string }) => t.name === name);
-            if (tool) {
-              lines.push(`## ${tool.name}\n${tool.description}\n`);
-            }
-          }
-          return {
-            content: [{ type: 'text', text: lines.join('\n') }],
-          };
-        }
-
-        return { content: [{ type: 'text', text: AI_AGENT_GUIDE }] };
-      }
 
       // -----------------------------------------------------------------------
       // ASSET TOOLS
@@ -2441,162 +2397,9 @@ You can now start creating new items on a clean canvas.`,
       // -----------------------------------------------------------------------
       // MAP TOOLS
       // -----------------------------------------------------------------------
-      case 'pinepaper_load_map': {
-        const input = LoadMapInputSchema.parse(args);
-        const code = codeGenerator.generateLoadMap(input);
-        const description = `Loads ${input.mapId} map with ${input.projection || 'default'} projection`;
-        return executeOrGenerate(code, description, options, 'pinepaper_load_map');
-      }
-
-      case 'pinepaper_highlight_regions': {
-        const input = HighlightRegionsInputSchema.parse(args);
-        const code = codeGenerator.generateHighlightRegions(input);
-        const description = `Highlights ${input.regionIds.length} region(s) on the map`;
-        return executeOrGenerate(code, description, options, 'pinepaper_highlight_regions');
-      }
-
-      case 'pinepaper_unhighlight_regions': {
-        const input = UnhighlightRegionsInputSchema.parse(args);
-        const code = codeGenerator.generateUnhighlightRegions(input);
-        return executeOrGenerate(code, 'Removes region highlights', options, 'pinepaper_unhighlight_regions');
-      }
-
-      case 'pinepaper_apply_data_colors': {
-        const input = ApplyDataColorsInputSchema.parse(args);
-        const code = codeGenerator.generateApplyDataColors(input);
-        const regionCount = Object.keys(input.data).length;
-        const description = `Applies choropleth coloring to ${regionCount} region(s)`;
-        return executeOrGenerate(code, description, options, 'pinepaper_apply_data_colors');
-      }
-
-      case 'pinepaper_add_marker': {
-        const input = AddMarkerInputSchema.parse(args);
-        const code = codeGenerator.generateAddMarker(input);
-        const description = `Adds marker at [${input.lat}, ${input.lon}]${input.label ? `: ${input.label}` : ''}`;
-        return executeOrGenerate(code, description, options, 'pinepaper_add_marker');
-      }
-
-      case 'pinepaper_add_map_labels': {
-        const input = AddMapLabelsInputSchema.parse(args);
-        const code = codeGenerator.generateAddMapLabels(input);
-        return executeOrGenerate(code, 'Adds labels to map regions', options, 'pinepaper_add_map_labels');
-      }
-
-      case 'pinepaper_pan_map': {
-        const input = PanMapInputSchema.parse(args);
-        const code = codeGenerator.generatePanMap(input);
-        const description = `Pans map to [${input.lat}, ${input.lon}]`;
-        return executeOrGenerate(code, description, options, 'pinepaper_pan_map');
-      }
-
-      case 'pinepaper_zoom_map': {
-        const input = ZoomMapInputSchema.parse(args);
-        const code = codeGenerator.generateZoomMap(input);
-        const description = `Sets map zoom level to ${input.level}`;
-        return executeOrGenerate(code, description, options, 'pinepaper_zoom_map');
-      }
-
-      case 'pinepaper_export_map': {
-        const code = codeGenerator.generateExportMap();
-        return executeOrGenerate(code, 'Exports map configuration', options, 'pinepaper_export_map');
-      }
-
-      case 'pinepaper_import_custom_map': {
-        const input = ImportCustomMapInputSchema.parse(args);
-        const code = codeGenerator.generateImportCustomMap(input);
-        const description = input.url ? `Imports custom map from URL` : 'Imports custom GeoJSON map';
-        return executeOrGenerate(code, description, options, 'pinepaper_import_custom_map');
-      }
-
-      case 'pinepaper_get_region_at_point': {
-        const input = GetRegionAtPointInputSchema.parse(args);
-        const code = codeGenerator.generateGetRegionAtPoint(input);
-        const description = `Gets region at point [${input.x}, ${input.y}]`;
-        return executeOrGenerate(code, description, options, 'pinepaper_get_region_at_point');
-      }
-
       // -----------------------------------------------------------------------
-      // MAP ANIMATION/CSV TOOLS
+      // MAP TOOLS — extracted to src/tools/handlers/maps.ts
       // -----------------------------------------------------------------------
-      case 'pinepaper_animate_map_regions': {
-        const input = AnimateMapRegionsInputSchema.parse(args);
-        const code = codeGenerator.generateAnimateMapRegions(input);
-        const regionCount = Object.keys(input.regions).length;
-        const description = `Animates ${regionCount} map region(s) over ${input.duration || 5}s`;
-        return executeOrGenerate(code, description, options, 'pinepaper_animate_map_regions');
-      }
-
-      case 'pinepaper_animate_map_wave': {
-        const input = AnimateMapWaveInputSchema.parse(args);
-        const code = codeGenerator.generateAnimateMapWave(input);
-        const description = `Creates ${input.waveDirection || 'horizontal'} wave animation`;
-        return executeOrGenerate(code, description, options, 'pinepaper_animate_map_wave');
-      }
-
-      case 'pinepaper_stop_map_animations': {
-        const input = StopMapAnimationsInputSchema.parse(args);
-        const code = codeGenerator.generateStopMapAnimations(input);
-        return executeOrGenerate(code, 'Stops map region animations', options, 'pinepaper_stop_map_animations');
-      }
-
-      case 'pinepaper_get_animated_map_regions': {
-        const code = codeGenerator.generateGetAnimatedMapRegions();
-        return executeOrGenerate(code, 'Gets list of animated map regions', options, 'pinepaper_get_animated_map_regions');
-      }
-
-      case 'pinepaper_export_map_region_csv': {
-        const input = ExportMapRegionCSVInputSchema.parse(args);
-        const code = codeGenerator.generateExportMapRegionCSV(input);
-        return executeOrGenerate(code, 'Exports map region data as CSV', options, 'pinepaper_export_map_region_csv');
-      }
-
-      case 'pinepaper_import_map_region_csv': {
-        const input = ImportMapRegionCSVInputSchema.parse(args);
-        const code = codeGenerator.generateImportMapRegionCSV(input);
-        return executeOrGenerate(code, 'Imports CSV data to update map regions', options, 'pinepaper_import_map_region_csv');
-      }
-
-      case 'pinepaper_select_map_regions': {
-        const input = SelectMapRegionsInputSchema.parse(args);
-        const code = codeGenerator.generateSelectMapRegions(input);
-        const description = `Selects ${input.regionIds.length} map region(s)`;
-        return executeOrGenerate(code, description, options, 'pinepaper_select_map_regions');
-      }
-
-      case 'pinepaper_deselect_map_regions': {
-        const input = DeselectMapRegionsInputSchema.parse(args);
-        const code = codeGenerator.generateDeselectMapRegions(input);
-        return executeOrGenerate(code, 'Deselects map regions', options, 'pinepaper_deselect_map_regions');
-      }
-
-      case 'pinepaper_get_highlighted_map_regions': {
-        const code = codeGenerator.generateGetHighlightedMapRegions();
-        return executeOrGenerate(code, 'Gets list of highlighted map regions', options, 'pinepaper_get_highlighted_map_regions');
-      }
-
-      case 'pinepaper_export_map_geojson': {
-        const code = codeGenerator.generateExportMapGeoJson({
-          includeStyles: args.includeStyles as boolean | undefined,
-          includeMetadata: args.includeMetadata as boolean | undefined,
-          selectedOnly: args.selectedOnly as boolean | undefined,
-          download: args.download as boolean | undefined,
-          filename: args.filename as string | undefined,
-        });
-        return executeOrGenerate(code, 'Exports map as GeoJSON', options, 'pinepaper_export_map_geojson');
-      }
-
-      case 'pinepaper_export_original_map_geojson': {
-        const code = codeGenerator.generateExportOriginalMapGeoJson({
-          download: args.download as boolean | undefined,
-          filename: args.filename as string | undefined,
-        });
-        return executeOrGenerate(code, 'Exports original map GeoJSON', options, 'pinepaper_export_original_map_geojson');
-      }
-
-      case 'pinepaper_get_map_source_info': {
-        const code = codeGenerator.generateGetMapSourceInfo();
-        return executeOrGenerate(code, 'Gets map source information', options, 'pinepaper_get_map_source_info');
-      }
 
       case 'pinepaper_register_item': {
         const code = codeGenerator.generateRegisterItem({
@@ -2628,167 +2431,8 @@ You can now start creating new items on a clean canvas.`,
       }
 
       // -----------------------------------------------------------------------
-      // ONTOLOGY TOOLS
+      // ONTOLOGY TOOLS — extracted to src/tools/handlers/ontology.ts
       // -----------------------------------------------------------------------
-      case 'pinepaper_analyze_design': {
-        const input = AnalyzeDesignInputSchema.parse(args);
-        const { DesignGraph } = await import('../ontology/index.js');
-        const dg = new DesignGraph();
-        const graph = dg.extractFromDefinition(input.definition as any);
-        const jsonLd = dg.toJsonLd(graph);
-        return {
-          content: [{
-            type: 'text' as const,
-            text: JSON.stringify({
-              templateId: graph.templateId,
-              templateName: graph.templateName,
-              category: graph.category,
-              dimensions: graph.dimensions,
-              duration: graph.duration,
-              nodeCount: graph.nodes.length,
-              edgeCount: graph.edges.length,
-              nodeTypes: Object.fromEntries(
-                Object.entries(graph.fingerprint?.nodeTypeCounts || {}).sort((a, b) => b[1] - a[1])
-              ),
-              edgeTypes: Object.fromEntries(
-                Object.entries(graph.fingerprint?.edgeTypeCounts || {}).sort((a, b) => b[1] - a[1])
-              ),
-              patterns: graph.patterns,
-              mathFunctions: graph.mathFunctions,
-              generator: graph.generator,
-              semantics: graph.semantics,
-              fingerprint: graph.fingerprint,
-              jsonLd,
-            }, null, 2),
-          }],
-        };
-      }
-
-      case 'pinepaper_validate_design': {
-        const input = ValidateDesignInputSchema.parse(args);
-        const { DesignGraph, KnowledgeGraphValidator } = await import('../ontology/index.js');
-        const dg = new DesignGraph();
-        const validator = new KnowledgeGraphValidator();
-        const definition = input.definition as any;
-        const validation = validator.validateTemplate(definition);
-        let quality = null;
-        if (validation.valid) {
-          const graph = dg.extractFromDefinition(definition);
-          quality = validator.scoreQuality(definition, graph);
-        }
-        return {
-          content: [{
-            type: 'text' as const,
-            text: JSON.stringify({
-              validation,
-              quality,
-            }, null, 2),
-          }],
-        };
-      }
-
-      // -----------------------------------------------------------------------
-      // ONTOLOGY QUERY (read-only graph navigation)
-      // -----------------------------------------------------------------------
-      case 'pinepaper_query_ontology': {
-        const input = QueryOntologyInputSchema.parse(args);
-        const { PP_VOCABULARY, ITEM_TYPE_MAP, RELATION_TYPE_MAP } = await import('../ontology/vocabulary.js');
-        const { DesignGraph } = await import('../ontology/design-graph.js');
-        const dg = new DesignGraph();
-
-        let result: unknown;
-        switch (input.query) {
-          case 'list_types': {
-            const entries = Object.entries(PP_VOCABULARY.types);
-            const filtered = entries.filter(([key, def]) => {
-              if (input.category && (def as any).category !== input.category) return false;
-              if (!input.includeAbstract && (def as any).abstract) return false;
-              return true;
-            });
-            result = Object.fromEntries(filtered);
-            break;
-          }
-          case 'list_edges': {
-            const entries = Object.entries(PP_VOCABULARY.edges);
-            const filtered = input.category
-              ? entries.filter(([, def]) => (def as any).category === input.category)
-              : entries;
-            result = Object.fromEntries(filtered);
-            break;
-          }
-          case 'list_generators': {
-            const entries = Object.entries(PP_VOCABULARY.generators);
-            const filtered = input.category
-              ? entries.filter(([, def]) => (def as any).category === input.category)
-              : entries;
-            result = Object.fromEntries(filtered);
-            break;
-          }
-          case 'list_effects': {
-            result = ['sparkle', 'blast', 'smoke', 'fire', 'rain', 'snow', 'confetti', 'ripple', 'glow', 'electric'];
-            break;
-          }
-          case 'list_patterns': {
-            result = PP_VOCABULARY.patterns;
-            break;
-          }
-          case 'list_math_functions': {
-            result = PP_VOCABULARY.mathFunctions;
-            break;
-          }
-          case 'type_hierarchy': {
-            if (!input.ppType) return errorResult(ErrorCodes.INVALID_INPUT, 'ppType is required for type_hierarchy');
-            result = dg.getTypeHierarchy(input.ppType);
-            break;
-          }
-          case 'type_children': {
-            if (!input.ppType) return errorResult(ErrorCodes.INVALID_INPUT, 'ppType is required for type_children');
-            result = dg.getTypeChildren(input.ppType);
-            break;
-          }
-          case 'type_properties': {
-            if (!input.ppType) return errorResult(ErrorCodes.INVALID_INPUT, 'ppType is required for type_properties');
-            result = dg.getPropertiesFor(input.ppType);
-            break;
-          }
-          case 'animatable_properties': {
-            if (!input.ppType) return errorResult(ErrorCodes.INVALID_INPUT, 'ppType is required for animatable_properties');
-            result = dg.getAnimatableProperties(input.ppType);
-            break;
-          }
-          case 'is_subtype': {
-            if (!input.typeA || !input.typeB) return errorResult(ErrorCodes.INVALID_INPUT, 'typeA and typeB are required for is_subtype');
-            result = { isSubtype: dg.isSubtypeOf(input.typeA, input.typeB) };
-            break;
-          }
-          case 'edge_info': {
-            const edgeName = input.relationName || input.ppType;
-            if (!edgeName) return errorResult(ErrorCodes.INVALID_INPUT, 'relationName or ppType is required for edge_info');
-            const ppEdge = PP_VOCABULARY.edges[edgeName] || PP_VOCABULARY.edges[RELATION_TYPE_MAP[edgeName] || ''];
-            result = ppEdge || { error: `Unknown edge: ${edgeName}` };
-            break;
-          }
-          case 'node_type': {
-            if (!input.itemType) return errorResult(ErrorCodes.INVALID_INPUT, 'itemType is required for node_type');
-            result = { ppType: dg.getNodeType(input.itemType) };
-            break;
-          }
-          case 'edge_type': {
-            if (!input.relationName) return errorResult(ErrorCodes.INVALID_INPUT, 'relationName is required for edge_type');
-            result = { ppEdge: dg.getEdgeType(input.relationName) };
-            break;
-          }
-          default:
-            return errorResult(ErrorCodes.INVALID_INPUT, `Unknown query: ${input.query}`);
-        }
-
-        return {
-          content: [{
-            type: 'text' as const,
-            text: JSON.stringify(result, null, 2),
-          }],
-        };
-      }
 
       // -----------------------------------------------------------------------
       // UNKNOWN TOOL
