@@ -156,6 +156,7 @@ import { fontHandlers } from './handlers/font.js';
 import { toolGuideHandlers } from './handlers/tool-guide.js';
 import { mapHandlers } from './handlers/maps.js';
 import { ontologyHandlers } from './handlers/ontology.js';
+import { exportHandlers } from './handlers/export.js';
 
 /**
  * Registry of per-domain handler maps. Tools listed here short-circuit the
@@ -168,6 +169,7 @@ const DOMAIN_HANDLERS: Array<Record<string, (args: Record<string, unknown>, opti
   toolGuideHandlers,
   mapHandlers,
   ontologyHandlers,
+  exportHandlers,
 ];
 
 // =============================================================================
@@ -618,7 +620,7 @@ ${code}
 // I18N HELPER FUNCTIONS
 // =============================================================================
 
-function getLocalizedSuccessMessage(
+export function getLocalizedSuccessMessage(
   i18n: I18nManager | undefined,
   key: string,
   params: Record<string, string | number>
@@ -1348,32 +1350,8 @@ You can now start creating new items on a clean canvas.`,
       }
 
       // -----------------------------------------------------------------------
-      // EXPORT TOOLS
+      // EXPORT TOOLS — extracted to src/tools/handlers/export.ts
       // -----------------------------------------------------------------------
-      case 'pinepaper_export_svg': {
-        const code = codeGenerator.generateExportSVG();
-        const description = getLocalizedSuccessMessage(i18n, 'exported', {
-          format: 'SVG',
-        });
-        return executeOrGenerate(code, description, options, 'pinepaper_export_svg');
-      }
-
-      case 'pinepaper_export_training_data': {
-        const input = ExportTrainingDataInputSchema.parse(args);
-        const code = codeGenerator.generateExportTrainingData(
-          input.format,
-          input.includeMetadata
-        );
-        const description = getLocalizedSuccessMessage(i18n, 'exported', {
-          format: input.format?.toUpperCase() || 'JSON',
-        });
-        return executeOrGenerate(code, description, options, 'pinepaper_export_training_data');
-      }
-
-      case 'pinepaper_export_scene': {
-        const code = codeGenerator.generateExportScene();
-        return executeOrGenerate(code, 'Exports complete scene state', options, 'pinepaper_export_scene');
-      }
 
       // -----------------------------------------------------------------------
       // BROWSER CONTROL TOOLS
