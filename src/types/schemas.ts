@@ -736,6 +736,17 @@ export const ImportMermaidInputSchema = z.object({
 });
 export type ImportMermaidInput = z.infer<typeof ImportMermaidInputSchema>;
 
+// Capture current canvas as pp: ontology — wraps FxTool's
+// app.exportCanvasOntology() (PinePaper.js, post-promotion) so an LLM can
+// reason about composition from a compact triples block + structured items
+// list rather than a raw paper.js dump.
+export const GetCanvasOntologyInputSchema = z.object({
+  maxItems: z.number().int().positive().max(500).optional().default(50).describe('Cap on item summaries (default 50). Larger scenes are truncated, not paginated.'),
+  maxChildren: z.number().int().positive().max(50).optional().default(10).describe('Cap on per-group child summaries (default 10).'),
+  includeViewport: z.boolean().optional().default(false).describe('Include current view zoom/center + camera-animation flag (default false).'),
+});
+export type GetCanvasOntologyInput = z.infer<typeof GetCanvasOntologyInputSchema>;
+
 // Add Filter
 export const AddFilterInputSchema = z.object({
   filterType: FilterTypeSchema,

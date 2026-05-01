@@ -2564,6 +2564,7 @@ You can now start creating new items on a clean canvas.`,
             'pinepaper_tool_guide',
             'pinepaper_set_toolkit',
             // Ontology tools
+            'pinepaper_get_canvas_ontology',
             'pinepaper_analyze_design',
             'pinepaper_validate_design',
             'pinepaper_query_ontology',

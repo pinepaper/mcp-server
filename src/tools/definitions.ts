@@ -7163,6 +7163,42 @@ EXAMPLES:
   // ONTOLOGY TOOLS (Design Knowledge Graph)
   // ---------------------------------------------------------------------------
   {
+    name: 'pinepaper_get_canvas_ontology',
+    annotations: {
+      title: 'Get Canvas Ontology',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Capture the live canvas as compact pp: ontology triples + a structured item summary.
+
+USE THIS instead of pinepaper_get_items when you need to REASON about composition (what's on the canvas, how items relate, what's animated). Typical scenes shrink 3-10× compared to a raw item dump while preserving relations, animations, effects, masks, and collage styling.
+
+OUTPUT (a snapshot of FxTool's canvas state):
+- canvasWidth, canvasHeight, canvasPreset
+- itemCount, itemTypes ([unique]), hasAnimations, relationCount
+- items: capped item summaries with positions, colors, group structure, collage metadata, keyframes, effects, deformations
+- triples: a TripleLanguage-serialized pp: triple block (compact tokenized form). Read this for structural reasoning.
+- viewport (when includeViewport: true): zoom + center + hasCameraAnimation flag
+
+OPTIONS:
+- maxItems (default 50): cap on item summaries. Larger scenes are truncated, not paginated — pinepaper_query_ontology and pinepaper_get_items remain available for full enumeration.
+- maxChildren (default 10): cap on per-group child summaries.
+- includeViewport (default false): include zoom/pan/camera-animation flag.
+
+NOTE: Requires FxTool with the canvas-ontology promotion. Returns { success: false, error } with a clear hint when running against an older build.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        maxItems: { type: 'number', description: 'Cap on item summaries (default 50, max 500).' },
+        maxChildren: { type: 'number', description: 'Cap on per-group child summaries (default 10, max 50).' },
+        includeViewport: { type: 'boolean', description: 'Include zoom/pan/camera-animation state (default false).' },
+      },
+    },
+  },
+
+  {
     name: 'pinepaper_analyze_design',
     annotations: {
       title: 'Analyze Design',

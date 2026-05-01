@@ -1204,6 +1204,49 @@ throw new Error('Either svgString or url must be provided');
   }
 
   /**
+   * Generate code for capturing the canvas as pp: ontology. Wraps FxTool's
+   * app.exportCanvasOntology() — defined in PinePaper.js after the
+   * canvas-state-to-ontology promotion. Output mirrors the cloud-sync
+   * postMessage contract: { canvasWidth, canvasHeight, itemCount,
+   * itemTypes, hasAnimations, relationCount, items, triples, [viewport] }.
+   *
+   * Failure modes: app missing the method → return { success: false, error }
+   * with a clear FxTool-version hint. Internal exceptions propagate from
+   * the browser-side function (TripleLanguage warns to console; we don't
+   * fail the tool call on triple-only failures).
+   */
+  generateGetCanvasOntology(
+    options: { maxItems?: number; maxChildren?: number; includeViewport?: boolean } = {},
+  ): string {
+    const optsJson = JSON.stringify(options);
+    return `
+// Capture canvas as pp: ontology
+(function() {
+  if (!app.exportCanvasOntology) {
+    return {
+      success: false,
+      error: 'app.exportCanvasOntology not available — requires FxTool with canvas-ontology promotion. Falling back to pinepaper_get_items is acceptable but loses the triples representation.',
+    };
+  }
+  const ctx = app.exportCanvasOntology(${optsJson});
+  return {
+    success: true,
+    canvasWidth: ctx.canvasWidth,
+    canvasHeight: ctx.canvasHeight,
+    canvasPreset: ctx.canvasPreset,
+    itemCount: ctx.itemCount,
+    itemTypes: ctx.itemTypes,
+    hasAnimations: ctx.hasAnimations,
+    relationCount: ctx.relationCount,
+    items: ctx.items,
+    triples: ctx.triples,
+    viewport: ctx.viewport,
+  };
+})();
+`.trim();
+  }
+
+  /**
    * Generate code for adding a filter
    */
   generateAddFilter(

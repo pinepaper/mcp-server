@@ -644,6 +644,44 @@ describe('PinePaperCodeGenerator', () => {
     });
   });
 
+  describe('generateGetCanvasOntology', () => {
+    it('emits a guarded call to app.exportCanvasOntology', () => {
+      const code = codeGenerator.generateGetCanvasOntology({});
+      expect(code).toContain('app.exportCanvasOntology');
+      expect(code).toContain('if (!app.exportCanvasOntology)');
+      expect(code).toContain('requires FxTool with canvas-ontology promotion');
+    });
+
+    it('passes through maxItems / maxChildren / includeViewport options', () => {
+      const code = codeGenerator.generateGetCanvasOntology({
+        maxItems: 100,
+        maxChildren: 5,
+        includeViewport: true,
+      });
+      expect(code).toContain('"maxItems":100');
+      expect(code).toContain('"maxChildren":5');
+      expect(code).toContain('"includeViewport":true');
+    });
+
+    it('returns a result shape including triples + items + summary fields', () => {
+      const code = codeGenerator.generateGetCanvasOntology({});
+      // The mapped fields the LLM cares about must appear in the return:
+      for (const field of [
+        'canvasWidth', 'canvasHeight', 'canvasPreset',
+        'itemCount', 'itemTypes', 'hasAnimations', 'relationCount',
+        'items', 'triples', 'viewport',
+      ]) {
+        expect(code).toContain(field);
+      }
+    });
+
+    it('omits options that are not provided', () => {
+      const code = codeGenerator.generateGetCanvasOntology({});
+      // No options means the JSON-stringified opts is "{}"
+      expect(code).toContain('app.exportCanvasOntology({})');
+    });
+  });
+
   describe('generateImportMermaid', () => {
     it('emits app.importMermaid with the source text', () => {
       const code = codeGenerator.generateImportMermaid(
