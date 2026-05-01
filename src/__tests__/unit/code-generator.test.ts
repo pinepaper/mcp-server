@@ -644,6 +644,36 @@ describe('PinePaperCodeGenerator', () => {
     });
   });
 
+  describe('generateAgentStartJob — ontology pre-bundle', () => {
+    it('bundles app.exportCanvasOntology() into the return by default', () => {
+      const code = codeGenerator.generateAgentStartJob({});
+      expect(code).toContain('app.exportCanvasOntology');
+      expect(code).toContain('ontology: _ontology');
+      expect(code).toContain('ontologyUnavailable');
+    });
+
+    it('marks ontologyUnavailable when the public method is missing', () => {
+      const code = codeGenerator.generateAgentStartJob({});
+      // The guard sets _ontologyUnavailable = true on missing method
+      expect(code).toContain('if (app.exportCanvasOntology)');
+      expect(code).toContain('_ontologyUnavailable = true');
+    });
+
+    it('skips the ontology block when includeOntology: false', () => {
+      const code = codeGenerator.generateAgentStartJob({ includeOntology: false });
+      expect(code).not.toContain('app.exportCanvasOntology');
+      expect(code).not.toContain('ontology: _ontology');
+    });
+
+    it('captures ontology even when clearCanvas: false (resume case)', () => {
+      const code = codeGenerator.generateAgentStartJob({ clearCanvas: false });
+      // Clear-canvas block must be absent
+      expect(code).not.toContain('app.clearCanvas()');
+      // But ontology capture must still run
+      expect(code).toContain('app.exportCanvasOntology');
+    });
+  });
+
   describe('generateGetCanvasOntology', () => {
     it('emits a guarded call to app.exportCanvasOntology', () => {
       const code = codeGenerator.generateGetCanvasOntology({});

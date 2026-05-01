@@ -1933,11 +1933,12 @@ throw new Error('Unknown diagram mode action: ${action}');
    */
   generateAgentStartJob(input: AgentStartJobInput): string {
     const validated = AgentStartJobInputSchema.parse(input);
-    const { name, screenshotPolicy, canvasPreset, clearCanvas } = validated;
+    const { name, screenshotPolicy, canvasPreset, clearCanvas, includeOntology } = validated;
 
     const nameStr = name ? `'${name.replace(/'/g, "\\'")}'` : 'null';
     const policyStr = screenshotPolicy || 'on_complete';
     const shouldClear = clearCanvas !== false;
+    const wantOntology = includeOntology !== false;
 
     let code = `
 // Start agent job
@@ -1972,8 +1973,30 @@ throw new Error('Unknown diagram mode action: ${action}');
 `;
     }
 
+    if (wantOntology) {
+      code += `
+  // Capture initial canvas ontology so the agent has baseline context
+  // without a follow-up pinepaper_get_canvas_ontology call. After
+  // clearCanvas this is a tiny empty-state payload; with clearCanvas:false
+  // it captures whatever's already on the canvas. Older FxTool builds
+  // without exportCanvasOntology produce an _ontologyUnavailable: true
+  // marker so the agent knows to fall back to pinepaper_get_items.
+  let _ontology = null;
+  let _ontologyUnavailable = false;
+  try {
+    if (app.exportCanvasOntology) {
+      _ontology = app.exportCanvasOntology();
+    } else {
+      _ontologyUnavailable = true;
+    }
+  } catch (e) {
+    _ontologyUnavailable = true;
+  }
+`;
+    }
+
     code += `
-  // Return job context with canvas size
+  // Return job context with canvas size${wantOntology ? ' + initial ontology' : ''}
   const _cs = app.getCanvasSize ? app.getCanvasSize() : { width: 800, height: 600 };
   return {
     success: true,
@@ -1982,7 +2005,9 @@ throw new Error('Unknown diagram mode action: ${action}');
     screenshotPolicy: '${policyStr}',
     canvasPreset: ${canvasPreset ? `'${canvasPreset}'` : 'null'},
     canvasCleared: ${shouldClear},
-    canvasSize: { width: _cs.width || 800, height: _cs.height || 600 }
+    canvasSize: { width: _cs.width || 800, height: _cs.height || 600 }${wantOntology ? `,
+    ontology: _ontology,
+    ontologyUnavailable: _ontologyUnavailable || undefined` : ''}
   };
 })();
 `;

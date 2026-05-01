@@ -6512,7 +6512,7 @@ PRIVACY: No screenshots, no tool call arguments, no user content — only struct
 
 WORKFLOW: start_job → batch_execute (everything in ONE call) → end_job (screenshot) → show user → iterate if needed.
 
-RETURNS: canvasSize {width, height} — use this to position items within bounds.
+RETURNS: canvasSize {width, height} — use this to position items within bounds. Also returns ontology: a pp: triples + item summary snapshot of the (typically empty) canvas. Reuse this baseline across the same agent turn instead of calling pinepaper_get_canvas_ontology unless you've mutated the canvas. When clearCanvas is false, the ontology captures whatever's already on the canvas.
 
 CANVAS PRESETS: instagram (1080x1080), instagram-story (1080x1920), tiktok (1080x1920), youtube (1920x1080), youtube-thumbnail (1280x720), twitter (1200x675), linkedin (1200x627), web, print-a4, print-letter`,
     inputSchema: {
@@ -6539,6 +6539,10 @@ CANVAS PRESETS: instagram (1080x1080), instagram-story (1080x1920), tiktok (1080
         clearCanvas: {
           type: 'boolean',
           description: 'Clear canvas when starting job (default: true)',
+        },
+        includeOntology: {
+          type: 'boolean',
+          description: 'Include canvas ontology snapshot in the result (default: true). Pre-bundles a pp: triples baseline so the agent can reason about composition without a follow-up pinepaper_get_canvas_ontology call.',
         },
       },
     },
