@@ -1674,6 +1674,39 @@ describe('handleToolCall', () => {
     });
   });
 
+  describe('pinepaper_get_canvas_ontology', () => {
+    it('generates a guarded call to app.exportCanvasOntology', async () => {
+      const result = await handleToolCall('pinepaper_get_canvas_ontology', {});
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('app.exportCanvasOntology');
+      expect(text).toContain('triples');
+    });
+
+    it('passes maxItems / maxChildren / includeViewport through to the call', async () => {
+      const result = await handleToolCall('pinepaper_get_canvas_ontology', {
+        maxItems: 25,
+        maxChildren: 5,
+        includeViewport: true,
+      });
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('"maxItems":25');
+      expect(text).toContain('"maxChildren":5');
+      expect(text).toContain('"includeViewport":true');
+    });
+
+    it('rejects out-of-range maxItems (>500) at Zod validation', async () => {
+      const result = await handleToolCall('pinepaper_get_canvas_ontology', {
+        maxItems: 5000,
+      });
+      expect(result.isError).toBe(true);
+      const text = (result.content[0] as { type: string; text: string }).text;
+      const parsed = JSON.parse(text);
+      expect(parsed.error.code).toBe('VALIDATION_ERROR');
+    });
+  });
+
   describe('unknown tool', () => {
     it('should return error for unknown tool', async () => {
       const result = await handleToolCall('unknown_tool', {});

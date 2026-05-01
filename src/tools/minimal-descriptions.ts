@@ -196,6 +196,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_register_item: 'Register an existing Paper.js item in the PinePaper registry.',
 
   // --- Ontology ---
+  pinepaper_get_canvas_ontology: 'Capture live canvas as compact pp: triples + item summary. Prefer over get_items for composition reasoning. maxItems, maxChildren, includeViewport.',
   pinepaper_analyze_design: 'Analyze template definition → typed graph, patterns, math functions, semantics, fingerprint, JSON-LD.',
   pinepaper_validate_design: 'Validate + score template definition. 5-dimension quality scoring: completeness, animation, semantics, composition, structure.',
   pinepaper_query_ontology: 'Query design knowledge graph. query: list_types|list_edges|list_generators|list_effects|type_hierarchy|type_properties|animatable_properties|is_subtype|node_type|edge_type.',

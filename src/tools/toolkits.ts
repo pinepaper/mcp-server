@@ -270,6 +270,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
 
   // --- Ontology (Design Knowledge Graph) ---
   ontology: [
+    'pinepaper_get_canvas_ontology',
     'pinepaper_analyze_design',
     'pinepaper_validate_design',
     'pinepaper_query_ontology',

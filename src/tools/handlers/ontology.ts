@@ -15,11 +15,13 @@
  */
 
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { errorResult, type HandlerOptions } from '../handlers.js';
+import { errorResult, executeOrGenerate, type HandlerOptions } from '../handlers.js';
+import { codeGenerator } from '../../types/code-generator.js';
 import {
   AnalyzeDesignInputSchema,
   ValidateDesignInputSchema,
   QueryOntologyInputSchema,
+  GetCanvasOntologyInputSchema,
   ErrorCodes,
 } from '../../types/schemas.js';
 
@@ -29,6 +31,16 @@ export type OntologyHandler = (
 ) => Promise<CallToolResult>;
 
 export const ontologyHandlers: Record<string, OntologyHandler> = {
+  pinepaper_get_canvas_ontology: async (args, options) => {
+    const input = GetCanvasOntologyInputSchema.parse(args);
+    const code = codeGenerator.generateGetCanvasOntology({
+      maxItems: input.maxItems,
+      maxChildren: input.maxChildren,
+      includeViewport: input.includeViewport,
+    });
+    return executeOrGenerate(code, 'Captures canvas as pp: ontology', options, 'pinepaper_get_canvas_ontology');
+  },
+
   pinepaper_analyze_design: async (args, _options) => {
     const input = AnalyzeDesignInputSchema.parse(args);
     const { DesignGraph } = await import('../../ontology/index.js');
