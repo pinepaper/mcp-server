@@ -150,7 +150,7 @@ import {
 import { getPerformanceTracker, TimingMetric, MetricsExportFormat } from '../metrics/index.js';
 import { ErrorContext, formatErrorContext, captureCanvasState } from '../execution/index.js';
 import { getSessionManager } from '../agent/session-manager.js';
-import { vocabularyHintForPath } from '../ontology/hints.js';
+import { vocabularyHintForPath, validateBatchVocabulary } from '../ontology/hints.js';
 
 // =============================================================================
 // SCREENSHOT MODE CONFIGURATION
@@ -2390,6 +2390,29 @@ You can now start creating new items on a clean canvas.`,
 
       case 'pinepaper_agent_batch_execute': {
         const input = AgentBatchExecuteInputSchema.parse(args);
+
+        // Ontology preflight — catch typos in itemType/relationType/
+        // effectType/generatorName before generating JS, so the LLM gets a
+        // structured hint instead of a silent failure inside the browser.
+        // Opt-out via skipValidation: true when the caller knows what they're
+        // doing (e.g. experimental vocabulary).
+        if (!input.skipValidation) {
+          const violations = validateBatchVocabulary(
+            input.operations as ReadonlyArray<Record<string, unknown>>,
+          );
+          if (violations.length > 0) {
+            return errorResult(
+              ErrorCodes.VALIDATION_ERROR,
+              `Batch preflight rejected ${violations.length} operation${violations.length > 1 ? 's' : ''} with unknown vocabulary value${violations.length > 1 ? 's' : ''}. Fix the offending fields and retry, or pass skipValidation: true to bypass.`,
+              violations.map((v) => ({
+                path: `operations[${v.opIndex}].${v.field}`,
+                opType: v.opType,
+                vocabulary: v.hint,
+              })),
+            );
+          }
+        }
+
         const code = codeGenerator.generateAgentBatchExecute(input);
         const description = `Batch executed ${input.operations.length} operations${input.atomic !== false ? ' (atomic)' : ''}`;
 

@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect } from 'bun:test';
-import { suggestTypo, vocabularyHintForPath, VOCABULARY_FIELD_NAMES } from '../../ontology/hints.js';
+import { suggestTypo, vocabularyHintForPath, VOCABULARY_FIELD_NAMES, validateBatchVocabulary } from '../../ontology/hints.js';
 import {
   ItemTypeSchema,
   RelationTypeSchema,
@@ -192,5 +192,79 @@ describe('Descriptions derive from vocabulary (no drift)', () => {
   it('EffectTypeSchema options are a deduped non-empty set', () => {
     expect(EffectTypeSchema.options.length).toBeGreaterThan(0);
     expect(new Set(EffectTypeSchema.options).size).toBe(EffectTypeSchema.options.length);
+  });
+});
+
+describe('validateBatchVocabulary (preflight for pinepaper_agent_batch_execute)', () => {
+  it('returns no violations for an all-valid batch', () => {
+    const violations = validateBatchVocabulary([
+      { type: 'create', itemType: 'circle' },
+      { type: 'create', itemType: 'text' },
+      { type: 'relation', relationType: 'orbits' },
+      { type: 'apply_effect', effectType: 'sparkle' },
+      { type: 'execute_generator', generatorName: 'drawBokeh' },
+    ]);
+    expect(violations).toEqual([]);
+  });
+
+  it('flags a typo in itemType with op index, field, and a suggestion', () => {
+    const violations = validateBatchVocabulary([
+      { type: 'create', itemType: 'circle' },
+      { type: 'create', itemType: 'circel' }, // typo
+    ]);
+    expect(violations.length).toBe(1);
+    const v = violations[0];
+    expect(v.opIndex).toBe(1);
+    expect(v.opType).toBe('create');
+    expect(v.field).toBe('itemType');
+    expect(v.hint.suggestion).toBe('circle');
+    expect(v.hint.ppType).toBe('pp:Circle');
+  });
+
+  it('flags relationType + effectType + generatorName independently', () => {
+    const violations = validateBatchVocabulary([
+      { type: 'relation', relationType: 'oribits' },
+      { type: 'apply_effect', effectType: 'sparkl' },
+      { type: 'execute_generator', generatorName: 'drawBokh' },
+    ]);
+    expect(violations.length).toBe(3);
+    expect(violations.map((v) => v.field)).toEqual(['relationType', 'effectType', 'generatorName']);
+    expect(violations.map((v) => v.hint.suggestion)).toEqual(['orbits', 'sparkle', 'drawBokeh']);
+  });
+
+  it('skips ops whose type is not a vocabulary-bearing type', () => {
+    const violations = validateBatchVocabulary([
+      { type: 'set_canvas_size', preset: 'totally-invalid-preset' }, // preset isn't vocab-checked here
+      { type: 'play_timeline', action: 'maybe-typo' },
+      { type: 'modify', itemId: '$0' },
+    ]);
+    expect(violations).toEqual([]);
+  });
+
+  it('ignores undefined/null vocab fields (op may legitimately omit them)', () => {
+    const violations = validateBatchVocabulary([
+      { type: 'create' }, // no itemType — caught by other validation, not this preflight
+      { type: 'relation' },
+    ]);
+    expect(violations).toEqual([]);
+  });
+
+  it('case-sensitive: "Circle" is invalid, suggestion is "circle"', () => {
+    const violations = validateBatchVocabulary([
+      { type: 'create', itemType: 'Circle' },
+    ]);
+    expect(violations.length).toBe(1);
+    expect(violations[0].hint.suggestion).toBe('circle');
+  });
+
+  it('preserves op index across mixed valid/invalid operations', () => {
+    const violations = validateBatchVocabulary([
+      { type: 'create', itemType: 'circle' },
+      { type: 'create', itemType: 'rectangel' }, // op[1] typo
+      { type: 'relation', relationType: 'follows' },
+      { type: 'apply_effect', effectType: 'fier' },  // op[3] typo
+    ]);
+    expect(violations.map((v) => v.opIndex)).toEqual([1, 3]);
+    expect(violations.map((v) => v.hint.suggestion)).toEqual(['rectangle', 'fire']);
   });
 });
