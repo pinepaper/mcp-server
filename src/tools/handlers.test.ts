@@ -641,6 +641,63 @@ describe('handleToolCall', () => {
 
       expect(result.isError).toBeFalsy();
     });
+
+    it('rejects vocabulary typos at preflight with VALIDATION_ERROR + suggestion', async () => {
+      const result = await handleToolCall('pinepaper_agent_batch_execute', {
+        operations: [
+          { type: 'create', itemType: 'circle' },
+          { type: 'create', itemType: 'circel' }, // typo
+        ],
+      });
+
+      expect(result.isError).toBe(true);
+      const text = (result.content[0] as { type: string; text: string }).text;
+      const parsed = JSON.parse(text);
+      expect(parsed.error.code).toBe('VALIDATION_ERROR');
+      expect(parsed.error.message).toContain('preflight');
+      // Detail must point at op index 1 and suggest 'circle'
+      const detail = parsed.error.details[0];
+      expect(detail.path).toBe('operations[1].itemType');
+      expect(detail.opType).toBe('create');
+      expect(detail.vocabulary.suggestion).toBe('circle');
+      expect(detail.vocabulary.ppType).toBe('pp:Circle');
+    });
+
+    it('skipValidation:true bypasses the preflight even with a typo', async () => {
+      const result = await handleToolCall('pinepaper_agent_batch_execute', {
+        operations: [
+          { type: 'create', itemType: 'circel' }, // would normally fail
+        ],
+        skipValidation: true,
+      });
+
+      // Codegen still runs — typo gets stringified into the JS, no preflight
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('circel');
+    });
+
+    it('catches relationType + effectType + generatorName typos in one preflight', async () => {
+      const result = await handleToolCall('pinepaper_agent_batch_execute', {
+        operations: [
+          { type: 'create', itemType: 'circle' },
+          { type: 'relation', relationType: 'oribits' },
+          { type: 'apply_effect', effectType: 'sparkl' },
+          { type: 'execute_generator', generatorName: 'drawBokh' },
+        ],
+      });
+
+      expect(result.isError).toBe(true);
+      const text = (result.content[0] as { type: string; text: string }).text;
+      const parsed = JSON.parse(text);
+      expect(parsed.error.details.length).toBe(3);
+      const fields = parsed.error.details.map((d: { path: string }) => d.path);
+      expect(fields).toEqual([
+        'operations[1].relationType',
+        'operations[2].effectType',
+        'operations[3].generatorName',
+      ]);
+    });
   });
 
   describe('pinepaper_agent_export', () => {

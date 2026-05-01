@@ -6670,6 +6670,8 @@ NOTE: For diagrams (flowcharts, UML), use pinepaper_create_diagram_shape + pinep
 
 ⚠️ SIZING: All positions/sizes MUST fit within the canvas. start_job returns canvasSize. Keep items within 5%-95% of canvas width/height. Max canvas: 4096x4096.
 
+ONTOLOGY PREFLIGHT: Before code generation, this tool validates itemType, relationType, effectType, and generatorName against the canonical PinePaper vocabulary. A typo (e.g. "circel") returns a structured VALIDATION_ERROR with the operation index, the offending field, the canonical valid list, and a suggested fix — fix and retry rather than guessing. Pass skipValidation: true to bypass when intentionally using experimental vocabulary.
+
 WORKFLOW:
 1. pinepaper_agent_start_job → 2. pinepaper_agent_batch_execute (everything) → 3. pinepaper_agent_end_job (screenshot for validation)
 After validation: user reviews screenshot → feedback → modify/recreate as needed.
@@ -6830,6 +6832,10 @@ EXAMPLE — Animated sky scene with timed reveals:
         atomic: {
           type: 'boolean',
           description: 'If true, all operations succeed or all fail (default: true)',
+        },
+        skipValidation: {
+          type: 'boolean',
+          description: 'Skip the ontology preflight that catches vocabulary typos before browser execution (default: false). Only set true when knowingly using experimental values.',
         },
       },
       required: ['operations'],

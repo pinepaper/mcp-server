@@ -100,3 +100,53 @@ export function vocabularyHintForPath(path: string, received: unknown): Vocabula
 
 /** Exposed for tests + description-parity checks. */
 export const VOCABULARY_FIELD_NAMES = Object.keys(VOCABULARY_FIELDS);
+
+/**
+ * Per-operation-type → which vocabulary fields to validate.
+ * Used by batch preflight (pinepaper_agent_batch_execute) so an LLM that
+ * typoed `circel` instead of `circle` gets a structured hint back BEFORE
+ * the batch crosses the browser boundary — rather than failing silently
+ * or throwing inside the generated JS.
+ */
+const BATCH_OP_VOCABULARY_FIELDS: Record<string, readonly string[]> = {
+  create: ['itemType'],
+  relation: ['relationType'],
+  apply_effect: ['effectType'],
+  execute_generator: ['generatorName'],
+};
+
+export interface BatchVocabularyViolation {
+  opIndex: number;
+  opType: string;
+  field: string;
+  hint: VocabularyHint;
+}
+
+/**
+ * Walk a batch operations array and return a vocabulary-violation list. Each
+ * entry carries the op index, the op type, the offending field, and a
+ * VocabularyHint with the canonical valid list and a typo suggestion.
+ *
+ * Operation shape kept loose (Record<string, unknown>) so the helper is
+ * callable without depending on the generated Zod types.
+ */
+export function validateBatchVocabulary(
+  operations: ReadonlyArray<Record<string, unknown>>,
+): BatchVocabularyViolation[] {
+  const violations: BatchVocabularyViolation[] = [];
+  operations.forEach((op, opIndex) => {
+    const opType = typeof op.type === 'string' ? op.type : '';
+    const fields = BATCH_OP_VOCABULARY_FIELDS[opType];
+    if (!fields) return;
+    for (const field of fields) {
+      const value = op[field];
+      if (value === undefined || value === null) continue;
+      if (typeof value !== 'string') continue;
+      const hint = vocabularyHintForPath(field, value);
+      if (!hint) continue;
+      const isValid = (hint.validValues as readonly string[]).includes(value);
+      if (!isValid) violations.push({ opIndex, opType, field, hint });
+    }
+  });
+  return violations;
+}

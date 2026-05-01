@@ -1701,6 +1701,7 @@ export type AgentBatchOperation = z.infer<typeof AgentBatchOperationSchema>;
 export const AgentBatchExecuteInputSchema = z.object({
   operations: z.array(AgentBatchOperationSchema).min(1).describe('Array of operations to execute'),
   atomic: z.boolean().optional().default(true).describe('Rollback all operations on any failure'),
+  skipValidation: z.boolean().optional().default(false).describe('Skip the ontology preflight that catches typos in itemType/relationType/effectType/generatorName before browser execution. Use only when intentionally passing experimental vocabulary values.'),
 }).describe('Batch execution input');
 
 export type AgentBatchExecuteInput = z.infer<typeof AgentBatchExecuteInputSchema>;
