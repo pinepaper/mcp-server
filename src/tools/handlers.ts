@@ -765,7 +765,7 @@ async function handleToolCallInner(
         const animProps = ['animationType', 'animationSpeed', 'keyframes', 'animation'];
         const passedAnimProps = animProps.filter(p => p in (input.properties || {}));
         if (passedAnimProps.length > 0) {
-          return errorResult('INVALID_PROPERTIES',
+          return errorResult(ErrorCodes.INVALID_PROPERTIES,
             `Animation properties (${passedAnimProps.join(', ')}) cannot be set via pinepaper_modify_item — they will be silently ignored. ` +
             `Use pinepaper_animate for loop animations (pulse, rotate, bounce, fade, wobble, slide) ` +
             `or pinepaper_keyframe_animate for timed/sequenced animations with precise control.`
@@ -1438,7 +1438,7 @@ async function handleToolCallInner(
 
         if (!controller.connected) {
           return errorResult(
-            'BROWSER_NOT_CONNECTED',
+            ErrorCodes.BROWSER_NOT_CONNECTED,
             'Not connected to PinePaper Studio. Call pinepaper_browser_connect first.'
           );
         }
@@ -1475,7 +1475,7 @@ You can now start creating new items on a clean canvas.`,
           return { content };
         } catch (error) {
           return errorResult(
-            'REFRESH_FAILED',
+            ErrorCodes.REFRESH_FAILED,
             error instanceof Error ? error.message : 'Failed to refresh page'
           );
         }
@@ -1622,7 +1622,7 @@ You can now start creating new items on a clean canvas.`,
 
         if (!controller.connected) {
           return errorResult(
-            'BROWSER_NOT_CONNECTED',
+            ErrorCodes.BROWSER_NOT_CONNECTED,
             'Not connected to PinePaper Studio. Call pinepaper_browser_connect first.'
           );
         }
@@ -1634,7 +1634,7 @@ You can now start creating new items on a clean canvas.`,
           const canvasState = await captureCanvasState(controller);
 
           return errorResult(
-            'SCREENSHOT_FAILED',
+            ErrorCodes.SCREENSHOT_FAILED,
             'Failed to capture screenshot',
             undefined,
             {
@@ -2892,49 +2892,49 @@ You can now start creating new items on a clean canvas.`,
             break;
           }
           case 'type_hierarchy': {
-            if (!input.ppType) return errorResult('INVALID_INPUT', 'ppType is required for type_hierarchy');
+            if (!input.ppType) return errorResult(ErrorCodes.INVALID_INPUT, 'ppType is required for type_hierarchy');
             result = dg.getTypeHierarchy(input.ppType);
             break;
           }
           case 'type_children': {
-            if (!input.ppType) return errorResult('INVALID_INPUT', 'ppType is required for type_children');
+            if (!input.ppType) return errorResult(ErrorCodes.INVALID_INPUT, 'ppType is required for type_children');
             result = dg.getTypeChildren(input.ppType);
             break;
           }
           case 'type_properties': {
-            if (!input.ppType) return errorResult('INVALID_INPUT', 'ppType is required for type_properties');
+            if (!input.ppType) return errorResult(ErrorCodes.INVALID_INPUT, 'ppType is required for type_properties');
             result = dg.getPropertiesFor(input.ppType);
             break;
           }
           case 'animatable_properties': {
-            if (!input.ppType) return errorResult('INVALID_INPUT', 'ppType is required for animatable_properties');
+            if (!input.ppType) return errorResult(ErrorCodes.INVALID_INPUT, 'ppType is required for animatable_properties');
             result = dg.getAnimatableProperties(input.ppType);
             break;
           }
           case 'is_subtype': {
-            if (!input.typeA || !input.typeB) return errorResult('INVALID_INPUT', 'typeA and typeB are required for is_subtype');
+            if (!input.typeA || !input.typeB) return errorResult(ErrorCodes.INVALID_INPUT, 'typeA and typeB are required for is_subtype');
             result = { isSubtype: dg.isSubtypeOf(input.typeA, input.typeB) };
             break;
           }
           case 'edge_info': {
             const edgeName = input.relationName || input.ppType;
-            if (!edgeName) return errorResult('INVALID_INPUT', 'relationName or ppType is required for edge_info');
+            if (!edgeName) return errorResult(ErrorCodes.INVALID_INPUT, 'relationName or ppType is required for edge_info');
             const ppEdge = PP_VOCABULARY.edges[edgeName] || PP_VOCABULARY.edges[RELATION_TYPE_MAP[edgeName] || ''];
             result = ppEdge || { error: `Unknown edge: ${edgeName}` };
             break;
           }
           case 'node_type': {
-            if (!input.itemType) return errorResult('INVALID_INPUT', 'itemType is required for node_type');
+            if (!input.itemType) return errorResult(ErrorCodes.INVALID_INPUT, 'itemType is required for node_type');
             result = { ppType: dg.getNodeType(input.itemType) };
             break;
           }
           case 'edge_type': {
-            if (!input.relationName) return errorResult('INVALID_INPUT', 'relationName is required for edge_type');
+            if (!input.relationName) return errorResult(ErrorCodes.INVALID_INPUT, 'relationName is required for edge_type');
             result = { ppEdge: dg.getEdgeType(input.relationName) };
             break;
           }
           default:
-            return errorResult('INVALID_INPUT', `Unknown query: ${input.query}`);
+            return errorResult(ErrorCodes.INVALID_INPUT, `Unknown query: ${input.query}`);
         }
 
         return {
@@ -2953,7 +2953,7 @@ You can now start creating new items on a clean canvas.`,
           ? i18n.getError('unknownTool', { toolName })
           : `Unknown tool: ${toolName}`;
 
-        return errorResult('UNKNOWN_TOOL', message, {
+        return errorResult(ErrorCodes.UNKNOWN_TOOL, message, {
           availableTools: [
             'pinepaper_create_item',
             'pinepaper_modify_item',
