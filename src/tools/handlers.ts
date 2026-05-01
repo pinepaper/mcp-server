@@ -151,6 +151,18 @@ import { getPerformanceTracker, TimingMetric, MetricsExportFormat } from '../met
 import { ErrorContext, formatErrorContext, captureCanvasState } from '../execution/index.js';
 import { getSessionManager } from '../agent/session-manager.js';
 import { vocabularyHintForPath, validateBatchVocabulary } from '../ontology/hints.js';
+import { cameraHandlers } from './handlers/camera.js';
+import { fontHandlers } from './handlers/font.js';
+
+/**
+ * Registry of per-domain handler maps. Tools listed here short-circuit the
+ * main switch at dispatch time (see handleToolCallInner). New domains are
+ * folded in incrementally as they are migrated out of the monolithic switch.
+ */
+const DOMAIN_HANDLERS: Array<Record<string, (args: Record<string, unknown>, options: HandlerOptions) => Promise<CallToolResult>>> = [
+  cameraHandlers,
+  fontHandlers,
+];
 
 // =============================================================================
 // SCREENSHOT MODE CONFIGURATION
@@ -394,7 +406,7 @@ function handleValidationError(error: ZodError, i18n?: I18nManager): CallToolRes
  *
  * Default is 'on_request' for optimal performance per best practices.
  */
-async function executeOrGenerate(
+export async function executeOrGenerate(
   code: string,
   description: string,
   options: HandlerOptions,
@@ -721,6 +733,14 @@ async function handleToolCallInner(
   const { i18n } = options;
 
   try {
+    // Domain-module dispatch: tools migrated to per-domain handler files
+    // short-circuit before the main switch. See DOMAIN_HANDLERS for the
+    // current registry.
+    for (const domainMap of DOMAIN_HANDLERS) {
+      const handler = domainMap[toolName];
+      if (handler) return await handler(args, options);
+    }
+
     switch (toolName) {
       // -----------------------------------------------------------------------
       // ITEM TOOLS
@@ -1172,210 +1192,12 @@ async function handleToolCallInner(
       }
 
       // -----------------------------------------------------------------------
-      // CAMERA TOOLS
+      // CAMERA TOOLS — extracted to src/tools/handlers/camera.ts
       // -----------------------------------------------------------------------
-      case 'pinepaper_camera_animate': {
-        const keyframes = args.keyframes as Array<{
-          time: number;
-          zoom?: number;
-          center?: [number, number];
-          pitch?: number;
-          yaw?: number;
-          easing?: string;
-        }>;
-        const duration = args.duration as number;
-        const loop = (args.loop as boolean) ?? false;
-        const delay = (args.delay as number) ?? 0;
-        const fov = (args.fov as number) ?? 60;
-        const mode = (args.mode as string) ?? 'keyframes';
-        const target = args.target as { x: number; y: number } | undefined;
-
-        const keyframesStr = JSON.stringify(keyframes);
-        const relParams: Record<string, unknown> = { keyframes: JSON.parse(keyframesStr), duration, loop, delay, fov, mode };
-        if (target) relParams.target = target;
-        const relParamsStr = JSON.stringify(relParams);
-        const code = `app.camera && app.camera.animate ? app.camera.animate(${keyframesStr}, ${duration}, ${loop}, ${delay}, { fov: ${fov}, mode: '${mode}'${target ? `, target: ${JSON.stringify(target)}` : ''} }) : app.addRelation('camera', 'camera', 'camera_animates', ${relParamsStr});`;
-        return executeOrGenerate(code, `Animates camera with ${keyframes.length} keyframes over ${duration}s`, options, 'pinepaper_camera_animate');
-      }
-
-      case 'pinepaper_camera_zoom': {
-        const direction = args.direction as 'in' | 'out';
-        const level = (args.level as number) ?? (direction === 'in' ? 2 : 0.5);
-        const duration = (args.duration as number) ?? 0.5;
-
-        const method = direction === 'in' ? 'zoomIn' : 'zoomOut';
-        const code = `app.camera && app.camera.${method} ? app.camera.${method}(${level}, ${duration}) : null;`;
-        return executeOrGenerate(code, `Camera zoom ${direction} to ${level}x`, options, 'pinepaper_camera_zoom');
-      }
-
-      case 'pinepaper_camera_pan': {
-        const direction = args.direction as 'left' | 'right' | 'up' | 'down' | undefined;
-        const amount = (args.amount as number) ?? 100;
-        const x = args.x as number | undefined;
-        const y = args.y as number | undefined;
-        const duration = (args.duration as number) ?? 0.5;
-
-        let code: string;
-        let description: string;
-
-        if (x !== undefined && y !== undefined) {
-          code = `app.camera && app.camera.panTo ? app.camera.panTo(${x}, ${y}, ${duration}) : null;`;
-          description = `Camera pan to (${x}, ${y})`;
-        } else if (direction) {
-          const methodMap = { left: 'panLeft', right: 'panRight', up: 'panUp', down: 'panDown' };
-          const method = methodMap[direction];
-          code = `app.camera && app.camera.${method} ? app.camera.${method}(${amount}, ${duration}) : null;`;
-          description = `Camera pan ${direction} by ${amount}px`;
-        } else {
-          code = `// No direction or coordinates specified`;
-          description = 'Camera pan (no parameters)';
-        }
-
-        return executeOrGenerate(code, description, options, 'pinepaper_camera_pan');
-      }
-
-      case 'pinepaper_camera_move_to': {
-        const x = args.x as number;
-        const y = args.y as number;
-        const zoom = args.zoom as number;
-        const duration = (args.duration as number) ?? 0.5;
-
-        const code = `app.camera && app.camera.moveTo ? app.camera.moveTo(${x}, ${y}, ${zoom}, ${duration}) : null;`;
-        return executeOrGenerate(code, `Camera move to (${x}, ${y}) at ${zoom}x zoom`, options, 'pinepaper_camera_move_to');
-      }
-
-      case 'pinepaper_camera_reset': {
-        const duration = (args.duration as number) ?? 0.5;
-
-        const code = `app.camera && app.camera.reset ? app.camera.reset(${duration}) : null;`;
-        return executeOrGenerate(code, 'Reset camera to default state', options, 'pinepaper_camera_reset');
-      }
-
-      case 'pinepaper_camera_stop': {
-        const code = `app.camera && app.camera.stop ? app.camera.stop() : null;`;
-        return executeOrGenerate(code, 'Stop camera animation', options, 'pinepaper_camera_stop');
-      }
-
-      case 'pinepaper_camera_state': {
-        const code = `app.camera && app.camera.getState ? app.camera.getState() : { zoom: 1, center: [400, 300], isAnimating: false };`;
-        return executeOrGenerate(code, 'Get current camera state', options, 'pinepaper_camera_state');
-      }
 
       // -----------------------------------------------------------------------
-      // FONT TOOLS
+      // FONT TOOLS — extracted to src/tools/handlers/font.ts
       // -----------------------------------------------------------------------
-      case 'pinepaper_font_show_studio': {
-        const code = `app.fontStudio && app.fontStudio.show ? app.fontStudio.show() : null;`;
-        return executeOrGenerate(code, 'Opens Font Studio UI', options, 'pinepaper_font_show_studio');
-      }
-
-      case 'pinepaper_font_set_name': {
-        const { name } = args as { name: string };
-        const code = `app.fontStudio.setName(${JSON.stringify(name)});`;
-        return executeOrGenerate(code, `Set font name to "${name}"`, options, 'pinepaper_font_set_name');
-      }
-
-      case 'pinepaper_font_get_required_chars': {
-        const { set } = args as { set?: string };
-        const setArg = set ? JSON.stringify(set) : '"minimum"';
-        const code = `app.fontStudio.getRequiredChars(${setArg});`;
-        return executeOrGenerate(code, `Get required characters (${set || 'minimum'} set)`, options, 'pinepaper_font_get_required_chars');
-      }
-
-      case 'pinepaper_font_get_status': {
-        const code = `app.fontStudio.getStatus();`;
-        return executeOrGenerate(code, 'Get font completion status', options, 'pinepaper_font_get_status');
-      }
-
-      case 'pinepaper_font_create_glyph': {
-        const { character, pathId } = args as { character: string; pathId: string };
-        const code = `app.fontStudio.createGlyph(${JSON.stringify(character)}, ${JSON.stringify(pathId)});`;
-        return executeOrGenerate(code, `Create glyph for "${character}" from path ${pathId}`, options, 'pinepaper_font_create_glyph');
-      }
-
-      case 'pinepaper_font_create_space': {
-        const { width } = args as { width?: number };
-        const code = width !== undefined
-          ? `app.fontStudio.createSpace(${width});`
-          : `app.fontStudio.createSpace();`;
-        return executeOrGenerate(code, `Create space glyph${width ? ` (width: ${width})` : ''}`, options, 'pinepaper_font_create_space');
-      }
-
-      case 'pinepaper_font_remove_glyph': {
-        const { character } = args as { character: string };
-        const code = `app.fontStudio.removeGlyph(${JSON.stringify(character)});`;
-        return executeOrGenerate(code, `Remove glyph for "${character}"`, options, 'pinepaper_font_remove_glyph');
-      }
-
-      case 'pinepaper_font_set_metrics': {
-        const metrics = args as { unitsPerEm?: number; ascender?: number; descender?: number; xHeight?: number; capHeight?: number };
-        const code = `app.fontStudio.setMetrics(${JSON.stringify(metrics)});`;
-        return executeOrGenerate(code, 'Set font metrics', options, 'pinepaper_font_set_metrics');
-      }
-
-      case 'pinepaper_font_export': {
-        const { download } = args as { download?: boolean };
-        const code = download === false
-          ? `app.fontStudio.export({ download: false });`
-          : `app.fontStudio.export();`;
-        return executeOrGenerate(code, 'Export font as OTF', options, 'pinepaper_font_export');
-      }
-
-      case 'pinepaper_font_load_into_document': {
-        const code = `app.fontStudio.loadIntoDocument();`;
-        return executeOrGenerate(code, 'Load font into document', options, 'pinepaper_font_load_into_document');
-      }
-
-      case 'pinepaper_font_export_data': {
-        const { download } = args as { download?: boolean };
-        const code = download === false
-          ? `app.fontStudio.exportData({ download: false });`
-          : `app.fontStudio.exportData();`;
-        return executeOrGenerate(code, 'Export font data as JSON', options, 'pinepaper_font_export_data');
-      }
-
-      case 'pinepaper_font_import_data': {
-        const { data } = args as { data: object };
-        const code = `app.fontStudio.importData(${JSON.stringify(data)});`;
-        return executeOrGenerate(code, 'Import font data from JSON', options, 'pinepaper_font_import_data');
-      }
-
-      case 'pinepaper_font_clear': {
-        const code = `app.fontStudio.clear();`;
-        return executeOrGenerate(code, 'Clear all glyphs and reset font', options, 'pinepaper_font_clear');
-      }
-
-      case 'pinepaper_font_remove_overlap': {
-        const { pathId } = args as { pathId: string };
-        const code = `app.fontStudio.removeOverlap(${JSON.stringify(pathId)});`;
-        return executeOrGenerate(code, `Remove overlaps from path ${pathId}`, options, 'pinepaper_font_remove_overlap');
-      }
-
-      case 'pinepaper_font_correct_direction': {
-        const { pathId } = args as { pathId: string };
-        const code = `app.fontStudio.correctDirection(${JSON.stringify(pathId)});`;
-        return executeOrGenerate(code, `Correct path direction for ${pathId}`, options, 'pinepaper_font_correct_direction');
-      }
-
-      case 'pinepaper_font_cleanup_path': {
-        const { pathId, removeOverlap, correctDirection, smooth, smoothTolerance } = args as {
-          pathId: string;
-          removeOverlap?: boolean;
-          correctDirection?: boolean;
-          smooth?: boolean;
-          smoothTolerance?: number;
-        };
-        const optsObj: Record<string, unknown> = {};
-        if (removeOverlap !== undefined) optsObj.removeOverlap = removeOverlap;
-        if (correctDirection !== undefined) optsObj.correctDirection = correctDirection;
-        if (smooth !== undefined) optsObj.smooth = smooth;
-        if (smoothTolerance !== undefined) optsObj.smoothTolerance = smoothTolerance;
-        const hasOpts = Object.keys(optsObj).length > 0;
-        const code = hasOpts
-          ? `app.fontStudio.cleanupPath(${JSON.stringify(pathId)}, ${JSON.stringify(optsObj)});`
-          : `app.fontStudio.cleanupPath(${JSON.stringify(pathId)});`;
-        return executeOrGenerate(code, `Cleanup path ${pathId}`, options, 'pinepaper_font_cleanup_path');
-      }
 
       // -----------------------------------------------------------------------
       // QUERY TOOLS
