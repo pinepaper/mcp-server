@@ -7361,8 +7361,10 @@ Lookup:
 
 USE WHEN: You need full parameter docs, examples, or workflow guidance — especially in minimal verbosity mode where tool descriptions are short summaries.
 
+PREFER RESOURCES WHERE POSSIBLE: The full AI Agent Guide is also available via the MCP resources API at pinepaper://docs/agent-guide — clients that support resources should pull it that way rather than calling this tool. Per-domain references live at pinepaper://docs/{generators,relations,masks,diagrams,maps,effects-and-filters,fonts,custom-paths,paperjs-in-pinepaper,templates,customization,getting-started}. Use this tool when the client doesn't support resources or when you want a specific tool's verbose description.
+
 MODES:
-- No args → returns the full AI Agent Guide (workflow, rules, batch operations, visual composition tips)
+- No args → returns the full AI Agent Guide (same content as pinepaper://docs/agent-guide)
 - tool: "pinepaper_agent_batch_execute" → returns that tool's full verbose description
 - category: "animation" → returns all tools in that category with full descriptions
 
