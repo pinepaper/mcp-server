@@ -96,6 +96,86 @@ const CINEMA_TITLES_PROMPT: PromptMetadata = {
   ],
 };
 
+const SOCIAL_GRAPHIC_PROMPT: PromptMetadata = {
+  name: 'social-graphic',
+  description:
+    'Platform-sized social post with background generator, headline text, and call-to-action. Sets the right canvas preset and exports as the platform-recommended format.',
+  arguments: [
+    {
+      name: 'platform',
+      description: 'instagram | instagram-story | tiktok | youtube | youtube-thumbnail | twitter | linkedin (default: instagram)',
+      required: false,
+    },
+    {
+      name: 'description',
+      description: 'Headline + vibe, e.g. "Sale: 50% off — neon, urgent" or "Welcome back — calm pastel"',
+      required: true,
+    },
+  ],
+};
+
+const ANIMATED_INFOGRAPHIC_PROMPT: PromptMetadata = {
+  name: 'animated-infographic',
+  description:
+    'Data visualization with chart + reveal animations. Uses pinepaper_create_chart to render bar/line/scatter/area charts; the reveal uses keyframe animations and apply_mask.',
+  arguments: [
+    {
+      name: 'description',
+      description: 'The data + framing, e.g. "Q3 revenue by region — bars revealing left-to-right with totals"',
+      required: true,
+    },
+  ],
+};
+
+const MERMAID_DIAGRAM_PROMPT: PromptMetadata = {
+  name: 'mermaid-diagram',
+  description:
+    'Render Mermaid source as a native PinePaper diagram via pinepaper_import_mermaid. Supports flowchart, sequenceDiagram, erDiagram, classDiagram, stateDiagram. Optional walkthrough animation.',
+  arguments: [
+    {
+      name: 'mermaidText',
+      description: 'The Mermaid source string. First non-blank line picks the diagram type.',
+      required: true,
+    },
+    {
+      name: 'walkthrough',
+      description: 'Optional: "true" to add a camera_animates walkthrough that traverses each node.',
+      required: false,
+    },
+  ],
+};
+
+const LOADING_SCREEN_PROMPT: PromptMetadata = {
+  name: 'loading-screen',
+  description:
+    'Branded loading screen with rotating spinner and pulsing logo text. Loops indefinitely.',
+  arguments: [
+    {
+      name: 'description',
+      description: 'Brand and feel, e.g. "Acme Corp — minimal monochrome" or "GameZone — neon arcade"',
+      required: true,
+    },
+  ],
+};
+
+const LETTER_COLLAGE_PROMPT: PromptMetadata = {
+  name: 'letter-collage',
+  description:
+    'Decorative word display using pinepaper_create_letter_collage with a chosen palette + style (tile, magazine, paperCut, fold, gradient, image). Pairs with apply_animated_mask for elegant reveals.',
+  arguments: [
+    {
+      name: 'word',
+      description: 'The word or short phrase, e.g. "DREAM" or "HELLO"',
+      required: true,
+    },
+    {
+      name: 'description',
+      description: 'Style + palette feel, e.g. "fold style, sunset palette, slow reveal"',
+      required: false,
+    },
+  ],
+};
+
 // -----------------------------------------------------------------------------
 // PROMPTS array — exported for ListPrompts handler
 // -----------------------------------------------------------------------------
@@ -106,6 +186,11 @@ export const PROMPTS: PromptMetadata[] = [
   SIMPLE_DECISION_FLOW_PROMPT,
   SOLAR_SYSTEM_PROMPT,
   CINEMA_TITLES_PROMPT,
+  SOCIAL_GRAPHIC_PROMPT,
+  ANIMATED_INFOGRAPHIC_PROMPT,
+  MERMAID_DIAGRAM_PROMPT,
+  LOADING_SCREEN_PROMPT,
+  LETTER_COLLAGE_PROMPT,
 ];
 
 // -----------------------------------------------------------------------------
@@ -177,6 +262,77 @@ function buildCinemaTitles(args: Record<string, string> = {}): PromptMessage[] {
   ];
 }
 
+function buildSocialGraphic(args: Record<string, string> = {}): PromptMessage[] {
+  const platform = args.platform || 'instagram';
+  const description = args.description || 'Headline content — bold and modern';
+  return [
+    {
+      role: 'user',
+      content: {
+        type: 'text',
+        text: `Create a ${platform} social graphic: ${description}. Use the ${platform} canvas preset and export in the platform-recommended format.`,
+      },
+    },
+  ];
+}
+
+function buildAnimatedInfographic(args: Record<string, string> = {}): PromptMessage[] {
+  const description = args.description || 'Quarterly metrics dashboard — bars revealing left-to-right with totals';
+  return [
+    {
+      role: 'user',
+      content: {
+        type: 'text',
+        text: `Create an animated infographic: ${description}. Use pinepaper_create_chart for the data plot and pinepaper_keyframe_animate or pinepaper_apply_animated_mask for the reveal.`,
+      },
+    },
+  ];
+}
+
+function buildMermaidDiagram(args: Record<string, string> = {}): PromptMessage[] {
+  const mermaid = args.mermaidText || 'flowchart TD\n  A[Start] --> B{Decision}\n  B -->|Yes| C[Action]\n  B -->|No| D[End]';
+  const walkthrough = args.walkthrough === 'true';
+  const walkthroughLine = walkthrough
+    ? '\nThen add a camera_animates walkthrough that visits each node in sequence.'
+    : '';
+  return [
+    {
+      role: 'user',
+      content: {
+        type: 'text',
+        text: `Render this Mermaid diagram on the canvas using pinepaper_import_mermaid:\n\n\`\`\`mermaid\n${mermaid}\n\`\`\`${walkthroughLine}`,
+      },
+    },
+  ];
+}
+
+function buildLoadingScreen(args: Record<string, string> = {}): PromptMessage[] {
+  const description = args.description || 'Acme Corp — minimal monochrome';
+  return [
+    {
+      role: 'user',
+      content: {
+        type: 'text',
+        text: `Create a looping branded loading screen: ${description}. Include a rotating spinner and pulsing logo/text. Loop the timeline.`,
+      },
+    },
+  ];
+}
+
+function buildLetterCollage(args: Record<string, string> = {}): PromptMessage[] {
+  const word = args.word || 'HELLO';
+  const description = args.description || 'tile style, wordle palette';
+  return [
+    {
+      role: 'user',
+      content: {
+        type: 'text',
+        text: `Create a decorative letter collage of "${word}" using pinepaper_create_letter_collage. Style/palette: ${description}. Add a subtle reveal with apply_animated_mask.`,
+      },
+    },
+  ];
+}
+
 // -----------------------------------------------------------------------------
 // Prompt message builder map
 // -----------------------------------------------------------------------------
@@ -187,6 +343,11 @@ const PROMPT_BUILDERS: Record<string, (args: Record<string, string>) => PromptMe
   'simple-decision-flow': buildSimpleDecisionFlow,
   'solar-system-education': buildSolarSystem,
   'cinema-titles': buildCinemaTitles,
+  'social-graphic': buildSocialGraphic,
+  'animated-infographic': buildAnimatedInfographic,
+  'mermaid-diagram': buildMermaidDiagram,
+  'loading-screen': buildLoadingScreen,
+  'letter-collage': buildLetterCollage,
 };
 
 // -----------------------------------------------------------------------------

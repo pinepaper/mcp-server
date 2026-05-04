@@ -36,16 +36,31 @@ describe('Prompt Metadata', () => {
     expect(new Set(names).size).toBe(names.length);
   });
 
-  it('has exactly 5 prompts', () => {
-    expect(PROMPTS.length).toBe(5);
+  it('has exactly 10 prompts', () => {
+    expect(PROMPTS.length).toBe(10);
   });
 
-  it('every prompt has a single declarative description argument', () => {
+  it('every prompt declares at least one argument with a string description', () => {
     for (const prompt of PROMPTS) {
       expect(prompt.arguments).toBeTruthy();
-      expect(prompt.arguments!.length).toBe(1);
-      expect(prompt.arguments![0].name).toBe('description');
-      expect(typeof prompt.arguments![0].description).toBe('string');
+      expect(prompt.arguments!.length).toBeGreaterThanOrEqual(1);
+      for (const arg of prompt.arguments!) {
+        expect(typeof arg.name).toBe('string');
+        expect(typeof arg.description).toBe('string');
+        expect(arg.description.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('every prompt has a description argument (the user-prompt slot)', () => {
+    for (const prompt of PROMPTS) {
+      const names = prompt.arguments!.map((a) => a.name);
+      // The conventional 'description' slot is present except where a
+      // domain-specific arg replaces it (mermaid-diagram → mermaidText,
+      // letter-collage → word). At least one of the conventional names
+      // must be present so the model knows what to fill.
+      const hasUserSlot = names.includes('description') || names.includes('mermaidText') || names.includes('word');
+      expect(hasUserSlot).toBe(true);
     }
   });
 });
