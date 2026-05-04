@@ -12,6 +12,20 @@ import { Tool } from '@modelcontextprotocol/sdk/types.js';
 import { I18nManager } from '../i18n/index.js';
 import { COMPACT_DESCRIPTIONS } from './compact-descriptions.js';
 import { MINIMAL_DESCRIPTIONS } from './minimal-descriptions.js';
+import {
+  EffectTypeSchema,
+  SimpleAnimationTypeSchema,
+} from '../types/schemas.js';
+
+/**
+ * Vocabulary lists derived from Zod schemas so tool descriptions stay in
+ * sync automatically. The description-schema-parity test
+ * (src/__tests__/unit/description-schema-parity.test.ts) fails CI if any
+ * tool description that names a vocabulary slot drops or invents values
+ * relative to the source-of-truth schema.
+ */
+const EFFECT_TYPES_LIST = EffectTypeSchema.options.join(', ');
+const SIMPLE_ANIMATION_TYPES_LIST = SimpleAnimationTypeSchema.options.join(', ');
 
 // =============================================================================
 // AI AGENT GUIDE (exported for pinepaper_tool_guide)
@@ -6705,7 +6719,7 @@ ITEMS:
 
 ANIMATION:
   animate — Loop animation: {itemId, animationType, animationOptions}
-    animationType: pulse, rotate, bounce, fade, wobble, slide, typewriter
+    animationType: ${SIMPLE_ANIMATION_TYPES_LIST}
   keyframe_animate — Timed animation: {itemId, keyframes: [{time, properties, easing}], duration, loop}
     Animatable properties: opacity, scale, scaleX, scaleY, x, y, rotation, fillColor, strokeColor, fontSize
     Easing: easeInOut, easeIn, easeOut, easeInCubic, easeOutCubic, easeOutBounce, linear
@@ -6716,7 +6730,7 @@ EFFECTS:
   apply_mask — Reveal effect: {itemId, maskPreset, maskOptions}
     maskPreset: wipeLeft, wipeRight, wipeUp, wipeDown, iris, irisOut, star, heart, curtainHorizontal, curtainVertical, cinematic, diagonalWipe, revealUp, revealDown
   apply_effect — Visual effect: {itemId, effectType, effectParams}
-    effectType: sparkle, blast
+    effectType: ${EFFECT_TYPES_LIST}
 
 PLAYBACK:
   play_timeline — {action: "play"|"stop"|"seek", duration, loop}
