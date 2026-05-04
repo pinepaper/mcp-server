@@ -21,7 +21,7 @@ import {
   GetPromptRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 
-import { PINEPAPER_TOOLS, getLocalizedTools, getToolsForVerbosity } from './tools/definitions.js';
+import { PINEPAPER_TOOLS, getLocalizedTools, getToolsForVerbosity, AI_AGENT_GUIDE } from './tools/definitions.js';
 import type { ToolVerbosity } from './tools/definitions.js';
 import {
   getToolsForToolkit,
@@ -57,6 +57,12 @@ const SERVER_INFO = {
 
 const RESOURCES = [
   // === CORE GUIDES (Start here) ===
+  {
+    uri: 'pinepaper://docs/agent-guide',
+    name: '🤖 AI Agent Guide',
+    description: 'Canonical 130-line workflow + tool-categories reference. Same content the pinepaper_tool_guide tool returns when called with no args. Available here so MCP clients can pull it as a resource without a tool round-trip.',
+    mimeType: 'text/markdown',
+  },
   {
     uri: 'pinepaper://docs/getting-started',
     name: '🚀 Getting Started',
@@ -165,6 +171,10 @@ const RESOURCES = [
 ];
 
 const RESOURCE_CONTENTS: Record<string, string> = {
+  // Agent guide — single source of truth for the canonical workflow + tool
+  // categories text. Mirrors what pinepaper_tool_guide returns with no args
+  // so MCP clients can pull it via the resources API without a tool call.
+  'pinepaper://docs/agent-guide': AI_AGENT_GUIDE,
   'pinepaper://docs/getting-started': `# Getting Started with PinePaper MCP
 
 ## IMPORTANT — Read This First
