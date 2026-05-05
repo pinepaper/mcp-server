@@ -12,6 +12,16 @@ import {
   RelationTypeSchema,
   GeneratorNameSchema,
   EffectTypeSchema,
+  TextPropertiesSchema,
+  CirclePropertiesSchema,
+  StarPropertiesSchema,
+  RectanglePropertiesSchema,
+  PolygonPropertiesSchema,
+  EllipsePropertiesSchema,
+  PathPropertiesSchema,
+  LinePropertiesSchema,
+  ArcPropertiesSchema,
+  BaseVisualPropertiesSchema,
 } from '../types/schemas.js';
 import { ITEM_TYPE_MAP, RELATION_TYPE_MAP, DIAGRAM_SHAPE_MAP } from './vocabulary.js';
 
@@ -120,6 +130,83 @@ export interface BatchVocabularyViolation {
   opType: string;
   field: string;
   hint: VocabularyHint;
+}
+
+/**
+ * Known property keys per itemType — derived from existing per-shape Zod
+ * schemas at module load. Used for batch-preflight typo detection: a key
+ * within Levenshtein-2 of a known key in the same itemType is flagged with
+ * a suggestion. Keys that aren't close to any known key pass through, so
+ * legitimate extras like `gradient`, `data`, custom internals don't false-
+ * positive. Mirrors the suggestTypo / vocabularyHintForPath shape used for
+ * top-level vocabulary fields.
+ */
+function shapeKeys(schema: unknown): string[] {
+  const def = (schema as { _def?: { shape?: () => Record<string, unknown> } })._def;
+  if (!def?.shape) return [];
+  return Object.keys(def.shape());
+}
+
+const baseVisualKeys = shapeKeys(BaseVisualPropertiesSchema);
+const KNOWN_PROPERTY_KEYS_BY_ITEM_TYPE: Record<string, readonly string[]> = {
+  text: shapeKeys(TextPropertiesSchema),
+  circle: [...shapeKeys(CirclePropertiesSchema), ...baseVisualKeys],
+  star: [...shapeKeys(StarPropertiesSchema), ...baseVisualKeys],
+  rectangle: [...shapeKeys(RectanglePropertiesSchema), ...baseVisualKeys],
+  triangle: [...shapeKeys(PolygonPropertiesSchema), ...baseVisualKeys], // triangle uses polygon shape
+  polygon: [...shapeKeys(PolygonPropertiesSchema), ...baseVisualKeys],
+  ellipse: [...shapeKeys(EllipsePropertiesSchema), ...baseVisualKeys],
+  path: [...shapeKeys(PathPropertiesSchema), ...baseVisualKeys],
+  line: [...shapeKeys(LinePropertiesSchema), ...baseVisualKeys],
+  arc: [...shapeKeys(ArcPropertiesSchema), ...baseVisualKeys],
+};
+
+export interface BatchPropertyTypoViolation {
+  opIndex: number;
+  opType: 'create';
+  itemType: string;
+  property: string;
+  suggestion: string;
+  validKeys: readonly string[];
+}
+
+/**
+ * Detect clear property-key typos in batch_execute `create` operations.
+ * Returns ONLY keys that are Levenshtein-≤2 from a known key for the
+ * given itemType — legitimate extras (gradient, custom internals) won't
+ * match anything close, so they pass through silently. This deliberately
+ * narrow scope avoids false positives while still catching the typo class
+ * (radiues vs radius, fontSiz vs fontSize, corneRadius vs cornerRadius).
+ *
+ * Empty itemType / unknown itemType → empty result (let the vocabulary
+ * preflight handle the upstream type error first).
+ */
+export function detectBatchPropertyTypos(
+  operations: ReadonlyArray<Record<string, unknown>>,
+): BatchPropertyTypoViolation[] {
+  const violations: BatchPropertyTypoViolation[] = [];
+  operations.forEach((op, opIndex) => {
+    if (op.type !== 'create') return;
+    const itemType = typeof op.itemType === 'string' ? op.itemType : '';
+    const knownKeys = KNOWN_PROPERTY_KEYS_BY_ITEM_TYPE[itemType];
+    if (!knownKeys || knownKeys.length === 0) return;
+    const props = op.properties;
+    if (!props || typeof props !== 'object') return;
+    for (const key of Object.keys(props)) {
+      if (knownKeys.includes(key)) continue;
+      const suggestion = suggestTypo(key, knownKeys);
+      if (!suggestion) continue;
+      violations.push({
+        opIndex,
+        opType: 'create',
+        itemType,
+        property: key,
+        suggestion,
+        validKeys: knownKeys,
+      });
+    }
+  });
+  return violations;
 }
 
 /**

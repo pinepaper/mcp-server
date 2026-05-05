@@ -150,7 +150,7 @@ import {
 import { getPerformanceTracker, TimingMetric, MetricsExportFormat } from '../metrics/index.js';
 import { ErrorContext, formatErrorContext, captureCanvasState } from '../execution/index.js';
 import { getSessionManager } from '../agent/session-manager.js';
-import { vocabularyHintForPath, validateBatchVocabulary } from '../ontology/hints.js';
+import { vocabularyHintForPath, validateBatchVocabulary, detectBatchPropertyTypos } from '../ontology/hints.js';
 import { cameraHandlers } from './handlers/camera.js';
 import { fontHandlers } from './handlers/font.js';
 import { toolGuideHandlers } from './handlers/tool-guide.js';
@@ -2153,9 +2153,8 @@ You can now start creating new items on a clean canvas.`,
         // Opt-out via skipValidation: true when the caller knows what they're
         // doing (e.g. experimental vocabulary).
         if (!input.skipValidation) {
-          const violations = validateBatchVocabulary(
-            input.operations as ReadonlyArray<Record<string, unknown>>,
-          );
+          const ops = input.operations as ReadonlyArray<Record<string, unknown>>;
+          const violations = validateBatchVocabulary(ops);
           if (violations.length > 0) {
             return errorResult(
               ErrorCodes.VALIDATION_ERROR,
@@ -2164,6 +2163,25 @@ You can now start creating new items on a clean canvas.`,
                 path: `operations[${v.opIndex}].${v.field}`,
                 opType: v.opType,
                 vocabulary: v.hint,
+              })),
+            );
+          }
+          // Property-key typo detection — narrow scope (Levenshtein ≤2) so
+          // legitimate extras like `gradient` pass through. Catches the
+          // common typo class (radiues vs radius, fontSiz vs fontSize)
+          // before browser execution silently drops them.
+          const typos = detectBatchPropertyTypos(ops);
+          if (typos.length > 0) {
+            return errorResult(
+              ErrorCodes.VALIDATION_ERROR,
+              `Batch preflight detected ${typos.length} likely property-key typo${typos.length > 1 ? 's' : ''}. Each suggestion is a Levenshtein-≤2 match against the schema for that itemType — fix and retry, or pass skipValidation: true to bypass.`,
+              typos.map((t) => ({
+                path: `operations[${t.opIndex}].properties.${t.property}`,
+                opType: t.opType,
+                itemType: t.itemType,
+                received: t.property,
+                suggestion: t.suggestion,
+                validKeys: t.validKeys,
               })),
             );
           }

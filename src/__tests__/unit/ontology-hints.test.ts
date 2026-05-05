@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect } from 'bun:test';
-import { suggestTypo, vocabularyHintForPath, VOCABULARY_FIELD_NAMES, validateBatchVocabulary } from '../../ontology/hints.js';
+import { suggestTypo, vocabularyHintForPath, VOCABULARY_FIELD_NAMES, validateBatchVocabulary, detectBatchPropertyTypos } from '../../ontology/hints.js';
 import {
   ItemTypeSchema,
   RelationTypeSchema,
@@ -266,5 +266,77 @@ describe('validateBatchVocabulary (preflight for pinepaper_agent_batch_execute)'
     ]);
     expect(violations.map((v) => v.opIndex)).toEqual([1, 3]);
     expect(violations.map((v) => v.hint.suggestion)).toEqual(['rectangle', 'fire']);
+  });
+});
+
+describe('detectBatchPropertyTypos (#4 — property-key preflight)', () => {
+  it('returns no violations for an all-valid batch', () => {
+    const typos = detectBatchPropertyTypos([
+      { type: 'create', itemType: 'circle', properties: { radius: 50, color: '#ff0000' } },
+      { type: 'create', itemType: 'rectangle', properties: { width: 100, height: 50, cornerRadius: 8 } },
+      { type: 'create', itemType: 'text', properties: { content: 'hi', fontSize: 24 } },
+    ]);
+    expect(typos).toEqual([]);
+  });
+
+  it('flags a typo with op index, suggestion, and itemType', () => {
+    const typos = detectBatchPropertyTypos([
+      { type: 'create', itemType: 'circle', properties: { radiues: 50 } }, // typo
+    ]);
+    expect(typos.length).toBe(1);
+    expect(typos[0].opIndex).toBe(0);
+    expect(typos[0].itemType).toBe('circle');
+    expect(typos[0].property).toBe('radiues');
+    expect(typos[0].suggestion).toBe('radius');
+    expect(typos[0].validKeys).toContain('radius');
+  });
+
+  it('catches multiple typos across operations', () => {
+    const typos = detectBatchPropertyTypos([
+      { type: 'create', itemType: 'rectangle', properties: { corneRadius: 4 } }, // → cornerRadius
+      { type: 'create', itemType: 'text', properties: { fontSiz: 12 } },         // → fontSize
+    ]);
+    expect(typos.length).toBe(2);
+    expect(typos.map((t) => t.suggestion)).toEqual(['cornerRadius', 'fontSize']);
+  });
+
+  it('passes through legitimate extras (no Levenshtein-2 match)', () => {
+    // gradient, _meta, customInternal — none close to any known key
+    const typos = detectBatchPropertyTypos([
+      { type: 'create', itemType: 'circle', properties: { radius: 50, gradient: { stops: [] }, _meta: 'foo', customInternal: true } },
+    ]);
+    expect(typos).toEqual([]);
+  });
+
+  it('skips ops that are not "create"', () => {
+    const typos = detectBatchPropertyTypos([
+      { type: 'modify', itemId: '$0', properties: { radiues: 50 } }, // modify is not create
+      { type: 'animate', itemId: '$0', animationType: 'pulse' },
+    ]);
+    expect(typos).toEqual([]);
+  });
+
+  it('skips create ops with unknown itemType (let vocab preflight handle it)', () => {
+    const typos = detectBatchPropertyTypos([
+      { type: 'create', itemType: 'circel', properties: { radiues: 50 } },
+    ]);
+    expect(typos).toEqual([]);
+  });
+
+  it('skips create ops with no properties object', () => {
+    const typos = detectBatchPropertyTypos([
+      { type: 'create', itemType: 'circle' },
+      { type: 'create', itemType: 'circle', properties: null },
+    ]);
+    expect(typos).toEqual([]);
+  });
+
+  it('shadow/blendMode/opacity (BaseVisualProperties) are valid on shape items', () => {
+    const typos = detectBatchPropertyTypos([
+      { type: 'create', itemType: 'circle', properties: {
+        radius: 50, shadowColor: '#000', shadowBlur: 4, blendMode: 'multiply', opacity: 0.8,
+      }},
+    ]);
+    expect(typos).toEqual([]);
   });
 });

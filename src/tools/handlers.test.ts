@@ -677,6 +677,36 @@ describe('handleToolCall', () => {
       expect(text).toContain('circel');
     });
 
+    it('rejects property-key typos with Levenshtein suggestion (#4)', async () => {
+      const result = await handleToolCall('pinepaper_agent_batch_execute', {
+        operations: [
+          { type: 'create', itemType: 'circle', properties: { radiues: 50, color: '#ff0000' } },
+        ],
+      });
+
+      expect(result.isError).toBe(true);
+      const text = (result.content[0] as { type: string; text: string }).text;
+      const parsed = JSON.parse(text);
+      expect(parsed.error.code).toBe('VALIDATION_ERROR');
+      expect(parsed.error.message).toContain('property-key typo');
+      const detail = parsed.error.details[0];
+      expect(detail.path).toBe('operations[0].properties.radiues');
+      expect(detail.itemType).toBe('circle');
+      expect(detail.suggestion).toBe('radius');
+    });
+
+    it('property-key preflight passes legitimate extras like "gradient"', async () => {
+      const result = await handleToolCall('pinepaper_agent_batch_execute', {
+        operations: [
+          { type: 'create', itemType: 'circle', properties: {
+            radius: 50,
+            gradient: { type: 'linear', stops: [] },
+          }},
+        ],
+      });
+      expect(result.isError).toBeFalsy();
+    });
+
     it('catches relationType + effectType + generatorName typos in one preflight', async () => {
       const result = await handleToolCall('pinepaper_agent_batch_execute', {
         operations: [
