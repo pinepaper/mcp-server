@@ -73,12 +73,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
 
   // --- Camera ---
   pinepaper_camera_animate: 'Camera keyframes. Per-kf: zoom, focus ([x,y]|id|{item,offset}), pitch, yaw, easing; curved via pathOut/pathIn or pathMode:arc+pivot / custom+path. mode: keyframes|fly_to|orbit.',
-  pinepaper_camera_zoom: 'Set camera zoom level.',
-  pinepaper_camera_pan: 'Pan camera to offset.',
-  pinepaper_camera_move_to: 'Move camera to center on a point or item.',
-  pinepaper_camera_reset: 'Reset camera to default view.',
-  pinepaper_camera_stop: 'Stop camera animation.',
-  pinepaper_camera_state: 'Get current camera position, zoom, and rotation.',
+  pinepaper_camera: 'Camera control. action: zoom|pan|move_to|reset|stop|state. zoom: direction:in|out, level. pan: direction or {x,y}, amount. move_to: {x,y,zoom}. duration default 0.5s.',
 
   // --- Scenes & Templates ---
   pinepaper_create_scene: 'Create scene. items: [{name, itemType, position, properties}], relations: [{source, target, type}], animations: [{target, type}].',
@@ -123,22 +118,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_get_map_source_info: 'Get map source attribution and metadata.',
 
   // --- Fonts ---
-  pinepaper_font_show_studio: 'Open Font Studio UI for glyph editing.',
-  pinepaper_font_set_name: 'Set the font family name.',
-  pinepaper_font_get_required_chars: 'Get list of required character glyphs.',
-  pinepaper_font_get_status: 'Get font creation progress and glyph status.',
-  pinepaper_font_create_glyph: 'Create or update a glyph from SVG path data.',
-  pinepaper_font_create_space: 'Create the space character glyph.',
-  pinepaper_font_remove_glyph: 'Remove a glyph from the font.',
-  pinepaper_font_set_metrics: 'Set font metrics (ascent, descent, units per em).',
-  pinepaper_font_export: 'Export font as OTF/TTF/WOFF2 file.',
-  pinepaper_font_load_into_document: 'Load the custom font into the current document.',
-  pinepaper_font_export_data: 'Export font project as JSON for backup.',
-  pinepaper_font_import_data: 'Import font project from JSON backup.',
-  pinepaper_font_clear: 'Clear all font data and start fresh.',
-  pinepaper_font_remove_overlap: 'Clean up overlapping paths in a glyph.',
-  pinepaper_font_correct_direction: 'Fix path winding direction for a glyph.',
-  pinepaper_font_cleanup_path: 'Simplify and clean up glyph path data.',
+  pinepaper_font: 'Font Studio. action: show_studio|set_name|create_glyph|create_space|remove_glyph|set_metrics|export|cleanup_path|… (16 actions; see pinepaper_tool_guide).',
 
   // --- Letter Collage ---
   pinepaper_create_letter_collage: 'Create stylized text with per-letter customization (Wordle, magazine, gradient).',

@@ -2071,163 +2071,56 @@ EXAMPLE (curved arc between waypoints):
     },
   },
   {
-    name: 'pinepaper_camera_zoom',
+    name: 'pinepaper_camera',
     annotations: {
-      title: 'Camera Zoom',
+      title: 'Camera Control',
       readOnlyHint: false,
       destructiveHint: false,
       idempotentHint: false,
       openWorldHint: false,
     },
-    description: `Simple camera zoom animation.
+    description: `Camera control: zoom, pan, move, reset, stop, get state. Single action-dispatched tool replaces six thin wrappers. For keyframe walkthroughs / 3D pitch+yaw / curved paths, use pinepaper_camera_animate (a separate, richer tool).
 
-USE WHEN:
-- Quick zoom in to focus on something
-- Zoom out to show full canvas
-- Simple zoom effects without complex keyframes`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        direction: {
-          type: 'string',
-          enum: ['in', 'out'],
-          description: 'Zoom direction',
-        },
-        level: {
-          type: 'number',
-          description: 'Target zoom level (default: 2 for in, 0.5 for out)',
-        },
-        duration: {
-          type: 'number',
-          description: 'Animation duration in seconds (default: 0.5)',
-        },
-      },
-      required: ['direction'],
-    },
-  },
-  {
-    name: 'pinepaper_camera_pan',
-    annotations: {
-      title: 'Camera Pan',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: false,
-      openWorldHint: false,
-    },
-    description: `Pan camera in a direction or to specific coordinates.
-
-USE WHEN:
-- Moving view to different part of canvas
-- Directional panning (left, right, up, down)
-- Centering on specific coordinates
+ACTIONS:
+- zoom    — { direction: "in"|"out", level?: number, duration?: number }
+            level defaults to 2 (in) or 0.5 (out). duration default 0.5s.
+- pan     — { direction?: "left"|"right"|"up"|"down", amount?: number, x?: number, y?: number, duration?: number }
+            Either direction+amount (default 100px) OR x+y for panTo.
+- move_to — { x, y, zoom, duration?: number }
+            Combined zoom + pan in one motion.
+- reset   — { duration?: number }
+            Back to center + zoom 1.
+- stop    — {}
+            Cancel any active animation.
+- state   — {}
+            Returns { zoom, center, isAnimating }.
 
 EXAMPLES:
-// Pan left 200 pixels
-{ "direction": "left", "amount": 200 }
-
-// Pan to specific coordinates
-{ "x": 200, "y": 200, "duration": 1 }`,
+{ action: "zoom", direction: "in", level: 2.5 }
+{ action: "pan", x: 200, y: 200, duration: 1 }
+{ action: "move_to", x: 600, y: 400, zoom: 2 }
+{ action: "reset" }
+{ action: "state" }`,
     inputSchema: {
       type: 'object',
       properties: {
+        action: {
+          type: 'string',
+          enum: ['zoom', 'pan', 'move_to', 'reset', 'stop', 'state'],
+          description: 'Camera action to perform',
+        },
         direction: {
           type: 'string',
-          enum: ['left', 'right', 'up', 'down'],
-          description: 'Pan direction (use with amount)',
+          description: 'For zoom: "in"|"out". For pan: "left"|"right"|"up"|"down".',
         },
-        amount: {
-          type: 'number',
-          description: 'Pixels to pan (default: 100)',
-        },
-        x: {
-          type: 'number',
-          description: 'Target X coordinate (use with y for panTo)',
-        },
-        y: {
-          type: 'number',
-          description: 'Target Y coordinate (use with x for panTo)',
-        },
-        duration: {
-          type: 'number',
-          description: 'Animation duration in seconds (default: 0.5)',
-        },
+        level: { type: 'number', description: 'Zoom level (zoom action; default 2 for in, 0.5 for out)' },
+        amount: { type: 'number', description: 'Pixels to pan (pan action with direction; default 100)' },
+        x: { type: 'number', description: 'Target X coordinate (pan with x+y, or move_to)' },
+        y: { type: 'number', description: 'Target Y coordinate (pan with x+y, or move_to)' },
+        zoom: { type: 'number', description: 'Target zoom level (move_to)' },
+        duration: { type: 'number', description: 'Animation duration in seconds (default 0.5)' },
       },
-    },
-  },
-  {
-    name: 'pinepaper_camera_move_to',
-    annotations: {
-      title: 'Camera Move To',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: false,
-      openWorldHint: false,
-    },
-    description: `Combined camera zoom and pan to a specific location.
-
-USE WHEN:
-- Moving to and zooming on a specific point in one motion
-- Focusing on an item with appropriate zoom level`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        x: { type: 'number', description: 'Target X coordinate' },
-        y: { type: 'number', description: 'Target Y coordinate' },
-        zoom: { type: 'number', description: 'Target zoom level' },
-        duration: { type: 'number', description: 'Animation duration in seconds (default: 0.5)' },
-      },
-      required: ['x', 'y', 'zoom'],
-    },
-  },
-  {
-    name: 'pinepaper_camera_reset',
-    annotations: {
-      title: 'Camera Reset',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: false,
-      openWorldHint: false,
-    },
-    description: `Reset camera to default state (center of canvas, zoom 1).
-
-USE WHEN:
-- Returning to default view after camera movements
-- Resetting before starting new sequence`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        duration: { type: 'number', description: 'Animation duration in seconds (default: 0.5)' },
-      },
-    },
-  },
-  {
-    name: 'pinepaper_camera_stop',
-    annotations: {
-      title: 'Camera Stop',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Stop current camera animation.`,
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
-  },
-  {
-    name: 'pinepaper_camera_state',
-    annotations: {
-      title: 'Camera State',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Get current camera state (zoom level, center position, animation status).`,
-    inputSchema: {
-      type: 'object',
-      properties: {},
+      required: ['action'],
     },
   },
 
@@ -4848,423 +4741,75 @@ RETURNS:
     },
   },
 
+
   // ---------------------------------------------------------------------------
-  // DOMAIN: FONT TOOLS
+  // DOMAIN: FONT TOOLS — single action-dispatched tool replaces 16 wrappers
   // ---------------------------------------------------------------------------
   {
-    name: 'pinepaper_font_show_studio',
+    name: 'pinepaper_font',
     annotations: {
-      title: 'Font Show Studio',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Open the Font Studio UI for interactive font creation.
-
-USE WHEN:
-- Starting a custom font creation workflow
-- Need the interactive Font Studio interface with guide lines
-- Want to create a hand-drawn font from scratch
-
-WORKFLOW:
-1. Open Font Studio → pinepaper_font_show_studio
-2. Set font name → pinepaper_font_set_name
-3. Check required chars → pinepaper_font_get_required_chars
-4. For each character: draw path, cleanup, create glyph
-5. Check progress → pinepaper_font_get_status
-6. Export when complete → pinepaper_font_export`,
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
-  },
-  {
-    name: 'pinepaper_font_set_name',
-    annotations: {
-      title: 'Font Set Name',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Set the font family name for the current font being created.`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        name: {
-          type: 'string',
-          description: "Font family name (e.g., 'MyHandwriting')",
-        },
-      },
-      required: ['name'],
-    },
-  },
-  {
-    name: 'pinepaper_font_get_required_chars',
-    annotations: {
-      title: 'Font Get Required Chars',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Get the list of characters needed for a complete font.
-
-CHARACTER SETS:
-- minimum: A-Z, a-z, 0-9, space (63 chars) - enough for basic text
-- standard: adds punctuation and symbols (90+ chars) - full typography`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        set: {
-          type: 'string',
-          enum: ['minimum', 'standard'],
-          description: 'minimum: A-Z, a-z, 0-9, space (63 chars). standard: adds punctuation (90+ chars)',
-        },
-      },
-    },
-  },
-  {
-    name: 'pinepaper_font_get_status',
-    annotations: {
-      title: 'Font Get Status',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Get font completion status including progress percentage, completed/pending characters.
-
-USE WHEN:
-- Checking progress during font creation
-- Determining which characters still need to be drawn
-- Verifying font is complete before export`,
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
-  },
-  {
-    name: 'pinepaper_font_create_glyph',
-    annotations: {
-      title: 'Font Create Glyph',
+      title: 'Font Studio',
       readOnlyHint: false,
       destructiveHint: false,
       idempotentHint: false,
       openWorldHint: false,
     },
-    description: `Create a glyph from a Paper.js path. Converts a drawn path into an OpenType glyph with calculated advance width.
+    description: `Font Studio control — single action-dispatched tool covering the full Studio API. Sixteen previous thin wrappers collapse into this one entry to reduce the tool list footprint without losing capability.
 
-USE WHEN:
-- Converting a drawn character path to a font glyph
-- Adding a new character to the font
-
-WORKFLOW:
-1. Draw the character as a Paper.js path on the canvas
-2. Optionally clean up the path (pinepaper_font_cleanup_path)
-3. Use the path's registry ID to create the glyph`,
+ACTIONS:
+- show_studio          — {}                          open the Font Studio UI
+- set_name             — { name }                    name the in-progress font
+- get_required_chars   — { set?: string }            list chars to draw (default: minimum)
+- get_status           — {}                          completion status
+- create_glyph         — { character, pathId }       attach a path as a glyph
+- create_space         — { width? }                  create a space glyph
+- remove_glyph         — { character }
+- set_metrics          — { metrics: { unitsPerEm?, ascender?, descender?, xHeight?, capHeight? } } (or top-level keys)
+- export               — { download?: boolean }      export as OTF
+- load_into_document   — {}                          load the font for use in this canvas
+- export_data          — { download?: boolean }      export as JSON
+- import_data          — { data: object }            import from JSON
+- clear                — {}                          reset everything
+- remove_overlap       — { pathId }                  path cleanup
+- correct_direction    — { pathId }                  path cleanup
+- cleanup_path         — { pathId, removeOverlap?, correctDirection?, smooth?, smoothTolerance? }`,
     inputSchema: {
       type: 'object',
       properties: {
-        character: {
+        action: {
           type: 'string',
-          description: "Single character (e.g., 'A', 'a', '1', ' ')",
+          enum: [
+            'show_studio', 'set_name', 'get_required_chars', 'get_status',
+            'create_glyph', 'create_space', 'remove_glyph', 'set_metrics',
+            'export', 'load_into_document', 'export_data', 'import_data',
+            'clear', 'remove_overlap', 'correct_direction', 'cleanup_path',
+          ],
+          description: 'Font Studio action',
         },
-        pathId: {
-          type: 'string',
-          description: 'Registry ID of the Paper.js path to use as glyph shape',
-        },
-      },
-      required: ['character', 'pathId'],
-    },
-  },
-  {
-    name: 'pinepaper_font_create_space',
-    annotations: {
-      title: 'Font Create Space',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Create the space glyph (no visible shape, just advance width).
-
-USE WHEN:
-- Adding the space character to the font
-- Space needs no drawn path, only a width value`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        width: {
-          type: 'number',
-          description: 'Space width in font units (default: 250)',
-        },
-      },
-    },
-  },
-  {
-    name: 'pinepaper_font_remove_glyph',
-    annotations: {
-      title: 'Font Remove Glyph',
-      readOnlyHint: false,
-      destructiveHint: true,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Remove a glyph from the font. Use when a character needs to be redrawn.`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        character: {
-          type: 'string',
-          description: 'Character to remove',
-        },
-      },
-      required: ['character'],
-    },
-  },
-  {
-    name: 'pinepaper_font_set_metrics',
-    annotations: {
-      title: 'Font Set Metrics',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Set font metrics (advanced). Controls the coordinate grid and vertical measurements.
-
-METRICS:
-- unitsPerEm: Coordinate grid size (default: 1000)
-- ascender: Height above baseline (default: 800)
-- descender: Depth below baseline, negative (default: -200)
-- xHeight: Lowercase letter height (default: 500)
-- capHeight: Capital letter height (default: 700)`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        unitsPerEm: {
-          type: 'number',
-          description: 'Coordinate grid size (default: 1000)',
-        },
-        ascender: {
-          type: 'number',
-          description: 'Height above baseline (default: 800)',
-        },
-        descender: {
-          type: 'number',
-          description: 'Depth below baseline, negative (default: -200)',
-        },
-        xHeight: {
-          type: 'number',
-          description: 'Lowercase letter height (default: 500)',
-        },
-        capHeight: {
-          type: 'number',
-          description: 'Capital letter height (default: 700)',
-        },
-      },
-    },
-  },
-  {
-    name: 'pinepaper_font_export',
-    annotations: {
-      title: 'Font Export',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Export the font as an OTF file. Triggers browser download of the completed font.
-
-USE WHEN:
-- Font is complete and ready for download
-- User wants to save the font as a file`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        download: {
-          type: 'boolean',
-          description: 'Trigger browser download (default: true)',
-        },
-      },
-    },
-  },
-  {
-    name: 'pinepaper_font_load_into_document',
-    annotations: {
-      title: 'Font Load Into Document',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Load the custom font into the document for immediate use in PinePaper text items.
-
-USE WHEN:
-- Want to use the created font immediately in the current document
-- Testing how the font looks in actual text items`,
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
-  },
-  {
-    name: 'pinepaper_font_export_data',
-    annotations: {
-      title: 'Font Export Data',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Export font data as JSON for saving progress. Use to save work-in-progress fonts.
-
-USE WHEN:
-- Saving font progress for later continuation
-- Backing up font data`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        download: {
-          type: 'boolean',
-          description: 'Trigger browser download (default: true)',
-        },
-      },
-    },
-  },
-  {
-    name: 'pinepaper_font_import_data',
-    annotations: {
-      title: 'Font Import Data',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: false,
-      openWorldHint: false,
-    },
-    description: `Import font data from previously saved JSON. Restores a font from exported data.
-
-USE WHEN:
-- Resuming work on a previously saved font
-- Loading font data exported with pinepaper_font_export_data`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        data: {
+        name: { type: 'string', description: 'Font name (set_name)' },
+        set: { type: 'string', description: 'Character set name (get_required_chars; default "minimum")' },
+        character: { type: 'string', description: 'Single-character glyph identifier (create_glyph, remove_glyph)' },
+        pathId: { type: 'string', description: 'Item id of the path source (create_glyph, remove_overlap, correct_direction, cleanup_path)' },
+        width: { type: 'number', description: 'Space-glyph width (create_space)' },
+        download: { type: 'boolean', description: 'Trigger browser download (export, export_data); default true' },
+        metrics: {
           type: 'object',
-          description: 'Font data object from pinepaper_font_export_data',
+          description: 'Font metrics (set_metrics)',
+          properties: {
+            unitsPerEm: { type: 'number' },
+            ascender: { type: 'number' },
+            descender: { type: 'number' },
+            xHeight: { type: 'number' },
+            capHeight: { type: 'number' },
+          },
         },
+        data: { type: 'object', description: 'Font JSON payload (import_data)' },
+        removeOverlap: { type: 'boolean', description: 'cleanup_path option' },
+        correctDirection: { type: 'boolean', description: 'cleanup_path option' },
+        smooth: { type: 'boolean', description: 'cleanup_path option (default true)' },
+        smoothTolerance: { type: 'number', description: 'cleanup_path tolerance (default 2.5)' },
       },
-      required: ['data'],
-    },
-  },
-  {
-    name: 'pinepaper_font_clear',
-    annotations: {
-      title: 'Font Clear',
-      readOnlyHint: false,
-      destructiveHint: true,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Clear all glyphs and reset the font. Removes all drawn characters.
-
-WARNING: This is destructive - all glyph progress will be lost.`,
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
-  },
-  {
-    name: 'pinepaper_font_remove_overlap',
-    annotations: {
-      title: 'Font Remove Overlap',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Remove overlapping areas from a path (like FontForge's RemoveOverlap). Merges multiple overlapping paths into a single clean outline.
-
-USE WHEN:
-- Path has overlapping strokes that need merging
-- Preparing a glyph path for clean font output`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        pathId: {
-          type: 'string',
-          description: 'Registry ID of the Paper.js path to process',
-        },
-      },
-      required: ['pathId'],
-    },
-  },
-  {
-    name: 'pinepaper_font_correct_direction',
-    annotations: {
-      title: 'Font Correct Direction',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Correct path winding direction for proper fill rendering (like FontForge's CorrectDirection). Ensures outer contours are clockwise and inner holes are counter-clockwise.
-
-USE WHEN:
-- Glyph fills are rendering incorrectly (holes appear filled)
-- Preparing paths for font export`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        pathId: {
-          type: 'string',
-          description: 'Registry ID of the Paper.js path to process',
-        },
-      },
-      required: ['pathId'],
-    },
-  },
-  {
-    name: 'pinepaper_font_cleanup_path',
-    annotations: {
-      title: 'Font Cleanup Path',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Apply all path cleanup operations in the correct order: removeOverlap -> correctDirection -> smooth. Convenience tool that combines all path preparation steps.
-
-USE WHEN:
-- Preparing a drawn path before creating a glyph
-- Quick one-step path cleanup instead of calling individual operations`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        pathId: {
-          type: 'string',
-          description: 'Registry ID of the Paper.js path to process',
-        },
-        removeOverlap: {
-          type: 'boolean',
-          description: 'Merge overlapping strokes (default: true)',
-        },
-        correctDirection: {
-          type: 'boolean',
-          description: 'Fix winding direction for fills (default: true)',
-        },
-        smooth: {
-          type: 'boolean',
-          description: 'Apply path smoothing (default: true)',
-        },
-        smoothTolerance: {
-          type: 'number',
-          description: 'Smoothing tolerance - higher = more simplification (default: 2.5)',
-        },
-      },
-      required: ['pathId'],
+      required: ['action'],
     },
   },
 
