@@ -184,29 +184,10 @@ export const TOOL_TAGS: Record<string, string[]> = {
 
   // --- Domain: Maps ---
   map: [
-    'pinepaper_load_map',
-    'pinepaper_highlight_regions',
-    'pinepaper_unhighlight_regions',
-    'pinepaper_apply_data_colors',
-    'pinepaper_add_marker',
-    'pinepaper_add_map_labels',
-    'pinepaper_pan_map',
-    'pinepaper_zoom_map',
-    'pinepaper_export_map',
-    'pinepaper_import_custom_map',
-    'pinepaper_get_region_at_point',
-    'pinepaper_animate_map_regions',
-    'pinepaper_animate_map_wave',
-    'pinepaper_stop_map_animations',
-    'pinepaper_get_animated_map_regions',
-    'pinepaper_export_map_region_csv',
-    'pinepaper_import_map_region_csv',
-    'pinepaper_select_map_regions',
-    'pinepaper_deselect_map_regions',
-    'pinepaper_get_highlighted_map_regions',
-    'pinepaper_export_map_geojson',
-    'pinepaper_export_original_map_geojson',
-    'pinepaper_get_map_source_info',
+    'pinepaper_map',
+    'pinepaper_map_regions',
+    'pinepaper_map_animation',
+    'pinepaper_map_data',
   ],
 
   // --- Domain: Fonts ---
