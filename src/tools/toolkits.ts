@@ -88,12 +88,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
   ],
   camera: [
     'pinepaper_camera_animate',
-    'pinepaper_camera_zoom',
-    'pinepaper_camera_pan',
-    'pinepaper_camera_move_to',
-    'pinepaper_camera_reset',
-    'pinepaper_camera_stop',
-    'pinepaper_camera_state',
+    'pinepaper_camera',
   ],
 
   // --- Generators & effects ---
@@ -216,22 +211,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
 
   // --- Domain: Fonts ---
   font: [
-    'pinepaper_font_show_studio',
-    'pinepaper_font_set_name',
-    'pinepaper_font_get_required_chars',
-    'pinepaper_font_get_status',
-    'pinepaper_font_create_glyph',
-    'pinepaper_font_create_space',
-    'pinepaper_font_remove_glyph',
-    'pinepaper_font_set_metrics',
-    'pinepaper_font_export',
-    'pinepaper_font_load_into_document',
-    'pinepaper_font_export_data',
-    'pinepaper_font_import_data',
-    'pinepaper_font_clear',
-    'pinepaper_font_remove_overlap',
-    'pinepaper_font_correct_direction',
-    'pinepaper_font_cleanup_path',
+    'pinepaper_font',
   ],
 
   // --- Domain: Letter Collage ---
