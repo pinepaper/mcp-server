@@ -3755,992 +3755,155 @@ EXAMPLES:
     },
   },
 
+
+
   // ---------------------------------------------------------------------------
-  // DOMAIN: MAP TOOLS
+  // DOMAIN: MAP TOOLS — four action-dispatched tools replace 23 wrappers
   // ---------------------------------------------------------------------------
   {
-    name: 'pinepaper_load_map',
+    name: 'pinepaper_map',
     annotations: {
-      title: 'Load Map',
+      title: 'Map: Load + Viewport',
       readOnlyHint: false,
       destructiveHint: false,
       idempotentHint: false,
       openWorldHint: false,
     },
-    description: `Load a geographic map onto the canvas with specified projection and styling.
+    description: `Load a map and control its viewport. Call action: "load" first to set up; subsequent calls control pan / zoom / config import-export.
 
-USE WHEN:
-- Creating world maps or country visualizations
-- Building choropleth data visualizations
-- Making infographics with geographic data
-- Creating animated map reveals
+ACTIONS:
+- load           — { mapId: "usa"|"world"|"worldHighRes"|<custom>, projection?, options? }
+- pan            — { lat, lon, duration? }
+- zoom           — { level, duration? }
+- export_config  — {}
+- import_custom  — { url? | geojson?, projection? }
 
-AVAILABLE MAPS:
-- world: World countries (110m resolution, faster)
-- worldHighRes: World countries (50m resolution, more detailed)
-- usa: US states map
-
-PROJECTIONS:
-- naturalEarth: Natural Earth projection (recommended for world maps)
-- mercator: Standard web mercator
-- equalEarth: Equal-area projection
-- orthographic: Globe/3D sphere view
-- albers: Conic projection (good for USA)
-- stereographic: Stereographic projection
-
-QUALITY SETTINGS:
-- fast: Aggressive simplification (prototyping)
-- balanced: Moderate detail (most uses)
-- professional: No simplification (publications)
-
-EXAMPLES:
-- World map: {mapId: "world", projection: "naturalEarth", quality: "balanced"}
-- USA map: {mapId: "usa", projection: "albers", quality: "professional"}
-- Globe view: {mapId: "worldHighRes", projection: "orthographic", rotate: [0, -30, 0]}
-
-RETURNS:
-- mapId: Reference ID for the loaded map
-- group: Paper.js group containing all regions
-- regions: Array of region info
-- bounds: Map bounding box`,
+For region styling/selection use pinepaper_map_regions; for animations use pinepaper_map_animation; for CSV/GeoJSON/source-info use pinepaper_map_data.`,
     inputSchema: {
       type: 'object',
       properties: {
-        mapId: {
-          type: 'string',
-          enum: ['world', 'worldHighRes', 'usa'],
-          description: 'Map to load (world=110m, worldHighRes=50m professional quality, usa=US states)',
-        },
-        projection: {
-          type: 'string',
-          enum: ['mercator', 'equalEarth', 'naturalEarth', 'orthographic', 'albers', 'stereographic'],
-          description: 'Map projection type',
-        },
-        quality: {
-          type: 'string',
-          enum: ['fast', 'balanced', 'professional'],
-          description: 'Rendering quality (professional=no simplification)',
-        },
-        fillColor: { type: 'string', description: 'Default fill color for regions' },
-        strokeColor: { type: 'string', description: 'Border/stroke color' },
-        strokeWidth: { type: 'number', description: 'Border width in pixels' },
-        scale: { type: 'number', description: 'Scale multiplier' },
-        center: {
-          type: 'array',
-          items: { type: 'number' },
-          description: 'Center coordinates [longitude, latitude]',
-        },
-        rotate: {
-          type: 'array',
-          items: { type: 'number' },
-          description: 'Rotation angles [x, y, z]',
-        },
-        enableHover: { type: 'boolean', description: 'Enable hover effects on regions' },
-        enableClick: { type: 'boolean', description: 'Enable click events on regions' },
-        hoverFill: { type: 'string', description: 'Fill color on hover' },
-        hoverStroke: { type: 'string', description: 'Stroke color on hover' },
+        action: { type: 'string', enum: ['load', 'pan', 'zoom', 'export_config', 'import_custom'], description: 'Map action' },
+        mapId: { type: 'string', description: 'Map identifier (load)' },
+        projection: { type: 'string', description: 'Projection (load / import_custom)' },
+        options: { type: 'object', description: 'Map options (load)', additionalProperties: true },
+        lat: { type: 'number', description: 'Latitude (pan)' },
+        lon: { type: 'number', description: 'Longitude (pan)' },
+        level: { type: 'number', description: 'Zoom level (zoom)' },
+        duration: { type: 'number', description: 'Animation duration (pan, zoom; default 0.5)' },
+        url: { type: 'string', description: 'GeoJSON/TopoJSON URL (import_custom)' },
+        geojson: { type: 'object', description: 'Inline GeoJSON (import_custom)' },
       },
-      required: ['mapId'],
+      required: ['action'],
     },
   },
   {
-    name: 'pinepaper_highlight_regions',
+    name: 'pinepaper_map_regions',
     annotations: {
-      title: 'Highlight Regions',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Highlight specific regions on a loaded map with custom styling.
-
-USE WHEN:
-- Emphasizing specific countries or states
-- Creating interactive map highlights
-- Building step-by-step map reveals
-- Showing geographic data points
-
-REGION ID FORMATS:
-- World maps: Full country names ("United States of America", "France", "Japan")
-- USA map: State codes ("CA", "TX", "NY", "FL")
-
-STYLING OPTIONS:
-- fillColor: Highlight fill color
-- strokeColor: Highlight stroke color
-- strokeWidth: Border width for highlighted regions
-- animate: Whether to animate the highlight transition
-
-EXAMPLES:
-- Highlight countries: {regionIds: ["United States of America", "Canada", "Mexico"], options: {fillColor: "#3b82f6"}}
-- Highlight US states: {regionIds: ["CA", "TX", "NY"], options: {fillColor: "#22c55e", animate: true}}
-- Custom styling: {regionIds: ["Japan"], options: {fillColor: "#ef4444", strokeColor: "#dc2626", strokeWidth: 2}}`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        regionIds: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Array of region IDs to highlight (country names or state codes)',
-        },
-        options: {
-          type: 'object',
-          properties: {
-            fillColor: { type: 'string', description: 'Highlight fill color' },
-            strokeColor: { type: 'string', description: 'Highlight stroke color' },
-            strokeWidth: { type: 'number', description: 'Highlight stroke width' },
-            animate: { type: 'boolean', description: 'Animate the highlight transition' },
-          },
-          description: 'Highlight styling options',
-        },
-      },
-      required: ['regionIds'],
-    },
-  },
-  {
-    name: 'pinepaper_unhighlight_regions',
-    annotations: {
-      title: 'Unhighlight Regions',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Remove highlights from specific regions or all regions on the map.
-
-USE WHEN:
-- Resetting map to original state
-- Removing specific region highlights
-- Cycling through different highlight states
-
-EXAMPLES:
-- Remove all highlights: {regionIds: "all"}
-- Remove specific: {regionIds: ["CA", "TX"]}`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        regionIds: {
-          oneOf: [
-            { type: 'array', items: { type: 'string' } },
-            { type: 'string', enum: ['all'] },
-          ],
-          description: 'Region IDs to unhighlight, or "all" for all regions',
-        },
-      },
-      required: ['regionIds'],
-    },
-  },
-  {
-    name: 'pinepaper_apply_data_colors',
-    annotations: {
-      title: 'Apply Data Colors',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Apply data-driven coloring to map regions (choropleth visualization).
-
-USE WHEN:
-- Visualizing statistics by region (population, GDP, etc.)
-- Creating heat maps
-- Showing data distribution across geography
-- Building infographics with data overlays
-
-COLOR SCALES:
-- blues: Light to dark blue gradient
-- greens: Light to dark green gradient
-- reds: Light to dark red gradient
-- oranges: Light to dark orange gradient
-- purples: Light to dark purple gradient
-- heat: Yellow to red heat map gradient
-
-DATA FORMAT:
-Keys must match region IDs exactly (country names for world maps, state codes for USA).
-
-EXAMPLES:
-- Population data: {data: {"California": 39538223, "Texas": 29145505, "New York": 20201249}, options: {colorScale: "blues", showLegend: true}}
-- GDP heat map: {data: {"United States of America": 21000, "China": 15000, "Japan": 5000}, options: {colorScale: "heat"}}
-- Custom range: {data: {"CA": 85, "TX": 72}, options: {colorScale: "greens", minValue: 0, maxValue: 100}}`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        data: {
-          type: 'object',
-          additionalProperties: { type: 'number' },
-          description: 'Object mapping region IDs to numeric values',
-        },
-        options: {
-          type: 'object',
-          properties: {
-            colorScale: {
-              type: 'string',
-              enum: ['blues', 'greens', 'reds', 'oranges', 'purples', 'heat'],
-              description: 'Color scale to use',
-            },
-            minValue: { type: 'number', description: 'Minimum value for scale' },
-            maxValue: { type: 'number', description: 'Maximum value for scale' },
-            showLegend: { type: 'boolean', description: 'Display color legend' },
-            legendPosition: {
-              type: 'string',
-              enum: ['top-left', 'top-right', 'bottom-left', 'bottom-right'],
-              description: 'Legend position',
-            },
-            legendTitle: { type: 'string', description: 'Title for the legend' },
-          },
-          description: 'Choropleth styling options',
-        },
-      },
-      required: ['data'],
-    },
-  },
-  {
-    name: 'pinepaper_add_marker',
-    annotations: {
-      title: 'Add Map Marker',
+      title: 'Map: Region Styling + Selection',
       readOnlyHint: false,
       destructiveHint: false,
       idempotentHint: false,
       openWorldHint: false,
     },
-    description: `Add a marker to the map at specified coordinates.
+    description: `Highlight, color, label, and select map regions. Requires a map loaded via pinepaper_map { action: "load" } first.
 
-USE WHEN:
-- Marking cities or points of interest
-- Creating location-based visualizations
-- Adding data points with geographic coordinates
-- Building interactive map annotations
-
-MARKER OPTIONS:
-- lat, lon: Geographic coordinates (required)
-- label: Text label for the marker
-- color: Marker color
-- size: Marker size in pixels
-- pulse: Enable animated pulse effect
-- shape: Marker shape (circle, pin, star)
-
-EXAMPLES:
-- City marker: {lat: 37.7749, lon: -122.4194, label: "San Francisco", color: "#ef4444", pulse: true}
-- Simple point: {lat: 40.7128, lon: -74.0060, size: 8, color: "#3b82f6"}
-- Pin marker: {lat: 51.5074, lon: -0.1278, label: "London", shape: "pin"}`,
+ACTIONS:
+- highlight        — { regionIds: string[], color?, opacity? }
+- unhighlight      — { regionIds?: string[] }              omit to clear all
+- apply_colors     — { data: Record<regionId, value>, options? }   choropleth coloring
+- add_marker       — { lat, lon, label?, color?, size? }
+- add_labels       — { regions?: string[], style?, formatter? }
+- get_at_point     — { x, y }                              region at canvas coords
+- select           — { regionIds: string[] }
+- deselect         — { regionIds?: string[] }              omit to deselect all
+- get_highlighted  — {}`,
     inputSchema: {
       type: 'object',
       properties: {
-        lat: { type: 'number', description: 'Latitude' },
-        lon: { type: 'number', description: 'Longitude' },
-        label: { type: 'string', description: 'Marker label text' },
-        color: { type: 'string', description: 'Marker color' },
-        size: { type: 'number', description: 'Marker size in pixels' },
-        pulse: { type: 'boolean', description: 'Enable pulse animation' },
-        shape: {
-          type: 'string',
-          enum: ['circle', 'pin', 'star'],
-          description: 'Marker shape',
-        },
+        action: { type: 'string', enum: ['highlight', 'unhighlight', 'apply_colors', 'add_marker', 'add_labels', 'get_at_point', 'select', 'deselect', 'get_highlighted'], description: 'Region action' },
+        regionIds: { type: 'array', items: { type: 'string' } },
+        color: { type: 'string' },
+        opacity: { type: 'number' },
+        data: { type: 'object', description: 'Region → value (apply_colors)', additionalProperties: true },
+        options: { type: 'object', additionalProperties: true },
+        lat: { type: 'number' },
+        lon: { type: 'number' },
+        label: { type: 'string' },
+        size: { type: 'number' },
+        regions: { type: 'array', items: { type: 'string' } },
+        style: { type: 'object', additionalProperties: true },
+        formatter: { type: 'string' },
+        x: { type: 'number' },
+        y: { type: 'number' },
       },
-      required: ['lat', 'lon'],
+      required: ['action'],
     },
   },
   {
-    name: 'pinepaper_add_map_labels',
+    name: 'pinepaper_map_animation',
     annotations: {
-      title: 'Add Map Labels',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Add text labels to map regions.
-
-USE WHEN:
-- Labeling countries or states
-- Adding region names to visualizations
-- Creating annotated maps
-- Showing data values on regions
-
-LABEL TYPES:
-- name: Full region name
-- code: Region code (e.g., "CA" for California)
-- value: Data value (if applyDataColors was used)
-
-EXAMPLES:
-- Label all visible: {options: {fontSize: 10, fontColor: "#374151"}}
-- Label specific regions: {regions: ["California", "Texas"], options: {labelType: "code"}}
-- Show data values: {options: {labelType: "value", fontSize: 12}}`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        regions: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Specific regions to label (null for all visible)',
-        },
-        options: {
-          type: 'object',
-          properties: {
-            fontSize: { type: 'number', description: 'Label font size' },
-            fontColor: { type: 'string', description: 'Label text color' },
-            labelType: {
-              type: 'string',
-              enum: ['name', 'code', 'value'],
-              description: 'Type of label content',
-            },
-            backgroundColor: { type: 'string', description: 'Label background color' },
-          },
-          description: 'Label styling options',
-        },
-      },
-    },
-  },
-  {
-    name: 'pinepaper_pan_map',
-    annotations: {
-      title: 'Pan Map',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Pan the map view to center on specific coordinates.
-
-USE WHEN:
-- Navigating to a specific location
-- Creating animated map transitions
-- Focusing on a region of interest
-
-EXAMPLES:
-- Pan to New York: {lat: 40.7128, lon: -74.0060}
-- Pan to Europe: {lat: 50, lon: 10}`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        lat: { type: 'number', description: 'Target latitude' },
-        lon: { type: 'number', description: 'Target longitude' },
-        animate: { type: 'boolean', description: 'Animate the pan transition' },
-        duration: { type: 'number', description: 'Animation duration in seconds' },
-      },
-      required: ['lat', 'lon'],
-    },
-  },
-  {
-    name: 'pinepaper_zoom_map',
-    annotations: {
-      title: 'Zoom Map',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Set the map zoom level.
-
-USE WHEN:
-- Zooming in on specific areas
-- Creating zoom animations
-- Adjusting map scale
-
-ZOOM LEVELS:
-- 1: Full view (default)
-- 2-5: Moderate zoom
-- 5+: Close-up view
-
-EXAMPLES:
-- Zoom in: {level: 2}
-- Animated zoom: {level: 3, animate: true, duration: 1}`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        level: { type: 'number', description: 'Zoom level (1 = full view)' },
-        animate: { type: 'boolean', description: 'Animate the zoom transition' },
-        duration: { type: 'number', description: 'Animation duration in seconds' },
-      },
-      required: ['level'],
-    },
-  },
-  {
-    name: 'pinepaper_export_map',
-    annotations: {
-      title: 'Export Map',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Export the current map configuration and state.
-
-USE WHEN:
-- Saving map state for later restoration
-- Exporting map data for external use
-- Creating shareable map configurations
-
-RETURNS:
-- mapId: Current map identifier
-- projection: Active projection
-- regions: Region states and highlights
-- markers: All added markers
-- dataColors: Applied data coloring configuration`,
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
-  },
-  {
-    name: 'pinepaper_import_custom_map',
-    annotations: {
-      title: 'Import Custom Map',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: false,
-      openWorldHint: true,
-    },
-    description: `Import a custom GeoJSON or TopoJSON map.
-
-USE WHEN:
-- Loading custom geographic boundaries
-- Using detailed country/region maps from GADM
-- Importing custom shapes or territories
-- Working with non-standard geographic data
-
-SUPPORTED FORMATS:
-- GeoJSON: Standard geographic JSON format
-- TopoJSON: Compressed topology format
-
-SOURCES:
-- GADM: Detailed country subdivisions (gadm.org)
-- Natural Earth: Public domain maps (naturalearthdata.com)
-- Census: Official boundary files
-- Custom: Your own GeoJSON files
-
-EXAMPLES:
-- Import from URL: {url: "https://example.com/custom.geojson", options: {projection: "mercator"}}
-- Import GeoJSON object: {geoJson: {...}, options: {projection: "naturalEarth"}}`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        url: { type: 'string', description: 'URL to GeoJSON/TopoJSON file' },
-        geoJson: {
-          type: 'object',
-          description: 'GeoJSON object to import directly',
-        },
-        options: {
-          type: 'object',
-          properties: {
-            projection: {
-              type: 'string',
-              enum: ['mercator', 'equalEarth', 'naturalEarth', 'orthographic', 'albers', 'stereographic'],
-              description: 'Projection to use for rendering',
-            },
-            fillColor: { type: 'string' },
-            strokeColor: { type: 'string' },
-            strokeWidth: { type: 'number' },
-          },
-          description: 'Import options',
-        },
-      },
-    },
-  },
-  {
-    name: 'pinepaper_get_region_at_point',
-    annotations: {
-      title: 'Get Region at Point',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `[Utility] Get the region at a specific canvas point (hit testing).
-
-USE WHEN:
-- Implementing click interactions
-- Finding which region is at a coordinate
-- Building interactive map features
-
-EXAMPLES:
-- Check point: {x: 400, y: 300}
-
-RETURNS:
-- regionId: ID of the region at point (or null)
-- regionName: Display name
-- properties: Region properties from GeoJSON`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        x: { type: 'number', description: 'Canvas X coordinate' },
-        y: { type: 'number', description: 'Canvas Y coordinate' },
-      },
-      required: ['x', 'y'],
-    },
-  },
-  {
-    name: 'pinepaper_animate_map_regions',
-    annotations: {
-      title: 'Animate Map Regions',
+      title: 'Map: Region Animations',
       readOnlyHint: false,
       destructiveHint: false,
       idempotentHint: false,
       openWorldHint: false,
     },
-    description: `Animate specific map regions with timeline-integrated keyframe color animations.
+    description: `Animate map regions with keyframes or wave effects.
 
-USE WHEN:
-- Creating animated choropleth transitions
-- Showing data changes over time
-- Building story-based map visualizations
-- Adding visual emphasis to regions
-
-KEYFRAME PROPERTIES:
-- time: Time in seconds for this keyframe
-- fillColor: Fill color at this keyframe (required)
-- strokeColor: Optional stroke color
-- opacity: Optional opacity (0-1)
-
-EXAMPLES:
-- Simple color transition: {duration: 5, loop: true, regions: {"USA": [{"time": 0, "fillColor": "#ef4444"}, {"time": 5, "fillColor": "#22c55e"}]}}
-- Multi-region animation: {duration: 8, regions: {"USA": [...], "France": [...], "Japan": [...]}}`,
+ACTIONS:
+- animate_regions  — { regions: Record<regionId, keyframes[]>, duration?, loop? }
+- animate_wave     — { regions?: string[], waveDirection?, speed?, color?, duration?, loop? }
+- stop             — { regionIds?: string[] }
+- get_animated     — {}`,
     inputSchema: {
       type: 'object',
       properties: {
-        duration: {
-          type: 'number',
-          description: 'Total animation duration in seconds (default: 5)',
-        },
-        loop: {
-          type: 'boolean',
-          description: 'Loop the animation (default: true)',
-        },
-        regions: {
-          type: 'object',
-          additionalProperties: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                time: { type: 'number', description: 'Time in seconds' },
-                fillColor: { type: 'string', description: 'Fill color at this keyframe' },
-                strokeColor: { type: 'string', description: 'Stroke color (optional)' },
-                opacity: { type: 'number', description: 'Opacity 0-1 (optional)' },
-              },
-              required: ['time', 'fillColor'],
-            },
-          },
-          description: 'Object mapping region IDs to arrays of keyframes',
-        },
+        action: { type: 'string', enum: ['animate_regions', 'animate_wave', 'stop', 'get_animated'], description: 'Animation action' },
+        regions: { type: 'object', description: 'Keyframes per region (animate_regions) or list (animate_wave)', additionalProperties: true },
+        regionIds: { type: 'array', items: { type: 'string' } },
+        waveDirection: { type: 'string', enum: ['horizontal', 'vertical', 'radial'] },
+        speed: { type: 'number' },
+        color: { type: 'string' },
+        duration: { type: 'number' },
+        loop: { type: 'boolean' },
       },
-      required: ['regions'],
+      required: ['action'],
     },
   },
   {
-    name: 'pinepaper_animate_map_wave',
+    name: 'pinepaper_map_data',
     annotations: {
-      title: 'Animate Map Wave',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: false,
-      openWorldHint: false,
-    },
-    description: `Create a wave animation across all map regions based on geographic position.
-
-USE WHEN:
-- Creating dramatic visual effects
-- Showing global spread patterns
-- Adding ambient map animations
-- Building attention-grabbing transitions
-
-WAVE DIRECTIONS:
-- horizontal: Wave sweeps left to right
-- vertical: Wave sweeps top to bottom
-- radial: Wave radiates from center outward
-
-EXAMPLES:
-- Rainbow wave: {duration: 10, colors: ["#ef4444", "#fbbf24", "#22c55e", "#3b82f6"], waveDirection: "horizontal"}
-- Fast radial pulse: {duration: 3, colors: ["#ffffff", "#3b82f6"], waveDirection: "radial", loop: true}`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        duration: {
-          type: 'number',
-          description: 'Total wave duration in seconds (default: 10)',
-        },
-        loop: {
-          type: 'boolean',
-          description: 'Loop the animation (default: true)',
-        },
-        colors: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Array of colors for the wave (default: red, yellow, green, blue)',
-        },
-        waveDirection: {
-          type: 'string',
-          enum: ['horizontal', 'vertical', 'radial'],
-          description: 'Direction of the wave effect (default: horizontal)',
-        },
-      },
-    },
-  },
-  {
-    name: 'pinepaper_stop_map_animations',
-    annotations: {
-      title: 'Stop Map Animations',
+      title: 'Map: Data Import + Export',
       readOnlyHint: false,
       destructiveHint: false,
       idempotentHint: true,
       openWorldHint: false,
     },
-    description: `Stop all or specific map region animations.
+    description: `CSV / GeoJSON import-export and source-info introspection.
 
-USE WHEN:
-- Ending animated sequences
-- Resetting map to static state
-- Pausing for user interaction
-- Transitioning to different visualization
-
-EXAMPLES:
-- Stop all: {}
-- Stop specific regions: {regions: ["USA", "France"]}
-- Stop and reset colors: {resetColors: true}`,
+ACTIONS:
+- export_csv               — { regionIds?, columns?, download?, filename? }
+- import_csv               — { csv: string, mapping?: { region?, value?, color? } }
+- export_geojson           — { includeStyles?, includeMetadata?, selectedOnly?, download?, filename? }
+- export_original_geojson  — { download?, filename? }   source GeoJSON before styling
+- source_info              — {}                          { source, projection, quality, regionCount, hasOriginalGeoJSON, isCustomImport }`,
     inputSchema: {
       type: 'object',
       properties: {
-        regions: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Specific region IDs to stop (omit for all)',
-        },
-        resetColors: {
-          type: 'boolean',
-          description: 'Reset regions to default colors (default: true)',
-        },
+        action: { type: 'string', enum: ['export_csv', 'import_csv', 'export_geojson', 'export_original_geojson', 'source_info'], description: 'Data action' },
+        regionIds: { type: 'array', items: { type: 'string' } },
+        columns: { type: 'array', items: { type: 'string' } },
+        csv: { type: 'string' },
+        mapping: { type: 'object', additionalProperties: true },
+        includeStyles: { type: 'boolean' },
+        includeMetadata: { type: 'boolean' },
+        selectedOnly: { type: 'boolean' },
+        download: { type: 'boolean' },
+        filename: { type: 'string' },
       },
+      required: ['action'],
     },
   },
-  {
-    name: 'pinepaper_get_animated_map_regions',
-    annotations: {
-      title: 'Get Animated Map Regions',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `[Utility] Get list of currently animated map regions with their animation data.
-
-USE WHEN:
-- Debugging animations
-- Checking animation state
-- Building animation controls
-- Inspecting current timeline
-
-RETURNS:
-- animatedRegions: Array of region animation info
-- count: Total number of animated regions`,
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
-  },
-  {
-    name: 'pinepaper_export_map_region_csv',
-    annotations: {
-      title: 'Export Map Region CSV',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Export map region data as CSV including colors, highlight, and selection status.
-
-USE WHEN:
-- Saving map state for later
-- Creating data-driven workflows
-- Integrating with spreadsheet tools
-- Building export features
-
-CSV COLUMNS:
-- regionId: Region identifier
-- name: Display name
-- highlighted: 1 or 0
-- selected: 1 or 0
-- fillColor: Current fill color
-- strokeColor: Current stroke color
-
-EXAMPLES:
-- Full export: {}
-- Colors only: {includeHighlighted: false, includeSelected: false}
-- Auto-download: {download: true, filename: "map-export.csv"}`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        includeHighlighted: {
-          type: 'boolean',
-          description: 'Include highlight status column (default: true)',
-        },
-        includeSelected: {
-          type: 'boolean',
-          description: 'Include selection status column (default: true)',
-        },
-        includeColors: {
-          type: 'boolean',
-          description: 'Include fill/stroke color columns (default: true)',
-        },
-        download: {
-          type: 'boolean',
-          description: 'Auto-download the CSV file (default: false)',
-        },
-        filename: {
-          type: 'string',
-          description: 'Filename for download (default: map-regions.csv)',
-        },
-      },
-    },
-  },
-  {
-    name: 'pinepaper_import_map_region_csv',
-    annotations: {
-      title: 'Import Map Region CSV',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Import CSV data to update map region states (colors, highlight, selection).
-
-USE WHEN:
-- Restoring saved map state
-- Applying data from spreadsheets
-- Batch updating region properties
-- Building data-driven visualizations
-
-CSV FORMAT:
-Must have 'regionId' column. Optional columns:
-- fillColor: Hex color for fill
-- strokeColor: Hex color for stroke
-- highlighted: 1 or 0
-- selected: 1 or 0
-
-EXAMPLES:
-- Import full CSV: {csvText: "regionId,fillColor,highlighted\\nUSA,#22c55e,1\\nFrance,#3b82f6,0"}
-- Colors only: {csvText: "...", applyHighlight: false, applySelection: false}`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        csvText: {
-          type: 'string',
-          description: 'CSV text content to import',
-        },
-        applyColors: {
-          type: 'boolean',
-          description: 'Apply fill/stroke colors from CSV (default: true)',
-        },
-        applyHighlight: {
-          type: 'boolean',
-          description: 'Update highlight status from CSV (default: true)',
-        },
-        applySelection: {
-          type: 'boolean',
-          description: 'Update selection status from CSV (default: true)',
-        },
-      },
-      required: ['csvText'],
-    },
-  },
-  {
-    name: 'pinepaper_select_map_regions',
-    annotations: {
-      title: 'Select Map Regions',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Programmatically select map regions.
-
-USE WHEN:
-- Building interactive map features
-- Responding to user input
-- Creating selection-based workflows
-- Highlighting user choices
-
-EXAMPLES:
-- Select countries: {regionIds: ["USA", "Canada", "Mexico"]}
-- Select US states: {regionIds: ["CA", "TX", "NY"]}`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        regionIds: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Array of region IDs to select',
-        },
-      },
-      required: ['regionIds'],
-    },
-  },
-  {
-    name: 'pinepaper_deselect_map_regions',
-    annotations: {
-      title: 'Deselect Map Regions',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Programmatically deselect map regions.
-
-USE WHEN:
-- Clearing user selections
-- Resetting map state
-- Implementing toggle behavior
-- Building selection management
-
-EXAMPLES:
-- Deselect specific: {regionIds: ["USA", "France"]}
-- Deselect all: {} (omit regionIds)`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        regionIds: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Array of region IDs to deselect (omit for all)',
-        },
-      },
-    },
-  },
-  {
-    name: 'pinepaper_get_highlighted_map_regions',
-    annotations: {
-      title: 'Get Highlighted Map Regions',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `[Utility] Get list of currently highlighted map regions.
-
-USE WHEN:
-- Checking current highlight state
-- Building conditional logic
-- Creating highlight summaries
-- Debugging map state
-
-RETURNS:
-- highlighted: Array of highlighted region IDs
-- count: Total number of highlighted regions`,
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
-  },
-  {
-    name: 'pinepaper_export_map_geojson',
-    annotations: {
-      title: 'Export Map GeoJSON',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Export the current map as GeoJSON (with current colors/modifications).
-
-USE WHEN:
-- Saving map state with custom styling
-- Exporting for use in other mapping tools
-- Creating styled GeoJSON for external applications
-- Archiving map customizations
-
-EXAMPLES:
-- Export with styles: {includeStyles: true}
-- Selected regions only: {selectedOnly: true}
-- Auto-download: {download: true, filename: "my-map.geojson"}`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        includeStyles: {
-          type: 'boolean',
-          description: 'Include fill/stroke colors as properties (default: true)',
-        },
-        includeMetadata: {
-          type: 'boolean',
-          description: 'Include region names and IDs (default: true)',
-        },
-        selectedOnly: {
-          type: 'boolean',
-          description: 'Only export selected regions (default: false)',
-        },
-        download: {
-          type: 'boolean',
-          description: 'Auto-download the file (default: false)',
-        },
-        filename: {
-          type: 'string',
-          description: 'Filename for download (default: "map-export.geojson")',
-        },
-      },
-    },
-  },
-  {
-    name: 'pinepaper_export_original_map_geojson',
-    annotations: {
-      title: 'Export Original Map GeoJSON',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Export the original source GeoJSON (unmodified boundaries). Returns the exact data used to load the map, allowing users to edit boundaries externally and re-import.
-
-USE WHEN:
-- Extracting original map data for external editing
-- Getting clean boundaries without customizations
-- Creating a baseline for map modifications
-- Re-importing after external boundary edits
-
-EXAMPLES:
-- Get original data: {}
-- Auto-download: {download: true, filename: "map-source.geojson"}`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        download: {
-          type: 'boolean',
-          description: 'Auto-download the file (default: false)',
-        },
-        filename: {
-          type: 'string',
-          description: 'Filename for download (default: "map-source.geojson")',
-        },
-      },
-    },
-  },
-  {
-    name: 'pinepaper_get_map_source_info',
-    annotations: {
-      title: 'Get Map Source Info',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `[Utility] Get information about the currently loaded map source.
-
-USE WHEN:
-- Checking what map is currently loaded
-- Debugging map loading issues
-- Getting map metadata
-- Verifying map configuration
-
-RETURNS:
-- source: Map source identifier (e.g., "world", "worldHighRes", "usa", or custom)
-- projection: Current projection type
-- quality: Rendering quality setting
-- regionCount: Total number of regions
-- hasOriginalGeoJSON: Whether original GeoJSON is available
-- isCustomImport: Whether this is a custom imported map`,
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
-  },
-
 
   // ---------------------------------------------------------------------------
   // DOMAIN: FONT TOOLS — single action-dispatched tool replaces 16 wrappers

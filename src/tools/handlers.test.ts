@@ -1133,7 +1133,7 @@ describe('handleToolCall', () => {
 
   describe('pinepaper_load_map', () => {
     it('should generate code for loading world map', async () => {
-      const result = await handleToolCall('pinepaper_load_map', {
+      const result = await handleToolCall('pinepaper_map', { action: 'load',
         mapId: 'world',
       });
 
@@ -1144,7 +1144,7 @@ describe('handleToolCall', () => {
     });
 
     it('should generate code with projection options', async () => {
-      const result = await handleToolCall('pinepaper_load_map', {
+      const result = await handleToolCall('pinepaper_map', { action: 'load',
         mapId: 'usa',
         projection: 'albers',
         quality: 'professional',
@@ -1158,7 +1158,7 @@ describe('handleToolCall', () => {
     });
 
     it('should require mapId', async () => {
-      const result = await handleToolCall('pinepaper_load_map', {});
+      const result = await handleToolCall('pinepaper_map', { action: 'load' });
 
       expect(result.isError).toBe(true);
     });
@@ -1166,7 +1166,7 @@ describe('handleToolCall', () => {
 
   describe('pinepaper_highlight_regions', () => {
     it('should generate code for highlighting regions', async () => {
-      const result = await handleToolCall('pinepaper_highlight_regions', {
+      const result = await handleToolCall('pinepaper_map_regions', { action: 'highlight',
         regionIds: ['CA', 'TX', 'NY'],
       });
 
@@ -1177,7 +1177,7 @@ describe('handleToolCall', () => {
     });
 
     it('should generate code with styling options', async () => {
-      const result = await handleToolCall('pinepaper_highlight_regions', {
+      const result = await handleToolCall('pinepaper_map_regions', { action: 'highlight',
         regionIds: ['United States of America'],
         options: {
           fillColor: '#3b82f6',
@@ -1194,7 +1194,7 @@ describe('handleToolCall', () => {
 
   describe('pinepaper_unhighlight_regions', () => {
     it('should generate code to unhighlight all regions', async () => {
-      const result = await handleToolCall('pinepaper_unhighlight_regions', {
+      const result = await handleToolCall('pinepaper_map_regions', { action: 'unhighlight',
         regionIds: 'all',
       });
 
@@ -1207,7 +1207,7 @@ describe('handleToolCall', () => {
 
   describe('pinepaper_apply_data_colors', () => {
     it('should generate code for choropleth coloring', async () => {
-      const result = await handleToolCall('pinepaper_apply_data_colors', {
+      const result = await handleToolCall('pinepaper_map_regions', { action: 'apply_colors',
         data: { CA: 85, TX: 72, NY: 90 },
       });
 
@@ -1217,7 +1217,7 @@ describe('handleToolCall', () => {
     });
 
     it('should generate code with color scale options', async () => {
-      const result = await handleToolCall('pinepaper_apply_data_colors', {
+      const result = await handleToolCall('pinepaper_map_regions', { action: 'apply_colors',
         data: { 'United States of America': 330 },
         options: {
           colorScale: 'blues',
@@ -1234,7 +1234,7 @@ describe('handleToolCall', () => {
 
   describe('pinepaper_add_marker', () => {
     it('should generate code to add a marker', async () => {
-      const result = await handleToolCall('pinepaper_add_marker', {
+      const result = await handleToolCall('pinepaper_map_regions', { action: 'add_marker',
         lat: 37.7749,
         lon: -122.4194,
       });
@@ -1246,7 +1246,7 @@ describe('handleToolCall', () => {
     });
 
     it('should generate code with label and pulse', async () => {
-      const result = await handleToolCall('pinepaper_add_marker', {
+      const result = await handleToolCall('pinepaper_map_regions', { action: 'add_marker',
         lat: 40.7128,
         lon: -74.006,
         label: 'New York',
@@ -1263,7 +1263,7 @@ describe('handleToolCall', () => {
 
   describe('pinepaper_add_map_labels', () => {
     it('should generate code to add map labels', async () => {
-      const result = await handleToolCall('pinepaper_add_map_labels', {
+      const result = await handleToolCall('pinepaper_map_regions', { action: 'add_labels',
         options: {
           fontSize: 12,
           labelType: 'name',
@@ -1278,7 +1278,7 @@ describe('handleToolCall', () => {
 
   describe('pinepaper_pan_map', () => {
     it('should generate code to pan the map', async () => {
-      const result = await handleToolCall('pinepaper_pan_map', {
+      const result = await handleToolCall('pinepaper_map', { action: 'pan',
         lat: 50,
         lon: 10,
       });
@@ -1291,7 +1291,7 @@ describe('handleToolCall', () => {
 
   describe('pinepaper_zoom_map', () => {
     it('should generate code to zoom the map', async () => {
-      const result = await handleToolCall('pinepaper_zoom_map', {
+      const result = await handleToolCall('pinepaper_map', { action: 'zoom',
         level: 2,
       });
 
@@ -1304,7 +1304,7 @@ describe('handleToolCall', () => {
 
   describe('pinepaper_export_map', () => {
     it('should generate code to export map', async () => {
-      const result = await handleToolCall('pinepaper_export_map', {});
+      const result = await handleToolCall('pinepaper_map', { action: 'export_config' });
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
@@ -1314,7 +1314,7 @@ describe('handleToolCall', () => {
 
   describe('pinepaper_import_custom_map', () => {
     it('should generate code to import from URL', async () => {
-      const result = await handleToolCall('pinepaper_import_custom_map', {
+      const result = await handleToolCall('pinepaper_map', { action: 'import_custom',
         url: 'https://example.com/custom.geojson',
       });
 
@@ -1327,7 +1327,7 @@ describe('handleToolCall', () => {
 
   describe('pinepaper_get_region_at_point', () => {
     it('should generate code for hit testing', async () => {
-      const result = await handleToolCall('pinepaper_get_region_at_point', {
+      const result = await handleToolCall('pinepaper_map_regions', { action: 'get_at_point',
         x: 400,
         y: 300,
       });
@@ -1344,7 +1344,7 @@ describe('handleToolCall', () => {
 
   describe('pinepaper_animate_map_regions', () => {
     it('should generate code for region keyframe animation', async () => {
-      const result = await handleToolCall('pinepaper_animate_map_regions', {
+      const result = await handleToolCall('pinepaper_map_animation', { action: 'animate_regions',
         duration: 5,
         loop: true,
         regions: {
@@ -1362,7 +1362,7 @@ describe('handleToolCall', () => {
     });
 
     it('should require regions parameter', async () => {
-      const result = await handleToolCall('pinepaper_animate_map_regions', {});
+      const result = await handleToolCall('pinepaper_map_animation', { action: 'animate_regions' });
 
       expect(result.isError).toBe(true);
     });
@@ -1370,7 +1370,7 @@ describe('handleToolCall', () => {
 
   describe('pinepaper_animate_map_wave', () => {
     it('should generate code for wave animation', async () => {
-      const result = await handleToolCall('pinepaper_animate_map_wave', {
+      const result = await handleToolCall('pinepaper_map_animation', { action: 'animate_wave',
         duration: 10,
         waveDirection: 'horizontal',
       });
@@ -1382,7 +1382,7 @@ describe('handleToolCall', () => {
     });
 
     it('should work with custom colors', async () => {
-      const result = await handleToolCall('pinepaper_animate_map_wave', {
+      const result = await handleToolCall('pinepaper_map_animation', { action: 'animate_wave',
         colors: ['#ff0000', '#00ff00', '#0000ff'],
         waveDirection: 'radial',
       });
@@ -1395,7 +1395,7 @@ describe('handleToolCall', () => {
 
   describe('pinepaper_stop_map_animations', () => {
     it('should generate code to stop all animations', async () => {
-      const result = await handleToolCall('pinepaper_stop_map_animations', {});
+      const result = await handleToolCall('pinepaper_map_animation', { action: 'stop' });
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
@@ -1403,7 +1403,7 @@ describe('handleToolCall', () => {
     });
 
     it('should generate code to stop specific regions', async () => {
-      const result = await handleToolCall('pinepaper_stop_map_animations', {
+      const result = await handleToolCall('pinepaper_map_animation', { action: 'stop',
         regions: ['USA', 'France'],
         resetColors: true,
       });
@@ -1417,7 +1417,7 @@ describe('handleToolCall', () => {
 
   describe('pinepaper_get_animated_map_regions', () => {
     it('should generate code to get animated regions', async () => {
-      const result = await handleToolCall('pinepaper_get_animated_map_regions', {});
+      const result = await handleToolCall('pinepaper_map_animation', { action: 'get_animated' });
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
@@ -1427,7 +1427,7 @@ describe('handleToolCall', () => {
 
   describe('pinepaper_export_map_region_csv', () => {
     it('should generate code to export CSV', async () => {
-      const result = await handleToolCall('pinepaper_export_map_region_csv', {});
+      const result = await handleToolCall('pinepaper_map_data', { action: 'export_csv' });
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
@@ -1435,7 +1435,7 @@ describe('handleToolCall', () => {
     });
 
     it('should generate code with options', async () => {
-      const result = await handleToolCall('pinepaper_export_map_region_csv', {
+      const result = await handleToolCall('pinepaper_map_data', { action: 'export_csv',
         includeHighlighted: true,
         download: true,
         filename: 'my-map.csv',
@@ -1449,7 +1449,7 @@ describe('handleToolCall', () => {
 
   describe('pinepaper_import_map_region_csv', () => {
     it('should generate code to import CSV', async () => {
-      const result = await handleToolCall('pinepaper_import_map_region_csv', {
+      const result = await handleToolCall('pinepaper_map_data', { action: 'import_csv',
         csvText: 'regionId,fillColor\nUSA,#22c55e',
       });
 
@@ -1459,7 +1459,7 @@ describe('handleToolCall', () => {
     });
 
     it('should require csvText', async () => {
-      const result = await handleToolCall('pinepaper_import_map_region_csv', {});
+      const result = await handleToolCall('pinepaper_map_data', { action: 'import_csv' });
 
       expect(result.isError).toBe(true);
     });
@@ -1467,7 +1467,7 @@ describe('handleToolCall', () => {
 
   describe('pinepaper_select_map_regions', () => {
     it('should generate code to select regions', async () => {
-      const result = await handleToolCall('pinepaper_select_map_regions', {
+      const result = await handleToolCall('pinepaper_map_regions', { action: 'select',
         regionIds: ['USA', 'Canada', 'Mexico'],
       });
 
@@ -1478,7 +1478,7 @@ describe('handleToolCall', () => {
     });
 
     it('should require regionIds', async () => {
-      const result = await handleToolCall('pinepaper_select_map_regions', {});
+      const result = await handleToolCall('pinepaper_map_regions', { action: 'select' });
 
       expect(result.isError).toBe(true);
     });
@@ -1486,7 +1486,7 @@ describe('handleToolCall', () => {
 
   describe('pinepaper_deselect_map_regions', () => {
     it('should generate code to deselect all regions', async () => {
-      const result = await handleToolCall('pinepaper_deselect_map_regions', {});
+      const result = await handleToolCall('pinepaper_map_regions', { action: 'deselect' });
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
@@ -1494,7 +1494,7 @@ describe('handleToolCall', () => {
     });
 
     it('should generate code to deselect specific regions', async () => {
-      const result = await handleToolCall('pinepaper_deselect_map_regions', {
+      const result = await handleToolCall('pinepaper_map_regions', { action: 'deselect',
         regionIds: ['USA', 'France'],
       });
 
@@ -1506,7 +1506,7 @@ describe('handleToolCall', () => {
 
   describe('pinepaper_get_highlighted_map_regions', () => {
     it('should generate code to get highlighted regions', async () => {
-      const result = await handleToolCall('pinepaper_get_highlighted_map_regions', {});
+      const result = await handleToolCall('pinepaper_map_regions', { action: 'get_highlighted' });
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
@@ -1516,7 +1516,7 @@ describe('handleToolCall', () => {
 
   describe('pinepaper_export_map_geojson', () => {
     it('should generate code to export map as GeoJSON', async () => {
-      const result = await handleToolCall('pinepaper_export_map_geojson', {
+      const result = await handleToolCall('pinepaper_map_data', { action: 'export_geojson',
         includeStyles: true,
         includeMetadata: true,
       });
@@ -1527,7 +1527,7 @@ describe('handleToolCall', () => {
     });
 
     it('should support download option', async () => {
-      const result = await handleToolCall('pinepaper_export_map_geojson', {
+      const result = await handleToolCall('pinepaper_map_data', { action: 'export_geojson',
         download: true,
         filename: 'my-map.geojson',
       });
@@ -1541,7 +1541,7 @@ describe('handleToolCall', () => {
 
   describe('pinepaper_export_original_map_geojson', () => {
     it('should generate code to export original map GeoJSON', async () => {
-      const result = await handleToolCall('pinepaper_export_original_map_geojson', {});
+      const result = await handleToolCall('pinepaper_map_data', { action: 'export_original_geojson' });
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
@@ -1551,7 +1551,7 @@ describe('handleToolCall', () => {
 
   describe('pinepaper_get_map_source_info', () => {
     it('should generate code to get map source info', async () => {
-      const result = await handleToolCall('pinepaper_get_map_source_info', {});
+      const result = await handleToolCall('pinepaper_map_data', { action: 'source_info' });
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
