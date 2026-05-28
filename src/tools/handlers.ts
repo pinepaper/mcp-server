@@ -1359,23 +1359,35 @@ You can now start creating new items on a clean canvas.`,
       case 'pinepaper_browser_connect': {
         // Default to headless: false — if you explicitly call browser_connect, you likely want to see it
         const headless = (args.headless as boolean) ?? false;
+        // Target a custom Studio instance (e.g. local dev at http://localhost:3000).
+        // Falls back to the PINEPAPER_STUDIO_URL env var, else PuppeteerController's
+        // built-in prod default. "/editor" + agent params are appended by the controller.
+        const studioUrl = ((args.url as string) || process.env.PINEPAPER_STUDIO_URL || '').trim() || undefined;
+        const cfg = studioUrl ? { headless, studioUrl } : { headless };
 
-        const controller = getBrowserController({ headless });
+        const controller = getBrowserController(cfg);
 
-        // Already connected with same headless mode → nothing to do
-        if (controller.connected && controller.isHeadless === headless) {
+        // Did the caller request a URL that differs from the live connection?
+        const norm = (u?: string) => (u || '').replace(/\/+$/, '');
+        const urlChanged = !!studioUrl && controller.connected &&
+          norm(controller.studioUrl).indexOf(norm(studioUrl)) === -1;
+
+        // Already connected, same headless mode, same URL → nothing to do
+        if (controller.connected && controller.isHeadless === headless && !urlChanged) {
           return {
-            content: [{ type: 'text', text: `Already connected to PinePaper Studio (headless: ${headless}).` }],
+            content: [{ type: 'text', text: `Already connected to PinePaper Studio (${controller.studioUrl || 'default'}, headless: ${headless}).` }],
           };
         }
 
-        // Already connected but different headless mode → reconnect
-        if (controller.connected && controller.isHeadless !== headless) {
+        // Connected but headless mode OR target URL changed → tear down so the
+        // new config takes effect (getBrowserController ignores config once the
+        // singleton exists).
+        if (controller.connected && (controller.isHeadless !== headless || urlChanged)) {
           await resetBrowserController();
         }
 
         try {
-          const newController = controller.connected ? controller : getBrowserController({ headless });
+          const newController = controller.connected ? controller : getBrowserController(cfg);
           if (!newController.connected) await newController.connect();
 
           const canvasSizeResult = await newController.executeCode(
@@ -1387,7 +1399,7 @@ You can now start creating new items on a clean canvas.`,
             : { width: 800, height: 600 };
 
           return {
-            content: [{ type: 'text', text: `Connected to PinePaper Studio (headless: ${headless}, canvas: ${canvasSize.width}x${canvasSize.height}).` }],
+            content: [{ type: 'text', text: `Connected to PinePaper Studio (${newController.studioUrl || 'default'}, headless: ${headless}, canvas: ${canvasSize.width}x${canvasSize.height}).` }],
           };
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Failed to connect';

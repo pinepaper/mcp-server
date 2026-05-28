@@ -4994,6 +4994,10 @@ RETURNS:
           type: 'boolean',
           description: 'Run in headless mode (default: false when explicitly called)',
         },
+        url: {
+          type: 'string',
+          description: 'Studio URL to connect to (e.g. "http://localhost:3000" for local dev). Overrides the PINEPAPER_STUDIO_URL env var and the prod default. "/editor" and agent-mode params are added automatically. Passing a URL that differs from the current connection reconnects.',
+        },
       },
     },
   },

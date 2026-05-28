@@ -660,6 +660,8 @@ pinepaper_batch_create({
 // Total: ~350ms (8.3x faster!)
 ```
 
+**Why it matters (it's O(N) vs O(N²), not just round-trips)**: every individual create saves an undo state, and saving serializes the **entire** canvas (every item) each time. So creating items one-by-one re-serializes 1 + 2 + … + N items = **O(N²)** — at ~100+ items that's multiple seconds of lag and visibly janky animation, not a linear slowdown. `pinepaper_batch_create` creates the whole set with a single history save → linear. **Use it for any scene with more than a handful of items** (graphs, grids, particle fields, tables).
+
 ### Minimize Screenshot Calls
 
 **Problem**: Screenshots are expensive (~150ms each)
@@ -747,6 +749,8 @@ pinepaper_add_relation({sourceId: 'moon', targetId: 'earth', relationType: 'atta
    - Source and target IDs are correct
    - Relation parameters are valid (e.g., radius > 0 for orbits)
    - Items exist on canvas
+
+4. **Keyframes must be registered with the item — not just the `animationType` flag.** Use either `pinepaper_create_item` with inline `animationType:'keyframe'` + `keyframes`, OR `pinepaper_keyframe_animate` (which calls `app.addAnimation` → `_applyChangesToItem` and writes `data.keyframes` + adds the item to `keyframeItems`). Both paths work. **The trap**: setting `animationType:'keyframe'` via `pinepaper_modify_item` (or any path that flips the type without supplying the `keyframes` array). That sets the flag but leaves the keyframe engine no data to interpolate, so the item never animates. **Symptom**: items exist on the canvas but never move/fade — and if they were created at `opacity: 0`, they're permanently invisible. (The same footgun exists in custom client code: `app.animate(item, {animationType:'keyframe', keyframes})` silently no-ops — use `app.addAnimation()` or pass keyframes to `app.create()` instead.)
 
 ### Scenario: "Canvas is too small for content"
 
