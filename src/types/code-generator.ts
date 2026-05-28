@@ -3085,7 +3085,18 @@ app.historyManager.saveState();
     app.historyManager.saveState('create_letter_collage');
   }
 
-  return result;
+  // Return a SERIALIZABLE summary — never the raw result. result.group and
+  // result.letters are live Paper.js objects (circular parent/children refs,
+  // methods, canvas handles); the browser round-trip (page.evaluate / CDP
+  // return-by-value) can't serialize them, so returning result throws
+  // "Failed to execute code in browser" even though the collage was already
+  // created — a false negative. Surface registry ids instead.
+  const collageId = (result && (result.collageId
+    || (result.group && result.group.data && (result.group.data.id || result.group.data.registryId)))) || null;
+  const letterIds = (result && Array.isArray(result.letters))
+    ? result.letters.map(function(l){ return (l && l.data && (l.data.id || l.data.registryId)) || null; }).filter(Boolean)
+    : [];
+  return { success: true, collageId: collageId, itemId: collageId, letterCount: letterIds.length, letterIds: letterIds, text: text };
 })();
 `.trim();
   }
