@@ -111,14 +111,11 @@ export const cameraHandlers: Record<string, CameraHandler> = {
     const loop = (args.loop as boolean) ?? false;
     const delay = (args.delay as number) ?? 0;
     const fov = (args.fov as number) ?? 60;
-    const mode = (args.mode as string) ?? 'keyframes';
-    const target = args.target as { x: number; y: number } | undefined;
 
     const keyframesStr = JSON.stringify(keyframes);
-    const relParams: Record<string, unknown> = { keyframes: JSON.parse(keyframesStr), duration, loop, delay, fov, mode };
-    if (target) relParams.target = target;
+    const relParams: Record<string, unknown> = { keyframes: JSON.parse(keyframesStr), duration, loop, delay, fov };
     const relParamsStr = JSON.stringify(relParams);
-    const code = `app.camera && app.camera.animate ? app.camera.animate(${keyframesStr}, ${duration}, ${loop}, ${delay}, { fov: ${fov}, mode: '${mode}'${target ? `, target: ${JSON.stringify(target)}` : ''} }) : app.addRelation('camera', 'camera', 'camera_animates', ${relParamsStr});`;
+    const code = `app.camera && app.camera.animate ? app.camera.animate(${keyframesStr}, ${duration}, ${loop}, ${delay}, { fov: ${fov} }) : app.addRelation('camera', 'camera', 'camera_animates', ${relParamsStr});`;
     return executeOrGenerate(code, `Animates camera with ${keyframes.length} keyframes over ${duration}s`, options, 'pinepaper_camera_animate');
   },
 

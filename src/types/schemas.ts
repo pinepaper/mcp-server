@@ -258,6 +258,10 @@ export const RelationTypeSchema = z.enum([
   'camera_follows',
   'camera_animates',
   'morphs_to',
+  // Pair-by-index group morph; same call shape works for any two paper.Groups
+  'group_morphs_to',
+  // Self-relation; item moves along a custom-drawn path stored in params
+  'moves_along_path',
 ]).describe('Type of relationship between items');
 
 export type RelationType = z.infer<typeof RelationTypeSchema>;
@@ -377,11 +381,6 @@ export const CameraAnimatesParamsSchema = z.object({
   loop: z.boolean().optional().default(false).describe('Loop animation'),
   delay: z.number().optional().default(0).describe('Delay before starting'),
   fov: z.number().optional().default(60).describe('Field of view in degrees for 3D perspective'),
-  mode: z.enum(['keyframes', 'fly_to', 'orbit']).optional().default('keyframes').describe('Camera mode'),
-  target: z.object({
-    x: z.number(),
-    y: z.number(),
-  }).optional().describe('Target position for fly_to mode'),
 });
 
 export const MorphsToParamsSchema = z.object({
@@ -390,6 +389,32 @@ export const MorphsToParamsSchema = z.object({
   easing: z.string().optional().default('easeInOutCubic').describe('Easing function'),
   morphColor: z.boolean().optional().default(true).describe('Also morph color'),
   morphSize: z.boolean().optional().default(true).describe('Also morph size'),
+});
+
+// Pair-by-index group morph. Source paper.Group's children migrate into target
+// Group's children's positions; Path.Line endpoints deform; excess children fade.
+// Generic — any two groups (graph vertices+edges, letter collages, dashboard
+// clusters, etc.) work with the same call shape.
+export const GroupMorphsToParamsSchema = z.object({
+  duration:    z.number().optional().default(1.5).describe('Morph duration each direction (seconds)'),
+  hold:        z.number().optional().default(1.0).describe('Hold time on each end before reversing (seconds)'),
+  loop:        z.boolean().optional().default(true).describe('Cycle source ↔ target indefinitely'),
+  easing:      z.enum(['linear', 'easeIn', 'easeOut', 'easeInOut']).optional().default('easeInOut').describe('Easing for the position interpolation'),
+  deformLines: z.boolean().optional().default(true).describe('Path.Line children deform via segment endpoints instead of rigid translation'),
+});
+
+// Self-relation: item is driven along a custom-drawn path stored in params.
+// In the editor the Relations picker offers a drag-to-draw capture mode; via
+// MCP / agent code, pass the points array explicitly.
+export const MovesAlongPathParamsSchema = z.object({
+  path:   z.array(z.union([
+            z.object({ x: z.number(), y: z.number() }),
+            z.tuple([z.number(), z.number()]),
+          ])).describe('Path points: array of {x,y} objects or [x,y] tuples'),
+  speed:  z.number().optional().default(1).describe('Speed multiplier (1 ≈ 150 px/s)'),
+  closed: z.boolean().optional().default(true).describe('Loop back to start at end of path'),
+  phase:  z.number().optional().default(0).describe('Starting position along path (0–1)'),
+  easing: z.enum(['linear', 'easeIn', 'easeOut', 'easeInOut', 'sine', 'bounce', 'pingpong']).optional().default('linear').describe('Motion curve mapping normalized time → progress along path'),
 });
 
 // =============================================================================

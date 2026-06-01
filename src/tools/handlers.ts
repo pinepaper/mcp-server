@@ -1362,15 +1362,47 @@ You can now start creating new items on a clean canvas.`,
         // Target a custom Studio instance (e.g. local dev at http://localhost:3000).
         // Falls back to the PINEPAPER_STUDIO_URL env var, else PuppeteerController's
         // built-in prod default. "/editor" + agent params are appended by the controller.
-        const studioUrl = ((args.url as string) || process.env.PINEPAPER_STUDIO_URL || '').trim() || undefined;
+        const rawUrl = typeof args.url === 'string' ? args.url.trim() : '';
+        const studioUrl = (rawUrl || (process.env.PINEPAPER_STUDIO_URL || '').trim()) || undefined;
+
+        // Only http(s) is supported — reject file://, data://, javascript:, etc.
+        if (studioUrl) {
+          let parsed: URL;
+          try {
+            parsed = new URL(studioUrl);
+          } catch {
+            return errorResult(ErrorCodes.INVALID_INPUT, `Invalid Studio URL: ${studioUrl}`);
+          }
+          if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+            return errorResult(ErrorCodes.INVALID_INPUT, `Studio URL must use http:// or https:// (got ${parsed.protocol}).`);
+          }
+        }
+
         const cfg = studioUrl ? { headless, studioUrl } : { headless };
 
         const controller = getBrowserController(cfg);
 
-        // Did the caller request a URL that differs from the live connection?
-        const norm = (u?: string) => (u || '').replace(/\/+$/, '');
+        // Did the caller request a URL whose origin+pathname differs from the live
+        // connection? Compare structured URL parts so e.g. port :3000 vs :30000
+        // don't substring-match, and so the controller-appended /editor + agent
+        // query params don't trigger spurious reconnects.
+        const sameTarget = (a?: string, b?: string): boolean => {
+          if (!a || !b) return !a && !b;
+          try {
+            const ua = new URL(a);
+            const ub = new URL(b);
+            // origin includes scheme+host+port. pathname compared without trailing /.
+            const path = (u: URL) => u.pathname.replace(/\/+$/, '') || '/';
+            // If the user supplied a bare origin (no path), treat any pathname on the
+            // stored side as a match — the controller appends /editor itself.
+            const userHasPath = path(ub) !== '/';
+            return ua.origin === ub.origin && (!userHasPath || path(ua) === path(ub));
+          } catch {
+            return a === b;
+          }
+        };
         const urlChanged = !!studioUrl && controller.connected &&
-          norm(controller.studioUrl).indexOf(norm(studioUrl)) === -1;
+          !sameTarget(controller.studioUrl, studioUrl);
 
         // Already connected, same headless mode, same URL → nothing to do
         if (controller.connected && controller.isHeadless === headless && !urlChanged) {

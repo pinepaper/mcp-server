@@ -72,7 +72,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_get_available_easings: 'List available easing functions.',
 
   // --- Camera ---
-  pinepaper_camera_animate: 'Camera keyframes. Per-kf: zoom, focus ([x,y]|id|{item,offset}), pitch, yaw, easing; curved via pathOut/pathIn or pathMode:arc+pivot / custom+path. mode: keyframes|fly_to|orbit.',
+  pinepaper_camera_animate: 'Camera keyframes. Per-kf: zoom, focus ([x,y]|id|{item,offset}), pitch, yaw, easing; curved via pathOut/pathIn or pathMode:arc+pivot / custom+path.',
   pinepaper_camera: 'Camera control. action: zoom|pan|move_to|reset|stop|state. zoom: direction:in|out, level. pan: direction or {x,y}, amount. move_to: {x,y,zoom}. duration default 0.5s.',
 
   // --- Scenes & Templates ---
