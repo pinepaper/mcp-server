@@ -3070,7 +3070,7 @@ app.historyManager.saveState();
     if (gradientDirection) options.gradientDirection = gradientDirection;
 
     return `
-// Create letter collage: "${text}"
+// Create letter collage
 (function() {
   const text = ${JSON.stringify(text)};
   const options = ${JSON.stringify(options, null, 2)};
@@ -3096,7 +3096,10 @@ app.historyManager.saveState();
   const letterIds = (result && Array.isArray(result.letters))
     ? result.letters.map(function(l){ return (l && l.data && (l.data.id || l.data.registryId)) || null; }).filter(Boolean)
     : [];
-  return { success: true, collageId: collageId, itemId: collageId, letterCount: letterIds.length, letterIds: letterIds, text: text };
+  if (!collageId) {
+    return { success: false, error: 'createLetterCollage returned no id', letterCount: letterIds.length, letterIds: letterIds };
+  }
+  return { success: true, collageId: collageId, itemId: collageId, letterCount: letterIds.length, letterIds: letterIds };
 })();
 `.trim();
   }

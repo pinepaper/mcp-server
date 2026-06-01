@@ -121,6 +121,8 @@ export const PP_VOCABULARY: PinePaperVocabulary = {
     'pp:staggeredWith':     { category: 'animation',  behaviorType: 'trigger', cardinality: 'group', description: 'Stored as pairwise edges with index param to reconstruct group ordering.', mathFunctions: ['delayOffset'], parentType: 'pp:AnimationRelation', mcpToolRef: 'pinepaper_add_relation' },
     'pp:waveThrough':       { category: 'animation',  behaviorType: 'constraint', cardinality: 'group', description: 'Stored as pairwise edges with index param for phase offset.', mathFunctions: ['phaseOffsetSinusoid'], parentType: 'pp:AnimationRelation', mcpToolRef: 'pinepaper_add_relation' },
     'pp:morphsTo':          { category: 'animation',  behaviorType: 'trigger', mathFunctions: ['pathPointLerp'], parentType: 'pp:AnimationRelation', mcpToolRef: 'pinepaper_add_relation' },
+    'pp:groupMorphsTo':     { category: 'animation',  behaviorType: 'trigger', description: "Pair-by-index morph between two paper.Groups: source children migrate into target children's positions; Path.Line children deform via segment endpoints; other children translate; excess fade. Generic across any two groups.", mathFunctions: ['pathPointLerp'], parentType: 'pp:AnimationRelation', mcpToolRef: 'pinepaper_add_relation' },
+    'pp:movesAlongPath':    { category: 'procedural', behaviorType: 'procedural', description: 'Self-relation: item position is driven along a custom-drawn path stored in params; named easing curves (linear / easeIn / easeOut / easeInOut / sine / bounce / pingpong).', mathFunctions: ['pathPointLerp'], parentType: 'pp:ProceduralRelation', mcpToolRef: 'pinepaper_add_relation' },
     'pp:circumscribes':     { category: 'animation',  behaviorType: 'trigger', mathFunctions: ['boundingGeometry'], parentType: 'pp:TransformRelation', mcpToolRef: 'pinepaper_add_relation' },
     'pp:indicates':         { category: 'animation',  behaviorType: 'trigger', description: 'Temporary emphasis effect.', mathFunctions: ['pulseScale'], parentType: 'pp:AnimationRelation', mcpToolRef: 'pinepaper_add_relation' },
     // Procedural relations
@@ -413,6 +415,8 @@ export const RELATION_TYPE_MAP: Record<string, string> = {
   'staggered_with':     'pp:staggeredWith',
   'wave_through':       'pp:waveThrough',
   'morphs_to':          'pp:morphsTo',
+  'group_morphs_to':    'pp:groupMorphsTo',
+  'moves_along_path':   'pp:movesAlongPath',
   'circumscribes':      'pp:circumscribes',
   'indicates':          'pp:indicates',
   'driven_by':          'pp:drivenBy',

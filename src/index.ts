@@ -680,6 +680,36 @@ pinepaper_add_relation sourceId: "circle" targetId: "star" relationType: "morphs
 
 **Great for:** Logo animations, shape transitions, loading indicators, morphing icons
 
+### group_morphs_to
+Pair-by-index morph between two paper.Groups. Source group's children migrate into target group's children's positions; Path.Line children deform via their segment endpoints; non-line children translate; excess children fade. Generic — works for any two groups (graph vertices+edges, letter collages, dashboard clusters).
+- \`duration\`: Morph duration each direction in seconds (default: 1.5)
+- \`hold\`: Hold time on each end before reversing in seconds (default: 1.0)
+- \`loop\`: Cycle source ↔ target indefinitely (default: true)
+- \`easing\`: 'linear' | 'easeIn' | 'easeOut' | 'easeInOut' (default: 'easeInOut')
+- \`deformLines\`: Path.Line children deform via segment endpoints instead of rigid translation (default: true)
+
+\`\`\`
+pinepaper_add_relation sourceId: "graphA" targetId: "graphB" relationType: "group_morphs_to"
+  params: {duration: 1.5, hold: 1.0, loop: true}
+\`\`\`
+
+**Great for:** Graph layout transitions, letter-collage morphs, before/after dashboards
+
+### moves_along_path
+Self-relation: item travels along a custom-drawn path stored in params. Pass \`targetId: null\`. In the editor the Relations picker offers a drag-to-draw capture mode; via MCP, pass the points array explicitly.
+- \`path\`: Array of \`{x, y}\` objects or \`[x, y]\` tuples (required)
+- \`speed\`: Speed multiplier — 1 ≈ 150 px/s (default: 1)
+- \`closed\`: Loop back to start at end of path (default: true)
+- \`phase\`: Starting position along path, 0–1 (default: 0)
+- \`easing\`: 'linear' | 'easeIn' | 'easeOut' | 'easeInOut' | 'sine' | 'bounce' | 'pingpong' (default: 'linear')
+
+\`\`\`
+pinepaper_add_relation sourceId: "ball" targetId: null relationType: "moves_along_path"
+  params: {path: [[100,100],[300,200],[500,100]], speed: 1, closed: true, easing: "easeInOut"}
+\`\`\`
+
+**Great for:** Procedural motion along an author-defined trajectory, scripted camera fly-throughs, decorative paths
+
 ### camera_follows
 Camera pans to follow a target item (like Manim MovingCameraScene).
 - \`smoothing\`: 0-1 (higher = smoother following)

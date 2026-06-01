@@ -93,7 +93,7 @@ SVG imports for recognizable objects (planes, cars, animals, buildings):
 
 Loop presets (animate): pulse, rotate, bounce, fade, wobble, slide, typewriter
 Keyframe (keyframe_animate): [{time, properties, easing}] → opacity, scale, scaleX, scaleY, x, y, rotation, fillColor, strokeColor, fontSize
-Relations (relation): orbits, follows, attached_to, points_at, mirrors, parallax, wave_through, morphs_to (+ 9 more in batch_execute schema)
+Relations (relation): orbits, follows, attached_to, points_at, mirrors, parallax, wave_through, morphs_to, group_morphs_to, moves_along_path (+ 9 more in batch_execute schema)
 Masks (apply_mask): wipeLeft, wipeRight, wipeUp, wipeDown, iris, irisOut, star, heart, curtainHorizontal, curtainVertical, cinematic, diagonalWipe, revealUp, revealDown
 Effects (apply_effect): sparkle, blast
 
@@ -1299,6 +1299,8 @@ RELATION COMPATIBILITY:
   Circle→Circle: radius interpolation
   Text→Text: font blend
   Cross-type: particle denoising transition
+- group_morphs_to: pair-by-index morph between two paper.Groups (any two — graph vertices+edges, letter collages, dashboard clusters). Path.Line children deform via endpoints; other children translate; excess children fade. Params: duration, hold, loop, easing (linear|easeIn|easeOut|easeInOut), deformLines.
+- moves_along_path: self-relation (targetId=null); item is driven along a custom-drawn path stored in params.path (array of {x,y} or [x,y]). Params: path, speed, closed, phase, easing (linear|easeIn|easeOut|easeInOut|sine|bounce|pingpong).
 
 VERIFYING ANIMATION WORKS:
 After adding a relation, verify the animation is running:
@@ -1320,7 +1322,7 @@ Relations are COMPOSITIONAL - an item can have multiple relations that work toge
         },
         relationType: {
           type: 'string',
-          enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'camera_animates', 'morphs_to'],
+          enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'camera_animates', 'morphs_to', 'group_morphs_to', 'moves_along_path'],
           description: 'Type of relationship',
         },
         params: {
@@ -1355,7 +1357,7 @@ USE WHEN:
         targetId: { type: 'string', description: 'Target item ID' },
         relationType: {
           type: 'string',
-          enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'camera_animates', 'morphs_to'],
+          enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'camera_animates', 'morphs_to', 'group_morphs_to', 'moves_along_path'],
           description: 'Specific relation type to remove (optional - removes all if not specified)',
         },
       },
@@ -1384,7 +1386,7 @@ USE WHEN:
         itemId: { type: 'string', description: 'Item to query relations for' },
         relationType: {
           type: 'string',
-          enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'camera_animates', 'morphs_to'],
+          enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'camera_animates', 'morphs_to', 'group_morphs_to', 'moves_along_path'],
           description: 'Filter by relation type (optional)',
         },
         direction: {
@@ -1948,10 +1950,10 @@ USE WHEN:
 - Tour animations showing different parts of canvas
 - 3D perspective effects (pitch/yaw tilt via equirectangular projection)
 
-MODES:
-- keyframes (default): Manual keyframe array with full control
-- fly_to: Shorthand — fly to target position with zoom
-- orbit: Revolve camera around a point
+The camera follows a keyframe sequence. For an orbit-style camera (revolving
+around a subject), add 4-8 keyframes around the pivot using pathMode: "arc"
+with pivot + arcDirection on each segment. There is no separate "orbit" mode
+— it is expressible as keyframes + arc paths.
 
 KEYFRAME PROPERTIES:
 - time: Time in seconds
@@ -2056,16 +2058,6 @@ EXAMPLE (curved arc between waypoints):
         loop: { type: 'boolean', description: 'Loop the animation' },
         delay: { type: 'number', description: 'Delay before animation starts' },
         fov: { type: 'number', description: 'Field of view in degrees for 3D perspective (default: 60)' },
-        mode: {
-          type: 'string',
-          enum: ['keyframes', 'fly_to', 'orbit'],
-          description: 'Camera mode: keyframes (manual), fly_to (shorthand to target), orbit (revolve)',
-        },
-        target: {
-          type: 'object',
-          properties: { x: { type: 'number' }, y: { type: 'number' } },
-          description: 'Target position for fly_to mode',
-        },
       },
       required: ['keyframes', 'duration'],
     },
@@ -2189,7 +2181,7 @@ EXAMPLE - Bouncing Balls:
 }
 
 SUPPORTED ITEM TYPES: text, circle, star, rectangle, triangle, polygon, ellipse, path, line, arc
-SUPPORTED RELATIONS: orbits, follows, attached_to, maintains_distance, points_at, mirrors, parallax, bounds_to, animates, grows_from, staggered_with, indicates, circumscribes, wave_through, camera_follows, camera_animates, morphs_to
+SUPPORTED RELATIONS: orbits, follows, attached_to, maintains_distance, points_at, mirrors, parallax, bounds_to, animates, grows_from, staggered_with, indicates, circumscribes, wave_through, camera_follows, camera_animates, morphs_to, group_morphs_to, moves_along_path
 SUPPORTED ANIMATIONS: pulse, rotate, bounce, fade, wobble, slide, typewriter`,
     inputSchema: {
       type: 'object',
@@ -2235,7 +2227,7 @@ SUPPORTED ANIMATIONS: pulse, rotate, bounce, fade, wobble, slide, typewriter`,
               target: { type: 'string', description: 'Name of target item' },
               type: {
                 type: 'string',
-                enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'camera_animates', 'morphs_to'],
+                enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'camera_animates', 'morphs_to', 'group_morphs_to', 'moves_along_path'],
               },
               params: {
                 type: 'object',
@@ -4996,7 +4988,7 @@ RETURNS:
         },
         url: {
           type: 'string',
-          description: 'Studio URL to connect to (e.g. "http://localhost:3000" for local dev). Overrides the PINEPAPER_STUDIO_URL env var and the prod default. "/editor" and agent-mode params are added automatically. Passing a URL that differs from the current connection reconnects.',
+          description: 'Studio URL to connect to (e.g. "http://localhost:3000" for local dev). Must be http:// or https:// — file:/data:/javascript: are rejected. Overrides the PINEPAPER_STUDIO_URL env var and the prod default. "/editor" and agent-mode params are added automatically. Passing a URL with a different origin/pathname reconnects.',
         },
       },
     },
@@ -5436,7 +5428,7 @@ ANIMATION:
     Animatable properties: opacity, scale, scaleX, scaleY, x, y, rotation, fillColor, strokeColor, fontSize
     Easing: easeInOut, easeIn, easeOut, easeInCubic, easeOutCubic, easeOutBounce, linear
   relation — Behavioral link: {sourceId, targetId, relationType, relationOptions}
-    relationType: orbits, follows, attached_to, points_at, mirrors, parallax, wave_through, morphs_to (+ 9 more in schema)
+    relationType: orbits, follows, attached_to, points_at, mirrors, parallax, wave_through, morphs_to, group_morphs_to, moves_along_path (+ 9 more in schema)
 
 EFFECTS:
   apply_mask — Reveal effect: {itemId, maskPreset, maskOptions}
@@ -5528,7 +5520,7 @@ EXAMPLE — Animated sky scene with timed reveals:
               targetId: { type: 'string', description: 'For relation: target item ID or $N' },
               relationType: {
                 type: 'string',
-                enum: ['orbits', 'follows', 'attached_to', 'points_at', 'mirrors', 'parallax', 'animates', 'grows_from', 'staggered_with', 'wave_through', 'circumscribes', 'morphs_to', 'maintains_distance', 'bounds_to', 'indicates', 'camera_follows', 'camera_animates'],
+                enum: ['orbits', 'follows', 'attached_to', 'points_at', 'mirrors', 'parallax', 'animates', 'grows_from', 'staggered_with', 'wave_through', 'circumscribes', 'morphs_to', 'group_morphs_to', 'moves_along_path', 'maintains_distance', 'bounds_to', 'indicates', 'camera_follows', 'camera_animates'],
                 description: 'For relation: type',
               },
               relationOptions: { type: 'object', description: 'For relation: options' },

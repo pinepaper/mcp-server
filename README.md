@@ -643,12 +643,14 @@ export PINEPAPER_METRICS_RETENTION=5000
 
 - **[Workflow Guide](docs/WORKFLOW_GUIDE.md)** - Decision trees, multi-step patterns, performance optimization, and troubleshooting
 - **[Performance Metrics](docs/PERFORMANCE_METRICS.md)** - In-memory metrics system for AI self-optimization
-- **[PinePaper Reference](https://pinepaper.studio/docs/)** - Complete PinePaper Studio API reference
+- **[PinePaper Reference](https://pinepaper.studio/api/)** - Complete PinePaper Studio API reference
 
 ### External Documentation
 
-- [PinePaper API Docs](https://pinepaper.studio/docs/api)
-- [MCP Tools Specification](https://pinepaper.studio/docs/mcp)
+- [PinePaper API Docs](https://pinepaper.studio/api/)
+- [MCP Tools Specification](https://pinepaper.studio/api/mcp/tools-spec)
+- [MCP Server Installation](https://pinepaper.studio/api/mcp/installation)
+- [User Guide](https://pinepaper.studio/guide/)
 
 ## Contributing
 
@@ -669,7 +671,7 @@ MIT License - see [LICENSE](LICENSE) for details.
 ## Links
 
 - [PinePaper Studio](https://pinepaper.studio)
-- [Documentation](https://pinepaper.studio/docs)
+- [Documentation](https://pinepaper.studio/guide/)
 - [GitHub Issues](https://github.com/pinepaper/mcp-server/issues)
 - [MCP Specification](https://modelcontextprotocol.io)
 
