@@ -147,6 +147,7 @@ import {
   resetBrowserController,
   type BrowserControllerConfig,
 } from '../browser/puppeteer-controller.js';
+import { sameStudioTarget, validateStudioUrl } from '../browser/url-target.js';
 import { getPerformanceTracker, TimingMetric, MetricsExportFormat } from '../metrics/index.js';
 import { ErrorContext, formatErrorContext, captureCanvasState } from '../execution/index.js';
 import { getSessionManager } from '../agent/session-manager.js';
@@ -1367,42 +1368,16 @@ You can now start creating new items on a clean canvas.`,
 
         // Only http(s) is supported — reject file://, data://, javascript:, etc.
         if (studioUrl) {
-          let parsed: URL;
-          try {
-            parsed = new URL(studioUrl);
-          } catch {
-            return errorResult(ErrorCodes.INVALID_INPUT, `Invalid Studio URL: ${studioUrl}`);
-          }
-          if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-            return errorResult(ErrorCodes.INVALID_INPUT, `Studio URL must use http:// or https:// (got ${parsed.protocol}).`);
-          }
+          const v = validateStudioUrl(studioUrl);
+          if (!v.ok) return errorResult(ErrorCodes.INVALID_INPUT, v.error);
         }
 
         const cfg = studioUrl ? { headless, studioUrl } : { headless };
 
         const controller = getBrowserController(cfg);
 
-        // Did the caller request a URL whose origin+pathname differs from the live
-        // connection? Compare structured URL parts so e.g. port :3000 vs :30000
-        // don't substring-match, and so the controller-appended /editor + agent
-        // query params don't trigger spurious reconnects.
-        const sameTarget = (a?: string, b?: string): boolean => {
-          if (!a || !b) return !a && !b;
-          try {
-            const ua = new URL(a);
-            const ub = new URL(b);
-            // origin includes scheme+host+port. pathname compared without trailing /.
-            const path = (u: URL) => u.pathname.replace(/\/+$/, '') || '/';
-            // If the user supplied a bare origin (no path), treat any pathname on the
-            // stored side as a match — the controller appends /editor itself.
-            const userHasPath = path(ub) !== '/';
-            return ua.origin === ub.origin && (!userHasPath || path(ua) === path(ub));
-          } catch {
-            return a === b;
-          }
-        };
         const urlChanged = !!studioUrl && controller.connected &&
-          !sameTarget(controller.studioUrl, studioUrl);
+          !sameStudioTarget(controller.studioUrl, studioUrl);
 
         // Already connected, same headless mode, same URL → nothing to do
         if (controller.connected && controller.isHeadless === headless && !urlChanged) {
