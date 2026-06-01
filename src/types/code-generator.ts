@@ -2561,37 +2561,43 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
       case 'mp4':
       case 'webm': {
         const videoMimeType = { mp4: 'video/mp4', webm: 'video/webm', gif: 'image/gif' }[format];
-        const baseVideoSettings = { format, fps: settings.fps, bitrate: settings.bitrate, duration: 5 };
+        // FxTool VideoExporter._calculateBitrate multiplies a per-resolution
+        // base by settings.quality (0.5-1.0). Our existing per-tier compression
+        // values (0.6 / 0.85 / 0.95) map directly to that scale. Without this,
+        // ExportEngine._quickExportVideo overrides quality with undefined for
+        // mp4/webm, _calculateBitrate yields NaN, and VideoEncoder.configure
+        // rejects with 'malformed bitrate value'.
+        const baseVideoSettings = { format, fps: settings.fps, quality: settings.compression, duration: 5 };
+        const blobToDataUrl = (b) => new Promise(resolve => {
+          const r = new FileReader();
+          r.onloadend = () => resolve(r.result);
+          r.readAsDataURL(b);
+        });
         // Camera framing requires going direct to videoExporter so width/height
         // pass through — _quickExportVideo strips dim fields.
         if (cameraDims && app.exportEngine && app.exportEngine.videoExporter) {
           const blob = await app.exportEngine.videoExporter.export({ ...baseVideoSettings, width: cameraDims.width, height: cameraDims.height });
-          const reader = new FileReader();
-          const dataUrl = await new Promise(resolve => {
-            reader.onloadend = () => resolve(reader.result);
-            reader.readAsDataURL(blob);
-          });
+          const dataUrl = await blobToDataUrl(blob);
           result = { success: true, platform, format, framing, data: dataUrl, mimeType: videoMimeType, size: blob.size, dimensions: cameraDims };
+        } else if ((format === 'mp4' || format === 'webm') && app.exportEngine && app.exportEngine.videoExporter) {
+          // Bypass _quickExportVideo for mp4/webm — it hardcodes
+          // quality:undefined for these formats and produces a NaN bitrate.
+          const blob = await app.exportEngine.videoExporter.export(baseVideoSettings);
+          const dataUrl = await blobToDataUrl(blob);
+          result = { success: true, platform, format, framing, data: dataUrl, mimeType: videoMimeType, size: blob.size };
         } else if (app.exportEngine && app.exportEngine._quickExportVideo) {
+          // GIF path (working): _quickExportVideo forwards gifQuality to
+          // gif.js. Also serves as the fallback if videoExporter is absent.
           const videoResult = await app.exportEngine._quickExportVideo(format, baseVideoSettings, false);
           if (videoResult && videoResult.blob) {
-            const reader = new FileReader();
-            const dataUrl = await new Promise(resolve => {
-              reader.onloadend = () => resolve(reader.result);
-              reader.readAsDataURL(videoResult.blob);
-            });
+            const dataUrl = await blobToDataUrl(videoResult.blob);
             result = { success: true, platform, format, framing, data: dataUrl, mimeType: videoMimeType, size: videoResult.blob.size };
           } else {
             result = { success: false, error: format.toUpperCase() + ' export returned no data' };
           }
         } else if (app.exportEngine && app.exportEngine.videoExporter) {
-          // Fallback: call VideoExporter.export directly
           const blob = await app.exportEngine.videoExporter.export(baseVideoSettings);
-          const reader = new FileReader();
-          const dataUrl = await new Promise(resolve => {
-            reader.onloadend = () => resolve(reader.result);
-            reader.readAsDataURL(blob);
-          });
+          const dataUrl = await blobToDataUrl(blob);
           result = { success: true, platform, format, framing, data: dataUrl, mimeType: videoMimeType, size: blob.size };
         } else {
           result = { success: false, error: format.toUpperCase() + ' export not available' };
