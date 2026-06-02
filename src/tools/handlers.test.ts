@@ -1602,8 +1602,9 @@ describe('handleToolCall', () => {
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
+      // 1.5.5: keyframes route to app.maskingSystem.applyCustomMask(item, type, kf, opts).
       expect(text).toContain('rectangle');
-      expect(text).toContain('keyframes');
+      expect(text).toContain('app.maskingSystem.applyCustomMask(item,');
     });
 
     it('should generate code for hybrid mode', async () => {
@@ -1618,8 +1619,9 @@ describe('handleToolCall', () => {
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
+      // 1.5.5: with both preset and keyframes, the keyframe branch wins.
       expect(text).toContain('iris');
-      expect(text).toContain('keyframes');
+      expect(text).toContain('app.maskingSystem.applyCustomMask(item,');
     });
   });
 

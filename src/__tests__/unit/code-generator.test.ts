@@ -525,7 +525,8 @@ describe('PinePaperCodeGenerator', () => {
       const code = codeGenerator.generateAgentBatchExecute({
         operations: [{ type: 'apply_mask', itemId: '$0', maskPreset: 'wipeLeft', maskOptions: { duration: 0.5 } }],
       });
-      expect(code).toContain('app.maskSystem.applyAnimatedMask');
+      // 1.5.5: app.maskSystem was a phantom; calls app.applyAnimatedMask directly now.
+      expect(code).toContain('app.applyAnimatedMask(item,');
       expect(code).toContain("'wipeLeft'");
     });
 

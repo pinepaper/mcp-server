@@ -244,6 +244,120 @@ describe('Relation alignment — group_morphs_to + moves_along_path', () => {
 // agent_export MP4/WebM bitrate fix
 // =============================================================================
 
+// =============================================================================
+// 1.5.5 — MCP→FxTool symbol mismatches
+// =============================================================================
+
+describe('Mask codegen — FxTool symbol mismatches (1.5.5)', () => {
+  // FxTool exposes app.applyMask/applyAnimatedMask/removeMask as convenience
+  // wrappers (PinePaper.js:6822-6859), plus app.maskingSystem.applyCustomMask
+  // for keyframe-based masks. Pre-1.5.5 the codegen called the non-existent
+  // app.maskSystem.* — "Masks aren't available in this build" was always thrown.
+
+  it('batch_execute apply_mask: resolves item from id and calls app.applyAnimatedMask(item, preset, options)', () => {
+    const code = codeGenerator.generateAgentBatchExecute({
+      operations: [{ type: 'apply_mask', itemId: '$0', maskPreset: 'iris', maskOptions: { duration: 1.2 } }],
+    });
+    expect(code).not.toContain('app.maskSystem');
+    expect(code).toContain('app.getItemById(targetId)');
+    expect(code).toContain("app.applyAnimatedMask(item, 'iris'");
+    expect(code).toContain('"duration":1.2');
+  });
+
+  it('pinepaper_apply_mask: uses app.applyAnimatedMask with positional preset', () => {
+    const code = codeGenerator.generateApplyAnimatedMask({
+      itemId: 'item_5',
+      preset: 'wipeLeft',
+      options: { duration: 0.8 },
+    });
+    expect(code).not.toContain('app.maskSystem');
+    expect(code).toContain("app.applyAnimatedMask(item, 'wipeLeft'");
+    expect(code).toContain('app.getItemById');
+  });
+
+  it('pinepaper_apply_mask (custom keyframes): routes to app.maskingSystem.applyCustomMask with positional args', () => {
+    const code = codeGenerator.generateApplyAnimatedMask({
+      itemId: 'item_5',
+      maskType: 'star',
+      keyframes: [{ time: 0, properties: {} }, { time: 1, properties: {} }],
+    });
+    expect(code).toContain('app.maskingSystem.applyCustomMask(item,');
+  });
+
+  it('pinepaper_apply_custom_mask: uses maskingSystem.applyCustomMask with positional args (item, type, keyframes, opts)', () => {
+    const code = codeGenerator.generateApplyCustomMask({
+      itemId: 'item_5',
+      maskType: 'star',
+      keyframes: [{ time: 0, properties: {} } as any, { time: 1, properties: {} } as any],
+      maskOptions: { repeat: 2 },
+    } as any);
+    expect(code).not.toContain('app.maskSystem');
+    expect(code).toContain('app.maskingSystem.applyCustomMask(item,');
+    expect(code).toContain("'star'");
+    expect(code).toContain('app.getItemById');
+  });
+
+  it('pinepaper_remove_mask: resolves item and passes the masked group to app.removeMask', () => {
+    const code = codeGenerator.generateRemoveMask({ itemId: 'item_5' });
+    expect(code).not.toContain('app.maskSystem');
+    expect(code).toContain('app.removeMask(maskedGroup)');
+    expect(code).toContain('app.getItemById');
+  });
+});
+
+describe('Widget export codegen — route through app.exportEngine (1.5.5)', () => {
+  // Pre-1.5.5 the codegen called app.exportWidget(opts) / app.exportWidgetHTML(opts)
+  // directly on the app object, but FxTool only exposes these on app.exportEngine
+  // (ExportEngine.js:4351, 4747). Result: every export_widget* call returned
+  // "Widget export not available".
+
+  it('pinepaper_export_widget: calls app.exportEngine.exportWidget', () => {
+    const code = codeGenerator.generateExportWidget({ download: false } as any);
+    expect(code).not.toMatch(/app\.exportWidget\(/);
+    expect(code).toContain('app.exportEngine.exportWidget(');
+  });
+
+  it('pinepaper_export_widget_html: calls app.exportEngine.exportWidgetHTML', () => {
+    const code = codeGenerator.generateExportWidgetHtml({ download: false } as any);
+    expect(code).not.toMatch(/app\.exportWidgetHTML\(/);
+    expect(code).toContain('app.exportEngine.exportWidgetHTML(');
+  });
+});
+
+describe('Other FxTool symbol mismatches (1.5.5)', () => {
+  // Three smaller renames discovered alongside the masks/widget audit.
+
+  it('create_scene relations: calls app.addRelation(srcId, tgtId, …), not app.relationManager.addRelation(item, item, …)', () => {
+    // The relations-in-scene codegen lives in generateCreateScene.
+    const code = codeGenerator.generateCreateScene({
+      items: [
+        { name: 'a', itemType: 'circle', position: { x: 0, y: 0 } },
+        { name: 'b', itemType: 'circle', position: { x: 100, y: 0 } },
+      ],
+      relations: [{ source: 'a', target: 'b', type: 'orbits' }],
+    } as any);
+    expect(code).not.toContain('app.relationManager');
+    expect(code).toMatch(/app\.addRelation\(\s*sourceId,\s*targetId,\s*'orbits'/);
+  });
+
+  it('selection codegen: uses app.getSelectedItems() (FxTool has no getSelection)', () => {
+    const selectAll = codeGenerator.generateSelection({ action: 'select_all' } as any);
+    const get = codeGenerator.generateSelection({ action: 'get' } as any);
+    const deleteSel = codeGenerator.generateSelection({ action: 'delete_selected' } as any);
+    for (const code of [selectAll, get, deleteSel]) {
+      expect(code).not.toMatch(/app\.getSelection\(/);
+      expect(code).toContain('app.getSelectedItems()');
+    }
+  });
+
+  it('background get codegen: uses app.getBackgroundMode() and returns {mode}', () => {
+    const code = codeGenerator.generateBackground({ action: 'get' } as any);
+    expect(code).not.toMatch(/app\.getBackground\(\)/);
+    expect(code).toContain('app.getBackgroundMode');
+    expect(code).toContain('mode');
+  });
+});
+
 describe('generateAgentExport — VideoEncoder NaN-bitrate fix', () => {
   // Repro from a live MCP session:
   //   "Failed to read the 'bitrate' property from 'VideoEncoderConfig':
