@@ -1600,13 +1600,9 @@ if (typeof app.generators !== 'undefined' && app.generators['${backgroundGenerat
   const sourceId = nameToId['${source}'];
   const targetId = nameToId['${target}'];
   if (sourceId && targetId) {
-    const sourceItem = app.itemRegistry.get(sourceId);
-    const targetItem = app.itemRegistry.get(targetId);
-    if (sourceItem && targetItem) {
-      const params = ${paramsStr};
-      app.relationManager.addRelation(sourceItem, targetItem, '${type}', params);
-      results.relations.push({ source: '${source}', target: '${target}', type: '${type}' });
-    }
+    const params = ${paramsStr};
+    app.addRelation(sourceId, targetId, '${type}', params);
+    results.relations.push({ source: '${source}', target: '${target}', type: '${type}' });
   }
 })();
 `);
@@ -2389,16 +2385,14 @@ return { itemId: targetId, duration: ${kfDuration}, loop: ${kfLoop} };
           ? `itemIds[${op.itemId.substring(1)}]`
           : `'${op.itemId}'`;
         const maskOpts = JSON.stringify(op.maskOptions || {});
+        const preset = op.maskPreset || op.maskType || 'wipeLeft';
         return `
 const targetId = ${maskItemRef};
-if (!app.maskSystem) throw new Error('Mask system not available');
-const result = app.maskSystem.applyAnimatedMask(targetId, {
-  preset: ${op.maskPreset ? `'${op.maskPreset}'` : 'null'},
-  maskType: ${op.maskType ? `'${op.maskType}'` : 'null'},
-  options: ${maskOpts},
-  maskOptions: ${maskOpts}
-});
-return result;
+const item = app.getItemById(targetId);
+if (!item) throw new Error('Item not found: ' + targetId);
+if (!app.applyAnimatedMask) throw new Error('Mask system not available');
+const maskedGroup = app.applyAnimatedMask(item, '${preset}', ${maskOpts});
+return { success: !!maskedGroup, itemId: targetId, preset: '${preset}' };
 `;
       }
 
@@ -4062,22 +4056,27 @@ app.historyManager.saveState();
     const keyframesStr = validated.keyframes ? JSON.stringify(validated.keyframes) : 'null';
     const maskOptionsStr = validated.maskOptions ? JSON.stringify(validated.maskOptions) : '{}';
 
+    const preset = validated.preset || validated.maskType || 'wipeLeft';
+    // Per-preset options. Custom keyframes are an animated-mask extension —
+    // when supplied, fall through to maskingSystem.applyCustomMask instead.
     return `
 // Apply animated mask to ${validated.itemId}
 (function() {
-  if (!app.maskSystem) {
+  if (!app.applyAnimatedMask) {
     return { success: false, error: 'Mask system not available' };
   }
+  const item = app.getItemById('${validated.itemId}');
+  if (!item) return { success: false, error: 'Item not found: ${validated.itemId}' };
 
   try {
-    const result = app.maskSystem.applyAnimatedMask('${validated.itemId}', {
-      preset: ${validated.preset ? `'${validated.preset}'` : 'null'},
-      maskType: ${validated.maskType ? `'${validated.maskType}'` : 'null'},
-      keyframes: ${keyframesStr},
-      options: ${optionsStr},
-      maskOptions: ${maskOptionsStr}
-    });
-    return result;
+    const mergedOpts = Object.assign({}, ${optionsStr}, ${maskOptionsStr});
+    let maskedGroup;
+    if (${keyframesStr} && app.maskingSystem && app.maskingSystem.applyCustomMask) {
+      maskedGroup = app.maskingSystem.applyCustomMask(item, '${preset}', ${keyframesStr}, mergedOpts);
+    } else {
+      maskedGroup = app.applyAnimatedMask(item, '${preset}', mergedOpts);
+    }
+    return { success: !!maskedGroup, itemId: '${validated.itemId}', preset: '${preset}' };
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -4093,17 +4092,15 @@ app.historyManager.saveState();
     return `
 // Apply custom mask to ${validated.itemId}
 (function() {
-  if (!app.maskSystem) {
+  if (!app.maskingSystem || !app.maskingSystem.applyCustomMask) {
     return { success: false, error: 'Mask system not available' };
   }
+  const item = app.getItemById('${validated.itemId}');
+  if (!item) return { success: false, error: 'Item not found: ${validated.itemId}' };
 
   try {
-    const result = app.maskSystem.applyCustomMask('${validated.itemId}', {
-      maskType: '${validated.maskType}',
-      keyframes: ${keyframesStr},
-      maskOptions: ${maskOptionsStr}
-    });
-    return result;
+    const maskedGroup = app.maskingSystem.applyCustomMask(item, '${validated.maskType}', ${keyframesStr}, ${maskOptionsStr});
+    return { success: !!maskedGroup, itemId: '${validated.itemId}', maskType: '${validated.maskType}' };
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -4117,12 +4114,17 @@ app.historyManager.saveState();
     return `
 // Remove mask from ${validated.itemId}
 (function() {
-  if (!app.maskSystem) {
+  if (!app.removeMask) {
     return { success: false, error: 'Mask system not available' };
   }
+  // The item id may point at either the masked group OR the original item;
+  // app.removeMask expects the masked group, so resolve and walk up if needed.
+  const item = app.getItemById('${validated.itemId}');
+  if (!item) return { success: false, error: 'Item not found: ${validated.itemId}' };
+  const maskedGroup = (item.data && item.data.isMaskedGroup) ? item : (item.parent && item.parent.data && item.parent.data.isMaskedGroup ? item.parent : item);
 
   try {
-    const result = app.maskSystem.removeMask('${validated.itemId}');
+    app.removeMask(maskedGroup);
     return { success: true, itemId: '${validated.itemId}', message: 'Mask removed' };
   } catch (error) {
     return { success: false, error: error.message };
@@ -4548,7 +4550,7 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    const ite
 // Select all items
 (function() {
   app.selectAll();
-  const items = app.getSelection().map(i => i.data?.itemId || i.name || i.id);
+  const items = app.getSelectedItems().map(i => i.data?.itemId || i.name || i.id);
   return { success: true, action: 'select_all', count: items.length, items };
 })();`.trim();
       case 'deselect_all':
@@ -4562,7 +4564,7 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    const ite
         return `
 // Get current selection
 (function() {
-  const items = app.getSelection().map(i => ({
+  const items = app.getSelectedItems().map(i => ({
     itemId: i.data?.itemId || i.name || i.id,
     type: i.data?.itemType || i.className,
     bounds: i.bounds ? { x: i.bounds.x, y: i.bounds.y, width: i.bounds.width, height: i.bounds.height } : null
@@ -4573,7 +4575,7 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    const ite
         return `
 // Delete selected items
 (function() {
-  const selection = app.getSelection();
+  const selection = app.getSelectedItems();
   const deleted = selection.map(i => i.data?.itemId || i.name || i.id);
   app.deleteSelected();
   return { success: true, action: 'delete_selected', deleted, count: deleted.length };
@@ -4880,8 +4882,9 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    const ite
         return `
 // Get background info
 (function() {
-  const bg = app.getBackground();
-  return { success: true, action: 'get', ...bg };
+  // FxTool exposes getBackgroundMode() returning the mode string only.
+  const mode = app.getBackgroundMode ? app.getBackgroundMode() : null;
+  return { success: true, action: 'get', mode };
 })();`.trim();
       default:
         return `(function() { return { error: 'Unknown background action: ${(input as any).action}' }; })();`;
@@ -5193,8 +5196,8 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    const ite
     return `
 // Export widget (pp:PinePaper ontology JSON)
 (async function() {
-  if (!app.exportWidget) return { error: 'Widget export not available' };
-  const result = await app.exportWidget(${JSON.stringify(opts)});
+  if (!app.exportEngine || !app.exportEngine.exportWidget) return { error: 'Widget export not available' };
+  const result = await app.exportEngine.exportWidget(${JSON.stringify(opts)});
   return { success: true, json: result.json, filename: result.filename, embedCode: result.embedCode, metadata: result.data?.metadata };
 })();`.trim();
   }
@@ -5206,8 +5209,8 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    const ite
     return `
 // Export widget as self-contained HTML
 (async function() {
-  if (!app.exportWidgetHTML) return { error: 'Widget HTML export not available' };
-  const result = await app.exportWidgetHTML(${JSON.stringify(opts)});
+  if (!app.exportEngine || !app.exportEngine.exportWidgetHTML) return { error: 'Widget HTML export not available' };
+  const result = await app.exportEngine.exportWidgetHTML(${JSON.stringify(opts)});
   return { success: true, html: result.html, estimatedSize: result.estimatedSize, analysis: { itemTypes: [...result.analysis.itemTypes], relationTypes: [...result.analysis.relationTypes], hasSimpleAnimations: result.analysis.hasSimpleAnimations, hasKeyframeAnimations: result.analysis.hasKeyframeAnimations, hasMasks: result.analysis.hasMasks } };
 })();`.trim();
   }

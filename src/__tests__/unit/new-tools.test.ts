@@ -111,7 +111,8 @@ describe('Selection code generation', () => {
 
   it('get returns selection with bounds', () => {
     const code = codeGenerator.generateSelection({ action: 'get' });
-    expect(code).toContain('app.getSelection()');
+    // 1.5.5: FxTool exposes getSelectedItems (no getSelection).
+    expect(code).toContain('app.getSelectedItems()');
     expect(code).toContain('bounds');
   });
 
@@ -499,9 +500,9 @@ describe('Background code generation', () => {
     expect(code).toContain('app.clearBackground()');
   });
 
-  it('get calls app.getBackground', () => {
+  it('get calls app.getBackgroundMode (1.5.5: FxTool has no getBackground)', () => {
     const code = codeGenerator.generateBackground({ action: 'get' });
-    expect(code).toContain('app.getBackground()');
+    expect(code).toContain('app.getBackgroundMode');
   });
 });
 
@@ -926,11 +927,12 @@ describe('ExportWidgetHtmlInputSchema', () => {
 });
 
 describe('Widget export code generation', () => {
-  it('export_widget generates async IIFE with exportWidget guard', () => {
+  it('export_widget generates async IIFE that calls app.exportEngine.exportWidget', () => {
     const code = codeGenerator.generateExportWidget({});
     expect(code).toContain('async function');
-    expect(code).toContain("if (!app.exportWidget) return { error: 'Widget export not available' }");
-    expect(code).toContain('app.exportWidget');
+    // 1.5.5: route through app.exportEngine.
+    expect(code).toContain("if (!app.exportEngine || !app.exportEngine.exportWidget)");
+    expect(code).toContain('app.exportEngine.exportWidget(');
   });
 
   it('export_widget passes options through', () => {
@@ -939,11 +941,12 @@ describe('Widget export code generation', () => {
     expect(code).toContain('"filename":"test.json"');
   });
 
-  it('export_widget_html generates async IIFE with exportWidgetHTML guard', () => {
+  it('export_widget_html generates async IIFE that calls app.exportEngine.exportWidgetHTML', () => {
     const code = codeGenerator.generateExportWidgetHtml({});
     expect(code).toContain('async function');
-    expect(code).toContain("if (!app.exportWidgetHTML) return { error: 'Widget HTML export not available' }");
-    expect(code).toContain('app.exportWidgetHTML');
+    // 1.5.5: route through app.exportEngine.
+    expect(code).toContain("if (!app.exportEngine || !app.exportEngine.exportWidgetHTML)");
+    expect(code).toContain('app.exportEngine.exportWidgetHTML(');
   });
 
   it('export_widget_html passes title option', () => {
