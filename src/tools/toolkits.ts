@@ -145,6 +145,9 @@ export const TOOL_TAGS: Record<string, string[]> = {
   measurement: [
     'pinepaper_measurement',
   ],
+  template: [
+    'pinepaper_apply_template',
+  ],
 
   // --- Query & export ---
   query: [

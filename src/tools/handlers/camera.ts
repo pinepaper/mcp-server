@@ -89,10 +89,17 @@ async function dispatchCameraAction(args: Record<string, unknown>, options: Hand
       return executeOrGenerate(code, 'Get current camera state', options, 'pinepaper_camera');
     }
 
+    case 'fit_view': {
+      // FxTool exposes app.fitView() as the canonical zoom-to-fit (added in
+      // commit f97fc60 so mobile gestures and this tool both work).
+      const code = `app.fitView ? app.fitView() : null;`;
+      return executeOrGenerate(code, 'Fit content to view', options, 'pinepaper_camera');
+    }
+
     default:
       return errorResult(
         ErrorCodes.INVALID_INPUT,
-        `Unknown camera action "${action}". Valid: zoom, pan, move_to, reset, stop, state. For keyframe walkthroughs use pinepaper_camera_animate.`,
+        `Unknown camera action "${action}". Valid: zoom, pan, move_to, reset, stop, state, fit_view. For keyframe walkthroughs use pinepaper_camera_animate.`,
       );
   }
 }

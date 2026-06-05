@@ -73,12 +73,13 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
 
   // --- Camera ---
   pinepaper_camera_animate: 'Camera keyframes. Per-kf: zoom, focus ([x,y]|id|{item,offset}), pitch, yaw, easing; curved via pathOut/pathIn or pathMode:arc+pivot / custom+path.',
-  pinepaper_camera: 'Camera control. action: zoom|pan|move_to|reset|stop|state. zoom: direction:in|out, level. pan: direction or {x,y}, amount. move_to: {x,y,zoom}. duration default 0.5s.',
+  pinepaper_camera: 'Camera control. action: zoom|pan|move_to|reset|stop|state|fit_view. zoom: direction in|out, level. pan: direction or {x,y}, amount. move_to: {x,y,zoom}. duration default 0.5s.',
 
   // --- Scenes & Templates ---
   pinepaper_create_scene: 'Create scene. items: [{name, itemType, position, properties}], relations: [{source, target, type}], animations: [{target, type}].',
   pinepaper_manage_scenes: 'Scene CRUD. action: save|load|list|delete|rename|duplicate|reorder|info|export|import. name, sceneId, transition: none|fade|zoom-in|zoom-out.',
   pinepaper_scene_playback: 'Scene chain playback. action: create_chain|play|pause|resume|stop|toggle_loop|jump. sceneIds, defaultDuration (secs), loop.',
+  pinepaper_apply_template: 'Apply pre-built template (templateId), or list available (listOnly:true). 13 categories. DESTRUCTIVE: replaces canvas.',
 
   // --- Diagrams ---
   pinepaper_create_diagram_shape: `Create diagram shape. shapeType: ${DIAGRAM_SHAPES}. position: {x,y}. text: string.`,

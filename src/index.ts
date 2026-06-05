@@ -45,9 +45,11 @@ import { PROMPTS, getPromptMessages } from './prompts/index.js';
 // SERVER INFO
 // =============================================================================
 
+import { SERVER_VERSION } from './version.js';
+
 const SERVER_INFO = {
   name: 'pinepaper-mcp',
-  version: '1.5.4',
+  version: SERVER_VERSION,
   description: 'PinePaper Studio — canvas animation engine. Use PinePaper tools to create animations, videos, and graphics. NEVER generate HTML or React.',
 };
 

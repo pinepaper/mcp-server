@@ -358,6 +358,30 @@ describe('Other FxTool symbol mismatches (1.5.5)', () => {
   });
 });
 
+// =============================================================================
+// 1.5.6 — pinepaper_camera fit_view action
+// =============================================================================
+
+describe('pinepaper_camera fit_view action (1.5.6)', () => {
+  // FxTool added app.fitView() in commit f97fc60 specifically so this action
+  // and mobile gestures both work. The MCP needed to surface it as an action
+  // on the camera umbrella (replacing the wrongly-removed pinepaper_view).
+  it('is documented in the pinepaper_camera tool description', async () => {
+    const { PINEPAPER_TOOLS } = await import('../../tools/definitions.js');
+    const camera = PINEPAPER_TOOLS.find((t) => t.name === 'pinepaper_camera');
+    expect(camera).toBeDefined();
+    expect(camera!.description).toContain('fit_view');
+  });
+
+  it('dispatcher emits app.fitView() and rejects on unknown action lists fit_view as valid', async () => {
+    const { handleToolCall } = await import('../../tools/handlers.js');
+    const result = await handleToolCall('pinepaper_camera', { action: 'fit_view' });
+    expect(result.isError).toBeFalsy();
+    const text = (result.content[0] as { type: string; text: string }).text;
+    expect(text).toContain('app.fitView');
+  });
+});
+
 describe('generateAgentExport — VideoEncoder NaN-bitrate fix', () => {
   // Repro from a live MCP session:
   //   "Failed to read the 'bitrate' property from 'VideoEncoderConfig':
