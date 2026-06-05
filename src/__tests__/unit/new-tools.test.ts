@@ -14,13 +14,11 @@ import {
   LassoInputSchema,
   CutoutStyleInputSchema,
   PrecompInputSchema,
-  ViewInputSchema,
   BackgroundInputSchema,
   QueryInputSchema,
   PlayTimelineInputSchema,
   DeformInputSchema,
   SpriteSheetInputSchema,
-  StorageInputSchema,
   InteractionInputSchema,
   TextPropertiesSchema,
   ExportWidgetInputSchema,
@@ -407,47 +405,6 @@ describe('Precomp code generation', () => {
 });
 
 // =============================================================================
-// VIEW
-// =============================================================================
-
-describe('ViewInputSchema', () => {
-  it('accepts fit with mode and padding', () => {
-    const result = ViewInputSchema.parse({ action: 'fit', mode: 'content', padding: 30 });
-    expect(result.mode).toBe('content');
-    expect(result.padding).toBe(30);
-  });
-
-  it('accepts get_state', () => {
-    expect(() => ViewInputSchema.parse({ action: 'get_state' })).not.toThrow();
-  });
-
-  it('rejects invalid action', () => {
-    expect(() => ViewInputSchema.parse({ action: 'zoom' })).toThrow();
-  });
-
-  it('rejects invalid mode', () => {
-    expect(() => ViewInputSchema.parse({ action: 'fit', mode: 'all' })).toThrow();
-  });
-});
-
-describe('View code generation', () => {
-  it('fit calls app.fitView', () => {
-    const code = codeGenerator.generateView({ action: 'fit', mode: 'content', padding: 30 });
-    expect(code).toContain("app.fitView('content', 30)");
-  });
-
-  it('fit defaults to content mode with 20px padding', () => {
-    const code = codeGenerator.generateView({ action: 'fit' });
-    expect(code).toContain("app.fitView('content', 20)");
-  });
-
-  it('get_state calls app.getViewState', () => {
-    const code = codeGenerator.generateView({ action: 'get_state' });
-    expect(code).toContain('app.getViewState()');
-  });
-});
-
-// =============================================================================
 // BACKGROUND
 // =============================================================================
 
@@ -776,56 +733,6 @@ describe('Sprite sheet code generation', () => {
     const code = codeGenerator.generateSpriteSheet({ action: 'export', spriteSheetId: 'sheet_1', format: 'webp' });
     expect(code).toContain('app.spriteSheetSystem.exportSpriteSheet');
     expect(code).toContain("'webp'");
-  });
-});
-
-// =============================================================================
-// STORAGE
-// =============================================================================
-
-describe('StorageInputSchema', () => {
-  it('accepts save with name', () => {
-    const result = StorageInputSchema.parse({ action: 'save', name: 'My Project' });
-    expect(result.action).toBe('save');
-    expect(result.name).toBe('My Project');
-  });
-
-  it('accepts all 4 actions', () => {
-    for (const action of ['save', 'load', 'list', 'delete'] as const) {
-      expect(() => StorageInputSchema.parse({ action })).not.toThrow();
-    }
-  });
-});
-
-describe('Storage code generation', () => {
-  it('save is async IIFE with storageManager guard', () => {
-    const code = codeGenerator.generateStorage({ action: 'save', name: 'Test' });
-    expect(code).toContain('async function');
-    expect(code).toContain("if (!app.storageManager) return { error: 'StorageManager not available' }");
-    expect(code).toContain('app.storageManager.saveProject');
-  });
-
-  it('load generates loadProject call', () => {
-    const code = codeGenerator.generateStorage({ action: 'load', projectId: 'proj_1' });
-    expect(code).toContain('app.storageManager.loadProject');
-    expect(code).toContain('proj_1');
-  });
-
-  it('list generates listProjects call', () => {
-    const code = codeGenerator.generateStorage({ action: 'list' });
-    expect(code).toContain('app.storageManager.listProjects');
-  });
-
-  it('delete generates deleteProject call', () => {
-    const code = codeGenerator.generateStorage({ action: 'delete', projectId: 'proj_1' });
-    expect(code).toContain('app.storageManager.deleteProject');
-    expect(code).toContain('proj_1');
-  });
-
-  it('load with special chars in projectId uses safe embedding', () => {
-    const code = codeGenerator.generateStorage({ action: 'load', projectId: "proj'inject" });
-    expect(code).not.toContain("projectId: 'proj'inject'");
-    expect(code).toContain(JSON.stringify("proj'inject"));
   });
 });
 
@@ -1279,7 +1186,7 @@ describe('Measurement code generation', () => {
 });
 
 // =============================================================================
-// INTEGRATION — All 20 tools in PINEPAPER_TOOLS, tag groups, minimal descs
+// INTEGRATION — consolidated tools in PINEPAPER_TOOLS, tag groups, minimal descs
 // =============================================================================
 
 const NEW_TOOL_NAMES = [
@@ -1290,12 +1197,10 @@ const NEW_TOOL_NAMES = [
   'pinepaper_lasso',
   'pinepaper_cutout_style',
   'pinepaper_precomp',
-  'pinepaper_view',
   'pinepaper_background',
   'pinepaper_query',
   'pinepaper_deform',
   'pinepaper_sprite_sheet',
-  'pinepaper_storage',
   'pinepaper_interaction',
   'pinepaper_export_widget',
   'pinepaper_export_widget_html',
@@ -1358,10 +1263,6 @@ describe('Integration — tag groups', () => {
     expect(TOOL_TAGS.precomp).toContain('pinepaper_precomp');
   });
 
-  it('canvas tag group contains pinepaper_view', () => {
-    expect(TOOL_TAGS.canvas).toContain('pinepaper_view');
-  });
-
   it('canvas tag group contains pinepaper_background', () => {
     expect(TOOL_TAGS.canvas).toContain('pinepaper_background');
   });
@@ -1376,10 +1277,6 @@ describe('Integration — tag groups', () => {
 
   it('sprite tag group contains pinepaper_sprite_sheet', () => {
     expect(TOOL_TAGS.sprite).toContain('pinepaper_sprite_sheet');
-  });
-
-  it('storage tag group contains pinepaper_storage', () => {
-    expect(TOOL_TAGS.storage).toContain('pinepaper_storage');
   });
 
   it('interaction tag group contains pinepaper_interaction', () => {

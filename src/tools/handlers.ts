@@ -55,20 +55,9 @@ import {
   AgentBatchExecuteInputSchema,
   AgentExportInputSchema,
   AgentAnalyzeInputSchema,
-  // Interactive/Trigger schemas
-  AddTriggerInputSchema,
-  RemoveTriggerInputSchema,
-  QueryTriggersInputSchema,
-  // Quiz schemas
-  CreateQuizInputSchema,
-  GetQuizStateInputSchema,
-  ResetQuizInputSchema,
   // Letter collage schemas
   CreateLetterCollageInputSchema,
   AnimateLetterCollageInputSchema,
-  GetLetterCollageOptionsInputSchema,
-  // Canvas presets schemas
-  GetCanvasPresetsInputSchema,
   // Map schemas
   LoadMapInputSchema,
   HighlightRegionsInputSchema,
@@ -98,8 +87,6 @@ import {
   ApplyAnimatedMaskInputSchema,
   ApplyCustomMaskInputSchema,
   RemoveMaskInputSchema,
-  // Template schemas
-  ApplyTemplateInputSchema,
   // Image import schemas
   ImportImageInputSchema,
   // Tool guide schema
@@ -119,12 +106,10 @@ import {
   LassoInputSchema,
   CutoutStyleInputSchema,
   PrecompInputSchema,
-  ViewInputSchema,
   BackgroundInputSchema,
   QueryInputSchema,
   DeformInputSchema,
   SpriteSheetInputSchema,
-  StorageInputSchema,
   InteractionInputSchema,
   ExportWidgetInputSchema,
   ExportWidgetHtmlInputSchema,
@@ -907,12 +892,6 @@ async function handleToolCallInner(
         return executeOrGenerate(code, `Precomp: ${input.action}`, options, 'pinepaper_precomp');
       }
 
-      case 'pinepaper_view': {
-        const input = ViewInputSchema.parse(args);
-        const code = codeGenerator.generateView(input);
-        return executeOrGenerate(code, `View: ${input.action}`, options, 'pinepaper_view');
-      }
-
       case 'pinepaper_background': {
         const input = BackgroundInputSchema.parse(args);
         const code = codeGenerator.generateBackground(input);
@@ -941,12 +920,6 @@ async function handleToolCallInner(
         const input = SpriteSheetInputSchema.parse(args);
         const code = codeGenerator.generateSpriteSheet(input);
         return executeOrGenerate(code, `Sprite sheet: ${input.action}`, options, 'pinepaper_sprite_sheet');
-      }
-
-      case 'pinepaper_storage': {
-        const input = StorageInputSchema.parse(args);
-        const code = codeGenerator.generateStorage(input);
-        return executeOrGenerate(code, `Storage: ${input.action}`, options, 'pinepaper_storage');
       }
 
       case 'pinepaper_interaction': {
@@ -2324,62 +2297,6 @@ You can now start creating new items on a clean canvas.`,
       }
 
       // -----------------------------------------------------------------------
-      // INTERACTIVE TRIGGER TOOLS
-      // -----------------------------------------------------------------------
-      case 'pinepaper_add_trigger': {
-        const input = AddTriggerInputSchema.parse(args);
-        const code = codeGenerator.generateAddTrigger(input);
-        const description = `Added ${input.event} trigger to ${input.itemId} with ${input.actions.length} actions`;
-        return executeOrGenerate(code, description, options, 'pinepaper_add_trigger');
-      }
-
-      case 'pinepaper_remove_trigger': {
-        const input = RemoveTriggerInputSchema.parse(args);
-        const code = codeGenerator.generateRemoveTrigger(input);
-        const description = input.removeAll
-          ? `Removed all triggers from ${input.itemId}`
-          : `Removed ${input.event} trigger from ${input.itemId}`;
-        return executeOrGenerate(code, description, options, 'pinepaper_remove_trigger');
-      }
-
-      case 'pinepaper_query_triggers': {
-        const input = QueryTriggersInputSchema.parse(args);
-        const code = codeGenerator.generateQueryTriggers(input);
-        const description = input.itemId
-          ? `Queried triggers for ${input.itemId}`
-          : 'Queried all triggers on canvas';
-        return executeOrGenerate(code, description, options, 'pinepaper_query_triggers');
-      }
-
-      // -----------------------------------------------------------------------
-      // QUIZ/LMS TOOLS
-      // -----------------------------------------------------------------------
-      case 'pinepaper_create_quiz': {
-        const input = CreateQuizInputSchema.parse(args);
-        const code = codeGenerator.generateCreateQuiz(input);
-        const description = `Created quiz${input.title ? ` "${input.title}"` : ''} with ${input.questions.length} questions`;
-        return executeOrGenerate(code, description, options, 'pinepaper_create_quiz');
-      }
-
-      case 'pinepaper_get_quiz_state': {
-        const input = GetQuizStateInputSchema.parse(args);
-        const code = codeGenerator.generateGetQuizState(input);
-        const description = input.quizId
-          ? `Got state for quiz ${input.quizId}`
-          : 'Got state for active quiz';
-        return executeOrGenerate(code, description, options, 'pinepaper_get_quiz_state');
-      }
-
-      case 'pinepaper_reset_quiz': {
-        const input = ResetQuizInputSchema.parse(args);
-        const code = codeGenerator.generateResetQuiz(input);
-        const description = input.quizId
-          ? `Reset quiz ${input.quizId}`
-          : 'Reset active quiz';
-        return executeOrGenerate(code, description, options, 'pinepaper_reset_quiz');
-      }
-
-      // -----------------------------------------------------------------------
       // LETTER COLLAGE TOOLS
       // -----------------------------------------------------------------------
       case 'pinepaper_create_letter_collage': {
@@ -2396,22 +2313,6 @@ You can now start creating new items on a clean canvas.`,
         return executeOrGenerate(code, description, options, 'pinepaper_animate_letter_collage');
       }
 
-      case 'pinepaper_get_letter_collage_options': {
-        const code = codeGenerator.generateGetLetterCollageOptions();
-        return executeOrGenerate(code, 'Gets available letter collage styles and palettes', options, 'pinepaper_get_letter_collage_options');
-      }
-
-      // -----------------------------------------------------------------------
-      // CANVAS PRESETS TOOLS
-      // -----------------------------------------------------------------------
-      case 'pinepaper_get_canvas_presets': {
-        const code = codeGenerator.generateGetCanvasPresets();
-        return executeOrGenerate(code, 'Gets all available canvas presets', options, 'pinepaper_get_canvas_presets');
-      }
-
-      // -----------------------------------------------------------------------
-      // MAP TOOLS
-      // -----------------------------------------------------------------------
       // -----------------------------------------------------------------------
       // MAP TOOLS — extracted to src/tools/handlers/maps.ts
       // -----------------------------------------------------------------------
@@ -2423,16 +2324,6 @@ You can now start creating new items on a clean canvas.`,
           properties: args.properties as Record<string, unknown> | undefined,
         });
         return executeOrGenerate(code, 'Registers Paper.js item', options, 'pinepaper_register_item');
-      }
-
-      // -----------------------------------------------------------------------
-      // TEMPLATE TOOLS
-      // -----------------------------------------------------------------------
-
-      case 'pinepaper_apply_template': {
-        const parsed = ApplyTemplateInputSchema.parse(args);
-        const code = codeGenerator.generateApplyTemplate(parsed);
-        return executeOrGenerate(code, 'Applies template', options, 'pinepaper_apply_template');
       }
 
       // -----------------------------------------------------------------------
@@ -2530,20 +2421,9 @@ You can now start creating new items on a clean canvas.`,
             'pinepaper_agent_batch_execute',
             'pinepaper_agent_export',
             'pinepaper_agent_analyze',
-            // Interactive trigger tools
-            'pinepaper_add_trigger',
-            'pinepaper_remove_trigger',
-            'pinepaper_query_triggers',
-            // Quiz/LMS tools
-            'pinepaper_create_quiz',
-            'pinepaper_get_quiz_state',
-            'pinepaper_reset_quiz',
             // Letter collage tools
             'pinepaper_create_letter_collage',
             'pinepaper_animate_letter_collage',
-            'pinepaper_get_letter_collage_options',
-            // Canvas presets tools
-            'pinepaper_get_canvas_presets',
             // Map tools (4 action-dispatched)
             'pinepaper_map',
             'pinepaper_map_regions',
@@ -2551,8 +2431,6 @@ You can now start creating new items on a clean canvas.`,
             'pinepaper_map_data',
             // Font tools
             'pinepaper_font',
-            // Template tools
-            'pinepaper_apply_template',
             // Image import tools
             'pinepaper_import_image',
             // Paper.js direct access tools
@@ -2575,14 +2453,12 @@ You can now start creating new items on a clean canvas.`,
             'pinepaper_cutout_style',
             // Composition & view tools
             'pinepaper_precomp',
-            'pinepaper_view',
             'pinepaper_background',
             // Canvas query tools
             'pinepaper_query',
-            // Deformation, sprite sheets, storage, interaction
+            // Deformation, sprite sheets, interaction
             'pinepaper_deform',
             'pinepaper_sprite_sheet',
-            'pinepaper_storage',
             'pinepaper_interaction',
             // Widget export
             'pinepaper_export_widget',

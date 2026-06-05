@@ -79,7 +79,6 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_create_scene: 'Create scene. items: [{name, itemType, position, properties}], relations: [{source, target, type}], animations: [{target, type}].',
   pinepaper_manage_scenes: 'Scene CRUD. action: save|load|list|delete|rename|duplicate|reorder|info|export|import. name, sceneId, transition: none|fade|zoom-in|zoom-out.',
   pinepaper_scene_playback: 'Scene chain playback. action: create_chain|play|pause|resume|stop|toggle_loop|jump. sceneIds, defaultDuration (secs), loop.',
-  pinepaper_apply_template: 'Apply a pre-built template to the canvas.',
 
   // --- Diagrams ---
   pinepaper_create_diagram_shape: `Create diagram shape. shapeType: ${DIAGRAM_SHAPES}. position: {x,y}. text: string.`,
@@ -104,7 +103,6 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   // --- Letter Collage ---
   pinepaper_create_letter_collage: 'Create stylized text with per-letter customization (Wordle, magazine, gradient).',
   pinepaper_animate_letter_collage: 'Animate letter collage with staggered effects.',
-  pinepaper_get_letter_collage_options: 'List available collage styles, palettes, and options.',
 
   // --- Generators ---
   pinepaper_execute_generator: 'Run generator. name: drawBokeh|drawGrid|drawWaves|drawSunburst|drawFunctionPlot|drawSimulation|draw3DSurface|... params: {colors, interactive}.',
@@ -113,16 +111,6 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   // --- Effects & Filters ---
   pinepaper_apply_effect: 'Apply visual effect. effectType: sparkle|blast|smoke|fire|rain|snow|confetti|ripple|glow|electric|bubbles|dust|fireflies|shockwave|trail. params: {color, speed, ...}.',
   pinepaper_add_filter: 'Add SVG filter to canvas (blur, glow, shadow, etc.).',
-
-  // --- Triggers ---
-  pinepaper_add_trigger: 'Add interactive event trigger (click, hover, drag) to an item.',
-  pinepaper_remove_trigger: 'Remove event triggers from an item.',
-  pinepaper_query_triggers: 'Query existing triggers on canvas.',
-
-  // --- Quiz ---
-  pinepaper_create_quiz: 'Create interactive quiz with multiple question types.',
-  pinepaper_get_quiz_state: 'Get quiz score, progress, and answers.',
-  pinepaper_reset_quiz: 'Reset quiz to initial state.',
 
   // --- Query ---
   pinepaper_get_items: 'Get all items on canvas with positions and properties.',
@@ -152,7 +140,6 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_agent_analyze: 'Analyze canvas content for export recommendations.',
 
   // --- Misc ---
-  pinepaper_get_canvas_presets: 'List canvas size presets (YouTube, Instagram, TikTok, etc.).',
   pinepaper_p5_draw: 'Execute p5.js-style drawing code on canvas.',
   pinepaper_register_item: 'Register an existing Paper.js item in the PinePaper registry.',
 
@@ -174,16 +161,14 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
 
   // --- Composition & View ---
   pinepaper_precomp: 'Nested compositions. action: create|add|remove. itemIds, name, precompId, itemId.',
-  pinepaper_view: 'View control. action: fit|get_state. mode: content|canvas, padding.',
   pinepaper_background: 'Background. action: set|clear|get. mode: color|pattern|generator.',
 
   // --- Canvas Query ---
   pinepaper_query: 'Canvas queries. action: get_by_id|hit_test|is_empty. itemId, x, y, tolerance.',
 
-  // --- Deformation, Sprite Sheets, Storage, Interaction ---
+  // --- Deformation, Sprite Sheets, Interaction ---
   pinepaper_deform: 'Vertex deformation. action: apply|trigger|remove. itemId, preset: fold|squeeze|squash|twist|ripple|wave|breathe|wobble..., phase, amplitude.',
   pinepaper_sprite_sheet: 'Sprite sheets. action: generate|play|export. skeletonId, spriteSheetId, poses, animations, format.',
-  pinepaper_storage: 'Project storage. action: save|load|list|delete. name, projectId, thumbnail.',
   pinepaper_interaction: 'Physics behaviors. action: add_behavior|remove_behavior|trigger_action|get_state. behaviorType: repel|attract|follow|orbit|slingshot.',
 
   // --- Widget Export ---
