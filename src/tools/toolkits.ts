@@ -236,8 +236,8 @@ export const TOOLKIT_PROFILES: Record<ToolkitProfile, string[]> = {
   agent: [
     'agent', 'browser', 'canvas',
     'core', 'import', 'assets', 'batch',
-    'relations', 'animation', 'masks',
-    'generators', 'effects',
+    'relations', 'animation', 'masks', 'camera',
+    'generators', 'effects', 'template',
     'scene',
     'selection', 'transform', 'history',
     'image_processing', 'precomp',
