@@ -63,6 +63,7 @@ import {
   HighlightRegionsInputSchema,
   UnhighlightRegionsInputSchema,
   ApplyDataColorsInputSchema,
+  ApplyTemplateInputSchema,
   AddMarkerInputSchema,
   AddMapLabelsInputSchema,
   PanMapInputSchema,
@@ -1516,8 +1517,9 @@ You can now start creating new items on a clean canvas.`,
 
         // --- Server info ---
         const { detectToolkitFromEnvironment: detectToolkit, detectVerbosityFromEnvironment: detectVerbosity } = await import('./toolkits.js');
+        const { SERVER_VERSION } = await import('../version.js');
         const serverSection = {
-          version: '1.5.1',
+          version: SERVER_VERSION,
           toolkit: detectToolkit(),
           verbosity: detectVerbosity(),
           locale: process.env.PINEPAPER_LOCALE || 'en',
@@ -2324,6 +2326,16 @@ You can now start creating new items on a clean canvas.`,
           properties: args.properties as Record<string, unknown> | undefined,
         });
         return executeOrGenerate(code, 'Registers Paper.js item', options, 'pinepaper_register_item');
+      }
+
+      // -----------------------------------------------------------------------
+      // TEMPLATE TOOL
+      // -----------------------------------------------------------------------
+
+      case 'pinepaper_apply_template': {
+        const parsed = ApplyTemplateInputSchema.parse(args);
+        const code = codeGenerator.generateApplyTemplate(parsed);
+        return executeOrGenerate(code, 'Applies template', options, 'pinepaper_apply_template');
       }
 
       // -----------------------------------------------------------------------

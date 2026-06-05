@@ -78,6 +78,8 @@ import {
   UnhighlightRegionsInput,
   ApplyDataColorsInputSchema,
   ApplyDataColorsInput,
+  ApplyTemplateInputSchema,
+  ApplyTemplateInput,
   AddMarkerInputSchema,
   AddMarkerInput,
   AddMapLabelsInputSchema,
@@ -3863,6 +3865,56 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
       'revealUp', 'revealDown'
     ]
   };
+})();
+`.trim();
+  }
+
+  // =============================================================================
+  // TEMPLATE
+  // =============================================================================
+
+  generateApplyTemplate(input: ApplyTemplateInput): string {
+    const { templateId, category, listOnly } = input;
+
+    if (listOnly || !templateId) {
+      const categoryFilter = category ? `'${category}'` : 'null';
+      return `
+// List available templates
+(function() {
+  if (!app.templateManager) {
+    return { error: 'Template manager not available. Make sure PinePaper Studio is loaded.' };
+  }
+  const allTemplates = app.templateManager.getAllTemplates();
+  const category = ${categoryFilter};
+  const filtered = category
+    ? allTemplates.filter(t => t.category === category)
+    : allTemplates;
+  return {
+    templates: filtered.map(t => ({
+      id: t.id,
+      name: t.name,
+      category: t.category,
+      description: t.description || ''
+    })),
+    count: filtered.length,
+    categories: [...new Set(allTemplates.map(t => t.category))]
+  };
+})();
+`.trim();
+    }
+
+    return `
+// Apply template: ${templateId}
+(async function() {
+  if (!app.templateManager) {
+    return { error: 'Template manager not available. Make sure PinePaper Studio is loaded.' };
+  }
+  try {
+    await app.templateManager.loadTemplate('${templateId}', true);
+    return { success: true, templateId: '${templateId}', message: 'Template applied successfully. Canvas has been replaced with template content.' };
+  } catch (e) {
+    return { error: 'Failed to apply template: ' + e.message };
+  }
 })();
 `.trim();
   }

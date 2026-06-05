@@ -2083,6 +2083,8 @@ ACTIONS:
             Cancel any active animation.
 - state   — {}
             Returns { zoom, center, isAnimating }.
+- fit_view — {}
+            Fit canvas content to the viewport (calls app.fitView()).
 
 EXAMPLES:
 { action: "zoom", direction: "in", level: 2.5 }
@@ -2922,6 +2924,61 @@ Params: title (page title), download (bool)`,
       properties: {
         title: { type: 'string', description: 'HTML page title (default: PinePaper Widget)' },
         download: { type: 'boolean', description: 'Trigger browser download (default: false)' },
+      },
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // DOMAIN: TEMPLATE TOOL
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_apply_template',
+    annotations: {
+      title: 'Apply Template',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Load a pre-built template design onto the canvas, or list available templates.
+
+USE WHEN:
+- User wants to start from a pre-made design
+- User asks for a template, preset, or starter layout
+- User wants to see what templates are available
+- Need a quick starting point for social media, presentations, etc.
+
+⚠️ DESTRUCTIVE: Loading a template replaces the current canvas content.
+
+MODES:
+1. LIST MODE: Set listOnly: true (or omit templateId) to browse available templates
+   - Optionally filter by category
+2. LOAD MODE: Provide a templateId to apply that template
+
+TEMPLATE CATEGORIES (13):
+- social-media, meme, business, education, creative, tech, global,
+  indigenous, seasonal, masking, scenes, diagrams, maps
+
+EXAMPLES:
+- List all templates: { "listOnly": true }
+- List by category: { "category": "social-media", "listOnly": true }
+- Load template: { "templateId": "solar-system" }`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        templateId: {
+          type: 'string',
+          description: 'Template ID to load (omit to list templates)',
+        },
+        category: {
+          type: 'string',
+          enum: ['social-media', 'meme', 'business', 'education', 'creative', 'tech', 'global', 'indigenous', 'seasonal', 'masking', 'scenes', 'diagrams', 'maps'],
+          description: 'Filter templates by category',
+        },
+        listOnly: {
+          type: 'boolean',
+          description: 'If true, only list available templates without loading (default: false)',
+        },
       },
     },
   },

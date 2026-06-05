@@ -2228,6 +2228,26 @@ export const GetHighlightedMapRegionsInputSchema = z.object({}).describe('Get hi
 export type GetHighlightedMapRegionsInput = z.infer<typeof GetHighlightedMapRegionsInputSchema>;
 
 // =============================================================================
+// TEMPLATE SCHEMAS
+// =============================================================================
+
+export const TemplateCategorySchema = z.enum([
+  'social-media', 'meme', 'business', 'education', 'creative',
+  'tech', 'global', 'indigenous', 'seasonal', 'masking',
+  'scenes', 'diagrams', 'maps',
+]).describe('Template category');
+
+export type TemplateCategory = z.infer<typeof TemplateCategorySchema>;
+
+export const ApplyTemplateInputSchema = z.object({
+  templateId: z.string().optional().describe('Template ID to load (omit to list templates)'),
+  category: TemplateCategorySchema.optional().describe('Filter templates by category'),
+  listOnly: z.boolean().optional().default(false).describe('If true, only list available templates without loading'),
+}).describe('Apply template input');
+
+export type ApplyTemplateInput = z.infer<typeof ApplyTemplateInputSchema>;
+
+// =============================================================================
 // IMAGE IMPORT SCHEMAS
 // =============================================================================
 
