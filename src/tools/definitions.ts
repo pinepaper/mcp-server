@@ -143,9 +143,6 @@ Sprite Sheets: pinepaper_sprite_sheet — generate from skeleton poses, play, ex
 Interaction: pinepaper_interaction — continuous physics behaviors (repel, attract, follow, orbit, slingshot)
   For interactive storytelling, quizzes, games. trigger_action for state changes (incrementScore, navigate, showFeedback).
 
-Storage: pinepaper_storage — save/load/list/delete projects (IndexedDB persistence)
-  For multi-project workflows and session recovery.
-
 Data Viz: pinepaper_create_chart — create/update/reconfigure/remove charts (bar, line, scatter, area)
   Pass data as array of objects + options. Auto-animated with expression-driven oscillation.
 
@@ -1593,7 +1590,7 @@ USE WHEN:
 - Any animation with specific timing or sequential stages
 
 ANIMATABLE PROPERTIES:
-- position: [x, y] array
+- position: [x, y] array (a { x, y } object is also accepted and normalized)
 - x, y: Individual coordinates
 - scale: Uniform scale
 - scaleX, scaleY: Axis scaling
@@ -2644,38 +2641,6 @@ ACTIONS:
     },
   },
   {
-    name: 'pinepaper_view',
-    annotations: {
-      title: 'View',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: false,
-      openWorldHint: false,
-    },
-    description: `View control — fit view to content or get current view state.
-
-ACTIONS:
-- fit: Fit view to content or canvas bounds. Params: mode (content|canvas), padding (number)
-- get_state: Get current view state (zoom, center, bounds)`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        action: {
-          type: 'string',
-          enum: ['fit', 'get_state'],
-          description: 'View action',
-        },
-        mode: {
-          type: 'string',
-          enum: ['content', 'canvas'],
-          description: 'Fit mode (for fit action)',
-        },
-        padding: { type: 'number', description: 'Padding around content in pixels (default: 20)' },
-      },
-      required: ['action'],
-    },
-  },
-  {
     name: 'pinepaper_background',
     annotations: {
       title: 'Background',
@@ -2749,7 +2714,7 @@ ACTIONS:
   },
 
   // ---------------------------------------------------------------------------
-  // DEFORMATION, SPRITE SHEETS, STORAGE, INTERACTION
+  // DEFORMATION, SPRITE SHEETS, INTERACTION
   // ---------------------------------------------------------------------------
   {
     name: 'pinepaper_deform',
@@ -2862,38 +2827,6 @@ ACTIONS:
   },
 
   {
-    name: 'pinepaper_storage',
-    annotations: {
-      title: 'Storage',
-      readOnlyHint: false,
-      destructiveHint: true,
-      idempotentHint: false,
-      openWorldHint: false,
-    },
-    description: `Persistent project storage via IndexedDB.
-
-ACTIONS:
-- save: Save current project. Params: name, thumbnail (bool)
-- load: Load project onto canvas. Params: projectId
-- list: List all saved projects
-- delete: Delete a saved project. Params: projectId`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        action: {
-          type: 'string',
-          enum: ['save', 'load', 'list', 'delete'],
-          description: 'Storage action',
-        },
-        projectId: { type: 'string', description: 'Project ID (for load/delete)' },
-        name: { type: 'string', description: 'Project name (for save)' },
-        thumbnail: { type: 'boolean', description: 'Auto-capture thumbnail on save' },
-      },
-      required: ['action'],
-    },
-  },
-
-  {
     name: 'pinepaper_interaction',
     annotations: {
       title: 'Interaction',
@@ -2989,72 +2922,6 @@ Params: title (page title), download (bool)`,
       properties: {
         title: { type: 'string', description: 'HTML page title (default: PinePaper Widget)' },
         download: { type: 'boolean', description: 'Trigger browser download (default: false)' },
-      },
-    },
-  },
-
-  // ---------------------------------------------------------------------------
-  // LAYER 5 — BLUEPRINTS: TEMPLATE TOOLS
-  // ---------------------------------------------------------------------------
-  {
-    name: 'pinepaper_apply_template',
-    annotations: {
-      title: 'Apply Template',
-      readOnlyHint: false,
-      destructiveHint: true,
-      idempotentHint: false,
-      openWorldHint: false,
-    },
-    description: `Load a pre-built template design onto the canvas, or list available templates.
-
-USE WHEN:
-- User wants to start from a pre-made design
-- User asks for a template, preset, or starter layout
-- User wants to see what templates are available
-- Need a quick starting point for social media, presentations, etc.
-
-⚠️ DESTRUCTIVE: Loading a template replaces the current canvas content.
-
-MODES:
-1. LIST MODE: Set listOnly: true (or omit templateId) to browse available templates
-   - Optionally filter by category
-2. LOAD MODE: Provide a templateId to apply that template
-
-TEMPLATE CATEGORIES (13):
-- social-media: Social media post/story layouts
-- meme: Meme templates and formats
-- business: Business cards, letterheads, presentations
-- education: Educational diagrams, worksheets
-- creative: Artistic and creative compositions
-- tech: Technology-themed designs
-- global: International and multicultural designs
-- indigenous: Indigenous art-inspired patterns
-- seasonal: Holiday and seasonal themes
-- masking: Mask reveal effect demonstrations
-- scenes: Pre-built animated scenes
-- diagrams: Flowchart and diagram starters
-- maps: Geographic visualization templates
-
-EXAMPLES:
-- List all templates: { "listOnly": true }
-- List by category: { "category": "social-media", "listOnly": true }
-- Load template: { "templateId": "solar-system" }`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        templateId: {
-          type: 'string',
-          description: 'Template ID to load (omit to list templates)',
-        },
-        category: {
-          type: 'string',
-          enum: ['social-media', 'meme', 'business', 'education', 'creative', 'tech', 'global', 'indigenous', 'seasonal', 'masking', 'scenes', 'diagrams', 'maps'],
-          description: 'Filter templates by category',
-        },
-        listOnly: {
-          type: 'boolean',
-          description: 'If true, only list available templates without loading (default: false)',
-        },
       },
     },
   },
@@ -4138,34 +4005,6 @@ EXAMPLES:
       required: ['collageId', 'animationType'],
     },
   },
-  {
-    name: 'pinepaper_get_letter_collage_options',
-    annotations: {
-      title: 'Get Letter Collage Options',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `[Utility] Get available styles, palettes, and gradient options for letter collages.
-
-USE WHEN:
-- Learning available letter collage styles
-- Discovering palette options
-- Exploring gradient possibilities
-- Building UI for collage creation
-
-RETURNS:
-- styles: All available style types
-- tilePalettes: Grouped by category (game, vibrant, soft, natural, etc.)
-- gradientPalettes: Available gradient color schemes
-- gradientDirections: Direction options for gradients`,
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
-  },
-
   // ---------------------------------------------------------------------------
   // DOMAIN: GENERATOR TOOLS
   // ---------------------------------------------------------------------------
@@ -4391,415 +4230,6 @@ Filters can be stacked - call multiple times to combine effects.`,
         },
       },
       required: ['filterType'],
-    },
-  },
-
-  // ---------------------------------------------------------------------------
-  // DOMAIN: INTERACTIVE TRIGGER TOOLS
-  // ---------------------------------------------------------------------------
-  {
-    name: 'pinepaper_add_trigger',
-    annotations: {
-      title: 'Add Trigger',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: false,
-      openWorldHint: false,
-    },
-    description: `Add an interactive trigger to an item. Triggers execute actions when events occur.
-
-USE WHEN:
-- Making items clickable
-- Adding hover effects
-- Creating drag interactions
-- Building interactive tutorials/quizzes
-- Timeline-based triggers
-
-TRIGGER EVENTS:
-- click: When item is clicked
-- hover_enter: When mouse enters item
-- hover_exit: When mouse leaves item
-- drag_start: When item drag begins
-- drag_move: While item is being dragged
-- drag_end: When item drag ends
-- timeline: At specific time in animation
-- scene_enter: When scene becomes active
-- scene_exit: When scene deactivates
-- animation_end: When item's animation completes
-- quiz_answer: When quiz answer is submitted
-
-ACTION TYPES:
-- show: Make target item visible
-- hide: Hide target item
-- toggle_visibility: Toggle target visibility
-- play_animation: Start animation on target
-- stop_animation: Stop animation on target
-- navigate: Navigate to scene or URL
-- update_property: Change item property
-- set_variable: Set a scene variable
-- submit_answer: Submit quiz answer
-- increment_score: Add to quiz score
-- reset_quiz: Reset quiz state
-
-EXAMPLES:
-- Click to show: {itemId: "button_1", event: "click", actions: [{type: "show", targetItemId: "panel_1"}]}
-- Hover to animate: {itemId: "star_1", event: "hover_enter", actions: [{type: "play_animation", targetItemId: "star_1", animationType: "pulse"}]}
-- Click to navigate: {itemId: "next_btn", event: "click", actions: [{type: "navigate", url: "#scene2"}]}`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        itemId: {
-          type: 'string',
-          description: 'Item to attach trigger to',
-        },
-        event: {
-          type: 'string',
-          enum: ['click', 'hover_enter', 'hover_exit', 'drag_start', 'drag_move', 'drag_end', 'timeline', 'scene_enter', 'scene_exit', 'animation_end', 'quiz_answer'],
-          description: 'Event that fires the trigger',
-        },
-        actions: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              type: {
-                type: 'string',
-                enum: ['show', 'hide', 'toggle_visibility', 'play_animation', 'stop_animation', 'navigate', 'update_property', 'set_variable', 'submit_answer', 'increment_score', 'reset_quiz'],
-                description: 'Action type',
-              },
-              targetItemId: {
-                type: 'string',
-                description: 'Target item for the action',
-              },
-              animationType: {
-                type: 'string',
-                description: 'Animation type for play_animation',
-              },
-              property: {
-                type: 'string',
-                description: 'Property name for update_property',
-              },
-              value: {
-                description: 'Value for update_property or set_variable',
-              },
-              variableName: {
-                type: 'string',
-                description: 'Variable name for set_variable',
-              },
-              url: {
-                type: 'string',
-                description: 'URL or scene ID for navigate',
-              },
-              points: {
-                type: 'number',
-                description: 'Points for increment_score',
-              },
-            },
-            required: ['type'],
-          },
-          description: 'Actions to execute when triggered',
-        },
-        condition: {
-          type: 'string',
-          description: 'Optional condition expression (e.g., "$score > 10")',
-        },
-        timelineOffset: {
-          type: 'number',
-          description: 'Time offset in ms for timeline triggers',
-        },
-      },
-      required: ['itemId', 'event', 'actions'],
-    },
-  },
-
-  {
-    name: 'pinepaper_remove_trigger',
-    annotations: {
-      title: 'Remove Trigger',
-      readOnlyHint: false,
-      destructiveHint: true,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Remove triggers from an item.
-
-USE WHEN:
-- Disabling interactivity on an item
-- Cleaning up triggers before adding new ones
-- Removing specific event handlers
-
-OPTIONS:
-- Remove specific event: {itemId: "button_1", event: "click"}
-- Remove all triggers: {itemId: "button_1", removeAll: true}`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        itemId: {
-          type: 'string',
-          description: 'Item to remove triggers from',
-        },
-        event: {
-          type: 'string',
-          enum: ['click', 'hover_enter', 'hover_exit', 'drag_start', 'drag_move', 'drag_end', 'timeline', 'scene_enter', 'scene_exit', 'animation_end', 'quiz_answer'],
-          description: 'Specific event to remove (optional)',
-        },
-        removeAll: {
-          type: 'boolean',
-          description: 'Remove all triggers from item',
-        },
-      },
-      required: ['itemId'],
-    },
-  },
-
-  {
-    name: 'pinepaper_query_triggers',
-    annotations: {
-      title: 'Query Triggers',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `[Utility] List all triggers on the canvas or for a specific item.
-
-USE WHEN:
-- Inspecting existing interactivity
-- Debugging trigger behavior
-- Understanding scene's interactive elements
-
-EXAMPLES:
-- All triggers: {}
-- Triggers on specific item: {itemId: "button_1"}
-- Filter by event type: {event: "click"}`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        itemId: {
-          type: 'string',
-          description: 'Filter triggers by item ID',
-        },
-        event: {
-          type: 'string',
-          enum: ['click', 'hover_enter', 'hover_exit', 'drag_start', 'drag_move', 'drag_end', 'timeline', 'scene_enter', 'scene_exit', 'animation_end', 'quiz_answer'],
-          description: 'Filter by event type',
-        },
-      },
-    },
-  },
-
-  // ---------------------------------------------------------------------------
-  // DOMAIN: QUIZ/LMS TOOLS
-  // ---------------------------------------------------------------------------
-  {
-    name: 'pinepaper_create_quiz',
-    annotations: {
-      title: 'Create Quiz',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: false,
-      openWorldHint: false,
-    },
-    description: `Create an interactive quiz with questions, answers, and scoring.
-
-USE WHEN:
-- Building educational content
-- Creating assessments
-- Adding gamification elements
-- Making interactive learning modules
-
-QUESTION TYPES:
-- multiple-choice: Single correct answer from options
-- multiple-select: Multiple correct answers
-- drag-drop: Drag items to correct zones
-- matching: Match pairs of items
-- sequencing: Put items in correct order
-- hotspot: Click correct area on image
-- true-false: True or false question
-
-FEEDBACK:
-Each question can have:
-- correctFeedback: Message shown on correct answer
-- incorrectFeedback: Message shown on wrong answer
-- partialFeedback: Message for partially correct (multi-select)
-
-SCORING:
-- Each question has a points value
-- passingScore: Minimum score to pass
-- showScore: Display score during quiz
-- allowRetry: Allow retrying incorrect answers
-
-EXAMPLE:
-{
-  "title": "Geography Quiz",
-  "questions": [
-    {
-      "type": "multiple-choice",
-      "prompt": "What is the capital of France?",
-      "options": [
-        {"id": "a", "label": "London"},
-        {"id": "b", "label": "Paris", "isCorrect": true},
-        {"id": "c", "label": "Berlin"}
-      ],
-      "points": 10,
-      "correctFeedback": "Correct! Paris is the capital.",
-      "incorrectFeedback": "Sorry, the correct answer is Paris."
-    }
-  ],
-  "passingScore": 70,
-  "showScore": true
-}`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        title: {
-          type: 'string',
-          description: 'Quiz title',
-        },
-        questions: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              type: {
-                type: 'string',
-                enum: ['multiple-choice', 'multiple-select', 'drag-drop', 'matching', 'sequencing', 'hotspot', 'true-false'],
-                description: 'Question type',
-              },
-              prompt: {
-                type: 'string',
-                description: 'Question text',
-              },
-              options: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    id: { type: 'string' },
-                    label: { type: 'string' },
-                    isCorrect: { type: 'boolean' },
-                  },
-                },
-                description: 'Answer options',
-              },
-              points: {
-                type: 'number',
-                description: 'Points for correct answer',
-              },
-              correctFeedback: {
-                type: 'string',
-                description: 'Feedback for correct answer',
-              },
-              incorrectFeedback: {
-                type: 'string',
-                description: 'Feedback for incorrect answer',
-              },
-              draggableItems: {
-                type: 'array',
-                items: { type: 'string' },
-                description: 'Item IDs that can be dragged (for drag-drop)',
-              },
-              dropZones: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    id: { type: 'string' },
-                    correctItems: { type: 'array', items: { type: 'string' } },
-                  },
-                },
-                description: 'Drop zones with correct items (for drag-drop)',
-              },
-            },
-            required: ['type', 'prompt', 'points'],
-          },
-          description: 'Quiz questions',
-        },
-        passingScore: {
-          type: 'number',
-          description: 'Minimum percentage to pass (0-100)',
-        },
-        showScore: {
-          type: 'boolean',
-          description: 'Display score during quiz',
-        },
-        allowRetry: {
-          type: 'boolean',
-          description: 'Allow retrying incorrect answers',
-        },
-        shuffleQuestions: {
-          type: 'boolean',
-          description: 'Randomize question order',
-        },
-        shuffleOptions: {
-          type: 'boolean',
-          description: 'Randomize answer options',
-        },
-      },
-      required: ['questions'],
-    },
-  },
-
-  {
-    name: 'pinepaper_get_quiz_state',
-    annotations: {
-      title: 'Get Quiz State',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `[Utility] Get the current state of an active quiz.
-
-USE WHEN:
-- Checking quiz progress
-- Getting current score
-- Reviewing answered questions
-- Debugging quiz behavior
-
-RETURNS:
-- quizId: Quiz identifier
-- currentQuestion: Current question index
-- totalQuestions: Total number of questions
-- score: Current score
-- maxScore: Maximum possible score
-- answers: Array of submitted answers
-- passed: Whether passing score achieved (if complete)
-- complete: Whether quiz is finished`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        quizId: {
-          type: 'string',
-          description: 'Quiz ID (optional, uses active quiz if not specified)',
-        },
-      },
-    },
-  },
-
-  {
-    name: 'pinepaper_reset_quiz',
-    annotations: {
-      title: 'Reset Quiz',
-      readOnlyHint: false,
-      destructiveHint: true,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `Reset a quiz to its initial state.
-
-USE WHEN:
-- Restarting a quiz
-- Clearing quiz progress
-- Allowing user to retake quiz`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        quizId: {
-          type: 'string',
-          description: 'Quiz ID (optional, uses active quiz if not specified)',
-        },
-      },
     },
   },
 
@@ -5439,7 +4869,11 @@ EFFECTS:
 PLAYBACK:
   play_timeline — {action: "play"|"stop"|"seek", duration, loop}
 
-VARIABLE REFERENCES: "$0", "$1" etc. reference items by creation order within the batch.
+VARIABLE REFERENCES: "$0", "$1" etc. reference items by creation order within the batch. Place ALL create ops before any ops that reference them so the indices stay stable.
+
+ANIMATION NOTES:
+- keyframe_animate position accepts [x, y] or { x, y } (normalized). fillColor/strokeColor accept rgba() for alpha. The create "opacity" and "blendMode" props are applied to the item.
+- For MP4/GIF export the keyframe timeline is rendered once across the duration; author motion to fill the clip and use loop:false. Looping item-animations (loop:true) are not advanced by the exporter and render frozen.
 
 EXAMPLE — Animated sky scene with timed reveals:
 {operations: [
@@ -5675,39 +5109,6 @@ EXAMPLE RESPONSE:
     {"platform": "web", "format": "webm", "confidence": 0.85}
   ]
 }`,
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
-  },
-
-  // ---------------------------------------------------------------------------
-  // LAYER 1 — ATOMS: CANVAS PRESETS TOOL
-  // ---------------------------------------------------------------------------
-  {
-    name: 'pinepaper_get_canvas_presets',
-    annotations: {
-      title: 'Get Canvas Presets',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    description: `[Utility] List all available canvas presets with their dimensions.
-
-USE WHEN:
-- Setting up canvas for specific platforms (YouTube, Instagram, TikTok, etc.)
-- Discovering available size presets
-- Planning content dimensions
-- Building UI for size selection
-
-PRESETS BY CATEGORY:
-- Video: youtube-thumbnail, youtube-short, tiktok, hd-720p, full-hd-1080p
-- Social: instagram-story, instagram-post, facebook-post, twitter-post, linkedin-post, pinterest-pin
-- Presentation: presentation-16x9, presentation-4x3
-
-RETURNS:
-Array of presets with: key, name, width, height, aspectRatio, category`,
     inputSchema: {
       type: 'object',
       properties: {},

@@ -50,8 +50,6 @@ Pass description for creative direction and canvasPreset for platform sizing. WO
 
   pinepaper_agent_analyze: `Analyze what's on the canvas and get export recommendations.`,
 
-  pinepaper_get_canvas_presets: `List available canvas size presets (YouTube, Instagram, TikTok, etc.).`,
-
   pinepaper_tool_guide: `Get detailed docs for any tool or category. Call with no args for the full workflow guide.`,
 
   pinepaper_set_toolkit: `Switch available tools. Toolkits: agent, diagram, map, font, full, minimal. Verbosity: verbose, compact, minimal.`,

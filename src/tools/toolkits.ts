@@ -38,9 +38,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
     'pinepaper_get_canvas_size',
     'pinepaper_clear_canvas',
     'pinepaper_refresh_page',
-    'pinepaper_get_canvas_presets',
     'pinepaper_background',
-    'pinepaper_view',
   ],
 
   // --- Item creation & modification ---
@@ -132,9 +130,6 @@ export const TOOL_TAGS: Record<string, string[]> = {
   sprite: [
     'pinepaper_sprite_sheet',
   ],
-  storage: [
-    'pinepaper_storage',
-  ],
   interaction: [
     'pinepaper_interaction',
   ],
@@ -149,9 +144,6 @@ export const TOOL_TAGS: Record<string, string[]> = {
   ],
   measurement: [
     'pinepaper_measurement',
-  ],
-  template: [
-    'pinepaper_apply_template',
   ],
 
   // --- Query & export ---
@@ -199,19 +191,6 @@ export const TOOL_TAGS: Record<string, string[]> = {
   letter_collage: [
     'pinepaper_create_letter_collage',
     'pinepaper_animate_letter_collage',
-    'pinepaper_get_letter_collage_options',
-  ],
-
-  // --- Domain: Interactive ---
-  triggers: [
-    'pinepaper_add_trigger',
-    'pinepaper_remove_trigger',
-    'pinepaper_query_triggers',
-  ],
-  quiz: [
-    'pinepaper_create_quiz',
-    'pinepaper_get_quiz_state',
-    'pinepaper_reset_quiz',
   ],
 
   // --- Advanced ---
@@ -259,7 +238,7 @@ export const TOOLKIT_PROFILES: Record<ToolkitProfile, string[]> = {
     'scene',
     'selection', 'transform', 'history',
     'image_processing', 'precomp',
-    'deform', 'sprite', 'storage', 'interaction',
+    'deform', 'sprite', 'interaction',
     'dataviz', 'magic', 'physics', 'measurement',
     'query', 'export',
     'p5', 'ontology', 'guide',

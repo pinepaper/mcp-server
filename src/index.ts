@@ -247,7 +247,6 @@ Use "$0", "$1" etc. to reference items by creation order within the batch.
 | **Deformation** | Organic motion effects | \`pinepaper_deform\` (twist, ripple, wave, breathe, wobble) |
 | **Sprite Sheets** | Character animation | \`pinepaper_sprite_sheet\` (generate → play → export) |
 | **Interaction** | Interactive/game content | \`pinepaper_interaction\` (physics behaviors, state management) |
-| **Storage** | Project persistence | \`pinepaper_storage\` (save/load/list/delete projects) |
 | **Widget Export** | Portable embeds | \`pinepaper_export_widget\` (JSON) + \`pinepaper_export_widget_html\` (self-contained HTML) |
 
 ## Key Rules
@@ -530,8 +529,7 @@ pinepaper_apply_animated_mask itemId: "item_3" preset: "wipeLeft"
 ## Apply a Template
 
 \`pinepaper_list_templates\` — browse available pre-built templates.
-\`pinepaper_apply_template\` — load a template by name. Animations are pre-configured.
-After applying: modify text/colors with \`pinepaper_modify_item\`, then export.
+After applying a template (via Studio UI): modify text/colors with \`pinepaper_modify_item\`, then export.
 
 ## Template Categories
 

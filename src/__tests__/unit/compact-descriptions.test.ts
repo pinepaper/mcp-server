@@ -2,7 +2,7 @@
  * Compact & Minimal Descriptions Tests
  *
  * Validates the multi-tier tool description system:
- * - Compact: 13 manually written shorter descriptions
+ * - Compact: a curated set of manually written shorter descriptions
  * - Minimal: 1-line summaries for ALL tools
  * - getToolsForVerbosity returns correct tool sets for all tiers
  * - pinepaper_tool_guide tool definition exists
@@ -18,7 +18,7 @@ import {
   getToolsForVerbosity,
 } from '../../tools/definitions.js';
 
-const EXPECTED_COMPACT_COUNT = 29;
+const EXPECTED_COMPACT_COUNT = 28;
 const toolNameSet = new Set(PINEPAPER_TOOLS.map(t => t.name));
 
 describe('Compact Descriptions', () => {
@@ -101,7 +101,7 @@ describe('getToolsForVerbosity', () => {
     expect(tools.length).toBe(PINEPAPER_TOOLS.length);
   });
 
-  it('compact mode swaps exactly 13 descriptions', () => {
+  it('compact mode swaps exactly EXPECTED_COMPACT_COUNT descriptions', () => {
     const tools = getToolsForVerbosity('compact');
     let swappedCount = 0;
     for (let i = 0; i < tools.length; i++) {

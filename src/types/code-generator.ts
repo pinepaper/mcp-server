@@ -64,30 +64,11 @@ import {
   AgentExportInput,
   AgentAnalyzeInputSchema,
   AgentAnalyzeInput,
-  // Interactive/Trigger types
-  AddTriggerInputSchema,
-  AddTriggerInput,
-  RemoveTriggerInputSchema,
-  RemoveTriggerInput,
-  QueryTriggersInputSchema,
-  QueryTriggersInput,
-  // Quiz types
-  CreateQuizInputSchema,
-  CreateQuizInput,
-  GetQuizStateInputSchema,
-  GetQuizStateInput,
-  ResetQuizInputSchema,
-  ResetQuizInput,
   // Letter collage types
   CreateLetterCollageInputSchema,
   CreateLetterCollageInput,
   AnimateLetterCollageInputSchema,
   AnimateLetterCollageInput,
-  GetLetterCollageOptionsInputSchema,
-  GetLetterCollageOptionsInput,
-  // Canvas presets types
-  GetCanvasPresetsInputSchema,
-  GetCanvasPresetsInput,
   // Map types
   LoadMapInputSchema,
   LoadMapInput,
@@ -142,9 +123,6 @@ import {
   ApplyCustomMaskInput,
   RemoveMaskInputSchema,
   RemoveMaskInput,
-  // Template types
-  ApplyTemplateInputSchema,
-  ApplyTemplateInput,
   // Image import types
   ImportImageInputSchema,
   ImportImageInput,
@@ -161,13 +139,11 @@ import {
   LassoInput,
   CutoutStyleInput,
   PrecompInput,
-  ViewInput,
   BackgroundInput,
   QueryInput,
   // New parity tools
   DeformInput,
   SpriteSheetInput,
-  StorageInput,
   InteractionInput,
   ExportWidgetInput,
   ExportWidgetHtmlInput,
@@ -526,6 +502,23 @@ app.animate(item, {
 }
 
 /**
+ * PinePaper's keyframe interpolator only tweens `position` when it is an [x, y]
+ * ARRAY. Callers (and other agents) routinely pass a { x, y } object, which is
+ * silently ignored — the item then stays frozen for the whole animation. Accept
+ * both shapes by normalizing { x, y } -> [x, y] before the keyframes are emitted.
+ */
+function normalizeKeyframePositions<T extends { properties?: Record<string, unknown> }>(keyframes: T[]): T[] {
+  return (keyframes || []).map((kf) => {
+    const props = (kf as any)?.properties;
+    const p = props?.position;
+    if (p && !Array.isArray(p) && typeof p === 'object' && 'x' in p && 'y' in p) {
+      return { ...kf, properties: { ...props, position: [p.x, p.y] } } as T;
+    }
+    return kf;
+  });
+}
+
+/**
  * Template for keyframe animation
  */
 function generateKeyframeAnimateCode(
@@ -537,7 +530,7 @@ function generateKeyframeAnimateCode(
   clipInPoint?: number,
   clipOutPoint?: number
 ): string {
-  const keyframesJson = JSON.stringify(keyframes, null, 2);
+  const keyframesJson = JSON.stringify(normalizeKeyframePositions(keyframes), null, 2);
   const calculatedDuration = duration || Math.max(...keyframes.map(k => k.time));
 
   const opts: Record<string, unknown> = { duration: calculatedDuration, loop };
@@ -2079,14 +2072,7 @@ throw new Error('Unknown diagram mode action: ${action}');
     if (item.shadowColor || item.shadowBlur) analysis.hasShadows = true;
   });
 
-  // Check animation manager for registered animations
-  if (app.animationManager) {
-    const animations = app.animationManager.getAll ? app.animationManager.getAll() : (app.animationManager.animations || []);
-    if (animations.length > 0) {
-      analysis.hasAnimations = true;
-      animationSet.add('managed');
-    }
-  }
+  // FxTool has no animationManager — animations are detected via item.data.animationType walk above
   // Check timeline for active animations
   if (app.timeline && (app.timeline.isPlaying || app.timeline.animations?.length > 0)) {
     analysis.hasAnimations = true;
@@ -2272,16 +2258,29 @@ throw new Error('Unknown diagram mode action: ${action}');
    */
   private generateBatchOperationCode(op: z.infer<typeof AgentBatchExecuteInputSchema>['operations'][0], index: number): string {
     switch (op.type) {
-      case 'create':
+      case 'create': {
         const pos = op.position || { x: 400, y: 300 };
-        const props = JSON.stringify(op.properties || {});
-        return `
+        const createProps = (op.properties || {}) as Record<string, unknown>;
+        const props = JSON.stringify(createProps);
+        let createCode = `
 const item = app.create('${op.itemType}', { position: { x: ${pos.x}, y: ${pos.y} }, ...${props} });
-const itemId = item.data && item.data.id ? item.data.id : app.registerItem(item, '${op.itemType}', { source: 'mcp-batch' });
+const itemId = item.data && item.data.id ? item.data.id : app.registerItem(item, '${op.itemType}', { source: 'mcp-batch' });`;
+        // app.create() does not read blendMode/opacity from its params, but the
+        // underlying Paper.js item supports them directly — apply post-create so
+        // callers can pass them inline in `properties` and have them take effect.
+        if (createProps.blendMode !== undefined) {
+          createCode += `\nif ('blendMode' in item) item.blendMode = ${JSON.stringify(createProps.blendMode)};`;
+        }
+        if (createProps.opacity !== undefined) {
+          createCode += `\nif ('opacity' in item) item.opacity = ${JSON.stringify(createProps.opacity)};`;
+        }
+        createCode += `
 // Ensure item is visible above backgrounds/generators
 if (item.bringToFront) item.bringToFront();
 return { itemId };
 `;
+        return createCode;
+      }
 
       case 'modify':
         const itemRef = op.itemId?.startsWith('$')
@@ -2370,7 +2369,7 @@ return { success: true, width: ${w}, height: ${h} };
         const kfItemRef = op.itemId?.startsWith('$')
           ? `itemIds[${op.itemId.substring(1)}]`
           : `'${op.itemId}'`;
-        const kfJson = JSON.stringify(op.keyframes || []);
+        const kfJson = JSON.stringify(normalizeKeyframePositions(op.keyframes || []));
         const kfDuration = op.duration || (op.keyframes?.length ? Math.max(...op.keyframes.map(k => k.time)) : 5);
         const kfLoop = op.loop ?? false;
         return `
@@ -2686,14 +2685,7 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
     if (item.shadowColor || item.shadowBlur) hasShadow = true;
   });
 
-  // Check animation manager for registered animations
-  if (app.animationManager) {
-    const animations = app.animationManager.getAll ? app.animationManager.getAll() : (app.animationManager.animations || []);
-    if (animations.length > 0) {
-      analysis.hasAnimations = true;
-      animationSet.add('managed');
-    }
-  }
+  // FxTool has no animationManager — animations are detected via item.data.animationType walk above
   // Check timeline for active animations
   if (app.timeline && (app.timeline.isPlaying || app.timeline.animations?.length > 0)) {
     analysis.hasAnimations = true;
@@ -2757,277 +2749,6 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
     suggestedPlatforms
   };
 })();
-`.trim();
-  }
-
-  // ===========================================================================
-  // INTERACTIVE TRIGGER CODE GENERATORS
-  // ===========================================================================
-
-  /**
-   * Generate code for adding a trigger
-   */
-  generateAddTrigger(input: AddTriggerInput): string {
-    const validated = AddTriggerInputSchema.parse(input);
-    const { itemId, event, actions, condition, timelineOffset } = validated;
-
-    const actionsStr = JSON.stringify(actions);
-    const conditionStr = condition ? `'${condition.replace(/'/g, "\\'")}'` : 'null';
-    const offsetStr = timelineOffset !== undefined ? timelineOffset : 'null';
-
-    return `
-// Add trigger to ${itemId}
-const item = app.getItemById('${itemId}');
-if (!item) throw new Error('Item not found: ${itemId}');
-
-const trigger = {
-  event: '${event}',
-  actions: ${actionsStr},
-  condition: ${conditionStr},
-  timelineOffset: ${offsetStr}
-};
-
-// Initialize triggers array if needed
-if (!item.data) item.data = {};
-if (!item.data.triggers) item.data.triggers = [];
-
-// Add trigger
-item.data.triggers.push(trigger);
-
-// Register event handler
-if (app.triggerManager) {
-  app.triggerManager.registerTrigger(item, trigger);
-}
-
-app.historyManager.saveState();
-({ success: true, itemId: '${itemId}', event: '${event}', triggerId: item.data.triggers.length - 1 });
-`.trim();
-  }
-
-  /**
-   * Generate code for removing a trigger
-   */
-  generateRemoveTrigger(input: RemoveTriggerInput): string {
-    const validated = RemoveTriggerInputSchema.parse(input);
-    const { itemId, event, removeAll } = validated;
-
-    if (removeAll) {
-      return `
-// Remove all triggers from ${itemId}
-const item = app.getItemById('${itemId}');
-if (!item) throw new Error('Item not found: ${itemId}');
-
-const removedCount = item.data?.triggers?.length || 0;
-if (item.data) item.data.triggers = [];
-
-if (app.triggerManager) {
-  app.triggerManager.unregisterAll(item);
-}
-
-app.historyManager.saveState();
-({ success: true, itemId: '${itemId}', removedCount, removeAll: true });
-`.trim();
-    }
-
-    return `
-// Remove ${event} trigger from ${itemId}
-const item = app.getItemById('${itemId}');
-if (!item) throw new Error('Item not found: ${itemId}');
-
-let removedCount = 0;
-if (item.data?.triggers) {
-  const before = item.data.triggers.length;
-  item.data.triggers = item.data.triggers.filter(t => t.event !== '${event}');
-  removedCount = before - item.data.triggers.length;
-}
-
-if (app.triggerManager) {
-  app.triggerManager.unregisterEvent(item, '${event}');
-}
-
-app.historyManager.saveState();
-({ success: true, itemId: '${itemId}', event: '${event}', removedCount });
-`.trim();
-  }
-
-  /**
-   * Generate code for querying triggers
-   */
-  generateQueryTriggers(input: QueryTriggersInput): string {
-    const validated = QueryTriggersInputSchema.parse(input);
-    const { itemId, event } = validated;
-
-    if (itemId) {
-      return `
-// Query triggers for ${itemId}
-const item = app.getItemById('${itemId}');
-if (!item) throw new Error('Item not found: ${itemId}');
-
-let triggers = item.data?.triggers || [];
-${event ? `triggers = triggers.filter(t => t.event === '${event}');` : ''}
-
-({ success: true, itemId: '${itemId}', triggers, count: triggers.length });
-`.trim();
-    }
-
-    return `
-// Query all triggers
-const allTriggers = [];
-const items = app.itemRegistry ? app.itemRegistry.getAll() : [];
-
-items.forEach(entry => {
-  const item = entry.item;
-  if (item.data?.triggers?.length > 0) {
-    let triggers = item.data.triggers;
-    ${event ? `triggers = triggers.filter(t => t.event === '${event}');` : ''}
-    triggers.forEach((trigger, idx) => {
-      allTriggers.push({
-        itemId: entry.id,
-        triggerId: idx,
-        ...trigger
-      });
-    });
-  }
-});
-
-({ success: true, triggers: allTriggers, count: allTriggers.length${event ? `, event: '${event}'` : ''} });
-`.trim();
-  }
-
-  // ===========================================================================
-  // QUIZ CODE GENERATORS
-  // ===========================================================================
-
-  /**
-   * Generate code for creating a quiz
-   */
-  generateCreateQuiz(input: CreateQuizInput): string {
-    const validated = CreateQuizInputSchema.parse(input);
-    const { title, questions, passingScore, showScore, allowRetry, shuffleQuestions, shuffleOptions } = validated;
-
-    const quizConfig = JSON.stringify({
-      title: title || 'Untitled Quiz',
-      questions,
-      passingScore: passingScore || 70,
-      showScore: showScore !== false,
-      allowRetry: allowRetry !== false,
-      shuffleQuestions: shuffleQuestions || false,
-      shuffleOptions: shuffleOptions || false,
-    }, null, 2);
-
-    return `
-// Create quiz
-const quizConfig = ${quizConfig};
-
-// Initialize quiz manager if needed
-if (!app.quizManager) {
-  app.quizManager = {
-    quizzes: [],
-    activeQuiz: null,
-    createQuiz: function(config) {
-      const quiz = {
-        id: 'quiz_' + Date.now(),
-        ...config,
-        state: {
-          currentQuestion: 0,
-          answers: [],
-          score: 0,
-          maxScore: config.questions.reduce((sum, q) => sum + q.points, 0),
-          complete: false
-        }
-      };
-      this.quizzes.push(quiz);
-      this.activeQuiz = quiz;
-      return quiz;
-    }
-  };
-}
-
-const quiz = app.quizManager.createQuiz(quizConfig);
-app.historyManager.saveState();
-
-({
-  success: true,
-  quizId: quiz.id,
-  title: quiz.title,
-  questionCount: quiz.questions.length,
-  maxScore: quiz.state.maxScore,
-  passingScore: quiz.passingScore
-});
-`.trim();
-  }
-
-  /**
-   * Generate code for getting quiz state
-   */
-  generateGetQuizState(input: GetQuizStateInput): string {
-    const validated = GetQuizStateInputSchema.parse(input);
-    const { quizId } = validated;
-
-    const quizRef = quizId
-      ? `app.quizManager.quizzes.find(q => q.id === '${quizId}')`
-      : 'app.quizManager?.activeQuiz';
-
-    return `
-// Get quiz state
-if (!app.quizManager) {
-  return { success: false, error: 'No quiz manager initialized' };
-}
-
-const quiz = ${quizRef};
-if (!quiz) {
-  return { success: false, error: 'Quiz not found' };
-}
-
-({
-  success: true,
-  quizId: quiz.id,
-  title: quiz.title,
-  currentQuestion: quiz.state.currentQuestion,
-  totalQuestions: quiz.questions.length,
-  score: quiz.state.score,
-  maxScore: quiz.state.maxScore,
-  answers: quiz.state.answers,
-  complete: quiz.state.complete,
-  passed: quiz.state.complete ? (quiz.state.score / quiz.state.maxScore * 100) >= quiz.passingScore : null
-});
-`.trim();
-  }
-
-  /**
-   * Generate code for resetting a quiz
-   */
-  generateResetQuiz(input: ResetQuizInput): string {
-    const validated = ResetQuizInputSchema.parse(input);
-    const { quizId } = validated;
-
-    const quizRef = quizId
-      ? `app.quizManager.quizzes.find(q => q.id === '${quizId}')`
-      : 'app.quizManager?.activeQuiz';
-
-    return `
-// Reset quiz
-if (!app.quizManager) {
-  return { success: false, error: 'No quiz manager initialized' };
-}
-
-const quiz = ${quizRef};
-if (!quiz) {
-  return { success: false, error: 'Quiz not found' };
-}
-
-// Reset state
-quiz.state = {
-  currentQuestion: 0,
-  answers: [],
-  score: 0,
-  maxScore: quiz.questions.reduce((sum, q) => sum + q.points, 0),
-  complete: false
-};
-
-app.historyManager.saveState();
-
-({ success: true, quizId: quiz.id, reset: true });
 `.trim();
   }
 
@@ -3135,83 +2856,6 @@ app.historyManager.saveState();
   });
 
   return result;
-})();
-`.trim();
-  }
-
-  /**
-   * Generate code to get letter collage options
-   */
-  generateGetLetterCollageOptions(): string {
-    return `
-// Get letter collage options
-(function() {
-  if (!app.getLetterCollageOptions) {
-    // Return static options if function not available
-    return {
-      success: true,
-      styles: ['tile', 'magazine', 'paperCut', 'fold', 'gradient', 'image'],
-      tilePalettes: {
-        game: ['wordle', 'scrabble'],
-        vibrant: ['candy', 'neon', 'rainbow'],
-        soft: ['pastel', 'cotton'],
-        natural: ['earth', 'ocean', 'forest', 'sunset'],
-        professional: ['corporate', 'minimal', 'slate'],
-        seasonal: ['christmas', 'halloween', 'spring'],
-        magazine: ['magazine', 'newspaper', 'vintage'],
-        paperCraft: ['paperCraft', 'origami', 'craftPaper']
-      },
-      gradientPalettes: ['rainbow', 'sunset', 'ocean', 'fire', 'gold', 'rose', 'ice', 'cyberpunk', 'neonGlow', 'purplePink'],
-      gradientDirections: ['vertical', 'horizontal', 'diagonal', 'radial']
-    };
-  }
-
-  return app.getLetterCollageOptions();
-})();
-`.trim();
-  }
-
-  // ===========================================================================
-  // CANVAS PRESETS CODE GENERATORS
-  // ===========================================================================
-
-  /**
-   * Generate code to get canvas presets
-   */
-  generateGetCanvasPresets(): string {
-    return `
-// Get canvas presets
-(function() {
-  if (app.getCanvasPresets) {
-    return app.getCanvasPresets();
-  }
-
-  // Return static presets if function not available
-  return {
-    success: true,
-    presets: [
-      { key: 'youtube-thumbnail', name: 'YouTube Thumbnail', width: 1280, height: 720, aspectRatio: '16:9', category: 'video' },
-      { key: 'youtube-short', name: 'YouTube Shorts', width: 1080, height: 1920, aspectRatio: '9:16', category: 'video' },
-      { key: 'tiktok', name: 'TikTok', width: 1080, height: 1920, aspectRatio: '9:16', category: 'video' },
-      { key: 'instagram-story', name: 'Instagram Story', width: 1080, height: 1920, aspectRatio: '9:16', category: 'social' },
-      { key: 'instagram-post', name: 'Instagram Post (Square)', width: 1080, height: 1080, aspectRatio: '1:1', category: 'social' },
-      { key: 'instagram-landscape', name: 'Instagram Landscape', width: 1080, height: 566, aspectRatio: '1.91:1', category: 'social' },
-      { key: 'instagram-portrait', name: 'Instagram Portrait', width: 1080, height: 1350, aspectRatio: '4:5', category: 'social' },
-      { key: 'facebook-post', name: 'Facebook Post', width: 1200, height: 630, aspectRatio: '1.91:1', category: 'social' },
-      { key: 'facebook-cover', name: 'Facebook Cover', width: 820, height: 312, aspectRatio: '2.63:1', category: 'social' },
-      { key: 'facebook-story', name: 'Facebook Story', width: 1080, height: 1920, aspectRatio: '9:16', category: 'social' },
-      { key: 'twitter-post', name: 'Twitter/X Post', width: 1200, height: 675, aspectRatio: '16:9', category: 'social' },
-      { key: 'twitter-header', name: 'Twitter/X Header', width: 1500, height: 500, aspectRatio: '3:1', category: 'social' },
-      { key: 'linkedin-post', name: 'LinkedIn Post', width: 1200, height: 627, aspectRatio: '1.91:1', category: 'social' },
-      { key: 'linkedin-banner', name: 'LinkedIn Banner', width: 1584, height: 396, aspectRatio: '4:1', category: 'social' },
-      { key: 'pinterest-pin', name: 'Pinterest Pin', width: 1000, height: 1500, aspectRatio: '2:3', category: 'social' },
-      { key: 'presentation-16x9', name: 'Presentation 16:9', width: 1920, height: 1080, aspectRatio: '16:9', category: 'presentation' },
-      { key: 'presentation-4x3', name: 'Presentation 4:3', width: 1024, height: 768, aspectRatio: '4:3', category: 'presentation' },
-      { key: 'hd-720p', name: 'HD 720p', width: 1280, height: 720, aspectRatio: '16:9', category: 'video' },
-      { key: 'full-hd-1080p', name: 'Full HD 1080p', width: 1920, height: 1080, aspectRatio: '16:9', category: 'video' },
-      { key: 'default', name: 'Default', width: 800, height: 600, aspectRatio: '4:3', category: 'general' }
-    ]
-  };
 })();
 `.trim();
   }
@@ -4223,54 +3867,6 @@ app.historyManager.saveState();
 `.trim();
   }
 
-  generateApplyTemplate(input: ApplyTemplateInput): string {
-    const { templateId, category, listOnly } = input;
-
-    if (listOnly || !templateId) {
-      // List mode: return available templates, optionally filtered by category
-      const categoryFilter = category ? `'${category}'` : 'null';
-      return `
-// List available templates
-(function() {
-  if (!app.templateManager) {
-    return { error: 'Template manager not available. Make sure PinePaper Studio is loaded.' };
-  }
-  const allTemplates = app.templateManager.getAllTemplates();
-  const category = ${categoryFilter};
-  const filtered = category
-    ? allTemplates.filter(t => t.category === category)
-    : allTemplates;
-  return {
-    templates: filtered.map(t => ({
-      id: t.id,
-      name: t.name,
-      category: t.category,
-      description: t.description || ''
-    })),
-    count: filtered.length,
-    categories: [...new Set(allTemplates.map(t => t.category))]
-  };
-})();
-`.trim();
-    }
-
-    // Load mode: apply a specific template
-    return `
-// Apply template: ${templateId}
-(async function() {
-  if (!app.templateManager) {
-    return { error: 'Template manager not available. Make sure PinePaper Studio is loaded.' };
-  }
-  try {
-    await app.templateManager.loadTemplate('${templateId}', true);
-    return { success: true, templateId: '${templateId}', message: 'Template applied successfully. Canvas has been replaced with template content.' };
-  } catch (e) {
-    return { error: 'Failed to apply template: ' + e.message };
-  }
-})();
-`.trim();
-  }
-
   generateImportImage(input: ImportImageInput): string {
     const { url, position, maxWidth, maxHeight, mask } = input;
 
@@ -4815,30 +4411,6 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    const ite
     }
   }
 
-  generateView(input: ViewInput): string {
-    switch (input.action) {
-      case 'fit': {
-        const mode = input.mode || 'content';
-        const padding = input.padding ?? 20;
-        return `
-// Fit view to ${mode}
-(function() {
-  app.fitView('${mode}', ${padding});
-  return { success: true, action: 'fit', mode: '${mode}', padding: ${padding} };
-})();`.trim();
-      }
-      case 'get_state':
-        return `
-// Get current view state
-(function() {
-  const state = app.getViewState();
-  return { success: true, action: 'get_state', ...state };
-})();`.trim();
-      default:
-        return `(function() { return { error: 'Unknown view action: ${(input as any).action}' }; })();`;
-    }
-  }
-
   generateBackground(input: BackgroundInput): string {
     switch (input.action) {
       case 'set': {
@@ -5067,63 +4639,6 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    const ite
 })();`.trim();
       default:
         return `(function() { return { error: 'Unknown sprite sheet action: ${(input as any).action}' }; })();`;
-    }
-  }
-
-  // ===========================================================================
-  // STORAGE
-  // ===========================================================================
-
-  generateStorage(input: StorageInput): string {
-    const guard = `if (!app.storageManager) return { error: 'StorageManager not available' };`;
-    switch (input.action) {
-      case 'save': {
-        const name = input.name ? JSON.stringify(input.name) : "'Untitled Project'";
-        const thumbnailCode = input.thumbnail
-          ? `const thumbnail = app.exportThumbnail ? app.exportThumbnail() : null;\n  if (thumbnail) project.thumbnail = thumbnail;`
-          : '';
-        return `
-// Save project
-(async function() {
-  ${guard}
-  const project = { name: ${name}, data: app.serialize() };
-  ${thumbnailCode}
-  const projectId = await app.storageManager.saveProject(project);
-  return { success: true, action: 'save', projectId, name: ${name} };
-})();`.trim();
-      }
-      case 'load': {
-        const projId = JSON.stringify(input.projectId || '');
-        return `
-// Load project
-(async function() {
-  ${guard}
-  const project = await app.storageManager.loadProject(${projId});
-  if (!project) return { error: 'Project not found: ' + ${projId} };
-  app.deserialize(project.data);
-  return { success: true, action: 'load', projectId: ${projId}, name: project.name };
-})();`.trim();
-      }
-      case 'list':
-        return `
-// List saved projects
-(async function() {
-  ${guard}
-  const projects = await app.storageManager.listProjects();
-  return { success: true, action: 'list', projects: projects.map(p => ({ id: p.id, name: p.name, updatedAt: p.updatedAt })), count: projects.length };
-})();`.trim();
-      case 'delete': {
-        const projId = JSON.stringify(input.projectId || '');
-        return `
-// Delete project
-(async function() {
-  ${guard}
-  await app.storageManager.deleteProject(${projId});
-  return { success: true, action: 'delete', projectId: ${projId} };
-})();`.trim();
-      }
-      default:
-        return `(function() { return { error: 'Unknown storage action: ${(input as any).action}' }; })();`;
     }
   }
 

@@ -1843,44 +1843,6 @@ export const TriggerActionSchema = z.object({
 
 export type TriggerAction = z.infer<typeof TriggerActionSchema>;
 
-/**
- * Add trigger input
- */
-export const AddTriggerInputSchema = z.object({
-  itemId: z.string().describe('Registry ID of the item'),
-  event: TriggerEventSchema,
-  time: z.number().optional().describe('Time in seconds for timeline triggers'),
-  timelineOffset: z.number().optional().describe('Time offset in ms for timeline triggers'),
-  conditions: z.array(TriggerConditionSchema).optional().describe('Conditions that must be met'),
-  condition: z.string().optional().describe('Optional condition expression (e.g., "$score > 10")'),
-  actions: z.array(TriggerActionSchema).min(1).describe('Actions to execute'),
-  once: z.boolean().optional().default(false).describe('Fire only once'),
-}).describe('Add trigger to item');
-
-export type AddTriggerInput = z.infer<typeof AddTriggerInputSchema>;
-
-/**
- * Remove trigger input
- */
-export const RemoveTriggerInputSchema = z.object({
-  itemId: z.string().describe('Registry ID of the item'),
-  triggerId: z.string().optional().describe('Specific trigger ID to remove'),
-  event: TriggerEventSchema.optional().describe('Remove all triggers of this event type'),
-  removeAll: z.boolean().optional().describe('Remove all triggers from item'),
-}).describe('Remove triggers from item');
-
-export type RemoveTriggerInput = z.infer<typeof RemoveTriggerInputSchema>;
-
-/**
- * Query triggers input
- */
-export const QueryTriggersInputSchema = z.object({
-  itemId: z.string().optional().describe('Filter by item ID'),
-  event: TriggerEventSchema.optional().describe('Filter by event type'),
-}).describe('Query triggers');
-
-export type QueryTriggersInput = z.infer<typeof QueryTriggersInputSchema>;
-
 // =============================================================================
 // QUIZ / LMS SCHEMAS
 // =============================================================================
@@ -1950,42 +1912,6 @@ export const QuizQuestionSchema = z.object({
 }).describe('Quiz question');
 
 export type QuizQuestion = z.infer<typeof QuizQuestionSchema>;
-
-/**
- * Create quiz input
- */
-export const CreateQuizInputSchema = z.object({
-  id: z.string().optional().describe('Quiz ID'),
-  title: z.string().optional().describe('Quiz title'),
-  questions: z.array(QuizQuestionSchema).min(1),
-  shuffleQuestions: z.boolean().optional().default(false),
-  shuffleOptions: z.boolean().optional().default(false),
-  showFeedback: z.enum(['immediate', 'after-submit', 'never']).optional().default('immediate'),
-  showScore: z.boolean().optional().default(true).describe('Display score during quiz'),
-  passingScore: z.number().optional().describe('Minimum score to pass (percentage)'),
-  allowRetry: z.boolean().optional().default(true),
-  trackProgress: z.boolean().optional().default(true),
-}).describe('Create quiz input');
-
-export type CreateQuizInput = z.infer<typeof CreateQuizInputSchema>;
-
-/**
- * Get quiz state input
- */
-export const GetQuizStateInputSchema = z.object({
-  quizId: z.string().optional().describe('Quiz ID (uses active quiz if not specified)'),
-}).describe('Get quiz state');
-
-export type GetQuizStateInput = z.infer<typeof GetQuizStateInputSchema>;
-
-/**
- * Reset quiz input
- */
-export const ResetQuizInputSchema = z.object({
-  quizId: z.string().optional().describe('Quiz ID to reset (uses active quiz if not specified)'),
-}).describe('Reset quiz');
-
-export type ResetQuizInput = z.infer<typeof ResetQuizInputSchema>;
 
 // =============================================================================
 // LETTER COLLAGE SCHEMAS
@@ -2065,18 +1991,6 @@ export const AnimateLetterCollageInputSchema = z.object({
 }).describe('Animate letter collage input');
 
 export type AnimateLetterCollageInput = z.infer<typeof AnimateLetterCollageInputSchema>;
-
-export const GetLetterCollageOptionsInputSchema = z.object({}).describe('Get letter collage options input (no parameters)');
-
-export type GetLetterCollageOptionsInput = z.infer<typeof GetLetterCollageOptionsInputSchema>;
-
-// =============================================================================
-// CANVAS PRESETS SCHEMA
-// =============================================================================
-
-export const GetCanvasPresetsInputSchema = z.object({}).describe('Get canvas presets input (no parameters)');
-
-export type GetCanvasPresetsInput = z.infer<typeof GetCanvasPresetsInputSchema>;
 
 // =============================================================================
 // MAP SCHEMAS
@@ -2314,26 +2228,6 @@ export const GetHighlightedMapRegionsInputSchema = z.object({}).describe('Get hi
 export type GetHighlightedMapRegionsInput = z.infer<typeof GetHighlightedMapRegionsInputSchema>;
 
 // =============================================================================
-// TEMPLATE SCHEMAS
-// =============================================================================
-
-export const TemplateCategorySchema = z.enum([
-  'social-media', 'meme', 'business', 'education', 'creative',
-  'tech', 'global', 'indigenous', 'seasonal', 'masking',
-  'scenes', 'diagrams', 'maps',
-]).describe('Template category');
-
-export type TemplateCategory = z.infer<typeof TemplateCategorySchema>;
-
-export const ApplyTemplateInputSchema = z.object({
-  templateId: z.string().optional().describe('Template ID to load (omit to list templates)'),
-  category: TemplateCategorySchema.optional().describe('Filter templates by category'),
-  listOnly: z.boolean().optional().default(false).describe('If true, only list available templates without loading'),
-}).describe('Apply template input');
-
-export type ApplyTemplateInput = z.infer<typeof ApplyTemplateInputSchema>;
-
-// =============================================================================
 // IMAGE IMPORT SCHEMAS
 // =============================================================================
 
@@ -2486,13 +2380,6 @@ export const PrecompInputSchema = z.object({
 });
 export type PrecompInput = z.infer<typeof PrecompInputSchema>;
 
-export const ViewInputSchema = z.object({
-  action: z.enum(['fit', 'get_state']),
-  mode: z.enum(['content', 'canvas']).optional(),
-  padding: z.number().optional(),
-});
-export type ViewInput = z.infer<typeof ViewInputSchema>;
-
 export const BackgroundInputSchema = z.object({
   action: z.enum(['set', 'clear', 'get']),
   mode: z.enum(['color', 'pattern', 'generator']).optional(),
@@ -2576,18 +2463,6 @@ export const SpriteSheetInputSchema = z.object({
   format: z.enum(['png', 'webp']).optional(),
 });
 export type SpriteSheetInput = z.infer<typeof SpriteSheetInputSchema>;
-
-// =============================================================================
-// STORAGE TOOLS
-// =============================================================================
-
-export const StorageInputSchema = z.object({
-  action: z.enum(['save', 'load', 'list', 'delete']),
-  projectId: z.string().optional(),
-  name: z.string().optional(),
-  thumbnail: z.boolean().optional(),
-});
-export type StorageInput = z.infer<typeof StorageInputSchema>;
 
 // =============================================================================
 // INTERACTION TOOLS
