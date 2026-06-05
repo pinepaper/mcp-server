@@ -12,8 +12,9 @@ import { TOOLKIT_PROFILES_LIST } from './tools/toolkits.js';
 import type { ToolkitProfile } from './tools/toolkits.js';
 import type { ToolVerbosity } from './tools/definitions.js';
 import { getToolsForToolkit, getToolsForVerbosity } from './tools/index.js';
+import { SERVER_VERSION } from './version.js';
 
-const VERSION = '1.5.1';
+const VERSION = SERVER_VERSION;
 const VALID_VERBOSITIES: ToolVerbosity[] = ['verbose', 'compact', 'minimal'];
 
 async function main(): Promise<void> {

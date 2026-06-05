@@ -25,9 +25,16 @@ describe('SERVER_VERSION — single source of truth', () => {
   });
 
   it('no source file hardcodes a different version string', () => {
-    // Anti-regression: scan src/ for any standalone "1.X.Y" / "2.X.Y" / etc.
-    // version literal that doesn't match SERVER_VERSION.
+    // Anti-regression: scan the version-emitting entry files for any quoted
+    // semver literal that doesn't match SERVER_VERSION. These files MUST NOT
+    // contain a quoted semver of their own — every version they emit has to
+    // come from SERVER_VERSION (which reads package.json). cli.ts is included
+    // because it surfaces a version via --version and the startup banner; it
+    // was the site missed by the original 1.5.6 single-sourcing pass (it used
+    // a bare `const VERSION = '1.5.1'`, which the old near-a-"version:"-key
+    // heuristic never caught).
     const filesToScan = [
+      'src/cli.ts',
       'src/index.ts',
       'src/tools/handlers.ts',
     ];
@@ -37,9 +44,7 @@ describe('SERVER_VERSION — single source of truth', () => {
       let match;
       while ((match = versionLiteralRe.exec(content)) !== null) {
         const literal = match[1];
-        // Only flag SERVER_VERSION-shaped literals near "version" keys.
-        const line = content.slice(Math.max(0, match.index - 60), match.index + match[0].length);
-        if (/version\s*:/.test(line) && literal !== SERVER_VERSION) {
+        if (literal !== SERVER_VERSION) {
           throw new Error(`Hardcoded version literal "${literal}" in ${rel} drifts from SERVER_VERSION "${SERVER_VERSION}". Use SERVER_VERSION instead.`);
         }
       }
