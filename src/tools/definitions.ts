@@ -2097,7 +2097,7 @@ EXAMPLES:
       properties: {
         action: {
           type: 'string',
-          enum: ['zoom', 'pan', 'move_to', 'reset', 'stop', 'state'],
+          enum: ['zoom', 'pan', 'move_to', 'reset', 'stop', 'state', 'fit_view'],
           description: 'Camera action to perform',
         },
         direction: {

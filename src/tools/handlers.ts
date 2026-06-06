@@ -1348,9 +1348,17 @@ You can now start creating new items on a clean canvas.`,
 
         const cfg = studioUrl ? { headless, studioUrl } : { headless };
 
-        const controller = getBrowserController(cfg);
+        let controller = getBrowserController(cfg);
 
-        const urlChanged = !!studioUrl && controller.connected &&
+        // NOT gated on controller.connected. getBrowserController() ignores cfg
+        // once the singleton exists, AND the singleton survives disconnect()
+        // (pinepaper_browser_disconnect doesn't null it) carrying its old
+        // studioUrl. So a stale/disconnected controller pointing at the prod
+        // default — which any prior browser_status() or connect() creates —
+        // would otherwise silently swallow an explicit url= (e.g. localhost for
+        // a dev build). Treat a different requested target as a change even when
+        // not currently connected.
+        const urlChanged = !!studioUrl &&
           !sameStudioTarget(controller.studioUrl, studioUrl);
 
         // Already connected, same headless mode, same URL → nothing to do
@@ -1360,15 +1368,17 @@ You can now start creating new items on a clean canvas.`,
           };
         }
 
-        // Connected but headless mode OR target URL changed → tear down so the
-        // new config takes effect (getBrowserController ignores config once the
-        // singleton exists).
-        if (controller.connected && (controller.isHeadless !== headless || urlChanged)) {
+        // Headless mode or target URL differs from the existing singleton → tear
+        // it down so the new config takes effect. Runs even when disconnected,
+        // because getBrowserController() reuses the stale singleton (and its old
+        // config) on the next call otherwise.
+        if (urlChanged || (controller.connected && controller.isHeadless !== headless)) {
           await resetBrowserController();
+          controller = getBrowserController(cfg);
         }
 
         try {
-          const newController = controller.connected ? controller : getBrowserController(cfg);
+          const newController = controller;
           if (!newController.connected) await newController.connect();
 
           const canvasSizeResult = await newController.executeCode(
