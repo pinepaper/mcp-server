@@ -437,4 +437,31 @@ describe('generateAgentExport — VideoEncoder NaN-bitrate fix', () => {
     expect(standard).toContain('"compression":0.85');
     expect(high).toContain('"compression":0.95');
   });
+
+  // 1.5.5 — duration was hardcoded to 5s; any longer play_timeline was
+  // silently truncated. Real bug surfaced live by an agent trying to render
+  // a 9-second mp4. baseVideoSettings.duration must respect the request.
+  it('respects requested duration for animated formats (no more 5s cap)', () => {
+    const nineSec = codeGenerator.generateAgentExport({ ...baseInput, format: 'mp4', duration: 9 });
+    // baseVideoSettings is a JS object literal in the generated IIFE — unquoted key.
+    expect(nineSec).toMatch(/baseVideoSettings\s*=\s*\{[^}]*duration:\s*9\b/);
+
+    const twentySec = codeGenerator.generateAgentExport({ ...baseInput, format: 'webm', duration: 20 });
+    expect(twentySec).toMatch(/baseVideoSettings\s*=\s*\{[^}]*duration:\s*20\b/);
+
+    const gifTwelve = codeGenerator.generateAgentExport({ ...baseInput, format: 'gif', duration: 12 });
+    expect(gifTwelve).toMatch(/baseVideoSettings\s*=\s*\{[^}]*duration:\s*12\b/);
+  });
+
+  it('falls back to 5s default when duration is omitted', () => {
+    const code = codeGenerator.generateAgentExport({ ...baseInput, format: 'mp4' });
+    expect(code).toMatch(/baseVideoSettings\s*=\s*\{[^}]*duration:\s*5\b/);
+  });
+
+  it('Zod rejects out-of-range duration (must be 0.5–60)', async () => {
+    const { AgentExportInputSchema } = await import('../../types/schemas.js');
+    expect(() => AgentExportInputSchema.parse({ platform: 'instagram', duration: 0 })).toThrow();
+    expect(() => AgentExportInputSchema.parse({ platform: 'instagram', duration: 75 })).toThrow();
+    expect(() => AgentExportInputSchema.parse({ platform: 'instagram', duration: 30 })).not.toThrow();
+  });
 });

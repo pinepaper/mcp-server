@@ -1752,6 +1752,7 @@ export const AgentExportInputSchema = z.object({
   quality: z.enum(['draft', 'standard', 'high']).optional().default('standard').describe('Export quality level'),
   includeRecommendations: z.boolean().optional().default(true).describe('Include alternative format recommendations'),
   framing: z.enum(['canvas', 'camera']).optional().default('canvas').describe('Output framing: "canvas" (full canvas, default) or "camera" (camera_animates first-keyframe viewport — fails if no walkthrough exists). Camera animation still drives motion within the fixed output frame.'),
+  duration: z.number().min(0.5).max(60).optional().default(5).describe('Video duration in seconds for animated formats (mp4/webm/gif). Default 5. Max 60. Static formats (png/svg/pdf) ignore this.'),
 }).describe('Smart export options');
 
 export type AgentExportInput = z.infer<typeof AgentExportInputSchema>;

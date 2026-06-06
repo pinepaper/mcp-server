@@ -2437,8 +2437,9 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
    */
   generateAgentExport(input: AgentExportInput): string {
     const validated = AgentExportInputSchema.parse(input);
-    const { platform, format, quality, framing } = validated;
+    const { platform, format, quality, framing, duration } = validated;
     const qualityLevel = quality || 'standard';
+    const videoDuration = duration ?? 5;
 
     // Quality settings (bitrate in bps for VideoEncoder)
     const qualitySettings = {
@@ -2556,7 +2557,7 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
         // ExportEngine._quickExportVideo overrides quality with undefined for
         // mp4/webm, _calculateBitrate yields NaN, and VideoEncoder.configure
         // rejects with 'malformed bitrate value'.
-        const baseVideoSettings = { format, fps: settings.fps, quality: settings.compression, duration: 5 };
+        const baseVideoSettings = { format, fps: settings.fps, quality: settings.compression, duration: ${videoDuration} };
         const blobToDataUrl = (b) => new Promise(resolve => {
           const r = new FileReader();
           r.onloadend = () => resolve(r.result);

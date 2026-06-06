@@ -5111,6 +5111,12 @@ EXAMPLES:
           enum: ['canvas', 'camera'],
           description: 'Output framing. "canvas" (default) renders the full canvas. "camera" renders only the first-keyframe viewport of a camera_animates walkthrough — video formats only.',
         },
+        duration: {
+          type: 'number',
+          minimum: 0.5,
+          maximum: 60,
+          description: 'Video duration in seconds for mp4/webm/gif (default 5, max 60). Static formats ignore this. If you set play_timeline to N seconds, pass the same N here.',
+        },
       },
       required: ['platform'],
     },
