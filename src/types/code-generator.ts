@@ -722,35 +722,29 @@ const size = app.getCanvasSize();
  */
 function generateClearCanvasCode(): string {
   return `
-// Clear all items from canvas
-const entries = app.itemRegistry.getAll();
-const itemIds = entries.map(entry => entry.id || entry.itemId);
-let removedCount = 0;
+// Clear all items from canvas. Prefer app.clearCanvas() — the canonical
+// reset that also tears down relations, the (virtual) camera animation,
+// generators, effects and background. The old manual loop here was broken:
+// it keyed item lookups on entry.id/entry.itemId (the registry getAll()
+// entries don't expose those — getItemById wants the registry id), so it
+// removed 0 items, and it called the non-existent app.clearAllRelations.
+const before = app.itemRegistry ? app.itemRegistry.getAll().length : 0;
 
-for (const itemId of itemIds) {
-  try {
-    const item = app.getItemById(itemId);
-    if (item) {
-      item.remove();
-      app.itemRegistry.remove(itemId);
-      removedCount++;
-    }
-  } catch (e) {
-    console.warn('Failed to remove item:', itemId, e);
-  }
+if (typeof app.clearCanvas === 'function') {
+  app.clearCanvas();
+} else {
+  // Fallback for older builds without clearCanvas().
+  if (app.textItemGroup) app.textItemGroup.removeChildren();
+  if (app.patternGroup) app.patternGroup.removeChildren();
+  if (app.itemRegistry) app.itemRegistry.clear();
+  if (app.relationRegistry) app.relationRegistry.clear();
 }
 
-// Also clear any relations
-if (app.clearAllRelations) {
-  app.clearAllRelations();
-}
+if (app.historyManager) app.historyManager.saveState();
 
-app.historyManager.saveState();
+const remaining = app.itemRegistry ? app.itemRegistry.getAll().length : 0;
 
-// Verify canvas is empty
-const remaining = app.itemRegistry.getAll().length;
-
-({ success: true, removedCount, remainingItems: remaining });
+({ success: true, removedCount: Math.max(0, before - remaining), remainingItems: remaining });
 `.trim();
 }
 
