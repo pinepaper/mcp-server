@@ -238,7 +238,7 @@ export const TOOLKIT_PROFILES: Record<ToolkitProfile, string[]> = {
     'core', 'import', 'assets', 'batch',
     'relations', 'animation', 'masks', 'camera',
     'generators', 'effects', 'template',
-    'scene',
+    'scene', 'diagram', 'map',
     'selection', 'transform', 'history',
     'image_processing', 'precomp',
     'deform', 'sprite', 'interaction',
