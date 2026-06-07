@@ -135,10 +135,13 @@ describe('getToolsForToolkit', () => {
     expect(result.length).toBeGreaterThan(10);
   });
 
-  it('agent profile returns a mid-range tool count', () => {
-    const result = getToolsForToolkit(PINEPAPER_TOOLS, 'agent');
-    expect(result.length).toBeGreaterThan(30);
-    expect(result.length).toBeLessThan(90);
+  it('agent profile is a curated subset — bigger than a focused profile, smaller than full', () => {
+    const agent = getToolsForToolkit(PINEPAPER_TOOLS, 'agent').length;
+    const full = getToolsForToolkit(PINEPAPER_TOOLS, 'full').length;
+    // Drift-proof bounds: compare against full rather than a magic constant
+    // (the prior `< 90` broke when camera/template/map/diagram joined agent).
+    expect(agent).toBeGreaterThan(30);
+    expect(agent).toBeLessThan(full);
   });
 
   it('diagram profile returns fewer tools than agent', () => {
