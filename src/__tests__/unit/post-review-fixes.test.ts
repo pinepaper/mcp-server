@@ -465,3 +465,68 @@ describe('generateAgentExport — VideoEncoder NaN-bitrate fix', () => {
     expect(() => AgentExportInputSchema.parse({ platform: 'instagram', duration: 30 })).not.toThrow();
   });
 });
+
+// =============================================================================
+// 1.5.6 — generator region (mirrors FxTool c81781c)
+// =============================================================================
+
+describe('pinepaper_execute_generator — optional region (1.5.6)', () => {
+  // FxTool added `options.region = {x, y, width, height}` to executeGenerator
+  // so generators can draw into a clipped sub-region instead of full-canvas.
+  // MCP exposes it via ExecuteGeneratorInputSchema.region.
+
+  it('codegen passes the three-arg signature (name, params, options) when no region', () => {
+    const code = codeGenerator.generateExecuteGenerator({
+      generatorName: 'drawBokeh',
+      params: { bgColor: '#0b0f1a' },
+    });
+    // No region → options is {} but still positionally present.
+    expect(code).toMatch(/app\.executeGenerator\('drawBokeh',\s*\{[^}]*"bgColor":\s*"#0b0f1a"[^}]*\},\s*\{\}\)/);
+  });
+
+  it('codegen routes region into options.region (FxTool reads it from arg #3)', () => {
+    const code = codeGenerator.generateExecuteGenerator({
+      generatorName: 'drawBokeh',
+      params: {},
+      region: { x: 100, y: 200, width: 400, height: 300 },
+    });
+    expect(code).toMatch(/app\.executeGenerator\('drawBokeh',\s*\{\},\s*\{"region":\{"x":100,"y":200,"width":400,"height":300\}\}\)/);
+  });
+
+  it('codegen surfaces region in the return payload for agent feedback', () => {
+    const code = codeGenerator.generateExecuteGenerator({
+      generatorName: 'drawGrid',
+      params: {},
+      region: { x: 0, y: 0, width: 200, height: 200 },
+    });
+    expect(code).toContain('region: {"x":0,"y":0,"width":200,"height":200}');
+  });
+
+  it('Zod rejects invalid regions (width/height must be positive)', async () => {
+    const { ExecuteGeneratorInputSchema } = await import('../../types/schemas.js');
+    expect(() => ExecuteGeneratorInputSchema.parse({
+      generatorName: 'drawBokeh',
+      region: { x: 0, y: 0, width: 0, height: 100 },
+    })).toThrow();
+    expect(() => ExecuteGeneratorInputSchema.parse({
+      generatorName: 'drawBokeh',
+      region: { x: 0, y: 0, width: 100, height: -50 },
+    })).toThrow();
+    expect(() => ExecuteGeneratorInputSchema.parse({
+      generatorName: 'drawBokeh',
+      region: { x: 0, y: 0, width: 100, height: 100 },
+    })).not.toThrow();
+  });
+
+  it('agent_batch_execute execute_generator op accepts generatorRegion', () => {
+    const code = codeGenerator.generateAgentBatchExecute({
+      operations: [{
+        type: 'execute_generator',
+        generatorName: 'drawWaves',
+        generatorParams: {},
+        generatorRegion: { x: 50, y: 50, width: 300, height: 150 },
+      }],
+    });
+    expect(code).toMatch(/app\.executeGenerator\('drawWaves',\s*\{\},\s*\{"region":\{"x":50,"y":50,"width":300,"height":150\}\}\)/);
+  });
+});

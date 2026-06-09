@@ -880,9 +880,25 @@ export const KeyframeAnimateInputSchema = z.object({
 });
 
 // Execute Generator
+//
+// Region (added FxTool c81781c): when set, the generator draws into a clipped
+// sub-group translated to (x,y) sized (width × height). Region runs imply
+// preserve (won't wipe the canvas) and re-running the same generator replaces
+// its prior region. Different generators' regions coexist. Invalid/zero-size
+// regions fall back to full-canvas FxTool-side.
+export const GeneratorRegionSchema = z.object({
+  x: z.number().describe('Region top-left X in canvas coords'),
+  y: z.number().describe('Region top-left Y in canvas coords'),
+  width: z.number().positive().describe('Region width in pixels'),
+  height: z.number().positive().describe('Region height in pixels'),
+}).describe('Optional sub-region {x, y, width, height} the generator draws into.');
+
+export type GeneratorRegion = z.infer<typeof GeneratorRegionSchema>;
+
 export const ExecuteGeneratorInputSchema = z.object({
   generatorName: GeneratorNameSchema,
   params: z.record(z.unknown()).optional().default({}),
+  region: GeneratorRegionSchema.optional(),
 });
 
 // Apply Effect
@@ -1706,6 +1722,7 @@ export const AgentBatchOperationSchema = z.object({
   // Execute generator fields
   generatorName: z.string().optional().describe('Generator name for execute_generator'),
   generatorParams: z.record(z.unknown()).optional().describe('Generator parameters'),
+  generatorRegion: GeneratorRegionSchema.optional().describe('Optional sub-region {x, y, width, height} for execute_generator'),
   // Set canvas size fields
   width: z.number().min(100).max(4096).optional().describe('Canvas width for set_canvas_size (100-4096)'),
   height: z.number().min(100).max(4096).optional().describe('Canvas height for set_canvas_size (100-4096)'),

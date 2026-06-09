@@ -4145,6 +4145,17 @@ COMMON PARAMS (all generators):
           description: 'Generator-specific parameters',
           additionalProperties: true,
         },
+        region: {
+          type: 'object',
+          description: 'Optional sub-region {x, y, width, height} (canvas coords) — generator draws into a clipped, translated sub-group instead of full-canvas. Region runs imply preserve (won\'t wipe the canvas) and re-running the same generator replaces its prior region; different generators\' regions coexist. Invalid/zero-size regions fall back to full-canvas.',
+          properties: {
+            x: { type: 'number', description: 'Region top-left X in canvas coords' },
+            y: { type: 'number', description: 'Region top-left Y in canvas coords' },
+            width: { type: 'number', minimum: 1, description: 'Region width in pixels' },
+            height: { type: 'number', minimum: 1, description: 'Region height in pixels' },
+          },
+          required: ['x', 'y', 'width', 'height'],
+        },
       },
       required: ['generatorName'],
     },

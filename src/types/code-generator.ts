@@ -553,13 +553,17 @@ app.addAnimation('${itemId}', ${keyframesJson}, ${JSON.stringify(opts)});
  */
 function generateExecuteGeneratorCode(
   generatorName: GeneratorName,
-  params: Record<string, unknown>
+  params: Record<string, unknown>,
+  region?: { x: number; y: number; width: number; height: number }
 ): string {
+  // FxTool signature: app.executeGenerator(name, params, options).
+  // region lives in options (added in FxTool c81781c).
+  const options = region ? { region } : {};
   return `
-// Execute ${generatorName} generator
+// Execute ${generatorName} generator${region ? ` in region ${region.width}×${region.height} @ (${region.x},${region.y})` : ''}
 (async function() {
-  await app.executeGenerator('${generatorName}', ${JSON.stringify(params, null, 2)});
-  return { success: true, generator: '${generatorName}' };
+  await app.executeGenerator('${generatorName}', ${JSON.stringify(params, null, 2)}, ${JSON.stringify(options)});
+  return { success: true, generator: '${generatorName}'${region ? ', region: ' + JSON.stringify(region) : ''} };
 })();
 `.trim();
 }
@@ -1007,7 +1011,8 @@ export class PinePaperCodeGenerator {
     const validated = ExecuteGeneratorInputSchema.parse(input);
     return generateExecuteGeneratorCode(
       validated.generatorName,
-      validated.params as Record<string, unknown>
+      validated.params as Record<string, unknown>,
+      validated.region
     );
   }
 
@@ -2345,9 +2350,10 @@ return { success: true, backgroundColor: '${bgColor}' };
       case 'execute_generator':
         const genName = op.generatorName || 'drawSunburst';
         const genParams = JSON.stringify(op.generatorParams || {});
+        const genOptions = JSON.stringify(op.generatorRegion ? { region: op.generatorRegion } : {});
         return `
-await app.executeGenerator('${genName}', ${genParams});
-return { success: true, generator: '${genName}' };
+await app.executeGenerator('${genName}', ${genParams}, ${genOptions});
+return { success: true, generator: '${genName}'${op.generatorRegion ? ', region: ' + JSON.stringify(op.generatorRegion) : ''} };
 `;
 
       case 'set_canvas_size': {
