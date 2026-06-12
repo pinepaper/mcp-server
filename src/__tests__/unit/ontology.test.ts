@@ -742,6 +742,30 @@ describe('Ontology MCP tools', () => {
     expect(MINIMAL_DESCRIPTIONS.pinepaper_validate_design).toBeDefined();
     expect(MINIMAL_DESCRIPTIONS.pinepaper_query_ontology).toBeDefined();
   });
+
+  it('pinepaper_validate is registered (definition, toolkit, minimal desc)', async () => {
+    const { PINEPAPER_TOOLS } = await import('../../tools/definitions.js');
+    const { TOOL_TAGS } = await import('../../tools/toolkits.js');
+    const { MINIMAL_DESCRIPTIONS } = await import('../../tools/minimal-descriptions.js');
+    expect(PINEPAPER_TOOLS.find((t: any) => t.name === 'pinepaper_validate')).toBeDefined();
+    expect(TOOL_TAGS.ontology).toContain('pinepaper_validate');
+    expect(MINIMAL_DESCRIPTIONS.pinepaper_validate).toBeDefined();
+  });
+
+  it('generateValidate emits scene + op browser code with a guard', async () => {
+    const { codeGenerator } = await import('../../types/code-generator.js');
+    const scene = codeGenerator.generateValidate({ mode: 'scene' });
+    expect(scene).toContain('app.validateScene()');
+    expect(scene).toContain('typeof app.validateScene'); // availability guard
+    const op = codeGenerator.generateValidate({ mode: 'op', op: { kind: 'addRelation', from: 'a', to: 'b', relation: 'orbits' } });
+    expect(op).toContain('app.validateOp(');
+    expect(op).toContain('"relation":"orbits"');
+  });
+
+  it('pinepaper_validate handler is registered in ontologyHandlers', async () => {
+    const { ontologyHandlers } = await import('../../tools/handlers/ontology.js');
+    expect(typeof ontologyHandlers.pinepaper_validate).toBe('function');
+  });
 });
 
 // =============================================================================

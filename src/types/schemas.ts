@@ -2299,6 +2299,26 @@ export const ValidateDesignInputSchema = z.object({
 
 export type ValidateDesignInput = z.infer<typeof ValidateDesignInputSchema>;
 
+// Semantic scene/op validator (OntologyValidator in FxTool) — distinct from
+// ValidateDesign (which scores a template definition server-side). Runs in the
+// browser against the live scene and returns structured diagnostics.
+export const ValidateInputSchema = z.object({
+  mode: z.enum(['scene', 'op']).default('scene')
+    .describe("'scene' audits the whole live canvas; 'op' validates a proposed mutation before applying it"),
+  op: z.object({
+    kind: z.enum(['addRelation', 'create', 'modify']).describe('The kind of mutation being validated'),
+    from: z.string().optional().describe('Source item id (addRelation)'),
+    to: z.string().optional().describe('Target item id (addRelation)'),
+    relation: z.string().optional().describe('Relation type (addRelation)'),
+    params: z.record(z.unknown()).optional().describe('Relation params (addRelation)'),
+    type: z.string().optional().describe('Item type (create)'),
+    id: z.string().optional().describe('Item id (modify)'),
+    changes: z.record(z.unknown()).optional().describe('Property changes (modify)'),
+  }).optional().describe("Required when mode='op': the proposed mutation to validate"),
+}).describe('Semantic validation input');
+
+export type ValidateInput = z.infer<typeof ValidateInputSchema>;
+
 export const QueryOntologyInputSchema = z.object({
   query: z.enum([
     'list_types', 'list_edges', 'list_generators', 'list_effects',

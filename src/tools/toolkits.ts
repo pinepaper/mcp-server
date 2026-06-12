@@ -216,6 +216,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
     'pinepaper_get_canvas_ontology',
     'pinepaper_analyze_design',
     'pinepaper_validate_design',
+    'pinepaper_validate',
     'pinepaper_query_ontology',
   ],
 

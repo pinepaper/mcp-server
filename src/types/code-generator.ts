@@ -1241,6 +1241,29 @@ throw new Error('Either svgString or url must be provided');
   }
 
   /**
+   * Generate code for semantic validation (FxTool OntologyValidator) — runs in the
+   * browser against the live scene and returns structured diagnostics.
+   */
+  generateValidate(input: { mode?: 'scene' | 'op'; op?: Record<string, unknown> }): string {
+    const mode = input.mode || 'scene';
+    const opJson = JSON.stringify(input.op ?? null);
+    return `
+// Semantic validation — structured diagnostics
+(function() {
+  if (typeof app.validateScene !== 'function' || typeof app.validateOp !== 'function') {
+    return {
+      success: false,
+      error: 'app.validateScene/validateOp not available — requires FxTool with OntologyValidator v1 (commit 7f151f4 or later).',
+    };
+  }
+  var mode = ${JSON.stringify(mode)};
+  var result = (mode === 'op') ? app.validateOp(${opJson}) : app.validateScene();
+  return { success: true, mode: mode, ok: result.ok, diagnostics: result.diagnostics };
+})();
+`.trim();
+  }
+
+  /**
    * Generate code for adding a filter
    */
   generateAddFilter(

@@ -5461,6 +5461,55 @@ USE WHEN:
   },
 
   {
+    name: 'pinepaper_validate',
+    annotations: {
+      title: 'Validate Scene/Op',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Semantically validate the LIVE scene (or a proposed mutation before you apply it) and get back STRUCTURED diagnostics — not just pass/fail.
+
+Distinct from pinepaper_validate_design (which scores a template *definition* object). This runs against the live canvas and checks references, relation types, params, and reference cycles, returning:
+  { ok, diagnostics: [{ code, severity, message, target?, context?, fix? }] }
+
+Codes: TARGET_NOT_FOUND / SOURCE_NOT_FOUND (with a nearest-id "did you mean?" fix), UNKNOWN_RELATION, UNKNOWN_ITEM_TYPE, PARAM_TYPE, PARAM_ENUM / PARAM_RANGE (with a replace/clamp fix), RELATION_CYCLE (with the cycle path), DUPLICATE_RELATION. severity is error|warning|hint; ok is false only when an error is present. Advisory — it never mutates; fix.apply is a proposed op you may run.
+
+USE WHEN:
+- Before adding a relation, to confirm the target exists and the edge won't create a cycle (mode:'op')
+- After building a scene, to lint references/types/params (mode:'scene')
+- To recover from a failed op with an actionable suggestion instead of guessing
+
+mode:'scene' (default) audits the whole canvas. mode:'op' validates a single proposed mutation passed in 'op'.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        mode: {
+          type: 'string',
+          enum: ['scene', 'op'],
+          description: "'scene' audits the whole live canvas (default); 'op' validates a proposed mutation before applying it",
+        },
+        op: {
+          type: 'object',
+          description: "Required when mode='op'. The proposed mutation: { kind:'addRelation'|'create'|'modify', from?, to?, relation?, params?, type?, id?, changes? }",
+          properties: {
+            kind: { type: 'string', enum: ['addRelation', 'create', 'modify'] },
+            from: { type: 'string', description: 'Source item id (addRelation)' },
+            to: { type: 'string', description: 'Target item id (addRelation)' },
+            relation: { type: 'string', description: 'Relation type (addRelation)' },
+            params: { type: 'object', description: 'Relation params (addRelation)' },
+            type: { type: 'string', description: 'Item type (create)' },
+            id: { type: 'string', description: 'Item id (modify)' },
+            changes: { type: 'object', description: 'Property changes (modify)' },
+          },
+          required: ['kind'],
+        },
+      },
+    },
+  },
+
+  {
     name: 'pinepaper_query_ontology',
     annotations: {
       title: 'Query Ontology',

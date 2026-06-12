@@ -20,6 +20,7 @@ import { codeGenerator } from '../../types/code-generator.js';
 import {
   AnalyzeDesignInputSchema,
   ValidateDesignInputSchema,
+  ValidateInputSchema,
   QueryOntologyInputSchema,
   GetCanvasOntologyInputSchema,
   ErrorCodes,
@@ -93,6 +94,20 @@ export const ontologyHandlers: Record<string, OntologyHandler> = {
         text: JSON.stringify({ validation, quality }, null, 2),
       }],
     };
+  },
+
+  // Semantic validation of the LIVE scene or a proposed op (FxTool OntologyValidator).
+  // Distinct from validate_design (server-side template scoring): this runs in the
+  // browser and returns structured diagnostics {code, severity, message, target, fix}.
+  pinepaper_validate: async (args, options) => {
+    const input = ValidateInputSchema.parse(args);
+    const code = codeGenerator.generateValidate(input);
+    return executeOrGenerate(
+      code,
+      'Semantic validation — structured diagnostics (references, relation types, params, cycles)',
+      options,
+      'pinepaper_validate',
+    );
   },
 
   pinepaper_query_ontology: async (args, _options) => {
