@@ -51,3 +51,12 @@ export { DesignGraph } from './design-graph.js';
 
 // KnowledgeGraphValidator class + weights
 export { KnowledgeGraphValidator, QUALITY_WEIGHTS } from './validator.js';
+
+// OntologyValidator — structured semantic diagnostics (ported from FxTool S3.4 shared lib)
+export {
+  OntologyValidator,
+  SEVERITY,
+  buildDefinitionValidatorContext,
+  validateDefinitionSemantics,
+} from './ontology-validator.js';
+export type { Diagnostic, ValidatorResult, ValidatorContext } from './ontology-validator.js';

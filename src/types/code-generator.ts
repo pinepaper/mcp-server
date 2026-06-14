@@ -153,6 +153,10 @@ import {
   MagicInput,
   PhysicsInput,
   MeasurementInput,
+  GeometryInput,
+  ConstructionSequenceInput,
+  ValidateSceneInput,
+  CaptureFramesInput,
 } from './schemas.js';
 import { z } from 'zod';
 
@@ -486,8 +490,13 @@ const relations = results.map(r => ({
 function generateAnimateCode(
   itemId: string,
   animationType: SimpleAnimationType,
-  speed: number
+  speed: number,
+  intensity?: number,
+  delay?: number
 ): string {
+  const extra =
+    (intensity !== undefined ? `,\n  animationIntensity: ${intensity}` : '') +
+    (delay !== undefined ? `,\n  animationDelay: ${delay}` : '');
   return `
 // Apply ${animationType} animation to ${itemId}
 const item = app.getItemById('${itemId}');
@@ -496,7 +505,7 @@ if (!item) {
 }
 app.animate(item, {
   animationType: '${animationType}',
-  animationSpeed: ${speed}
+  animationSpeed: ${speed}${extra}
 });
 
 ({ success: true, itemId: '${itemId}', animationType: '${animationType}' });
@@ -650,7 +659,8 @@ function generatePlayTimelineCode(
   action: 'play' | 'pause' | 'stop' | 'seek',
   duration?: number,
   loop?: boolean,
-  time?: number
+  time?: number,
+  deterministic?: boolean
 ): string {
   switch (action) {
     case 'play':
@@ -672,6 +682,18 @@ app.stopKeyframeTimeline();
 ({ success: true, action: 'stop' });
 `.trim();
     case 'seek':
+      if (deterministic) {
+        return `
+// Deterministic seek — evaluate the whole scene at the exact time (keyframes + relations + generators)
+(function() {
+  const t = ${time || 0};
+  if (typeof app.sceneAt === 'function') { app.sceneAt(t); return { success: true, action: 'seek', time: t, deterministic: true }; }
+  // Fallback for older FxTool builds without sceneAt
+  app.setPlaybackTime(t);
+  return { success: true, action: 'seek', time: t, deterministic: false, note: 'app.sceneAt unavailable — used setPlaybackTime (keyframe state only); update FxTool for deterministic relations/generators' };
+})();
+`.trim();
+      }
       return `
 // Seek to time
 app.setPlaybackTime(${time || 0});
@@ -915,6 +937,8 @@ export class PinePaperCodeGenerator {
     const properties = { ...(validated.properties as Record<string, unknown>) };
     if (validated.animationType !== undefined) properties.animationType = validated.animationType;
     if (validated.animationSpeed !== undefined) properties.animationSpeed = validated.animationSpeed;
+    if (validated.animationIntensity !== undefined) properties.animationIntensity = validated.animationIntensity;
+    if (validated.animationDelay !== undefined) properties.animationDelay = validated.animationDelay;
     if (validated.keyframes !== undefined) properties.keyframes = validated.keyframes;
     return generateCreateItemCode(
       validated.itemType,
@@ -984,7 +1008,9 @@ export class PinePaperCodeGenerator {
     return generateAnimateCode(
       validated.itemId,
       validated.animationType,
-      validated.speed
+      validated.speed,
+      validated.intensity,
+      validated.delay
     );
   }
 
@@ -1047,9 +1073,10 @@ export class PinePaperCodeGenerator {
     action: 'play' | 'pause' | 'stop' | 'seek',
     duration?: number,
     loop?: boolean,
-    time?: number
+    time?: number,
+    deterministic?: boolean
   ): string {
-    return generatePlayTimelineCode(action, duration, loop, time);
+    return generatePlayTimelineCode(action, duration, loop, time, deterministic);
   }
 
   /**
@@ -5088,6 +5115,190 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    const ite
       default:
         return `(function() { return { error: 'Unknown measurement action: ${(input as any).action}' }; })();`;
     }
+  }
+
+  /**
+   * Audit the live scene (or pre-validate a batch of proposed ops) with FxTool's
+   * OntologyValidator — structured { ok, diagnostics } feedback instead of console warnings.
+   */
+  generateValidateScene(input: ValidateSceneInput): string {
+    const guard = `const v = app.sceneValidator;
+  if (!v) return { success: false, error: 'app.sceneValidator unavailable — update FxTool to a build with the OntologyValidator' };`;
+    if (input.ops) {
+      const opsJson = JSON.stringify(input.ops);
+      return `
+// Pre-validate proposed ops against the live scene
+(function() {
+  ${guard}
+  if (typeof v.validateOps !== 'function') return { success: false, error: 'validateOps unavailable in this FxTool build' };
+  const r = v.validateOps(${opsJson});
+  return { success: true, mode: 'ops', ok: r.ok, diagnosticCount: r.diagnostics.length, diagnostics: r.diagnostics };
+})();`.trim();
+    }
+    return `
+// Audit the current scene
+(function() {
+  ${guard}
+  const r = v.validateScene();
+  return { success: true, mode: 'scene', ok: r.ok, diagnosticCount: r.diagnostics.length, diagnostics: r.diagnostics };
+})();`.trim();
+  }
+
+  /**
+   * Deterministic headless frame capture (S3): app.captureFramesAt(times, { seed })
+   * seeds Math.random once around the sequence and evaluates the scene at each time via
+   * sceneAt(t). Returns a cheap per-frame hash by default (token-light) so an agent can
+   * verify determinism (re-run → identical hashes) and whether frames actually change.
+   */
+  generateCaptureFrames(input: CaptureFramesInput): string {
+    const timesJson = JSON.stringify(input.times);
+    const seed = input.seed !== undefined ? input.seed : 0;
+    const includeDataUrls = !!input.includeDataUrls;
+    return `
+// Deterministic frame capture
+(function() {
+  if (typeof app.captureFramesAt !== 'function') {
+    return { success: false, error: 'app.captureFramesAt unavailable — update FxTool to a build with the deterministic capture entrypoint' };
+  }
+  const includeDataUrls = ${includeDataUrls};
+  const hashStr = function(s) { let h = 5381; for (let i = 0; i < s.length; i++) { h = (((h << 5) + h) ^ s.charCodeAt(i)) >>> 0; } return h.toString(16); };
+  const frames = app.captureFramesAt(${timesJson}, {
+    seed: ${seed},
+    capture: function(c, t, i) {
+      const url = (c && c.toDataURL) ? c.toDataURL() : '';
+      const f = { index: i, time: t, hash: hashStr(url), bytes: url.length };
+      if (includeDataUrls) f.dataUrl = url;
+      return f;
+    }
+  });
+  const uniqueHashes = new Set(frames.map(function(f) { return f.hash; })).size;
+  return { success: true, seed: ${seed}, frameCount: frames.length, uniqueHashes: uniqueHashes, allIdentical: uniqueHashes <= 1, frames: frames };
+})();`.trim();
+  }
+
+  /**
+   * Drive app.constructionSequence (Layer 3): build a step-by-step reveal of a
+   * figure, play it on the timeline, clear it, or list sequences. Item refs are
+   * registryId strings — build resolves them via app.getItemById.
+   */
+  generateConstructionSequence(input: ConstructionSequenceInput): string {
+    const guard = `const cs = app.constructionSequence;
+  if (!cs) return { success: false, error: 'app.constructionSequence unavailable — update FxTool to a build with the construction-sequence library' };`;
+    switch (input.action) {
+      case 'build': {
+        const stepsJson = JSON.stringify(input.steps ?? []);
+        const opts = JSON.stringify({
+          ...(input.stepDuration !== undefined ? { stepDuration: input.stepDuration } : {}),
+          ...(input.fadeIn !== undefined ? { fadeIn: input.fadeIn } : {}),
+        });
+        return `
+// Build construction sequence
+(function() {
+  ${guard}
+  const rec = cs.build(${stepsJson}, ${opts});
+  return {
+    success: true,
+    action: 'build',
+    sequenceId: rec.id,
+    stepCount: rec.steps.length,
+    stepDuration: rec.stepDuration,
+    fadeIn: rec.fadeIn,
+    totalDuration: rec.totalDuration,
+  };
+})();`.trim();
+      }
+      case 'play': {
+        const seqArg = input.sequenceId ? JSON.stringify(input.sequenceId) : 'null';
+        const opts = JSON.stringify({
+          loop: !!input.loop,
+          ...(input.duration !== undefined ? { duration: input.duration } : {}),
+        });
+        return `
+// Play construction sequence
+(function() {
+  ${guard}
+  let seqId = ${seqArg};
+  if (!seqId) { const all = cs.list(); seqId = all.length ? all[all.length - 1].id : null; }
+  if (!seqId) return { success: false, error: 'No sequence to play — build one first' };
+  const duration = cs.play(seqId, ${opts});
+  return { success: true, action: 'play', sequenceId: seqId, duration: duration, loop: ${!!input.loop} };
+})();`.trim();
+      }
+      case 'clear': {
+        const seqArg = input.sequenceId ? JSON.stringify(input.sequenceId) : 'null';
+        return `
+// Clear construction sequence
+(function() {
+  ${guard}
+  let seqId = ${seqArg};
+  if (!seqId) { const all = cs.list(); seqId = all.length ? all[all.length - 1].id : null; }
+  if (!seqId) return { success: false, error: 'No sequence to clear' };
+  const ok = cs.clear(seqId);
+  return { success: ok, action: 'clear', sequenceId: seqId };
+})();`.trim();
+      }
+      case 'list':
+      default:
+        return `
+// List construction sequences
+(function() {
+  ${guard}
+  const sequences = cs.list().map(function(r) {
+    return { id: r.id, stepCount: r.steps.length, stepDuration: r.stepDuration, totalDuration: r.totalDuration };
+  });
+  return { success: true, action: 'list', sequences: sequences };
+})();`.trim();
+    }
+  }
+
+  /**
+   * Run an app.geometry.* construction helper (Layer 1) and, when createAs is
+   * given, build a canvas item from the result. The op name is whitelisted by the
+   * Zod enum, so it is safe to index app.geometry[op] directly. Mirrors FxTool's
+   * documented composition: app.create('polygon', { points: app.geometry.regularPolygon(...) }).
+   */
+  generateGeometry(input: GeometryInput): string {
+    const op = JSON.stringify(input.operation);
+    const argsJson = JSON.stringify(input.args ?? []);
+    const createAsJson = input.createAs ? JSON.stringify(input.createAs) : 'null';
+    return `
+// Geometry construction: ${input.operation}
+(function() {
+  const g = app.geometry;
+  if (!g || typeof g[${op}] !== 'function') {
+    return { success: false, error: 'app.geometry.' + ${op} + ' unavailable — update FxTool to a build with the geometry construction library' };
+  }
+  const result = g[${op}](...${argsJson});
+  if (result == null) {
+    return { success: false, operation: ${op}, result: null, error: 'Degenerate construction (parallel lines, collinear points, or a point inside the circle) — returned null' };
+  }
+
+  let itemId = null;
+  const createAs = ${createAsJson};
+  if (createAs) {
+    const { itemType, radius, ...style } = createAs;
+    let item = null;
+    if (Array.isArray(result)) {
+      // Vertex list (regularPolygon / star / polygonFromVertices / tangent points)
+      item = app.create('polygon', { points: result, ...style });
+    } else if (result.center && typeof result.radius === 'number') {
+      // Circle / circumcircle
+      item = app.create('circle', { x: result.center.x, y: result.center.y, radius: result.radius, ...style });
+    } else if (typeof result.x === 'number' && typeof result.y === 'number') {
+      // Point → small marker
+      item = app.create(itemType || 'circle', { x: result.x, y: result.y, radius: (radius != null ? radius : 6), ...style });
+    } else {
+      return { success: true, operation: ${op}, result, itemId: null, note: 'Result is not directly creatable (line/scalar) — use the returned geometry as input to other tools' };
+    }
+    if (item) {
+      if (item.bringToFront) item.bringToFront();
+      itemId = item.data && item.data.registryId;
+      if (app.historyManager) app.historyManager.saveState();
+    }
+  }
+
+  return { success: true, operation: ${op}, result, itemId };
+})();`.trim();
   }
 }
 

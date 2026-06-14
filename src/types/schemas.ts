@@ -262,6 +262,15 @@ export const RelationTypeSchema = z.enum([
   'group_morphs_to',
   // Self-relation; item moves along a custom-drawn path stored in params
   'moves_along_path',
+  // Geometric construction constraints (Layer 2) — the source is RE-DERIVED each
+  // frame from its anchor item(s), so dragging an anchor updates it live
+  // (GeoGebra-style). Anchor A is the relation target; extra anchors ride in params.
+  'is_midpoint_of',      // source = midpoint(target, params.other)
+  'lies_on_line',        // source on line target→params.other at fraction params.t
+  'is_centroid_of',      // source = centroid(target, ...params.others)
+  'is_circumcenter_of',  // source = circumcenter(target, params.other1, params.other2)
+  'concentric_with',     // source shares the target's center
+  'construction_reveal', // self-relation: opacity 0→1 at params.revealAt over params.fadeIn (timeline-driven)
 ]).describe('Type of relationship between items');
 
 export type RelationType = z.infer<typeof RelationTypeSchema>;
@@ -516,6 +525,15 @@ export const GeneratorNameSchema = z.enum([
   'drawSimulation',
   'drawSpectrumAnalyzer',
   'draw3DSurface',
+  // S6 seeded procedural generators (curated presets + Motion group)
+  'drawTruchet',
+  'drawHalftone',
+  'drawRibbons',
+  // GPU / GLSL math-art generators
+  'drawFormulaArt',
+  'drawParametricCollection',
+  'drawShaderArt',
+  'drawYeganehMountains',
 ]).describe('Background generator name');
 
 export type GeneratorName = z.infer<typeof GeneratorNameSchema>;
@@ -785,6 +803,8 @@ export const CreateItemInputSchema = z.object({
   properties: z.record(z.unknown()).optional().default({}),
   animationType: z.string().optional().describe('Inline animation to apply on creation. Loop presets (pulse, rotate, bounce, fade, wobble, slide, typewriter) or "keyframe" with keyframes array. Equivalent to a follow-up pinepaper_animate / pinepaper_keyframe_animate call.'),
   animationSpeed: z.number().optional().describe('Speed multiplier for loop animations (default: 1.0). Ignored when animationType is "keyframe".'),
+  animationIntensity: z.number().optional().describe('Loop animation amplitude (0.1 = ±10%, default 0.15). Drives pulse/wobble/bounce/breathe amplitude; honored by SVG/SMIL/widget export.'),
+  animationDelay: z.number().optional().describe('Loop animation start delay in seconds.'),
   keyframes: z.array(KeyframeSchema).optional().describe('Required when animationType is "keyframe". Inline keyframe array attached at creation.'),
 });
 
@@ -866,6 +886,8 @@ export const AnimateItemInputSchema = z.object({
   itemId: z.string().describe('Registry ID of the item'),
   animationType: SimpleAnimationTypeSchema,
   speed: z.number().optional().default(1).describe('Animation speed multiplier'),
+  intensity: z.number().optional().describe('Animation amplitude (animationIntensity): 0.1 = ±10%, 0.2 = ±20% (default 0.15). Drives pulse/wobble/bounce/breathe amplitude and is now honored by SVG/SMIL/widget export.'),
+  delay: z.number().optional().describe('Animation start delay in seconds (animationDelay).'),
 });
 
 // Keyframe Animate
@@ -924,6 +946,10 @@ export const PlayTimelineInputSchema = z.object({
   duration: z.number().optional().describe('Duration for play action'),
   loop: z.boolean().optional(),
   time: z.number().optional().describe('Time to seek to'),
+  deterministic: z
+    .boolean()
+    .optional()
+    .describe('For seek: evaluate the scene at the exact time via app.sceneAt(t) — ticks keyframes + relations + generators deterministically (same t → same frame), not just the keyframe state. Use before a screenshot for a reproducible frame.'),
 });
 
 // Canvas Control
@@ -2620,3 +2646,87 @@ export const MeasurementInputSchema = z.object({
   itemId: z.string().optional(),
 });
 export type MeasurementInput = z.infer<typeof MeasurementInputSchema>;
+
+// Geometry construction helpers (Layer 1) — pure functions exposed by FxTool's
+// app.geometry (GeometryConstruction). The server computes a construction and
+// optionally creates an item from the result, mirroring:
+//   app.create('polygon', { points: app.geometry.regularPolygon(cx, cy, r, 5) });
+export const GEOMETRY_OPERATIONS = [
+  // points
+  'point', 'distance', 'midpoint', 'lerpPoint', 'centroid',
+  'translatePoint', 'rotatePoint', 'scalePoint',
+  // polygons
+  'regularPolygon', 'star', 'polygonFromVertices',
+  // lines
+  'lineThrough', 'lineDirection', 'lineIntersection', 'projectPointToLine',
+  'perpendicular', 'parallel', 'perpendicularBisector', 'reflectPoint',
+  // angles
+  'angle', 'angleBisector',
+  // circles
+  'circle', 'pointOnCircle', 'circumcenter', 'circleThrough', 'incenter',
+  'tangentPointsFromExternal',
+] as const;
+
+export const GeometryInputSchema = z.object({
+  operation: z.enum(GEOMETRY_OPERATIONS).describe('Which app.geometry.* construction helper to run'),
+  args: z.array(z.any()).default([]).describe(
+    'Positional arguments for the operation, in order. Points are {x,y} objects (or [x,y] arrays where a vertex list is accepted); lines are {p1,p2}; circles are {center,radius}. Angles are in radians. e.g. regularPolygon → [cx, cy, radius, sides, rotation?]'
+  ),
+  createAs: z
+    .object({
+      itemType: z.string().optional().describe('Override item type for point results (default "circle").'),
+      color: z.string().optional(),
+      fillColor: z.string().optional(),
+      strokeColor: z.string().optional(),
+      strokeWidth: z.number().optional(),
+      radius: z.number().optional().describe('Marker radius for point results (default 6).'),
+    })
+    .passthrough()
+    .optional()
+    .describe(
+      'When provided, also create a canvas item from the result: a vertex-list result → polygon, a circle result → circle, a point result → a small marker. Extra keys pass through to app.create. Omit for compute-only.'
+    ),
+});
+export type GeometryInput = z.infer<typeof GeometryInputSchema>;
+
+// Construction sequences (Layer 3) — step-by-step reveal of a geometric figure,
+// wrapping FxTool's app.constructionSequence. Each step hides its items and attaches
+// a timeline-driven construction_reveal relation, so playback reveals the figure one
+// step at a time (replayable, scrubbable, editable as relation graph data).
+export const ConstructionSequenceInputSchema = z.object({
+  action: z.enum(['build', 'play', 'clear', 'list']).describe('build a sequence, play it on the timeline, clear (restore items), or list sequences'),
+  steps: z
+    .array(
+      z.union([
+        z.array(z.string()),
+        z.object({ items: z.array(z.string()), label: z.string().optional() }),
+      ])
+    )
+    .optional()
+    .describe('For build: ordered steps; each step is an array of item ids (or {items, label}) revealed together. Step i reveals at i * stepDuration seconds.'),
+  stepDuration: z.number().positive().optional().describe('For build: seconds between steps (default 1).'),
+  fadeIn: z.number().min(0).optional().describe('For build: per-step fade-in duration in seconds (default 0.3).'),
+  sequenceId: z.string().optional().describe('For play/clear: the cseq_ id returned by build. Defaults to the most recently built sequence.'),
+  loop: z.boolean().optional().describe('For play: loop the timeline (default false).'),
+  duration: z.number().positive().optional().describe('For play: override total play duration in seconds (default = sequence total).'),
+});
+export type ConstructionSequenceInput = z.infer<typeof ConstructionSequenceInputSchema>;
+
+// Live-scene semantic validation (OntologyValidator / S2) — structured diagnostics
+// over the actual canvas (dangling refs, unknown types/props, keyframe issues, cycles).
+export const ValidateSceneInputSchema = z.object({
+  ops: z
+    .array(z.record(z.string(), z.any()))
+    .optional()
+    .describe('Optional: validate a batch of PROPOSED ops ({ kind: "addRelation"|"create"|"modify"|"delete", ... }) against the live scene before applying them, instead of auditing the current scene. Ids created earlier in the batch count as existing for later ops.'),
+});
+export type ValidateSceneInput = z.infer<typeof ValidateSceneInputSchema>;
+
+// Deterministic headless frame capture (S3) — evaluate the scene at each time via
+// sceneAt(t) with Math.random seeded once around the whole sequence, then snapshot.
+export const CaptureFramesInputSchema = z.object({
+  times: z.array(z.number()).min(1).describe('Capture times in seconds, rendered in order.'),
+  seed: z.number().optional().describe('Seed Math.random once around the whole sequence so random generators/particles are reproducible (default 0).'),
+  includeDataUrls: z.boolean().optional().describe('Include each frame as a PNG data URL (large — token-heavy). Default false → returns a cheap per-frame hash + byte size only.'),
+});
+export type CaptureFramesInput = z.infer<typeof CaptureFramesInputSchema>;

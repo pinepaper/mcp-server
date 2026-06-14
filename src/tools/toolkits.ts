@@ -49,6 +49,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
     'pinepaper_create_glossy_sphere',
     'pinepaper_create_diagonal_stripes',
     'pinepaper_create_grid',
+    'pinepaper_geometry',
   ],
   import: [
     'pinepaper_import_svg',
@@ -76,6 +77,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
     'pinepaper_play_timeline',
     'pinepaper_get_animatable_properties',
     'pinepaper_get_available_easings',
+    'pinepaper_construction_sequence',
   ],
   masks: [
     'pinepaper_apply_animated_mask',
@@ -161,6 +163,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
     'pinepaper_export_scene',
     'pinepaper_export_widget',
     'pinepaper_export_widget_html',
+    'pinepaper_capture_frames',
   ],
 
   // --- Domain: Diagrams ---
@@ -217,6 +220,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
     'pinepaper_analyze_design',
     'pinepaper_validate_design',
     'pinepaper_validate',
+    'pinepaper_validate_scene',
     'pinepaper_query_ontology',
   ],
 

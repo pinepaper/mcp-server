@@ -91,6 +91,10 @@ export const PP_VOCABULARY: PinePaperVocabulary = {
     'pp:LineChart':      { anchor: null, description: 'Line chart — connected trajectory marks', parentType: 'pp:DataVizElement', mcpTool: 'pinepaper_create_chart' },
     'pp:ScatterPlot':    { anchor: null, description: 'Scatter plot — point marks encoding two quantitative variables', parentType: 'pp:DataVizElement', mcpTool: 'pinepaper_create_chart' },
     'pp:AreaChart':      { anchor: null, description: 'Area chart — filled region under a line', parentType: 'pp:DataVizElement', mcpTool: 'pinepaper_create_chart' },
+    // Geometric construction sequencing (Layer 3/4) — abstract concepts, not canvas items
+    'pp:Concept':              { anchor: 'schema:Intangible', description: 'Abstract non-visual concept node', abstract: true },
+    'pp:ConstructionSequence': { anchor: null, description: 'Ordered set of pp:ConstructionStep, played on the timeline to reveal a geometric construction one step at a time (replayable, scrubbable). Persisted as timed pp:constructionReveal relations, not a script.', parentType: 'pp:Concept', mcpTool: 'pinepaper_construction_sequence' },
+    'pp:ConstructionStep':     { anchor: null, description: 'One step of a pp:ConstructionSequence: the item(s) introduced at a given stepOrder, mapped to a timeline reveal time (stepOrder × stepDuration).', parentType: 'pp:Concept', mcpTool: 'pinepaper_construction_sequence' },
     // Escape hatch — items that don't match any vocabulary type
     'pp:Unclassified':  { anchor: null, description: 'Item type not expressible in current vocabulary.', parentType: 'pp:CanvasElement' },
   },
@@ -145,6 +149,15 @@ export const PP_VOCABULARY: PinePaperVocabulary = {
     'pp:association':       { category: 'diagram', description: 'Association between diagram elements', parentType: 'pp:DiagramFlowRelation', bpmnEquivalent: 'bpmn:Association' },
     'pp:dependency':        { category: 'diagram', description: 'Dependency between diagram elements', parentType: 'pp:DiagramFlowRelation' },
     'pp:connectsTo':        { category: 'diagram', description: 'Generic diagram connection', parentType: 'pp:DiagramFlowRelation' },
+    // Geometric construction constraints (Layer 2) — dependent re-derived each frame
+    // from anchor item(s); dragging an anchor updates the dependent live (GeoGebra-style).
+    'pp:ConstructionRelation': { category: 'abstract', description: 'Abstract geometric construction constraint — dependent re-derived from anchors each frame', abstract: true, parentType: 'pp:SpatialRelation' },
+    'pp:isMidpointOf':      { category: 'construction', behaviorType: 'constraint', description: 'Source stays at the midpoint of the target and params.other.', mathFunctions: ['midpoint'], parentType: 'pp:ConstructionRelation', mcpToolRef: 'pinepaper_add_relation' },
+    'pp:liesOnLine':        { category: 'construction', behaviorType: 'constraint', description: 'Source stays on the line target→params.other at fraction params.t.', mathFunctions: ['lerp'], parentType: 'pp:ConstructionRelation', mcpToolRef: 'pinepaper_add_relation' },
+    'pp:isCentroidOf':      { category: 'construction', behaviorType: 'constraint', cardinality: 'group', description: 'Source stays at the centroid of the target and params.others.', mathFunctions: ['centroid'], parentType: 'pp:ConstructionRelation', mcpToolRef: 'pinepaper_add_relation' },
+    'pp:isCircumcenterOf':  { category: 'construction', behaviorType: 'constraint', description: 'Source stays at the circumcenter of target, params.other1, params.other2 (undefined when collinear).', mathFunctions: ['circumcenter'], parentType: 'pp:ConstructionRelation', mcpToolRef: 'pinepaper_add_relation' },
+    'pp:concentricWith':    { category: 'construction', behaviorType: 'constraint', description: "Source stays centered on the target (shared center).", mathFunctions: ['rigidOffset'], parentType: 'pp:ConstructionRelation', mcpToolRef: 'pinepaper_add_relation' },
+    'pp:constructionReveal':{ category: 'construction', behaviorType: 'procedural', description: 'Self-relation: opacity 0→1 starting at params.revealAt over params.fadeIn seconds, driven by the timeline (loop/scrub correct).', mathFunctions: ['timedFade'], parentType: 'pp:ProceduralRelation', mcpToolRef: 'pinepaper_add_relation' },
     // Escape hatch
     'pp:unknownRelation':   { category: 'unknown', behaviorType: null, description: 'Relation type not expressible in current vocabulary.', parentType: 'pp:Relation' },
   },
@@ -202,6 +215,10 @@ export const PP_VOCABULARY: PinePaperVocabulary = {
     'delayOffset':              { category: 'timing', formula: 'delay = index · stagger' },
     'pulseScale':               { category: 'animation', formula: 'Temporary scale pulse' },
     'boundingGeometry':         { category: 'geometry', formula: 'Bounding box/circle calculation' },
+    'midpoint':                 { category: 'geometry', formula: '((Ax+Bx)/2, (Ay+By)/2)' },
+    'centroid':                 { category: 'geometry', formula: '(Σx/n, Σy/n)' },
+    'circumcenter':             { category: 'geometry', formula: 'Center equidistant from A, B, C (null if collinear)' },
+    'timedFade':                { category: 'animation', formula: 'opacity = clamp((t - revealAt)/fadeIn, 0, 1)' },
     'pathPointLerp':            { category: 'interpolation', formula: 'Per-point path interpolation' },
     'proximityThreshold':       { category: 'spatial', formula: 'dist < radius → trigger' },
     'timedCycling':             { category: 'timing', formula: 'mode[floor(t/cycleDur) % n]' },
@@ -231,6 +248,7 @@ export const PP_VOCABULARY: PinePaperVocabulary = {
     'proceduralBackground':  { description: 'Algorithmically generated background' },
     'trimPathDraw':          { description: 'Stroke draw-on effect via trim paths', mathFunctions: ['trimPath'] },
     'diagramFlow':           { description: 'Connected flowchart/diagram shapes', nodeTypes: ['pp:DiagramShape', 'pp:Connector'] },
+    'geometricConstruction': { description: 'Figure held together by live geometric constraints (midpoint, centroid, circumcenter, …)', requiredEdges: ['pp:isMidpointOf'] },
     'diagramFlowchart':      { description: 'Linear/branching flowchart', nodeTypes: ['pp:FlowchartShape', 'pp:SequenceConnector'], requiredEdges: ['pp:sequenceFlow'] },
     'diagramUML':            { description: 'UML class or use-case diagram', nodeTypes: ['pp:UMLShape'] },
     'diagramNetwork':        { description: 'Network topology diagram', nodeTypes: ['pp:NetworkShape'] },
@@ -275,6 +293,15 @@ export const PP_VOCABULARY: PinePaperVocabulary = {
     'drawSimulation':        { category: 'math',          mathFunctions: ['ode', 'rk4', 'dynamicSystem'], parentType: 'pp:MathGenerator' },
     'drawSpectrumAnalyzer':  { category: 'math',          mathFunctions: ['fft', 'signalProcessing'], parentType: 'pp:MathGenerator' },
     'draw3DSurface':         { category: 'math',          mathFunctions: ['parametricSurface', 'projection3d'], parentType: 'pp:MathGenerator' },
+    // S6 seeded procedural generators — OKLCH palettes, curated presets, optional Motion
+    'drawTruchet':           { category: 'patterns',      mathFunctions: ['perlinNoise'], parentType: 'pp:PatternGenerator' },
+    'drawHalftone':          { category: 'patterns',      mathFunctions: ['perlinNoise', 'sinCos'], parentType: 'pp:PatternGenerator' },
+    'drawRibbons':           { category: 'organic',       mathFunctions: ['sinOscillation', 'cubicBezier'], parentType: 'pp:FieldGenerator' },
+    // GPU / GLSL math-art generators
+    'drawFormulaArt':        { category: 'math',          mathFunctions: ['mathExpression'], parentType: 'pp:MathGenerator' },
+    'drawParametricCollection': { category: 'math',       mathFunctions: ['mathExpression', 'parametricCircle'], parentType: 'pp:MathGenerator' },
+    'drawShaderArt':         { category: 'math',          mathFunctions: ['mathExpression'], parentType: 'pp:MathGenerator' },
+    'drawYeganehMountains':  { category: 'math',          mathFunctions: ['mathExpression'], parentType: 'pp:MathGenerator' },
   },
 
   // --- Formal Properties ---
@@ -417,6 +444,12 @@ export const RELATION_TYPE_MAP: Record<string, string> = {
   'morphs_to':          'pp:morphsTo',
   'group_morphs_to':    'pp:groupMorphsTo',
   'moves_along_path':   'pp:movesAlongPath',
+  'is_midpoint_of':     'pp:isMidpointOf',
+  'lies_on_line':       'pp:liesOnLine',
+  'is_centroid_of':     'pp:isCentroidOf',
+  'is_circumcenter_of': 'pp:isCircumcenterOf',
+  'concentric_with':    'pp:concentricWith',
+  'construction_reveal':'pp:constructionReveal',
   'circumscribes':      'pp:circumscribes',
   'indicates':          'pp:indicates',
   'driven_by':          'pp:drivenBy',

@@ -45,6 +45,10 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_batch_create: 'Create multiple items in one call with single history save.',
   pinepaper_batch_modify: 'Modify multiple items in one call with single history save.',
   pinepaper_create_grid: 'Create a grid of lines on canvas.',
+  pinepaper_geometry: 'Exact geometry construction (polygon vertices, intersections, circumcircle, tangents); optionally creates an item from the result. {operation, args, createAs?}',
+  pinepaper_construction_sequence: 'Reveal a figure step by step on the timeline (build/play/clear/list). {action, steps?, stepDuration?}',
+  pinepaper_validate_scene: 'Audit the live canvas (dangling refs, unknown types/props, keyframes, cycles) → structured diagnostics. Optional ops[] to pre-validate proposed mutations.',
+  pinepaper_capture_frames: 'Deterministic frame capture at given times (seeded random). Returns per-frame hashes (or data URLs) to verify reproducibility/motion. {times, seed?, includeDataUrls?}',
 
   // --- Relations ---
   pinepaper_add_relation: `Add relation. sourceId, targetId, type: ${RELATION_TYPES}. params: {speed, ...}.`,

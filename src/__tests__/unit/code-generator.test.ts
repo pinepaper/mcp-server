@@ -754,4 +754,159 @@ describe('PinePaperCodeGenerator', () => {
       expect(code).toContain('importMermaid not available');
     });
   });
+
+  describe('generateGeometry', () => {
+    it('invokes the named app.geometry helper with the given args', () => {
+      const code = codeGenerator.generateGeometry({
+        operation: 'regularPolygon',
+        args: [400, 300, 120, 5],
+      });
+      expect(code).toContain('app.geometry');
+      expect(code).toContain('"regularPolygon"');
+      expect(code).toContain('[400,300,120,5]');
+      expect(code).toContain('success: true');
+    });
+
+    it('guards against an FxTool without the geometry library', () => {
+      const code = codeGenerator.generateGeometry({ operation: 'midpoint', args: [] });
+      expect(code).toContain('unavailable');
+    });
+
+    it('returns an error shape for degenerate (null) constructions', () => {
+      const code = codeGenerator.generateGeometry({ operation: 'lineIntersection', args: [] });
+      expect(code).toContain('result == null');
+      expect(code).toContain('Degenerate');
+    });
+
+    it('compute-only when createAs is omitted (create branch stays dead)', () => {
+      const code = codeGenerator.generateGeometry({ operation: 'circumcenter', args: [] });
+      expect(code).toContain('const createAs = null;');
+      expect(code).toContain('if (createAs)');
+    });
+
+    it('creates a polygon from a vertex-list result when createAs is given', () => {
+      const code = codeGenerator.generateGeometry({
+        operation: 'regularPolygon',
+        args: [0, 0, 100, 6],
+        createAs: { fillColor: '#FF6B6B' },
+      });
+      expect(code).toContain("app.create('polygon'");
+      expect(code).toContain("app.create('circle'"); // circle + point branches present
+      expect(code).toContain('#FF6B6B');
+      expect(code).toContain('registryId');
+    });
+  });
+
+  describe('generateConstructionSequence', () => {
+    it('build embeds steps and options', () => {
+      const code = codeGenerator.generateConstructionSequence({
+        action: 'build',
+        steps: [['a', 'b'], ['mid']],
+        stepDuration: 2,
+      });
+      expect(code).toContain('cs.build(');
+      expect(code).toContain('[["a","b"],["mid"]]');
+      expect(code).toContain('"stepDuration":2');
+      expect(code).toContain('sequenceId: rec.id');
+    });
+
+    it('play falls back to the most recent sequence when none given', () => {
+      const code = codeGenerator.generateConstructionSequence({ action: 'play', loop: true });
+      expect(code).toContain('cs.play(');
+      expect(code).toContain('all[all.length - 1].id');
+      expect(code).toContain('"loop":true');
+    });
+
+    it('clear restores the named sequence', () => {
+      const code = codeGenerator.generateConstructionSequence({ action: 'clear', sequenceId: 'cseq_3' });
+      expect(code).toContain('cs.clear(');
+      expect(code).toContain('"cseq_3"');
+    });
+
+    it('list maps sequences and guards missing subsystem', () => {
+      const code = codeGenerator.generateConstructionSequence({ action: 'list' });
+      expect(code).toContain('cs.list()');
+      expect(code).toContain('constructionSequence unavailable');
+    });
+  });
+
+  describe('generateAnimate intensity/delay', () => {
+    it('omits intensity/delay when not provided', () => {
+      const code = codeGenerator.generateAnimate({ itemId: 'x1', animationType: 'pulse', speed: 1 });
+      expect(code).toContain('animationSpeed: 1');
+      expect(code).not.toContain('animationIntensity');
+      expect(code).not.toContain('animationDelay');
+    });
+
+    it('passes animationIntensity and animationDelay through to app.animate', () => {
+      const code = codeGenerator.generateAnimate({
+        itemId: 'x1',
+        animationType: 'wobble',
+        speed: 2,
+        intensity: 0.3,
+        delay: 0.5,
+      });
+      expect(code).toContain('animationIntensity: 0.3');
+      expect(code).toContain('animationDelay: 0.5');
+    });
+
+    it('create-time animationIntensity/animationDelay land on the item', () => {
+      const code = codeGenerator.generateCreateItem({
+        itemType: 'circle',
+        position: { x: 0, y: 0 },
+        properties: { radius: 20 },
+        animationType: 'pulse',
+        animationIntensity: 0.25,
+        animationDelay: 1,
+      } as any);
+      expect(code).toContain('animationIntensity');
+      expect(code).toContain('0.25');
+      expect(code).toContain('animationDelay');
+    });
+  });
+
+  describe('determinism + validator surface', () => {
+    it('deterministic seek uses app.sceneAt with a setPlaybackTime fallback', () => {
+      const code = codeGenerator.generatePlayTimeline('seek', undefined, undefined, 1.5, true);
+      expect(code).toContain('app.sceneAt(t)');
+      expect(code).toContain('app.setPlaybackTime(t)'); // fallback for older builds
+      expect(code).toContain('1.5');
+    });
+
+    it('plain seek stays on setPlaybackTime (no sceneAt)', () => {
+      const code = codeGenerator.generatePlayTimeline('seek', undefined, undefined, 2);
+      expect(code).toContain('app.setPlaybackTime(2)');
+      expect(code).not.toContain('sceneAt');
+    });
+
+    it('validate_scene audits the live scene by default', () => {
+      const code = codeGenerator.generateValidateScene({});
+      expect(code).toContain('app.sceneValidator');
+      expect(code).toContain('v.validateScene()');
+      expect(code).toContain("mode: 'scene'");
+    });
+
+    it('validate_scene pre-validates proposed ops when given', () => {
+      const code = codeGenerator.generateValidateScene({
+        ops: [{ kind: 'create', id: 'c1', itemType: 'circle' }],
+      });
+      expect(code).toContain('v.validateOps(');
+      expect(code).toContain('"kind":"create"');
+      expect(code).toContain("mode: 'ops'");
+    });
+
+    it('capture_frames seeds, hashes frames, and guards missing entrypoint', () => {
+      const code = codeGenerator.generateCaptureFrames({ times: [0, 1, 2], seed: 42 });
+      expect(code).toContain('app.captureFramesAt([0,1,2]');
+      expect(code).toContain('seed: 42');
+      expect(code).toContain('allIdentical');
+      expect(code).toContain('captureFramesAt unavailable');
+      expect(code).toContain('const includeDataUrls = false;'); // defaults off
+    });
+
+    it('capture_frames includes data URLs only when asked', () => {
+      const code = codeGenerator.generateCaptureFrames({ times: [0], includeDataUrls: true });
+      expect(code).toContain('f.dataUrl = url');
+    });
+  });
 });

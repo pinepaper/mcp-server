@@ -32,6 +32,10 @@ import {
   BatchCreateInputSchema,
   BatchModifyInputSchema,
   CreateGridInputSchema,
+  GeometryInputSchema,
+  ConstructionSequenceInputSchema,
+  ValidateSceneInputSchema,
+  CaptureFramesInputSchema,
   CreateSceneInputSchema,
   GetPerformanceMetricsInputSchema,
   DiagnosticReportInputSchema,
@@ -992,6 +996,34 @@ async function handleToolCallInner(
         return executeOrGenerate(code, description, options, 'pinepaper_create_grid');
       }
 
+      case 'pinepaper_geometry': {
+        const input = GeometryInputSchema.parse(args);
+        const code = codeGenerator.generateGeometry(input);
+        const description = `Geometry construction: ${input.operation}${input.createAs ? ' (+ create item)' : ''}`;
+        return executeOrGenerate(code, description, options, 'pinepaper_geometry');
+      }
+
+      case 'pinepaper_construction_sequence': {
+        const input = ConstructionSequenceInputSchema.parse(args);
+        const code = codeGenerator.generateConstructionSequence(input);
+        const description = `Construction sequence: ${input.action}`;
+        return executeOrGenerate(code, description, options, 'pinepaper_construction_sequence');
+      }
+
+      case 'pinepaper_validate_scene': {
+        const input = ValidateSceneInputSchema.parse(args);
+        const code = codeGenerator.generateValidateScene(input);
+        const description = input.ops ? `Pre-validate ${input.ops.length} proposed op(s)` : 'Audit the live scene';
+        return executeOrGenerate(code, description, options, 'pinepaper_validate_scene');
+      }
+
+      case 'pinepaper_capture_frames': {
+        const input = CaptureFramesInputSchema.parse(args);
+        const code = codeGenerator.generateCaptureFrames(input);
+        const description = `Deterministic capture of ${input.times.length} frame(s)`;
+        return executeOrGenerate(code, description, options, 'pinepaper_capture_frames');
+      }
+
       // -----------------------------------------------------------------------
       // RELATION TOOLS
       // -----------------------------------------------------------------------
@@ -1087,7 +1119,8 @@ async function handleToolCallInner(
           input.action,
           input.duration,
           input.loop,
-          input.time
+          input.time,
+          input.deterministic
         );
         return executeOrGenerate(code, `Timeline action: ${input.action}`, options, 'pinepaper_play_timeline');
       }
@@ -2380,6 +2413,10 @@ You can now start creating new items on a clean canvas.`,
             'pinepaper_batch_create',
             'pinepaper_batch_modify',
             'pinepaper_create_grid',
+            'pinepaper_geometry',
+            'pinepaper_construction_sequence',
+            'pinepaper_validate_scene',
+            'pinepaper_capture_frames',
             'pinepaper_add_relation',
             'pinepaper_remove_relation',
             'pinepaper_query_relations',

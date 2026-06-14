@@ -15,6 +15,7 @@ import { MINIMAL_DESCRIPTIONS } from './minimal-descriptions.js';
 import {
   EffectTypeSchema,
   SimpleAnimationTypeSchema,
+  GEOMETRY_OPERATIONS,
 } from '../types/schemas.js';
 
 /**
@@ -93,7 +94,7 @@ SVG imports for recognizable objects (planes, cars, animals, buildings):
 
 Loop presets (animate): pulse, rotate, bounce, fade, wobble, slide, typewriter
 Keyframe (keyframe_animate): [{time, properties, easing}] → opacity, scale, scaleX, scaleY, x, y, rotation, fillColor, strokeColor, fontSize
-Relations (relation): orbits, follows, attached_to, points_at, mirrors, parallax, wave_through, morphs_to, group_morphs_to, moves_along_path (+ 9 more in batch_execute schema)
+Relations (relation): orbits, follows, attached_to, points_at, mirrors, parallax, wave_through, morphs_to, group_morphs_to, moves_along_path, is_midpoint_of, is_circumcenter_of, construction_reveal (+ geometric constraints & more in batch_execute schema)
 Masks (apply_mask): wipeLeft, wipeRight, wipeUp, wipeDown, iris, irisOut, star, heart, curtainHorizontal, curtainVertical, cinematic, diagonalWipe, revealUp, revealDown
 Effects (apply_effect): sparkle, blast
 
@@ -445,6 +446,14 @@ For glossy 3D spheres, use pinepaper_create_glossy_sphere instead. For diagonal 
         animationSpeed: {
           type: 'number',
           description: 'Animation speed multiplier (for simple animations, default: 1.0)',
+        },
+        animationIntensity: {
+          type: 'number',
+          description: 'Loop animation amplitude (0.1 = ±10%, default 0.15); drives pulse/wobble/bounce/breathe amplitude and is honored by SVG/SMIL/widget export.',
+        },
+        animationDelay: {
+          type: 'number',
+          description: 'Loop animation start delay in seconds.',
         },
         keyframes: {
           type: 'array',
@@ -1253,6 +1262,179 @@ EXAMPLE:
     },
   },
 
+  {
+    name: 'pinepaper_geometry',
+    annotations: {
+      title: 'Geometry Construction',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Run an exact geometric construction (FxTool's app.geometry library) and optionally create a canvas item from the result. Use this instead of hand-computing vertices, intersections, or centers — it returns precise coordinates and never NaN (degenerate inputs return null with an explanatory error).
+
+Compose it with the create tools, e.g. compute a pentagon's vertices then drop them straight into a polygon. With createAs it does both in one call.
+
+OPERATIONS (args are positional; points are {x,y}, lines are {p1,p2}, circles are {center,radius}, angles in radians):
+- Points: point(x,y) · distance(a,b) · midpoint(a,b) · lerpPoint(a,b,t) · centroid([pts]) · translatePoint(p,dx,dy) · rotatePoint(p,center,angleRad) · scalePoint(p,center,factor)
+- Polygons (→ vertex list): regularPolygon(cx,cy,radius,sides,rotation?) · star(cx,cy,outerR,innerR,points,rotation?) · polygonFromVertices([pts])
+- Lines (→ {p1,p2}): lineThrough(a,b) · lineDirection(line) · lineIntersection(l1,l2) · projectPointToLine(p,line) · perpendicular(line,through) · parallel(line,through) · perpendicularBisector(a,b) · reflectPoint(p,line)
+- Angles: angle(a,b,c) → radians at vertex b · angleBisector(a,vertex,c) → line
+- Circles: circle(cx,cy,r) · pointOnCircle(circ,angleRad) · circumcenter(a,b,c) · circleThrough(a,b,c) → circumcircle · incenter(a,b,c) · tangentPointsFromExternal(circ,p) → up to 2 touch points
+
+createAs (optional): also create an item from the result — a vertex-list result → polygon, a circle result → circle, a point result → a small marker. Style keys (color/fillColor/strokeColor/strokeWidth) pass through to app.create. Omit for compute-only.
+
+RETURNS: { success, operation, result, itemId } — result is the raw geometry; itemId is set only when createAs created something. null/degenerate constructions return { success:false, ..., error }.
+
+EXAMPLES:
+- Pentagon: { operation: "regularPolygon", args: [400, 300, 120, 5], createAs: { fillColor: "#FF6B6B" } }
+- Circumcircle of a triangle: { operation: "circleThrough", args: [{x:100,y:100},{x:300,y:120},{x:200,y:300}], createAs: { strokeColor: "#333", fillColor: "transparent" } }
+- Intersection of two lines (compute only): { operation: "lineIntersection", args: [{p1:{x:0,y:0},p2:{x:100,y:100}}, {p1:{x:0,y:100},p2:{x:100,y:0}}] }
+
+For figures that must stay correct as anchors move (GeoGebra-style), use the geometric constraint relations on pinepaper_add_relation (is_midpoint_of, is_circumcenter_of, …) instead.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        operation: {
+          type: 'string',
+          enum: [...GEOMETRY_OPERATIONS],
+          description: 'Which geometry construction helper to run.',
+        },
+        args: {
+          type: 'array',
+          description: 'Positional arguments in order. Points are {x,y} objects; lines {p1,p2}; circles {center,radius}; angles in radians.',
+        },
+        createAs: {
+          type: 'object',
+          description: 'When present, also create an item from the result (vertex list → polygon, circle → circle, point → marker). Style keys pass through to app.create. Optional itemType / radius for point markers.',
+        },
+      },
+      required: ['operation'],
+    },
+  },
+
+  {
+    name: 'pinepaper_construction_sequence',
+    annotations: {
+      title: 'Construction Sequence',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Reveal a geometric figure step by step (FxTool's app.constructionSequence, Layer 3). Each step hides its items and attaches a timeline-driven construction_reveal relation, so playing the timeline draws the construction one step at a time — replayable, scrubbable, and editable as relation graph data (not a one-shot script). Builds on the construction_reveal relation; pair it with pinepaper_geometry / the geometric constraint relations.
+
+ACTIONS:
+- build: { steps, stepDuration?, fadeIn? } — steps is an ordered array; each step is an array of item ids (or { items: [ids], label }) revealed together. Step i reveals at i * stepDuration seconds. Items are hidden until their step opens. Extends the keyframe timeline to fit. Returns { sequenceId, stepCount, totalDuration }.
+- play: { sequenceId?, loop?, duration? } — play the sequence on the timeline (defaults to the most recently built one).
+- clear: { sequenceId? } — remove the reveal relations and restore items to full opacity.
+- list: enumerate built sequences.
+
+EXAMPLE (reveal two points, then their midpoint, then a circle):
+{ action: "build", steps: [["pt_a","pt_b"], ["mid_ab"], ["circ"]], stepDuration: 1 }
+then { action: "play", loop: true }`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['build', 'play', 'clear', 'list'],
+          description: 'build a sequence, play it, clear it, or list sequences.',
+        },
+        steps: {
+          type: 'array',
+          description: 'For build: ordered steps; each is an array of item ids or { items: [ids], label }. Step i reveals at i * stepDuration seconds.',
+        },
+        stepDuration: { type: 'number', description: 'For build: seconds between steps (default 1).' },
+        fadeIn: { type: 'number', description: 'For build: per-step fade-in seconds (default 0.3).' },
+        sequenceId: { type: 'string', description: 'For play/clear: the cseq_ id from build (default = most recent).' },
+        loop: { type: 'boolean', description: 'For play: loop the timeline (default false).' },
+        duration: { type: 'number', description: 'For play: override total duration in seconds.' },
+      },
+      required: ['action'],
+    },
+  },
+
+  {
+    name: 'pinepaper_validate_scene',
+    annotations: {
+      title: 'Validate Scene',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Audit the LIVE canvas with FxTool's OntologyValidator and get structured, actionable diagnostics instead of console warnings. Each diagnostic is { code, severity, message, target, context, fix } — so you can re-plan from the feedback.
+
+CHECKS: unknown item types, dangling relation targets / missing anchors, unknown properties, malformed keyframes, and relation cycles.
+
+USE WHEN:
+- Confirming a scene is well-formed after a batch of edits
+- Diagnosing why a relation/animation isn't behaving
+- Pre-flighting proposed mutations before applying them
+
+MODES:
+- No args → audit the current scene. Returns { ok, diagnosticCount, diagnostics }.
+- ops → validate a batch of PROPOSED ops against the live scene WITHOUT applying them. Each op is { kind: "addRelation"|"create"|"modify"|"delete", ... }. Ids created earlier in the batch count as existing for later ops, so forward references don't false-error.
+
+This complements pinepaper_validate_design (which validates a definition object, not the live scene).
+
+EXAMPLE (pre-flight): { ops: [ { kind: "create", id: "c1", itemType: "circle" }, { kind: "addRelation", source: "c1", target: "missing", relationType: "orbits" } ] }`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ops: {
+          type: 'array',
+          description: 'Optional: proposed ops to validate against the live scene instead of auditing the current scene. Each is { kind, ... }.',
+        },
+      },
+    },
+  },
+
+  {
+    name: 'pinepaper_capture_frames',
+    annotations: {
+      title: 'Capture Frames (Deterministic)',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Deterministically render the scene at a list of times and snapshot each frame (FxTool's app.captureFramesAt, S3). Math.random is seeded ONCE around the whole sequence and the scene is evaluated at each time via sceneAt(t), so the same scene + same { times, seed } produces identical frames every run — even with random generators/particles.
+
+By default returns a cheap per-frame hash + byte size (token-light), plus uniqueHashes / allIdentical, so you can:
+- Verify determinism: run twice with the same seed → identical hashes.
+- Detect motion: uniqueHashes > 1 means frames actually change over time (allIdentical: true on a multi-time capture usually means nothing is animating).
+
+Set includeDataUrls: true to also get each frame as a PNG data URL (large — only for a few frames).
+
+USE WHEN:
+- Verifying an animation is deterministic / reproducible
+- Checking whether a scene actually animates across a time range
+- Grabbing reproducible frames for a regression baseline
+
+EXAMPLE: { times: [0, 0.5, 1, 1.5, 2], seed: 42 }`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        times: {
+          type: 'array',
+          items: { type: 'number' },
+          description: 'Capture times in seconds, rendered in order.',
+        },
+        seed: {
+          type: 'number',
+          description: 'Seed for reproducible random generators/particles (default 0).',
+        },
+        includeDataUrls: {
+          type: 'boolean',
+          description: 'Include each frame as a PNG data URL (large). Default false → hashes only.',
+        },
+      },
+      required: ['times'],
+    },
+  },
+
   // ---------------------------------------------------------------------------
   // LAYER 2 — RULES: RELATION TOOLS (KEY FOR ANIMATION)
   // ---------------------------------------------------------------------------
@@ -1276,7 +1458,11 @@ USE WHEN:
 - "reflection mirrors original" → relationType: mirrors
 - "background moves with parallax" → relationType: parallax
 - "player stays in arena" → relationType: bounds_to
+- "M is the midpoint of A and B" → relationType: is_midpoint_of (params.other: B)
+- "O is the circumcenter of the triangle" → relationType: is_circumcenter_of
+- "reveal each step in turn" → relationType: construction_reveal (params.revealAt, fadeIn)
 - Creating physics-based or behavioral animations
+- Building live geometric constructions (GeoGebra-style — dragging an anchor updates the dependent)
 
 RELATION TYPES:
 - orbits: Circular motion around target (params: radius, speed, direction, phase)
@@ -1299,6 +1485,18 @@ RELATION COMPATIBILITY:
 - group_morphs_to: pair-by-index morph between two paper.Groups (any two — graph vertices+edges, letter collages, dashboard clusters). Path.Line children deform via endpoints; other children translate; excess children fade. Params: duration, hold, loop, easing (linear|easeIn|easeOut|easeInOut), deformLines.
 - moves_along_path: self-relation (targetId=null); item is driven along a custom-drawn path stored in params.path (array of {x,y} or [x,y]). Params: path, speed, closed, phase, easing (linear|easeIn|easeOut|easeInOut|sine|bounce|pingpong).
 
+GEOMETRIC CONSTRUCTION CONSTRAINTS (Layer 2) — the source item is RE-DERIVED every frame from its anchor item(s), so dragging an anchor updates the dependent live (GeoGebra-style), and the construction persists as relation graph data (edit it by editing relations, not by re-running code). Anchor A is the relation target; extra anchors ride in params:
+- is_midpoint_of: source = midpoint(target, params.other). params.other = id of the second endpoint (B).
+- lies_on_line: source held on the line target→params.other at fraction params.t (0=A, 1=B; default 0.5). params.other (B), params.t.
+- is_centroid_of: source = centroid(target, ...params.others). params.others = array of the remaining point ids.
+- is_circumcenter_of: source = circumcenter(target, params.other1, params.other2); holds position when the three anchors are collinear. params.other1 (B), params.other2 (C).
+- concentric_with: source stays centered on the target (shared center).
+- construction_reveal: self-relation (targetId=null); opacity 0→1 starting at params.revealAt (timeline seconds) over params.fadeIn seconds — loop- and scrub-correct. Pair with pinepaper_construction_sequence to reveal a figure one step at a time.
+
+CURSOR / MOUSE AS TARGET — a relation can target the live pointer instead of an item by passing the reserved targetId 'cursor' (aliases 'mouse' / 'pointer'); collaborator cursors are 'cursor:<peerId>'. e.g. make an item flee the mouse: relationType 'repels', targetId 'cursor', params { returnSpeed: 0.08 }. The cursor is a virtual target (no canvas item) and its interactions are inspectable in FxTool's "Mouse / Cursor" registry section.
+
+TEMPORAL VALIDITY WINDOWS (temporal-model v1) — ANY relation may carry params.window = { start, end?, repeat? } (scene seconds) to gate WHEN it is active. The engine only applies the relation within [start, end) and feeds it window-relative local time (so an orbit/wave starts its phase at the window open, not at scene 0). repeat ∈ once (default) | loop | pingpong. Omit end for open-ended. Windowless relations are always active. e.g. params: { ...relationParams, window: { start: 2, end: 5 } } makes the relation live only from 2s to 5s.
+
 VERIFYING ANIMATION WORKS:
 After adding a relation, verify the animation is running:
 1. Use pinepaper_browser_screenshot to see the canvas
@@ -1319,7 +1517,7 @@ Relations are COMPOSITIONAL - an item can have multiple relations that work toge
         },
         relationType: {
           type: 'string',
-          enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'camera_animates', 'morphs_to', 'group_morphs_to', 'moves_along_path'],
+          enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'camera_animates', 'morphs_to', 'group_morphs_to', 'moves_along_path', 'is_midpoint_of', 'lies_on_line', 'is_centroid_of', 'is_circumcenter_of', 'concentric_with', 'construction_reveal'],
           description: 'Type of relationship',
         },
         params: {
@@ -1354,7 +1552,7 @@ USE WHEN:
         targetId: { type: 'string', description: 'Target item ID' },
         relationType: {
           type: 'string',
-          enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'camera_animates', 'morphs_to', 'group_morphs_to', 'moves_along_path'],
+          enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'camera_animates', 'morphs_to', 'group_morphs_to', 'moves_along_path', 'is_midpoint_of', 'lies_on_line', 'is_centroid_of', 'is_circumcenter_of', 'concentric_with', 'construction_reveal'],
           description: 'Specific relation type to remove (optional - removes all if not specified)',
         },
       },
@@ -1383,7 +1581,7 @@ USE WHEN:
         itemId: { type: 'string', description: 'Item to query relations for' },
         relationType: {
           type: 'string',
-          enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'camera_animates', 'morphs_to', 'group_morphs_to', 'moves_along_path'],
+          enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'camera_animates', 'morphs_to', 'group_morphs_to', 'moves_along_path', 'is_midpoint_of', 'lies_on_line', 'is_centroid_of', 'is_circumcenter_of', 'concentric_with', 'construction_reveal'],
           description: 'Filter by relation type (optional)',
         },
         direction: {
@@ -1566,6 +1764,14 @@ ANIMATION TYPES:
           type: 'number',
           description: 'Animation speed multiplier (default: 1.0)',
         },
+        intensity: {
+          type: 'number',
+          description: 'Animation amplitude (0.1 = ±10%, default 0.15): drives pulse/wobble/bounce/breathe amplitude and is honored by SVG/SMIL/widget export.',
+        },
+        delay: {
+          type: 'number',
+          description: 'Animation start delay in seconds.',
+        },
       },
       required: ['itemId', 'animationType'],
     },
@@ -1680,7 +1886,9 @@ EXAMPLE — Reveal at 2s, skip first second of keyframe data, end at 4s of keyfr
 USE WHEN:
 - Starting/stopping/pausing timeline playback
 - Seeking to specific time
-- Controlling animation state`,
+- Controlling animation state
+
+DETERMINISTIC SEEK: pass deterministic: true with action 'seek' to evaluate the WHOLE scene at the exact time via app.sceneAt(t) — keyframes + relations + generators all tick to t, so the same time always yields the same frame (paired with a seed in pinepaper_capture_frames for reproducible output). Plain seek only sets the keyframe playback state. Use deterministic seek before pinepaper_browser_screenshot to capture a reproducible frame.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1700,6 +1908,10 @@ USE WHEN:
         time: {
           type: 'number',
           description: 'Time to seek to (for seek action)',
+        },
+        deterministic: {
+          type: 'boolean',
+          description: 'For seek: evaluate the full scene at the exact time via app.sceneAt(t) — deterministic (same t → same frame). Default false.',
         },
       },
       required: ['action'],
@@ -2180,7 +2392,7 @@ EXAMPLE - Bouncing Balls:
 }
 
 SUPPORTED ITEM TYPES: text, circle, star, rectangle, triangle, polygon, ellipse, path, line, arc
-SUPPORTED RELATIONS: orbits, follows, attached_to, maintains_distance, points_at, mirrors, parallax, bounds_to, animates, grows_from, staggered_with, indicates, circumscribes, wave_through, camera_follows, camera_animates, morphs_to, group_morphs_to, moves_along_path
+SUPPORTED RELATIONS: orbits, follows, attached_to, maintains_distance, points_at, mirrors, parallax, bounds_to, animates, grows_from, staggered_with, indicates, circumscribes, wave_through, camera_follows, camera_animates, morphs_to, group_morphs_to, moves_along_path, is_midpoint_of, lies_on_line, is_centroid_of, is_circumcenter_of, concentric_with, construction_reveal
 SUPPORTED ANIMATIONS: pulse, rotate, bounce, fade, wobble, slide, typewriter`,
     inputSchema: {
       type: 'object',
@@ -2226,7 +2438,7 @@ SUPPORTED ANIMATIONS: pulse, rotate, bounce, fade, wobble, slide, typewriter`,
               target: { type: 'string', description: 'Name of target item' },
               type: {
                 type: 'string',
-                enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'camera_animates', 'morphs_to', 'group_morphs_to', 'moves_along_path'],
+                enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'camera_animates', 'morphs_to', 'group_morphs_to', 'moves_along_path', 'is_midpoint_of', 'lies_on_line', 'is_centroid_of', 'is_circumcenter_of', 'concentric_with', 'construction_reveal'],
               },
               params: {
                 type: 'object',
@@ -2846,6 +3058,7 @@ ACTIONS:
 - get_state: Get interaction state (score, progress, step)
 
 BEHAVIOR TYPES: repel, attract, follow, orbit, slingshot, physics_body, draggable_constrained
+- repel params: strength, maxDistance, minDistance, returnSpeed (0–1, default 0.08 — how fast the item eases back to its home position once the target/cursor leaves; returnSpeed: 0 freezes it scattered instead of reforming).
 
 ACTION TYPES: navigate, show, hide, animate, stopAnimation, setState, incrementScore, playTimeline, pauseTimeline, seekTimeline, showFeedback, complete`,
     inputSchema: {
@@ -4120,6 +4333,17 @@ PineMath — Math/Science:
 - drawSpectrumAnalyzer: FFT signal visualization (waveform: sine|square|sawtooth|triangle|noise|composite, frequency, amplitude, sampleRate, window: none|hann|hamming|blackman, waveColor, spectrumColor)
 - draw3DSurface: 3D surfaces from equations (preset: torus|sphere|wave|klein|mobius|custom, xExpr, yExpr, zExpr, uSteps, vSteps, scale, rotateSpeed)
 
+S6 Procedural (seeded, OKLCH palettes, curated presets, optional Motion). All take: palette (ocean|neon|ember|slate|dusk|pastel|mint|lagoon…), colorMode (gradient|random|mono), bgColor, seed (same seed → identical output), animation (none|driftX|driftY|rotate|pulse), animationSpeed:
+- drawTruchet: Truchet tiles — interlocking arcs/diagonals (tileSize, lineWidth, variant: arcs|diagonals, lineColor). Presets: Ocean Maze, Neon Circuit, Ember Weave, Slate Diagonals.
+- drawHalftone: halftone dot field (toneMode: radial|noise|linear, dotSpacing, maxDotRadius, contrast, dotColor, opacity). Presets: Sunburst Dots, Noise Field, Pop Ramp, Soft Mono.
+- drawRibbons: flowing Bézier ribbons (ribbonCount, ribbonWidth, amplitude, waviness, opacity). Presets: Deep Current, Aurora, Silk, Mint Flow.
+
+GPU / GLSL math-art (transpiled to a fragment shader, 60fps; all take renderScale 0.25–1, transparentBg, speed):
+- drawFormulaArt: type a math expression in x,y,t → scalar mapped through a 3-stop palette (formula, domain, color1/color2/color3). Try sin(x*5+t)*cos(y*3).
+- drawParametricCollection: N circles or line segments indexed by k, expressions in k,N,t — Yeganeh-style (mode: circles|lines, count, xExpression/yExpression/radiusExpression or x1..y2Expression, scale, palette, bgColor).
+- drawShaderArt: paste your own GLSL fragment shader (fragmentSource; uniforms u_time, u_resolution, u_color1/2/3) or pick a preset.
+- drawYeganehMountains: GLSL port of Hamid Naderi Yeganeh's "Mountains" (mountainCount, timeOffset, skyTop, skyBottom, ridgeColor, valleyColor).
+
 COMMON PARAMS (all generators):
 - bgColor: Background color ("none"/"transparent" for no background)
 - interactive: Make generated items selectable/draggable (default false)
@@ -4137,6 +4361,8 @@ COMMON PARAMS (all generators):
             'drawGlobeWireframe',
             'drawFunctionPlot', 'drawParametricCurve', 'drawSimulation',
             'drawSpectrumAnalyzer', 'draw3DSurface',
+            'drawTruchet', 'drawHalftone', 'drawRibbons',
+            'drawFormulaArt', 'drawParametricCollection', 'drawShaderArt', 'drawYeganehMountains',
           ],
           description: 'Generator name',
         },
@@ -5022,7 +5248,7 @@ EXAMPLE — Animated sky scene with timed reveals:
               targetId: { type: 'string', description: 'For relation: target item ID or $N' },
               relationType: {
                 type: 'string',
-                enum: ['orbits', 'follows', 'attached_to', 'points_at', 'mirrors', 'parallax', 'animates', 'grows_from', 'staggered_with', 'wave_through', 'circumscribes', 'morphs_to', 'group_morphs_to', 'moves_along_path', 'maintains_distance', 'bounds_to', 'indicates', 'camera_follows', 'camera_animates'],
+                enum: ['orbits', 'follows', 'attached_to', 'points_at', 'mirrors', 'parallax', 'animates', 'grows_from', 'staggered_with', 'wave_through', 'circumscribes', 'morphs_to', 'group_morphs_to', 'moves_along_path', 'maintains_distance', 'bounds_to', 'indicates', 'camera_follows', 'camera_animates', 'is_midpoint_of', 'lies_on_line', 'is_centroid_of', 'is_circumcenter_of', 'concentric_with', 'construction_reveal'],
                 description: 'For relation: type',
               },
               relationOptions: { type: 'object', description: 'For relation: options' },
@@ -5438,16 +5664,18 @@ USE WHEN:
     },
     description: `Validate and score a template definition against the PinePaper ontology.
 
-Two-phase analysis:
+Three-phase analysis:
 1. Schema validation — checks required fields, known item/relation types, keyframe structure, semantic vocabulary compliance
 2. Quality scoring — rates across 5 dimensions: completeness (0.20), animationDesign (0.25), semanticRichness (0.20), compositionUse (0.15), structuralDepth (0.20)
+3. Semantic diagnostics — FxTool's OntologyValidator (the same "one validator, two surfaces" library the Cloud pre-render gate runs), executed Node-side over the definition: dangling relation targets and unknown item/relation types (with nearest-id suggestions), duplicate edges, relation cycles, and keyframe order/easing issues. Returns { ok, diagnostics:[{code, severity, message, target, fix}], validatorVersion } under "diagnostics".
 
 Quality tiers: basic (<0.4), fair (0.4-0.6), good (0.6-0.8), excellent (>=0.8)
 
 USE WHEN:
 - Checking a template for structural issues before publishing
 - Comparing quality scores between template variants
-- Validating that all item/relation types are in the vocabulary`,
+- Validating that all item/relation types are in the vocabulary
+- Catching dangling references / cycles in a definition before it runs (use pinepaper_validate_scene for the LIVE canvas equivalent)`,
     inputSchema: {
       type: 'object',
       properties: {

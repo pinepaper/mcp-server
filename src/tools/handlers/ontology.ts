@@ -78,7 +78,7 @@ export const ontologyHandlers: Record<string, OntologyHandler> = {
 
   pinepaper_validate_design: async (args, _options) => {
     const input = ValidateDesignInputSchema.parse(args);
-    const { DesignGraph, KnowledgeGraphValidator } = await import('../../ontology/index.js');
+    const { DesignGraph, KnowledgeGraphValidator, validateDefinitionSemantics } = await import('../../ontology/index.js');
     const dg = new DesignGraph();
     const validator = new KnowledgeGraphValidator();
     const definition = input.definition as any;
@@ -88,10 +88,14 @@ export const ontologyHandlers: Record<string, OntologyHandler> = {
       const graph = dg.extractFromDefinition(definition);
       quality = validator.scoreQuality(definition, graph);
     }
+    // Structured semantic diagnostics (FxTool's S3.4 OntologyValidator, ported) — dangling
+    // relation targets, unknown item/relation types (+nearest-id), duplicate edges,
+    // relation cycles, keyframe order/easing. Runs Node-side, no browser round-trip.
+    const semantics = validateDefinitionSemantics(definition);
     return {
       content: [{
         type: 'text' as const,
-        text: JSON.stringify({ validation, quality }, null, 2),
+        text: JSON.stringify({ validation, quality, diagnostics: semantics }, null, 2),
       }],
     };
   },
