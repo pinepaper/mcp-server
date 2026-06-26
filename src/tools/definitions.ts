@@ -65,7 +65,7 @@ RULES:
 ─── BATCH OPERATIONS (12 types, in order) ───
 
 CANVAS:  set_canvas_size (width/height or preset) → set_background (color) → execute_generator (procedural art)
-ITEMS:   create (itemType, position, properties) → modify (itemId, properties) → delete (itemId)
+ITEMS:   create (itemType, position, properties) → modify (itemId, properties) → delete (itemId) → group (itemIds → one entity)
 ANIMATE: animate (loop presets) → keyframe_animate (timed reveals) → relation (behavioral links)
 EFFECTS: apply_mask (reveal animations) → apply_effect (sparkle/blast/bubbles/fireflies/trail...)
 PLAY:    play_timeline (start playback)
@@ -82,13 +82,29 @@ Choose based on mood:
 
 ─── ITEMS ───
 
-Shapes: circle, rectangle, star, ellipse, triangle, polygon, line, arc, path
+Shapes: circle, rectangle, star, ellipse, triangle, polygon, line, arc, path, pentagon, hexagon, diamond, arrow, heart
 Text: text (content, fontSize, fontFamily, color, fontWeight)
   Dynamic text: set contentType on text items → clock (live time), timer (elapsed), countdown (from N seconds), stopwatch (pauseable)
 All items: opacity, shadowColor, shadowBlur, blendMode, strokeColor, strokeWidth
 
 SVG imports for recognizable objects (planes, cars, animals, buildings):
   pinepaper_search_assets → pinepaper_import_asset (850k+ SVG icons)
+  An imported SVG is ONE opaque item. To move/recolor its parts (a wheel, a window), pinepaper_group action:"break_apart" splits it into individually movable, re-grouped sub-parts.
+
+Photos / raster images (on-device, no upload):
+  pinepaper_detect_objects — find objects (labeled boxes), or asNodes:true to promote each to an image-anchored design NODE (pp:Detected*) you can bind a shape to with a relation (relational compositing — e.g. a hat that follows a detected person as the photo moves).
+  pinepaper_extract_object — crop the best-matching object (label: "cat") out of a photo into its own item.
+
+⚠️ COMPOSITE OBJECTS — GROUP THE PARTS:
+  When the user asks for ONE specific named object built from multiple primitives — a car (body + wheels + windows), a robot, a house, a tree, a snowman, a character — the pieces are INDEPENDENT until grouped. Without grouping, dragging the "car" only moves the piece grabbed; the wheels stay behind, and it can't be moved/animated as one thing.
+  → After creating the parts, add a "group" op listing them (reference batch-created parts as "$0","$1",…). This is the default for any nameable object. Grouping is non-destructive — the user can ungroup anytime (pinepaper_group action:"ungroup"), so grouping is always the safe choice.
+  → Do NOT group a whole scene/infographic whose elements move independently — only group the parts that form ONE object. A scene may contain several groups (e.g. two separate cars).
+
+⚠️ MOVE vs ANIMATE — pick the tool from the user's intent:
+  • Reposition (no time, no path): "put X at (x',y')", "move X to the corner" → modify { x, y }. A single, instant position change — NOT an animation.
+  • Animated A→B move ("animate X moving to (x',y')", "slide it over 2s", "have it drift to the corner") → keyframe_animate with two keyframes: [{time:0, properties:{x,y}}, {time:T, properties:{x',y'}}]. Use this when the user wants the motion itself to be visible.
+  • Follow a multi-point PATH (the user lists several coordinates, or "make X follow this path / trace these points (x1,y1),(x2,y2),…") → relation moves_along_path with params.path = [{x,y},…] (speed, closed, easing optional). One coordinate list = one path-follow, not N separate moves.
+  When the request is ambiguous between a static move and an animated one, a one-shot reposition is the literal reading; only animate if motion/timing/path is implied.
 
 ─── ANIMATION (all in batch) ───
 
@@ -366,6 +382,11 @@ ITEM TYPES:
 - path: Custom path with segments or SVG data (properties: segments, pathData, strokeColor, fillColor, closed, smooth)
 - line: Line between two points (properties: from, to, strokeColor, strokeWidth)
 - arc: Curved arc through three points (properties: from, through, to, strokeColor)
+- pentagon: Regular 5-sided polygon (properties: radius, color)
+- hexagon: Regular 6-sided polygon (properties: radius, color)
+- diamond: 4-sided diamond/rhombus (properties: radius, color)
+- arrow: Right-pointing block arrow (properties: width, height, color)
+- heart: Heart shape (properties: color)
 
 PATH FOR CUSTOM SHAPES:
 Use itemType: "path" with either:
@@ -403,7 +424,7 @@ For glossy 3D spheres, use pinepaper_create_glossy_sphere instead. For diagonal 
       properties: {
         itemType: {
           type: 'string',
-          enum: ['text', 'circle', 'star', 'rectangle', 'triangle', 'polygon', 'ellipse', 'path', 'line', 'arc'],
+          enum: ['text', 'circle', 'star', 'rectangle', 'triangle', 'polygon', 'ellipse', 'path', 'line', 'arc', 'pentagon', 'hexagon', 'diamond', 'arrow', 'heart'],
           description: 'Type of item to create',
         },
         position: {
@@ -1352,6 +1373,174 @@ then { action: "play", loop: true }`,
         duration: { type: 'number', description: 'For play: override total duration in seconds.' },
       },
       required: ['action'],
+    },
+  },
+
+  {
+    name: 'pinepaper_group',
+    annotations: {
+      title: 'Group / Ungroup',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Combine several items into ONE entity that selects, drags, and animates as a single unit — or ungroup one back into loose items.
+
+⚠️ GROUP THE PARTS OF A COMPOSITE OBJECT. When you build a specific named object out of multiple primitives — a car (body + wheels + windows), a robot, a house, a tree, a character — the pieces are independent until you group them. WITHOUT grouping, dragging the "car" only moves the one shape you grabbed; the wheels stay behind. After creating all the parts, group them so the object behaves as one thing. Grouping is non-destructive and always safe: the user (or you, via action "ungroup") can break it apart later. In a single pipeline, prefer the "group" operation inside pinepaper_agent_batch_execute (reference the parts as "$0","$1",… ) so the object is grouped the moment it's built.
+
+Do NOT group a whole scene/infographic whose elements are meant to move independently — only group the parts that form ONE object.
+
+ACTIONS:
+- group: combine itemIds (registry IDs) into a new group. Optional groupName. Returns { groupId, itemCount }.
+- ungroup: dissolve the group with groupId back into its individual items (which keep their own ids). Returns { ungrouped: true }.
+- break_apart: split an IMPORTED SVG / group / compound-path (itemId) into its individually movable sub-parts, re-wrapped as one group. Use this after pinepaper_import_asset / import_svg when the user wants to move or recolor the PARTS of an imported object (a wheel, a window) — an imported icon is a single opaque item until broken apart. Each part gets its own registry id. Returns { groupId, partIds, partCount }.
+
+EXAMPLES:
+- Group a car you built: { action: "group", itemIds: ["body_1","wheel_2","wheel_3","window_4"], groupName: "car" }
+- Ungroup it: { action: "ungroup", groupId: "group_17" }
+- Make an imported SVG's parts movable: { action: "break_apart", itemId: "svg_5" }`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['group', 'ungroup', 'break_apart'],
+          description: 'group: combine itemIds into one entity. ungroup: dissolve a group. break_apart: split an imported SVG/group/compound-path into movable parts.',
+        },
+        itemIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'For group: registry IDs of the items to combine.',
+        },
+        itemId: { type: 'string', description: 'For break_apart: registry ID of the imported SVG / group / compound-path to decompose.' },
+        groupName: { type: 'string', description: 'For group: optional name (e.g. "car", "robot").' },
+        groupId: { type: 'string', description: 'For ungroup: registry ID of the group to dissolve.' },
+      },
+      required: ['action'],
+    },
+  },
+
+  {
+    name: 'pinepaper_camera_director',
+    annotations: {
+      title: 'Camera Director',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Direct a cinematic camera walkthrough of the scene from a high-level SHOT LIST. Compiles to a single camera_animates keyframe track (one camera — WYSIWYG between the editor view and any export size). Great for "give me a camera tour", "pan across the scene", "zoom into each item in turn".
+
+ACTIONS:
+- auto: auto-generate a walkthrough — one medium push-in shot per top-level item, smooth eased moves. Options: order ("reading" default | "reverse" | "creation"), hold (dwell seconds), establishing (open on a wide shot of everything), loop. Returns the generated shots.
+- shots: apply an explicit shot list. Each shot: { subjects: "everything" | [itemIds], framing: "tight"|"medium"|"wide" (or a zoom number), hold, moveIn ("push-in"|"pan"), ease ("smooth"|"linear"|"settle"|"snap"), transition (seconds to travel in) }.
+
+Pair with pinepaper_agent_export (framing: "camera") to render the walkthrough as video.
+
+EXAMPLES:
+- Auto tour: { action: "auto", establishing: true, hold: 1.5, loop: true }
+- Explicit: { action: "shots", shots: [ { subjects: "everything", framing: "wide", hold: 1 }, { subjects: ["hero_1"], framing: "tight", moveIn: "push-in", hold: 2 } ] }`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['auto', 'shots'], description: 'auto: generate a walkthrough. shots: apply an explicit shot list.' },
+        shots: {
+          type: 'array',
+          description: 'For "shots": ordered shot list. Each: { subjects, framing, hold, moveIn, ease, transition }.',
+          items: {
+            type: 'object',
+            properties: {
+              subjects: { description: '"everything" or an array of item registry IDs' },
+              framing: { description: '"tight" | "medium" | "wide", or a zoom number' },
+              hold: { type: 'number' },
+              moveIn: { type: 'string' },
+              ease: { type: 'string', enum: ['smooth', 'linear', 'settle', 'snap'] },
+              transition: { type: 'number' },
+            },
+          },
+        },
+        order: { type: 'string', enum: ['reading', 'reverse', 'creation'], description: 'For "auto": item visiting order.' },
+        hold: { type: 'number', description: 'For "auto": per-shot dwell seconds.' },
+        establishing: { type: 'boolean', description: 'For "auto": open with a wide establishing shot.' },
+        loop: { type: 'boolean', description: 'Loop the walkthrough.' },
+      },
+      required: ['action'],
+    },
+  },
+
+  {
+    name: 'pinepaper_detect_objects',
+    annotations: {
+      title: 'Detect Objects',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Run on-device object detection (fully local — no upload) over an imported image and either draw labeled boxes or promote each detection to a design node. bbox detection, not pixel-mask segmentation.
+
+First import an image (pinepaper_import_image / pinepaper_import_asset), then call this on it.
+
+MODELS:
+- Default (no queries): DETR — fast, fixed 80 COCO classes (person, car, dog, chair, …).
+- queries given: OWL-ViT open-vocabulary (zero-shot) — finds WHATEVER you describe ("red umbrella", "traffic light", "logo"), not limited to 80 classes. Larger one-time on-device model download. Pass queries as a list or comma-separated string.
+
+MODES:
+- Default (asNodes omitted/false): draws a labeled rectangle over each detection. Returns { ok, drawn, detections: [{label, confidence}] }.
+- asNodes: true — RELATIONAL COMPOSITING. Instead of boxes, promotes each detection to a typed, image-anchored DESIGN NODE: a registered relation target carrying a pp:Detected* type aliased (rdfs:subClassOf) to a Wikidata entity, plus its confidence. Returns { ok, promoted, count, nodes: [{id, label, ppType, wikidata, confidence}] }. You can then bind a shape on/around/at a detected object with a relation (e.g. follows / attached_to) and it tracks the image as it moves.
+
+PARAMS: itemId (image; default = most recent image), threshold (0-1, default ~0.35), asNodes.
+
+EXAMPLE (relational compositing — put a hat on a detected person):
+1) { } → detect, or { asNodes: true } → get nodes [{ id: "det_3", label: "person", ... }]
+2) create the hat → pinepaper_add_relation { sourceId: hatId, targetId: "det_3", relationType: "follows" }
+
+NOTE: requires an FxTool build that exposes on-device detection (app.detectObjects). Returns { success: false, error } with a hint otherwise.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        itemId: { type: 'string', description: 'Registry ID of the image to scan (default: most recent image).' },
+        threshold: { type: 'number', description: 'Confidence threshold 0-1 (default ~0.35 DETR, ~0.1 open-vocab).' },
+        asNodes: { type: 'boolean', description: 'Promote each detection to a typed, image-anchored design node (relation target) instead of drawing a box.' },
+        queries: {
+          description: 'Open-vocabulary search (OWL-ViT): a list of strings (or comma-separated string) describing what to find — e.g. ["red umbrella","logo"]. Omit for the default 80-class DETR detector.',
+          oneOf: [
+            { type: 'array', items: { type: 'string' } },
+            { type: 'string' },
+          ],
+        },
+      },
+    },
+  },
+
+  {
+    name: 'pinepaper_extract_object',
+    annotations: {
+      title: 'Extract Object',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Detect objects in an imported image and crop the best match into a NEW item — e.g. pull the cat out of a photo. On-device, no upload.
+
+PARAMS: label (what to extract, e.g. "cat", "person"; default = highest-confidence detection), itemId (source image; default = most recent), x/y (optional hint to disambiguate which instance), threshold (0-1).
+
+RETURNS: { ok, object (matched label), extracted, itemId (the new item) }.
+
+EXAMPLE: { label: "cat" } — find the cat and crop it into its own movable item.
+
+NOTE: requires an FxTool build that exposes on-device detection (app.extractObject).`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        label: { type: 'string', description: 'What to extract (e.g. "cat", "person"). Default = highest-confidence detection.' },
+        itemId: { type: 'string', description: 'Registry ID of the source image (default: most recent image).' },
+        x: { type: 'number', description: 'Optional hint X (canvas coords) to disambiguate which detection to extract.' },
+        y: { type: 'number', description: 'Optional hint Y (canvas coords).' },
+        threshold: { type: 'number', description: 'Confidence threshold 0-1.' },
+      },
     },
   },
 
@@ -4344,6 +4533,14 @@ GPU / GLSL math-art (transpiled to a fragment shader, 60fps; all take renderScal
 - drawShaderArt: paste your own GLSL fragment shader (fragmentSource; uniforms u_time, u_resolution, u_color1/2/3) or pick a preset.
 - drawYeganehMountains: GLSL port of Hamid Naderi Yeganeh's "Mountains" (mountainCount, timeOffset, skyTop, skyBottom, ridgeColor, valleyColor).
 
+OKLCH seeded backgrounds (palette + seed → reproducible):
+- drawBlobs: soft organic blobs (smoothed jittered circles). Dreamy/soft backgrounds.
+- drawLowPoly: triangulated low-poly facets (gradient-filled). Modern/geometric.
+- drawPeaks: stacked zig-zag mountain ridgeline bands.
+- drawStackedWaves: layered cubic-bézier wave bands — hero/section-divider background.
+- drawScatter: scattered field of small shapes (circles/triangles/squares), palette-colored.
+- draw3DParametricCurve: plot a 3D curve (x(t),y(t),z(t)) projected to canvas. Try Helix: sin(t),cos(t),t/4.
+
 COMMON PARAMS (all generators):
 - bgColor: Background color ("none"/"transparent" for no background)
 - interactive: Make generated items selectable/draggable (default false)
@@ -4363,6 +4560,7 @@ COMMON PARAMS (all generators):
             'drawSpectrumAnalyzer', 'draw3DSurface',
             'drawTruchet', 'drawHalftone', 'drawRibbons',
             'drawFormulaArt', 'drawParametricCollection', 'drawShaderArt', 'drawYeganehMountains',
+            'drawBlobs', 'drawLowPoly', 'drawPeaks', 'drawScatter', 'drawStackedWaves', 'draw3DParametricCurve',
           ],
           description: 'Generator name',
         },
@@ -5122,7 +5320,7 @@ WORKFLOW:
 1. pinepaper_agent_start_job → 2. pinepaper_agent_batch_execute (everything) → 3. pinepaper_agent_end_job (screenshot for validation)
 After validation: user reviews screenshot → feedback → modify/recreate as needed.
 
-OPERATION TYPES (12) — use in this order:
+OPERATION TYPES (13) — use in this order:
 
 CANVAS SETUP:
   set_canvas_size — {width, height} or {preset: "instagram"|"youtube"|"tiktok"|...}
@@ -5133,7 +5331,7 @@ CANVAS SETUP:
 
 ITEMS:
   create — {itemType, position: {x,y}, properties}
-    itemType: text, circle, rectangle, star, triangle, polygon, ellipse, path, line, arc
+    itemType: text, circle, rectangle, star, triangle, polygon, ellipse, path, line, arc, pentagon, hexagon, diamond, arrow, heart
     Properties per type:
       text: {content, fontSize, fontFamily, color, fontWeight}
       circle: {radius, color, strokeColor, strokeWidth}
@@ -5142,8 +5340,9 @@ ITEMS:
       ellipse: {radiusX, radiusY, color}
       triangle/polygon: {width/sides, height/radius, color}
     All: opacity, shadowColor, shadowBlur, blendMode, strokeColor, strokeWidth
-  modify — {itemId, properties}
+  modify — {itemId, properties} — instant reposition/restyle. To MOVE an item, set {x,y} here (a one-shot position change, not an animation).
   delete — {itemId}
+  group — {itemIds: ["$0","$1",...], groupName} — combine the parts of a composite object into ONE draggable/animatable entity. ALWAYS group a specific named object (car, robot, house, character) after creating its parts. Returns {groupId}; safe — user can ungroup. Do NOT group a whole scene whose pieces move independently.
 
 ANIMATION:
   animate — Loop animation: {itemId, animationType, animationOptions}
@@ -5153,6 +5352,8 @@ ANIMATION:
     Easing: easeInOut, easeIn, easeOut, easeInCubic, easeOutCubic, easeOutBounce, linear
   relation — Behavioral link: {sourceId, targetId, relationType, relationOptions}
     relationType: orbits, follows, attached_to, points_at, mirrors, parallax, wave_through, morphs_to, group_morphs_to, moves_along_path (+ 9 more in schema)
+
+  MOVE vs ANIMATE vs PATH (pick by intent): instant reposition → modify {x,y}. Animated A→B move → keyframe_animate two keyframes [{time:0,{x,y}},{time:T,{x',y'}}]. Follow a multi-point path the user lists → relation moves_along_path {params:{path:[{x,y},…]}}.
 
 EFFECTS:
   apply_mask — Reveal effect: {itemId, maskPreset, maskOptions}
@@ -5194,7 +5395,7 @@ EXAMPLE — Animated sky scene with timed reveals:
             properties: {
               type: {
                 type: 'string',
-                enum: ['set_canvas_size', 'set_background', 'execute_generator', 'create', 'modify', 'delete', 'animate', 'keyframe_animate', 'relation', 'apply_mask', 'apply_effect', 'play_timeline'],
+                enum: ['set_canvas_size', 'set_background', 'execute_generator', 'create', 'modify', 'delete', 'group', 'animate', 'keyframe_animate', 'relation', 'apply_mask', 'apply_effect', 'play_timeline'],
                 description: 'Operation type',
               },
               // Canvas setup
@@ -5211,7 +5412,7 @@ EXAMPLE — Animated sky scene with timed reveals:
               // Items
               itemType: {
                 type: 'string',
-                enum: ['text', 'circle', 'rectangle', 'star', 'triangle', 'polygon', 'ellipse', 'path', 'line', 'arc'],
+                enum: ['text', 'circle', 'rectangle', 'star', 'triangle', 'polygon', 'ellipse', 'path', 'line', 'arc', 'pentagon', 'hexagon', 'diamond', 'arrow', 'heart'],
                 description: 'For create: item type',
               },
               position: {
@@ -5221,6 +5422,9 @@ EXAMPLE — Animated sky scene with timed reveals:
               },
               properties: { type: 'object', description: 'For create/modify: item properties' },
               itemId: { type: 'string', description: 'Target item ID or $N reference' },
+              // Group (combine composite-object parts into one entity)
+              itemIds: { type: 'array', items: { type: 'string' }, description: 'For group: item IDs or $N refs to combine into one entity (the parts of a composite object).' },
+              groupName: { type: 'string', description: 'For group: optional group name (e.g. "car").' },
               // Loop animation
               animationType: {
                 type: 'string',

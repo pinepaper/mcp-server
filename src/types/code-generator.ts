@@ -157,6 +157,10 @@ import {
   ConstructionSequenceInput,
   ValidateSceneInput,
   CaptureFramesInput,
+  GroupInput,
+  CameraDirectorInput,
+  DetectObjectsInput,
+  ExtractObjectInput,
 } from './schemas.js';
 import { z } from 'zod';
 
@@ -2389,6 +2393,20 @@ item.remove();
 if (app.itemRegistry) app.itemRegistry.unregister(targetId);
 return { itemId: targetId, deleted: true };
 `;
+
+      case 'group': {
+        // Resolve each ref ($N → itemIds[N]; literal → quoted id) into a JS array.
+        const refs = (op.itemIds || []).map((ref) =>
+          ref?.startsWith('$') ? `itemIds[${ref.substring(1)}]` : `'${ref}'`,
+        );
+        const idsArrayExpr = `[${refs.join(', ')}]`;
+        const nameExpr = op.groupName !== undefined ? JSON.stringify(op.groupName) : 'undefined';
+        // Returns { groupId, ... } (no itemId) so it does NOT shift $N indices — like relation.
+        return `
+return (function() {${this.groupCodeBody(idsArrayExpr, nameExpr)}
+})();
+`;
+      }
 
       case 'set_background':
         const bgColor = op.backgroundColor || (op.properties as any)?.color || '#000000';
@@ -5115,6 +5133,156 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    const ite
       default:
         return `(function() { return { error: 'Unknown measurement action: ${(input as any).action}' }; })();`;
     }
+  }
+
+  /**
+   * On-device object detection (FxTool ImageWorkflow). Finds objects in an image;
+   * with asNodes promotes each detection to a typed, image-anchored design node
+   * (pp:Detected*) instead of a labeled box. Async (runs an on-device ML model).
+   */
+  generateDetectObjects(input: DetectObjectsInput): string {
+    const args = JSON.stringify({
+      ...(input.itemId !== undefined ? { itemId: input.itemId } : {}),
+      ...(input.threshold !== undefined ? { threshold: input.threshold } : {}),
+      ...(input.asNodes !== undefined ? { asNodes: input.asNodes } : {}),
+      ...(input.queries !== undefined ? { queries: input.queries } : {}),
+    });
+    return `
+// Detect objects${input.queries !== undefined ? ' (open-vocabulary / OWL-ViT)' : ''}${input.asNodes ? ' (asNodes — relational compositing)' : ''}
+(async function() {
+  if (typeof app.detectObjects !== 'function') {
+    return { success: false, error: 'app.detectObjects unavailable — update FxTool to a build that exposes on-device object detection on app' };
+  }
+  try {
+    const res = await app.detectObjects(${args});
+    return Object.assign({ success: !!(res && res.ok) }, res || {});
+  } catch (e) { return { success: false, error: String((e && e.message) || e) }; }
+})();`.trim();
+  }
+
+  /**
+   * Extract the best-matching detected region from an image as a NEW item (FxTool
+   * ImageWorkflow.extractObject). Async (runs detection first).
+   */
+  generateExtractObject(input: ExtractObjectInput): string {
+    const args = JSON.stringify({
+      ...(input.label !== undefined ? { label: input.label } : {}),
+      ...(input.itemId !== undefined ? { itemId: input.itemId } : {}),
+      ...(input.x !== undefined ? { x: input.x } : {}),
+      ...(input.y !== undefined ? { y: input.y } : {}),
+      ...(input.threshold !== undefined ? { threshold: input.threshold } : {}),
+    });
+    return `
+// Extract object${input.label ? ` "${input.label}"` : ''} from the image
+(async function() {
+  if (typeof app.extractObject !== 'function') {
+    return { success: false, error: 'app.extractObject unavailable — update FxTool to a build that exposes on-device object detection on app' };
+  }
+  try {
+    const res = await app.extractObject(${args});
+    return Object.assign({ success: !!(res && res.ok) }, res || {});
+  } catch (e) { return { success: false, error: String((e && e.message) || e) }; }
+})();`.trim();
+  }
+
+  /**
+   * Camera director (FxTool DirectorCompiler): compile a shot list into ONE
+   * camera_animates walkthrough. 'auto' derives a shot per item; 'shots' applies
+   * an explicit list. WYSIWYG between editor and any export size (one camera).
+   */
+  generateCameraDirector(input: CameraDirectorInput): string {
+    if (input.action === 'shots') {
+      const shotsJson = JSON.stringify(input.shots ?? []);
+      const opts = JSON.stringify({ loop: !!input.loop });
+      return `
+// Camera director — apply explicit shot list
+(function() {
+  if (typeof app.applyDirectorShots !== 'function') {
+    return { success: false, error: 'app.applyDirectorShots unavailable — update FxTool to a build with the camera director' };
+  }
+  const shots = ${shotsJson};
+  const ok = app.applyDirectorShots(shots, ${opts});
+  return { success: !!ok, mode: 'shots', shotCount: shots.length, loop: ${!!input.loop} };
+})();`.trim();
+    }
+    const opts = JSON.stringify({
+      ...(input.order !== undefined ? { order: input.order } : {}),
+      ...(input.hold !== undefined ? { hold: input.hold } : {}),
+      ...(input.establishing !== undefined ? { establishing: input.establishing } : {}),
+      loop: !!input.loop,
+    });
+    return `
+// Camera director — auto-direct a walkthrough of the scene
+(function() {
+  if (typeof app.autoDirectStory !== 'function') {
+    return { success: false, error: 'app.autoDirectStory unavailable — update FxTool to a build with the camera director' };
+  }
+  const shots = app.autoDirectStory(${opts});
+  if (!shots) return { success: false, mode: 'auto', error: 'No items to direct — add content first' };
+  return { success: true, mode: 'auto', shotCount: shots.length, shots: shots };
+})();`.trim();
+  }
+
+  /**
+   * Inner JS that groups resolved item ids into ONE draggable entity via the
+   * GroupManager (createGroup → addItemsToGroup). idsArrayExpr is a JS expression
+   * evaluating to an array of id strings; nameExpr is a JS string expression or 'undefined'.
+   * Shared by the standalone pinepaper_group tool and the batch "group" operation.
+   */
+  private groupCodeBody(idsArrayExpr: string, nameExpr: string): string {
+    return `
+  if (!app.groupManager) return { success: false, error: 'GroupManager not available — update FxTool' };
+  const ids = (${idsArrayExpr}).filter(function(x) { return x != null; });
+  const items = ids.map(function(id) { return app.getItemById(id); }).filter(Boolean);
+  if (!items.length) return { success: false, error: 'No valid items to group (check the ids / $N refs)' };
+  const group = app.groupManager.createGroup(${nameExpr});
+  if (!group) return { success: false, error: 'Failed to create group' };
+  app.groupManager.addItemsToGroup(items, group);
+  if (app.historyManager) app.historyManager.saveState();
+  const groupId = (group.data && (group.data.registryId || group.data.groupId)) || null;
+  return { success: true, groupId: groupId, groupName: group.data && group.data.groupName, itemCount: items.length };`;
+  }
+
+  /**
+   * Group a set of items into one draggable entity, or ungroup one back into loose
+   * items. Grouping is non-destructive — ungroup restores the individual items.
+   */
+  generateGroup(input: GroupInput): string {
+    if (input.action === 'break_apart') {
+      const idExpr = JSON.stringify(input.itemId || '');
+      return `
+// Break apart ${input.itemId || ''} into movable parts
+(function() {
+  if (typeof app.breakApart !== 'function') return { success: false, error: 'app.breakApart unavailable — update FxTool to a build with SVG/group segmentation' };
+  const target = app.getItemById(${idExpr});
+  if (!target) return { success: false, error: 'Item not found: ' + ${idExpr} };
+  const result = app.breakApart(target);
+  if (!result || !result.parts || !result.parts.length) return { success: false, error: 'Nothing to break apart (no sub-parts found)' };
+  const partIds = result.parts.map(function(p) { return p && p.data && (p.data.registryId || p.data.id); }).filter(Boolean);
+  const groupId = (result.group && result.group.data && (result.group.data.registryId || result.group.data.groupId)) || null;
+  return { success: true, action: 'break_apart', groupId: groupId, partIds: partIds, partCount: partIds.length };
+})();`.trim();
+    }
+    if (input.action === 'ungroup') {
+      const idExpr = JSON.stringify(input.groupId || '');
+      return `
+// Ungroup ${input.groupId || ''}
+(function() {
+  if (!app.groupManager) return { success: false, error: 'GroupManager not available — update FxTool' };
+  const gid = ${idExpr};
+  const group = app.getItemById(gid) || (app.groupManager.getGroupById ? app.groupManager.getGroupById(gid) : null);
+  if (!group) return { success: false, error: 'Group not found: ' + gid };
+  app.groupManager.ungroupAll(group);
+  if (app.historyManager) app.historyManager.saveState();
+  return { success: true, ungrouped: true, groupId: gid };
+})();`.trim();
+    }
+    const idsArrayExpr = JSON.stringify(input.itemIds ?? []);
+    const nameExpr = input.groupName !== undefined ? JSON.stringify(input.groupName) : 'undefined';
+    return `
+// Group ${(input.itemIds || []).length} items${input.groupName ? ` as "${input.groupName}"` : ''}
+(function() {${this.groupCodeBody(idsArrayExpr, nameExpr)}
+})();`.trim();
   }
 
   /**

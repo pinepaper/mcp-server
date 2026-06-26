@@ -116,6 +116,12 @@ export const ItemTypeSchema = z.enum([
   'path',
   'line',
   'arc',
+  // Named shape variants (regular polygons + paths) — createable directly by name
+  'pentagon',
+  'hexagon',
+  'diamond',
+  'arrow',
+  'heart',
 ]);
 
 export type ItemType = z.infer<typeof ItemTypeSchema>;
@@ -534,6 +540,13 @@ export const GeneratorNameSchema = z.enum([
   'drawParametricCollection',
   'drawShaderArt',
   'drawYeganehMountains',
+  // OKLCH seeded backgrounds + 3D parametric curve
+  'drawBlobs',
+  'drawLowPoly',
+  'drawPeaks',
+  'drawScatter',
+  'drawStackedWaves',
+  'draw3DParametricCurve',
 ]).describe('Background generator name');
 
 export type GeneratorName = z.infer<typeof GeneratorNameSchema>;
@@ -1715,7 +1728,7 @@ export type AgentResetInput = z.infer<typeof AgentResetInputSchema>;
  */
 export const AgentBatchOperationTypeSchema = z.enum([
   'set_canvas_size', 'set_background', 'execute_generator',
-  'create', 'modify', 'delete',
+  'create', 'modify', 'delete', 'group',
   'animate', 'keyframe_animate', 'relation',
   'apply_mask', 'apply_effect',
   'play_timeline',
@@ -1735,6 +1748,9 @@ export const AgentBatchOperationSchema = z.object({
   properties: z.record(z.unknown()).optional().describe('Properties for create/modify operations'),
   // Modify/Animate/Delete/Keyframe/Mask/Effect target
   itemId: z.string().optional().describe('Target item ID or $N reference'),
+  // Group operation fields
+  itemIds: z.array(z.string()).optional().describe('Item IDs or $N references to combine for a "group" operation (the parts of a composite object).'),
+  groupName: z.string().optional().describe('Optional name for the group created by a "group" operation (e.g. "car").'),
   // Animate operation fields
   animationType: z.string().optional().describe('Animation type for animate operations'),
   animationOptions: z.record(z.unknown()).optional().describe('Animation options'),
@@ -1774,6 +1790,62 @@ export const AgentBatchOperationSchema = z.object({
 }).describe('Single batch operation');
 
 export type AgentBatchOperation = z.infer<typeof AgentBatchOperationSchema>;
+
+// Group / ungroup — combine the parts of a composite object into ONE draggable entity
+// (a car's body + wheels + windows), or break a group back into loose items.
+export const GroupInputSchema = z.object({
+  action: z.enum(['group', 'ungroup', 'break_apart']).describe('group: combine itemIds into one entity. ungroup: dissolve a group back into loose items. break_apart: split an imported SVG / group / compound-path into individually movable parts (re-grouped as one).'),
+  itemIds: z.array(z.string()).optional().describe('For group: registry IDs of the items to combine.'),
+  itemId: z.string().optional().describe('For break_apart: registry ID of the imported SVG / group / compound-path to decompose into parts.'),
+  groupName: z.string().optional().describe('For group: optional name (e.g. "car", "robot").'),
+  groupId: z.string().optional().describe('For ungroup: registry ID of the group to dissolve.'),
+});
+export type GroupInput = z.infer<typeof GroupInputSchema>;
+
+// Camera director — compile a high-level SHOT LIST into one camera_animates walkthrough
+// (FxTool's DirectorCompiler). 'auto' derives a shot per item; 'shots' takes an explicit list.
+export const CameraDirectorInputSchema = z.object({
+  action: z.enum(['auto', 'shots']).describe("auto: generate a default walkthrough (one shot per item). shots: apply an explicit shot list."),
+  shots: z
+    .array(
+      z.object({
+        subjects: z.union([z.literal('everything'), z.array(z.string())]).describe("'everything' or item registry IDs the shot frames"),
+        framing: z.union([z.enum(['tight', 'medium', 'wide']), z.number()]).optional().describe('Framing tightness (or an explicit zoom number). Default medium.'),
+        hold: z.number().optional().describe('Seconds to dwell on the shot (default 1.2).'),
+        moveIn: z.string().optional().describe("Move style, e.g. 'push-in' | 'pan'."),
+        ease: z.enum(['smooth', 'linear', 'settle', 'snap']).optional().describe('Easing between shots (default smooth).'),
+        transition: z.number().optional().describe('Seconds to travel into this shot (default 1.0).'),
+      }),
+    )
+    .optional()
+    .describe('For action "shots": ordered shot list. Each shot frames its subjects at the given tightness.'),
+  order: z.enum(['reading', 'reverse', 'creation']).optional().describe('For action "auto": item visiting order (default reading).'),
+  hold: z.number().optional().describe('For action "auto": per-shot dwell seconds.'),
+  establishing: z.boolean().optional().describe('For action "auto": open with a wide establishing shot of everything.'),
+  loop: z.boolean().optional().describe('Loop the camera walkthrough.'),
+});
+export type CameraDirectorInput = z.infer<typeof CameraDirectorInputSchema>;
+
+// On-device object detection (FxTool ImageWorkflow / DETR·YOLO). Find objects in an
+// imported image; optionally promote each detection to a typed, image-anchored design
+// node (pp:Detected*, Wikidata-aliased) so relations can bind a shape to it.
+export const DetectObjectsInputSchema = z.object({
+  itemId: z.string().optional().describe('Registry ID of the image to scan (default: the most recent image on the canvas).'),
+  threshold: z.number().min(0).max(1).optional().describe('Confidence threshold 0-1 (default ~0.35 for DETR, ~0.1 for open-vocabulary).'),
+  asNodes: z.boolean().optional().describe('true → promote each detection to a typed, image-anchored design NODE (a relation target: pp:Detected* aliased to a Wikidata entity) instead of drawing a labeled box. Enables relational compositing (bind a shape on/around/at the object; it tracks the image).'),
+  queries: z.union([z.array(z.string()), z.string()]).optional().describe('OPEN-VOCABULARY detection (OWL-ViT, zero-shot): a list (or comma-separated string) of things to find by description — e.g. ["red umbrella","traffic light"]. Finds whatever you describe instead of the fixed 80 COCO classes. Omit to use the default DETR detector. The OWL-ViT model is a large one-time on-device download.'),
+});
+export type DetectObjectsInput = z.infer<typeof DetectObjectsInputSchema>;
+
+// Extract the best-matching detected region from an image as a NEW item.
+export const ExtractObjectInputSchema = z.object({
+  label: z.string().optional().describe('What to extract (e.g. "cat", "person"). Picks the best-matching detection; default = highest-confidence.'),
+  itemId: z.string().optional().describe('Registry ID of the source image (default: most recent image).'),
+  x: z.number().optional().describe('Optional hint X (canvas coords) to disambiguate which detection to extract.'),
+  y: z.number().optional().describe('Optional hint Y (canvas coords).'),
+  threshold: z.number().min(0).max(1).optional().describe('Confidence threshold 0-1.'),
+});
+export type ExtractObjectInput = z.infer<typeof ExtractObjectInputSchema>;
 
 /**
  * Batch execute input schema

@@ -50,10 +50,13 @@ export const TOOL_TAGS: Record<string, string[]> = {
     'pinepaper_create_diagonal_stripes',
     'pinepaper_create_grid',
     'pinepaper_geometry',
+    'pinepaper_group',
   ],
   import: [
     'pinepaper_import_svg',
     'pinepaper_import_image',
+    'pinepaper_detect_objects',
+    'pinepaper_extract_object',
   ],
   assets: [
     'pinepaper_search_assets',
@@ -89,6 +92,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
   camera: [
     'pinepaper_camera_animate',
     'pinepaper_camera',
+    'pinepaper_camera_director',
   ],
 
   // --- Generators & effects ---

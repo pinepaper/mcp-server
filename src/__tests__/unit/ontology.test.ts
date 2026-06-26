@@ -42,7 +42,7 @@ describe('PP_VOCABULARY', () => {
   });
 
   it('has expected number of generators (26)', () => {
-    expect(Object.keys(PP_VOCABULARY.generators).length).toBe(33);
+    expect(Object.keys(PP_VOCABULARY.generators).length).toBe(39);
   });
 
   it('has expected number of math functions (38+)', () => {
@@ -165,8 +165,8 @@ describe('Mapping Tables', () => {
     }
   });
 
-  it('ITEM_TYPE_MAP has 24 entries', () => {
-    expect(Object.keys(ITEM_TYPE_MAP).length).toBe(24);
+  it('ITEM_TYPE_MAP has 29 entries', () => {
+    expect(Object.keys(ITEM_TYPE_MAP).length).toBe(29);
   });
 
   it('RELATION_TYPE_MAP has 33 entries', () => {

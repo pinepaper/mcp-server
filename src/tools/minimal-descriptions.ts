@@ -19,7 +19,7 @@ function shortList(items: readonly string[], maxShown: number): string {
   return `${items.slice(0, maxShown).join('|')}…(${items.length} total via pinepaper_query_ontology)`;
 }
 
-const ITEM_TYPES = shortList(ItemTypeSchema.options, 10);
+const ITEM_TYPES = shortList(ItemTypeSchema.options, ItemTypeSchema.options.length);
 const RELATION_TYPES = shortList(RelationTypeSchema.options, 8);
 const DIAGRAM_SHAPES = shortList(Object.keys(DIAGRAM_SHAPE_MAP), 12);
 
@@ -47,6 +47,10 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_create_grid: 'Create a grid of lines on canvas.',
   pinepaper_geometry: 'Exact geometry construction (polygon vertices, intersections, circumcircle, tangents); optionally creates an item from the result. {operation, args, createAs?}',
   pinepaper_construction_sequence: 'Reveal a figure step by step on the timeline (build/play/clear/list). {action, steps?, stepDuration?}',
+  pinepaper_group: 'Group a composite object\'s parts into ONE entity, ungroup, or break_apart an imported SVG into movable parts. {action: group|ungroup|break_apart, itemIds?, itemId?, groupName?, groupId?}',
+  pinepaper_camera_director: 'Cinematic camera walkthrough from a shot list (auto: one shot per item, or explicit shots). Compiles to one camera_animates track. {action: auto|shots, shots?, order?, establishing?, loop?}',
+  pinepaper_detect_objects: 'On-device image detection: DETR 80-class, or queries:[…] open-vocabulary (OWL-ViT). asNodes:true → image-anchored design nodes. {itemId?, threshold?, asNodes?, queries?}',
+  pinepaper_extract_object: 'Detect + crop the best-matching object out of an imported image into a new item. {label?, itemId?, x?, y?, threshold?}',
   pinepaper_validate_scene: 'Audit the live canvas (dangling refs, unknown types/props, keyframes, cycles) → structured diagnostics. Optional ops[] to pre-validate proposed mutations.',
   pinepaper_capture_frames: 'Deterministic frame capture at given times (seeded random). Returns per-frame hashes (or data URLs) to verify reproducibility/motion. {times, seed?, includeDataUrls?}',
 

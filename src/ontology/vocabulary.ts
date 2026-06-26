@@ -95,6 +95,10 @@ export const PP_VOCABULARY: PinePaperVocabulary = {
     'pp:Concept':              { anchor: 'schema:Intangible', description: 'Abstract non-visual concept node', abstract: true },
     'pp:ConstructionSequence': { anchor: null, description: 'Ordered set of pp:ConstructionStep, played on the timeline to reveal a geometric construction one step at a time (replayable, scrubbable). Persisted as timed pp:constructionReveal relations, not a script.', parentType: 'pp:Concept', mcpTool: 'pinepaper_construction_sequence' },
     'pp:ConstructionStep':     { anchor: null, description: 'One step of a pp:ConstructionSequence: the item(s) introduced at a given stepOrder, mapped to a timeline reveal time (stepOrder × stepDuration).', parentType: 'pp:Concept', mcpTool: 'pinepaper_construction_sequence' },
+    // Object detection — a detected object promoted to an image-anchored design node
+    // (relational compositing). Concrete classes (pp:DetectedPerson, …) are dynamic,
+    // each rdfs:subClassOf its Wikidata entity; this is their shared root.
+    'pp:DetectedObject':       { anchor: null, description: 'An object detected in an image (on-device DETR/YOLO), promoted to a typed, raster-anchored design node that relations can bind to. Concrete classes (pp:DetectedPerson, pp:DetectedCat, …) are Wikidata-aliased subtypes emitted at detection time.', parentType: 'pp:Concept', mcpTool: 'pinepaper_detect_objects' },
     // Escape hatch — items that don't match any vocabulary type
     'pp:Unclassified':  { anchor: null, description: 'Item type not expressible in current vocabulary.', parentType: 'pp:CanvasElement' },
   },
@@ -302,6 +306,13 @@ export const PP_VOCABULARY: PinePaperVocabulary = {
     'drawParametricCollection': { category: 'math',       mathFunctions: ['mathExpression', 'parametricCircle'], parentType: 'pp:MathGenerator' },
     'drawShaderArt':         { category: 'math',          mathFunctions: ['mathExpression'], parentType: 'pp:MathGenerator' },
     'drawYeganehMountains':  { category: 'math',          mathFunctions: ['mathExpression'], parentType: 'pp:MathGenerator' },
+    // OKLCH seeded backgrounds + 3D parametric curve
+    'drawBlobs':             { category: 'organic',       mathFunctions: ['perlinNoise'], parentType: 'pp:FieldGenerator' },
+    'drawLowPoly':           { category: 'patterns',      mathFunctions: ['lerp'], parentType: 'pp:PatternGenerator' },
+    'drawPeaks':             { category: 'patterns',      mathFunctions: ['lerp'], parentType: 'pp:PatternGenerator' },
+    'drawScatter':           { category: 'distributions', mathFunctions: ['parametricCircle'], parentType: 'pp:ParticleGenerator' },
+    'drawStackedWaves':      { category: 'patterns',      mathFunctions: ['cubicBezier'], parentType: 'pp:PatternGenerator' },
+    'draw3DParametricCurve': { category: 'math',          mathFunctions: ['parametricSurface', 'projection3d'], parentType: 'pp:MathGenerator' },
   },
 
   // --- Formal Properties ---
@@ -386,6 +397,11 @@ export const ITEM_TYPE_MAP: Record<string, string> = {
   'star':           'pp:Star',
   'triangle':       'pp:Triangle',
   'polygon':        'pp:Polygon',
+  'pentagon':       'pp:Polygon',
+  'hexagon':        'pp:Polygon',
+  'diamond':        'pp:Polygon',
+  'arrow':          'pp:ClosedPath',
+  'heart':          'pp:ClosedPath',
   'ellipse':        'pp:Ellipse',
   'line':           'pp:Line',
   'arc':            'pp:Arc',

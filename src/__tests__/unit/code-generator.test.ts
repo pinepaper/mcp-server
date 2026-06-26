@@ -865,6 +865,101 @@ describe('PinePaperCodeGenerator', () => {
     });
   });
 
+  describe('generateGroup', () => {
+    it('groups items via the GroupManager and returns a groupId', () => {
+      const code = codeGenerator.generateGroup({ action: 'group', itemIds: ['a', 'b', 'c'], groupName: 'car' });
+      expect(code).toContain('app.groupManager.createGroup("car")');
+      expect(code).toContain('addItemsToGroup');
+      expect(code).toContain('["a","b","c"]');
+      expect(code).toContain('groupId');
+      expect(code).toContain('GroupManager not available'); // guard
+    });
+
+    it('group works without a name (undefined)', () => {
+      const code = codeGenerator.generateGroup({ action: 'group', itemIds: ['a', 'b'] });
+      expect(code).toContain('app.groupManager.createGroup(undefined)');
+    });
+
+    it('break_apart decomposes an imported item via app.breakApart', () => {
+      const code = codeGenerator.generateGroup({ action: 'break_apart', itemId: 'svg_5' });
+      expect(code).toContain('app.breakApart(');
+      expect(code).toContain('"svg_5"');
+      expect(code).toContain('partIds');
+      expect(code).toContain('breakApart unavailable'); // guard
+    });
+
+    it('ungroup dissolves a group by id', () => {
+      const code = codeGenerator.generateGroup({ action: 'ungroup', groupId: 'group_7' });
+      expect(code).toContain('ungroupAll');
+      expect(code).toContain('"group_7"');
+      expect(code).toContain('ungrouped: true');
+    });
+
+    it('batch group op resolves $N refs against itemIds and returns no itemId', () => {
+      const code = codeGenerator.generateAgentBatchExecute({
+        operations: [
+          { type: 'create', itemType: 'circle', position: { x: 0, y: 0 } },
+          { type: 'create', itemType: 'circle', position: { x: 50, y: 0 } },
+          { type: 'group', itemIds: ['$0', '$1'], groupName: 'wheels' },
+        ],
+      } as any);
+      expect(code).toContain('[itemIds[0], itemIds[1]]');
+      expect(code).toContain('createGroup("wheels")');
+      // group op returns groupId (no itemId) so it must not shift $N indices
+      expect(code).toContain('groupId');
+    });
+  });
+
+  describe('generateCameraDirector', () => {
+    it('auto mode calls autoDirectStory with options', () => {
+      const code = codeGenerator.generateCameraDirector({ action: 'auto', establishing: true, hold: 1.5, loop: true });
+      expect(code).toContain('app.autoDirectStory(');
+      expect(code).toContain('"establishing":true');
+      expect(code).toContain("mode: 'auto'");
+      expect(code).toContain('autoDirectStory unavailable'); // guard
+    });
+
+    it('shots mode applies an explicit shot list', () => {
+      const code = codeGenerator.generateCameraDirector({
+        action: 'shots',
+        shots: [{ subjects: 'everything', framing: 'wide', hold: 1 }],
+        loop: false,
+      });
+      expect(code).toContain('app.applyDirectorShots(');
+      expect(code).toContain('"framing":"wide"');
+      expect(code).toContain("mode: 'shots'");
+    });
+  });
+
+  describe('object detection', () => {
+    it('detect_objects (default) calls app.detectObjects, guarded + async', () => {
+      const code = codeGenerator.generateDetectObjects({ threshold: 0.4 });
+      expect(code).toContain('async function');
+      expect(code).toContain('await app.detectObjects(');
+      expect(code).toContain('"threshold":0.4');
+      expect(code).toContain('detectObjects unavailable'); // guard
+    });
+
+    it('detect_objects asNodes is passed through', () => {
+      const code = codeGenerator.generateDetectObjects({ asNodes: true, itemId: 'img_1' });
+      expect(code).toContain('"asNodes":true');
+      expect(code).toContain('"itemId":"img_1"');
+    });
+
+    it('detect_objects open-vocabulary queries are passed through (OWL-ViT)', () => {
+      const code = codeGenerator.generateDetectObjects({ queries: ['red umbrella', 'logo'] });
+      expect(code).toContain('"queries":["red umbrella","logo"]');
+      expect(code).toContain('open-vocabulary');
+    });
+
+    it('extract_object calls app.extractObject with the label', () => {
+      const code = codeGenerator.generateExtractObject({ label: 'cat' });
+      expect(code).toContain('await app.extractObject(');
+      expect(code).toContain('"label":"cat"');
+      expect(code).toContain('extractObject unavailable'); // guard
+    });
+  });
+
   describe('determinism + validator surface', () => {
     it('deterministic seek uses app.sceneAt with a setPlaybackTime fallback', () => {
       const code = codeGenerator.generatePlayTimeline('seek', undefined, undefined, 1.5, true);

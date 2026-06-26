@@ -36,6 +36,10 @@ import {
   ConstructionSequenceInputSchema,
   ValidateSceneInputSchema,
   CaptureFramesInputSchema,
+  GroupInputSchema,
+  CameraDirectorInputSchema,
+  DetectObjectsInputSchema,
+  ExtractObjectInputSchema,
   CreateSceneInputSchema,
   GetPerformanceMetricsInputSchema,
   DiagnosticReportInputSchema,
@@ -1008,6 +1012,39 @@ async function handleToolCallInner(
         const code = codeGenerator.generateConstructionSequence(input);
         const description = `Construction sequence: ${input.action}`;
         return executeOrGenerate(code, description, options, 'pinepaper_construction_sequence');
+      }
+
+      case 'pinepaper_group': {
+        const input = GroupInputSchema.parse(args);
+        const code = codeGenerator.generateGroup(input);
+        const description =
+          input.action === 'ungroup' ? `Ungroup ${input.groupId ?? ''}`
+          : input.action === 'break_apart' ? `Break apart ${input.itemId ?? ''} into movable parts`
+          : `Group ${(input.itemIds ?? []).length} item(s)${input.groupName ? ` as "${input.groupName}"` : ''}`;
+        return executeOrGenerate(code, description, options, 'pinepaper_group');
+      }
+
+      case 'pinepaper_camera_director': {
+        const input = CameraDirectorInputSchema.parse(args);
+        const code = codeGenerator.generateCameraDirector(input);
+        const description = input.action === 'shots'
+          ? `Camera director: ${(input.shots ?? []).length} shot(s)`
+          : 'Camera director: auto-direct walkthrough';
+        return executeOrGenerate(code, description, options, 'pinepaper_camera_director');
+      }
+
+      case 'pinepaper_detect_objects': {
+        const input = DetectObjectsInputSchema.parse(args);
+        const code = codeGenerator.generateDetectObjects(input);
+        const description = `Detect objects${input.asNodes ? ' (as design nodes)' : ''}`;
+        return executeOrGenerate(code, description, options, 'pinepaper_detect_objects');
+      }
+
+      case 'pinepaper_extract_object': {
+        const input = ExtractObjectInputSchema.parse(args);
+        const code = codeGenerator.generateExtractObject(input);
+        const description = `Extract object${input.label ? ` "${input.label}"` : ''} from image`;
+        return executeOrGenerate(code, description, options, 'pinepaper_extract_object');
       }
 
       case 'pinepaper_validate_scene': {
@@ -2415,6 +2452,10 @@ You can now start creating new items on a clean canvas.`,
             'pinepaper_create_grid',
             'pinepaper_geometry',
             'pinepaper_construction_sequence',
+            'pinepaper_group',
+            'pinepaper_camera_director',
+            'pinepaper_detect_objects',
+            'pinepaper_extract_object',
             'pinepaper_validate_scene',
             'pinepaper_capture_frames',
             'pinepaper_add_relation',
