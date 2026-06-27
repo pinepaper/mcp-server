@@ -51,6 +51,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_camera_director: 'Cinematic camera walkthrough from a shot list (auto: one shot per item, or explicit shots). Compiles to one camera_animates track. {action: auto|shots, shots?, order?, establishing?, loop?}',
   pinepaper_detect_objects: 'On-device image detection: DETR 80-class, or queries:[…] open-vocabulary (OWL-ViT). asNodes:true → image-anchored design nodes. {itemId?, threshold?, asNodes?, queries?}',
   pinepaper_extract_object: 'Detect + crop the best-matching object out of an imported image into a new item. {label?, itemId?, x?, y?, threshold?}',
+  pinepaper_arrange: 'Change an item\'s z-order (stacking). {itemId, action: front|back|forward|backward}',
   pinepaper_validate_scene: 'Audit the live canvas (dangling refs, unknown types/props, keyframes, cycles) → structured diagnostics. Optional ops[] to pre-validate proposed mutations.',
   pinepaper_capture_frames: 'Deterministic frame capture at given times (seeded random). Returns per-frame hashes (or data URLs) to verify reproducibility/motion. {times, seed?, includeDataUrls?}',
 

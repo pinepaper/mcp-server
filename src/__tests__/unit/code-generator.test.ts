@@ -931,6 +931,20 @@ describe('PinePaperCodeGenerator', () => {
     });
   });
 
+  describe('generateArrange (z-order)', () => {
+    it('maps each action to the right app stacking method', () => {
+      const map: Record<string, string> = {
+        front: 'bringToFront', back: 'sendToBack', forward: 'bringForward', backward: 'sendBackward',
+      };
+      for (const [action, method] of Object.entries(map)) {
+        const code = codeGenerator.generateArrange({ itemId: 'c1', action: action as any });
+        expect(code).toContain(`app.${method}()`);
+        expect(code).toContain('app.select("c1")');
+        expect(code).toContain('Item not found'); // guard
+      }
+    });
+  });
+
   describe('object detection', () => {
     it('detect_objects (default) calls app.detectObjects, guarded + async', () => {
       const code = codeGenerator.generateDetectObjects({ threshold: 0.4 });

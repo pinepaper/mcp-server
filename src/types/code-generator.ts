@@ -161,6 +161,7 @@ import {
   CameraDirectorInput,
   DetectObjectsInput,
   ExtractObjectInput,
+  ArrangeInput,
 } from './schemas.js';
 import { z } from 'zod';
 
@@ -5133,6 +5134,30 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    const ite
       default:
         return `(function() { return { error: 'Unknown measurement action: ${(input as any).action}' }; })();`;
     }
+  }
+
+  /**
+   * Z-order: select the item, then call the matching app stacking method
+   * (bringToFront / sendToBack / bringForward / sendBackward).
+   */
+  generateArrange(input: ArrangeInput): string {
+    const method = {
+      front: 'bringToFront',
+      back: 'sendToBack',
+      forward: 'bringForward',
+      backward: 'sendBackward',
+    }[input.action];
+    const id = JSON.stringify(input.itemId);
+    return `
+// Arrange ${input.itemId} → ${input.action}
+(function() {
+  const item = app.getItemById(${id});
+  if (!item) return { success: false, error: 'Item not found: ' + ${id} };
+  if (typeof app.${method} !== 'function') return { success: false, error: 'app.${method} unavailable — update FxTool' };
+  app.select(${id});
+  app.${method}();
+  return { success: true, itemId: ${id}, action: '${input.action}' };
+})();`.trim();
   }
 
   /**

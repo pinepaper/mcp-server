@@ -1545,6 +1545,42 @@ NOTE: requires an FxTool build that exposes on-device detection (app.extractObje
   },
 
   {
+    name: 'pinepaper_arrange',
+    annotations: {
+      title: 'Arrange (Z-Order)',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Change an item's stacking order (z-order) — which items draw on top of which.
+
+ACTIONS:
+- front: bring the item to the TOP of the stack (drawn over everything).
+- back: send it to the BOTTOM (behind everything; drops to the background layer if needed).
+- forward: move it up ONE step.
+- backward: move it down ONE step.
+
+USE WHEN:
+- A shape is hidden behind another and should be on top ("bring the logo to the front").
+- Layering a composition (move a background panel behind the text).
+
+EXAMPLE: { itemId: "circle_3", action: "front" }`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        itemId: { type: 'string', description: 'Registry ID of the item to reorder.' },
+        action: {
+          type: 'string',
+          enum: ['front', 'back', 'forward', 'backward'],
+          description: 'front: to top. back: to bottom. forward: up one. backward: down one.',
+        },
+      },
+      required: ['itemId', 'action'],
+    },
+  },
+
+  {
     name: 'pinepaper_validate_scene',
     annotations: {
       title: 'Validate Scene',

@@ -1847,6 +1847,13 @@ export const ExtractObjectInputSchema = z.object({
 });
 export type ExtractObjectInput = z.infer<typeof ExtractObjectInputSchema>;
 
+// Z-order / arrange — move an item up or down the stacking order.
+export const ArrangeInputSchema = z.object({
+  itemId: z.string().describe('Registry ID of the item to reorder.'),
+  action: z.enum(['front', 'back', 'forward', 'backward']).describe('front: bring to top of the stack. back: send to bottom. forward: move up one. backward: move down one.'),
+});
+export type ArrangeInput = z.infer<typeof ArrangeInputSchema>;
+
 /**
  * Batch execute input schema
  */

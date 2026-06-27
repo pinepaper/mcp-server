@@ -40,6 +40,7 @@ import {
   CameraDirectorInputSchema,
   DetectObjectsInputSchema,
   ExtractObjectInputSchema,
+  ArrangeInputSchema,
   CreateSceneInputSchema,
   GetPerformanceMetricsInputSchema,
   DiagnosticReportInputSchema,
@@ -1045,6 +1046,13 @@ async function handleToolCallInner(
         const code = codeGenerator.generateExtractObject(input);
         const description = `Extract object${input.label ? ` "${input.label}"` : ''} from image`;
         return executeOrGenerate(code, description, options, 'pinepaper_extract_object');
+      }
+
+      case 'pinepaper_arrange': {
+        const input = ArrangeInputSchema.parse(args);
+        const code = codeGenerator.generateArrange(input);
+        const description = `Arrange ${input.itemId}: ${input.action}`;
+        return executeOrGenerate(code, description, options, 'pinepaper_arrange');
       }
 
       case 'pinepaper_validate_scene': {
@@ -2456,6 +2464,7 @@ You can now start creating new items on a clean canvas.`,
             'pinepaper_camera_director',
             'pinepaper_detect_objects',
             'pinepaper_extract_object',
+            'pinepaper_arrange',
             'pinepaper_validate_scene',
             'pinepaper_capture_frames',
             'pinepaper_add_relation',
