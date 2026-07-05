@@ -36,7 +36,9 @@
     "test:coverage": "bun test --coverage",
     "lint": "eslint src/**/*.ts",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "bun run build"
+    "check:manifest": "bun scripts/check-manifest-tools.mjs",
+    "fix:manifest": "bun scripts/check-manifest-tools.mjs --fix",
+    "prepublishOnly": "bun run check:manifest && bun run build"
   },
   "keywords": [
     "mcp",

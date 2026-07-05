@@ -80,86 +80,6 @@
   },
   "tools": [
     {
-      "name": "pinepaper_create_item",
-      "description": "Create text, shapes, or graphics on the PinePaper canvas"
-    },
-    {
-      "name": "pinepaper_modify_item",
-      "description": "Modify an existing item's properties (color, size, position)"
-    },
-    {
-      "name": "pinepaper_delete_item",
-      "description": "Remove an item from the canvas"
-    },
-    {
-      "name": "pinepaper_create_glossy_sphere",
-      "description": "Create a 3D-looking glossy sphere with lighting effects"
-    },
-    {
-      "name": "pinepaper_create_diagonal_stripes",
-      "description": "Create a diagonal stripe pattern"
-    },
-    {
-      "name": "pinepaper_batch_create",
-      "description": "Create multiple items at once with single history save"
-    },
-    {
-      "name": "pinepaper_batch_modify",
-      "description": "Modify multiple items at once with single history save"
-    },
-    {
-      "name": "pinepaper_create_grid",
-      "description": "Create a grid of lines on the canvas"
-    },
-    {
-      "name": "pinepaper_add_relation",
-      "description": "Add animation relations between items (orbits, follows, attached_to)"
-    },
-    {
-      "name": "pinepaper_remove_relation",
-      "description": "Remove a relation between items"
-    },
-    {
-      "name": "pinepaper_query_relations",
-      "description": "Query existing relations for an item"
-    },
-    {
-      "name": "pinepaper_animate",
-      "description": "Apply simple loop animations to items"
-    },
-    {
-      "name": "pinepaper_keyframe_animate",
-      "description": "Create timed keyframe animations"
-    },
-    {
-      "name": "pinepaper_play_timeline",
-      "description": "Control animation playback"
-    },
-    {
-      "name": "pinepaper_execute_generator",
-      "description": "Run procedural background generators"
-    },
-    {
-      "name": "pinepaper_list_generators",
-      "description": "List available background generators"
-    },
-    {
-      "name": "pinepaper_apply_effect",
-      "description": "Apply visual effects to items"
-    },
-    {
-      "name": "pinepaper_get_items",
-      "description": "Get all items on the canvas"
-    },
-    {
-      "name": "pinepaper_get_relation_stats",
-      "description": "Get statistics about relations"
-    },
-    {
-      "name": "pinepaper_get_performance_metrics",
-      "description": "Get execution timing metrics and performance statistics"
-    },
-    {
       "name": "pinepaper_set_background_color",
       "description": "Set the canvas background color"
     },
@@ -180,8 +100,36 @@
       "description": "Refresh the PinePaper page"
     },
     {
+      "name": "pinepaper_create_item",
+      "description": "Create text, shapes, or graphics on the PinePaper canvas"
+    },
+    {
+      "name": "pinepaper_modify_item",
+      "description": "Modify an existing item's properties (color, size, position)"
+    },
+    {
+      "name": "pinepaper_delete_item",
+      "description": "Remove an item from the canvas"
+    },
+    {
+      "name": "pinepaper_create_glossy_sphere",
+      "description": "Create a 3D-looking glossy sphere with lighting effects"
+    },
+    {
+      "name": "pinepaper_create_diagonal_stripes",
+      "description": "Create a diagonal stripe pattern"
+    },
+    {
       "name": "pinepaper_import_svg",
       "description": "Import SVG content onto the canvas"
+    },
+    {
+      "name": "pinepaper_import_mermaid",
+      "description": "Import a Mermaid diagram (flowchart|graph|stateDiagram|sequenceDiagram|erDiagram|classDiagram). mermaidText, autoLayout, clearExisting."
+    },
+    {
+      "name": "pinepaper_import_image",
+      "description": "Import a raster image (PNG/JPG/WebP) onto the canvas."
     },
     {
       "name": "pinepaper_search_assets",
@@ -192,40 +140,192 @@
       "description": "Import and place an asset from search results onto the canvas"
     },
     {
-      "name": "pinepaper_add_filter",
-      "description": "Add a visual filter effect to the canvas"
+      "name": "pinepaper_batch_create",
+      "description": "Create multiple items at once with single history save"
     },
     {
-      "name": "pinepaper_export_svg",
-      "description": "Export canvas as animated SVG"
+      "name": "pinepaper_batch_modify",
+      "description": "Modify multiple items at once with single history save"
     },
     {
-      "name": "pinepaper_export_training_data",
-      "description": "Export instruction/code pairs for LLM training"
+      "name": "pinepaper_create_grid",
+      "description": "Create a grid of lines on the canvas"
     },
     {
-      "name": "pinepaper_browser_connect",
-      "description": "Connect to PinePaper Studio in browser"
+      "name": "pinepaper_geometry",
+      "description": "Exact geometry construction (polygon vertices, intersections, circumcircle, tangents); optionally creates an item from the result. {operation, args, createAs?}"
     },
     {
-      "name": "pinepaper_browser_disconnect",
-      "description": "Disconnect from browser"
+      "name": "pinepaper_construction_sequence",
+      "description": "Reveal a figure step by step on the timeline (build/play/clear/list). {action, steps?, stepDuration?}"
     },
     {
-      "name": "pinepaper_browser_screenshot",
-      "description": "Take a screenshot of the canvas"
+      "name": "pinepaper_group",
+      "description": "Group a composite object's parts into ONE entity, ungroup, or break_apart an imported SVG into movable parts. {action: group|ungroup|break_apart, itemIds?, itemId?, groupName?, groupId?}"
     },
     {
-      "name": "pinepaper_browser_status",
-      "description": "Check browser connection status"
+      "name": "pinepaper_camera_director",
+      "description": "Cinematic camera walkthrough from a shot list (auto: one shot per item, or explicit shots). Compiles to one camera_animates track. {action: auto|shots, shots?, order?, establishing?, loop?}"
     },
     {
-      "name": "pinepaper_p5_draw",
-      "description": "Execute p5.js-style drawing code on the canvas (subset of p5.js API)"
+      "name": "pinepaper_detect_objects",
+      "description": "On-device image detection: DETR 80-class, or queries:[…] open-vocabulary (OWL-ViT). asNodes:true → image-anchored design nodes. {itemId?, threshold?, asNodes?, queries?}"
+    },
+    {
+      "name": "pinepaper_extract_object",
+      "description": "Detect + crop the best-matching object out of an imported image into a new item. {label?, itemId?, x?, y?, threshold?}"
+    },
+    {
+      "name": "pinepaper_arrange",
+      "description": "Change an item's z-order (stacking). {itemId, action: front|back|forward|backward}"
+    },
+    {
+      "name": "pinepaper_validate_scene",
+      "description": "Audit the live canvas (dangling refs, unknown types/props, keyframes, cycles) → structured diagnostics. Optional ops[] to pre-validate proposed mutations."
+    },
+    {
+      "name": "pinepaper_capture_frames",
+      "description": "Deterministic frame capture at given times (seeded random). Returns per-frame hashes (or data URLs) to verify reproducibility/motion. {times, seed?, includeDataUrls?}"
+    },
+    {
+      "name": "pinepaper_add_relation",
+      "description": "Add animation relations between items (orbits, follows, attached_to)"
+    },
+    {
+      "name": "pinepaper_remove_relation",
+      "description": "Remove a relation between items"
+    },
+    {
+      "name": "pinepaper_query_relations",
+      "description": "Query existing relations for an item"
+    },
+    {
+      "name": "pinepaper_register_custom_relation",
+      "description": "Register a custom relation type with JavaScript update function."
+    },
+    {
+      "name": "pinepaper_execute_custom_code",
+      "description": "Execute arbitrary JavaScript in the PinePaper browser context."
+    },
+    {
+      "name": "pinepaper_animate",
+      "description": "Apply simple loop animations to items"
+    },
+    {
+      "name": "pinepaper_keyframe_animate",
+      "description": "Create timed keyframe animations"
+    },
+    {
+      "name": "pinepaper_play_timeline",
+      "description": "Control animation playback"
+    },
+    {
+      "name": "pinepaper_apply_animated_mask",
+      "description": "Apply mask. itemId, preset: wipeLeft|wipeRight|iris|irisOut|star|heart|curtainH|curtainV|cinematic|diagonalWipe|revealUp|revealDown."
+    },
+    {
+      "name": "pinepaper_apply_custom_mask",
+      "description": "Apply a custom mask shape to an item."
+    },
+    {
+      "name": "pinepaper_remove_mask",
+      "description": "Remove mask from an item."
+    },
+    {
+      "name": "pinepaper_get_animatable_properties",
+      "description": "List animatable properties for an item type."
+    },
+    {
+      "name": "pinepaper_get_available_easings",
+      "description": "List available easing functions."
+    },
+    {
+      "name": "pinepaper_get_mask_types",
+      "description": "List available mask types."
+    },
+    {
+      "name": "pinepaper_get_mask_animations",
+      "description": "List available mask animation presets."
+    },
+    {
+      "name": "pinepaper_camera_animate",
+      "description": "Camera keyframes. Per-kf: zoom, focus ([x,y]|id|{item,offset}), pitch, yaw, easing; curved via pathOut/pathIn or pathMode:arc+pivot / custom+path."
+    },
+    {
+      "name": "pinepaper_camera",
+      "description": "Camera control. action: zoom|pan|move_to|reset|stop|state|fit_view. zoom: direction in|out, level. pan: direction or {x,y}, amount. move_to: {x,y,zoom}. duration default 0.5s."
     },
     {
       "name": "pinepaper_create_scene",
       "description": "Create a complete scene with multiple items, relations, and animations in a single operation"
+    },
+    {
+      "name": "pinepaper_manage_scenes",
+      "description": "Scene CRUD. action: save|load|list|delete|rename|duplicate|reorder|info|export|import. name, sceneId, transition: none|fade|zoom-in|zoom-out."
+    },
+    {
+      "name": "pinepaper_scene_playback",
+      "description": "Scene chain playback. action: create_chain|play|pause|resume|stop|toggle_loop|jump. sceneIds, defaultDuration (secs), loop."
+    },
+    {
+      "name": "pinepaper_selection",
+      "description": "Manage selection. action: select|select_all|deselect_all|get|delete_selected. itemIds, mode: replace|add|remove."
+    },
+    {
+      "name": "pinepaper_transform",
+      "description": "Transform items. action: nudge|flip|reorder. dx,dy. direction: horizontal|vertical. order: bringToFront|sendToBack|moveUp|moveDown."
+    },
+    {
+      "name": "pinepaper_history",
+      "description": "Undo/redo. action: undo|redo|get_state."
+    },
+    {
+      "name": "pinepaper_image_filter",
+      "description": "GPU image filters. action: apply|chain. itemId, filterName, params, filters[]."
+    },
+    {
+      "name": "pinepaper_lasso",
+      "description": "Lasso selection. action: activate|apply. itemId."
+    },
+    {
+      "name": "pinepaper_cutout_style",
+      "description": "Style cutouts. action: apply|list. itemId, preset, options."
+    },
+    {
+      "name": "pinepaper_precomp",
+      "description": "Nested compositions. action: create|add|remove. itemIds, name, precompId, itemId."
+    },
+    {
+      "name": "pinepaper_background",
+      "description": "Background. action: set|clear|get. mode: color|pattern|generator."
+    },
+    {
+      "name": "pinepaper_query",
+      "description": "Canvas queries. action: get_by_id|hit_test|is_empty. itemId, x, y, tolerance."
+    },
+    {
+      "name": "pinepaper_deform",
+      "description": "Vertex deformation. action: apply|trigger|remove. itemId, preset: fold|squeeze|squash|twist|ripple|wave|breathe|wobble..., phase, amplitude."
+    },
+    {
+      "name": "pinepaper_sprite_sheet",
+      "description": "Sprite sheets. action: generate|play|export. skeletonId, spriteSheetId, poses, animations, format."
+    },
+    {
+      "name": "pinepaper_interaction",
+      "description": "Physics behaviors. action: add_behavior|remove_behavior|trigger_action|get_state. behaviorType: repel|attract|follow|orbit|slingshot."
+    },
+    {
+      "name": "pinepaper_export_widget",
+      "description": "Export scene as pp:PinePaper ontology JSON. download, filename, includeInteractions, minify."
+    },
+    {
+      "name": "pinepaper_export_widget_html",
+      "description": "Export scene as self-contained HTML with tree-shaken runtime. title, download."
+    },
+    {
+      "name": "pinepaper_apply_template",
+      "description": "Apply pre-built template (templateId), or list available (listOnly:true). 13 categories. DESTRUCTIVE: replaces canvas."
     },
     {
       "name": "pinepaper_create_diagram_shape",
@@ -264,6 +364,94 @@
       "description": "Control diagram mode for interactive editing (activate, deactivate, set tool mode)"
     },
     {
+      "name": "pinepaper_map",
+      "description": "Map load + viewport. action: load|pan|zoom|export_config|import_custom. mapId: usa|world|worldHighRes|<custom>."
+    },
+    {
+      "name": "pinepaper_map_regions",
+      "description": "Map region styling/selection. action: highlight|unhighlight|apply_colors|add_marker|add_labels|get_at_point|select|deselect|get_highlighted."
+    },
+    {
+      "name": "pinepaper_map_animation",
+      "description": "Map region animation. action: animate_regions|animate_wave|stop|get_animated. duration, loop."
+    },
+    {
+      "name": "pinepaper_map_data",
+      "description": "Map import/export. action: export_csv|import_csv|export_geojson|export_original_geojson|source_info."
+    },
+    {
+      "name": "pinepaper_font",
+      "description": "Font Studio. action: show_studio|set_name|create_glyph|create_space|remove_glyph|set_metrics|export|cleanup_path|… (16 actions; see pinepaper_tool_guide)."
+    },
+    {
+      "name": "pinepaper_create_letter_collage",
+      "description": "Create stylized text with per-letter customization (Wordle, magazine cutout, gradient styles)"
+    },
+    {
+      "name": "pinepaper_animate_letter_collage",
+      "description": "Apply staggered animation to letter collage letters"
+    },
+    {
+      "name": "pinepaper_execute_generator",
+      "description": "Run procedural background generators"
+    },
+    {
+      "name": "pinepaper_list_generators",
+      "description": "List available background generators"
+    },
+    {
+      "name": "pinepaper_apply_effect",
+      "description": "Apply visual effects to items"
+    },
+    {
+      "name": "pinepaper_add_filter",
+      "description": "Add a visual filter effect to the canvas"
+    },
+    {
+      "name": "pinepaper_get_items",
+      "description": "Get all items on the canvas"
+    },
+    {
+      "name": "pinepaper_get_relation_stats",
+      "description": "Get statistics about relations"
+    },
+    {
+      "name": "pinepaper_export_svg",
+      "description": "Export canvas as animated SVG"
+    },
+    {
+      "name": "pinepaper_export_training_data",
+      "description": "Export instruction/code pairs for LLM training"
+    },
+    {
+      "name": "pinepaper_export_scene",
+      "description": "Export scene definition as JSON."
+    },
+    {
+      "name": "pinepaper_browser_connect",
+      "description": "Connect to PinePaper Studio in browser"
+    },
+    {
+      "name": "pinepaper_browser_disconnect",
+      "description": "Disconnect from browser"
+    },
+    {
+      "name": "pinepaper_browser_screenshot",
+      "description": "Take a screenshot of the canvas"
+    },
+    {
+      "name": "pinepaper_browser_status",
+      "description": "Check browser connection status"
+    },
+    {
+      "name": "pinepaper_get_performance_metrics",
+      "description": "Get execution timing metrics and performance statistics"
+    },
+    {
+      "name": "pinepaper_diagnostic_report",
+      "description": "Generate diagnostic report with token budget analysis."
+    },
+    {
       "name": "pinepaper_agent_start_job",
       "description": "Start an agent job session for batch content creation workflows"
     },
@@ -288,44 +476,32 @@
       "description": "Analyze canvas content for export recommendations"
     },
     {
-      "name": "pinepaper_add_trigger",
-      "description": "Add interactive event triggers to items (click, hover, drag)"
+      "name": "pinepaper_p5_draw",
+      "description": "Execute p5.js-style drawing code on the canvas (subset of p5.js API)"
     },
     {
-      "name": "pinepaper_remove_trigger",
-      "description": "Remove event triggers from an item"
+      "name": "pinepaper_register_item",
+      "description": "Register an existing Paper.js item in the PinePaper registry."
     },
     {
-      "name": "pinepaper_query_triggers",
-      "description": "Query existing triggers on the canvas"
+      "name": "pinepaper_get_canvas_ontology",
+      "description": "Capture live canvas as compact pp: triples + item summary. Prefer over get_items for composition reasoning. maxItems, maxChildren, includeViewport."
     },
     {
-      "name": "pinepaper_create_quiz",
-      "description": "Create interactive quizzes with multiple question types"
+      "name": "pinepaper_analyze_design",
+      "description": "Analyze template definition → typed graph, patterns, math functions, semantics, fingerprint, JSON-LD."
     },
     {
-      "name": "pinepaper_get_quiz_state",
-      "description": "Get current quiz state (score, progress, answers)"
+      "name": "pinepaper_validate_design",
+      "description": "Validate + score template definition. 5-dimension quality scoring: completeness, animation, semantics, composition, structure."
     },
     {
-      "name": "pinepaper_reset_quiz",
-      "description": "Reset quiz to initial state"
+      "name": "pinepaper_validate",
+      "description": "Semantic validation of the live scene/op → structured diagnostics {code, severity, message, fix}. mode:'scene'|'op'. Catches missing targets (+did-you-mean), bad params, cycles."
     },
     {
-      "name": "pinepaper_create_letter_collage",
-      "description": "Create stylized text with per-letter customization (Wordle, magazine cutout, gradient styles)"
-    },
-    {
-      "name": "pinepaper_animate_letter_collage",
-      "description": "Apply staggered animation to letter collage letters"
-    },
-    {
-      "name": "pinepaper_get_letter_collage_options",
-      "description": "Get available letter collage styles, palettes, and options"
-    },
-    {
-      "name": "pinepaper_get_canvas_presets",
-      "description": "List all available canvas size presets (YouTube, Instagram, TikTok, etc.)"
+      "name": "pinepaper_query_ontology",
+      "description": "Query design knowledge graph. query: list_types|list_edges|list_generators|list_effects|type_hierarchy|type_properties|animatable_properties|is_subtype|node_type|edge_type."
     },
     {
       "name": "pinepaper_tool_guide",
@@ -334,6 +510,22 @@
     {
       "name": "pinepaper_set_toolkit",
       "description": "Switch toolkit profile and/or verbosity level at runtime"
+    },
+    {
+      "name": "pinepaper_create_chart",
+      "description": "Charts. action: create|update|reconfigure|remove. chartType: bar|line|scatter|area. data, options, chartId. Bar opts: orient:\"horizontal\", labelArrangement: auto|slanted|vertical|truncate|wrap."
+    },
+    {
+      "name": "pinepaper_magic",
+      "description": "Auto-animation. action: animate|remix. mood: calm|professional|energetic|dramatic|whimsical. selectionOnly."
+    },
+    {
+      "name": "pinepaper_physics",
+      "description": "Rigid body sim. action: init|add_body|remove_body|apply_force|apply_impulse|set_velocity|get_state|create_ground|create_joint. gravity, bodyType, mass, friction."
+    },
+    {
+      "name": "pinepaper_measurement",
+      "description": "Rulers/grid. action: set_rulers|set_grid|get_dimensions|set_snap. enabled, itemId."
     }
   ]
 }
