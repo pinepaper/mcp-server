@@ -423,19 +423,89 @@ export const GroupMorphsToParamsSchema = z.object({
   deformLines: z.boolean().optional().default(true).describe('Path.Line children deform via segment endpoints instead of rigid translation'),
 });
 
+// =============================================================================
+// EQUATION-DRIVEN PATHS (Expression IR — FxTool S10 B5)
+// Deterministic: math strings are parsed via expr-to-ir (no eval), sampled on
+// the Expression IR. Shared by pinepaper_equation_path (geometry) and the
+// moves_along_path `equation` motion source.
+// =============================================================================
+
+// Curated curve library (curvePreset). Each is a parametric preset.
+export const CurvePresetSchema = z.enum(['spiral', 'rose', 'lissajous', 'astroid', 'heart', 'spirograph'])
+  .describe('Curated curve preset');
+
+// One Fourier term for kind:"fourier".
+export const HarmonicSchema = z.object({
+  freq:  z.number().describe('Harmonic frequency'),
+  amp:   z.number().describe('Amplitude'),
+  phase: z.number().optional().describe('Phase offset (radians)'),
+});
+
+// Chained parametric warp — displaces each sampled point by (dx, dy),
+// expressions of x, y (point coords) and t (0..1 along the path).
+export const EquationWarpSchema = z.object({
+  dx: z.string().optional().describe('x displacement expression of x, y, t (0..1)'),
+  dy: z.string().optional().describe('y displacement expression of x, y, t (0..1)'),
+});
+
+// The math-source fields common to both equation surfaces (no placement).
+const equationSpecShape = {
+  kind:      z.enum(['function', 'parametric', 'fourier', 'preset']).optional().default('function').describe("'function' y=f(variable) · 'parametric' x=fx(param),y=fy(param) · 'fourier' harmonics · 'preset' curated curve"),
+  expr:      z.string().optional().describe("y = f(variable) — kind 'function', e.g. 'sin(x)*80'"),
+  xExpr:     z.string().optional().describe("x = fx(param) — kind 'parametric'"),
+  yExpr:     z.string().optional().describe("y = fy(param) — kind 'parametric'"),
+  harmonics: z.array(HarmonicSchema).optional().describe("Fourier terms — kind 'fourier'"),
+  preset:    CurvePresetSchema.optional().describe("Curated curve — kind 'preset'"),
+  variable:  z.string().optional().default('x').describe("Sample variable for kind 'function'"),
+  param:     z.string().optional().default('t').describe("Sample variable for kind 'parametric'/'preset'"),
+  min:       z.number().optional().describe('Sample range start'),
+  max:       z.number().optional().describe('Sample range end'),
+  samples:   z.number().optional().default(200).describe('Number of samples along the range'),
+  scale:     z.number().optional().default(1).describe('Multiply equation coords before placing'),
+  flipY:     z.boolean().optional().default(true).describe('Math y-up → screen y-down'),
+  warp:      z.union([EquationWarpSchema, z.array(EquationWarpSchema)]).optional().describe('Chained parametric warp(s) applied to the sampled points'),
+} as const;
+
 // Self-relation: item is driven along a custom-drawn path stored in params.
 // In the editor the Relations picker offers a drag-to-draw capture mode; via
 // MCP / agent code, pass the points array explicitly.
+// Equation motion source for moves_along_path (S10 B5): the item TRAVERSES a
+// math curve instead of a drawn point list. Origin is cx/cy (default 0) —
+// distinct from pinepaper_equation_path's x/y (canvas-center default).
+// .passthrough(): preset tuning params (e.g. rose's k/r, spiral's turns) ride on
+// the top-level object — FxTool does curvePreset(eq.preset, eq) — so they must
+// survive validation instead of being stripped.
+export const MovesAlongPathEquationSchema = z.object({
+  ...equationSpecShape,
+  cx: z.number().optional().describe('Canvas origin x for the sampled curve (default 0)'),
+  cy: z.number().optional().describe('Canvas origin y for the sampled curve (default 0)'),
+}).passthrough();
+
 export const MovesAlongPathParamsSchema = z.object({
+  // path OR equation — one is required. equation overrides path when both are set.
   path:   z.array(z.union([
             z.object({ x: z.number(), y: z.number() }),
             z.tuple([z.number(), z.number()]),
-          ])).describe('Path points: array of {x,y} objects or [x,y] tuples'),
+          ])).optional().describe('Path points: array of {x,y} objects or [x,y] tuples (omit when using `equation`)'),
+  equation: MovesAlongPathEquationSchema.optional().describe('Equation motion source (S10 B5): traverse a math curve instead of a drawn path — deterministic, sampled on the Expression IR'),
   speed:  z.number().optional().default(1).describe('Speed multiplier (1 ≈ 150 px/s)'),
   closed: z.boolean().optional().default(true).describe('Loop back to start at end of path'),
   phase:  z.number().optional().default(0).describe('Starting position along path (0–1)'),
   easing: z.enum(['linear', 'easeIn', 'easeOut', 'easeInOut', 'sine', 'bounce', 'pingpong']).optional().default('linear').describe('Motion curve mapping normalized time → progress along path'),
 });
+
+// pinepaper_equation_path input — creates a path ITEM from a math equation.
+// Placement is x/y (canvas center default) + style, on top of the shared spec.
+// .passthrough(): preset tuning params (rose's k/r, spiral's turns, …) ride on
+// the top-level object — FxTool does curvePreset(opts.preset, opts.presetParams
+// || opts) — so they must survive validation.
+export const EquationPathInputSchema = z.object({
+  ...equationSpecShape,
+  x:     z.number().optional().describe('Canvas origin x (default: canvas center)'),
+  y:     z.number().optional().describe('Canvas origin y (default: canvas center)'),
+  style: z.record(z.unknown()).optional().describe('Path style forwarded to create (strokeColor, strokeWidth, fillColor, …)'),
+}).passthrough();
+export type EquationPathInput = z.infer<typeof EquationPathInputSchema>;
 
 // Procedural / deterministic property binding (Expression IR — FxTool S10 G1).
 // driven_by: source's `sourceProperty` = target's `targetProperty` * multiplier

@@ -142,6 +142,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
   ],
   dataviz: [
     'pinepaper_create_chart',
+    'pinepaper_equation_path',
   ],
   magic: [
     'pinepaper_magic',

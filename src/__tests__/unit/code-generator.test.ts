@@ -4,6 +4,7 @@
 
 import { describe, it, expect } from 'bun:test';
 import { codeGenerator } from '../../types/code-generator.js';
+import { EquationPathInputSchema } from '../../types/schemas.js';
 import {
   mockTextItem,
   mockCircleItem,
@@ -814,6 +815,37 @@ describe('PinePaperCodeGenerator', () => {
       expect(code).toContain("app.create('circle'"); // circle + point branches present
       expect(code).toContain('#FF6B6B');
       expect(code).toContain('registryId');
+    });
+  });
+
+  describe('generateEquationPath', () => {
+    it('emits app.createEquationPath with the opts and returns itemId', () => {
+      const code = codeGenerator.generateEquationPath(
+        EquationPathInputSchema.parse({ kind: 'function', expr: 'sin(x/40)*60', min: -300, max: 300 })
+      );
+      expect(code).toContain('app.createEquationPath(');
+      expect(code).toContain('sin(x/40)*60');
+      expect(code).toContain('registryId');
+      expect(code).toContain('success: true');
+    });
+
+    it('guards against an FxTool without the equation-path API', () => {
+      const code = codeGenerator.generateEquationPath(EquationPathInputSchema.parse({}));
+      expect(code).toContain("typeof app.createEquationPath !== 'function'");
+      expect(code).toContain('unavailable');
+    });
+
+    it('carries parametric + preset params through verbatim', () => {
+      const para = codeGenerator.generateEquationPath(
+        EquationPathInputSchema.parse({ kind: 'parametric', xExpr: 'cos(3*t)*120', yExpr: 'sin(2*t)*80' })
+      );
+      expect(para).toContain('cos(3*t)*120');
+      expect(para).toContain('sin(2*t)*80');
+
+      const preset = codeGenerator.generateEquationPath(
+        EquationPathInputSchema.parse({ kind: 'preset', preset: 'rose', k: 5 } as any)
+      );
+      expect(preset).toContain('"preset":"rose"');
     });
   });
 

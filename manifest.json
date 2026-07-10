@@ -156,6 +156,10 @@
       "description": "Exact geometry construction (polygon vertices, intersections, circumcircle, tangents); optionally creates an item from the result. {operation, args, createAs?}"
     },
     {
+      "name": "pinepaper_equation_path",
+      "description": "Create a path item from a math equation (deterministic, Expression IR). kind: function|parametric|fourier|preset (spiral/rose/lissajous/astroid/heart/spirograph). {kind, expr|xExpr/yExpr|harmonics|preset, min, max, samples, scale, x, y, style}"
+    },
+    {
       "name": "pinepaper_construction_sequence",
       "description": "Reveal a figure step by step on the timeline (build/play/clear/list). {action, steps?, stepDuration?}"
     },

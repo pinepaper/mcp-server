@@ -1335,6 +1335,59 @@ For figures that must stay correct as anchors move (GeoGebra-style), use the geo
   },
 
   {
+    name: 'pinepaper_equation_path',
+    annotations: {
+      title: 'Equation-Driven Path',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Create a path ITEM from a math equation (FxTool's app.createEquationPath, Expression IR — S10 B5). Deterministic: the math strings are PARSED (expr-to-ir, no eval) and sampled on the Expression IR, so the same input always yields the same curve. Use this instead of hand-computing points for a curve.
+
+KINDS:
+- function (default): y = f(variable). expr, e.g. "sin(x) * 80". variable defaults to 'x'.
+- parametric: x = fx(param), y = fy(param). xExpr + yExpr, e.g. xExpr "cos(3*t)*120", yExpr "sin(2*t)*80". param defaults to 't'.
+- fourier: sum of harmonics. harmonics: [{ freq, amp, phase? }, …].
+- preset: a curated curve. preset ∈ spiral | rose | lissajous | astroid | heart | spirograph (preset-specific tuning passed as top-level fields, e.g. { kind:"preset", preset:"rose", k:5, r:140 }).
+
+SAMPLING & PLACEMENT: min/max (sample range) · samples (default 200) · scale (multiply coords) · x/y (canvas origin, default canvas center) · flipY (math y-up → screen y-down, default true) · style (strokeColor/strokeWidth/fillColor forwarded to create).
+
+warp (optional): chained parametric warp(s) — displace each sampled point by { dx, dy }, expressions of x, y (point coords) and t (0..1 along the path). Pass one object or an array to chain.
+
+RETURNS: { success, kind, itemId } — itemId is the created path. Bad expressions / empty ranges return { success:false, error }.
+
+To make an item TRAVEL along an equation curve (instead of drawing it), use pinepaper_add_relation relationType moves_along_path with params.equation instead.
+
+EXAMPLES:
+- Sine wave: { kind: "function", expr: "sin(x/40) * 60", min: -300, max: 300, style: { strokeColor: "#4f46e5" } }
+- Lissajous: { kind: "parametric", xExpr: "cos(3*t)*120", yExpr: "sin(2*t)*80", min: 0, max: 6.2832 }
+- Rose preset: { kind: "preset", preset: "rose", k: 5, r: 140 }`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        kind: { type: 'string', enum: ['function', 'parametric', 'fourier', 'preset'], description: "Equation kind (default 'function')" },
+        expr: { type: 'string', description: "y = f(variable) — kind 'function'" },
+        xExpr: { type: 'string', description: "x = fx(param) — kind 'parametric'" },
+        yExpr: { type: 'string', description: "y = fy(param) — kind 'parametric'" },
+        harmonics: { type: 'array', description: "kind 'fourier': [{ freq, amp, phase? }, …]" },
+        preset: { type: 'string', enum: ['spiral', 'rose', 'lissajous', 'astroid', 'heart', 'spirograph'], description: "kind 'preset': curated curve" },
+        variable: { type: 'string', description: "Sample variable for 'function' (default 'x')" },
+        param: { type: 'string', description: "Sample variable for 'parametric'/'preset' (default 't')" },
+        min: { type: 'number', description: 'Sample range start' },
+        max: { type: 'number', description: 'Sample range end' },
+        samples: { type: 'number', description: 'Sample count (default 200)' },
+        scale: { type: 'number', description: 'Multiply equation coords (default 1)' },
+        x: { type: 'number', description: 'Canvas origin x (default: canvas center)' },
+        y: { type: 'number', description: 'Canvas origin y (default: canvas center)' },
+        flipY: { type: 'boolean', description: 'Math y-up → screen y-down (default true)' },
+        style: { type: 'object', description: 'Path style forwarded to create (strokeColor, strokeWidth, fillColor, …)' },
+        warp: { description: 'Chained parametric warp(s): { dx, dy } expressions of x, y, t — one object or an array' },
+      },
+    },
+  },
+
+  {
     name: 'pinepaper_construction_sequence',
     annotations: {
       title: 'Construction Sequence',
@@ -1710,7 +1763,7 @@ RELATION COMPATIBILITY:
   Text→Text: font blend
   Cross-type: particle denoising transition
 - group_morphs_to: pair-by-index morph between two paper.Groups (any two — graph vertices+edges, letter collages, dashboard clusters). Path.Line children deform via endpoints; other children translate; excess children fade. Params: duration, hold, loop, easing (linear|easeIn|easeOut|easeInOut), deformLines.
-- moves_along_path: self-relation (targetId=null); item is driven along a custom-drawn path stored in params.path (array of {x,y} or [x,y]). Params: path, speed, closed, phase, easing (linear|easeIn|easeOut|easeInOut|sine|bounce|pingpong).
+- moves_along_path: self-relation (targetId=null); item is driven along a path. Source the path EITHER from params.path (array of {x,y} or [x,y]) OR from params.equation (S10 B5) — a math curve the item TRAVERSES, sampled deterministically on the Expression IR: params.equation = { kind: function|parametric|fourier|preset, expr | xExpr/yExpr | harmonics | preset, min, max, samples, scale, cx, cy, flipY, warp } (same equation contract as pinepaper_equation_path, but origin is cx/cy, default 0). Params: path OR equation, speed, closed, phase, easing (linear|easeIn|easeOut|easeInOut|sine|bounce|pingpong).
 
 GEOMETRIC CONSTRUCTION CONSTRAINTS (Layer 2) — the source item is RE-DERIVED every frame from its anchor item(s), so dragging an anchor updates the dependent live (GeoGebra-style), and the construction persists as relation graph data (edit it by editing relations, not by re-running code). Anchor A is the relation target; extra anchors ride in params:
 - is_midpoint_of: source = midpoint(target, params.other). params.other = id of the second endpoint (B).

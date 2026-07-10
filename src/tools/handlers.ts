@@ -33,6 +33,7 @@ import {
   BatchModifyInputSchema,
   CreateGridInputSchema,
   GeometryInputSchema,
+  EquationPathInputSchema,
   ConstructionSequenceInputSchema,
   ValidateSceneInputSchema,
   CaptureFramesInputSchema,
@@ -1006,6 +1007,13 @@ async function handleToolCallInner(
         const code = codeGenerator.generateGeometry(input);
         const description = `Geometry construction: ${input.operation}${input.createAs ? ' (+ create item)' : ''}`;
         return executeOrGenerate(code, description, options, 'pinepaper_geometry');
+      }
+
+      case 'pinepaper_equation_path': {
+        const input = EquationPathInputSchema.parse(args);
+        const code = codeGenerator.generateEquationPath(input);
+        const description = `Equation-driven path: ${input.kind}${input.preset ? ` (${input.preset})` : ''}`;
+        return executeOrGenerate(code, description, options, 'pinepaper_equation_path');
       }
 
       case 'pinepaper_construction_sequence': {

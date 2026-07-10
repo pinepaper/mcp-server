@@ -21,6 +21,8 @@ import {
   RelationTypeSchema,
   DrivenByParamsSchema,
   TimeExpressionParamsSchema,
+  EquationPathInputSchema,
+  MovesAlongPathParamsSchema,
   SimpleAnimationTypeSchema,
   GeneratorNameSchema,
   EffectTypeSchema,
@@ -133,6 +135,49 @@ describe('Schema Validation', () => {
     it('accepts an expression of t and v in signal mode', () => {
       const r = TimeExpressionParamsSchema.safeParse({
         property: 'y', expression: 'sin(t * 2) * 50 + v', baseValue: 300, signal: true,
+      });
+      expect(r.success).toBe(true);
+    });
+  });
+
+  describe('EquationPathInputSchema (S10 B5 equation-driven paths)', () => {
+    it('applies FxTool-matching defaults', () => {
+      const p = EquationPathInputSchema.parse({});
+      expect(p.kind).toBe('function');
+      expect(p.variable).toBe('x');
+      expect(p.param).toBe('t');
+      expect(p.samples).toBe(200);
+      expect(p.scale).toBe(1);
+      expect(p.flipY).toBe(true);
+    });
+
+    it('accepts each kind', () => {
+      expect(EquationPathInputSchema.safeParse({ kind: 'function', expr: 'sin(x)*80' }).success).toBe(true);
+      expect(EquationPathInputSchema.safeParse({ kind: 'parametric', xExpr: 'cos(3*t)*120', yExpr: 'sin(2*t)*80' }).success).toBe(true);
+      expect(EquationPathInputSchema.safeParse({ kind: 'fourier', harmonics: [{ freq: 1, amp: 100 }, { freq: 3, amp: 33, phase: 0.5 }] }).success).toBe(true);
+      expect(EquationPathInputSchema.safeParse({ kind: 'preset', preset: 'rose', style: { strokeColor: '#4f46e5' } }).success).toBe(true);
+    });
+
+    it('accepts chained warp (single or array)', () => {
+      expect(EquationPathInputSchema.safeParse({ warp: { dx: 'sin(t*6)*4', dy: '0' } }).success).toBe(true);
+      expect(EquationPathInputSchema.safeParse({ warp: [{ dx: '0', dy: 'cos(x/20)*5' }] }).success).toBe(true);
+    });
+
+    it('rejects an unknown preset', () => {
+      expect(EquationPathInputSchema.safeParse({ kind: 'preset', preset: 'bogus' }).success).toBe(false);
+    });
+  });
+
+  describe('MovesAlongPathParamsSchema equation source (S10 B5)', () => {
+    it('still accepts a drawn point path (backward compatible)', () => {
+      const r = MovesAlongPathParamsSchema.safeParse({ path: [{ x: 0, y: 0 }, [100, 100]], speed: 1 });
+      expect(r.success).toBe(true);
+    });
+
+    it('accepts an equation source with no drawn path', () => {
+      const r = MovesAlongPathParamsSchema.safeParse({
+        equation: { kind: 'preset', preset: 'lissajous', cx: 400, cy: 300 },
+        speed: 0.5, closed: true,
       });
       expect(r.success).toBe(true);
     });

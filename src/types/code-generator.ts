@@ -154,6 +154,7 @@ import {
   PhysicsInput,
   MeasurementInput,
   GeometryInput,
+  EquationPathInput,
   ConstructionSequenceInput,
   ValidateSceneInput,
   CaptureFramesInput,
@@ -5491,6 +5492,30 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    const ite
   }
 
   return { success: true, operation: ${op}, result, itemId };
+})();`.trim();
+  }
+
+  /**
+   * Generate code for an equation-driven path (Expression IR — S10 B5).
+   * Emits app.createEquationPath(opts); the whole validated input IS the opts
+   * object. Guards on the app method so old FxTool builds degrade gracefully.
+   */
+  generateEquationPath(input: EquationPathInput): string {
+    const optsJson = JSON.stringify(input);
+    const kindJson = JSON.stringify(input.kind);
+    return `
+// Equation-driven path: ${input.kind}${input.preset ? ' ' + input.preset : ''}
+(function() {
+  if (typeof app.createEquationPath !== 'function') {
+    return { success: false, error: 'app.createEquationPath unavailable — update FxTool to a build with the Expression IR equation-path API (S10 B5)' };
+  }
+  const path = app.createEquationPath(${optsJson});
+  if (!path) {
+    return { success: false, error: 'Equation path produced no points — check expr/xExpr/yExpr, the sample range, or the preset name' };
+  }
+  const itemId = path.data && path.data.registryId;
+  if (app.historyManager) app.historyManager.saveState();
+  return { success: true, kind: ${kindJson}, itemId };
 })();`.trim();
   }
 }
