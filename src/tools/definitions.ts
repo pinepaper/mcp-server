@@ -1686,6 +1686,8 @@ USE WHEN:
 - "M is the midpoint of A and B" → relationType: is_midpoint_of (params.other: B)
 - "O is the circumcenter of the triangle" → relationType: is_circumcenter_of
 - "reveal each step in turn" → relationType: construction_reveal (params.revealAt, fadeIn)
+- "bar height driven by the slider's x" / "tint the dot by the planet's position" → relationType: driven_by
+- "make it bob with sin(t)" / "property follows a math expression of time" → relationType: time_expression
 - Creating physics-based or behavioral animations
 - Building live geometric constructions (GeoGebra-style — dragging an anchor updates the dependent)
 
@@ -1718,6 +1720,10 @@ GEOMETRIC CONSTRUCTION CONSTRAINTS (Layer 2) — the source item is RE-DERIVED e
 - concentric_with: source stays centered on the target (shared center).
 - construction_reveal: self-relation (targetId=null); opacity 0→1 starting at params.revealAt (timeline seconds) over params.fadeIn seconds — loop- and scrub-correct. Pair with pinepaper_construction_sequence to reveal a figure one step at a time.
 
+PROCEDURAL / DETERMINISTIC BINDING (Expression IR — S10 G1) — bind a property to another property or to a math function of time. Pass params.signal:true to route through the pure, seed/frame-deterministic signal interpreter (replay-stable — same time → identical output); omit it for the per-frame compute fallback.
+- driven_by: source's sourceProperty = target's targetProperty * multiplier + offset (optionally clamped). sourceProperty ∈ x|y|rotation|opacity|scale|strokeWidth|fillColor|strokeColor; targetProperty ∈ x|y|rotation|opacity|scale. For fillColor/strokeColor the (clamped 0..1) driven value interpolates colorFrom→colorTo — so a relation drives COLOR. NEEDS a target (the property source). params: sourceProperty, targetProperty, multiplier, offset, clamp {min,max}, colorFrom, colorTo, signal. e.g. tint a dot by a planet's x: sourceProperty 'fillColor', targetProperty 'x', colorFrom '#0055ff', colorTo '#ff3300', signal true.
+- time_expression: self-relation (targetId=null); the source's params.property is driven by a math expression of t (scene time) and v (params.baseValue). params: property (default 'y'), expression (e.g. 'sin(t*2)*50 + v'), baseValue, signal. With signal:true the expression is parsed into the Expression IR and evaluated as a pure f(t); it falls back to per-frame if it uses random() or an unknown symbol (non-deterministic).
+
 CURSOR / MOUSE AS TARGET — a relation can target the live pointer instead of an item by passing the reserved targetId 'cursor' (aliases 'mouse' / 'pointer'); collaborator cursors are 'cursor:<peerId>'. e.g. make an item flee the mouse: relationType 'repels', targetId 'cursor', params { returnSpeed: 0.08 }. The cursor is a virtual target (no canvas item) and its interactions are inspectable in FxTool's "Mouse / Cursor" registry section.
 
 TEMPORAL VALIDITY WINDOWS (temporal-model v1) — ANY relation may carry params.window = { start, end?, repeat? } (scene seconds) to gate WHEN it is active. The engine only applies the relation within [start, end) and feeds it window-relative local time (so an orbit/wave starts its phase at the window open, not at scene 0). repeat ∈ once (default) | loop | pingpong. Omit end for open-ended. Windowless relations are always active. e.g. params: { ...relationParams, window: { start: 2, end: 5 } } makes the relation live only from 2s to 5s.
@@ -1742,7 +1748,7 @@ Relations are COMPOSITIONAL - an item can have multiple relations that work toge
         },
         relationType: {
           type: 'string',
-          enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'camera_animates', 'morphs_to', 'group_morphs_to', 'moves_along_path', 'is_midpoint_of', 'lies_on_line', 'is_centroid_of', 'is_circumcenter_of', 'concentric_with', 'construction_reveal'],
+          enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'camera_animates', 'morphs_to', 'group_morphs_to', 'moves_along_path', 'is_midpoint_of', 'lies_on_line', 'is_centroid_of', 'is_circumcenter_of', 'concentric_with', 'construction_reveal', 'driven_by', 'time_expression'],
           description: 'Type of relationship',
         },
         params: {
@@ -1777,7 +1783,7 @@ USE WHEN:
         targetId: { type: 'string', description: 'Target item ID' },
         relationType: {
           type: 'string',
-          enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'camera_animates', 'morphs_to', 'group_morphs_to', 'moves_along_path', 'is_midpoint_of', 'lies_on_line', 'is_centroid_of', 'is_circumcenter_of', 'concentric_with', 'construction_reveal'],
+          enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'camera_animates', 'morphs_to', 'group_morphs_to', 'moves_along_path', 'is_midpoint_of', 'lies_on_line', 'is_centroid_of', 'is_circumcenter_of', 'concentric_with', 'construction_reveal', 'driven_by', 'time_expression'],
           description: 'Specific relation type to remove (optional - removes all if not specified)',
         },
       },
@@ -1806,7 +1812,7 @@ USE WHEN:
         itemId: { type: 'string', description: 'Item to query relations for' },
         relationType: {
           type: 'string',
-          enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'camera_animates', 'morphs_to', 'group_morphs_to', 'moves_along_path', 'is_midpoint_of', 'lies_on_line', 'is_centroid_of', 'is_circumcenter_of', 'concentric_with', 'construction_reveal'],
+          enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'camera_animates', 'morphs_to', 'group_morphs_to', 'moves_along_path', 'is_midpoint_of', 'lies_on_line', 'is_centroid_of', 'is_circumcenter_of', 'concentric_with', 'construction_reveal', 'driven_by', 'time_expression'],
           description: 'Filter by relation type (optional)',
         },
         direction: {
@@ -2663,7 +2669,7 @@ SUPPORTED ANIMATIONS: pulse, rotate, bounce, fade, wobble, slide, typewriter`,
               target: { type: 'string', description: 'Name of target item' },
               type: {
                 type: 'string',
-                enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'camera_animates', 'morphs_to', 'group_morphs_to', 'moves_along_path', 'is_midpoint_of', 'lies_on_line', 'is_centroid_of', 'is_circumcenter_of', 'concentric_with', 'construction_reveal'],
+                enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'camera_animates', 'morphs_to', 'group_morphs_to', 'moves_along_path', 'is_midpoint_of', 'lies_on_line', 'is_centroid_of', 'is_circumcenter_of', 'concentric_with', 'construction_reveal', 'driven_by', 'time_expression'],
               },
               params: {
                 type: 'object',
@@ -5488,7 +5494,7 @@ EXAMPLE — Animated sky scene with timed reveals:
               targetId: { type: 'string', description: 'For relation: target item ID or $N' },
               relationType: {
                 type: 'string',
-                enum: ['orbits', 'follows', 'attached_to', 'points_at', 'mirrors', 'parallax', 'animates', 'grows_from', 'staggered_with', 'wave_through', 'circumscribes', 'morphs_to', 'group_morphs_to', 'moves_along_path', 'maintains_distance', 'bounds_to', 'indicates', 'camera_follows', 'camera_animates', 'is_midpoint_of', 'lies_on_line', 'is_centroid_of', 'is_circumcenter_of', 'concentric_with', 'construction_reveal'],
+                enum: ['orbits', 'follows', 'attached_to', 'points_at', 'mirrors', 'parallax', 'animates', 'grows_from', 'staggered_with', 'wave_through', 'circumscribes', 'morphs_to', 'group_morphs_to', 'moves_along_path', 'maintains_distance', 'bounds_to', 'indicates', 'camera_follows', 'camera_animates', 'is_midpoint_of', 'lies_on_line', 'is_centroid_of', 'is_circumcenter_of', 'concentric_with', 'construction_reveal', 'driven_by', 'time_expression'],
                 description: 'For relation: type',
               },
               relationOptions: { type: 'object', description: 'For relation: options' },

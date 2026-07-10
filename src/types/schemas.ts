@@ -277,6 +277,11 @@ export const RelationTypeSchema = z.enum([
   'is_circumcenter_of',  // source = circumcenter(target, params.other1, params.other2)
   'concentric_with',     // source shares the target's center
   'construction_reveal', // self-relation: opacity 0→1 at params.revealAt over params.fadeIn (timeline-driven)
+  // Procedural / deterministic property binding (Expression IR — FxTool S10 G1).
+  // params.signal:true routes through the pure, seed/frame-deterministic signal
+  // interpreter (replay-stable), else the per-frame compute fallback runs.
+  'driven_by',           // source property = target property * multiplier + offset (+clamp); drives color/stroke/opacity/scale/pos. Needs a target.
+  'time_expression',     // self-relation: source property driven by a math expression f(t, v) — t=time, v=params.baseValue
 ]).describe('Type of relationship between items');
 
 export type RelationType = z.infer<typeof RelationTypeSchema>;
@@ -430,6 +435,34 @@ export const MovesAlongPathParamsSchema = z.object({
   closed: z.boolean().optional().default(true).describe('Loop back to start at end of path'),
   phase:  z.number().optional().default(0).describe('Starting position along path (0–1)'),
   easing: z.enum(['linear', 'easeIn', 'easeOut', 'easeInOut', 'sine', 'bounce', 'pingpong']).optional().default('linear').describe('Motion curve mapping normalized time → progress along path'),
+});
+
+// Procedural / deterministic property binding (Expression IR — FxTool S10 G1).
+// driven_by: source's `sourceProperty` = target's `targetProperty` * multiplier
+// + offset (optionally clamped). For fillColor/strokeColor the driven value
+// (clamped 0..1) interpolates colorFrom→colorTo — a relation that drives COLOR.
+// signal:true evaluates via the pure IR signal interpreter (frame-deterministic,
+// x/y target props track a moving target); else the per-frame compute runs.
+export const DrivenByParamsSchema = z.object({
+  sourceProperty: z.enum(['x', 'y', 'rotation', 'opacity', 'scale', 'strokeWidth', 'fillColor', 'strokeColor']).optional().default('opacity').describe('Property on the SOURCE item to drive'),
+  targetProperty: z.enum(['x', 'y', 'rotation', 'opacity', 'scale']).optional().default('x').describe('Property on the TARGET item to read'),
+  multiplier: z.number().optional().default(1).describe('Scale factor applied to the target value'),
+  offset: z.number().optional().default(0).describe('Offset added after the multiplier'),
+  clamp: z.object({ min: z.number().optional(), max: z.number().optional() }).optional().describe('Optional {min, max} clamp on the result'),
+  colorFrom: z.string().optional().default('#000000').describe('Color at driven value 0 (fillColor/strokeColor sourceProperty)'),
+  colorTo: z.string().optional().default('#ffffff').describe('Color at driven value 1 (fillColor/strokeColor sourceProperty)'),
+  signal: z.boolean().optional().default(false).describe('Deterministic IR-signal mode — replay-stable; x/y target props track a moving target'),
+});
+
+// time_expression: self-relation (targetId=null). The source's `property` is
+// driven by a math expression of t (scene time) and v (baseValue). signal:true
+// parses the expression into the Expression IR and evaluates a pure f(t)
+// (replay-stable), falling back to per-frame if it uses random()/unknown symbols.
+export const TimeExpressionParamsSchema = z.object({
+  property: z.string().optional().default('y').describe('Property to drive: x, y, rotation, opacity, scale'),
+  expression: z.string().optional().default('sin(t * 2) * 50 + 300').describe('Math expression of t (time) and v (baseValue), e.g. "sin(t*2)*50 + v"'),
+  baseValue: z.number().optional().default(0).describe('Base value accessible as v in the expression'),
+  signal: z.boolean().optional().default(false).describe('Deterministic IR mode — parse expression to IR, evaluate as pure f(t)'),
 });
 
 // =============================================================================
@@ -875,7 +908,7 @@ export const DeleteItemInputSchema = z.object({
 // Add Relation
 export const AddRelationInputSchema = z.object({
   sourceId: z.string().describe('Registry ID of the source item'),
-  targetId: z.string().optional().describe('Registry ID of the target item (can be null for self-animations)'),
+  targetId: z.string().nullish().describe('Registry ID of the target item; null/omitted for self-relations (animates, moves_along_path, construction_reveal, time_expression)'),
   relationType: RelationTypeSchema,
   params: z.record(z.unknown()).optional().default({}),
 });

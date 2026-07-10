@@ -19,12 +19,15 @@ import {
   AgentBatchExecuteInputSchema,
   ItemTypeSchema,
   RelationTypeSchema,
+  DrivenByParamsSchema,
+  TimeExpressionParamsSchema,
   SimpleAnimationTypeSchema,
   GeneratorNameSchema,
   EffectTypeSchema,
   PositionSchema,
   KeyframeSchema,
 } from '../../types/schemas.js';
+import { PINEPAPER_TOOLS } from '../../tools/definitions.js';
 
 describe('Schema Validation', () => {
   describe('PositionSchema', () => {
@@ -70,6 +73,8 @@ describe('Schema Validation', () => {
     const validTypes = [
       'orbits', 'follows', 'attached_to', 'maintains_distance',
       'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates',
+      // Procedural / deterministic property binding (S10 G1)
+      'driven_by', 'time_expression',
     ];
 
     it.each(validTypes)('should validate %s as valid relation type', (type) => {
@@ -80,6 +85,56 @@ describe('Schema Validation', () => {
     it('should reject invalid relation type', () => {
       const result = RelationTypeSchema.safeParse('invalid');
       expect(result.success).toBe(false);
+    });
+
+    // The tool inputSchema enums are hand-maintained copies of the Zod enum
+    // (5 relation-carrying tools). Guard against future drift.
+    it.each([
+      'pinepaper_add_relation', 'pinepaper_remove_relation', 'pinepaper_query_relations',
+    ])('%s inputSchema enum covers every RelationTypeSchema option', (toolName) => {
+      const tool = PINEPAPER_TOOLS.find((t) => t.name === toolName);
+      expect(tool).toBeDefined();
+      const enumVals = (tool!.inputSchema as any).properties.relationType.enum as string[];
+      const missing = RelationTypeSchema.options.filter((o) => !enumVals.includes(o));
+      expect(missing).toEqual([]);
+    });
+  });
+
+  describe('DrivenByParamsSchema (S10 G1 deterministic binding)', () => {
+    it('applies FxTool-matching defaults', () => {
+      const p = DrivenByParamsSchema.parse({});
+      expect(p.sourceProperty).toBe('opacity');
+      expect(p.targetProperty).toBe('x');
+      expect(p.multiplier).toBe(1);
+      expect(p.signal).toBe(false);
+    });
+
+    it('accepts color binding + signal mode + clamp', () => {
+      const r = DrivenByParamsSchema.safeParse({
+        sourceProperty: 'fillColor', targetProperty: 'x',
+        colorFrom: '#0055ff', colorTo: '#ff3300', signal: true,
+        clamp: { min: 0, max: 1 },
+      });
+      expect(r.success).toBe(true);
+    });
+
+    it('rejects an unknown sourceProperty', () => {
+      expect(DrivenByParamsSchema.safeParse({ sourceProperty: 'bogus' }).success).toBe(false);
+    });
+  });
+
+  describe('TimeExpressionParamsSchema (S10 deterministic f(t))', () => {
+    it('defaults property to y and signal to false', () => {
+      const p = TimeExpressionParamsSchema.parse({});
+      expect(p.property).toBe('y');
+      expect(p.signal).toBe(false);
+    });
+
+    it('accepts an expression of t and v in signal mode', () => {
+      const r = TimeExpressionParamsSchema.safeParse({
+        property: 'y', expression: 'sin(t * 2) * 50 + v', baseValue: 300, signal: true,
+      });
+      expect(r.success).toBe(true);
     });
   });
 

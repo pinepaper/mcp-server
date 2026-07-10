@@ -11,6 +11,8 @@ import {
   mockOrbitsRelation,
   mockFollowsRelation,
   mockAttachedToRelation,
+  mockDrivenByRelation,
+  mockTimeExpressionRelation,
   mockPulseAnimation,
   mockFadeInKeyframes,
   mockSunburstGenerator,
@@ -158,6 +160,24 @@ describe('PinePaperCodeGenerator', () => {
     it('should include error handling for failed relation', () => {
       const code = codeGenerator.generateAddRelation(mockOrbitsRelation);
       expect(code).toContain('if (!success)');
+    });
+
+    it('should generate driven_by code preserving signal + color binding params', () => {
+      const code = codeGenerator.generateAddRelation(mockDrivenByRelation);
+
+      expect(code).toContain("app.addRelation('dot_1', 'planet_1', 'driven_by'");
+      expect(code).toContain('fillColor');       // sourceProperty
+      expect(code).toContain('#0055ff');          // colorFrom
+      expect(code).toContain('#ff3300');          // colorTo
+      expect(code).toContain('"signal": true');   // deterministic IR mode preserved
+    });
+
+    it('should generate time_expression self-relation preserving the expression', () => {
+      const code = codeGenerator.generateAddRelation(mockTimeExpressionRelation);
+
+      expect(code).toContain("'time_expression'");
+      expect(code).toContain('sin(t * 2) * 50 + v'); // expression preserved verbatim
+      expect(code).toContain('"signal": true');
     });
   });
 

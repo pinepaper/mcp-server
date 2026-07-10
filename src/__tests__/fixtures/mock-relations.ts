@@ -85,6 +85,37 @@ export const mockBoundsToRelation = {
   },
 };
 
+// Procedural / deterministic property binding (Expression IR — S10 G1).
+// driven_by drives the source's fillColor from the target's x via the pure
+// signal interpreter (signal:true → replay-stable).
+export const mockDrivenByRelation = {
+  sourceId: 'dot_1',
+  targetId: 'planet_1',
+  relationType: 'driven_by' as const,
+  params: {
+    sourceProperty: 'fillColor',
+    targetProperty: 'x',
+    multiplier: 0.002,
+    offset: 0,
+    colorFrom: '#0055ff',
+    colorTo: '#ff3300',
+    signal: true,
+  },
+};
+
+// time_expression: self-relation (targetId=null); bob the y with sin(t).
+export const mockTimeExpressionRelation = {
+  sourceId: 'floater_1',
+  targetId: null,
+  relationType: 'time_expression' as const,
+  params: {
+    property: 'y',
+    expression: 'sin(t * 2) * 50 + v',
+    baseValue: 300,
+    signal: true,
+  },
+};
+
 // Collection of all mock relations
 export const allMockRelations = [
   mockOrbitsRelation,
@@ -95,4 +126,6 @@ export const allMockRelations = [
   mockMirrorsRelation,
   mockParallaxRelation,
   mockBoundsToRelation,
+  mockDrivenByRelation,
+  mockTimeExpressionRelation,
 ];
