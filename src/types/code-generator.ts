@@ -155,6 +155,7 @@ import {
   MeasurementInput,
   GeometryInput,
   EquationPathInput,
+  EventInput,
   ConstructionSequenceInput,
   ValidateSceneInput,
   CaptureFramesInput,
@@ -5516,6 +5517,41 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    const ite
   const itemId = path.data && path.data.registryId;
   if (app.historyManager) app.historyManager.saveState();
   return { success: true, kind: ${kindJson}, itemId };
+})();`.trim();
+  }
+
+  /**
+   * Generate code for the pp:event channel (S11 event-driven scene chains).
+   * create → app.createEvent(name, opts) → eventId; pulse → app.pulseEvent.
+   * Guards on the app methods so old FxTool builds degrade gracefully.
+   */
+  generateEvent(input: EventInput): string {
+    if (input.action === 'create') {
+      const nameJson = JSON.stringify(input.name);
+      const optsJson = JSON.stringify({ payloadType: input.payloadType, x: input.x, y: input.y });
+      return `
+// Create event: ${input.name}
+(function() {
+  if (typeof app.createEvent !== 'function') {
+    return { success: false, error: 'app.createEvent unavailable — update FxTool to a build with the event system (S11)' };
+  }
+  const eventId = app.createEvent(${nameJson}, ${optsJson});
+  if (!eventId) { return { success: false, error: 'Event creation failed' }; }
+  if (app.historyManager) app.historyManager.saveState();
+  return { success: true, action: 'create', eventId };
+})();`.trim();
+    }
+    // pulse — a runtime fire, not a scene edit (no history save)
+    const eventIdJson = JSON.stringify(input.eventId);
+    const payloadJson = JSON.stringify(input.payload ?? null);
+    return `
+// Pulse event: ${input.eventId}
+(function() {
+  if (typeof app.pulseEvent !== 'function') {
+    return { success: false, error: 'app.pulseEvent unavailable — update FxTool to a build with the event system (S11)' };
+  }
+  app.pulseEvent(${eventIdJson}, ${payloadJson});
+  return { success: true, action: 'pulse', eventId: ${eventIdJson} };
 })();`.trim();
   }
 }

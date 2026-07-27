@@ -1388,6 +1388,43 @@ EXAMPLES:
   },
 
   {
+    name: 'pinepaper_event',
+    annotations: {
+      title: 'Event Channel',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Manage the pp:event channel — the backbone of EVENT-DRIVEN SCENE CHAINS (FxTool S11). An event is a fireable channel; relations with an event as their source run when it fires. This is how you author a LONG scene as a graph of timed beats instead of a keyframe track.
+
+ACTIONS:
+- create: make an event. { name (required), payloadType?, x?, y? } → returns { eventId }. Use the eventId as the sourceId of on_event_* relations (pinepaper_add_relation).
+- pulse: fire an event now. { eventId (required), payload? }. Kicks off a chain.
+
+TYPICAL SCENE CHAIN:
+1. pinepaper_event create → e0, e1, e2 (one per beat).
+2. Chain them: add_relation on_event_fire_after from e0→e1 (params.delay, timeline:'canvas'), e1→e2, …
+3. Give each beat reactions: on_event_add_relation (spawn an orbit/path), on_event_set_color, on_event_set_property, on_event_set_visibility (all via pinepaper_add_relation, sourceId=the event).
+4. pinepaper_event pulse e0 to start. Canvas-timed fires are scrub/loop/replay-stable.
+
+RETURNS: create → { success, action, eventId }; pulse → { success, action, eventId }.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['create', 'pulse'], description: "'create' a pp:event · 'pulse' it to fire" },
+        name: { type: 'string', description: "Event name — required for action 'create'" },
+        payloadType: { type: 'string', description: "Payload type label (default 'Pulse') — action 'create'" },
+        x: { type: 'number', description: 'Canvas x for the event marker — action create' },
+        y: { type: 'number', description: 'Canvas y for the event marker — action create' },
+        eventId: { type: 'string', description: "Event id to fire — required for action 'pulse'" },
+        payload: { description: "Optional value forwarded to listeners — action 'pulse'" },
+      },
+      required: ['action'],
+    },
+  },
+
+  {
     name: 'pinepaper_construction_sequence',
     annotations: {
       title: 'Construction Sequence',
@@ -1777,6 +1814,22 @@ PROCEDURAL / DETERMINISTIC BINDING (Expression IR — S10 G1) — bind a propert
 - driven_by: source's sourceProperty = target's targetProperty * multiplier + offset (optionally clamped). sourceProperty ∈ x|y|rotation|opacity|scale|strokeWidth|fillColor|strokeColor; targetProperty ∈ x|y|rotation|opacity|scale. For fillColor/strokeColor the (clamped 0..1) driven value interpolates colorFrom→colorTo — so a relation drives COLOR. NEEDS a target (the property source). params: sourceProperty, targetProperty, multiplier, offset, clamp {min,max}, colorFrom, colorTo, signal. e.g. tint a dot by a planet's x: sourceProperty 'fillColor', targetProperty 'x', colorFrom '#0055ff', colorTo '#ff3300', signal true.
 - time_expression: self-relation (targetId=null); the source's params.property is driven by a math expression of t (scene time) and v (params.baseValue). params: property (default 'y'), expression (e.g. 'sin(t*2)*50 + v'), baseValue, signal. With signal:true the expression is parsed into the Expression IR and evaluated as a pure f(t); it falls back to per-frame if it uses random() or an unknown symbol (non-deterministic).
 
+EVENT-DRIVEN SCENE CHAINS (S11) — build a LONG scene as a graph of timed events, not a keyframe track. First make events with pinepaper_event (action:'create' → eventId). The relations below have an EVENT as their sourceId; firing the event runs the reaction. Chain beats over animation time with on_event_fire_after (timeline:'canvas'), have beats mutate the scene with on_event_add_relation, then kick it off with pinepaper_event action:'pulse'. Because canvas-timed fires are on the animation clock, the whole chain is scrub-, loop-, and replay-stable.
+- on_event_fire_after: sourceId=event, targetId=the NEXT event. When source fires, pulse target after params.delay ms. params.timeline: 'canvas' (animation clock — use for scene chains) | 'wall' (real setTimeout). This is the chaining primitive.
+- on_event_add_relation: sourceId=event, targetId=the item to affect. When the event fires, ADD a relation FROM that item: params { type (relation type, e.g. orbits/moves_along_path/driven_by), target (id or null for self), params (that relation's params) }. The scene evolves itself — new orbits/paths appear on a beat.
+- on_event_remove_relation: sourceId=event, targetId=item. Tears down a previously-added relation: params { type, target }.
+- on_event_set_color: sourceId=event, targetId=item. params { color, which: 'fill'|'stroke' }.
+- on_event_set_property: sourceId=event, targetId=item. params { property, value } — set any item property (opacity, rotation, strokeWidth, …).
+- on_event_set_visibility: sourceId=event, targetId=item. params { visible } (default true).
+
+STRUCTURAL LAYOUT (S12) — express STATIC COMPOSITION as relations instead of hardcoded x/y. Placement is computed from the TARGET'S BOUNDS and re-derived every frame, so moving or resizing the target moves the dependent with it, and the layout survives as editable graph data. Reach for these whenever the intent is "on", "under", "next to", "inside", or "lined up with" — a create_item with literal coordinates cannot express that intent and silently breaks when the target moves. All six need a target; all accept params.signal (deterministic IR port) and params.window.
+- on_top_of: source's BOTTOM edge rests on the target's TOP edge — stacking (a cocktail on a bar). params { gap (px between edges, default 0), align: 'left'|'center'(default)|'right', overhang (extra signed x-offset) }.
+- below: mirror of on_top_of — source's TOP edge rests on the target's BOTTOM edge. params { gap, align, overhang }.
+- beside: source flanks the target horizontally. params { side: 'left'|'right' (default 'right'), gap, align: 'top'|'center'(default)|'bottom' }.
+- inside: source is placed within the target's bounds at a 9-way anchor. params { anchor: 'center'(default)|'top-left'|'top'|'top-right'|'left'|'right'|'bottom-left'|'bottom'|'bottom-right', padding (inset from the target edge) }. Contrast bounds_to, which CLAMPS a moving item; inside PLACES it.
+- centered_on: source center = target center + offset. params { offsetX, offsetY } — concentric rings at zero offset.
+- aligned_with: matches the target's center on ONE axis, leaving the other free (a partial write — use it to column-align a label while it still moves vertically). params { axis: 'x'|'y' — REQUIRED, the relation is inert without it, offset }.
+
 CURSOR / MOUSE AS TARGET — a relation can target the live pointer instead of an item by passing the reserved targetId 'cursor' (aliases 'mouse' / 'pointer'); collaborator cursors are 'cursor:<peerId>'. e.g. make an item flee the mouse: relationType 'repels', targetId 'cursor', params { returnSpeed: 0.08 }. The cursor is a virtual target (no canvas item) and its interactions are inspectable in FxTool's "Mouse / Cursor" registry section.
 
 TEMPORAL VALIDITY WINDOWS (temporal-model v1) — ANY relation may carry params.window = { start, end?, repeat? } (scene seconds) to gate WHEN it is active. The engine only applies the relation within [start, end) and feeds it window-relative local time (so an orbit/wave starts its phase at the window open, not at scene 0). repeat ∈ once (default) | loop | pingpong. Omit end for open-ended. Windowless relations are always active. e.g. params: { ...relationParams, window: { start: 2, end: 5 } } makes the relation live only from 2s to 5s.
@@ -1801,7 +1854,7 @@ Relations are COMPOSITIONAL - an item can have multiple relations that work toge
         },
         relationType: {
           type: 'string',
-          enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'camera_animates', 'morphs_to', 'group_morphs_to', 'moves_along_path', 'is_midpoint_of', 'lies_on_line', 'is_centroid_of', 'is_circumcenter_of', 'concentric_with', 'construction_reveal', 'driven_by', 'time_expression'],
+          enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'camera_animates', 'morphs_to', 'group_morphs_to', 'moves_along_path', 'is_midpoint_of', 'lies_on_line', 'is_centroid_of', 'is_circumcenter_of', 'concentric_with', 'construction_reveal', 'driven_by', 'time_expression', 'on_event_fire_after', 'on_event_add_relation', 'on_event_remove_relation', 'on_event_set_color', 'on_event_set_property', 'on_event_set_visibility', 'on_top_of', 'below', 'beside', 'inside', 'centered_on', 'aligned_with'],
           description: 'Type of relationship',
         },
         params: {
@@ -1836,7 +1889,7 @@ USE WHEN:
         targetId: { type: 'string', description: 'Target item ID' },
         relationType: {
           type: 'string',
-          enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'camera_animates', 'morphs_to', 'group_morphs_to', 'moves_along_path', 'is_midpoint_of', 'lies_on_line', 'is_centroid_of', 'is_circumcenter_of', 'concentric_with', 'construction_reveal', 'driven_by', 'time_expression'],
+          enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'camera_animates', 'morphs_to', 'group_morphs_to', 'moves_along_path', 'is_midpoint_of', 'lies_on_line', 'is_centroid_of', 'is_circumcenter_of', 'concentric_with', 'construction_reveal', 'driven_by', 'time_expression', 'on_event_fire_after', 'on_event_add_relation', 'on_event_remove_relation', 'on_event_set_color', 'on_event_set_property', 'on_event_set_visibility', 'on_top_of', 'below', 'beside', 'inside', 'centered_on', 'aligned_with'],
           description: 'Specific relation type to remove (optional - removes all if not specified)',
         },
       },
@@ -1865,7 +1918,7 @@ USE WHEN:
         itemId: { type: 'string', description: 'Item to query relations for' },
         relationType: {
           type: 'string',
-          enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'camera_animates', 'morphs_to', 'group_morphs_to', 'moves_along_path', 'is_midpoint_of', 'lies_on_line', 'is_centroid_of', 'is_circumcenter_of', 'concentric_with', 'construction_reveal', 'driven_by', 'time_expression'],
+          enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'camera_animates', 'morphs_to', 'group_morphs_to', 'moves_along_path', 'is_midpoint_of', 'lies_on_line', 'is_centroid_of', 'is_circumcenter_of', 'concentric_with', 'construction_reveal', 'driven_by', 'time_expression', 'on_event_fire_after', 'on_event_add_relation', 'on_event_remove_relation', 'on_event_set_color', 'on_event_set_property', 'on_event_set_visibility', 'on_top_of', 'below', 'beside', 'inside', 'centered_on', 'aligned_with'],
           description: 'Filter by relation type (optional)',
         },
         direction: {
@@ -2722,7 +2775,7 @@ SUPPORTED ANIMATIONS: pulse, rotate, bounce, fade, wobble, slide, typewriter`,
               target: { type: 'string', description: 'Name of target item' },
               type: {
                 type: 'string',
-                enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'camera_animates', 'morphs_to', 'group_morphs_to', 'moves_along_path', 'is_midpoint_of', 'lies_on_line', 'is_centroid_of', 'is_circumcenter_of', 'concentric_with', 'construction_reveal', 'driven_by', 'time_expression'],
+                enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'camera_follows', 'camera_animates', 'morphs_to', 'group_morphs_to', 'moves_along_path', 'is_midpoint_of', 'lies_on_line', 'is_centroid_of', 'is_circumcenter_of', 'concentric_with', 'construction_reveal', 'driven_by', 'time_expression', 'on_event_fire_after', 'on_event_add_relation', 'on_event_remove_relation', 'on_event_set_color', 'on_event_set_property', 'on_event_set_visibility', 'on_top_of', 'below', 'beside', 'inside', 'centered_on', 'aligned_with'],
               },
               params: {
                 type: 'object',
@@ -5547,7 +5600,7 @@ EXAMPLE — Animated sky scene with timed reveals:
               targetId: { type: 'string', description: 'For relation: target item ID or $N' },
               relationType: {
                 type: 'string',
-                enum: ['orbits', 'follows', 'attached_to', 'points_at', 'mirrors', 'parallax', 'animates', 'grows_from', 'staggered_with', 'wave_through', 'circumscribes', 'morphs_to', 'group_morphs_to', 'moves_along_path', 'maintains_distance', 'bounds_to', 'indicates', 'camera_follows', 'camera_animates', 'is_midpoint_of', 'lies_on_line', 'is_centroid_of', 'is_circumcenter_of', 'concentric_with', 'construction_reveal', 'driven_by', 'time_expression'],
+                enum: ['orbits', 'follows', 'attached_to', 'points_at', 'mirrors', 'parallax', 'animates', 'grows_from', 'staggered_with', 'wave_through', 'circumscribes', 'morphs_to', 'group_morphs_to', 'moves_along_path', 'maintains_distance', 'bounds_to', 'indicates', 'camera_follows', 'camera_animates', 'is_midpoint_of', 'lies_on_line', 'is_centroid_of', 'is_circumcenter_of', 'concentric_with', 'construction_reveal', 'driven_by', 'time_expression', 'on_event_fire_after', 'on_event_add_relation', 'on_event_remove_relation', 'on_event_set_color', 'on_event_set_property', 'on_event_set_visibility', 'on_top_of', 'below', 'beside', 'inside', 'centered_on', 'aligned_with'],
                 description: 'For relation: type',
               },
               relationOptions: { type: 'object', description: 'For relation: options' },

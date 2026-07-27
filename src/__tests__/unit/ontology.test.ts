@@ -169,8 +169,29 @@ describe('Mapping Tables', () => {
     expect(Object.keys(ITEM_TYPE_MAP).length).toBe(29);
   });
 
-  it('RELATION_TYPE_MAP has 33 entries', () => {
-    expect(Object.keys(RELATION_TYPE_MAP).length).toBe(33);
+  it('RELATION_TYPE_MAP has 45 entries', () => {
+    expect(Object.keys(RELATION_TYPE_MAP).length).toBe(45);
+  });
+
+  // S12-E1 structural layout relations. These names and their pp: targets must
+  // match FxTool's Vocabulary.js exactly — the mirror is the whole point.
+  it('maps the S12 structural layout relations to their FxTool pp: edges', () => {
+    expect(RELATION_TYPE_MAP['on_top_of']).toBe('pp:onTopOf');
+    expect(RELATION_TYPE_MAP['below']).toBe('pp:below');
+    expect(RELATION_TYPE_MAP['beside']).toBe('pp:beside');
+    expect(RELATION_TYPE_MAP['inside']).toBe('pp:inside');
+    expect(RELATION_TYPE_MAP['centered_on']).toBe('pp:centeredOn');
+    expect(RELATION_TYPE_MAP['aligned_with']).toBe('pp:alignedWith');
+  });
+
+  it('registers the structural layout edges as spatial constraints', () => {
+    for (const pp of ['pp:onTopOf', 'pp:below', 'pp:beside', 'pp:inside', 'pp:centeredOn', 'pp:alignedWith']) {
+      const edge = PP_VOCABULARY.edges[pp];
+      expect(edge).toBeDefined();
+      expect(edge.category).toBe('structural');
+      expect(edge.behaviorType).toBe('constraint');
+      expect(edge.parentType).toBe('pp:SpatialRelation');
+    }
   });
 });
 

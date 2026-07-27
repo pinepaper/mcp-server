@@ -113,6 +113,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
     'pinepaper_create_scene',
     'pinepaper_manage_scenes',
     'pinepaper_scene_playback',
+    'pinepaper_event',
   ],
   selection: [
     'pinepaper_selection',

@@ -34,6 +34,7 @@ import {
   CreateGridInputSchema,
   GeometryInputSchema,
   EquationPathInputSchema,
+  EventInputSchema,
   ConstructionSequenceInputSchema,
   ValidateSceneInputSchema,
   CaptureFramesInputSchema,
@@ -1014,6 +1015,15 @@ async function handleToolCallInner(
         const code = codeGenerator.generateEquationPath(input);
         const description = `Equation-driven path: ${input.kind}${input.preset ? ` (${input.preset})` : ''}`;
         return executeOrGenerate(code, description, options, 'pinepaper_equation_path');
+      }
+
+      case 'pinepaper_event': {
+        const input = EventInputSchema.parse(args);
+        const code = codeGenerator.generateEvent(input);
+        const description = input.action === 'create'
+          ? `Create event "${input.name}"`
+          : `Pulse event ${input.eventId}`;
+        return executeOrGenerate(code, description, options, 'pinepaper_event');
       }
 
       case 'pinepaper_construction_sequence': {

@@ -160,6 +160,10 @@
       "description": "Create a path item from a math equation (deterministic, Expression IR). kind: function|parametric|fourier|preset (spiral/rose/lissajous/astroid/heart/spirograph). {kind, expr|xExpr/yExpr|harmonics|preset, min, max, samples, scale, x, y, style}"
     },
     {
+      "name": "pinepaper_event",
+      "description": "Event channel for scene chains (S11). action:'create' {name}→eventId, or 'pulse' {eventId}. Wire beats with on_event_fire_after/add_relation/set_color relations (event as sourceId)."
+    },
+    {
       "name": "pinepaper_construction_sequence",
       "description": "Reveal a figure step by step on the timeline (build/play/clear/list). {action, steps?, stepDuration?}"
     },

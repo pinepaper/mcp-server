@@ -111,6 +111,7 @@ export const PP_VOCABULARY: PinePaperVocabulary = {
     'pp:TransformRelation': { category: 'abstract', description: 'Orientation/scale-based relation', abstract: true, parentType: 'pp:Relation' },
     'pp:AnimationRelation': { category: 'abstract', description: 'Time-based animation relation', abstract: true, parentType: 'pp:Relation' },
     'pp:ProceduralRelation':{ category: 'abstract', description: 'Procedural/expression relation', abstract: true, parentType: 'pp:Relation' },
+    'pp:EventRelation':     { category: 'abstract', description: 'Event-channel relation — source is a pp:event; the reaction runs when the event fires (S11 scene chains)', abstract: true, parentType: 'pp:Relation' },
     // Structural
     'pp:contains':          { category: 'structural', description: 'Parent-child containment' },
     'pp:maskedBy':          { category: 'structural', description: 'Clipped by mask shape' },
@@ -146,6 +147,22 @@ export const PP_VOCABULARY: PinePaperVocabulary = {
     // Blending
     'pp:blendReactsTo':     { category: 'blending',   behaviorType: 'procedural', mathFunctions: ['proximityThreshold'], parentType: 'pp:ProceduralRelation', mcpToolRef: 'pinepaper_add_relation' },
     'pp:blendTransition':   { category: 'blending',   behaviorType: 'procedural', mathFunctions: ['timedCycling'], parentType: 'pp:ProceduralRelation', mcpToolRef: 'pinepaper_add_relation' },
+    // Event-driven scene chains (S11) — source is a pp:event, reaction runs on fire
+    'pp:onEventFireAfter':    { category: 'event', behaviorType: 'trigger', description: 'On event pulse, schedule a target event pulse after params.delay ms (timeline wall|canvas). The chaining primitive.', parentType: 'pp:EventRelation', mcpToolRef: 'pinepaper_add_relation' },
+    'pp:onEventAddRelation':  { category: 'event', behaviorType: 'trigger', description: 'Meta-relation: on event pulse, add a params.type relation from the target item. The scene mutates itself.', parentType: 'pp:EventRelation', mcpToolRef: 'pinepaper_add_relation' },
+    'pp:onEventRemoveRelation':{ category: 'event', behaviorType: 'trigger', description: 'On event pulse, remove a params.type relation from the target item.', parentType: 'pp:EventRelation', mcpToolRef: 'pinepaper_add_relation' },
+    'pp:onEventSetColor':     { category: 'event', behaviorType: 'trigger', description: 'On event pulse, set the target item fill/stroke to params.color.', parentType: 'pp:EventRelation', mcpToolRef: 'pinepaper_add_relation' },
+    'pp:onEventSetProperty':  { category: 'event', behaviorType: 'trigger', description: 'On event pulse, set target[params.property] = params.value.', parentType: 'pp:EventRelation', mcpToolRef: 'pinepaper_add_relation' },
+    'pp:onEventSetVisibility':{ category: 'event', behaviorType: 'trigger', description: 'On event pulse, show/hide the target item (params.visible).', parentType: 'pp:EventRelation', mcpToolRef: 'pinepaper_add_relation' },
+    // Structural layout (S12-E1) — a dependent is placed relative to a target's
+    // bounds (stacking / adjacency / containment / alignment); re-derived each
+    // frame so dragging the target moves the dependent.
+    'pp:onTopOf':           { category: 'structural', behaviorType: 'constraint', description: 'Source bottom edge sits on target top edge. Use for stacking (a cocktail on a bar). Params: gap, align (left/center/right), overhang.', parentType: 'pp:SpatialRelation', mcpToolRef: 'pinepaper_add_relation' },
+    'pp:below':             { category: 'structural', behaviorType: 'constraint', description: 'Source top edge sits on target bottom edge (mirror of on_top_of). Params: gap, align, overhang.', parentType: 'pp:SpatialRelation', mcpToolRef: 'pinepaper_add_relation' },
+    'pp:beside':            { category: 'structural', behaviorType: 'constraint', description: 'Source is placed to the left or right of the target. Params: side (left/right), gap, align (top/center/bottom).', parentType: 'pp:SpatialRelation', mcpToolRef: 'pinepaper_add_relation' },
+    'pp:inside':            { category: 'structural', behaviorType: 'constraint', description: 'Source is placed inside the target bounds at a 9-way anchor. Places the item once per frame (contrast bounds_to, which clamps a moving item). Params: anchor, padding.', parentType: 'pp:SpatialRelation', mcpToolRef: 'pinepaper_add_relation' },
+    'pp:centeredOn':        { category: 'structural', behaviorType: 'constraint', description: 'Source center = target center + offset. Concentric when offset is 0 (use for concentric rings). Params: offsetX, offsetY.', parentType: 'pp:SpatialRelation', mcpToolRef: 'pinepaper_add_relation' },
+    'pp:alignedWith':       { category: 'structural', behaviorType: 'constraint', description: 'One axis (x or y) of the source center matches the target center; the other axis stays free (partial write). Params: axis (required), offset.', parentType: 'pp:SpatialRelation', mcpToolRef: 'pinepaper_add_relation' },
     // Diagram flow
     'pp:DiagramFlowRelation': { category: 'abstract', description: 'Abstract diagram flow relation', abstract: true, parentType: 'pp:Relation' },
     'pp:sequenceFlow':      { category: 'diagram', description: 'Sequence/control flow between shapes', parentType: 'pp:DiagramFlowRelation', bpmnEquivalent: 'bpmn:SequenceFlow' },
@@ -471,6 +488,18 @@ export const RELATION_TYPE_MAP: Record<string, string> = {
   'driven_by':          'pp:drivenBy',
   'wiggle':             'pp:wiggle',
   'time_expression':    'pp:timeExpression',
+  'on_event_fire_after':      'pp:onEventFireAfter',
+  'on_event_add_relation':    'pp:onEventAddRelation',
+  'on_event_remove_relation': 'pp:onEventRemoveRelation',
+  'on_event_set_color':       'pp:onEventSetColor',
+  'on_event_set_property':    'pp:onEventSetProperty',
+  'on_event_set_visibility':  'pp:onEventSetVisibility',
+  'on_top_of':          'pp:onTopOf',
+  'below':              'pp:below',
+  'beside':             'pp:beside',
+  'inside':             'pp:inside',
+  'centered_on':        'pp:centeredOn',
+  'aligned_with':       'pp:alignedWith',
   'camera_follows':     'pp:cameraFollows',
   'camera_animates':    'pp:cameraAnimates',
   'bone_attached':      'pp:boneAttached',

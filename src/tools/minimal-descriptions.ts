@@ -47,6 +47,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_create_grid: 'Create a grid of lines on canvas.',
   pinepaper_geometry: 'Exact geometry construction (polygon vertices, intersections, circumcircle, tangents); optionally creates an item from the result. {operation, args, createAs?}',
   pinepaper_equation_path: 'Path item from a math equation (deterministic). kind: function|parametric|fourier|preset (spiral/rose/lissajous/astroid/heart/spirograph). {expr|xExpr/yExpr|harmonics|preset, min, max, samples}',
+  pinepaper_event: "Event channel for scene chains (S11). action:'create' {name}→eventId, or 'pulse' {eventId}. Wire beats with on_event_fire_after/add_relation/set_color relations (event as sourceId).",
   pinepaper_construction_sequence: 'Reveal a figure step by step on the timeline (build/play/clear/list). {action, steps?, stepDuration?}',
   pinepaper_group: 'Group a composite object\'s parts into ONE entity, ungroup, or break_apart an imported SVG into movable parts. {action: group|ungroup|break_apart, itemIds?, itemId?, groupName?, groupId?}',
   pinepaper_camera_director: 'Cinematic camera walkthrough from a shot list (auto: one shot per item, or explicit shots). Compiles to one camera_animates track. {action: auto|shots, shots?, order?, establishing?, loop?}',

@@ -7,12 +7,16 @@
 
 ## Overview
 
-PinePaper MCP Server enables AI assistants to create and animate graphics in [PinePaper Studio](https://pinepaper.studio) via the Model Context Protocol (MCP). Works with any AI that supports MCP tool calling (Claude, GPT, Gemini, local models, etc.). Using natural language, you can:
+PinePaper MCP Server enables AI assistants to create and animate graphics in [PinePaper Studio](https://pinepaper.studio) via the Model Context Protocol (MCP). Works with any AI that supports MCP tool calling (Claude, GPT, Gemini, local models, etc.).
 
-- Create text, shapes, and complex graphics
-- Animate items with behavior-driven relations
-- Generate procedural backgrounds
-- Export animated SVG and training data
+The server exposes **114 tools** across drawing, animation, diagrams, maps, typography, physics, data visualization, and export. Using natural language, you can:
+
+- Create text, shapes, geometry, and complex graphics
+- Animate items with behavior-driven **relations** rather than keyframes
+- Build long scenes as **event-driven chains** that stay scrub- and replay-stable
+- Generate procedural backgrounds and parametric/equation-driven paths
+- Author diagrams, maps, charts, and letter collages
+- Export animated SVG, video frames, embeddable widgets, and LLM training data
 
 ## Quick Start
 
@@ -57,14 +61,41 @@ Open your AI client and try:
 
 > "Add a sunburst background with blue and purple colors"
 
+## Toolkits & Token Budget
+
+114 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
+
+**Toolkit profiles** (`PINEPAPER_TOOLKIT`):
+
+| Profile | Contents |
+|---------|----------|
+| `full` | Every tool, no filtering (default) |
+| `agent` | Broad authoring surface, minus niche/low-level groups |
+| `diagram` | Canvas + diagram + query/export |
+| `map` | Canvas + map + query/export |
+| `font` | Canvas + font + letter collage + export |
+| `minimal` | Agent, browser, canvas, and guide only |
+
+**Verbosity tiers** (`PINEPAPER_VERBOSITY`): `verbose`, `compact` (default), `minimal`.
+
+**Client auto-detection.** When neither env var is set explicitly, the server picks a profile from the MCP `initialize` handshake:
+
+| Client | Toolkit | Verbosity |
+|--------|---------|-----------|
+| `claude-ai` | `minimal` | `compact` |
+| `claude-desktop` | `full` | `compact` |
+| `claude-code` | `agent` | `compact` |
+| `cursor` | `full` | `compact` |
+| `windsurf` | `full` | `compact` |
+
+Explicit env vars always win. You can also hand-pick tools with `PINEPAPER_TOOLS` (comma-separated names), or switch profiles at runtime with the `pinepaper_set_toolkit` tool. Start with `pinepaper_tool_guide` to have the server explain its own surface.
+
 ## Features
 
-### 🤖 Agent Flow Mode (ENFORCED in v1.5.0)
-
-Agent mode is now **enforced by default** for optimal performance:
+### 🤖 Agent Flow Mode (enforced by default)
 
 - **Auto-Connection**: Browser connects automatically on first tool call (headless mode)
-- **Auto-Session**: Agent sessions start automatically - just start creating!
+- **Auto-Session**: Agent sessions start automatically — just start creating
 - **Batch Operations**: Execute multiple operations in one call (~10x faster)
 - **Smart Exports**: Auto-detect optimal format for Instagram, TikTok, YouTube, etc.
 
@@ -74,57 +105,108 @@ Agent mode is now **enforced by default** for optimal performance:
 "Analyze the scene and recommend export format"
 ```
 
-**No manual setup required** - just start making tool calls.
+**No manual setup required** — just start making tool calls.
 
-**Tools:**
-- `pinepaper_agent_start_job` - Start a named job session (optional)
-- `pinepaper_agent_end_job` - End job with summary and export recommendations
-- `pinepaper_agent_reset` - Quick canvas reset
-- `pinepaper_agent_batch_execute` - Execute multiple operations in batch
-- `pinepaper_agent_export` - Smart export with platform auto-detection
-- `pinepaper_agent_analyze` - Analyze content for export recommendations
+### 🔄 Relations (Behavior-Driven Animation)
 
-### 🎯 Interactive Triggers (NEW in v1.5.0)
+The **key feature** — describe HOW items should behave, and the engine solves the motion every frame. 39 relation types are available via `pinepaper_add_relation`. Relations are compositional: one item can carry several at once.
 
-Add click, hover, and drag interactions to items:
+**Spatial & motion**
+
+| Relation | Description |
+|----------|-------------|
+| `orbits` | Circular motion around a target |
+| `follows` | Move toward target (with offset) |
+| `attached_to` | Fixed offset from target |
+| `maintains_distance` | Hold a set distance |
+| `points_at` | Rotate to face target |
+| `mirrors` | Mirror target's position |
+| `parallax` | Depth-scaled movement |
+| `bounds_to` | Stay within an area |
+| `wave_through` | Wave propagation across items |
+| `moves_along_path` | Travel along a path or equation |
+
+**Structural layout**
+
+Static composition expressed as edges instead of hardcoded coordinates. Placement is derived from the target's bounds and re-derived each frame, so moving or resizing the target brings the dependent along — and the layout stays editable as graph data.
+
+| Relation | Description |
+|----------|-------------|
+| `on_top_of` | Source's bottom edge rests on the target's top edge — stacking (`gap`, `align`, `overhang`) |
+| `below` | Mirror of `on_top_of` — source's top edge on the target's bottom edge |
+| `beside` | Flank the target left or right (`side`, `gap`, `align`) |
+| `inside` | Place within the target's bounds at a 9-way `anchor`, inset by `padding` |
+| `centered_on` | Source center = target center + (`offsetX`, `offsetY`); concentric at zero |
+| `aligned_with` | Match the target on one `axis` only, leaving the other free (`axis` is required) |
+
+**Structure & construction**
+
+| Relation | Description |
+|----------|-------------|
+| `is_midpoint_of` | Sit at the midpoint of two items |
+| `lies_on_line` | Constrain onto a line |
+| `is_centroid_of` | Sit at the centroid of a set |
+| `is_circumcenter_of` | Sit at the circumcenter |
+| `concentric_with` | Share a center |
+| `circumscribes` | Enclose a target |
+| `indicates` | Point out / annotate |
+| `construction_reveal` | Staged geometric reveal |
+
+**Animation & camera**
+
+| Relation | Description |
+|----------|-------------|
+| `animates` | Drive a property over time |
+| `grows_from` | Scale in from an origin |
+| `staggered_with` | Offset timing across a set |
+| `morphs_to` / `group_morphs_to` | Shape morphing |
+| `camera_follows` / `camera_animates` | Camera behavior |
+
+**Deterministic binding (Expression IR)**
+
+| Relation | Description |
+|----------|-------------|
+| `driven_by` | Bind one property to another: `source.p = target.p * multiplier + offset`, optionally clamped. For `fillColor`/`strokeColor` the driven value interpolates `colorFrom`→`colorTo`, so a relation can drive color. |
+| `time_expression` | Self-relation: drive a property by a math expression of `t` (scene time) and `v` (base value), e.g. `sin(t*2)*50 + v`. |
+
+With `signal: true` these compile to a pure `f(t)` Expression IR, making them scrub-, loop-, and replay-stable. Expressions using `random()` or unknown symbols fall back to per-frame evaluation.
+
+**Event-driven scene chains**
+
+| Relation | Description |
+|----------|-------------|
+| `on_event_fire_after` | When source event fires, pulse the target event after a delay (chaining primitive) |
+| `on_event_add_relation` | On fire, add a relation to an item — the scene evolves itself |
+| `on_event_remove_relation` | On fire, tear a relation down |
+| `on_event_set_color` | On fire, set fill/stroke color |
+| `on_event_set_property` | On fire, set any item property |
+| `on_event_set_visibility` | On fire, show/hide |
+
+Create channels with `pinepaper_event` (`create` → `eventId`, `pulse` → fire it). Chain beats with `on_event_fire_after` on the `canvas` timeline to author a long scene as a graph of timed beats instead of a keyframe track.
+
+**Extras**: relations can target the live pointer via the reserved `targetId` `'cursor'`, and any relation can carry `params.window = { start, end?, repeat? }` to gate when it is active (`repeat`: `once` | `loop` | `pingpong`).
+
+### 🎨 Item Creation & Geometry
 
 ```
-"Make the button show a panel when clicked"
-"Add a hover effect that plays an animation"
-"Create a drag-and-drop quiz"
+"Create a blue circle at position 200, 300 with radius 50"
+"Create text saying 'Welcome' with font size 72"
+"Draw the perpendicular bisector of AB"
 ```
 
-**Event Types:**
-- `click`, `hover_enter`, `hover_exit`
-- `drag_start`, `drag_move`, `drag_end`
-- `timeline`, `animation_end`
+Beyond basic shapes, `pinepaper_geometry` provides construction primitives, `pinepaper_group` handles group/ungroup/break-apart, and `pinepaper_arrange` controls z-order (bring forward/back/front/back).
 
-**Tools:**
-- `pinepaper_add_trigger` - Add event triggers with actions
-- `pinepaper_remove_trigger` - Remove triggers from items
-- `pinepaper_query_triggers` - List all triggers
+### 🎬 Simple Animations
 
-### 📝 Quiz/LMS Integration (NEW in v1.5.0)
+For quick looping effects: `pulse`, `rotate`, `bounce`, `fade`, `wobble`, `slide`, `typewriter`. For timed work use `pinepaper_keyframe_animate`; query the valid targets with `pinepaper_get_animatable_properties` and `pinepaper_get_available_easings`.
 
-Create interactive quizzes with SCORM/xAPI support:
+### 🖼️ Background Generators
 
-```
-"Create a multiple choice quiz about planets"
-"Add a drag-and-drop matching exercise"
-"Track quiz score and progress"
-```
+31 procedural generators via `pinepaper_execute_generator` (list them with `pinepaper_list_generators`):
 
-**Question Types:**
-- Multiple choice, Multiple select
-- Drag-and-drop, Matching, Sequencing
-- Hotspot, True/False, Fill-in-blank
+`drawBlobs`, `drawBokeh`, `drawCircuit`, `drawFluidFlow`, `drawFormulaArt`, `drawFunctionPlot`, `drawGeometricAbstract`, `drawGlobeWireframe`, `drawGradientMesh`, `drawGrid`, `drawHalftone`, `drawLowPoly`, `drawNoiseTexture`, `drawOrganicFlow`, `drawParametricCollection`, `drawParametricCurve`, `drawPattern`, `drawPeaks`, `drawRibbons`, `drawScatter`, `drawShaderArt`, `drawSimulation`, `drawSpectrumAnalyzer`, `drawStackedCircles`, `drawStackedWaves`, `drawSunburst`, `drawSunsetScene`, `drawTruchet`, `drawWaves`, `drawWindField`, `drawYeganehMountains`
 
-**Tools:**
-- `pinepaper_create_quiz` - Create interactive quizzes
-- `pinepaper_get_quiz_state` - Get score, progress, answers
-- `pinepaper_reset_quiz` - Reset quiz state
-
-### 📐 Diagram Tools (NEW in v1.4.3)
+### 📐 Diagram Tools
 
 Create flowcharts, UML diagrams, network diagrams, and more:
 
@@ -134,57 +216,37 @@ Create flowcharts, UML diagrams, network diagrams, and more:
 "Design a network topology with 3 servers connected to a cloud"
 ```
 
-**Shape Types:**
-- **Flowchart**: process, decision, terminal, data, document, database, preparation
-- **UML**: uml-class, uml-usecase, uml-actor
-- **Network**: cloud, server
-- **Basic**: rectangle, circle, triangle, star
+- **Shape types** — Flowchart: process, decision, terminal, data, document, database, preparation · UML: uml-class, uml-usecase, uml-actor · Network: cloud, server · Basic: rectangle, circle, triangle, star
+- **Connectors** — smart routing (orthogonal, direct, curved), arrow styles (classic, stealth, diamond, circle, none), animated bolt effect, labels
+- **Auto-layout** — hierarchical, force-directed, tree, radial, grid
+- **Mermaid** — import existing diagrams with `pinepaper_import_mermaid`
 
-**Connector Features:**
-- Smart routing (orthogonal, direct, curved)
-- Arrow styles (classic, stealth, diamond, circle, none)
-- Animated bolt effect for data flow
-- Labels on connectors
+### 🗺️ Maps
 
-**Auto-Layout Algorithms:**
-- Hierarchical (flowcharts, org charts)
-- Force-directed (network diagrams)
-- Tree (hierarchies)
-- Radial (mind maps)
-- Grid (component libraries)
+Choropleths, region styling, and data-driven map animation via `pinepaper_map`, `pinepaper_map_regions`, `pinepaper_map_animation`, and `pinepaper_map_data`.
 
-**Tools:**
-- `pinepaper_create_diagram_shape` - Create diagram shapes with ports
-- `pinepaper_connect` - Connect items with smart connectors
-- `pinepaper_connect_ports` - Connect specific ports
-- `pinepaper_add_ports` - Add connection ports to items
-- `pinepaper_auto_layout` - Automatically arrange items
-- `pinepaper_get_diagram_shapes` - List available shapes
-- `pinepaper_update_connector` - Update connector properties
-- `pinepaper_remove_connector` - Remove a connector
-- `pinepaper_diagram_mode` - Control diagram editing mode
+### 🔤 Typography
 
-### 🔍 Asset Search & Import (NEW in v1.3.0)
+`pinepaper_font` covers font loading and text-to-path work; `pinepaper_create_letter_collage` and `pinepaper_animate_letter_collage` build and animate letterform collages.
+
+### 🔍 Asset Search & Import
 
 Search and import free SVG assets from multiple repositories:
 
-```
-"Search for a rocket icon"
-"Import a cat illustration"
-"Add a user avatar icon"
-```
-
-**Supported Repositories:**
 - **SVGRepo**: 500,000+ icons with various licenses
 - **OpenClipart**: 150,000+ public domain clipart (CC0)
 - **Iconify**: 200,000+ icons from multiple icon sets
 - **Font Awesome**: 2,000+ free icons (CC BY 4.0)
 
-**Tools:**
-- `pinepaper_search_assets` - Search across all repositories
-- `pinepaper_import_asset` - Import and place on canvas
+### 🖼️ Image Processing & Object Detection
 
-### 📊 Performance Metrics (NEW in v1.3.0)
+Import images, then use `pinepaper_image_filter`, `pinepaper_lasso`, and `pinepaper_cutout_style` to process them. `pinepaper_detect_objects` runs object detection (with text queries) and can composite results as nodes; `pinepaper_extract_object` pulls a single object out.
+
+### 🧠 Ontology & Validation
+
+The server keeps a design graph of the canvas, so an AI can inspect and critique its own work: `pinepaper_get_canvas_ontology`, `pinepaper_query_ontology`, `pinepaper_analyze_design`, `pinepaper_validate_design`, `pinepaper_validate`, and `pinepaper_validate_scene`.
+
+### 📊 Performance Metrics
 
 Built-in performance tracking helps AI assistants optimize workflows:
 
@@ -193,81 +255,10 @@ Built-in performance tracking helps AI assistants optimize workflows:
 - Export formats: summary, detailed JSON, CSV
 - Self-optimization through `pinepaper_get_performance_metrics`
 
-**Example workflow:**
-```
-1. Run your scene creation workflow
-2. Call pinepaper_get_performance_metrics
-3. Identify bottlenecks (e.g., individual creates vs batch)
-4. Adjust approach and re-run
-```
-
-### 🐛 Enhanced Error Messages (NEW in v1.3.0)
-
-Errors now include canvas context for easier debugging:
-
-- Total item count and types
-- Active relations
-- Recent items created
-- Canvas state at time of error
-
-Makes troubleshooting much faster and more precise.
-
-### 🎨 Item Creation
-
-Create text, shapes, and custom graphics:
-
-```
-"Create a blue circle at position 200, 300 with radius 50"
-"Add a gold star in the center"
-"Create text saying 'Welcome' with font size 72"
-```
-
-### 🔄 Relations (Behavior-Driven Animation)
-
-The **key feature** - describe HOW items should behave:
-
-| Relation | Description | Example |
-|----------|-------------|---------|
-| `orbits` | Circular motion | "Moon orbits Earth" |
-| `follows` | Move toward target | "Label follows player" |
-| `attached_to` | Fixed offset | "Hat attached to character" |
-| `maintains_distance` | Stay at distance | "Satellite 200px from station" |
-| `points_at` | Face target | "Arrow points at target" |
-| `mirrors` | Mirror position | "Reflection mirrors original" |
-| `parallax` | Depth movement | "Background parallax scroll" |
-| `bounds_to` | Stay within area | "Player stays in arena" |
-
-### 🎬 Simple Animations
-
-For quick looping effects:
-
-- `pulse` - Scale up/down
-- `rotate` - Continuous spin
-- `bounce` - Vertical bounce
-- `fade` - Opacity cycle
-- `wobble` - Side-to-side
-- `slide` - Horizontal slide
-- `typewriter` - Character reveal
-
-### 🖼️ Background Generators
-
-Procedural patterns:
-
-- `drawSunburst` - Radial rays
-- `drawSunsetScene` - Animated sunset
-- `drawGrid` - Lines, dots, squares
-- `drawWaves` - Layered waves
-- `drawCircuit` - Tech circuit board
-
 ### 📊 Training Data Export
 
 Generate instruction/code pairs for LLM fine-tuning:
 
-```
-"Export training data from this scene"
-```
-
-Outputs pairs like:
 ```json
 {
   "instruction": "moon orbits earth at radius 100",
@@ -277,57 +268,130 @@ Outputs pairs like:
 
 ## Tools Reference
 
-### Item Tools
+All 114 tools, grouped by the tag used for toolkit filtering.
+
+### Canvas (`canvas`)
+| Tool | Description |
+|------|-------------|
+| `pinepaper_set_background_color` | Set background color |
+| `pinepaper_set_canvas_size` | Set canvas dimensions |
+| `pinepaper_get_canvas_size` | Read canvas dimensions |
+| `pinepaper_clear_canvas` | Clear the canvas |
+| `pinepaper_refresh_page` | Reload the studio page |
+| `pinepaper_background` | Manage background layers |
+
+### Item Creation (`core`)
 | Tool | Description |
 |------|-------------|
 | `pinepaper_create_item` | Create text, shapes, graphics |
 | `pinepaper_modify_item` | Change item properties |
 | `pinepaper_delete_item` | Remove an item |
-| `pinepaper_batch_create` | Create multiple items at once |
-| `pinepaper_batch_modify` | Modify multiple items at once |
 | `pinepaper_create_grid` | Create items in a grid layout |
 | `pinepaper_create_glossy_sphere` | Create 3D glossy sphere effect |
 | `pinepaper_create_diagonal_stripes` | Create diagonal stripe pattern |
+| `pinepaper_geometry` | Geometric construction primitives |
+| `pinepaper_group` | Group / ungroup / break apart |
+| `pinepaper_arrange` | Z-order: bring forward/back/front/back |
 
-### Relation Tools
+### Batch (`batch`)
 | Tool | Description |
 |------|-------------|
-| `pinepaper_add_relation` | Create behavioral relationship |
-| `pinepaper_remove_relation` | Remove relationship |
-| `pinepaper_query_relations` | Find existing relations |
+| `pinepaper_batch_create` | Create multiple items at once |
+| `pinepaper_batch_modify` | Modify multiple items at once |
 
-### Animation Tools
+### Import (`import`)
 | Tool | Description |
 |------|-------------|
-| `pinepaper_animate` | Apply simple loop animation |
-| `pinepaper_keyframe_animate` | Timed keyframe animation |
-| `pinepaper_play_timeline` | Control playback |
+| `pinepaper_import_svg` | Import SVG markup |
+| `pinepaper_import_image` | Import a raster image |
+| `pinepaper_detect_objects` | Detect objects in an image (text queries, composite as nodes) |
+| `pinepaper_extract_object` | Extract a detected object |
 
-### Generator Tools
+### Assets (`assets`)
 | Tool | Description |
 |------|-------------|
-| `pinepaper_execute_generator` | Run background generator |
-| `pinepaper_list_generators` | List available generators |
-
-### Effect Tools
-| Tool | Description |
-|------|-------------|
-| `pinepaper_apply_effect` | Apply sparkle, blast effects |
-
-### Asset Tools (NEW)
-| Tool | Description |
-|------|-------------|
-| `pinepaper_search_assets` | Search for SVG assets across repositories |
+| `pinepaper_search_assets` | Search SVG assets across repositories |
 | `pinepaper_import_asset` | Import asset from search results |
 
-### Query Tools
+### Relations (`relations`)
 | Tool | Description |
 |------|-------------|
-| `pinepaper_get_items` | Get canvas items |
-| `pinepaper_get_relation_stats` | Relation statistics |
-| `pinepaper_get_performance_metrics` | Get execution timing metrics |
+| `pinepaper_add_relation` | Create a behavioral relationship |
+| `pinepaper_remove_relation` | Remove a relationship |
+| `pinepaper_query_relations` | Find existing relations |
+| `pinepaper_register_custom_relation` | Register a custom relation type |
 
-### Diagram Tools (NEW in v1.4.3)
+### Animation (`animation`)
+| Tool | Description |
+|------|-------------|
+| `pinepaper_animate` | Apply a simple loop animation |
+| `pinepaper_keyframe_animate` | Timed keyframe animation |
+| `pinepaper_play_timeline` | Control playback |
+| `pinepaper_get_animatable_properties` | List animatable properties |
+| `pinepaper_get_available_easings` | List easing functions |
+| `pinepaper_construction_sequence` | Staged construction animation |
+
+### Masks (`masks`)
+| Tool | Description |
+|------|-------------|
+| `pinepaper_apply_animated_mask` | Apply an animated mask |
+| `pinepaper_apply_custom_mask` | Apply a custom mask |
+| `pinepaper_remove_mask` | Remove a mask |
+| `pinepaper_get_mask_types` | List mask types |
+| `pinepaper_get_mask_animations` | List mask animations |
+
+### Camera (`camera`)
+| Tool | Description |
+|------|-------------|
+| `pinepaper_camera` | Camera state control |
+| `pinepaper_camera_animate` | Animate the camera |
+| `pinepaper_camera_director` | Shot-level camera direction |
+
+### Scene & Events (`scene`)
+| Tool | Description |
+|------|-------------|
+| `pinepaper_create_scene` | Create a scene |
+| `pinepaper_manage_scenes` | Manage scenes |
+| `pinepaper_scene_playback` | Scene playback control |
+| `pinepaper_event` | Create / pulse event channels for scene chains |
+
+### Generators, Effects & Filters
+| Tool | Description |
+|------|-------------|
+| `pinepaper_execute_generator` | Run a background generator |
+| `pinepaper_list_generators` | List available generators |
+| `pinepaper_apply_effect` | Apply sparkle, blast, and other effects |
+| `pinepaper_add_filter` | Add an image filter |
+
+### Editing (`selection`, `transform`, `history`)
+| Tool | Description |
+|------|-------------|
+| `pinepaper_selection` | Selection management |
+| `pinepaper_transform` | Transform items |
+| `pinepaper_history` | Undo / redo |
+
+### Image Processing (`image_processing`)
+| Tool | Description |
+|------|-------------|
+| `pinepaper_image_filter` | Apply image filters |
+| `pinepaper_lasso` | Lasso selection on images |
+| `pinepaper_cutout_style` | Cutout styling |
+
+### Composition (`precomp`, `deform`, `sprite`, `interaction`)
+| Tool | Description |
+|------|-------------|
+| `pinepaper_precomp` | Pre-composition management |
+| `pinepaper_deform` | Deformation tools |
+| `pinepaper_sprite_sheet` | Sprite sheet handling |
+| `pinepaper_interaction` | Click, hover, and drag interactions |
+
+### Data Visualization (`dataviz`)
+| Tool | Description |
+|------|-------------|
+| `pinepaper_create_chart` | Create a chart |
+| `pinepaper_equation_path` | Function / parametric / Fourier equation paths |
+
+### Diagram (`diagram`)
 | Tool | Description |
 |------|-------------|
 | `pinepaper_create_diagram_shape` | Create flowchart/UML/network shapes with ports |
@@ -339,42 +403,90 @@ Outputs pairs like:
 | `pinepaper_update_connector` | Update connector style/label |
 | `pinepaper_remove_connector` | Remove a connector |
 | `pinepaper_diagram_mode` | Control diagram editing mode |
+| `pinepaper_import_mermaid` | Import a Mermaid diagram |
 
-### Agent Flow Mode Tools (NEW in v1.5.0)
+### Map (`map`)
 | Tool | Description |
 |------|-------------|
-| `pinepaper_agent_start_job` | Start content creation job session |
+| `pinepaper_map` | Create / configure a map |
+| `pinepaper_map_regions` | Region styling and selection |
+| `pinepaper_map_animation` | Animate a map |
+| `pinepaper_map_data` | Bind data to a map |
+
+### Typography (`font`, `letter_collage`)
+| Tool | Description |
+|------|-------------|
+| `pinepaper_font` | Font loading and text-to-path |
+| `pinepaper_create_letter_collage` | Create a letterform collage |
+| `pinepaper_animate_letter_collage` | Animate a letterform collage |
+
+### Simulation & Utilities (`magic`, `physics`, `measurement`, `template`)
+| Tool | Description |
+|------|-------------|
+| `pinepaper_magic` | High-level "make it look good" helpers |
+| `pinepaper_physics` | Physics simulation |
+| `pinepaper_measurement` | Measurement and annotation |
+| `pinepaper_apply_template` | Apply a scene template |
+
+### Query (`query`)
+| Tool | Description |
+|------|-------------|
+| `pinepaper_get_items` | Get canvas items |
+| `pinepaper_get_relation_stats` | Relation statistics |
+| `pinepaper_query` | General canvas query |
+
+### Ontology (`ontology`)
+| Tool | Description |
+|------|-------------|
+| `pinepaper_get_canvas_ontology` | Get the canvas design graph |
+| `pinepaper_query_ontology` | Query the design graph |
+| `pinepaper_analyze_design` | Analyze design quality |
+| `pinepaper_validate_design` | Validate against design rules |
+| `pinepaper_validate` | General validation |
+| `pinepaper_validate_scene` | Validate scene integrity |
+
+### Export (`export`)
+| Tool | Description |
+|------|-------------|
+| `pinepaper_export_svg` | Export animated SVG |
+| `pinepaper_export_scene` | Export the scene |
+| `pinepaper_export_training_data` | Export LLM training pairs |
+| `pinepaper_export_widget` | Export an embeddable widget |
+| `pinepaper_export_widget_html` | Export widget HTML |
+| `pinepaper_capture_frames` | Capture deterministic frames |
+
+### Agent Flow (`agent`)
+| Tool | Description |
+|------|-------------|
+| `pinepaper_agent_start_job` | Start a content creation job session |
 | `pinepaper_agent_end_job` | End job with summary and recommendations |
 | `pinepaper_agent_reset` | Quick canvas reset without page refresh |
 | `pinepaper_agent_batch_execute` | Execute multiple operations in batch |
 | `pinepaper_agent_export` | Smart export with platform auto-detection |
 | `pinepaper_agent_analyze` | Analyze content for export recommendations |
 
-### Interactive Trigger Tools (NEW in v1.5.0)
+### Browser (`browser`)
 | Tool | Description |
 |------|-------------|
-| `pinepaper_add_trigger` | Add event triggers (click, hover, drag) |
-| `pinepaper_remove_trigger` | Remove triggers from items |
-| `pinepaper_query_triggers` | List all triggers on canvas |
+| `pinepaper_browser_connect` | Connect to the studio |
+| `pinepaper_browser_disconnect` | Disconnect |
+| `pinepaper_browser_screenshot` | Take a screenshot |
+| `pinepaper_browser_status` | Connection status |
 
-### Quiz/LMS Tools (NEW in v1.5.0)
+### Guide & Diagnostics
 | Tool | Description |
 |------|-------------|
-| `pinepaper_create_quiz` | Create interactive quizzes |
-| `pinepaper_get_quiz_state` | Get quiz score, progress, answers |
-| `pinepaper_reset_quiz` | Reset quiz to initial state |
+| `pinepaper_tool_guide` | Server-side guide to the tool surface |
+| `pinepaper_set_toolkit` | Switch toolkit profile at runtime |
+| `pinepaper_get_performance_metrics` | Get execution timing metrics |
+| `pinepaper_diagnostic_report` | Diagnostic report |
 
-### Canvas Tools
+### Escape Hatches (`custom_code`, `p5`, `register`)
 | Tool | Description |
 |------|-------------|
-| `pinepaper_set_background_color` | Set background |
-| `pinepaper_set_canvas_size` | Set dimensions |
-
-### Export Tools
-| Tool | Description |
-|------|-------------|
-| `pinepaper_export_svg` | Export animated SVG |
-| `pinepaper_export_training_data` | Export LLM training pairs |
+| `pinepaper_execute_custom_code` | Run custom code against the app |
+| `pinepaper_p5_draw` | p5.js-style drawing |
+| `pinepaper_register_item` | Register an externally created item |
 
 ## Examples
 
@@ -405,7 +517,18 @@ Outputs pairs like:
 3. Add relation: label follows player with offset [0, -50]
 ```
 
-### Flowchart Diagram (NEW)
+### Event-Driven Scene Chain
+
+```
+1. Create events e0, e1, e2 (one per beat)
+2. Chain them: on_event_fire_after e0 → e1 (delay 2000, timeline: canvas)
+3. Chain: on_event_fire_after e1 → e2 (delay 2000, timeline: canvas)
+4. Give beat 1 a reaction: on_event_add_relation e1 → planet (type: orbits)
+5. Give beat 2 a reaction: on_event_set_color e2 → planet (color: #ff3300)
+6. Pulse e0 to start — the whole chain is scrub- and replay-stable
+```
+
+### Flowchart Diagram
 
 ```
 1. Create a terminal shape with label "Start"
@@ -419,7 +542,7 @@ Outputs pairs like:
 9. Apply hierarchical auto-layout
 ```
 
-### Network Diagram (NEW)
+### Network Diagram
 
 ```
 1. Create a cloud shape with label "Internet"
@@ -432,27 +555,29 @@ Outputs pairs like:
 
 ## Architecture
 
+The server does not draw anything itself. It validates a tool call, generates JavaScript that calls PinePaper Studio's `app.*` API, and executes it in the browser — so the studio app stays the single source of truth for behavior.
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                 AI Client (Claude, etc.)                    │
 │                          │                                  │
 │                    MCP Protocol                             │
 │                          │                                  │
-│              ┌───────────▼───────────┐                     │
-│              │  PinePaper MCP Server │                     │
-│              │  ┌─────────────────┐  │                     │
-│              │  │  Tool Handlers  │  │                     │
-│              │  └────────┬────────┘  │                     │
-│              │           │           │                     │
-│              │  ┌────────▼────────┐  │                     │
-│              │  │ Code Generator  │  │                     │
-│              │  └────────┬────────┘  │                     │
-│              └───────────┼───────────┘                     │
+│              ┌───────────▼───────────┐                      │
+│              │  PinePaper MCP Server │                      │
+│              │  ┌─────────────────┐  │                      │
+│              │  │  Tool Handlers  │  │  validate + route    │
+│              │  └────────┬────────┘  │                      │
+│              │           │           │                      │
+│              │  ┌────────▼────────┐  │                      │
+│              │  │ Code Generator  │  │  emit app.* calls    │
+│              │  └────────┬────────┘  │                      │
+│              └───────────┼───────────┘                      │
 │                          │                                  │
-│              ┌───────────▼───────────┐                     │
-│              │   PinePaper Studio    │                     │
-│              │   (Browser/App)       │                     │
-│              └───────────────────────┘                     │
+│              ┌───────────▼───────────┐                      │
+│              │   PinePaper Studio    │  execute in browser  │
+│              │   (Browser/App)       │                      │
+│              └───────────────────────┘                      │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -477,10 +602,6 @@ bun run build
 
 1. Build the server:
    ```bash
-   # Using npm
-   npm run build
-
-   # Using bun
    bun run build
    ```
 
@@ -502,24 +623,30 @@ bun run build
 
 ### Run Tests
 
-```bash
-# Using npm
-npm test
+Tests run on the Bun test runner.
 
-# Using bun
+```bash
 bun test
 
-# Run with coverage
+# With coverage
 bun test --coverage
+
+# Typecheck
+bun run typecheck
+```
+
+### Manifest Check
+
+`manifest.json`'s `tools[]` must stay in sync with the served tool surface. This is enforced on publish (`prepublishOnly`), and you can run it directly:
+
+```bash
+bun run check:manifest   # verify
+bun run fix:manifest     # rewrite manifest to match source
 ```
 
 ### Development Watch Mode
 
 ```bash
-# Using npm
-npm run dev
-
-# Using bun
 bun run dev
 ```
 
@@ -538,20 +665,11 @@ PinePaper MCP Server supports 51 languages, providing localized tool description
 | **Middle Eastern** | Arabic, Hebrew, Persian (RTL support) |
 | **Indigenous (Canada)** | Chipewyan, Cree, Michif, Inuktitut, Mi'kmaq, Mohawk, Ojibwe |
 
-### How It Works
-
-The i18n system provides localized:
-- Tool names and descriptions
-- Error messages
-- Success messages
-- UI labels for item types, relations, animations, and generators
-
 ### Setting Language
 
 Set the `PINEPAPER_LOCALE` environment variable:
 
-```bash
-# In MCP client config (example for Claude Desktop)
+```json
 {
   "mcpServers": {
     "pinepaper": {
@@ -570,10 +688,7 @@ Or programmatically:
 ```typescript
 import { setLocale, t } from '@pinepaper.studio/mcp-server';
 
-// Set locale
 setLocale('fr');
-
-// Get translated string
 const description = t('tools.pinepaper_create_item.description');
 ```
 
@@ -593,16 +708,20 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `PINEPAPER_DEBUG` | Enable debug logging | `false` |
-| `PINEPAPER_LOG_LEVEL` | Log level (error/warn/info/debug) | `info` |
+| `PINEPAPER_STUDIO_URL` | PinePaper Studio URL to connect to (`/editor` is appended automatically) | `https://pinepaper.studio` |
+| `PINEPAPER_HEADLESS` | Run the browser headless (set `false` to watch it work) | `true` |
+| `PINEPAPER_EXECUTION_MODE` | `puppeteer` (execute in a real browser) or `code` (return generated code only) | `puppeteer` |
+| `PINEPAPER_EXPORT_DIR` | Directory for exported files | `<tmpdir>/pinepaper-exports` |
 | `PINEPAPER_LOCALE` | Language locale code | `en` |
+| `PINEPAPER_TOOLKIT` | Toolkit profile (`full`/`agent`/`diagram`/`map`/`font`/`minimal`) | auto-detected |
+| `PINEPAPER_TOOLS` | Explicit comma-separated tool allowlist | unset |
+| `PINEPAPER_VERBOSITY` | Description verbosity (`verbose`/`compact`/`minimal`) | `compact` |
+| `PINEPAPER_TOOL_VERBOSITY` | Deprecated alias for `PINEPAPER_VERBOSITY` | unset |
 | `PINEPAPER_METRICS_ENABLED` | Enable performance metrics tracking | `true` |
 | `PINEPAPER_METRICS_RETENTION` | Max metrics to retain in memory | `1000` |
-| `PINEPAPER_SCREENSHOT_MODE` | Screenshot mode (on_request/always/never) | `on_request` |
+| `PINEPAPER_SCREENSHOT_MODE` | Screenshot mode (`on_request`/`always`/`never`) | `on_request` |
 
 ### Performance Metrics
-
-PinePaper MCP Server includes built-in performance tracking to help AI assistants optimize workflows by identifying bottlenecks and choosing faster alternatives.
 
 **Key Features:**
 - ⚡ Automatic timing for all tool operations
@@ -641,9 +760,10 @@ export PINEPAPER_METRICS_RETENTION=5000
 
 ### Guides
 
-- **[Workflow Guide](docs/WORKFLOW_GUIDE.md)** - Decision trees, multi-step patterns, performance optimization, and troubleshooting
-- **[Performance Metrics](docs/PERFORMANCE_METRICS.md)** - In-memory metrics system for AI self-optimization
-- **[PinePaper Reference](https://pinepaper.studio/api/)** - Complete PinePaper Studio API reference
+- **[Workflow Guide](docs/WORKFLOW_GUIDE.md)** — Decision trees, multi-step patterns, performance optimization, and troubleshooting
+- **[Performance Metrics](docs/PERFORMANCE_METRICS.md)** — In-memory metrics system for AI self-optimization
+- **[Testing Guide](TESTING_GUIDE.md)** — Test layout and conventions
+- **[PinePaper Reference](https://pinepaper.studio/api/)** — Complete PinePaper Studio API reference
 
 ### External Documentation
 
@@ -661,7 +781,7 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Run tests: `npm test`
+4. Run tests: `bun test`
 5. Submit a pull request
 
 ## License

@@ -282,6 +282,26 @@ export const RelationTypeSchema = z.enum([
   // interpreter (replay-stable), else the per-frame compute fallback runs.
   'driven_by',           // source property = target property * multiplier + offset (+clamp); drives color/stroke/opacity/scale/pos. Needs a target.
   'time_expression',     // self-relation: source property driven by a math expression f(t, v) — t=time, v=params.baseValue
+  // Event-driven scene chains (FxTool S11). The source is a pp:event (make one
+  // with pinepaper_event); firing it runs these reactions. on_event_fire_after
+  // chains events over canvas/wall time; on_event_add_relation mutates the graph
+  // (the scene evolves itself). Kick a chain off with pinepaper_event pulse.
+  'on_event_fire_after',   // event→event: when source fires, pulse target after params.delay (timeline: wall|canvas)
+  'on_event_add_relation', // event→item: add params.type relation from item to params.target when the event fires
+  'on_event_remove_relation', // event→item: remove params.type relation from item to params.target
+  'on_event_set_color',    // event→item: set fill/stroke to params.color
+  'on_event_set_property', // event→item: set item[params.property] = params.value
+  'on_event_set_visibility', // event→item: show/hide (params.visible, default true)
+  // Structural layout relations (FxTool S12-E1) — STATIC composition as graph edges.
+  // Placement is derived from the TARGET'S BOUNDS and re-derived each frame, so
+  // dragging or resizing the target moves the dependent live. Use these instead of
+  // hardcoding x/y when the intent is "on", "under", "next to", "inside".
+  'on_top_of',    // source bottom edge rests on target top edge (params: gap, align, overhang)
+  'below',        // source top edge rests on target bottom edge (params: gap, align, overhang)
+  'beside',       // source flanks the target left/right (params: side, gap, align)
+  'inside',       // source anchored inside the target's bounds (params: anchor, padding)
+  'centered_on',  // source center = target center + (offsetX, offsetY)
+  'aligned_with', // source matches target on ONE axis only — the other stays free (params: axis, offset)
 ]).describe('Type of relationship between items');
 
 export type RelationType = z.infer<typeof RelationTypeSchema>;
@@ -533,6 +553,122 @@ export const TimeExpressionParamsSchema = z.object({
   expression: z.string().optional().default('sin(t * 2) * 50 + 300').describe('Math expression of t (time) and v (baseValue), e.g. "sin(t*2)*50 + v"'),
   baseValue: z.number().optional().default(0).describe('Base value accessible as v in the expression'),
   signal: z.boolean().optional().default(false).describe('Deterministic IR mode — parse expression to IR, evaluate as pure f(t)'),
+});
+
+// =============================================================================
+// EVENT-DRIVEN SCENE CHAINS (FxTool S11). Source of each is a pp:event.
+// =============================================================================
+
+// on_event_fire_after (event→event): chain a delayed pulse. timeline 'canvas'
+// schedules on the animation clock (pauses/seeks/loops with the timeline) — use
+// it for scene chains; 'wall' is real-world setTimeout ms.
+export const OnEventFireAfterParamsSchema = z.object({
+  delay:    z.number().min(0).optional().default(1000).describe('Delay before pulsing the target event (milliseconds)'),
+  timeline: z.enum(['wall', 'canvas']).optional().default('wall').describe("'canvas' = animation-clock time (scrub/loop-stable) · 'wall' = real setTimeout ms"),
+});
+
+// on_event_add_relation (event→item): when the event fires, add a relation FROM
+// the target item TO params.target of type params.type. The scene mutates itself.
+export const OnEventAddRelationParamsSchema = z.object({
+  type:   z.string().describe('Relation type to add (e.g. orbits, moves_along_path, driven_by)'),
+  target: z.string().nullish().describe('Target item id for the added relation (null for self-relations)'),
+  params: z.record(z.unknown()).optional().default({}).describe('Params for the added relation'),
+});
+
+// on_event_remove_relation (event→item): tear down a relation added earlier.
+export const OnEventRemoveRelationParamsSchema = z.object({
+  type:   z.string().describe('Relation type to remove'),
+  target: z.string().nullish().describe('Target item id (null for self-relations)'),
+});
+
+// on_event_set_color (event→item).
+export const OnEventSetColorParamsSchema = z.object({
+  color: z.string().describe('Color to apply when the event fires'),
+  which: z.enum(['fill', 'stroke']).optional().default('fill').describe('Which color channel to set'),
+});
+
+// on_event_set_property (event→item): set an arbitrary property.
+export const OnEventSetPropertyParamsSchema = z.object({
+  property: z.string().describe('Item property to set (e.g. opacity, rotation, strokeWidth)'),
+  value:    z.unknown().describe('Value to assign'),
+});
+
+// on_event_set_visibility (event→item).
+export const OnEventSetVisibilityParamsSchema = z.object({
+  visible: z.boolean().optional().default(true).describe('Show (true) or hide (false) the item'),
+});
+
+// pinepaper_event tool — manage the pp:event channel.
+//   create → app.createEvent(name, {payloadType,x,y}) → returns eventId
+//   pulse  → app.pulseEvent(eventId, payload) → kicks off a chain
+export const EventInputSchema = z.object({
+  action:      z.enum(['create', 'pulse']).describe("'create' a pp:event · 'pulse' it to fire listeners/chains"),
+  name:        z.string().optional().describe("Event name — required for action 'create'"),
+  payloadType: z.string().optional().describe("Payload type label (default 'Pulse') — action 'create'"),
+  x:           z.number().optional().describe('Canvas x for the event marker — action create'),
+  y:           z.number().optional().describe('Canvas y for the event marker — action create'),
+  eventId:     z.string().optional().describe("Event id to fire — required for action 'pulse'"),
+  payload:     z.unknown().optional().describe("Optional value forwarded to listeners — action 'pulse'"),
+}).refine((v) => v.action !== 'create' || !!v.name, { message: "action 'create' requires name", path: ['name'] })
+  .refine((v) => v.action !== 'pulse' || !!v.eventId, { message: "action 'pulse' requires eventId", path: ['eventId'] });
+export type EventInput = z.infer<typeof EventInputSchema>;
+
+// =============================================================================
+// STRUCTURAL LAYOUT RELATIONS (FxTool S12-E1)
+// =============================================================================
+// Placement expressed as a graph edge rather than baked-in coordinates. Every
+// compute reads the TARGET'S bounds and the SOURCE'S own bounds, and re-runs each
+// frame — move or resize the target and the dependent follows. All six need a
+// target. `signal: true` routes through the pure Expression-IR port, which FxTool
+// keeps bit-identical to the live compute.
+
+// on_top_of: source bottom edge rests on the target's top edge.
+//   y = T.y - target.height/2 - gap - source.height/2
+export const OnTopOfParamsSchema = z.object({
+  gap:      z.number().optional().default(0).describe('Pixels between the two edges'),
+  align:    z.enum(['left', 'center', 'right']).optional().default('center').describe('Horizontal alignment relative to the target'),
+  overhang: z.number().optional().default(0).describe('Extra signed x-offset in px'),
+  signal:   z.boolean().optional().default(false).describe('Deterministic mode — route through the pure Expression-IR port'),
+});
+
+// below: the mirror of on_top_of — source top edge rests on the target's bottom edge.
+export const BelowParamsSchema = z.object({
+  gap:      z.number().optional().default(0).describe('Pixels between the two edges'),
+  align:    z.enum(['left', 'center', 'right']).optional().default('center').describe('Horizontal alignment relative to the target'),
+  overhang: z.number().optional().default(0).describe('Extra signed x-offset in px'),
+  signal:   z.boolean().optional().default(false).describe('Deterministic mode — route through the pure Expression-IR port'),
+});
+
+// beside: source flanks the target horizontally, aligned vertically.
+export const BesideParamsSchema = z.object({
+  side:   z.enum(['left', 'right']).optional().default('right').describe('Which side of the target'),
+  gap:    z.number().optional().default(0).describe('Pixels between the two edges'),
+  align:  z.enum(['top', 'center', 'bottom']).optional().default('center').describe('Vertical alignment relative to the target'),
+  signal: z.boolean().optional().default(false).describe('Deterministic mode — route through the pure Expression-IR port'),
+});
+
+// inside: source placed fully within the target's bounds at a 9-way anchor.
+export const InsideParamsSchema = z.object({
+  anchor:  z.enum(['center', 'top-left', 'top', 'top-right', 'left', 'right', 'bottom-left', 'bottom', 'bottom-right'])
+            .optional().default('center').describe('Where inside the target to anchor the source'),
+  padding: z.number().optional().default(0).describe('Inset from the target edge in px'),
+  signal:  z.boolean().optional().default(false).describe('Deterministic mode — route through the pure Expression-IR port'),
+});
+
+// centered_on: source center = target center + offset (concentric when offset is 0).
+export const CenteredOnParamsSchema = z.object({
+  offsetX: z.number().optional().default(0).describe('Signed x-offset from the target center'),
+  offsetY: z.number().optional().default(0).describe('Signed y-offset from the target center'),
+  signal:  z.boolean().optional().default(false).describe('Deterministic mode — route through the pure Expression-IR port'),
+});
+
+// aligned_with: ONE axis of the source center matches the target's; the other axis
+// is left untouched (FxTool writes only the returned component). `axis` is required —
+// FxTool's compute returns undefined (relation does nothing) without it.
+export const AlignedWithParamsSchema = z.object({
+  axis:   z.enum(['x', 'y']).describe('Which axis to align (required — the relation is inert without it)'),
+  offset: z.number().optional().default(0).describe('Signed offset along that axis'),
+  signal: z.boolean().optional().default(false).describe('Deterministic mode — route through the pure Expression-IR port'),
 });
 
 // =============================================================================

@@ -4,7 +4,7 @@
 
 import { describe, it, expect } from 'bun:test';
 import { codeGenerator } from '../../types/code-generator.js';
-import { EquationPathInputSchema } from '../../types/schemas.js';
+import { EquationPathInputSchema, EventInputSchema } from '../../types/schemas.js';
 import {
   mockTextItem,
   mockCircleItem,
@@ -846,6 +846,27 @@ describe('PinePaperCodeGenerator', () => {
         EquationPathInputSchema.parse({ kind: 'preset', preset: 'rose', k: 5 } as any)
       );
       expect(preset).toContain('"preset":"rose"');
+    });
+  });
+
+  describe('generateEvent (S11 scene chains)', () => {
+    it('create emits app.createEvent and returns eventId', () => {
+      const code = codeGenerator.generateEvent(EventInputSchema.parse({ action: 'create', name: 'e0' }));
+      expect(code).toContain('app.createEvent("e0"');
+      expect(code).toContain('eventId');
+      expect(code).toContain("typeof app.createEvent !== 'function'"); // guard
+    });
+
+    it('pulse emits app.pulseEvent with the id and payload', () => {
+      const code = codeGenerator.generateEvent(EventInputSchema.parse({ action: 'pulse', eventId: 'e0', payload: { n: 1 } }));
+      expect(code).toContain('app.pulseEvent("e0"');
+      expect(code).toContain('{"n":1}');
+      expect(code).toContain("typeof app.pulseEvent !== 'function'"); // guard
+    });
+
+    it('pulse does not save history (runtime fire, not an edit)', () => {
+      const code = codeGenerator.generateEvent(EventInputSchema.parse({ action: 'pulse', eventId: 'e0' }));
+      expect(code).not.toContain('saveState');
     });
   });
 
