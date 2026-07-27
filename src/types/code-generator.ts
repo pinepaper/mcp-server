@@ -2847,6 +2847,8 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
       gradientDirection = 'vertical',
       cornerRadius = 4,
       shadowEnabled = true,
+      particleSpacing,
+      particleDotSize,
     } = validated;
 
     // Build options object
@@ -2863,6 +2865,8 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
     if (position) options.position = position;
     if (gradientPalette) options.gradientPalette = gradientPalette;
     if (gradientDirection) options.gradientDirection = gradientDirection;
+    if (particleSpacing !== undefined) options.particleSpacing = particleSpacing;
+    if (particleDotSize !== undefined) options.particleDotSize = particleDotSize;
 
     return `
 // Create letter collage

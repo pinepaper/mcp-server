@@ -535,7 +535,7 @@ GRADIENT OBJECT FORMAT:
 
 LETTER-COLLAGE PROPS (non-destructive — registry ids, animations, relations, effects, deformations all preserved):
 - palette (collage group): Swap palette name in-place. e.g. "wordle", "spring", "sunset", "magazine". Walks existing letters, rewrites tile + text fills. No geometry change.
-- collageStyle (collage group): Swap visual style — "tile" | "magazine" | "paperCut" | "fold" | "gradient" | "image". Geometry rebuilds; every registryId is preserved via graft.
+- collageStyle (collage group): Swap visual style — "tile" | "magazine" | "paperCut" | "fold" | "gradient" | "image" | "particle". Geometry rebuilds; every registryId is preserved via graft.
 - palette + collageStyle (collage group): Combine in one call to apply both atomically.
 - bgColor (single letter group, child of a collage): Tile/background fill for that one letter.
 - textColor (single letter group): PointText fill for that one letter.
@@ -4470,6 +4470,7 @@ STYLE TYPES:
 - fold: Origami-style folded letters
 - gradient: Each letter with gradient fill (use with gradient palettes)
 - image: Letters filled with image
+- particle: Each glyph sampled into a cloud of colored dots (re-typable "particle font"); reuses tile palettes. Optional particleSpacing / particleDotSize tune density.
 
 TILE PALETTES:
 - Game: wordle, scrabble
@@ -4498,7 +4499,7 @@ EXAMPLES:
         },
         style: {
           type: 'string',
-          enum: ['tile', 'magazine', 'paperCut', 'fold', 'gradient', 'image'],
+          enum: ['tile', 'magazine', 'paperCut', 'fold', 'gradient', 'image', 'particle'],
           description: 'Style type (default: tile)',
         },
         palette: {
@@ -4552,6 +4553,14 @@ EXAMPLES:
         shadowEnabled: {
           type: 'boolean',
           description: 'Enable drop shadows (default: true)',
+        },
+        particleSpacing: {
+          type: 'number',
+          description: 'Dot spacing for style="particle" (smaller = denser cloud; default ~fontSize*0.11)',
+        },
+        particleDotSize: {
+          type: 'number',
+          description: 'Base dot radius for style="particle" (default ~particleSpacing*0.44)',
         },
       },
       required: ['text'],

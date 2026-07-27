@@ -2286,6 +2286,7 @@ export const LetterCollageStyleSchema = z.enum([
   'fold',
   'gradient',
   'image',
+  'particle',
 ]).describe('Style type for letter collage');
 
 export type LetterCollageStyle = z.infer<typeof LetterCollageStyleSchema>;
@@ -2341,6 +2342,8 @@ export const CreateLetterCollageInputSchema = z.object({
   gradientDirection: GradientDirectionSchema.optional().default('vertical').describe('Gradient direction (for style="gradient")'),
   cornerRadius: z.number().optional().default(4).describe('Corner radius for tile backgrounds'),
   shadowEnabled: z.boolean().optional().default(true).describe('Enable drop shadows'),
+  particleSpacing: z.number().optional().describe('Dot spacing for style="particle" (smaller = denser cloud; default ~fontSize*0.11)'),
+  particleDotSize: z.number().optional().describe('Base dot radius for style="particle" (default ~particleSpacing*0.44)'),
 }).describe('Create letter collage input');
 
 export type CreateLetterCollageInput = z.infer<typeof CreateLetterCollageInputSchema>;

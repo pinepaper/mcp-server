@@ -204,6 +204,32 @@ describe('letter_collage codegen — review fixes #2 and #4', () => {
 });
 
 // =============================================================================
+// FxTool sync — 'particle' letter-collage style (re-typable dot-cloud font)
+// =============================================================================
+
+describe("letter_collage 'particle' style (FxTool sync)", () => {
+  it('emits style particle and forwards the density knobs when given', () => {
+    const code = codeGenerator.generateCreateLetterCollage({
+      text: 'DOTS',
+      style: 'particle',
+      palette: 'neon',
+      particleSpacing: 3,
+      particleDotSize: 1.5,
+    });
+    expect(code).toContain('"style": "particle"');
+    expect(code).toContain('"particleSpacing": 3');
+    expect(code).toContain('"particleDotSize": 1.5');
+  });
+
+  it('omits the density knobs when not supplied (FxTool derives defaults)', () => {
+    const code = codeGenerator.generateCreateLetterCollage({ text: 'DOTS', style: 'particle' });
+    expect(code).toContain('"style": "particle"');
+    expect(code).not.toContain('particleSpacing');
+    expect(code).not.toContain('particleDotSize');
+  });
+});
+
+// =============================================================================
 // #3 — camera_animate schema sync
 // =============================================================================
 
