@@ -685,6 +685,26 @@ describe('KnowledgeGraphValidator', () => {
       expect(quality.score).toBeGreaterThan(0.5);
       expect(['good', 'excellent']).toContain(quality.tier);
       expect(quality.dimensions.completeness).toBeGreaterThan(0.5);
+      // relationalDensity (1.2.0): 4 of 5 items (circle1/circle2/title/subtitle)
+      // are incident to a relation; star1 is isolated → 0.8.
+      expect(quality.dimensions.relationalDensity).toBeCloseTo(0.8, 5);
+    });
+
+    it('relationalDensity is 0 for a scene with no relations', () => {
+      const tmpl: TemplateDefinition = {
+        id: 'flat', name: 'Flat', category: 'test',
+        dimensions: { width: 1080, height: 1080 }, duration: 1,
+        data: {
+          items: [
+            { id: 'a', type: 'circle', x: 10, y: 10 },
+            { id: 'b', type: 'circle', x: 20, y: 20 },
+          ],
+          relations: [],
+        },
+      };
+      const graph = dg.extractFromDefinition(tmpl);
+      const quality = validator.scoreQuality(tmpl, graph);
+      expect(quality.dimensions.relationalDensity).toBe(0);
     });
 
     it('quality weights sum to 1.0', () => {

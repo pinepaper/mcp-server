@@ -18,7 +18,21 @@ const SEVERITY_RANK: Record<string, number> = { error: 0, warning: 1, hint: 2 };
 
 // Semver the diagnostic-code catalog: bump on any code add/semantics change so
 // benchmark runs are comparable across validator versions. Emitted in every result.
-const VALIDATOR_VERSION = '1.1.0';
+const VALIDATOR_VERSION = '1.2.0';
+
+// Structural layout relations (S12-E1) that write BOTH position axes. aligned_with
+// is handled separately (it writes one axis, chosen by params.axis). FxTool keeps
+// this same hardcoded set in its validator's _structuralAxes; the MCP mirrors the
+// fact here because it has no RelationRegistry to read a schema from.
+const STRUCTURAL_FULL_WRITE = new Set(['on_top_of', 'below', 'beside', 'inside', 'centered_on']);
+
+// Relation → required param names. FxTool reads `required` off each RelationRegistry
+// rule; the MCP has no registry, so it mirrors the same fact as a static table.
+// aligned_with.axis has no sensible default (FxTool's compute returns undefined
+// without it, so the relation silently no-ops).
+const RELATION_REQUIRED_PARAMS: Record<string, string[]> = {
+  aligned_with: ['axis'],
+};
 
 // Easing names the engine understands (mirrors EASING_TO_MATH in the ontology).
 const KNOWN_EASINGS = new Set([
@@ -42,7 +56,7 @@ export interface ValidatorItemEntry {
 }
 
 export interface ValidatorRule {
-  params?: Record<string, { type?: string; options?: unknown[]; min?: number; max?: number }>;
+  params?: Record<string, { type?: string; options?: unknown[]; min?: number; max?: number; required?: boolean }>;
 }
 
 export interface ValidatorContext {
@@ -249,6 +263,22 @@ export class OntologyValidator {
         { target: { kind: 'relation', relation: op.relation } }));
       return;
     }
+    // Required params (S12-E1): a param may be required with no sensible default
+    // (aligned_with.axis). _checkParams only inspects supplied keys, so the
+    // missing-required case is checked here. Sources: the rule's own `required`
+    // flags (if a context supplies them) plus the static mirror table.
+    const providedParams = op.params || {};
+    const requiredKeys = new Set<string>(RELATION_REQUIRED_PARAMS[op.relation] || []);
+    for (const pk of Object.keys(rule.params || {})) {
+      if (rule.params![pk]?.required) requiredKeys.add(pk);
+    }
+    for (const pk of requiredKeys) {
+      if (providedParams[pk] === undefined) {
+        out.push(this._diag('MISSING_REQUIRED_PARAM', SEVERITY.ERROR,
+          `${op.relation} requires param "${pk}".`,
+          { target: { kind: 'param', relation: op.relation, property: pk } }));
+      }
+    }
     this._checkParams(rule, op.relation, op.from, op.params || {}, out);
     if (op.from != null && op.to != null && op.from !== op.to) {
       const path = this._reachPath(this._associationGraph(), op.to, op.from);
@@ -259,6 +289,56 @@ export class OntologyValidator {
           { target: { kind: 'relation', relation: op.relation }, context: { cyclePath } }));
       }
     }
+    // Structural placement conflict (S12-E1): two structural relations writing the
+    // SAME axis on one source fight — last-writer-wins at runtime, so this is
+    // advisory (WARNING). aligned_with on a disjoint axis is legal.
+    const newAxes = this._structuralAxes(op.relation, op.params || {});
+    if (op.from != null && newAxes && newAxes.length) {
+      const existing = this._structuralAxesOnSource(op.from);
+      for (const [rel, axes] of existing) {
+        const shared = newAxes.filter((ax) => axes.has(ax));
+        if (shared.length) {
+          out.push(this._diag('STRUCTURAL_CONFLICT', SEVERITY.WARNING,
+            `${op.relation} and existing "${rel}" both write ${shared.join('/')} on ${op.from} — last-writer-wins.`,
+            { target: { kind: 'relation', relation: op.relation }, context: { conflictsWith: rel, axes: shared } }));
+          break;
+        }
+      }
+    }
+  }
+
+  /**
+   * Which position axes a structural placement relation writes: ['x','y'] for a
+   * full write, one axis for aligned_with, [] for aligned_with with no valid axis,
+   * or null if `relation` is not a structural placement relation.
+   */
+  private _structuralAxes(relation: string, params: any): string[] | null {
+    if (STRUCTURAL_FULL_WRITE.has(relation)) return ['x', 'y'];
+    if (relation === 'aligned_with') {
+      const ax = params && params.axis;
+      return (ax === 'x' || ax === 'y') ? [ax] : [];
+    }
+    return null;
+  }
+
+  /** Map<relation, Set<axis>> of structural placement relations already on a source. */
+  private _structuralAxesOnSource(fromId: string): Map<string, Set<string>> {
+    const byRel = new Map<string, Set<string>>();
+    const items = this._safe(() => this.ctx.getAllItems!(), [] as ValidatorItemEntry[]) || [];
+    const entry = items.find((e) => e.itemId === fromId);
+    const assoc = entry && entry.item && entry.item.data && entry.item.data.associations;
+    if (!assoc) return byRel;
+    for (const rel of Object.keys(assoc)) {
+      for (const a of (assoc[rel] || [])) {
+        const axes = this._structuralAxes(rel, a.params || {});
+        if (axes && axes.length) {
+          const set = byRel.get(rel) || new Set<string>();
+          axes.forEach((ax) => set.add(ax));
+          byRel.set(rel, set);
+        }
+      }
+    }
+    return byRel;
   }
 
   private _associationGraph(): Map<string, Set<string>> {

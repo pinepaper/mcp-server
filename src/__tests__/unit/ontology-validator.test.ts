@@ -23,7 +23,7 @@ describe('OntologyValidator', () => {
     const r = validateDefinitionSemantics(def);
     expect(r.ok).toBe(true);
     expect(r.diagnostics.filter((d) => d.severity === 'error')).toHaveLength(0);
-    expect(r.validatorVersion).toBe('1.1.0');
+    expect(r.validatorVersion).toBe('1.2.0');
   });
 
   it('flags a dangling relation target with a nearest-id suggestion', () => {
@@ -107,5 +107,57 @@ describe('OntologyValidator', () => {
     // c1 is fine (created earlier in batch); 'missing' target is flagged
     expect(r.diagnostics.some((d) => d.code === 'TARGET_NOT_FOUND')).toBe(true);
     expect(r.diagnostics.some((d) => d.code === 'SOURCE_NOT_FOUND')).toBe(false);
+  });
+
+  // S12-E1 validator parity (v1.2.0)
+  describe('structural layout diagnostics (1.2.0)', () => {
+    const scene = () => buildDefinitionValidatorContext({
+      data: {
+        items: [{ id: 'a', type: 'circle' }, { id: 'b', type: 'circle' }, { id: 'c', type: 'circle' }],
+        relations: [],
+      },
+    });
+
+    it('flags MISSING_REQUIRED_PARAM when aligned_with has no axis', () => {
+      const v = new OntologyValidator(scene());
+      const r = v.validateOp({ kind: 'addRelation', from: 'a', to: 'b', relation: 'aligned_with', params: {} });
+      const d = r.diagnostics.find((x) => x.code === 'MISSING_REQUIRED_PARAM');
+      expect(d).toBeDefined();
+      expect(d!.severity).toBe('error');
+      expect(d!.target?.property).toBe('axis');
+    });
+
+    it('accepts aligned_with when axis is supplied', () => {
+      const v = new OntologyValidator(scene());
+      const r = v.validateOp({ kind: 'addRelation', from: 'a', to: 'b', relation: 'aligned_with', params: { axis: 'x' } });
+      expect(r.diagnostics.some((x) => x.code === 'MISSING_REQUIRED_PARAM')).toBe(false);
+    });
+
+    it('warns STRUCTURAL_CONFLICT when two full-write relations share an axis', () => {
+      const ctx = buildDefinitionValidatorContext({
+        data: {
+          items: [{ id: 'a', type: 'circle' }, { id: 'b', type: 'circle' }, { id: 'c', type: 'circle' }],
+          relations: [{ source: 'a', target: 'b', type: 'on_top_of', params: {} }],
+        },
+      });
+      const v = new OntologyValidator(ctx);
+      const r = v.validateOp({ kind: 'addRelation', from: 'a', to: 'c', relation: 'centered_on', params: {} });
+      const d = r.diagnostics.find((x) => x.code === 'STRUCTURAL_CONFLICT');
+      expect(d).toBeDefined();
+      expect(d!.severity).toBe('warning');
+      expect(d!.context?.conflictsWith).toBe('on_top_of');
+    });
+
+    it('does NOT conflict when aligned_with uses a disjoint axis from an existing aligned_with', () => {
+      const ctx = buildDefinitionValidatorContext({
+        data: {
+          items: [{ id: 'a', type: 'circle' }, { id: 'b', type: 'circle' }, { id: 'c', type: 'circle' }],
+          relations: [{ source: 'a', target: 'b', type: 'aligned_with', params: { axis: 'x' } }],
+        },
+      });
+      const v = new OntologyValidator(ctx);
+      const r = v.validateOp({ kind: 'addRelation', from: 'a', to: 'c', relation: 'aligned_with', params: { axis: 'y' } });
+      expect(r.diagnostics.some((x) => x.code === 'STRUCTURAL_CONFLICT')).toBe(false);
+    });
   });
 });

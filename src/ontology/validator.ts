@@ -32,12 +32,16 @@ import type {
 // QUALITY METRIC WEIGHTS
 // =============================================================================
 
+// S12-T4.2 rebalance (mirrors FxTool KnowledgeGraphValidator): relationalDensity
+// (0.15) added; the prior five each shed weight to make room. structuralDepth
+// measures relation *diversity*, relationalDensity measures relation *coverage*.
 export const QUALITY_WEIGHTS: Record<keyof QualityDimensions, number> = {
-  completeness:    0.20,
-  animationDesign: 0.25,
-  semanticRichness:0.20,
-  compositionUse:  0.15,
-  structuralDepth: 0.20,
+  completeness:     0.17,
+  animationDesign:  0.22,
+  semanticRichness: 0.17,
+  compositionUse:   0.12,
+  structuralDepth:  0.17,
+  relationalDensity:0.15,
 };
 
 
@@ -185,6 +189,7 @@ export class KnowledgeGraphValidator {
       semanticRichness: this._scoreSemanticRichness(templateDef),
       compositionUse:   this._scoreCompositionUse(templateDef),
       structuralDepth:  this._scoreStructuralDepth(graph),
+      relationalDensity:this._scoreRelationalDensity(graph),
     };
 
     let score = 0;
@@ -355,6 +360,25 @@ export class KnowledgeGraphValidator {
     const mathScore = Math.min(mathFns.length / 3, 1);
 
     return edgeScore * 0.35 + patternScore * 0.35 + mathScore * 0.30;
+  }
+
+  /**
+   * Relational Density (S12-T2.2): the fraction of nodes incident to at least one
+   * relation edge. Items placed by absolute coordinate with no relations score 0;
+   * a fully composed graph scores 1. Complements structuralDepth (edge diversity).
+   */
+  private _scoreRelationalDensity(graph: TemplateGraph | null): number {
+    if (!graph) return 0;
+    const nodeIds = new Set((graph.nodes || []).map(n => n.id).filter((id): id is string => id != null));
+    if (nodeIds.size === 0) return 0;
+    const incident = new Set<string>();
+    for (const e of (graph.edges || [])) {
+      if (e.source != null) incident.add(e.source);
+      if (e.target != null) incident.add(e.target);
+    }
+    let withRel = 0;
+    for (const id of nodeIds) if (incident.has(id)) withRel++;
+    return withRel / nodeIds.size;
   }
 
   // ─────────────────────────────────────────────────────────────────────

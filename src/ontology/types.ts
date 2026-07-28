@@ -274,6 +274,7 @@ export interface QualityDimensions {
   semanticRichness: number;
   compositionUse: number;
   structuralDepth: number;
+  relationalDensity: number;
 }
 
 export interface QualityScore {
