@@ -200,6 +200,10 @@
       "description": "Compile a pp: JSON-LD design graph (typed nodes + structural edges like on_top_of) into a live scene — roots placed, the rest positioned by relations. {doc, canvas?, defaultGeometry?} → {itemIds, diagnostics}."
     },
     {
+      "name": "pinepaper_lint_scene",
+      "description": "Read-only relational-density audit of the live scene → {density, suggestions}. Flags coordinate-driven scenes and proposes structural relations for unrelated items already in position. {eps?, cap?}"
+    },
+    {
       "name": "pinepaper_add_relation",
       "description": "Add animation relations between items (orbits, follows, attached_to)"
     },

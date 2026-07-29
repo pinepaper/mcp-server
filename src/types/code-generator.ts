@@ -175,6 +175,7 @@ import {
   ValidateSceneInput,
   CaptureFramesInput,
   InstantiateOntologyInput,
+  LintSceneInput,
   GroupInput,
   CameraDirectorInput,
   DetectObjectsInput,
@@ -5641,6 +5642,27 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    const ite
   }
   if (app.historyManager) app.historyManager.saveState();
   return { success: errors.length === 0, itemIds: itemIds, itemCount: itemIds.length, diagnostics: diagnostics, errors: errors };
+})();`.trim();
+  }
+
+  /**
+   * Relational-density lint of the live scene (S12-E2) via app.lintScene(). Reports
+   * relationalDensity + edge/component counts and suggests structural relations for
+   * unrelated item pairs already in a structural configuration. Read-only/advisory.
+   */
+  generateLintScene(input: LintSceneInput): string {
+    const optsJson = JSON.stringify({
+      ...(input.eps !== undefined ? { eps: input.eps } : {}),
+      ...(input.cap !== undefined ? { cap: input.cap } : {}),
+    });
+    return `
+// Relational-density lint (advisory)
+(function() {
+  if (typeof app.lintScene !== 'function') {
+    return { success: false, error: 'app.lintScene unavailable — update FxTool to a build with the relational linter (S12-E2)' };
+  }
+  const result = app.lintScene(${optsJson});
+  return { success: true, density: result.density, suggestions: result.suggestions };
 })();`.trim();
   }
 

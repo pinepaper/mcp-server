@@ -3139,3 +3139,12 @@ export const InstantiateOntologyInputSchema = z.object({
   })).optional().describe('Per-type default { width, height } overrides (e.g. { text: { width: 300, height: 60 } }).'),
 });
 export type InstantiateOntologyInput = z.infer<typeof InstantiateOntologyInputSchema>;
+
+// Relational-density lint of the LIVE scene (S12-E2). Reports how much of the scene
+// participates in the relation graph and suggests structural relations for unrelated
+// items already sitting in a structural configuration. Advisory (nothing applied).
+export const LintSceneInputSchema = z.object({
+  eps: z.number().positive().optional().describe('Bounds-match tolerance in px for structural-configuration detection (default 4).'),
+  cap: z.number().int().positive().optional().describe('Max number of suggestions to return, ranked by confidence (default 20).'),
+});
+export type LintSceneInput = z.infer<typeof LintSceneInputSchema>;

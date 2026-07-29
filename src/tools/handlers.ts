@@ -39,6 +39,7 @@ import {
   ValidateSceneInputSchema,
   CaptureFramesInputSchema,
   InstantiateOntologyInputSchema,
+  LintSceneInputSchema,
   GroupInputSchema,
   CameraDirectorInputSchema,
   DetectObjectsInputSchema,
@@ -1108,6 +1109,12 @@ async function handleToolCallInner(
         const input = InstantiateOntologyInputSchema.parse(args);
         const code = codeGenerator.generateInstantiateOntology(input);
         return executeOrGenerate(code, 'Instantiate ontology → scene', options, 'pinepaper_instantiate_ontology');
+      }
+
+      case 'pinepaper_lint_scene': {
+        const input = LintSceneInputSchema.parse(args);
+        const code = codeGenerator.generateLintScene(input);
+        return executeOrGenerate(code, 'Lint scene (relational density)', options, 'pinepaper_lint_scene');
       }
 
       // -----------------------------------------------------------------------

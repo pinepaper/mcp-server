@@ -1794,6 +1794,36 @@ EXAMPLE doc: { "nodes": [ {"id":"bar","type":"pp:Rectangle","width":300,"height"
     },
   },
 
+  {
+    name: 'pinepaper_lint_scene',
+    annotations: {
+      title: 'Lint Scene (Relational Density)',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Audit the LIVE scene's relational structure (FxTool S12-E2) — read-only, nothing is changed. Answers "is this scene composed with relations, or just a pile of absolutely-positioned items?" and proposes fixes.
+
+RETURNS:
+- density: { itemCount, relationalItemCount, relationalDensity (0..1 — fraction of items touching the relation graph), edgeCount, componentCount }. A low relationalDensity means items are placed by hardcoded coordinates and won't hold together if something moves.
+- suggestions: structural relations for unrelated item pairs that ALREADY sit in a structural configuration — [{ from, to, type (on_top_of/below/beside/inside/centered_on/aligned_with), params, confidence }], ranked by confidence. Apply the good ones with pinepaper_add_relation to make the layout robust.
+
+USE WHEN:
+- After building a scene, to check it's relation-driven rather than coordinate-driven
+- To discover which items SHOULD be related (labels on shapes, a badge on a card, stacked elements) but aren't
+- Before export, as a composition-quality gate
+
+PARAMS: { eps? (bounds-match tolerance px, default 4), cap? (max suggestions, default 20) }`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        eps: { type: 'number', description: 'Bounds-match tolerance in px for structural-configuration detection (default 4).' },
+        cap: { type: 'number', description: 'Max suggestions to return, ranked by confidence (default 20).' },
+      },
+    },
+  },
+
   // ---------------------------------------------------------------------------
   // LAYER 2 — RULES: RELATION TOOLS (KEY FOR ANIMATION)
   // ---------------------------------------------------------------------------

@@ -95,3 +95,19 @@ describe('generateInstantiateOntology codegen', () => {
     expect(/\)\s*;?\s*$/.test(code.trim())).toBe(true);
   });
 });
+
+describe('generateLintScene codegen', () => {
+  it('emits a guarded app.lintScene call and forwards opts', () => {
+    const code = codeGenerator.generateLintScene({ eps: 6, cap: 10 });
+    expect(code).toContain('app.lintScene(');
+    expect(code).toContain('"eps":6');
+    expect(code).toContain('"cap":10');
+    expect(code).toContain("typeof app.lintScene !== 'function'"); // guard
+    expect(/\)\s*;?\s*$/.test(code.trim())).toBe(true);
+  });
+
+  it('omits opts when none supplied (FxTool defaults apply)', () => {
+    const code = codeGenerator.generateLintScene({});
+    expect(code).toContain('app.lintScene({})');
+  });
+});
