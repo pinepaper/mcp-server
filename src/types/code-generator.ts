@@ -5586,7 +5586,12 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    const ite
   const frames = app.captureFramesAt(${timesJson}, {
     seed: ${seed},
     capture: function(c, t, i) {
-      const url = (c && c.toDataURL) ? c.toDataURL() : '';
+      // Prefer app.captureFrameDataURL(): it renders only the used region, so an
+      // unbounded canvas's fill-workspace margin is never baked into the frame.
+      // Fall back to the raw canvas toDataURL on pre-capture-region FxTool builds.
+      const url = (typeof app.captureFrameDataURL === 'function')
+        ? app.captureFrameDataURL()
+        : ((c && c.toDataURL) ? c.toDataURL() : '');
       const f = { index: i, time: t, hash: hashStr(url), bytes: url.length };
       if (includeDataUrls) f.dataUrl = url;
       return f;

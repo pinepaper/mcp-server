@@ -1090,6 +1090,12 @@ describe('PinePaperCodeGenerator', () => {
       const code = codeGenerator.generateCaptureFrames({ times: [0], includeDataUrls: true });
       expect(code).toContain('f.dataUrl = url');
     });
+
+    it('capture_frames prefers app.captureFrameDataURL (used-region, no workspace margin) with a toDataURL fallback', () => {
+      const code = codeGenerator.generateCaptureFrames({ times: [0] });
+      expect(code).toContain('app.captureFrameDataURL()');
+      expect(code).toContain('c.toDataURL()'); // fallback retained for old builds
+    });
   });
 
   // The governor (app.runGenerated) captures a run's value only when the emitted
