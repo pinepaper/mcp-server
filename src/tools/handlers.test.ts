@@ -1356,6 +1356,134 @@ describe('handleToolCall', () => {
     });
   });
 
+  describe('pinepaper_globe', () => {
+    it('should generate code to enable globe mode', async () => {
+      const result = await handleToolCall('pinepaper_globe', { action: 'enable',
+        showOcean: true,
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('enableGlobeMode');
+      expect(text).toContain('showOcean');
+    });
+
+    it('should generate code to rotate the globe to a coordinate', async () => {
+      const result = await handleToolCall('pinepaper_globe', { action: 'rotate_to',
+        lon: -74.006,
+        lat: 40.7128,
+        duration: 2,
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('rotateGlobeTo');
+      expect(text).toContain('40.7128');
+    });
+
+    it('should generate code to spin the globe', async () => {
+      const result = await handleToolCall('pinepaper_globe', { action: 'spin',
+        speed: 10,
+        axis: 'longitude',
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('animateGlobeRotation');
+    });
+
+    it('should generate code for a world tour across regions', async () => {
+      const result = await handleToolCall('pinepaper_globe', { action: 'world_tour',
+        regions: ['United States of America', 'France', 'Japan'],
+        dwell: 2,
+        showLabels: true,
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('worldTour');
+      expect(text).toContain('Japan');
+    });
+
+    it('should generate code for a world tour across coordinates', async () => {
+      const result = await handleToolCall('pinepaper_globe', { action: 'world_tour',
+        coords: [[-74, 40], [2, 48]],
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('worldTour');
+    });
+
+    it('should require regions or coords for a world tour', async () => {
+      const result = await handleToolCall('pinepaper_globe', { action: 'world_tour',
+        dwell: 2,
+      });
+
+      expect(result.isError).toBe(true);
+    });
+
+    it('should generate code to stop all world tours', async () => {
+      const result = await handleToolCall('pinepaper_globe', { action: 'stop_tour' });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('stopWorldTour');
+    });
+
+    it('should generate code to pin an item to the globe', async () => {
+      const result = await handleToolCall('pinepaper_globe', { action: 'pin_item',
+        itemId: 'marker_1',
+        lon: 139.6917,
+        lat: 35.6895,
+        hideOnFarSide: true,
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('pinItemToGlobe');
+      expect(text).toContain('marker_1');
+    });
+
+    it('should generate code to tour an item along coordinates', async () => {
+      const result = await handleToolCall('pinepaper_globe', { action: 'tour_item',
+        itemId: 'plane_1',
+        coords: [[-74, 40], [2, 48]],
+        loop: true,
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('tourItemAlongCoords');
+      expect(text).toContain('plane_1');
+    });
+
+    it('should generate code to tour an item across regions', async () => {
+      const result = await handleToolCall('pinepaper_globe', { action: 'tour_item',
+        itemId: 'plane_1',
+        regions: ['France', 'Japan'],
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content[0] as { type: string; text: string }).text;
+      expect(text).toContain('tourRegions');
+    });
+
+    it('should require regions or coords for tour_item', async () => {
+      const result = await handleToolCall('pinepaper_globe', { action: 'tour_item',
+        itemId: 'plane_1',
+      });
+
+      expect(result.isError).toBe(true);
+    });
+
+    it('should reject an unknown globe action', async () => {
+      const result = await handleToolCall('pinepaper_globe', { action: 'nope' });
+
+      expect(result.isError).toBe(true);
+    });
+  });
+
   describe('pinepaper_register_item', () => {
     it('should generate code to register a Paper.js item', async () => {
       const result = await handleToolCall('pinepaper_register_item', {

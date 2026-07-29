@@ -193,6 +193,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
     'pinepaper_map_regions',
     'pinepaper_map_animation',
     'pinepaper_map_data',
+    'pinepaper_globe',
   ],
 
   // --- Domain: Fonts ---

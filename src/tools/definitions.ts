@@ -4370,6 +4370,55 @@ ACTIONS:
       required: ['action'],
     },
   },
+  {
+    name: 'pinepaper_globe',
+    annotations: {
+      title: 'Map: Globe + World Tour',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Turn a loaded map into a spinning 3D globe and swing it on a cinematic world tour. Requires a map loaded via pinepaper_map { action: "load" } first; call action: "enable" to switch to globe (orthographic) mode.
+
+ACTIONS:
+- enable      — { rotation?: [lambda,phi,gamma], momentum?, showOcean? }     switch to globe mode
+- rotate_to   — { lon, lat, duration? }                                       versor-slerp the globe to face a coordinate
+- spin        — { speed?, axis?: "longitude"|"latitude", duration? }          continuous auto-rotation
+- world_tour  — { regions?: string[] | coords?: [lon,lat][], dwell?, travel?, tilt?, loop?, easing?, highlightColors?: string[], showLabels?, labelColor? }   the headline: the globe swings to each stop, highlighting it (requires regions OR coords)
+- stop_tour   — { id? }                                                       omit id to stop all tours
+- pin_item    — { itemId, lon, lat, hideOnFarSide? }                          pin a canvas item to the globe surface
+- tour_item   — { itemId, regions?: string[] | coords?: [lon,lat][], dwell?, travel?, loop?, orient? }   move a canvas item along the globe (requires regions OR coords)`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['enable', 'rotate_to', 'spin', 'world_tour', 'stop_tour', 'pin_item', 'tour_item'], description: 'Globe action' },
+        rotation: { type: 'array', items: { type: 'number' }, description: 'Initial rotation [lambda, phi, gamma] (enable)' },
+        momentum: { type: 'boolean', description: 'Drag-spin inertia (enable)' },
+        showOcean: { type: 'boolean', description: 'Render ocean sphere (enable)' },
+        lon: { type: 'number', description: 'Longitude (rotate_to, pin_item)' },
+        lat: { type: 'number', description: 'Latitude (rotate_to, pin_item)' },
+        duration: { type: 'number', description: 'Animation duration in seconds (rotate_to, spin)' },
+        speed: { type: 'number', description: 'Spin speed deg/sec (spin)' },
+        axis: { type: 'string', enum: ['longitude', 'latitude'], description: 'Spin axis (spin)' },
+        regions: { type: 'array', items: { type: 'string' }, description: 'Region IDs to visit (world_tour, tour_item)' },
+        coords: { type: 'array', items: { type: 'array', items: { type: 'number' } }, description: 'Coordinate stops [lon,lat][] (world_tour, tour_item)' },
+        dwell: { type: 'number', description: 'Seconds dwelling at each stop' },
+        travel: { type: 'number', description: 'Seconds travelling between stops' },
+        tilt: { type: 'number', description: 'Camera tilt per stop (world_tour)' },
+        loop: { type: 'boolean', description: 'Loop the tour' },
+        easing: { type: 'string', description: 'Swing easing curve (world_tour)' },
+        highlightColors: { type: 'array', items: { type: 'string' }, description: 'Highlight colors cycled per stop (world_tour)' },
+        showLabels: { type: 'boolean', description: 'Label each stop (world_tour)' },
+        labelColor: { type: 'string', description: 'Label text color (world_tour)' },
+        id: { type: 'string', description: 'Tour id to stop (stop_tour)' },
+        itemId: { type: 'string', description: 'Canvas item id (pin_item, tour_item)' },
+        hideOnFarSide: { type: 'boolean', description: 'Hide item on far side of globe (pin_item)' },
+        orient: { type: 'boolean', description: 'Orient item along travel direction (tour_item)' },
+      },
+      required: ['action'],
+    },
+  },
 
   // ---------------------------------------------------------------------------
   // DOMAIN: FONT TOOLS — single action-dispatched tool replaces 16 wrappers

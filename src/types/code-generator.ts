@@ -113,6 +113,21 @@ import {
   DeselectMapRegionsInput,
   GetHighlightedMapRegionsInputSchema,
   GetHighlightedMapRegionsInput,
+  // Globe + world tour types
+  GlobeEnableInputSchema,
+  GlobeEnableInput,
+  GlobeRotateToInputSchema,
+  GlobeRotateToInput,
+  GlobeSpinInputSchema,
+  GlobeSpinInput,
+  WorldTourInputSchema,
+  WorldTourInput,
+  StopWorldTourInputSchema,
+  StopWorldTourInput,
+  PinToGlobeInputSchema,
+  PinToGlobeInput,
+  TourItemInputSchema,
+  TourItemInput,
   // Custom relation/code types
   RegisterCustomRelationInputSchema,
   RegisterCustomRelationInput,
@@ -3482,6 +3497,213 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
   try {
     const result = app.mapSystem.getHighlightedRegions();
     return { highlighted: result?.highlighted || [], count: result?.count || 0 };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+})();
+`.trim();
+  }
+
+  // -------------------------------------------------------------------------
+  // Globe + World Tour
+  // -------------------------------------------------------------------------
+
+  /**
+   * Generate code to enable globe (orthographic) mode
+   */
+  generateGlobeEnable(input: GlobeEnableInput): string {
+    const validated = GlobeEnableInputSchema.parse(input);
+    const optionsStr = JSON.stringify(validated);
+
+    return `
+// Enable globe mode
+(function() {
+  if (!app.mapSystem) {
+    return { success: false, error: 'Map system not available' };
+  }
+  if (typeof app.mapSystem.enableGlobeMode !== 'function') {
+    return { success: false, error: 'enableGlobeMode unavailable on this build (update the canvas)' };
+  }
+
+  try {
+    app.mapSystem.enableGlobeMode(${optionsStr});
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+})();
+`.trim();
+  }
+
+  /**
+   * Generate code to rotate the globe to a coordinate (versor slerp)
+   */
+  generateGlobeRotateTo(input: GlobeRotateToInput): string {
+    const validated = GlobeRotateToInputSchema.parse(input);
+    const durationArg = validated.duration !== undefined ? `, ${validated.duration}` : '';
+
+    return `
+// Rotate globe to coordinate
+(function() {
+  if (!app.mapSystem) {
+    return { success: false, error: 'Map system not available' };
+  }
+  if (typeof app.mapSystem.rotateGlobeTo !== 'function') {
+    return { success: false, error: 'rotateGlobeTo unavailable on this build (update the canvas)' };
+  }
+
+  try {
+    app.mapSystem.rotateGlobeTo(${validated.lon}, ${validated.lat}${durationArg});
+    return { success: true, rotateTo: [${validated.lon}, ${validated.lat}] };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+})();
+`.trim();
+  }
+
+  /**
+   * Generate code to continuously spin the globe
+   */
+  generateGlobeSpin(input: GlobeSpinInput): string {
+    const validated = GlobeSpinInputSchema.parse(input);
+    const optionsStr = JSON.stringify(validated);
+
+    return `
+// Spin globe continuously
+(function() {
+  if (!app.mapSystem) {
+    return { success: false, error: 'Map system not available' };
+  }
+  if (typeof app.mapSystem.animateGlobeRotation !== 'function') {
+    return { success: false, error: 'animateGlobeRotation unavailable on this build (update the canvas)' };
+  }
+
+  try {
+    const callbackId = app.mapSystem.animateGlobeRotation(${optionsStr});
+    return { success: true, callbackId: callbackId || null };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+})();
+`.trim();
+  }
+
+  /**
+   * Generate code to run a world tour across regions or coordinates
+   */
+  generateWorldTour(input: WorldTourInput): string {
+    const validated = WorldTourInputSchema.parse(input);
+    const optionsStr = JSON.stringify(validated);
+
+    return `
+// World tour across regions / coordinates
+(function() {
+  if (!app.mapSystem) {
+    return { success: false, error: 'Map system not available' };
+  }
+  if (typeof app.mapSystem.worldTour !== 'function') {
+    return { success: false, error: 'worldTour unavailable on this build (update the canvas)' };
+  }
+
+  try {
+    const tourId = app.mapSystem.worldTour(${optionsStr});
+    return { success: true, tourId: tourId || null };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+})();
+`.trim();
+  }
+
+  /**
+   * Generate code to stop a running world tour
+   */
+  generateStopWorldTour(input: StopWorldTourInput): string {
+    const validated = StopWorldTourInputSchema.parse(input);
+    const idArg = validated.id !== undefined ? JSON.stringify(validated.id) : '';
+
+    return `
+// Stop world tour
+(function() {
+  if (!app.mapSystem) {
+    return { success: false, error: 'Map system not available' };
+  }
+  if (typeof app.mapSystem.stopWorldTour !== 'function') {
+    return { success: false, error: 'stopWorldTour unavailable on this build (update the canvas)' };
+  }
+
+  try {
+    app.mapSystem.stopWorldTour(${idArg});
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+})();
+`.trim();
+  }
+
+  /**
+   * Generate code to pin a canvas item to a globe surface coordinate
+   */
+  generatePinToGlobe(input: PinToGlobeInput): string {
+    const validated = PinToGlobeInputSchema.parse(input);
+    const itemId = validated.itemId;
+    const opts = JSON.stringify({ hideOnFarSide: validated.hideOnFarSide });
+
+    return `
+// Pin item to globe coordinate
+(function() {
+  if (!app.mapSystem) {
+    return { success: false, error: 'Map system not available' };
+  }
+  if (typeof app.mapSystem.pinItemToGlobe !== 'function') {
+    return { success: false, error: 'pinItemToGlobe unavailable on this build (update the canvas)' };
+  }
+
+  const item = (app.getItemById && app.getItemById(${JSON.stringify(itemId)})) || (app.itemRegistry && app.itemRegistry.get && app.itemRegistry.get(${JSON.stringify(itemId)}) && (app.itemRegistry.get(${JSON.stringify(itemId)}).item || app.itemRegistry.get(${JSON.stringify(itemId)})));
+  if (!item) {
+    return { success: false, error: 'Item ${itemId} not found' };
+  }
+
+  try {
+    const pinned = app.mapSystem.pinItemToGlobe(item, ${validated.lon}, ${validated.lat}, ${opts});
+    return { success: !!pinned, pinned: !!pinned };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+})();
+`.trim();
+  }
+
+  /**
+   * Generate code to tour a canvas item along regions or coordinates
+   */
+  generateTourItem(input: TourItemInput): string {
+    const validated = TourItemInputSchema.parse(input);
+    const itemId = validated.itemId;
+    const { itemId: _omit, regions, coords, ...rest } = validated;
+    const optsStr = JSON.stringify(rest);
+
+    return `
+// Tour item along regions / coordinates
+(function() {
+  if (!app.mapSystem) {
+    return { success: false, error: 'Map system not available' };
+  }
+
+  const item = (app.getItemById && app.getItemById(${JSON.stringify(itemId)})) || (app.itemRegistry && app.itemRegistry.get && app.itemRegistry.get(${JSON.stringify(itemId)}) && (app.itemRegistry.get(${JSON.stringify(itemId)}).item || app.itemRegistry.get(${JSON.stringify(itemId)})));
+  if (!item) {
+    return { success: false, error: 'Item ${itemId} not found' };
+  }
+
+  try {
+    ${regions
+      ? `if (typeof app.mapSystem.tourRegions !== 'function') { return { success: false, error: 'tourRegions unavailable on this build (update the canvas)' }; }
+    const tourId = app.mapSystem.tourRegions(item, ${JSON.stringify(regions)}, ${optsStr});`
+      : `if (typeof app.mapSystem.tourItemAlongCoords !== 'function') { return { success: false, error: 'tourItemAlongCoords unavailable on this build (update the canvas)' }; }
+    const tourId = app.mapSystem.tourItemAlongCoords(item, ${JSON.stringify(coords || [])}, ${optsStr});`}
+    return { success: true, tourId: tourId || null };
   } catch (error) {
     return { success: false, error: error.message };
   }

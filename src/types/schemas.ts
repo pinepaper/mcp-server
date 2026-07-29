@@ -2593,6 +2593,76 @@ export const GetHighlightedMapRegionsInputSchema = z.object({}).describe('Get hi
 export type GetHighlightedMapRegionsInput = z.infer<typeof GetHighlightedMapRegionsInputSchema>;
 
 // =============================================================================
+// GLOBE + WORLD TOUR SCHEMAS
+// =============================================================================
+
+export const GlobeEnableInputSchema = z.object({
+  rotation: z.tuple([z.number(), z.number(), z.number()]).optional().describe('Initial rotation angles [lambda, phi, gamma]'),
+  momentum: z.boolean().optional().describe('Enable momentum/inertia on drag-spin'),
+  showOcean: z.boolean().optional().describe('Render the ocean sphere backdrop'),
+}).describe('Enable globe (orthographic) mode input');
+
+export type GlobeEnableInput = z.infer<typeof GlobeEnableInputSchema>;
+
+export const GlobeRotateToInputSchema = z.object({
+  lon: z.number().describe('Target longitude to rotate to face the viewer'),
+  lat: z.number().describe('Target latitude to rotate to face the viewer'),
+  duration: z.number().optional().describe('Animation duration in seconds (versor slerp)'),
+}).describe('Rotate globe to coordinate input');
+
+export type GlobeRotateToInput = z.infer<typeof GlobeRotateToInputSchema>;
+
+export const GlobeSpinInputSchema = z.object({
+  speed: z.number().optional().describe('Rotation speed (degrees per second)'),
+  axis: z.enum(['longitude', 'latitude']).optional().describe('Axis to spin around'),
+  duration: z.number().optional().describe('Spin duration in seconds (omit for continuous)'),
+}).describe('Continuous globe spin input');
+
+export type GlobeSpinInput = z.infer<typeof GlobeSpinInputSchema>;
+
+export const WorldTourInputSchema = z.object({
+  regions: z.array(z.string()).optional().describe('Region IDs to visit in order'),
+  coords: z.array(z.tuple([z.number(), z.number()])).optional().describe('Coordinate stops [lon, lat][] to visit in order'),
+  dwell: z.number().optional().describe('Seconds to dwell at each stop'),
+  travel: z.number().optional().describe('Seconds to travel between stops'),
+  tilt: z.number().optional().describe('Camera tilt applied at each stop'),
+  loop: z.boolean().optional().describe('Loop the tour continuously'),
+  easing: z.string().optional().describe('Easing curve for the swing between stops'),
+  highlightColors: z.array(z.string()).optional().describe('Highlight colors cycled per stop'),
+  showLabels: z.boolean().optional().describe('Show a label at each stop'),
+  labelColor: z.string().optional().describe('Label text color'),
+}).describe('World tour input (requires regions or coords)');
+
+export type WorldTourInput = z.infer<typeof WorldTourInputSchema>;
+
+export const StopWorldTourInputSchema = z.object({
+  id: z.string().optional().describe('Tour id to stop (omit to stop all tours)'),
+}).describe('Stop world tour input');
+
+export type StopWorldTourInput = z.infer<typeof StopWorldTourInputSchema>;
+
+export const PinToGlobeInputSchema = z.object({
+  itemId: z.string().describe('ID of the canvas item to pin to the globe surface'),
+  lon: z.number().describe('Longitude to pin the item at'),
+  lat: z.number().describe('Latitude to pin the item at'),
+  hideOnFarSide: z.boolean().optional().describe('Hide the item when its coordinate rotates to the far side'),
+}).describe('Pin item to globe input');
+
+export type PinToGlobeInput = z.infer<typeof PinToGlobeInputSchema>;
+
+export const TourItemInputSchema = z.object({
+  itemId: z.string().describe('ID of the canvas item to move along the tour'),
+  regions: z.array(z.string()).optional().describe('Region IDs to tour the item across'),
+  coords: z.array(z.tuple([z.number(), z.number()])).optional().describe('Coordinate stops [lon, lat][] to move the item along'),
+  dwell: z.number().optional().describe('Seconds to dwell at each stop'),
+  travel: z.number().optional().describe('Seconds to travel between stops'),
+  loop: z.boolean().optional().describe('Loop the item tour continuously'),
+  orient: z.boolean().optional().describe('Orient the item along its direction of travel'),
+}).describe('Tour item along coords/regions input (requires regions or coords)');
+
+export type TourItemInput = z.infer<typeof TourItemInputSchema>;
+
+// =============================================================================
 // TEMPLATE SCHEMAS
 // =============================================================================
 

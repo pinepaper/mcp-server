@@ -388,6 +388,10 @@
       "description": "Map import/export. action: export_csv|import_csv|export_geojson|export_original_geojson|source_info."
     },
     {
+      "name": "pinepaper_globe",
+      "description": "Globe mode + world tour. action: enable|rotate_to|spin|world_tour|stop_tour|pin_item|tour_item. world_tour needs regions or coords."
+    },
+    {
       "name": "pinepaper_font",
       "description": "Font Studio. action: show_studio|set_name|create_glyph|create_space|remove_glyph|set_metrics|export|cleanup_path|… (16 actions; see pinepaper_tool_guide)."
     },

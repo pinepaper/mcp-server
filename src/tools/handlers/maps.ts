@@ -34,6 +34,13 @@ import {
   ImportMapRegionCSVInputSchema,
   SelectMapRegionsInputSchema,
   DeselectMapRegionsInputSchema,
+  GlobeEnableInputSchema,
+  GlobeRotateToInputSchema,
+  GlobeSpinInputSchema,
+  WorldTourInputSchema,
+  StopWorldTourInputSchema,
+  PinToGlobeInputSchema,
+  TourItemInputSchema,
   ErrorCodes,
 } from '../../types/schemas.js';
 
@@ -222,9 +229,73 @@ async function dispatchMapData(args: Record<string, unknown>, options: HandlerOp
   }
 }
 
+// ---------------------------------------------------------------------------
+// pinepaper_globe — globe mode + world tour
+// ---------------------------------------------------------------------------
+
+async function dispatchGlobe(args: Record<string, unknown>, options: HandlerOptions): Promise<CallToolResult> {
+  const action = args.action as string;
+  switch (action) {
+    case 'enable': {
+      const input = GlobeEnableInputSchema.parse(args);
+      const code = codeGenerator.generateGlobeEnable(input);
+      return executeOrGenerate(code, 'Enables globe (orthographic) mode', options, 'pinepaper_globe');
+    }
+    case 'rotate_to': {
+      const input = GlobeRotateToInputSchema.parse(args);
+      const code = codeGenerator.generateGlobeRotateTo(input);
+      return executeOrGenerate(code, `Rotates globe to [${input.lon}, ${input.lat}]`, options, 'pinepaper_globe');
+    }
+    case 'spin': {
+      const input = GlobeSpinInputSchema.parse(args);
+      const code = codeGenerator.generateGlobeSpin(input);
+      return executeOrGenerate(code, `Spins the globe around ${input.axis || 'longitude'}`, options, 'pinepaper_globe');
+    }
+    case 'world_tour': {
+      const input = WorldTourInputSchema.parse(args);
+      if ((!input.regions || input.regions.length === 0) && (!input.coords || input.coords.length === 0)) {
+        return errorResult(
+          ErrorCodes.INVALID_INPUT,
+          'pinepaper_globe action "world_tour" requires at least one of "regions" or "coords".',
+        );
+      }
+      const code = codeGenerator.generateWorldTour(input);
+      const stops = input.regions?.length ?? input.coords?.length ?? 0;
+      return executeOrGenerate(code, `Runs a world tour across ${stops} stop(s)`, options, 'pinepaper_globe');
+    }
+    case 'stop_tour': {
+      const input = StopWorldTourInputSchema.parse(args);
+      const code = codeGenerator.generateStopWorldTour(input);
+      return executeOrGenerate(code, input.id ? `Stops world tour ${input.id}` : 'Stops all world tours', options, 'pinepaper_globe');
+    }
+    case 'pin_item': {
+      const input = PinToGlobeInputSchema.parse(args);
+      const code = codeGenerator.generatePinToGlobe(input);
+      return executeOrGenerate(code, `Pins item ${input.itemId} to [${input.lon}, ${input.lat}]`, options, 'pinepaper_globe');
+    }
+    case 'tour_item': {
+      const input = TourItemInputSchema.parse(args);
+      if ((!input.regions || input.regions.length === 0) && (!input.coords || input.coords.length === 0)) {
+        return errorResult(
+          ErrorCodes.INVALID_INPUT,
+          'pinepaper_globe action "tour_item" requires at least one of "regions" or "coords".',
+        );
+      }
+      const code = codeGenerator.generateTourItem(input);
+      return executeOrGenerate(code, `Tours item ${input.itemId} along the globe`, options, 'pinepaper_globe');
+    }
+    default:
+      return errorResult(
+        ErrorCodes.INVALID_INPUT,
+        `Unknown pinepaper_globe action "${action}". Valid: enable, rotate_to, spin, world_tour, stop_tour, pin_item, tour_item.`,
+      );
+  }
+}
+
 export const mapHandlers: Record<string, MapHandler> = {
   pinepaper_map: dispatchMap,
   pinepaper_map_regions: dispatchMapRegions,
   pinepaper_map_animation: dispatchMapAnimation,
   pinepaper_map_data: dispatchMapData,
+  pinepaper_globe: dispatchGlobe,
 };

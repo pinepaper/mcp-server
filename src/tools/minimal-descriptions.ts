@@ -108,6 +108,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_map_regions: 'Map region styling/selection. action: highlight|unhighlight|apply_colors|add_marker|add_labels|get_at_point|select|deselect|get_highlighted.',
   pinepaper_map_animation: 'Map region animation. action: animate_regions|animate_wave|stop|get_animated. duration, loop.',
   pinepaper_map_data: 'Map import/export. action: export_csv|import_csv|export_geojson|export_original_geojson|source_info.',
+  pinepaper_globe: 'Globe mode + world tour. action: enable|rotate_to|spin|world_tour|stop_tour|pin_item|tour_item. world_tour needs regions or coords.',
 
   // --- Fonts ---
   pinepaper_font: 'Font Studio. action: show_studio|set_name|create_glyph|create_space|remove_glyph|set_metrics|export|cleanup_path|… (16 actions; see pinepaper_tool_guide).',

@@ -2551,11 +2551,12 @@ You can now start creating new items on a clean canvas.`,
             // Letter collage tools
             'pinepaper_create_letter_collage',
             'pinepaper_animate_letter_collage',
-            // Map tools (4 action-dispatched)
+            // Map tools (5 action-dispatched)
             'pinepaper_map',
             'pinepaper_map_regions',
             'pinepaper_map_animation',
             'pinepaper_map_data',
+            'pinepaper_globe',
             // Font tools
             'pinepaper_font',
             // Image import tools
