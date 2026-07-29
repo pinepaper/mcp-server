@@ -1750,6 +1750,50 @@ EXAMPLE: { times: [0, 0.5, 1, 1.5, 2], seed: 42 }`,
     },
   },
 
+  {
+    name: 'pinepaper_instantiate_ontology',
+    annotations: {
+      title: 'Instantiate Ontology → Scene',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Compile a design ONTOLOGY (a pp:-namespaced JSON-LD graph of typed nodes + structural edges) into a real scene — the reverse of scene→graph extraction (FxTool S12-E3). "Author the graph, get the design."
+
+Give it typed nodes (pp:Circle, pp:Text, …) and STRUCTURAL edges (pp:onTopOf, pp:below, pp:beside, pp:inside, pp:centeredOn, pp:alignedWith, or their runtime names on_top_of/…). The compiler:
+- Places only ROOT nodes (never the source of a structural relation) at absolute coordinates, tiling connected components across the canvas. Every other node is positioned AT RUNTIME by its relations — move a root and its dependents follow.
+- Emits app.create + app.addRelation for the whole graph in one call, returns { itemIds, diagnostics, errors }.
+
+Accepts the DesignGraph.toJsonLd shape (pp:nodes / pp:edges), a plain { nodes, edges }, or nodes carrying inline pp: relation properties. Unknown @types fall back to a rectangle with a diagnostic (compilation never hard-fails).
+
+USE WHEN: you have a structured description of a composition (a graph) and want it built as a live, relation-driven scene rather than placing each item by hand.
+
+EXAMPLE doc: { "nodes": [ {"id":"bar","type":"pp:Rectangle","width":300,"height":40}, {"id":"glass","type":"pp:Circle","width":60,"height":60} ], "edges": [ {"type":"on_top_of","source":"glass","target":"bar","params":{"gap":2}} ] } → bar is placed; glass rides on top of it.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        doc: {
+          type: 'object',
+          description: 'The design graph: pp:nodes / pp:edges, or { nodes, edges }, or nodes with inline pp: relation properties.',
+        },
+        canvas: {
+          type: 'object',
+          properties: {
+            width: { type: 'number' },
+            height: { type: 'number' },
+          },
+          description: 'Canvas size used to tile component roots (default 1080×1080).',
+        },
+        defaultGeometry: {
+          type: 'object',
+          description: 'Per-type default { width, height } overrides, e.g. { "text": { "width": 300, "height": 60 } }.',
+        },
+      },
+      required: ['doc'],
+    },
+  },
+
   // ---------------------------------------------------------------------------
   // LAYER 2 — RULES: RELATION TOOLS (KEY FOR ANIMATION)
   // ---------------------------------------------------------------------------

@@ -174,12 +174,14 @@ import {
   ConstructionSequenceInput,
   ValidateSceneInput,
   CaptureFramesInput,
+  InstantiateOntologyInput,
   GroupInput,
   CameraDirectorInput,
   DetectObjectsInput,
   ExtractObjectInput,
   ArrangeInput,
 } from './schemas.js';
+import { OntologyCompiler } from '../ontology/ontology-compiler.js';
 import { z } from 'zod';
 
 // =============================================================================
@@ -5599,6 +5601,46 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    const ite
   });
   const uniqueHashes = new Set(frames.map(function(f) { return f.hash; })).size;
   return { success: true, seed: ${seed}, frameCount: frames.length, uniqueHashes: uniqueHashes, allIdentical: uniqueHashes <= 1, frames: frames };
+})();`.trim();
+  }
+
+  /**
+   * Ontology→scene compiler (S12-E3). Compiles the JSON-LD design graph SERVER-SIDE
+   * (deterministic, unit-tested) into create/addRelation ops, then emits code that
+   * applies them. Only root nodes carry coordinates; structural relations place the
+   * rest at runtime. Compile diagnostics are baked into the emitted result.
+   */
+  generateInstantiateOntology(input: InstantiateOntologyInput): string {
+    const { ops, diagnostics } = new OntologyCompiler({
+      canvas: input.canvas,
+      defaultGeometry: input.defaultGeometry,
+    }).compile(input.doc);
+    const opsJson = JSON.stringify(ops, null, 2);
+    const diagJson = JSON.stringify(diagnostics);
+    return `
+// Instantiate ontology → scene (${ops.filter((o) => o.op === 'create').length} items, ${ops.filter((o) => o.op === 'addRelation').length} relations)
+(function() {
+  if (typeof app.create !== 'function' || typeof app.addRelation !== 'function') {
+    return { success: false, error: 'app.create / app.addRelation unavailable' };
+  }
+  const ops = ${opsJson};
+  const diagnostics = ${diagJson};
+  const itemIds = [];
+  const errors = [];
+  for (const op of ops) {
+    try {
+      if (op.op === 'create') {
+        app.create(op.type, { id: op.id, x: op.x, y: op.y, width: op.width, height: op.height });
+        itemIds.push(op.id);
+      } else if (op.op === 'addRelation') {
+        app.addRelation(op.from, op.to, op.relation, op.params || {});
+      }
+    } catch (e) {
+      errors.push({ op: op.op, id: op.id || (op.from + '->' + op.to), error: e && e.message });
+    }
+  }
+  if (app.historyManager) app.historyManager.saveState();
+  return { success: errors.length === 0, itemIds: itemIds, itemCount: itemIds.length, diagnostics: diagnostics, errors: errors };
 })();`.trim();
   }
 

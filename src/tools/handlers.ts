@@ -38,6 +38,7 @@ import {
   ConstructionSequenceInputSchema,
   ValidateSceneInputSchema,
   CaptureFramesInputSchema,
+  InstantiateOntologyInputSchema,
   GroupInputSchema,
   CameraDirectorInputSchema,
   DetectObjectsInputSchema,
@@ -1101,6 +1102,12 @@ async function handleToolCallInner(
         const code = codeGenerator.generateCaptureFrames(input);
         const description = `Deterministic capture of ${input.times.length} frame(s)`;
         return executeOrGenerate(code, description, options, 'pinepaper_capture_frames');
+      }
+
+      case 'pinepaper_instantiate_ontology': {
+        const input = InstantiateOntologyInputSchema.parse(args);
+        const code = codeGenerator.generateInstantiateOntology(input);
+        return executeOrGenerate(code, 'Instantiate ontology → scene', options, 'pinepaper_instantiate_ontology');
       }
 
       // -----------------------------------------------------------------------

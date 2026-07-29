@@ -3121,3 +3121,21 @@ export const CaptureFramesInputSchema = z.object({
   includeDataUrls: z.boolean().optional().describe('Include each frame as a PNG data URL (large — token-heavy). Default false → returns a cheap per-frame hash + byte size only.'),
 });
 export type CaptureFramesInput = z.infer<typeof CaptureFramesInputSchema>;
+
+// Ontology→scene compiler (S12-E3). Compiles a pp:-namespaced JSON-LD design graph
+// (typed nodes + structural edges like pp:onTopOf) into a real scene. Compilation
+// runs server-side (deterministic, testable); only the resulting create/addRelation
+// ops are emitted. Only ROOT nodes get coordinates — the rest are placed at runtime
+// by their structural relations.
+export const InstantiateOntologyInputSchema = z.object({
+  doc: z.record(z.string(), z.unknown()).describe('The design graph: pp:nodes / pp:edges (DesignGraph.toJsonLd shape), or { nodes, edges }, or nodes carrying inline pp: relation properties.'),
+  canvas: z.object({
+    width: z.number().positive(),
+    height: z.number().positive(),
+  }).optional().describe('Canvas size used to tile component roots (default 1080×1080).'),
+  defaultGeometry: z.record(z.string(), z.object({
+    width: z.number(),
+    height: z.number(),
+  })).optional().describe('Per-type default { width, height } overrides (e.g. { text: { width: 300, height: 60 } }).'),
+});
+export type InstantiateOntologyInput = z.infer<typeof InstantiateOntologyInputSchema>;
