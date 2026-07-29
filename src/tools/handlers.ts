@@ -311,10 +311,24 @@ function executedResult(
   code: string,
   result: unknown,
   screenshot?: string,
-  description?: string
+  description?: string,
+  report?: Record<string, unknown>
 ): CallToolResult {
   const resultObj: Record<string, unknown> = { success: true, result };
   if (description) resultObj.description = description;
+
+  // Surface the governor's model-actionable feedback (app.runGenerated report):
+  // warnings (e.g. "500 items created one-by-one — prefer a pattern"), item count,
+  // and guard trips. Omitted entirely on pre-governor FxTool builds (no report).
+  if (report) {
+    const warnings = Array.isArray(report.warnings) ? report.warnings : [];
+    const items = report.items as { created?: number } | undefined;
+    const governor: Record<string, unknown> = {};
+    if (warnings.length) governor.warnings = warnings;
+    if (items && typeof items.created === 'number') governor.itemsCreated = items.created;
+    if ((report.guard as { tripped?: boolean } | undefined)?.tripped) governor.loopGuardTripped = true;
+    if (Object.keys(governor).length) resultObj.governor = governor;
+  }
 
   const content: (TextContent | ImageContent)[] = [
     { type: 'text', text: JSON.stringify(resultObj, null, 2) },
@@ -603,7 +617,9 @@ ${code}
     return errorResult(
       ErrorCodes.EXECUTION_ERROR,
       result.error || 'Failed to execute code in browser',
-      { code },
+      // errorCode surfaces the governor's structured code (PP_ITEM_BUDGET,
+      // PP_LOOP_BUDGET, PP_TIMEOUT) so the model can correct on the next turn.
+      { code, errorCode: result.errorCode, governorReport: result.report },
       {
         toolName,
         canvasState: canvasState || undefined,
@@ -611,7 +627,7 @@ ${code}
     );
   }
 
-  return executedResult(code, result.result, result.screenshot, description);
+  return executedResult(code, result.result, result.screenshot, description, result.report);
 }
 
 // =============================================================================

@@ -57,6 +57,12 @@ export interface ExecuteResult {
   result?: unknown;
   error?: string;
   screenshot?: string; // base64 encoded
+  /** Governor report from app.runGenerated (items/complexity/guard/warnings), when available. */
+  report?: Record<string, unknown>;
+  /** Structured error code from the governor (PP_ITEM_BUDGET, PP_LOOP_BUDGET, …), when available. */
+  errorCode?: string;
+  /** How the code ran: 'governed' via app.runGenerated, or 'eval' fallback on older builds. */
+  executedVia?: 'governed' | 'eval';
 }
 
 // =============================================================================
@@ -294,20 +300,43 @@ export class PinePaperBrowserController {
     }
 
     try {
-      // Execute the code in page context
-      const result = await this.page.evaluate((codeToRun: string) => {
+      // Execute the code in page context. Prefer the FxTool governor
+      // (app.runGenerated → GeneratedCodeRunner): seeded determinism, loop/item
+      // budgets, bulk-create perf, and a machine-readable report. It returns the
+      // code's trailing-expression value as result.value (FxTool captures it).
+      // Fall back to raw eval on older builds that lack runGenerated.
+      const result = await this.page.evaluate(async (codeToRun: string) => {
+        const app = (window as any).app || (window as any).PinePaper;
+        if (app && typeof app.runGenerated === 'function') {
+          try {
+            const run = await app.runGenerated(codeToRun, { source: 'agent' });
+            if (run && run.ok === false) {
+              return {
+                success: false,
+                error: run.error?.message || 'Execution error',
+                errorCode: run.error?.code || undefined,
+                report: run.report,
+                executedVia: 'governed' as const,
+              };
+            }
+            return { success: true, result: run?.value, report: run?.report, executedVia: 'governed' as const };
+          } catch (e) {
+            return { success: false, error: e instanceof Error ? e.message : 'Execution error', executedVia: 'governed' as const };
+          }
+        }
+        // Fallback: raw eval (pre-governor FxTool build).
         try {
           // eslint-disable-next-line no-eval
           const evalResult = eval(codeToRun);
-          // Handle promises
           if (evalResult instanceof Promise) {
-            return evalResult.then((r) => ({ success: true, result: r }));
+            return evalResult.then((r) => ({ success: true, result: r, executedVia: 'eval' as const }));
           }
-          return { success: true, result: evalResult };
+          return { success: true, result: evalResult, executedVia: 'eval' as const };
         } catch (e) {
           return {
             success: false,
             error: e instanceof Error ? e.message : 'Execution error',
+            executedVia: 'eval' as const,
           };
         }
       }, code);

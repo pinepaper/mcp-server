@@ -1091,4 +1091,25 @@ describe('PinePaperCodeGenerator', () => {
       expect(code).toContain('f.dataUrl = url');
     });
   });
+
+  // The governor (app.runGenerated) captures a run's value only when the emitted
+  // code ends in a `(`-led trailing expression (({...}) or an IIFE) — FxTool's
+  // wrapTrailingReturn rewrites that to `return (…)`. Guard the MCP's half of the
+  // contract: representative generators must end in such an expression, else the
+  // agent silently loses itemId/eventId/query payloads under the governor.
+  describe('governor value-capture contract — emitted code ends in a (-led trailing expression', () => {
+    const endsInParenExpr = (code: string) => /\)\s*;?\s*$/.test(code.trim());
+    const cases: Array<[string, string]> = [
+      ['create_item', codeGenerator.generateCreateItem(mockCircleItem)],
+      ['add_relation', codeGenerator.generateAddRelation({ sourceId: 'a', targetId: 'b', relationType: 'orbits', params: { radius: 50 } })],
+      ['event create', codeGenerator.generateEvent({ action: 'create', name: 'e0' })],
+      ['event pulse', codeGenerator.generateEvent({ action: 'pulse', eventId: 'e0' })],
+      ['letter_collage', codeGenerator.generateCreateLetterCollage({ text: 'HI', style: 'particle' })],
+    ];
+    for (const [name, code] of cases) {
+      it(`${name} ends in a capturable trailing expression`, () => {
+        expect(endsInParenExpr(code)).toBe(true);
+      });
+    }
+  });
 });
