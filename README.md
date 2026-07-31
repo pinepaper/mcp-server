@@ -9,7 +9,7 @@
 
 PinePaper MCP Server enables AI assistants to create and animate graphics in [PinePaper Studio](https://pinepaper.studio) via the Model Context Protocol (MCP). Works with any AI that supports MCP tool calling (Claude, GPT, Gemini, local models, etc.).
 
-The server exposes **114 tools** across drawing, animation, diagrams, maps, typography, physics, data visualization, and export. Using natural language, you can:
+The server exposes **119 tools** across drawing, animation, diagrams, maps, typography, physics, data visualization, and export. Using natural language, you can:
 
 - Create text, shapes, geometry, and complex graphics
 - Animate items with behavior-driven **relations** rather than keyframes
@@ -63,7 +63,7 @@ Open your AI client and try:
 
 ## Toolkits & Token Budget
 
-114 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
+119 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
 
 **Toolkit profiles** (`PINEPAPER_TOOLKIT`):
 
@@ -268,7 +268,7 @@ Generate instruction/code pairs for LLM fine-tuning:
 
 ## Tools Reference
 
-All 114 tools, grouped by the tag used for toolkit filtering.
+All 119 tools, grouped by the tag used for toolkit filtering.
 
 ### Canvas (`canvas`)
 | Tool | Description |
@@ -412,6 +412,17 @@ All 114 tools, grouped by the tag used for toolkit filtering.
 | `pinepaper_map_regions` | Region styling and selection |
 | `pinepaper_map_animation` | Animate a map |
 | `pinepaper_map_data` | Bind data to a map |
+| `pinepaper_globe` | Globe mode + world tour |
+
+### Media (`media`)
+| Tool | Description |
+|------|-------------|
+| `pinepaper_media` | Video/audio from a URL (upload, list, remove, playback rate) |
+
+### Rigging (`rigging`)
+| Tool | Description |
+|------|-------------|
+| `pinepaper_rigging` | Skeletons, bones, IK chains, breakdown-pose keyframes |
 
 ### Typography (`font`, `letter_collage`)
 | Tool | Description |
@@ -444,6 +455,8 @@ All 114 tools, grouped by the tag used for toolkit filtering.
 | `pinepaper_validate_design` | Validate against design rules |
 | `pinepaper_validate` | General validation |
 | `pinepaper_validate_scene` | Validate scene integrity |
+| `pinepaper_instantiate_ontology` | Compile a pp: design graph into a scene |
+| `pinepaper_lint_scene` | Relational-density audit + structural-relation suggestions |
 
 ### Export (`export`)
 | Tool | Description |
