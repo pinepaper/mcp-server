@@ -59,6 +59,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_instantiate_ontology: 'Compile a pp: JSON-LD graph (typed nodes + structural edges like on_top_of) into a scene — roots placed, rest positioned by relations. {doc, canvas?, defaultGeometry?} → {itemIds, diagnostics}.',
   pinepaper_lint_scene: 'Read-only relational-density audit of the live scene → {density, suggestions}. Flags coordinate-driven scenes and proposes structural relations for unrelated items already in position. {eps?, cap?}',
   pinepaper_media: "Video/audio on the canvas from a URL. action: upload_video|upload_audio|list|remove|set_playback_rate. Uploads are first-class items. {action, url?, id?, rate?, ...}",
+  pinepaper_rigging: "Skeletal rigging + animation. action: create_skeleton, add_bone, attach_item, create_ik_chain, add_pose_keyframe (S12 breakdown controls), set_target_path, save_pose, save_shape_key.",
 
   // --- Relations ---
   pinepaper_add_relation: `Add relation. sourceId, targetId, type: ${RELATION_TYPES}. params: {speed, ...}.`,

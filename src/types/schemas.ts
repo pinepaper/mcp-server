@@ -3172,3 +3172,61 @@ export const MediaInputSchema = z.object({
   .refine((v) => !(v.action === 'remove' || v.action === 'set_playback_rate') || !!v.id, { message: 'this action requires id', path: ['id'] })
   .refine((v) => v.action !== 'set_playback_rate' || v.rate !== undefined, { message: 'set_playback_rate requires rate', path: ['rate'] });
 export type MediaInput = z.infer<typeof MediaInputSchema>;
+
+// Rigging (skeletons, bones, IK, breakdown-pose keyframes) via app.riggingSystem.
+// One consolidated tool: build a skeleton, then pose/animate it. The S12 breakdown-pose
+// options (favor/breakdown/curve/boneOffsets/movingHold/holdDrift) ride add_pose_keyframe.
+export const RiggingInputSchema = z.object({
+  action: z.enum([
+    'create_skeleton', 'add_bone', 'attach_item', 'create_ik_chain',
+    'add_pose_keyframe', 'set_target_path', 'save_pose', 'save_shape_key',
+  ]).describe('Rigging operation'),
+  // identifiers
+  skeletonId: z.string().optional().describe('Skeleton id — required for every action except create_skeleton.'),
+  boneId: z.string().optional().describe('Bone id — attach_item.'),
+  itemId: z.string().optional().describe('Canvas item id — attach_item.'),
+  chainId: z.string().optional().describe('IK chain id — set_target_path.'),
+  name: z.string().optional().describe('Name — create_skeleton / add_bone / create_ik_chain / save_pose / save_shape_key.'),
+  // create_skeleton
+  rootPosition: PositionSchema.optional().describe('Skeleton root position (default {x:400,y:300}) — create_skeleton.'),
+  // add_bone
+  parentBoneId: z.string().optional().describe('Parent bone id (omit for root) — add_bone.'),
+  length: z.number().positive().optional().describe('Bone length px (default 80) — add_bone.'),
+  angle: z.number().optional().describe('Bone rest angle in degrees — add_bone.'),
+  flexibility: z.number().min(0).max(1).optional().describe('0 rigid … 1 fully flexible — add_bone.'),
+  segments: z.number().int().min(0).optional().describe('Curve segments (0 = auto) — add_bone.'),
+  // attach_item
+  attachPoint: z.number().min(0).max(1).optional().describe('Position along bone 0=joint…1=tip (default 0.5) — attach_item.'),
+  // create_ik_chain
+  boneIds: z.array(z.string()).min(2).optional().describe('Ordered bone ids (≥2) — create_ik_chain.'),
+  solverType: z.enum(['fabrik', 'two_bone', 'ccd']).optional().describe('IK solver (default fabrik) — create_ik_chain.'),
+  iterations: z.number().int().positive().optional().describe('Solver iterations (default 10) — create_ik_chain.'),
+  tolerance: z.number().positive().optional().describe('Solver tolerance px (default 0.5) — create_ik_chain.'),
+  strength: z.number().optional().describe('Chain strength 0..1 (default 1) — create_ik_chain.'),
+  poleVector: PositionSchema.optional().describe('Pole vector hint — create_ik_chain.'),
+  // add_pose_keyframe
+  time: z.number().optional().describe('Keyframe time in seconds — add_pose_keyframe.'),
+  pose: z.union([z.string(), z.record(z.string(), z.number())]).optional().describe('A saved pose id, or a { boneId: angleDeg } map — add_pose_keyframe.'),
+  easing: z.string().optional().describe('Named easing (default linear) — add_pose_keyframe.'),
+  favor: z.number().min(-1).max(1).optional().describe('Breakdown spacing bias −1..1 (− favors prev key, + favors next) — add_pose_keyframe.'),
+  breakdown: z.boolean().optional().describe('Mark as a breakdown pose (vs a storytelling key) — add_pose_keyframe.'),
+  curve: z.array(z.number()).optional().describe('Per-segment cubic-bezier ease [x1,y1,x2,y2] (overrides named easing) — add_pose_keyframe.'),
+  boneOffsets: z.record(z.string(), z.number()).optional().describe('Per-bone lag { boneId: 0..0.95 } for overlap/follow-through — add_pose_keyframe.'),
+  movingHold: z.boolean().optional().describe('Hold drifts toward the next key instead of dead-stopping — add_pose_keyframe.'),
+  holdDrift: z.number().optional().describe('Fraction toward the next key the moving hold drifts (default 0.06) — add_pose_keyframe.'),
+  // set_target_path
+  waypoints: z.array(z.object({
+    x: z.number(), y: z.number(),
+    out: PositionSchema.optional(),
+    in: PositionSchema.optional(),
+  })).optional().describe('IK effector path waypoints with optional bezier tangents — set_target_path.'),
+  duration: z.number().positive().optional().describe('Seconds to traverse the path (default 1) — set_target_path.'),
+  loop: z.boolean().optional().describe('Cycle the path — set_target_path.'),
+})
+  .refine((v) => v.action === 'create_skeleton' || !!v.skeletonId, { message: 'this action requires skeletonId', path: ['skeletonId'] })
+  .refine((v) => v.action !== 'add_bone' || v.skeletonId != null, { message: 'add_bone requires skeletonId', path: ['skeletonId'] })
+  .refine((v) => v.action !== 'attach_item' || (!!v.boneId && !!v.itemId), { message: 'attach_item requires boneId and itemId', path: ['boneId'] })
+  .refine((v) => v.action !== 'create_ik_chain' || (!!v.boneIds && v.boneIds.length >= 2), { message: 'create_ik_chain requires boneIds (≥2)', path: ['boneIds'] })
+  .refine((v) => v.action !== 'add_pose_keyframe' || (v.time !== undefined && v.pose !== undefined), { message: 'add_pose_keyframe requires time and pose', path: ['pose'] })
+  .refine((v) => v.action !== 'set_target_path' || (!!v.chainId && !!v.waypoints), { message: 'set_target_path requires chainId and waypoints', path: ['waypoints'] });
+export type RiggingInput = z.infer<typeof RiggingInputSchema>;

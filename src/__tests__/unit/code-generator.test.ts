@@ -1118,4 +1118,50 @@ describe('PinePaperCodeGenerator', () => {
       });
     }
   });
+
+  // $N references are documented as "items CREATED in earlier operations".
+  // animate/keyframe_animate/modify/delete results also carry { itemId } (the
+  // TARGET's id); pushing those into itemIds shifted every later $N reference —
+  // a [create ×2, keyframe_animate ×2, create ×2, keyframe_animate($2) ×2]
+  // batch silently re-animated the FIRST items and left the later creates
+  // without keyframes (mis-animated vehicles, 2026-07-30).
+  describe('generateAgentBatchExecute — only create ops claim $N slots', () => {
+    it('emits itemIds.push only for create operations', () => {
+      const code = codeGenerator.generateAgentBatchExecute({
+        operations: [
+          { type: 'create', itemType: 'rectangle', position: { x: 100, y: 100 }, properties: { width: 120, height: 40, rotation: 90 } },
+          { type: 'keyframe_animate', itemId: '$0', keyframes: [
+            { time: 0, properties: { x: 100, y: 100 } },
+            { time: 2, properties: { x: 100, y: 250 } },
+          ] },
+          { type: 'create', itemType: 'circle', position: { x: 300, y: 100 }, properties: { radius: 30 } },
+          { type: 'keyframe_animate', itemId: '$1', keyframes: [
+            { time: 0, properties: { x: 300, y: 100 } },
+            { time: 2, properties: { x: 300, y: 250 } },
+          ] },
+        ],
+      } as never);
+
+      const pushes = code.match(/itemIds\.push\(/g) || [];
+      expect(pushes.length).toBe(2); // exactly one per create op
+
+      // $1 must resolve to the SECOND create (itemIds[1]) — with the old
+      // unconditional push, itemIds[1] was the first keyframe op's target.
+      expect(code).toContain('itemIds[1]');
+    });
+
+    it('modify/animate/delete results never extend the $N space', () => {
+      const code = codeGenerator.generateAgentBatchExecute({
+        operations: [
+          { type: 'create', itemType: 'text', position: { x: 50, y: 50 }, properties: { content: 'hi' } },
+          { type: 'modify', itemId: '$0', properties: { fontSize: 40 } },
+          { type: 'animate', itemId: '$0', animationType: 'pulse' },
+          { type: 'delete', itemId: '$0' },
+        ],
+      } as never);
+
+      const pushes = code.match(/itemIds\.push\(/g) || [];
+      expect(pushes.length).toBe(1);
+    });
+  });
 });

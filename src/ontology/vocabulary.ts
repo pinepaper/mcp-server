@@ -53,8 +53,18 @@ export const PP_VOCABULARY: PinePaperVocabulary = {
     'pp:Group':         { anchor: null, description: 'Item group/container', parentType: 'pp:CanvasContainer' },
     'pp:LetterCollage': { anchor: null, description: 'Styled text collage', parentType: 'pp:CanvasText', mcpTool: 'pinepaper_create_item' },
     'pp:Precomp':       { anchor: null, description: 'Nested composition', parentType: 'pp:CanvasContainer' },
-    'pp:Skeleton':      { anchor: null, description: 'Rigging skeleton', parentType: 'pp:CanvasContainer', mcpTool: 'pinepaper_create_skeleton' },
-    'pp:Bone':          { anchor: null, description: 'Skeleton bone', parentType: 'pp:CanvasElement', mcpTool: 'pinepaper_add_bone' },
+    'pp:Skeleton':      { anchor: null, description: 'Rigging skeleton', parentType: 'pp:CanvasContainer', mcpTool: 'pinepaper_rigging' },
+    'pp:Bone':          { anchor: null, description: 'Skeleton bone', parentType: 'pp:CanvasElement', mcpTool: 'pinepaper_rigging' },
+    // Rigging concepts (mirrors FxTool Vocabulary.js). Consolidated onto pinepaper_rigging.
+    'pp:Pose':          { anchor: null, description: 'Named bone-angle map saved on a skeleton, addressable by id. Multiple poses form a pose library.', parentType: 'pp:Concept', mcpTool: 'pinepaper_rigging' },
+    'pp:BreakdownPose': { anchor: null, description: 'A pose keyframe that shapes the ARC and SPACING of the transition between key poses. Carries favor (−1..1 spacing bias) and a breakdown flag; turns robotic pose-to-pose into believable motion.', parentType: 'pp:Pose', mcpTool: 'pinepaper_rigging' },
+    'pp:TimingCurve':   { anchor: null, description: 'A per-segment cubic-bezier ease with y UNCLAMPED (overshoot/anticipation representable) — a Disney timing chart as data. Overrides the named ease on a pose keyframe.', parentType: 'pp:Concept', mcpTool: 'pinepaper_rigging' },
+    'pp:PoseOverlap':   { anchor: null, description: 'Per-bone timing offsets on a pose keyframe { boneId: lag∈[0,0.95) } — lagged bones trail so the tip drags the root: overlapping action / follow-through.', parentType: 'pp:Concept', mcpTool: 'pinepaper_rigging' },
+    'pp:MovingHold':    { anchor: null, description: 'A pose hold that slowly DRIFTS toward the next key (by holdDrift) instead of dead-stopping — keeps a held pose alive and anticipating.', parentType: 'pp:Concept', mcpTool: 'pinepaper_rigging' },
+    'pp:IKTargetPath':  { anchor: null, description: "A spatial motion PATH (bezier waypoints) an IK chain's effector follows, so it travels an ARC instead of a straight line to a static target.", parentType: 'pp:Concept', mcpTool: 'pinepaper_rigging' },
+    'pp:ShapeKey':      { anchor: null, description: 'Per-item visual delta (segments, opacity, color, size) saved on a skeleton with a rest baseline. Weighted blends drive facial-style animation.', parentType: 'pp:Concept', mcpTool: 'pinepaper_rigging' },
+    'pp:IKChain':       { anchor: null, description: 'Inverse-kinematics chain on a skeleton — ordered bones + solver (fabrik / two_bone / ccd), optional pole vector, optional driving target item.', parentType: 'pp:Concept', mcpTool: 'pinepaper_rigging' },
+    'pp:Glyph':         { anchor: null, description: 'A single character rendered as an editable vector outline (CompoundPath) — distinct from pp:Text (system-font text). Use to animate, morph, or boolean a letter as geometry.', parentType: 'pp:CanvasShape', mcpTool: 'pinepaper_execute_custom_code' },
     'pp:DiagramShape':  { anchor: null, description: 'Flowchart/UML shape', parentType: 'pp:DiagramElement', mcpTool: 'pinepaper_create_diagram_shape' },
     // Flowchart shape subtypes
     'pp:FlowchartShape':    { anchor: null, description: 'Abstract flowchart shape', abstract: true, parentType: 'pp:DiagramShape' },
@@ -142,7 +152,7 @@ export const PP_VOCABULARY: PinePaperVocabulary = {
     'pp:cameraFollows':     { category: 'camera',     behaviorType: 'constraint', mathFunctions: ['exponentialPursuit'], parentType: 'pp:SpatialRelation', mcpToolRef: 'pinepaper_add_relation' },
     'pp:cameraAnimates':    { category: 'camera',     behaviorType: 'trigger', mathFunctions: ['keyframeLerp'], parentType: 'pp:AnimationRelation', mcpToolRef: 'pinepaper_add_relation' },
     // Rigging
-    'pp:boneAttached':      { category: 'rigging',    behaviorType: 'constraint', mathFunctions: ['affineTransform', 'deltaRotation'], parentType: 'pp:SpatialRelation', mcpToolRef: 'pinepaper_attach_item_to_bone' },
+    'pp:boneAttached':      { category: 'rigging',    behaviorType: 'constraint', mathFunctions: ['affineTransform', 'deltaRotation'], parentType: 'pp:SpatialRelation', mcpToolRef: 'pinepaper_rigging' },
     'pp:ikTarget':          { category: 'rigging',    behaviorType: 'constraint', mathFunctions: ['fabrikSolver'], parentType: 'pp:SpatialRelation', mcpToolRef: 'pinepaper_add_relation' },
     // Blending
     'pp:blendReactsTo':     { category: 'blending',   behaviorType: 'procedural', mathFunctions: ['proximityThreshold'], parentType: 'pp:ProceduralRelation', mcpToolRef: 'pinepaper_add_relation' },

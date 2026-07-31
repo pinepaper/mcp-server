@@ -62,6 +62,9 @@ export const TOOL_TAGS: Record<string, string[]> = {
   media: [
     'pinepaper_media',
   ],
+  rigging: [
+    'pinepaper_rigging',
+  ],
   assets: [
     'pinepaper_search_assets',
     'pinepaper_import_asset',
@@ -259,7 +262,7 @@ export const TOOLKIT_PROFILES: Record<ToolkitProfile, string[]> = {
     'scene', 'diagram', 'map',
     'selection', 'transform', 'history',
     'image_processing', 'precomp',
-    'deform', 'sprite', 'interaction',
+    'deform', 'sprite', 'interaction', 'rigging',
     'dataviz', 'magic', 'physics', 'measurement',
     'query', 'export',
     'p5', 'ontology', 'guide',

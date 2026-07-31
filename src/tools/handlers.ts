@@ -41,6 +41,7 @@ import {
   InstantiateOntologyInputSchema,
   LintSceneInputSchema,
   MediaInputSchema,
+  RiggingInputSchema,
   GroupInputSchema,
   CameraDirectorInputSchema,
   DetectObjectsInputSchema,
@@ -1122,6 +1123,12 @@ async function handleToolCallInner(
         const input = MediaInputSchema.parse(args);
         const code = codeGenerator.generateMedia(input);
         return executeOrGenerate(code, `Media: ${input.action}`, options, 'pinepaper_media');
+      }
+
+      case 'pinepaper_rigging': {
+        const input = RiggingInputSchema.parse(args);
+        const code = codeGenerator.generateRigging(input);
+        return executeOrGenerate(code, `Rigging: ${input.action}`, options, 'pinepaper_rigging');
       }
 
       // -----------------------------------------------------------------------

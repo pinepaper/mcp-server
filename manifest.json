@@ -200,6 +200,10 @@
       "description": "Video/audio on the canvas from a URL. action: upload_video|upload_audio|list|remove|set_playback_rate. Uploads are first-class items. {action, url?, id?, rate?, ...}"
     },
     {
+      "name": "pinepaper_rigging",
+      "description": "Skeletal rigging + animation. action: create_skeleton|add_bone|attach_item|create_ik_chain|add_pose_keyframe|set_target_path|save_pose|save_shape_key. Pose keyframes carry S12 breakdown controls (favor/breakdown/boneOffsets/movingHold)."
+    },
+    {
       "name": "pinepaper_instantiate_ontology",
       "description": "Compile a pp: JSON-LD design graph (typed nodes + structural edges like on_top_of) into a live scene — roots placed, the rest positioned by relations. {doc, canvas?, defaultGeometry?} → {itemIds, diagnostics}."
     },

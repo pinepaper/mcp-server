@@ -1794,6 +1794,69 @@ EXAMPLE: { action: 'upload_video', url: 'https://…/clip.mp4', scale: 0.5, time
   },
 
   {
+    name: 'pinepaper_rigging',
+    annotations: {
+      title: 'Rigging (Skeleton / Bones / IK / Poses)',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Rig and animate with SKELETONS — bones, IK chains, and pose keyframes (FxTool RiggingSystem). Build a skeleton, attach canvas items to bones, then drive it with poses. Includes the S12 "breakdown-pose" controls that turn robotic pose-to-pose into believable motion.
+
+WORKFLOW: create_skeleton → add_bone (×N, parent them into a hierarchy) → attach_item (bind shapes to bones) → optionally create_ik_chain → animate with add_pose_keyframe (or save_pose then reference it).
+
+ACTIONS:
+- create_skeleton: { name?, rootPosition? } → { skeletonId }
+- add_bone: { skeletonId, name?, parentBoneId? (omit for root), length? (80), angle? (deg), flexibility? (0 rigid…1), segments? } → { boneId }
+- attach_item: { skeletonId, boneId, itemId, attachPoint? (0 joint…1 tip, 0.5) }
+- create_ik_chain: { skeletonId, boneIds[] (≥2, ordered), solverType? (fabrik|two_bone|ccd), iterations?, tolerance?, strength?, poleVector? } → { chainId }
+- add_pose_keyframe: { skeletonId, time (s), pose (a saved pose id OR a { boneId: angleDeg } map), easing?, and BREAKDOWN controls: favor? (−1..1 spacing bias), breakdown? (flag), curve? ([x1,y1,x2,y2] cubic-bezier ease, overrides easing), boneOffsets? ({ boneId: 0..0.95 lag } for overlap/follow-through), movingHold? (drift a held pose toward the next key), holdDrift? }
+- set_target_path: { skeletonId, chainId, waypoints[] ({x,y,out?,in?} bezier tangents), duration?, loop? } — the IK effector travels an ARC, not a straight line
+- save_pose: { skeletonId, name? } → { poseId } (snapshot current bone angles)
+- save_shape_key: { skeletonId, name? } → { shapeKeyId } (per-item visual delta for facial-style blends)
+
+BREAKDOWN POSES (S12): a breakdown keyframe shapes the ARC + SPACING between key poses (favor biases spacing; boneOffsets lag bones so a tip drags its root — follow-through; movingHold keeps a hold alive). This is the difference between mechanical and lifelike motion.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['create_skeleton', 'add_bone', 'attach_item', 'create_ik_chain', 'add_pose_keyframe', 'set_target_path', 'save_pose', 'save_shape_key'], description: 'Rigging operation' },
+        skeletonId: { type: 'string', description: 'Skeleton id — every action except create_skeleton.' },
+        boneId: { type: 'string', description: 'Bone id — attach_item.' },
+        itemId: { type: 'string', description: 'Canvas item id — attach_item.' },
+        chainId: { type: 'string', description: 'IK chain id — set_target_path.' },
+        name: { type: 'string', description: 'Name — create_skeleton / add_bone / create_ik_chain / save_pose / save_shape_key.' },
+        rootPosition: { type: 'object', properties: { x: { type: 'number' }, y: { type: 'number' } }, description: 'Skeleton root position — create_skeleton.' },
+        parentBoneId: { type: 'string', description: 'Parent bone id (omit for root) — add_bone.' },
+        length: { type: 'number', description: 'Bone length px (default 80) — add_bone.' },
+        angle: { type: 'number', description: 'Bone rest angle deg — add_bone.' },
+        flexibility: { type: 'number', description: '0 rigid…1 flexible — add_bone.' },
+        segments: { type: 'number', description: 'Curve segments (0 auto) — add_bone.' },
+        attachPoint: { type: 'number', description: 'Along-bone 0 joint…1 tip (0.5) — attach_item.' },
+        boneIds: { type: 'array', items: { type: 'string' }, description: 'Ordered bone ids (≥2) — create_ik_chain.' },
+        solverType: { type: 'string', enum: ['fabrik', 'two_bone', 'ccd'], description: 'IK solver (fabrik) — create_ik_chain.' },
+        iterations: { type: 'number', description: 'Solver iterations (10) — create_ik_chain.' },
+        tolerance: { type: 'number', description: 'Solver tolerance px (0.5) — create_ik_chain.' },
+        strength: { type: 'number', description: 'Chain strength 0..1 (1) — create_ik_chain.' },
+        poleVector: { type: 'object', properties: { x: { type: 'number' }, y: { type: 'number' } }, description: 'Pole vector hint — create_ik_chain.' },
+        time: { type: 'number', description: 'Keyframe time s — add_pose_keyframe.' },
+        pose: { description: 'Saved pose id (string) OR { boneId: angleDeg } map — add_pose_keyframe.' },
+        easing: { type: 'string', description: 'Named easing (linear) — add_pose_keyframe.' },
+        favor: { type: 'number', description: 'Breakdown spacing bias −1..1 — add_pose_keyframe.' },
+        breakdown: { type: 'boolean', description: 'Mark as breakdown pose — add_pose_keyframe.' },
+        curve: { type: 'array', items: { type: 'number' }, description: 'Cubic-bezier ease [x1,y1,x2,y2] — add_pose_keyframe.' },
+        boneOffsets: { type: 'object', description: 'Per-bone lag { boneId: 0..0.95 } — add_pose_keyframe.' },
+        movingHold: { type: 'boolean', description: 'Drift a held pose toward the next key — add_pose_keyframe.' },
+        holdDrift: { type: 'number', description: 'Moving-hold drift fraction (0.06) — add_pose_keyframe.' },
+        waypoints: { type: 'array', items: { type: 'object' }, description: 'IK path [{x,y,out?,in?}] — set_target_path.' },
+        duration: { type: 'number', description: 'Path duration s (1) — set_target_path.' },
+        loop: { type: 'boolean', description: 'Cycle the path — set_target_path.' },
+      },
+      required: ['action'],
+    },
+  },
+
+  {
     name: 'pinepaper_instantiate_ontology',
     annotations: {
       title: 'Instantiate Ontology → Scene',

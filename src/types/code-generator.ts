@@ -177,6 +177,7 @@ import {
   InstantiateOntologyInput,
   LintSceneInput,
   MediaInput,
+  RiggingInput,
   GroupInput,
   CameraDirectorInput,
   DetectObjectsInput,
@@ -2297,6 +2298,16 @@ throw new Error('Unknown diagram mode action: ${action}');
 
     operations.forEach((op, index) => {
       const opCode = this.generateBatchOperationCode(op, index);
+      // $N variable references are documented as "items CREATED in earlier
+      // operations" — only `create` results may extend the itemIds array.
+      // animate/keyframe_animate/modify/delete also return { itemId } (the
+      // TARGET's id), and unconditionally pushing those shifted every later
+      // $N reference: a batch of [create ×5, keyframe_animate ×5, create ×5,
+      // keyframe_animate ×5] silently re-animated the FIRST five items and
+      // left the second five without keyframes (mis-oriented/mis-animated
+      // vehicles, 2026-07-30). `group` already follows this rule by
+      // returning groupId instead of itemId.
+      const claimsItemSlot = op.type === 'create';
       code += `
     // Operation ${index}: ${op.type}
     try {
@@ -2304,9 +2315,9 @@ throw new Error('Unknown diagram mode action: ${action}');
         ${opCode}
       })();
       results.push({ index: ${index}, success: true, result: result${index} });
-      if (result${index} && result${index}.itemId) {
+      ${claimsItemSlot ? `if (result${index} && result${index}.itemId) {
         itemIds.push(result${index}.itemId);
-      }
+      }` : ''}
     } catch (opError) {
       results.push({ index: ${index}, success: false, error: opError.message });
       ${isAtomic ? 'throw opError;' : 'success = false;'}
@@ -5730,6 +5741,97 @@ ${guard}
   const ok = A.setMediaPlaybackRate(${JSON.stringify(input.id)}, ${input.rate});
   return { success: ok, action: 'set_playback_rate', id: ${JSON.stringify(input.id)}, rate: ${input.rate} };
 })();`.trim();
+    }
+  }
+
+  /**
+   * Rigging (skeletons/bones/IK/breakdown-pose keyframes) via app.riggingSystem.
+   * One consolidated emitter; each action maps 1:1 to a riggingSystem method with
+   * FxTool's exact param contract. Guarded on app.riggingSystem.
+   */
+  generateRigging(input: RiggingInput): string {
+    const g = `  const R = app.riggingSystem;
+  if (!R) { return { success: false, error: 'app.riggingSystem unavailable — update FxTool to a rigging-capable build' }; }`;
+    const wrap = (comment: string, body: string) => `\n// ${comment}\n(function() {\n${g}\n${body}\n})();`.trim();
+    const S = (v: unknown) => JSON.stringify(v);
+    switch (input.action) {
+      case 'create_skeleton': {
+        const root = input.rootPosition ? S(input.rootPosition) : S({ x: 400, y: 300 });
+        return wrap('Rigging: create skeleton',
+          `  const skeletonId = R.createSkeleton(${S(input.name ?? null)}, ${root});
+  if (app.historyManager) app.historyManager.saveState();
+  return { success: !!skeletonId, action: 'create_skeleton', skeletonId: skeletonId };`);
+      }
+      case 'add_bone': {
+        const config = S({
+          ...(input.name !== undefined ? { name: input.name } : {}),
+          ...(input.parentBoneId !== undefined ? { parentBoneId: input.parentBoneId } : {}),
+          ...(input.length !== undefined ? { length: input.length } : {}),
+          ...(input.angle !== undefined ? { angle: input.angle } : {}),
+          ...(input.flexibility !== undefined ? { flexibility: input.flexibility } : {}),
+          ...(input.segments !== undefined ? { segments: input.segments } : {}),
+        });
+        return wrap('Rigging: add bone',
+          `  const boneId = R.addBone(${S(input.skeletonId)}, ${config});
+  if (app.historyManager) app.historyManager.saveState();
+  return { success: !!boneId, action: 'add_bone', boneId: boneId };`);
+      }
+      case 'attach_item': {
+        const opts = S(input.attachPoint !== undefined ? { attachPoint: input.attachPoint } : {});
+        return wrap('Rigging: attach item to bone',
+          `  const ok = R.attachItem(${S(input.skeletonId)}, ${S(input.boneId)}, ${S(input.itemId)}, ${opts});
+  if (app.historyManager) app.historyManager.saveState();
+  return { success: !!ok, action: 'attach_item', itemId: ${S(input.itemId)}, boneId: ${S(input.boneId)} };`);
+      }
+      case 'create_ik_chain': {
+        const config = S({
+          boneIds: input.boneIds,
+          ...(input.name !== undefined ? { name: input.name } : {}),
+          ...(input.solverType !== undefined ? { solverType: input.solverType } : {}),
+          ...(input.iterations !== undefined ? { iterations: input.iterations } : {}),
+          ...(input.tolerance !== undefined ? { tolerance: input.tolerance } : {}),
+          ...(input.strength !== undefined ? { strength: input.strength } : {}),
+          ...(input.poleVector !== undefined ? { poleVector: input.poleVector } : {}),
+        });
+        return wrap('Rigging: create IK chain',
+          `  const chainId = R.createIKChain(${S(input.skeletonId)}, ${config});
+  if (app.historyManager) app.historyManager.saveState();
+  return { success: !!chainId, action: 'create_ik_chain', chainId: chainId };`);
+      }
+      case 'add_pose_keyframe': {
+        const opts = S({
+          ...(input.favor !== undefined ? { favor: input.favor } : {}),
+          ...(input.breakdown !== undefined ? { breakdown: input.breakdown } : {}),
+          ...(input.curve !== undefined ? { curve: input.curve } : {}),
+          ...(input.boneOffsets !== undefined ? { boneOffsets: input.boneOffsets } : {}),
+          ...(input.movingHold !== undefined ? { movingHold: input.movingHold } : {}),
+          ...(input.holdDrift !== undefined ? { holdDrift: input.holdDrift } : {}),
+        });
+        return wrap('Rigging: add pose keyframe',
+          `  const ok = R.addPoseKeyframe(${S(input.skeletonId)}, ${input.time}, ${S(input.pose)}, ${S(input.easing ?? 'linear')}, ${opts});
+  if (app.historyManager) app.historyManager.saveState();
+  return { success: !!ok, action: 'add_pose_keyframe', time: ${input.time} };`);
+      }
+      case 'set_target_path': {
+        const opts = S({
+          ...(input.duration !== undefined ? { duration: input.duration } : {}),
+          ...(input.loop !== undefined ? { loop: input.loop } : {}),
+        });
+        return wrap('Rigging: set IK target path',
+          `  const ok = R.setTargetPath(${S(input.skeletonId)}, ${S(input.chainId)}, ${S(input.waypoints)}, ${opts});
+  if (app.historyManager) app.historyManager.saveState();
+  return { success: !!ok, action: 'set_target_path', chainId: ${S(input.chainId)} };`);
+      }
+      case 'save_pose':
+        return wrap('Rigging: save pose',
+          `  const poseId = R.savePose(${S(input.skeletonId)}, ${S(input.name ?? null)});
+  if (app.historyManager) app.historyManager.saveState();
+  return { success: !!poseId, action: 'save_pose', poseId: poseId };`);
+      case 'save_shape_key':
+        return wrap('Rigging: save shape key',
+          `  const shapeKeyId = R.saveShapeKey(${S(input.skeletonId)}, ${S(input.name ?? null)});
+  if (app.historyManager) app.historyManager.saveState();
+  return { success: !!shapeKeyId, action: 'save_shape_key', shapeKeyId: shapeKeyId };`);
     }
   }
 
