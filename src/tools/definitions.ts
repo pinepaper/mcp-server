@@ -1751,6 +1751,49 @@ EXAMPLE: { times: [0, 0.5, 1, 1.5, 2], seed: 42 }`,
   },
 
   {
+    name: 'pinepaper_media',
+    annotations: {
+      title: 'Media (Video / Audio)',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+    description: `Bring VIDEO and AUDIO onto the canvas from a URL, and control playback. Uploaded video is a first-class canvas item (drag, scale, animate, export like any shape); audio rides the timeline.
+
+ACTIONS:
+- upload_video: { url (required), position?, scale?, timeOffset? (timeline start, s), clipInPoint?, clipOutPoint? (trim, s) } → { id, duration, width, height, name }
+- upload_audio: { url (required), volume? (0–1, default 1), loop? (default true), muted?, timeOffset? } → { id, duration, name }
+- list: → all media [{ id, kind, duration, … }]
+- remove: { id } → removed boolean
+- set_playback_rate: { id, rate (0.25–4) } → applies to video or audio
+
+NOTES:
+- URL-based: the URL is fetched in the browser, so it must be reachable + CORS-permitted.
+- Use the returned id with set_playback_rate / remove, and (for video) modify/animate it like any item.
+
+EXAMPLE: { action: 'upload_video', url: 'https://…/clip.mp4', scale: 0.5, timeOffset: 1 }`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['upload_video', 'upload_audio', 'list', 'remove', 'set_playback_rate'], description: "Media action" },
+        url: { type: 'string', description: 'Media URL — required for upload_video / upload_audio.' },
+        id: { type: 'string', description: 'Media id — required for remove / set_playback_rate.' },
+        rate: { type: 'number', description: 'Playback rate 0.25–4 — set_playback_rate.' },
+        position: { type: 'object', properties: { x: { type: 'number' }, y: { type: 'number' } }, description: 'Canvas position — upload_video.' },
+        scale: { type: 'number', description: 'Scale factor — upload_video.' },
+        timeOffset: { type: 'number', description: 'Timeline start offset (s) — upload_video / upload_audio.' },
+        clipInPoint: { type: 'number', description: 'Trim in-point (s) — upload_video.' },
+        clipOutPoint: { type: 'number', description: 'Trim out-point (s) — upload_video.' },
+        volume: { type: 'number', description: 'Volume 0–1 (default 1) — upload_audio.' },
+        loop: { type: 'boolean', description: 'Loop (default true) — upload_audio.' },
+        muted: { type: 'boolean', description: 'Start muted — upload_audio.' },
+      },
+      required: ['action'],
+    },
+  },
+
+  {
     name: 'pinepaper_instantiate_ontology',
     annotations: {
       title: 'Instantiate Ontology → Scene',

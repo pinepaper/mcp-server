@@ -176,6 +176,7 @@ import {
   CaptureFramesInput,
   InstantiateOntologyInput,
   LintSceneInput,
+  MediaInput,
   GroupInput,
   CameraDirectorInput,
   DetectObjectsInput,
@@ -5664,6 +5665,72 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    const ite
   const result = app.lintScene(${optsJson});
   return { success: true, density: result.density, suggestions: result.suggestions };
 })();`.trim();
+  }
+
+  /**
+   * Media (video/audio) via window.PinePaperAgent. Upload is URL-based (the agent
+   * hands a URL, FxTool fetches → File). Async IIFE so uploads resolve before the
+   * value is returned (the governor awaits it).
+   */
+  generateMedia(input: MediaInput): string {
+    const guard = `  const A = (typeof window !== 'undefined') && window.PinePaperAgent;
+  if (!A || typeof A.uploadVideo !== 'function') { return { success: false, error: 'window.PinePaperAgent media API unavailable — update FxTool to a media-capable build' }; }`;
+    switch (input.action) {
+      case 'upload_video': {
+        const opts = JSON.stringify({
+          ...(input.position ? { position: input.position } : {}),
+          ...(input.scale !== undefined ? { scale: input.scale } : {}),
+          ...(input.timeOffset !== undefined ? { timeOffset: input.timeOffset } : {}),
+          ...(input.clipInPoint !== undefined ? { clipInPoint: input.clipInPoint } : {}),
+          ...(input.clipOutPoint !== undefined ? { clipOutPoint: input.clipOutPoint } : {}),
+        });
+        return `
+// Upload video from URL
+(async function() {
+${guard}
+  const info = await A.uploadVideo(${JSON.stringify(input.url)}, ${opts});
+  return { success: true, action: 'upload_video', media: info };
+})();`.trim();
+      }
+      case 'upload_audio': {
+        const opts = JSON.stringify({
+          ...(input.volume !== undefined ? { volume: input.volume } : {}),
+          ...(input.loop !== undefined ? { loop: input.loop } : {}),
+          ...(input.muted !== undefined ? { muted: input.muted } : {}),
+          ...(input.timeOffset !== undefined ? { timeOffset: input.timeOffset } : {}),
+        });
+        return `
+// Upload audio from URL
+(async function() {
+${guard}
+  const info = await A.uploadAudio(${JSON.stringify(input.url)}, ${opts});
+  return { success: true, action: 'upload_audio', media: info };
+})();`.trim();
+      }
+      case 'list':
+        return `
+// List media
+(function() {
+${guard}
+  return { success: true, action: 'list', media: A.listMedia() };
+})();`.trim();
+      case 'remove':
+        return `
+// Remove media
+(function() {
+${guard}
+  const removed = A.removeMedia(${JSON.stringify(input.id)});
+  return { success: removed, action: 'remove', id: ${JSON.stringify(input.id)}, removed: removed };
+})();`.trim();
+      case 'set_playback_rate':
+        return `
+// Set media playback rate
+(function() {
+${guard}
+  const ok = A.setMediaPlaybackRate(${JSON.stringify(input.id)}, ${input.rate});
+  return { success: ok, action: 'set_playback_rate', id: ${JSON.stringify(input.id)}, rate: ${input.rate} };
+})();`.trim();
+    }
   }
 
   /**

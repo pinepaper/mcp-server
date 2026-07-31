@@ -3148,3 +3148,27 @@ export const LintSceneInputSchema = z.object({
   cap: z.number().int().positive().optional().describe('Max number of suggestions to return, ranked by confidence (default 20).'),
 });
 export type LintSceneInput = z.infer<typeof LintSceneInputSchema>;
+
+// Media (video/audio) via window.PinePaperAgent. Agent-facing surface is URL-based
+// (the agent can't hand over a File). Uploaded media are first-class canvas items.
+export const MediaInputSchema = z.object({
+  action: z.enum(['upload_video', 'upload_audio', 'list', 'remove', 'set_playback_rate'])
+    .describe("'upload_video' / 'upload_audio' (from a URL) · 'list' media · 'remove' by id · 'set_playback_rate'"),
+  url: z.string().url().optional().describe('Media URL — required for upload_video / upload_audio (fetched then imported).'),
+  id: z.string().optional().describe('Media id — required for remove / set_playback_rate.'),
+  rate: z.number().min(0.25).max(4).optional().describe('Playback rate 0.25–4 — required for set_playback_rate.'),
+  // upload_video placement
+  position: PositionSchema.optional().describe('Canvas position — upload_video.'),
+  scale: z.number().positive().optional().describe('Scale factor — upload_video.'),
+  timeOffset: z.number().optional().describe('Start offset on the timeline in seconds — upload_video / upload_audio.'),
+  clipInPoint: z.number().optional().describe('Trim in-point in seconds — upload_video.'),
+  clipOutPoint: z.number().optional().describe('Trim out-point in seconds — upload_video.'),
+  // upload_audio
+  volume: z.number().min(0).max(1).optional().describe('Volume 0–1 (default 1) — upload_audio.'),
+  loop: z.boolean().optional().describe('Loop playback (default true) — upload_audio.'),
+  muted: z.boolean().optional().describe('Start muted (default false) — upload_audio.'),
+})
+  .refine((v) => !(v.action === 'upload_video' || v.action === 'upload_audio') || !!v.url, { message: 'upload requires url', path: ['url'] })
+  .refine((v) => !(v.action === 'remove' || v.action === 'set_playback_rate') || !!v.id, { message: 'this action requires id', path: ['id'] })
+  .refine((v) => v.action !== 'set_playback_rate' || v.rate !== undefined, { message: 'set_playback_rate requires rate', path: ['rate'] });
+export type MediaInput = z.infer<typeof MediaInputSchema>;

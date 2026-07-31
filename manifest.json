@@ -196,6 +196,10 @@
       "description": "Deterministic frame capture at given times (seeded random). Returns per-frame hashes (or data URLs) to verify reproducibility/motion. {times, seed?, includeDataUrls?}"
     },
     {
+      "name": "pinepaper_media",
+      "description": "Video/audio on the canvas from a URL. action: upload_video|upload_audio|list|remove|set_playback_rate. Uploads are first-class items. {action, url?, id?, rate?, ...}"
+    },
+    {
       "name": "pinepaper_instantiate_ontology",
       "description": "Compile a pp: JSON-LD design graph (typed nodes + structural edges like on_top_of) into a live scene — roots placed, the rest positioned by relations. {doc, canvas?, defaultGeometry?} → {itemIds, diagnostics}."
     },

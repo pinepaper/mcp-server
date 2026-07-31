@@ -40,6 +40,7 @@ import {
   CaptureFramesInputSchema,
   InstantiateOntologyInputSchema,
   LintSceneInputSchema,
+  MediaInputSchema,
   GroupInputSchema,
   CameraDirectorInputSchema,
   DetectObjectsInputSchema,
@@ -1115,6 +1116,12 @@ async function handleToolCallInner(
         const input = LintSceneInputSchema.parse(args);
         const code = codeGenerator.generateLintScene(input);
         return executeOrGenerate(code, 'Lint scene (relational density)', options, 'pinepaper_lint_scene');
+      }
+
+      case 'pinepaper_media': {
+        const input = MediaInputSchema.parse(args);
+        const code = codeGenerator.generateMedia(input);
+        return executeOrGenerate(code, `Media: ${input.action}`, options, 'pinepaper_media');
       }
 
       // -----------------------------------------------------------------------

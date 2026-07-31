@@ -59,6 +59,9 @@ export const TOOL_TAGS: Record<string, string[]> = {
     'pinepaper_detect_objects',
     'pinepaper_extract_object',
   ],
+  media: [
+    'pinepaper_media',
+  ],
   assets: [
     'pinepaper_search_assets',
     'pinepaper_import_asset',
@@ -250,7 +253,7 @@ export const TOOLKIT_PROFILES: Record<ToolkitProfile, string[]> = {
 
   agent: [
     'agent', 'browser', 'canvas',
-    'core', 'import', 'assets', 'batch',
+    'core', 'import', 'media', 'assets', 'batch',
     'relations', 'animation', 'masks', 'camera',
     'generators', 'effects', 'template',
     'scene', 'diagram', 'map',

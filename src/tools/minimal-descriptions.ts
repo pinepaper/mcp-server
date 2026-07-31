@@ -58,6 +58,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_capture_frames: 'Deterministic frame capture at given times (seeded random). Returns per-frame hashes (or data URLs) to verify reproducibility/motion. {times, seed?, includeDataUrls?}',
   pinepaper_instantiate_ontology: 'Compile a pp: JSON-LD graph (typed nodes + structural edges like on_top_of) into a scene — roots placed, rest positioned by relations. {doc, canvas?, defaultGeometry?} → {itemIds, diagnostics}.',
   pinepaper_lint_scene: 'Read-only relational-density audit of the live scene → {density, suggestions}. Flags coordinate-driven scenes and proposes structural relations for unrelated items already in position. {eps?, cap?}',
+  pinepaper_media: "Video/audio on the canvas from a URL. action: upload_video|upload_audio|list|remove|set_playback_rate. Uploads are first-class items. {action, url?, id?, rate?, ...}",
 
   // --- Relations ---
   pinepaper_add_relation: `Add relation. sourceId, targetId, type: ${RELATION_TYPES}. params: {speed, ...}.`,
