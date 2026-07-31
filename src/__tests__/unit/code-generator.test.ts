@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'bun:test';
-import { codeGenerator } from '../../types/code-generator.js';
+import { codeGenerator, planKeyframeMerges } from '../../types/code-generator.js';
 import { EquationPathInputSchema, EventInputSchema } from '../../types/schemas.js';
 import {
   mockTextItem,
@@ -1162,6 +1162,146 @@ describe('PinePaperCodeGenerator', () => {
 
       const pushes = code.match(/itemIds\.push\(/g) || [];
       expect(pushes.length).toBe(1);
+    });
+  });
+
+  // Regression: agent-pipeline defects found while authoring the ICML GAUGE
+  // reproduction poster/explainer (2026-07-31). Both failed SILENTLY — the
+  // batch reported success while the scene was wrong.
+  describe('agent batch — silent-failure regressions', () => {
+    describe('explicit position on coordinate-built items', () => {
+      // app.create('path', …) builds geometry from segments/pathData and never
+      // reads params.position (PinePaper.js ~1425-1482), so a caller asking for
+      // a path AT a point silently got it at its raw coordinates instead.
+      it('applies an explicit position after creating a path', () => {
+        const code = codeGenerator.generateAgentBatchExecute({
+          operations: [{
+            type: 'create',
+            itemType: 'path',
+            position: { x: 620, y: 420 },
+            properties: { pathData: 'M -34 0 L 34 0', strokeColor: '#fff' },
+          }],
+        } as never);
+
+        expect(code).toContain('item.position');
+        expect(code).toContain('620');
+        expect(code).toContain('420');
+      });
+
+      it('does NOT reposition a path when no position was given', () => {
+        // Absolute-coordinate paths (the common case) must stay where their
+        // coordinates put them — never snapped to the injected default.
+        const code = codeGenerator.generateAgentBatchExecute({
+          operations: [{
+            type: 'create',
+            itemType: 'path',
+            properties: { segments: [[90, 252], [1350, 252]], strokeColor: '#000' },
+          }],
+        } as never);
+
+        expect(code).not.toContain('item.position =');
+      });
+
+      it('leaves shape items alone — app.create already honours their position', () => {
+        const code = codeGenerator.generateAgentBatchExecute({
+          operations: [{
+            type: 'create',
+            itemType: 'circle',
+            position: { x: 100, y: 200 },
+            properties: { radius: 50 },
+          }],
+        } as never);
+
+        expect(code).not.toContain('item.position =');
+      });
+    });
+
+    describe('duplicate keyframe_animate targets', () => {
+      // app.addAnimation replaces data.keyframes wholesale, so a second op on
+      // the same item silently discarded the first track.
+      it('merges two keyframe ops on the same item into one addAnimation', () => {
+        const code = codeGenerator.generateAgentBatchExecute({
+          operations: [
+            {
+              type: 'keyframe_animate',
+              itemId: 'item_9',
+              keyframes: [{ time: 0, properties: { rotation: 25 } }, { time: 4, properties: { rotation: 0 } }],
+            },
+            {
+              type: 'keyframe_animate',
+              itemId: 'item_9',
+              keyframes: [{ time: 0, properties: { strokeColor: '#aaa' } }, { time: 4, properties: { strokeColor: '#0f0' } }],
+            },
+          ],
+        } as never);
+
+        const calls = code.match(/app\.addAnimation/g) || [];
+        expect(calls.length).toBe(1);
+        // both channels survive, merged per timestamp
+        expect(code).toContain('rotation');
+        expect(code).toContain('strokeColor');
+      });
+
+      it('keeps keyframe ops on different items separate', () => {
+        const code = codeGenerator.generateAgentBatchExecute({
+          operations: [
+            { type: 'keyframe_animate', itemId: 'item_1', keyframes: [{ time: 0, properties: { opacity: 0 } }] },
+            { type: 'keyframe_animate', itemId: 'item_2', keyframes: [{ time: 0, properties: { opacity: 1 } }] },
+          ],
+        } as never);
+
+        const calls = code.match(/app\.addAnimation/g) || [];
+        expect(calls.length).toBe(2);
+      });
+
+      it('unions keyframes by timestamp, later op winning per-property', () => {
+        const plan = planKeyframeMerges([
+          {
+            type: 'keyframe_animate', itemId: 'a', duration: 4,
+            keyframes: [
+              { time: 0, properties: { rotation: 25, opacity: 1 } },
+              { time: 4, properties: { rotation: 0 } },
+            ],
+          },
+          {
+            type: 'keyframe_animate', itemId: 'a', loop: true, duration: 9,
+            keyframes: [{ time: 0, properties: { rotation: 90, strokeColor: '#0f0' } }],
+          },
+        ]);
+
+        expect([...plan.foldedInto.entries()]).toEqual([[1, 0]]);
+        const merged = plan.merged.get(0)!;
+        // t=0 keeps opacity from op-0, takes rotation from op-1, gains strokeColor
+        expect(merged.keyframes[0].properties).toEqual({ rotation: 90, opacity: 1, strokeColor: '#0f0' });
+        // t=4 only existed in op-0 and survives
+        expect(merged.keyframes[1]).toEqual({ time: 4, properties: { rotation: 0 } });
+        expect(merged.duration).toBe(9);
+        expect(merged.loop).toBe(true);
+      });
+
+      it('plans nothing when every target is unique', () => {
+        const plan = planKeyframeMerges([
+          { type: 'keyframe_animate', itemId: 'a', keyframes: [{ time: 0, properties: { opacity: 0 } }] },
+          { type: 'keyframe_animate', itemId: 'b', keyframes: [{ time: 0, properties: { opacity: 1 } }] },
+          { type: 'create', itemType: 'circle' },
+        ]);
+
+        expect(plan.merged.size).toBe(0);
+        expect(plan.foldedInto.size).toBe(0);
+      });
+
+      it('merges $N-referenced targets too', () => {
+        const code = codeGenerator.generateAgentBatchExecute({
+          operations: [
+            { type: 'create', itemType: 'circle', position: { x: 0, y: 0 }, properties: {} },
+            { type: 'keyframe_animate', itemId: '$0', keyframes: [{ time: 0, properties: { rotation: 10 } }] },
+            { type: 'keyframe_animate', itemId: '$0', keyframes: [{ time: 1, properties: { opacity: 1 } }] },
+          ],
+        } as never);
+
+        const calls = code.match(/app\.addAnimation/g) || [];
+        expect(calls.length).toBe(1);
+      });
     });
   });
 });

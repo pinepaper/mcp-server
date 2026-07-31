@@ -872,6 +872,100 @@ const formatted = generators.map(g => ({
 }
 
 /**
+ * True when app.create() derives this item's geometry from explicit coordinates
+ * and therefore ignores params.position:
+ *   - path  built from `segments` or `pathData`
+ *   - line  built from `from`/`to`
+ *   - arc   built from `from`/`through`/`to`
+ * Without those coordinate props these types fall back to the position-derived
+ * point, so create() already places them correctly and we must not interfere.
+ */
+export function isCoordinateBuilt(
+  itemType: string | undefined,
+  props: Record<string, unknown>,
+): boolean {
+  switch (itemType) {
+    case 'path':
+      return props.segments !== undefined || props.pathData !== undefined;
+    case 'line':
+      return props.from !== undefined || props.to !== undefined;
+    case 'arc':
+      return props.from !== undefined || props.through !== undefined || props.to !== undefined;
+    default:
+      return false;
+  }
+}
+
+interface KeyframeLike { time: number; properties?: Record<string, unknown>; easing?: string }
+
+export interface KeyframeMergePlan {
+  /** index → merged keyframe payload to emit in place of the op's own */
+  merged: Map<number, { keyframes: KeyframeLike[]; duration: number; loop: boolean }>;
+  /** index → index of the op its keyframes were folded into (emit a no-op) */
+  foldedInto: Map<number, number>;
+}
+
+/**
+ * app.addAnimation() REPLACES data.keyframes wholesale, so two
+ * keyframe_animate ops targeting one item meant the first track was silently
+ * discarded — the batch still reported success while (e.g.) a rotation channel
+ * vanished because a later op set a colour channel on the same item.
+ *
+ * Plan a merge: fold every duplicate target's keyframes into its FIRST op
+ * (keeping author order), union by timestamp with later ops winning on a
+ * per-property conflict. Op slots are preserved so `results` stays 1:1 with
+ * `operations` and `$N` indices are untouched; the folded slots emit an
+ * explicit `{ merged: true }` marker so the merge is visible to the caller
+ * rather than being another silent rewrite.
+ */
+export function planKeyframeMerges(
+  operations: ReadonlyArray<{ type: string; itemId?: string; keyframes?: KeyframeLike[]; duration?: number; loop?: boolean }>,
+): KeyframeMergePlan {
+  const byTarget = new Map<string, number[]>();
+  operations.forEach((op, i) => {
+    if (op.type !== 'keyframe_animate' || !op.itemId) return;
+    const list = byTarget.get(op.itemId) || [];
+    list.push(i);
+    byTarget.set(op.itemId, list);
+  });
+
+  const plan: KeyframeMergePlan = { merged: new Map(), foldedInto: new Map() };
+
+  for (const indices of byTarget.values()) {
+    if (indices.length < 2) continue;
+    const first = indices[0];
+
+    // Union keyframes by time; later ops shallow-merge over earlier ones.
+    const byTime = new Map<number, KeyframeLike>();
+    let duration = 0;
+    let loop = false;
+    for (const i of indices) {
+      const op = operations[i];
+      for (const kf of op.keyframes || []) {
+        const prev = byTime.get(kf.time);
+        byTime.set(kf.time, {
+          time: kf.time,
+          properties: { ...(prev?.properties || {}), ...(kf.properties || {}) },
+          ...((kf.easing ?? prev?.easing) !== undefined ? { easing: kf.easing ?? prev?.easing } : {}),
+        });
+      }
+      const opMax = op.keyframes?.length ? Math.max(...op.keyframes.map(k => k.time)) : 0;
+      duration = Math.max(duration, op.duration || opMax);
+      loop = loop || op.loop === true;
+      if (i !== first) plan.foldedInto.set(i, first);
+    }
+
+    plan.merged.set(first, {
+      keyframes: [...byTime.values()].sort((a, b) => a.time - b.time),
+      duration: duration || 5,
+      loop,
+    });
+  }
+
+  return plan;
+}
+
+/**
  * Template for batch create - creates multiple items with single history save
  */
 function generateBatchCreateCode(items: BatchCreateItem[]): string {
@@ -2285,6 +2379,9 @@ throw new Error('Unknown diagram mode action: ${action}');
     const validated = AgentBatchExecuteInputSchema.parse(input);
     const { operations, atomic } = validated;
     const isAtomic = atomic !== false;
+    // Fold duplicate keyframe_animate targets so a later op can't silently
+    // clobber an earlier track (app.addAnimation replaces, never merges).
+    const mergePlan = planKeyframeMerges(operations as never);
 
     let code = `
 // Batch execute ${operations.length} operations
@@ -2297,7 +2394,7 @@ throw new Error('Unknown diagram mode action: ${action}');
 `;
 
     operations.forEach((op, index) => {
-      const opCode = this.generateBatchOperationCode(op, index);
+      const opCode = this.generateBatchOperationCode(op, index, mergePlan);
       // $N variable references are documented as "items CREATED in earlier
       // operations" — only `create` results may extend the itemIds array.
       // animate/keyframe_animate/modify/delete also return { itemId } (the
@@ -2344,7 +2441,7 @@ throw new Error('Unknown diagram mode action: ${action}');
   /**
    * Generate code for a single batch operation
    */
-  private generateBatchOperationCode(op: z.infer<typeof AgentBatchExecuteInputSchema>['operations'][0], index: number): string {
+  private generateBatchOperationCode(op: z.infer<typeof AgentBatchExecuteInputSchema>['operations'][0], index: number, mergePlan?: KeyframeMergePlan): string {
     switch (op.type) {
       case 'create': {
         const pos = op.position || { x: 400, y: 300 };
@@ -2361,6 +2458,19 @@ const itemId = item.data && item.data.id ? item.data.id : app.registerItem(item,
         }
         if (createProps.opacity !== undefined) {
           createCode += `\nif ('opacity' in item) item.opacity = ${JSON.stringify(createProps.opacity)};`;
+        }
+        // Coordinate-built items (path from segments/pathData, line/arc from
+        // from/through/to) derive their geometry from those coordinates and
+        // IGNORE params.position — so `create` at a point silently produced an
+        // item at its raw coordinates instead. Re-seat it after create when the
+        // caller explicitly asked for a position. Guarded on an explicit
+        // op.position so absolute-coordinate geometry (the common case, which
+        // passes no position) is never snapped to the injected default.
+        if (op.position && isCoordinateBuilt(op.itemType, createProps)) {
+          createCode += `
+// create() builds this item type from its own coordinates and ignores
+// params.position — apply the caller's explicit position after the fact.
+if (item.position) item.position = new paper.Point(${pos.x}, ${pos.y});`;
         }
         createCode += `
 // Ensure item is visible above backgrounds/generators
@@ -2469,12 +2579,25 @@ return { success: true, width: ${w}, height: ${h} };
       }
 
       case 'keyframe_animate': {
+        // Folded into an earlier op on the same target (see planKeyframeMerges).
+        const foldTarget = mergePlan?.foldedInto.get(index);
+        if (foldTarget !== undefined) {
+          return `
+// Keyframes merged into operation ${foldTarget} (same target). A keyframe track
+// is replaced wholesale, so emitting both here would silently drop one.
+return { itemId: ${op.itemId?.startsWith('$') ? `itemIds[${op.itemId.substring(1)}]` : `'${op.itemId}'`}, merged: true, mergedInto: ${foldTarget} };
+`;
+        }
+        const mergedPayload = mergePlan?.merged.get(index);
         const kfItemRef = op.itemId?.startsWith('$')
           ? `itemIds[${op.itemId.substring(1)}]`
           : `'${op.itemId}'`;
-        const kfJson = JSON.stringify(normalizeKeyframePositions(op.keyframes || []));
-        const kfDuration = op.duration || (op.keyframes?.length ? Math.max(...op.keyframes.map(k => k.time)) : 5);
-        const kfLoop = op.loop ?? false;
+        const kfSource = mergedPayload ? mergedPayload.keyframes : (op.keyframes || []);
+        const kfJson = JSON.stringify(normalizeKeyframePositions(kfSource as never));
+        const kfDuration = mergedPayload
+          ? mergedPayload.duration
+          : (op.duration || (op.keyframes?.length ? Math.max(...op.keyframes.map(k => k.time)) : 5));
+        const kfLoop = mergedPayload ? mergedPayload.loop : (op.loop ?? false);
         return `
 const targetId = ${kfItemRef};
 app.addAnimation(targetId, ${kfJson}, { duration: ${kfDuration}, loop: ${kfLoop} });

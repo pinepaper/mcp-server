@@ -63,6 +63,14 @@ export interface ExecuteResult {
   errorCode?: string;
   /** How the code ran: 'governed' via app.runGenerated, or 'eval' fallback on older builds. */
   executedVia?: 'governed' | 'eval';
+  /** Set when the call succeeded only after recovering from a stale page/frame. */
+  recovered?: boolean;
+  /**
+   * Set alongside `recovered`: true if the canvas came back EMPTY (the page
+   * reloaded and no scene was restored), so the caller must rebuild rather than
+   * keep referencing item ids from before the reload. undefined = unknown.
+   */
+  canvasReset?: boolean;
 }
 
 // =============================================================================
@@ -289,6 +297,66 @@ export class PinePaperBrowserController {
   }
 
   /**
+   * True for the "the page handle outlived its frame" family of Puppeteer
+   * errors — raised after the tab reloads or its main frame is swapped. The
+   * BROWSER is still alive; only our Page/Frame reference is stale.
+   */
+  private static isStaleFrameError(error: unknown): boolean {
+    const msg = error instanceof Error ? error.message : String(error);
+    return /detached Frame|Target closed|Session closed|Execution context was destroyed|Requesting main frame too early/i.test(msg);
+  }
+
+  /**
+   * Re-acquire a live Page handle WITHOUT relaunching the browser.
+   *
+   * connect() recovers from staleness by closing the browser and starting over,
+   * which throws away the canvas. A detached frame usually just means the tab
+   * reloaded, so the same browser still has a usable page (and PinePaper may
+   * have restored its own scene from IndexedDB). Re-binding to it keeps the
+   * session — and any surviving scene — intact.
+   *
+   * @returns true when a responsive page was re-bound.
+   */
+  private async reacquirePage(): Promise<boolean> {
+    if (!this.browser) return false;
+    try {
+      const pages = await this.browser.pages();
+      // Prefer a page already on the studio origin; fall back to the first one.
+      const candidate = pages.find((p) => {
+        try {
+          return p.url().includes('/editor');
+        } catch {
+          return false;
+        }
+      }) || pages[0];
+      if (!candidate) return false;
+
+      // Confirm it is actually responsive before adopting it.
+      await candidate.evaluate(() => true);
+      this.page = candidate;
+      this.isConnected = true;
+      console.error('[PinePaper] Re-acquired page after stale frame (browser kept alive)');
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Number of registry items currently on the canvas, or null if unknown. */
+  private async canvasItemCount(): Promise<number | null> {
+    if (!this.page) return null;
+    try {
+      return await this.page.evaluate(() => {
+        const app = (window as any).app || (window as any).PinePaper;
+        const all = app?.itemRegistry?.getAll?.();
+        return Array.isArray(all) ? all.length : null;
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Execute JavaScript code in PinePaper Studio
    */
   async executeCode(code: string, takeScreenshot = true): Promise<ExecuteResult> {
@@ -352,6 +420,30 @@ export class PinePaperBrowserController {
         screenshot,
       };
     } catch (error) {
+      // A stale frame used to hard-fail here forever: isConnected stayed true,
+      // so every later call hit the same error until the caller manually
+      // disconnected — and disconnect+connect relaunches the browser, losing
+      // the canvas. Re-bind to the live page and retry ONCE instead.
+      if (PinePaperBrowserController.isStaleFrameError(error) && await this.reacquirePage()) {
+        try {
+          const retry = await this.executeCode(code, takeScreenshot);
+          // The page reloaded under us, so the scene may be gone even though
+          // execution now succeeds. Say so explicitly — silently continuing
+          // against vanished item ids is how this bug wasted a whole rebuild.
+          const items = await this.canvasItemCount();
+          return {
+            ...retry,
+            recovered: true,
+            canvasReset: items === 0 ? true : items === null ? undefined : false,
+          };
+        } catch (retryError) {
+          return {
+            success: false,
+            error: retryError instanceof Error ? retryError.message : 'Unknown execution error',
+            recovered: false,
+          };
+        }
+      }
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown execution error',
