@@ -29,11 +29,13 @@ The server exposes **121 tools** across drawing, animation, diagrams, maps, typo
 
 ## Made with tool calls
 
-Every graphic below is an animated SVG produced through this server's tool surface — the arguments shown beside each result are what an AI agent passes to the named tool. They aren't shell commands; **[Run these yourself](#run-these-yourself)** below shows the three ways to execute them.
+Every graphic below is an animated SVG produced through this server's tool surface — the arguments shown with each result are what an AI agent passes to the named tool. They aren't shell commands; **[Run these yourself](#run-these-yourself)** below shows the three ways to execute them.
 
-<table>
-<tr>
-<td width="55%">
+<!-- Stacked (image then code) rather than a two-column table so the SVGs render on
+     mobile — GitHub keeps HTML tables two-column on narrow screens, which squeezes
+     the image column to nothing. -->
+
+<p align="center"><img src="assets/poster-sunburst.svg" width="360" alt="The graph is the animation — canvas view above, typed-edge graph below"></p>
 
 ```js
 // The scene IS a graph: two items, two declared edges —
@@ -46,11 +48,7 @@ Every graphic below is an animated SVG produced through this server's tool surfa
   "options": { "speed": 0.18 } }
 ```
 
-</td>
-<td align="center"><img src="assets/poster-sunburst.svg" width="260" alt="The graph is the animation — canvas view above, typed-edge graph below"></td>
-</tr>
-<tr>
-<td>
+<p align="center"><img src="assets/easing-splashes.svg" width="420" alt="Five easing curves compared on vertical rails"></p>
 
 ```js
 // Five rails, five named easings, one loop — each dot is
@@ -64,11 +62,7 @@ for (const easing of ['linear', 'easeIn', 'easeOut',
 }
 ```
 
-</td>
-<td align="center"><img src="assets/easing-splashes.svg" width="300" alt="Five easing curves compared on vertical rails"></td>
-</tr>
-<tr>
-<td>
+<p align="center"><img src="assets/equation-path.svg" width="420" alt="A dot tracing the rose curve r = cos(2θ)"></p>
 
 ```js
 // The engine solves the curve; the exporter bakes the
@@ -82,11 +76,7 @@ for (const easing of ['linear', 'easeIn', 'easeOut',
     "duration": 8, "loop": true } }
 ```
 
-</td>
-<td align="center"><img src="assets/equation-path.svg" width="300" alt="A dot tracing the rose curve r = cos(2θ)"></td>
-</tr>
-<tr>
-<td>
+<p align="center"><img src="assets/live-badge.svg" width="300" alt="LIVE status chip with blinking green dot"></p>
 
 ```js
 // Status chip: pale panel, slate bar, green dot blinking
@@ -97,11 +87,6 @@ for (const easing of ['linear', 'easeIn', 'easeOut',
 { "itemId": "$1", "animationType": "fade",
   "options": { "speed": 1.0 } }   // only the dot blinks
 ```
-
-</td>
-<td align="center"><img src="assets/live-badge.svg" width="220" alt="LIVE status chip with blinking green dot"></td>
-</tr>
-</table>
 
 All five showcase files (including the banner) live in [`assets/`](assets/) — tiny (4–11 KB), dependency-free, loop forever, and render anywhere SVG renders: GitHub READMEs, docs sites, dashboards, emails that allow SVG. They follow one editorial design system (serif mastheads, hairline rules, slate ink on paper white, framed canvas stages, typed-edge graph diagrams) supplied to the agent as context — share a design guideline with your agent and the tool calls come out on-system.
 
