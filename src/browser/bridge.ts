@@ -249,16 +249,72 @@ export class PinePaperBridge {
 // =============================================================================
 
 /**
+ * Configuration for the studio-side message handler.
+ */
+export interface StudioHandlerConfig {
+  /**
+   * REQUIRED. Exact origins permitted to drive this studio window.
+   * Wildcards are rejected: a `'*'` allowlist on a handler that can run
+   * code means any page holding a window reference (opener, embedder,
+   * `window.open` result) gets code execution in this origin.
+   */
+  allowedOrigins: string[];
+
+  /**
+   * Optional host-supplied executor for `execute-code` requests.
+   *
+   * This package deliberately ships NO code evaluator. If the host does
+   * not inject one, `execute-code` is refused. Hosts that want it wire
+   * their own sandbox/governor here and own that decision explicitly.
+   */
+  executeCode?: (code: string) => Promise<unknown>;
+
+  /**
+   * Allow `mcp-request` messages to dispatch MCP tool calls. Off by
+   * default — tool dispatch mutates the host document.
+   */
+  allowToolCalls?: boolean;
+}
+
+/**
  * Message handler for PinePaper Studio side
  *
  * Install this in PinePaper Studio to handle incoming bridge messages.
+ *
+ * SECURITY: this handler is a remote-control surface for the window it is
+ * installed in. It therefore requires an explicit origin allowlist, ships
+ * no code evaluator (see `StudioHandlerConfig.executeCode`), and keeps
+ * tool dispatch opt-in.
  */
 export class PinePaperStudioHandler {
   private allowedOrigins: string[];
+  private executeCodeFn?: (code: string) => Promise<unknown>;
+  private allowToolCalls: boolean;
   private messageHandler: (event: MessageEvent) => void;
 
-  constructor(allowedOrigins: string[] = ['*']) {
-    this.allowedOrigins = allowedOrigins;
+  constructor(config: StudioHandlerConfig | string[]) {
+    const cfg: StudioHandlerConfig = Array.isArray(config)
+      ? { allowedOrigins: config }
+      : config;
+
+    const origins = cfg?.allowedOrigins;
+    if (!Array.isArray(origins) || origins.length === 0) {
+      throw new Error(
+        'PinePaperStudioHandler: `allowedOrigins` is required — pass the exact ' +
+          "origins allowed to drive this window, e.g. ['https://pinepaper.studio']."
+      );
+    }
+    if (origins.some((o) => typeof o !== 'string' || o.trim() === '' || o.includes('*'))) {
+      throw new Error(
+        'PinePaperStudioHandler: wildcard/empty origins are not allowed. ' +
+          'List exact origins — a wildcard lets any page that holds a window ' +
+          'reference drive this studio.'
+      );
+    }
+
+    this.allowedOrigins = [...origins];
+    this.executeCodeFn = cfg.executeCode;
+    this.allowToolCalls = cfg.allowToolCalls === true;
     this.messageHandler = this.handleMessage.bind(this);
     window.addEventListener('message', this.messageHandler);
   }
@@ -267,11 +323,15 @@ export class PinePaperStudioHandler {
    * Handle incoming messages
    */
   private handleMessage(event: MessageEvent): void {
-    // Validate origin
-    if (
-      !this.allowedOrigins.includes('*') &&
-      !this.allowedOrigins.includes(event.origin)
-    ) {
+    // Validate origin — exact match only, no wildcard escape hatch.
+    if (!this.allowedOrigins.includes(event.origin)) {
+      return;
+    }
+
+    // Replies go back to the sending window; without one there is nothing
+    // to answer and no way to scope the response.
+    const source = event.source as Window | null;
+    if (!source) {
       return;
     }
 
@@ -282,15 +342,15 @@ export class PinePaperStudioHandler {
 
     switch (message.type) {
       case 'ping':
-        this.handlePing(event.source as Window, event.origin);
+        this.handlePing(source, event.origin);
         break;
 
       case 'execute-code':
-        this.handleExecuteCode(message, event.source as Window, event.origin);
+        this.handleExecuteCode(message, source, event.origin);
         break;
 
       case 'mcp-request':
-        this.handleMCPRequest(message, event.source as Window, event.origin);
+        this.handleMCPRequest(message, source, event.origin);
         break;
     }
   }
@@ -311,7 +371,15 @@ export class PinePaperStudioHandler {
   }
 
   /**
-   * Handle code execution request
+   * Handle code execution request.
+   *
+   * This package ships no evaluator. Code runs only through an executor the
+   * HOST injected via `StudioHandlerConfig.executeCode`; otherwise the
+   * request is refused. Historically this path dynamically evaluated the
+   * message payload, which — combined with the old wildcard origin default —
+   * let any page holding a window reference run arbitrary code in the studio
+   * origin and read the result back over postMessage (CVE-class: cross-origin
+   * remote code execution; reported by Socket.dev 2026-08-01).
    */
   private async handleExecuteCode(
     message: BridgeMessage,
@@ -320,10 +388,26 @@ export class PinePaperStudioHandler {
   ): Promise<void> {
     const { code } = message.payload as { code: string };
 
+    if (!this.executeCodeFn) {
+      source.postMessage(
+        {
+          type: 'code-result',
+          id: message.id,
+          payload: {
+            success: false,
+            error:
+              'Code execution is not enabled on this bridge. The host must ' +
+              'supply StudioHandlerConfig.executeCode to opt in.',
+          },
+          source: 'pinepaper-studio',
+        } as BridgeMessage,
+        origin
+      );
+      return;
+    }
+
     try {
-      // Execute the code in PinePaper context
-      // eslint-disable-next-line no-eval
-      const result = await eval(`(async () => { ${code} })()`);
+      const result = await this.executeCodeFn(code);
 
       source.postMessage(
         {
@@ -362,6 +446,25 @@ export class PinePaperStudioHandler {
       tool: string;
       arguments: Record<string, unknown>;
     };
+
+    // Tool dispatch mutates the host document — opt-in only.
+    if (!this.allowToolCalls) {
+      source.postMessage(
+        {
+          type: 'mcp-response',
+          id: message.id,
+          payload: {
+            success: false,
+            error:
+              'Tool calls are not enabled on this bridge. Set ' +
+              'StudioHandlerConfig.allowToolCalls to opt in.',
+          },
+          source: 'pinepaper-studio',
+        } as BridgeMessage,
+        origin
+      );
+      return;
+    }
 
     try {
       // Import and use the handler
@@ -413,8 +516,14 @@ export function createBridge(config: BridgeConfig): PinePaperBridge {
 }
 
 /**
- * Create a handler for PinePaper Studio side
+ * Create a handler for PinePaper Studio side.
+ *
+ * `config.allowedOrigins` is REQUIRED and must list exact origins — there is
+ * deliberately no default. This handler remote-controls the window it is
+ * installed in; a permissive default is a cross-origin foothold.
  */
-export function createStudioHandler(allowedOrigins?: string[]): PinePaperStudioHandler {
-  return new PinePaperStudioHandler(allowedOrigins);
+export function createStudioHandler(
+  config: StudioHandlerConfig | string[]
+): PinePaperStudioHandler {
+  return new PinePaperStudioHandler(config);
 }
