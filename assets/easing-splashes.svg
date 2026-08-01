@@ -1,0 +1,152 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 230" width="560" height="230">
+  <title>The Easing Comparison — five splines, one shared clock</title>
+  <rect x="0" y="0" width="560" height="230" fill="#ffffff"/>
+
+  <!-- ============ header ============ -->
+  <text x="36" y="24" font-family="Helvetica, Arial, sans-serif" font-size="7.5" letter-spacing="2.5" fill="#57646f">PINEPAPER STUDIO · MOTION REFERENCE</text>
+  <text x="524" y="24" text-anchor="end" font-family="Helvetica, Arial, sans-serif" font-size="7" letter-spacing="2" fill="#57646f">SHARED PERIOD</text>
+
+  <text x="36" y="46" font-family="Georgia, 'Times New Roman', serif" font-size="21" fill="#16202b">The Easing Comparison</text>
+  <text x="282" y="46" font-family="Georgia, 'Times New Roman', serif" font-style="italic" font-size="11.5" fill="#57646f">— five splines, one shared clock</text>
+
+  <!-- period dial: one revolution = one loop -->
+  <circle cx="466" cy="40" r="9" fill="#eef2f6" stroke="#a9bfd4" stroke-width="1"/>
+  <line x1="466" y1="40" x2="466" y2="33.5" stroke="#2e5e8f" stroke-width="1.5" stroke-linecap="round">
+    <animateTransform attributeName="transform" type="rotate" from="0 466 40" to="360 466 40" dur="4s" begin="0s" repeatCount="indefinite"/>
+  </line>
+  <circle cx="466" cy="40" r="1.2" fill="#16202b"/>
+  <text x="524" y="46" text-anchor="end" font-family="Georgia, 'Times New Roman', serif" font-size="17" fill="#16202b">4.0 s</text>
+
+  <line x1="36" y1="56" x2="524" y2="56" stroke="#16202b" stroke-width="1"/>
+
+  <!-- ============ stage frame ============ -->
+  <rect x="32" y="66" width="496" height="114" fill="none" stroke="#16202b" stroke-width="1.5"/>
+
+  <!-- start / finish guides -->
+  <line x1="40" y1="76" x2="520" y2="76" stroke="#a9bfd4" stroke-width="1" stroke-dasharray="5 5"/>
+  <line x1="40" y1="168" x2="520" y2="168" stroke="#a9bfd4" stroke-width="1" stroke-dasharray="5 5"/>
+  <text x="442" y="73.5" text-anchor="end" font-family="'Courier New', monospace" font-size="6" fill="#9aa3ab">x = 0</text>
+  <text x="442" y="165.5" text-anchor="end" font-family="'Courier New', monospace" font-size="6" fill="#9aa3ab">x = 1</text>
+
+  <!-- ============ column 1 · LINEAR ============ -->
+  <line x1="46" y1="76" x2="46" y2="168" stroke="#a9bfd4" stroke-width="1.2"/>
+  <path d="M67 98 V143 H115" fill="none" stroke="#a9bfd4" stroke-width="0.8"/>
+  <path d="M70 100 L114 140" fill="none" stroke="#a9bfd4" stroke-width="1.4"/>
+  <circle cx="46" cy="76" r="5" fill="#2e5e8f">
+    <animate attributeName="cy" values="76;168;168;76;76" keyTimes="0;0.425;0.5;0.925;1"
+      calcMode="spline" keySplines="0 0 1 1;0 0 1 1;0 0 1 1;0 0 1 1"
+      dur="4s" begin="0s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="70" cy="100" r="2.4" fill="#2e5e8f">
+    <animate attributeName="cx" values="70;114;114;70;70" keyTimes="0;0.425;0.5;0.925;1"
+      calcMode="linear" dur="4s" begin="0s" repeatCount="indefinite"/>
+    <animate attributeName="cy" values="100;140;140;100;100" keyTimes="0;0.425;0.5;0.925;1"
+      calcMode="spline" keySplines="0 0 1 1;0 0 1 1;0 0 1 1;0 0 1 1"
+      dur="4s" begin="0s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="1;1;0.35;0.35;1" keyTimes="0;0.5;0.55;0.925;1"
+      dur="4s" begin="0s" repeatCount="indefinite"/>
+  </circle>
+  <text x="92" y="151" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="6" fill="#9aa3ab">time →</text>
+  <text x="64" y="104" font-family="Helvetica, Arial, sans-serif" font-size="6" fill="#9aa3ab" transform="rotate(-90 64 104)">pos</text>
+  <text x="78" y="190" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="8.5" font-weight="bold" letter-spacing="1.5" fill="#16202b">LINEAR</text>
+  <rect x="36" y="194" width="84" height="14" fill="#eef2f6"/>
+  <rect x="36" y="194" width="5" height="14" fill="#2e5e8f"/>
+  <text x="80.5" y="203.5" text-anchor="middle" font-family="'Courier New', monospace" font-size="7.5" fill="#57646f">0 0 1 1</text>
+
+  <!-- ============ column 2 · EASE-IN ============ -->
+  <line x1="148" y1="76" x2="148" y2="168" stroke="#a9bfd4" stroke-width="1.2"/>
+  <path d="M169 98 V143 H217" fill="none" stroke="#a9bfd4" stroke-width="0.8"/>
+  <path d="M172 100 C190.5 100 216 140 216 140" fill="none" stroke="#a9bfd4" stroke-width="1.4"/>
+  <circle cx="148" cy="76" r="5" fill="#2e5e8f">
+    <animate attributeName="cy" values="76;168;168;76;76" keyTimes="0;0.425;0.5;0.925;1"
+      calcMode="spline" keySplines="0.42 0 1 1;0 0 1 1;0 0 0.58 1;0 0 1 1"
+      dur="4s" begin="0s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="172" cy="100" r="2.4" fill="#2e5e8f">
+    <animate attributeName="cx" values="172;216;216;172;172" keyTimes="0;0.425;0.5;0.925;1"
+      calcMode="linear" dur="4s" begin="0s" repeatCount="indefinite"/>
+    <animate attributeName="cy" values="100;140;140;100;100" keyTimes="0;0.425;0.5;0.925;1"
+      calcMode="spline" keySplines="0.42 0 1 1;0 0 1 1;0 0 0.58 1;0 0 1 1"
+      dur="4s" begin="0s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="1;1;0.35;0.35;1" keyTimes="0;0.5;0.55;0.925;1"
+      dur="4s" begin="0s" repeatCount="indefinite"/>
+  </circle>
+  <text x="180" y="190" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="8.5" font-weight="bold" letter-spacing="1.5" fill="#16202b">EASE-IN</text>
+  <rect x="138" y="194" width="84" height="14" fill="#eef2f6"/>
+  <rect x="138" y="194" width="5" height="14" fill="#2e5e8f"/>
+  <text x="182.5" y="203.5" text-anchor="middle" font-family="'Courier New', monospace" font-size="7.5" fill="#57646f">.42 0 1 1</text>
+
+  <!-- ============ column 3 · EASE-OUT ============ -->
+  <line x1="250" y1="76" x2="250" y2="168" stroke="#a9bfd4" stroke-width="1.2"/>
+  <path d="M271 98 V143 H319" fill="none" stroke="#a9bfd4" stroke-width="0.8"/>
+  <path d="M274 100 C274 100 299.5 140 318 140" fill="none" stroke="#a9bfd4" stroke-width="1.4"/>
+  <circle cx="250" cy="76" r="5" fill="#2e5e8f">
+    <animate attributeName="cy" values="76;168;168;76;76" keyTimes="0;0.425;0.5;0.925;1"
+      calcMode="spline" keySplines="0 0 0.58 1;0 0 1 1;0.42 0 1 1;0 0 1 1"
+      dur="4s" begin="0s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="274" cy="100" r="2.4" fill="#2e5e8f">
+    <animate attributeName="cx" values="274;318;318;274;274" keyTimes="0;0.425;0.5;0.925;1"
+      calcMode="linear" dur="4s" begin="0s" repeatCount="indefinite"/>
+    <animate attributeName="cy" values="100;140;140;100;100" keyTimes="0;0.425;0.5;0.925;1"
+      calcMode="spline" keySplines="0 0 0.58 1;0 0 1 1;0.42 0 1 1;0 0 1 1"
+      dur="4s" begin="0s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="1;1;0.35;0.35;1" keyTimes="0;0.5;0.55;0.925;1"
+      dur="4s" begin="0s" repeatCount="indefinite"/>
+  </circle>
+  <text x="282" y="190" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="8.5" font-weight="bold" letter-spacing="1.5" fill="#16202b">EASE-OUT</text>
+  <rect x="240" y="194" width="84" height="14" fill="#eef2f6"/>
+  <rect x="240" y="194" width="5" height="14" fill="#2e5e8f"/>
+  <text x="284.5" y="203.5" text-anchor="middle" font-family="'Courier New', monospace" font-size="7.5" fill="#57646f">0 0 .58 1</text>
+
+  <!-- ============ column 4 · EASE-IN-OUT ============ -->
+  <line x1="352" y1="76" x2="352" y2="168" stroke="#a9bfd4" stroke-width="1.2"/>
+  <path d="M373 98 V143 H421" fill="none" stroke="#a9bfd4" stroke-width="0.8"/>
+  <path d="M376 100 C394.5 100 401.5 140 420 140" fill="none" stroke="#a9bfd4" stroke-width="1.4"/>
+  <circle cx="352" cy="76" r="5" fill="#2e5e8f">
+    <animate attributeName="cy" values="76;168;168;76;76" keyTimes="0;0.425;0.5;0.925;1"
+      calcMode="spline" keySplines="0.42 0 0.58 1;0 0 1 1;0.42 0 0.58 1;0 0 1 1"
+      dur="4s" begin="0s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="376" cy="100" r="2.4" fill="#2e5e8f">
+    <animate attributeName="cx" values="376;420;420;376;376" keyTimes="0;0.425;0.5;0.925;1"
+      calcMode="linear" dur="4s" begin="0s" repeatCount="indefinite"/>
+    <animate attributeName="cy" values="100;140;140;100;100" keyTimes="0;0.425;0.5;0.925;1"
+      calcMode="spline" keySplines="0.42 0 0.58 1;0 0 1 1;0.42 0 0.58 1;0 0 1 1"
+      dur="4s" begin="0s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="1;1;0.35;0.35;1" keyTimes="0;0.5;0.55;0.925;1"
+      dur="4s" begin="0s" repeatCount="indefinite"/>
+  </circle>
+  <text x="384" y="190" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="8.5" font-weight="bold" letter-spacing="1.5" fill="#16202b">EASE-IN-OUT</text>
+  <rect x="342" y="194" width="84" height="14" fill="#eef2f6"/>
+  <rect x="342" y="194" width="5" height="14" fill="#2e5e8f"/>
+  <text x="386.5" y="203.5" text-anchor="middle" font-family="'Courier New', monospace" font-size="7.5" fill="#57646f">.42 0 .58 1</text>
+
+  <!-- ============ column 5 · SHUTTLE (ping-pong) ============ -->
+  <line x1="454" y1="76" x2="454" y2="168" stroke="#a9bfd4" stroke-width="1.2"/>
+  <path d="M475 98 V143 H523" fill="none" stroke="#a9bfd4" stroke-width="0.8"/>
+  <path d="M478 100 C482.6 100 484.4 140 489 140 C493.6 140 495.4 100 500 100 C504.6 100 506.4 140 511 140 C515.6 140 517.4 100 522 100" fill="none" stroke="#a9bfd4" stroke-width="1.4"/>
+  <circle cx="454" cy="76" r="5" fill="#f0a030">
+    <animate attributeName="cy" values="76;168;76;168;76" keyTimes="0;0.25;0.5;0.75;1"
+      calcMode="spline" keySplines="0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1"
+      dur="4s" begin="0s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="478" cy="100" r="2.4" fill="#f0a030">
+    <animate attributeName="cx" values="478;522" keyTimes="0;1"
+      calcMode="linear" dur="4s" begin="0s" repeatCount="indefinite"/>
+    <animate attributeName="cy" values="100;140;100;140;100" keyTimes="0;0.25;0.5;0.75;1"
+      calcMode="spline" keySplines="0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1"
+      dur="4s" begin="0s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="1;1;0;0;1" keyTimes="0;0.985;0.993;0.997;1"
+      dur="4s" begin="0s" repeatCount="indefinite"/>
+  </circle>
+  <text x="486" y="190" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="8.5" font-weight="bold" letter-spacing="1.5" fill="#16202b">SHUTTLE</text>
+  <rect x="444" y="194" width="84" height="14" fill="#eef2f6"/>
+  <rect x="444" y="194" width="5" height="14" fill="#2e5e8f"/>
+  <text x="488.5" y="200.8" text-anchor="middle" font-family="'Courier New', monospace" font-size="7.5" fill="#57646f">.42 0 .58 1</text>
+  <text x="488.5" y="206.8" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="5.5" fill="#9aa3ab">4 segments</text>
+
+  <!-- ============ footer ============ -->
+  <text x="36" y="222" font-family="Helvetica, Arial, sans-serif" font-size="7" fill="#9aa3ab">PinePaper Studio — Motion Reference Card No. 04</text>
+  <text x="524" y="222" text-anchor="end" font-family="'Courier New', monospace" font-size="7" fill="#9aa3ab">calcMode="spline" · keySplines · SMIL</text>
+</svg>

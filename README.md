@@ -1,69 +1,177 @@
 # PinePaper MCP Server
 
-> Create animated graphics with AI using the Model Context Protocol
+> Create animated vector graphics with AI using the Model Context Protocol
 
 [![npm version](https://badge.fury.io/js/%40pinepaper.studio%2Fmcp-server.svg)](https://www.npmjs.com/package/@pinepaper.studio/mcp-server)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+**English** · [简体中文](README.zh-CN.md) · [日本語](README.ja.md) · [한국어](README.ko.md) · [Español](README.es.md) · [Português (BR)](README.pt-BR.md) · [Français](README.fr.md) · [Deutsch](README.de.md) · [हिन्दी](README.hi.md)
+
+<p align="center">
+  <img src="assets/hero.svg" alt="PinePaper MCP — a tool call on the left becomes motion on the canvas at the right" width="840">
+</p>
+
+*Everything above and below moves — these are animated SVGs exported straight from PinePaper tool calls, no video files, no GIFs. Open this README on GitHub and watch.*
 
 ## Overview
 
 PinePaper MCP Server enables AI assistants to create and animate graphics in [PinePaper Studio](https://pinepaper.studio) via the Model Context Protocol (MCP). Works with any AI that supports MCP tool calling (Claude, GPT, Gemini, local models, etc.).
 
-The server exposes **119 tools** across drawing, animation, diagrams, maps, typography, physics, data visualization, and export. Using natural language, you can:
+The server exposes **121 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
 
 - Create text, shapes, geometry, and complex graphics
 - Animate items with behavior-driven **relations** rather than keyframes
 - Build long scenes as **event-driven chains** that stay scrub- and replay-stable
 - Generate procedural backgrounds and parametric/equation-driven paths
 - Author diagrams, maps, charts, and letter collages
+- Edit images: crop, chroma-key background removal, GPU filters, lasso cutouts, object detection
 - Export animated SVG, video frames, embeddable widgets, and LLM training data
 
-## Quick Start
+## Made with tool calls
 
-### 1. Install
+Every graphic below is an animated SVG produced through this server's tool surface — the arguments shown beside each result are what an AI agent passes to the named tool. They aren't shell commands; **[Run these yourself](#run-these-yourself)** below shows the three ways to execute them.
 
-```bash
-# Using npm
-npm install -g @pinepaper.studio/mcp-server
+<table>
+<tr>
+<td width="55%">
 
-# Using bun
-bun add -g @pinepaper.studio/mcp-server
+```js
+// The scene IS a graph: two items, two declared edges —
+// the canvas view and the graph view are the same data.
+{ "sourceId": "$dot",
+  "relationType": "moves_along_path",
+  "relationOptions": { "path": "$p1",   // an ellipse path
+    "duration": 6, "easing": "easeInOut", "loop": true } }
+{ "itemId": "$square", "animationType": "rotate",
+  "options": { "speed": 0.18 } }
 ```
 
-### 2. Configure Your AI Client
+</td>
+<td align="center"><img src="assets/poster-sunburst.svg" width="260" alt="The graph is the animation — canvas view above, typed-edge graph below"></td>
+</tr>
+<tr>
+<td>
 
-Add to your MCP client configuration. Examples:
-
-**Claude Desktop** (`claude_desktop_config.json`):
-- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
-
-```json
-{
-  "mcpServers": {
-    "pinepaper": {
-      "command": "npx",
-      "args": ["-y", "@pinepaper.studio/mcp-server"]
-    }
-  }
+```js
+// Five rails, five named easings, one loop — each dot is
+// a moves_along_path down its rail with a different easing
+for (const easing of ['linear', 'easeIn', 'easeOut',
+                      'easeInOut', 'pingpong']) {
+  add_relation($dot, 'moves_along_path', {
+    equation: { kind: 'parametric', xExpr: '0', yExpr: 't',
+                min: -1, max: 1, scale: 58 },
+    duration: 2.6, easing, loop: true });
 }
 ```
 
-**Other MCP Clients**: Refer to your AI client's MCP configuration documentation.
+</td>
+<td align="center"><img src="assets/easing-splashes.svg" width="300" alt="Five easing curves compared on vertical rails"></td>
+</tr>
+<tr>
+<td>
 
-### 3. Start Using
+```js
+// The engine solves the curve; the exporter bakes the
+// motion to native SVG keyframes. pinepaper_add_relation:
+{ "sourceId": "$dot", "relationType": "moves_along_path",
+  "relationOptions": { "equation": {
+    "kind": "parametric",
+    "xExpr": "cos(2*t)*cos(t)",
+    "yExpr": "cos(2*t)*sin(t)",
+    "scale": 108, "cx": 280, "cy": 118 },
+    "duration": 8, "loop": true } }
+```
 
-Open your AI client and try:
+</td>
+<td align="center"><img src="assets/equation-path.svg" width="300" alt="A dot tracing the rose curve r = cos(2θ)"></td>
+</tr>
+<tr>
+<td>
 
-> "Create a red pulsing text that says HELLO"
+```js
+// Status chip: pale panel, slate bar, green dot blinking
+{ "itemType": "rectangle", "properties": { "width": 264,
+  "height": 72, "fillColor": "#e8eff5" } }
+{ "itemType": "circle", "properties": { "radius": 9,
+  "fillColor": "#2e9b4e" } }
+{ "itemId": "$1", "animationType": "fade",
+  "options": { "speed": 1.0 } }   // only the dot blinks
+```
 
-> "Create a sun and earth, make earth orbit the sun"
+</td>
+<td align="center"><img src="assets/live-badge.svg" width="220" alt="LIVE status chip with blinking green dot"></td>
+</tr>
+</table>
 
-> "Add a sunburst background with blue and purple colors"
+All five showcase files (including the banner) live in [`assets/`](assets/) — tiny (4–11 KB), dependency-free, loop forever, and render anywhere SVG renders: GitHub READMEs, docs sites, dashboards, emails that allow SVG. They follow one editorial design system (serif mastheads, hairline rules, slate ink on paper white, framed canvas stages, typed-edge graph diagrams) supplied to the agent as context — share a design guideline with your agent and the tool calls come out on-system.
+
+### Try it interactive
+
+GitHub can't run scripts inside a README, so the interactive demos live in the editor — one click, no install. Each is a shipped template where the **relation graph** does all the state handling (tabs, accordions, menus — no event-handler code):
+
+- [Tabs from relations](https://pinepaper.studio/editor.html?template=tabs-from-relations) — `on_click_fire` + `exclusive_group` + `on_enter_set_visibility`
+- [Accordion from relations](https://pinepaper.studio/editor.html?template=accordion-from-relations) — disclosure pairs via `on_event_toggle`
+- [Solar system, 4-in-1 tabs](https://pinepaper.studio/editor.html?template=solar-system-tabs) — the state machine driving four scenes
+- [Menubar from relations](https://pinepaper.studio/editor.html?template=menubar-from-relations) — WAI-ARIA menubar semantics from the same graph
+
+The same graph drives visuals, keyboard access, and screen-reader roles (WCAG 2.1 AA) — see `pinepaper://docs/relations` from your MCP client.
+
+## Run these yourself
+
+The snippets above are MCP tool-call arguments — they execute when an AI agent invokes the tool. Three ways to make that happen:
+
+**1 · Ask your agent (any MCP client).** With this server [configured](#2-configure-your-ai-client), paste a prompt like:
+
+> Create a blue circle and make it ride a diamond-shaped path with easeInOut, looping. Add an orange rotating square beside it. Then export the scene as animated SVG.
+
+Your agent picks the tools (`pinepaper_create_item`, `pinepaper_add_relation`, `pinepaper_export_svg`) and runs them.
+
+**2 · Hand your agent a complete batch.** This is a full, valid `pinepaper_agent_batch_execute` argument — an agent (or an MCP inspector) can execute it verbatim; `$0`/`$1` reference the created items in order:
+
+```json
+{
+  "operations": [
+    { "type": "create", "itemType": "circle",
+      "properties": { "x": 300, "y": 260, "radius": 10, "fillColor": "#2e5e8f" } },
+    { "type": "relation", "relationType": "moves_along_path", "sourceId": "$0",
+      "relationOptions": { "path": [ { "x": 180, "y": 260 }, { "x": 300, "y": 180 },
+                                     { "x": 420, "y": 260 }, { "x": 300, "y": 340 } ],
+                           "duration": 6, "easing": "easeInOut", "loop": true } },
+    { "type": "create", "itemType": "rectangle",
+      "properties": { "x": 520, "y": 260, "width": 60, "height": 60, "fillColor": "#f0a030" } },
+    { "type": "animate", "itemId": "$1", "animationType": "rotate" }
+  ]
+}
+```
+
+**3 · No MCP, no agent — just a browser.** Open [pinepaper.studio/editor](https://pinepaper.studio/editor.html), open the browser console, and paste (verified working as-is):
+
+```js
+const app = window.PinePaper;
+const dot = app.create('circle', { x: 300, y: 260, radius: 10, fillColor: '#2e5e8f' });
+app.addRelation(dot.data.id, null, 'moves_along_path', {
+  path: [ {x:180,y:260}, {x:300,y:180}, {x:420,y:260}, {x:300,y:340} ],
+  duration: 6, easing: 'easeInOut', loop: true,
+});
+const sq = app.create('rectangle', { x: 520, y: 260, width: 60, height: 60, fillColor: '#f0a030' });
+app.animate(sq, { animationType: 'rotate' });
+```
+
+The same code an agent generates is the code you can paste — the canvas is yours either way, undo included.
+
+## What's new in 1.6.0
+
+- **Image editing tools**: `pinepaper_crop_image` (one-shot crop, keeps the item's id and relations) and `pinepaper_chroma_key` (green-screen background removal with auto-estimated thresholds)
+- **`pinepaper_media` gains `set_clip`** — re-trim an already-uploaded video/audio clip
+- **Shader auras** in `pinepaper_apply_effect`: `heatmap`, `liquid_metal`, `gem_smoke` (WebGL2, silhouette-clipped)
+- **`pinepaper_image_filter` fixed and expanded** — now routed to the real GPU filter engine with the full 15-filter set (halftone family, posterize, vignette, HSL, tint, dither, blur…)
+- **README as an MCP resource** — clients can read `pinepaper://docs/readme` (and per-language variants) without leaving the protocol
+- This README, in 9 languages, with live animated examples
+
 
 ## Toolkits & Token Budget
 
-119 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
+121 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
 
 **Toolkit profiles** (`PINEPAPER_TOOLKIT`):
 
@@ -268,7 +376,7 @@ Generate instruction/code pairs for LLM fine-tuning:
 
 ## Tools Reference
 
-All 119 tools, grouped by the tag used for toolkit filtering.
+All 121 tools, grouped by the tag used for toolkit filtering.
 
 ### Canvas (`canvas`)
 | Tool | Description |

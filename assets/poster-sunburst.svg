@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="420" height="420" viewBox="0 0 420 420">
+  <title>The graph is the animation</title>
+  <desc>A PinePaper thesis figure: the same scene shown as a canvas stage and as a typed relation graph. Edges activate in the graph, then the canvas motion they declare begins.</desc>
+
+  <!-- ================= paper ================= -->
+  <rect x="0" y="0" width="420" height="420" fill="#ffffff"/>
+
+  <!-- ================= masthead ================= -->
+  <text x="28" y="40" font-family="Helvetica, Arial, sans-serif" font-size="7.5" letter-spacing="2" fill="#57646f">PINEPAPER &#183; THESIS FIGURE 01</text>
+  <text x="28" y="76" font-family="Georgia, 'Times New Roman', serif" font-size="34" fill="#16202b">The graph is</text>
+  <text x="28" y="112" font-family="Georgia, 'Times New Roman', serif" font-size="34" fill="#16202b">the <tspan fill="#2e5e8f">animation.</tspan></text>
+
+  <!-- ================= canvas stage ================= -->
+  <rect x="28" y="130" width="364" height="116" fill="#ffffff" stroke="#16202b" stroke-width="1.5"/>
+  <text x="36" y="146" font-family="Helvetica, Arial, sans-serif" font-size="7" letter-spacing="1.5" fill="#9aa3ab">CANVAS</text>
+
+  <!-- engine status, top right of stage -->
+  <circle cx="326" cy="143" r="3" fill="#2e9b4e">
+    <animate attributeName="opacity" values="0.35;1;0.35" keyTimes="0;0.5;1" dur="2s" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1" repeatCount="indefinite"/>
+  </circle>
+  <text x="384" y="146" text-anchor="end" font-family="Helvetica, Arial, sans-serif" font-size="7" fill="#9aa3ab">engine running</text>
+
+  <!-- the declared path p1 (also the motion path; closed, so the ride loops seamlessly) -->
+  <path id="loopPath" d="M155,150 C201,150 231,166 231,186 C231,206 201,222 155,222 C109,222 79,206 79,186 C79,166 109,150 155,150 Z"
+        fill="none" stroke="#a9bfd4" stroke-width="1.2" stroke-dasharray="5 5"/>
+  <text x="155" y="234" text-anchor="middle" font-family="'Courier New', monospace" font-size="7" fill="#9aa3ab">p1</text>
+
+  <!-- item:dot rides p1 after edge 1 fires (edge lands at 0.6s, dot departs at 0.8s of the 8s cycle);
+       calcMode=linear with a dense keyPoints ramp approximates the ease cross-browser -->
+  <circle r="6" fill="#2e5e8f">
+    <animateMotion dur="8s" repeatCount="indefinite" calcMode="linear"
+      keyPoints="0;0;0.045;0.155;0.33;0.54;0.72;0.86;0.95;1;1"
+      keyTimes="0;0.1;0.147;0.194;0.241;0.288;0.334;0.381;0.428;0.475;1">
+      <mpath xlink:href="#loopPath" href="#loopPath"/>
+    </animateMotion>
+  </circle>
+
+  <!-- item:sq rotates after edge 2 fires (edge lands at 4.6s, turn begins at 4.8s) -->
+  <g>
+    <animateTransform attributeName="transform" type="rotate" dur="8s" repeatCount="indefinite" calcMode="spline"
+      values="0 315 186;0 315 186;360 315 186;360 315 186" keyTimes="0;0.6;0.925;1"
+      keySplines="0 0 1 1;0.42 0 0.2 1;0 0 1 1"/>
+    <rect x="295" y="166" width="40" height="40" fill="#e8eff5" stroke="#16202b" stroke-width="1.5"/>
+    <line x1="315" y1="186" x2="315" y2="168" stroke="#2e5e8f" stroke-width="2"/>
+    <circle cx="315" cy="168" r="3" fill="#2e5e8f"/>
+  </g>
+  <text x="315" y="234" text-anchor="middle" font-family="'Courier New', monospace" font-size="7" fill="#9aa3ab">sq</text>
+
+  <!-- ================= relation graph ================= -->
+  <text x="28" y="268" font-family="Helvetica, Arial, sans-serif" font-size="7" letter-spacing="1.5" fill="#9aa3ab">GRAPH</text>
+
+  <!-- node chip: item:dot -->
+  <rect x="32" y="284" width="64" height="26" fill="#e8eff5"/>
+  <rect x="32" y="284" width="5" height="26" fill="#2e5e8f"/>
+  <text x="43" y="300" font-family="'Courier New', monospace" font-size="9" fill="#16202b">item:dot</text>
+
+  <!-- node chip: path:p1 -->
+  <rect x="176" y="284" width="62" height="26" fill="#e8eff5"/>
+  <rect x="176" y="284" width="5" height="26" fill="#2e5e8f"/>
+  <text x="187" y="300" font-family="'Courier New', monospace" font-size="9" fill="#16202b">path:p1</text>
+
+  <!-- node chip: item:sq -->
+  <rect x="316" y="284" width="60" height="26" fill="#e8eff5"/>
+  <rect x="316" y="284" width="5" height="26" fill="#2e5e8f"/>
+  <text x="327" y="300" font-family="'Courier New', monospace" font-size="9" fill="#16202b">item:sq</text>
+
+  <!-- edge 1 : item:dot -> path:p1  (moves_along_path) -->
+  <path d="M96,297 L170,297" fill="none" stroke="#a9bfd4" stroke-width="1.2"/>
+  <polygon points="168,293 168,301 176,297" fill="#a9bfd4"/>
+  <text x="136" y="291" text-anchor="middle" font-family="'Courier New', monospace" font-size="8" fill="#9aa3ab">moves_along_path</text>
+
+  <!-- edge 1 activation overlay: draws on, holds while the dot rides, fades -->
+  <path d="M96,297 L170,297" pathLength="74" fill="none" stroke="#2e5e8f" stroke-width="1.6" stroke-dasharray="74">
+    <animate attributeName="stroke-dashoffset" values="74;0;0;74;74" keyTimes="0;0.075;0.49;0.5;1" dur="8s" repeatCount="indefinite"
+      calcMode="spline" keySplines="0.4 0 0.2 1;0 0 1 1;0 0 1 1;0 0 1 1"/>
+    <animate attributeName="opacity" values="0;1;1;0;0" keyTimes="0;0.01;0.44;0.49;1" dur="8s" repeatCount="indefinite"/>
+  </path>
+  <polygon points="168,293 168,301 176,297" fill="#2e5e8f">
+    <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.07;0.09;0.44;0.49;1" dur="8s" repeatCount="indefinite"/>
+  </polygon>
+  <text x="136" y="291" text-anchor="middle" font-family="'Courier New', monospace" font-size="8" fill="#2e5e8f">moves_along_path<animate attributeName="opacity" values="0;1;1;0;0" keyTimes="0;0.05;0.44;0.49;1" dur="8s" repeatCount="indefinite"/></text>
+
+  <!-- edge 2 : item:sq -> item:sq  (rotate, self-relation) -->
+  <path d="M334,284 C334,266 362,266 362,284" fill="none" stroke="#a9bfd4" stroke-width="1.2"/>
+  <polygon points="358,277 366,277 362,285" fill="#a9bfd4"/>
+  <text x="348" y="264" text-anchor="middle" font-family="'Courier New', monospace" font-size="8" fill="#9aa3ab">rotate</text>
+
+  <!-- edge 2 activation overlay -->
+  <path d="M334,284 C334,266 362,266 362,284" pathLength="50" fill="none" stroke="#2e5e8f" stroke-width="1.6" stroke-dasharray="50">
+    <animate attributeName="stroke-dashoffset" values="50;50;0;0;50;50" keyTimes="0;0.47;0.575;0.93;0.94;1" dur="8s" repeatCount="indefinite"
+      calcMode="spline" keySplines="0 0 1 1;0.4 0 0.2 1;0 0 1 1;0 0 1 1;0 0 1 1"/>
+    <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.47;0.48;0.88;0.925;1" dur="8s" repeatCount="indefinite"/>
+  </path>
+  <polygon points="358,277 366,277 362,285" fill="#2e5e8f">
+    <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.565;0.585;0.88;0.925;1" dur="8s" repeatCount="indefinite"/>
+  </polygon>
+  <text x="348" y="264" text-anchor="middle" font-family="'Courier New', monospace" font-size="8" fill="#2e5e8f">rotate<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.47;0.5;0.88;0.925;1" dur="8s" repeatCount="indefinite"/></text>
+
+  <!-- ================= footer ================= -->
+  <line x1="28" y1="344" x2="392" y2="344" stroke="#16202b" stroke-width="1"/>
+  <text x="28" y="398" font-family="Georgia, 'Times New Roman', serif" font-size="56" fill="#2e5e8f">2</text>
+  <text x="62" y="398" font-family="Georgia, 'Times New Roman', serif" font-size="18" fill="#2e5e8f">edges</text>
+  <text x="124" y="386" font-family="Helvetica, Arial, sans-serif" font-size="8.5" fill="#57646f">declared, not keyframed &#8212;</text>
+  <text x="124" y="398" font-family="Helvetica, Arial, sans-serif" font-size="8.5" fill="#57646f">the engine solves the motion.</text>
+  <text x="392" y="396" text-anchor="end" font-family="Helvetica, Arial, sans-serif" font-size="7" fill="#9aa3ab">pinepaper.studio &#183; fig. 1</text>
+</svg>

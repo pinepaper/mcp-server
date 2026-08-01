@@ -1,0 +1,126 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="840" height="280" viewBox="0 0 840 280">
+  <title>PinePaper MCP &#8212; a tool call becomes motion</title>
+
+  <!-- paper -->
+  <rect x="0" y="0" width="840" height="280" fill="#ffffff"/>
+
+  <defs>
+    <mask id="guideReveal" maskUnits="userSpaceOnUse" x="458" y="22" width="352" height="236">
+      <path d="M498,198 C560,90 620,240 690,130 C720,84 750,72 772,68"
+            pathLength="520" fill="none" stroke="#ffffff" stroke-width="9"
+            stroke-linecap="round" stroke-dasharray="520 520" stroke-dashoffset="520">
+        <animate attributeName="stroke-dashoffset"
+                 values="520;520;0;0;-520;-520"
+                 keyTimes="0;0.12;0.36;0.76;0.95;1"
+                 calcMode="spline"
+                 keySplines="0 0 1 1;.3 0 .25 1;0 0 1 1;.4 0 .6 1;0 0 1 1"
+                 dur="7s" repeatCount="indefinite"/>
+      </path>
+    </mask>
+  </defs>
+
+  <!-- ============ LEFT COLUMN : masthead ============ -->
+  <text x="48" y="44" font-family="Helvetica, Arial, sans-serif" font-size="9.5"
+        letter-spacing="2" fill="#57646f">MODEL CONTEXT PROTOCOL &#215; PAPER.JS</text>
+
+  <text x="48" y="94" font-family="Georgia, 'Times New Roman', serif" font-size="56"
+        fill="#16202b">PinePaper <tspan fill="#2e5e8f">MCP</tspan></text>
+
+  <line x1="48" y1="106" x2="418" y2="106" stroke="#16202b" stroke-width="1"/>
+
+  <text x="48" y="128" font-family="Helvetica, Arial, sans-serif" font-size="15"
+        fill="#57646f">Animated vector graphics, made by tool calls</text>
+
+  <!-- code chip : the call -->
+  <rect x="48" y="146" width="300" height="78" fill="#eef2f6"/>
+  <rect x="48" y="146" width="5" height="78" fill="#2e5e8f">
+    <animate attributeName="opacity" values="1;0.35;1;1" keyTimes="0;0.03;0.09;1"
+             dur="7s" repeatCount="indefinite"/>
+  </rect>
+  <g font-family="'Courier New', monospace" font-size="12" fill="#16202b">
+    <text x="65" y="164">pinepaper_add_relation({</text>
+    <text x="80" y="180">relationType: <tspan fill="#2e5e8f">"moves_along_path"</tspan>,</text>
+    <text x="80" y="196">easing: <tspan fill="#2e5e8f">"easeInOut"</tspan>, loop: <tspan fill="#2e9b4e">true</tspan></text>
+    <text x="65" y="212">})</text>
+  </g>
+
+  <!-- wire : the call travels from chip to stage -->
+  <path id="wirePath" d="M354,185 C400,185 432,193 464,196"
+        fill="none" stroke="#a9bfd4" stroke-width="1" stroke-dasharray="4 4"/>
+  <circle r="3" fill="#2e5e8f" opacity="0">
+    <animate attributeName="opacity" values="0;1;1;0;0" keyTimes="0;0.01;0.1;0.12;1"
+             dur="7s" repeatCount="indefinite"/>
+    <animateMotion id="wireMove" dur="0.84s" begin="0s;wireMove.end+6.16s"
+                   fill="freeze" calcMode="spline" keyTimes="0;1" keySplines=".3 0 .7 1">
+      <mpath xlink:href="#wirePath" href="#wirePath"/>
+    </animateMotion>
+  </circle>
+
+  <!-- ============ RIGHT : framed canvas stage ============ -->
+  <rect x="468" y="32" width="332" height="216" fill="#ffffff"
+        stroke="#16202b" stroke-width="1.5"/>
+  <text x="480" y="48" font-family="Helvetica, Arial, sans-serif" font-size="9"
+        letter-spacing="1" fill="#57646f">canvas &#8212; <tspan font-family="'Courier New', monospace">moves_along_path</tspan></text>
+
+  <!-- origin tick : blinks slate on call arrival, handing off to the guide draw -->
+  <circle cx="498" cy="198" r="2.5" fill="#a9bfd4">
+    <animate attributeName="fill" values="#a9bfd4;#a9bfd4;#2e5e8f;#a9bfd4;#a9bfd4"
+             keyTimes="0;0.12;0.14;0.20;1" dur="7s" repeatCount="indefinite"/>
+  </circle>
+
+  <!-- dashed guide path : draws itself on, then is consumed at cycle end -->
+  <path id="guidePath" d="M498,198 C560,90 620,240 690,130 C720,84 750,72 772,68"
+        fill="none" stroke="#a9bfd4" stroke-width="1.6" stroke-dasharray="5 5"
+        mask="url(#guideReveal)"/>
+
+  <!-- solid trace drawn behind the rider as it moves -->
+  <path d="M498,198 C560,90 620,240 690,130 C720,84 750,72 772,68"
+        pathLength="520" fill="none" stroke="#2e5e8f" stroke-width="2"
+        stroke-linecap="round" stroke-dasharray="520 520" stroke-dashoffset="520" opacity="0">
+    <animate attributeName="stroke-dashoffset" values="520;520;0;0"
+             keyTimes="0;0.4;0.72;1" calcMode="spline"
+             keySplines="0 0 1 1;.42 0 .1 1;0 0 1 1"
+             dur="7s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0;0;1;1;0;0"
+             keyTimes="0;0.395;0.41;0.74;0.84;1"
+             dur="7s" repeatCount="indefinite"/>
+  </path>
+
+  <!-- destination target : blooms as the drawn guide arrives -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;0;1;1;0;0"
+             keyTimes="0;0.36;0.40;0.86;0.92;1"
+             dur="7s" repeatCount="indefinite"/>
+    <circle cx="772" cy="68" r="5.5" fill="none" stroke="#f0a030" stroke-width="1.5"/>
+    <circle cx="772" cy="68" r="1.5" fill="#f0a030"/>
+  </g>
+
+  <!-- the rider : an item executing the relation with true eased motion -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;0;1;1;0;0"
+             keyTimes="0;0.40;0.41;0.72;0.76;1"
+             dur="7s" repeatCount="indefinite"/>
+    <rect x="-7" y="-7" width="14" height="14" rx="3.5"
+          fill="#2e5e8f" stroke="#ffffff" stroke-width="2"/>
+    <animateMotion id="riderMove" dur="2.24s" begin="2.8s;riderMove.end+4.76s"
+                   fill="freeze" rotate="auto" calcMode="spline"
+                   keyTimes="0;1" keySplines=".42 0 .1 1">
+      <mpath xlink:href="#guidePath" href="#guidePath"/>
+    </animateMotion>
+  </g>
+
+  <!-- run status : lit while the relation executes -->
+  <circle cx="732" cy="235" r="3" fill="#2e9b4e" opacity="0.3">
+    <animate attributeName="opacity" values="0.3;0.3;1;1;0.3;0.3"
+             keyTimes="0;0.38;0.42;0.72;0.78;1"
+             dur="7s" repeatCount="indefinite"/>
+  </circle>
+  <text x="742" y="238" font-family="Helvetica, Arial, sans-serif" font-size="9"
+        fill="#57646f">running</text>
+
+  <!-- footer credits : one hairline-aligned band -->
+  <text x="48" y="266" font-family="Helvetica, Arial, sans-serif" font-size="9"
+        fill="#9aa3ab">composed with PinePaper Studio</text>
+  <text x="800" y="266" text-anchor="end" font-family="Helvetica, Arial, sans-serif"
+        font-size="9" fill="#9aa3ab">spec 01 &#8212; a tool call becomes motion</text>
+</svg>

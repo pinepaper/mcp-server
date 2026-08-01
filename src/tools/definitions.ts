@@ -2426,6 +2426,7 @@ EXAMPLE — Reveal at 2s, skip first second of keyframe data, end at 4s of keyfr
       type: 'object',
       properties: {
         itemId: { type: 'string', description: 'Registry ID of the item' },
+        timeUnits: { type: 'string', enum: ['seconds', 'ms'], description: "Explicit units for keyframe times/duration. Pass 'seconds' for long-form timelines — values over 100 are otherwise auto-read as milliseconds." },
         keyframes: {
           type: 'array',
           items: {

@@ -157,6 +157,19 @@ const RESOURCES = [
     description: 'Create custom hand-drawn fonts with Font Studio tools',
     mimeType: 'text/markdown',
   },
+  // === README (multi-language, read from the package at runtime) ===
+  {
+    uri: 'pinepaper://docs/readme',
+    name: '📖 README (English)',
+    description: 'The full server README — install, toolkits, tool reference, animated-SVG showcase. Language variants: pinepaper://docs/readme/{zh-CN|ja|ko|es|pt-BR|fr|de|hi}.',
+    mimeType: 'text/markdown',
+  },
+  ...['zh-CN', 'ja', 'ko', 'es', 'pt-BR', 'fr', 'de', 'hi'].map((lang) => ({
+    uri: `pinepaper://docs/readme/${lang}`,
+    name: `📖 README (${lang})`,
+    description: `Condensed README in ${lang} — overview, quick start, what's new. Full reference lives in the English README.`,
+    mimeType: 'text/markdown',
+  })),
   // === ADVANCED (For developers) ===
   {
     uri: 'pinepaper://docs/custom-paths',
@@ -5931,7 +5944,25 @@ The tools generate Paper.js/JavaScript code that executes on the PinePaper canva
   // Read resource content
   server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     const { uri } = request.params;
-    const content = RESOURCE_CONTENTS[uri];
+    let content = RESOURCE_CONTENTS[uri];
+
+    // README resources are read from the shipped package files at request
+    // time (they're large and already on disk — no need to inline them).
+    if (!content && uri.startsWith('pinepaper://docs/readme')) {
+      const lang = uri.replace('pinepaper://docs/readme', '').replace(/^\//, '');
+      const file = lang ? `README.${lang}.md` : 'README.md';
+      try {
+        const { readFileSync } = await import('node:fs');
+        const { fileURLToPath } = await import('node:url');
+        const { dirname, join } = await import('node:path');
+        const here = dirname(fileURLToPath(import.meta.url));
+        // dist/index.js → package root is one level up (same layout
+        // version.ts relies on).
+        content = readFileSync(join(here, '..', file), 'utf8');
+      } catch {
+        throw new Error(`README not found for: ${uri}`);
+      }
+    }
 
     if (!content) {
       throw new Error(`Resource not found: ${uri}`);

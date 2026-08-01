@@ -568,7 +568,8 @@ function generateKeyframeAnimateCode(
   loop: boolean = false,
   timeOffset?: number,
   clipInPoint?: number,
-  clipOutPoint?: number
+  clipOutPoint?: number,
+  timeUnits?: 'seconds' | 'ms'
 ): string {
   const keyframesJson = JSON.stringify(normalizeKeyframePositions(keyframes), null, 2);
   const calculatedDuration = duration || Math.max(...keyframes.map(k => k.time));
@@ -577,6 +578,7 @@ function generateKeyframeAnimateCode(
   if (timeOffset !== undefined) opts.timeOffset = timeOffset;
   if (clipInPoint !== undefined) opts.clipInPoint = clipInPoint;
   if (clipOutPoint !== undefined) opts.clipOutPoint = clipOutPoint;
+  if (timeUnits !== undefined) opts.timeUnits = timeUnits;
 
   return `
 // Apply keyframe animation to ${itemId}
@@ -695,7 +697,7 @@ function generatePlayTimelineCode(
     case 'play':
       return `
 // Play keyframe timeline
-app.playKeyframeTimeline(${duration || 5}, ${loop ?? false});
+app.playKeyframeTimeline(${duration || 5}, ${loop ?? false}, { timeUnits: 'seconds' });
 ({ success: true, action: 'play', duration: ${duration || 5}, loop: ${loop ?? false} });
 `.trim();
     case 'pause':
@@ -1149,7 +1151,8 @@ export class PinePaperCodeGenerator {
       validated.loop,
       validated.timeOffset,
       validated.clipInPoint,
-      validated.clipOutPoint
+      validated.clipOutPoint,
+      validated.timeUnits
     );
   }
 
@@ -2643,7 +2646,7 @@ return { itemId: targetId, effectType: '${op.effectType || 'sparkle'}' };
         const ptLoop = op.loop ?? false;
         if (ptAction === 'play') {
           return `
-app.playKeyframeTimeline(${ptDuration}, ${ptLoop});
+app.playKeyframeTimeline(${ptDuration}, ${ptLoop}, { timeUnits: 'seconds' });
 return { success: true, action: 'play', duration: ${ptDuration}, loop: ${ptLoop} };
 `;
         } else if (ptAction === 'stop') {
