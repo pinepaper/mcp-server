@@ -974,7 +974,12 @@ export const EffectTypeSchema = z.enum([
   'fireflies',
   'shockwave',
   'trail',
-]).describe('Visual effect type');
+  // Shader auras (WebGL2 silhouette-clipped) — routed to ItemAuraSystem by
+  // the same app.applyEffect entry point as the particle types.
+  'heatmap',
+  'liquid_metal',
+  'gem_smoke',
+]).describe('Visual effect type (particle effects + shader auras)');
 
 export const SparkleParamsSchema = z.object({
   color: ColorSchema.optional().default('#fbbf24').describe('Sparkle color'),
@@ -3152,11 +3157,13 @@ export type LintSceneInput = z.infer<typeof LintSceneInputSchema>;
 // Media (video/audio) via window.PinePaperAgent. Agent-facing surface is URL-based
 // (the agent can't hand over a File). Uploaded media are first-class canvas items.
 export const MediaInputSchema = z.object({
-  action: z.enum(['upload_video', 'upload_audio', 'list', 'remove', 'set_playback_rate'])
-    .describe("'upload_video' / 'upload_audio' (from a URL) · 'list' media · 'remove' by id · 'set_playback_rate'"),
+  action: z.enum(['upload_video', 'upload_audio', 'list', 'remove', 'set_playback_rate', 'set_clip'])
+    .describe("'upload_video' / 'upload_audio' (from a URL) · 'list' media · 'remove' by id · 'set_playback_rate' · 'set_clip' (re-trim an existing clip)"),
   url: z.string().url().optional().describe('Media URL — required for upload_video / upload_audio (fetched then imported).'),
-  id: z.string().optional().describe('Media id — required for remove / set_playback_rate.'),
+  id: z.string().optional().describe('Media id — required for remove / set_playback_rate / set_clip.'),
   rate: z.number().min(0.25).max(4).optional().describe('Playback rate 0.25–4 — required for set_playback_rate.'),
+  inPoint: z.number().min(0).optional().describe('Clip in-point in media-time seconds — required for set_clip.'),
+  outPoint: z.number().min(0).optional().describe('Clip out-point in media-time seconds — required for set_clip.'),
   // upload_video placement
   position: PositionSchema.optional().describe('Canvas position — upload_video.'),
   scale: z.number().positive().optional().describe('Scale factor — upload_video.'),
@@ -3169,9 +3176,38 @@ export const MediaInputSchema = z.object({
   muted: z.boolean().optional().describe('Start muted (default false) — upload_audio.'),
 })
   .refine((v) => !(v.action === 'upload_video' || v.action === 'upload_audio') || !!v.url, { message: 'upload requires url', path: ['url'] })
-  .refine((v) => !(v.action === 'remove' || v.action === 'set_playback_rate') || !!v.id, { message: 'this action requires id', path: ['id'] })
-  .refine((v) => v.action !== 'set_playback_rate' || v.rate !== undefined, { message: 'set_playback_rate requires rate', path: ['rate'] });
+  .refine((v) => !(v.action === 'remove' || v.action === 'set_playback_rate' || v.action === 'set_clip') || !!v.id, { message: 'this action requires id', path: ['id'] })
+  .refine((v) => v.action !== 'set_playback_rate' || v.rate !== undefined, { message: 'set_playback_rate requires rate', path: ['rate'] })
+  .refine((v) => v.action !== 'set_clip' || (v.inPoint !== undefined && v.outPoint !== undefined && v.outPoint > v.inPoint), { message: 'set_clip requires inPoint and outPoint with outPoint > inPoint', path: ['outPoint'] });
 export type MediaInput = z.infer<typeof MediaInputSchema>;
+
+// =============================================================================
+// ONE-SHOT IMAGE OPS (crop / chroma key — Track A agent parity, 2026-07-31)
+// =============================================================================
+
+export const CropImageInputSchema = z.object({
+  itemId: z.string().describe('Registry id of the raster item (or a group containing one).'),
+  rect: z.object({
+    x: z.number().describe('Left edge, canvas coordinates'),
+    y: z.number().describe('Top edge, canvas coordinates'),
+    width: z.number().positive().describe('Crop width in canvas units'),
+    height: z.number().positive().describe('Crop height in canvas units'),
+  }).describe('Crop rectangle in project (canvas) coordinates — clamped into the image bounds.'),
+  aspectRatio: z.enum(['free', '1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3']).optional()
+    .describe('Optional aspect-ratio constraint applied to the rect.'),
+});
+export type CropImageInput = z.infer<typeof CropImageInputSchema>;
+
+export const ChromaKeyInputSchema = z.object({
+  itemId: z.string().describe('Registry id of the raster item (or a group containing one).'),
+  color: z.string().optional()
+    .describe("Key color: '#rrggbb' or preset name (green, chromaGreen, blue, chromaBlue, magenta). Default: pure green."),
+  threshold: z.number().min(0).max(255).optional()
+    .describe('Color-distance threshold for full transparency. Omit to auto-estimate from the image.'),
+  smoothing: z.number().min(0).max(100).optional()
+    .describe('Edge-smoothing range past the threshold. Omit to auto-estimate.'),
+});
+export type ChromaKeyInput = z.infer<typeof ChromaKeyInputSchema>;
 
 // Rigging (skeletons, bones, IK, breakdown-pose keyframes) via app.riggingSystem.
 // One consolidated tool: build a skeleton, then pose/animate it. The S12 breakdown-pose

@@ -1767,19 +1767,22 @@ ACTIONS:
 - list: → all media [{ id, kind, duration, … }]
 - remove: { id } → removed boolean
 - set_playback_rate: { id, rate (0.25–4) } → applies to video or audio
+- set_clip: { id, inPoint, outPoint (media-time s, outPoint > inPoint) } → re-trim an ALREADY-uploaded clip (video or audio)
 
 NOTES:
 - URL-based: the URL is fetched in the browser, so it must be reachable + CORS-permitted.
-- Use the returned id with set_playback_rate / remove, and (for video) modify/animate it like any item.
+- Use the returned id with set_playback_rate / set_clip / remove, and (for video) modify/animate it like any item.
 
 EXAMPLE: { action: 'upload_video', url: 'https://…/clip.mp4', scale: 0.5, timeOffset: 1 }`,
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['upload_video', 'upload_audio', 'list', 'remove', 'set_playback_rate'], description: "Media action" },
+        action: { type: 'string', enum: ['upload_video', 'upload_audio', 'list', 'remove', 'set_playback_rate', 'set_clip'], description: "Media action" },
         url: { type: 'string', description: 'Media URL — required for upload_video / upload_audio.' },
-        id: { type: 'string', description: 'Media id — required for remove / set_playback_rate.' },
+        id: { type: 'string', description: 'Media id — required for remove / set_playback_rate / set_clip.' },
         rate: { type: 'number', description: 'Playback rate 0.25–4 — set_playback_rate.' },
+        inPoint: { type: 'number', description: 'Clip in-point (media-time s) — set_clip.' },
+        outPoint: { type: 'number', description: 'Clip out-point (media-time s, > inPoint) — set_clip.' },
         position: { type: 'object', properties: { x: { type: 'number' }, y: { type: 'number' } }, description: 'Canvas position — upload_video.' },
         scale: { type: 'number', description: 'Scale factor — upload_video.' },
         timeOffset: { type: 'number', description: 'Timeline start offset (s) — upload_video / upload_audio.' },
@@ -1790,6 +1793,85 @@ EXAMPLE: { action: 'upload_video', url: 'https://…/clip.mp4', scale: 0.5, time
         muted: { type: 'boolean', description: 'Start muted — upload_audio.' },
       },
       required: ['action'],
+    },
+  },
+
+  {
+    name: 'pinepaper_crop_image',
+    annotations: {
+      title: 'Crop Image',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Crop an imported image to a rectangle — one shot, no interactive session. The replacement raster KEEPS the item's registry id (relations, animations, and connectors stay attached).
+
+USE WHEN:
+- Trimming an imported photo/screenshot to the region that matters
+- Preparing an image before filters, detection, or chroma key (operations compose in any order)
+
+NOTES:
+- rect is in canvas coordinates (same space as item positions) and is clamped into the image bounds.
+- For non-rectangular crops use pinepaper_apply_custom_mask (shape masks) or pinepaper_lasso (freehand).
+
+EXAMPLE: { itemId: 'item_12', rect: { x: 340, y: 220, width: 320, height: 180 }, aspectRatio: '16:9' }`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        itemId: { type: 'string', description: 'Registry id of the raster item (or a group containing one)' },
+        rect: {
+          type: 'object',
+          properties: {
+            x: { type: 'number', description: 'Left edge (canvas coords)' },
+            y: { type: 'number', description: 'Top edge (canvas coords)' },
+            width: { type: 'number', description: 'Crop width' },
+            height: { type: 'number', description: 'Crop height' },
+          },
+          required: ['x', 'y', 'width', 'height'],
+          description: 'Crop rectangle in canvas coordinates',
+        },
+        aspectRatio: {
+          type: 'string',
+          enum: ['free', '1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3'],
+          description: 'Optional aspect-ratio constraint',
+        },
+      },
+      required: ['itemId', 'rect'],
+    },
+  },
+
+  {
+    name: 'pinepaper_chroma_key',
+    annotations: {
+      title: 'Chroma Key (Remove Background Color)',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Remove a background color from an imported image (green-screen style) — one shot, no interactive session. Pixels near the key color become transparent, with smoothed edges. The replacement raster KEEPS the item's registry id.
+
+USE WHEN:
+- Removing a green/blue screen from a photo
+- Knocking out a flat background color before compositing
+
+NOTES:
+- Omit threshold/smoothing to auto-estimate from the image's color histogram.
+- color accepts '#rrggbb' or a preset: green, chromaGreen, blue, chromaBlue, magenta (default: green).
+- For irregular subjects on busy backgrounds use pinepaper_lasso or pinepaper_extract_object instead.
+
+EXAMPLE: { itemId: 'item_7', color: 'green' }
+EXAMPLE: { itemId: 'item_7', color: '#00b140', threshold: 60, smoothing: 12 }`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        itemId: { type: 'string', description: 'Registry id of the raster item (or a group containing one)' },
+        color: { type: 'string', description: "Key color: '#rrggbb' or preset (green, chromaGreen, blue, chromaBlue, magenta). Default green." },
+        threshold: { type: 'number', description: 'Color-distance threshold 0–255 for full transparency. Omit to auto-estimate.' },
+        smoothing: { type: 'number', description: 'Edge-smoothing range past the threshold. Omit to auto-estimate.' },
+      },
+      required: ['itemId'],
     },
   },
 
@@ -3243,7 +3325,8 @@ ACTIONS:
 - apply: Apply a single filter. Params: itemId, filterName, params
 - chain: Apply multiple filters in sequence. Params: itemId, filters (array of {name, params})
 
-Available filters: blur, brightness, contrast, saturate, grayscale, sepia, invert, hue-rotate, sharpen, emboss, edge-detect.`,
+Available filters (GPU raster set): blur, grayscale, sepia, brightness, contrast, saturation, invert, posterize, hsl (hue/saturation/lightness), colorTint (color, intensity, blendMode), vignette (intensity, radius), edgeDetect, halftoneDots (size, angle), halftoneCMYK (size), dither (levels).
+(Scene-wide filters — sharpen/emboss/noise/vintage etc. — are a different surface: use pinepaper_add_filter.)`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -5013,7 +5096,7 @@ USE WHEN:
 - Celebration effects (confetti)
 - Enhancing visual impact (ripple, glow, electric)
 
-EFFECTS (15 total):
+EFFECTS (15 particle + 3 shader auras):
 - sparkle: Glitter/sparkle particles (color, speed, size)
 - blast: Explosion burst effect (color, radius, count)
 - smoke: Rising smoke plumes (color, speed, size, drift, height, growthRate)
@@ -5030,15 +5113,23 @@ EFFECTS (15 total):
 - shockwave: Expanding concentric rings — burst type (speed, maxRadius, count, thickness)
 - trail: Fading afterimages following movement (speed, count, size, fadeRate)
 
+SHADER AURAS (WebGL2, silhouette-clipped — same tool, routed to the aura system):
+- heatmap: Thermal shimmer aura (palette 0=Hot 1=Cool 2=Violet)
+- liquid_metal: Flowing metallic sheen (palette 0=Chrome 1=Gold 2=Copper)
+- gem_smoke: Crystalline smoke wisps
+Aura params: { intensity, radius, palette, mode ('inside'|'outside'|'overlay'), tint, tintStrength, offsetX, offsetY, channels: { a: {speed, curve}, b: {speed, curve} } } — curves: linear, sawtooth, sine, triangle, pulse, ease, bounce, noise.
+
 EXAMPLE — bubbles with magenta interior over a blue rim:
-{ effectType: "bubbles", params: { color: "#93c5fd", fill: "#ff00aa", fillOpacity: 0.4 } }`,
+{ effectType: "bubbles", params: { color: "#93c5fd", fill: "#ff00aa", fillOpacity: 0.4 } }
+EXAMPLE — gold liquid-metal aura outside a logo:
+{ effectType: "liquid_metal", params: { palette: 1, mode: "outside", intensity: 0.8 } }`,
     inputSchema: {
       type: 'object',
       properties: {
         itemId: { type: 'string', description: 'Registry ID of the item' },
         effectType: {
           type: 'string',
-          enum: ['sparkle', 'blast', 'smoke', 'fire', 'rain', 'snow', 'confetti', 'ripple', 'glow', 'electric', 'bubbles', 'dust', 'fireflies', 'shockwave', 'trail'],
+          enum: ['sparkle', 'blast', 'smoke', 'fire', 'rain', 'snow', 'confetti', 'ripple', 'glow', 'electric', 'bubbles', 'dust', 'fireflies', 'shockwave', 'trail', 'heatmap', 'liquid_metal', 'gem_smoke'],
           description: 'Type of effect',
         },
         params: {
@@ -5853,7 +5944,7 @@ EXAMPLE — Animated sky scene with timed reveals:
               // Effects
               effectType: {
                 type: 'string',
-                enum: ['sparkle', 'blast', 'smoke', 'fire', 'rain', 'snow', 'confetti', 'ripple', 'glow', 'electric', 'bubbles', 'dust', 'fireflies', 'shockwave', 'trail'],
+                enum: ['sparkle', 'blast', 'smoke', 'fire', 'rain', 'snow', 'confetti', 'ripple', 'glow', 'electric', 'bubbles', 'dust', 'fireflies', 'shockwave', 'trail', 'heatmap', 'liquid_metal', 'gem_smoke'],
                 description: 'For apply_effect: effect type',
               },
               effectParams: { type: 'object', description: 'For apply_effect: parameters' },

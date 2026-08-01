@@ -21,6 +21,13 @@ describe('MediaInputSchema validation', () => {
   it('clamps rate to 0.25–4', () => {
     expect(MediaInputSchema.safeParse({ action: 'set_playback_rate', id: 'v1', rate: 8 }).success).toBe(false);
   });
+  it('set_clip requires id + inPoint + outPoint with outPoint > inPoint', () => {
+    expect(MediaInputSchema.safeParse({ action: 'set_clip', id: 'v1' }).success).toBe(false);
+    expect(MediaInputSchema.safeParse({ action: 'set_clip', id: 'v1', inPoint: 1 }).success).toBe(false);
+    expect(MediaInputSchema.safeParse({ action: 'set_clip', id: 'v1', inPoint: 3, outPoint: 1 }).success).toBe(false);
+    expect(MediaInputSchema.safeParse({ action: 'set_clip', inPoint: 1, outPoint: 3 }).success).toBe(false);
+    expect(MediaInputSchema.safeParse({ action: 'set_clip', id: 'v1', inPoint: 1, outPoint: 3 }).success).toBe(true);
+  });
 });
 
 describe('generateMedia codegen', () => {
@@ -49,5 +56,12 @@ describe('generateMedia codegen', () => {
     expect(codeGenerator.generateMedia({ action: 'remove', id: 'v1' })).toContain('A.removeMedia("v1")');
     const rate = codeGenerator.generateMedia({ action: 'set_playback_rate', id: 'v1', rate: 2 });
     expect(rate).toContain('A.setMediaPlaybackRate("v1", 2)');
+  });
+
+  it('set_clip → A.setMediaClip with in/out points and its own availability guard', () => {
+    const code = codeGenerator.generateMedia({ action: 'set_clip', id: 'v1', inPoint: 1.5, outPoint: 6 });
+    expect(code).toContain('A.setMediaClip("v1", 1.5, 6)');
+    expect(code).toContain('setMediaClip unavailable');
+    guarded(code); trailingExpr(code);
   });
 });

@@ -134,6 +134,8 @@ export const TOOL_TAGS: Record<string, string[]> = {
     'pinepaper_image_filter',
     'pinepaper_lasso',
     'pinepaper_cutout_style',
+    'pinepaper_crop_image',
+    'pinepaper_chroma_key',
   ],
   precomp: [
     'pinepaper_precomp',

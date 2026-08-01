@@ -272,20 +272,25 @@ describe('ImageFilterInputSchema', () => {
 });
 
 describe('ImageFilter code generation', () => {
-  it('apply is async with imageTools guard', () => {
+  // 2026-07-31: emitters retargeted to the REAL engine entry points —
+  // app.applyImageFilter / applyImageFilterChain on a resolved raster. The
+  // old app.imageTools.applyFilter never existed (tool errored on every use).
+  it('apply is async, resolves the raster, and calls app.applyImageFilter', () => {
     const code = codeGenerator.generateImageFilter({ action: 'apply', itemId: 'item_1', filterName: 'blur', params: { amount: 5 } });
     expect(code).toContain('async function');
-    expect(code).toContain("if (!app.imageTools) return { error: 'ImageTools not available' }");
-    expect(code).toContain('app.imageTools.applyFilter');
+    expect(code).toContain('_resolveRaster');
+    expect(code).toContain('app.applyImageFilter(item, "blur"');
+    expect(code).not.toContain('app.imageTools.applyFilter');
   });
 
-  it('chain calls applyFilterChain', () => {
+  it('chain calls app.applyImageFilterChain', () => {
     const code = codeGenerator.generateImageFilter({
       action: 'chain',
       itemId: 'item_1',
       filters: [{ name: 'blur' }, { name: 'grayscale' }],
     });
-    expect(code).toContain('app.imageTools.applyFilterChain');
+    expect(code).toContain('app.applyImageFilterChain(item, filters)');
+    expect(code).not.toContain('app.imageTools.applyFilterChain');
   });
 });
 

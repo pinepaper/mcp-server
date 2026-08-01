@@ -177,6 +177,8 @@ import {
   InstantiateOntologyInput,
   LintSceneInput,
   MediaInput,
+  CropImageInput,
+  ChromaKeyInput,
   RiggingInput,
   GroupInput,
   CameraDirectorInput,
@@ -4768,15 +4770,23 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    const ite
   // ===========================================================================
 
   generateImageFilter(input: ImageFilterInput): string {
-    const guard = `if (!app.imageTools) return { error: 'ImageTools not available' };`;
+    // Resolve the raster from the registry id (unwrapping groups when the
+    // build has the _resolveRaster helper), then use the real GPU-filter
+    // facades. The previous emitter called app.imageTools.applyFilter, a
+    // method that never existed — the tool errored on every use.
+    const resolve = `  const item = (typeof app._resolveRaster === 'function')
+    ? app._resolveRaster(${JSON.stringify(input.itemId)})
+    : (app.itemRegistry ? app.itemRegistry.getItem(${JSON.stringify(input.itemId)}) : null);
+  if (!item) return { error: 'Item not found or not a raster: ' + ${JSON.stringify(input.itemId)} };
+  if (typeof app.applyImageFilter !== 'function') return { error: 'GPU image filters unavailable — update FxTool' };`;
     switch (input.action) {
       case 'apply':
         return `
 // Apply image filter
 (async function() {
-  ${guard}
+${resolve}
   try {
-    const result = await app.imageTools.applyFilter(${JSON.stringify(input.itemId)}, ${JSON.stringify(input.filterName || '')}, ${JSON.stringify(input.params || {})});
+    await app.applyImageFilter(item, ${JSON.stringify(input.filterName || '')}, ${JSON.stringify(input.params || {})});
     return { success: true, action: 'apply', itemId: ${JSON.stringify(input.itemId)}, filter: ${JSON.stringify(input.filterName || '')} };
   } catch (e) {
     return { error: 'Failed to apply filter: ' + e.message };
@@ -4786,10 +4796,10 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    const ite
         return `
 // Apply filter chain
 (async function() {
-  ${guard}
+${resolve}
   try {
     const filters = ${JSON.stringify(input.filters || [])};
-    const result = await app.imageTools.applyFilterChain(${JSON.stringify(input.itemId)}, filters);
+    await app.applyImageFilterChain(item, filters);
     return { success: true, action: 'chain', itemId: ${JSON.stringify(input.itemId)}, filterCount: filters.length };
   } catch (e) {
     return { error: 'Failed to apply filter chain: ' + e.message };
@@ -5864,7 +5874,52 @@ ${guard}
   const ok = A.setMediaPlaybackRate(${JSON.stringify(input.id)}, ${input.rate});
   return { success: ok, action: 'set_playback_rate', id: ${JSON.stringify(input.id)}, rate: ${input.rate} };
 })();`.trim();
+      case 'set_clip':
+        return `
+// Re-trim an existing media clip (media-time seconds)
+(function() {
+${guard}
+  if (typeof A.setMediaClip !== 'function') { return { success: false, error: 'setMediaClip unavailable — update FxTool' }; }
+  const ok = A.setMediaClip(${JSON.stringify(input.id)}, ${input.inPoint}, ${input.outPoint});
+  return { success: ok, action: 'set_clip', id: ${JSON.stringify(input.id)}, inPoint: ${input.inPoint}, outPoint: ${input.outPoint} };
+})();`.trim();
     }
+  }
+
+  /**
+   * One-shot image crop via the PinePaper.cropImage facade (Track A parity).
+   * The replacement raster keeps the item's registry id.
+   */
+  generateCropImage(input: CropImageInput): string {
+    const opts = input.aspectRatio ? JSON.stringify({ aspectRatio: input.aspectRatio }) : '{}';
+    return `
+// Crop image ${input.itemId}
+(async function() {
+  if (typeof app.cropImage !== 'function') { return { success: false, error: 'app.cropImage unavailable — update FxTool to a build with one-shot image ops' }; }
+  const result = await app.cropImage(${JSON.stringify(input.itemId)}, ${JSON.stringify(input.rect)}, ${opts});
+  if (!result) { return { success: false, error: 'crop failed — item is not a raster or rect does not intersect it' }; }
+  return { success: true, itemId: result.data.id, width: Math.round(result.width), height: Math.round(result.height) };
+})();`.trim();
+  }
+
+  /**
+   * One-shot chroma key (background removal) via PinePaper.applyChromaKey.
+   * Threshold/smoothing auto-estimate when omitted.
+   */
+  generateChromaKey(input: ChromaKeyInput): string {
+    const opts = JSON.stringify({
+      ...(input.color !== undefined ? { color: input.color } : {}),
+      ...(input.threshold !== undefined ? { threshold: input.threshold } : {}),
+      ...(input.smoothing !== undefined ? { smoothing: input.smoothing } : {}),
+    });
+    return `
+// Chroma-key image ${input.itemId}
+(async function() {
+  if (typeof app.applyChromaKey !== 'function') { return { success: false, error: 'app.applyChromaKey unavailable — update FxTool to a build with one-shot image ops' }; }
+  const result = await app.applyChromaKey(${JSON.stringify(input.itemId)}, ${opts});
+  if (!result) { return { success: false, error: 'chroma key failed — item is not a raster or the color is invalid' }; }
+  return { success: true, itemId: result.data.id, params: result.data.chromaKeyParams };
+})();`.trim();
   }
 
   /**

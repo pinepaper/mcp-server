@@ -41,6 +41,8 @@ import {
   InstantiateOntologyInputSchema,
   LintSceneInputSchema,
   MediaInputSchema,
+  CropImageInputSchema,
+  ChromaKeyInputSchema,
   RiggingInputSchema,
   GroupInputSchema,
   CameraDirectorInputSchema,
@@ -1123,6 +1125,18 @@ async function handleToolCallInner(
         const input = MediaInputSchema.parse(args);
         const code = codeGenerator.generateMedia(input);
         return executeOrGenerate(code, `Media: ${input.action}`, options, 'pinepaper_media');
+      }
+
+      case 'pinepaper_crop_image': {
+        const input = CropImageInputSchema.parse(args);
+        const code = codeGenerator.generateCropImage(input);
+        return executeOrGenerate(code, `Crop image ${input.itemId}`, options, 'pinepaper_crop_image');
+      }
+
+      case 'pinepaper_chroma_key': {
+        const input = ChromaKeyInputSchema.parse(args);
+        const code = codeGenerator.generateChromaKey(input);
+        return executeOrGenerate(code, `Chroma-key image ${input.itemId}`, options, 'pinepaper_chroma_key');
       }
 
       case 'pinepaper_rigging': {
