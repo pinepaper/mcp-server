@@ -29,3 +29,6 @@ docs-internal/
 # Lock files (optional - uncomment if you want to commit them)
 # package-lock.json
 # bun.lock
+
+# Claude Code session scratch (worktree diff stashes, local agent state)
+.claude/
