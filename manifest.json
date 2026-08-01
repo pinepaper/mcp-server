@@ -200,6 +200,14 @@
       "description": "Video/audio on the canvas from a URL. action: upload_video|upload_audio|list|remove|set_playback_rate. Uploads are first-class items. {action, url?, id?, rate?, ...}"
     },
     {
+      "name": "pinepaper_crop_image",
+      "description": "One-shot crop of an image item to a canvas-coords rect (clamped; keeps the registry id). {itemId, rect: {x,y,width,height}, aspectRatio?}"
+    },
+    {
+      "name": "pinepaper_chroma_key",
+      "description": "One-shot green-screen background removal on an image item (keeps the registry id). Omit threshold/smoothing to auto-estimate. {itemId, color?, threshold?, smoothing?}"
+    },
+    {
       "name": "pinepaper_rigging",
       "description": "Skeletal rigging + animation. action: create_skeleton|add_bone|attach_item|create_ik_chain|add_pose_keyframe|set_target_path|save_pose|save_shape_key. Pose keyframes carry S12 breakdown controls (favor/breakdown/boneOffsets/movingHold)."
     },

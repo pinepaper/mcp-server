@@ -362,7 +362,7 @@ describe('PinePaperCodeGenerator', () => {
     it('should generate play command', () => {
       const code = codeGenerator.generatePlayTimeline('play', 5, true);
 
-      expect(code).toContain('app.playKeyframeTimeline(5, true)');
+      expect(code).toContain("app.playKeyframeTimeline(5, true, { timeUnits: 'seconds' })");
     });
 
     it('should generate stop command', () => {
@@ -563,7 +563,7 @@ describe('PinePaperCodeGenerator', () => {
       const code = codeGenerator.generateAgentBatchExecute({
         operations: [{ type: 'play_timeline', action: 'play', duration: 5, loop: true }],
       });
-      expect(code).toContain('app.playKeyframeTimeline(5, true)');
+      expect(code).toContain("app.playKeyframeTimeline(5, true, { timeUnits: 'seconds' })");
     });
 
     it('should resolve $N variable references to itemIds array', () => {
