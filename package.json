@@ -1,6 +1,6 @@
 {
   "name": "@pinepaper.studio/mcp-server",
-  "version": "1.6.1",
+  "version": "1.6.2",
   "mcpName": "io.github.pinepaper/mcp-server",
   "description": "MCP Server for PinePaper Studio - Create animated graphics with AI",
   "type": "module",
@@ -60,7 +60,7 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "puppeteer": "^24.37.3",
     "zod": "^3.22.4"
   },
@@ -86,5 +86,15 @@
     "README.fr.md",
     "README.de.md",
     "README.hi.md"
-  ]
+  ],
+  "overrides": {
+    "es-define-property": "npm:@socketregistry/es-define-property@^1.0.7",
+    "function-bind": "npm:@socketregistry/function-bind@^1.0.7",
+    "gopd": "npm:@socketregistry/gopd@^1.0.7",
+    "has-symbols": "npm:@socketregistry/has-symbols@^1.0.7",
+    "hasown": "npm:@socketregistry/hasown@^1.0.7",
+    "object-assign": "npm:@socketregistry/object-assign@^1.0.5",
+    "safer-buffer": "npm:@socketregistry/safer-buffer@^1.0.10",
+    "side-channel": "npm:@socketregistry/side-channel@^1.0.10"
+  }
 }

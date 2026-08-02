@@ -1,7 +1,7 @@
 {
   "manifest_version": "0.3",
   "name": "pinepaper-mcp",
-  "version": "1.6.1",
+  "version": "1.6.2",
   "display_name": "PinePaper Studio",
   "description": "Create animated graphics with AI using PinePaper Studio",
   "long_description": "PinePaper MCP Server enables Claude to create, animate, and export graphics through PinePaper Studio. Features include shape creation, relation-based animations (orbits, follows, attached_to), procedural generators, visual effects, SVG export with animations, asset search & import from 4 open repositories (500k+ icons), performance metrics tracking, diagram tools for flowcharts/UML/network diagrams with smart connectors and auto-layout, enhanced error messages with canvas context, Agent Flow Mode for content automation pipelines with batch operations and smart platform exports (Instagram, TikTok, YouTube, etc.), interactive triggers (click, hover, drag events), quiz/LMS integration with SCORM/xAPI support, Letter Collage for stylized text with per-letter customization (Wordle, magazine cutout, gradient styles with 24+ palettes), and canvas presets for social media platforms. Supports two execution modes: Puppeteer (live browser execution) and Code (generate code for manual paste).",
@@ -33,26 +33,42 @@
     "entry_point": "dist/cli.js",
     "mcp_config": {
       "command": "node",
-      "args": ["${__dirname}/dist/cli.js"]
+      "args": [
+        "${__dirname}/dist/cli.js"
+      ]
     },
     "options": {
       "mode": {
         "type": "string",
         "description": "Execution mode: 'puppeteer' (live browser) or 'code' (generate only)",
         "default": "puppeteer",
-        "enum": ["puppeteer", "code"]
+        "enum": [
+          "puppeteer",
+          "code"
+        ]
       },
       "toolkit": {
         "type": "string",
         "description": "Tool visibility profile controlling which tools are exposed",
         "default": "agent",
-        "enum": ["full", "agent", "diagram", "map", "font", "minimal"]
+        "enum": [
+          "full",
+          "agent",
+          "diagram",
+          "map",
+          "font",
+          "minimal"
+        ]
       },
       "verbosity": {
         "type": "string",
         "description": "Tool description detail level. 'minimal' uses 1-line summaries with on-demand guide tool",
         "default": "compact",
-        "enum": ["verbose", "compact", "minimal"]
+        "enum": [
+          "verbose",
+          "compact",
+          "minimal"
+        ]
       }
     },
     "env": {
@@ -161,7 +177,7 @@
     },
     {
       "name": "pinepaper_event",
-      "description": "Event channel for scene chains (S11). action:'create' {name}→eventId, or 'pulse' {eventId}. Wire beats with on_event_fire_after/add_relation/set_color relations (event as sourceId)."
+      "description": "Event channel for scene chains (S11). action:'create' {name}\u2192eventId, or 'pulse' {eventId}. Wire beats with on_event_fire_after/add_relation/set_color relations (event as sourceId)."
     },
     {
       "name": "pinepaper_construction_sequence",
@@ -177,7 +193,7 @@
     },
     {
       "name": "pinepaper_detect_objects",
-      "description": "On-device image detection: DETR 80-class, or queries:[…] open-vocabulary (OWL-ViT). asNodes:true → image-anchored design nodes. {itemId?, threshold?, asNodes?, queries?}"
+      "description": "On-device image detection: DETR 80-class, or queries:[\u2026] open-vocabulary (OWL-ViT). asNodes:true \u2192 image-anchored design nodes. {itemId?, threshold?, asNodes?, queries?}"
     },
     {
       "name": "pinepaper_extract_object",
@@ -189,7 +205,7 @@
     },
     {
       "name": "pinepaper_validate_scene",
-      "description": "Audit the live canvas (dangling refs, unknown types/props, keyframes, cycles) → structured diagnostics. Optional ops[] to pre-validate proposed mutations."
+      "description": "Audit the live canvas (dangling refs, unknown types/props, keyframes, cycles) \u2192 structured diagnostics. Optional ops[] to pre-validate proposed mutations."
     },
     {
       "name": "pinepaper_capture_frames",
@@ -213,11 +229,11 @@
     },
     {
       "name": "pinepaper_instantiate_ontology",
-      "description": "Compile a pp: JSON-LD design graph (typed nodes + structural edges like on_top_of) into a live scene — roots placed, the rest positioned by relations. {doc, canvas?, defaultGeometry?} → {itemIds, diagnostics}."
+      "description": "Compile a pp: JSON-LD design graph (typed nodes + structural edges like on_top_of) into a live scene \u2014 roots placed, the rest positioned by relations. {doc, canvas?, defaultGeometry?} \u2192 {itemIds, diagnostics}."
     },
     {
       "name": "pinepaper_lint_scene",
-      "description": "Read-only relational-density audit of the live scene → {density, suggestions}. Flags coordinate-driven scenes and proposes structural relations for unrelated items already in position. {eps?, cap?}"
+      "description": "Read-only relational-density audit of the live scene \u2192 {density, suggestions}. Flags coordinate-driven scenes and proposes structural relations for unrelated items already in position. {eps?, cap?}"
     },
     {
       "name": "pinepaper_add_relation",
@@ -417,7 +433,7 @@
     },
     {
       "name": "pinepaper_font",
-      "description": "Font Studio. action: show_studio|set_name|create_glyph|create_space|remove_glyph|set_metrics|export|cleanup_path|… (16 actions; see pinepaper_tool_guide)."
+      "description": "Font Studio. action: show_studio|set_name|create_glyph|create_space|remove_glyph|set_metrics|export|cleanup_path|\u2026 (16 actions; see pinepaper_tool_guide)."
     },
     {
       "name": "pinepaper_create_letter_collage",
@@ -525,7 +541,7 @@
     },
     {
       "name": "pinepaper_analyze_design",
-      "description": "Analyze template definition → typed graph, patterns, math functions, semantics, fingerprint, JSON-LD."
+      "description": "Analyze template definition \u2192 typed graph, patterns, math functions, semantics, fingerprint, JSON-LD."
     },
     {
       "name": "pinepaper_validate_design",
@@ -533,7 +549,7 @@
     },
     {
       "name": "pinepaper_validate",
-      "description": "Semantic validation of the live scene/op → structured diagnostics {code, severity, message, fix}. mode:'scene'|'op'. Catches missing targets (+did-you-mean), bad params, cycles."
+      "description": "Semantic validation of the live scene/op \u2192 structured diagnostics {code, severity, message, fix}. mode:'scene'|'op'. Catches missing targets (+did-you-mean), bad params, cycles."
     },
     {
       "name": "pinepaper_query_ontology",
