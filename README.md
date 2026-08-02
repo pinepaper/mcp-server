@@ -467,6 +467,8 @@ All 121 tools, grouped by the tag used for toolkit filtering.
 | Tool | Description |
 |------|-------------|
 | `pinepaper_image_filter` | Apply image filters |
+| `pinepaper_crop_image` | Crop an image to a rect (optional aspect ratio) |
+| `pinepaper_chroma_key` | Key out a background color (auto-estimates threshold) |
 | `pinepaper_lasso` | Lasso selection on images |
 | `pinepaper_cutout_style` | Cutout styling |
 
