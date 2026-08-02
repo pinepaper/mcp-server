@@ -1,6 +1,6 @@
 {
   "name": "@pinepaper.studio/mcp-server",
-  "version": "1.6.2",
+  "version": "1.6.3",
   "mcpName": "io.github.pinepaper/mcp-server",
   "description": "MCP Server for PinePaper Studio - Create animated graphics with AI",
   "type": "module",
