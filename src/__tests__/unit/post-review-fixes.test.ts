@@ -490,6 +490,59 @@ describe('generateAgentExport — VideoEncoder NaN-bitrate fix', () => {
     expect(() => AgentExportInputSchema.parse({ platform: 'instagram', duration: 75 })).toThrow();
     expect(() => AgentExportInputSchema.parse({ platform: 'instagram', duration: 30 })).not.toThrow();
   });
+
+  // GIF is not codec-bounded: _exportGIF hands gif.js a quality level, not a
+  // bitrate target, so size scales with frames × dimensions instead of settling
+  // near bitrate × duration. The editor UI has always stopped GIF presets at 15s
+  // while video goes to 60; before this cap the agent surface could request
+  // durations no human could pick through the UI.
+  describe('GIF duration cap', () => {
+    it('rejects a GIF longer than the cap, naming duration as the offending field', async () => {
+      const { AgentExportInputSchema, GIF_MAX_DURATION_S } = await import('../../types/schemas.js');
+      const result = AgentExportInputSchema.safeParse({
+        platform: 'twitter', format: 'gif', duration: GIF_MAX_DURATION_S + 1,
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        const issue = result.error.issues.find((i) => i.path.includes('duration'));
+        expect(issue).toBeDefined();
+        // The message has to tell the agent what to do instead, or it will retry
+        // the same call verbatim.
+        expect(issue!.message).toMatch(/mp4|webm/i);
+      }
+    });
+
+    it('accepts a GIF exactly at the cap', async () => {
+      const { AgentExportInputSchema, GIF_MAX_DURATION_S } = await import('../../types/schemas.js');
+      expect(() => AgentExportInputSchema.parse({
+        platform: 'twitter', format: 'gif', duration: GIF_MAX_DURATION_S,
+      })).not.toThrow();
+    });
+
+    it('leaves the 60s ceiling intact for codec-bounded formats', async () => {
+      const { AgentExportInputSchema } = await import('../../types/schemas.js');
+      for (const format of ['mp4', 'webm'] as const) {
+        expect(() => AgentExportInputSchema.parse({ platform: 'youtube', format, duration: 60 }))
+          .not.toThrow();
+      }
+    });
+
+    it('does not fire on format "auto" — auto never resolves to gif', async () => {
+      const { AgentExportInputSchema } = await import('../../types/schemas.js');
+      // generateAgentExport resolves auto via preset.staticFormat (png/svg/pdf),
+      // so a long "auto" export is never a GIF and must not be blocked.
+      expect(() => AgentExportInputSchema.parse({ platform: 'twitter', duration: 60 })).not.toThrow();
+      expect(() => AgentExportInputSchema.parse({ platform: 'twitter', format: 'auto', duration: 60 }))
+        .not.toThrow();
+    });
+
+    it('is enforced on the code-generation path too, not just the handler', () => {
+      // generateAgentExport re-parses its input, so the cap holds even for
+      // callers that reach the emitter directly.
+      expect(() => codeGenerator.generateAgentExport({ ...baseInput, format: 'gif', duration: 45 }))
+        .toThrow();
+    });
+  });
 });
 
 // =============================================================================

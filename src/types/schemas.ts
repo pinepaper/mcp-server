@@ -2111,6 +2111,22 @@ export const AgentBatchExecuteInputSchema = z.object({
 export type AgentBatchExecuteInput = z.infer<typeof AgentBatchExecuteInputSchema>;
 
 /**
+ * Max duration for GIF exports, in seconds.
+ *
+ * MP4/WebM are codec-bounded — the encoder is handed a target bitrate picked from
+ * a resolution tier, so output size lands at roughly bitrate × duration and the
+ * 60s ceiling is predictable. GIF has NO bitrate target (VideoExporter._exportGIF
+ * hands gif.js a quality level, not a rate), so size scales with
+ * frames × dimensions and a 60s export at a large canvas is pathological.
+ *
+ * The editor UI has always offered GIF duration presets only up to 15s while
+ * video goes to 60 (ExportEngine: `isGif ? [3,5,10,15] : [3,5,10,15,30,60]`).
+ * That divergence left the agent surface able to request durations a human
+ * could not. This brings the two in line.
+ */
+export const GIF_MAX_DURATION_S = 15;
+
+/**
  * Smart export input schema
  */
 export const AgentExportInputSchema = z.object({
@@ -2119,8 +2135,17 @@ export const AgentExportInputSchema = z.object({
   quality: z.enum(['draft', 'standard', 'high']).optional().default('standard').describe('Export quality level'),
   includeRecommendations: z.boolean().optional().default(true).describe('Include alternative format recommendations'),
   framing: z.enum(['canvas', 'camera']).optional().default('canvas').describe('Output framing: "canvas" (full canvas, default) or "camera" (camera_animates first-keyframe viewport — fails if no walkthrough exists). Camera animation still drives motion within the fixed output frame.'),
-  duration: z.number().min(0.5).max(60).optional().default(5).describe('Video duration in seconds for animated formats (mp4/webm/gif). Default 5. Max 60. Static formats (png/svg/pdf) ignore this.'),
-}).describe('Smart export options');
+  duration: z.number().min(0.5).max(60).optional().default(5).describe(`Video duration in seconds for animated formats (mp4/webm/gif). Default 5. Max 60 for mp4/webm, max ${GIF_MAX_DURATION_S} for gif (GIF is not codec-bounded, so file size scales with frames × dimensions). Static formats (png/svg/pdf) ignore this.`),
+}).describe('Smart export options')
+  .superRefine((val, ctx) => {
+    if (val.format === 'gif' && val.duration > GIF_MAX_DURATION_S) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['duration'],
+        message: `GIF exports are capped at ${GIF_MAX_DURATION_S}s (got ${val.duration}s). GIF has no bitrate target, so file size scales with frames × dimensions rather than staying near a predictable ceiling. Use format "mp4" or "webm" for longer clips.`,
+      });
+    }
+  });
 
 export type AgentExportInput = z.infer<typeof AgentExportInputSchema>;
 

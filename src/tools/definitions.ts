@@ -6034,7 +6034,7 @@ EXAMPLES:
           type: 'number',
           minimum: 0.5,
           maximum: 60,
-          description: 'Video duration in seconds for mp4/webm/gif (default 5, max 60). Static formats ignore this. If you set play_timeline to N seconds, pass the same N here.',
+          description: 'Video duration in seconds for mp4/webm/gif (default 5). Max 60 for mp4/webm; GIF is capped at 15 because it has no bitrate target, so size scales with frames × dimensions — use mp4/webm for longer clips. Static formats ignore this. If you set play_timeline to N seconds, pass the same N here.',
         },
       },
       required: ['platform'],
