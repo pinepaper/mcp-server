@@ -49,6 +49,7 @@ import {
   SceneDiffInputSchema,
   AudioBeatsInputSchema,
   TemplateParamsInputSchema,
+  ComposeInputSchema,
   CropImageInputSchema,
   ChromaKeyInputSchema,
   RiggingInputSchema,
@@ -1170,6 +1171,12 @@ async function handleToolCallInner(
         const input = SceneDiffInputSchema.parse(args);
         const code = codeGenerator.generateSceneDiff(input);
         return executeOrGenerate(code, `Scene diff: ${input.action}`, options, 'pinepaper_scene_diff');
+      }
+
+      case 'pinepaper_compose': {
+        const input = ComposeInputSchema.parse(args);
+        const code = codeGenerator.generateCompose(input);
+        return executeOrGenerate(code, `Compose: ${input.action}`, options, 'pinepaper_compose');
       }
 
       case 'pinepaper_audio_beats': {

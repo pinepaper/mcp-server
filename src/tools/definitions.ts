@@ -3291,6 +3291,51 @@ ACTIONS:
     },
   },
   {
+    name: 'pinepaper_compose',
+    annotations: {
+      title: 'Compose', readOnlyHint: false, destructiveHint: false,
+      idempotentHint: false, openWorldHint: false,
+    },
+    description: `Arrange items into a NAMED COMPOSITION and film it — "here are four photos, lay them out
+nicely and give me a clip".
+
+ACTIONS:
+- list_patterns: Available patterns with their slot counts. CALL THIS FIRST — each pattern takes a
+  specific number of items, and the definitions say what each is for.
+- apply: Arrange items. Params: pattern, itemIds (IN SLOT ORDER — the order is the composition),
+  treatment (defaults to the pattern's own), applyCamera (false to arrange only), craft.
+- list_treatments: Available camera treatments.
+- set_treatment: Re-film an existing composition. Params: rootId (returned by apply), treatment.
+
+PATTERNS: grid-2x2 (4 equal images) · hero-plus-strip (3–6, one dominant — the product-shot default)
+· editorial-split (2–3 plus deliberate empty space for a headline) · stacked-depth (2–5 overlapping
+cards).
+TREATMENTS: sheet-reveal · hero-then-details · slow-pan · push-through.
+
+WHAT THIS RETURNS, AND WHY IT MATTERS: apply positions ONE root and wires structural relations
+(beside / below / on_top_of) for the rest — it does not set a coordinate per item. The composition
+therefore stays live: move the root and everything follows, swap in a taller image and its
+neighbours re-flow. It also records pp:composedAs / pp:fillsSlot so the scene can be queried and
+re-filmed later.
+
+Prefer this over positioning images yourself. Hand-placed coordinates are what pinepaper_lint_scene
+flags as a badly-composed scene, and they do not survive an artboard change.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['list_patterns', 'list_treatments', 'apply', 'set_treatment'] },
+        pattern: { type: 'string', description: 'Pattern key from list_patterns' },
+        itemIds: { type: 'array', items: { type: 'string' }, description: 'Items in slot order' },
+        treatment: { type: 'string', description: 'Camera treatment key' },
+        rootId: { type: 'string', description: 'Composition root (from apply) — for set_treatment' },
+        applyCamera: { type: 'boolean', description: 'false to arrange without compiling a camera track' },
+        loop: { type: 'boolean' },
+        craft: { type: 'object', description: 'Override craft ratios (gutter, margin…), as fractions of the short canvas edge' },
+      },
+      required: ['action'],
+    },
+  },
+  {
     name: 'pinepaper_brand_kit',
     annotations: {
       title: 'Brand Kit', readOnlyHint: false, destructiveHint: false,

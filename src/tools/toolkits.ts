@@ -138,6 +138,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
   // Design-system surface (1.6.4): reusable styling, reusable structure, and
   // retargeting a finished design to another frame.
   design_system: [
+    'pinepaper_compose',
     'pinepaper_brand_kit',
     'pinepaper_component',
     'pinepaper_artboard',

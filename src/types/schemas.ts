@@ -2941,6 +2941,23 @@ export const SceneDiffInputSchema = z.object({
 });
 export type SceneDiffInput = z.infer<typeof SceneDiffInputSchema>;
 
+export const ComposeInputSchema = z.object({
+  action: z.enum(['list_patterns', 'list_treatments', 'apply', 'set_treatment']),
+  /** Pattern key from list_patterns. Each declares the slot count it accepts. */
+  pattern: z.string().optional(),
+  /** Items IN SLOT ORDER — the order is the composition, not a detail. */
+  itemIds: z.array(z.string()).optional(),
+  treatment: z.string().optional(),
+  /** Composition root, returned by apply. Required for set_treatment. */
+  rootId: z.string().optional(),
+  /** Skip compiling the camera track; arrange only. */
+  applyCamera: z.boolean().optional(),
+  loop: z.boolean().optional(),
+  /** Override individual craft ratios (gutter, margin, …). Fractions of the short canvas edge. */
+  craft: z.record(z.string(), z.number()).optional(),
+});
+export type ComposeInput = z.infer<typeof ComposeInputSchema>;
+
 export const AudioBeatsInputSchema = z.object({
   action: z.enum(['analyze', 'animate_to_beat']),
   /** Asset id, data URL or URL. Required for analyze; optional if beats are supplied. */

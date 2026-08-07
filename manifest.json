@@ -324,6 +324,10 @@
       "description": "Transform items. action: nudge|flip|reorder. dx,dy. direction: horizontal|vertical. order: bringToFront|sendToBack|moveUp|moveDown."
     },
     {
+      "name": "pinepaper_compose",
+      "description": "Arrange items into a named composition + film it. action: list_patterns (call first — each takes a set slot count) | apply {pattern, itemIds in slot order, treatment?} | list_treatments | set_treatment {rootId, treatment}. Wires relations, not coordinates."
+    },
+    {
       "name": "pinepaper_brand_kit",
       "description": "Apply a brand kit — colours, fonts and roles — across the scene."
     },

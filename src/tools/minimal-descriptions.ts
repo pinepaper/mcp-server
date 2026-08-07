@@ -175,6 +175,9 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   // tiers; minimal is for token-starved clients and has a hard 200-char cap.
   pinepaper_transform: 'Transform items. action: fit|nudge|flip|reorder. fit: mode contain|cover, scales+centres to the export frame. dx,dy. direction: horizontal|vertical. order: bringToFront|sendToBack|moveUp|moveDown.',
   pinepaper_history: 'Undo/redo. action: undo|redo|get_state.',
+  // "Wires relations, not coordinates" earns its place even at this tier: it is
+  // what stops a model positioning the images itself and getting a dead layout.
+  pinepaper_compose: 'Named collage layout + camera. action: list_patterns (call first — fixed slot counts) | apply {pattern, itemIds in slot order} | list_treatments | set_treatment. Wires relations, not coordinates.',
   pinepaper_brand_kit: 'Apply brand colours by role. action: plan (dry run + contrast audit)|apply. kit: {name, colors:{primary,secondary?,accent?,background?,text?}, fonts?}. Only name+colors.primary required.',
   pinepaper_component: 'Reusable master + instances, per-instance overrides. action: define|list|instantiate|set_override|sync|update_from_instance|detach. {itemIds?, componentId?, instanceId?, componentKey?, prop?, value?}',
   pinepaper_artboard: 'Resize the artboard and control reflow. action: list_presets|set|set_constraints. {preset? | width+height, itemId?, horizontal?, vertical?}',

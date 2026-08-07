@@ -159,6 +159,7 @@ import {
   SceneDiffInput,
   AudioBeatsInput,
   TemplateParamsInput,
+  ComposeInput,
   HistoryInput,
   ImageFilterInput,
   LassoInput,
@@ -4932,6 +4933,28 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    // The RE
         return this._facadeCall('recordLineage',
           `${id}, ${JSON.stringify(input.kind || 'derived')}, ${JSON.stringify(input.sourceRef || '')}, ${JSON.stringify(input.meta || {})}`,
           'Provenance: record lineage');
+    }
+  }
+
+  generateCompose(input: ComposeInput): string {
+    switch (input.action) {
+      case 'list_patterns':
+        return this._facadeCall('listCollagePatterns', '', 'Compose: list patterns');
+      case 'list_treatments':
+        return this._facadeCall('listCameraTreatments', '', 'Compose: list treatments');
+      case 'set_treatment':
+        return this._facadeCall('setCollageTreatment',
+          `${JSON.stringify(input.rootId || '')}, ${JSON.stringify(input.treatment || '')}, ${JSON.stringify({ ...(input.loop ? { loop: true } : {}) })}`,
+          'Compose: set treatment');
+      case 'apply':
+      default:
+        return this._facadeCall('composeCollage',
+          `${JSON.stringify(input.pattern || '')}, ${JSON.stringify(input.itemIds || [])}, ${JSON.stringify({
+            ...(input.treatment ? { treatment: input.treatment } : {}),
+            ...(input.applyCamera === false ? { applyCamera: false } : {}),
+            ...(input.loop ? { loop: true } : {}),
+            ...(input.craft ? { craft: input.craft } : {}),
+          })}`, 'Compose: apply pattern');
     }
   }
 
