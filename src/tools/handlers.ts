@@ -41,6 +41,12 @@ import {
   InstantiateOntologyInputSchema,
   LintSceneInputSchema,
   MediaInputSchema,
+  BrandKitInputSchema,
+  ComponentInputSchema,
+  ArtboardInputSchema,
+  CommentInputSchema,
+  ProvenanceInputSchema,
+  SceneDiffInputSchema,
   CropImageInputSchema,
   ChromaKeyInputSchema,
   RiggingInputSchema,
@@ -1125,6 +1131,43 @@ async function handleToolCallInner(
         const input = MediaInputSchema.parse(args);
         const code = codeGenerator.generateMedia(input);
         return executeOrGenerate(code, `Media: ${input.action}`, options, 'pinepaper_media');
+      }
+
+      // ─── 1.6.4: agent surface for the Tier-2 engine features ───
+      case 'pinepaper_brand_kit': {
+        const input = BrandKitInputSchema.parse(args);
+        const code = codeGenerator.generateBrandKit(input);
+        return executeOrGenerate(code, `Brand kit: ${input.action}`, options, 'pinepaper_brand_kit');
+      }
+
+      case 'pinepaper_component': {
+        const input = ComponentInputSchema.parse(args);
+        const code = codeGenerator.generateComponent(input);
+        return executeOrGenerate(code, `Component: ${input.action}`, options, 'pinepaper_component');
+      }
+
+      case 'pinepaper_artboard': {
+        const input = ArtboardInputSchema.parse(args);
+        const code = codeGenerator.generateArtboard(input);
+        return executeOrGenerate(code, `Artboard: ${input.action}`, options, 'pinepaper_artboard');
+      }
+
+      case 'pinepaper_comment': {
+        const input = CommentInputSchema.parse(args);
+        const code = codeGenerator.generateComment(input);
+        return executeOrGenerate(code, `Comment: ${input.action}`, options, 'pinepaper_comment');
+      }
+
+      case 'pinepaper_provenance': {
+        const input = ProvenanceInputSchema.parse(args);
+        const code = codeGenerator.generateProvenance(input);
+        return executeOrGenerate(code, `Provenance: ${input.action}`, options, 'pinepaper_provenance');
+      }
+
+      case 'pinepaper_scene_diff': {
+        const input = SceneDiffInputSchema.parse(args);
+        const code = codeGenerator.generateSceneDiff(input);
+        return executeOrGenerate(code, `Scene diff: ${input.action}`, options, 'pinepaper_scene_diff');
       }
 
       case 'pinepaper_crop_image': {

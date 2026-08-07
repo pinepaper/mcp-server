@@ -126,12 +126,34 @@ describe('PinePaperCodeGenerator', () => {
   });
 
   describe('generateDeleteItem', () => {
-    it('should generate delete code', () => {
+    it('delegates to app.deleteItem instead of hand-rolling the removal', () => {
       const code = codeGenerator.generateDeleteItem('item_5');
+      expect(code).toContain("app.deleteItem('item_5')");
+      // app.deleteItem also clears animatedItems / keyframeItems / selection,
+      // redraws, snapshots history and emits the collaboration mutation — none
+      // of which the old inline version did.
+      expect(code).toContain('typeof app.deleteItem');
+    });
 
-      expect(code).toContain("app.getItemById('item_5')");
-      expect(code).toContain('item.remove()');
-      expect(code).toContain("app.itemRegistry.remove('item_5')");
+    it('never calls app.itemRegistry.remove — that method does not exist', () => {
+      // This assertion is the whole point of the test. The previous version
+      // PINNED the bug: it required `app.itemRegistry.remove(...)`, a method
+      // ItemRegistry has never had (it is `unregister`). Every delete therefore
+      // removed the Paper item and left its registry row behind, pointing at a
+      // detached object — so the scene kept reporting nodes that were not on
+      // screen and agents could still address them.
+      // Strip comments first: the emitted source explains the old bug by name,
+      // so a plain substring check would match the explanation rather than any
+      // call. Assert against what actually runs.
+      const executable = codeGenerator.generateDeleteItem('item_5')
+        .split('\n').filter((l) => !l.trim().startsWith('//')).join('\n');
+      expect(executable).not.toContain('itemRegistry.remove');
+    });
+
+    it('reports a miss instead of throwing, so a batch can continue', () => {
+      const code = codeGenerator.generateDeleteItem('item_5');
+      expect(code).toContain('success: false');
+      expect(code).not.toContain('throw new Error');
     });
   });
 

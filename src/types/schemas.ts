@@ -2828,14 +2828,116 @@ export const SelectionInputSchema = z.object({
 export type SelectionInput = z.infer<typeof SelectionInputSchema>;
 
 export const TransformInputSchema = z.object({
-  action: z.enum(['nudge', 'flip', 'reorder']),
+  // 'fit' scales + centres an item to the EXPORT FRAME. It lives here rather
+  // than on pinepaper_media because it is a transform and applies to any item —
+  // but video is the case that forced it: an uploaded clip landed at native
+  // size, so a 640x360 source filled one ninth of a 1920x1080 canvas and there
+  // was no agent-reachable way to size it.
+  action: z.enum(['nudge', 'flip', 'reorder', 'fit']),
   itemId: z.string().optional(),
   dx: z.number().optional(),
   dy: z.number().optional(),
   direction: z.enum(['horizontal', 'vertical']).optional(),
   order: z.enum(['bringToFront', 'sendToBack', 'moveUp', 'moveDown']).optional(),
+  /** 'contain' (default) fits inside the frame; 'cover' fills it, cropping overflow. */
+  mode: z.enum(['contain', 'cover']).optional(),
 });
 export type TransformInput = z.infer<typeof TransformInputSchema>;
+
+// ─── 1.6.4: agent surface for the Tier-2 engine features ────────────────────
+//
+// Eleven modules landed in js/core/ with PinePaper facades and NO way for an
+// agent to reach any of them. These are grouped by subject with an `action`
+// discriminator rather than split into ~30 verb-per-tool entries: the tool
+// count is already the thing the consolidation backlog complains about, and
+// `pinepaper_media` / `pinepaper_transform` set the precedent.
+
+export const BrandKitInputSchema = z.object({
+  /** 'plan' reports what WOULD change without touching the scene. */
+  action: z.enum(['plan', 'apply']),
+  // Spelled out rather than a loose record. A first version typed this as
+  // `z.record(...)` described as a "role → colour map", which is NOT the shape
+  // the engine takes — every call was rejected with "name is required;
+  // colors.primary is required". A permissive schema over a strict engine just
+  // moves the failure to runtime and teaches the model the wrong shape.
+  kit: z.object({
+    name: z.string(),
+    colors: z.object({
+      primary: z.string(),
+      secondary: z.string().optional(),
+      accent: z.string().optional(),
+      background: z.string().optional(),
+      text: z.string().optional(),
+    }),
+    // Missing roles are FILLED from what is present, not rejected — only
+    // `name` and `colors.primary` are genuinely required.
+    fonts: z.object({
+      heading: z.string().optional(),
+      body: z.string().optional(),
+    }).optional(),
+  }),
+  selectionOnly: z.boolean().optional(),
+});
+export type BrandKitInput = z.infer<typeof BrandKitInputSchema>;
+
+export const ComponentInputSchema = z.object({
+  action: z.enum(['define', 'list', 'instantiate', 'set_override', 'sync', 'update_from_instance', 'detach']),
+  itemIds: z.array(z.string()).optional(),
+  componentId: z.string().optional(),
+  instanceId: z.string().optional(),
+  name: z.string().optional(),
+  position: z.object({ x: z.number(), y: z.number() }).optional(),
+  /** Per-part override: which part of the component, which property, what value. */
+  componentKey: z.string().optional(),
+  prop: z.string().optional(),
+  value: z.unknown().optional(),
+  overrides: z.record(z.string(), z.unknown()).optional(),
+});
+export type ComponentInput = z.infer<typeof ComponentInputSchema>;
+
+export const ArtboardInputSchema = z.object({
+  action: z.enum(['list_presets', 'set', 'set_constraints']),
+  preset: z.string().optional(),
+  width: z.number().optional(),
+  height: z.number().optional(),
+  itemId: z.string().optional(),
+  horizontal: z.string().optional(),
+  vertical: z.string().optional(),
+});
+export type ArtboardInput = z.infer<typeof ArtboardInputSchema>;
+
+export const CommentInputSchema = z.object({
+  action: z.enum(['add', 'list', 'resolve', 'delete']),
+  id: z.string().optional(),
+  text: z.string().optional(),
+  author: z.string().optional(),
+  /** Anchor: an item, a point, a moment — at least one is required by the engine. */
+  itemId: z.string().optional(),
+  x: z.number().optional(),
+  y: z.number().optional(),
+  time: z.number().optional(),
+  resolved: z.boolean().optional(),
+  includeResolved: z.boolean().optional(),
+});
+export type CommentInput = z.infer<typeof CommentInputSchema>;
+
+export const ProvenanceInputSchema = z.object({
+  action: z.enum(['get', 'lineage', 'dependents', 'record']),
+  itemId: z.string(),
+  kind: z.string().optional(),
+  sourceRef: z.string().optional(),
+  meta: z.record(z.string(), z.unknown()).optional(),
+});
+export type ProvenanceInput = z.infer<typeof ProvenanceInputSchema>;
+
+export const SceneDiffInputSchema = z.object({
+  /** 'history' compares two undo states; 'version' compares live vs a saved version. */
+  action: z.enum(['history', 'version']),
+  indexA: z.number().optional(),
+  indexB: z.number().optional(),
+  versionId: z.string().optional(),
+});
+export type SceneDiffInput = z.infer<typeof SceneDiffInputSchema>;
 
 export const HistoryInputSchema = z.object({
   action: z.enum(['undo', 'redo', 'get_state']),

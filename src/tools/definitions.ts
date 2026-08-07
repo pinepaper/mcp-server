@@ -3249,9 +3249,14 @@ ACTIONS:
       idempotentHint: false,
       openWorldHint: false,
     },
-    description: `Transform items: nudge position, flip, or change z-order.
+    description: `Transform items: fit to the canvas, nudge position, flip, or change z-order.
 
 ACTIONS:
+- fit: Scale + centre an item to the EXPORT FRAME. Params: itemId, mode (contain|cover, default contain).
+  Use this after uploading a video or image — an uploaded clip lands at its NATIVE size, so a 640x360
+  source occupies a fraction of a 1920x1080 canvas until you fit it. Accepts a canvas item id OR a
+  media id (vraster_…) returned by pinepaper_media upload_video. 'contain' letterboxes, 'cover' crops.
+  Idempotent: fitting twice is the same as fitting once.
 - nudge: Move item by dx/dy offset. Params: itemId, dx, dy
 - flip: Mirror item. Params: itemId, direction (horizontal|vertical)
 - reorder: Change z-order. Params: itemId, order (bringToFront|sendToBack|moveUp|moveDown)`,
@@ -3260,8 +3265,13 @@ ACTIONS:
       properties: {
         action: {
           type: 'string',
-          enum: ['nudge', 'flip', 'reorder'],
+          enum: ['fit', 'nudge', 'flip', 'reorder'],
           description: 'Transform action',
+        },
+        mode: {
+          type: 'string',
+          enum: ['contain', 'cover'],
+          description: 'For fit: contain (whole item visible, may letterbox) or cover (fill frame, crop overflow)',
         },
         itemId: { type: 'string', description: 'Target item ID' },
         dx: { type: 'number', description: 'Horizontal offset (for nudge)' },
@@ -3276,6 +3286,219 @@ ACTIONS:
           enum: ['bringToFront', 'sendToBack', 'moveUp', 'moveDown'],
           description: 'Z-order operation',
         },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'pinepaper_brand_kit',
+    annotations: {
+      title: 'Brand Kit', readOnlyHint: false, destructiveHint: false,
+      idempotentHint: true, openWorldHint: false,
+    },
+    description: `Apply a brand kit — colours, fonts and roles — across the scene.
+
+ACTIONS:
+- plan: Report what WOULD change (count, per-role breakdown, WCAG contrast audit) WITHOUT touching
+  the canvas. Call this first on an unfamiliar scene; a whole-scene recolour is hard to eyeball afterwards.
+- apply: Commit it. A history snapshot is taken FIRST, so one undo puts everything back.
+
+KIT SHAPE — only name and colors.primary are required:
+  { "name": "Acme", "colors": { "primary": "#e11d48", "secondary": "#0ea5e9",
+    "accent": "#f59e0b", "background": "#ffffff", "text": "#111111" },
+    "fonts": { "heading": "Inter", "body": "Inter" } }
+Missing roles are filled from what is present (secondary←primary, accent←secondary, background←white,
+text←whatever is readable on the background) and reported as warnings, so a kit with just a primary is
+a valid thing to send.
+
+Items are matched to roles by their current styling. Pass selectionOnly to restrict to the selection.
+Both actions return a WCAG contrast audit, so you can see failing pairs before shipping them.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['plan', 'apply'], description: 'plan (dry run) or apply' },
+        kit: {
+          type: 'object',
+          description: 'Brand kit. Requires name and colors.primary; other roles are inferred.',
+          properties: {
+            name: { type: 'string' },
+            colors: {
+              type: 'object',
+              properties: {
+                primary: { type: 'string' },
+                secondary: { type: 'string' },
+                accent: { type: 'string' },
+                background: { type: 'string' },
+                text: { type: 'string' },
+              },
+              required: ['primary'],
+            },
+            fonts: {
+              type: 'object',
+              properties: { heading: { type: 'string' }, body: { type: 'string' } },
+            },
+          },
+          required: ['name', 'colors'],
+        },
+        selectionOnly: { type: 'boolean', description: 'Restrict to current selection' },
+      },
+      required: ['action', 'kit'],
+    },
+  },
+  {
+    name: 'pinepaper_component',
+    annotations: {
+      title: 'Component', readOnlyHint: false, destructiveHint: false,
+      idempotentHint: false, openWorldHint: false,
+    },
+    description: `Reusable components with per-instance overrides — a master and its instances.
+
+ACTIONS:
+- define: Turn items into a component master. Params: itemIds[], name
+- list: All defined components
+- instantiate: Place an instance. Params: componentId, position, overrides
+- set_override: Change ONE part of ONE instance without detaching it. Params: instanceId, componentKey, prop, value
+- sync: Push the master's current state to every instance (overrides are preserved). Params: componentId
+- update_from_instance: Promote an instance's edits back into the master. Params: instanceId
+- detach: Make an instance an ordinary independent item. Params: instanceId
+
+Overrides are the point: an instance can differ from its master and still receive master updates.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['define', 'list', 'instantiate', 'set_override', 'sync', 'update_from_instance', 'detach'],
+        },
+        itemIds: { type: 'array', items: { type: 'string' }, description: 'Items to define a component from' },
+        componentId: { type: 'string' },
+        instanceId: { type: 'string' },
+        name: { type: 'string' },
+        position: {
+          type: 'object',
+          properties: { x: { type: 'number' }, y: { type: 'number' } },
+        },
+        componentKey: { type: 'string', description: 'Which part of the component to override' },
+        prop: { type: 'string', description: 'Property to override, e.g. fillColor or content' },
+        value: { description: 'Override value' },
+        overrides: { type: 'object', description: 'Overrides applied at instantiate time' },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'pinepaper_artboard',
+    annotations: {
+      title: 'Artboard', readOnlyHint: false, destructiveHint: false,
+      idempotentHint: true, openWorldHint: false,
+    },
+    description: `Resize the artboard and control how items reflow when it changes.
+
+ACTIONS:
+- list_presets: Named artboard sizes (social, print, web…)
+- set: Resize. Params: preset OR width+height. Items reflow according to their constraints.
+- set_constraints: Declare how ONE item behaves on resize. Params: itemId, horizontal, vertical
+  (left|right|center|scale|both). Without constraints an item just scales with the frame, which is
+  wrong for things that should stay pinned to an edge.
+
+Use this to retarget a finished design to another aspect ratio instead of rebuilding it.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['list_presets', 'set', 'set_constraints'] },
+        preset: { type: 'string', description: 'Preset key from list_presets' },
+        width: { type: 'number' },
+        height: { type: 'number' },
+        itemId: { type: 'string' },
+        horizontal: { type: 'string', description: 'left | right | center | scale | both' },
+        vertical: { type: 'string', description: 'top | bottom | center | scale | both' },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'pinepaper_comment',
+    annotations: {
+      title: 'Comment', readOnlyHint: false, destructiveHint: false,
+      idempotentHint: false, openWorldHint: false,
+    },
+    description: `Notes pinned to a place and a moment — review feedback on a scene.
+
+ACTIONS:
+- add: Params: text, plus AT LEAST ONE anchor — itemId (the pin follows the item), x+y (a point on the
+  canvas), or time (a moment on the timeline). They combine: "the exit is too fast" on item_4 at 4.2s.
+- list: Comments with their CURRENT resolved position. Params: time (only those visible at that
+  moment), includeResolved
+- resolve: Mark done. Params: id, resolved. The comment is KEPT — the thread is the record.
+- delete: Remove outright. Params: id
+
+An unanchored comment is refused: a note with no anchor is a text file with extra steps. Deleting an
+item ORPHANS its comments rather than dropping them, and they report themselves as orphaned.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['add', 'list', 'resolve', 'delete'] },
+        id: { type: 'string' },
+        text: { type: 'string' },
+        author: { type: 'string' },
+        itemId: { type: 'string', description: 'Anchor to an item — the pin follows it' },
+        x: { type: 'number' },
+        y: { type: 'number' },
+        time: { type: 'number', description: 'Anchor to a moment (seconds)' },
+        resolved: { type: 'boolean' },
+        includeResolved: { type: 'boolean' },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'pinepaper_provenance',
+    annotations: {
+      title: 'Provenance', readOnlyHint: true, destructiveHint: false,
+      idempotentHint: true, openWorldHint: false,
+    },
+    description: `Where an item came from and what depends on it.
+
+ACTIONS:
+- get: Who created and last touched this item (human vs agent), and when. Params: itemId
+- lineage: Walk back to the roots — the chain of imports/derivations that produced it. Params: itemId
+- dependents: What breaks if you delete it. Params: itemId — check this BEFORE removing something
+  other items were built from.
+- record: Note that this item derives from a source. Params: itemId, kind, sourceRef, meta`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['get', 'lineage', 'dependents', 'record'] },
+        itemId: { type: 'string' },
+        kind: { type: 'string', description: 'Lineage kind, e.g. traced | imported | derived' },
+        sourceRef: { type: 'string', description: 'What it came from (item id, asset id, URL)' },
+        meta: { type: 'object' },
+      },
+      required: ['action', 'itemId'],
+    },
+  },
+  {
+    name: 'pinepaper_scene_diff',
+    annotations: {
+      title: 'Scene Diff', readOnlyHint: true, destructiveHint: false,
+      idempotentHint: true, openWorldHint: false,
+    },
+    description: `What changed between two states of the scene — added, removed and modified items.
+
+ACTIONS:
+- history: Compare two undo states. Params: indexA, indexB (see pinepaper_history get_state for the range)
+- version: Compare the LIVE scene against a saved version. Params: versionId
+
+Use this to check your own work: snapshot the history index before a batch, run it, then diff to
+confirm the calls produced the scene you intended rather than assuming a success result means the
+graph is right. Also the safe way to preview a destructive change — diff first, then decide.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['history', 'version'] },
+        indexA: { type: 'number' },
+        indexB: { type: 'number' },
+        versionId: { type: 'string' },
       },
       required: ['action'],
     },

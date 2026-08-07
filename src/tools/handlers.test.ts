@@ -88,8 +88,13 @@ describe('handleToolCall', () => {
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
-      expect(text).toContain("app.getItemById('item_5')");
-      expect(text).toContain('item.remove()');
+      // Deletion goes through the engine facade. The old expectations pinned a
+      // hand-rolled removal that called `app.itemRegistry.remove(...)` — a
+      // method that does not exist — so the registry row outlived the item.
+      expect(text).toContain("app.deleteItem('item_5')");
+      // Comment lines stripped — the emitted source names the old bug in prose.
+      const executable = text.split('\n').filter((l) => !l.trim().startsWith('//')).join('\n');
+      expect(executable).not.toContain('itemRegistry.remove');
     });
   });
 

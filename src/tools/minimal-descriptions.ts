@@ -171,8 +171,16 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
 
   // --- Selection, Transform & History ---
   pinepaper_selection: 'Manage selection. action: select|select_all|deselect_all|get|delete_selected. itemIds, mode: replace|add|remove.',
-  pinepaper_transform: 'Transform items. action: nudge|flip|reorder. dx,dy. direction: horizontal|vertical. order: bringToFront|sendToBack|moveUp|moveDown.',
+  // The "call this after uploading a video" hint lives in the full and compact
+  // tiers; minimal is for token-starved clients and has a hard 200-char cap.
+  pinepaper_transform: 'Transform items. action: fit|nudge|flip|reorder. fit: mode contain|cover, scales+centres to the export frame. dx,dy. direction: horizontal|vertical. order: bringToFront|sendToBack|moveUp|moveDown.',
   pinepaper_history: 'Undo/redo. action: undo|redo|get_state.',
+  pinepaper_brand_kit: 'Apply brand colours by role. action: plan (dry run + contrast audit)|apply. kit: {name, colors:{primary,secondary?,accent?,background?,text?}, fonts?}. Only name+colors.primary required.',
+  pinepaper_component: 'Reusable master + instances, per-instance overrides. action: define|list|instantiate|set_override|sync|update_from_instance|detach. {itemIds?, componentId?, instanceId?, componentKey?, prop?, value?}',
+  pinepaper_artboard: 'Resize the artboard and control reflow. action: list_presets|set|set_constraints. {preset? | width+height, itemId?, horizontal?, vertical?}',
+  pinepaper_comment: 'Notes pinned to an item, a point and/or a time. action: add|list|resolve|delete. add needs text + at least one anchor. {text?, itemId?, x?, y?, time?, id?}',
+  pinepaper_provenance: 'Where an item came from, what depends on it. action: get|lineage|dependents|record. {itemId, kind?, sourceRef?}',
+  pinepaper_scene_diff: 'What changed between two scene states. action: history {indexA,indexB}|version {versionId}. Use it to verify a batch produced the scene you intended.',
 
   // --- Image Processing ---
   pinepaper_image_filter: 'GPU image filters. action: apply|chain. itemId, filterName, params, filters[].',

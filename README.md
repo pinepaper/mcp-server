@@ -17,7 +17,7 @@
 
 PinePaper MCP Server enables AI assistants to create and animate graphics in [PinePaper Studio](https://pinepaper.studio) via the Model Context Protocol (MCP). Works with any AI that supports MCP tool calling (Claude, GPT, Gemini, local models, etc.).
 
-The server exposes **121 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
+The server exposes **127 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
 
 - Create text, shapes, geometry, and complex graphics
 - Animate items with behavior-driven **relations** rather than keyframes
@@ -156,7 +156,7 @@ The same code an agent generates is the code you can paste — the canvas is you
 
 ## Toolkits & Token Budget
 
-121 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
+127 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
 
 **Toolkit profiles** (`PINEPAPER_TOOLKIT`):
 
@@ -361,7 +361,7 @@ Generate instruction/code pairs for LLM fine-tuning:
 
 ## Tools Reference
 
-All 121 tools, grouped by the tag used for toolkit filtering.
+All 127 tools, grouped by the tag used for toolkit filtering.
 
 ### Canvas (`canvas`)
 | Tool | Description |
@@ -460,8 +460,14 @@ All 121 tools, grouped by the tag used for toolkit filtering.
 | Tool | Description |
 |------|-------------|
 | `pinepaper_selection` | Selection management |
-| `pinepaper_transform` | Transform items |
+| `pinepaper_transform` | Transform items — fit to frame, nudge, flip, reorder |
 | `pinepaper_history` | Undo / redo |
+| `pinepaper_brand_kit` | Apply brand colours / fonts by role, with a contrast audit |
+| `pinepaper_component` | Reusable master + instances, with per-instance overrides |
+| `pinepaper_artboard` | Resize the artboard; per-item reflow constraints |
+| `pinepaper_comment` | Notes pinned to an item, a point and/or a moment |
+| `pinepaper_provenance` | Where an item came from; what depends on it |
+| `pinepaper_scene_diff` | What changed between two scene states |
 
 ### Image Processing (`image_processing`)
 | Tool | Description |

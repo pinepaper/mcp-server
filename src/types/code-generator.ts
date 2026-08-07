@@ -151,6 +151,12 @@ import {
   // New consolidated tool types
   SelectionInput,
   TransformInput,
+  BrandKitInput,
+  ComponentInput,
+  ArtboardInput,
+  CommentInput,
+  ProvenanceInput,
+  SceneDiffInput,
   HistoryInput,
   ImageFilterInput,
   LassoInput,
@@ -416,16 +422,28 @@ app.historyManager.saveState();
 function generateDeleteItemCode(itemId: string): string {
   return `
 // Delete item ${itemId}
-const item = app.getItemById('${itemId}');
-if (!item) {
-  throw new Error('Item not found: ${itemId}');
-}
-item.remove();
-app.itemRegistry.remove('${itemId}');
-app.historyManager.saveState();
-
-// Return success
-({ success: true, itemId: '${itemId}' });
+//
+// Delegate to app.deleteItem rather than hand-rolling the removal. The old
+// inline version called \`app.itemRegistry.remove(...)\`, which does not exist —
+// the method is \`unregister\` — so the Paper item left the canvas while its
+// REGISTRY ROW SURVIVED, pointing at a detached object. The scene then reported
+// nodes that were not on screen, agents could still address them, and relations
+// to them looked alive. It also skipped the identity-keyed trackers
+// (animatedItems / keyframeItems / selectedItems), so a deleted item that was
+// animating kept being ticked every frame.
+//
+// app.deleteItem does all of that, plus the redraw, the history snapshot and
+// the collaboration mutation event, and it resolves any ref form.
+(function () {
+  if (typeof app.deleteItem !== 'function') {
+    return { success: false, error: 'app.deleteItem unavailable — update FxTool' };
+  }
+  const ok = app.deleteItem('${itemId}');
+  if (!ok) {
+    return { success: false, error: 'Item not found: ${itemId}' };
+  }
+  return { success: true, itemId: '${itemId}' };
+})();
 `.trim();
 }
 
@@ -487,7 +505,11 @@ const relations = app.getRelations('${itemId}', ${typeArg});
 // Format results
 const formatted = relations.map(r => ({
   sourceId: r.sourceId || '${itemId}',
-  targetId: r.targetId,
+  // RelationRegistry.getAssociations returns { relation, target, params } —
+  // there is no \`targetId\` on it. Reading the wrong field made EVERY edge come
+  // back with an undefined destination, so the graph was unreadable through
+  // this tool even though it was wired correctly on the canvas.
+  targetId: r.target ?? r.targetId ?? null,
   relationType: r.relation || r.type,
   params: r.params || {}
 }));
@@ -504,7 +526,10 @@ const results = app.queryByRelationTarget('${itemId}', ${typeArg});
 const relations = results.map(r => ({
   sourceId: r.itemId,
   targetId: '${itemId}',
-  relationType: '${relationType || 'unknown'}',
+  // queryByTarget returns the real relation name on each result. Hardcoding
+  // the filter string labelled every edge 'unknown' on an unfiltered query —
+  // which is exactly the query you make when exploring an unfamiliar graph.
+  relationType: r.relation || ${relationType ? `'${relationType}'` : "'unknown'"},
   params: r.params || {}
 }));
 
@@ -3893,12 +3918,20 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
     const relations = [];
     const decorative = [];
 
-    // Collect items from registry
-    if (app.itemRegistry) {
-      for (const [id, item] of app.itemRegistry.entries()) {
+    // Collect items from registry.
+    //
+    // ItemRegistry exposes get/getAll — never \`entries()\`. Iterating a
+    // non-existent method threw on EVERY call, so this tool has never once
+    // returned a scene. getAll() yields registry ENTRIES
+    // ({ itemId, item, type, properties }), not bare Paper items, so the
+    // geometry has to be read off entry.item.
+    if (app.itemRegistry && typeof app.itemRegistry.getAll === 'function') {
+      for (const entry of app.itemRegistry.getAll()) {
+        const item = entry.item;
+        if (!item) continue;
         const itemData = {
-          id: id,
-          type: item.data?.type || item.className?.toLowerCase() || 'unknown',
+          id: entry.itemId,
+          type: entry.type || item.data?.type || item.className?.toLowerCase() || 'unknown',
           position: item.position ? { x: item.position.x, y: item.position.y } : null,
           bounds: item.bounds ? {
             x: item.bounds.x,
@@ -3916,6 +3949,30 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
         if (item.opacity !== undefined) itemData.properties.opacity = item.opacity;
         if (item.rotation) itemData.properties.rotation = item.rotation;
         if (item.data?.content) itemData.properties.content = item.data.content;
+        if (item.visible === false) itemData.properties.visible = false;
+
+        // THE SECOND TIMELINE. A video/audio item carries its own clip window
+        // (media-time in/out) plus where that window sits on the project
+        // timeline. Without it a consumer sees "there is a video here" and has
+        // no idea which 5 seconds of it play, or when.
+        const p = entry.properties || {};
+        if (p.inPoint !== undefined || p.outPoint !== undefined || p.clipStartTime !== undefined) {
+          itemData.clip = {
+            clipStartTime: p.clipStartTime ?? 0,   // project-timeline start, s
+            inPoint: p.inPoint ?? 0,               // media-time in, s
+            outPoint: p.outPoint ?? null           // media-time out, s
+          };
+        }
+
+        // When this item is on screen at all, merged across keyframe clip
+        // window / loop / mask / relation windows / effects / media clip.
+        // null end = open-ended. Static items report null.
+        if (typeof app.activeWindowOf === 'function') {
+          try {
+            const w = app.activeWindowOf(entry.itemId);
+            if (w) itemData.activeWindow = w;
+          } catch (_) { /* non-fatal — an item without a window is just static */ }
+        }
 
         if (item.data?.isDecorative) {
           decorative.push(itemData);
@@ -3925,14 +3982,19 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
       }
     }
 
-    // Collect relations
-    if (app.getRelations) {
-      const activeRelations = app.getRelations();
-      for (const rel of activeRelations) {
+    // Collect relations — the EDGE LIST, which with the items above is the
+    // scene DAG.
+    //
+    // \`app.getRelations()\` takes an itemId; called bare it returns [], so the
+    // old code emitted an empty edge list for every scene. exportForSave() is
+    // the canonical whole-graph dump (the same one history persistence uses)
+    // and returns { fromId, toId, relation, params }.
+    if (app.relationRegistry && typeof app.relationRegistry.exportForSave === 'function') {
+      for (const rel of app.relationRegistry.exportForSave()) {
         relations.push({
-          sourceId: rel.sourceId,
-          targetId: rel.targetId,
-          type: rel.type,
+          sourceId: rel.fromId,
+          targetId: rel.toId ?? null,   // null = self-relation, not a missing edge
+          type: rel.relation,
           params: rel.params
         });
       }
@@ -4390,9 +4452,18 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
   generateImportImage(input: ImportImageInput): string {
     const { url, position, maxWidth, maxHeight, mask } = input;
 
-    const positionOpts = position ? `, position: { x: ${position.x}, y: ${position.y} }` : '';
-    const maxWidthOpt = maxWidth !== undefined ? `, maxWidth: ${maxWidth}` : '';
-    const maxHeightOpt = maxHeight !== undefined ? `, maxHeight: ${maxHeight}` : '';
+    // Each fragment used to be written with a LEADING comma, as if it followed
+    // an entry that no longer exists — so the first one opened the object with
+    // `{, position: …}` and the emitted code was a syntax error. Passing any
+    // option at all therefore failed 100% of the time, which is why imported
+    // images could never be positioned, sized or masked. Join instead, so the
+    // separators come from the number of options rather than from each one.
+    const optParts = [
+      position ? `position: { x: ${position.x}, y: ${position.y} }` : '',
+      maxWidth !== undefined ? `maxWidth: ${maxWidth}` : '',
+      maxHeight !== undefined ? `maxHeight: ${maxHeight}` : '',
+    ].filter(Boolean);
+    const optsLiteral = optParts.length ? `{ ${optParts.join(', ')} }` : '{}';
 
     return `
 // Import image from URL
@@ -4402,9 +4473,20 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
   }
   try {
     const entry = await app.imageTools.uploadFromURL('${url}');
-    const opts = {${positionOpts}${maxWidthOpt}${maxHeightOpt} };
+    const opts = ${optsLiteral};
     const raster = await app.imageTools.placeImage(entry.id, Object.keys(opts).length > 0 ? opts : undefined);
-${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    const itemId = raster.data?.itemId || raster.name || raster.id;
+${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    // The REGISTRY id is \`data.id\`. \`data.itemId\` has never existed, so this
+    // fell through to \`raster.id\` — a Paper.js NUMBER — and the handle the tool
+    // returned could not be used as a relation endpoint or with modify/animate.
+    // Register the raster if placeImage somehow left it unregistered, so the
+    // caller always gets a usable id rather than a number that looks like one.
+    let itemId = raster.data?.id;
+    if (!itemId && typeof app.registerItem === 'function') {
+      itemId = app.registerItem(raster, 'image', { source: 'mcp-import' });
+    }
+    if (!itemId) {
+      return { error: 'Image placed but not registered — no usable item id. This is a bug; report the scene.' };
+    }
     return {
       success: true,
       itemId: itemId,
@@ -4701,8 +4783,167 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    const ite
     }
   }
 
+  /**
+   * @private Guard + call one PinePaper facade, uniformly.
+   *
+   * Every one of the 1.6.4 tools wraps a facade that a given editor build may
+   * not have yet — the server ships independently of the app. A missing method
+   * has to come back as a NAMED error, not a TypeError inside runGenerated:
+   * this repo has shipped three emitters that called methods which never
+   * existed (`imageTools.applyFilter`, `itemRegistry.entries`,
+   * `itemRegistry.remove`) and each reported success or an opaque throw.
+   */
+  private _facadeCall(method: string, args: string, label: string): string {
+    return `
+// ${label}
+(async function() {
+  if (typeof app.${method} !== 'function') {
+    return { success: false, error: 'app.${method}() unavailable — update PinePaper Studio to a build that has it.' };
+  }
+  const r = await app.${method}(${args});
+  // Facades report { ok } — normalise to { success } so every tool result reads
+  // the same way, while keeping the original payload intact.
+  if (r && typeof r === 'object' && 'ok' in r) {
+    return { success: r.ok !== false, ...r };
+  }
+  return { success: true, result: r };
+})();`.trim();
+  }
+
+  generateBrandKit(input: BrandKitInput): string {
+    const opts = JSON.stringify({ ...(input.selectionOnly ? { selectionOnly: true } : {}) });
+    const method = input.action === 'plan' ? 'planBrandKit' : 'applyBrandKit';
+    return this._facadeCall(method, `${JSON.stringify(input.kit)}, ${opts}`,
+      `Brand kit: ${input.action}`);
+  }
+
+  generateComponent(input: ComponentInput): string {
+    const ids = JSON.stringify(input.itemIds || []);
+    switch (input.action) {
+      case 'define':
+        // defineComponent takes ITEMS, not ids — resolve through the registry
+        // here so the tool can speak the id space every other tool speaks.
+        return `
+// Component: define
+(function() {
+  if (typeof app.defineComponent !== 'function') {
+    return { success: false, error: 'app.defineComponent() unavailable — update PinePaper Studio.' };
+  }
+  const items = ${ids}.map((id) => app.itemRegistry.get(id)?.item).filter(Boolean);
+  if (!items.length) return { success: false, error: 'no live items for the given ids' };
+  const r = app.defineComponent(items, ${JSON.stringify({ name: input.name })});
+  return { success: r.ok !== false, ...r };
+})();`.trim();
+      case 'list':
+        return this._facadeCall('listComponents', '', 'Component: list');
+      case 'instantiate':
+        return this._facadeCall('instantiateComponent',
+          `${JSON.stringify(input.componentId || '')}, ${JSON.stringify({
+            ...(input.position ? { position: input.position } : {}),
+            ...(input.overrides ? { overrides: input.overrides } : {}),
+          })}`, 'Component: instantiate');
+      case 'set_override':
+        return this._facadeCall('setComponentOverride',
+          `${JSON.stringify(input.instanceId || '')}, ${JSON.stringify(input.componentKey || '')}, ${JSON.stringify(input.prop || '')}, ${JSON.stringify(input.value ?? null)}`,
+          'Component: set override');
+      case 'sync':
+        return this._facadeCall('syncComponent', JSON.stringify(input.componentId || ''), 'Component: sync');
+      case 'update_from_instance':
+        return this._facadeCall('updateComponentFromInstance', JSON.stringify(input.instanceId || ''), 'Component: update from instance');
+      case 'detach':
+        return this._facadeCall('detachComponentInstance', JSON.stringify(input.instanceId || ''), 'Component: detach');
+    }
+  }
+
+  generateArtboard(input: ArtboardInput): string {
+    switch (input.action) {
+      case 'list_presets':
+        return this._facadeCall('listArtboardPresets', '', 'Artboard: list presets');
+      case 'set': {
+        const target = input.preset
+          ? JSON.stringify(input.preset)
+          : JSON.stringify({ width: input.width, height: input.height });
+        return this._facadeCall('setArtboard', target, 'Artboard: set');
+      }
+      case 'set_constraints':
+        return this._facadeCall('setItemConstraints',
+          `${JSON.stringify(input.itemId || '')}, ${JSON.stringify({
+            ...(input.horizontal ? { horizontal: input.horizontal } : {}),
+            ...(input.vertical ? { vertical: input.vertical } : {}),
+          })}`, 'Artboard: set constraints');
+    }
+  }
+
+  generateComment(input: CommentInput): string {
+    switch (input.action) {
+      case 'add':
+        return this._facadeCall('addComment', JSON.stringify({
+          text: input.text,
+          ...(input.author ? { author: input.author } : {}),
+          ...(input.itemId ? { itemId: input.itemId } : {}),
+          ...(input.x !== undefined ? { x: input.x } : {}),
+          ...(input.y !== undefined ? { y: input.y } : {}),
+          ...(input.time !== undefined ? { time: input.time } : {}),
+        }), 'Comment: add');
+      case 'list':
+        return this._facadeCall('listComments', JSON.stringify({
+          ...(input.time !== undefined ? { time: input.time } : {}),
+          ...(input.includeResolved ? { includeResolved: true } : {}),
+        }), 'Comment: list');
+      case 'resolve':
+        return this._facadeCall('resolveComment',
+          `${JSON.stringify(input.id || '')}, ${input.resolved === false ? 'false' : 'true'}`, 'Comment: resolve');
+      case 'delete':
+        return this._facadeCall('deleteComment', JSON.stringify(input.id || ''), 'Comment: delete');
+    }
+  }
+
+  generateProvenance(input: ProvenanceInput): string {
+    const id = JSON.stringify(input.itemId);
+    switch (input.action) {
+      case 'get': return this._facadeCall('getItemProvenance', id, 'Provenance: get');
+      case 'lineage': return this._facadeCall('getLineage', id, 'Provenance: lineage');
+      case 'dependents': return this._facadeCall('getDependents', id, 'Provenance: dependents');
+      case 'record':
+        return this._facadeCall('recordLineage',
+          `${id}, ${JSON.stringify(input.kind || 'derived')}, ${JSON.stringify(input.sourceRef || '')}, ${JSON.stringify(input.meta || {})}`,
+          'Provenance: record lineage');
+    }
+  }
+
+  generateSceneDiff(input: SceneDiffInput): string {
+    if (input.action === 'version') {
+      return this._facadeCall('diffAgainstVersion', JSON.stringify(input.versionId || ''), 'Scene diff: vs version');
+    }
+    return this._facadeCall('diffHistoryStates', `${input.indexA ?? 0}, ${input.indexB ?? 0}`, 'Scene diff: history');
+  }
+
   generateTransform(input: TransformInput): string {
     switch (input.action) {
+      case 'fit': {
+        const mode = input.mode || 'contain';
+        return `
+// Fit item to the export frame (${mode})
+(function() {
+  // Route through the agent facade, not app.fitToFrame directly: an agent that
+  // just called upload_video holds a MEDIA id (vraster_…), which is a different
+  // id space from canvas item ids. PinePaperAgent.fitToFrame resolves either.
+  const A = (typeof window !== 'undefined') && window.PinePaperAgent;
+  if (A && typeof A.fitToFrame === 'function') {
+    const ok = A.fitToFrame(${JSON.stringify(input.itemId || '')}, '${mode}');
+    return ok
+      ? { success: true, action: 'fit', itemId: '${input.itemId}', mode: '${mode}' }
+      : { success: false, error: 'Item not found or not fittable: ${input.itemId}' };
+  }
+  if (typeof app.fitToFrame !== 'function') {
+    return { success: false, error: 'fitToFrame unavailable — update FxTool' };
+  }
+  const ok = app.fitToFrame(${JSON.stringify(input.itemId || '')}, '${mode}');
+  return ok
+    ? { success: true, action: 'fit', itemId: '${input.itemId}', mode: '${mode}' }
+    : { success: false, error: 'Item not found: ${input.itemId}' };
+})();`.trim();
+      }
       case 'nudge': {
         const dx = input.dx ?? 0;
         const dy = input.dy ?? 0;

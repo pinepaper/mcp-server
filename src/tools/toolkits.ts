@@ -129,6 +129,20 @@ export const TOOL_TAGS: Record<string, string[]> = {
   ],
   history: [
     'pinepaper_history',
+    // Diffing is a history question — "what changed between these two states".
+    'pinepaper_scene_diff',
+  ],
+  // Design-system surface (1.6.4): reusable styling, reusable structure, and
+  // retargeting a finished design to another frame.
+  design_system: [
+    'pinepaper_brand_kit',
+    'pinepaper_component',
+    'pinepaper_artboard',
+  ],
+  // Review surface (1.6.4): anchored feedback, and where things came from.
+  review: [
+    'pinepaper_comment',
+    'pinepaper_provenance',
   ],
   image_processing: [
     'pinepaper_image_filter',
