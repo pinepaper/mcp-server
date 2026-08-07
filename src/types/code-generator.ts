@@ -157,6 +157,8 @@ import {
   CommentInput,
   ProvenanceInput,
   SceneDiffInput,
+  AudioBeatsInput,
+  TemplateParamsInput,
   HistoryInput,
   ImageFilterInput,
   LassoInput,
@@ -1302,20 +1304,41 @@ export class PinePaperCodeGenerator {
     svgString?: string,
     url?: string,
     position: { x: number; y: number } = { x: 400, y: 300 },
-    scale: number = 1.0
+    scale: number = 1.0,
+    source?: 'generic' | 'figma'
   ): string {
+    // Figma is an OPTION on this tool rather than a tool of its own: it is the
+    // same import with a normalisation pass in front, and the tool count is
+    // already the thing the consolidation backlog objects to.
+    //
+    // The pass is not cosmetic. Figma's "Copy as SVG" carries a root
+    // fill="none" that INHERITS (everything renders invisible — the classic "I
+    // pasted my icon and got nothing"), frequently no viewBox, and global ids
+    // like `clip0` that make a second import silently adopt the first one's
+    // clipPath.
+    const importExpr = (varName: string) => source === 'figma'
+      ? `(function () {
+  if (typeof app.importFigmaSVG !== 'function') {
+    return { item: app.importSVG(${varName}), changes: ['figma normalisation unavailable — update PinePaper Studio'] };
+  }
+  const r = app.importFigmaSVG(${varName});
+  return { item: r.item || null, changes: r.changes || [] };
+})()`
+      : `{ item: app.importSVG(${varName}), changes: [] }`;
+
     if (url) {
       return `
-// Import SVG from URL
+// Import SVG from URL${source === 'figma' ? ' (Figma-normalised)' : ''}
 const response = await fetch('${url}');
 const svgText = await response.text();
-const imported = app.importSVG(svgText);
+const _r = ${importExpr('svgText')};
+const imported = _r.item;
 if (imported) {
   imported.position = new paper.Point(${position.x}, ${position.y});
   imported.scale(${scale});
   const itemId = app.registerItem(imported, 'svg-import', { source: 'mcp' });
   app.historyManager.saveState();
-  ({ success: true, itemId, position: { x: ${position.x}, y: ${position.y} } });
+  ({ success: true, itemId, changes: _r.changes, position: { x: ${position.x}, y: ${position.y} } });
 } else {
   throw new Error('Failed to import SVG from URL');
 }
@@ -1326,15 +1349,16 @@ if (imported) {
       // Escape the SVG string for embedding in code
       const escapedSvg = svgString.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
       return `
-// Import SVG string
+// Import SVG string${source === 'figma' ? ' (Figma-normalised)' : ''}
 const svgString = \`${escapedSvg}\`;
-const imported = app.importSVG(svgString);
+const _r = ${importExpr('svgString')};
+const imported = _r.item;
 if (imported) {
   imported.position = new paper.Point(${position.x}, ${position.y});
   imported.scale(${scale});
   const itemId = app.registerItem(imported, 'svg-import', { source: 'mcp' });
   app.historyManager.saveState();
-  ({ success: true, itemId, position: { x: ${position.x}, y: ${position.y} } });
+  ({ success: true, itemId, changes: _r.changes, position: { x: ${position.x}, y: ${position.y} } });
 } else {
   throw new Error('Failed to import SVG');
 }
@@ -4909,6 +4933,36 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    // The RE
           `${id}, ${JSON.stringify(input.kind || 'derived')}, ${JSON.stringify(input.sourceRef || '')}, ${JSON.stringify(input.meta || {})}`,
           'Provenance: record lineage');
     }
+  }
+
+  generateAudioBeats(input: AudioBeatsInput): string {
+    if (input.action === 'analyze') {
+      return this._facadeCall('analyzeAudio',
+        `${JSON.stringify(input.source || '')}, ${JSON.stringify({
+          ...(input.sensitivity !== undefined ? { sensitivity: input.sensitivity } : {}),
+          ...(input.minGap !== undefined ? { minGap: input.minGap } : {}),
+        })}`, 'Audio: analyze beats');
+    }
+    return this._facadeCall('animateToBeat',
+      `${JSON.stringify(input.itemId || '')}, ${JSON.stringify({
+        ...(input.source ? { source: input.source } : {}),
+        ...(input.beats ? { beats: input.beats } : {}),
+        ...(input.grid ? { grid: true } : {}),
+        ...(input.property ? { property: input.property } : {}),
+        ...(input.base !== undefined ? { base: input.base } : {}),
+        ...(input.accent !== undefined ? { accent: input.accent } : {}),
+        ...(input.decay !== undefined ? { decay: input.decay } : {}),
+        ...(input.sensitivity !== undefined ? { sensitivity: input.sensitivity } : {}),
+      })}`, 'Audio: animate to beat');
+  }
+
+  generateTemplateParams(input: TemplateParamsInput): string {
+    if (input.action === 'get') {
+      return this._facadeCall('getTemplateParams', JSON.stringify(input.templateId), 'Template params: get');
+    }
+    return this._facadeCall('applyTemplateWithParams',
+      `${JSON.stringify(input.templateId)}, ${JSON.stringify(input.params || {})}`,
+      'Template params: apply');
   }
 
   generateSceneDiff(input: SceneDiffInput): string {

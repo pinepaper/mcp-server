@@ -61,6 +61,9 @@ export const TOOL_TAGS: Record<string, string[]> = {
   ],
   media: [
     'pinepaper_media',
+    // Beat detection is a media question, and animate_to_beat is the reason
+    // anyone uploads audio in the first place.
+    'pinepaper_audio_beats',
   ],
   rigging: [
     'pinepaper_rigging',
@@ -178,6 +181,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
   ],
   template: [
     'pinepaper_apply_template',
+    'pinepaper_template_params',
   ],
 
   // --- Query & export ---
@@ -281,6 +285,7 @@ export const TOOLKIT_PROFILES: Record<ToolkitProfile, string[]> = {
     'deform', 'sprite', 'interaction', 'rigging',
     'dataviz', 'magic', 'physics', 'measurement',
     'query', 'export',
+    'design_system', 'review',
     'p5', 'ontology', 'guide',
   ],
 

@@ -37,7 +37,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_delete_item: 'Remove item by itemId.',
   pinepaper_create_glossy_sphere: 'Create a 3D-looking glossy sphere with lighting.',
   pinepaper_create_diagonal_stripes: 'Create a diagonal stripe pattern.',
-  pinepaper_import_svg: 'Import SVG markup onto the canvas.',
+  pinepaper_import_svg: "Import SVG markup or a URL. source:'figma' normalises Figma Copy-as-SVG first (root fill=none makes everything invisible; missing viewBox; global ids like clip0 collide across imports).",
   pinepaper_import_mermaid: 'Import a Mermaid diagram (flowchart|graph|stateDiagram|sequenceDiagram|erDiagram|classDiagram). mermaidText, autoLayout, clearExisting.',
   pinepaper_import_image: 'Import a raster image (PNG/JPG/WebP) onto the canvas.',
   pinepaper_search_assets: 'Search 850k+ SVG icons from SVGRepo, Iconify, FontAwesome, OpenClipart.',
@@ -180,6 +180,8 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_artboard: 'Resize the artboard and control reflow. action: list_presets|set|set_constraints. {preset? | width+height, itemId?, horizontal?, vertical?}',
   pinepaper_comment: 'Notes pinned to an item, a point and/or a time. action: add|list|resolve|delete. add needs text + at least one anchor. {text?, itemId?, x?, y?, time?, id?}',
   pinepaper_provenance: 'Where an item came from, what depends on it. action: get|lineage|dependents|record. {itemId, kind?, sourceRef?}',
+  pinepaper_audio_beats: 'Beat detection + bake to keyframes. action: analyze {source} | animate_to_beat {itemId, source|beats[], grid?, property?, base?, accent?, decay?}.',
+  pinepaper_template_params: 'Templates with typed inputs. action: get {templateId} (discover params) | apply {templateId, params}. Values are coerced + range-checked.',
   pinepaper_scene_diff: 'What changed between two scene states. action: history {indexA,indexB}|version {versionId}. Use it to verify a batch produced the scene you intended.',
 
   // --- Image Processing ---

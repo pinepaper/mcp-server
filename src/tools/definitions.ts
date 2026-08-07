@@ -3504,6 +3504,70 @@ graph is right. Also the safe way to preview a destructive change — diff first
     },
   },
   {
+    name: 'pinepaper_audio_beats',
+    annotations: {
+      title: 'Audio Beats', readOnlyHint: false, destructiveHint: false,
+      idempotentHint: false, openWorldHint: false,
+    },
+    description: `Detect beats in audio and bake an item's animation onto them.
+
+ACTIONS:
+- analyze: Onsets, BPM, confidence and duration. Params: source (asset id, data URL or URL),
+  sensitivity, minGap. Read-only — run it first to see what the track gives you.
+- animate_to_beat: Write a keyframe track that pulses on the beat. Params: itemId, plus EITHER
+  source (analyze first) OR beats[] (times you already have). grid:true uses an even pulse from the
+  detected tempo instead of the raw onsets — the difference between following the rhythm and
+  following the beat. property (default scale), base, accent, decay shape the hit.
+
+Analysis runs ONCE and produces keyframes, deliberately not a live analyser: a keyframe track
+survives MP4, SVG/SMIL and Lottie export, and gives the same answer on every run. A live analyser
+node survives none of them.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['analyze', 'animate_to_beat'] },
+        source: { type: 'string', description: 'Asset id, data URL, or URL' },
+        itemId: { type: 'string' },
+        beats: { type: 'array', items: { type: 'number' }, description: 'Beat times (s) you already have' },
+        grid: { type: 'boolean', description: 'Even pulse from the tempo instead of raw onsets' },
+        property: { type: 'string', description: 'Property to pulse (default scale)' },
+        base: { type: 'number' },
+        accent: { type: 'number' },
+        decay: { type: 'number' },
+        sensitivity: { type: 'number', description: 'Lower it if no beats are detected' },
+        minGap: { type: 'number', description: 'Minimum seconds between onsets' },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'pinepaper_template_params',
+    annotations: {
+      title: 'Template Params', readOnlyHint: false, destructiveHint: false,
+      idempotentHint: true, openWorldHint: false,
+    },
+    description: `Templates that take typed inputs — the same scene rebuilt for your text and colours.
+
+ACTIONS:
+- get: The template's declared params with their defaults, types and ranges. Params: templateId.
+  Call this first to discover what a template will accept; most templates declare none.
+- apply: Load the template with your values. Params: templateId, params
+
+Values are COERCED to their declared type and range-checked, and anything uncoercible falls back to
+the default with a warning rather than reaching the template — so a number param cannot arrive as the
+string "5" and silently produce "55" instead of 10. The same declaration drives the editor panel and
+this tool, so a control cannot exist that an agent cannot set.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['get', 'apply'] },
+        templateId: { type: 'string' },
+        params: { type: 'object', description: 'key → value, coerced to the declared types' },
+      },
+      required: ['action', 'templateId'],
+    },
+  },
+  {
     name: 'pinepaper_history',
     annotations: {
       title: 'History',

@@ -348,6 +348,14 @@
       "description": "What changed between two states of the scene — added, removed and modified items."
     },
     {
+      "name": "pinepaper_audio_beats",
+      "description": "Detect beats in audio and bake an item's animation onto them."
+    },
+    {
+      "name": "pinepaper_template_params",
+      "description": "Templates that take typed inputs — the same scene rebuilt for your text and colours."
+    },
+    {
       "name": "pinepaper_history",
       "description": "Undo/redo. action: undo|redo|get_state."
     },

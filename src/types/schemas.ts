@@ -1026,6 +1026,8 @@ export const ImportSVGInputSchema = z.object({
   url: z.string().optional().describe('URL to fetch SVG from'),
   position: PositionSchema.optional().default({ x: 400, y: 300 }),
   scale: z.number().optional().default(1.0).describe('Scale factor'),
+  source: z.enum(['generic', 'figma']).optional()
+    .describe("'figma' normalises Figma's Copy-as-SVG output first: strips the inherited root fill=\"none\" that makes everything invisible, adds a missing viewBox, and namespaces global ids like clip0 so a second import does not adopt the first one's clipPath"),
 });
 
 // Import Mermaid (flowchart, stateDiagram, sequenceDiagram, erDiagram, classDiagram)
@@ -2938,6 +2940,30 @@ export const SceneDiffInputSchema = z.object({
   versionId: z.string().optional(),
 });
 export type SceneDiffInput = z.infer<typeof SceneDiffInputSchema>;
+
+export const AudioBeatsInputSchema = z.object({
+  action: z.enum(['analyze', 'animate_to_beat']),
+  /** Asset id, data URL or URL. Required for analyze; optional if beats are supplied. */
+  source: z.string().optional(),
+  itemId: z.string().optional(),
+  beats: z.array(z.number()).optional(),
+  /** Even pulse from the detected tempo instead of the raw onsets. */
+  grid: z.boolean().optional(),
+  property: z.string().optional(),
+  base: z.number().optional(),
+  accent: z.number().optional(),
+  decay: z.number().optional(),
+  sensitivity: z.number().optional(),
+  minGap: z.number().optional(),
+});
+export type AudioBeatsInput = z.infer<typeof AudioBeatsInputSchema>;
+
+export const TemplateParamsInputSchema = z.object({
+  action: z.enum(['get', 'apply']),
+  templateId: z.string(),
+  params: z.record(z.string(), z.unknown()).optional(),
+});
+export type TemplateParamsInput = z.infer<typeof TemplateParamsInputSchema>;
 
 export const HistoryInputSchema = z.object({
   action: z.enum(['undo', 'redo', 'get_state']),

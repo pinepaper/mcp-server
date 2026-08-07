@@ -47,6 +47,8 @@ import {
   CommentInputSchema,
   ProvenanceInputSchema,
   SceneDiffInputSchema,
+  AudioBeatsInputSchema,
+  TemplateParamsInputSchema,
   CropImageInputSchema,
   ChromaKeyInputSchema,
   RiggingInputSchema,
@@ -1170,6 +1172,18 @@ async function handleToolCallInner(
         return executeOrGenerate(code, `Scene diff: ${input.action}`, options, 'pinepaper_scene_diff');
       }
 
+      case 'pinepaper_audio_beats': {
+        const input = AudioBeatsInputSchema.parse(args);
+        const code = codeGenerator.generateAudioBeats(input);
+        return executeOrGenerate(code, `Audio: ${input.action}`, options, 'pinepaper_audio_beats');
+      }
+
+      case 'pinepaper_template_params': {
+        const input = TemplateParamsInputSchema.parse(args);
+        const code = codeGenerator.generateTemplateParams(input);
+        return executeOrGenerate(code, `Template params: ${input.action}`, options, 'pinepaper_template_params');
+      }
+
       case 'pinepaper_crop_image': {
         const input = CropImageInputSchema.parse(args);
         const code = codeGenerator.generateCropImage(input);
@@ -1492,7 +1506,8 @@ You can now start creating new items on a clean canvas.`,
           input.svgString,
           input.url,
           input.position,
-          input.scale
+          input.scale,
+          input.source
         );
         const description = 'Imports SVG onto the canvas';
         return executeOrGenerate(code, description, options, 'pinepaper_import_svg');
