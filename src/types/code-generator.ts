@@ -2672,7 +2672,7 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
    */
   generateAgentExport(input: AgentExportInput): string {
     const validated = AgentExportInputSchema.parse(input);
-    const { platform, format, quality, framing, duration } = validated;
+    const { platform, format, quality, framing, duration, estimateOnly } = validated;
     const qualityLevel = quality || 'standard';
     const videoDuration = duration ?? 5;
 
@@ -2710,6 +2710,33 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
   const framing = '${framing}';
   const settings = ${JSON.stringify(qualitySettings)};
   const dimensions = ${JSON.stringify({ width: preset.width, height: preset.height })};
+
+  // Preflight: same resolved settings as the real export, but render nothing.
+  // Branching HERE rather than in a separate tool is deliberate — the estimate
+  // has to see the same platform dimensions, fps and quality the export would
+  // use, and a parallel tool would re-derive them and drift.
+  if (${estimateOnly ? 'true' : 'false'}) {
+    if (typeof app.estimateExportSize !== 'function') {
+      return { success: false, estimateOnly: true, error: 'This PinePaper build has no estimateExportSize() — update the editor to preflight export size.' };
+    }
+    const est = await app.estimateExportSize({
+      format,
+      duration: ${videoDuration},
+      fps: settings.fps,
+      quality,
+      width: dimensions.width,
+      height: dimensions.height,
+    });
+    return {
+      success: true,
+      estimateOnly: true,
+      platform, format, quality,
+      duration: ${videoDuration},
+      fps: settings.fps,
+      dimensions: dimensions.width + 'x' + dimensions.height,
+      estimate: est,
+    };
+  }
 
   // Resolve camera-view framing dims when requested. Reads the first
   // camera_animates keyframe's zoom and divides the canvas dims by it

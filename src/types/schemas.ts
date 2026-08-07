@@ -2136,6 +2136,7 @@ export const AgentExportInputSchema = z.object({
   includeRecommendations: z.boolean().optional().default(true).describe('Include alternative format recommendations'),
   framing: z.enum(['canvas', 'camera']).optional().default('canvas').describe('Output framing: "canvas" (full canvas, default) or "camera" (camera_animates first-keyframe viewport — fails if no walkthrough exists). Camera animation still drives motion within the fixed output frame.'),
   duration: z.number().min(0.5).max(60).optional().default(5).describe(`Video duration in seconds for animated formats (mp4/webm/gif). Default 5. Max 60 for mp4/webm, max ${GIF_MAX_DURATION_S} for gif (GIF is not codec-bounded, so file size scales with frames × dimensions). Static formats (png/svg/pdf) ignore this.`),
+  estimateOnly: z.boolean().optional().default(false).describe('Preflight only: return the estimated file size for these EXACT settings and render nothing. Use before a long or high-quality export to check the size first. Modeled for mp4/webm/gif; png/pdf/svg return confidence "none" because no dimension-based model exists for them.'),
 }).describe('Smart export options')
   .superRefine((val, ctx) => {
     if (val.format === 'gif' && val.duration > GIF_MAX_DURATION_S) {

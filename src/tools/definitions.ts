@@ -6006,7 +6006,8 @@ EXAMPLES:
 - {platform: "instagram"} — auto-selects best format
 - {platform: "instagram", format: "mp4"} — force MP4
 - {platform: "web", format: "svg"} — animated SVG
-- {platform: "youtube", format: "mp4", framing: "camera"} — render only what the camera frames during the walkthrough`,
+- {platform: "youtube", format: "mp4", framing: "camera"} — render only what the camera frames during the walkthrough
+- {platform: "youtube", format: "mp4", duration: 30, estimateOnly: true} — how big would that be? (renders nothing)`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -6029,6 +6030,10 @@ EXAMPLES:
           type: 'string',
           enum: ['canvas', 'camera'],
           description: 'Output framing. "canvas" (default) renders the full canvas. "camera" renders only the first-keyframe viewport of a camera_animates walkthrough — video formats only.',
+        },
+        estimateOnly: {
+          type: 'boolean',
+          description: 'Preflight only — return the estimated file size for these exact settings and render nothing. Modeled for mp4/webm/gif; png/pdf/svg report confidence "none" (no dimension-based model exists for them).',
         },
         duration: {
           type: 'number',

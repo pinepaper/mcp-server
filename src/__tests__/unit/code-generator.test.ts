@@ -623,6 +623,42 @@ describe('PinePaperCodeGenerator', () => {
     });
   });
 
+  describe('generateAgentExport — estimateOnly', () => {
+    // The preflight branch is emitted as a literal `if (true)` / `if (false)`
+    // so the generated code has no runtime flag to get wrong. These guard the
+    // flip itself: an inverted condition would silently render a 30s encode
+    // for an agent that only asked how big it would be.
+    it('emits a live estimate branch and no export when estimateOnly is set', () => {
+      const code = codeGenerator.generateAgentExport({
+        platform: 'youtube', format: 'mp4', duration: 30, quality: 'high', estimateOnly: true,
+      });
+      expect(code).toContain('app.estimateExportSize(');
+      expect(code).toContain('if (true) {');
+      expect(code).not.toContain('if (false) {');
+    });
+
+    it('leaves the branch dead by default, so normal exports are untouched', () => {
+      const code = codeGenerator.generateAgentExport({
+        platform: 'youtube', format: 'mp4', duration: 30, quality: 'high',
+      });
+      expect(code).toContain('if (false) {');
+      expect(code).not.toContain('if (true) {');
+    });
+
+    it('estimates the RESOLVED settings, not the raw input', () => {
+      // youtube -> 1920x1080 and quality "high" -> 60 fps are resolved by the
+      // generator. The estimate has to see those, or it predicts a different
+      // export than the one it is standing in for.
+      const code = codeGenerator.generateAgentExport({
+        platform: 'youtube', format: 'mp4', duration: 30, quality: 'high', estimateOnly: true,
+      });
+      expect(code).toContain('width: dimensions.width');
+      expect(code).toContain('fps: settings.fps');
+      expect(code).toContain('"width":1920');
+      expect(code).toContain('"fps":60');
+    });
+  });
+
   describe('generateAgentExport — framing', () => {
     it('emits framing="canvas" by default', () => {
       const code = codeGenerator.generateAgentExport({
