@@ -1773,11 +1773,34 @@ NOTES:
 - URL-based: the URL is fetched in the browser, so it must be reachable + CORS-permitted.
 - Use the returned id with set_playback_rate / set_clip / remove, and (for video) modify/animate it like any item.
 
+VIDEO EDITING:
+- set_time_remap: { id, remapTrack: [{time, value, easing?}, …] | null } — canvas-time → SOURCE-time curve: speed ramps, freeze frames, reverse. null restores 1:1.
+- speed_ramp: { id, segments: [{duration, speed}, …] } — the human way to say a remap. speed 0 freezes, negative reverses.
+- match_cut: { fromItemId, toItemId, subject? (detect|bounds), label?, at?, settle?, fade?, consent? } — cut between two shots with the SUBJECT aligned across the cut (on-device detection; first use returns {needsConsent, cost} until consent: true).
+- apply_track_matte: { id, matteItemId, channel? (luma|alpha|red), invert?, strength?, hideMatte?, live? } — the matte item's pixels drive the target's alpha. The classic: a headline filled with footage. live: true keeps the cut tracking an ANIMATING matte (kinetic mask reveal); otherwise it bakes once, destructively (recorded in data.filterChain for round-trip).
+- stop_live_matte: { id } — stop a live matte, keep the last cut.
+
 EXAMPLE: { action: 'upload_video', url: 'https://…/clip.mp4', scale: 0.5, timeOffset: 1 }`,
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['upload_video', 'upload_audio', 'list', 'remove', 'set_playback_rate', 'set_clip'], description: "Media action" },
+        action: { type: 'string', enum: ['upload_video', 'upload_audio', 'list', 'remove', 'set_playback_rate', 'set_clip', 'set_time_remap', 'speed_ramp', 'match_cut', 'apply_track_matte', 'stop_live_matte'], description: "Media action" },
+        remapTrack: { type: 'array', items: { type: 'object', properties: { time: { type: 'number' }, value: { type: 'number' }, easing: { type: 'string' } }, required: ['time', 'value'] }, description: 'set_time_remap: canvas-seconds → source-seconds curve (≥2 points). null clears the remap.' },
+        segments: { type: 'array', items: { type: 'object', properties: { duration: { type: 'number' }, speed: { type: 'number' } }, required: ['duration', 'speed'] }, description: 'speed_ramp: consecutive {duration, speed} segments. speed 0 = freeze frame, negative = reverse.' },
+        fromItemId: { type: 'string', description: 'match_cut: outgoing shot item id.' },
+        toItemId: { type: 'string', description: 'match_cut: incoming shot item id.' },
+        subject: { type: 'string', enum: ['detect', 'bounds'], description: "match_cut: subject source — 'detect' (on-device DETR, needs consent on first use) or 'bounds'." },
+        label: { type: 'string', description: 'match_cut: narrow detection to one class ("person") when the biggest object is not the subject.' },
+        at: { type: 'number', description: 'match_cut: cut time in seconds (default 0).' },
+        settle: { type: 'number', description: 'match_cut: seconds to relax to natural framing (default 0.8).' },
+        fade: { type: 'number', description: 'match_cut: crossfade seconds; 0 = hard cut (default 0.12).' },
+        consent: { type: 'boolean', description: 'match_cut: allow the detection model download (a first run without it returns needsConsent instead of downloading silently).' },
+        matteItemId: { type: 'string', description: 'apply_track_matte: the item whose pixels drive the alpha — a headline, a gradient, any raster or vector.' },
+        channel: { type: 'string', enum: ['luma', 'alpha', 'red'], description: 'apply_track_matte: matte channel (default luma).' },
+        invert: { type: 'boolean', description: 'apply_track_matte: invert the matte.' },
+        strength: { type: 'number', description: 'apply_track_matte: 0–1.' },
+        hideMatte: { type: 'boolean', description: 'apply_track_matte: hide the matte item after applying.' },
+        live: { type: 'boolean', description: 'apply_track_matte: keep re-cutting as the matte moves/animates — the kinetic mask reveal. Omitted = bake once, destructively.' },
         url: { type: 'string', description: 'Media URL — required for upload_video / upload_audio.' },
         id: { type: 'string', description: 'Media id — required for remove / set_playback_rate / set_clip.' },
         rate: { type: 'number', description: 'Playback rate 0.25–4 — set_playback_rate.' },
@@ -1796,6 +1819,40 @@ EXAMPLE: { action: 'upload_video', url: 'https://…/clip.mp4', scale: 0.5, time
     },
   },
 
+
+  {
+    name: 'pinepaper_text_style',
+    annotations: {
+      title: 'Text Styles (Display Titles / Variable Fonts)',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Display TEXT STYLES and variable-font axes — the stacked-layer titles a fill+stroke+shadow cannot make, and weight/width/slant as animatable properties.
+
+ACTIONS:
+- apply_style: { itemId, styleKey, palette?, variant?, content?, fontFamily?, fontSize? } — render a text item as a layered display title (offset copies, outlines, fills). The result GROUP ADOPTS the text's registry id, so existing relations/keyframes/handles keep pointing at it. fontFamily: 'suggested' opts into the face the style was designed around (arcade wants a pixel face — a layer stack can outline any typeface but cannot pixellate one); never automatic.
+- set_font_axes: { itemId, axes: { weight?, width?, slant? } } — STANDARD variable-font axes only (Canvas 2D has no font-variation-settings, so custom foundry axes are unreachable — platform limit, stated, not silent). Returns {applied, rejected}: CHECK rejected — an axis silently ignored is the failure this surface exists to prevent. All three are ordinary animatable properties: keyframe fontWeight and type breathes between weights.
+- list_styles: {} — styles + palettes + axes, for pickers. Call this first; styleKey strings come from here.
+
+EXAMPLE: { action: 'apply_style', itemId: 'title_1', styleKey: 'arcade', fontFamily: 'suggested' }`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['apply_style', 'set_font_axes', 'list_styles'], description: 'Text style operation' },
+        itemId: { type: 'string', description: 'Text item id — apply_style / set_font_axes.' },
+        styleKey: { type: 'string', description: 'apply_style: style name from list_styles.' },
+        palette: { description: 'apply_style: named colourway (string) or explicit color array.' },
+        variant: { type: 'number', description: 'apply_style: variation index within the style.' },
+        content: { type: 'string', description: 'apply_style: replace the text while styling.' },
+        fontFamily: { type: 'string', description: "apply_style: font override; 'suggested' = the face the style was designed around." },
+        fontSize: { type: 'number', description: 'apply_style: font size (defaults to the item\'s).' },
+        axes: { type: 'object', properties: { weight: { type: 'number' }, width: {}, slant: { type: 'number' } }, description: 'set_font_axes: weight (wght), width (wdth), slant (slnt).' },
+      },
+      required: ['action'],
+    },
+  },
   {
     name: 'pinepaper_crop_image',
     annotations: {
@@ -1875,6 +1932,104 @@ EXAMPLE: { itemId: 'item_7', color: '#00b140', threshold: 60, smoothing: 12 }`,
     },
   },
 
+
+  {
+    name: 'pinepaper_shatter_image',
+    annotations: {
+      title: 'Shatter Image (Grid of Tiles)',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Split a raster into a GRID OF TILES — the primitive under every "photo breaks apart / assembles from pieces" effect.
+
+Deliberately INERT: the pieces land exactly where the picture was, so the canvas looks unchanged until something animates them (per-tile keyframes, blast/scatter relations, physics bodies, staggered_with). The GROUP inherits the original item's registry id — relations, handles, and composition slots keep pointing at the thing in its place.
+
+Params: { itemId, pieces? (≈100; grid solves for square-ish tiles at source aspect, so 100 of a 3:2 photo → 12×8), rows?/cols? (exact grid, override pieces), keepSource? (hide-don't-delete the original so the photo can be restored) }
+Returns: { groupId (= the original id, adopted), tiles, rows, cols }
+
+RECIPE — assemble-from-pieces: shatter with keepSource, keyframe each tile from a random offscreen position to {x:0,y:0} delta, stagger by index, then swap the source back on completion.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        itemId: { type: 'string', description: 'The raster to shatter (or a group containing one).' },
+        pieces: { type: 'number', description: 'Approximate piece count (default 100).' },
+        rows: { type: 'number', description: 'Exact grid rows — overrides pieces.' },
+        cols: { type: 'number', description: 'Exact grid cols — overrides pieces.' },
+        keepSource: { type: 'boolean', description: 'Keep the original hidden for later restore.' },
+      },
+      required: ['itemId'],
+    },
+  },
+  {
+    name: 'pinepaper_import_layered_character',
+    annotations: {
+      title: 'Import Layered Character (Decomposer Output)',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+    description: `Land a DECOMPOSED character illustration as one Group of role-bound parts — eyes that blink, a mouth that talks, with ZERO further wiring.
+
+Input is the output of a single-image layer decomposer (See-through — one flat anime drawing in, ~20 occlusion-inpainted layers out — or any PSD-style layer dump with the same manifest shape). The decomposition model does NOT run here: it needs a GPU and minutes per image; run it where it fits and import the folder.
+
+Layer tags map onto the exact role tokens the expresses presets read (eye_left, pupil_right, mouth…), so pinepaper_animate/expresses blink-smile-talk work on the imported character immediately.
+
+Params: { info (the decomposer manifest: tags, xyxy rects, depth_median draw order, frame_size [h,w]), images ({tag: PNG data URL or CORS-reachable https URL} — data URLs are the reliable path; ~20 layers of base64 is a big call, use URLs when you can), position?, scale?, name? }
+Returns: { groupId, parts, roles, rolesWired, warnings }
+
+CHECK rolesWired: a character importing with 0 roles renders perfectly and silently refuses to animate — that number is the difference between a picture and a puppet.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        info: { type: 'object', description: 'Decomposer manifest (See-through meta.json contents).' },
+        images: { type: 'object', description: 'Layer tag → PNG data URL (or https URL, CORS permitting).' },
+        position: { type: 'object', properties: { x: { type: 'number' }, y: { type: 'number' } }, description: 'Placement (default canvas center).' },
+        scale: { type: 'number', description: 'Uniform scale after the frame→canvas fit.' },
+        name: { type: 'string', description: 'Group name.' },
+      },
+      required: ['info', 'images'],
+    },
+  },
+
+  {
+    name: 'pinepaper_game',
+    annotations: {
+      title: 'Game Logic (Pathfinding / Tilemaps)',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `GAME-LOGIC primitives as pure computation: A* pathfinding and tilemap boards. Nothing here draws — the outputs plug into the surfaces that do.
+
+ACTIONS:
+- pathfind: { grid: { cols, rows, cellSize?, origin?, blocked?|obstacles? }, start, goal, diagonal? } → { path: [{x,y}], waypoints }
+  start/goal are WORLD coordinates (what items have). obstacles is world rects — pass item bounds and the walls block the board. Deterministic (fixed tie-breaking): same board, same route, every time — replays hold. Diagonal never cuts corners. FEED path DIRECTLY into pinepaper_add_relation moves_along_path (params.path) or a keyframe track: that is the movement system, this is only the route.
+- create_tilemap: { cols, rows, tileSize? (32), origin?, tileset? ([{id (1-based; 0=empty), solid?, name?, fill?}]), fills? ([{x0,y0,x1,y1,tileId}] tile-space rects, painted in order) } → { map, grid, collisionRects, rectCount }
+  map is DATA — persist it in item.data or the project document; render tiles only if the design wants them drawn (a 60×40 board should not be 2,400 canvas items for pure logic). grid feeds pathfind unchanged. collisionRects are greedy-merged (a 60-tile wall is ONE rect) — hand them to pinepaper_physics as static bodies.
+
+RECIPE — a playable maze: create_tilemap with wall fills → batch_create colored rects from map data where you want visuals → pathfind player→exit → moves_along_path along the result. Multiplayer sync is deliberately NOT here: it is a live client-runtime protocol (EventSync), not a canvas op.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['pathfind', 'create_tilemap'], description: 'Game operation' },
+        grid: { type: 'object', properties: { cols: { type: 'number' }, rows: { type: 'number' }, cellSize: { type: 'number' }, origin: { type: 'object' }, blocked: { type: 'array', items: { type: 'number' } }, obstacles: { type: 'array', items: { type: 'object' } } }, description: 'pathfind: the board.' },
+        start: { type: 'object', properties: { x: { type: 'number' }, y: { type: 'number' } }, description: 'pathfind: start (world coords).' },
+        goal: { type: 'object', properties: { x: { type: 'number' }, y: { type: 'number' } }, description: 'pathfind: goal (world coords).' },
+        diagonal: { type: 'boolean', description: 'pathfind: 8-way movement (default true).' },
+        cols: { type: 'number', description: 'create_tilemap: board width in tiles.' },
+        rows: { type: 'number', description: 'create_tilemap: board height in tiles.' },
+        tileSize: { type: 'number', description: 'create_tilemap: world units per tile (default 32).' },
+        origin: { type: 'object', properties: { x: { type: 'number' }, y: { type: 'number' } }, description: 'create_tilemap: world position of tile (0,0).' },
+        tileset: { type: 'array', items: { type: 'object' }, description: 'create_tilemap: [{id, solid?, name?, fill?}] — 1-based ids.' },
+        fills: { type: 'array', items: { type: 'object' }, description: 'create_tilemap: [{x0,y0,x1,y1,tileId}] painted in order.' },
+      },
+      required: ['action'],
+    },
+  },
   {
     name: 'pinepaper_rigging',
     annotations: {
@@ -1897,12 +2052,20 @@ ACTIONS:
 - set_target_path: { skeletonId, chainId, waypoints[] ({x,y,out?,in?} bezier tangents), duration?, loop? } — the IK effector travels an ARC, not a straight line
 - save_pose: { skeletonId, name? } → { poseId } (snapshot current bone angles)
 - save_shape_key: { skeletonId, name? } → { shapeKeyId } (per-item visual delta for facial-style blends)
+- import_bvh: { bvhText, view? (side|front), fps? (15; 0 = every frame), height? (320px), rootPosition?, name? } → { skeletonId, poses, duration, warnings } — build a NEW rig from a BVH mocap clip (CMU / Mixamo), stick figure included. Root translation returns as a separate track rather than baked into poses.
+- retarget_bvh: { bvhText, skeletonId, fps?, name? } → { skeletonId, matched, unmatchedSource, unmatchedTarget, poses, duration } — drive an EXISTING rig with a BVH clip, bones matched by name. CHECK matched/unmatched in the result: a retarget that matched 2 of 15 bones "succeeds" and looks broken.
+- import_spine: { spineJson, rootPosition?, name? } → { skeletonId, bones, placeholders, animations, warnings } — import a Spine editor JSON export (bones, poses, attachment placeholders).
 
 BREAKDOWN POSES (S12): a breakdown keyframe shapes the ARC + SPACING between key poses (favor biases spacing; boneOffsets lag bones so a tip drags its root — follow-through; movingHold keeps a hold alive). This is the difference between mechanical and lifelike motion.`,
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['create_skeleton', 'add_bone', 'attach_item', 'create_ik_chain', 'add_pose_keyframe', 'set_target_path', 'save_pose', 'save_shape_key'], description: 'Rigging operation' },
+        action: { type: 'string', enum: ['create_skeleton', 'add_bone', 'attach_item', 'create_ik_chain', 'add_pose_keyframe', 'set_target_path', 'save_pose', 'save_shape_key', 'import_bvh', 'retarget_bvh', 'import_spine'], description: 'Rigging operation' },
+        bvhText: { type: 'string', description: 'import_bvh / retarget_bvh: the .bvh file contents.' },
+        spineJson: { type: 'string', description: 'import_spine: the Spine JSON export, as a string.' },
+        view: { type: 'string', enum: ['side', 'front'], description: 'import_bvh: 3D→2D projection plane. CMU walks read best from the side (default).' },
+        fps: { type: 'number', description: 'import_bvh / retarget_bvh: pose sampling rate (default 15; 0 keeps every frame).' },
+        height: { type: 'number', description: 'import_bvh: skeleton height on canvas, px (default 320).' },
         skeletonId: { type: 'string', description: 'Skeleton id — every action except create_skeleton.' },
         boneId: { type: 'string', description: 'Bone id — attach_item.' },
         itemId: { type: 'string', description: 'Canvas item id — attach_item.' },
@@ -3663,7 +3826,14 @@ ACTIONS:
 - apply: Apply a single filter. Params: itemId, filterName, params
 - chain: Apply multiple filters in sequence. Params: itemId, filters (array of {name, params})
 
-Available filters (GPU raster set): blur, grayscale, sepia, brightness, contrast, saturation, invert, posterize, hsl (hue/saturation/lightness), colorTint (color, intensity, blendMode), vignette (intensity, radius), edgeDetect, halftoneDots (size, angle), halftoneCMYK (size), dither (levels).
+Available filters (GPU raster set):
+- Color: grayscale, sepia, brightness, contrast, saturation, invert, posterize (levels), hsl (hue/saturation/lightness), colorTint (color, intensity, blendMode), colorMatrix (matrix), duotone (shadow, highlight, mix), paletteMap (swatches[], amount, preserveShading — recolor to a fixed palette)
+- Stylize: vignette (intensity, radius), edgeDetect, halftoneDots (size, angle), halftoneCMYK (size), dither (levels), grain (amount, seed), scanlines (intensity, period), chromaticAberration (amount), blur
+- Light (additive): bloom (amount, threshold, radius), glow, halation (warm-fringed bloom; color), lightShafts (amount, threshold, decay, density, x, y, color — volumetric rays from a point)
+- Keying: lumaKey (threshold, softness, invert)
+- SECOND-INPUT (params.map = another item's id, resolved to its pixels): displace (amount, dispersion, map, mapChannel — the map's brightness pushes pixels), refract (displace with per-channel dispersion — glass), trackMatte (channel, invert, strength — prefer pinepaper_media apply_track_matte for the live version), datamosh (amount, block, map? — self-moshes without a map)
+
+RECIPE — grunge poster: chain [grain, scanlines, vignette]. Glass header: refract with map = a gradient item.
 (Scene-wide filters — sharpen/emboss/noise/vintage etc. — are a different surface: use pinepaper_add_filter.)`,
     inputSchema: {
       type: 'object',

@@ -67,6 +67,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
   ],
   rigging: [
     'pinepaper_rigging',
+    'pinepaper_import_layered_character',
   ],
   assets: [
     'pinepaper_search_assets',
@@ -149,6 +150,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
     'pinepaper_provenance',
   ],
   image_processing: [
+    'pinepaper_shatter_image',
     'pinepaper_image_filter',
     'pinepaper_lasso',
     'pinepaper_cutout_style',
@@ -175,6 +177,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
     'pinepaper_magic',
   ],
   physics: [
+    'pinepaper_game',
     'pinepaper_physics',
   ],
   measurement: [
@@ -226,6 +229,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
   // --- Domain: Fonts ---
   font: [
     'pinepaper_font',
+    'pinepaper_text_style',
   ],
 
   // --- Domain: Letter Collage ---

@@ -65,3 +65,91 @@ describe('generateMedia codegen', () => {
     guarded(code); trailingExpr(code);
   });
 });
+
+describe('video-editing actions (v1.6.4)', () => {
+  // These call `app.*` PinePaper facades, not the PinePaperAgent media API —
+  // asserting the exact facade name catches the guard drifting from the call.
+
+  it('set_time_remap validates: id + a track (or explicit null to clear)', () => {
+    expect(MediaInputSchema.safeParse({ action: 'set_time_remap', id: 'v1' }).success).toBe(false);
+    expect(MediaInputSchema.safeParse({ action: 'set_time_remap', remapTrack: null }).success).toBe(false);
+    expect(MediaInputSchema.safeParse({ action: 'set_time_remap', id: 'v1', remapTrack: null }).success).toBe(true);
+    expect(MediaInputSchema.safeParse({ action: 'set_time_remap', id: 'v1', remapTrack: [{ time: 0, value: 0 }, { time: 2, value: 1 }] }).success).toBe(true);
+  });
+
+  it('set_time_remap with null emits null — the documented clear, not []', () => {
+    // JSON.stringify(undefined ?? null) — an emitter that dropped the null would
+    // silently turn "clear my remap" into "invalid remap".
+    const c = codeGenerator.generateMedia(MediaInputSchema.parse({ action: 'set_time_remap', id: 'v1', remapTrack: null }));
+    expect(c).toContain('app.setTimeRemap("v1", null)');
+  });
+
+  it('set_time_remap forwards the track with easing intact', () => {
+    const c = codeGenerator.generateMedia(MediaInputSchema.parse({
+      action: 'set_time_remap', id: 'v1',
+      remapTrack: [{ time: 0, value: 0 }, { time: 1, value: 3, easing: 'easeOut' }],
+    }));
+    expect(c).toContain('"easing":"easeOut"');
+    expect(c).toContain('app.setTimeRemap unavailable');
+  });
+
+  it('speed_ramp requires non-empty segments and emits app.speedRamp', () => {
+    expect(MediaInputSchema.safeParse({ action: 'speed_ramp', id: 'v1', segments: [] }).success).toBe(false);
+    const c = codeGenerator.generateMedia(MediaInputSchema.parse({
+      action: 'speed_ramp', id: 'v1', segments: [{ duration: 1, speed: 1 }, { duration: 0.5, speed: 0 }],
+    }));
+    expect(c).toContain('app.speedRamp("v1"');
+    expect(c).toContain('"speed":0'); // freeze frames are a legal segment
+  });
+
+  it('match_cut needs both shots; consent flows through', () => {
+    expect(MediaInputSchema.safeParse({ action: 'match_cut', fromItemId: 'a' }).success).toBe(false);
+    const c = codeGenerator.generateMedia(MediaInputSchema.parse({
+      action: 'match_cut', fromItemId: 'a', toItemId: 'b', label: 'person', consent: true, fade: 0,
+    }));
+    expect(c).toContain('await app.matchCut("a", "b"');
+    expect(c).toContain('"consent":true');
+    expect(c).toContain('"fade":0'); // 0 is a hard cut, not a missing value
+  });
+
+  it('match_cut surfaces needsConsent as an actionable failure, not success', () => {
+    // The facade returns {needsConsent, cost} on first use — reporting that as
+    // success would tell the agent a cut happened when nothing did.
+    const c = codeGenerator.generateMedia(MediaInputSchema.parse({ action: 'match_cut', fromItemId: 'a', toItemId: 'b' }));
+    expect(c).toContain('needsConsent');
+    expect(c).toContain('re-call with consent: true');
+  });
+
+  it('apply_track_matte forwards channel/live and catches the facade THROW', () => {
+    // applyTrackMatte throws on a missing raster/matte rather than returning
+    // {ok:false} — an emitter without try/catch turns that into an unhandled
+    // rejection with no result at all.
+    expect(MediaInputSchema.safeParse({ action: 'apply_track_matte', id: 'v1' }).success).toBe(false);
+    const c = codeGenerator.generateMedia(MediaInputSchema.parse({
+      action: 'apply_track_matte', id: 'v1', matteItemId: 'title', channel: 'alpha', live: true,
+    }));
+    expect(c).toContain('await app.applyTrackMatte("v1", "title"');
+    expect(c).toContain('"channel":"alpha"');
+    expect(c).toContain('"live":true');
+    expect(c).toContain('catch');
+  });
+
+  it('stop_live_matte emits the stop facade', () => {
+    const c = codeGenerator.generateMedia(MediaInputSchema.parse({ action: 'stop_live_matte', id: 'v1' }));
+    expect(c).toContain('app.stopLiveMatte("v1")');
+  });
+
+  it('none of the five double-snapshot history — the facades save state themselves', () => {
+    for (const input of [
+      { action: 'set_time_remap' as const, id: 'v1', remapTrack: [{ time: 0, value: 0 }, { time: 1, value: 1 }] },
+      { action: 'speed_ramp' as const, id: 'v1', segments: [{ duration: 1, speed: 2 }] },
+      { action: 'match_cut' as const, fromItemId: 'a', toItemId: 'b' },
+      { action: 'apply_track_matte' as const, id: 'v1', matteItemId: 'm' },
+      { action: 'stop_live_matte' as const, id: 'v1' },
+    ]) {
+      const c = codeGenerator.generateMedia(MediaInputSchema.parse(input));
+      expect(c).not.toContain('historyManager.saveState');
+      expect(() => new Function(c)).not.toThrow(); // and each parses
+    }
+  });
+});

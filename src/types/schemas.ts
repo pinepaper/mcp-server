@@ -3343,8 +3343,8 @@ export type LintSceneInput = z.infer<typeof LintSceneInputSchema>;
 // Media (video/audio) via window.PinePaperAgent. Agent-facing surface is URL-based
 // (the agent can't hand over a File). Uploaded media are first-class canvas items.
 export const MediaInputSchema = z.object({
-  action: z.enum(['upload_video', 'upload_audio', 'list', 'remove', 'set_playback_rate', 'set_clip'])
-    .describe("'upload_video' / 'upload_audio' (from a URL) · 'list' media · 'remove' by id · 'set_playback_rate' · 'set_clip' (re-trim an existing clip)"),
+  action: z.enum(['upload_video', 'upload_audio', 'list', 'remove', 'set_playback_rate', 'set_clip', 'set_time_remap', 'speed_ramp', 'match_cut', 'apply_track_matte', 'stop_live_matte'])
+    .describe("'upload_video' / 'upload_audio' (from a URL) · 'list' media · 'remove' by id · 'set_playback_rate' · 'set_clip' (re-trim) · 'set_time_remap' (canvas-time→source-time curve: ramps, freezes, reverse) · 'speed_ramp' ({duration, speed} segments — the human way to say a remap) · 'match_cut' (cut between two shots aligning the SUBJECT via on-device detection) · 'apply_track_matte' (an item's alpha driven by another item's luma/alpha — type-filled-with-footage; live:true keeps it tracking as the matte animates) · 'stop_live_matte'"),
   url: z.string().url().optional().describe('Media URL — required for upload_video / upload_audio (fetched then imported).'),
   id: z.string().optional().describe('Media id — required for remove / set_playback_rate / set_clip.'),
   rate: z.number().min(0.25).max(4).optional().describe('Playback rate 0.25–4 — required for set_playback_rate.'),
@@ -3360,12 +3360,151 @@ export const MediaInputSchema = z.object({
   volume: z.number().min(0).max(1).optional().describe('Volume 0–1 (default 1) — upload_audio.'),
   loop: z.boolean().optional().describe('Loop playback (default true) — upload_audio.'),
   muted: z.boolean().optional().describe('Start muted (default false) — upload_audio.'),
+  // set_time_remap / speed_ramp — canvas seconds → SOURCE seconds
+  remapTrack: z.array(z.object({
+    time: z.number().describe('Canvas time, seconds'),
+    value: z.number().describe('Source time, seconds'),
+    easing: z.string().optional(),
+  })).nullable().optional().describe('set_time_remap: the remap curve (≥2 points). Pass null to clear the remap and restore 1:1 playback.'),
+  segments: z.array(z.object({
+    duration: z.number().positive().describe('Segment length in canvas seconds'),
+    speed: z.number().describe('Playback speed for the segment (0 = freeze frame, negative = reverse)'),
+  })).optional().describe('speed_ramp: consecutive {duration, speed} segments, compiled into a remap curve.'),
+  // match_cut
+  fromItemId: z.string().optional().describe('match_cut: the outgoing shot (item id).'),
+  toItemId: z.string().optional().describe('match_cut: the incoming shot (item id).'),
+  subject: z.enum(['detect', 'bounds']).optional().describe("match_cut: how to find the subject — 'detect' (on-device DETR) or 'bounds' (item bounds). Default detect."),
+  label: z.string().optional().describe('match_cut: narrow detection to a class ("person") when the biggest object is not the subject.'),
+  at: z.number().optional().describe('match_cut: cut time in seconds (default 0).'),
+  settle: z.number().optional().describe('match_cut: seconds to relax to natural framing (default 0.8).'),
+  fade: z.number().optional().describe('match_cut: crossfade seconds; 0 for a hard cut (default 0.12).'),
+  consent: z.boolean().optional().describe('match_cut: proceed with the detection model download. Without it, a first run returns {needsConsent} instead of downloading silently.'),
+  // apply_track_matte / stop_live_matte
+  matteItemId: z.string().optional().describe('apply_track_matte: the item whose pixels drive the alpha (text, gradient, any raster/vector).'),
+  channel: z.enum(['luma', 'alpha', 'red']).optional().describe('apply_track_matte: which channel of the matte drives alpha (default luma).'),
+  invert: z.boolean().optional().describe('apply_track_matte: invert the matte.'),
+  strength: z.number().min(0).max(1).optional().describe('apply_track_matte: matte strength 0–1.'),
+  hideMatte: z.boolean().optional().describe('apply_track_matte: hide the matte item after applying (default true behavior follows the facade).'),
+  live: z.boolean().optional().describe('apply_track_matte: keep re-cutting as the matte moves/animates — the kinetic-mask-reveal mode. Without it the matte bakes once, destructively.'),
 })
   .refine((v) => !(v.action === 'upload_video' || v.action === 'upload_audio') || !!v.url, { message: 'upload requires url', path: ['url'] })
   .refine((v) => !(v.action === 'remove' || v.action === 'set_playback_rate' || v.action === 'set_clip') || !!v.id, { message: 'this action requires id', path: ['id'] })
   .refine((v) => v.action !== 'set_playback_rate' || v.rate !== undefined, { message: 'set_playback_rate requires rate', path: ['rate'] })
+  .refine((v) => v.action !== 'set_time_remap' || v.id !== undefined, { message: 'set_time_remap requires id (the video item / media id)', path: ['id'] })
+  .refine((v) => v.action !== 'set_time_remap' || v.remapTrack !== undefined, { message: 'set_time_remap requires remapTrack (or null to clear)', path: ['remapTrack'] })
+  .refine((v) => v.action !== 'speed_ramp' || (!!v.id && !!v.segments && v.segments.length > 0), { message: 'speed_ramp requires id and segments', path: ['segments'] })
+  .refine((v) => v.action !== 'match_cut' || (!!v.fromItemId && !!v.toItemId), { message: 'match_cut requires fromItemId and toItemId', path: ['fromItemId'] })
+  .refine((v) => v.action !== 'apply_track_matte' || (!!v.id && !!v.matteItemId), { message: 'apply_track_matte requires id (the matted item) and matteItemId', path: ['matteItemId'] })
+  .refine((v) => v.action !== 'stop_live_matte' || !!v.id, { message: 'stop_live_matte requires id', path: ['id'] })
   .refine((v) => v.action !== 'set_clip' || (v.inPoint !== undefined && v.outPoint !== undefined && v.outPoint > v.inPoint), { message: 'set_clip requires inPoint and outPoint with outPoint > inPoint', path: ['outPoint'] });
 export type MediaInput = z.infer<typeof MediaInputSchema>;
+
+/**
+ * pinepaper_text_style — display text styles + variable-font axes.
+ *
+ * A display style renders a text item as a STACKED-LAYER title group (offset
+ * copies, outlines, fills) that a fill+stroke+shadow cannot make; the group
+ * ADOPTS the text's registry id so relations/keyframes keep pointing at it.
+ * Font axes are the standard variable-font trio only (weight/width/slant) —
+ * Canvas 2D has no font-variation-settings, so custom foundry axes are a
+ * platform impossibility, not an omission.
+ */
+export const TextStyleInputSchema = z.object({
+  action: z.enum(['apply_style', 'set_font_axes', 'list_styles'])
+    .describe("'apply_style' (stacked-layer display style) · 'set_font_axes' (variable-font weight/width/slant) · 'list_styles' (styles + palettes + axes, for pickers)"),
+  itemId: z.string().optional().describe('Text item id — apply_style / set_font_axes.'),
+  styleKey: z.string().optional().describe("apply_style: style name from list_styles (e.g. 'stacked', 'arcade' — the pixel/arcade styles suggest their own face)."),
+  palette: z.union([z.string(), z.array(z.string())]).optional().describe('apply_style: a named colourway or an explicit color array.'),
+  variant: z.number().optional().describe('apply_style: variation index within the style.'),
+  content: z.string().optional().describe('apply_style: replace the text content while styling.'),
+  fontFamily: z.string().optional().describe("apply_style: font override. 'suggested' opts into the face the style was designed around (arcade wants a pixel face) — never automatic."),
+  fontSize: z.number().positive().optional().describe('apply_style: font size (defaults to the item\'s).'),
+  axes: z.object({
+    weight: z.number().optional().describe('wght 1–1000'),
+    width: z.union([z.number(), z.string()]).optional().describe('wdth % or a keyword'),
+    slant: z.number().optional().describe('slnt degrees'),
+  }).optional().describe('set_font_axes: standard axes only. All three are animatable properties (addKeyframe with fontWeight interpolates).'),
+})
+  .refine((v) => v.action !== 'apply_style' || (!!v.itemId && !!v.styleKey), { message: 'apply_style requires itemId and styleKey', path: ['styleKey'] })
+  .refine((v) => v.action !== 'set_font_axes' || (!!v.itemId && !!v.axes && Object.keys(v.axes).length > 0), { message: 'set_font_axes requires itemId and at least one axis', path: ['axes'] });
+export type TextStyleInput = z.infer<typeof TextStyleInputSchema>;
+
+/**
+ * pinepaper_shatter_image — split a raster into a grid of per-tile rasters.
+ * Deliberately INERT on its own: the pieces sit exactly where the picture was
+ * until something animates them (blast relations, per-tile keyframes, physics).
+ */
+export const ShatterImageInputSchema = z.object({
+  itemId: z.string().describe('The raster to shatter (or a group containing one).'),
+  pieces: z.number().int().positive().max(2500).optional().describe('Approximate piece count (default 100); the grid solves for square-ish tiles at the source aspect, so 100 of a 3:2 photo lands as 12×8.'),
+  rows: z.number().int().positive().max(50).optional().describe('Exact grid rows — overrides pieces.'),
+  cols: z.number().int().positive().max(50).optional().describe('Exact grid cols — overrides pieces.'),
+  keepSource: z.boolean().optional().describe('Leave the original in place, hidden, so the pieces can be dropped and the photo restored.'),
+});
+export type ShatterImageInput = z.infer<typeof ShatterImageInputSchema>;
+
+/**
+ * pinepaper_import_layered_character — land a decomposed character illustration
+ * (See-through / PSD-style layer dump) as one Group of role-bound parts.
+ *
+ * The decomposition model does NOT run here (GPU, minutes/image) — the caller
+ * runs it wherever it fits and imports the output. Roles are the exact tokens
+ * the `expresses` presets read, so blink/smile work with zero further wiring.
+ */
+export const ImportLayeredCharacterInputSchema = z.object({
+  info: z.record(z.string(), z.unknown()).describe('The decomposer manifest (See-through meta.json contents): layer tags, xyxy rects, depth_median, frame_size [h, w].'),
+  images: z.record(z.string(), z.string()).describe('Layer tag → image source. PNG data URLs are the reliable path; https URLs work when CORS allows. ~20 layers of base64 is a large call — URLs when you can.'),
+  position: PositionSchema.optional().describe('Where to place the character (default canvas center).'),
+  scale: z.number().positive().optional().describe('Uniform scale applied after the shared frame→canvas fit.'),
+  name: z.string().optional().describe('Group name.'),
+})
+  .refine((v) => Object.keys(v.images).length > 0, { message: 'images must contain at least one layer', path: ['images'] });
+export type ImportLayeredCharacterInput = z.infer<typeof ImportLayeredCharacterInputSchema>;
+
+/**
+ * pinepaper_game — the game-logic primitives (A* pathfinding, tilemaps) as
+ * PURE COMPUTATION over the canvas: paths feed moves_along_path, collision
+ * rects feed the physics world, the map JSON persists in the project document.
+ *
+ * Multiplayer (EventSync) is deliberately absent: it is a client-runtime
+ * protocol between live peers, not a canvas operation — an MCP call has no
+ * peer to synchronize with.
+ */
+export const GameInputSchema = z.object({
+  action: z.enum(['pathfind', 'create_tilemap'])
+    .describe("'pathfind' (A* over a grid/obstacles → [{x,y}] waypoints for moves_along_path) · 'create_tilemap' (board data + pathfinding grid + merged collision rects)"),
+  // pathfind
+  grid: z.object({
+    cols: z.number().int().positive(),
+    rows: z.number().int().positive(),
+    cellSize: z.number().positive().optional().describe('World units per cell (default 1).'),
+    origin: PositionSchema.optional().describe('World position of cell (0,0).'),
+    blocked: z.array(z.number()).optional().describe('Flat cols×rows array, 1 = blocked.'),
+    obstacles: z.array(z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() }))
+      .optional().describe('World-space rects to block — pass item bounds and the walls block the board.'),
+  }).optional().describe('pathfind: the board.'),
+  start: PositionSchema.optional().describe('pathfind: start, WORLD coordinates.'),
+  goal: PositionSchema.optional().describe('pathfind: goal, WORLD coordinates.'),
+  diagonal: z.boolean().optional().describe('pathfind: 8-way movement (default true). Never cuts corners.'),
+  // create_tilemap
+  cols: z.number().int().positive().max(500).optional().describe('create_tilemap: board width in tiles.'),
+  rows: z.number().int().positive().max(500).optional().describe('create_tilemap: board height in tiles.'),
+  tileSize: z.number().positive().optional().describe('create_tilemap: world units per tile (default 32).'),
+  origin: PositionSchema.optional().describe('create_tilemap: world position of tile (0,0).'),
+  tileset: z.array(z.object({
+    id: z.number().int().positive().describe('1-based; 0 is empty'),
+    name: z.string().optional(),
+    solid: z.boolean().optional().describe('Blocks movement — feeds the grid and collision rects.'),
+    fill: z.string().optional().describe('Solid color for simple rendering.'),
+  })).optional().describe('create_tilemap: tile definitions.'),
+  fills: z.array(z.object({
+    x0: z.number().int(), y0: z.number().int(), x1: z.number().int(), y1: z.number().int(),
+    tileId: z.number().int(),
+  })).optional().describe('create_tilemap: tile-space rects painted in order — walls, floors, platforms.'),
+})
+  .refine((v) => v.action !== 'pathfind' || (!!v.grid && !!v.start && !!v.goal), { message: 'pathfind requires grid, start, goal', path: ['grid'] })
+  .refine((v) => v.action !== 'create_tilemap' || (v.cols !== undefined && v.rows !== undefined), { message: 'create_tilemap requires cols and rows', path: ['cols'] });
+export type GameInput = z.infer<typeof GameInputSchema>;
 
 // =============================================================================
 // ONE-SHOT IMAGE OPS (crop / chroma key — Track A agent parity, 2026-07-31)
@@ -3402,7 +3541,19 @@ export const RiggingInputSchema = z.object({
   action: z.enum([
     'create_skeleton', 'add_bone', 'attach_item', 'create_ik_chain',
     'add_pose_keyframe', 'set_target_path', 'save_pose', 'save_shape_key',
+    'import_bvh', 'retarget_bvh', 'import_spine',
   ]).describe('Rigging operation'),
+  // ── Mocap / rig import (import_bvh, retarget_bvh, import_spine) ──
+  // The file CONTENTS travel in the call (MCP has no filesystem): .bvh text for
+  // BVH, the exported .json for Spine. import_bvh builds a NEW stick-figure rig
+  // driven by the clip; retarget_bvh drives an EXISTING rig by bone name and
+  // needs skeletonId. Root translation comes back as rootTrack rather than being
+  // baked into poses — a walk whose root motion was dropped is a march on the spot.
+  bvhText: z.string().optional().describe('For import_bvh/retarget_bvh: the .bvh file contents (CMU and Mixamo clips both work).'),
+  spineJson: z.string().optional().describe('For import_spine: the Spine editor JSON export, as a string.'),
+  view: z.enum(['side', 'front']).optional().describe('For import_bvh: projection plane for the 3D→2D flatten. CMU walk cycles read best from the side (default).'),
+  fps: z.number().optional().describe('For import_bvh/retarget_bvh: pose sampling rate (default 15 — CMU records at 120 and nobody wants 120 poses/sec in the pose list). 0 keeps every frame.'),
+  height: z.number().optional().describe('For import_bvh: skeleton height on the canvas in px (default 320).'),
   // identifiers
   skeletonId: z.string().optional().describe('Skeleton id — required for every action except create_skeleton.'),
   boneId: z.string().optional().describe('Bone id — attach_item.'),
@@ -3445,10 +3596,13 @@ export const RiggingInputSchema = z.object({
   duration: z.number().positive().optional().describe('Seconds to traverse the path (default 1) — set_target_path.'),
   loop: z.boolean().optional().describe('Cycle the path — set_target_path.'),
 })
-  .refine((v) => v.action === 'create_skeleton' || !!v.skeletonId, { message: 'this action requires skeletonId', path: ['skeletonId'] })
+  .refine((v) => ['create_skeleton', 'import_bvh', 'import_spine'].includes(v.action) || !!v.skeletonId, { message: 'this action requires skeletonId', path: ['skeletonId'] })
   .refine((v) => v.action !== 'add_bone' || v.skeletonId != null, { message: 'add_bone requires skeletonId', path: ['skeletonId'] })
   .refine((v) => v.action !== 'attach_item' || (!!v.boneId && !!v.itemId), { message: 'attach_item requires boneId and itemId', path: ['boneId'] })
   .refine((v) => v.action !== 'create_ik_chain' || (!!v.boneIds && v.boneIds.length >= 2), { message: 'create_ik_chain requires boneIds (≥2)', path: ['boneIds'] })
   .refine((v) => v.action !== 'add_pose_keyframe' || (v.time !== undefined && v.pose !== undefined), { message: 'add_pose_keyframe requires time and pose', path: ['pose'] })
-  .refine((v) => v.action !== 'set_target_path' || (!!v.chainId && !!v.waypoints), { message: 'set_target_path requires chainId and waypoints', path: ['waypoints'] });
+  .refine((v) => v.action !== 'set_target_path' || (!!v.chainId && !!v.waypoints), { message: 'set_target_path requires chainId and waypoints', path: ['waypoints'] })
+  .refine((v) => !['import_bvh', 'retarget_bvh'].includes(v.action) || !!v.bvhText, { message: 'import_bvh/retarget_bvh require bvhText (the .bvh file contents)', path: ['bvhText'] })
+  .refine((v) => v.action !== 'retarget_bvh' || v.skeletonId != null, { message: 'retarget_bvh requires skeletonId (the existing rig to drive)', path: ['skeletonId'] })
+  .refine((v) => v.action !== 'import_spine' || !!v.spineJson, { message: 'import_spine requires spineJson', path: ['spineJson'] });
 export type RiggingInput = z.infer<typeof RiggingInputSchema>;

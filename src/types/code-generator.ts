@@ -185,7 +185,7 @@ import {
   CaptureFramesInput,
   InstantiateOntologyInput,
   LintSceneInput,
-  MediaInput,
+  MediaInput, TextStyleInput, ShatterImageInput, ImportLayeredCharacterInput, GameInput,
   CropImageInput,
   ChromaKeyInput,
   RiggingInput,
@@ -6247,6 +6247,232 @@ ${guard}
   const ok = A.setMediaClip(${JSON.stringify(input.id)}, ${input.inPoint}, ${input.outPoint});
   return { success: ok, action: 'set_clip', id: ${JSON.stringify(input.id)}, inPoint: ${input.inPoint}, outPoint: ${input.outPoint} };
 })();`.trim();
+
+      // ── Video-editing actions (v1.6.4) — these live on `app` (PinePaper
+      // facades), not the agent media API, so they carry their own guards.
+      // The facades snapshot history themselves; no saveState here.
+      case 'set_time_remap': {
+        const S = (v: unknown) => JSON.stringify(v);
+        return `
+// Remap a clip's time — speed ramps, freeze frames, reverse (null clears)
+(function() {
+  if (typeof app.setTimeRemap !== 'function') { return { success: false, error: 'app.setTimeRemap unavailable — update FxTool to a time-remap-capable build' }; }
+  const r = app.setTimeRemap(${S(input.id)}, ${S(input.remapTrack ?? null)});
+  return r && r.ok ? { success: true, action: 'set_time_remap', points: r.points } : { success: false, error: (r && r.error) || 'remap failed' };
+})();`.trim();
+      }
+      case 'speed_ramp': {
+        const S = (v: unknown) => JSON.stringify(v);
+        return `
+// Speed ramp: consecutive {duration, speed} segments compiled to a remap curve
+(function() {
+  if (typeof app.speedRamp !== 'function') { return { success: false, error: 'app.speedRamp unavailable — update FxTool to a time-remap-capable build' }; }
+  const r = app.speedRamp(${S(input.id)}, ${S(input.segments)});
+  return r && r.ok ? { success: true, action: 'speed_ramp', points: r.points } : { success: false, error: (r && r.error) || 'speed ramp failed' };
+})();`.trim();
+      }
+      case 'match_cut': {
+        const S = (v: unknown) => JSON.stringify(v);
+        const opts = S({
+          ...(input.subject !== undefined ? { subject: input.subject } : {}),
+          ...(input.label !== undefined ? { label: input.label } : {}),
+          ...(input.at !== undefined ? { at: input.at } : {}),
+          ...(input.settle !== undefined ? { settle: input.settle } : {}),
+          ...(input.fade !== undefined ? { fade: input.fade } : {}),
+          ...(input.consent !== undefined ? { consent: input.consent } : {}),
+        });
+        return `
+// Match cut: align the SUBJECT across the cut (on-device detection)
+(async function() {
+  if (typeof app.matchCut !== 'function') { return { success: false, error: 'app.matchCut unavailable — update FxTool to a match-cut-capable build' }; }
+  const r = await app.matchCut(${S(input.fromItemId)}, ${S(input.toItemId)}, ${opts});
+  if (r && r.needsConsent) { return { success: false, needsConsent: true, cost: r.cost, error: 'Detection model download needs consent — re-call with consent: true' }; }
+  if (!r || !r.ok) { return { success: false, error: (r && r.error) || 'match cut failed' }; }
+  return { success: true, action: 'match_cut', aspectMismatch: r.aspectMismatch || false };
+})();`.trim();
+      }
+      case 'apply_track_matte': {
+        const S = (v: unknown) => JSON.stringify(v);
+        const opts = S({
+          ...(input.channel !== undefined ? { channel: input.channel } : {}),
+          ...(input.invert !== undefined ? { invert: input.invert } : {}),
+          ...(input.strength !== undefined ? { strength: input.strength } : {}),
+          ...(input.hideMatte !== undefined ? { hideMatte: input.hideMatte } : {}),
+          ...(input.live !== undefined ? { live: input.live } : {}),
+        });
+        return `
+// Track matte: the matte item's ${input.channel || 'luma'} drives the target's alpha${input.live ? ' (LIVE — re-cuts as the matte animates)' : ''}
+(async function() {
+  if (typeof app.applyTrackMatte !== 'function') { return { success: false, error: 'app.applyTrackMatte unavailable — update FxTool to a track-matte-capable build' }; }
+  try {
+    await app.applyTrackMatte(${S(input.id)}, ${S(input.matteItemId)}, ${opts});
+    return { success: true, action: 'apply_track_matte', id: ${S(input.id)}, matte: ${S(input.matteItemId)}, live: ${S(!!input.live)} };
+  } catch (e) {
+    // The facade throws on a missing raster/matte rather than returning {ok:false}.
+    return { success: false, error: e && e.message ? e.message : String(e) };
+  }
+})();`.trim();
+      }
+      case 'stop_live_matte': {
+        const S = (v: unknown) => JSON.stringify(v);
+        return `
+// Stop a live matte, leaving the last cut in place
+(function() {
+  if (typeof app.stopLiveMatte !== 'function') { return { success: false, error: 'app.stopLiveMatte unavailable — update FxTool' }; }
+  const r = app.stopLiveMatte(${S(input.id)});
+  return r && r.ok ? { success: true, action: 'stop_live_matte' } : { success: false, error: (r && r.error) || 'no live matte on that item' };
+})();`.trim();
+      }
+    }
+  }
+
+  /**
+   * pinepaper_text_style — display styles + variable-font axes.
+   * All three facades return their own {ok, …} envelopes; forwarded as-is.
+   */
+  generateTextStyle(input: TextStyleInput): string {
+    const S = (v: unknown) => JSON.stringify(v);
+    switch (input.action) {
+      case 'apply_style': {
+        const opts = S({
+          ...(input.palette !== undefined ? { palette: input.palette } : {}),
+          ...(input.variant !== undefined ? { variant: input.variant } : {}),
+          ...(input.content !== undefined ? { content: input.content } : {}),
+          ...(input.fontFamily !== undefined ? { fontFamily: input.fontFamily } : {}),
+          ...(input.fontSize !== undefined ? { fontSize: input.fontSize } : {}),
+        });
+        return `
+// Display text style: ${input.styleKey} — stacked-layer title, id adopted from the text
+(function() {
+  if (typeof app.applyTextStyle !== 'function') { return { success: false, error: 'app.applyTextStyle unavailable — update FxTool to a text-styles build' }; }
+  const r = app.applyTextStyle(${S(input.itemId)}, ${S(input.styleKey)}, ${opts});
+  if (!r || !r.ok) { return { success: false, error: (r && r.error) || 'style failed' }; }
+  // The styled group ADOPTS the text item's registry id — r.id is the SAME id
+  // the caller passed, so their handle keeps working. Say so in the result.
+  return { success: true, action: 'apply_style', id: r.id, style: r.style, layers: r.layers, palette: r.palette, bounds: r.bounds };
+})();`.trim();
+      }
+      case 'set_font_axes': {
+        return `
+// Variable-font axes (standard trio: weight/width/slant — Canvas 2D has no custom axes)
+(function() {
+  if (typeof app.setFontAxes !== 'function') { return { success: false, error: 'app.setFontAxes unavailable — update FxTool to a variable-font build' }; }
+  const r = app.setFontAxes(${S(input.itemId)}, ${S(input.axes)});
+  if (!r || !r.ok) { return { success: false, error: (r && r.error) || 'axes failed' }; }
+  // rejected is the interesting half: an axis silently ignored is the failure
+  // mode this surface exists to prevent.
+  return { success: true, action: 'set_font_axes', applied: r.applied, rejected: r.rejected || [] };
+})();`.trim();
+      }
+      case 'list_styles': {
+        return `
+// Text styles + palettes + font axes — the picker surface
+(function() {
+  if (typeof app.listTextStyles !== 'function') { return { success: false, error: 'app.listTextStyles unavailable — update FxTool to a text-styles build' }; }
+  return {
+    success: true,
+    styles: app.listTextStyles(),
+    palettes: typeof app.listTextPalettes === 'function' ? app.listTextPalettes() : [],
+    fontAxes: typeof app.listFontAxes === 'function' ? app.listFontAxes() : null,
+  };
+})();`.trim();
+      }
+    }
+  }
+
+  /**
+   * Shatter a raster into a grid of tiles. The group INHERITS the original's
+   * registry id (relations/handles keep pointing at the thing in its place),
+   * and the result is deliberately inert until something animates the pieces.
+   */
+  generateShatterImage(input: ShatterImageInput): string {
+    const S = (v: unknown) => JSON.stringify(v);
+    const opts = S({
+      ...(input.pieces !== undefined ? { pieces: input.pieces } : {}),
+      ...(input.rows !== undefined ? { rows: input.rows } : {}),
+      ...(input.cols !== undefined ? { cols: input.cols } : {}),
+      ...(input.keepSource !== undefined ? { keepSource: input.keepSource } : {}),
+    });
+    return `
+// Shatter ${input.itemId} into tiles (inert until animated — that is the point)
+(function() {
+  if (typeof app.shatterImage !== 'function') { return { success: false, error: 'app.shatterImage unavailable — update FxTool to a shatter-capable build' }; }
+  const r = app.shatterImage(${S(input.itemId)}, ${opts});
+  if (!r || !r.ok) { return { success: false, error: (r && r.error) || 'shatter failed' }; }
+  // groupId === the original item's id (adopted). tiles/rows/cols tell the
+  // caller what grid they actually got — 100 pieces of a 3:2 photo is 12x8=96.
+  return { success: true, groupId: r.groupId, tiles: r.tiles, rows: r.rows, cols: r.cols };
+})();`.trim();
+  }
+
+  /**
+   * Import a decomposed character (layer manifest + per-layer images) as a
+   * role-bound Group. The facade is async and does its own heavy-module
+   * loading (the cold-boot rigging-rules trap is handled inside it).
+   */
+  generateImportLayeredCharacter(input: ImportLayeredCharacterInput): string {
+    const S = (v: unknown) => JSON.stringify(v);
+    const opts = S({
+      ...(input.position !== undefined ? { position: input.position } : {}),
+      ...(input.scale !== undefined ? { scale: input.scale } : {}),
+      ...(input.name !== undefined ? { name: input.name } : {}),
+    });
+    return `
+// Import a layered character (decomposer output → role-bound parts; blink works out of the box)
+(async function() {
+  if (typeof app.importLayeredCharacter !== 'function') { return { success: false, error: 'app.importLayeredCharacter unavailable — update FxTool to a layered-character build' }; }
+  // The importer's contract is a Map (it calls images.get) — the wire format is
+  // a plain object, so rebuild the Map here.
+  const bundle = { info: ${S(input.info)}, images: new Map(Object.entries(${S(input.images)})) };
+  const r = await app.importLayeredCharacter(bundle, ${opts});
+  if (!r || !r.groupId) { return { success: false, error: (r && r.error) || 'layered character import failed' }; }
+  // roles maps part roles → item ids; zero roles wired means the character
+  // renders but will NOT animate — surface the count so that cannot hide.
+  return { success: true, groupId: r.groupId, parts: (r.parts || []).length, roles: r.roles || {}, rolesWired: Object.keys(r.roles || {}).length, warnings: r.warnings || [] };
+})();`.trim();
+  }
+
+  /**
+   * pinepaper_game — pathfinding + tilemaps via the PinePaper facades.
+   * Both are pure data ops; the interesting glue is in the doc: paths feed
+   * moves_along_path, collisionRects feed pinepaper_physics.
+   */
+  generateGame(input: GameInput): string {
+    const S = (v: unknown) => JSON.stringify(v);
+    switch (input.action) {
+      case 'pathfind': {
+        const opts = S({ ...(input.diagonal !== undefined ? { diagonal: input.diagonal } : {}) });
+        return `
+// A* pathfind — waypoints for moves_along_path
+(async function() {
+  if (typeof app.findPath !== 'function') { return { success: false, error: 'app.findPath unavailable — update FxTool to a games-capable build' }; }
+  const r = await app.findPath(${S(input.grid)}, ${S(input.start)}, ${S(input.goal)}, ${opts});
+  if (!r || !r.ok) { return { success: false, error: (r && r.error) || 'pathfind failed' }; }
+  // path is world-space [{x,y}] — feed it DIRECTLY to pinepaper_add_relation
+  // moves_along_path params.path, or to a keyframe track.
+  return { success: true, path: r.path, waypoints: r.path.length };
+})();`.trim();
+      }
+      case 'create_tilemap': {
+        const spec = S({
+          cols: input.cols, rows: input.rows,
+          ...(input.tileSize !== undefined ? { tileSize: input.tileSize } : {}),
+          ...(input.origin !== undefined ? { origin: input.origin } : {}),
+          ...(input.tileset !== undefined ? { tileset: input.tileset } : {}),
+          ...(input.fills !== undefined ? { fills: input.fills } : {}),
+        });
+        return `
+// Tilemap: board data + pathfinding grid + merged collision rects
+(async function() {
+  if (typeof app.createTilemap !== 'function') { return { success: false, error: 'app.createTilemap unavailable — update FxTool to a games-capable build' }; }
+  const r = await app.createTilemap(${spec});
+  if (!r || !r.ok) { return { success: false, error: (r && r.error) || 'tilemap failed' }; }
+  // map: persist it (item.data / project document) — it is DATA, not items;
+  // grid: pass straight back into pathfind; collisionRects: pinepaper_physics
+  // bodies (greedy-merged, so a 60x1 wall is ONE rect, not 60).
+  return { success: true, map: r.map, grid: r.grid, collisionRects: r.collisionRects, rectCount: r.collisionRects.length };
+})();`.trim();
+      }
     }
   }
 
@@ -6374,6 +6600,62 @@ ${guard}
           `  const shapeKeyId = R.saveShapeKey(${S(input.skeletonId)}, ${S(input.name ?? null)});
   if (app.historyManager) app.historyManager.saveState();
   return { success: !!shapeKeyId, action: 'save_shape_key', shapeKeyId: shapeKeyId };`);
+
+      // ── Mocap / rig import — these live on `app` (PinePaper facades), not
+      // riggingSystem, and they are async, so they get their own async IIFE
+      // instead of the sync `wrap` above. Each returns the facade's own result
+      // object: it already carries {ok, error, warnings…} and inventing a
+      // second envelope here would just hide the interesting fields.
+      case 'import_bvh': {
+        const opts = S({
+          ...(input.view !== undefined ? { view: input.view } : {}),
+          ...(input.fps !== undefined ? { fps: input.fps } : {}),
+          ...(input.height !== undefined ? { height: input.height } : {}),
+          ...(input.rootPosition !== undefined ? { position: input.rootPosition } : {}),
+          ...(input.name !== undefined ? { name: input.name } : {}),
+        });
+        return `
+// Rigging: import BVH mocap as a new rig (stick figure included)
+(async function() {
+  if (typeof app.importBVH !== 'function') { return { success: false, error: 'app.importBVH unavailable — update FxTool to a BVH-capable build' }; }
+  const r = await app.importBVH(${S(input.bvhText ?? '')}, ${opts});
+  if (!r || !r.ok) { return { success: false, error: (r && r.error) || 'BVH import failed' }; }
+  // (facade snapshots history itself — a second saveState here would cost an extra undo step)
+  return { success: true, action: 'import_bvh', skeletonId: r.skeletonId, poses: r.poses, duration: r.duration, warnings: r.warnings || [] };
+})();`.trim();
+      }
+      case 'retarget_bvh': {
+        const opts = S({
+          ...(input.fps !== undefined ? { fps: input.fps } : {}),
+          ...(input.name !== undefined ? { name: input.name } : {}),
+        });
+        return `
+// Rigging: retarget a BVH clip onto an EXISTING rig (matched by bone name)
+(async function() {
+  if (typeof app.retargetBVH !== 'function') { return { success: false, error: 'app.retargetBVH unavailable — update FxTool to a BVH-capable build' }; }
+  const r = await app.retargetBVH(${S(input.bvhText ?? '')}, ${S(input.skeletonId)}, ${opts});
+  if (!r || !r.ok) { return { success: false, error: (r && r.error) || 'BVH retarget failed' }; }
+  // (facade snapshots history itself — a second saveState here would cost an extra undo step)
+  // matched/unmatched matter: a retarget that matched 2 of 15 bones "succeeded"
+  // and looks broken — the caller needs the numbers to know which happened.
+  return { success: true, action: 'retarget_bvh', skeletonId: r.skeletonId, matched: r.matched, unmatchedSource: r.unmatchedSource, unmatchedTarget: r.unmatchedTarget, poses: r.poses, duration: r.duration, warnings: r.warnings || [] };
+})();`.trim();
+      }
+      case 'import_spine': {
+        const opts = S({
+          ...(input.rootPosition !== undefined ? { position: input.rootPosition } : {}),
+          ...(input.name !== undefined ? { name: input.name } : {}),
+        });
+        return `
+// Rigging: import a Spine JSON export (bones, poses, attachment placeholders)
+(async function() {
+  if (typeof app.importSpine !== 'function') { return { success: false, error: 'app.importSpine unavailable — update FxTool to a Spine-capable build' }; }
+  const r = await app.importSpine(${S(input.spineJson ?? '')}, ${opts});
+  if (!r || !r.ok) { return { success: false, error: (r && r.error) || 'Spine import failed' }; }
+  // (facade snapshots history itself — a second saveState here would cost an extra undo step)
+  return { success: true, action: 'import_spine', skeletonId: r.skeletonId, bones: r.bones, placeholders: r.placeholders, animations: (r.animations || []).map(function(a) { return a.name; }), warnings: r.warnings || [] };
+})();`.trim();
+      }
     }
   }
 

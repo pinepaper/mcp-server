@@ -17,7 +17,7 @@
 
 PinePaper MCP Server enables AI assistants to create and animate graphics in [PinePaper Studio](https://pinepaper.studio) via the Model Context Protocol (MCP). Works with any AI that supports MCP tool calling (Claude, GPT, Gemini, local models, etc.).
 
-The server exposes **130 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
+The server exposes **134 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
 
 - Create text, shapes, geometry, and complex graphics
 - Animate items with behavior-driven **relations** rather than keyframes
@@ -156,7 +156,7 @@ The same code an agent generates is the code you can paste — the canvas is you
 
 ## Toolkits & Token Budget
 
-130 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
+134 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
 
 **Toolkit profiles** (`PINEPAPER_TOOLKIT`):
 
@@ -361,7 +361,7 @@ Generate instruction/code pairs for LLM fine-tuning:
 
 ## Tools Reference
 
-All 130 tools, grouped by the tag used for toolkit filtering.
+All 134 tools, grouped by the tag used for toolkit filtering.
 
 ### Canvas (`canvas`)
 | Tool | Description |
@@ -478,6 +478,7 @@ All 130 tools, grouped by the tag used for toolkit filtering.
 | `pinepaper_image_filter` | Apply image filters |
 | `pinepaper_crop_image` | Crop an image to a rect (optional aspect ratio) |
 | `pinepaper_chroma_key` | Key out a background color (auto-estimates threshold) |
+| `pinepaper_shatter_image` | Split a raster into a tile grid (inert until animated; group adopts the original id) |
 | `pinepaper_lasso` | Lasso selection on images |
 | `pinepaper_cutout_style` | Cutout styling |
 
@@ -521,17 +522,19 @@ All 130 tools, grouped by the tag used for toolkit filtering.
 ### Media (`media`)
 | Tool | Description |
 |------|-------------|
-| `pinepaper_media` | Video/audio from a URL (upload, list, remove, playback rate) |
+| `pinepaper_media` | Video/audio + editing: upload, trim, time remap / speed ramps, match cut, track matte (live) |
 
 ### Rigging (`rigging`)
 | Tool | Description |
 |------|-------------|
-| `pinepaper_rigging` | Skeletons, bones, IK chains, breakdown-pose keyframes |
+| `pinepaper_rigging` | Skeletons, bones, IK, breakdown poses; BVH mocap import/retarget, Spine import |
+| `pinepaper_import_layered_character` | Decomposed character layers → role-bound parts (blink/smile work immediately) |
 
 ### Typography (`font`, `letter_collage`)
 | Tool | Description |
 |------|-------------|
 | `pinepaper_font` | Font loading and text-to-path |
+| `pinepaper_text_style` | Display text styles (stacked-layer titles) + variable-font axes |
 | `pinepaper_create_letter_collage` | Create a letterform collage |
 | `pinepaper_animate_letter_collage` | Animate a letterform collage |
 
@@ -540,6 +543,7 @@ All 130 tools, grouped by the tag used for toolkit filtering.
 |------|-------------|
 | `pinepaper_magic` | High-level "make it look good" helpers |
 | `pinepaper_physics` | Physics simulation |
+| `pinepaper_game` | Game logic: A* pathfinding (feeds moves_along_path) + tilemaps with collision rects |
 | `pinepaper_measurement` | Measurement and annotation |
 | `pinepaper_apply_template` | Apply a scene template |
 

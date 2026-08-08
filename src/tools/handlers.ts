@@ -41,6 +41,10 @@ import {
   InstantiateOntologyInputSchema,
   LintSceneInputSchema,
   MediaInputSchema,
+  TextStyleInputSchema,
+  ShatterImageInputSchema,
+  ImportLayeredCharacterInputSchema,
+  GameInputSchema,
   BrandKitInputSchema,
   ComponentInputSchema,
   ArtboardInputSchema,
@@ -1136,6 +1140,12 @@ async function handleToolCallInner(
         return executeOrGenerate(code, `Media: ${input.action}`, options, 'pinepaper_media');
       }
 
+      case 'pinepaper_text_style': {
+        const input = TextStyleInputSchema.parse(args);
+        const code = codeGenerator.generateTextStyle(input);
+        return executeOrGenerate(code, `Text style: ${input.action}`, options, 'pinepaper_text_style');
+      }
+
       // ─── 1.6.4: agent surface for the Tier-2 engine features ───
       case 'pinepaper_brand_kit': {
         const input = BrandKitInputSchema.parse(args);
@@ -1201,6 +1211,24 @@ async function handleToolCallInner(
         const input = ChromaKeyInputSchema.parse(args);
         const code = codeGenerator.generateChromaKey(input);
         return executeOrGenerate(code, `Chroma-key image ${input.itemId}`, options, 'pinepaper_chroma_key');
+      }
+
+      case 'pinepaper_shatter_image': {
+        const input = ShatterImageInputSchema.parse(args);
+        const code = codeGenerator.generateShatterImage(input);
+        return executeOrGenerate(code, `Shatter image ${input.itemId}`, options, 'pinepaper_shatter_image');
+      }
+
+      case 'pinepaper_import_layered_character': {
+        const input = ImportLayeredCharacterInputSchema.parse(args);
+        const code = codeGenerator.generateImportLayeredCharacter(input);
+        return executeOrGenerate(code, 'Import layered character', options, 'pinepaper_import_layered_character');
+      }
+
+      case 'pinepaper_game': {
+        const input = GameInputSchema.parse(args);
+        const code = codeGenerator.generateGame(input);
+        return executeOrGenerate(code, `Game: ${input.action}`, options, 'pinepaper_game');
       }
 
       case 'pinepaper_rigging': {

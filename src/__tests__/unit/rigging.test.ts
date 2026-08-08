@@ -91,3 +91,73 @@ describe('rigging vocabulary reconciliation', () => {
     expect((PP_VOCABULARY.edges['pp:boneAttached'] as any).mcpToolRef).toBe('pinepaper_rigging');
   });
 });
+
+describe('mocap / rig import actions (v1.6.4)', () => {
+  // These three live on `app` (async PinePaper facades), not app.riggingSystem —
+  // the guard string differs from the sync actions on purpose.
+  const BVH = 'HIERARCHY\nROOT Hips\n{\n  OFFSET 0 0 0\n}\nMOTION\nFrames: 2\n';
+
+  it('import_bvh requires bvhText; import_spine requires spineJson', () => {
+    expect(RiggingInputSchema.safeParse({ action: 'import_bvh' }).success).toBe(false);
+    expect(RiggingInputSchema.safeParse({ action: 'import_bvh', bvhText: BVH }).success).toBe(true);
+    expect(RiggingInputSchema.safeParse({ action: 'import_spine' }).success).toBe(false);
+    expect(RiggingInputSchema.safeParse({ action: 'import_spine', spineJson: '{}' }).success).toBe(true);
+  });
+
+  it('retarget_bvh requires BOTH the clip and the target skeleton', () => {
+    // A retarget without a target silently becoming an import would be the
+    // worst failure shape: plausible result, wrong rig.
+    expect(RiggingInputSchema.safeParse({ action: 'retarget_bvh', bvhText: BVH }).success).toBe(false);
+    expect(RiggingInputSchema.safeParse({ action: 'retarget_bvh', skeletonId: 's1' }).success).toBe(false);
+    expect(RiggingInputSchema.safeParse({ action: 'retarget_bvh', bvhText: BVH, skeletonId: 's1' }).success).toBe(true);
+  });
+
+  it('import_bvh emits an awaited app.importBVH call with mapped options', () => {
+    const c = codeGenerator.generateRigging(RiggingInputSchema.parse({
+      action: 'import_bvh', bvhText: BVH, view: 'side', fps: 15, height: 320,
+      rootPosition: { x: 400, y: 500 }, name: 'walker',
+    }));
+    expect(c).toContain('await app.importBVH(');
+    expect(c).toContain('"view":"side"');
+    // rootPosition maps to the facade's `position` option — the schema name and
+    // the facade name differ, and forwarding the wrong key silently centers
+    // every import.
+    expect(c).toContain('"position":{"x":400,"y":500}');
+    expect(c).not.toContain('rootPosition');
+    expect(c).toContain('app.importBVH unavailable');
+  });
+
+  it('emitted BVH text survives JSON stringification (newlines and all)', () => {
+    const c = codeGenerator.generateRigging(RiggingInputSchema.parse({ action: 'import_bvh', bvhText: BVH }));
+    expect(c).toContain(JSON.stringify(BVH));
+    expect(() => new Function(c)).not.toThrow();
+  });
+
+  it('retarget_bvh surfaces matched/unmatched — a 2-of-15 match "succeeds" and looks broken', () => {
+    const c = codeGenerator.generateRigging(RiggingInputSchema.parse({ action: 'retarget_bvh', bvhText: BVH, skeletonId: 's1' }));
+    expect(c).toContain('await app.retargetBVH(');
+    expect(c).toContain('matched: r.matched');
+    expect(c).toContain('unmatchedSource');
+    expect(c).toContain('unmatchedTarget');
+  });
+
+  it('import_spine returns the facade fields that exist, not invented ones', () => {
+    // Aligned against PinePaper.importSpine's real return: bones/placeholders/
+    // animations — there is no `poses` field on the spine path.
+    const c = codeGenerator.generateRigging(RiggingInputSchema.parse({ action: 'import_spine', spineJson: '{"bones":[]}' }));
+    expect(c).toContain('await app.importSpine(');
+    expect(c).toContain('placeholders: r.placeholders');
+    expect(c).not.toContain('poses: r.poses');
+  });
+
+  it('none of the three double-snapshot history — the facades save state themselves', () => {
+    for (const input of [
+      { action: 'import_bvh' as const, bvhText: BVH },
+      { action: 'retarget_bvh' as const, bvhText: BVH, skeletonId: 's1' },
+      { action: 'import_spine' as const, spineJson: '{}' },
+    ]) {
+      const c = codeGenerator.generateRigging(RiggingInputSchema.parse(input));
+      expect(c).not.toContain('historyManager.saveState');
+    }
+  });
+});
