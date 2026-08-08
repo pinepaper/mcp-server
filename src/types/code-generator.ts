@@ -4942,18 +4942,34 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    // The RE
         return this._facadeCall('listCollagePatterns', '', 'Compose: list patterns');
       case 'list_treatments':
         return this._facadeCall('listCameraTreatments', '', 'Compose: list treatments');
+      case 'list_reveals':
+        return this._facadeCall('listReveals', '', 'Compose: list reveals');
+      case 'list_styles':
+        return this._facadeCall('listStyles', '', 'Compose: list styles');
       case 'set_treatment':
         return this._facadeCall('setCollageTreatment',
           `${JSON.stringify(input.rootId || '')}, ${JSON.stringify(input.treatment || '')}, ${JSON.stringify({ ...(input.loop ? { loop: true } : {}) })}`,
           'Compose: set treatment');
       case 'apply':
       default:
+        // Forward the WHOLE surface. The first version forwarded only
+        // treatment/camera/loop/craft — the temporal (reveal), style, text,
+        // vector and audio halves of composeCollage were unreachable through
+        // MCP, so agents converged on the four static patterns the description
+        // happened to name. A capability gap reads as model bias from outside.
         return this._facadeCall('composeCollage',
           `${JSON.stringify(input.pattern || '')}, ${JSON.stringify(input.itemIds || [])}, ${JSON.stringify({
             ...(input.treatment ? { treatment: input.treatment } : {}),
             ...(input.applyCamera === false ? { applyCamera: false } : {}),
             ...(input.loop ? { loop: true } : {}),
             ...(input.craft ? { craft: input.craft } : {}),
+            ...(input.reveal !== undefined ? { reveal: input.reveal } : {}),
+            ...(input.revealOptions ? { revealOptions: input.revealOptions } : {}),
+            ...(input.style ? { style: input.style } : {}),
+            ...(input.text ? { text: input.text } : {}),
+            ...(input.assets ? { assets: input.assets } : {}),
+            ...(input.audio ? { audio: input.audio } : {}),
+            ...(input.grid ? { grid: true } : {}),
           })}`, 'Compose: apply pattern');
     }
   }

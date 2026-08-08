@@ -2942,7 +2942,7 @@ export const SceneDiffInputSchema = z.object({
 export type SceneDiffInput = z.infer<typeof SceneDiffInputSchema>;
 
 export const ComposeInputSchema = z.object({
-  action: z.enum(['list_patterns', 'list_treatments', 'apply', 'set_treatment']),
+  action: z.enum(['list_patterns', 'list_treatments', 'list_reveals', 'list_styles', 'apply', 'set_treatment']),
   /** Pattern key from list_patterns. Each declares the slot count it accepts. */
   pattern: z.string().optional(),
   /** Items IN SLOT ORDER — the order is the composition, not a detail. */
@@ -2955,6 +2955,20 @@ export const ComposeInputSchema = z.object({
   loop: z.boolean().optional(),
   /** Override individual craft ratios (gutter, margin, …). Fractions of the short canvas edge. */
   craft: z.record(z.string(), z.number()).optional(),
+  /** Temporal reveal key from list_reveals — items arriving over time is what makes it a clip. */
+  reveal: z.string().nullable().optional(),
+  /** Reveal tuning: { duration, beat, fade, beats: number[] } — explicit beats sync cuts to audio. */
+  revealOptions: z.record(z.string(), z.unknown()).optional(),
+  /** Visual style bundle from list_styles (treatments + spacing + motion defaults). */
+  style: z.string().optional(),
+  /** Content for the pattern's own TEXT slots (headline, caption…), in slot order. */
+  text: z.array(z.string()).optional(),
+  /** SVG markup for the pattern's VECTOR slots (badge, logo mark), in slot order. */
+  assets: z.array(z.string()).optional(),
+  /** Audio source to beat-sync the reveal to; onsets are detected and recorded on the graph. */
+  audio: z.string().optional(),
+  /** With audio: snap to an even tempo grid instead of raw onsets. */
+  grid: z.boolean().optional(),
 });
 export type ComposeInput = z.infer<typeof ComposeInputSchema>;
 

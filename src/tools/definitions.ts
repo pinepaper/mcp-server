@@ -3300,17 +3300,22 @@ ACTIONS:
 nicely and give me a clip".
 
 ACTIONS:
-- list_patterns: Available patterns with their slot counts. CALL THIS FIRST — each pattern takes a
-  specific number of items, and the definitions say what each is for.
+- list_patterns: ~25 patterns with slot counts and when-to-use definitions. CALL THIS FIRST and
+  CHOOSE FROM THE LIST — do not fall back to a remembered favourite. The catalogue spans media
+  grids, no-crop mosaics, typographic cards (title, quote, magazine cover, before/after), vector
+  slots (badge, logo lockup), and video shapes (lower-third, picture-in-picture).
+- list_reveals: temporal reveals (how items ARRIVE over time — staggers, cascades, beat-driven
+  hard cuts). A composition without a reveal is a still.
+- list_styles: visual style bundles (tone treatments + spacing + the motion each implies).
 - apply: Arrange items. Params: pattern, itemIds (IN SLOT ORDER — the order is the composition),
-  treatment (defaults to the pattern's own), applyCamera (false to arrange only), craft.
-- list_treatments: Available camera treatments.
-- set_treatment: Re-film an existing composition. Params: rootId (returned by apply), treatment.
+  reveal + revealOptions ({ duration, beats }), style, text (fills the pattern's own text slots),
+  assets (SVG for vector slots), audio + grid (beat-sync the cuts to a track), treatment,
+  applyCamera, craft.
+- list_treatments / set_treatment: camera treatments; re-film via rootId.
 
-PATTERNS: grid-2x2 (4 equal images) · hero-plus-strip (3–6, one dominant — the product-shot default)
-· editorial-split (2–3 plus deliberate empty space for a headline) · stacked-depth (2–5 overlapping
-cards).
-TREATMENTS: sheet-reveal · hero-then-details · slow-pan · push-through.
+PICKING WELL: match the pattern to the CONTENT (count, aspect ratios, whether type or video is
+involved) — the list_patterns definitions state this per pattern. Vary reveals and styles across a
+session; identical choices on every scene is a sign the list was never consulted.
 
 WHAT THIS RETURNS, AND WHY IT MATTERS: apply positions ONE root and wires structural relations
 (beside / below / on_top_of) for the rest — it does not set a coordinate per item. The composition
