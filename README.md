@@ -144,14 +144,35 @@ app.animate(sq, { animationType: 'rotate' });
 
 The same code an agent generates is the code you can paste — the canvas is yours either way, undo included.
 
-## What's new in 1.6.0
+## What's new in 1.6.4
+
+Fourteen new tools (121 → 135) and new actions across the surface — the release that catches the agent surface up with the engine.
+
+**3D worlds.** `pinepaper_world3d` — a real depth-buffered 3D world under the canvas: terrain presets (`forest`, `snowMountain`, `field`, `jungle`), sun shadows, an addressable actor stage and a directed camera (`follow`/`fixed`/`orbit`). `add_actor` with `live: true` puts a rigged canvas character INTO the world, performing — walk cycle, expressions and all. `describe` returns the engine's own parameter schema, so the docs cannot drift.
+
+**Motion capture & characters.** `pinepaper_rigging` gains `import_bvh` (CMU/Mixamo mocap → a new rig, stick figure included), `retarget_bvh` (drive an *existing* rig by bone name — the result reports matched/unmatched bones) and `import_spine` (Spine JSON). New `pinepaper_import_layered_character` lands a layer-decomposed illustration as role-bound parts — blink and smile work with zero wiring (check `rolesWired` in the result).
+
+**Video editing.** `pinepaper_media` gains `set_time_remap` (speed ramps, freeze frames, reverse), `speed_ramp`, `match_cut` (subject-aligned cuts via on-device detection), `apply_track_matte` (a headline filled with footage; `live: true` tracks an animating matte) and `stop_live_matte`.
+
+**Design systems.** `pinepaper_brand_kit` (plan with WCAG contrast audit, then apply), `pinepaper_component` (master/instance with overrides that survive master updates), `pinepaper_artboard` (retarget a finished design to a new format), `pinepaper_comment`, `pinepaper_provenance`, `pinepaper_scene_diff` — plus `pinepaper_transform` `fit` (contain/cover).
+
+**Typography & imagery.** `pinepaper_text_style` (stacked-layer display titles + variable-font weight/width/slant as animatable properties), `pinepaper_shatter_image` (raster → tile grid, inert until animated), `pinepaper_compose` (the collage patterns), and `pinepaper_image_filter` now documents the full GPU registry — grain, scanlines, duotone, bloom, halation, lightShafts, paletteMap, and the second-input set (displace, refract, trackMatte, datamosh) — plus `analyze_palette`/`recolor_palette` (read an image's palette, recolor another to match, shading preserved).
+
+**Games & data.** `pinepaper_game` (deterministic A* pathfinding that feeds `moves_along_path`, tilemaps with merged collision rects), `pinepaper_audio_beats` (beat detection → `animate_to_beat`), `pinepaper_template_params`, and Figma import via `pinepaper_import_asset`.
+
+**Agent economics.** `pinepaper_agent_export` gains `estimateOnly` — preflight an export's size without rendering it; GIF exports are capped at 15s with a clear message instead of an OOM.
+
+<details>
+<summary>What's new in 1.6.0</summary>
 
 - **Image editing tools**: `pinepaper_crop_image` (one-shot crop, keeps the item's id and relations) and `pinepaper_chroma_key` (green-screen background removal with auto-estimated thresholds)
 - **`pinepaper_media` gains `set_clip`** — re-trim an already-uploaded video/audio clip
 - **Shader auras** in `pinepaper_apply_effect`: `heatmap`, `liquid_metal`, `gem_smoke` (WebGL2, silhouette-clipped)
-- **`pinepaper_image_filter` fixed and expanded** — now routed to the real GPU filter engine with the full 15-filter set (halftone family, posterize, vignette, HSL, tint, dither, blur…)
+- **`pinepaper_image_filter` fixed and expanded** — routed to the real GPU filter engine
 - **README as an MCP resource** — clients can read `pinepaper://docs/readme` (and per-language variants) without leaving the protocol
 - This README, in 9 languages, with live animated examples
+
+</details>
 
 
 ## Toolkits & Token Budget
