@@ -2030,6 +2030,50 @@ RECIPE — a playable maze: create_tilemap with wall fills → batch_create colo
       required: ['action'],
     },
   },
+
+  {
+    name: 'pinepaper_world3d',
+    annotations: {
+      title: '3D World (Terrain / Actors / Camera)',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `A real 3D WORLD under the canvas — depth-buffered terrain, sky, sun shadows, an addressable actor stage and a directed camera. ADDITIVE: Paper.js keeps every vector item, hit-test and export path; the world composites underneath the (transparent) Paper canvas.
+
+ACTIONS:
+- create: { spec? ('forest' | 'snowMountain' | 'field' | 'jungle' | a full spec object), character? (true/config → a walkable character) } → { configurableKeys }
+- describe: {} → the ENGINE'S OWN parameter schema — every world parameter with type, range and description. Call this before configure; the tool does not restate the schema, so it cannot drift from the engine.
+- configure: { patch } — live deep-merged change to anything describe lists (colours, fog, sun, terrain amplitude/ridge, seed…). Schema-validated: a wrong key errors NAMING the right one, never a silent no-op.
+- add_actor: { actorId?, x, z, height?, sprite? (a canvas item id), live? } → { actorId }. live: true re-rasterizes the item as it animates — a RIGGED character (walk cycle, expressions) PERFORMS in the world instead of standing there as a photograph of itself.
+- remove_actor / list_actors / set_actor_pose: { actorId, pose: { x?, z?, angle? } } — the setter a timeline, sequencer or agent drives frame by frame.
+- set_camera: { camera: { mode: 'follow' | 'fixed' | 'orbit', target? (actorId), radius?, speed?, eye?, lookAt? } }
+- add_object: { object: { x, z, height?, color? } } (y defaults to sitting ON the terrain) / remove_object: { objectId }
+- remove_world: {} — tears the world down; the Paper canvas was always its own layer and is untouched.
+
+RECIPE — a character walking through a forest: create {spec:'forest'} → import/rig a character on the canvas → add_actor {sprite: itemId, live: true} → set_camera {mode:'follow', target} → drive set_actor_pose over time (or let the built-in character control walk).`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['create', 'describe', 'configure', 'add_actor', 'remove_actor', 'list_actors', 'set_actor_pose', 'set_camera', 'add_object', 'remove_object', 'remove_world'], description: 'World operation' },
+        spec: { description: "create: preset id ('forest'|'snowMountain'|'field'|'jungle') or a full spec object." },
+        character: { description: 'create: include the walkable character (boolean or config).' },
+        patch: { type: 'object', description: 'configure: partial world spec, validated against describe.' },
+        actorId: { type: 'string', description: 'Actor id.' },
+        x: { type: 'number', description: 'add_actor: world x.' },
+        z: { type: 'number', description: 'add_actor: world z.' },
+        height: { type: 'number', description: 'add_actor: world-unit size.' },
+        sprite: { type: 'string', description: 'add_actor: canvas item id for the sprite.' },
+        live: { type: 'boolean', description: 'add_actor: re-rasterize as the item animates.' },
+        pose: { type: 'object', description: 'set_actor_pose: { x?, z?, angle? }.' },
+        camera: { type: 'object', description: "set_camera: { mode: follow|fixed|orbit, target?, radius?, speed?, eye?, lookAt? }." },
+        object: { type: 'object', description: 'add_object: { x, z, height?, color?, y? }.' },
+        objectId: { type: 'string', description: 'remove_object: object id.' },
+      },
+      required: ['action'],
+    },
+  },
   {
     name: 'pinepaper_rigging',
     annotations: {
@@ -3825,6 +3869,8 @@ ACTIONS:
 ACTIONS:
 - apply: Apply a single filter. Params: itemId, filterName, params
 - chain: Apply multiple filters in sequence. Params: itemId, filters (array of {name, params})
+- analyze_palette: { itemId, maxSwatches? (8) } → { swatches: [{hex, share}…] largest-area-first } — READ an image's palette. The natural loop: analyze image A → recolor_palette (or the paletteMap filter) on image B with A's hexes.
+- recolor_palette: { itemId, mapping ({from,to}[] or {'#old':'#new'}), amount?, preserveShading? } — swap colours, keep the shading (GPU).
 
 Available filters (GPU raster set):
 - Color: grayscale, sepia, brightness, contrast, saturation, invert, posterize (levels), hsl (hue/saturation/lightness), colorTint (color, intensity, blendMode), colorMatrix (matrix), duotone (shadow, highlight, mix), paletteMap (swatches[], amount, preserveShading — recolor to a fixed palette)

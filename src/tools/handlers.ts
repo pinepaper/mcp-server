@@ -45,6 +45,7 @@ import {
   ShatterImageInputSchema,
   ImportLayeredCharacterInputSchema,
   GameInputSchema,
+  World3DInputSchema,
   BrandKitInputSchema,
   ComponentInputSchema,
   ArtboardInputSchema,
@@ -1229,6 +1230,12 @@ async function handleToolCallInner(
         const input = GameInputSchema.parse(args);
         const code = codeGenerator.generateGame(input);
         return executeOrGenerate(code, `Game: ${input.action}`, options, 'pinepaper_game');
+      }
+
+      case 'pinepaper_world3d': {
+        const input = World3DInputSchema.parse(args);
+        const code = codeGenerator.generateWorld3D(input);
+        return executeOrGenerate(code, `World3D: ${input.action}`, options, 'pinepaper_world3d');
       }
 
       case 'pinepaper_rigging': {

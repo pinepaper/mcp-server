@@ -59,6 +59,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_instantiate_ontology: 'Compile a pp: JSON-LD graph (typed nodes + structural edges like on_top_of) into a scene — roots placed, rest positioned by relations. {doc, canvas?, defaultGeometry?} → {itemIds, diagnostics}.',
   pinepaper_lint_scene: 'Read-only relational-density audit of the live scene → {density, suggestions}. Flags coordinate-driven scenes and proposes structural relations for unrelated items already in position. {eps?, cap?}',
   pinepaper_media: "Video/audio + editing. action: upload_video|upload_audio|list|remove|set_playback_rate|set_clip|set_time_remap|speed_ramp|match_cut|apply_track_matte|stop_live_matte.",
+  pinepaper_world3d: "3D world under the canvas: create (forest|snowMountain|field|jungle)|describe (engine schema)|configure|add_actor (live sprites)|set_actor_pose|set_camera (follow|fixed|orbit)|objects|remove_world.",
   pinepaper_game: "Game logic: pathfind (A* world-coords waypoints for moves_along_path)|create_tilemap (board data + grid + merged collision rects). Pure data, draws nothing.",
   pinepaper_shatter_image: "Split a raster into a grid of tiles (inert until animated). Group adopts the original id. {itemId, pieces?|rows?+cols?, keepSource?}",
   pinepaper_import_layered_character: "Import decomposer output (layer manifest + images) as role-bound parts; blink/smile work immediately. CHECK rolesWired>0. {info, images}",

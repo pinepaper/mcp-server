@@ -185,7 +185,7 @@ import {
   CaptureFramesInput,
   InstantiateOntologyInput,
   LintSceneInput,
-  MediaInput, TextStyleInput, ShatterImageInput, ImportLayeredCharacterInput, GameInput,
+  MediaInput, TextStyleInput, ShatterImageInput, ImportLayeredCharacterInput, GameInput, World3DInput,
   CropImageInput,
   ChromaKeyInput,
   RiggingInput,
@@ -5171,6 +5171,32 @@ ${resolve}
 })();`.trim();
       default:
         return `(function() { return { error: 'Unknown image_filter action: ${(input as any).action}' }; })();`;
+case 'analyze_palette':
+        return `
+// Analyze palette: the dominant colours, largest area first (GPU path)
+(async function() {
+  if (typeof app.analyzePalette !== 'function') { return { success: false, error: 'app.analyzePalette unavailable — update FxTool to a palette-capable build' }; }
+  try {
+    const r = await app.analyzePalette(${JSON.stringify(input.itemId)}, ${JSON.stringify({ ...(input.maxSwatches !== undefined ? { maxSwatches: input.maxSwatches } : {}) })});
+    // swatches: [{hex, share, …}] largest-first — feed hex values straight into
+    // recolor_palette mapping or the paletteMap filter's swatches[].
+    return { success: true, width: r.width, height: r.height, opaquePixels: r.opaquePixels, swatches: r.swatches };
+  } catch (e) {
+    return { success: false, error: e && e.message ? e.message : String(e) };
+  }
+})();`.trim();
+      case 'recolor_palette':
+        return `
+// Recolor palette: swap colours, keep the shading (GPU path)
+(async function() {
+  if (typeof app.recolorPalette !== 'function') { return { success: false, error: 'app.recolorPalette unavailable — update FxTool to a palette-capable build' }; }
+  try {
+    await app.recolorPalette(${JSON.stringify(input.itemId)}, ${JSON.stringify(input.mapping)}, ${JSON.stringify({ ...(input.amount !== undefined ? { amount: input.amount } : {}), ...(input.preserveShading !== undefined ? { preserveShading: input.preserveShading } : {}) })});
+    return { success: true, action: 'recolor_palette', itemId: ${JSON.stringify(input.itemId)} };
+  } catch (e) {
+    return { success: false, error: e && e.message ? e.message : String(e) };
+  }
+})();`.trim();
     }
   }
 
@@ -6473,6 +6499,118 @@ ${guard}
   return { success: true, map: r.map, grid: r.grid, collisionRects: r.collisionRects, rectCount: r.collisionRects.length };
 })();`.trim();
       }
+    }
+  }
+
+  /**
+   * pinepaper_world3d — every action rides the PinePaper world facades. The
+   * world is lazily created by createWorld3D; every other action guards on the
+   * facade AND on a world existing, with the create hint in the error.
+   */
+  generateWorld3D(input: World3DInput): string {
+    const S = (v: unknown) => JSON.stringify(v);
+    const needWorld = `  if (!app._world3d) { return { success: false, error: "no 3D world — call pinepaper_world3d create first" }; }`;
+    switch (input.action) {
+      case 'create': {
+        const opts = S({ ...(input.character !== undefined ? { character: input.character } : {}) });
+        return `
+// World3D: create — terrain, sky, shadows, walkable character, under the Paper canvas
+(async function() {
+  if (typeof app.createWorld3D !== 'function') { return { success: false, error: 'app.createWorld3D unavailable — update FxTool to a world3d-capable build' }; }
+  await app.createWorld3D(${S(input.spec ?? 'forest')}, ${opts});
+  // describe() is the world's own parameter schema — return the preset list +
+  // top-level keys so the agent knows what configure can touch, without the
+  // full multi-KB schema on every create.
+  const d = typeof app.describeWorld3D === 'function' ? await app.describeWorld3D() : null;
+  return { success: true, action: 'create', spec: ${S(input.spec ?? 'forest')}, configurableKeys: d ? Object.keys(d.params || d) : [] };
+})();`.trim();
+      }
+      case 'describe':
+        return `
+// World3D: the engine's own parameter schema — types, ranges, descriptions
+(async function() {
+  if (typeof app.describeWorld3D !== 'function') { return { success: false, error: 'app.describeWorld3D unavailable — update FxTool' }; }
+  return { success: true, schema: await app.describeWorld3D() };
+})();`.trim();
+      case 'configure':
+        return `
+// World3D: live configure (deep-merged, schema-validated)
+(function() {
+  if (typeof app.configureWorld3D !== 'function') { return { success: false, error: 'app.configureWorld3D unavailable — update FxTool' }; }
+${needWorld}
+  const r = app.configureWorld3D(${S(input.patch)});
+  // The validator names the right key on a wrong one — forward it verbatim.
+  return r && r.ok ? { success: true, action: 'configure' } : { success: false, error: (r && r.error) || 'configure failed' };
+})();`.trim();
+      case 'add_actor': {
+        const actor = S({
+          ...(input.actorId !== undefined ? { id: input.actorId } : {}),
+          ...(input.x !== undefined ? { x: input.x } : {}),
+          ...(input.z !== undefined ? { z: input.z } : {}),
+          ...(input.height !== undefined ? { height: input.height } : {}),
+          ...(input.sprite !== undefined ? { sprite: input.sprite } : {}),
+          ...(input.live !== undefined ? { live: input.live } : {}),
+        });
+        return `
+// World3D: put an actor on the stage${input.live ? ' (live sprite — a rigged character PERFORMS, not a photograph of itself)' : ''}
+(function() {
+  if (typeof app.addWorldActor !== 'function') { return { success: false, error: 'app.addWorldActor unavailable — update FxTool' }; }
+${needWorld}
+  const id = app.addWorldActor(${actor});
+  return id ? { success: true, actorId: id } : { success: false, error: 'actor not added — is the sprite id a canvas item?' };
+})();`.trim();
+      }
+      case 'remove_actor':
+        return `
+// World3D: remove actor
+(function() {
+${needWorld}
+  return { success: !!app.removeWorldActor(${S(input.actorId)}), actorId: ${S(input.actorId)} };
+})();`.trim();
+      case 'list_actors':
+        return `
+// World3D: the addressable stage
+(function() {
+${needWorld}
+  return { success: true, actors: app.listWorldActors() };
+})();`.trim();
+      case 'set_actor_pose':
+        return `
+// World3D: pose an actor — the setter a timeline, sequencer or agent drives
+(function() {
+${needWorld}
+  return { success: !!app.setWorldActorPose(${S(input.actorId)}, ${S(input.pose)}), actorId: ${S(input.actorId)} };
+})();`.trim();
+      case 'set_camera':
+        return `
+// World3D: direct the camera (follow | fixed | orbit)
+(function() {
+${needWorld}
+  const r = app.setWorldCamera(${S(input.camera)});
+  return r === false ? { success: false, error: 'camera config rejected' } : { success: true };
+})();`.trim();
+      case 'add_object':
+        return `
+// World3D: place an object (y defaults to sitting on the terrain)
+(function() {
+${needWorld}
+  const id = app.addWorldObject(${S(input.object)});
+  return id ? { success: true, objectId: id } : { success: false, error: 'object not added' };
+})();`.trim();
+      case 'remove_object':
+        return `
+// World3D: remove object
+(function() {
+${needWorld}
+  return { success: !!app.removeWorldObject(${S(input.objectId)}), objectId: ${S(input.objectId)} };
+})();`.trim();
+      case 'remove_world':
+        return `
+// World3D: tear the world down — Paper's canvas is untouched (it was always its own layer)
+(function() {
+  if (typeof app.removeWorld3D !== 'function') { return { success: false, error: 'app.removeWorld3D unavailable — update FxTool' }; }
+  return { success: !!app.removeWorld3D() };
+})();`.trim();
     }
   }
 

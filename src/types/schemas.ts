@@ -3006,7 +3006,7 @@ export type HistoryInput = z.infer<typeof HistoryInputSchema>;
 // =============================================================================
 
 export const ImageFilterInputSchema = z.object({
-  action: z.enum(['apply', 'chain']),
+  action: z.enum(['apply', 'chain', 'analyze_palette', 'recolor_palette']),
   itemId: z.string(),
   filterName: z.string().optional(),
   params: z.record(z.unknown()).optional(),
@@ -3014,6 +3014,14 @@ export const ImageFilterInputSchema = z.object({
     name: z.string(),
     params: z.record(z.unknown()).optional(),
   })).optional(),
+  // analyze_palette / recolor_palette (GPU path)
+  maxSwatches: z.number().int().positive().max(32).optional().describe('analyze_palette: swatch count cap (default 8).'),
+  mapping: z.union([
+    z.array(z.object({ from: z.string(), to: z.string() })),
+    z.record(z.string(), z.string()),
+  ]).optional().describe("recolor_palette: {from,to}[] or {'#old':'#new'} — colours swap, shading survives."),
+  amount: z.number().min(0).max(1).optional().describe('recolor_palette: blend 0–1.'),
+  preserveShading: z.number().min(0).max(1).optional().describe('recolor_palette: how much of the original luminance detail survives (default 1).'),
 });
 export type ImageFilterInput = z.infer<typeof ImageFilterInputSchema>;
 
@@ -3505,6 +3513,38 @@ export const GameInputSchema = z.object({
   .refine((v) => v.action !== 'pathfind' || (!!v.grid && !!v.start && !!v.goal), { message: 'pathfind requires grid, start, goal', path: ['grid'] })
   .refine((v) => v.action !== 'create_tilemap' || (v.cols !== undefined && v.rows !== undefined), { message: 'create_tilemap requires cols and rows', path: ['cols'] });
 export type GameInput = z.infer<typeof GameInputSchema>;
+
+/**
+ * pinepaper_world3d — the additive 3D renderer layer under the Paper canvas:
+ * terrain, sky, shadows, an addressable actor stage, and a directed camera.
+ * Paper.js keeps every vector item and export path; the world composites
+ * underneath. `describe` returns the full parameter schema from the engine
+ * itself — the tool does not restate it, so it cannot drift.
+ */
+export const World3DInputSchema = z.object({
+  action: z.enum(['create', 'describe', 'configure', 'add_actor', 'remove_actor', 'list_actors', 'set_actor_pose', 'set_camera', 'add_object', 'remove_object', 'remove_world'])
+    .describe("'create' (a preset world) · 'describe' (every parameter with type/range — CALL THIS before configure) · 'configure' (live deep-merge patch, schema-validated) · actor ops · 'set_camera' (follow|fixed|orbit) · object ops · 'remove_world'"),
+  spec: z.union([z.string(), z.record(z.string(), z.unknown())]).optional().describe("create: a preset id ('forest', 'snowMountain', …) or a full world spec object."),
+  character: z.union([z.boolean(), z.record(z.string(), z.unknown())]).optional().describe('create: include the walkable character (true/config).'),
+  patch: z.record(z.string(), z.unknown()).optional().describe('configure: partial world spec, deep-merged and validated — a wrong key errors naming the right one.'),
+  actorId: z.string().optional().describe('Actor id — add_actor (optional, generated if omitted) / remove_actor / set_actor_pose / set_camera target.'),
+  x: z.number().optional().describe('World-space x — add_actor / add_object.'),
+  z: z.number().optional().describe('World-space z — add_actor / add_object.'),
+  height: z.number().optional().describe('add_actor / add_object: size in world units.'),
+  sprite: z.string().optional().describe('add_actor: a canvas item id to use as the sprite.'),
+  live: z.boolean().optional().describe('add_actor: re-rasterize the item as it animates — a rigged character PERFORMS in the world instead of standing there as a photograph of itself.'),
+  pose: z.record(z.string(), z.unknown()).optional().describe('set_actor_pose: { x?, z?, angle?, … } — the setter a timeline or agent drives.'),
+  camera: z.record(z.string(), z.unknown()).optional().describe("set_camera: { mode: 'follow'|'fixed'|'orbit', target?, radius?, speed?, eye?, lookAt? }."),
+  object: z.record(z.string(), z.unknown()).optional().describe('add_object: { x, z, height?, color?, y? (defaults to sitting on the terrain) }.'),
+  objectId: z.string().optional().describe('remove_object: the object id.'),
+})
+  .refine((v) => v.action !== 'configure' || !!v.patch, { message: 'configure requires patch', path: ['patch'] })
+  .refine((v) => !['remove_actor', 'set_actor_pose'].includes(v.action) || !!v.actorId, { message: 'this action requires actorId', path: ['actorId'] })
+  .refine((v) => v.action !== 'set_actor_pose' || !!v.pose, { message: 'set_actor_pose requires pose', path: ['pose'] })
+  .refine((v) => v.action !== 'set_camera' || !!v.camera, { message: 'set_camera requires camera', path: ['camera'] })
+  .refine((v) => v.action !== 'add_object' || !!v.object, { message: 'add_object requires object', path: ['object'] })
+  .refine((v) => v.action !== 'remove_object' || !!v.objectId, { message: 'remove_object requires objectId', path: ['objectId'] });
+export type World3DInput = z.infer<typeof World3DInputSchema>;
 
 // =============================================================================
 // ONE-SHOT IMAGE OPS (crop / chroma key — Track A agent parity, 2026-07-31)

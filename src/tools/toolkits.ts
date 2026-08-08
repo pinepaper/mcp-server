@@ -178,6 +178,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
   ],
   physics: [
     'pinepaper_game',
+    'pinepaper_world3d',
     'pinepaper_physics',
   ],
   measurement: [
