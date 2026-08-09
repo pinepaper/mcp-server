@@ -70,7 +70,7 @@
     "eslint": "^10.8.1",
     "@typescript-eslint/eslint-plugin": "^8.66.0",
     "@typescript-eslint/parser": "^8.66.0",
-    "puppeteer": "^24.37.3"
+    "puppeteer": "^24.43.1"
   },
   "files": [
     "dist",
@@ -88,14 +88,23 @@
     "README.hi.md"
   ],
   "overrides": {
+    "basic-ftp": "^5.3.1",
+    "body-parser": "^2.3.0",
     "es-define-property": "npm:@socketregistry/es-define-property@^1.0.7",
+    "fast-uri": "^3.1.5",
+    "flatted": "^3.4.2",
     "function-bind": "npm:@socketregistry/function-bind@^1.0.7",
     "gopd": "npm:@socketregistry/gopd@^1.0.7",
     "has-symbols": "npm:@socketregistry/has-symbols@^1.0.7",
     "hasown": "npm:@socketregistry/hasown@^1.0.7",
+    "ip-address": "^10.3.1",
+    "js-yaml": "^4.3.1",
     "object-assign": "npm:@socketregistry/object-assign@^1.0.5",
+    "path-to-regexp": "^8.4.2",
+    "qs": "^6.15.2",
     "safer-buffer": "npm:@socketregistry/safer-buffer@^1.0.10",
-    "side-channel": "npm:@socketregistry/side-channel@^1.0.10"
+    "side-channel": "npm:@socketregistry/side-channel@^1.0.10",
+    "ws": "^8.21.1"
   },
   "peerDependencies": {
     "puppeteer": ">=22"
