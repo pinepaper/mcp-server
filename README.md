@@ -144,6 +144,17 @@ app.animate(sq, { animationType: 'rotate' });
 
 The same code an agent generates is the code you can paste — the canvas is yours either way, undo included.
 
+## What's new in 1.6.6
+
+Dependency security, no new tools and no API changes:
+
+- **10 vulnerable transitive pins cleared** (21 advisories: 1 critical, 13 high, 6 moderate, 1 low) across `basic-ftp`, `fast-uri`, `js-yaml`, `path-to-regexp`, `ws`, `ip-address`, `qs`, `flatted`, `body-parser` and `ajv`. Each is pinned to a floor in `overrides` so neither resolver can drift back.
+- **Root cause was a stale committed `bun.lock`.** It pinned the vulnerable versions while `package-lock.json` had already re-resolved most of them — and `bun test`/`bun run build` install from `bun.lock`, so that was the tree in use. Both lockfiles now agree.
+- **`npm audit` reported zero** against all of this; its registry advisory feed lags GitHub's. Verified instead with an OSV.dev sweep of both lockfiles, red-tested against the previous commit.
+- **`manifest.json` version parity is now tested.** It had silently sat at 1.6.4 through the 1.6.5 release.
+
+Exposure note: `puppeteer` has been an optional peer since 1.6.5, so its chain (`basic-ftp`, `ws`, `ip-address`, `js-yaml`) never reached installs of this package. The `@modelcontextprotocol/sdk` chain (`fast-uri`, `path-to-regexp`, `qs`, `body-parser`, `ajv`) is the production surface.
+
 ## What's new in 1.6.5
 
 Security hardening, no new tools:

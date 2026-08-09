@@ -24,6 +24,18 @@ describe('SERVER_VERSION — single source of truth', () => {
     expect(SERVER_VERSION).toMatch(/^\d+\.\d+\.\d+(?:-[\w.]+)?$/);
   });
 
+  it('manifest.json version matches package.json', () => {
+    // manifest.json carries its own version field and is NOT reachable from
+    // SERVER_VERSION (it's data, not code), so `npm version` doesn't touch it.
+    // It silently sat at 1.6.4 through the whole 1.6.5 release — the manifest
+    // is what MCP directory listings show, so the drift is user-visible.
+    // check:manifest only compares tools[], which is why nothing caught it.
+    const manifest = JSON.parse(
+      readFileSync(join(REPO_ROOT, 'manifest.json'), 'utf-8')
+    ) as { version: string };
+    expect(manifest.version).toBe(SERVER_VERSION);
+  });
+
   it('no source file hardcodes a different version string', () => {
     // Anti-regression: scan the version-emitting entry files for any quoted
     // semver literal that doesn't match SERVER_VERSION. These files MUST NOT
