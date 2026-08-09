@@ -218,8 +218,18 @@ export class PinePaperBrowserController {
         this.page = null;
       }
 
-      // Dynamic import to avoid issues when puppeteer isn't installed
-      const puppeteer = await import('puppeteer');
+      // Puppeteer is an OPTIONAL peer (1.6.5): browser automation is 4 of 135
+      // tools, and carrying a headless-browser + install-script dependency in
+      // the default tree is what supply-chain scanners flag hardest. Absent →
+      // a clear instruction, not a crash.
+      let puppeteer: { default: { launch: (opts: object) => Promise<import('puppeteer').Browser> } };
+      try {
+        puppeteer = await import('puppeteer');
+      } catch {
+        throw new Error(
+          'The browser tools need puppeteer, which is an optional install: run `npm i puppeteer` (or `npm i -g puppeteer` for a global CLI) and retry. It is kept out of the default dependency tree for supply-chain hygiene.',
+        );
+      }
 
       console.error('[PinePaper] Launching browser...');
       this.browser = await puppeteer.default.launch({
@@ -615,8 +625,18 @@ export class PinePaperBrowserController {
         this.page = null;
       }
 
-      // Dynamic import to avoid issues when puppeteer isn't installed
-      const puppeteer = await import('puppeteer');
+      // Puppeteer is an OPTIONAL peer (1.6.5): browser automation is 4 of 135
+      // tools, and carrying a headless-browser + install-script dependency in
+      // the default tree is what supply-chain scanners flag hardest. Absent →
+      // a clear instruction, not a crash.
+      let puppeteer: { default: { launch: (opts: object) => Promise<import('puppeteer').Browser> } };
+      try {
+        puppeteer = await import('puppeteer');
+      } catch {
+        throw new Error(
+          'The browser tools need puppeteer, which is an optional install: run `npm i puppeteer` (or `npm i -g puppeteer` for a global CLI) and retry. It is kept out of the default dependency tree for supply-chain hygiene.',
+        );
+      }
 
       // Agent mode defaults to visible browser so user can see PinePaper Studio
       const useHeadless = options.headless ?? this.config.headless;

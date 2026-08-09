@@ -1363,3 +1363,26 @@ describe('PinePaperCodeGenerator', () => {
     });
   });
 });
+
+describe('emitted string literals are breakout-proof (CodeQL js/incomplete-sanitization)', () => {
+  // Quote-only escaping turns `x\'; evil()` into a literal backslash + a live
+  // closing quote — the payload lands OUTSIDE the string in the generated
+  // code. JSON.stringify closes the class; these pin it.
+  const HOSTILE = "x\\'; evil(); '";
+
+  it('agent job names cannot escape their literal', () => {
+    const code = codeGenerator.generateAgentStartJob({ name: HOSTILE } as never);
+    const literal = JSON.stringify(HOSTILE);
+    // containment of the JSON literal IS the proof: JSON.stringify escaping is
+    // complete, and parsing that exact span round-trips to the hostile input
+    // (i.e. every byte stayed INSIDE the string).
+    const at = code.indexOf(literal);
+    expect(at).toBeGreaterThan(-1);
+    expect(JSON.parse(code.slice(at, at + literal.length))).toBe(HOSTILE);
+  });
+
+  it('diagram labels cannot escape their literal', () => {
+    const code = codeGenerator.generateCreateDiagramShape({ shapeType: 'rectangle', x: 100, y: 100, label: HOSTILE } as never);
+    expect(code).toContain(JSON.stringify(HOSTILE));
+  });
+});

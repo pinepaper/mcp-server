@@ -144,6 +144,14 @@ app.animate(sq, { animationType: 'rotate' });
 
 The same code an agent generates is the code you can paste — the canvas is yours either way, undo included.
 
+## What's new in 1.6.5
+
+Security hardening, no new tools:
+
+- **Generated code is breakout-proof.** Three emitters wrapped user text in hand-escaped quotes without escaping backslashes (CodeQL `js/incomplete-sanitization`, High ×3) — an input like ``x\'; evil()`` could land outside the string in emitted code. All string literals now emit via `JSON.stringify`; regression tests pin the class.
+- **Puppeteer is now an optional peer.** The 4 browser tools lazy-load it and explain the one-line install (`npm i puppeteer`) when absent. The default dependency tree drops the headless-browser download, its install script, and its large transitive tree (`tar-fs`/`bare-*` — the usual "obfuscated code" scanner alerts). Default deps: `@modelcontextprotocol/sdk` + `zod`.
+- **Slimmer tarball.** Compiled test fixtures no longer ship in `dist/`.
+
 ## What's new in 1.6.4
 
 Fourteen new tools (121 → 135) and new actions across the surface — the release that catches the agent surface up with the engine.

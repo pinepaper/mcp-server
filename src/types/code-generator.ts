@@ -1873,7 +1873,10 @@ results;
     const styleStr = style ? JSON.stringify(style) : '{}';
     const widthVal = width || 120;
     const heightVal = height || 60;
-    const labelStr = label ? `'${label.replace(/'/g, "\\'")}'` : 'null';
+    // JSON.stringify emits a complete escaped literal — hand-rolled quote
+    // escaping missed backslashes (CodeQL js/incomplete-sanitization: an input
+    // ending in \ escapes the closing quote; 'x\\'; evil()' breaks out).
+    const labelStr = label ? JSON.stringify(label) : 'null';
 
     return `
 // Create diagram shape: ${shapeType}
@@ -2054,7 +2057,7 @@ const shapes = app.diagramManager.getAvailableShapes(category);
       updates.push(`style: ${JSON.stringify(style)}`);
     }
     if (label !== undefined) {
-      updates.push(`label: '${label.replace(/'/g, "\\'")}'`);
+      updates.push(`label: ${JSON.stringify(label)}`);
     }
     if (labelPosition !== undefined) {
       updates.push(`labelPosition: ${labelPosition}`);
@@ -2151,7 +2154,7 @@ throw new Error('Unknown diagram mode action: ${action}');
     const validated = AgentStartJobInputSchema.parse(input);
     const { name, screenshotPolicy, canvasPreset, clearCanvas, includeOntology } = validated;
 
-    const nameStr = name ? `'${name.replace(/'/g, "\\'")}'` : 'null';
+    const nameStr = name ? JSON.stringify(name) : 'null';
     const policyStr = screenshotPolicy || 'on_complete';
     const shouldClear = clearCanvas !== false;
     const wantOntology = includeOntology !== false;
