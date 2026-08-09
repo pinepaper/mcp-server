@@ -216,12 +216,32 @@
       "description": "Video/audio on the canvas from a URL. action: upload_video|upload_audio|list|remove|set_playback_rate. Uploads are first-class items. {action, url?, id?, rate?, ...}"
     },
     {
+      "name": "pinepaper_text_style",
+      "description": "Display text styles + variable fonts. action: apply_style (stacked-layer title, adopts the text id)|set_font_axes (weight/width/slant, animatable)|list_styles."
+    },
+    {
       "name": "pinepaper_crop_image",
       "description": "One-shot crop of an image item to a canvas-coords rect (clamped; keeps the registry id). {itemId, rect: {x,y,width,height}, aspectRatio?}"
     },
     {
       "name": "pinepaper_chroma_key",
       "description": "One-shot green-screen background removal on an image item (keeps the registry id). Omit threshold/smoothing to auto-estimate. {itemId, color?, threshold?, smoothing?}"
+    },
+    {
+      "name": "pinepaper_shatter_image",
+      "description": "Split a raster into a grid of tiles (inert until animated). Group adopts the original id. {itemId, pieces?|rows?+cols?, keepSource?}"
+    },
+    {
+      "name": "pinepaper_import_layered_character",
+      "description": "Import decomposer output (layer manifest + images) as role-bound parts; blink/smile work immediately. CHECK rolesWired>0. {info, images}"
+    },
+    {
+      "name": "pinepaper_game",
+      "description": "Game logic: pathfind (A* world-coords waypoints for moves_along_path)|create_tilemap (board data + grid + merged collision rects). Pure data, draws nothing."
+    },
+    {
+      "name": "pinepaper_world3d",
+      "description": "3D world under the canvas: create (forest|snowMountain|field|jungle)|describe (engine schema)|configure|add_actor (live sprites)|set_actor_pose|set_camera (follow|fixed|orbit)|objects|remove_world."
     },
     {
       "name": "pinepaper_rigging",
