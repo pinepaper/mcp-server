@@ -8,7 +8,15 @@
 **English** · [简体中文](README.zh-CN.md) · [日本語](README.ja.md) · [한국어](README.ko.md) · [Español](README.es.md) · [Português (BR)](README.pt-BR.md) · [Français](README.fr.md) · [Deutsch](README.de.md) · [हिन्दी](README.hi.md)
 
 <p align="center">
-  <img src="assets/hero.svg" alt="PinePaper MCP — a tool call on the left becomes motion on the canvas at the right" width="840">
+  <img src="docs/assets/edit-whenever.svg" alt="Generate once. Edit whenever. — animated PinePaper poster: the headline assembles from scatter, a color wave runs through every letter, and 'generate twice / thrice' get struck out before 'once' is highlighted" width="720">
+</p>
+
+<p align="center">
+  <b>The animation engine agents can drive.</b><br>
+  This poster is one 16&nbsp;KB SVG — 100+ animations, no scripts. View source on it.<br><br>
+  <a href="https://pinepaper.studio/?utm_source=github&utm_medium=readme&utm_campaign=launch_pinned&utm_content=hero">Try PinePaper Studio</a> ·
+  <a href="https://pinepaper.studio/docs?utm_source=github&utm_medium=readme&utm_campaign=launch_pinned&utm_content=docs">Docs</a> ·
+  <a href="https://www.npmjs.com/package/@pinepaper.studio/mcp-server">npm</a>
 </p>
 
 *Everything above and below moves — these are animated SVGs exported straight from PinePaper tool calls, no video files, no GIFs. Open this README on GitHub and watch.*
