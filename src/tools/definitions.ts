@@ -1854,6 +1854,50 @@ EXAMPLE: { action: 'apply_style', itemId: 'title_1', styleKey: 'arcade', fontFam
     },
   },
   {
+    name: 'pinepaper_text_effect',
+    annotations: {
+      title: 'Text Effects (37 Character-Level Animations)',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Animate text CHARACTER BY CHARACTER — 37 effects (terminaltexteffects' vocabulary, reimplemented from source).
+
+⚠️ THIS REPLACES THE TEXT ITEM. Unlike pinepaper_text_style (which ADOPTS the text's registry id), this EXPLODES the text into one item per character and REMOVES the original. Any relation, keyframe, or handle pointing at the source id DIES with it. Pass keepSource: true to leave the original in place. The returned \`ids\` array is your entire new handle set.
+
+ACTIONS:
+- list: {} — the 37 effects as {key, label, definition}. Call this first; effect keys come from here.
+- apply: { itemId, effect, duration?, seed?, gradient?, gradientStops?, gradientDirection?, gradientSteps?, keepSource?, options? } — explode and animate.
+
+WHAT YOU GET: ordinary keyframe-animated items. It scrubs on the timeline, survives undo and session restore, and exports through the existing MP4 / SMIL / Lottie paths — this is not a frame-callback effect that renders on screen and vanishes from your export. Every effect ends AT REST, so \`duration\` is the settle time and the text is readable afterwards.
+
+COLOR: by default the resting characters are painted with a GRADIENT across the text block — that is what the upstream effects do and what their reference frames show. Pass gradient: false to keep the text's authored fill, or gradientStops to choose your own.
+
+DETERMINISM: seed defaults to 1, so the same text + effect + seed animates identically every run. Vary seed for a different scatter of the same effect.
+
+EFFECT KEYS (37): scattered, expand, spray, slice, bouncyballs, pour, slide, print, randomsequence, wipe, sweep, highlight, middleout, fireworks, blackhole, unstable, crumble, rings, swarm, orbittingvolley, overflow, decrypt, errorcorrect, matrix, binarypath, rain, burn, smoke, thunderstorm, bubbles, waves, beams, laseretch, spotlights, synthgrid, vhstape, colorshift.
+
+EXAMPLE: { action: 'apply', itemId: 'title_1', effect: 'decrypt', duration: 3, gradientStops: ['#00ff9c', '#0066ff'] }`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['apply', 'list'], description: 'Text effect operation' },
+        itemId: { type: 'string', description: 'apply: the text item to animate (must have non-whitespace content).' },
+        effect: { type: 'string', description: "apply: effect key from 'list'." },
+        duration: { type: 'number', description: 'apply: seconds for the whole effect (default 2.5); ends at rest.' },
+        seed: { type: 'number', description: 'apply: PRNG seed (default 1) — same seed reproduces the animation exactly.' },
+        gradient: { type: 'boolean', description: "apply: false keeps the text's authored fill. Default true (gradient across the block)." },
+        gradientStops: { type: 'array', items: { type: 'string' }, description: 'apply: hex colors overriding the effect gradient.' },
+        gradientDirection: { type: 'string', enum: ['vertical', 'horizontal', 'radial', 'diagonal'], description: 'apply: gradient axis.' },
+        gradientSteps: { type: 'number', description: 'apply: quantization steps in the gradient ramp.' },
+        keepSource: { type: 'boolean', description: 'apply: keep the original text item — use when relations/keyframes reference its id.' },
+        options: { type: 'object', description: 'apply: per-effect knobs, passed through verbatim.' },
+      },
+      required: ['action'],
+    },
+  },
+  {
     name: 'pinepaper_crop_image',
     annotations: {
       title: 'Crop Image',

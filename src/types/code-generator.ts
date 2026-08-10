@@ -185,7 +185,7 @@ import {
   CaptureFramesInput,
   InstantiateOntologyInput,
   LintSceneInput,
-  MediaInput, TextStyleInput, ShatterImageInput, ImportLayeredCharacterInput, GameInput, World3DInput,
+  MediaInput, TextStyleInput, TextEffectInput, ShatterImageInput, ImportLayeredCharacterInput, GameInput, World3DInput,
   CropImageInput,
   ChromaKeyInput,
   RiggingInput,
@@ -6404,6 +6404,60 @@ ${guard}
     palettes: typeof app.listTextPalettes === 'function' ? app.listTextPalettes() : [],
     fontAxes: typeof app.listFontAxes === 'function' ? app.listFontAxes() : null,
   };
+})();`.trim();
+      }
+    }
+  }
+
+  /**
+   * pinepaper_text_effect — the 37 character-level text effects.
+   *
+   * `applyTextEffect` is ASYNC (it lazy-`import()`s the effects chunk), so this
+   * emits an async IIFE — a sync wrapper would hand the bridge a pending
+   * Promise instead of the result.
+   *
+   * The returned `items` are live Paper objects and cannot cross the bridge;
+   * only ids/count/duration are forwarded. `ids` is the whole handle set the
+   * caller now has, since the source item is gone.
+   */
+  generateTextEffect(input: TextEffectInput): string {
+    const S = (v: unknown) => JSON.stringify(v);
+    switch (input.action) {
+      case 'apply': {
+        // options spreads FIRST so the named fields win on collision — the
+        // schema advertises that precedence, so it has to be real here.
+        const opts = S({
+          ...(input.options ?? {}),
+          ...(input.duration !== undefined ? { duration: input.duration } : {}),
+          ...(input.seed !== undefined ? { seed: input.seed } : {}),
+          ...(input.gradient !== undefined ? { gradient: input.gradient } : {}),
+          ...(input.gradientStops !== undefined ? { gradientStops: input.gradientStops } : {}),
+          ...(input.gradientDirection !== undefined ? { gradientDirection: input.gradientDirection } : {}),
+          ...(input.gradientSteps !== undefined ? { gradientSteps: input.gradientSteps } : {}),
+          ...(input.keepSource !== undefined ? { keepSource: input.keepSource } : {}),
+        });
+        return `
+// Text effect: ${input.effect} — the text becomes one animated item PER CHARACTER
+(async function() {
+  if (typeof app.applyTextEffect !== 'function') { return { success: false, error: 'app.applyTextEffect unavailable — update FxTool to a text-effects build' }; }
+  const r = await app.applyTextEffect(${S(input.itemId)}, ${S(input.effect)}, ${opts});
+  if (!r || !r.ok) { return { success: false, error: (r && r.error) || 'text effect failed' }; }
+  // r.items are live Paper objects — NOT serializable, deliberately dropped.
+  // The source item id is GONE unless keepSource was set, so r.ids is now the
+  // caller's entire handle set; returning it is what makes the tool usable.
+  return {
+    success: true, action: 'apply', effect: r.effect, ids: r.ids, count: r.count,
+    duration: r.duration, sourceRemoved: ${S(input.keepSource !== true)},
+  };
+})();`.trim();
+      }
+      case 'list': {
+        return `
+// The 37 character-level text effects — the picker surface
+(async function() {
+  if (typeof app.listTextEffects !== 'function') { return { success: false, error: 'app.listTextEffects unavailable — update FxTool to a text-effects build' }; }
+  const effects = await app.listTextEffects();
+  return { success: true, effects, count: effects.length };
 })();`.trim();
       }
     }

@@ -42,6 +42,7 @@ import {
   LintSceneInputSchema,
   MediaInputSchema,
   TextStyleInputSchema,
+  TextEffectInputSchema,
   ShatterImageInputSchema,
   ImportLayeredCharacterInputSchema,
   GameInputSchema,
@@ -1145,6 +1146,12 @@ async function handleToolCallInner(
         const input = TextStyleInputSchema.parse(args);
         const code = codeGenerator.generateTextStyle(input);
         return executeOrGenerate(code, `Text style: ${input.action}`, options, 'pinepaper_text_style');
+      }
+
+      case 'pinepaper_text_effect': {
+        const input = TextEffectInputSchema.parse(args);
+        const code = codeGenerator.generateTextEffect(input);
+        return executeOrGenerate(code, `Text effect: ${input.action}`, options, 'pinepaper_text_effect');
       }
 
       // ─── 1.6.4: agent surface for the Tier-2 engine features ───

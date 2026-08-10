@@ -3438,6 +3438,42 @@ export const TextStyleInputSchema = z.object({
 export type TextStyleInput = z.infer<typeof TextStyleInputSchema>;
 
 /**
+ * pinepaper_text_effect — the 37 character-level text effects
+ * (terminaltexteffects' vocabulary, reimplemented in FxTool from source).
+ *
+ * The contract that separates this from `pinepaper_text_style`, and the one
+ * thing a caller must know: this tool EXPLODES the text item into one item per
+ * character and REMOVES the original. `text_style` ADOPTS the text's registry
+ * id; this DESTROYS it. Relations, keyframes and agent handles pointing at the
+ * source id die with it — `keepSource: true` leaves the original in place if
+ * they matter.
+ *
+ * `effect` is a free string, not an enum: the engine owns the vocabulary, its
+ * own error names every valid key, and `action: 'list'` is authoritative. An
+ * enum here would pin the server to today's 37 and go stale on the 38th.
+ *
+ * The planner is pure and emits KEYFRAMES, so the result is ordinary animated
+ * items — it scrubs, survives undo/session restore, and exports through the
+ * existing MP4/SMIL/Lottie paths rather than needing a per-exporter animator.
+ */
+export const TextEffectInputSchema = z.object({
+  action: z.enum(['apply', 'list'])
+    .describe("'apply' (explode a text item into animated characters) · 'list' (the 37 effects with key/label/definition, for a picker)"),
+  itemId: z.string().optional().describe('apply: the text item to animate. Must be a text item with non-whitespace content.'),
+  effect: z.string().optional().describe("apply: effect key from 'list' (e.g. scattered, decrypt, matrix, burn, fireworks, rain, blackhole)."),
+  duration: z.number().positive().optional().describe('apply: seconds for the whole effect (default 2.5). Every effect ends AT REST, so this is the settle time.'),
+  seed: z.number().int().optional().describe('apply: PRNG seed (default 1). Same seed + same text = identical animation, so exports are reproducible.'),
+  gradient: z.boolean().optional().describe("apply: false keeps each character's authored fill. Default TRUE — the upstream effects all end by painting the block with a gradient, which is what their reference frames show."),
+  gradientStops: z.array(z.string()).optional().describe('apply: hex colors overriding the effect\'s own gradient.'),
+  gradientDirection: z.enum(['vertical', 'horizontal', 'radial', 'diagonal']).optional().describe('apply: gradient axis across the text block.'),
+  gradientSteps: z.number().int().positive().optional().describe('apply: quantization steps in the gradient ramp.'),
+  keepSource: z.boolean().optional().describe('apply: leave the original text item in place instead of removing it — the escape hatch when relations/keyframes reference its id.'),
+  options: z.record(z.string(), z.unknown()).optional().describe('apply: per-effect knobs, passed through verbatim (each of the 37 has its own). Spread FIRST, so named fields above win on collision.'),
+})
+  .refine((v) => v.action !== 'apply' || (!!v.itemId && !!v.effect), { message: 'apply requires itemId and effect', path: ['effect'] });
+export type TextEffectInput = z.infer<typeof TextEffectInputSchema>;
+
+/**
  * pinepaper_shatter_image — split a raster into a grid of per-tile rasters.
  * Deliberately INERT on its own: the pieces sit exactly where the picture was
  * until something animates them (blast relations, per-tile keyframes, physics).

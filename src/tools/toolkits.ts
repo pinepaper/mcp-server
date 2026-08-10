@@ -113,6 +113,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
   ],
   effects: [
     'pinepaper_apply_effect',
+    'pinepaper_text_effect',
   ],
   filters: [
     'pinepaper_add_filter',

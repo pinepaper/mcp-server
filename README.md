@@ -17,7 +17,7 @@
 
 PinePaper MCP Server enables AI assistants to create and animate graphics in [PinePaper Studio](https://pinepaper.studio) via the Model Context Protocol (MCP). Works with any AI that supports MCP tool calling (Claude, GPT, Gemini, local models, etc.).
 
-The server exposes **135 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
+The server exposes **136 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
 
 - Create text, shapes, geometry, and complex graphics
 - Animate items with behavior-driven **relations** rather than keyframes
@@ -144,6 +144,16 @@ app.animate(sq, { animationType: 'rotate' });
 
 The same code an agent generates is the code you can paste — the canvas is yours either way, undo included.
 
+## What's new in 1.6.7
+
+**New tool: `pinepaper_text_effect`** — 37 character-level text animations (terminaltexteffects' vocabulary, reimplemented in the engine from source). `list` returns the effects; `apply` explodes a text item into one animated item per character.
+
+- The planner is pure and emits **keyframes**, so the result is ordinary animated items: it scrubs on the timeline, survives undo and session restore, and exports through the existing MP4 / SMIL / Lottie paths. Every effect ends at rest.
+- **It replaces the text item.** Unlike `pinepaper_text_style` (which adopts the text's registry id), this removes the original and returns the new per-character ids — so relations and keyframes on the source id do not survive. `keepSource: true` is the escape hatch. The tool is marked `destructiveHint` and says so in its description, because it inverts the id-preservation convention every neighbouring tool follows.
+- Resting characters are painted with a gradient across the text block by default (what the upstream effects actually do); `gradient: false` keeps the authored fill. `seed` defaults to 1, so a given text + effect + seed animates identically every run.
+
+Includes the 1.6.6 dependency-security work below (1.6.6 was tagged but never published to npm).
+
 ## What's new in 1.6.6
 
 Dependency security, no new tools and no API changes:
@@ -196,7 +206,7 @@ Fourteen new tools (121 → 135) and new actions across the surface — the rele
 
 ## Toolkits & Token Budget
 
-135 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
+136 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
 
 **Toolkit profiles** (`PINEPAPER_TOOLKIT`):
 
@@ -401,7 +411,7 @@ Generate instruction/code pairs for LLM fine-tuning:
 
 ## Tools Reference
 
-All 135 tools, grouped by the tag used for toolkit filtering.
+All 136 tools, grouped by the tag used for toolkit filtering.
 
 ### Canvas (`canvas`)
 | Tool | Description |
@@ -494,6 +504,7 @@ All 135 tools, grouped by the tag used for toolkit filtering.
 | `pinepaper_execute_generator` | Run a background generator |
 | `pinepaper_list_generators` | List available generators |
 | `pinepaper_apply_effect` | Apply sparkle, blast, and other effects |
+| `pinepaper_text_effect` | 37 character-level text animations; replaces the text with one keyframed item per character |
 | `pinepaper_add_filter` | Add an image filter |
 
 ### Editing (`selection`, `transform`, `history`)
