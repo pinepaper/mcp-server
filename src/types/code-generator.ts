@@ -12,6 +12,7 @@ import {
   RelationType,
   GeneratorName,
   CreateItemInputSchema,
+  ImportMotionCaptureInputSchema,
   ModifyItemInputSchema,
   AddRelationInputSchema,
   AnimateItemInputSchema,
@@ -619,6 +620,42 @@ app.addAnimation('${itemId}', ${keyframesJson}, ${JSON.stringify(opts)});
 /**
  * Template for executing generators
  */
+function generateImportMotionCaptureCode(
+  bvh: string,
+  mode: 'import' | 'retarget',
+  skeletonId?: string,
+  opts: Record<string, unknown> = {}
+): string {
+  // Both FxTool entry points are async and return {ok, ...} rather than throwing, so the failure
+  // path is a value the model can read (unmatchedSource/unmatchedTarget tell it exactly which bone
+  // names to put in boneMap) instead of an opaque exception.
+  const bvhLiteral = JSON.stringify(bvh);
+  const optsLiteral = JSON.stringify(opts);
+  if (mode === 'retarget') {
+    return `
+// Retarget a BVH clip onto an existing rig — proportions from the rig, motion from the capture
+(async function() {
+  const res = await app.retargetBVH(${bvhLiteral}, ${JSON.stringify(skeletonId ?? '')}, ${optsLiteral});
+  if (!res || res.ok === false) {
+    return { success: false, error: (res && res.error) || 'retarget failed',
+             unmatchedSource: res && res.unmatchedSource, unmatchedTarget: res && res.unmatchedTarget };
+  }
+  return { success: true, skeletonId: res.skeletonId, matched: res.matched,
+           unmatchedSource: res.unmatchedSource, unmatchedTarget: res.unmatchedTarget };
+})()`;
+  }
+  return `
+// Import a BVH clip as a NEW skeleton
+(async function() {
+  const res = await app.importBVH(${bvhLiteral}, ${optsLiteral});
+  if (!res || res.ok === false) {
+    return { success: false, error: (res && res.error) || 'import failed' };
+  }
+  return { success: true, skeletonId: res.skeletonId, bones: res.bones, poses: res.poses,
+           duration: res.duration };
+})()`;
+}
+
 function generateExecuteGeneratorCode(
   generatorName: GeneratorName,
   params: Record<string, unknown>,
@@ -1182,6 +1219,23 @@ export class PinePaperCodeGenerator {
       validated.clipOutPoint,
       validated.timeUnits
     );
+  }
+
+  /**
+   * Generate code for importing / retargeting a motion-capture clip
+   */
+  generateImportMotionCapture(input: z.infer<typeof ImportMotionCaptureInputSchema>): string {
+    const v = ImportMotionCaptureInputSchema.parse(input);
+    if (v.mode === 'retarget' && !v.skeletonId) {
+      throw new Error("pinepaper_import_motion_capture: mode='retarget' requires skeletonId (the rig to drive)");
+    }
+    const opts: Record<string, unknown> = {};
+    if (v.fps !== undefined) opts.fps = v.fps;
+    if (v.height !== undefined) opts.height = v.height;
+    if (v.position !== undefined) opts.position = v.position;
+    if (v.name !== undefined) opts.name = v.name;
+    if (v.boneMap !== undefined) opts.boneMap = v.boneMap;
+    return generateImportMotionCaptureCode(v.bvh, v.mode, v.skeletonId, opts);
   }
 
   /**

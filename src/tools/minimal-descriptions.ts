@@ -37,6 +37,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_delete_item: 'Remove item by itemId.',
   pinepaper_create_glossy_sphere: 'Create a 3D-looking glossy sphere with lighting.',
   pinepaper_create_diagonal_stripes: 'Create a diagonal stripe pattern.',
+  pinepaper_import_motion_capture: "Import a BVH clip as a new skeleton, or retarget it onto an existing rig (skeletonId) so proportions stay and only motion comes from the capture.",
   pinepaper_import_svg: "Import SVG markup or a URL. source:'figma' normalises Figma Copy-as-SVG first (root fill=none makes everything invisible; missing viewBox; global ids like clip0 collide across imports).",
   pinepaper_import_mermaid: 'Import a Mermaid diagram (flowchart|graph|stateDiagram|sequenceDiagram|erDiagram|classDiagram). mermaidText, autoLayout, clearExisting.',
   pinepaper_import_image: 'Import a raster image (PNG/JPG/WebP) onto the canvas.',

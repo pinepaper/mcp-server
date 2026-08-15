@@ -1161,6 +1161,29 @@ export const KeyframeAnimateInputSchema = z.object({
   clipOutPoint: z.number().optional().describe('Stop at N seconds into the keyframe data — clip tail trim. Default: lastKeyframeTime.'),
 });
 
+// Motion Capture (BVH)
+//
+// FxTool exposes two distinct operations and the difference is the whole point:
+//   importBVH   builds a NEW skeleton shaped like the capture file
+//   retargetBVH drives an EXISTING rig — proportions stay yours, only MOTION comes from the clip
+// Angles transfer as bind-pose deltas (target.rest + (source(t) - source(rest))), so a T-posed CMU
+// rest is not slammed onto a rig with a relaxed stance. Bone matching carries the BVH child-joint
+// shift ("LeftLeg" is the thigh); anything unmatched is REPORTED, never silently half-driven.
+export const ImportMotionCaptureInputSchema = z.object({
+  bvh: z.string().describe('BVH clip text (CMU / Mixamo export). Required.'),
+  mode: z.enum(['import', 'retarget']).optional().default('import')
+    .describe("'import' builds a new skeleton from the file; 'retarget' drives an existing rig named by skeletonId — use retarget when the character already exists, so its proportions are preserved and only the motion is taken from the capture."),
+  skeletonId: z.string().optional()
+    .describe("Rig to drive. REQUIRED when mode='retarget'; ignored for 'import'."),
+  fps: z.number().optional().describe('Pose sampling rate. CMU records at 120fps and nobody wants 120 poses a second; 0 keeps every frame. Default 15.'),
+  height: z.number().optional().describe('Skeleton height on the canvas in px (import mode). Default 320.'),
+  position: z.object({ x: z.number(), y: z.number() }).optional()
+    .describe('Where the ROOT joint stands (import mode). Defaults to canvas centre, 70% down.'),
+  name: z.string().optional().describe('Name for the created skeleton (import mode).'),
+  boneMap: z.record(z.string(), z.string()).optional()
+    .describe('BVH edge name → this rig\'s bone name. Overrides the alias table when a clip uses non-standard joint names; check unmatchedSource/unmatchedTarget in the result to see what needs mapping.'),
+});
+
 // Execute Generator
 //
 // Region (added FxTool c81781c): when set, the generator draws into a clipped

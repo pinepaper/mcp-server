@@ -87,6 +87,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
   ],
   animation: [
     'pinepaper_animate',
+    'pinepaper_import_motion_capture',
     'pinepaper_keyframe_animate',
     'pinepaper_play_timeline',
     'pinepaper_get_animatable_properties',

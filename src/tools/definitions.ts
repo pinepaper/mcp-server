@@ -759,6 +759,56 @@ EXAMPLES:
   // LAYER 1 — ATOMS: IMPORT TOOLS
   // ---------------------------------------------------------------------------
   {
+    name: 'pinepaper_import_motion_capture',
+    annotations: {
+      title: 'Import Motion Capture (BVH)',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+    description: `Import a BVH motion-capture clip (CMU, Mixamo) as an animated skeleton, or retarget one onto a rig that already exists.
+
+TWO MODES, and picking the right one is the whole decision:
+- mode:'import'   → builds a NEW skeleton shaped like the capture file. Use when there is no character yet.
+- mode:'retarget' → drives an EXISTING rig named by skeletonId. Proportions stay the character's; only the MOTION comes from the clip. Use whenever the character already exists.
+
+USE WHEN:
+- The user supplies a .bvh clip, or asks for real captured motion rather than a simple animationType
+- A rigged character should perform a walk / run / gesture
+- Simple animation (pulse, bounce, rotate) is too coarse for the request
+
+DO NOT USE FOR:
+- Simple property animation → pinepaper_animate
+- Timed keyframe tracks you author yourself → pinepaper_keyframe_animate
+
+RESULT:
+- import   → { skeletonId, bones, poses, duration }
+- retarget → { skeletonId, matched, unmatchedSource, unmatchedTarget }
+
+BONE MATCHING: a BVH edge is named for the joint it ENDS at, so "LeftLeg" is the thigh and "LeftFoot" the shin — the alias table accounts for this. Anything it cannot place is reported in unmatchedSource/unmatchedTarget rather than silently driving half the rig; pass boneMap to resolve those explicitly.
+
+SAMPLING: CMU records at 120fps. fps defaults to 15 because 120 poses per second is unusable on a canvas timeline; fps:0 keeps every frame.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        bvh: { type: 'string', description: 'BVH clip text.' },
+        mode: { type: 'string', enum: ['import', 'retarget'], description: "'import' = new skeleton from the file; 'retarget' = drive the existing rig in skeletonId, keeping its proportions. Default 'import'." },
+        skeletonId: { type: 'string', description: "Rig to drive. REQUIRED when mode='retarget'." },
+        fps: { type: 'number', description: 'Pose sampling rate; 0 keeps every frame. Default 15.' },
+        height: { type: 'number', description: 'Skeleton height on canvas in px (import mode). Default 320.' },
+        position: {
+          type: 'object',
+          description: 'Where the ROOT joint stands (import mode).',
+          properties: { x: { type: 'number' }, y: { type: 'number' } },
+        },
+        name: { type: 'string', description: 'Name for the created skeleton (import mode).' },
+        boneMap: { type: 'object', description: "BVH edge name → this rig's bone name; overrides the alias table.", additionalProperties: { type: 'string' } },
+      },
+      required: ['bvh'],
+    },
+  },
+  {
     name: 'pinepaper_import_svg',
     annotations: {
       title: 'Import SVG',

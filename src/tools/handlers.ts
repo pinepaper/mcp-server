@@ -16,6 +16,7 @@ import {
   RemoveRelationInputSchema,
   QueryRelationsInputSchema,
   AnimateItemInputSchema,
+  ImportMotionCaptureInputSchema,
   KeyframeAnimateInputSchema,
   ExecuteGeneratorInputSchema,
   ApplyEffectInputSchema,
@@ -1327,6 +1328,16 @@ async function handleToolCallInner(
           itemId: input.itemId,
         });
         return executeOrGenerate(code, description, options, 'pinepaper_animate');
+      }
+
+      case 'pinepaper_import_motion_capture': {
+        const input = ImportMotionCaptureInputSchema.parse(args);
+        const code = codeGenerator.generateImportMotionCapture(input);
+        const what =
+          input.mode === 'retarget'
+            ? `Retargets a BVH clip onto rig ${input.skeletonId}`
+            : 'Imports a BVH clip as a new animated skeleton';
+        return executeOrGenerate(code, what, options, 'pinepaper_import_motion_capture');
       }
 
       case 'pinepaper_keyframe_animate': {

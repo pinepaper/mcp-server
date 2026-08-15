@@ -136,6 +136,10 @@
       "description": "Create a diagonal stripe pattern"
     },
     {
+      "name": "pinepaper_import_motion_capture",
+      "description": "Import a BVH motion-capture clip (CMU, Mixamo) as an animated skeleton, or retarget one onto a rig that already exists."
+    },
+    {
       "name": "pinepaper_import_svg",
       "description": "Import SVG content onto the canvas"
     },
