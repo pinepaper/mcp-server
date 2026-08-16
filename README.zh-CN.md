@@ -64,6 +64,23 @@ npm install -g @pinepaper.studio/mcp-server
 - **`pinepaper_image_filter` 修复并扩充** —— 直连真实 GPU 滤镜引擎，完整 15 种滤镜（半调家族、色调分离、暗角、HSL、抖动等）
 - **README 成为 MCP 资源** —— 客户端可直接读取 `pinepaper://docs/readme`（含多语言变体）
 
+## 本地运行或托管
+
+**本地运行免费且功能完整。** 只要你自己运行这个服务器，所有工具都可用，
+没有功能缩水的版本。
+
+需要：Node 18 或更高版本、约 **320 MB** 磁盘空间（Puppeteer 会下载 Chrome），
+以及任务运行期间约 1 GB 内存。笔记本电脑没问题，小型 VPS 或受限的办公电脑
+则未必。
+
+**[cloud.pinepaper.studio](https://cloud.pinepaper.studio) 替你运行同一个
+服务器** —— 相同的工具、相同的版本，通过 HTTP 提供，无需安装，也不需要在你的
+机器上运行浏览器。
+
+托管需要成本，因此是付费的：**Starter 每月 $4.99**（每天 500 次请求）与
+**Pro 每月 $14.99**（每天 5,000 次，另含动画模板库）。如果你能在本地运行，
+就在本地运行 —— 这样不会损失任何功能。
+
 ## 更多
 
 完整的工具参考、工具包（toolkit）与令牌预算、关系类型列表等，请见 [英文版 README](README.md)。文档也可以在 MCP 协议内读取：资源 `pinepaper://docs/agent-guide` 是为 AI 代理准备的规范工作流。

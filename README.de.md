@@ -64,6 +64,25 @@ Bitten Sie Ihre KI zum Beispiel:
 - **`pinepaper_image_filter` repariert und erweitert** — an die echte GPU-Filter-Engine angebunden, alle 15 Filter (Halbton-Familie, Posterisieren, Vignette, HSL, Dithering …)
 - **README als MCP-Ressource** — Clients können `pinepaper://docs/readme` (mit Sprachvarianten) direkt im Protokoll lesen
 
+## Lokal oder gehostet
+
+**Lokal ist kostenlos und vollständig.** Alle Tools funktionieren, wenn Sie
+diesen Server selbst betreiben. Es gibt keine reduzierte Stufe.
+
+Benötigt: Node 18 oder neuer, rund **320 MB** Speicherplatz (Puppeteer lädt
+Chrome herunter) und etwa 1 GB Arbeitsspeicher, solange ein Job läuft. Auf
+einem Laptop ist das unproblematisch, auf einem kleinen VPS oder einem
+gesperrten Arbeitsrechner eher nicht.
+
+**[cloud.pinepaper.studio](https://cloud.pinepaper.studio) betreibt denselben
+Server für Sie** — gleiche Tools, gleiche Version, über HTTP, ohne Installation
+und ohne Browser auf Ihrem Rechner.
+
+Hosting kostet Geld, daher ist es kostenpflichtig: **Starter 4,99 $/Monat**
+(500 Anfragen/Tag) und **Pro 14,99 $/Monat** (5.000/Tag, plus die
+Animationsvorlagen). Wenn Sie lokal laufen lassen können, tun Sie das — Sie
+verlieren dadurch nichts.
+
 ## Mehr
 
 Die vollständige Tool-Referenz, Toolkits und Token-Budget sowie die Relationsliste stehen im [englischen README](README.md). Der kanonische Agenten-Workflow liegt in der Ressource `pinepaper://docs/agent-guide`.

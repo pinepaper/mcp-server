@@ -64,6 +64,25 @@ Prueba a pedirle a tu IA:
 - **`pinepaper_image_filter` corregido y ampliado** — conectado al motor real de filtros GPU con los 15 filtros (familia de semitonos, posterizar, viñeta, HSL, dither…)
 - **El README como recurso MCP** — los clientes pueden leer `pinepaper://docs/readme` (con variantes por idioma) sin salir del protocolo
 
+## Local o alojado
+
+**Local es gratis y completo.** Todas las herramientas funcionan si ejecuta
+este servidor usted mismo. No hay una versión reducida.
+
+Necesita: Node 18 o superior, unos **320 MB** de disco (Puppeteer descarga
+Chrome) y alrededor de 1 GB de memoria mientras se ejecuta un trabajo. En un
+portátil no supone problema; en un VPS pequeño o un equipo de trabajo
+restringido, sí.
+
+**[cloud.pinepaper.studio](https://cloud.pinepaper.studio) ejecuta el mismo
+servidor por usted** — mismas herramientas, misma versión, por HTTP, sin
+instalación y sin navegador en su máquina.
+
+El alojamiento cuesta dinero, así que es de pago: **Starter 4,99 $/mes**
+(500 peticiones/día) y **Pro 14,99 $/mes** (5.000/día, más la biblioteca de
+plantillas de animación). Si puede ejecutarlo localmente, hágalo — no pierde
+nada.
+
 ## Más
 
 La referencia completa de herramientas, los toolkits y el presupuesto de tokens, y la lista de relaciones están en el [README en inglés](README.md). El flujo de trabajo canónico para agentes está en el recurso `pinepaper://docs/agent-guide`.
