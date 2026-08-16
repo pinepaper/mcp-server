@@ -5,11 +5,15 @@
  * Repository info: 2,000+ free icons (CC BY 4.0 license)
  */
 
-import { AssetRepository, AssetResult, AssetMetadata, AssetLicense } from '../types.js';
+import { AssetRepository, AssetResult, AssetMetadata } from '../types.js';
 
 /**
  * Font Awesome icon metadata
  */
+// Describes the shape of the upstream Font Awesome API response. Unused by the
+// code today, kept because it documents an EXTERNAL contract this file depends
+// on — that is worth more than the line it costs.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- documents the upstream API shape
 interface FontAwesomeIcon {
   id: string;
   label: string;

@@ -24,7 +24,6 @@ import {
   PlayTimelineInputSchema,
   SetBackgroundColorInputSchema,
   SetCanvasSizeInputSchema,
-  ExportTrainingDataInputSchema,
   ImportSVGInputSchema,
   ImportMermaidInputSchema,
   AddFilterInputSchema,
@@ -92,28 +91,8 @@ import {
   CreateLetterCollageInputSchema,
   AnimateLetterCollageInputSchema,
   // Map schemas
-  LoadMapInputSchema,
-  HighlightRegionsInputSchema,
-  UnhighlightRegionsInputSchema,
-  ApplyDataColorsInputSchema,
   ApplyTemplateInputSchema,
-  AddMarkerInputSchema,
-  AddMapLabelsInputSchema,
-  PanMapInputSchema,
-  ZoomMapInputSchema,
-  ExportMapInputSchema,
-  ImportCustomMapInputSchema,
-  GetRegionAtPointInputSchema,
   // Map animation/CSV schemas
-  AnimateMapRegionsInputSchema,
-  AnimateMapWaveInputSchema,
-  StopMapAnimationsInputSchema,
-  GetAnimatedMapRegionsInputSchema,
-  ExportMapRegionCSVInputSchema,
-  ImportMapRegionCSVInputSchema,
-  SelectMapRegionsInputSchema,
-  DeselectMapRegionsInputSchema,
-  GetHighlightedMapRegionsInputSchema,
   // Custom relation/code schemas
   RegisterCustomRelationInputSchema,
   ExecuteCustomCodeInputSchema,
@@ -124,11 +103,7 @@ import {
   // Image import schemas
   ImportImageInputSchema,
   // Tool guide schema
-  ToolGuideInputSchema,
   // Ontology schemas
-  AnalyzeDesignInputSchema,
-  ValidateDesignInputSchema,
-  QueryOntologyInputSchema,
   // Scene management schemas
   ManageScenesInputSchema,
   ScenePlaybackInputSchema,
@@ -159,15 +134,14 @@ import { ZodError } from 'zod';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { I18nManager, getI18n } from '../i18n/index.js';
+import { I18nManager } from '../i18n/index.js';
 import {
   PinePaperBrowserController,
   getBrowserController,
   resetBrowserController,
-  type BrowserControllerConfig,
 } from '../browser/puppeteer-controller.js';
 import { sameStudioTarget, validateStudioUrl } from '../browser/url-target.js';
-import { getPerformanceTracker, TimingMetric, MetricsExportFormat } from '../metrics/index.js';
+import { getPerformanceTracker, MetricsExportFormat } from '../metrics/index.js';
 import { ErrorContext, formatErrorContext, captureCanvasState } from '../execution/index.js';
 import { getSessionManager } from '../agent/session-manager.js';
 import { vocabularyHintForPath, validateBatchVocabulary, detectBatchPropertyTypos } from '../ontology/hints.js';
@@ -677,7 +651,15 @@ export function getLocalizedSuccessMessage(
 
 /**
  * Execute a tool handler with automatic performance tracking for validation and code generation
+ *
+ * NOT CALLED ANYWHERE. Kept rather than deleted because it is a complete,
+ * working helper and nothing equivalent replaced it — the performance tracking
+ * it implements was written and never wired, which is a gap worth closing
+ * rather than a dead symbol worth removing. Deleting it would erase the intent
+ * along with the code; wiring it is a behaviour change and belongs in its own
+ * commit.
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- written, never wired; see above
 async function executeToolWithTracking<T>(
   toolName: string,
   args: Record<string, unknown>,
@@ -2518,7 +2500,7 @@ You can now start creating new items on a clean canvas.`,
           console.error('[PinePaper] Auto-connecting browser for export...');
           try {
             await controller.connect();
-          } catch (connectError) {
+          } catch (_connectError) {
             // Fall back to executeOrGenerate which handles the fallback gracefully
             return executeOrGenerate(code, description, options, 'pinepaper_agent_export');
           }
@@ -2788,7 +2770,7 @@ You can now start creating new items on a clean canvas.`,
       if (controller.connected) {
         canvasState = await captureCanvasState(controller);
       }
-    } catch (stateError) {
+    } catch (_stateError) {
       // Ignore errors from canvas state capture
     }
 

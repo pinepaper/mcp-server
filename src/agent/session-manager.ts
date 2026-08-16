@@ -10,13 +10,7 @@ import type {
   JobOptions,
   JobResult,
   ResetOptions,
-  BatchExecuteResult,
-  BatchOperation,
-  ContentAnalysis,
-  ExportRecommendation,
   ScreenshotPolicy,
-  Platform,
-  PLATFORM_PRESETS,
 } from './types.js';
 
 // Simple unique ID generator (avoids uuid dependency)

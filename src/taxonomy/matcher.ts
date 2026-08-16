@@ -12,7 +12,6 @@ import type {
   ModifierNode,
   TaxonomyMatch,
   TaxonomyConfig,
-  DEFAULT_TAXONOMY_CONFIG,
 } from './types.js';
 import { ANIMATION_TAXONOMY, MODIFIER_NODES } from './registry.js';
 

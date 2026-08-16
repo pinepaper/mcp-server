@@ -18,7 +18,7 @@ import type {
   TaxonomyConfig,
 } from './types.js';
 import { TaxonomyMatcher, getTaxonomyMatcher } from './matcher.js';
-import { ANIMATION_TAXONOMY, MODIFIER_NODES, getTaxonomyNode } from './registry.js';
+import { ANIMATION_TAXONOMY } from './registry.js';
 
 /**
  * Color name to hex mapping for common colors
@@ -436,7 +436,7 @@ export class IntentClassifier {
   /**
    * Get suggestions when no match is found
    */
-  private getSuggestions(input: string): string[] {
+  private getSuggestions(_input: string): string[] {
     // Return common concepts as suggestions
     const commonConcepts = [
       'create_circle',

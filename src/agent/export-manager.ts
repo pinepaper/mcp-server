@@ -12,9 +12,6 @@ import {
   PLATFORM_PRESETS,
   ContentAnalysis,
   ExportRecommendation,
-  SmartExportOptions,
-  SmartExportResult,
-  ColorComplexity,
 } from './types.js';
 
 // =============================================================================
@@ -361,7 +358,7 @@ export class SmartExportManager {
   /**
    * Generate GIF export code
    */
-  private generateGIFExportCode(fps: number, quality: number): string {
+  private generateGIFExportCode(fps: number, _quality: number): string {
     return `
 (async function() {
   if (!app.exportEngine) {
@@ -403,7 +400,7 @@ export class SmartExportManager {
   private generateVideoExportCode(
     format: 'mp4' | 'webm',
     fps: number,
-    dimensions: { width: number; height: number }
+    _dimensions: { width: number; height: number }
   ): string {
     const mimeType = format === 'mp4' ? 'video/mp4' : 'video/webm';
 

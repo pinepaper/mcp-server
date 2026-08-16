@@ -34,11 +34,12 @@
     "start:dist": "bun dist/index.js",
     "test": "bun test",
     "test:coverage": "bun test --coverage",
-    "lint": "eslint src/**/*.ts",
+    "lint": "eslint src",
     "typecheck": "tsc --noEmit",
     "check:manifest": "bun scripts/check-manifest-tools.mjs",
     "fix:manifest": "bun scripts/check-manifest-tools.mjs --fix",
-    "prepublishOnly": "bun run check:manifest && bun run build"
+    "prepublishOnly": "bun run check:manifest && bun run build",
+    "lint:errors": "eslint src --quiet"
   },
   "keywords": [
     "mcp",

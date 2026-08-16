@@ -21,7 +21,7 @@ import {
   GetPromptRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 
-import { PINEPAPER_TOOLS, getLocalizedTools, getToolsForVerbosity, AI_AGENT_GUIDE } from './tools/definitions.js';
+import { PINEPAPER_TOOLS, getToolsForVerbosity, AI_AGENT_GUIDE } from './tools/definitions.js';
 import type { ToolVerbosity } from './tools/definitions.js';
 import {
   getToolsForToolkit,
@@ -34,7 +34,6 @@ import {
 import type { ToolkitProfile } from './tools/toolkits.js';
 import { handleToolCall, ExecutionMode, getExecutionMode } from './tools/handlers.js';
 import {
-  I18nManager,
   initI18n,
   SupportedLocale,
   DEFAULT_LOCALE,
@@ -5897,7 +5896,6 @@ The tools generate Paper.js/JavaScript code that executes on the PinePaper canva
     // direct access to mutable effectiveToolkit/effectiveVerbosity state
     if (name === 'pinepaper_set_toolkit') {
       const { SetToolkitInputSchema } = await import('./types/schemas.js');
-      const { TOOLKIT_PROFILES_LIST } = await import('./tools/toolkits.js');
       const input = SetToolkitInputSchema.parse(args);
 
       let changed = false;

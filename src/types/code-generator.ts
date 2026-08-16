@@ -79,7 +79,6 @@ import {
   UnhighlightRegionsInput,
   ApplyDataColorsInputSchema,
   ApplyDataColorsInput,
-  ApplyTemplateInputSchema,
   ApplyTemplateInput,
   AddMarkerInputSchema,
   AddMarkerInput,
@@ -89,8 +88,6 @@ import {
   PanMapInput,
   ZoomMapInputSchema,
   ZoomMapInput,
-  ExportMapInputSchema,
-  ExportMapInput,
   ImportCustomMapInputSchema,
   ImportCustomMapInput,
   GetRegionAtPointInputSchema,
@@ -102,8 +99,6 @@ import {
   AnimateMapWaveInput,
   StopMapAnimationsInputSchema,
   StopMapAnimationsInput,
-  GetAnimatedMapRegionsInputSchema,
-  GetAnimatedMapRegionsInput,
   ExportMapRegionCSVInputSchema,
   ExportMapRegionCSVInput,
   ImportMapRegionCSVInputSchema,
@@ -112,8 +107,6 @@ import {
   SelectMapRegionsInput,
   DeselectMapRegionsInputSchema,
   DeselectMapRegionsInput,
-  GetHighlightedMapRegionsInputSchema,
-  GetHighlightedMapRegionsInput,
   // Globe + world tour types
   GlobeEnableInputSchema,
   GlobeEnableInput,
@@ -142,12 +135,9 @@ import {
   RemoveMaskInputSchema,
   RemoveMaskInput,
   // Image import types
-  ImportImageInputSchema,
   ImportImageInput,
   // Scene management types
-  ManageScenesInputSchema,
   ManageScenesInput,
-  ScenePlaybackInputSchema,
   ScenePlaybackInput,
   // New consolidated tool types
   SelectionInput,

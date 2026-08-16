@@ -7,9 +7,9 @@
  */
 
 import type { SupportedLocale } from '../i18n/types.js';
-import type { TaxonomyError, TaxonomyErrorCode, TaxonomyMatch } from './types.js';
+import type { TaxonomyErrorCode, TaxonomyMatch } from './types.js';
 import { getTaxonomyMatcher } from './matcher.js';
-import { ANIMATION_TAXONOMY, getTaxonomyNode } from './registry.js';
+
 
 /**
  * Error recovery context with rich suggestions

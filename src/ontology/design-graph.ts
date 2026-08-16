@@ -18,7 +18,6 @@ import type {
   PinePaperVocabulary,
   GraphNode,
   GraphEdge,
-  GeneratorInfo,
   SemanticInfo,
   Fingerprint,
   TemplateGraph,
@@ -27,9 +26,6 @@ import type {
   TemplateRelation,
   TemplateKeyframe,
   ValidationResult,
-  VocabularyType,
-  VocabularyEdge,
-  VocabularyGenerator,
 } from './types.js';
 
 
@@ -756,7 +752,6 @@ export class DesignGraph {
     const data = template.data || {};
     const items = data.items || [];
     const nodeTypes = new Set(graph.nodes.map(n => n.type));
-    const edgeTypes = new Set(graph.edges.map(e => e.type));
 
     // --- animationComplexity ---
     const hasKeyframes = graph.nodes.some(n => n.properties && n.properties.hasKeyframes);

@@ -5,7 +5,7 @@
  * Repository info: 150,000+ public domain clipart (CC0 license)
  */
 
-import { AssetRepository, AssetResult, AssetMetadata, AssetLicense } from '../types.js';
+import { AssetRepository, AssetResult, AssetMetadata } from '../types.js';
 
 /**
  * OpenClipart JSON API response format
