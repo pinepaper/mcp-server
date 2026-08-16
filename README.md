@@ -35,6 +35,31 @@ The server exposes **137 tools** across drawing, animation, diagrams, maps, typo
 - Edit images: crop, chroma-key background removal, GPU filters, lasso cutouts, object detection
 - Export animated SVG, video frames, embeddable widgets, and LLM training data
 
+## Running it: local or hosted
+
+**Local is free and complete.** Every one of the 137 tools works when you run
+this server yourself. There is no reduced tier and nothing held back.
+
+What it needs:
+
+| | |
+|---|---|
+| Node | 18 or newer |
+| Disk | Puppeteer downloads Chrome on install — roughly **320 MB** per version |
+| Memory | a Chrome process plus the Studio canvas, so budget ~1 GB while a job runs |
+
+That is fine on a laptop and awkward on a small VPS, a locked-down work machine,
+or a container you would rather keep thin.
+
+**[cloud.pinepaper.studio](https://cloud.pinepaper.studio) runs the same server
+for you** — same tools, same version, over HTTP with no install and no browser
+on your machine. It exists for three cases: you have no MCP client, you cannot
+install one, or your machine cannot spare the browser.
+
+Hosting costs money, so it is paid: **Starter $4.99/mo** (500 requests/day) and
+**Pro $14.99/mo** (5,000/day, plus the animation template library). If you can
+run it locally, run it locally — you lose nothing by doing so.
+
 ## Made with tool calls
 
 Every graphic below is an animated SVG produced through this server's tool surface — the arguments shown with each result are what an AI agent passes to the named tool. They aren't shell commands; **[Run these yourself](#run-these-yourself)** below shows the three ways to execute them.
@@ -766,6 +791,10 @@ The server does not draw anything itself. It validates a tool call, generates Ja
 ## Development
 
 ### Setup
+
+> Installing pulls Chrome down through Puppeteer (~320 MB). If that is more than
+> the machine can spare, [cloud.pinepaper.studio](https://cloud.pinepaper.studio)
+> runs the same server over HTTP with nothing to install.
 
 ```bash
 git clone https://github.com/pinepaper/mcp-server.git
