@@ -1947,6 +1947,7 @@ app.historyManager.saveState();
   generateConnect(input: ConnectInput): string {
     const validated = ConnectInputSchema.parse(input);
     const {
+      id,
       sourceItemId,
       targetItemId,
       routing,
@@ -1970,6 +1971,13 @@ app.historyManager.saveState();
       boltEnabled,
       boltColor,
     };
+
+    // A caller-supplied id is honoured by Connector (`config.id || <generated>`),
+    // and it is the ONLY way a caller can address this connector afterwards:
+    // update/remove take a connectorId, and the fallback the engine mints is
+    // `connector_${Date.now()}_${random}` — unpredictable, and different on
+    // every run of the same scene.
+    if (id) config.id = id;
 
     if (lineColor) config.lineColor = lineColor;
     if (lineWidth) config.lineWidth = lineWidth;
@@ -1997,9 +2005,14 @@ app.historyManager.saveState();
    */
   generateConnectPorts(input: ConnectPortsInput): string {
     const validated = ConnectPortsInputSchema.parse(input);
-    const { sourceItemId, sourcePort, targetItemId, targetPort, config } = validated;
+    const { id, sourceItemId, sourcePort, targetItemId, targetPort, config } = validated;
 
-    const configStr = config ? JSON.stringify(config, null, 2) : '{}';
+    // `id` sits at the TOP level of the tool's input but belongs inside the
+    // engine's config object, which is where Connector reads it from. Merged
+    // here rather than asking callers to nest it, since every other style
+    // option they pass is nested and the id is not a style.
+    const merged = id ? { ...(config ?? {}), id } : config;
+    const configStr = merged ? JSON.stringify(merged, null, 2) : '{}';
 
     return `
 // Connect ports: ${sourceItemId}:${sourcePort} -> ${targetItemId}:${targetPort}

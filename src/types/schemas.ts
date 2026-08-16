@@ -1663,6 +1663,7 @@ export type CreateDiagramShapeInput = z.infer<typeof CreateDiagramShapeInputSche
  * Connect items input
  */
 export const ConnectInputSchema = z.object({
+  id: z.string().optional().describe('Stable connector ID. Assign your own and reuse it as `connectorId` in update/remove — the engine otherwise mints a Date.now()-based ID no caller can predict'),
   sourceItemId: z.string().describe('Registry ID of source item'),
   targetItemId: z.string().describe('Registry ID of target item'),
   routing: ConnectorRoutingSchema.optional().default('orthogonal'),
@@ -1683,6 +1684,7 @@ export type ConnectInput = z.infer<typeof ConnectInputSchema>;
  * Connect specific ports input
  */
 export const ConnectPortsInputSchema = z.object({
+  id: z.string().optional().describe('Stable connector ID. Assign your own and reuse it as `connectorId` in update/remove — the engine otherwise mints a Date.now()-based ID no caller can predict'),
   sourceItemId: z.string().describe('Registry ID of source item'),
   sourcePort: PortPositionSchema.describe('Port position on source'),
   targetItemId: z.string().describe('Registry ID of target item'),

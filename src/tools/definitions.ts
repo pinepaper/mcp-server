@@ -4604,6 +4604,10 @@ RETURNS:
     inputSchema: {
       type: 'object',
       properties: {
+        id: {
+          type: 'string',
+          description: 'Stable ID for the connector. Assign your own and reuse it as `connectorId` in pinepaper_update_connector / pinepaper_remove_connector — creation does not return an ID you can rely on. Without one the engine mints a timestamp-based ID that no caller can predict.',
+        },
         sourceItemId: {
           type: 'string',
           description: 'Registry ID of the source item (where arrow starts)',
@@ -4698,6 +4702,10 @@ Same as pinepaper_connect: routing, lineColor, lineWidth, lineStyle, headStyle, 
     inputSchema: {
       type: 'object',
       properties: {
+        id: {
+          type: 'string',
+          description: 'Stable ID for the connector. Assign your own and reuse it as `connectorId` in pinepaper_update_connector / pinepaper_remove_connector — creation does not return an ID you can rely on. Without one the engine mints a timestamp-based ID that no caller can predict.',
+        },
         sourceItemId: {
           type: 'string',
           description: 'Registry ID of the source item',
