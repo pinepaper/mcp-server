@@ -3816,7 +3816,8 @@ export const RiggingInputSchema = z.object({
     'import_bvh', 'retarget_bvh', 'import_spine',
     // ── Pose motion. The engine has had these for releases; nothing could
     // reach them, which is not the same as their not existing.
-    'list_skeletons', 'list_poses', 'load_pose', 'interpolate_poses',
+    'list_skeletons', 'list_bones', 'list_poses', 'load_pose', 'interpolate_poses',
+    'list_pose_libraries', 'load_pose_library',
     'play_pose_sequence', 'stop_pose_sequence', 'stitch_poses',
     'apply_pose_transition',
     'auto_walk', 'auto_breath', 'auto_idle', 'auto_jump',
@@ -3866,6 +3867,8 @@ export const RiggingInputSchema = z.object({
   blendSteps: z.number().int().min(2).max(64).optional().describe('Keys emitted across a seam (default 6) — stitch_poses.'),
   matchPhase: z.boolean().optional().describe('Enter a cyclic clip at the phase closest to where the last one ended (default true) — stitch_poses.'),
   plan: z.boolean().optional().describe('Return the seams WITHOUT installing the result — stitch_poses. Read `residual` per seam: it is the mismatch the blend is hiding, in degrees.'),
+  libraryName: z.string().optional().describe("Stock pose set — load_pose_library. The LIBRARIES are rig shapes: humanoid, quadruped, bird, fish. Loading one saves its poses (idle, walk_00…walk_07, walk_contact_L, run_*, …) against your bones. The walk/run/flap SEQUENCES are transitions, not libraries — play those with apply_pose_transition once the library is loaded. list_pose_libraries returns both lists."),
+  boneMap: z.record(z.string(), z.string()).optional().describe('Bone NAME → bone id — load_pose_library. Omit and it is built from list_bones, which is what you want unless the rig uses non-standard names.'),
   transitionName: z.string().optional().describe('Named pose transition — apply_pose_transition.'),
   poseIdMap: z.record(z.string(), z.string()).optional().describe('Transition pose name → saved pose id — apply_pose_transition.'),
   boneNames: z.array(z.string()).optional().describe('Ordered bone names for a spring chain — add_secondary_motion.'),

@@ -2253,6 +2253,7 @@ RECIPE — a character walking through a forest: create {spec:'forest'} → impo
 WORKFLOW: create_skeleton → add_bone (×N, parent them into a hierarchy) → attach_item (bind shapes to bones) → optionally create_ik_chain → animate with add_pose_keyframe (or save_pose then reference it).
 
 POSE MOTION — build a performance out of saved poses:
+- START HERE on a rig you did not build yourself: list_bones gives the ids an inline pose needs ({ boneId: angleDeg }), and list_pose_libraries + load_pose_library give a fresh rig a stock walk/run/jump set to work with. A newly rigged character has ZERO saved poses, so without one of these there is nothing to sequence.
 - save_pose / list_poses / load_pose / interpolate_poses: the pose library. A pose is a snapshot of bone angles; everything below is a graph over these.
 - play_pose_sequence: one clip. Keys name a saved pose id or an inline { boneId: angleDeg } map. ONE sequence per skeleton — starting another replaces it.
 - stitch_poses: join CLIPS into one continuous performance (walk ×3 → jump → land → idle) and install it as a single sequence. This is how you get a transition rather than a cut.
@@ -2281,7 +2282,7 @@ BREAKDOWN POSES (S12): a breakdown keyframe shapes the ARC + SPACING between key
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['create_skeleton', 'add_bone', 'attach_item', 'create_ik_chain', 'add_pose_keyframe', 'set_target_path', 'save_pose', 'save_shape_key', 'import_bvh', 'retarget_bvh', 'import_spine', 'list_skeletons', 'list_poses', 'load_pose', 'interpolate_poses', 'play_pose_sequence', 'stop_pose_sequence', 'stitch_poses', 'apply_pose_transition', 'auto_walk', 'auto_breath', 'auto_idle', 'auto_jump', 'move_root', 'stop_root_track', 'add_secondary_motion', 'skin_path', 'bake_animation', 'list_shape_keys', 'load_shape_key'], description: 'Rigging operation' },
+        action: { type: 'string', enum: ['create_skeleton', 'add_bone', 'attach_item', 'create_ik_chain', 'add_pose_keyframe', 'set_target_path', 'save_pose', 'save_shape_key', 'import_bvh', 'retarget_bvh', 'import_spine', 'list_skeletons', 'list_bones', 'list_pose_libraries', 'load_pose_library', 'list_poses', 'load_pose', 'interpolate_poses', 'play_pose_sequence', 'stop_pose_sequence', 'stitch_poses', 'apply_pose_transition', 'auto_walk', 'auto_breath', 'auto_idle', 'auto_jump', 'move_root', 'stop_root_track', 'add_secondary_motion', 'skin_path', 'bake_animation', 'list_shape_keys', 'load_shape_key'], description: 'Rigging operation' },
         bvhText: { type: 'string', description: 'import_bvh / retarget_bvh: the .bvh file contents.' },
         spineJson: { type: 'string', description: 'import_spine: the Spine JSON export, as a string.' },
         view: { type: 'string', enum: ['side', 'front'], description: 'import_bvh: 3D→2D projection plane. CMU walks read best from the side (default).' },
@@ -2293,6 +2294,8 @@ BREAKDOWN POSES (S12): a breakdown keyframe shapes the ARC + SPACING between key
         chainId: { type: 'string', description: 'IK chain id — set_target_path.' },
         name: { type: 'string', description: 'Name — create_skeleton / add_bone / create_ik_chain / save_pose / save_shape_key.' },
         poseId: { type: 'string', description: 'Saved pose id — load_pose.' },
+        libraryName: { type: 'string', description: 'Stock pose set — load_pose_library. list_pose_libraries for the names.' },
+        boneMap: { type: 'object', description: 'Bone NAME → bone id — load_pose_library. Omit to build it from list_bones.' },
         poseIdA: { type: 'string', description: 'First pose — interpolate_poses.' },
         poseIdB: { type: 'string', description: 'Second pose — interpolate_poses.' },
         t: { type: 'number', description: 'Blend 0=A … 1=B — interpolate_poses.' },

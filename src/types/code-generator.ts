@@ -6716,8 +6716,16 @@ ${guard}
         });
         return wrap('Medium: render in thread',
           `  if (typeof app.applyThreadPainting !== 'function') { return { success: false, error: 'thread medium unavailable — update FxTool' }; }
+  const entry = app.itemRegistry && app.itemRegistry.get(${S(input.itemId)});
+  const src = entry && entry.item;
+  if (!src) { return { success: false, action: 'apply_thread', error: 'no item ' + ${S(input.itemId)} }; }
+  // Check the shape BEFORE calling, so the refusal can name the fix. The
+  // engine warns to a console production strips, which an agent never sees.
+  if (src.content !== undefined && typeof src.getPointAt !== 'function') {
+    return { success: false, action: 'apply_thread', error: 'a text item has no outline to stitch. Convert it to glyph paths first (pinepaper_text_style), then stitch the result — the collage it produces is a group of closed paths, which this accepts.' };
+  }
   const g = app.applyThreadPainting(${S(input.itemId)}, ${opts});
-  if (!g) { return { success: false, action: 'apply_thread', error: 'no closed outline to stitch, or unknown stitch — call list_stitches' }; }
+  if (!g) { return { success: false, action: 'apply_thread', error: 'nothing stitchable here — thread needs a CLOSED path, a compound path, or a group containing them. An open stroke, a raster and an empty group all land here. (If you passed a stitch name, check it against list_stitches.)' }; }
   return { success: true, action: 'apply_thread', groupId: (g.data && g.data.id) || null, stitches: g.children.length };`);
       }
       default:
@@ -7109,6 +7117,41 @@ ${needWorld}
         return wrap('Rigging: list skeletons',
           `  const skeletons = R.listSkeletons();
   return { success: true, action: 'list_skeletons', skeletons: skeletons, count: skeletons.length };`);
+      case 'list_bones':
+        // Without this an inline pose is unwritable: a pose is
+        // { boneId: angleDeg } and nothing else returns a bone id.
+        return wrap('Rigging: list bones',
+          `  if (typeof R.listBones !== 'function') { return { success: false, error: 'listBones unavailable — update FxTool' }; }
+  const bones = R.listBones(${S(input.skeletonId)});
+  return { success: true, action: 'list_bones', bones: bones, count: bones.length };`);
+      case 'list_pose_libraries':
+        return wrap('Rigging: list pose libraries',
+          `  return (async function() {
+    if (typeof R.ensurePoseLibraries !== 'function') { return { success: false, error: 'pose libraries unavailable — update FxTool' }; }
+    const names = await R.ensurePoseLibraries();
+    return { success: true, action: 'list_pose_libraries', libraries: names.libraries, transitions: names.transitions };
+  })();`);
+      case 'load_pose_library': {
+        // The libraries used to load only from an editor button, so every
+        // agent ran with none and got null from every preset name. Awaited
+        // here so the guarantee is real rather than dependent on whether a
+        // human happened to click something earlier in the session.
+        const map = input.boneMap ? S(input.boneMap) : 'null';
+        return wrap('Rigging: load a stock pose library',
+          `  return (async function() {
+    if (typeof R.ensurePoseLibraries !== 'function') { return { success: false, error: 'pose libraries unavailable — update FxTool' }; }
+    const avail = await R.ensurePoseLibraries();
+    let boneMap = ${map};
+    if (!boneMap) {
+      boneMap = {};
+      for (const b of (R.listBones ? R.listBones(${S(input.skeletonId)}) : [])) { if (b.name) boneMap[b.name] = b.id; }
+    }
+    const res = R.loadPoseLibrary(${S(input.skeletonId)}, ${S(input.libraryName)}, boneMap);
+    if (!res) { return { success: false, action: 'load_pose_library', error: 'no such library, or none of its bone names matched this rig. Available: ' + avail.libraries.join(', '), available: avail.libraries }; }
+    if (app.historyManager) app.historyManager.saveState();
+    return { success: true, action: 'load_pose_library', library: ${S(input.libraryName)}, poses: res };
+  })();`);
+      }
       case 'list_poses':
         return wrap('Rigging: list poses',
           `  const poses = R.listPoses(${S(input.skeletonId ?? null)});
@@ -7154,9 +7197,22 @@ ${needWorld}
       }
       case 'apply_pose_transition':
         return wrap('Rigging: apply pose transition',
-          `  const res = R.applyPoseTransition(${S(input.skeletonId)}, ${S(input.transitionName)}, ${S(input.poseIdMap ?? {})});
-  if (app.historyManager) app.historyManager.saveState();
-  return { success: !!res, action: 'apply_pose_transition', transition: ${S(input.transitionName)} };`);
+          `  return (async function() {
+    if (typeof R.ensurePoseLibraries === 'function') { await R.ensurePoseLibraries(); }
+    // A transition names POSES BY NAME, so it needs name → id. Requiring the
+    // caller to build that by hand from list_poses is busywork with one
+    // correct answer, and getting it wrong returns a bare null. Build it here
+    // when it is omitted, exactly as load_pose_library builds its bone map.
+    let poseIdMap = ${input.poseIdMap ? S(input.poseIdMap) : 'null'};
+    if (!poseIdMap || !Object.keys(poseIdMap).length) {
+      poseIdMap = {};
+      for (const pose of (R.listPoses ? R.listPoses(${S(input.skeletonId)}) : [])) { if (pose.name) poseIdMap[pose.name] = pose.id; }
+    }
+    const res = R.applyPoseTransition(${S(input.skeletonId)}, ${S(input.transitionName)}, poseIdMap);
+    if (!res) { return { success: false, action: 'apply_pose_transition', error: "no such transition, or none of its pose names are saved on this skeleton. Load the matching library first (load_pose_library), then retry — the transition plays poses BY NAME." }; }
+    if (app.historyManager) app.historyManager.saveState();
+    return { success: true, action: 'apply_pose_transition', transition: ${S(input.transitionName)} };
+  })();`);
       case 'auto_walk':
       case 'auto_breath':
       case 'auto_idle':
@@ -7167,15 +7223,20 @@ ${needWorld}
         // tells an agent nothing, and a silent nothing is what sends it into a
         // retry loop. Say which names each one looks for.
         const needs: Record<string, string> = {
-          auto_walk: 'a skeleton',
-          auto_breath: "a bone named spine, chest, upper_spine or body",
-          auto_idle: "a bone named head, hip, upper_hub or spine",
-          auto_jump: 'a skeleton',
+          // autoWalk cycles through SAVED poses named walk_00…walk_07 or
+          // walk_contact_L/walk_passing_L/… — the ones the `humanoid` library
+          // saves. It is not a procedural generator, it is a pose player, and
+          // saying "needs a skeleton" when the skeleton is right there sends an
+          // agent looking in the wrong place.
+          auto_walk: "at least 2 saved walk poses (walk_00…, or walk_contact_L / walk_passing_L / walk_contact_R / walk_passing_R). Run load_pose_library with libraryName 'humanoid' (or 'quadruped') first — it saves exactly those",
+          auto_breath: 'a bone named spine, chest, upper_spine or body',
+          auto_idle: 'a bone named head, hip, upper_hub or spine',
+          auto_jump: 'a skeleton, and saved jump poses if you want a posed jump rather than a root arc',
         };
         return wrap(`Rigging: ${input.action}`,
           `  const res = R.${method}(${S(input.skeletonId)}, ${S(input.options ?? {})});
   if (res && app.historyManager) app.historyManager.saveState();
-  if (!res) { return { success: false, action: ${S(input.action)}, error: 'refused — needs ${needs[input.action]}. Bone NAMES drive the preset, so rename the bones or use apply_rig_preset naming.' }; }
+  if (!res) { return { success: false, action: ${S(input.action)}, error: ${S(`refused — needs ${needs[input.action]}.`)} }; }
   return { success: true, action: ${S(input.action)}, result: res };`);
       }
       case 'move_root':
@@ -7199,7 +7260,7 @@ ${needWorld}
         return wrap('Rigging: bake animation to keyframes',
           `  const res = R.bakeAnimation(${S(input.skeletonId)}, ${S(input.options ?? {})});
   if (res && app.historyManager) app.historyManager.saveState();
-  if (!res) { return { success: false, action: 'bake_animation', error: 'nothing to bake — no such skeleton, or no items are ATTACHED to its bones. Baking writes keyframes onto the attached items, so a bare skeleton has no output.' }; }
+  if (!res) { return { success: false, action: 'bake_animation', error: "nothing to bake — no such skeleton, or no items are ATTACHED to its bones. Baking writes keyframes onto the attached items, so a bare skeleton has no output." }; }
   return { success: true, action: 'bake_animation', result: res };`);
       case 'list_shape_keys':
         return wrap('Rigging: list shape keys',
