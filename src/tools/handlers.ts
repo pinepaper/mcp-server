@@ -43,6 +43,7 @@ import {
   MediaInputSchema,
   TextStyleInputSchema,
   TextEffectInputSchema,
+  DesignMediumInputSchema,
   ShatterImageInputSchema,
   ImportLayeredCharacterInputSchema,
   GameInputSchema,
@@ -1146,6 +1147,12 @@ async function handleToolCallInner(
         const input = TextStyleInputSchema.parse(args);
         const code = codeGenerator.generateTextStyle(input);
         return executeOrGenerate(code, `Text style: ${input.action}`, options, 'pinepaper_text_style');
+      }
+
+      case 'pinepaper_design_medium': {
+        const input = DesignMediumInputSchema.parse(args);
+        const code = codeGenerator.generateDesignMedium(input);
+        return executeOrGenerate(code, `Medium: ${input.action}`, options, 'pinepaper_design_medium');
       }
 
       case 'pinepaper_text_effect': {

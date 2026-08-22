@@ -68,7 +68,8 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_text_effect: "37 character-level text animations. action: list|apply {itemId, effect}. REPLACES the text with one keyframed item per character (source id dies; keepSource:true to keep it).",
   pinepaper_crop_image: 'One-shot crop of an image item to a canvas-coords rect (clamped; keeps the registry id). {itemId, rect: {x,y,width,height}, aspectRatio?}',
   pinepaper_chroma_key: "One-shot green-screen background removal on an image item (keeps the registry id). Omit threshold/smoothing to auto-estimate. {itemId, color?, threshold?, smoothing?}",
-  pinepaper_rigging: "Skeletal rigging + animation. action: create_skeleton, add_bone, attach_item, create_ik_chain, add_pose_keyframe (S12 breakdown controls), set_target_path, save_pose, save_shape_key.",
+  pinepaper_rigging: "Skeletal rigging + animation. action: create_skeleton, add_bone, attach_item, create_ik_chain, save/load/list/interpolate poses, play + stitch_poses, auto_walk|idle|jump, move_root, bake_animation.",
+  pinepaper_design_medium: "What makes the marks. action: list_media, resolve (refuses a medium it cannot honestly render, and says why), list_stitches, apply_thread (needlepainting).",
 
   // --- Relations ---
   pinepaper_add_relation: `Add relation. sourceId, targetId, type: ${RELATION_TYPES}. params: {speed, ...}.`,

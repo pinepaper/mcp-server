@@ -25,7 +25,7 @@
 
 PinePaper MCP Server enables AI assistants to create and animate graphics in [PinePaper Studio](https://pinepaper.studio) via the Model Context Protocol (MCP). Works with any AI that supports MCP tool calling (Claude, GPT, Gemini, local models, etc.).
 
-The server exposes **139 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
+The server exposes **140 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
 
 - Create text, shapes, geometry, and complex graphics
 - Animate items with behavior-driven **relations** rather than keyframes
@@ -37,7 +37,7 @@ The server exposes **139 tools** across drawing, animation, diagrams, maps, typo
 
 ## Running it: local or hosted
 
-**Local is free and complete.** Every one of the 139 tools works when you run
+**Local is free and complete.** Every one of the 140 tools works when you run
 this server yourself. There is no reduced tier and nothing held back.
 
 What it needs:
@@ -258,7 +258,7 @@ Fourteen new tools (121 → 135) and new actions across the surface — the rele
 
 ## Toolkits & Token Budget
 
-139 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
+140 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
 
 **Toolkit profiles** (`PINEPAPER_TOOLKIT`):
 
@@ -463,7 +463,7 @@ Generate instruction/code pairs for LLM fine-tuning:
 
 ## Tools Reference
 
-All 139 tools, grouped by the tag used for toolkit filtering.
+All 140 tools, grouped by the tag used for toolkit filtering.
 
 ### Canvas (`canvas`)
 | Tool | Description |
@@ -568,6 +568,7 @@ All 139 tools, grouped by the tag used for toolkit filtering.
 | `pinepaper_transform` | Transform items — fit to frame, nudge, flip, reorder |
 | `pinepaper_history` | Undo / redo |
 | `pinepaper_compose` | Arrange items into a named collage pattern and film it |
+| `pinepaper_design_medium` | What makes the marks — media with honest fidelity, and needlepainting |
 | `pinepaper_brand_kit` | Apply brand colours / fonts by role, with a contrast audit |
 | `pinepaper_component` | Reusable master + instances, with per-instance overrides |
 | `pinepaper_artboard` | Resize the artboard; per-item reflow constraints |

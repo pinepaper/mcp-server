@@ -3617,6 +3617,41 @@ export type TextStyleInput = z.infer<typeof TextStyleInputSchema>;
  * items — it scrubs, survives undo/session restore, and exports through the
  * existing MP4/SMIL/Lottie paths rather than needing a per-exporter animator.
  */
+/**
+ * The MEDIUM axis — what makes the marks, as distinct from which design
+ * language (register) and how well executed (level).
+ *
+ * Every medium declares a fidelity, and the tool refuses an `absent` one with
+ * the reason rather than producing flat shapes in its colours. Ask
+ * `list_media` before promising a medium in prose.
+ */
+export const DesignMediumInputSchema = z.object({
+  action: z.enum(['list_media', 'resolve', 'list_stitches', 'apply_thread'])
+    .describe("'list_media' (7 media with fidelity + limitation) · 'resolve' (can this medium be made here, and how honestly) · 'list_stitches' · 'apply_thread' (render an item in thread)"),
+  medium: z.string().optional().describe("resolve: medium key — vector, thread, ink, cutPaper, charcoal, oil, encaustic."),
+  itemId: z.string().optional().describe('apply_thread: a closed path or compound path. Its own silhouette is the region and its fill is the thread colour.'),
+  stitch: z.enum(['longAndShort', 'satin', 'seed', 'stem']).optional()
+    .describe("apply_thread: default longAndShort (the needlepainting fill). 'satin' spans the shape edge to edge — right for a narrow shape, wrong for a round one. 'seed' is texture. 'stem' is an outline mark and leaves the interior bare."),
+  field: z.object({
+    kind: z.enum(['radial', 'spine', 'constant']),
+    cx: z.number().optional(), cy: z.number().optional(),
+    angle: z.number().optional(),
+    spine: z.array(PositionSchema).optional(),
+    across: z.boolean().optional(),
+  }).optional().describe("apply_thread: the direction field — the thing that makes it needlepainting rather than hatching. Default radial from the shape centre. 'spine' runs stitches along a midrib or feather shaft; 'constant' is flat hatch."),
+  stitchLen: z.number().positive().optional().describe('apply_thread: nominal stitch length px (default 18).'),
+  rowGap: z.number().positive().optional().describe('apply_thread: row spacing px. Defaults from the thread width so the rows abut; setting it wider is what makes a fill read as hatching.'),
+  variance: z.number().min(0).max(1).optional().describe('apply_thread: length jitter 0..1 (default 0.35) — the variance IS the long-and-short shading.'),
+  width: z.number().positive().optional().describe('apply_thread: thread width px (default 2).'),
+  sheen: z.boolean().optional().describe('apply_thread: draw the highlight along each stitch (default true) — thread is not matte.'),
+  color: z.string().optional().describe("apply_thread: thread colour, defaulting to the item's own fill."),
+  seed: z.number().int().optional().describe('apply_thread: PRNG seed (default 1). Same seed stitches the same way.'),
+  count: z.number().int().positive().optional().describe('apply_thread: stitch count for seed/satin.'),
+})
+  .refine((v) => v.action !== 'apply_thread' || !!v.itemId, { message: 'apply_thread requires itemId', path: ['itemId'] })
+  .refine((v) => v.action !== 'resolve' || !!v.medium, { message: 'resolve requires medium', path: ['medium'] });
+export type DesignMediumInput = z.infer<typeof DesignMediumInputSchema>;
+
 export const TextEffectInputSchema = z.object({
   action: z.enum(['apply', 'list'])
     .describe("'apply' (explode a text item into animated characters) · 'list' (the 37 effects with key/label/definition, for a picker)"),
@@ -3779,7 +3814,67 @@ export const RiggingInputSchema = z.object({
     'create_skeleton', 'add_bone', 'attach_item', 'create_ik_chain',
     'add_pose_keyframe', 'set_target_path', 'save_pose', 'save_shape_key',
     'import_bvh', 'retarget_bvh', 'import_spine',
+    // ── Pose motion. The engine has had these for releases; nothing could
+    // reach them, which is not the same as their not existing.
+    'list_skeletons', 'list_poses', 'load_pose', 'interpolate_poses',
+    'play_pose_sequence', 'stop_pose_sequence', 'stitch_poses',
+    'apply_pose_transition',
+    'auto_walk', 'auto_breath', 'auto_idle', 'auto_jump',
+    'move_root', 'stop_root_track',
+    'add_secondary_motion', 'skin_path', 'bake_animation',
+    'list_shape_keys', 'load_shape_key',
   ]).describe('Rigging operation'),
+  // ── Pose motion ────────────────────────────────────────────────────────
+  poseId: z.string().optional().describe('Saved pose id — load_pose.'),
+  poseIdA: z.string().optional().describe('First pose — interpolate_poses.'),
+  poseIdB: z.string().optional().describe('Second pose — interpolate_poses.'),
+  t: z.number().min(0).max(1).optional().describe('Blend 0=A … 1=B — interpolate_poses.'),
+  /**
+   * A pose sequence: keys over normalized time, each naming a SAVED pose or an
+   * inline { boneId: angleDeg } map. The saved-pose form is the point — an
+   * animation that is literally a graph over the poses in the Poses panel.
+   */
+  sequence: z.array(z.object({
+    t: z.number().describe('Time (normalized within the clip unless duration is given).'),
+    pose: z.string().optional().describe('Saved pose id.'),
+    angles: z.record(z.string(), z.number()).optional().describe('Inline { boneId: angleDeg }.'),
+    ease: z.string().optional(),
+  })).optional().describe('Pose keys — play_pose_sequence.'),
+  /**
+   * Clips to STITCH into one continuous performance. Each clip is a sequence
+   * plus how it joins: `repeat` plays it N times, `loop` marks it cyclic (only
+   * a cyclic clip can be phase-matched), `blend` is the seam overlap.
+   */
+  clips: z.array(z.object({
+    keys: z.array(z.object({
+      t: z.number().optional(),
+      pose: z.string().optional(),
+      angles: z.record(z.string(), z.number()).optional(),
+      ease: z.string().optional(),
+    })).optional(),
+    poses: z.array(z.object({
+      pose: z.string().optional(),
+      angles: z.record(z.string(), z.number()).optional(),
+    })).optional().describe('Bare list — spread evenly across the clip.'),
+    duration: z.number().positive().optional(),
+    repeat: z.number().int().min(1).max(200).optional(),
+    loop: z.boolean().optional().describe('Cyclic: can be entered at any phase.'),
+    blend: z.number().min(0).optional().describe('Override the seam overlap into this clip.'),
+    matchPhase: z.boolean().optional(),
+  })).optional().describe('Clips in order — stitch_poses.'),
+  blend: z.number().min(0).optional().describe('Seam overlap in seconds (default 0.25) — stitch_poses.'),
+  blendSteps: z.number().int().min(2).max(64).optional().describe('Keys emitted across a seam (default 6) — stitch_poses.'),
+  matchPhase: z.boolean().optional().describe('Enter a cyclic clip at the phase closest to where the last one ended (default true) — stitch_poses.'),
+  plan: z.boolean().optional().describe('Return the seams WITHOUT installing the result — stitch_poses. Read `residual` per seam: it is the mismatch the blend is hiding, in degrees.'),
+  transitionName: z.string().optional().describe('Named pose transition — apply_pose_transition.'),
+  poseIdMap: z.record(z.string(), z.string()).optional().describe('Transition pose name → saved pose id — apply_pose_transition.'),
+  boneNames: z.array(z.string()).optional().describe('Ordered bone names for a spring chain — add_secondary_motion.'),
+  keyframes: z.array(z.object({
+    t: z.number(), x: z.number(), y: z.number(), ease: z.string().optional(),
+  })).optional().describe('World root positions over normalized time — move_root. This is what makes a figure travel instead of walking on the spot.'),
+  shapeKeyId: z.string().optional().describe('Saved shape key id — load_shape_key.'),
+  weight: z.number().optional().describe('Shape key weight 0..1 (default 1) — load_shape_key.'),
+  options: z.record(z.string(), z.unknown()).optional().describe('Pass-through options for auto_* / bake_animation / move_root / skin_path / play_pose_sequence.'),
   // ── Mocap / rig import (import_bvh, retarget_bvh, import_spine) ──
   // The file CONTENTS travel in the call (MCP has no filesystem): .bvh text for
   // BVH, the exported .json for Spine. import_bvh builds a NEW stick-figure rig

@@ -180,7 +180,7 @@ import {
   CaptureFramesInput,
   InstantiateOntologyInput,
   LintSceneInput,
-  MediaInput, TextStyleInput, TextEffectInput, ShatterImageInput, ImportLayeredCharacterInput, GameInput, World3DInput,
+  MediaInput, TextStyleInput, TextEffectInput, DesignMediumInput, ShatterImageInput, ImportLayeredCharacterInput, GameInput, World3DInput,
   CropImageInput,
   ChromaKeyInput,
   RiggingInput,
@@ -6677,6 +6677,54 @@ ${guard}
    * only ids/count/duration are forwarded. `ids` is the whole handle set the
    * caller now has, since the source item is gone.
    */
+  /**
+   * The medium axis. `list_media` and `resolve` are READS — they exist so an
+   * agent can find out what this build can honestly make before it promises a
+   * medium in prose, which is the failure the axis was built to prevent.
+   */
+  generateDesignMedium(input: DesignMediumInput): string {
+    const S = (v: unknown) => JSON.stringify(v);
+    const wrap = (comment: string, body: string) => `\n// ${comment}\n(function() {\n${body}\n})();`.trim();
+    switch (input.action) {
+      case 'list_media':
+        return wrap('Medium: list',
+          `  if (typeof app.listDesignMedia !== 'function') { return { success: false, error: 'medium axis unavailable — update FxTool' }; }
+  const media = app.listDesignMedia();
+  return { success: true, action: 'list_media', media: media, native: media.filter(function(m) { return m.fidelity === 'native'; }).map(function(m) { return m.key; }) };`);
+      case 'resolve':
+        return wrap('Medium: resolve',
+          `  if (typeof app.resolveDesignMedium !== 'function') { return { success: false, error: 'medium axis unavailable — update FxTool' }; }
+  const v = app.resolveDesignMedium(${S(input.medium)});
+  return Object.assign({ success: true, action: 'resolve' }, v);`);
+      case 'list_stitches':
+        return wrap('Medium: list stitches',
+          `  if (typeof app.listStitches !== 'function') { return { success: false, error: 'thread medium unavailable — update FxTool' }; }
+  const stitches = app.listStitches();
+  return { success: true, action: 'list_stitches', stitches: stitches, count: stitches.length };`);
+      case 'apply_thread': {
+        const opts = S({
+          ...(input.stitch !== undefined ? { stitch: input.stitch } : {}),
+          ...(input.field !== undefined ? { field: input.field } : {}),
+          ...(input.stitchLen !== undefined ? { stitchLen: input.stitchLen } : {}),
+          ...(input.rowGap !== undefined ? { rowGap: input.rowGap } : {}),
+          ...(input.variance !== undefined ? { variance: input.variance } : {}),
+          ...(input.width !== undefined ? { width: input.width } : {}),
+          ...(input.sheen !== undefined ? { sheen: input.sheen } : {}),
+          ...(input.color !== undefined ? { color: input.color } : {}),
+          ...(input.seed !== undefined ? { seed: input.seed } : {}),
+          ...(input.count !== undefined ? { count: input.count } : {}),
+        });
+        return wrap('Medium: render in thread',
+          `  if (typeof app.applyThreadPainting !== 'function') { return { success: false, error: 'thread medium unavailable — update FxTool' }; }
+  const g = app.applyThreadPainting(${S(input.itemId)}, ${opts});
+  if (!g) { return { success: false, action: 'apply_thread', error: 'no closed outline to stitch, or unknown stitch — call list_stitches' }; }
+  return { success: true, action: 'apply_thread', groupId: (g.data && g.data.id) || null, stitches: g.children.length };`);
+      }
+      default:
+        return wrap('Medium: unknown action', `  return { success: false, error: 'unknown action' };`);
+    }
+  }
+
   generateTextEffect(input: TextEffectInput): string {
     const S = (v: unknown) => JSON.stringify(v);
     switch (input.action) {
@@ -7052,6 +7100,115 @@ ${needWorld}
           `  const shapeKeyId = R.saveShapeKey(${S(input.skeletonId)}, ${S(input.name ?? null)});
   if (app.historyManager) app.historyManager.saveState();
   return { success: !!shapeKeyId, action: 'save_shape_key', shapeKeyId: shapeKeyId };`);
+
+      // ── Pose motion. Every case below maps 1:1 to a method that exists on
+      // riggingSystem (or, for stitch_poses, a PinePaper facade) — checked
+      // against the engine source, not against the docs, because the docs have
+      // named tools that were never registered before now.
+      case 'list_skeletons':
+        return wrap('Rigging: list skeletons',
+          `  const skeletons = R.listSkeletons();
+  return { success: true, action: 'list_skeletons', skeletons: skeletons, count: skeletons.length };`);
+      case 'list_poses':
+        return wrap('Rigging: list poses',
+          `  const poses = R.listPoses(${S(input.skeletonId ?? null)});
+  return { success: true, action: 'list_poses', poses: poses, count: poses.length };`);
+      case 'load_pose':
+        return wrap('Rigging: load pose',
+          `  const ok = R.loadPose(${S(input.poseId)});
+  if (app.historyManager) app.historyManager.saveState();
+  return { success: !!ok, action: 'load_pose', poseId: ${S(input.poseId)} };`);
+      case 'interpolate_poses':
+        return wrap('Rigging: interpolate poses',
+          `  const ok = R.interpolatePoses(${S(input.poseIdA)}, ${S(input.poseIdB)}, ${input.t ?? 0.5});
+  return { success: !!ok, action: 'interpolate_poses', t: ${input.t ?? 0.5} };`);
+      case 'play_pose_sequence': {
+        const opts = S({
+          ...(input.loop !== undefined ? { loop: input.loop } : {}),
+          ...(input.options ?? {}),
+        });
+        return wrap('Rigging: play pose sequence',
+          `  const ok = R.playPoseSequence(${S(input.skeletonId)}, ${S(input.sequence ?? [])}, ${opts});
+  return { success: !!ok, action: 'play_pose_sequence', keys: ${(input.sequence ?? []).length} };`);
+      }
+      case 'stop_pose_sequence':
+        return wrap('Rigging: stop pose sequence',
+          `  const ok = R.stopPoseSequence(${S(input.skeletonId)});
+  return { success: !!ok, action: 'stop_pose_sequence' };`);
+      case 'stitch_poses': {
+        // The one action on `app` rather than riggingSystem: stitching resolves
+        // saved pose ids and then installs the merged sequence through the
+        // ordinary player, so there is one code path and one thing to scrub.
+        const opts = S({
+          ...(input.blend !== undefined ? { blend: input.blend } : {}),
+          ...(input.blendSteps !== undefined ? { blendSteps: input.blendSteps } : {}),
+          ...(input.matchPhase !== undefined ? { matchPhase: input.matchPhase } : {}),
+          ...(input.loop !== undefined ? { loop: input.loop } : {}),
+          ...(input.plan !== undefined ? { plan: input.plan } : {}),
+          ...(input.options ?? {}),
+        });
+        return wrap('Rigging: stitch pose clips',
+          `  if (typeof app.stitchPoses !== 'function') { return { success: false, error: 'app.stitchPoses unavailable — update FxTool' }; }
+  const res = app.stitchPoses(${S(input.skeletonId)}, ${S(input.clips ?? [])}, ${opts});
+  return Object.assign({ success: !!res.ok, action: 'stitch_poses' }, res);`);
+      }
+      case 'apply_pose_transition':
+        return wrap('Rigging: apply pose transition',
+          `  const res = R.applyPoseTransition(${S(input.skeletonId)}, ${S(input.transitionName)}, ${S(input.poseIdMap ?? {})});
+  if (app.historyManager) app.historyManager.saveState();
+  return { success: !!res, action: 'apply_pose_transition', transition: ${S(input.transitionName)} };`);
+      case 'auto_walk':
+      case 'auto_breath':
+      case 'auto_idle':
+      case 'auto_jump': {
+        const method = { auto_walk: 'autoWalk', auto_breath: 'autoBreath', auto_idle: 'autoIdle', auto_jump: 'autoJump' }[input.action];
+        // These return null when the rig has no bone the preset recognises BY
+        // NAME, which is a real refusal and not an error — but `result: null`
+        // tells an agent nothing, and a silent nothing is what sends it into a
+        // retry loop. Say which names each one looks for.
+        const needs: Record<string, string> = {
+          auto_walk: 'a skeleton',
+          auto_breath: "a bone named spine, chest, upper_spine or body",
+          auto_idle: "a bone named head, hip, upper_hub or spine",
+          auto_jump: 'a skeleton',
+        };
+        return wrap(`Rigging: ${input.action}`,
+          `  const res = R.${method}(${S(input.skeletonId)}, ${S(input.options ?? {})});
+  if (res && app.historyManager) app.historyManager.saveState();
+  if (!res) { return { success: false, action: ${S(input.action)}, error: 'refused — needs ${needs[input.action]}. Bone NAMES drive the preset, so rename the bones or use apply_rig_preset naming.' }; }
+  return { success: true, action: ${S(input.action)}, result: res };`);
+      }
+      case 'move_root':
+        return wrap('Rigging: root locomotion track',
+          `  const ok = R.moveRoot(${S(input.skeletonId)}, ${S(input.keyframes ?? [])}, ${S(input.options ?? {})});
+  return { success: !!ok, action: 'move_root', keys: ${(input.keyframes ?? []).length} };`);
+      case 'stop_root_track':
+        return wrap('Rigging: stop root track',
+          `  const ok = R.stopRootTrack(${S(input.skeletonId)});
+  return { success: !!ok, action: 'stop_root_track' };`);
+      case 'add_secondary_motion':
+        return wrap('Rigging: secondary motion',
+          `  const res = R.addSecondaryMotion(${S(input.skeletonId)}, ${S(input.boneNames ?? [])}, ${S(input.options ?? {})});
+  return { success: !!res, action: 'add_secondary_motion', bones: ${(input.boneNames ?? []).length} };`);
+      case 'skin_path':
+        return wrap('Rigging: skin path to bones',
+          `  const res = R.skinPath(${S(input.skeletonId)}, ${S(input.itemId)}, ${S(input.options ?? {})});
+  if (app.historyManager) app.historyManager.saveState();
+  return { success: !!res, action: 'skin_path', itemId: ${S(input.itemId)} };`);
+      case 'bake_animation':
+        return wrap('Rigging: bake animation to keyframes',
+          `  const res = R.bakeAnimation(${S(input.skeletonId)}, ${S(input.options ?? {})});
+  if (res && app.historyManager) app.historyManager.saveState();
+  if (!res) { return { success: false, action: 'bake_animation', error: 'nothing to bake — no such skeleton, or no items are ATTACHED to its bones. Baking writes keyframes onto the attached items, so a bare skeleton has no output.' }; }
+  return { success: true, action: 'bake_animation', result: res };`);
+      case 'list_shape_keys':
+        return wrap('Rigging: list shape keys',
+          `  const keys = R.listShapeKeys(${S(input.skeletonId)});
+  return { success: true, action: 'list_shape_keys', shapeKeys: keys, count: keys.length };`);
+      case 'load_shape_key':
+        return wrap('Rigging: load shape key',
+          `  const ok = R.loadShapeKey(${S(input.skeletonId)}, ${S(input.shapeKeyId)}, ${input.weight ?? 1});
+  return { success: !!ok, action: 'load_shape_key', weight: ${input.weight ?? 1} };`);
 
       // ── Mocap / rig import — these live on `app` (PinePaper facades), not
       // riggingSystem, and they are async, so they get their own async IIFE

@@ -1913,6 +1913,62 @@ EXAMPLE: { action: 'apply_style', itemId: 'title_1', styleKey: 'arcade', fontFam
     },
   },
   {
+    name: 'pinepaper_design_medium',
+    annotations: {
+      title: 'Design Medium (What Makes The Marks)',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `The THIRD design axis: the MEDIUM — what physically makes the marks.
+
+Register is which design language a piece speaks; level is how well it is executed; a medium is a set of physical constraints that produce characteristic marks. All three are independent: an embroidered schematic is a technical register at a refined level in a thread medium, and no single better/worse ranking can say that.
+
+READ THIS BEFORE PROMISING A MEDIUM. Naming a medium does not create its marks. Every medium declares a FIDELITY:
+- native — the characteristic marks ARE vector geometry (vector, thread, ink, cutPaper)
+- stylised — a recognisable impression; the limitation is stated on the entry (charcoal, oil)
+- absent — no vertex-level expression; the tool REFUSES with the reason instead of producing flat shapes in its colours (encaustic)
+
+Call resolve before telling a user you will render in a medium. "yes, but as an impression" is the true answer for half of them, and a flat approximation misrepresents a medium rather than approximating it.
+
+ACTIONS:
+- list_media: all 7 with fidelity, definition and limitation.
+- resolve: { medium } → { ok, fidelity, reason, markMaker }. ok:false with a reason is a real answer — pass it on rather than trying anyway.
+- list_stitches: the 4 thread stitches with their params.
+- apply_thread: render an item in thread. Its own silhouette is the region and its own fill is the thread colour, so an existing drawing becomes stitched rather than needing to be redrawn. The source is HIDDEN, not destroyed.
+
+THE DIRECTION FIELD IS THE WHOLE THING. Stitches that all lie the same way are hatching; stitches that follow the form are needlepainting. Use { kind: 'radial', cx, cy } for anything that radiates (a flower, an eye), { kind: 'spine', spine: [...] } to run them along a midrib or feather shaft, { kind: 'constant', angle } when you actually want flat hatch.
+
+STITCH CHOICE: longAndShort (default) is the shading fill — the length variance IS the blend. satin spans the shape edge to edge in one sheet, which is right for a petal or a letter stroke and wrong for a round shape. seed is texture, not direction. stem is an OUTLINE mark and leaves the interior bare — that is the stitch, not a bug.
+
+An unknown stitch is refused rather than defaulted, and re-stitching an item REPLACES its previous stitching instead of stacking.
+
+EXAMPLE — a stitched leaf:
+{ "action": "apply_thread", "itemId": "item_3", "stitch": "longAndShort",
+  "field": { "kind": "spine", "spine": [{"x":400,"y":200},{"x":400,"y":520}] },
+  "stitchLen": 26, "variance": 0.45 }`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['list_media', 'resolve', 'list_stitches', 'apply_thread'], description: 'Medium operation' },
+        medium: { type: 'string', description: 'resolve: vector | thread | ink | cutPaper | charcoal | oil | encaustic' },
+        itemId: { type: 'string', description: 'apply_thread: a closed path or compound path.' },
+        stitch: { type: 'string', enum: ['longAndShort', 'satin', 'seed', 'stem'], description: 'apply_thread: default longAndShort.' },
+        field: { type: 'object', description: "apply_thread: { kind: 'radial'|'spine'|'constant', cx, cy, angle, spine[], across } — default radial from the shape centre." },
+        stitchLen: { type: 'number', description: 'apply_thread: nominal stitch length px (default 18).' },
+        rowGap: { type: 'number', description: 'apply_thread: row spacing px; defaults from thread width so rows abut.' },
+        variance: { type: 'number', description: 'apply_thread: length jitter 0..1 (default 0.35) — the long-and-short shading.' },
+        width: { type: 'number', description: 'apply_thread: thread width px (default 2).' },
+        sheen: { type: 'boolean', description: 'apply_thread: highlight along each stitch (default true).' },
+        color: { type: 'string', description: "apply_thread: thread colour (defaults to the item's fill)." },
+        seed: { type: 'number', description: 'apply_thread: PRNG seed (default 1) — same seed stitches the same way.' },
+        count: { type: 'number', description: 'apply_thread: stitch count for seed/satin.' },
+      },
+      required: ['action'],
+    },
+  },
+  {
     name: 'pinepaper_text_effect',
     annotations: {
       title: 'Text Effects (37 Character-Level Animations)',
@@ -2196,6 +2252,18 @@ RECIPE — a character walking through a forest: create {spec:'forest'} → impo
 
 WORKFLOW: create_skeleton → add_bone (×N, parent them into a hierarchy) → attach_item (bind shapes to bones) → optionally create_ik_chain → animate with add_pose_keyframe (or save_pose then reference it).
 
+POSE MOTION — build a performance out of saved poses:
+- save_pose / list_poses / load_pose / interpolate_poses: the pose library. A pose is a snapshot of bone angles; everything below is a graph over these.
+- play_pose_sequence: one clip. Keys name a saved pose id or an inline { boneId: angleDeg } map. ONE sequence per skeleton — starting another replaces it.
+- stitch_poses: join CLIPS into one continuous performance (walk ×3 → jump → land → idle) and install it as a single sequence. This is how you get a transition rather than a cut.
+  · A cyclic clip (loop: true) is entered at the phase CLOSEST to where the previous clip ended, so the legs do not teleport mid-stride. matchPhase: false to disable.
+  · Every seam reports 'residual' — the angular mismatch, in degrees, that the blend could not remove. Near zero is a real match; a large number means the blend is HIDING a cut. Read it.
+  · plan: true returns the seams without touching the skeleton, so you can check the joins first.
+- move_root: a deterministic locomotion track. Without it a walk cycle is a march on the spot.
+- auto_walk / auto_breath / auto_idle / auto_jump: one-call procedural layers. breath and idle find their bones BY NAME (spine/chest/body, head/hip/spine) and refuse with that list if the rig uses other names.
+- bake_animation: freeze the whole rig into plain item keyframes for export. Needs items ATTACHED to bones — a bare skeleton has no output.
+- add_secondary_motion: spring chains for tails, hair, cloth. skin_path: per-vertex deformation of a curved path.
+
 ACTIONS:
 - create_skeleton: { name?, rootPosition? } → { skeletonId }
 - add_bone: { skeletonId, name?, parentBoneId? (omit for root), length? (80), angle? (deg), flexibility? (0 rigid…1), segments? } → { boneId }
@@ -2213,7 +2281,7 @@ BREAKDOWN POSES (S12): a breakdown keyframe shapes the ARC + SPACING between key
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['create_skeleton', 'add_bone', 'attach_item', 'create_ik_chain', 'add_pose_keyframe', 'set_target_path', 'save_pose', 'save_shape_key', 'import_bvh', 'retarget_bvh', 'import_spine'], description: 'Rigging operation' },
+        action: { type: 'string', enum: ['create_skeleton', 'add_bone', 'attach_item', 'create_ik_chain', 'add_pose_keyframe', 'set_target_path', 'save_pose', 'save_shape_key', 'import_bvh', 'retarget_bvh', 'import_spine', 'list_skeletons', 'list_poses', 'load_pose', 'interpolate_poses', 'play_pose_sequence', 'stop_pose_sequence', 'stitch_poses', 'apply_pose_transition', 'auto_walk', 'auto_breath', 'auto_idle', 'auto_jump', 'move_root', 'stop_root_track', 'add_secondary_motion', 'skin_path', 'bake_animation', 'list_shape_keys', 'load_shape_key'], description: 'Rigging operation' },
         bvhText: { type: 'string', description: 'import_bvh / retarget_bvh: the .bvh file contents.' },
         spineJson: { type: 'string', description: 'import_spine: the Spine JSON export, as a string.' },
         view: { type: 'string', enum: ['side', 'front'], description: 'import_bvh: 3D→2D projection plane. CMU walks read best from the side (default).' },
@@ -2224,6 +2292,23 @@ BREAKDOWN POSES (S12): a breakdown keyframe shapes the ARC + SPACING between key
         itemId: { type: 'string', description: 'Canvas item id — attach_item.' },
         chainId: { type: 'string', description: 'IK chain id — set_target_path.' },
         name: { type: 'string', description: 'Name — create_skeleton / add_bone / create_ik_chain / save_pose / save_shape_key.' },
+        poseId: { type: 'string', description: 'Saved pose id — load_pose.' },
+        poseIdA: { type: 'string', description: 'First pose — interpolate_poses.' },
+        poseIdB: { type: 'string', description: 'Second pose — interpolate_poses.' },
+        t: { type: 'number', description: 'Blend 0=A … 1=B — interpolate_poses.' },
+        sequence: { type: 'array', items: { type: 'object' }, description: 'Pose keys [{ t, pose | angles, ease }] — play_pose_sequence.' },
+        clips: { type: 'array', items: { type: 'object' }, description: 'Clips in order for stitch_poses: [{ keys | poses, duration, repeat, loop, blend, matchPhase }]. A clip key names a SAVED pose id or an inline { boneId: angleDeg } map.' },
+        blend: { type: 'number', description: 'Seam overlap in seconds (default 0.25) — stitch_poses.' },
+        blendSteps: { type: 'number', description: 'Keys emitted across a seam (default 6) — stitch_poses.' },
+        matchPhase: { type: 'boolean', description: 'Enter a cyclic clip at the phase closest to where the last one ended (default true) — stitch_poses.' },
+        plan: { type: 'boolean', description: 'stitch_poses: return the seams WITHOUT installing the result.' },
+        transitionName: { type: 'string', description: 'Named transition — apply_pose_transition.' },
+        poseIdMap: { type: 'object', description: 'Transition pose name → saved pose id — apply_pose_transition.' },
+        boneNames: { type: 'array', items: { type: 'string' }, description: 'Ordered bone names for a spring chain — add_secondary_motion.' },
+        keyframes: { type: 'array', items: { type: 'object' }, description: 'World root positions [{ t, x, y, ease }] — move_root. What makes a figure travel instead of walking on the spot.' },
+        shapeKeyId: { type: 'string', description: 'Saved shape key id — load_shape_key.' },
+        weight: { type: 'number', description: 'Shape key weight (default 1) — load_shape_key.' },
+        options: { type: 'object', description: 'Pass-through options — auto_* / bake_animation / move_root / skin_path / play_pose_sequence.' },
         rootPosition: { type: 'object', properties: { x: { type: 'number' }, y: { type: 'number' } }, description: 'Skeleton root position — create_skeleton.' },
         parentBoneId: { type: 'string', description: 'Parent bone id (omit for root) — add_bone.' },
         length: { type: 'number', description: 'Bone length px (default 80) — add_bone.' },
