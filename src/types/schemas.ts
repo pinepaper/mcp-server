@@ -3873,8 +3873,9 @@ export const RiggingInputSchema = z.object({
   poseIdMap: z.record(z.string(), z.string()).optional().describe('Transition pose name → saved pose id — apply_pose_transition.'),
   boneNames: z.array(z.string()).optional().describe('Ordered bone names for a spring chain — add_secondary_motion.'),
   keyframes: z.array(z.object({
-    t: z.number(), x: z.number(), y: z.number(), ease: z.string().optional(),
-  })).optional().describe('World root positions over normalized time — move_root. This is what makes a figure travel instead of walking on the spot.'),
+    t: z.number().describe('SCENE SECONDS, not a 0..1 fraction.'),
+    x: z.number(), y: z.number(), ease: z.string().optional(),
+  })).optional().describe('World root positions over SCENE TIME — move_root. This is what makes a figure travel instead of walking on the spot. `t` is in seconds on the same clock as the pose sequence, so match the last keyframe to the performance duration or the figure arrives early and stands there. Pass options.loop with options.period to cycle it.'),
   shapeKeyId: z.string().optional().describe('Saved shape key id — load_shape_key.'),
   weight: z.number().optional().describe('Shape key weight 0..1 (default 1) — load_shape_key.'),
   options: z.record(z.string(), z.unknown()).optional().describe('Pass-through options for auto_* / bake_animation / move_root / skin_path / play_pose_sequence.'),

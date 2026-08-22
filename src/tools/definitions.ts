@@ -2260,7 +2260,7 @@ POSE MOTION — build a performance out of saved poses:
   · A cyclic clip (loop: true) is entered at the phase CLOSEST to where the previous clip ended, so the legs do not teleport mid-stride. matchPhase: false to disable.
   · Every seam reports 'residual' — the angular mismatch, in degrees, that the blend could not remove. Near zero is a real match; a large number means the blend is HIDING a cut. Read it.
   · plan: true returns the seams without touching the skeleton, so you can check the joins first.
-- move_root: a deterministic locomotion track. Without it a walk cycle is a march on the spot.
+- move_root: a deterministic locomotion track, keyed in SCENE SECONDS on the same clock as the pose sequence. Without it a walk cycle is a march on the spot; with a last keyframe shorter than the performance, the figure arrives early and stands there.
 - auto_walk / auto_breath / auto_idle / auto_jump: one-call procedural layers. breath and idle find their bones BY NAME (spine/chest/body, head/hip/spine) and refuse with that list if the rig uses other names.
 - bake_animation: freeze the whole rig into plain item keyframes for export. Needs items ATTACHED to bones — a bare skeleton has no output.
 - add_secondary_motion: spring chains for tails, hair, cloth. skin_path: per-vertex deformation of a curved path.
@@ -2308,7 +2308,7 @@ BREAKDOWN POSES (S12): a breakdown keyframe shapes the ARC + SPACING between key
         transitionName: { type: 'string', description: 'Named transition — apply_pose_transition.' },
         poseIdMap: { type: 'object', description: 'Transition pose name → saved pose id — apply_pose_transition.' },
         boneNames: { type: 'array', items: { type: 'string' }, description: 'Ordered bone names for a spring chain — add_secondary_motion.' },
-        keyframes: { type: 'array', items: { type: 'object' }, description: 'World root positions [{ t, x, y, ease }] — move_root. What makes a figure travel instead of walking on the spot.' },
+        keyframes: { type: 'array', items: { type: 'object' }, description: 'World root positions [{ t, x, y, ease }] — move_root. `t` is SCENE SECONDS on the same clock as the pose sequence, not a 0..1 fraction: match the last keyframe to the performance duration or the figure arrives early and stands still for the rest.' },
         shapeKeyId: { type: 'string', description: 'Saved shape key id — load_shape_key.' },
         weight: { type: 'number', description: 'Shape key weight (default 1) — load_shape_key.' },
         options: { type: 'object', description: 'Pass-through options — auto_* / bake_animation / move_root / skin_path / play_pose_sequence.' },
