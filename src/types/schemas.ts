@@ -2813,6 +2813,32 @@ export const QueryOntologyInputSchema = z.object({
 
 export type QueryOntologyInput = z.infer<typeof QueryOntologyInputSchema>;
 
+// Capabilities query schema: discover and match capabilities across text styles, text effects, generators, deforms, relations, etc.
+export const QueryCapabilitiesInputSchema = z.object({
+  action: z.enum(['list', 'choose', 'coverage', 'find']).default('list')
+    .describe("'list' (all capabilities or filtered by kind) · 'choose' (context/mood-weighted recommendation) · 'coverage' (breakdown of indexable capabilities) · 'find' (lookup by key)"),
+  kind: z.union([
+    z.string(),
+    z.array(z.string()),
+  ]).optional().describe("Filter by capability kind: 'style'|'effect'|'deform'|'entrance'|'animation'|'generator'|'collage'|'palette'|'mask'|'cutout'|'relation'"),
+  mood: z.union([
+    z.string(),
+    z.array(z.string()),
+  ]).optional().describe("For choose: target feeling ('reveal'|'triumphant'|'failure'|'calm'|'technical'|'energetic')"),
+  subject: z.string().optional().describe('For choose: contextual subject keywords / prompt text to score against capability definitions'),
+  avoid: z.union([
+    z.string(),
+    z.array(z.string()),
+  ]).optional().describe('For choose: mood terms or feelings to penalize'),
+  seed: z.string().optional().describe('For choose: deterministic seed string for reproducible selection'),
+  key: z.string().optional().describe('For find: exact capability key to look up'),
+  exclude: z.array(z.string()).optional().describe('For choose: list of capability keys to exclude from recommendation'),
+  warm: z.boolean().optional()
+    .describe('Load the lazy registries before answering (default true). The generator registry and the rigging/blending/deform relation rules only exist once touched, so a cold answer omits them — pass false only to re-read what is already resident, cheaply.'),
+});
+
+export type QueryCapabilitiesInput = z.infer<typeof QueryCapabilitiesInputSchema>;
+
 // =============================================================================
 // SCENE MANAGEMENT SCHEMAS
 // =============================================================================
@@ -2842,6 +2868,116 @@ export const ScenePlaybackInputSchema = z.object({
 });
 
 export type ScenePlaybackInput = z.infer<typeof ScenePlaybackInputSchema>;
+
+// Scene graph: interactive multi-node story/quiz state graphs (cards, answers, mutex, event wiring)
+//
+// The node and opts fields below mirror what the engine's compiler actually
+// reads (js/core/SceneGraph.js). zod strips unknown keys, so a field missing
+// here is not "passed through" — it is silently dropped on the way to an engine
+// that would have honoured it. `next`, `duration`, `outcome` and `subject` were
+// each unreachable for that reason.
+const SceneGraphNodeSchema = z.object({
+  id: z.string().describe('Unique node id (e.g., "q1", "win", "lose")'),
+  prompt: z.string().optional().describe('Prompt or headline text for question cards'),
+  text: z.string().optional().describe('Text for message/end cards'),
+  kind: z.enum(['node', 'card', 'end']).optional()
+    .describe("'node'/'card' (question or content) or 'end' (terminal/outcome). Anything that is not 'end' is a card."),
+  answers: z.array(z.object({
+    text: z.string().describe('Answer button text'),
+    correct: z.boolean().optional().describe('Whether this is the correct answer (increments score when scoreItemId given)'),
+    to: z.string().min(1).describe('Destination node id when clicked'),
+  })).optional().describe('Interactive answer choices (for question cards)'),
+  next: z.string().min(1).optional()
+    .describe('Unconditional destination — a linear story beat that auto-advances instead of waiting for a click. Use INSTEAD of answers, not alongside a lone fake button.'),
+  duration: z.number().positive().optional()
+    .describe('Seconds this card holds before `next` fires (default 3). Ignored without `next`.'),
+  outcome: z.enum(['win', 'lose']).optional()
+    .describe('Force the outcome of a terminal node. Without it the engine infers win/lose from the wording, which only works in English.'),
+});
+
+export const SceneGraphInputSchema = z.object({
+  action: z.enum(['create', 'validate']).default('create')
+    .describe("'create' builds the graph on the canvas · 'validate' runs the same check WITHOUT drawing anything, returning errors, warnings, unreachable nodes and cycles"),
+  graph: z.object({
+    start: z.string().optional().describe('Node id of the initial active card (defaults to the first node)'),
+    nodes: z.array(SceneGraphNodeSchema).min(1).describe('Array of scene graph nodes'),
+  })
+    // Structural integrity, checked HERE because in code mode there is no engine
+    // to catch it: the snippet is handed to the caller and fails silently later.
+    // Duplicate ids in particular are invisible engine-side — `indexNodes` keys a
+    // Map by id, so the second node quietly replaces the first.
+    .superRefine((graph, ctx) => {
+      const seen = new Set<string>();
+      graph.nodes.forEach((node, i) => {
+        if (seen.has(node.id)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['nodes', i, 'id'],
+            message: `duplicate node id "${node.id}" — the later node silently replaces the earlier one`,
+          });
+        }
+        seen.add(node.id);
+      });
+
+      const has = (id: string) => seen.has(id);
+      if (graph.start !== undefined && !has(graph.start)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['start'],
+          message: `start node "${graph.start}" does not exist`,
+        });
+      }
+
+      graph.nodes.forEach((node, i) => {
+        (node.answers || []).forEach((answer, a) => {
+          if (!has(answer.to)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['nodes', i, 'answers', a, 'to'],
+              message: `node "${node.id}" points at "${answer.to}", which does not exist — clicking it would do nothing`,
+            });
+          }
+        });
+        if (node.next !== undefined && !has(node.next)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['nodes', i, 'next'],
+            message: `node "${node.id}" advances to "${node.next}", which does not exist`,
+          });
+        }
+        // Mirrors the engine's own refusal: a non-terminal card with no edge is
+        // a dead end the player can never leave.
+        if (node.kind !== 'end' && !node.answers?.length && node.next === undefined) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['nodes', i],
+            message: `node "${node.id}" is not terminal but has no way out — give it answers, a next, or kind: 'end'`,
+          });
+        }
+      });
+    })
+    .describe('The declarative scene graph definition'),
+  opts: z.object({
+    width: z.number().optional().describe('Layout width (defaults to view width or canvas width)'),
+    height: z.number().optional().describe('Layout height (defaults to view height or canvas height)'),
+    centerX: z.number().optional().describe('Center X position for card stack'),
+    centerY: z.number().optional().describe('Center Y position for card stack'),
+    groupName: z.string().optional().describe('Prefix / seed namespace for generated IDs and effect selection'),
+    scoreItemId: z.string().optional().describe('Optional scoreboard text item id to increment on correct answers'),
+    subject: z.string().optional()
+      .describe("Extra context folded into each card's text-effect selection — the theme of the piece, e.g. 'space exploration'."),
+    plain: z.boolean().optional().describe('Opt out of rich effects/entrances for a bare structural graph'),
+    style: z.object({
+      panelColor: z.string().optional().describe('Background panel fill color (default #1E1B4B)'),
+      textColor: z.string().optional().describe('Headline/prompt text color (default #F8FAFC)'),
+      answerColor: z.string().optional().describe('Answer text color (default #93C5FD)'),
+      headlineSize: z.number().optional().describe('Font size for headline/prompt (default 34)'),
+      bodySize: z.number().optional().describe('Font size for body/answers (default 24)'),
+    }).optional().describe('Visual styling options for generated cards and text'),
+  }).optional().describe('Layout, style, and scoring options'),
+});
+
+export type SceneGraphInput = z.infer<typeof SceneGraphInputSchema>;
 
 // =============================================================================
 // SELECTION, TRANSFORM & HISTORY TOOLS
@@ -3596,7 +3732,7 @@ export const World3DInputSchema = z.object({
   live: z.boolean().optional().describe('add_actor: re-rasterize the item as it animates — a rigged character PERFORMS in the world instead of standing there as a photograph of itself.'),
   pose: z.record(z.string(), z.unknown()).optional().describe('set_actor_pose: { x?, z?, angle?, … } — the setter a timeline or agent drives.'),
   camera: z.record(z.string(), z.unknown()).optional().describe("set_camera: { mode: 'follow'|'fixed'|'orbit', target?, radius?, speed?, eye?, lookAt? }."),
-  object: z.record(z.string(), z.unknown()).optional().describe('add_object: { x, z, height?, color?, y? (defaults to sitting on the terrain) }.'),
+  object: z.record(z.string(), z.unknown()).optional().describe('add_object: { x, z, height?, color?, y?, metalness?, roughness?, emissiveIntensity? } (defaults to sitting on the terrain).'),
   objectId: z.string().optional().describe('remove_object: the object id.'),
 })
   .refine((v) => v.action !== 'configure' || !!v.patch, { message: 'configure requires patch', path: ['patch'] })

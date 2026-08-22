@@ -103,6 +103,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_create_scene: 'Create scene. items: [{name, itemType, position, properties}], relations: [{source, target, type}], animations: [{target, type}].',
   pinepaper_manage_scenes: 'Scene CRUD. action: save|load|list|delete|rename|duplicate|reorder|info|export|import. name, sceneId, transition: none|fade|zoom-in|zoom-out.',
   pinepaper_scene_playback: 'Scene chain playback. action: create_chain|play|pause|resume|stop|toggle_loop|jump. sceneIds, defaultDuration (secs), loop.',
+  pinepaper_scene_graph: 'Interactive story/quiz scene graph. action: create|validate. graph: {start, nodes:[{id, prompt?, text?, kind?, answers?, next?, duration?, outcome?}]}, opts: {style?, scoreItemId?, subject?}.',
   pinepaper_apply_template: 'Apply pre-built template (templateId), or list available (listOnly:true). 13 categories. DESTRUCTIVE: replaces canvas.',
 
   // --- Diagrams ---
@@ -205,6 +206,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
 
   // --- Canvas Query ---
   pinepaper_query: 'Canvas queries. action: get_by_id|hit_test|is_empty. itemId, x, y, tolerance.',
+  pinepaper_query_capabilities: 'Query and recommend capabilities across text styles, text effects, generators, deforms, and relations. action: list|choose|coverage|find. kind, mood, subject, seed, key, warm.',
 
   // --- Deformation, Sprite Sheets, Interaction ---
   pinepaper_deform: 'Vertex deformation. action: apply|trigger|remove. itemId, preset: fold|squeeze|squash|twist|ripple|wave|breathe|wobble..., phase, amplitude.',

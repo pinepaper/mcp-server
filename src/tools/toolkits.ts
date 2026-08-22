@@ -125,6 +125,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
     'pinepaper_create_scene',
     'pinepaper_manage_scenes',
     'pinepaper_scene_playback',
+    'pinepaper_scene_graph',
     'pinepaper_event',
   ],
   selection: [
@@ -196,6 +197,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
     'pinepaper_get_items',
     'pinepaper_get_relation_stats',
     'pinepaper_query',
+    'pinepaper_query_capabilities',
   ],
   export: [
     'pinepaper_export_svg',

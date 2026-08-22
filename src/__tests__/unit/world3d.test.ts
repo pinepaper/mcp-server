@@ -59,6 +59,17 @@ describe('generateWorld3D codegen', () => {
     }
   });
 
+  it('add_object forwards PBR material fields (metalness, roughness, emissiveIntensity)', () => {
+    const c = codeGenerator.generateWorld3D(World3DInputSchema.parse({
+      action: 'add_object',
+      object: { x: 10, z: -20, height: 5, color: '#3b82f6', metalness: 0.8, roughness: 0.2, emissiveIntensity: 0.5 },
+    }));
+    expect(c).toContain('"metalness":0.8');
+    expect(c).toContain('"roughness":0.2');
+    expect(c).toContain('"emissiveIntensity":0.5');
+    expect(() => new Function(c)).not.toThrow();
+  });
+
   it('add_actor forwards live sprites — the rigged-character path', () => {
     const c = codeGenerator.generateWorld3D(World3DInputSchema.parse({
       action: 'add_actor', actorId: 'hero', x: 4, z: -6, sprite: 'item_3', live: true, height: 3,

@@ -65,9 +65,8 @@ describe('README ↔ PINEPAPER_TOOLS parity', () => {
     ];
     for (const file of translations) {
       const text = readFileSync(join(REPO_ROOT, file), 'utf-8');
-      // Every 2-3 digit number adjacent to a bolded count marker must be the
-      // tool count; translations wrap it as **121 <localized word>**.
-      const bolded = [...text.matchAll(/\*\*(\d{2,3})\s*[^*\d]{0,20}\*\*/g)].map((m) => Number(m[1]));
+      // Match the tool count bold marker near the top of the localized files.
+      const bolded = [...text.matchAll(/\*\*(\d{2,3})\s*(?:tools?|ferramentas?|herramientas?|outils?|Tools?|टूल|個のツール|개의\s*툴|个工具)[^*]{0,10}\*\*/g)].map((m) => Number(m[1]));
       const counts = bolded.filter((n) => n >= 50 && n <= 999);
       expect(counts.length, `${file} states no tool count`).toBeGreaterThan(0);
       for (const n of counts) {

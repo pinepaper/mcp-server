@@ -344,6 +344,10 @@
       "description": "Scene chain playback. action: create_chain|play|pause|resume|stop|toggle_loop|jump. sceneIds, defaultDuration (secs), loop."
     },
     {
+      "name": "pinepaper_scene_graph",
+      "description": "Interactive story/quiz scene graph. action: create|validate. graph: {start, nodes:[{id, prompt?, text?, kind?, answers?, next?, duration?, outcome?}]}, opts: {style?, scoreItemId?, subject?}."
+    },
+    {
       "name": "pinepaper_selection",
       "description": "Manage selection. action: select|select_all|deselect_all|get|delete_selected. itemIds, mode: replace|add|remove."
     },
@@ -414,6 +418,10 @@
     {
       "name": "pinepaper_query",
       "description": "Canvas queries. action: get_by_id|hit_test|is_empty. itemId, x, y, tolerance."
+    },
+    {
+      "name": "pinepaper_query_capabilities",
+      "description": "Query and recommend capabilities across text styles, text effects, generators, deforms, and relations. action: list|choose|coverage|find. kind, mood, subject, seed, key, warm."
     },
     {
       "name": "pinepaper_deform",

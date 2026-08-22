@@ -107,6 +107,7 @@ import {
   // Scene management schemas
   ManageScenesInputSchema,
   ScenePlaybackInputSchema,
+  SceneGraphInputSchema,
   // New consolidated tool schemas
   SelectionInputSchema,
   TransformInputSchema,
@@ -117,6 +118,7 @@ import {
   PrecompInputSchema,
   BackgroundInputSchema,
   QueryInputSchema,
+  QueryCapabilitiesInputSchema,
   DeformInputSchema,
   SpriteSheetInputSchema,
   InteractionInputSchema,
@@ -873,6 +875,15 @@ async function handleToolCallInner(
         return executeOrGenerate(code, `Scene playback: ${input.action}`, options, 'pinepaper_scene_playback');
       }
 
+      case 'pinepaper_scene_graph': {
+        const input = SceneGraphInputSchema.parse(args);
+        const code = codeGenerator.generateSceneGraph(input);
+        const summary = input.action === 'validate'
+          ? `Scene graph: validating ${input.graph.nodes.length} node(s)`
+          : `Scene graph: ${input.graph.nodes.length} node(s)`;
+        return executeOrGenerate(code, summary, options, 'pinepaper_scene_graph');
+      }
+
       // -----------------------------------------------------------------------
       // SELECTION, TRANSFORM & HISTORY TOOLS
       // -----------------------------------------------------------------------
@@ -937,6 +948,12 @@ async function handleToolCallInner(
         const input = QueryInputSchema.parse(args);
         const code = codeGenerator.generateQuery(input);
         return executeOrGenerate(code, `Query: ${input.action}`, options, 'pinepaper_query');
+      }
+
+      case 'pinepaper_query_capabilities': {
+        const input = QueryCapabilitiesInputSchema.parse(args);
+        const code = codeGenerator.generateQueryCapabilities(input);
+        return executeOrGenerate(code, `Capabilities: ${input.action || 'list'}`, options, 'pinepaper_query_capabilities');
       }
 
       // -----------------------------------------------------------------------
@@ -2699,6 +2716,7 @@ You can now start creating new items on a clean canvas.`,
             'pinepaper_create_scene',
             'pinepaper_manage_scenes',
             'pinepaper_scene_playback',
+            'pinepaper_scene_graph',
             // Agent flow mode tools
             'pinepaper_agent_start_job',
             'pinepaper_agent_end_job',
@@ -2742,6 +2760,7 @@ You can now start creating new items on a clean canvas.`,
             'pinepaper_background',
             // Canvas query tools
             'pinepaper_query',
+            'pinepaper_query_capabilities',
             // Deformation, sprite sheets, interaction
             'pinepaper_deform',
             'pinepaper_sprite_sheet',

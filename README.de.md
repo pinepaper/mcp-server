@@ -14,7 +14,7 @@
 
 Der PinePaper MCP-Server lässt KI-Assistenten über das Model Context Protocol Grafiken in [PinePaper Studio](https://pinepaper.studio) erstellen und animieren. Funktioniert mit jeder KI, die MCP-Tool-Aufrufe unterstützt (Claude, GPT, Gemini, lokale Modelle usw.).
 
-Der Server bietet **137 Tools**: Zeichnen, Animation, Diagramme, Karten, Typografie, Physik, Bildbearbeitung, Datenvisualisierung und Export:
+Der Server bietet **139 Tools**: Zeichnen, Animation, Diagramme, Karten, Typografie, Physik, Bildbearbeitung, Datenvisualisierung und Export:
 
 - Text, Formen, Geometrie und komplexe Grafiken erstellen
 - Mit deklarativen **Relationen** animieren statt mit Keyframes

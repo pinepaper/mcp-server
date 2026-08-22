@@ -25,7 +25,7 @@
 
 PinePaper MCP Server enables AI assistants to create and animate graphics in [PinePaper Studio](https://pinepaper.studio) via the Model Context Protocol (MCP). Works with any AI that supports MCP tool calling (Claude, GPT, Gemini, local models, etc.).
 
-The server exposes **137 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
+The server exposes **139 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
 
 - Create text, shapes, geometry, and complex graphics
 - Animate items with behavior-driven **relations** rather than keyframes
@@ -37,7 +37,7 @@ The server exposes **137 tools** across drawing, animation, diagrams, maps, typo
 
 ## Running it: local or hosted
 
-**Local is free and complete.** Every one of the 137 tools works when you run
+**Local is free and complete.** Every one of the 139 tools works when you run
 this server yourself. There is no reduced tier and nothing held back.
 
 What it needs:
@@ -185,6 +185,25 @@ The same code an agent generates is the code you can paste — the canvas is you
 - **It replaces the text item.** Unlike `pinepaper_text_style` (which adopts the text's registry id), this removes the original and returns the new per-character ids — so relations and keyframes on the source id do not survive. `keepSource: true` is the escape hatch. The tool is marked `destructiveHint` and says so in its description, because it inverts the id-preservation convention every neighbouring tool follows.
 - Resting characters are painted with a gradient across the text block by default (what the upstream effects actually do); `gradient: false` keeps the authored fill. `seed` defaults to 1, so a given text + effect + seed animates identically every run.
 
+**New tool: `pinepaper_scene_graph`** — compiles an interactive story or quiz into native items and relations: cards, answer buttons, click→event routing, exclusive-group mutex visibility, and score tracking.
+
+- `action: 'validate'` runs the same structural check **without drawing anything** — errors, warnings, reachable nodes, cycles. Check a generated graph before committing a canvas full of cards to it.
+- The schema refuses a graph the engine would refuse, and one it would silently mangle: a dangling `to`, a `start` naming no node, a non-terminal card with no way out, and **duplicate node ids** — the engine keys its node index by id, so a repeated id quietly replaces the earlier node rather than erroring.
+- Two ways out of a card: `answers` waits for a click, `next` (+ `duration`) auto-advances for a linear story beat.
+- The result forwards `failed`, `wired` and `cycles`. A graph can render completely and still leave relations unwired — it looks built and is inert, and that count is the only thing that says so.
+
+**New tool: `pinepaper_query_capabilities`** — asks the engine what it can do (text styles, character effects, generators, deforms, relations) and recommends one: `list`, `find`, `coverage`, and a mood/subject-weighted `choose`.
+
+- It reads `app.getCapabilities()`, which **warms the lazy registries first**. Generators do not exist until the heavy modules land (~1.2s after boot) and the rigging/blending/deform relation rules only register once their subsystem is touched — answered cold, the engine reports zero generators and roughly 77 of ~100 relations. `warm: false` opts out when a cheap re-read of what is already resident is enough.
+- `coverage` names its own blind spots: kinds with no source wired, and entries that can be applied but not *ranked* because they carry no description. A chooser that scores on description can never recommend those, so it says so.
+- `seed` gives a stable tiebreak among equal-scoring candidates; with no seed the order is stable by key. Either way a repeated call answers the same way.
+
+**Every tool property now declares a type.** Ten inputs across `pinepaper_event`, `pinepaper_component`, `pinepaper_world3d`, `pinepaper_rigging`, `pinepaper_text_style`, `pinepaper_equation_path` and the new capabilities tool were published with a description and no `type` — valid JSON Schema, but strict function-calling clients reject a typeless property, and this server claims to work with any MCP-capable model. They are `anyOf` unions now.
+
+**`pinepaper_connect` / `connect_ports` accept an `id`.** `update_connector` and `remove_connector` address a connector by `connectorId`, and there was previously no value a caller could correctly pass — creation returns code rather than a result, and the engine's fallback is timestamp-based. Assign your own and reuse it.
+
+**`pinepaper_world3d` `add_object` forwards PBR material fields** — `metalness`, `roughness`, `emissiveIntensity`.
+
 Includes the 1.6.6 dependency-security work below (1.6.6 was tagged but never published to npm).
 
 ## What's new in 1.6.6
@@ -239,7 +258,7 @@ Fourteen new tools (121 → 135) and new actions across the surface — the rele
 
 ## Toolkits & Token Budget
 
-137 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
+139 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
 
 **Toolkit profiles** (`PINEPAPER_TOOLKIT`):
 
@@ -444,7 +463,7 @@ Generate instruction/code pairs for LLM fine-tuning:
 
 ## Tools Reference
 
-All 137 tools, grouped by the tag used for toolkit filtering.
+All 139 tools, grouped by the tag used for toolkit filtering.
 
 ### Canvas (`canvas`)
 | Tool | Description |
@@ -530,6 +549,7 @@ All 137 tools, grouped by the tag used for toolkit filtering.
 | `pinepaper_create_scene` | Create a scene |
 | `pinepaper_manage_scenes` | Manage scenes |
 | `pinepaper_scene_playback` | Scene playback control |
+| `pinepaper_scene_graph` | Interactive story / quiz card scene graph |
 | `pinepaper_event` | Create / pulse event channels for scene chains |
 
 ### Generators, Effects & Filters
@@ -639,6 +659,7 @@ All 137 tools, grouped by the tag used for toolkit filtering.
 | `pinepaper_get_items` | Get canvas items |
 | `pinepaper_get_relation_stats` | Relation statistics |
 | `pinepaper_query` | General canvas query |
+| `pinepaper_query_capabilities` | Query and recommend capabilities |
 
 ### Ontology (`ontology`)
 | Tool | Description |

@@ -1432,7 +1432,10 @@ EXAMPLES:
         y: { type: 'number', description: 'Canvas origin y (default: canvas center)' },
         flipY: { type: 'boolean', description: 'Math y-up → screen y-down (default true)' },
         style: { type: 'object', description: 'Path style forwarded to create (strokeColor, strokeWidth, fillColor, …)' },
-        warp: { description: 'Chained parametric warp(s): { dx, dy } expressions of x, y, t — one object or an array' },
+        warp: {
+          anyOf: [{ type: 'object' }, { type: 'array', items: { type: 'object' } }],
+          description: 'Chained parametric warp(s): { dx, dy } expressions of x, y, t — one object or an array',
+        },
       },
     },
   },
@@ -1468,7 +1471,10 @@ RETURNS: create → { success, action, eventId }; pulse → { success, action, e
         x: { type: 'number', description: 'Canvas x for the event marker — action create' },
         y: { type: 'number', description: 'Canvas y for the event marker — action create' },
         eventId: { type: 'string', description: "Event id to fire — required for action 'pulse'" },
-        payload: { description: "Optional value forwarded to listeners — action 'pulse'" },
+        payload: {
+          anyOf: [{ type: 'string' }, { type: 'number' }, { type: 'boolean' }, { type: 'object' }, { type: 'array' }],
+          description: "Optional value forwarded to listeners — action 'pulse'",
+        },
       },
       required: ['action'],
     },
@@ -1893,7 +1899,10 @@ EXAMPLE: { action: 'apply_style', itemId: 'title_1', styleKey: 'arcade', fontFam
         action: { type: 'string', enum: ['apply_style', 'set_font_axes', 'list_styles'], description: 'Text style operation' },
         itemId: { type: 'string', description: 'Text item id — apply_style / set_font_axes.' },
         styleKey: { type: 'string', description: 'apply_style: style name from list_styles.' },
-        palette: { description: 'apply_style: named colourway (string) or explicit color array.' },
+        palette: {
+          anyOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],
+          description: 'apply_style: named colourway (string) or explicit color array.',
+        },
         variant: { type: 'number', description: 'apply_style: variation index within the style.' },
         content: { type: 'string', description: 'apply_style: replace the text while styling.' },
         fontFamily: { type: 'string', description: "apply_style: font override; 'suggested' = the face the style was designed around." },
@@ -2143,7 +2152,7 @@ ACTIONS:
 - add_actor: { actorId?, x, z, height?, sprite? (a canvas item id), live? } → { actorId }. live: true re-rasterizes the item as it animates — a RIGGED character (walk cycle, expressions) PERFORMS in the world instead of standing there as a photograph of itself.
 - remove_actor / list_actors / set_actor_pose: { actorId, pose: { x?, z?, angle? } } — the setter a timeline, sequencer or agent drives frame by frame.
 - set_camera: { camera: { mode: 'follow' | 'fixed' | 'orbit', target? (actorId), radius?, speed?, eye?, lookAt? } }
-- add_object: { object: { x, z, height?, color? } } (y defaults to sitting ON the terrain) / remove_object: { objectId }
+- add_object: { object: { x, z, height?, color?, metalness?, roughness?, emissiveIntensity? } } (y defaults to sitting ON the terrain) / remove_object: { objectId }
 - remove_world: {} — tears the world down; the Paper canvas was always its own layer and is untouched.
 
 RECIPE — a character walking through a forest: create {spec:'forest'} → import/rig a character on the canvas → add_actor {sprite: itemId, live: true} → set_camera {mode:'follow', target} → drive set_actor_pose over time (or let the built-in character control walk).`,
@@ -2151,8 +2160,14 @@ RECIPE — a character walking through a forest: create {spec:'forest'} → impo
       type: 'object',
       properties: {
         action: { type: 'string', enum: ['create', 'describe', 'configure', 'add_actor', 'remove_actor', 'list_actors', 'set_actor_pose', 'set_camera', 'add_object', 'remove_object', 'remove_world'], description: 'World operation' },
-        spec: { description: "create: preset id ('forest'|'snowMountain'|'field'|'jungle') or a full spec object." },
-        character: { description: 'create: include the walkable character (boolean or config).' },
+        spec: {
+          anyOf: [{ type: 'string' }, { type: 'object' }],
+          description: "create: preset id ('forest'|'snowMountain'|'field'|'jungle') or a full spec object.",
+        },
+        character: {
+          anyOf: [{ type: 'boolean' }, { type: 'object' }],
+          description: 'create: include the walkable character (boolean or config).',
+        },
         patch: { type: 'object', description: 'configure: partial world spec, validated against describe.' },
         actorId: { type: 'string', description: 'Actor id.' },
         x: { type: 'number', description: 'add_actor: world x.' },
@@ -2223,7 +2238,10 @@ BREAKDOWN POSES (S12): a breakdown keyframe shapes the ARC + SPACING between key
         strength: { type: 'number', description: 'Chain strength 0..1 (1) — create_ik_chain.' },
         poleVector: { type: 'object', properties: { x: { type: 'number' }, y: { type: 'number' } }, description: 'Pole vector hint — create_ik_chain.' },
         time: { type: 'number', description: 'Keyframe time s — add_pose_keyframe.' },
-        pose: { description: 'Saved pose id (string) OR { boneId: angleDeg } map — add_pose_keyframe.' },
+        pose: {
+          anyOf: [{ type: 'string' }, { type: 'object', additionalProperties: { type: 'number' } }],
+          description: 'Saved pose id (string) OR { boneId: angleDeg } map — add_pose_keyframe.',
+        },
         easing: { type: 'string', description: 'Named easing (linear) — add_pose_keyframe.' },
         favor: { type: 'number', description: 'Breakdown spacing bias −1..1 — add_pose_keyframe.' },
         breakdown: { type: 'boolean', description: 'Mark as breakdown pose — add_pose_keyframe.' },
@@ -3498,6 +3516,125 @@ EXAMPLE — Slideshow:
       required: ['action'],
     },
   },
+  {
+    name: 'pinepaper_scene_graph',
+    annotations: {
+      title: 'Scene Graph (Interactive Stories / Quizzes)',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Create an interactive multi-node story or quiz card graph. Compiles cards, answer buttons, click-to-event routing, exclusive-group mutex visibility, and scoring into native items and relations.
+
+ACTIONS:
+- create (default): build the graph on the canvas.
+- validate: run the same structural check WITHOUT drawing anything. Returns errors, warnings, the nodes reachable from start, and any cycles. Cheap — use it on a graph you generated before committing a canvas full of cards to it.
+
+HOW IT WORKS:
+1. Provide a graph with nodes and choices (start node, question cards with answers pointing to other node IDs, end cards with outcome text).
+2. The engine compiles the card stack, creates panel rectangles and styled text items, wires on_click_fire -> event -> on_event_set_active relations, and binds active card mutex state.
+3. If scoreItemId is provided, correct answers automatically wire on_event_increment to track score.
+
+TWO WAYS OUT OF A CARD: 'answers' waits for a click (a quiz). 'next' advances on its own after 'duration' seconds (a linear story beat). Every non-terminal node needs one or the other, or the player is stuck; mark outcome cards kind: 'end'.
+
+READ THE RESULT: 'failed' counts relations that did not wire. A graph can render completely and still be inert, and that count is the only thing that says so. 'cycles' reports loops — legitimate for a retry, an accidental one is a game that never ends.
+
+EXAMPLE — Interactive Quiz:
+{
+  "graph": {
+    "start": "q1",
+    "nodes": [
+      {
+        "id": "q1",
+        "prompt": "Which planet is known as the Red Planet?",
+        "answers": [
+          { "text": "Mars", "correct": true, "to": "win" },
+          { "text": "Venus", "to": "lose" }
+        ]
+      },
+      { "id": "win", "kind": "end", "text": "Correct! Mars is rich in iron oxide." },
+      { "id": "lose", "kind": "end", "text": "Not quite! Mars is the Red Planet." }
+    ]
+  },
+  "opts": {
+    "style": { "panelColor": "#1E1B4B", "textColor": "#F8FAFC", "answerColor": "#93C5FD" }
+  }
+}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['create', 'validate'],
+          description: "'create' builds it (default) · 'validate' checks it without drawing",
+        },
+        graph: {
+          type: 'object',
+          properties: {
+            start: { type: 'string', description: 'Initial active node id' },
+            nodes: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string', description: 'Unique node id' },
+                  prompt: { type: 'string', description: 'Prompt text for question cards' },
+                  text: { type: 'string', description: 'Text for message/end cards' },
+                  kind: { type: 'string', enum: ['node', 'card', 'end'], description: "Card kind: 'node'/'card' (content) or 'end' (terminal)" },
+                  answers: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        text: { type: 'string', description: 'Answer button text' },
+                        correct: { type: 'boolean', description: 'Is correct answer' },
+                        to: { type: 'string', description: 'Destination node id' },
+                      },
+                      required: ['text', 'to'],
+                    },
+                    description: 'Interactive answer buttons — the card waits for a click',
+                  },
+                  next: { type: 'string', description: 'Unconditional destination — the card auto-advances instead of waiting for a click. Use INSTEAD of answers.' },
+                  duration: { type: 'number', description: 'Seconds the card holds before `next` fires (default 3). Ignored without `next`.' },
+                  outcome: { type: 'string', enum: ['win', 'lose'], description: 'Force a terminal node\u2019s outcome. Without it the engine infers it from the wording, which only works in English.' },
+                },
+                required: ['id'],
+              },
+              description: 'List of graph nodes',
+            },
+          },
+          required: ['nodes'],
+          description: 'Scene graph definition',
+        },
+        opts: {
+          type: 'object',
+          properties: {
+            width: { type: 'number', description: 'Layout width' },
+            height: { type: 'number', description: 'Layout height' },
+            centerX: { type: 'number', description: 'Center X coordinate' },
+            centerY: { type: 'number', description: 'Center Y coordinate' },
+            groupName: { type: 'string', description: 'Seed / prefix for IDs' },
+            scoreItemId: { type: 'string', description: 'Scoreboard item ID to increment on correct answers' },
+            subject: { type: 'string', description: "Theme of the piece, folded into each card's text-effect selection (e.g. 'space exploration')" },
+            plain: { type: 'boolean', description: 'Plain mode without entrance/text effects' },
+            style: {
+              type: 'object',
+              properties: {
+                panelColor: { type: 'string', description: 'Card panel background color' },
+                textColor: { type: 'string', description: 'Card text color' },
+                answerColor: { type: 'string', description: 'Answer button text color' },
+                headlineSize: { type: 'number', description: 'Prompt font size' },
+                bodySize: { type: 'number', description: 'Answer/body font size' },
+              },
+            },
+          },
+          description: 'Layout and styling options',
+        },
+      },
+      required: ['graph'],
+    },
+  },
 
   // ---------------------------------------------------------------------------
   // LAYER 4 — COMPOSITIONS: SELECTION, TRANSFORM & HISTORY TOOLS
@@ -3731,7 +3868,10 @@ Overrides are the point: an instance can differ from its master and still receiv
         },
         componentKey: { type: 'string', description: 'Which part of the component to override' },
         prop: { type: 'string', description: 'Property to override, e.g. fillColor or content' },
-        value: { description: 'Override value' },
+        value: {
+          anyOf: [{ type: 'string' }, { type: 'number' }, { type: 'boolean' }, { type: 'object' }, { type: 'array' }],
+          description: 'Override value',
+        },
         overrides: { type: 'object', description: 'Overrides applied at instantiate time' },
       },
       required: ['action'],
@@ -4172,6 +4312,83 @@ ACTIONS:
         tolerance: { type: 'number', description: 'Hit test tolerance in pixels (default: 5)' },
       },
       required: ['action'],
+    },
+  },
+  {
+    name: 'pinepaper_query_capabilities',
+    annotations: {
+      title: 'Query Capabilities',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Discover and match capabilities across the engine — text styles, character-level text effects, generators, vertex deforms, and behavioral relations.
+
+ACTIONS:
+- list: List all available capabilities or filter by kind (style, effect, generator, deform, relation, etc.).
+- choose: Mood- and context-weighted recommendation based on subject/prompt words and target feeling.
+- coverage: Report total indexable and describable capabilities across categories.
+- find: Direct lookup of a capability by key to inspect its description and how to apply it (applyWith).
+
+MOOD VOCABULARY FOR CHOOSE:
+- reveal: resolve, reveal, appear, emerge, decode, decrypt, unscramble, form, assemble
+- triumphant: burst, launch, firework, bloom, spark, explode, shine, glow, celebrate, rise
+- failure: crumble, fall, collapse, burn, decay, dissolve, break, shatter, sink, error
+- calm: drift, float, gentle, slow, settle, fade, wave, ripple, pour
+- technical: binary, matrix, grid, scan, code, digital, circuit, data, print, terminal
+- energetic: bounce, swarm, spray, shoot, fast, rapid, scatter, slam, volley
+
+EXAMPLE — Choose effect for a victory card:
+{
+  "action": "choose",
+  "kind": "effect",
+  "mood": "triumphant",
+  "subject": "celebrate correct answer",
+  "seed": "quiz_q1"
+}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['list', 'choose', 'coverage', 'find'],
+          description: 'Query mode: list, choose, coverage, or find (default: list)',
+        },
+        kind: {
+          anyOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],
+          description: 'Filter by capability kind (style, effect, deform, entrance, animation, generator, collage, palette, mask, cutout, relation)',
+        },
+        mood: {
+          anyOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],
+          description: "Target feeling for choose: reveal, triumphant, failure, calm, technical, energetic",
+        },
+        subject: {
+          type: 'string',
+          description: 'Contextual prompt/subject text to score against capability definitions',
+        },
+        avoid: {
+          anyOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],
+          description: 'Mood keys to penalize — only the six vocabulary keys above are matched, arbitrary words are ignored',
+        },
+        seed: {
+          type: 'string',
+          description: 'Deterministic seed string for reproducible selection',
+        },
+        key: {
+          type: 'string',
+          description: 'Capability key to look up (for find action)',
+        },
+        exclude: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Keys to exclude from choose recommendation',
+        },
+        warm: {
+          type: 'boolean',
+          description: 'Load the lazy registries before answering (default true). Generators and the rigging/blending/deform relation rules only exist once touched, so a cold answer omits them — pass false only to cheaply re-read what is already resident.',
+        },
+      },
     },
   },
 

@@ -139,6 +139,8 @@ import {
   // Scene management types
   ManageScenesInput,
   ScenePlaybackInput,
+  SceneGraphInput,
+  SceneGraphInputSchema,
   // New consolidated tool types
   SelectionInput,
   TransformInput,
@@ -158,6 +160,8 @@ import {
   PrecompInput,
   BackgroundInput,
   QueryInput,
+  QueryCapabilitiesInput,
+  QueryCapabilitiesInputSchema,
   // New parity tools
   DeformInput,
   SpriteSheetInput,
@@ -4802,6 +4806,63 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    // The RE
     }
   }
 
+  generateSceneGraph(input: SceneGraphInput): string {
+    const validated = SceneGraphInputSchema.parse(input);
+    const S = (v: unknown) => JSON.stringify(v);
+
+    if (validated.action === 'validate') {
+      return `
+// Check a scene graph WITHOUT drawing it — the same check createSceneGraph runs,
+// so an author can fix the graph before committing to a canvas full of cards.
+(function() {
+  if (typeof app.validateSceneGraph !== 'function') {
+    return { success: false, error: 'app.validateSceneGraph unavailable — update FxTool' };
+  }
+  const r = app.validateSceneGraph(${S(validated.graph)});
+  return {
+    success: true,
+    action: 'validate',
+    ok: r ? r.ok : false,
+    errors: (r && r.errors) || [],
+    // Cycles are legitimate (a retry loop) but reported: an accidental one
+    // looks exactly like a game that never ends.
+    warnings: (r && r.warnings) || [],
+    reachable: (r && r.reachable) || [],
+    cycles: (r && r.cycles) || [],
+  };
+})();
+`.trim();
+    }
+
+    return `
+// Create interactive scene graph (story / quiz cards)
+(async function() {
+  if (typeof app.createSceneGraph !== 'function') {
+    return { success: false, error: 'app.createSceneGraph unavailable — update FxTool' };
+  }
+  const result = await app.createSceneGraph(${S(validated.graph)}, ${S(validated.opts || {})});
+  if (!result) return { success: false, error: 'No result returned' };
+  return {
+    success: result.ok !== false,
+    ok: result.ok,
+    errors: result.errors || [],
+    warnings: result.warnings || [],
+    // The engine reports these and this tool used to drop them. \`failed\` is the
+    // one that matters: a graph can compile, render, and still leave N click
+    // relations unwired — it looks built and is inert, and nothing else in the
+    // result says so. A refused plan returns early without them, hence the
+    // defaults.
+    wired: result.wired,
+    failed: result.failed,
+    cycles: result.cycles || [],
+    entranced: result.entranced,
+    start: result.start,
+    ids: result.ids || {},
+  };
+})();
+`.trim();
+  }
+
   // ===========================================================================
   // SELECTION, TRANSFORM & HISTORY
   // ===========================================================================
@@ -5470,6 +5531,145 @@ case 'analyze_palette':
       default:
         return `(function() { return { error: 'Unknown query action: ${(input as any).action}' }; })();`;
     }
+  }
+
+  generateQueryCapabilities(input: QueryCapabilitiesInput): string {
+    const validated = QueryCapabilitiesInputSchema.parse(input);
+    const S = (v: unknown) => JSON.stringify(v);
+    // Warming is the engine's default and the honest answer, so the argument is
+    // omitted unless the caller explicitly opted out — no reason to spend bytes
+    // restating a default.
+    const warmArg = validated.warm === undefined ? '' : S({ warm: validated.warm });
+    return `
+// Query capabilities / recommend treatments from the engine's LIVE registries.
+//
+// Reads app.getCapabilities(), which warms the lazily-constructed registries
+// before answering and returns a coverage report saying what it read from.
+// \`warm: false\` skips that and answers from whatever is already resident —
+// cheaper, and the coverage report labels itself \`warmed: false\` when it does.
+// This tool previously rebuilt that index itself, and because generatorRegistry
+// is null until ensureHeavyModules() lands (~1.2s after boot) and the rigging /
+// blending / deform relation rules only register when their subsystem is first
+// touched, an early call reported ZERO generators and ~77 of ~100 relations as
+// if that were the whole engine.
+(async function() {
+  const action = ${S(validated.action || 'list')};
+  const kind = ${S(validated.kind)};
+  const mood = ${S(validated.mood)};
+  const subject = ${S(validated.subject)};
+  const avoid = ${S(validated.avoid)};
+  const seed = ${S(validated.seed)};
+  const key = ${S(validated.key)};
+  const exclude = ${S(validated.exclude)};
+
+  if (typeof app.getCapabilities !== 'function') {
+    return { success: false, error: 'app.getCapabilities unavailable — update FxTool' };
+  }
+
+  let caps = [], report = null;
+  try {
+    const res = await app.getCapabilities(${warmArg});
+    caps = (res && res.capabilities) || [];
+    report = (res && res.coverage) || null;
+  } catch (e) {
+    return { success: false, error: 'Failed to inspect capabilities: ' + e.message };
+  }
+
+  if (action === 'coverage') {
+    // The engine's own report: totals per kind, the entries that can be applied
+    // but not RANKED (no label, no definition), the kinds with no source wired,
+    // and which lazy registries were live when it answered.
+    return { success: true, action: 'coverage', ...(report || {}), total: caps.length };
+  }
+
+  if (action === 'find') {
+    if (!key) return { success: false, error: 'find action requires key' };
+    const found = caps.find(c => c.key === String(key));
+    return found ? { success: true, action: 'find', capability: found } : { success: false, error: 'Capability not found: ' + key };
+  }
+
+  let filtered = caps;
+  if (kind) {
+    const kinds = new Set(Array.isArray(kind) ? kind : [kind]);
+    filtered = caps.filter(c => kinds.has(c.kind));
+  }
+
+  if (action === 'list') {
+    return {
+      success: true,
+      action: 'list',
+      count: filtered.length,
+      total: caps.length,
+      unwiredKinds: report ? report.unwiredKinds : undefined,
+      capabilities: filtered.map(c => ({
+        key: c.key, kind: c.kind, label: c.label,
+        definition: c.definition, applyWith: c.applyWith, describable: c.describable
+      }))
+    };
+  }
+
+  if (action === 'choose') {
+    const STOP = new Set(['the', 'a', 'an', 'and', 'or', 'of', 'to', 'in', 'into', 'at', 'on', 'as', 'is', 'are', 'then', 'their', 'they', 'it', 'its', 'each', 'from', 'with', 'that', 'characters', 'character', 'letters', 'letter', 'text', 'frame', 'real']);
+    const tokenize = (t) => String(t || '').toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length > 2 && !STOP.has(w));
+    const MOOD_TERMS = {
+      reveal: ['resolve', 'resolves', 'reveal', 'appear', 'emerge', 'decode', 'decrypt', 'unscramble', 'form', 'assemble', 'converge'],
+      triumphant: ['burst', 'launch', 'firework', 'bloom', 'spark', 'explode', 'shine', 'glow', 'celebrate', 'rise'],
+      failure: ['crumble', 'fall', 'collapse', 'burn', 'decay', 'dissolve', 'break', 'shatter', 'sink', 'error', 'corrupt'],
+      calm: ['drift', 'float', 'gentle', 'slow', 'settle', 'fade', 'wave', 'ripple', 'pour'],
+      technical: ['binary', 'matrix', 'grid', 'scan', 'code', 'digital', 'circuit', 'data', 'print', 'terminal'],
+      energetic: ['bounce', 'swarm', 'spray', 'shoot', 'fast', 'rapid', 'scatter', 'slam', 'volley']
+    };
+
+    // Deterministic tiebreak. Equal-scoring candidates used to fall out in
+    // array order, which made \`seed\` — documented as giving reproducible
+    // selection — do nothing at all. FNV-1a over seed+key gives a stable
+    // shuffle per seed; with no seed the order is stable by key, so a repeated
+    // call still answers the same way.
+    const tiebreak = (k) => {
+      if (!seed) return null;
+      let h = 2166136261;
+      const s = String(seed) + '|' + k;
+      for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+      return h >>> 0;
+    };
+
+    const exSet = new Set(Array.isArray(exclude) ? exclude : []);
+    const scored = filtered.filter(c => !exSet.has(c.key)).map(c => {
+      const words = new Set(tokenize(c.text || (c.label + ' ' + c.definition)));
+      if (!words.size) return { item: c, score: 0 };
+      let score = 0;
+      const moods = Array.isArray(mood) ? mood : (mood ? [mood] : []);
+      for (const m of moods) {
+        for (const term of (MOOD_TERMS[m] || [])) { if (words.has(term)) score += 12; }
+      }
+      for (const w of tokenize(subject)) { if (words.has(w)) score += 7; }
+      for (const av of (Array.isArray(avoid) ? avoid : (avoid ? [avoid] : []))) {
+        for (const term of (MOOD_TERMS[av] || [])) { if (words.has(term)) score -= 10; }
+      }
+      return { item: c, score };
+    });
+
+    scored.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      const ha = tiebreak(a.item.key), hb = tiebreak(b.item.key);
+      if (ha !== null && ha !== hb) return ha - hb;
+      return a.item.key.localeCompare(b.item.key);
+    });
+    const top = scored.slice(0, 5).map(s => ({ ...s.item, score: s.score }));
+    return {
+      success: true,
+      action: 'choose',
+      recommendation: top[0] || null,
+      topCandidates: top,
+      // A chooser scores on description, so entries without one can never be
+      // recommended. Saying so beats silently never offering them.
+      unrankable: report ? report.unrankable : undefined
+    };
+  }
+
+  return { success: false, error: 'Unknown capabilities action: ' + action };
+})();
+`.trim();
   }
 
   // ===========================================================================
