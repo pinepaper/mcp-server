@@ -84,6 +84,45 @@ describe('pinepaper_rigging — every action is handled', () => {
     for (const call of Object.values(expected)) expect(body).toContain(call);
   });
 
+  it('every action explains its refusal instead of a bare false', () => {
+    // The standard was set for auto_* and bake_animation and then applied to
+    // two of thirty-three actions. `success: false` with no `error` is what
+    // sends an agent into a retry loop: it cannot tell "wrong id" from "wrong
+    // shape" from "nothing to do", so it tries the same call again.
+    const bare: string[] = [];
+    for (const action of actions) {
+      const idx = body.indexOf(`case '${action}'`);
+      if (idx < 0) continue;
+      let seg = body.slice(idx);
+      const nxt = seg.indexOf("case '", 6);
+      if (nxt > 0) seg = seg.slice(0, nxt);
+      if (/success: !!/.test(seg) && !/error:/.test(seg)) bare.push(action);
+    }
+    expect(bare).toEqual([]);
+  });
+
+  it('each refusal names a precondition rather than restating the failure', () => {
+    // "failed" is not a reason. Every message should say what was wrong with
+    // the INPUT or the rig, and most point at the action that would fix it.
+    const messages = [...body.matchAll(/error: "([^"]{10,})"/g)].map((m) => m[1]);
+    expect(messages.length).toBeGreaterThan(15);
+    for (const msg of messages) {
+      expect(msg.length).toBeGreaterThan(25);
+      expect(msg).not.toMatch(/^(failed|error|unknown error)\.?$/i);
+    }
+    // A good share should route the caller somewhere useful.
+    const pointing = messages.filter((m) => /list_\w+|Call \w+|Pass /.test(m));
+    expect(pointing.length).toBeGreaterThan(6);
+  });
+
+  it('no message carries a backtick — the emitted code is a template literal', () => {
+    // Third variant of one trap in a day: a backtick, an apostrophe, or a
+    // newline in prose interpolated into generated source is SYNTAX, and the
+    // program only fails when the browser tries to run it.
+    const messages = [...body.matchAll(/error: "([^"]+)"/g)].map((m) => m[1]);
+    for (const msg of messages) expect(msg).not.toContain('`');
+  });
+
   it('stitch_poses goes through the app facade and guards on it', () => {
     // It is the one action not on riggingSystem; an old FxTool must get a
     // stated error rather than a TypeError inside the page.

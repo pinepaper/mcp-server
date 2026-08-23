@@ -7036,7 +7036,8 @@ ${needWorld}
         return wrap('Rigging: create skeleton',
           `  const skeletonId = R.createSkeleton(${S(input.name ?? null)}, ${root});
   if (app.historyManager) app.historyManager.saveState();
-  return { success: !!skeletonId, action: 'create_skeleton', skeletonId: skeletonId };`);
+  if (!skeletonId) { return { success: false, action: 'create_skeleton', error: "the engine returned no skeleton id — createSkeleton does not normally fail, so treat this as a broken rigging subsystem rather than bad input" }; }
+  return { success: true, action: 'create_skeleton', skeletonId: skeletonId };`);
       }
       case 'add_bone': {
         const config = S({
@@ -7050,14 +7051,16 @@ ${needWorld}
         return wrap('Rigging: add bone',
           `  const boneId = R.addBone(${S(input.skeletonId)}, ${config});
   if (app.historyManager) app.historyManager.saveState();
-  return { success: !!boneId, action: 'add_bone', boneId: boneId };`);
+  if (!boneId) { return { success: false, action: 'add_bone', error: "no such skeleton. Call list_skeletons for the ids that exist" }; }
+  return { success: true, action: 'add_bone', boneId: boneId };`);
       }
       case 'attach_item': {
         const opts = S(input.attachPoint !== undefined ? { attachPoint: input.attachPoint } : {});
         return wrap('Rigging: attach item to bone',
           `  const ok = R.attachItem(${S(input.skeletonId)}, ${S(input.boneId)}, ${S(input.itemId)}, ${opts});
   if (app.historyManager) app.historyManager.saveState();
-  return { success: !!ok, action: 'attach_item', itemId: ${S(input.itemId)}, boneId: ${S(input.boneId)} };`);
+  if (!ok) { return { success: false, action: 'attach_item', error: "no such skeleton, or no such bone on it. list_bones gives the bone ids for a skeleton" }; }
+  return { success: true, action: 'attach_item', itemId: ${S(input.itemId)}, boneId: ${S(input.boneId)} };`);
       }
       case 'create_ik_chain': {
         const config = S({
@@ -7072,7 +7075,8 @@ ${needWorld}
         return wrap('Rigging: create IK chain',
           `  const chainId = R.createIKChain(${S(input.skeletonId)}, ${config});
   if (app.historyManager) app.historyManager.saveState();
-  return { success: !!chainId, action: 'create_ik_chain', chainId: chainId };`);
+  if (!chainId) { return { success: false, action: 'create_ik_chain', error: "no such skeleton, or fewer than 2 boneIds — a chain needs at least two bones to solve. Call list_bones for the ids on this rig" }; }
+  return { success: true, action: 'create_ik_chain', chainId: chainId };`);
       }
       case 'add_pose_keyframe': {
         const opts = S({
@@ -7086,7 +7090,8 @@ ${needWorld}
         return wrap('Rigging: add pose keyframe',
           `  const ok = R.addPoseKeyframe(${S(input.skeletonId)}, ${input.time}, ${S(input.pose)}, ${S(input.easing ?? 'linear')}, ${opts});
   if (app.historyManager) app.historyManager.saveState();
-  return { success: !!ok, action: 'add_pose_keyframe', time: ${input.time} };`);
+  if (!ok) { return { success: false, action: 'add_pose_keyframe', error: "no such skeleton, or 'pose' named a saved pose that does not exist. Pass an inline { boneId: angleDeg } map instead, or list_poses for the saved ones" }; }
+  return { success: true, action: 'add_pose_keyframe', time: ${input.time} };`);
       }
       case 'set_target_path': {
         const opts = S({
@@ -7096,18 +7101,21 @@ ${needWorld}
         return wrap('Rigging: set IK target path',
           `  const ok = R.setTargetPath(${S(input.skeletonId)}, ${S(input.chainId)}, ${S(input.waypoints)}, ${opts});
   if (app.historyManager) app.historyManager.saveState();
-  return { success: !!ok, action: 'set_target_path', chainId: ${S(input.chainId)} };`);
+  if (!ok) { return { success: false, action: 'set_target_path', error: "no such skeleton, no such IK chain on it, or waypoints was not an array. create_ik_chain returns the chainId to use here" }; }
+  return { success: true, action: 'set_target_path', chainId: ${S(input.chainId)} };`);
       }
       case 'save_pose':
         return wrap('Rigging: save pose',
           `  const poseId = R.savePose(${S(input.skeletonId)}, ${S(input.name ?? null)});
   if (app.historyManager) app.historyManager.saveState();
-  return { success: !!poseId, action: 'save_pose', poseId: poseId };`);
+  if (!poseId) { return { success: false, action: 'save_pose', error: "no such skeleton. A pose is a snapshot of ITS bone angles, so the skeleton has to exist first — call list_skeletons" }; }
+  return { success: true, action: 'save_pose', poseId: poseId };`);
       case 'save_shape_key':
         return wrap('Rigging: save shape key',
           `  const shapeKeyId = R.saveShapeKey(${S(input.skeletonId)}, ${S(input.name ?? null)});
   if (app.historyManager) app.historyManager.saveState();
-  return { success: !!shapeKeyId, action: 'save_shape_key', shapeKeyId: shapeKeyId };`);
+  if (!shapeKeyId) { return { success: false, action: 'save_shape_key', error: "no such skeleton, or nothing is attached to its bones — a shape key snapshots the attached items, so a bare skeleton has nothing to capture" }; }
+  return { success: true, action: 'save_shape_key', shapeKeyId: shapeKeyId };`);
 
       // ── Pose motion. Every case below maps 1:1 to a method that exists on
       // riggingSystem (or, for stitch_poses, a PinePaper facade) — checked
@@ -7160,11 +7168,13 @@ ${needWorld}
         return wrap('Rigging: load pose',
           `  const ok = R.loadPose(${S(input.poseId)});
   if (app.historyManager) app.historyManager.saveState();
-  return { success: !!ok, action: 'load_pose', poseId: ${S(input.poseId)} };`);
+  if (!ok) { return { success: false, action: 'load_pose', error: "no such pose, or the skeleton it was saved against is gone. list_poses for what is still loadable" }; }
+  return { success: true, action: 'load_pose', poseId: ${S(input.poseId)} };`);
       case 'interpolate_poses':
         return wrap('Rigging: interpolate poses',
           `  const ok = R.interpolatePoses(${S(input.poseIdA)}, ${S(input.poseIdB)}, ${input.t ?? 0.5});
-  return { success: !!ok, action: 'interpolate_poses', t: ${input.t ?? 0.5} };`);
+  if (!ok) { return { success: false, action: 'interpolate_poses', error: "one of the two poses does not exist, or they belong to DIFFERENT skeletons — blending across rigs is not defined. Call list_poses to see which skeleton each belongs to" }; }
+  return { success: true, action: 'interpolate_poses', t: ${input.t ?? 0.5} };`);
       case 'play_pose_sequence': {
         const opts = S({
           ...(input.loop !== undefined ? { loop: input.loop } : {}),
@@ -7172,12 +7182,14 @@ ${needWorld}
         });
         return wrap('Rigging: play pose sequence',
           `  const ok = R.playPoseSequence(${S(input.skeletonId)}, ${S(input.sequence ?? [])}, ${opts});
-  return { success: !!ok, action: 'play_pose_sequence', keys: ${(input.sequence ?? []).length} };`);
+  if (!ok) { return { success: false, action: 'play_pose_sequence', error: "no such skeleton, or the sequence was empty. Each key needs a 'pose' id or an inline 'angles' map — call list_poses for the saved ids" }; }
+  return { success: true, action: 'play_pose_sequence', keys: ${(input.sequence ?? []).length} };`);
       }
       case 'stop_pose_sequence':
         return wrap('Rigging: stop pose sequence',
           `  const ok = R.stopPoseSequence(${S(input.skeletonId)});
-  return { success: !!ok, action: 'stop_pose_sequence' };`);
+  if (!ok) { return { success: false, action: 'stop_pose_sequence', error: "nothing was playing on that skeleton — this is a no-op rather than a failure" }; }
+  return { success: true, action: 'stop_pose_sequence' };`);
       case 'stitch_poses': {
         // The one action on `app` rather than riggingSystem: stitching resolves
         // saved pose ids and then installs the merged sequence through the
@@ -7242,20 +7254,24 @@ ${needWorld}
       case 'move_root':
         return wrap('Rigging: root locomotion track',
           `  const ok = R.moveRoot(${S(input.skeletonId)}, ${S(input.keyframes ?? [])}, ${S(input.options ?? {})});
-  return { success: !!ok, action: 'move_root', keys: ${(input.keyframes ?? []).length} };`);
+  if (!ok) { return { success: false, action: 'move_root', error: "no such skeleton, or keyframes was empty. Each key is { t, x, y } with t in SCENE SECONDS" }; }
+  return { success: true, action: 'move_root', keys: ${(input.keyframes ?? []).length} };`);
       case 'stop_root_track':
         return wrap('Rigging: stop root track',
           `  const ok = R.stopRootTrack(${S(input.skeletonId)});
-  return { success: !!ok, action: 'stop_root_track' };`);
+  if (!ok) { return { success: false, action: 'stop_root_track', error: "no root track was running on that skeleton — this is a no-op rather than a failure" }; }
+  return { success: true, action: 'stop_root_track' };`);
       case 'add_secondary_motion':
         return wrap('Rigging: secondary motion',
           `  const res = R.addSecondaryMotion(${S(input.skeletonId)}, ${S(input.boneNames ?? [])}, ${S(input.options ?? {})});
-  return { success: !!res, action: 'add_secondary_motion', bones: ${(input.boneNames ?? []).length} };`);
+  if (!res) { return { success: false, action: 'add_secondary_motion', error: "no such skeleton, or fewer than 2 of the given bone NAMES resolve on it. A spring chain needs at least two; list_bones for the names this rig uses" }; }
+  return { success: true, action: 'add_secondary_motion', bones: ${(input.boneNames ?? []).length} };`);
       case 'skin_path':
         return wrap('Rigging: skin path to bones',
           `  const res = R.skinPath(${S(input.skeletonId)}, ${S(input.itemId)}, ${S(input.options ?? {})});
   if (app.historyManager) app.historyManager.saveState();
-  return { success: !!res, action: 'skin_path', itemId: ${S(input.itemId)} };`);
+  if (!res) { return { success: false, action: 'skin_path', error: "no such skeleton or item, the item is not a path, or no bone is close enough to influence it. Skinning binds vertices to nearby bones, so the path has to overlap the rig — call list_bones to see where they are" }; }
+  return { success: true, action: 'skin_path', itemId: ${S(input.itemId)} };`);
       case 'bake_animation':
         return wrap('Rigging: bake animation to keyframes',
           `  const res = R.bakeAnimation(${S(input.skeletonId)}, ${S(input.options ?? {})});
@@ -7269,7 +7285,8 @@ ${needWorld}
       case 'load_shape_key':
         return wrap('Rigging: load shape key',
           `  const ok = R.loadShapeKey(${S(input.skeletonId)}, ${S(input.shapeKeyId)}, ${input.weight ?? 1});
-  return { success: !!ok, action: 'load_shape_key', weight: ${input.weight ?? 1} };`);
+  if (!ok) { return { success: false, action: 'load_shape_key', error: "no such skeleton, or no such shape key on it. list_shape_keys for what is saved" }; }
+  return { success: true, action: 'load_shape_key', weight: ${input.weight ?? 1} };`);
 
       // ── Mocap / rig import — these live on `app` (PinePaper facades), not
       // riggingSystem, and they are async, so they get their own async IIFE
