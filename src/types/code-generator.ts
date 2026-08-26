@@ -7059,6 +7059,77 @@ ${guard}
   if (!g) { return { success: false, action: 'apply_thread', error: 'nothing stitchable here — thread needs a CLOSED path, a compound path, or a group containing them. An open stroke, a raster and an empty group all land here. (If you passed a stitch name, check it against list_stitches.)' }; }
   return { success: true, action: 'apply_thread', groupId: (g.data && g.data.id) || null, stitches: g.children.length };`);
       }
+      case 'list_flow_fields':
+        return wrap('Medium: list flow fields',
+          `  if (typeof app.listFlowFields !== 'function') { return { success: false, error: 'hatch medium unavailable — update FxTool' }; }
+  const fields = app.listFlowFields();
+  return { success: true, action: 'list_flow_fields', fields: fields, count: fields.length };`);
+      case 'list_hatch_options':
+        return wrap('Medium: hatch defaults',
+          `  if (typeof app.listHatchOptions !== 'function') { return { success: false, error: 'hatch medium unavailable — update FxTool' }; }
+  return { success: true, action: 'list_hatch_options', defaults: app.listHatchOptions() };`);
+      case 'apply_hatch': {
+        const opts = S({
+          ...(input.distance !== undefined ? { distance: input.distance } : {}),
+          ...(input.angle !== undefined ? { angle: input.angle } : {}),
+          ...(input.gradient !== undefined ? { gradient: input.gradient } : {}),
+          ...(input.rand !== undefined ? { rand: input.rand } : {}),
+          ...(input.continuous !== undefined ? { continuous: input.continuous } : {}),
+          ...(input.flowField !== undefined ? { field: input.flowField } : {}),
+          ...(input.t !== undefined ? { t: input.t } : {}),
+          ...(input.width !== undefined ? { width: input.width } : {}),
+          ...(input.color !== undefined ? { color: input.color } : {}),
+          ...(input.seed !== undefined ? { seed: input.seed } : {}),
+        });
+        return wrap('Medium: rule an item with hatching',
+          `  if (typeof app.applyHatching !== 'function') { return { success: false, error: 'hatch medium unavailable — update FxTool' }; }
+  const entry = app.itemRegistry && app.itemRegistry.get(${S(input.itemId)});
+  const src = entry && entry.item;
+  if (!src) { return { success: false, action: 'apply_hatch', error: 'no item ' + ${S(input.itemId)} }; }
+  // Every refusal below is one the engine only console.warns, and production
+  // strips the console — so an agent would otherwise get a bare null and no
+  // idea which of five different things went wrong.
+  if (src.content !== undefined && typeof src.getPointAt !== 'function') {
+    return { success: false, action: 'apply_hatch', error: 'a text item has no outline to hatch. Convert it to glyph paths first (pinepaper_text_style), then hatch the result — the collage it produces is a group of closed paths, which this accepts.' };
+  }
+  // Count the closed paths BEFORE the call, so a truncated group can be
+  // reported as truncated rather than looking complete.
+  let closed = 0;
+  const isGroup = src.children && !(typeof src.getPointAt === 'function' && src.closed);
+  if (isGroup) {
+    const walk = function(n) {
+      for (const c of (n.children || [])) {
+        if (c.children && typeof c.getPointAt !== 'function') walk(c);
+        else if (typeof c.getPointAt === 'function' && c.closed && c.length > 0) closed++;
+      }
+    };
+    walk(src);
+    if (!closed) { return { success: false, action: 'apply_hatch', error: 'that group contains no closed paths to hatch — hatching needs a closed outline, and open strokes, rasters and empty groups all land here.' }; }
+  }
+  const b = src.bounds;
+  const g = app.applyHatching(${S(input.itemId)}, ${opts});
+  if (!g) {
+    // Spacing wider than the shape is the usual cause and is otherwise a
+    // silent no-op: the item just vanishes behind an empty group.
+    return { success: false, action: 'apply_hatch', error: 'nothing was ruled. Most often the spacing exceeds the shape — distance is ' + ${S(input.distance ?? 6)} + 'px against bounds ' + Math.round(b.width) + 'x' + Math.round(b.height) + '. Otherwise the item has no closed outline: hatching needs a closed path, a compound path, or a group of them.' };
+  }
+  const parts = (g.data && g.data.parts) || null;
+  return {
+    success: true,
+    action: 'apply_hatch',
+    groupId: (g.data && g.data.id) || null,
+    lines: g.children ? g.children.length : 0,
+    angle: (g.data && g.data.angle) !== undefined ? g.data.angle : null,
+    spacing: (g.data && g.data.spacing) !== undefined ? g.data.spacing : null,
+    // The engine hatches at most 40 paths from a group and warns about the rest.
+    ...(parts !== null ? { parts: parts } : {}),
+    ...(closed > 40 ? { truncated: 'hatched the first 40 of ' + closed + ' closed paths' } : {}),
+    // Re-hatching REPLACES: a second set of lines over the first is
+    // indistinguishable from nothing having happened, so trying spacings in
+    // turn is safe and is the flow this exists for.
+    note: 'the source item is now hidden behind the hatching; re-hatching replaces rather than stacks',
+  };`);
+      }
       default:
         return wrap('Medium: unknown action', `  return { success: false, error: 'unknown action' };`);
     }

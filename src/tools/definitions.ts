@@ -1937,12 +1937,26 @@ ACTIONS:
 - resolve: { medium } → { ok, fidelity, reason, markMaker }. ok:false with a reason is a real answer — pass it on rather than trying anyway.
 - list_stitches: the 4 thread stitches with their params.
 - apply_thread: render an item in thread. Its own silhouette is the region and its own fill is the thread colour, so an existing drawing becomes stitched rather than needing to be redrawn. The source is HIDDEN, not destroyed.
+- apply_hatch: rule an item with hatching. Same deal — silhouette is the region, source is hidden, re-hatching replaces.
+- list_flow_fields: the 7 fields that bend a hatch line.
+- list_hatch_options: the hatch defaults.
 
 THE DIRECTION FIELD IS THE WHOLE THING. Stitches that all lie the same way are hatching; stitches that follow the form are needlepainting. Use { kind: 'radial', cx, cy } for anything that radiates (a flower, an eye), { kind: 'spine', spine: [...] } to run them along a midrib or feather shaft, { kind: 'constant', angle } when you actually want flat hatch.
 
 STITCH CHOICE: longAndShort (default) is the shading fill — the length variance IS the blend. satin spans the shape edge to edge in one sheet, which is right for a petal or a letter stroke and wrong for a round shape. seed is texture, not direction. stem is an OUTLINE mark and leaves the interior bare — that is the stitch, not a bug.
 
 An unknown stitch is refused rather than defaulted, and re-stitching an item REPLACES its previous stitching instead of stacking.
+
+HATCHING STATES VALUE THROUGH LINE DENSITY, not colour. The same shape at distance 6 and at distance 3 reads as light and dark with nothing else changed — that is the whole medium, and it is why distance is the parameter to reach for rather than a lighter ink. gradient makes the density fall off across the shape, which is a shaded ramp rather than a flat tone.
+
+The straight ruling is what a printer makes; flowField is what makes it read as DRAWN. hand is the small correlated wander of a hand-drawn line, waves for water/hair/contours, spiral for wood grain around a knot, columns for rake marks. continuous joins the whole set into one serpentine path — a pen that never leaves the paper, and one item instead of many.
+
+Hatching needs a CLOSED outline. Text has none: convert it to glyph paths (pinepaper_text_style) and hatch the result. A group is hatched child by child, up to 40 paths; past that the result says so rather than quietly stopping.
+
+Note that a thread field and a hatch flowField are different things and are named differently for it: 'field' steers stitches around a form, 'flowField' bends a ruling line the way a hand drifts.
+
+EXAMPLE — a hatched shadow side, drawn rather than printed:
+{ "action": "apply_hatch", "itemId": "item_3", "distance": 3, "angle": 30, "flowField": "hand", "rand": 0.2 }
 
 EXAMPLE — a stitched leaf:
 { "action": "apply_thread", "itemId": "item_3", "stitch": "longAndShort",
@@ -1951,9 +1965,9 @@ EXAMPLE — a stitched leaf:
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['list_media', 'resolve', 'list_stitches', 'apply_thread'], description: 'Medium operation' },
+        action: { type: 'string', enum: ['list_media', 'resolve', 'list_stitches', 'apply_thread', 'apply_hatch', 'list_flow_fields', 'list_hatch_options'], description: 'Medium operation' },
         medium: { type: 'string', description: 'resolve: vector | thread | ink | cutPaper | charcoal | oil | encaustic' },
-        itemId: { type: 'string', description: 'apply_thread: a closed path or compound path.' },
+        itemId: { type: 'string', description: 'apply_thread / apply_hatch: a closed path, compound path, or a group of them.' },
         stitch: { type: 'string', enum: ['longAndShort', 'satin', 'seed', 'stem'], description: 'apply_thread: default longAndShort.' },
         field: { type: 'object', description: "apply_thread: { kind: 'radial'|'spine'|'constant', cx, cy, angle, spine[], across } — default radial from the shape centre." },
         stitchLen: { type: 'number', description: 'apply_thread: nominal stitch length px (default 18).' },
@@ -1964,6 +1978,17 @@ EXAMPLE — a stitched leaf:
         color: { type: 'string', description: "apply_thread: thread colour (defaults to the item's fill)." },
         seed: { type: 'number', description: 'apply_thread: PRNG seed (default 1) — same seed stitches the same way.' },
         count: { type: 'number', description: 'apply_thread: stitch count for seed/satin.' },
+        distance: { type: 'number', description: 'apply_hatch: line spacing px (default 6). THE VALUE CONTROL — 6 vs 3 is light vs dark.' },
+        angle: { type: 'number', description: 'apply_hatch: ruling angle in DEGREES (default 45).' },
+        gradient: { type: 'number', description: 'apply_hatch: 0..1 spacing growth per line (default 0, even) — a shaded ramp rather than a flat tone.' },
+        rand: { type: 'number', description: 'apply_hatch: jitter as a fraction of distance (default 0) — takes the mechanical evenness off.' },
+        continuous: { type: 'boolean', description: 'apply_hatch: join the lines into ONE serpentine path (default false).' },
+        flowField: {
+          type: 'string',
+          enum: ['hand', 'curved', 'zigzag', 'waves', 'seabed', 'spiral', 'columns'],
+          description: 'apply_hatch: bend each line along a flow field — what makes it read as drawn rather than printed.',
+        },
+        t: { type: 'number', description: 'apply_hatch: flow-field time offset — advances the field without changing the seed.' },
       },
       required: ['action'],
     },

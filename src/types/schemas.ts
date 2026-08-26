@@ -3757,10 +3757,10 @@ export type TextStyleInput = z.infer<typeof TextStyleInputSchema>;
  * `list_media` before promising a medium in prose.
  */
 export const DesignMediumInputSchema = z.object({
-  action: z.enum(['list_media', 'resolve', 'list_stitches', 'apply_thread'])
-    .describe("'list_media' (7 media with fidelity + limitation) · 'resolve' (can this medium be made here, and how honestly) · 'list_stitches' · 'apply_thread' (render an item in thread)"),
+  action: z.enum(['list_media', 'resolve', 'list_stitches', 'apply_thread', 'apply_hatch', 'list_flow_fields', 'list_hatch_options'])
+    .describe("'list_media' (7 media with fidelity + limitation) · 'resolve' (can this medium be made here, and how honestly) · 'list_stitches' · 'apply_thread' (render an item in thread) · 'apply_hatch' (rule an item with hatching — value through line density) · 'list_flow_fields' · 'list_hatch_options'"),
   medium: z.string().optional().describe("resolve: medium key — vector, thread, ink, cutPaper, charcoal, oil, encaustic."),
-  itemId: z.string().optional().describe('apply_thread: a closed path or compound path. Its own silhouette is the region and its fill is the thread colour.'),
+  itemId: z.string().optional().describe('apply_thread / apply_hatch: a closed path, compound path, or a group of them. Its own silhouette is the region and its fill is the ink colour.'),
   stitch: z.enum(['longAndShort', 'satin', 'seed', 'stem']).optional()
     .describe("apply_thread: default longAndShort (the needlepainting fill). 'satin' spans the shape edge to edge — right for a narrow shape, wrong for a round one. 'seed' is texture. 'stem' is an outline mark and leaves the interior bare."),
   field: z.object({
@@ -3778,9 +3778,30 @@ export const DesignMediumInputSchema = z.object({
   color: z.string().optional().describe("apply_thread: thread colour, defaulting to the item's own fill."),
   seed: z.number().int().optional().describe('apply_thread: PRNG seed (default 1). Same seed stitches the same way.'),
   count: z.number().int().positive().optional().describe('apply_thread: stitch count for seed/satin.'),
+
+  // --- Hatching (pp: the p5.brush marks, as vector) ---
+  //
+  // `field` above is the THREAD direction field (radial/spine/constant) and is
+  // a different thing from `flowField` here (hand/curved/waves/…). Separate
+  // names because one steers stitches around a form and the other bends a
+  // ruling line the way a hand would drift; sharing a key would silently apply
+  // one where the other was meant.
+  distance: z.number().positive().optional()
+    .describe('apply_hatch: spacing between lines in px (default 6). THIS IS THE VALUE CONTROL — the same shape at 6px and 3px reads as light and dark with no change of colour.'),
+  angle: z.number().optional().describe('apply_hatch: ruling angle in DEGREES (default 45).'),
+  gradient: z.number().min(0).max(1).optional()
+    .describe('apply_hatch: 0..1 spacing growth per line (default 0, even). Non-zero makes the density fall off across the shape — a shaded ramp rather than a flat tone.'),
+  rand: z.number().min(0).max(1).optional()
+    .describe('apply_hatch: jitter as a fraction of distance (default 0) — takes the mechanical evenness off.'),
+  continuous: z.boolean().optional()
+    .describe('apply_hatch: join the lines into ONE serpentine path (default false) — a pen that never leaves the paper, and a single item instead of many.'),
+  flowField: z.enum(['hand', 'curved', 'zigzag', 'waves', 'seabed', 'spiral', 'columns']).optional()
+    .describe('apply_hatch: bend each line along a flow field. The straight scanline is the ruling; the field is what makes it read as drawn rather than printed. See list_flow_fields.'),
+  t: z.number().optional().describe('apply_hatch: flow-field time offset — advances the field without changing the seed.'),
 })
   .refine((v) => v.action !== 'apply_thread' || !!v.itemId, { message: 'apply_thread requires itemId', path: ['itemId'] })
-  .refine((v) => v.action !== 'resolve' || !!v.medium, { message: 'resolve requires medium', path: ['medium'] });
+  .refine((v) => v.action !== 'resolve' || !!v.medium, { message: 'resolve requires medium', path: ['medium'] })
+  .refine((v) => v.action !== 'apply_hatch' || !!v.itemId, { message: 'apply_hatch requires itemId', path: ['itemId'] });
 export type DesignMediumInput = z.infer<typeof DesignMediumInputSchema>;
 
 export const TextEffectInputSchema = z.object({
