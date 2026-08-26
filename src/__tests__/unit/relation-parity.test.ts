@@ -47,7 +47,13 @@ const EMITTED_BY_A_TOOL: Record<string, RegExp | string[]> = {
   pinepaper_deform: /^deform_/,
   pinepaper_apply_effect: /^effect_/,
   'map tools': /^geo_/,
-  pinepaper_rigging: ['bone_attached', 'bone_skinned', 'ik_target', 'locomotion', 'pose_layer', 'expresses'],
+  // `expresses` is NOT here, though it is registered by the rigging system:
+  // the engine documents it as a hand-authored call —
+  // `app.addRelation(rootId, null, 'expresses', { expression: 'blink' })` — and
+  // pinepaper_import_layered_character promises blink/smile "work immediately",
+  // which is false if an agent cannot name it. Registered-by is not the test;
+  // authored-by is.
+  pinepaper_rigging: ['bone_attached', 'bone_skinned', 'ik_target', 'locomotion', 'pose_layer'],
   'blending system': /^blend_/,
   pinepaper_component: ['composed_as', 'fills_slot'],
   'text tools': ['glyph_of', 'has_text_effect'],

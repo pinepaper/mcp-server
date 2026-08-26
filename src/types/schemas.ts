@@ -286,6 +286,7 @@ export const RelationTypeSchema = z.enum([
   'syncs_with',
   'tours',
   'synced_to_audio',
+  'expresses',
   // --- Camera ---
   'camera_follows',
   'camera_animates',

@@ -206,6 +206,8 @@ export const PP_VOCABULARY: PinePaperVocabulary = {
     // Escape hatch
     'pp:unknownRelation':   { category: 'unknown', behaviorType: null, description: 'Relation type not expressible in current vocabulary.', parentType: 'pp:Relation' },
   
+    // `expresses` has a rule and a map entry in the engine but no edge either.
+    'pp:expresses': { description: "A facial expression played over the part_of children of a root: blink, smile, surprise. Periodic when given an interval, sustained without one. It resolves its targets by walking part_of from the root, so parts with roles and NO parent are inert — the relation applies to nothing and reports success, which is what makes an unparented pair of eyes look finished while being unable to blink.", category: 'animation', directionality: 'root → its parts', parentType: 'pp:Relation' },
     // These three are mapped in the engine but carry NO edge there — the other
     // direction of the same bug, and the reason FxTool's own reference once
     // listed 73 relations against a map of 80. Written from what each rule
@@ -581,6 +583,7 @@ export const RELATION_TYPE_MAP: Record<string, string> = {
   'blend_transition':   'pp:blendTransition',
   'unknown':            'pp:unknownRelation',
 
+  'expresses':          'pp:expresses',
   // Added 2026-08-26 — every one of these is a relation the tool surface now
   // accepts. The map gates isKnownRelationType(), so a name callable but
   // unmapped makes the validator report a valid scene as an unknown relation.
