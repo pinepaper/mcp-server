@@ -83,7 +83,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   // --- Animation ---
   pinepaper_animate: 'Animate item. itemId, type: pulse|rotate|bounce|fade|wobble|slide|typewriter. speed, amplitude optional.',
   pinepaper_keyframe_animate: 'Keyframe animate. itemId, keyframes: [{time, properties:{opacity,scale,x,y,rotation,...}, easing}], duration. Clip window: timeOffset, clipInPoint, clipOutPoint.',
-  pinepaper_play_timeline: 'Control playback. action: play|pause|stop|seek. position (seconds) for seek.',
+  pinepaper_play_timeline: 'Playback. action: play|pause|stop|seek|set/get_time_scale|get/set_progress|bind_scroll|unbind_scroll|list_scrub_anchors. time, rate (0 freezes, <0 reverses), progress 0..1, scroll.',
 
   // --- Masks ---
   pinepaper_apply_animated_mask: 'Apply mask. itemId, preset: wipeLeft|wipeRight|iris|irisOut|star|heart|curtainH|curtainV|cinematic|diagonalWipe|revealUp|revealDown.',
@@ -104,6 +104,9 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_create_scene: 'Create scene. items: [{name, itemType, position, properties}], relations: [{source, target, type}], animations: [{target, type}].',
   pinepaper_manage_scenes: 'Scene CRUD. action: save|load|list|delete|rename|duplicate|reorder|info|export|import. name, sceneId, transition: none|fade|zoom-in|zoom-out.',
   pinepaper_scene_playback: 'Scene chain playback. action: create_chain|play|pause|resume|stop|toggle_loop|jump. sceneIds, defaultDuration (secs), loop.',
+  pinepaper_sequence: 'Relative clip timing. action: place|resolve|list_forms. clips:[{duration, position?, label?}]. Forms: "<" ">" "+=1" "-=25%" label. "-=25%"=% of INSERTED clip, "<25%"=% of PREVIOUS.',
+  pinepaper_stagger: 'Delay across items. action: apply|preview|list_origins. itemIds (in order), count, opts:{each|amount, from: start|end|center|edges|random, grid:[r,c], axis, ease, seed}.',
+  pinepaper_flip: 'Animate a layout change without describing it. action: record (before the change) | apply (after). itemIds, duration, easing, enter, stagger. Writes keyframes.',
   pinepaper_scene_graph: 'Interactive story/quiz scene graph. action: create|validate. graph: {start, nodes:[{id, prompt?, text?, kind?, answers?, next?, duration?, outcome?}]}, opts: {style?, scoreItemId?, subject?}.',
   pinepaper_apply_template: 'Apply pre-built template (templateId), or list available (listOnly:true). 13 categories. DESTRUCTIVE: replaces canvas.',
 

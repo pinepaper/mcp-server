@@ -2451,7 +2451,7 @@ USE WHEN:
 - Building live geometric constructions (GeoGebra-style — dragging an anchor updates the dependent)
 
 RELATION TYPES:
-- orbits: Circular motion around target (params: radius, speed, direction, phase)
+- orbits: Circular motion around target (params: radius, speed, direction, phaseDegrees). Use phaseDegrees. 'phase' is the one parameter in the whole relation vocabulary measured in RADIANS — the documented exception to "angles are DEGREES", kept only for scenes that already set it. phaseDegrees wins when both are given.
 - follows: Move toward target with smoothing (params: offset, smoothing, delay)
 - attached_to: Fixed offset from target (params: offset, inherit_rotation)
 - maintains_distance: Stay fixed distance from target (params: distance, strength)
@@ -2459,6 +2459,7 @@ RELATION TYPES:
 - mirrors: Mirror position across axis (params: axis, center)
 - parallax: Move relative by depth (params: depth, origin)
 - bounds_to: Stay within bounds (params: padding, bounce)
+- staggered_with: Delay an item's animation by its place in a sequence (params: index, stagger, effect). For a SHAPED stagger — outward from the centre, converging from the edges, across a grid — also pass count (required: without it there is no "end" to measure distance from), plus from (start|end|center|edges|random), amount (total seconds for the whole run, overrides stagger), grid ("rows,cols" or "auto"), axis (x|y) and distributeEase. Plain index x stagger still works and is taken first. To stagger items directly rather than through a relation, use pinepaper_stagger.
 
 RELATION COMPATIBILITY:
 - Universal relations (position-based) work with ALL item types including imported SVGs/images:
@@ -2895,14 +2896,44 @@ USE WHEN:
 - Seeking to specific time
 - Controlling animation state
 
-DETERMINISTIC SEEK: pass deterministic: true with action 'seek' to evaluate the WHOLE scene at the exact time via app.sceneAt(t) — keyframes + relations + generators all tick to t, so the same time always yields the same frame (paired with a seed in pinepaper_capture_frames for reproducible output). Plain seek only sets the keyframe playback state. Use deterministic seek before pinepaper_browser_screenshot to capture a reproducible frame.`,
+DETERMINISTIC SEEK: pass deterministic: true with action 'seek' to evaluate the WHOLE scene at the exact time via app.sceneAt(t) — keyframes + relations + generators all tick to t, so the same time always yields the same frame (paired with a seed in pinepaper_capture_frames for reproducible output). Plain seek only sets the keyframe playback state. Use deterministic seek before pinepaper_browser_screenshot to capture a reproducible frame.
+
+RATE (set_time_scale / get_time_scale): 1 is real time, 0.5 half speed, 0 freezes the clock WITHOUT stopping playback, and a negative rate runs the scene backwards. Changing it preserves the current position — the clock is rebased, so the playhead does not jump. Export is deliberately unaffected: a scene watched at 0.5x still exports its real duration rather than a file twice as long.
+
+PROGRESS (get_progress / set_progress): the timeline as 0..1, which is the unit a scrubber or a progress bar actually has. set_progress returns the seconds it landed on.
+
+SCROLL (bind_scroll / unbind_scroll / list_scrub_anchors): drive the timeline from how far the reader has scrolled instead of from a clock — what makes a scroll-told story a story rather than a video that happens to be on the page. Anchors ('top bottom' = the moment the element appears, 'bottom top' = the moment it is gone) say where the range starts and ends; scrub is a smoothing time constant so the playhead chases the scroll instead of snapping to it. Chiefly for embeds and generated code — nothing scrolls a headless page. ALWAYS unbind before rebinding or navigating away: the listener holds the scene alive. bind_scroll releases a previous binding for you, and unbind_scroll on nothing bound answers { bound: false } rather than failing.`,
     inputSchema: {
       type: 'object',
       properties: {
         action: {
           type: 'string',
-          enum: ['play', 'pause', 'stop', 'seek'],
+          enum: [
+            'play', 'pause', 'stop', 'seek',
+            'set_time_scale', 'get_time_scale',
+            'get_progress', 'set_progress',
+            'bind_scroll', 'unbind_scroll', 'list_scrub_anchors',
+          ],
           description: 'Playback action',
+        },
+        rate: {
+          type: 'number',
+          description: 'set_time_scale: 1 real time, 0.5 half speed, 0 freezes without stopping, negative runs backwards. Export is unaffected.',
+        },
+        progress: {
+          type: 'number',
+          description: 'set_progress: how far through the timeline, 0..1',
+        },
+        scroll: {
+          type: 'object',
+          properties: {
+            elementId: { type: 'string', description: 'DOM id of the element to track (defaults to the canvas)' },
+            start: { type: 'string', description: "Anchor where the range begins, e.g. 'top bottom' — see list_scrub_anchors" },
+            end: { type: 'string', description: "Anchor where the range ends, e.g. 'bottom top'" },
+            scrub: { type: 'number', description: 'Seconds of smoothing so the playhead chases the scroll (default 0.3; 0 snaps)' },
+            range: { type: 'array', items: { type: 'number' }, description: '[from, to] seconds — drive only a sub-range of the timeline' },
+          },
+          description: 'bind_scroll options',
         },
         duration: {
           type: 'number',
@@ -3605,6 +3636,242 @@ EXAMPLE — Slideshow:
     },
   },
   {
+    name: 'pinepaper_sequence',
+    annotations: {
+      title: 'Timeline Sequencing (Relative Positions)',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Work out WHEN clips start, said relative to each other instead of in absolute seconds. A pure planner — it computes times and touches nothing on the canvas. (For revealing a geometric construction step by step, that is pinepaper_construction_sequence, a different tool.)
+
+Nobody thinks "the subtitle starts at 1.85s"; they think "a quarter of a second after the title finishes". This resolves the second into the first, and re-resolves it when an earlier clip changes length.
+
+ACTIONS:
+- place: thread a whole run of clips, each resolved against the ones before it. Returns { placed: [{start, end, duration}], labels, duration }.
+- resolve: answer a single position spec against a context you supply.
+- list_forms: the accepted grammar, each form with what it means.
+
+POSITION FORMS:
+- 3 — exactly 3s from the start of the timeline
+- "<" / ">" — when the previous clip STARTED / ENDED
+- "<2" / ">2" — 2s after the previous clip started / ended
+- "+=1" / "-=1" — 1s after the timeline ends (a gap) / 1s before it (an overlap)
+- "intro" / "intro+=0.5" — at a label, or half a second after it
+- omitted — append at the end, which is what appending has always meant
+
+THE ONE THING TO GET RIGHT: a percentage means different things in different forms.
+- "-=25%" and "+=25%" scale against the clip BEING INSERTED — "overlap the previous clip by a quarter of MY length".
+- "<25%" and ">25%" scale against the PREVIOUS clip — "start a quarter of the way THROUGH it".
+They agree only when the two clips are the same length, which is rarely, and getting it backwards yields timings that look almost right.
+
+A label names the moment a clip STARTS, so "label+=0" lands on the clip rather than skipping it. The timeline only ever grows — placing something early with "-=" never pulls the end back.
+
+EXAMPLE:
+{
+  "action": "place",
+  "clips": [
+    { "id": "title",    "duration": 2, "label": "intro" },
+    { "id": "subtitle", "duration": 4, "position": "-=25%" },
+    { "id": "cta",      "duration": 1, "position": "intro+=0.5" }
+  ]
+}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['place', 'resolve', 'list_forms'],
+          description: 'place (a run of clips), resolve (one position), or list_forms (default: place)',
+        },
+        clips: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string', description: 'Your own name for the clip — echoed back on the placement' },
+              duration: { type: 'number', description: 'How long the clip runs, in seconds' },
+              position: {
+                anyOf: [{ type: 'number' }, { type: 'string' }],
+                description: 'Where it starts. Omit to append at the end of the run so far.',
+              },
+              label: { type: 'string', description: 'Name this moment for later clips to position against. Marks where the clip STARTS.' },
+            },
+            required: ['duration'],
+          },
+          description: 'place: the run of clips, in order',
+        },
+        position: {
+          anyOf: [{ type: 'number' }, { type: 'string' }],
+          description: 'resolve: the single position spec to resolve',
+        },
+        context: {
+          type: 'object',
+          properties: {
+            timelineEnd: { type: 'number', description: 'Where the timeline currently ends — what "+=1" counts from' },
+            prevStart: { type: 'number', description: 'Start of the most recent clip — what "<" means' },
+            prevEnd: { type: 'number', description: 'End of the most recent clip — what ">" means' },
+            insertDuration: { type: 'number', description: 'Duration of the clip being placed — the basis for a "+=25%" percentage' },
+          },
+          description: 'resolve: what the spec is measured against',
+        },
+        labels: {
+          type: 'object',
+          additionalProperties: { type: 'number' },
+          description: 'Named moments in seconds, addressable as "name" or "name+=0.5"',
+        },
+        startAt: { type: 'number', description: 'place: where the run begins (default 0)' },
+      },
+    },
+  },
+  {
+    name: 'pinepaper_stagger',
+    annotations: {
+      title: 'Stagger',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Shape a delay across many items. What makes a stagger read as designed rather than as a queue is where it STARTS and how it SPREADS — a grid lighting up outward from the centre, a row converging from both edges.
+
+Delays are written to the channel the engine and the SMIL exporter already read, so a staggered scene scrubs, exports and restores. Nothing here is playback-only.
+
+ACTIONS:
+- apply: write the delays onto real items, in the order you list them (row-major for a grid).
+- preview: the delays for a count, without touching the canvas.
+- list_origins: the origins, each with what it means.
+
+each VS amount — alternatives, not a pair:
+- each fixes the gap between NEIGHBOURS, so more items make a longer sequence.
+- amount fixes the TOTAL, so more items crowd together. It overrides each.
+
+ORIGINS (from):
+- start — the first item goes first, in order. The plain queue.
+- end — the last goes first; the sequence runs backwards.
+- center — spreads outward from the middle of the run or grid.
+- edges — starts at both ends at once and converges on the middle.
+- random — a shuffled ORDER, not random delays: every item still lands on one of the same slots, so the rhythm survives. Seeded.
+from also takes an item index, or [fx, fy] fractions for a grid ([0.5, 0.5] is the centre).
+
+ease distributes the START TIMES. It is not the items' own animation curve.
+
+EXAMPLE — a 3x3 grid lighting up from the middle:
+{ "action": "apply", "itemIds": ["a","b","c","d","e","f","g","h","i"], "opts": { "each": 0.1, "from": "center", "grid": [3, 3] } }`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['apply', 'preview', 'list_origins'],
+          description: 'apply (to items), preview (delays only), or list_origins (default: apply)',
+        },
+        itemIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'apply: registry IDs in the order the stagger should follow (row-major for a grid)',
+        },
+        count: { type: 'number', description: 'preview: how many items to compute delays for' },
+        opts: {
+          type: 'object',
+          properties: {
+            each: { type: 'number', description: 'Seconds between neighbours (default 0.1)' },
+            amount: { type: 'number', description: 'Total seconds for the whole run — overrides each' },
+            from: {
+              anyOf: [
+                { type: 'string', enum: ['start', 'end', 'center', 'edges', 'random'] },
+                { type: 'number' },
+                { type: 'array', items: { type: 'number' } },
+              ],
+              description: 'Named origin, an item index, or [fx, fy] fractions for a grid',
+            },
+            grid: { type: 'array', items: { type: 'number' }, description: '[rows, columns] for a 2D stagger' },
+            axis: { type: 'string', enum: ['x', 'y'], description: 'Restrict a grid stagger to one axis' },
+            ease: {
+              type: 'string',
+              enum: ['linear', 'easeIn', 'easeOut', 'easeInOut', 'easeInCubic', 'easeOutCubic'],
+              description: "Curve that distributes the START TIMES — not the items' own animation",
+            },
+            seed: { type: 'number', description: "from: 'random' — same seed, same shuffle (default 1)" },
+          },
+          description: 'Shape of the stagger',
+        },
+      },
+    },
+  },
+  {
+    name: 'pinepaper_flip',
+    annotations: {
+      title: 'Flip (Derived Transition)',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Animate a layout change WITHOUT describing the motion. Every other animation tool asks you to say what the movement is; this asks the opposite — record where things are, rearrange them however you like, and the transition is derived from the difference.
+
+That is what makes it usable for changes nobody could enumerate in advance: a re-sort, an auto-layout pass, a filter, a drag.
+
+THE ORDER MATTERS:
+1. action: 'record' — capture the current positions.
+2. Rearrange, with any tools you like (move, align, sort, re-layout).
+3. action: 'apply' — the motion between the two states is worked out and written.
+
+Recording after the change, or skipping step 2, produces nothing to animate.
+
+It writes ordinary keyframes, so the transition scrubs on the timeline, exports through the MP4 / SMIL / Lottie paths, and survives a reload. Only properties that ACTUALLY changed are written — a track that also pinned the unchanged ones would fight anything else animating them, and a flip of position would quietly freeze an item's own pulse.
+
+Rotation is compared on the shortest arc: 359 to 1 degrees is a two-degree move, not a near-full spin the wrong way.
+
+READ THE RESULT: 'entered' are items that appeared during the change and were given an entrance rather than popping in. 'left' are items that went away — they cannot be animated out, because they are already gone. Remove things AFTER the flip, not before.
+
+EXAMPLE:
+{ "action": "apply", "duration": 0.6, "easing": "easeInOut", "stagger": { "each": 0.05, "from": "center" } }`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['record', 'apply'],
+          description: "'record' before the change, 'apply' after it (default: record)",
+        },
+        itemIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'record: which items to capture (defaults to everything on the item layer)',
+        },
+        duration: { type: 'number', description: 'apply: seconds the transition runs' },
+        easing: { type: 'string', description: 'apply: named easing for the generated keyframes' },
+        enter: { type: 'string', description: 'apply: entrance preset for items that appeared during the change' },
+        stagger: {
+          type: 'object',
+          properties: {
+            each: { type: 'number', description: 'Seconds between neighbours' },
+            amount: { type: 'number', description: 'Total seconds for the whole run — overrides each' },
+            from: {
+              anyOf: [
+                { type: 'string', enum: ['start', 'end', 'center', 'edges', 'random'] },
+                { type: 'number' },
+                { type: 'array', items: { type: 'number' } },
+              ],
+              description: 'Named origin, an item index, or [fx, fy] fractions for a grid',
+            },
+            grid: { type: 'array', items: { type: 'number' }, description: '[rows, columns]' },
+            axis: { type: 'string', enum: ['x', 'y'], description: 'Restrict a grid stagger to one axis' },
+            ease: {
+              type: 'string',
+              enum: ['linear', 'easeIn', 'easeOut', 'easeInOut', 'easeInCubic', 'easeOutCubic'],
+              description: 'Curve that distributes the START TIMES',
+            },
+            seed: { type: 'number', description: 'Seed for the random origin' },
+          },
+          description: "apply: stagger the transition across the items, in the items' own order",
+        },
+      },
+    },
+  },
+  {
     name: 'pinepaper_scene_graph',
     annotations: {
       title: 'Scene Graph (Interactive Stories / Quizzes)',
@@ -3854,6 +4121,11 @@ flags as a badly-composed scene, and they do not survive an artboard change.`,
     inputSchema: {
       type: 'object',
       properties: {
+        register: { type: 'string', enum: ['naive', 'playful', 'poster', 'editorial', 'technical'], description: 'Which design language. Resolves gutter, margin, hue budget and type scale together; an explicit craft still overrides it.' },
+        level: { type: 'number', description: 'Craft level 1-4 within the register: sketch, competent, refined, art-directed.' },
+        medium: { type: 'string', enum: ['vector', 'thread'], description: "What makes the marks. 'thread' stitches every closed path AFTER arranging; photographs and text cannot be stitched and return in medium.skipped with the reason. Other media are refused with their own reason rather than faked." },
+        stitch: { type: 'string', enum: ['longAndShort', 'satin', 'seed', 'stem'], description: 'Which stitch when medium is thread (default longAndShort).' },
+        stitchBudget: { type: 'number', description: 'Total marks across the composition (default 6000); the stitch scales to fit rather than the fill being cut short.' },
         action: { type: 'string', enum: ['list_patterns', 'list_treatments', 'apply', 'set_treatment'] },
         pattern: { type: 'string', description: 'Pattern key from list_patterns' },
         itemIds: { type: 'array', items: { type: 'string' }, description: 'Items in slot order' },

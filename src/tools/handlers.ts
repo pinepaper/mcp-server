@@ -109,6 +109,9 @@ import {
   ManageScenesInputSchema,
   ScenePlaybackInputSchema,
   SceneGraphInputSchema,
+  SequenceInputSchema,
+  StaggerInputSchema,
+  FlipInputSchema,
   // New consolidated tool schemas
   SelectionInputSchema,
   TransformInputSchema,
@@ -876,6 +879,24 @@ async function handleToolCallInner(
         return executeOrGenerate(code, `Scene playback: ${input.action}`, options, 'pinepaper_scene_playback');
       }
 
+      case 'pinepaper_sequence': {
+        const input = SequenceInputSchema.parse(args);
+        const code = codeGenerator.generateSequence(input);
+        return executeOrGenerate(code, `Sequence: ${input.action}`, options, 'pinepaper_sequence');
+      }
+
+      case 'pinepaper_stagger': {
+        const input = StaggerInputSchema.parse(args);
+        const code = codeGenerator.generateStagger(input);
+        return executeOrGenerate(code, `Stagger: ${input.action}`, options, 'pinepaper_stagger');
+      }
+
+      case 'pinepaper_flip': {
+        const input = FlipInputSchema.parse(args);
+        const code = codeGenerator.generateFlip(input);
+        return executeOrGenerate(code, `Flip: ${input.action}`, options, 'pinepaper_flip');
+      }
+
       case 'pinepaper_scene_graph': {
         const input = SceneGraphInputSchema.parse(args);
         const code = codeGenerator.generateSceneGraph(input);
@@ -1364,7 +1385,8 @@ async function handleToolCallInner(
           input.duration,
           input.loop,
           input.time,
-          input.deterministic
+          input.deterministic,
+          { rate: input.rate, progress: input.progress, scroll: input.scroll }
         );
         return executeOrGenerate(code, `Timeline action: ${input.action}`, options, 'pinepaper_play_timeline');
       }
@@ -2724,6 +2746,9 @@ You can now start creating new items on a clean canvas.`,
             'pinepaper_manage_scenes',
             'pinepaper_scene_playback',
             'pinepaper_scene_graph',
+            'pinepaper_sequence',
+            'pinepaper_stagger',
+            'pinepaper_flip',
             // Agent flow mode tools
             'pinepaper_agent_start_job',
             'pinepaper_agent_end_job',

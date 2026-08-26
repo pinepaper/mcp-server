@@ -224,6 +224,10 @@
       "description": "Display text styles + variable fonts. action: apply_style (stacked-layer title, adopts the text id)|set_font_axes (weight/width/slant, animatable)|list_styles."
     },
     {
+      "name": "pinepaper_design_medium",
+      "description": "What makes the marks. action: list_media, resolve (refuses a medium it cannot honestly render, and says why), list_stitches, apply_thread (needlepainting)."
+    },
+    {
       "name": "pinepaper_text_effect",
       "description": "37 character-level text animations. action: list|apply {itemId, effect}. REPLACES the text with one keyframed item per character (source id dies; keepSource:true to keep it)."
     },
@@ -342,6 +346,18 @@
     {
       "name": "pinepaper_scene_playback",
       "description": "Scene chain playback. action: create_chain|play|pause|resume|stop|toggle_loop|jump. sceneIds, defaultDuration (secs), loop."
+    },
+    {
+      "name": "pinepaper_sequence",
+      "description": "Work out WHEN clips start, said relative to each other instead of in absolute seconds. A pure planner — it computes times and touches nothin"
+    },
+    {
+      "name": "pinepaper_stagger",
+      "description": "Shape a delay across many items. What makes a stagger read as designed rather than as a queue is where it STARTS and how it SPREADS — a grid"
+    },
+    {
+      "name": "pinepaper_flip",
+      "description": "Animate a layout change WITHOUT describing the motion. Every other animation tool asks you to say what the movement is; this asks the opposi"
     },
     {
       "name": "pinepaper_scene_graph",

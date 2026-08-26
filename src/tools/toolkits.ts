@@ -86,6 +86,8 @@ export const TOOL_TAGS: Record<string, string[]> = {
     'pinepaper_register_custom_relation',
   ],
   animation: [
+    'pinepaper_stagger',
+    'pinepaper_flip',
     'pinepaper_animate',
     'pinepaper_import_motion_capture',
     'pinepaper_keyframe_animate',
@@ -127,6 +129,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
     'pinepaper_scene_playback',
     'pinepaper_scene_graph',
     'pinepaper_event',
+    'pinepaper_sequence',
   ],
   selection: [
     'pinepaper_selection',

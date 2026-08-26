@@ -25,7 +25,7 @@
 
 PinePaper MCP Server enables AI assistants to create and animate graphics in [PinePaper Studio](https://pinepaper.studio) via the Model Context Protocol (MCP). Works with any AI that supports MCP tool calling (Claude, GPT, Gemini, local models, etc.).
 
-The server exposes **140 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
+The server exposes **143 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
 
 - Create text, shapes, geometry, and complex graphics
 - Animate items with behavior-driven **relations** rather than keyframes
@@ -37,7 +37,7 @@ The server exposes **140 tools** across drawing, animation, diagrams, maps, typo
 
 ## Running it: local or hosted
 
-**Local is free and complete.** Every one of the 140 tools works when you run
+**Local is free and complete.** Every one of the 143 tools works when you run
 this server yourself. There is no reduced tier and nothing held back.
 
 What it needs:
@@ -185,6 +185,25 @@ The same code an agent generates is the code you can paste — the canvas is you
 - **It replaces the text item.** Unlike `pinepaper_text_style` (which adopts the text's registry id), this removes the original and returns the new per-character ids — so relations and keyframes on the source id do not survive. `keepSource: true` is the escape hatch. The tool is marked `destructiveHint` and says so in its description, because it inverts the id-preservation convention every neighbouring tool follows.
 - Resting characters are painted with a gradient across the text block by default (what the upstream effects actually do); `gradient: false` keeps the authored fill. `seed` defaults to 1, so a given text + effect + seed animates identically every run.
 
+**GSAP's vocabulary, PinePaper's engine.** An audit of GSAP's concept set against the 49 relations found most of it already present under other names — MotionPath is `moves_along_path`, MorphSVG is `morphs_to`, DrawSVG is trim paths, Physics2D is `spring_follow`, SplitText is the 37 text effects, nested timelines are precomps, and `wiggle` is richer than CustomWiggle. Five concepts were genuinely missing. They are adopted as **vocabulary, not as a dependency**: a second animation runtime is one that none of the SMIL, Lottie or MP4 exporters would understand, so the grammar is GSAP's and the implementations are independent.
+
+**New tool: `pinepaper_sequence`** (`pp:TimelinePosition`) — say WHEN relative to something else instead of in absolute seconds. `"<"`, `">"`, `"+=1"`, `"-=25%"`, labels and `"intro+=0.5"` resolve to seconds, and `place` threads a whole run so each clip resolves against the ones before it. A pure planner; it touches nothing.
+
+- The one thing to get right: **a percentage means different things in different forms.** `"-=25%"` is a quarter of the clip *being inserted*; `"<25%"` is a quarter of the *previous* one. They agree only when the two clips are the same length, and getting it backwards yields timings that look almost right.
+
+**New tool: `pinepaper_stagger`** (`pp:Stagger`) — the shape of a delay across many items: a grid lighting up outward from the centre, a row converging from both edges. `each` fixes the gap between neighbours; `amount` fixes the total. Delays are written to the channel the engine and the SMIL exporter already read, so a staggered scene scrubs and exports — nothing here is playback-only. `staggered_with` gains the same shape parameters (`count`, `from`, `amount`, `grid`, `axis`, `distributeEase`).
+
+**New tool: `pinepaper_flip`** (`pp:Flip`) — animate a layout change *without describing the motion*. Record where things are, rearrange them however you like, and the transition is derived from the difference: the one animation an author never has to specify, which is what makes it usable for re-sorts, auto-layout passes and filters nobody could enumerate in advance. It writes ordinary keyframes, so the transition scrubs and exports. Rotation is compared on the shortest arc — 359° to 1° is a two-degree move, not a near-full spin the wrong way.
+
+**`pinepaper_play_timeline` gains rate, progress and scroll** (`pp:TimeScale`, `pp:InputDrivenPlayback`) — `set_time_scale` / `get_time_scale`, `get_progress` / `set_progress`, `bind_scroll` / `unbind_scroll` / `list_scrub_anchors`.
+
+- Rate is deliberately unclamped: 0 freezes the clock without stopping playback, and a negative rate runs the scene backwards. Changing it rebases the clock, so the playhead does not jump. **Export is unaffected** — a scene watched at 0.5x still exports its real duration rather than a file twice as long.
+- Scroll binding always releases a previous binding first: the listener holds the scene alive, so a rebind without an unbind is a leak *and* leaves two bindings scrubbing one timeline.
+
+**`orbits` gains `phaseDegrees`.** `phase` was the single parameter in the whole relation vocabulary measured in radians, against this engine's own stated convention that angles are degrees. `phaseDegrees` now takes precedence; `phase` is kept, and documented as the exception, because changing it outright would silently re-time every scene that already sets it — a 57× error of exactly the kind the convention exists to prevent.
+
+**`pinepaper_design_medium` was served but unlisted.** It had been missing from `manifest.json`'s tool list since it shipped. Caught by the prepublish guard while regenerating the manifest for the tools above.
+
 **New tool: `pinepaper_scene_graph`** — compiles an interactive story or quiz into native items and relations: cards, answer buttons, click→event routing, exclusive-group mutex visibility, and score tracking.
 
 - `action: 'validate'` runs the same structural check **without drawing anything** — errors, warnings, reachable nodes, cycles. Check a generated graph before committing a canvas full of cards to it.
@@ -258,7 +277,7 @@ Fourteen new tools (121 → 135) and new actions across the surface — the rele
 
 ## Toolkits & Token Budget
 
-140 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
+143 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
 
 **Toolkit profiles** (`PINEPAPER_TOOLKIT`):
 
@@ -463,7 +482,7 @@ Generate instruction/code pairs for LLM fine-tuning:
 
 ## Tools Reference
 
-All 140 tools, grouped by the tag used for toolkit filtering.
+All 143 tools, grouped by the tag used for toolkit filtering.
 
 ### Canvas (`canvas`)
 | Tool | Description |
@@ -522,7 +541,9 @@ All 140 tools, grouped by the tag used for toolkit filtering.
 |------|-------------|
 | `pinepaper_animate` | Apply a simple loop animation |
 | `pinepaper_keyframe_animate` | Timed keyframe animation |
-| `pinepaper_play_timeline` | Control playback |
+| `pinepaper_play_timeline` | Control playback, rate, progress, scroll-driven scrubbing |
+| `pinepaper_stagger` | Shape a delay across many items |
+| `pinepaper_flip` | Animate a layout change without describing the motion |
 | `pinepaper_get_animatable_properties` | List animatable properties |
 | `pinepaper_get_available_easings` | List easing functions |
 | `pinepaper_construction_sequence` | Staged construction animation |
@@ -550,6 +571,8 @@ All 140 tools, grouped by the tag used for toolkit filtering.
 | `pinepaper_manage_scenes` | Manage scenes |
 | `pinepaper_scene_playback` | Scene playback control |
 | `pinepaper_scene_graph` | Interactive story / quiz card scene graph |
+| `pinepaper_sequence` | Relative timeline positions for a run of clips |
+| `pinepaper_sequence` | Relative timeline positions for a run of clips |
 | `pinepaper_event` | Create / pulse event channels for scene chains |
 
 ### Generators, Effects & Filters

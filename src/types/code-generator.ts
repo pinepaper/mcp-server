@@ -141,6 +141,12 @@ import {
   ScenePlaybackInput,
   SceneGraphInput,
   SceneGraphInputSchema,
+  SequenceInput,
+  SequenceInputSchema,
+  StaggerInput,
+  StaggerInputSchema,
+  FlipInput,
+  FlipInputSchema,
   // New consolidated tool types
   SelectionInput,
   TransformInput,
@@ -745,14 +751,142 @@ const items = filtered.map(entry => ({
 /**
  * Template for timeline control
  */
+/** Options for the playback-rate and input-driven actions. */
+export interface PlayTimelineExtra {
+  rate?: number;
+  progress?: number;
+  scroll?: {
+    elementId?: string;
+    start?: string;
+    end?: string;
+    scrub?: number;
+    range?: number[];
+  };
+}
+
+// Where a scroll binding parks its unbind function. `bindTimelineToScroll`
+// returns a FUNCTION, which cannot cross the tool boundary — so it lives on the
+// page, where a later unbind_scroll call can still reach it.
+const SCRUB_UNBIND_KEY = '__ppScrubUnbind';
+
 function generatePlayTimelineCode(
-  action: 'play' | 'pause' | 'stop' | 'seek',
+  action: 'play' | 'pause' | 'stop' | 'seek' | 'set_time_scale' | 'get_time_scale'
+  | 'get_progress' | 'set_progress' | 'bind_scroll' | 'unbind_scroll' | 'list_scrub_anchors',
   duration?: number,
   loop?: boolean,
   time?: number,
-  deterministic?: boolean
+  deterministic?: boolean,
+  extra?: PlayTimelineExtra
 ): string {
+  const S = (v: unknown) => JSON.stringify(v);
   switch (action) {
+    case 'set_time_scale': {
+      // Deliberately not clamped: 0 freezes the clock without stopping, and a
+      // negative rate runs the scene backwards.
+      const rate = extra?.rate ?? 1;
+      return `
+// pp:TimeScale — the rate the scene clock runs at.
+(function() {
+  if (typeof app.setTimeScale !== 'function') {
+    return { success: false, error: 'app.setTimeScale unavailable — update FxTool' };
+  }
+  // Changing the rate rebases the clock so the CURRENT position is preserved;
+  // without that, doubling the rate mid-play jumps the playhead to twice its
+  // elapsed time, which reads as a glitch rather than a speed change.
+  const rate = app.setTimeScale(${S(rate)});
+  // Export drives time itself, so a scene watched at 0.5x still exports its
+  // real duration rather than a file twice as long.
+  return { success: true, action: 'set_time_scale', rate, affectsExport: false };
+})();
+`.trim();
+    }
+    case 'get_time_scale':
+      return `
+(function() {
+  if (typeof app.getTimeScale !== 'function') {
+    return { success: false, error: 'app.getTimeScale unavailable — update FxTool' };
+  }
+  return { success: true, action: 'get_time_scale', rate: app.getTimeScale() };
+})();
+`.trim();
+    case 'get_progress':
+      return `
+(function() {
+  if (typeof app.getProgress !== 'function') {
+    return { success: false, error: 'app.getProgress unavailable — update FxTool' };
+  }
+  return { success: true, action: 'get_progress', progress: app.getProgress() };
+})();
+`.trim();
+    case 'set_progress':
+      return `
+// Seek by proportion rather than by seconds — the unit a scrubber has.
+(function() {
+  if (typeof app.setProgress !== 'function') {
+    return { success: false, error: 'app.setProgress unavailable — update FxTool' };
+  }
+  const time = app.setProgress(${S(extra?.progress ?? 0)});
+  return { success: true, action: 'set_progress', progress: ${S(extra?.progress ?? 0)}, time };
+})();
+`.trim();
+    case 'list_scrub_anchors':
+      return `
+(function() {
+  if (typeof app.listScrubAnchors !== 'function') {
+    return { success: false, error: 'app.listScrubAnchors unavailable — update FxTool' };
+  }
+  const anchors = app.listScrubAnchors();
+  return { success: true, action: 'list_scrub_anchors', count: anchors.length, anchors };
+})();
+`.trim();
+    case 'bind_scroll': {
+      const scroll = extra?.scroll || {};
+      return `
+// pp:InputDrivenPlayback — drive the timeline from scroll instead of a clock.
+(function() {
+  if (typeof app.bindTimelineToScroll !== 'function') {
+    return { success: false, error: 'app.bindTimelineToScroll unavailable — update FxTool' };
+  }
+  const cfg = ${S(scroll)};
+  // The listener holds the app instance, so rebinding without unbinding leaks
+  // the old binding AND leaves two of them scrubbing the same timeline. Always
+  // release the previous one first.
+  let replaced = false;
+  if (typeof window !== 'undefined' && typeof window.${SCRUB_UNBIND_KEY} === 'function') {
+    try { window.${SCRUB_UNBIND_KEY}(); replaced = true; } catch (e) { /* already gone */ }
+    window.${SCRUB_UNBIND_KEY} = null;
+  }
+  const el = cfg.elementId && typeof document !== 'undefined'
+    ? document.getElementById(cfg.elementId)
+    : undefined;
+  if (cfg.elementId && !el) {
+    return { success: false, error: 'No element with id "' + cfg.elementId + '" — bind_scroll tracks a real DOM element' };
+  }
+  const unbind = app.bindTimelineToScroll({
+    ...(el ? { element: el } : {}),
+    ...(cfg.start !== undefined ? { start: cfg.start } : {}),
+    ...(cfg.end !== undefined ? { end: cfg.end } : {}),
+    ...(cfg.scrub !== undefined ? { scrub: cfg.scrub } : {}),
+    ...(cfg.range !== undefined ? { range: cfg.range } : {}),
+  });
+  if (typeof window !== 'undefined') window.${SCRUB_UNBIND_KEY} = unbind;
+  return { success: true, action: 'bind_scroll', bound: true, replaced, config: cfg };
+})();
+`.trim();
+    }
+    case 'unbind_scroll':
+      return `
+(function() {
+  // Nothing bound is an answer, not an error — an agent tidying up should not
+  // have to know whether it bound anything.
+  if (typeof window === 'undefined' || typeof window.${SCRUB_UNBIND_KEY} !== 'function') {
+    return { success: true, action: 'unbind_scroll', bound: false };
+  }
+  window.${SCRUB_UNBIND_KEY}();
+  window.${SCRUB_UNBIND_KEY} = null;
+  return { success: true, action: 'unbind_scroll', bound: true };
+})();
+`.trim();
     case 'play':
       return `
 // Play keyframe timeline
@@ -1272,13 +1406,15 @@ export class PinePaperCodeGenerator {
    * Generate code for timeline control
    */
   generatePlayTimeline(
-    action: 'play' | 'pause' | 'stop' | 'seek',
+    action: 'play' | 'pause' | 'stop' | 'seek' | 'set_time_scale' | 'get_time_scale'
+  | 'get_progress' | 'set_progress' | 'bind_scroll' | 'unbind_scroll' | 'list_scrub_anchors',
     duration?: number,
     loop?: boolean,
     time?: number,
-    deterministic?: boolean
+    deterministic?: boolean,
+    extra?: PlayTimelineExtra
   ): string {
-    return generatePlayTimelineCode(action, duration, loop, time, deterministic);
+    return generatePlayTimelineCode(action, duration, loop, time, deterministic, extra);
   }
 
   /**
@@ -4864,6 +5000,193 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    // The RE
   }
 
   // ===========================================================================
+  // RELATIVE TIMING, STAGGERS, FLIP
+  // ===========================================================================
+
+  generateSequence(input: SequenceInput): string {
+    const validated = SequenceInputSchema.parse(input);
+    const S = (v: unknown) => JSON.stringify(v);
+
+    if (validated.action === 'list_forms') {
+      return `
+(function() {
+  if (typeof app.listPositionForms !== 'function') {
+    return { success: false, error: 'app.listPositionForms unavailable — update FxTool' };
+  }
+  const forms = app.listPositionForms();
+  return { success: true, action: 'list_forms', count: forms.length, forms };
+})();
+`.trim();
+    }
+
+    if (validated.action === 'resolve') {
+      return `
+// Resolve ONE relative position to absolute seconds.
+(function() {
+  if (typeof app.resolveTimelinePosition !== 'function') {
+    return { success: false, error: 'app.resolveTimelinePosition unavailable — update FxTool' };
+  }
+  const ctx = { ...${S(validated.context || {})}, labels: ${S(validated.labels || {})} };
+  const seconds = app.resolveTimelinePosition(${S(validated.position ?? null)}, ctx);
+  return { success: true, action: 'resolve', position: ${S(validated.position ?? null)}, seconds, context: ctx };
+})();
+`.trim();
+    }
+
+    return `
+// Place a run of clips in order, each resolved against the ones before it.
+(function() {
+  if (typeof app.placeSequence !== 'function') {
+    return { success: false, error: 'app.placeSequence unavailable — update FxTool' };
+  }
+  const clips = ${S(validated.clips || [])};
+  const result = app.placeSequence(clips, {
+    startAt: ${S(validated.startAt ?? 0)},
+    labels: ${S(validated.labels || {})},
+  });
+  // Echo the caller's own clip ids back onto the placements — placeSequence
+  // answers positionally, and an agent that named its clips should get the
+  // names back rather than having to re-zip two arrays by index.
+  const placed = (result.placed || []).map((p, i) => (
+    clips[i] && clips[i].id ? { id: clips[i].id, ...p } : p
+  ));
+  return {
+    success: true,
+    action: 'place',
+    placed,
+    labels: result.labels,
+    // The timeline only ever grows: a clip placed early with "-=" must not pull
+    // the end back and silently truncate everything after it.
+    duration: result.duration,
+  };
+})();
+`.trim();
+  }
+
+  generateStagger(input: StaggerInput): string {
+    const validated = StaggerInputSchema.parse(input);
+    const S = (v: unknown) => JSON.stringify(v);
+
+    if (validated.action === 'list_origins') {
+      return `
+(function() {
+  if (typeof app.listStaggerOrigins !== 'function') {
+    return { success: false, error: 'app.listStaggerOrigins unavailable — update FxTool' };
+  }
+  const origins = app.listStaggerOrigins();
+  return { success: true, action: 'list_origins', count: origins.length, origins };
+})();
+`.trim();
+    }
+
+    if (validated.action === 'preview') {
+      return `
+// Delays for a count, without touching the canvas — plan before committing.
+(function() {
+  if (typeof app.staggerDelays !== 'function') {
+    return { success: false, error: 'app.staggerDelays unavailable — update FxTool' };
+  }
+  const delays = app.staggerDelays(${S(validated.count ?? 0)}, ${S(validated.opts || {})});
+  return {
+    success: true,
+    action: 'preview',
+    count: ${S(validated.count ?? 0)},
+    delays,
+    span: delays.length ? Math.max(...delays) : 0,
+  };
+})();
+`.trim();
+    }
+
+    return `
+// Apply a stagger to real items, in the order given.
+(function() {
+  if (typeof app.staggerItems !== 'function') {
+    return { success: false, error: 'app.staggerItems unavailable — update FxTool' };
+  }
+  const ids = ${S(validated.itemIds || [])};
+  if (!ids.length) {
+    return { success: false, error: 'apply needs itemIds, in the order the stagger should follow (row-major for a grid)' };
+  }
+  const r = app.staggerItems(ids, ${S(validated.opts || {})});
+  return {
+    success: r && r.ok === true,
+    action: 'apply',
+    // 'applied' can be lower than the ids given — an id that resolves to
+    // nothing is skipped, and a stagger that silently covered fewer items than
+    // asked for is the failure worth seeing.
+    requested: ids.length,
+    applied: r ? r.applied : 0,
+    delays: r ? r.delays : [],
+    span: r ? r.span : 0,
+  };
+})();
+`.trim();
+  }
+
+  generateFlip(input: FlipInput): string {
+    const validated = FlipInputSchema.parse(input);
+    const S = (v: unknown) => JSON.stringify(v);
+
+    if (validated.action === 'record') {
+      return `
+// pp:Flip step one — record where things are NOW, before the change.
+//
+// The record stays ON THE PAGE rather than travelling back through the tool
+// result: it is one snapshot per item of raw geometry, useless to read and
+// expensive to carry, and \`apply\` is the only thing that ever wants it.
+(function() {
+  if (typeof app.recordFlipState !== 'function') {
+    return { success: false, error: 'app.recordFlipState unavailable — update FxTool' };
+  }
+  const ids = ${S(validated.itemIds || null)};
+  const record = ids && ids.length ? app.recordFlipState(ids) : app.recordFlipState();
+  if (typeof window !== 'undefined') window.__ppFlipRecord = record;
+  return {
+    success: true,
+    action: 'record',
+    recorded: (record.snapshots || []).length,
+    takenAt: record.takenAt,
+    ids: (record.snapshots || []).map(s => s.id),
+  };
+})();
+`.trim();
+    }
+
+    const opts: Record<string, unknown> = {};
+    if (validated.duration !== undefined) opts.duration = validated.duration;
+    if (validated.easing !== undefined) opts.easing = validated.easing;
+    if (validated.enter !== undefined) opts.enter = validated.enter;
+    if (validated.stagger !== undefined) opts.stagger = validated.stagger;
+
+    return `
+// pp:Flip step two — animate from the recorded state to wherever things are now.
+// Writes ordinary keyframes, so the transition scrubs, exports to SMIL and
+// Lottie, and survives a reload.
+(function() {
+  if (typeof app.flipItems !== 'function') {
+    return { success: false, error: 'app.flipItems unavailable — update FxTool' };
+  }
+  const record = typeof window !== 'undefined' ? window.__ppFlipRecord : null;
+  if (!record || !(record.snapshots || []).length) {
+    return { success: false, error: 'Nothing was recorded — run pinepaper_flip { action: "record" } BEFORE the change, then rearrange, then apply' };
+  }
+  const r = app.flipItems(record, ${S(opts)});
+  return {
+    success: r && r.ok === true,
+    action: 'apply',
+    moved: r ? r.moved : 0,
+    entered: r ? r.entered : [],
+    // Items that LEFT during the change cannot be animated out — they are gone
+    // already. Remove them after the flip, not before.
+    left: r ? r.left : [],
+    duration: r ? r.duration : 0,
+  };
+})();
+`.trim();
+  }
+
+  // ===========================================================================
   // SELECTION, TRANSFORM & HISTORY
   // ===========================================================================
 
@@ -5091,6 +5414,14 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    // The RE
             ...(input.assets ? { assets: input.assets } : {}),
             ...(input.audio ? { audio: input.audio } : {}),
             ...(input.grid ? { grid: true } : {}),
+            // The design axes. A register resolves the craft (gutter, margin,
+            // hue budget, type scale); a medium says what makes the marks and
+            // is REFUSED when a composition cannot be rendered in it.
+            ...(input.register ? { register: input.register } : {}),
+            ...(input.level !== undefined ? { level: input.level } : {}),
+            ...(input.medium ? { medium: input.medium } : {}),
+            ...(input.stitch ? { stitch: input.stitch } : {}),
+            ...(input.stitchBudget !== undefined ? { stitchBudget: input.stitchBudget } : {}),
           })}`, 'Compose: apply pattern');
     }
   }

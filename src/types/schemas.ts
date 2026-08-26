@@ -311,7 +311,11 @@ export const OrbitsParamsSchema = z.object({
   radius: z.number().optional().default(100).describe('Orbit radius'),
   speed: z.number().optional().default(1).describe('Rotation speed'),
   direction: z.enum(['clockwise', 'counterclockwise']).optional().default('counterclockwise'),
-  phase: z.number().optional().default(0).describe('Starting angle offset'),
+  // The one angle in the relation vocabulary that is NOT degrees. Kept because
+  // changing it outright would silently re-time every scene that sets it — a 57x
+  // error of exactly the kind the "angles are DEGREES" convention exists to stop.
+  phase: z.number().optional().default(0).describe('Starting angle in RADIANS — the documented exception to the degrees convention, kept for existing scenes. Prefer phaseDegrees.'),
+  phaseDegrees: z.number().optional().describe('Starting angle in DEGREES, matching the convention every other angle uses. Takes precedence over phase when set.'),
 });
 
 export const FollowsParamsSchema = z.object({
@@ -366,8 +370,19 @@ export const GrowsFromParamsSchema = z.object({
 
 export const StaggeredWithParamsSchema = z.object({
   index: z.number().describe('0-based position in the stagger sequence'),
-  stagger: z.number().optional().default(0.1).describe('Delay between items in seconds'),
-  effect: z.enum(['fadeIn', 'fadeOut', 'growIn', 'slideIn', 'popIn']).optional().default('fadeIn').describe('Stagger effect type'),
+  stagger: z.number().optional().default(0.1).describe('Seconds between neighbours. Ignored when amount is set.'),
+  // Shape params (pp:Stagger). The plain index x stagger path is taken first and
+  // unchanged; these only engage when a shape is actually asked for AND count is
+  // known — there is no "end" to measure from without it, so an origin like
+  // 'center' would have nothing to mean.
+  count: z.number().optional().describe('How many items are in the stagger. Required by any origin other than "start".'),
+  from: z.enum(['start', 'end', 'center', 'edges', 'random']).optional().default('start').describe('Where the stagger begins — what turns a delay into a direction. Requires count.'),
+  amount: z.number().optional().describe('Total seconds for the WHOLE sequence, split among the items. Overrides stagger.'),
+  grid: z.string().optional().describe('Rows and columns as "rows,cols" (or "auto") for a 2D stagger. Requires count.'),
+  axis: z.enum(['x', 'y']).optional().describe('Restrict a grid stagger to one axis.'),
+  distributeEase: z.enum(['linear', 'easeIn', 'easeOut', 'easeInOut', 'easeInCubic', 'easeOutCubic']).optional().default('linear')
+    .describe("Curve that distributes the START TIMES — not the items' own animation curve."),
+  effect: z.enum(['fadeIn', 'fadeOut', 'growIn', 'slideIn', 'popIn', 'typewriter']).optional().default('fadeIn').describe('Stagger effect type'),
 });
 
 export const IndicatesParamsSchema = z.object({
@@ -1225,7 +1240,13 @@ export const GetItemsInputSchema = z.object({
 
 // Play Timeline
 export const PlayTimelineInputSchema = z.object({
-  action: z.enum(['play', 'pause', 'stop', 'seek']),
+  action: z.enum([
+    'play', 'pause', 'stop', 'seek',
+    // pp:TimeScale — the rate the scene clock runs at.
+    'set_time_scale', 'get_time_scale',
+    // pp:InputDrivenPlayback — progress driven by an input instead of a clock.
+    'get_progress', 'set_progress', 'bind_scroll', 'unbind_scroll', 'list_scrub_anchors',
+  ]),
   duration: z.number().optional().describe('Duration for play action'),
   loop: z.boolean().optional(),
   time: z.number().optional().describe('Time to seek to'),
@@ -1233,6 +1254,22 @@ export const PlayTimelineInputSchema = z.object({
     .boolean()
     .optional()
     .describe('For seek: evaluate the scene at the exact time via app.sceneAt(t) — ticks keyframes + relations + generators deterministically (same t → same frame), not just the keyframe state. Use before a screenshot for a reproducible frame.'),
+  // Deliberately unclamped: 0 freezes the clock without stopping playback, and a
+  // negative rate runs the scene backwards. Both are things the engine supports
+  // and a min(0) would quietly forbid.
+  rate: z.number().optional()
+    .describe('set_time_scale: 1 is real time, 0.5 half speed, 0 freezes without stopping, negative runs backwards. Export is unaffected — a scene watched at 0.5x still exports its real duration.'),
+  progress: z.number().min(0).max(1).optional()
+    .describe('set_progress: how far through the timeline, 0..1 — the unit a scrubber or a progress bar actually has.'),
+  scroll: z.object({
+    elementId: z.string().optional().describe('DOM id of the element to track (defaults to the canvas)'),
+    start: z.string().optional().describe("Anchor where the range begins, e.g. 'top bottom' (the moment the element appears). See list_scrub_anchors."),
+    end: z.string().optional().describe("Anchor where the range ends, e.g. 'bottom top' (the moment it is gone)."),
+    scrub: z.number().min(0).optional()
+      .describe('Seconds of smoothing — the played position chases the scroll instead of snapping to it (default 0.3). 0 snaps.'),
+    range: z.array(z.number()).length(2).optional()
+      .describe('[from, to] in seconds — drive only a sub-range of the timeline instead of the whole thing.'),
+  }).optional().describe('bind_scroll options'),
 });
 
 // Canvas Control
@@ -2869,6 +2906,82 @@ export const ScenePlaybackInputSchema = z.object({
 
 export type ScenePlaybackInput = z.infer<typeof ScenePlaybackInputSchema>;
 
+// =============================================================================
+// RELATIVE TIMING, STAGGERS, FLIP  (GSAP's vocabulary, PinePaper's engine)
+// =============================================================================
+
+// pp:TimelinePosition — saying WHEN relative to something else.
+//
+// The position spec is a number or one of the string forms; it stays loose on
+// purpose, because the grammar is open ("intro+=0.5" names a caller's label) and
+// an enum here could only ever be a stale subset of it. list_forms is the
+// discoverable list.
+export const SequenceInputSchema = z.object({
+  action: z.enum(['place', 'resolve', 'list_forms']).default('place')
+    .describe("'place' threads a run of clips, each resolved against the ones before it · 'resolve' answers a single position · 'list_forms' returns the accepted grammar with what each form means"),
+  clips: z.array(z.object({
+    id: z.string().optional().describe('Your own name for the clip — echoed back on the placement'),
+    duration: z.number().min(0).describe('How long the clip runs, in seconds'),
+    position: z.union([z.number(), z.string()]).optional()
+      .describe('Where it starts. Omit to append at the end of the timeline so far.'),
+    label: z.string().optional().describe('Name this moment so later clips can position against it. A label marks where the clip STARTS.'),
+  })).optional().describe('place: the run of clips, in order'),
+  position: z.union([z.number(), z.string()]).optional().describe('resolve: the single position spec to resolve'),
+  context: z.object({
+    timelineEnd: z.number().optional().describe('Where the timeline currently ends — what a bare "+=1" counts from'),
+    prevStart: z.number().optional().describe('Start of the most recently added clip — what "<" means'),
+    prevEnd: z.number().optional().describe('End of the most recently added clip — what ">" means'),
+    insertDuration: z.number().optional().describe('Duration of the clip being placed — the basis for a "+=25%" / "-=25%" percentage'),
+  }).optional().describe('resolve: what the spec is measured against'),
+  labels: z.record(z.string(), z.number()).optional().describe('Named moments in seconds, addressable as "name" or "name+=0.5"'),
+  startAt: z.number().optional().describe('place: where the run begins (default 0)'),
+});
+
+export type SequenceInput = z.infer<typeof SequenceInputSchema>;
+
+// pp:Stagger — the shape of a delay across many items.
+const StaggerOptsSchema = z.object({
+  // `each` and `amount` are ALTERNATIVES, not a pair: each fixes the gap between
+  // neighbours so more items make a longer sequence; amount fixes the total so
+  // more items crowd together.
+  each: z.number().min(0).optional().describe('Seconds between neighbours (default 0.1). More items ⇒ a longer sequence.'),
+  amount: z.number().min(0).optional().describe('Total seconds for the WHOLE run, split among the items. Overrides each — more items ⇒ they crowd together.'),
+  from: z.union([
+    z.enum(['start', 'end', 'center', 'edges', 'random']),
+    z.number(),
+    z.array(z.number()).length(2),
+  ]).optional().describe("Where the stagger begins: a named origin, an item index, or [fx, fy] fractions for a grid ([0.5, 0.5] is the centre)."),
+  grid: z.array(z.number()).length(2).optional().describe('[rows, columns] for a 2D stagger. Items are read row-major.'),
+  axis: z.enum(['x', 'y']).optional().describe('Restrict a grid stagger to one axis.'),
+  ease: z.enum(['linear', 'easeIn', 'easeOut', 'easeInOut', 'easeInCubic', 'easeOutCubic']).optional()
+    .describe("Curve that distributes the START TIMES — not the items' own animation curve."),
+  seed: z.number().optional().describe("from: 'random' — same seed, same shuffle (default 1)."),
+});
+
+export const StaggerInputSchema = z.object({
+  action: z.enum(['apply', 'preview', 'list_origins']).default('apply')
+    .describe("'apply' writes the delays onto real items · 'preview' returns the delays for a count without touching the canvas · 'list_origins' names the origins"),
+  itemIds: z.array(z.string()).optional().describe('apply: registry ids IN THE ORDER the stagger should follow (row-major for a grid)'),
+  count: z.number().int().min(0).optional().describe('preview: how many items to compute delays for'),
+  opts: StaggerOptsSchema.optional().describe('Shape of the stagger'),
+});
+
+export type StaggerInput = z.infer<typeof StaggerInputSchema>;
+
+// pp:Flip — a transition DERIVED from a change rather than described.
+export const FlipInputSchema = z.object({
+  action: z.enum(['record', 'apply']).default('record')
+    .describe("'record' captures where things are NOW · 'apply' animates from that record to wherever they have since been moved"),
+  itemIds: z.array(z.string()).optional()
+    .describe('record: which items to capture (defaults to everything on the item layer, which is the usual case for a re-layout)'),
+  duration: z.number().min(0).optional().describe('apply: seconds the transition runs (engine default)'),
+  easing: z.string().optional().describe('apply: named easing for the generated keyframes'),
+  enter: z.string().optional().describe('apply: entrance preset for items that appeared during the change, so they animate in rather than popping'),
+  stagger: StaggerOptsSchema.optional().describe("apply: stagger the transition across the items, in the items' own order"),
+});
+
+export type FlipInput = z.infer<typeof FlipInputSchema>;
+
 // Scene graph: interactive multi-node story/quiz state graphs (cards, answers, mutex, event wiring)
 //
 // The node and opts fields below mirror what the engine's compiler actually
@@ -3130,6 +3243,24 @@ export const ComposeInputSchema = z.object({
   audio: z.string().optional(),
   /** With audio: snap to an even tempo grid instead of raw onsets. */
   grid: z.boolean().optional(),
+  /**
+   * WHICH DESIGN LANGUAGE. Resolves the craft — gutter, margin, hue budget,
+   * type scale, alignment discipline — so those move together instead of being
+   * chosen one at a time. A default, not a handcuff: an explicit `craft` still
+   * wins. naive | playful | poster | editorial | technical.
+   */
+  register: z.string().optional().describe('Design register — naive, playful, poster, editorial, technical. Sets the craft; an explicit `craft` still overrides it.'),
+  level: z.number().int().min(1).max(4).optional().describe('Craft level 1-4 WITHIN the register (sketch, competent, refined, art-directed). Climbing never widens a budget — restraint is the direction of craft.'),
+  /**
+   * WHAT MAKES THE MARKS. Only media a whole composition can be rendered in
+   * are accepted: `vector` (what composing already produces) and `thread`
+   * (needlepainting, stitched after the arrangement). The rest are refused
+   * with the medium's own reason rather than composed as flat shapes in its
+   * colours.
+   */
+  medium: z.enum(['vector', 'thread']).optional().describe("Render the composition in a medium. 'thread' stitches every closed path; photographs and text CANNOT be stitched and come back in `medium.skipped` with the reason, so read that count — a composition can render completely and be entirely unstitched."),
+  stitch: z.enum(['longAndShort', 'satin', 'seed', 'stem']).optional().describe('Which stitch, when medium is thread. Default longAndShort.'),
+  stitchBudget: z.number().int().min(200).max(20000).optional().describe('Total marks across the composition (default 6000). The stitch is scaled to fit rather than the fill being truncated — a half-stitched shape looks broken, coarser thread does not.'),
 });
 export type ComposeInput = z.infer<typeof ComposeInputSchema>;
 

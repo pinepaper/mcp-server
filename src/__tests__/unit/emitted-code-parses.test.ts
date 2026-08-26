@@ -16,7 +16,16 @@
 
 import { describe, it, expect } from 'bun:test';
 import { PinePaperCodeGenerator } from '../../types/code-generator.js';
-import { RiggingInputSchema, DesignMediumInputSchema } from '../../types/schemas.js';
+import {
+  RiggingInputSchema,
+  DesignMediumInputSchema,
+  SequenceInputSchema,
+  StaggerInputSchema,
+  FlipInputSchema,
+  SceneGraphInputSchema,
+  QueryCapabilitiesInputSchema,
+  PlayTimelineInputSchema,
+} from '../../types/schemas.js';
 
 const G = new PinePaperCodeGenerator();
 
@@ -75,6 +84,72 @@ describe('emitted medium code is valid JavaScript', () => {
         const code = G.generateDesignMedium({ action, ...extra } as never);
         try { parses(code); } catch (e) { broken.push(`${action}: ${(e as Error).message}`); }
       }
+    }
+    expect(broken).toEqual([]);
+  });
+});
+
+/**
+ * The same guard over the newer emitters.
+ *
+ * Extended after a backtick inside a template literal broke two of these during
+ * development — twice, and `tsc --noEmit` reported nothing either time. A
+ * generator body IS a template literal, so every backtick and every `${` in a
+ * comment or a message is punctuation that becomes syntax.
+ */
+describe('emitted sequence / stagger / flip code is valid JavaScript', () => {
+  const cases: Array<[string, unknown, (a: never) => string]> = [
+    ['sequence', SequenceInputSchema, (a) => G.generateSequence(a)],
+    ['stagger', StaggerInputSchema, (a) => G.generateStagger(a)],
+    ['flip', FlipInputSchema, (a) => G.generateFlip(a)],
+    ['scene_graph', SceneGraphInputSchema, (a) => G.generateSceneGraph(a)],
+    ['capabilities', QueryCapabilitiesInputSchema, (a) => G.generateQueryCapabilities(a)],
+  ];
+
+  // Prose with punctuation in it, threaded through every string-shaped field.
+  const PROSE = "a clip's name — with `backticks`, a ${brace} and a \"quote\"";
+
+  it('parses for every action, with punctuation in every string', () => {
+    const broken: string[] = [];
+    for (const [name, schema, gen] of cases) {
+      for (const action of actionsOf(schema)) {
+        const args = {
+          action,
+          clips: [{ id: PROSE, duration: 2, label: PROSE, position: '-=25%' }],
+          position: '<25%',
+          labels: { intro: 1 },
+          itemIds: ['item_1', 'item_2'],
+          count: 4,
+          opts: { each: 0.1, from: 'center', grid: [2, 2] },
+          easing: PROSE,
+          enter: PROSE,
+          key: PROSE,
+          subject: PROSE,
+          mood: 'triumphant',
+          seed: PROSE,
+          graph: { nodes: [{ id: 'a', kind: 'end', text: PROSE }] },
+        };
+        try {
+          parses(gen(args as never));
+        } catch (e) {
+          broken.push(`${name}/${action}: ${(e as Error).message}`);
+        }
+      }
+    }
+    expect(broken).toEqual([]);
+  });
+});
+
+describe('emitted play_timeline code is valid JavaScript', () => {
+  it('parses for every action, including the new rate/progress/scroll ones', () => {
+    const broken: string[] = [];
+    for (const action of actionsOf(PlayTimelineInputSchema)) {
+      const code = G.generatePlayTimeline(action as never, 5, true, 2.5, true, {
+        rate: -0.5,
+        progress: 0.25,
+        scroll: { elementId: 'main', start: 'top bottom', end: 'bottom top', scrub: 0.3, range: [0, 4] },
+      });
+      try { parses(code); } catch (e) { broken.push(`${action}: ${(e as Error).message}`); }
     }
     expect(broken).toEqual([]);
   });

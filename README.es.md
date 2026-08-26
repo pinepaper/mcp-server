@@ -14,7 +14,7 @@
 
 El servidor MCP de PinePaper permite a los asistentes de IA crear y animar gráficos en [PinePaper Studio](https://pinepaper.studio) a través del Model Context Protocol. Funciona con cualquier IA que soporte llamadas a herramientas MCP (Claude, GPT, Gemini, modelos locales, etc.).
 
-Expone **140 herramientas**: dibujo, animación, diagramas, mapas, tipografía, física, edición de imágenes, visualización de datos y exportación:
+Expone **143 herramientas**: dibujo, animación, diagramas, mapas, tipografía, física, edición de imágenes, visualización de datos y exportación:
 
 - Crear texto, formas, geometría y gráficos complejos
 - Animar con **relaciones** declarativas en lugar de fotogramas clave
