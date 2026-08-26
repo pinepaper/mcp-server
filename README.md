@@ -243,7 +243,7 @@ The relation catalogue in the tool description now names families rather than al
 
 **`pinepaper_world3d` `add_object` forwards PBR material fields** — `metalness`, `roughness`, `emissiveIntensity`.
 
-Includes the 1.6.6 dependency-security work below (1.6.6 was tagged but never published to npm).
+Follows 1.6.6, whose dependency-security work is described below.
 
 ## What's new in 1.6.6
 
