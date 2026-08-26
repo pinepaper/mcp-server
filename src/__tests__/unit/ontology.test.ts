@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect } from 'bun:test';
+import { RelationTypeSchema } from '../../types/schemas.js';
 import {
   PP_VOCABULARY,
   ITEM_TYPE_MAP,
@@ -169,8 +170,16 @@ describe('Mapping Tables', () => {
     expect(Object.keys(ITEM_TYPE_MAP).length).toBe(29);
   });
 
-  it('RELATION_TYPE_MAP has 45 entries', () => {
-    expect(Object.keys(RELATION_TYPE_MAP).length).toBe(45);
+  it('RELATION_TYPE_MAP covers every callable relation', () => {
+    // Was a bare count of 45. A number tells you it changed, not whether it is
+    // RIGHT — and it was not: the map covered 45 of the engine's 134 while the
+    // tool enum offered 39, and nothing tied either to the other. The invariant
+    // that actually matters is pinned in relation-parity.test.ts; this asserts
+    // the map is a superset of what the surface accepts.
+    expect(Object.keys(RELATION_TYPE_MAP).length).toBeGreaterThanOrEqual(85);
+    for (const r of RelationTypeSchema.options) {
+      expect(RELATION_TYPE_MAP[r]).toBeTruthy();
+    }
   });
 
   // S12-E1 structural layout relations. These names and their pp: targets must

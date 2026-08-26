@@ -245,7 +245,20 @@ export type Keyframe = z.infer<typeof KeyframeSchema>;
 // RELATION TYPES
 // =============================================================================
 
+// The relation vocabulary the engine can actually run.
+//
+// Held in step with the engine by relation-parity.test.ts, against a fixture of
+// the registry's own map. This list is a hard gate: a name missing from it is
+// REJECTED at validation, so for 95 live relations the engine could do it and
+// no agent could name it — and for a model those are the same condition. The
+// whole interactive vocabulary sat on the wrong side of that line.
+//
+// Relations a dedicated tool emits (deform_*, effect_*, geo_*, bone_*, …) are
+// deliberately absent: the agent authors those THROUGH that tool, and a second
+// name here would be a worse way to do the same thing. The test file holds that
+// exclusion list, with the reason.
 export const RelationTypeSchema = z.enum([
+  // --- Motion, spatial and transform ---
   'orbits',
   'follows',
   'attached_to',
@@ -254,54 +267,87 @@ export const RelationTypeSchema = z.enum([
   'mirrors',
   'parallax',
   'bounds_to',
+  'anchored_in_world',
+  'spring_follow',
+  'repels',
+  'wiggle',
+  // --- Animation and sequencing ---
   'animates',
-  // Manim-inspired animation relations
   'grows_from',
   'staggered_with',
   'indicates',
   'circumscribes',
   'wave_through',
+  'morphs_to',
+  'group_morphs_to',
+  'moves_along_path',
+  'construction_reveal',
+  'triggers_animation',
+  'syncs_with',
+  'tours',
+  'synced_to_audio',
+  // --- Camera ---
   'camera_follows',
   'camera_animates',
-  'morphs_to',
-  // Pair-by-index group morph; same call shape works for any two paper.Groups
-  'group_morphs_to',
-  // Self-relation; item moves along a custom-drawn path stored in params
-  'moves_along_path',
-  // Geometric construction constraints (Layer 2) — the source is RE-DERIVED each
-  // frame from its anchor item(s), so dragging an anchor updates it live
-  // (GeoGebra-style). Anchor A is the relation target; extra anchors ride in params.
-  'is_midpoint_of',      // source = midpoint(target, params.other)
-  'lies_on_line',        // source on line target→params.other at fraction params.t
-  'is_centroid_of',      // source = centroid(target, ...params.others)
-  'is_circumcenter_of',  // source = circumcenter(target, params.other1, params.other2)
-  'concentric_with',     // source shares the target's center
-  'construction_reveal', // self-relation: opacity 0→1 at params.revealAt over params.fadeIn (timeline-driven)
-  // Procedural / deterministic property binding (Expression IR — FxTool S10 G1).
-  // params.signal:true routes through the pure, seed/frame-deterministic signal
-  // interpreter (replay-stable), else the per-frame compute fallback runs.
-  'driven_by',           // source property = target property * multiplier + offset (+clamp); drives color/stroke/opacity/scale/pos. Needs a target.
-  'time_expression',     // self-relation: source property driven by a math expression f(t, v) — t=time, v=params.baseValue
-  // Event-driven scene chains (FxTool S11). The source is a pp:event (make one
-  // with pinepaper_event); firing it runs these reactions. on_event_fire_after
-  // chains events over canvas/wall time; on_event_add_relation mutates the graph
-  // (the scene evolves itself). Kick a chain off with pinepaper_event pulse.
-  'on_event_fire_after',   // event→event: when source fires, pulse target after params.delay (timeline: wall|canvas)
-  'on_event_add_relation', // event→item: add params.type relation from item to params.target when the event fires
-  'on_event_remove_relation', // event→item: remove params.type relation from item to params.target
-  'on_event_set_color',    // event→item: set fill/stroke to params.color
-  'on_event_set_property', // event→item: set item[params.property] = params.value
-  'on_event_set_visibility', // event→item: show/hide (params.visible, default true)
-  // Structural layout relations (FxTool S12-E1) — STATIC composition as graph edges.
-  // Placement is derived from the TARGET'S BOUNDS and re-derived each frame, so
-  // dragging or resizing the target moves the dependent live. Use these instead of
-  // hardcoding x/y when the intent is "on", "under", "next to", "inside".
-  'on_top_of',    // source bottom edge rests on target top edge (params: gap, align, overhang)
-  'below',        // source top edge rests on target bottom edge (params: gap, align, overhang)
-  'beside',       // source flanks the target left/right (params: side, gap, align)
-  'inside',       // source anchored inside the target's bounds (params: anchor, padding)
-  'centered_on',  // source center = target center + (offsetX, offsetY)
-  'aligned_with', // source matches target on ONE axis only — the other stays free (params: axis, offset)
+  // --- Geometry ---
+  'is_midpoint_of',
+  'lies_on_line',
+  'is_centroid_of',
+  'is_circumcenter_of',
+  'concentric_with',
+  // --- Procedural / expression ---
+  'driven_by',
+  'time_expression',
+  // --- Input triggers — a user action FIRES an event channel ---
+  'on_click_fire',
+  'on_pointer_enter_fire',
+  'on_pointer_exit_fire',
+  'on_key_fire',
+  // --- Event reactions — an event fires and something happens ---
+  'on_event_fire_after',
+  'on_event_fire_if',
+  'on_event_add_relation',
+  'on_event_remove_relation',
+  'on_event_set_color',
+  'on_event_set_property',
+  'on_event_set_property_from_template',
+  'on_event_set_visibility',
+  'on_event_set_active',
+  'on_event_set_data',
+  'on_event_increment',
+  'on_event_toggle',
+  'on_event_store_set',
+  'on_event_store_increment',
+  // --- Proximity — the pointer entering or leaving an item ---
+  'on_enter_set_color',
+  'on_enter_set_property',
+  'on_enter_set_property_from_template',
+  'on_enter_set_visibility',
+  'on_enter_set_data',
+  'on_enter_increment',
+  'on_enter_toggle',
+  'on_exit_set_color',
+  'on_exit_set_property',
+  'on_exit_set_property_from_template',
+  'on_exit_set_visibility',
+  'on_exit_set_data',
+  'on_exit_increment',
+  'on_exit_toggle',
+  // --- Exclusive state — at most one member active ---
+  'exclusive_group',
+  'menubar_group',
+  'restores_from',
+  // --- Structural and diagram ---
+  'on_top_of',
+  'below',
+  'beside',
+  'inside',
+  'centered_on',
+  'aligned_with',
+  'part_of',
+  'connects_to',
+  'attached_to_tail',
+  'head_points_to',
 ]).describe('Type of relationship between items');
 
 export type RelationType = z.infer<typeof RelationTypeSchema>;

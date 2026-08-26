@@ -205,6 +205,55 @@ export const PP_VOCABULARY: PinePaperVocabulary = {
     'pp:constructionReveal':{ category: 'construction', behaviorType: 'procedural', description: 'Self-relation: opacity 0→1 starting at params.revealAt over params.fadeIn seconds, driven by the timeline (loop/scrub correct).', mathFunctions: ['timedFade'], parentType: 'pp:ProceduralRelation', mcpToolRef: 'pinepaper_add_relation' },
     // Escape hatch
     'pp:unknownRelation':   { category: 'unknown', behaviorType: null, description: 'Relation type not expressible in current vocabulary.', parentType: 'pp:Relation' },
+  
+    // These three are mapped in the engine but carry NO edge there — the other
+    // direction of the same bug, and the reason FxTool's own reference once
+    // listed 73 relations against a map of 80. Written from what each rule
+    // actually does, read out of the registry rather than invented.
+    'pp:onKeyFire': { description: "A keydown on the source item pulses the target event, when the item has focus or the relation is marked global. The keyboard sibling of pp:onClickFire — { key: 'Enter' } makes Enter activate a button exactly as a click would, which is what WCAG keyboard-operability asks for and what the tablist matcher uses to give any detected tablist arrow-key navigation.", category: 'event', directionality: 'item → event', parentType: 'pp:Relation' },
+    'pp:onEventSetPropertyFromTemplate': { description: 'On the event, set a property to a value built from a TEMPLATE rather than a literal — so the written value can quote graph state (a score, a stored datum) instead of being fixed when the relation was authored. The difference between "set the label to 3" and "set the label to whatever the score now is".', category: 'event', directionality: 'event → item', parentType: 'pp:Relation' },
+    'pp:partOf': { description: 'Semantic membership with a named role (eye_left, mouth, any custom string), following the parent position with an offset that is computed from where things currently are if not given. structural: true records the membership WITHOUT driving position — the right choice when the parent is already a group that transforms its children, since driving it as well would fight the group.', category: 'structural', directionality: 'part → whole', parentType: 'pp:Relation' },
+
+    // Added 2026-08-26 — the interactive vocabulary. Each of these is a relation
+    // the tool surface now accepts; without the edge the validator resolves the
+    // name to nothing and drops the row, which is how FxTool's own reference came
+    // to list 73 relations against a map of 80. Descriptions are the engine's.
+    'pp:anchoredInWorld': { description: 'A 2D item tracks a point in a 3D world (pp:World3D), projected onto the canvas — labels, markers and callouts that follow a character or a place as the camera moves. Use to caption, annotate or attach UI to 3D content.', category: 'spatial', directionality: 'self-relation: source follows a world coordinate', parentType: 'pp:Relation' },
+    'pp:springFollow': { description: 'Source follows target with spring dynamics — it lags behind, overshoots and settles rather than tracking rigidly. Params: stiffness (0-1), damping (0-1, higher settles sooner), mass, maxDisplacement in pixels. Use for secondary motion: hair, tails, cloth, anything that should feel attached rather than welded.', category: 'animation', directionality: 'source → target', parentType: 'pp:Relation' },
+    'pp:repels': { description: 'The source moves away from the target when it comes within a repulsion radius, and eases back to where it was when the target leaves. Params: force, maxDistance, minDistance, returnSpeed. Use for crowd avoidance and for things that should react to a cursor without being dragged by it.', category: 'physics', directionality: 'source → target', parentType: 'pp:Relation' },
+    'pp:triggersAnimation': { description: 'Source starts the target\'s animation when a condition is met — on complete, on start, at a time, or on each loop, with an optional delay. The declarative form of "and then": it puts sequencing in the graph instead of in a callback nobody can query.', category: 'animation', directionality: 'source → target', parentType: 'pp:Relation' },
+    'pp:syncsWith': { description: 'The source\'s animation runs on the target\'s timeline, with a time offset and a speed ratio. What makes two items share a clock rather than merely start together — they stay in step even when the target\'s timing changes.', category: 'animation', directionality: 'source → target', parentType: 'pp:Relation' },
+    'pp:tours': { description: 'The item visits a route of waypoints — dwelling at each, moving between them, optionally turning to face the direction of travel. The canvas-general form; pp:geoTours is its globe-aware counterpart.', category: 'animation', directionality: 'source → route', parentType: 'pp:Relation' },
+    'pp:syncedToAudio': { description: 'ANNOTATION: this composition is timed to an audio track, carrying the source asset, the detected bpm and the onset times in seconds. The beats live on the EDGE so they survive save/restore and can be queried, rather than in a local variable.', category: 'annotation', directionality: 'self-relation: annotates the item', parentType: 'pp:Relation' },
+    'pp:onClickFire': { description: 'Source item pulses target pp:Event on click. The producer half of the event channel: it names a pp:Event rather than doing anything itself, so any number of reactions can listen to one click without the click knowing about them.', category: 'event', directionality: 'click on source → fire target event', parentType: 'pp:Relation' },
+    'pp:onPointerEnterFire': { description: 'Source pulses target pp:Event when pointer enters its bounds.', category: 'event', directionality: 'pointer enter on source → fire target event', parentType: 'pp:Relation' },
+    'pp:onPointerExitFire': { description: 'Source pulses target pp:Event when pointer leaves its bounds.', category: 'event', directionality: 'pointer leave on source → fire target event', parentType: 'pp:Relation' },
+    'pp:onEventFireIf': { description: 'On a pp:Event pulse, fire another event only if a predicate holds. The one reaction in the family that TESTS graph state instead of mutating it — its predicate is an ExpressionIR program, so the condition is data the graph can carry, not a closure it cannot.', category: 'event', directionality: 'event → event', parentType: 'pp:Relation' },
+    'pp:onEventSetActive': { description: 'On pp:Event pulse, activate target in its exclusive_group (clears siblings).', category: 'event', directionality: 'event source → setActive on target (mutex)', parentType: 'pp:Relation' },
+    'pp:onEventSetData': { description: 'On pp:Event pulse, set target.data[property] = value. Writes to the item\'s data rather than its appearance — how a scene keeps state (a score, a mode, a flag) that other relations can then read.', category: 'event', directionality: 'event source → write item.data field on target', parentType: 'pp:Relation' },
+    'pp:onEventIncrement': { description: 'On pp:Event pulse, increment target.data[property] by N. Counters and steppers. Increment rather than set, so several sources can advance the same value without knowing its current one.', category: 'event', directionality: 'event source → numeric increment on target.data field', parentType: 'pp:Relation' },
+    'pp:onEventToggle': { description: 'On pp:Event pulse, flip target.visible or target.data[property].', category: 'event', directionality: 'event source → boolean flip on target', parentType: 'pp:Relation' },
+    'pp:onEventStoreSet': { description: 'On a pp:Event pulse, write `key = value` into a pp:Store. The persistent counterpart of pp:onEventSetData, which only reaches item.data and dies with the page.', category: 'event', directionality: 'event → store', parentType: 'pp:Relation' },
+    'pp:onEventStoreIncrement': { description: 'On a pp:Event pulse, add N to a stored numeric key, creating it at 0 if absent. Increment rather than set, so several sources can advance one score without any of them knowing its current value.', category: 'event', directionality: 'event → store', parentType: 'pp:Relation' },
+    'pp:onEnterSetColor': { description: 'When the pointer ENTERS the item, sets a colour on the target. Edge-triggered, so it fires once on the transition rather than every frame the pointer is inside — which is the difference between a hover state and a runaway counter.', category: 'event', directionality: 'source → target', parentType: 'pp:Relation' },
+    'pp:onEnterSetProperty': { description: 'When source becomes the active member of its exclusive_group, set target.[property] = value.', category: 'event', directionality: 'source activates → write item.property on target', parentType: 'pp:Relation' },
+    'pp:onEnterSetPropertyFromTemplate': { description: 'When the pointer ENTERS the item, sets a property from a template string, interpolating stored values into it on the target. Edge-triggered, so it fires once on the transition rather than every frame the pointer is inside — which is the difference between a hover state and a runaway counter.', category: 'event', directionality: 'source → target', parentType: 'pp:Relation' },
+    'pp:onEnterSetVisibility': { description: 'When source activates in its group, set target.visible. The enter half of a mutex: it fires when the source BECOMES active in its exclusive group, which is what makes a tab reveal its own panel without every tab knowing about every panel.', category: 'event', directionality: 'source activates → write item.visible on target', parentType: 'pp:Relation' },
+    'pp:onEnterSetData': { description: 'When the pointer ENTERS the item, writes a key into item.data on the target. Edge-triggered, so it fires once on the transition rather than every frame the pointer is inside — which is the difference between a hover state and a runaway counter.', category: 'event', directionality: 'source → target', parentType: 'pp:Relation' },
+    'pp:onEnterIncrement': { description: 'When the pointer ENTERS the item, adds N to a numeric property on the target. Edge-triggered, so it fires once on the transition rather than every frame the pointer is inside — which is the difference between a hover state and a runaway counter.', category: 'event', directionality: 'source → target', parentType: 'pp:Relation' },
+    'pp:onEnterToggle': { description: 'When the pointer ENTERS the item, flips a boolean property on the target. Edge-triggered, so it fires once on the transition rather than every frame the pointer is inside — which is the difference between a hover state and a runaway counter.', category: 'event', directionality: 'source → target', parentType: 'pp:Relation' },
+    'pp:onExitSetColor': { description: 'When the pointer LEAVES it, sets a colour on the target. Edge-triggered, so it fires once on the transition rather than every frame the pointer is inside — which is the difference between a hover state and a runaway counter.', category: 'event', directionality: 'source → target', parentType: 'pp:Relation' },
+    'pp:onExitSetProperty': { description: 'When source stops being the active member of its exclusive_group, set target.[property] = value.', category: 'event', directionality: 'source deactivates → write item.property on target', parentType: 'pp:Relation' },
+    'pp:onExitSetPropertyFromTemplate': { description: 'When the pointer LEAVES it, sets a property from a template string, interpolating stored values into it on the target. Edge-triggered, so it fires once on the transition rather than every frame the pointer is inside — which is the difference between a hover state and a runaway counter.', category: 'event', directionality: 'source → target', parentType: 'pp:Relation' },
+    'pp:onExitSetVisibility': { description: 'When source deactivates in its group, set target.visible. The exit half, firing as the source LOSES active status — what hides the outgoing panel. Without it a tab set reveals panels and never hides them.', category: 'event', directionality: 'source deactivates → write item.visible on target', parentType: 'pp:Relation' },
+    'pp:onExitSetData': { description: 'When the pointer LEAVES it, writes a key into item.data on the target. Edge-triggered, so it fires once on the transition rather than every frame the pointer is inside — which is the difference between a hover state and a runaway counter.', category: 'event', directionality: 'source → target', parentType: 'pp:Relation' },
+    'pp:onExitIncrement': { description: 'When the pointer LEAVES it, adds N to a numeric property on the target. Edge-triggered, so it fires once on the transition rather than every frame the pointer is inside — which is the difference between a hover state and a runaway counter.', category: 'event', directionality: 'source → target', parentType: 'pp:Relation' },
+    'pp:onExitToggle': { description: 'When the pointer LEAVES it, flips a boolean property on the target. Edge-triggered, so it fires once on the transition rather than every frame the pointer is inside — which is the difference between a hover state and a runaway counter.', category: 'event', directionality: 'source → target', parentType: 'pp:Relation' },
+    'pp:exclusiveGroup': { description: 'Two items belong to the same exclusive group — at most one is active at a time. Activating one via setActive() deactivates siblings and pulses :enter/:exit events.', category: 'event', directionality: 'mutex co-membership', parentType: 'pp:Relation' },
+    'pp:menubarGroup': { description: 'Two items share a menubar group — together they form a horizontal action bar (toolbar / app menu). The A11yShadowTree matcher promotes to role="menubar" + menuitem with horizontal arrow-key nav. Unlike exclusive_group, no item is "active"; clicking a menuitem fires its own on_click_fire reactions.', category: 'event', directionality: 'group co-membership', parentType: 'pp:Relation' },
+    'pp:restoresFrom': { description: 'At LOAD, once, before the first frame, set a property on this item from a stored key — with a fallback when the key is absent. The read half of persistence: without it a store is write-only and continuity across sessions, the entire point, does not exist.', category: 'event', directionality: 'item → store', parentType: 'pp:Relation' },
+    'pp:attachedToTail': { description: 'A diagram port is bound to an arrow\'s TAIL, so the connector\'s start follows the item as it moves. Half of what makes a flowchart survive being rearranged.', category: 'structural', directionality: 'port → arrow', parentType: 'pp:Relation' },
+    'pp:headPointsTo': { description: 'An arrow\'s HEAD is bound to a diagram port, so the connector\'s end follows the item. The counterpart of pp:attachedToTail; together they are why a connector stays connected.', category: 'structural', directionality: 'arrow → port', parentType: 'pp:Relation' },
   },
 
   // --- Mathematical Functions Catalogue ---
@@ -531,6 +580,50 @@ export const RELATION_TYPE_MAP: Record<string, string> = {
   'blend_reacts_to':    'pp:blendReactsTo',
   'blend_transition':   'pp:blendTransition',
   'unknown':            'pp:unknownRelation',
+
+  // Added 2026-08-26 — every one of these is a relation the tool surface now
+  // accepts. The map gates isKnownRelationType(), so a name callable but
+  // unmapped makes the validator report a valid scene as an unknown relation.
+  'anchored_in_world':     'pp:anchoredInWorld',
+  'attached_to_tail':      'pp:attachedToTail',
+  'connects_to':           'pp:connectsTo',
+  'exclusive_group':       'pp:exclusiveGroup',
+  'head_points_to':        'pp:headPointsTo',
+  'menubar_group':         'pp:menubarGroup',
+  'on_click_fire':         'pp:onClickFire',
+  'on_enter_increment':    'pp:onEnterIncrement',
+  'on_enter_set_color':    'pp:onEnterSetColor',
+  'on_enter_set_data':     'pp:onEnterSetData',
+  'on_enter_set_property': 'pp:onEnterSetProperty',
+  'on_enter_set_property_from_template': 'pp:onEnterSetPropertyFromTemplate',
+  'on_enter_set_visibility': 'pp:onEnterSetVisibility',
+  'on_enter_toggle':       'pp:onEnterToggle',
+  'on_event_fire_if':      'pp:onEventFireIf',
+  'on_event_increment':    'pp:onEventIncrement',
+  'on_event_set_active':   'pp:onEventSetActive',
+  'on_event_set_data':     'pp:onEventSetData',
+  'on_event_set_property_from_template': 'pp:onEventSetPropertyFromTemplate',
+  'on_event_store_increment': 'pp:onEventStoreIncrement',
+  'on_event_store_set':    'pp:onEventStoreSet',
+  'on_event_toggle':       'pp:onEventToggle',
+  'on_exit_increment':     'pp:onExitIncrement',
+  'on_exit_set_color':     'pp:onExitSetColor',
+  'on_exit_set_data':      'pp:onExitSetData',
+  'on_exit_set_property':  'pp:onExitSetProperty',
+  'on_exit_set_property_from_template': 'pp:onExitSetPropertyFromTemplate',
+  'on_exit_set_visibility': 'pp:onExitSetVisibility',
+  'on_exit_toggle':        'pp:onExitToggle',
+  'on_key_fire':           'pp:onKeyFire',
+  'on_pointer_enter_fire': 'pp:onPointerEnterFire',
+  'on_pointer_exit_fire':  'pp:onPointerExitFire',
+  'part_of':               'pp:partOf',
+  'repels':                'pp:repels',
+  'restores_from':         'pp:restoresFrom',
+  'spring_follow':         'pp:springFollow',
+  'synced_to_audio':       'pp:syncedToAudio',
+  'syncs_with':            'pp:syncsWith',
+  'tours':                 'pp:tours',
+  'triggers_animation':    'pp:triggersAnimation',
 };
 
 /** Known easing names that map to math function keys. */

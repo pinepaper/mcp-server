@@ -62,6 +62,8 @@ run it locally, run it locally — you lose nothing by doing so.
 
 ## Made with tool calls
 
+<p align="center"><img src="assets/hero.svg" width="720" alt="Animated vector graphics, made by tool calls — a tool call on the left runs and becomes a curve drawing itself on the right, composed with PinePaper Studio"></p>
+
 Every graphic below is an animated SVG produced through this server's tool surface — the arguments shown with each result are what an AI agent passes to the named tool. They aren't shell commands; **[Run these yourself](#run-these-yourself)** below shows the three ways to execute them.
 
 <!-- Stacked (image then code) rather than a two-column table so the SVGs render on
@@ -184,6 +186,17 @@ The same code an agent generates is the code you can paste — the canvas is you
 - The planner is pure and emits **keyframes**, so the result is ordinary animated items: it scrubs on the timeline, survives undo and session restore, and exports through the existing MP4 / SMIL / Lottie paths. Every effect ends at rest.
 - **It replaces the text item.** Unlike `pinepaper_text_style` (which adopts the text's registry id), this removes the original and returns the new per-character ids — so relations and keyframes on the source id do not survive. `keepSource: true` is the escape hatch. The tool is marked `destructiveHint` and says so in its description, because it inverts the id-preservation convention every neighbouring tool follows.
 - Resting characters are painted with a gradient across the text block by default (what the upstream effects actually do); `gradient: false` keeps the authored fill. `seed` defaults to 1, so a given text + effect + seed animates identically every run.
+
+**95 live relations were not callable.** `pinepaper_add_relation` offered 39 of the engine's 134, and the enum is a hard gate — a name missing from it is rejected at validation. The missing set was not a random 95: it was essentially the entire **interactive** vocabulary, every event-channel relation included, so the state-machine-via-relations capability was undiscoverable and unusable. `pinepaper_scene_graph` was emitting `on_click_fire` and `on_event_set_active` relations that an agent could not then create, inspect or recreate by hand.
+
+Nothing was broken at runtime, which is why it survived: the engine could do it and nothing could *name* it. For a model those are the same condition.
+
+- **41 relations are now callable** — the input triggers (`on_click_fire`, `on_pointer_enter_fire`, `on_pointer_exit_fire`, `on_key_fire`), the full `on_event_*` reaction set including template-interpolated property writes and the persistent-store pair, the `on_enter_*`/`on_exit_*` proximity families, `exclusive_group` / `menubar_group`, and the behavioural relations `repels`, `wiggle`, `spring_follow`, `syncs_with`, `triggers_animation`, `connects_to`, `part_of`, `attached_to_tail`, `head_points_to`, `anchored_in_world`, `tours`, `synced_to_audio`.
+- **Relations a dedicated tool emits stay out** — `deform_*`, `effect_*`, `geo_*`, `bone_*` and friends. The agent authors those *through* that tool, and a second name here would be a worse way to do the same thing. That exclusion list is written down with its reason, so the next engine diff doesn't re-litigate all 95.
+- **The map behind the validator was the same bug one layer down.** `RELATION_TYPE_MAP` gates "is this a known relation", so a relation callable but unmapped makes the validator report a perfectly valid scene as using an unknown one. 40 entries and 42 `pp:` edge definitions were backfilled from the engine's own descriptions.
+- **The real fix is the parity test.** The enum is duplicated across five tool schemas plus the zod schema, and nothing checked any copy against the engine or against each other. It's now pinned to a fixture of the engine's registry map, asserting in both directions — nothing offered that the engine cannot run, nothing runnable that the surface hides — and that all six copies agree. The additions are just this week's payload.
+
+The relation catalogue in the tool description now names families rather than all 80 members, and points at `pinepaper_query_capabilities { kind: 'relation' }` for the live list, which reads the registry instead of a list written down in prose.
 
 **Hatching reaches the tool surface** — `pinepaper_design_medium` gains `apply_hatch`, `list_flow_fields` and `list_hatch_options`. PinePaper could fill and it could stitch, and it could not hatch; the gap was already named in the thread-painting code, which notes that a constant stitch field "looks like hatching, which is a different medium."
 
