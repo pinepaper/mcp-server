@@ -181,6 +181,17 @@ The same code an agent generates is the code you can paste — the canvas is you
 
 ## What's new in 1.6.7
 
+**New tool: `pinepaper_import_motion_capture`** — BVH import and retarget. The engine has had `importBVH`/`retargetBVH` for releases and nothing exposed them; a model cannot use a capability no tool call reaches.
+
+- `mode: 'import'` builds a new skeleton shaped like the capture file. `mode: 'retarget'` drives an **existing** rig, so proportions stay the character's and only the motion comes from the clip — that distinction is the reason the tool exists.
+- Angles transfer as bind-pose deltas, so a T-posed CMU rest is not slammed onto a rig with a relaxed stance. Bones the alias table cannot place come back as `unmatchedSource`/`unmatchedTarget` instead of silently driving half a rig, so a caller can build `boneMap` from the failure. `fps` defaults to 15 — CMU records at 120, and nobody wants 120 poses a second on a canvas timeline.
+
+**`pinepaper_rigging` gains the pose-motion half — 18 actions.** The engine had 26 pose methods; the tool exposed two. The pose library (`list_poses`, `load_pose`, `interpolate_poses`, `list_skeletons`), playback (`play_pose_sequence`, `stop_pose_sequence`, `apply_pose_transition`), procedural layers (`auto_walk`, `auto_breath`, `auto_idle`, `auto_jump`), root locomotion (`move_root`, `stop_root_track`), and the export/deform edges (`bake_animation`, `add_secondary_motion`, `skin_path`, `list_shape_keys`, `load_shape_key`). Each was checked against the engine source rather than its docs, which name tools that were never registered.
+
+- **New capability: `stitch_poses`** — join clips into one continuous performance, entering a cyclic clip at the phase closest to where the previous one ended so the legs do not teleport mid-stride.
+
+**New tool: `pinepaper_design_medium`** — the third design axis: what physically makes the marks. Every medium declares a *fidelity*, and `resolve` refuses the ones it cannot honestly render rather than producing flat shapes in their colours. `apply_thread` renders an item as needlepainting; the direction field is what separates that from hatching.
+
 **New tool: `pinepaper_text_effect`** — 37 character-level text animations (terminaltexteffects' vocabulary, reimplemented in the engine from source). `list` returns the effects; `apply` explodes a text item into one animated item per character.
 
 - The planner is pure and emits **keyframes**, so the result is ordinary animated items: it scrubs on the timeline, survives undo and session restore, and exports through the existing MP4 / SMIL / Lottie paths. Every effect ends at rest.
@@ -231,7 +242,7 @@ The relation catalogue in the tool description now names families rather than al
 
 **`orbits` gains `phaseDegrees`.** `phase` was the single parameter in the whole relation vocabulary measured in radians, against this engine's own stated convention that angles are degrees. `phaseDegrees` now takes precedence; `phase` is kept, and documented as the exception, because changing it outright would silently re-time every scene that already sets it — a 57× error of exactly the kind the convention exists to prevent.
 
-**`pinepaper_design_medium` was served but unlisted.** It had been missing from `manifest.json`'s tool list since it shipped. Caught by the prepublish guard while regenerating the manifest for the tools above.
+**`pinepaper_design_medium` was served but unlisted.** It had been missing from `manifest.json`'s tool list since it shipped — introduced above, but invisible to the marketplace listing. Caught by the prepublish guard while regenerating the manifest for the tools above.
 
 **New tool: `pinepaper_scene_graph`** — compiles an interactive story or quiz into native items and relations: cards, answer buttons, click→event routing, exclusive-group mutex visibility, and score tracking.
 
@@ -253,6 +264,8 @@ The relation catalogue in the tool description now names families rather than al
 **`pinepaper_world3d` `add_object` forwards PBR material fields** — `metalness`, `roughness`, `emissiveIntensity`.
 
 Follows 1.6.6, whose dependency-security work is described below.
+
+**Engine requirement.** Several capabilities this server has always emitted correct calls for did nothing until recent FxTool builds: **physics** (the step callback was never registered, so nothing moved), scene-wide **GPU filters** on the WebGPU tier, **map region colour animation** (which reported success while animating nothing), and `modify_item`'s `pathData`. No change was needed here — the calls were right — but run an FxTool from 2026-08-29 or later to get them.
 
 ## What's new in 1.6.6
 
