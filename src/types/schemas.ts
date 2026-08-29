@@ -3825,7 +3825,7 @@ export type TextStyleInput = z.infer<typeof TextStyleInputSchema>;
 export const DesignMediumInputSchema = z.object({
   action: z.enum(['list_media', 'resolve', 'list_stitches', 'apply_thread', 'apply_hatch', 'list_flow_fields', 'list_hatch_options'])
     .describe("'list_media' (7 media with fidelity + limitation) · 'resolve' (can this medium be made here, and how honestly) · 'list_stitches' · 'apply_thread' (render an item in thread) · 'apply_hatch' (rule an item with hatching — value through line density) · 'list_flow_fields' · 'list_hatch_options'"),
-  medium: z.string().optional().describe("resolve: medium key — vector, thread, ink, cutPaper, charcoal, oil, encaustic."),
+  medium: z.string().optional().describe("resolve: medium key — vector, thread, hatch, watercolor, ink, cutPaper, charcoal, oil, encaustic. Call list_media for the live set with each one's fidelity; the catalogue grows."),
   itemId: z.string().optional().describe('apply_thread / apply_hatch: a closed path, compound path, or a group of them. Its own silhouette is the region and its fill is the ink colour.'),
   stitch: z.enum(['longAndShort', 'satin', 'seed', 'stem']).optional()
     .describe("apply_thread: default longAndShort (the needlepainting fill). 'satin' spans the shape edge to edge — right for a narrow shape, wrong for a round one. 'seed' is texture. 'stem' is an outline mark and leaves the interior bare."),

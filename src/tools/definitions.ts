@@ -1934,7 +1934,7 @@ READ THIS BEFORE PROMISING A MEDIUM. Naming a medium does not create its marks. 
 Call resolve before telling a user you will render in a medium. "yes, but as an impression" is the true answer for half of them, and a flat approximation misrepresents a medium rather than approximating it.
 
 ACTIONS:
-- list_media: all 7 with fidelity, definition and limitation.
+- list_media: every medium with fidelity, definition and limitation. Read it rather than assuming a fixed set — the catalogue grows (hatch and watercolor are recent additions).
 - resolve: { medium } → { ok, fidelity, reason, markMaker }. ok:false with a reason is a real answer — pass it on rather than trying anyway.
 - list_stitches: the 4 thread stitches with their params.
 - apply_thread: render an item in thread. Its own silhouette is the region and its own fill is the thread colour, so an existing drawing becomes stitched rather than needing to be redrawn. The source is HIDDEN, not destroyed.
