@@ -529,6 +529,7 @@ MODIFIABLE PROPERTIES:
 - shadowBlur: Shadow blur radius
 - shadowOffset: Shadow offset [x, y]
 - blendMode: Blend mode (normal, multiply, screen, overlay, etc.)
+- pathData: SVG path data — RESHAPE the geometry itself, not just its styling. This is how you straighten a hand-drawn box or correct a traced outline without deleting and recreating the item, which would lose its id and every relation and keyframe pointing at it. Requires an FxTool build from 2026-08 or later: before that the property was silently dropped while the same call applied the fill and stroke and reported success.
 
 GRADIENT OBJECT FORMAT:
 {type: "linear"|"radial", stops: [{color: "#fff", offset: 0}, {color: "#000", offset: 1}], origin: [x,y], destination: [x,y]}

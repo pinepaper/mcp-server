@@ -1246,6 +1246,39 @@ const grid = app.createGrid({
 // CODE GENERATOR CLASS
 // =============================================================================
 
+/**
+ * Agent PLATFORM name → the engine's canvas-preset key.
+ *
+ * AgentPlatformSchema is an export-target vocabulary ('instagram', 'youtube')
+ * that was also being handed straight to app.setCanvasSize(), which keys on
+ * 'instagram-post' and 'full-hd-1080p'. Seven of the ten names matched nothing:
+ * the engine fell through to its default and resized the artboard to 800x600
+ * while recording the preset as applied, so an agent asking for an Instagram
+ * canvas silently got neither the size nor an error. (FxTool 496d3910 now
+ * refuses an unknown key instead — better, but it warns to a console the
+ * production build strips, so the agent still learns nothing.)
+ *
+ * Mapping rather than renaming: 'instagram' is the right word for an export
+ * TARGET and a poor one for a canvas SIZE, and only the second use was wrong.
+ */
+const PLATFORM_TO_CANVAS_PRESET: Record<string, string> = {
+  instagram: 'instagram-post',       // 1080x1080
+  'instagram-story': 'instagram-story',
+  tiktok: 'tiktok',
+  youtube: 'full-hd-1080p',          // the video frame, 1920x1080
+  'youtube-thumbnail': 'youtube-thumbnail',
+  twitter: 'twitter-post',
+  linkedin: 'linkedin-post',
+  web: 'hd-720p',                    // 1280x720
+  'print-a4': 'a4-portrait',
+  'print-letter': 'letter-portrait',
+};
+
+/** The engine key for a platform, falling back to the value itself. */
+export function canvasPresetFor(platform: string): string {
+  return PLATFORM_TO_CANVAS_PRESET[platform] || platform;
+}
+
 export class PinePaperCodeGenerator {
   /**
    * Generate code for creating an item
@@ -2382,8 +2415,8 @@ throw new Error('Unknown diagram mode action: ${action}');
 
     if (canvasPreset) {
       code += `
-  // Set canvas size to preset
-  app.setCanvasSize('${canvasPreset}');
+  // Set canvas size to preset (platform name → engine preset key)
+  app.setCanvasSize('${canvasPresetFor(canvasPreset)}');
   // Allow canvas resize to take effect
   await new Promise(r => setTimeout(r, 50));
 `;
@@ -2602,8 +2635,8 @@ throw new Error('Unknown diagram mode action: ${action}');
 
     if (canvasPreset) {
       code += `
-  // Set canvas to preset
-  app.setCanvasSize('${canvasPreset}');
+  // Set canvas to preset (platform name → engine preset key)
+  app.setCanvasSize('${canvasPresetFor(canvasPreset)}');
   // Allow canvas resize to take effect
   await new Promise(r => setTimeout(r, 50));
 `;
