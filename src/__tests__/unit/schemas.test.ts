@@ -312,8 +312,13 @@ describe('Schema Validation', () => {
   });
 
   describe('SimpleAnimationTypeSchema', () => {
+    // Was ['pulse','rotate','bounce','fade','wobble','slide','typewriter'] — and
+    // it asserted that 'slide' PARSES, which it did. The engine has no such type:
+    // it stored the value and the driver ignored it, so this test was pinning the
+    // bug in place. The live list is pinned against the engine in
+    // animation-type-parity.test.ts.
     const validTypes = [
-      'pulse', 'rotate', 'bounce', 'fade', 'wobble', 'slide', 'typewriter',
+      'pulse', 'rotate', 'bounce', 'fade', 'wobble', 'slideLeftRight', 'typewriter',
     ];
 
     it.each(validTypes)('should validate %s as valid animation type', (type) => {

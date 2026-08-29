@@ -108,7 +108,7 @@ Photos / raster images (on-device, no upload):
 
 ─── ANIMATION (all in batch) ───
 
-Loop presets (animate): pulse, rotate, bounce, fade, wobble, slide, typewriter
+Loop presets (animate): bounce, breathe, fade, glow, jelly, path, pulse, rotate, scrollDown, scrollLeft, scrollRight, scrollUp, shake, slideLeftRight, slideUpDown, swing, typewriter, wobble
 Keyframe (keyframe_animate): [{time, properties, easing}] → opacity, scale, scaleX, scaleY, x, y, rotation, fillColor, strokeColor, fontSize
 Relations (relation): orbits, follows, attached_to, points_at, mirrors, parallax, wave_through, morphs_to, group_morphs_to, moves_along_path, is_midpoint_of, is_circumcenter_of, construction_reveal (+ geometric constraints & more in batch_execute schema)
 Masks (apply_mask): wipeLeft, wipeRight, wipeUp, wipeDown, iris, irisOut, star, heart, curtainHorizontal, curtainVertical, cinematic, diagonalWipe, revealUp, revealDown
@@ -462,7 +462,7 @@ For glossy 3D spheres, use pinepaper_create_glossy_sphere instead. For diagonal 
         },
         animationType: {
           type: 'string',
-          description: "Animation type to apply on creation (e.g., 'pulse', 'bounce', 'rotate', 'fade', 'wobble', 'slide', 'typewriter', 'keyframe')",
+          description: "Animation type to apply on creation (e.g., 'pulse', 'bounce', 'rotate', 'fade', 'slideLeftRight', 'scrollUp', 'typewriter', 'keyframe'). NOT 'slide' — that has never existed; the driver silently does nothing with an unknown type.",
         },
         animationSpeed: {
           type: 'number',
@@ -2795,7 +2795,8 @@ USE WHEN:
 - "bouncing text" → animationType: bounce
 - "fading effect" → animationType: fade
 - "wobbling button" → animationType: wobble
-- "sliding header" → animationType: slide
+- "sliding header" → animationType: slideLeftRight (or slideUpDown)
+- "scrolling banner" → animationType: scrollLeft (also scrollRight/Up/Down)
 - "typewriter effect" → animationType: typewriter (text only)
 
 DO NOT USE WHEN:
@@ -2803,21 +2804,30 @@ DO NOT USE WHEN:
 - User wants sequential animations ("first fade, then rotate") → Use keyframe animation
 - User describes relationships ("orbit around") → Use relations
 
-ANIMATION TYPES:
+ANIMATION TYPES (18 — the list the driver actually switches on):
 - pulse: Scale up/down rhythmically
+- breathe: A slower, softer pulse
 - rotate: Continuous rotation
+- swing: Pendulum rotation about the top
 - bounce: Vertical bouncing motion
-- fade: Opacity cycling
+- jelly: Squash-and-stretch wobble
+- shake: Rapid small displacement
 - wobble: Side-to-side wobbling
-- slide: Horizontal sliding
-- typewriter: Character-by-character reveal`,
+- fade: Opacity cycling
+- glow: Cycling luminance
+- slideLeftRight / slideUpDown: Sliding on one axis
+- scrollLeft / scrollRight / scrollUp / scrollDown: Continuous scroll, wrapping
+- path: Travel along an assigned path
+- typewriter: Character-by-character reveal
+
+There is NO 'slide'. An unknown type is stored and then ignored — the item sits still while its data claims otherwise, and the call still reports success — so use the exact names above.`,
     inputSchema: {
       type: 'object',
       properties: {
         itemId: { type: 'string', description: 'Registry ID of the item' },
         animationType: {
           type: 'string',
-          enum: ['pulse', 'rotate', 'bounce', 'fade', 'wobble', 'slide', 'typewriter'],
+          enum: ['bounce', 'breathe', 'fade', 'glow', 'jelly', 'path', 'pulse', 'rotate', 'scrollDown', 'scrollLeft', 'scrollRight', 'scrollUp', 'shake', 'slideLeftRight', 'slideUpDown', 'swing', 'typewriter', 'wobble'],
           description: 'Type of animation',
         },
         speed: {
@@ -3484,7 +3494,7 @@ EXAMPLE - Bouncing Balls:
 
 SUPPORTED ITEM TYPES: text, circle, star, rectangle, triangle, polygon, ellipse, path, line, arc
 SUPPORTED RELATIONS: orbits, follows, attached_to, maintains_distance, points_at, mirrors, parallax, bounds_to, animates, grows_from, staggered_with, indicates, circumscribes, wave_through, camera_follows, camera_animates, morphs_to, group_morphs_to, moves_along_path, is_midpoint_of, lies_on_line, is_centroid_of, is_circumcenter_of, concentric_with, construction_reveal
-SUPPORTED ANIMATIONS: pulse, rotate, bounce, fade, wobble, slide, typewriter`,
+SUPPORTED ANIMATIONS: bounce, breathe, fade, glow, jelly, path, pulse, rotate, scrollDown, scrollLeft, scrollRight, scrollUp, shake, slideLeftRight, slideUpDown, swing, typewriter, wobble`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -3549,7 +3559,7 @@ SUPPORTED ANIMATIONS: pulse, rotate, bounce, fade, wobble, slide, typewriter`,
               target: { type: 'string', description: 'Name of item to animate' },
               type: {
                 type: 'string',
-                enum: ['pulse', 'rotate', 'bounce', 'fade', 'wobble', 'slide', 'typewriter'],
+                enum: ['bounce', 'breathe', 'fade', 'glow', 'jelly', 'path', 'pulse', 'rotate', 'scrollDown', 'scrollLeft', 'scrollRight', 'scrollUp', 'shake', 'slideLeftRight', 'slideUpDown', 'swing', 'typewriter', 'wobble'],
               },
               speed: { type: 'number', description: 'Animation speed (default: 1.0)' },
               params: {
@@ -7191,7 +7201,7 @@ EXAMPLE — Animated sky scene with timed reveals:
               // Loop animation
               animationType: {
                 type: 'string',
-                enum: ['pulse', 'rotate', 'bounce', 'fade', 'wobble', 'slide', 'typewriter'],
+                enum: ['bounce', 'breathe', 'fade', 'glow', 'jelly', 'path', 'pulse', 'rotate', 'scrollDown', 'scrollLeft', 'scrollRight', 'scrollUp', 'shake', 'slideLeftRight', 'slideUpDown', 'swing', 'typewriter', 'wobble'],
                 description: 'For animate: loop animation type',
               },
               animationOptions: { type: 'object', description: 'For animate: {speed, amplitude, direction}' },

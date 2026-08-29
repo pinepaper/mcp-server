@@ -220,14 +220,32 @@ export const ArcPropertiesSchema = z.object({
 // ANIMATION TYPES
 // =============================================================================
 
+// The loop animations the engine's driver can actually run.
+//
+// Pinned to the engine by animation-type-parity.test.ts. It offered 'slide',
+// which has NEVER existed — the real ones are slideLeftRight and slideUpDown.
+// The engine stored the unknown value and the driver's switch fell through, so
+// the item sat still while its data claimed a slide, and nothing anywhere said
+// so. It also hid twelve types that do work.
 export const SimpleAnimationTypeSchema = z.enum([
+  'bounce',
+  'breathe',
+  'fade',
+  'glow',
+  'jelly',
+  'path',
   'pulse',
   'rotate',
-  'bounce',
-  'fade',
-  'wobble',
-  'slide',
+  'scrollDown',
+  'scrollLeft',
+  'scrollRight',
+  'scrollUp',
+  'shake',
+  'slideLeftRight',
+  'slideUpDown',
+  'swing',
   'typewriter',
+  'wobble',
 ]).describe('Simple loop animation type');
 
 export type SimpleAnimationType = z.infer<typeof SimpleAnimationTypeSchema>;
@@ -1122,7 +1140,7 @@ export const CreateItemInputSchema = z.object({
   itemType: ItemTypeSchema,
   position: PositionSchema.optional().default({ x: 400, y: 300 }),
   properties: z.record(z.unknown()).optional().default({}),
-  animationType: z.string().optional().describe('Inline animation to apply on creation. Loop presets (pulse, rotate, bounce, fade, wobble, slide, typewriter) or "keyframe" with keyframes array. Equivalent to a follow-up pinepaper_animate / pinepaper_keyframe_animate call.'),
+  animationType: z.string().optional().describe('Inline animation to apply on creation. Loop presets (bounce, breathe, fade, glow, jelly, path, pulse, rotate, scrollDown, scrollLeft, scrollRight, scrollUp, shake, slideLeftRight, slideUpDown, swing, typewriter, wobble) or "keyframe" with keyframes array. Equivalent to a follow-up pinepaper_animate / pinepaper_keyframe_animate call.'),
   animationSpeed: z.number().optional().describe('Speed multiplier for loop animations (default: 1.0). Ignored when animationType is "keyframe".'),
   animationIntensity: z.number().optional().describe('Loop animation amplitude (0.1 = ±10%, default 0.15). Drives pulse/wobble/bounce/breathe amplitude; honored by SVG/SMIL/widget export.'),
   animationDelay: z.number().optional().describe('Loop animation start delay in seconds.'),
@@ -1546,7 +1564,8 @@ export const SceneAnimationSchema = z.object({
   /** Reference name of the item to animate */
   target: z.string().describe('Name of the item to animate'),
   /** Type of animation */
-  type: z.enum(['pulse', 'rotate', 'bounce', 'fade', 'wobble', 'slide', 'typewriter']),
+  type: z.enum(['bounce', 'breathe', 'fade', 'glow', 'jelly', 'path', 'pulse', 'rotate', 'scrollDown', 'scrollLeft', 'scrollRight', 'scrollUp', 'shake', 'slideLeftRight', 'slideUpDown', 'swing', 'typewriter', 'wobble']),
+
   /** Animation speed (default: 1.0) */
   speed: z.number().optional(),
   /** Animation parameters */
