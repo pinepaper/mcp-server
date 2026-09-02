@@ -8,7 +8,7 @@
 **English** · [简体中文](README.zh-CN.md) · [日本語](README.ja.md) · [한국어](README.ko.md) · [Español](README.es.md) · [Português (BR)](README.pt-BR.md) · [Français](README.fr.md) · [Deutsch](README.de.md) · [हिन्दी](README.hi.md)
 
 <p align="center">
-  <img src="docs/assets/edit-whenever.svg" alt="Generate once. Edit whenever. — animated PinePaper poster: the headline assembles from scatter, a color wave runs through every letter, and 'generate twice / thrice' get struck out before 'once' is highlighted" width="720">
+  <img src="assets/edit-whenever.svg" alt="Generate once. Edit whenever. — animated PinePaper poster: the headline assembles from scatter, a color wave runs through every letter, and 'generate twice / thrice' get struck out before 'once' is highlighted" width="720">
 </p>
 
 <p align="center">
@@ -180,6 +180,18 @@ app.animate(sq, { animationType: 'rotate' });
 The same code an agent generates is the code you can paste — the canvas is yours either way, undo included.
 
 ## What's new in 1.6.7
+
+**New tool: `pinepaper_character`** — place a figure from the graph and direct it. The character layer was reachable from the cloud's build script and nowhere else, which by this project's own rule means it did not exist: an MCP client, a cloud caller and a small on-device model all see these schemas and nothing behind them.
+
+- It replaces roughly thirty exactly-right calls — create the skeleton, add each bone with the right parent and angle, create each shape, attach each to the right bone, then author poses — where one mistake anywhere leaves a broken figure. That volume of exactly-right output is the reported reason characters do not work for smaller models.
+- Direction is declarative beats: `{ concept: "pp:Pigeon", at: {...}, height: 300, beats: [{ at: 0, channel: "bob", until: 8 }, { at: 1.4, channel: "blink" }] }`.
+
+**`create_item` gains `shader` and `field` item types.** The cloud renderer has drawn shaders and parametric fields for months, reachable only by hand-writing a scene document — so the capability existed for whoever writes the build script and for nobody else.
+
+- The description names the parameters and the expression variables a field is written in: a parameter nobody can discover is the same as a parameter that is not there.
+- `bornAt`/`ttl` are documented on `properties`. They always passed through (`properties` is a free record) and nothing mentioned them, so no caller could build a piece that cuts between shots — which is why the only multi-shot pieces that exist had their shots inferred from a naming convention in a build script.
+- **A surface is not a shape**, and the ontology now says so instead of filing these under Path because they also end up as pixels: `pp:CanvasSurface`, with `pp:ShaderSurface` and `pp:ParametricField` under it. A shape is built as an item and drawn from its geometry; a surface is evaluated as the frame is drawn.
+
 
 **New tool: `pinepaper_import_motion_capture`** — BVH import and retarget. The engine has had `importBVH`/`retargetBVH` for releases and nothing exposed them; a model cannot use a capability no tool call reaches.
 
