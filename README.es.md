@@ -78,10 +78,9 @@ restringido, sí.
 servidor por usted** — mismas herramientas, misma versión, por HTTP, sin
 instalación y sin navegador en su máquina.
 
-El alojamiento cuesta dinero, así que es de pago, pero no hay suscripción ni
-plan que elegir. Compra créditos, no caducan y se cobra por operación; su
-primera recarga incluye $1 en créditos gratis. Los precios actuales están en [cloud.pinepaper.studio](https://cloud.pinepaper.studio). Si puede
-ejecutarlo localmente, hágalo — no pierde nada.
+El alojamiento cuesta dinero, así que es de pago — funciona con créditos.
+Los precios actuales están en [cloud.pinepaper.studio](https://cloud.pinepaper.studio). Si
+puede ejecutarlo localmente, hágalo — no pierde nada.
 
 ## Más
 

@@ -78,12 +78,9 @@ gesperrten Arbeitsrechner eher nicht.
 Server für Sie** — gleiche Tools, gleiche Version, über HTTP, ohne Installation
 und ohne Browser auf Ihrem Rechner.
 
-Hosting kostet Geld, daher ist es kostenpflichtig — aber es gibt kein Abo und
-keinen Tarif zu wählen. Sie kaufen Credits, diese verfallen nicht, und es wird
-pro Operation abgerechnet; bei Ihrer ersten Aufladung erhalten Sie $1 Guthaben
-gratis. Aktuelle Preise
-finden Sie unter [cloud.pinepaper.studio](https://cloud.pinepaper.studio). Wenn Sie lokal laufen lassen können, tun Sie das — Sie
-verlieren dadurch nichts.
+Hosting kostet Geld, daher ist es kostenpflichtig — es läuft über Credits.
+Aktuelle Preise finden Sie unter [cloud.pinepaper.studio](https://cloud.pinepaper.studio).
+Wenn Sie lokal laufen lassen können, tun Sie das — Sie verlieren dadurch nichts.
 
 ## Mehr
 

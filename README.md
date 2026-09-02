@@ -56,11 +56,9 @@ for you** — same tools, same version, over HTTP with no install and no browser
 on your machine. It exists for three cases: you have no MCP client, you cannot
 install one, or your machine cannot spare the browser.
 
-Hosting costs money, so the hosted option is paid — but there is no
-subscription and no plan to pick. You buy credits, they never expire, and you
-are charged per operation; your first top-up includes $1 of credit free.
-Current rates are on [cloud.pinepaper.studio](https://cloud.pinepaper.studio). If you can run it
-locally, run it locally — you lose nothing by doing so.
+Hosting costs money, so the hosted option is paid — it runs on credits. See
+[cloud.pinepaper.studio](https://cloud.pinepaper.studio) for current pricing. If you can
+run it locally, run it locally — you lose nothing by doing so.
 
 ## Made with tool calls
 

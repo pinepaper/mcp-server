@@ -78,11 +78,9 @@ de travail verrouillée, moins.
 serveur à votre place** — mêmes outils, même version, en HTTP, sans
 installation ni navigateur sur votre machine.
 
-L'hébergement a un coût, il est donc payant — mais sans abonnement ni forfait
-à choisir. Vous achetez des crédits, ils n'expirent pas, et la facturation se
-fait à l'opération ; votre première recharge inclut $1 de crédit offert. Les tarifs actuels
-sont sur [cloud.pinepaper.studio](https://cloud.pinepaper.studio). Si vous pouvez l'exécuter en local, faites-le — vous n'y perdez
-rien.
+L'hébergement a un coût, il est donc payant — il fonctionne avec des crédits.
+Les tarifs actuels sont sur [cloud.pinepaper.studio](https://cloud.pinepaper.studio). Si vous
+pouvez l'exécuter en local, faites-le — vous n'y perdez rien.
 
 ## Aller plus loin
 

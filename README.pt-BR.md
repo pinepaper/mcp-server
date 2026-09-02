@@ -78,10 +78,9 @@ restrita, nem tanto.
 servidor para você** — mesmas ferramentas, mesma versão, por HTTP, sem
 instalação e sem navegador na sua máquina.
 
-Hospedagem custa dinheiro, então é paga — mas não há assinatura nem plano a
-escolher. Você compra créditos, eles não expiram, e a cobrança é por operação;
-sua primeira recarga inclui $1 em créditos grátis. Os preços atuais estão em [cloud.pinepaper.studio](https://cloud.pinepaper.studio). Se você
-consegue rodar localmente, rode localmente — você não perde nada.
+Hospedagem custa dinheiro, então é paga — funciona por créditos. Os preços
+atuais estão em [cloud.pinepaper.studio](https://cloud.pinepaper.studio). Se você consegue
+rodar localmente, rode localmente — você não perde nada.
 
 ## Mais
 
