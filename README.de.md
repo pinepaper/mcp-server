@@ -83,8 +83,9 @@ Aktuelle Preise finden Sie unter [cloud.pinepaper.studio](https://cloud.pinepape
 Lassen Sie es lokal laufen, wenn Sie können — identisch ist es aber nicht: Der
 gehostete Dienst nutzt einen getesteten Satz an LLMs und repariert generierten
 Code, bevor er die Leinwand erreicht. Das kann ein lokaler Server nicht selbst. Welchem Modell Sie trauen, können
-Sie selbst prüfen: Es gibt einen Benchmark in der Beta — ein Prompt über
-mehrere Modelle, Ergebnisse nebeneinander, jeder Lauf teilbar.
+Sie selbst prüfen: Ein Benchmark führt ein Prompt über mehrere Modelle aus und
+stellt die Ergebnisse nebeneinander, jeder Lauf teilbar. Derzeit in einer Beta
+nur mit Einladung.
 
 ## Mehr
 

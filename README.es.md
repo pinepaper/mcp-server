@@ -83,8 +83,9 @@ Los precios actuales están en [cloud.pinepaper.studio](https://cloud.pinepaper.
 en local si puede, pero no es idéntico: el servicio alojado usa un conjunto de
 LLM probados y repara el código generado antes de que llegue al lienzo, algo
 que un servidor local no puede hacer por sí mismo. En qué modelo confiar es
-algo que puede comprobar usted mismo: hay un benchmark en beta — un prompt en
-varios modelos, resultados en paralelo, y cualquier ejecución compartible.
+algo que puede comprobar usted mismo: un benchmark ejecuta un prompt en varios
+modelos y muestra los resultados en paralelo, y cualquier ejecución se puede
+compartir. Está en beta solo por invitación.
 
 ## Más
 

@@ -83,8 +83,9 @@ atuais estão em [cloud.pinepaper.studio](https://cloud.pinepaper.studio). Rode 
 se puder, mas não é idêntico: o serviço hospedado usa um conjunto testado de
 LLMs e repara o código gerado antes que ele chegue ao canvas — algo que um
 servidor local não consegue fazer sozinho. Em qual modelo confiar é uma
-pergunta que você mesmo pode responder: há um benchmark em beta — um prompt em
-vários modelos, resultados lado a lado, e qualquer execução compartilhável.
+pergunta que você mesmo pode responder: um benchmark roda um prompt em vários
+modelos e mostra os resultados lado a lado, com qualquer execução
+compartilhável. Está em beta apenas por convite.
 
 ## Mais
 
