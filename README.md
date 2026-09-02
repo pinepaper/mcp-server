@@ -181,6 +181,10 @@ The same code an agent generates is the code you can paste — the canvas is you
 
 ## What's new in 1.6.7
 
+**Four more item-stage shader effects** — `electric_arc`, `vortex`, `rain_veil`, `caustics` (ABYSSAL's noise library). The `item` shader stage went from four built-ins to eight and nothing here named the new half.
+
+**`on_key_fire` now matches a chord exactly.** Its modifier tests were one-way — they required a modifier that was asked for but never rejected one that was not — so `{ key: 'Enter' }` fired on Ctrl+Enter, Shift+Enter and Cmd+Enter alike, and `{ key: 's' }` fired on the browser's own Ctrl+S. Those are different intents. The relation's documentation says so now, along with the focus gate that keeps it from taking keys from the rest of the page. (Reported from this repo during the relation audit; fixed engine-side.)
+
 **Three appliers that failed in silence now report.** The engine's `animate`, `applyAnimatedMask` and `applyCutoutStyle` refused an unknown key only through `console.warn`, and the production build strips the console — while returning values identical between success and failure (`undefined` either way, a Paper Group either way, and the very item it was given). Over MCP, where there is no console to read, an unknown key left the canvas unchanged and told every caller it had worked.
 
 The engine now records the refusal on the item it already hands back, and these tools read it: a refused animation type, a mask that applied but will never animate, and a cutout preset that returned the item untouched are all reported as failures, each carrying the requested value **and the known list**, so a caller can correct itself without a second round trip.

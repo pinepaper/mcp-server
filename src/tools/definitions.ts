@@ -479,7 +479,7 @@ Without these every item is on screen for the whole render, which is what makes
 a long piece read as one crowded frame instead of a sequence of shots.
 
 SHADER (itemType 'shader') — a lit surface, drawn per pixel:
-- shader: 'water' (open sea, lit swell) | 'liquid_metal' (chrome) | 'heatmap' (thermal halo) | 'gem_smoke' (smoke)
+- shader: 'water' (open sea, lit swell) | 'liquid_metal' (chrome) | 'heatmap' (thermal halo) | 'gem_smoke' (smoke) | 'electric_arc' (branching discharge, stepped flicker) | 'vortex' (hollow bright RING, sheared by differential rotation) | 'rain_veil' | 'caustics'
 - width, height: the quad it fills
 - shaderIntensity: 0..2, the effect's amplitude (water: chop)
 - shaderPalette: 0 day | 1 low sun | 2 night
@@ -2626,7 +2626,7 @@ RELATION TYPES:
 INTERACTIVE RELATIONS — the state machine lives in the graph.
 An event channel (pinepaper_event) is the hub: something FIRES it, and reactions bound to it run. Nothing here is a callback; it is all queryable graph, so it scrubs, exports and survives a reload.
 
-- Input triggers (item → event): on_click_fire, on_pointer_enter_fire, on_pointer_exit_fire, on_key_fire (params: key — { key: 'Enter' } makes Enter activate a button exactly as a click does).
+- Input triggers (item → event): on_click_fire, on_pointer_enter_fire, on_pointer_exit_fire, on_key_fire (params: key, modifiers, global, preventDefault). { key: 'Enter' } makes Enter activate a button exactly as a click does. The chord is matched EXACTLY in both directions — { key: 'Enter' } does NOT fire on Ctrl+Enter, and { key: 's' } does not steal the browser's Ctrl+S; ask for a modifier with modifiers: { ctrl: true }. Listens only while the source item has focus unless global: true, so it will not take keys from the rest of the page.
 - Event reactions (event → item), params in common: property, value, key, by, color, template, delay, timeline.
   · on_event_set_property / _set_color / _set_visibility / _set_data — write a value.
   · on_event_set_property_from_template — write a value built from a '{token}' TEMPLATE read off item.data, so the text can quote live state ("Score: {score}") instead of a literal fixed when you authored it.
@@ -6518,7 +6518,7 @@ USE WHEN:
 - Celebration effects (confetti)
 - Enhancing visual impact (ripple, glow, electric)
 
-EFFECTS (15 particle + 3 shader auras):
+EFFECTS (15 particle + 7 shader auras):
 - sparkle: Glitter/sparkle particles (color, speed, size)
 - blast: Explosion burst effect (color, radius, count)
 - smoke: Rising smoke plumes (color, speed, size, drift, height, growthRate)
@@ -6539,6 +6539,10 @@ SHADER AURAS (WebGL2, silhouette-clipped — same tool, routed to the aura syste
 - heatmap: Thermal shimmer aura (palette 0=Hot 1=Cool 2=Violet)
 - liquid_metal: Flowing metallic sheen (palette 0=Chrome 1=Gold 2=Copper)
 - gem_smoke: Crystalline smoke wisps
+- electric_arc: Branching discharge filaments with a hot core and inverse-square bloom. Stepped flicker, not a sine — a stroke is a train of return strokes, which reads far more electric than a smooth pulse.
+- vortex: The bright band is a RING, not a disc — condensation tracks the steepest pressure gradient, so the core is hollow, and differential rotation shears the field rather than spinning one picture round.
+- rain_veil: Drifting sheets of falling rain across the silhouette.
+- caustics: Refracted light patterns, as through moving water.
 Aura params: { intensity, radius, palette, mode ('inside'|'outside'|'overlay'), tint, tintStrength, offsetX, offsetY, channels: { a: {speed, curve}, b: {speed, curve} } } — curves: linear, sawtooth, sine, triangle, pulse, ease, bounce, noise.
 
 EXAMPLE — bubbles with magenta interior over a blue rim:
@@ -6551,7 +6555,7 @@ EXAMPLE — gold liquid-metal aura outside a logo:
         itemId: { type: 'string', description: 'Registry ID of the item' },
         effectType: {
           type: 'string',
-          enum: ['sparkle', 'blast', 'smoke', 'fire', 'rain', 'snow', 'confetti', 'ripple', 'glow', 'electric', 'bubbles', 'dust', 'fireflies', 'shockwave', 'trail', 'heatmap', 'liquid_metal', 'gem_smoke'],
+          enum: ['sparkle', 'blast', 'smoke', 'fire', 'rain', 'snow', 'confetti', 'ripple', 'glow', 'electric', 'bubbles', 'dust', 'fireflies', 'shockwave', 'trail', 'heatmap', 'liquid_metal', 'gem_smoke', 'electric_arc', 'vortex', 'rain_veil', 'caustics'],
           description: 'Type of effect',
         },
         params: {
@@ -7366,7 +7370,7 @@ EXAMPLE — Animated sky scene with timed reveals:
               // Effects
               effectType: {
                 type: 'string',
-                enum: ['sparkle', 'blast', 'smoke', 'fire', 'rain', 'snow', 'confetti', 'ripple', 'glow', 'electric', 'bubbles', 'dust', 'fireflies', 'shockwave', 'trail', 'heatmap', 'liquid_metal', 'gem_smoke'],
+                enum: ['sparkle', 'blast', 'smoke', 'fire', 'rain', 'snow', 'confetti', 'ripple', 'glow', 'electric', 'bubbles', 'dust', 'fireflies', 'shockwave', 'trail', 'heatmap', 'liquid_metal', 'gem_smoke', 'electric_arc', 'vortex', 'rain_veil', 'caustics'],
                 description: 'For apply_effect: effect type',
               },
               effectParams: { type: 'object', description: 'For apply_effect: parameters' },

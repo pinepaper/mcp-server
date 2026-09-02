@@ -1071,6 +1071,10 @@ export const EffectTypeSchema = z.enum([
   'heatmap',
   'liquid_metal',
   'gem_smoke',
+  'electric_arc',
+  'vortex',
+  'rain_veil',
+  'caustics',
 ]).describe('Visual effect type (particle effects + shader auras)');
 
 export const SparkleParamsSchema = z.object({
