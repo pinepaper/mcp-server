@@ -184,6 +184,31 @@ app.animate(sq, { animationType: 'rotate' });
 
 The same code an agent generates is the code you can paste — the canvas is yours either way, undo included.
 
+## Security: yes, it executes code
+
+**Supply-chain scanners flag this package, and they are not wrong about the mechanism.** Socket and tools like it mark it as malware-adjacent because it evaluates JavaScript at runtime. The detection is correct about the capability and wrong about the intent, so here is exactly what happens.
+
+**Every tool emits JavaScript — that is the architecture, not an exception.** A tool call is compiled into a snippet written against the PinePaper and Paper.js APIs; the snippet is the product. `pinepaper_execute_custom_code` is simply the case where the *agent* writes the snippet instead of the server generating it, which is what lets a model draw something no other tool has a name for. Removing execution would not harden this package, it would delete it.
+
+**Where the code runs.** In a browser page on your own machine, against your own canvas. It does not run in the server process, and nothing is sent anywhere else to be executed.
+
+**Two modes, and one of them never executes anything:**
+
+| Mode | What happens |
+|---|---|
+| `code` (`PINEPAPER_EXECUTION_MODE=code`) | The tool returns the JavaScript and stops. Nothing runs. You read it and paste it if you want it. |
+| `puppeteer` (default) | The server launches Chrome and runs the snippet in the page via `page.evaluate()`. |
+
+If you do not want an agent executing anything, `code` mode is a first-class path, not a degraded one — the same snippet, handed to you instead of run.
+
+**What guards execution.** On current engine builds the snippet goes through `app.runGenerated(code, { source: 'agent' })` — a governor with seeded determinism, loop and item budgets, and a machine-readable report — rather than a bare `eval`. Older engine builds fall back to `eval`.
+
+**What to weigh before running it.**
+
+- Code an agent writes runs with whatever that browser page has. Give this server the same trust you would give anything else you let write and run code on your machine — which is the trust you already extend to an MCP client with tool access.
+- Puppeteer mode launches Chrome with `--no-sandbox` and `--disable-setuid-sandbox`. That is routine for headless automation and it does weaken Chrome's own process sandbox. If that matters where you are running it, use `code` mode or put the server in a container.
+- Puppeteer itself is an **optional** peer dependency, kept out of the default tree precisely because a headless browser plus an install script is what scanners flag hardest. Install it only if you want the executing mode.
+
 ## What's new in 1.6.7
 
 **Four more item-stage shader effects** — `electric_arc`, `vortex`, `rain_veil`, `caustics` (ABYSSAL's noise library). The `item` shader stage went from four built-ins to eight and nothing here named the new half.
