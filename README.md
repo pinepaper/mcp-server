@@ -285,6 +285,10 @@ The relation catalogue in the tool description now names families rather than al
 
 Follows 1.6.6, whose dependency-security work is described below.
 
+**Dependency security.** `puppeteer` moves to ^25, clearing GHSA-jmr9-qjv8-65gv (`extract-zip` symlink path traversal) — `@puppeteer/browsers` 3.2.1 drops `extract-zip` entirely. The published package was never exposed (puppeteer is an optional peer), but the browser tools need one, and the path was re-verified against real Chrome rather than a green unit suite that never launches a browser.
+
+`qs` is pinned to ^6.16.0, clearing GHSA-4mjr-xmp4-gh2g — a denial of service on the **production** chain, via `@modelcontextprotocol/sdk` → `express`. `npm audit` reported zero against it, as it did through the 1.6.6 work: its registry feed lags GitHub's. Verified instead with an OSV sweep of all 82 production packages, which is clean.
+
 **Engine requirement.** Several capabilities this server has always emitted correct calls for did nothing until recent FxTool builds: **physics** (the step callback was never registered, so nothing moved), scene-wide **GPU filters** on the WebGPU tier, **map region colour animation** (which reported success while animating nothing), and `modify_item`'s `pathData`. No change was needed here — the calls were right — but run an FxTool from 2026-08-29 or later to get them.
 
 ## What's new in 1.6.6

@@ -102,7 +102,7 @@
     "js-yaml": "^4.3.1",
     "object-assign": "npm:@socketregistry/object-assign@^1.0.5",
     "path-to-regexp": "^8.4.2",
-    "qs": "^6.15.2",
+    "qs": "^6.16.0",
     "safer-buffer": "npm:@socketregistry/safer-buffer@^1.0.10",
     "side-channel": "npm:@socketregistry/side-channel@^1.0.10",
     "ws": "^8.21.1"
