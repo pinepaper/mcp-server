@@ -68,6 +68,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_text_effect: "37 character-level text animations. action: list|apply {itemId, effect}. REPLACES the text with one keyframed item per character (source id dies; keepSource:true to keep it).",
   pinepaper_crop_image: 'One-shot crop of an image item to a canvas-coords rect (clamped; keeps the registry id). {itemId, rect: {x,y,width,height}, aspectRatio?}',
   pinepaper_chroma_key: "One-shot green-screen background removal on an image item (keeps the registry id). Omit threshold/smoothing to auto-estimate. {itemId, color?, threshold?, smoothing?}",
+  pinepaper_character: "Place a character from the graph and direct it. {concept, at, height, beats:[{at, channel, until?, value?}]}. The concept declares its channels — blink, say, headTurn, bob.",
   pinepaper_rigging: "Skeletal rigging + animation. action: create_skeleton, add_bone, attach_item, create_ik_chain, save/load/list/interpolate poses, play + stitch_poses, auto_walk|idle|jump, move_root, bake_animation.",
   pinepaper_design_medium: "What makes the marks. action: list_media|resolve (refuses what it cannot honestly render)|list_stitches|apply_thread|apply_hatch (value via line density)|list_flow_fields|list_hatch_options.",
 

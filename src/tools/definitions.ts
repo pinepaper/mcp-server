@@ -2314,6 +2314,83 @@ RECIPE — a character walking through a forest: create {spec:'forest'} → impo
     },
   },
   {
+    name: 'pinepaper_character',
+    annotations: {
+      title: 'Character (place and direct a figure from the graph)',
+      readOnlyHint: false,
+      idempotentHint: false,
+    },
+    description: `Place a CHARACTER from the design graph and DIRECT it — no geometry, no bones, no poses.
+
+The knowledge of how a figure is built and how it moves lives in the graph; this asks for it by name and states WHAT happens. The alternative is thirty-odd exactly-right calls — create the skeleton, add each bone with the right parent and angle, create each shape, attach each to the right bone, then author poses — where one mistake anywhere leaves a broken figure.
+
+  { concept: "pp:Character", at: { x: 470, y: 250 }, height: 300,
+    beats: [ { at: 1.0, channel: "blink" },
+             { at: 1.8, channel: "say", until: 4.2 },
+             { at: 5.0, channel: "headTurn", value: -0.8 } ] }
+
+CHANNELS ARE DECLARED BY THE CONCEPT, not by you. Ask pinepaper_ontology for a concept to see the ones it has. Four kinds exist:
+- transform: one part deformed with an attack, a hold and a release — a blink is the eyes flattening in scaleY and easing back. This is what gives a gesture a MIDDLE; a swap between two drawings has only two ends and reads as flashing.
+- cycle: a repeating throw that runs for as long as you ask — a pigeon's head bob, a tail flick. Amplitude is a fraction of the part, so it means the same at any size.
+- shift: every part moved together, for a turn a flat drawing cannot rotate into.
+- alternate / speak: swaps between drawn states, for shapes that genuinely differ rather than deform.
+
+BEATS ARE INSTANTS OR SPANS. \`at\` is when it happens; \`until\` is how long for a channel that occupies time. \`value\` is how far, for channels that take a magnitude.
+
+WHAT YOU GET BACK: the items and keyframe tracks the beats compile to. They are ordinary scene items afterwards — modify, animate and relate them like anything else.
+
+NOT LIP SYNC. \`say\` opens and closes a mouth for the length of a line. Matching phonemes needs the word timings a voice track carries; pass \`timings\` if you have them and each entry drives one mouth opening.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        concept: {
+          type: 'string',
+          description: 'Concept id from the design graph, e.g. "pp:Character" or "pp:Pigeon". Its parts, rig and channels come with it.',
+        },
+        at: {
+          type: 'object',
+          properties: {
+            x: { type: 'number', description: 'X of the figure\'s centre' },
+            y: { type: 'number', description: 'Y of the figure\'s centre' },
+          },
+          description: 'Where the figure stands.',
+        },
+        height: { type: 'number', description: 'Drawn height in pixels. Every amplitude in the graph is a fraction, so the performance scales with it.' },
+        id: { type: 'string', description: 'Prefix for the created items (default: the concept name).' },
+        style: { type: 'string', description: 'Style id for the depiction (default: the concept\'s own).' },
+        variant: { type: 'string', description: 'Depiction variant (default: "default").' },
+        durationSeconds: { type: 'number', description: 'Length of the piece, so every track spans it. A track that starts late leaves the figure invisible until it does.' },
+        beats: {
+          type: 'array',
+          description: 'What happens, in order. Channels the concept does not declare are ignored rather than approximated.',
+          items: {
+            type: 'object',
+            properties: {
+              at: { type: 'number', description: 'When, in seconds' },
+              channel: { type: 'string', description: 'A channel the concept declares — blink, say, headTurn, bob, tailFlick…' },
+              until: { type: 'number', description: 'For a channel that occupies a span rather than an instant' },
+              value: { type: 'number', description: 'How far, for a channel that takes a magnitude' },
+            },
+            required: ['at', 'channel'],
+          },
+        },
+        timings: {
+          type: 'array',
+          description: 'Optional word or syllable timings from a voice track. Each entry drives one mouth opening, which is what turns the shape of speech into lip sync.',
+          items: {
+            type: 'object',
+            properties: {
+              at: { type: 'number', description: 'Start, in seconds' },
+              until: { type: 'number', description: 'End, in seconds' },
+            },
+            required: ['at'],
+          },
+        },
+      },
+      required: ['concept'],
+    },
+  },
+  {
     name: 'pinepaper_rigging',
     annotations: {
       title: 'Rigging (Skeleton / Bones / IK / Poses)',

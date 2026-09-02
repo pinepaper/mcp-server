@@ -68,6 +68,10 @@ export const TOOL_TAGS: Record<string, string[]> = {
   rigging: [
     'pinepaper_rigging',
     'pinepaper_import_layered_character',
+    // Directing a figure is the same subject as rigging one — it is the layer
+    // above it, where the bones and poses are already known and only the
+    // performance is asked for.
+    'pinepaper_character',
   ],
   assets: [
     'pinepaper_search_assets',
