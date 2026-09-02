@@ -77,9 +77,10 @@ npm install -g @pinepaper.studio/mcp-server
 服务器** —— 相同的工具、相同的版本，通过 HTTP 提供，无需安装，也不需要在你的
 机器上运行浏览器。
 
-托管需要成本，因此是付费的，按额度（credits）计费。当前价格请见
-[cloud.pinepaper.studio](https://cloud.pinepaper.studio)。如果你能在本地运行，
-就在本地运行 —— 这样不会损失任何功能。
+托管需要成本，因此是付费的，但没有订阅、也不需要选套餐。你购买额度
+（credits），按操作计费，额度不会过期；首次使用赠送 $1 额度。当前费率请见
+[cloud.pinepaper.studio](https://cloud.pinepaper.studio)。如果你能在本地运行，就在本地运行 ——
+这样不会损失任何功能。
 
 ## 更多
 
