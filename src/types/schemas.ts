@@ -122,6 +122,18 @@ export const ItemTypeSchema = z.enum([
   'diamond',
   'arrow',
   'heart',
+  // RENDER-TIME SURFACES. These two are not Paper items and never enter the
+  // scene tree: they are drawn per pixel by the cloud rasterizer, straight from
+  // the scene document. They are here because a capability nobody can name is a
+  // capability nobody has — the cloud has drawn shaders and fields for months
+  // and no tool has ever offered them, so the only way to reach one was to
+  // hand-write a scene file.
+  //
+  // In the browser they degrade to a flat plate of their own colour (see
+  // generateCreateItemCode) so a composition built with one still reads
+  // locally; the shaded surface appears in a cloud render.
+  'shader',
+  'field',
 ]);
 
 export type ItemType = z.infer<typeof ItemTypeSchema>;

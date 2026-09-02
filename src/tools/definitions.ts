@@ -83,6 +83,10 @@ Choose based on mood:
 ─── ITEMS ───
 
 Shapes: circle, rectangle, star, ellipse, triangle, polygon, line, arc, path, pentagon, hexagon, diamond, arrow, heart
+Surfaces (render-time, evaluated per pixel — not shapes): shader, field
+  shader: a lit surface — water, liquid_metal, heatmap, gem_smoke. Set behind:true to put it UNDER the art, which is what scenery wants.
+  field:  one expression, many marks — xExpr/yExpr/count, re-evaluated every frame against t.
+  Both draw fully in a cloud render; locally they stand in as a flat plate.
 Text: text (content, fontSize, fontFamily, color, fontWeight)
   Dynamic text: set contentType on text items → clock (live time), timer (elapsed), countdown (from N seconds), stopwatch (pauseable)
 All items: opacity, shadowColor, shadowBlur, blendMode, strokeColor, strokeWidth
@@ -416,6 +420,24 @@ Items on the canvas can originate from multiple sources — all become first-cla
 - pinepaper_import_asset: Pre-made asset import → becomes a full item
 All imported items participate in the relation and animation systems just like natively created items.
 
+RENDER-TIME SURFACES — 'shader' and 'field':
+These are not shapes. A shape is built as an item and drawn from its geometry; a
+surface has no geometry — it is evaluated, per pixel or per sample, as each frame
+is drawn. Use them for things a vector cannot be: an open sea, a drifting field
+of marks, a lit material.
+- shader: pick one of water | liquid_metal | heatmap | gem_smoke, give it width
+  and height, and set behind:true to place it UNDER the vector art — which is
+  what scenery wants, a sea the boats float ON rather than a sheen over them.
+- field: xExpr/yExpr/count draw many marks from one expression, re-evaluated
+  every frame against t. rExpr and aExpr vary size and alpha per mark.
+Both draw fully in a cloud render; on a local canvas they stand in as a flat
+plate of their own colour so the layout still reads.
+
+LIFETIMES — bornAt and ttl, on any item:
+The only way to build a piece that CUTS between shots. Without them every item
+is on screen for the whole render, which is what makes a long piece read as one
+crowded frame instead of a sequence.
+
 WORKFLOW TIP:
 After creating items, use pinepaper_add_relation to animate them (e.g., orbits, follows, attached_to).
 For glossy 3D spheres, use pinepaper_create_glossy_sphere instead. For diagonal stripes, use pinepaper_create_diagonal_stripes.`,
@@ -424,8 +446,8 @@ For glossy 3D spheres, use pinepaper_create_glossy_sphere instead. For diagonal 
       properties: {
         itemType: {
           type: 'string',
-          enum: ['text', 'circle', 'star', 'rectangle', 'triangle', 'polygon', 'ellipse', 'path', 'line', 'arc', 'pentagon', 'hexagon', 'diamond', 'arrow', 'heart'],
-          description: 'Type of item to create',
+          enum: ['text', 'circle', 'star', 'rectangle', 'triangle', 'polygon', 'ellipse', 'path', 'line', 'arc', 'pentagon', 'hexagon', 'diamond', 'arrow', 'heart', 'shader', 'field'],
+          description: "Type of item to create. 'shader' and 'field' are RENDER-TIME SURFACES drawn per pixel by the cloud renderer — locally they stand in as a flat plate. See the shader/field properties below.",
         },
         position: {
           oneOf: [
@@ -448,7 +470,33 @@ For glossy 3D spheres, use pinepaper_create_glossy_sphere instead. For diagonal 
         },
         properties: {
           type: 'object',
-          description: 'Type-specific properties (content, radius, color, fontSize, etc.)',
+          description: `Type-specific properties (content, radius, color, fontSize, etc.)
+
+LIFETIME — on ANY item, and the only way to build a piece that CUTS between shots:
+- bornAt: seconds. The item does not exist before this instant.
+- ttl: seconds it lives for. Omit for "until the end".
+Without these every item is on screen for the whole render, which is what makes
+a long piece read as one crowded frame instead of a sequence of shots.
+
+SHADER (itemType 'shader') — a lit surface, drawn per pixel:
+- shader: 'water' (open sea, lit swell) | 'liquid_metal' (chrome) | 'heatmap' (thermal halo) | 'gem_smoke' (smoke)
+- width, height: the quad it fills
+- shaderIntensity: 0..2, the effect's amplitude (water: chop)
+- shaderPalette: 0 day | 1 low sun | 2 night
+- behind: true draws it UNDER the vector art, which is what scenery needs —
+  a sea the boats float ON rather than a sheen laid over them. Default false.
+
+FIELD (itemType 'field') — one expression, many marks. The generative form:
+a whole surface as a function of the sample index and the clock, rather than
+thousands of authored items.
+- xExpr, yExpr: expressions for each mark's position
+- rExpr, aExpr: optional radius and alpha per mark. A radius <= 0 is skipped,
+  so subtracting a threshold draws only the crests of a wave.
+- count: how many marks (up to 200000)
+- Variables in scope: i (0..count-1), n (count), t (seconds), u (i/n), pi, e, tau.
+  Functions: sin cos tan asin acos atan sinh cosh tanh exp ln log10 log2 sqrt
+  cbrt abs floor ceil round sign atan2 min max pow hypot, and % for modulo.
+- Example — a rolling swell: xExpr "(i % 120) * 8", yExpr "400 + sin((i % 120) * 0.4 - t * 2) * 12", count 3600`,
           additionalProperties: true,
         },
         data: {

@@ -36,6 +36,14 @@ export const PP_VOCABULARY: PinePaperVocabulary = {
     'pp:CanvasContainer':{ anchor: null, description: 'Abstract container element', abstract: true, parentType: 'pp:CanvasElement' },
     'pp:DiagramElement': { anchor: null, description: 'Abstract diagram element', abstract: true, parentType: 'pp:CanvasElement' },
     'pp:GeoElement':     { anchor: null, description: 'Abstract geographic element', abstract: true, parentType: 'pp:CanvasElement' },
+    // A SURFACE IS NOT A SHAPE. Shapes are built as items in the scene tree and
+    // drawn from their geometry; a surface has no geometry to build — it is
+    // EVALUATED, per pixel or per sample, at the moment a frame is drawn. That
+    // is why these have no anchor in the shape hierarchy and why the browser
+    // engine cannot construct one: they are a different kind of thing, and the
+    // ontology should say so rather than file them under Path because they end
+    // up as pixels too.
+    'pp:CanvasSurface':  { anchor: null, description: 'Abstract procedural surface — evaluated at render time rather than built as a scene item', abstract: true, parentType: 'pp:CanvasElement' },
     // Concrete types
     'pp:Template':      { anchor: 'schema:VisualArtwork', description: 'A motion graphics template' },
     'pp:Text':          { anchor: 'schema:CreativeWork',  description: 'Text element', parentType: 'pp:CanvasText', mcpTool: 'pinepaper_create_item' },
@@ -48,6 +56,8 @@ export const PP_VOCABULARY: PinePaperVocabulary = {
     'pp:Triangle':      { anchor: null, description: 'Triangle shape (geometrically: 3-sided polygon)', parentType: 'pp:CanvasShape', geometricSupertype: 'pp:Polygon', mcpTool: 'pinepaper_create_item' },
     'pp:Polygon':       { anchor: null, description: 'N-sided regular polygon', parentType: 'pp:CanvasShape', mcpTool: 'pinepaper_create_item' },
     'pp:Ellipse':       { anchor: null, description: 'Ellipse shape', parentType: 'pp:CanvasShape', mcpTool: 'pinepaper_create_item' },
+    'pp:ShaderSurface': { anchor: null, description: 'Lit surface evaluated per pixel by a fragment program (water, liquid_metal, heatmap, gem_smoke). Carries its own light and material; can be placed behind the vector art as scenery.', parentType: 'pp:CanvasSurface', mcpTool: 'pinepaper_create_item' },
+    'pp:ParametricField':{ anchor: null, description: 'A field of marks whose position, size and alpha are expressions of the sample index and the clock — one expression, many marks, re-evaluated every frame.', parentType: 'pp:CanvasSurface', mcpTool: 'pinepaper_create_item' },
     'pp:Line':          { anchor: null, description: 'Line segment — 2-point open path with curveType: linear', parentType: 'pp:CanvasShape', geometricSupertype: 'pp:OpenPath', defaultCurveType: 'linear', mcpTool: 'pinepaper_create_item' },
     'pp:Arc':           { anchor: null, description: 'Arc segment — open path subset with curveType: arc', parentType: 'pp:CanvasShape', geometricSupertype: 'pp:OpenPath', defaultCurveType: 'arc', mcpTool: 'pinepaper_create_item' },
     'pp:Group':         { anchor: null, description: 'Item group/container', parentType: 'pp:CanvasContainer' },
@@ -500,6 +510,8 @@ export const ITEM_TYPE_MAP: Record<string, string> = {
   'group':          'pp:Group',
   'image':          'pp:Image',
   'raster':         'pp:Image',
+  'shader':         'pp:ShaderSurface',
+  'field':          'pp:ParametricField',
   'compound-path':  'pp:CompoundPath',
   'compoundpath':   'pp:CompoundPath',
   'diagram-shape':  'pp:DiagramShape',

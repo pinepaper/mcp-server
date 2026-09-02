@@ -166,8 +166,11 @@ describe('Mapping Tables', () => {
     }
   });
 
-  it('ITEM_TYPE_MAP has 29 entries', () => {
-    expect(Object.keys(ITEM_TYPE_MAP).length).toBe(29);
+  it('ITEM_TYPE_MAP has 31 entries', () => {
+    // 29 + shader and field, the two render-time surfaces. A count assertion is
+    // here so a type cannot be added to the schema without someone deciding
+    // where it sits in the ontology — which is exactly what it caught.
+    expect(Object.keys(ITEM_TYPE_MAP).length).toBe(31);
   });
 
   it('RELATION_TYPE_MAP covers every callable relation', () => {

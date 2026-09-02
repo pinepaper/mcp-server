@@ -315,6 +315,35 @@ function generateCreateItemCode(
     params.strokeColor = strokeColor;
   }
 
+  // RENDER-TIME SURFACES DEGRADE, THEY DO NOT FAIL.
+  //
+  // `shader` and `field` are drawn per pixel by the cloud rasterizer from the
+  // scene document; the browser engine has no such item type and answers
+  // `create('shader')` with "unknown type — nothing was created". Emitting that
+  // call would hand every local user a silent hole where their backdrop was.
+  //
+  // So locally they become a plate: a rectangle carrying the same id, position,
+  // size and colour, which keeps the composition readable and the item
+  // addressable by every later call. The scene document still says `shader`, so
+  // a cloud render draws the real surface. The divergence is declared here
+  // rather than discovered in a frame.
+  if (itemType === 'shader' || itemType === 'field') {
+    const plate: Record<string, unknown> = {
+      x: position.x,
+      y: position.y,
+      width: (params.width as number) ?? 200,
+      height: (params.height as number) ?? 200,
+      fillColor: (params.fillColor as string) ?? (params.fill as string) ?? '#334155',
+    };
+    if (params.id) plate.id = params.id;
+    if (params.opacity != null) plate.opacity = params.opacity;
+    return `
+// ${itemType} — a render-time surface. Drawn per pixel by the cloud renderer;
+// stood in for locally by a flat plate so the layout still reads.
+const item = app.create('rectangle', ${JSON.stringify(plate, null, 2)});
+if (item && item.data) { item.data.renderAs = ${JSON.stringify(itemType)}; item.data.renderParams = ${JSON.stringify(params)}; }`;
+  }
+
   // Build the code
   let code = `
 // Create ${itemType} item
