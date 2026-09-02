@@ -79,8 +79,10 @@ serveur à votre place** — mêmes outils, même version, en HTTP, sans
 installation ni navigateur sur votre machine.
 
 L'hébergement a un coût, il est donc payant — il fonctionne avec des crédits.
-Les tarifs actuels sont sur [cloud.pinepaper.studio](https://cloud.pinepaper.studio). Si vous
-pouvez l'exécuter en local, faites-le — vous n'y perdez rien.
+Les tarifs actuels sont sur [cloud.pinepaper.studio](https://cloud.pinepaper.studio). Exécutez-le
+en local si vous le pouvez, mais ce n'est pas identique : le service hébergé
+utilise un ensemble de LLM testés et répare le code généré avant qu'il
+n'atteigne le canevas, ce qu'un serveur local ne peut pas faire lui-même.
 
 ## Aller plus loin
 

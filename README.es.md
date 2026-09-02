@@ -79,8 +79,10 @@ servidor por usted** — mismas herramientas, misma versión, por HTTP, sin
 instalación y sin navegador en su máquina.
 
 El alojamiento cuesta dinero, así que es de pago — funciona con créditos.
-Los precios actuales están en [cloud.pinepaper.studio](https://cloud.pinepaper.studio). Si
-puede ejecutarlo localmente, hágalo — no pierde nada.
+Los precios actuales están en [cloud.pinepaper.studio](https://cloud.pinepaper.studio). Ejecútelo
+en local si puede, pero no es idéntico: el servicio alojado usa un conjunto de
+LLM probados y repara el código generado antes de que llegue al lienzo, algo
+que un servidor local no puede hacer por sí mismo.
 
 ## Más
 

@@ -78,8 +78,9 @@ npm install -g @pinepaper.studio/mcp-server
 机器上运行浏览器。
 
 托管需要成本，因此是付费的，按额度（credits）运行。当前价格请见
-[cloud.pinepaper.studio](https://cloud.pinepaper.studio)。如果你能在本地运行，就在本地运行
-—— 这样不会损失任何功能。
+[cloud.pinepaper.studio](https://cloud.pinepaper.studio)。能在本地运行就在本地运行，
+但两者并不完全相同：托管服务使用经过测试的 LLM，并在生成的代码进入画布前
+进行修复 —— 这是本地服务器自身无法做到的。
 
 ## 更多
 

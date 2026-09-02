@@ -80,7 +80,9 @@ und ohne Browser auf Ihrem Rechner.
 
 Hosting kostet Geld, daher ist es kostenpflichtig — es läuft über Credits.
 Aktuelle Preise finden Sie unter [cloud.pinepaper.studio](https://cloud.pinepaper.studio).
-Wenn Sie lokal laufen lassen können, tun Sie das — Sie verlieren dadurch nichts.
+Lassen Sie es lokal laufen, wenn Sie können — identisch ist es aber nicht: Der
+gehostete Dienst nutzt einen getesteten Satz an LLMs und repariert generierten
+Code, bevor er die Leinwand erreicht. Das kann ein lokaler Server nicht selbst.
 
 ## Mehr
 

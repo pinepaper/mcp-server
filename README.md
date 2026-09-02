@@ -57,8 +57,10 @@ on your machine. It exists for three cases: you have no MCP client, you cannot
 install one, or your machine cannot spare the browser.
 
 Hosting costs money, so the hosted option is paid — it runs on credits. See
-[cloud.pinepaper.studio](https://cloud.pinepaper.studio) for current pricing. If you can
-run it locally, run it locally — you lose nothing by doing so.
+[cloud.pinepaper.studio](https://cloud.pinepaper.studio) for current pricing. Run it
+locally if you can, but it is not identical: the hosted service runs a tested
+set of LLMs and repairs generated code before it reaches the canvas, which a
+local server structurally cannot do for itself.
 
 ## Made with tool calls
 
