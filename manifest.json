@@ -256,6 +256,10 @@
       "description": "3D world under the canvas: create (forest|snowMountain|field|jungle)|describe (engine schema)|configure|add_actor (live sprites)|set_actor_pose|set_camera (follow|fixed|orbit)|objects|remove_world."
     },
     {
+      "name": "pinepaper_character",
+      "description": "Place a character from the graph and direct it. {concept, at, height, beats:[{at, channel, until?, value?}]}. The concept declares its channels — blink, say, headTurn, bob."
+    },
+    {
       "name": "pinepaper_rigging",
       "description": "Skeletal rigging + animation. action: create_skeleton|add_bone|attach_item|create_ik_chain|add_pose_keyframe|set_target_path|save_pose|save_shape_key. Pose keyframes carry S12 breakdown controls (favor/breakdown/boneOffsets/movingHold)."
     },
