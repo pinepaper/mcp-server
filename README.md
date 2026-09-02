@@ -181,6 +181,10 @@ The same code an agent generates is the code you can paste — the canvas is you
 
 ## What's new in 1.6.7
 
+**Three appliers that failed in silence now report.** The engine's `animate`, `applyAnimatedMask` and `applyCutoutStyle` refused an unknown key only through `console.warn`, and the production build strips the console — while returning values identical between success and failure (`undefined` either way, a Paper Group either way, and the very item it was given). Over MCP, where there is no console to read, an unknown key left the canvas unchanged and told every caller it had worked.
+
+The engine now records the refusal on the item it already hands back, and these tools read it: a refused animation type, a mask that applied but will never animate, and a cutout preset that returned the item untouched are all reported as failures, each carrying the requested value **and the known list**, so a caller can correct itself without a second round trip.
+
 **New tool: `pinepaper_character`** — place a figure from the graph and direct it. The character layer was reachable from the cloud's build script and nowhere else, which by this project's own rule means it did not exist: an MCP client, a cloud caller and a small on-device model all see these schemas and nothing behind them.
 
 - It replaces roughly thirty exactly-right calls — create the skeleton, add each bone with the right parent and angle, create each shape, attach each to the right bone, then author poses — where one mistake anywhere leaves a broken figure. That volume of exactly-right output is the reported reason characters do not work for smaller models.

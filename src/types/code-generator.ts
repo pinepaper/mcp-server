@@ -595,7 +595,23 @@ app.animate(item, {
   animationSpeed: ${speed}${extra}
 });
 
-({ success: true, itemId: '${itemId}', animationType: '${animationType}' });
+// The engine records a refused type on the item rather than throwing, because
+// animate() is on too many paths for a throw to be safe. It used to warn only
+// to a console the production build strips, so an unknown type left the item
+// still and every caller told it had worked. Read the record back.
+(() => {
+  const r = item.data && item.data.animationRejected;
+  if (r) {
+    return {
+      success: false,
+      itemId: '${itemId}',
+      error: 'Unknown animationType "' + r.requested + '" — nothing will move.',
+      requested: r.requested,
+      known: r.known,
+    };
+  }
+  return { success: true, itemId: '${itemId}', animationType: '${animationType}' };
+})();
 `.trim();
 }
 
@@ -2934,6 +2950,10 @@ const item = app.getItemById(targetId);
 if (!item) throw new Error('Item not found: ' + targetId);
 if (!app.applyAnimatedMask) throw new Error('Mask system not available');
 const maskedGroup = app.applyAnimatedMask(item, '${preset}', ${maskOpts});
+const maskRej = maskedGroup && maskedGroup.data && maskedGroup.data.maskAnimationRejected;
+if (maskRej) {
+  return { success: false, itemId: targetId, error: 'Masked, but animation preset "' + maskRej.requested + '" is unknown — it will NOT animate.', requested: maskRej.requested, known: maskRej.known };
+}
 return { success: !!maskedGroup, itemId: targetId, preset: '${preset}' };
 `;
       }
@@ -4539,6 +4559,18 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
     } else {
       maskedGroup = app.applyAnimatedMask(item, '${preset}', mergedOpts);
     }
+    // A mask with an unknown ANIMATION preset still masks — the item just never
+    // animates — so !!maskedGroup is true either way. The engine records which.
+    const rej = maskedGroup && maskedGroup.data && maskedGroup.data.maskAnimationRejected;
+    if (rej) {
+      return {
+        success: false,
+        itemId: '${validated.itemId}',
+        error: 'Masked, but the animation preset "' + rej.requested + '" is unknown — it will NOT animate.',
+        requested: rej.requested,
+        known: rej.known,
+      };
+    }
     return { success: !!maskedGroup, itemId: '${validated.itemId}', preset: '${preset}' };
   } catch (error) {
     return { success: false, error: error.message };
@@ -5756,6 +5788,12 @@ case 'analyze_palette':
   ${guard}
   try {
     const result = await app.imageTools.applyCutoutStyle(${JSON.stringify(input.itemId || '')}, ${JSON.stringify(input.preset || '')}, ${JSON.stringify(input.options || {})});
+    // An unknown preset returns the very item it was given, unchanged — so a
+    // truthy result proves nothing. The engine records the refusal on it.
+    const cutRej = result && result.data && result.data.cutoutStyleRejected;
+    if (cutRej) {
+      return { success: false, action: 'apply', itemId: ${JSON.stringify(input.itemId || '')}, error: 'Unknown cutout preset "' + cutRej.requested + '" — the item is UNCHANGED.', requested: cutRej.requested, known: cutRej.known };
+    }
     return { success: true, action: 'apply', itemId: ${JSON.stringify(input.itemId || '')}, preset: ${JSON.stringify(input.preset || '')} };
   } catch (e) {
     return { error: 'Failed to apply cutout style: ' + e.message };
