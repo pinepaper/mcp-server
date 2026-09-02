@@ -82,7 +82,9 @@ El alojamiento cuesta dinero, así que es de pago — funciona con créditos.
 Los precios actuales están en [cloud.pinepaper.studio](https://cloud.pinepaper.studio). Ejecútelo
 en local si puede, pero no es idéntico: el servicio alojado usa un conjunto de
 LLM probados y repara el código generado antes de que llegue al lienzo, algo
-que un servidor local no puede hacer por sí mismo.
+que un servidor local no puede hacer por sí mismo. En qué modelo confiar es
+algo que puede comprobar usted mismo: hay un benchmark en beta — un prompt en
+varios modelos, resultados en paralelo, y cualquier ejecución compartible.
 
 ## Más
 

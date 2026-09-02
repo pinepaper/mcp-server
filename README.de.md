@@ -82,7 +82,9 @@ Hosting kostet Geld, daher ist es kostenpflichtig — es läuft über Credits.
 Aktuelle Preise finden Sie unter [cloud.pinepaper.studio](https://cloud.pinepaper.studio).
 Lassen Sie es lokal laufen, wenn Sie können — identisch ist es aber nicht: Der
 gehostete Dienst nutzt einen getesteten Satz an LLMs und repariert generierten
-Code, bevor er die Leinwand erreicht. Das kann ein lokaler Server nicht selbst.
+Code, bevor er die Leinwand erreicht. Das kann ein lokaler Server nicht selbst. Welchem Modell Sie trauen, können
+Sie selbst prüfen: Es gibt einen Benchmark in der Beta — ein Prompt über
+mehrere Modelle, Ergebnisse nebeneinander, jeder Lauf teilbar.
 
 ## Mehr
 

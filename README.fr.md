@@ -82,7 +82,10 @@ L'hébergement a un coût, il est donc payant — il fonctionne avec des crédit
 Les tarifs actuels sont sur [cloud.pinepaper.studio](https://cloud.pinepaper.studio). Exécutez-le
 en local si vous le pouvez, mais ce n'est pas identique : le service hébergé
 utilise un ensemble de LLM testés et répare le code généré avant qu'il
-n'atteigne le canevas, ce qu'un serveur local ne peut pas faire lui-même.
+n'atteigne le canevas, ce qu'un serveur local ne peut pas faire lui-même. Quel modèle privilégier est
+une question que vous pouvez trancher vous-même : un banc d'essai est
+disponible en bêta — un prompt sur plusieurs modèles, les résultats côte à
+côte, et chaque exécution partageable.
 
 ## Aller plus loin
 

@@ -60,7 +60,9 @@ Hosting costs money, so the hosted option is paid — it runs on credits. See
 [cloud.pinepaper.studio](https://cloud.pinepaper.studio) for current pricing. Run it
 locally if you can, but it is not identical: the hosted service runs a tested
 set of LLMs and repairs generated code before it reaches the canvas, which a
-local server structurally cannot do for itself.
+local server structurally cannot do for itself. Which model to trust is a
+question you can answer yourself: there is a benchmark in beta — run one prompt
+across several models, compare the results side by side, and share any run.
 
 ## Made with tool calls
 

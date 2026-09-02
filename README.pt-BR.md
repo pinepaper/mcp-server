@@ -82,7 +82,9 @@ Hospedagem custa dinheiro, então é paga — funciona por créditos. Os preços
 atuais estão em [cloud.pinepaper.studio](https://cloud.pinepaper.studio). Rode localmente
 se puder, mas não é idêntico: o serviço hospedado usa um conjunto testado de
 LLMs e repara o código gerado antes que ele chegue ao canvas — algo que um
-servidor local não consegue fazer sozinho.
+servidor local não consegue fazer sozinho. Em qual modelo confiar é uma
+pergunta que você mesmo pode responder: há um benchmark em beta — um prompt em
+vários modelos, resultados lado a lado, e qualquer execução compartilhável.
 
 ## Mais
 
