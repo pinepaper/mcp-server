@@ -56,9 +56,9 @@ for you** — same tools, same version, over HTTP with no install and no browser
 on your machine. It exists for three cases: you have no MCP client, you cannot
 install one, or your machine cannot spare the browser.
 
-Hosting costs money, so it is paid: **Starter $4.99/mo** (500 requests/day) and
-**Pro $14.99/mo** (5,000/day, plus the animation template library). If you can
-run it locally, run it locally — you lose nothing by doing so.
+Hosting costs money, so the hosted option is paid — it runs on credits. See
+[cloud.pinepaper.studio](https://cloud.pinepaper.studio) for current pricing. If
+you can run it locally, run it locally — you lose nothing by doing so.
 
 ## Made with tool calls
 

@@ -78,10 +78,9 @@ gesperrten Arbeitsrechner eher nicht.
 Server für Sie** — gleiche Tools, gleiche Version, über HTTP, ohne Installation
 und ohne Browser auf Ihrem Rechner.
 
-Hosting kostet Geld, daher ist es kostenpflichtig: **Starter 4,99 $/Monat**
-(500 Anfragen/Tag) und **Pro 14,99 $/Monat** (5.000/Tag, plus die
-Animationsvorlagen). Wenn Sie lokal laufen lassen können, tun Sie das — Sie
-verlieren dadurch nichts.
+Hosting kostet Geld, daher ist es kostenpflichtig und wird über Credits
+abgerechnet. Aktuelle Preise finden Sie unter [cloud.pinepaper.studio](https://cloud.pinepaper.studio). Wenn Sie lokal laufen
+lassen können, tun Sie das — Sie verlieren dadurch nichts.
 
 ## Mehr
 

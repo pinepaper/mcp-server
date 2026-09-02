@@ -78,10 +78,9 @@ restrita, nem tanto.
 servidor para você** — mesmas ferramentas, mesma versão, por HTTP, sem
 instalação e sem navegador na sua máquina.
 
-Hospedagem custa dinheiro, então é paga: **Starter US$ 4,99/mês**
-(500 requisições/dia) e **Pro US$ 14,99/mês** (5.000/dia, mais a biblioteca de
-modelos de animação). Se você consegue rodar localmente, rode localmente — você
-não perde nada.
+Hospedagem custa dinheiro, então é paga e funciona por créditos. Os preços
+atuais estão em [cloud.pinepaper.studio](https://cloud.pinepaper.studio). Se você consegue rodar localmente, rode localmente —
+você não perde nada.
 
 ## Mais
 

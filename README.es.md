@@ -78,10 +78,9 @@ restringido, sí.
 servidor por usted** — mismas herramientas, misma versión, por HTTP, sin
 instalación y sin navegador en su máquina.
 
-El alojamiento cuesta dinero, así que es de pago: **Starter 4,99 $/mes**
-(500 peticiones/día) y **Pro 14,99 $/mes** (5.000/día, más la biblioteca de
-plantillas de animación). Si puede ejecutarlo localmente, hágalo — no pierde
-nada.
+El alojamiento cuesta dinero, así que es de pago y funciona con créditos.
+Los precios actuales están en [cloud.pinepaper.studio](https://cloud.pinepaper.studio). Si puede ejecutarlo localmente, hágalo —
+no pierde nada.
 
 ## Más
 

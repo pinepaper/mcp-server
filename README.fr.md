@@ -78,10 +78,9 @@ de travail verrouillée, moins.
 serveur à votre place** — mêmes outils, même version, en HTTP, sans
 installation ni navigateur sur votre machine.
 
-L'hébergement a un coût, il est donc payant : **Starter 4,99 $/mois**
-(500 requêtes/jour) et **Pro 14,99 $/mois** (5 000/jour, plus la bibliothèque
-de modèles d'animation). Si vous pouvez l'exécuter en local, faites-le — vous
-n'y perdez rien.
+L'hébergement a un coût, il est donc payant et fonctionne avec des crédits.
+Les tarifs actuels sont sur [cloud.pinepaper.studio](https://cloud.pinepaper.studio). Si vous pouvez l'exécuter en local,
+faites-le — vous n'y perdez rien.
 
 ## Aller plus loin
 

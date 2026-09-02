@@ -77,8 +77,8 @@ npm install -g @pinepaper.studio/mcp-server
 服务器** —— 相同的工具、相同的版本，通过 HTTP 提供，无需安装，也不需要在你的
 机器上运行浏览器。
 
-托管需要成本，因此是付费的：**Starter 每月 $4.99**（每天 500 次请求）与
-**Pro 每月 $14.99**（每天 5,000 次，另含动画模板库）。如果你能在本地运行，
+托管需要成本，因此是付费的，按额度（credits）计费。当前价格请见
+[cloud.pinepaper.studio](https://cloud.pinepaper.studio)。如果你能在本地运行，
 就在本地运行 —— 这样不会损失任何功能。
 
 ## 更多
