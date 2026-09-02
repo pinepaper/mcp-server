@@ -80,7 +80,7 @@ instalação e sem navegador na sua máquina.
 
 Hospedagem custa dinheiro, então é paga — mas não há assinatura nem plano a
 escolher. Você compra créditos, eles não expiram, e a cobrança é por operação;
-$1 em créditos é grátis para começar. Os preços atuais estão em [cloud.pinepaper.studio](https://cloud.pinepaper.studio). Se você
+sua primeira recarga inclui $1 em créditos grátis. Os preços atuais estão em [cloud.pinepaper.studio](https://cloud.pinepaper.studio). Se você
 consegue rodar localmente, rode localmente — você não perde nada.
 
 ## Mais

@@ -58,9 +58,9 @@ install one, or your machine cannot spare the browser.
 
 Hosting costs money, so the hosted option is paid — but there is no
 subscription and no plan to pick. You buy credits, they never expire, and you
-are charged per operation; $1 of credit is free to start. Current rates are on
-[cloud.pinepaper.studio](https://cloud.pinepaper.studio). If you can run it locally, run it
-locally — you lose nothing by doing so.
+are charged per operation; your first top-up includes $1 of credit free.
+Current rates are on [cloud.pinepaper.studio](https://cloud.pinepaper.studio). If you can run it
+locally, run it locally — you lose nothing by doing so.
 
 ## Made with tool calls
 

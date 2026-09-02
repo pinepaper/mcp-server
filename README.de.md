@@ -80,7 +80,8 @@ und ohne Browser auf Ihrem Rechner.
 
 Hosting kostet Geld, daher ist es kostenpflichtig — aber es gibt kein Abo und
 keinen Tarif zu wählen. Sie kaufen Credits, diese verfallen nicht, und es wird
-pro Operation abgerechnet; $1 Guthaben ist zum Start kostenlos. Aktuelle Preise
+pro Operation abgerechnet; bei Ihrer ersten Aufladung erhalten Sie $1 Guthaben
+gratis. Aktuelle Preise
 finden Sie unter [cloud.pinepaper.studio](https://cloud.pinepaper.studio). Wenn Sie lokal laufen lassen können, tun Sie das — Sie
 verlieren dadurch nichts.
 
