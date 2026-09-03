@@ -92,7 +92,7 @@
     "basic-ftp": "^5.3.1",
     "body-parser": "^2.3.0",
     "es-define-property": "npm:@socketregistry/es-define-property@^1.0.7",
-    "fast-uri": "^3.1.5",
+    "fast-uri": "^3.1.7",
     "flatted": "^3.4.2",
     "function-bind": "npm:@socketregistry/function-bind@^1.0.7",
     "gopd": "npm:@socketregistry/gopd@^1.0.7",
