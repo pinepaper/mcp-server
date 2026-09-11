@@ -46,6 +46,7 @@ import {
   DesignMediumInputSchema,
   ShatterImageInputSchema,
   ImportLayeredCharacterInputSchema,
+  CharacterInputSchema,
   GameInputSchema,
   World3DInputSchema,
   BrandKitInputSchema,
@@ -157,6 +158,7 @@ import { toolGuideHandlers } from './handlers/tool-guide.js';
 import { mapHandlers } from './handlers/maps.js';
 import { ontologyHandlers } from './handlers/ontology.js';
 import { exportHandlers } from './handlers/export.js';
+import { planCharacter, generateCharacterCode } from './handlers/character.js';
 
 /**
  * Registry of per-domain handler maps. Tools listed here short-circuit the
@@ -1041,6 +1043,34 @@ async function handleToolCallInner(
       // -----------------------------------------------------------------------
       // BATCH OPERATION TOOLS
       // -----------------------------------------------------------------------
+      case 'pinepaper_character': {
+        const input = CharacterInputSchema.parse(args);
+        const plan = planCharacter(input);
+        if (!plan.ok) {
+          // A refusal that names what WOULD have worked. The caller cannot see
+          // the design graph, and a bare "no" is how a model came to ask for a
+          // concept that has never had a drawing.
+          return {
+            content: [{ type: 'text', text: `pinepaper_character: ${plan.reason}` }],
+            isError: true,
+          };
+        }
+        const code = generateCharacterCode(
+          plan,
+          {
+            generateCreateItem: (i: unknown) => codeGenerator.generateCreateItem(i as never),
+            generateKeyframeAnimate: (i: unknown) => codeGenerator.generateKeyframeAnimate(i as never),
+          },
+          {
+            createItem: (a: unknown) => CreateItemInputSchema.parse(a),
+            keyframeAnimate: (a: unknown) => KeyframeAnimateInputSchema.parse(a),
+          },
+        );
+        const description =
+          `Places ${input.concept} as ${plan.parts.length} parts with ${plan.tracks} keyframe tracks`;
+        return executeOrGenerate(code, description, options, 'pinepaper_character');
+      }
+
       case 'pinepaper_batch_create': {
         const input = BatchCreateInputSchema.parse(args);
         const code = codeGenerator.generateBatchCreate(input);

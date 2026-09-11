@@ -31,13 +31,14 @@ const read = (p: string) => readFileSync(join(SRC, p), 'utf-8');
 /**
  * Tools defined but not reachable. Each needs the reason it is here.
  *
- * - pinepaper_character: no handler case, no zod schema, no emitter. The
- *   implementation it describes (concept → channels → beats → keyframes) lives
- *   in mcp-cloud's build script; mirroring it here is real work, not a wiring
- *   fix, so it is recorded rather than stubbed. A stub would answer the call
- *   and still not place a figure, which is the same lie with a slower failure.
+ * EMPTY as of 2026-09-11. `pinepaper_character` was the last entry and is now
+ * wired: `src/character/` carries the concept graph, the composed depictions
+ * and `performCharacter` vendored from mcp-cloud, and the handler routes its
+ * ops through the EXISTING create_item and keyframe_animate emitters. Adding a
+ * name back means a second phantom shipped, and that needs a reason in writing
+ * here, not a silent append.
  */
-const KNOWN_ORPHANS = ['pinepaper_character'];
+const KNOWN_ORPHANS: string[] = [];
 
 function definedTools(): string[] {
   const defs = read('tools/definitions.ts');

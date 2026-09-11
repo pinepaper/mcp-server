@@ -1258,6 +1258,30 @@ export const KeyframeAnimateInputSchema = z.object({
   clipOutPoint: z.number().optional().describe('Stop at N seconds into the keyframe data — clip tail trim. Default: lastKeyframeTime.'),
 });
 
+// Character — a symbol and some beats, expanded against the design graph.
+//
+// Mirrors `pinepaper_character`'s inputSchema field for field. Only `concept`
+// is required: everything else has a defensible default, and the point of the
+// tool is that a caller who knows nothing but the name of a figure gets one.
+export const CharacterBeatSchema = z.object({
+  at: z.number().describe('When, in seconds'),
+  channel: z.string().describe('A channel the concept declares — blink, say, headTurn, bob, tailFlick…'),
+  until: z.number().optional().describe('For a channel that occupies a span rather than an instant'),
+  value: z.number().optional().describe('How far, for a channel that takes a magnitude'),
+});
+export const CharacterInputSchema = z.object({
+  concept: z.string().describe('Concept id from the design graph, e.g. "pp:Character" or "pp:Pigeon".'),
+  at: z.object({ x: z.number().optional(), y: z.number().optional() }).optional().describe('Where the figure stands.'),
+  height: z.number().optional().describe('Drawn height in pixels.'),
+  id: z.string().optional().describe('Prefix for the created items (default: the concept name).'),
+  style: z.string().optional().describe('Style id for the depiction (default: the concept\'s own).'),
+  variant: z.string().optional().describe('Depiction variant (default: "default").'),
+  durationSeconds: z.number().optional().describe('Length of the piece, so every track spans it.'),
+  beats: z.array(CharacterBeatSchema).optional().describe('What happens, in order.'),
+  timings: z.array(z.object({ at: z.number(), until: z.number().optional() })).optional()
+    .describe('Word or syllable timings from a voice track; each entry drives one mouth opening.'),
+});
+
 // Motion Capture (BVH)
 //
 // FxTool exposes two distinct operations and the difference is the whole point:
