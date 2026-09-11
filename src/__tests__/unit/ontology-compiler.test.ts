@@ -94,6 +94,23 @@ describe('generateInstantiateOntology codegen', () => {
     // ends in a (-led trailing expression → governor can capture its value
     expect(/\)\s*;?\s*$/.test(code.trim())).toBe(true);
   });
+
+  it('prefers the studio engine door (app.instantiateOntology) with the raw doc, and keeps the box loop as the fallback', () => {
+    const doc = {
+      nodes: [{ id: 'hero', type: 'pp:Disk', 'pp:radius': 40, 'pp:fillColor': '#ff0000', 'pp:keyframeCount': 2 }],
+      edges: [],
+    };
+    const code = codeGenerator.generateInstantiateOntology({ doc, canvas: { width: 800, height: 600 } });
+    // the raw document rides to the engine, facets and all — the server never rewrites it
+    expect(code).toContain("typeof app.instantiateOntology === 'function'");
+    expect(code).toContain('await app.instantiateOntology(doc, {"canvas":{"width":800,"height":600}})');
+    expect(code).toContain('"pp:fillColor":"#ff0000"');
+    expect(code).toContain('"pp:radius":40');
+    // the fallback still exists for older studios and says what it lost
+    expect(code).toContain('app.create(op.type');
+    expect(code).toContain("engine: 'server-box'");
+    expect(code).toMatch(/^\(async function\(\)/m);
+  });
 });
 
 describe('generateLintScene codegen', () => {
