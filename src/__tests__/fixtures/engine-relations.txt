@@ -123,6 +123,7 @@ on_top_of
 orbits
 parallax
 part_of
+part_of_figure
 points_at
 pose_layer
 repels

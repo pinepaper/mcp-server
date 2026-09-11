@@ -122,11 +122,33 @@ export function toEngineConvention(op: CharacterOp): CharacterOp {
  * which tries to reach a browser and times out at 5001ms.
  */
 export function planCharacter(args: CharacterArgs):
-  | { ok: true; ops: CharacterOp[]; parts: string[]; tracks: number; notes: string[] }
+  | { ok: true; ops: CharacterOp[]; parts: string[]; tracks: number; notes: string[]; concept: string; root: string | null }
   | { ok: false; reason: string } {
   const r = resolveCharacter(args);
   if (!r.ok) return r;
-  return { ...r, ops: r.ops.map(toEngineConvention) };
+  return {
+    ...r,
+    ops: r.ops.map(toEngineConvention),
+    concept: String(args.concept ?? ''),
+    root: figureRoot(r.parts),
+  };
+}
+
+/**
+ * The part the others hang off.
+ *
+ * `part_of_figure` points at a SIBLING, exactly as `glyph_of` points at the
+ * root glyph — there is no wrapper item, and inventing one would be the Paper
+ * group this design deliberately avoids. The body is the natural root because
+ * it is the part every other one is drawn against; failing that, the first in
+ * z-order, which is stable for a given concept.
+ */
+export function figureRoot(parts: string[]): string | null {
+  if (!parts.length) return null;
+  // The ink copies are duplicates of a source part and must never be the root.
+  const real = parts.filter((p) => !p.endsWith('__ink'));
+  const pool = real.length ? real : parts;
+  return pool.find((p) => p.endsWith('_body')) ?? pool[0] ?? null;
 }
 
 /**
@@ -141,7 +163,7 @@ export function planCharacter(args: CharacterArgs):
  * once made every generated `auto_walk` program a SyntaxError.
  */
 export function generateCharacterCode(
-  plan: { ops: CharacterOp[]; parts: string[]; tracks: number; notes: string[] },
+  plan: { ops: CharacterOp[]; parts: string[]; tracks: number; notes: string[]; concept?: string; root?: string | null },
   gen: {
     generateCreateItem: (input: unknown) => string;
     generateKeyframeAnimate: (input: unknown) => string;
@@ -167,6 +189,11 @@ export function generateCharacterCode(
   //
   // So the program binds each part to the id the engine actually assigned and
   // the tracks reference that, which is what makes the performance run.
+  // On a CURRENT studio this map is the identity — FxTool's `create()` now
+  // honours a caller-supplied `id` (and suffixes rather than steals a taken
+  // one). It is kept because an MCP server talks to whatever studio is open,
+  // and on an older one the minted ids are all that exist. Reading the id back
+  // from the item is correct on both.
   out.push('const __ppChar = {};');
 
   // ONE AUTHORING ACT, ONE UNDO. Each generated op ends with its own
@@ -200,6 +227,37 @@ export function generateCharacterCode(
         .split(JSON.stringify(token)).join(`__ppChar[${JSON.stringify(partId)}]`)
         .split(`'${token}'`).join(`__ppChar[${JSON.stringify(partId)}]`);
       out.push(`{\n${body}\n}`);
+    }
+  }
+
+  // ── THE PARTS ARE ONE FIGURE, AND ONLY THE GRAPH CAN SAY SO ───────────────
+  //
+  // Nothing else in the program does. They are thirteen sibling paths; a Paper
+  // group would bind them and would also put ONE transform over all of them,
+  // which is wrong for a performance keyed per part — the same trade text
+  // effects make by joining glyphs with edges instead of grouping them.
+  //
+  // `part_of_figure` is an ANNOTATION: inert at frame time. It is deliberately
+  // not `part_of`, which cascades the parent's position — every carried part
+  // already has that motion baked into its own track by `carriedBy`, so the two
+  // together would move it twice.
+  if (plan.root) {
+    const bindings = plan.parts
+      .filter((p) => p !== plan.root)
+      .map((p) => ({ part: p, role: p.replace(/^[^_]+_/, '').replace(/__ink$/, '') }));
+    if (bindings.length) {
+      out.push(
+        [
+          `// ${bindings.length} parts bound into one figure, rooted on ${plan.root}`,
+          'if (app.addRelation) {',
+          ...bindings.map(
+            (b) =>
+              `  app.addRelation(__ppChar[${JSON.stringify(b.part)}], __ppChar[${JSON.stringify(plan.root)}],` +
+              ` 'part_of_figure', { role: ${JSON.stringify(b.role)}, concept: ${JSON.stringify(plan.concept)} });`,
+          ),
+          '}',
+        ].join('\n'),
+      );
     }
   }
 

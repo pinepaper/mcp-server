@@ -57,6 +57,14 @@ const EMITTED_BY_A_TOOL: Record<string, RegExp | string[]> = {
   'blending system': /^blend_/,
   pinepaper_component: ['composed_as', 'fills_slot'],
   'text tools': ['glyph_of', 'has_text_effect'],
+  // `part_of_figure` is the figure twin of `glyph_of` and is excluded for the
+  // same reason: it is BOOKKEEPING the composing tool maintains, not an edge a
+  // caller authors. pinepaper_character writes one per part so the thirteen
+  // shapes of a pigeon are addressable as one figure; an agent adding them
+  // ad-hoc would produce a figure whose membership disagrees with its parts.
+  // (It is deliberately NOT `part_of`, which cascades position — see the note
+  // in FxTool's RelationRegistry.)
+  pinepaper_character: ['part_of_figure'],
   pinepaper_camera_director: ['has_camera_treatment'],
   'map tools (place containment)': ['contained_in_place'],
   '(not a relation — the escape hatch for an unrecognised edge)': ['unknown'],

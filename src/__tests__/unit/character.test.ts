@@ -17,7 +17,7 @@ import { describe, it, expect } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
-import { planCharacter, toEngineConvention, generateCharacterCode } from '../../tools/handlers/character.js';
+import { planCharacter, toEngineConvention, generateCharacterCode, figureRoot } from '../../tools/handlers/character.js';
 import { resolveCharacter, drawableConcepts, channelsOf } from '../../character/resolve.js';
 import { pathBBox } from '../../character/path-bbox.js';
 import { CharacterInputSchema, CreateItemInputSchema, KeyframeAnimateInputSchema } from '../../types/schemas.js';
@@ -247,5 +247,41 @@ describe('vendor parity with mcp-cloud', () => {
       .flatMap((v) => (v && typeof v === 'object' && 'ms' in v ? [(v as { ms: number }).ms] : []))
       .sort((a, b) => a - b);
     expect(expected).toEqual([100, 150, 200, 300, 400, 500, 800]);
+  });
+});
+
+describe('the parts are bound into one figure', () => {
+  it('roots on the body and binds every other part with its role', () => {
+    const r = planCharacter({ concept: 'pp:Pigeon', at: { x: 470, y: 250 }, height: 300 });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.root).toBe('pigeon_body');
+    const code = generateCharacterCode(
+      r,
+      {
+        generateCreateItem: (i) => codeGenerator.generateCreateItem(i as never),
+        generateKeyframeAnimate: (i) => codeGenerator.generateKeyframeAnimate(i as never),
+      },
+      { createItem: (a) => CreateItemInputSchema.parse(a), keyframeAnimate: (a) => KeyframeAnimateInputSchema.parse(a) },
+    );
+    expect(code).toContain("'part_of_figure'");
+    expect(code).toContain('{ role: "eye", concept: "pp:Pigeon" }');
+    // the root does not point at itself
+    expect(code).not.toContain('__ppChar["pigeon_body"], __ppChar["pigeon_body"]');
+    // and it is an ANNOTATION, so nothing at frame time — never part_of
+    expect(code).not.toContain("'part_of'");
+    expect(() => new Function(code)).not.toThrow();
+  });
+
+  it('never roots on an ink duplicate', () => {
+    // The ink copies are duplicates of a source part; rooting on one would make
+    // the figure hang off its own outline.
+    expect(figureRoot(['x_head__ink', 'x_body__ink', 'x_head', 'x_body'])).toBe('x_body');
+    expect(figureRoot(['x_tail__ink', 'x_tail'])).toBe('x_tail');
+  });
+
+  it('falls back to the first part when nothing is named _body', () => {
+    expect(figureRoot(['tree_trunk', 'tree_leaves'])).toBe('tree_trunk');
+    expect(figureRoot([])).toBeNull();
   });
 });
