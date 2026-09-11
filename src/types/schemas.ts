@@ -300,6 +300,7 @@ export const RelationTypeSchema = z.enum([
   'anchored_in_world',
   'spring_follow',
   'repels',
+  'attracts',
   'wiggle',
   // --- Animation and sequencing ---
   'animates',

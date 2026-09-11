@@ -3,6 +3,7 @@ anchored_in_world
 animates
 attached_to
 attached_to_tail
+attracts
 below
 beside
 blend_reacts_to
@@ -36,9 +37,11 @@ deform_wobble
 driven_by
 effect_blast
 effect_bubbles
+effect_caustics
 effect_confetti
 effect_dust
 effect_electric
+effect_electric_arc
 effect_fire
 effect_fireflies
 effect_gem_smoke
@@ -47,12 +50,14 @@ effect_heatmap
 effect_ink_bleed
 effect_liquid_metal
 effect_rain
+effect_rain_veil
 effect_ripple
 effect_shockwave
 effect_smoke
 effect_snow
 effect_sparkle
 effect_trail
+effect_vortex
 exclusive_group
 expresses
 fills_slot
