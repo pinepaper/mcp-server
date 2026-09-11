@@ -6845,7 +6845,10 @@ case 'analyze_palette':
     const opsJson = JSON.stringify(ops, null, 2);
     const diagJson = JSON.stringify(diagnostics);
     const docJson = JSON.stringify(input.doc);
-    const engineOptsJson = JSON.stringify({ canvas: input.canvas, defaultGeometry: input.defaultGeometry });
+    // awaitImages: the studio decorates a raster (fit, keyframes, mask) on its
+    // 'load' event and re-runs its finalize steps when the last one lands; a
+    // tool call that screenshots next wants that to have happened.
+    const engineOptsJson = JSON.stringify({ canvas: input.canvas, defaultGeometry: input.defaultGeometry, awaitImages: true });
     return `
 // Instantiate ontology → scene (${ops.filter((o) => o.op === 'create').length} items, ${ops.filter((o) => o.op === 'addRelation').length} relations)
 (async function() {

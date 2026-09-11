@@ -103,7 +103,9 @@ describe('generateInstantiateOntology codegen', () => {
     const code = codeGenerator.generateInstantiateOntology({ doc, canvas: { width: 800, height: 600 } });
     // the raw document rides to the engine, facets and all — the server never rewrites it
     expect(code).toContain("typeof app.instantiateOntology === 'function'");
-    expect(code).toContain('await app.instantiateOntology(doc, {"canvas":{"width":800,"height":600}})');
+    // awaitImages: the studio decorates rasters on their 'load' event; the call
+    // returns once the last one has landed, so the screenshot after it is whole.
+    expect(code).toContain('await app.instantiateOntology(doc, {"canvas":{"width":800,"height":600},"awaitImages":true})');
     expect(code).toContain('"pp:fillColor":"#ff0000"');
     expect(code).toContain('"pp:radius":40');
     // the fallback still exists for older studios and says what it lost
