@@ -41,8 +41,13 @@ export class DesignGraph {
   /** Map a PinePaper item type string to its pp: type. */
   getNodeType(itemType: string | undefined): string {
     if (!itemType) return 'pp:Group';
-    const lower = itemType.toLowerCase();
-    return ITEM_TYPE_MAP[lower] || 'pp:Group';
+    // Try the key AS SPELLED before folding case. ITEM_TYPE_MAP mirrors the
+    // engine's map, which carries camelCase keys (barChart, lineChart,
+    // scatterPlot, areaChart) — lowercasing first made all four unreachable, so
+    // every chart silently classified as pp:Group instead of its own type. The
+    // fallback keeps the case-insensitivity everything else relies on.
+    if (ITEM_TYPE_MAP[itemType]) return ITEM_TYPE_MAP[itemType];
+    return ITEM_TYPE_MAP[itemType.toLowerCase()] || 'pp:Group';
   }
 
   /** Map a PinePaper relation name to its pp: edge type. */

@@ -278,6 +278,27 @@ describe('DesignGraph', () => {
       expect(dg.getNodeType('TEXT')).toBe('pp:Text');
       expect(dg.getNodeType('Circle')).toBe('pp:Circle');
     });
+
+    // Found by the FxTool long-form-export session, 2026-09-12, in the engine's
+    // own DesignGraph: getNodeType lowercased before the lookup, so every
+    // camelCase key in the map was dead. Four of this map's 27 keys are
+    // camelCase, and all four are chart types — they classified as pp:Group,
+    // which is a readable graph of the wrong thing rather than an error.
+    it('reaches every key in ITEM_TYPE_MAP, camelCase included', () => {
+      const unreachable = Object.keys(ITEM_TYPE_MAP)
+        .filter((k) => dg.getNodeType(k) !== ITEM_TYPE_MAP[k]);
+      expect(unreachable).toEqual([]);
+    });
+
+    it('classifies the chart types as charts, not groups', () => {
+      expect(dg.getNodeType('barChart')).toBe(ITEM_TYPE_MAP['barChart']);
+      expect(dg.getNodeType('lineChart')).toBe(ITEM_TYPE_MAP['lineChart']);
+      expect(dg.getNodeType('scatterPlot')).toBe(ITEM_TYPE_MAP['scatterPlot']);
+      expect(dg.getNodeType('areaChart')).toBe(ITEM_TYPE_MAP['areaChart']);
+      for (const k of ['barChart', 'lineChart', 'scatterPlot', 'areaChart']) {
+        expect(dg.getNodeType(k)).not.toBe('pp:Group');
+      }
+    });
   });
 
   describe('getEdgeType', () => {
