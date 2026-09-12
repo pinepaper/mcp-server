@@ -113,6 +113,26 @@ describe('generateInstantiateOntology codegen', () => {
     expect(code).toContain("engine: 'server-box'");
     expect(code).toMatch(/^\(async function\(\)/m);
   });
+
+  it('reports every count the engine returns, and a failed image is not a success', () => {
+    const code = codeGenerator.generateInstantiateOntology({
+      doc: { nodes: [{ id: 'hero', type: 'pp:Disk', 'pp:radius': 40 }], edges: [] },
+      canvas: { width: 800, height: 600 },
+    });
+    // OntologyCompiler.instantiate returns { itemIds, diagnostics, ...counts,
+    // settled }. Surfacing a chosen three of the counts is how a scene that
+    // looks built and is not becomes invisible over MCP.
+    for (const key of [
+      'keyframesApplied', 'masksApplied', 'deferred', 'relationsApplied',
+      'connectorsApplied', 'interactionsApplied', 'effectsApplied',
+      'groupsCreated', 'nested', 'imagesFailed', 'backgroundApplied', 'duration',
+    ]) {
+      expect(code).toContain(`${key}: r.${key}`);
+    }
+    // A raster that never decoded must not report success, even when the
+    // compiler logged no error-level diagnostic for it.
+    expect(code).toContain('&& !r.imagesFailed');
+  });
 });
 
 describe('generateLintScene codegen', () => {

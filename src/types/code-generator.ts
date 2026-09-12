@@ -6863,10 +6863,19 @@ case 'analyze_palette':
     const r = await app.instantiateOntology(doc, ${engineOptsJson});
     const diags = r.diagnostics || [];
     return {
-      success: !diags.some(function(d) { return d && d.level === 'error'; }),
+      success: !diags.some(function(d) { return d && d.level === 'error'; }) && !r.imagesFailed,
       engine: 'studio',
       itemIds: r.itemIds, itemCount: r.itemIds.length,
+      // Every count the engine returns, not a chosen three. imagesFailed is the
+      // one that matters most: a raster that never decoded leaves a scene that
+      // looks built and is not, and dropping the count is how that becomes
+      // invisible. relationsApplied and connectorsApplied are the only way to
+      // tell "the doc declared no edges" from "the edges did not bind".
       keyframesApplied: r.keyframesApplied, masksApplied: r.masksApplied, deferred: r.deferred,
+      relationsApplied: r.relationsApplied, connectorsApplied: r.connectorsApplied,
+      interactionsApplied: r.interactionsApplied, effectsApplied: r.effectsApplied,
+      groupsCreated: r.groupsCreated, nested: r.nested,
+      imagesFailed: r.imagesFailed, backgroundApplied: r.backgroundApplied, duration: r.duration,
       diagnostics: diags, errors: [],
     };
   }
