@@ -94,6 +94,45 @@ describe('generateInstantiateOntology codegen', () => {
     // ends in a (-led trailing expression → governor can capture its value
     expect(/\)\s*;?\s*$/.test(code.trim())).toBe(true);
   });
+
+  it('prefers the studio engine door (app.instantiateOntology) with the raw doc, and keeps the box loop as the fallback', () => {
+    const doc = {
+      nodes: [{ id: 'hero', type: 'pp:Disk', 'pp:radius': 40, 'pp:fillColor': '#ff0000', 'pp:keyframeCount': 2 }],
+      edges: [],
+    };
+    const code = codeGenerator.generateInstantiateOntology({ doc, canvas: { width: 800, height: 600 } });
+    // the raw document rides to the engine, facets and all — the server never rewrites it
+    expect(code).toContain("typeof app.instantiateOntology === 'function'");
+    // awaitImages: the studio decorates rasters on their 'load' event; the call
+    // returns once the last one has landed, so the screenshot after it is whole.
+    expect(code).toContain('await app.instantiateOntology(doc, {"canvas":{"width":800,"height":600},"awaitImages":true})');
+    expect(code).toContain('"pp:fillColor":"#ff0000"');
+    expect(code).toContain('"pp:radius":40');
+    // the fallback still exists for older studios and says what it lost
+    expect(code).toContain('app.create(op.type');
+    expect(code).toContain("engine: 'server-box'");
+    expect(code).toMatch(/^\(async function\(\)/m);
+  });
+
+  it('reports every count the engine returns, and a failed image is not a success', () => {
+    const code = codeGenerator.generateInstantiateOntology({
+      doc: { nodes: [{ id: 'hero', type: 'pp:Disk', 'pp:radius': 40 }], edges: [] },
+      canvas: { width: 800, height: 600 },
+    });
+    // OntologyCompiler.instantiate returns { itemIds, diagnostics, ...counts,
+    // settled }. Surfacing a chosen three of the counts is how a scene that
+    // looks built and is not becomes invisible over MCP.
+    for (const key of [
+      'keyframesApplied', 'masksApplied', 'deferred', 'relationsApplied',
+      'connectorsApplied', 'interactionsApplied', 'effectsApplied',
+      'groupsCreated', 'nested', 'imagesFailed', 'backgroundApplied', 'duration',
+    ]) {
+      expect(code).toContain(`${key}: r.${key}`);
+    }
+    // A raster that never decoded must not report success, even when the
+    // compiler logged no error-level diagnostic for it.
+    expect(code).toContain('&& !r.imagesFailed');
+  });
 });
 
 describe('generateLintScene codegen', () => {

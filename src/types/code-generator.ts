@@ -6844,9 +6844,41 @@ case 'analyze_palette':
     }).compile(input.doc);
     const opsJson = JSON.stringify(ops, null, 2);
     const diagJson = JSON.stringify(diagnostics);
+    const docJson = JSON.stringify(input.doc);
+    // awaitImages: the studio decorates a raster (fit, keyframes, mask) on its
+    // 'load' event and re-runs its finalize steps when the last one lands; a
+    // tool call that screenshots next wants that to have happened.
+    const engineOptsJson = JSON.stringify({ canvas: input.canvas, defaultGeometry: input.defaultGeometry, awaitImages: true });
     return `
 // Instantiate ontology → scene (${ops.filter((o) => o.op === 'create').length} items, ${ops.filter((o) => o.op === 'addRelation').length} relations)
-(function() {
+(async function() {
+  // Engine door first: the studio's own OntologyCompiler reads every node facet
+  // (geometry, paint, text, the keyframe track, masks) and builds through the
+  // template loader's paths — the round trip the studio's pixel tests verify
+  // (e2e/graph-instantiate-parity.spec.js). The server-side compile above is
+  // kept for the diagnostics preview and for studios that predate the facade,
+  // which get the box loop below and a note saying so.
+  const doc = ${docJson};
+  if (typeof app.instantiateOntology === 'function') {
+    const r = await app.instantiateOntology(doc, ${engineOptsJson});
+    const diags = r.diagnostics || [];
+    return {
+      success: !diags.some(function(d) { return d && d.level === 'error'; }) && !r.imagesFailed,
+      engine: 'studio',
+      itemIds: r.itemIds, itemCount: r.itemIds.length,
+      // Every count the engine returns, not a chosen three. imagesFailed is the
+      // one that matters most: a raster that never decoded leaves a scene that
+      // looks built and is not, and dropping the count is how that becomes
+      // invisible. relationsApplied and connectorsApplied are the only way to
+      // tell "the doc declared no edges" from "the edges did not bind".
+      keyframesApplied: r.keyframesApplied, masksApplied: r.masksApplied, deferred: r.deferred,
+      relationsApplied: r.relationsApplied, connectorsApplied: r.connectorsApplied,
+      interactionsApplied: r.interactionsApplied, effectsApplied: r.effectsApplied,
+      groupsCreated: r.groupsCreated, nested: r.nested,
+      imagesFailed: r.imagesFailed, backgroundApplied: r.backgroundApplied, duration: r.duration,
+      diagnostics: diags, errors: [],
+    };
+  }
   if (typeof app.create !== 'function' || typeof app.addRelation !== 'function') {
     return { success: false, error: 'app.create / app.addRelation unavailable' };
   }
@@ -6867,7 +6899,7 @@ case 'analyze_palette':
     }
   }
   if (app.historyManager) app.historyManager.saveState();
-  return { success: errors.length === 0, itemIds: itemIds, itemCount: itemIds.length, diagnostics: diagnostics, errors: errors };
+  return { success: errors.length === 0, engine: 'server-box', note: 'this studio predates app.instantiateOntology: items were placed as boxes without paint, text, keyframes or masks', itemIds: itemIds, itemCount: itemIds.length, diagnostics: diagnostics, errors: errors };
 })();`.trim();
   }
 
