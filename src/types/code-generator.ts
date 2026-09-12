@@ -1324,6 +1324,18 @@ export function canvasPresetFor(platform: string): string {
   return PLATFORM_TO_CANVAS_PRESET[platform] || platform;
 }
 
+/**
+ * Largest export the emitted code will hand back as an inline base64 data URL.
+ *
+ * Only reached on a studio with no `app.exportEngine.exportToStore` — with the
+ * store, mp4/webm never base64 in the page at all. Set above what that legacy
+ * path could already deliver (60 s at 8 Mbps is roughly 60 MB, ~80 MB once
+ * base64'd) so raising the duration cap cannot make a previously working
+ * export start refusing; past it the code names the ceiling instead of dying
+ * inside the encode.
+ */
+export const INLINE_MAX_BYTES = 96 * 1024 * 1024;
+
 export class PinePaperCodeGenerator {
   /**
    * Generate code for creating an item
@@ -3002,6 +3014,46 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
   /**
    * Generate code for smart export
    */
+  /**
+   * Read one slice of a held export, base64-encoded.
+   *
+   * The handler calls this in a loop and appends each chunk to the file it was
+   * going to write anyway, so no more than one chunk is ever in memory on
+   * either side of the bridge. Every refusal the engine can give is passed
+   * through untouched — a bad range names the real size, and an id that was
+   * EVICTED to make room says so rather than reporting not-found, because
+   * those are different bugs from the caller's side.
+   */
+  generateReadExportChunk(exportId: string, offset: number, length?: number): string {
+    const range: Record<string, number> = { offset };
+    if (typeof length === 'number') range.length = length;
+    return `
+// Read export chunk at ${offset}
+(async function() {
+  if (!app.exportEngine || typeof app.exportEngine.readExport !== 'function') {
+    return { ok: false, reason: 'app.exportEngine.readExport unavailable — update FxTool' };
+  }
+  return await app.exportEngine.readExport(${JSON.stringify(exportId)}, ${JSON.stringify(range)});
+})();`.trim();
+  }
+
+  /**
+   * Drop a held export once its bytes are safely on disk here.
+   *
+   * Called only after the whole file has been written. A release before that
+   * would be unrecoverable: the store is the only copy.
+   */
+  generateReleaseExport(exportId: string): string {
+    return `
+// Release held export
+(async function() {
+  if (!app.exportEngine || typeof app.exportEngine.releaseExport !== 'function') {
+    return { ok: false, reason: 'app.exportEngine.releaseExport unavailable — update FxTool' };
+  }
+  return await app.exportEngine.releaseExport(${JSON.stringify(exportId)});
+})();`.trim();
+  }
+
   generateAgentExport(input: AgentExportInput): string {
     const validated = AgentExportInputSchema.parse(input);
     const { platform, format, quality, framing, duration, estimateOnly } = validated;
@@ -3157,32 +3209,110 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
           r.onloadend = () => resolve(r.result);
           r.readAsDataURL(b);
         });
+
+        // THE EXPORT STORE. A long export cannot come back as one base64
+        // string: base64 of a gigabyte is larger than the gigabyte, and it
+        // crosses the browser→server bridge as a single page.evaluate return
+        // value. exportToStore() streams the encode straight to the studio's
+        // origin-private store and hands back an id, so the bytes stay on disk
+        // and the handler pages them into the file it was going to write
+        // anyway. mp4/webm ALWAYS land in a file on the server side, so there
+        // is no size at which building a data URL for them is worth doing —
+        // the id goes back at every size and nothing is base64'd in the page.
+        // gif is refused by name by the store (it has its own encoder and
+        // never streams), so gif keeps the buffered path below.
+        const store = (app.exportEngine
+          && typeof app.exportEngine.exportToStore === 'function'
+          && typeof app.exportEngine.readExport === 'function')
+          ? app.exportEngine : null;
+
+        if (store && format !== 'gif') {
+          const stored = await store.exportToStore({
+            format,
+            duration: baseVideoSettings.duration,
+            fps: settings.fps,
+            // A NUMBER, not the quality tier's name. _calculateBitrate
+            // multiplies by it, and a non-finite value used to survive its
+            // Math.max(100000, NaN) "floor" all the way to
+            // VideoEncoder.configure.
+            quality: settings.compression,
+            width: cameraDims ? cameraDims.width : dimensions.width,
+            height: cameraDims ? cameraDims.height : dimensions.height,
+          });
+          if (!stored || stored.ok === false) {
+            result = { success: false, platform, format, error: (stored && stored.reason) || 'the export store refused the export without saying why' };
+          } else {
+            let chunkBytes = 4 * 1024 * 1024;
+            try {
+              const declared = app.exportEngine.constructor && app.exportEngine.constructor.EXPORT_CHUNK_BYTES;
+              if (typeof declared === 'number' && declared > 0) chunkBytes = declared;
+            } catch (_) { /* keep the default */ }
+            result = {
+              success: true, platform, framing,
+              // Trust the container the store reports over the one asked for:
+              // mp4 falls back to WebM without WebCodecs, and WebM bytes named
+              // .mp4 fail in container-validating players.
+              format: stored.format || format,
+              retained: true,
+              exportId: stored.exportId,
+              mimeType: stored.mimeType || videoMimeType,
+              size: stored.size,
+              chunkBytes: chunkBytes,
+              dimensions: cameraDims || dimensions,
+            };
+          }
+          break;
+        }
+
+        // NO EXPORT STORE ON THIS STUDIO, or gif. Both remaining failures are
+        // named rather than left to blow up: a streamed export hands back a
+        // marker instead of a Blob and FileReader throws on it, and an export
+        // past the inline ceiling used to die somewhere in the base64 rather
+        // than say so. The ceiling sits above what this path could already do
+        // (60 s at 8 Mbps is roughly 60 MB) so nothing that works today starts
+        // refusing.
+        const INLINE_MAX_BYTES = ${INLINE_MAX_BYTES};
+        const mb = (n) => (n / (1024 * 1024)).toFixed(1);
+        const deliver = async (blob) => {
+          if (!blob || typeof blob.size !== 'number' || typeof blob.slice !== 'function') {
+            return {
+              success: false, platform, format,
+              error: 'this export streamed to a file instead of returning bytes, and this studio has no app.exportEngine.exportToStore to page it back from — update FxTool for long-form export',
+            };
+          }
+          if (blob.size > INLINE_MAX_BYTES) {
+            return {
+              success: false, platform, format, size: blob.size,
+              error: 'export is ' + mb(blob.size) + ' MB, over the ' + mb(INLINE_MAX_BYTES)
+                + ' MB inline ceiling, and this studio has no app.exportEngine.exportToStore to page it out of — update FxTool, or lower duration/quality',
+            };
+          }
+          return { success: true, platform, format, framing, data: await blobToDataUrl(blob), mimeType: videoMimeType, size: blob.size };
+        };
+
         // Camera framing requires going direct to videoExporter so width/height
         // pass through — _quickExportVideo strips dim fields.
         if (cameraDims && app.exportEngine && app.exportEngine.videoExporter) {
           const blob = await app.exportEngine.videoExporter.export({ ...baseVideoSettings, width: cameraDims.width, height: cameraDims.height });
-          const dataUrl = await blobToDataUrl(blob);
-          result = { success: true, platform, format, framing, data: dataUrl, mimeType: videoMimeType, size: blob.size, dimensions: cameraDims };
+          result = await deliver(blob);
+          if (result.success) result.dimensions = cameraDims;
         } else if ((format === 'mp4' || format === 'webm') && app.exportEngine && app.exportEngine.videoExporter) {
           // Bypass _quickExportVideo for mp4/webm — it hardcodes
           // quality:undefined for these formats and produces a NaN bitrate.
           const blob = await app.exportEngine.videoExporter.export(baseVideoSettings);
-          const dataUrl = await blobToDataUrl(blob);
-          result = { success: true, platform, format, framing, data: dataUrl, mimeType: videoMimeType, size: blob.size };
+          result = await deliver(blob);
         } else if (app.exportEngine && app.exportEngine._quickExportVideo) {
           // GIF path (working): _quickExportVideo forwards gifQuality to
           // gif.js. Also serves as the fallback if videoExporter is absent.
           const videoResult = await app.exportEngine._quickExportVideo(format, baseVideoSettings, false);
           if (videoResult && videoResult.blob) {
-            const dataUrl = await blobToDataUrl(videoResult.blob);
-            result = { success: true, platform, format, framing, data: dataUrl, mimeType: videoMimeType, size: videoResult.blob.size };
+            result = await deliver(videoResult.blob);
           } else {
             result = { success: false, error: format.toUpperCase() + ' export returned no data' };
           }
         } else if (app.exportEngine && app.exportEngine.videoExporter) {
           const blob = await app.exportEngine.videoExporter.export(baseVideoSettings);
-          const dataUrl = await blobToDataUrl(blob);
-          result = { success: true, platform, format, framing, data: dataUrl, mimeType: videoMimeType, size: blob.size };
+          result = await deliver(blob);
         } else {
           result = { success: false, error: format.toUpperCase() + ' export not available' };
         }

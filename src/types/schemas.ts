@@ -2298,6 +2298,18 @@ export type AgentBatchExecuteInput = z.infer<typeof AgentBatchExecuteInputSchema
 export const GIF_MAX_DURATION_S = 15;
 
 /**
+ * Longest mp4/webm export the tool will accept, in seconds.
+ *
+ * Was 60. A ten-minute export is only reachable because the bytes no longer
+ * cross the browser→server bridge as one base64 string: above an inline
+ * ceiling the studio keeps the file in its export store and the handler pages
+ * it out in chunks. On a studio with no export store the emitted code refuses
+ * by name with the numbers instead, so raising this cap cannot turn into an
+ * out-of-memory — it turns into a message naming the ceiling and what to do.
+ */
+export const VIDEO_MAX_DURATION_S = 600;
+
+/**
  * Smart export input schema
  */
 export const AgentExportInputSchema = z.object({
@@ -2306,7 +2318,7 @@ export const AgentExportInputSchema = z.object({
   quality: z.enum(['draft', 'standard', 'high']).optional().default('standard').describe('Export quality level'),
   includeRecommendations: z.boolean().optional().default(true).describe('Include alternative format recommendations'),
   framing: z.enum(['canvas', 'camera']).optional().default('canvas').describe('Output framing: "canvas" (full canvas, default) or "camera" (camera_animates first-keyframe viewport — fails if no walkthrough exists). Camera animation still drives motion within the fixed output frame.'),
-  duration: z.number().min(0.5).max(60).optional().default(5).describe(`Video duration in seconds for animated formats (mp4/webm/gif). Default 5. Max 60 for mp4/webm, max ${GIF_MAX_DURATION_S} for gif (GIF is not codec-bounded, so file size scales with frames × dimensions). Static formats (png/svg/pdf) ignore this.`),
+  duration: z.number().min(0.5).max(VIDEO_MAX_DURATION_S).optional().default(5).describe(`Video duration in seconds for animated formats (mp4/webm/gif). Default 5. Max ${VIDEO_MAX_DURATION_S} for mp4/webm, max ${GIF_MAX_DURATION_S} for gif (GIF is not codec-bounded, so file size scales with frames × dimensions, and it cannot stream to the export store). Static formats (png/svg/pdf) ignore this. Past roughly a minute the export is held in the studio's export store and paged back to a file rather than returned inline; a studio without that store refuses by name and says so.`),
   estimateOnly: z.boolean().optional().default(false).describe('Preflight only: return the estimated file size for these EXACT settings and render nothing. Use before a long or high-quality export to check the size first. Modeled for mp4/webm/gif; png/pdf/svg return confidence "none" because no dimension-based model exists for them.'),
 }).describe('Smart export options')
   .superRefine((val, ctx) => {

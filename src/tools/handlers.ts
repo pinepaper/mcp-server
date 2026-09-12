@@ -138,7 +138,7 @@ import {
   ItemType,
 } from '../types/schemas.js';
 import { ZodError } from 'zod';
-import { writeFile, mkdir } from 'node:fs/promises';
+import { writeFile, mkdir, appendFile, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { I18nManager } from '../i18n/index.js';
@@ -240,6 +240,88 @@ async function saveExportToFile(
     await writeFile(filePath, data, 'utf-8');
     return { filePath, fileSize: Buffer.byteLength(data, 'utf-8') };
   }
+}
+
+/**
+ * Page a RETAINED export out of the studio's export store into a local file.
+ *
+ * The bytes never cross the bridge as one string. The studio holds the encoded
+ * file in its origin-private store and hands back an id; this reads it a chunk
+ * at a time and appends each one, so at most one chunk (4 MB by default) is in
+ * memory on either side. The agent still made one tool call and still gets one
+ * filePath — the paging is entirely inside the tool, because an agent-facing
+ * pager would only expose a transport limit the agent cannot act on.
+ *
+ * On failure the export is deliberately LEFT HELD: the store is the only copy,
+ * so the id and the byte count reached go back in the error and the bytes stay
+ * recoverable. `releaseExport` runs only once the whole file is written.
+ */
+async function streamRetainedExportToFile(
+  controller: { executeCode: (code: string, screenshot: boolean) => Promise<{ success: boolean; error?: string; result?: unknown }> },
+  retained: { exportId: string; size: number; format: string; chunkBytes?: number },
+  platform: string
+): Promise<{ filePath: string; fileSize: number; chunks: number }> {
+  const exportDir = getExportDir();
+  await mkdir(exportDir, { recursive: true });
+
+  const ext = getFileExtension(retained.format);
+  const fileName = `pinepaper_${platform}_${Date.now()}.${ext}`;
+  const filePath = join(exportDir, fileName);
+
+  const chunkBytes = retained.chunkBytes && retained.chunkBytes > 0 ? retained.chunkBytes : 4 * 1024 * 1024;
+  let offset = 0;
+  let chunks = 0;
+
+  // Start from empty: appendFile would otherwise extend a same-millisecond file.
+  await writeFile(filePath, Buffer.alloc(0));
+
+  // Returns the error rather than throwing it, so `throw await abandon(...)`
+  // reads as a throw to the type checker and narrows what follows.
+  const abandon = async (why: string): Promise<Error> => {
+    try { await unlink(filePath); } catch { /* nothing written yet */ }
+    return new Error(
+      `${why} (export "${retained.exportId}" is still held in the studio, ${offset} of ${retained.size} bytes read; ` +
+      `it can be paged again, and is released only once a whole file is written)`
+    );
+  };
+
+  for (;;) {
+    const code = codeGenerator.generateReadExportChunk(retained.exportId, offset, Math.min(chunkBytes, retained.size - offset));
+    const run = await controller.executeCode(code, false);
+    if (!run.success) throw await abandon(`reading the export failed: ${run.error || 'unknown error'}`);
+
+    const chunk = run.result as { ok?: boolean; reason?: string; evicted?: boolean; data?: string; length?: number; eof?: boolean } | undefined;
+    if (!chunk || chunk.ok !== true) {
+      // An evicted id is its own failure: a later export reclaimed the space.
+      // Re-exporting is the caller's decision, never this loop's.
+      throw await abandon(chunk?.evicted
+        ? `the export was evicted mid-read: ${chunk.reason}`
+        : `the studio refused the read: ${chunk?.reason || 'no reason given'}`);
+    }
+
+    const buf = Buffer.from(chunk.data || '', 'base64');
+    if (buf.length === 0 && chunk.eof !== true) throw await abandon('the studio returned an empty chunk before the end of the file');
+    await appendFile(filePath, buf);
+    offset += buf.length;
+    chunks++;
+
+    if (chunk.eof === true) break;
+    if (offset >= retained.size) break;
+  }
+
+  if (offset !== retained.size) {
+    throw await abandon(`reassembled ${offset} bytes but the studio reported ${retained.size}`);
+  }
+
+  // Only now is it safe to drop the studio's copy.
+  try {
+    await controller.executeCode(codeGenerator.generateReleaseExport(retained.exportId), false);
+  } catch (releaseError) {
+    // A held export costs quota, not correctness — the file is already whole.
+    console.error('[PinePaper] Export written but releaseExport failed:', releaseError);
+  }
+
+  return { filePath, fileSize: offset, chunks };
 }
 
 // =============================================================================
@@ -2603,6 +2685,45 @@ You can now start creating new items on a clean canvas.`,
         const exportResult = exportBrowserResult.result as Record<string, any>;
         const format = exportResult?.format || input.format || 'png';
         const data = exportResult?.data;
+
+        // RETAINED: the studio held the encoded file in its export store rather
+        // than returning bytes, because base64 of a long video is a bigger
+        // string than the video and it would cross the bridge as one value.
+        // Page it into a file here. mp4/webm were always going to be written to
+        // a file anyway (ALWAYS_SAVE_FORMATS), so the agent's result is the
+        // same shape it has always been — a filePath — just reachable at sizes
+        // that used to run out of memory.
+        if (exportResult?.retained === true && typeof exportResult.exportId === 'string') {
+          try {
+            const { filePath, fileSize, chunks } = await streamRetainedExportToFile(
+              controller,
+              {
+                exportId: exportResult.exportId,
+                size: Number(exportResult.size) || 0,
+                format,
+                chunkBytes: Number(exportResult.chunkBytes) || undefined,
+              },
+              input.platform || 'auto'
+            );
+            const cleanResult = { ...exportResult, data: undefined, filePath, fileSize, chunks };
+            return {
+              content: [{
+                type: 'text' as const,
+                text: `Export saved to file:\n\nFile: ${filePath}\nFormat: ${format}\nSize: ${(fileSize / 1024).toFixed(1)} KB\nPlatform: ${input.platform}\nPaged out of the studio's export store in ${chunks} chunk${chunks === 1 ? '' : 's'}\n\nResult: ${JSON.stringify(cleanResult, null, 2)}`,
+              }],
+            };
+          } catch (streamError) {
+            // The export is still held — the message says so and names the id,
+            // because the bytes are recoverable and re-exporting is not free.
+            const canvasState = await captureCanvasState(controller);
+            return errorResult(
+              ErrorCodes.EXECUTION_ERROR,
+              streamError instanceof Error ? streamError.message : 'Paging the export out of the store failed',
+              { code, exportId: exportResult.exportId, size: exportResult.size },
+              { toolName: 'pinepaper_agent_export', canvasState: canvasState || undefined }
+            );
+          }
+        }
 
         const shouldSaveToFile = data && typeof data === 'string' && (
           ALWAYS_SAVE_FORMATS.has(format) ||

@@ -148,21 +148,31 @@ export async function captureCanvasState(
 
 /**
  * Format canvas state for human-readable error messages
+ *
+ * Every field is read DEFENSIVELY. captureCanvasState promises never to throw
+ * and returns whatever the studio handed back, so a studio on an older shape —
+ * or any probe that half-succeeds — produced a state missing `itemTypes` or
+ * `canvasSize`, and this function then threw while formatting somebody else's
+ * error. The real failure was lost and replaced with a TypeError from the error
+ * path itself, which is the worst place to have one.
  */
 export function formatCanvasState(state: CanvasState): string {
   const lines: string[] = [];
+  const counts = (v: unknown): Array<[string, number]> =>
+    (v && typeof v === 'object') ? Object.entries(v as Record<string, number>) : [];
 
   lines.push('Canvas State:');
 
   if (state.isEmpty) {
     lines.push('  - Canvas is EMPTY (no items)');
   } else {
-    lines.push(`  - Total Items: ${state.itemCount}`);
+    lines.push(`  - Total Items: ${state.itemCount ?? 'unknown'}`);
 
     // Item types
-    if (Object.keys(state.itemTypes).length > 0) {
+    const itemTypes = counts(state.itemTypes);
+    if (itemTypes.length > 0) {
       lines.push('  - Item Types:');
-      Object.entries(state.itemTypes)
+      itemTypes
         .sort(([, a], [, b]) => b - a) // Sort by count descending
         .forEach(([type, count]) => {
           lines.push(`    • ${type}: ${count}`);
@@ -170,10 +180,11 @@ export function formatCanvasState(state: CanvasState): string {
     }
 
     // Relations
-    if (state.relations.total > 0) {
+    if (state.relations && state.relations.total > 0) {
       lines.push(`  - Relations: ${state.relations.total}`);
-      if (Object.keys(state.relations.byType).length > 0) {
-        Object.entries(state.relations.byType)
+      const byType = counts(state.relations.byType);
+      if (byType.length > 0) {
+        byType
           .sort(([, a], [, b]) => b - a)
           .forEach(([type, count]) => {
             lines.push(`    • ${type}: ${count}`);
@@ -184,7 +195,7 @@ export function formatCanvasState(state: CanvasState): string {
     }
 
     // Recent items
-    if (state.recentItems.length > 0) {
+    if (Array.isArray(state.recentItems) && state.recentItems.length > 0) {
       lines.push('  - Recent Items:');
       state.recentItems.forEach(item => {
         lines.push(`    • ${item.id} (${item.type})`);
@@ -192,7 +203,9 @@ export function formatCanvasState(state: CanvasState): string {
     }
   }
 
-  lines.push(`  - Canvas Size: ${state.canvasSize.width}x${state.canvasSize.height}`);
+  if (state.canvasSize) {
+    lines.push(`  - Canvas Size: ${state.canvasSize.width}x${state.canvasSize.height}`);
+  }
 
   return lines.join('\n');
 }

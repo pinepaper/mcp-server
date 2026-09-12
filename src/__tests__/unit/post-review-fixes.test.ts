@@ -484,11 +484,19 @@ describe('generateAgentExport — VideoEncoder NaN-bitrate fix', () => {
     expect(code).toMatch(/baseVideoSettings\s*=\s*\{[^}]*duration:\s*5\b/);
   });
 
-  it('Zod rejects out-of-range duration (must be 0.5–60)', async () => {
-    const { AgentExportInputSchema } = await import('../../types/schemas.js');
+  // The ceiling was 60s while the only delivery was one inline base64 string.
+  // It is VIDEO_MAX_DURATION_S now that mp4/webm are held in the studio's
+  // export store and paged into a file — a duration past the inline ceiling on
+  // a studio WITHOUT that store is refused by the emitted code, by name, so a
+  // higher cap cannot turn into an out-of-memory.
+  it('Zod rejects out-of-range duration', async () => {
+    const { AgentExportInputSchema, VIDEO_MAX_DURATION_S } = await import('../../types/schemas.js');
     expect(() => AgentExportInputSchema.parse({ platform: 'instagram', duration: 0 })).toThrow();
-    expect(() => AgentExportInputSchema.parse({ platform: 'instagram', duration: 75 })).toThrow();
+    expect(() => AgentExportInputSchema.parse({ platform: 'instagram', duration: VIDEO_MAX_DURATION_S + 1 })).toThrow();
     expect(() => AgentExportInputSchema.parse({ platform: 'instagram', duration: 30 })).not.toThrow();
+    // A ten-minute export is the point of the raise: it used to be unreachable
+    // regardless of how the bytes came back.
+    expect(() => AgentExportInputSchema.parse({ platform: 'youtube', format: 'mp4', duration: 600 })).not.toThrow();
   });
 
   // GIF is not codec-bounded: _exportGIF hands gif.js a quality level, not a
