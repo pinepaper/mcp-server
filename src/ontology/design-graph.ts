@@ -18,6 +18,7 @@ import type {
   PinePaperVocabulary,
   GraphNode,
   GraphEdge,
+  NodeProperties,
   SemanticInfo,
   Fingerprint,
   TemplateGraph,
@@ -148,6 +149,7 @@ export class DesignGraph {
       mathFunctions: [],
       patterns: [],
       generator: null,
+      world: null,
       fingerprint: null,
     };
 
@@ -217,6 +219,23 @@ export class DesignGraph {
         name: genName,
         type: genDef ? genDef.category || 'unknown' : 'unknown',
         mathFunctions: genDef && genDef.mathFunctions ? genDef.mathFunctions : [],
+        // The MERGED params, when the capture carried them. Naming the
+        // generator without them is a recipe nobody can re-run.
+        ...(data.backgroundGeneratorParams && typeof data.backgroundGeneratorParams === 'object'
+          ? { params: { ...data.backgroundGeneratorParams } }
+          : {}),
+      };
+    }
+
+    // --- Extract the 3D stage ---
+    // OUTSIDE the generator block on purpose. A World3D scene has no generator,
+    // so nesting the stage under one drops it from every scene that needs it —
+    // and a mesh rebuilt with no ground under it fails with a true error about
+    // a stage nobody laid.
+    if (data.world && typeof data.world === 'object') {
+      graph.world = {
+        preset: typeof data.world.preset === 'string' ? data.world.preset : null,
+        ...(typeof data.world.seed === 'number' ? { seed: data.world.seed } : {}),
       };
     }
 
@@ -418,6 +437,24 @@ export class DesignGraph {
         if (node.properties.animationType && node.properties.animationType !== 'keyframe') {
           nodeDoc['pp:animationType'] = node.properties.animationType;
         }
+        // Recipes. A consumer that drops any hop of
+        // item.data → node.properties → JSON-LD → the door rebuilds the scene
+        // MINUS everything code drew, and it looks like a working rebuild.
+        if (node.properties.generator) nodeDoc['pp:itemGenerator'] = node.properties.generator;
+        if (node.properties.generatorParams && Object.keys(node.properties.generatorParams).length > 0) {
+          nodeDoc['pp:itemGeneratorParams'] = node.properties.generatorParams;
+        }
+        if (node.properties.generatorRole) nodeDoc['pp:itemGeneratorRole'] = node.properties.generatorRole;
+        if (node.properties.meshProvenance) {
+          nodeDoc['pp:meshProvenance'] = {
+            'pp:op': node.properties.meshProvenance.op,
+            // A node id in THIS graph, resolved during the rebuild pass.
+            'pp:sourceId': node.properties.meshProvenance.sourceId
+              ? `pp:node/${node.properties.meshProvenance.sourceId}`
+              : null,
+            'pp:opts': node.properties.meshProvenance.opts,
+          };
+        }
       }
       return nodeDoc;
     });
@@ -461,11 +498,24 @@ export class DesignGraph {
 
     // Generator
     if (graph.generator) {
-      jsonLd['pp:generator'] = {
+      const genDoc: Record<string, unknown> = {
         'pp:name': graph.generator.name,
         'pp:generatorCategory': graph.generator.type,
         'pp:mathFunctions': graph.generator.mathFunctions,
       };
+      if (graph.generator.params && Object.keys(graph.generator.params).length > 0) {
+        genDoc['pp:generatorParams'] = graph.generator.params;
+      }
+      jsonLd['pp:generator'] = genDoc;
+    }
+
+    // The 3D stage — a SIBLING of pp:generator, never nested inside it. A
+    // World3D scene has no generator, so nesting drops the stage from exactly
+    // the scenes that cannot rebuild without it.
+    if (graph.world && graph.world.preset) {
+      const worldDoc: Record<string, unknown> = { 'pp:preset': graph.world.preset };
+      if (typeof graph.world.seed === 'number') worldDoc['pp:seed'] = graph.world.seed;
+      jsonLd['pp:world'] = worldDoc;
     }
 
     // Semantics
@@ -652,6 +702,13 @@ export class DesignGraph {
       closed: pathClosed !== null ? pathClosed : undefined,
       curveType: pathCurveType || undefined,
       segmentCount: item.segments ? (Array.isArray(item.segments) ? item.segments.length : 0) : undefined,
+      // RECIPES. A generator raster and an authored mesh have no geometry to
+      // round-trip — the call that drew them is their geometry. Params must be
+      // the MERGED set: the subset a generator hands register() is empty or two
+      // keys of thirty for the GPU generators, and a recipe that names a
+      // generator it cannot reproduce is indistinguishable from a working one
+      // until someone re-runs it.
+      ...this._recipeProperties(item),
     };
 
     return {
@@ -660,6 +717,42 @@ export class DesignGraph {
       label: item.content || item.label || itemId || item.type || 'item',
       properties,
     };
+  }
+
+  /**
+   * The recipe fields for one item: what code drew it, and how.
+   *
+   * Returns only the keys the item actually carries, so a hand-authored item
+   * gains nothing and a captured one keeps everything. `meshProvenance.sourceId`
+   * stays a plain node id: it is resolved within the rebuild pass, never
+   * against the session that captured it.
+   */
+  private _recipeProperties(item: TemplateItem): Partial<NodeProperties> {
+    const out: Partial<NodeProperties> = {};
+
+    const generator = typeof item.generator === 'string' ? item.generator : undefined;
+    if (generator) out.generator = generator;
+
+    const params = item.generatorParams;
+    if (params && typeof params === 'object' && !Array.isArray(params)) {
+      out.generatorParams = { ...(params as Record<string, unknown>) };
+    }
+
+    const role = typeof item.generatorRole === 'string' ? item.generatorRole : undefined;
+    if (role) out.generatorRole = role;
+
+    const mesh = item.meshProvenance as { op?: unknown; sourceId?: unknown; opts?: unknown } | undefined;
+    if (mesh && typeof mesh === 'object' && (mesh.op === 'extrude' || mesh.op === 'lathe')) {
+      out.meshProvenance = {
+        op: mesh.op,
+        sourceId: typeof mesh.sourceId === 'string' ? mesh.sourceId : null,
+        opts: (mesh.opts && typeof mesh.opts === 'object' && !Array.isArray(mesh.opts))
+          ? { ...(mesh.opts as Record<string, unknown>) }
+          : {},
+      };
+    }
+
+    return out;
   }
 
   /** Convert a template relation definition into a graph edge. */

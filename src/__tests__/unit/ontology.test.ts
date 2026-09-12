@@ -301,6 +301,124 @@ describe('DesignGraph', () => {
     });
   });
 
+  // RECIPES. Three kinds of node have no geometry to round-trip because code
+  // drew them and the code's inputs ARE their geometry. The port kept only
+  // {name, type, mathFunctions} from data.backgroundGenerator, which names a
+  // generator and cannot re-run one. Shapes from the FxTool long-form-export
+  // session's write-up, 2026-09-12.
+  describe('recipes for what code drew', () => {
+    const captured = {
+      id: 'tunnel',
+      name: 'Tunnel',
+      data: {
+        backgroundGenerator: 'drawGPUTunnel',
+        backgroundGeneratorParams: { speed: 1.4, depth: 1, rings: 14, seed: 1 },
+        world: { preset: 'moon', seed: 1 },
+        items: [
+          {
+            id: 'raster',
+            type: 'raster',
+            generator: 'drawGPUTunnel',
+            generatorParams: { speed: 1.4, depth: 1, rings: 14, stripes: 8, colorA: '#ff8c42', renderScale: 0.5 },
+            generatorRole: 'tunnelRaster',
+          },
+          {
+            id: 'mesh',
+            type: 'group',
+            meshProvenance: { op: 'extrude', sourceId: 'item_3', opts: { depth: 20, caps: true, segments: 24 } },
+          },
+          { id: 'plain', type: 'rectangle', x: 10, y: 10 },
+        ],
+        relations: [],
+      },
+    };
+
+    it('keeps the MERGED generator params on the node, not a subset', () => {
+      const graph = dg.extractFromDefinition(captured);
+      const raster = graph.nodes.find(n => n.id === 'raster')!;
+      expect(raster.properties.generator).toBe('drawGPUTunnel');
+      expect(raster.properties.generatorRole).toBe('tunnelRaster');
+      // Six keys, not the empty object or the two-of-thirty the GPU generators
+      // used to hand register().
+      expect(Object.keys(raster.properties.generatorParams!).length).toBe(6);
+      expect(raster.properties.generatorParams!.renderScale).toBe(0.5);
+    });
+
+    it('keeps mesh provenance, including the node it was derived from', () => {
+      const graph = dg.extractFromDefinition(captured);
+      const mesh = graph.nodes.find(n => n.id === 'mesh')!;
+      expect(mesh.properties.meshProvenance).toEqual({
+        op: 'extrude',
+        sourceId: 'item_3',
+        opts: { depth: 20, caps: true, segments: 24 },
+      });
+    });
+
+    it('adds nothing to a hand-authored item', () => {
+      const graph = dg.extractFromDefinition(captured);
+      const plain = graph.nodes.find(n => n.id === 'plain')!;
+      expect(plain.properties.generator).toBeUndefined();
+      expect(plain.properties.generatorParams).toBeUndefined();
+      expect(plain.properties.meshProvenance).toBeUndefined();
+    });
+
+    it('carries the merged params at document level too', () => {
+      const graph = dg.extractFromDefinition(captured);
+      expect(graph.generator!.params).toEqual({ speed: 1.4, depth: 1, rings: 14, seed: 1 });
+    });
+
+    it('reads the 3D stage, and reads it INDEPENDENTLY of the generator', () => {
+      const graph = dg.extractFromDefinition(captured);
+      expect(graph.world).toEqual({ preset: 'moon', seed: 1 });
+
+      // The bug this guards: a World3D scene has no generator, so a stage read
+      // inside `if (generator)` is dropped from exactly the scenes that cannot
+      // rebuild without it.
+      const worldOnly = dg.extractFromDefinition({
+        id: 'w', data: { world: { preset: 'moon', seed: 3 }, items: [], relations: [] },
+      });
+      expect(worldOnly.generator).toBeNull();
+      expect(worldOnly.world).toEqual({ preset: 'moon', seed: 3 });
+    });
+
+    it('survives the JSON-LD hop — every recipe reaches the document', () => {
+      const jsonLd = dg.toJsonLd(dg.extractFromDefinition(captured));
+      const nodes = jsonLd['pp:nodes'] as Array<Record<string, unknown>>;
+
+      const raster = nodes.find(n => n['@id'] === 'pp:node/raster')!;
+      expect(raster['pp:itemGenerator']).toBe('drawGPUTunnel');
+      expect(raster['pp:itemGeneratorRole']).toBe('tunnelRaster');
+      expect((raster['pp:itemGeneratorParams'] as Record<string, unknown>).stripes).toBe(8);
+
+      const mesh = nodes.find(n => n['@id'] === 'pp:node/mesh')!;
+      const prov = mesh['pp:meshProvenance'] as Record<string, unknown>;
+      expect(prov['pp:op']).toBe('extrude');
+      expect(prov['pp:sourceId']).toBe('pp:node/item_3');
+      expect((prov['pp:opts'] as Record<string, unknown>).segments).toBe(24);
+
+      // pp:world is a SIBLING of pp:generator, never nested inside it.
+      expect(jsonLd['pp:world']).toEqual({ 'pp:preset': 'moon', 'pp:seed': 1 });
+      expect((jsonLd['pp:generator'] as Record<string, unknown>)['pp:world']).toBeUndefined();
+      expect((jsonLd['pp:generator'] as Record<string, unknown>)['pp:generatorParams']).toBeDefined();
+    });
+
+    it('a stage with no generator still reaches the JSON-LD', () => {
+      const jsonLd = dg.toJsonLd(dg.extractFromDefinition({
+        id: 'w', data: { world: { preset: 'moon' }, items: [], relations: [] },
+      }));
+      expect(jsonLd['pp:generator']).toBeUndefined();
+      expect(jsonLd['pp:world']).toEqual({ 'pp:preset': 'moon' });
+    });
+
+    it('refuses a mesh op it does not know rather than inventing one', () => {
+      const graph = dg.extractFromDefinition({
+        id: 'x',
+        data: { items: [{ id: 'm', type: 'group', meshProvenance: { op: 'bevel', sourceId: 'a', opts: {} } }], relations: [] },
+      });
+      expect(graph.nodes[0].properties.meshProvenance).toBeUndefined();
+    });
+  });
+
   describe('getEdgeType', () => {
     it('maps known relation types', () => {
       expect(dg.getEdgeType('orbits')).toBe('pp:orbits');

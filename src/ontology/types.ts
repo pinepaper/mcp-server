@@ -133,6 +133,42 @@ export interface NodeProperties {
   closed?: boolean;
   curveType?: string;
   segmentCount?: number;
+  // --- RECIPES: nodes that code drew, whose inputs ARE their geometry ---
+  // A generator raster or an authored mesh has no geometry to round-trip; the
+  // call that produced it does. Without these a captured scene is readable and
+  // not rebuildable, and the rebuild looks like it worked.
+  /** Registered generator name, e.g. 'drawGPUTunnel'. */
+  generator?: string;
+  /** MERGED generator params — never the subset a generator handed register(). */
+  generatorParams?: Record<string, unknown>;
+  /** The generator registry's typeName for this item, e.g. 'tunnelRaster'. */
+  generatorRole?: string;
+  /** How an authored mesh was derived, and from which node in this same graph. */
+  meshProvenance?: MeshProvenance;
+}
+
+/**
+ * The op that produced a mesh, and its inputs.
+ *
+ * `sourceId` is a node id WITHIN THE SAME graph, so a rebuild resolves it
+ * against the items that pass has already created rather than against a stale
+ * id from the session that captured it.
+ */
+export interface MeshProvenance {
+  op: 'extrude' | 'lathe';
+  sourceId: string | null;
+  opts: Record<string, unknown>;
+}
+
+/**
+ * The 3D stage a scene's meshes sit on. Document level, not per node.
+ *
+ * Emitted independently of `generator`: a World3D scene has no generator, so
+ * nesting this under one drops it from every scene that needs it.
+ */
+export interface WorldInfo {
+  preset: string | null;
+  seed?: number;
 }
 
 export interface GraphEdge {
@@ -146,6 +182,8 @@ export interface GeneratorInfo {
   name: string;
   type: string;
   mathFunctions: string[];
+  /** MERGED params the generator was run with, when the capture carried them. */
+  params?: Record<string, unknown>;
 }
 
 export interface SemanticInfo {
@@ -187,6 +225,8 @@ export interface TemplateGraph {
   mathFunctions: string[];
   patterns: string[];
   generator: GeneratorInfo | null;
+  /** The 3D stage, when the scene has one. Independent of `generator`. */
+  world?: WorldInfo | null;
   fingerprint: Fingerprint | null;
   semantics?: SemanticInfo;
 }
@@ -208,6 +248,10 @@ export interface TemplateDefinition {
     items?: TemplateItem[];
     relations?: TemplateRelation[];
     backgroundGenerator?: string;
+    /** MERGED params the background generator was run with. */
+    backgroundGeneratorParams?: Record<string, unknown>;
+    /** The 3D stage. Carried at document level, like the generator. */
+    world?: { preset?: string; seed?: number };
   };
   onLoad?: unknown;
 }
