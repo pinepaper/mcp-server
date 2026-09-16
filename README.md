@@ -25,7 +25,7 @@
 
 PinePaper MCP Server enables AI assistants to create and animate graphics in [PinePaper Studio](https://pinepaper.studio) via the Model Context Protocol (MCP). Works with any AI that supports MCP tool calling (Claude, GPT, Gemini, local models, etc.).
 
-The server exposes **145 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
+The server exposes **146 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
 
 - Create text, shapes, geometry, and complex graphics
 - Animate items with behavior-driven **relations** rather than keyframes
@@ -37,7 +37,7 @@ The server exposes **145 tools** across drawing, animation, diagrams, maps, typo
 
 ## Running it: local or hosted
 
-**Local is free and complete.** Every one of the 145 tools works when you run
+**Local is free and complete.** Every one of the 146 tools works when you run
 this server yourself. There is no reduced tier and nothing held back.
 
 What it needs:
@@ -230,6 +230,13 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - The parameters have to be the **merged** set. What a generator hands its registry is empty, or two keys of thirty for the GPU generators, and a recipe built from that names a generator it cannot reproduce — which is indistinguishable from a working one until someone re-runs it.
 - `pp:world` is a **sibling** of `pp:generator`, never nested inside it. A World3D scene has no generator, so a stage read inside `if (generator)` is dropped from exactly the scenes that cannot rebuild without it.
 
+**New tool: `pinepaper_motion`** — the generators' Animation knob, pointed at anything. The motion engine every generator's own animation runs on was reachable from the code console and from custom generators, and from no tool call.
+
+- A **group** motion (drift, sway, rotate, pulse, wave, bounce) moves the target as one. A **field** motion (ripple, breathe, undulate) sweeps a crest *through* the children from an origin, with a chosen waveform — a wave passing through a crowd rather than a crowd moving together. Nothing else on this surface could do the second kind: `pinepaper_animate` applies a loop preset to one item.
+- `action: 'list'` returns the engine's own catalogue. `motion` is deliberately a free string rather than an enum: pinning the names here is exactly how `add_relation` came to list 39 of the engine's 134 relations.
+- Origins include `random` (every element on its own phase — a twinkle, not a wave) and `roam` (hopping between the corners and the centre); pass a `seed` to make `random` reproducible.
+- The waveform `spike` is a narrow bump. It was called `pulse` until the engine noticed one word was naming both a waveform and an animation; saved scenes still carry the old spelling and it is still accepted, but it is not offered as a choice.
+
 **New tool: `pinepaper_path`** — the destructive path operations Paper.js has always had and nothing here could reach. Booleans (`unite`, `subtract`, `intersect`, `exclude`, `divide`), `simplify`, `outline_stroke`, `toggle_closed`, repeat `pattern`s (concentric, radial, grid, extrude), `get_geometry`, and a lock.
 
 - They live apart from `pinepaper_modify_item` on purpose: modify restyles an item and keeps its id, while every action here changes what items *exist*. A boolean **consumes its operands** — they stop existing, and their relations and keyframes go with them. The tool description says so, because a caller who reads a boolean as a restyle loses work.
@@ -415,7 +422,7 @@ Fourteen new tools (121 → 135) and new actions across the surface — the rele
 
 ## Toolkits & Token Budget
 
-145 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
+146 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
 
 **Toolkit profiles** (`PINEPAPER_TOOLKIT`):
 
@@ -620,7 +627,7 @@ Generate instruction/code pairs for LLM fine-tuning:
 
 ## Tools Reference
 
-All 145 tools, grouped by the tag used for toolkit filtering.
+All 146 tools, grouped by the tag used for toolkit filtering.
 
 ### Canvas (`canvas`)
 | Tool | Description |
@@ -678,6 +685,7 @@ All 145 tools, grouped by the tag used for toolkit filtering.
 ### Animation (`animation`)
 | Tool | Description |
 |------|-------------|
+| `pinepaper_motion` | Generator motion engine: group and field motions |
 | `pinepaper_animate` | Apply a simple loop animation |
 | `pinepaper_keyframe_animate` | Timed keyframe animation |
 | `pinepaper_play_timeline` | Control playback, rate, progress, scroll-driven scrubbing |

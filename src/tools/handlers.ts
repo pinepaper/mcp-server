@@ -60,6 +60,7 @@ import {
   ComposeInputSchema,
   CropImageInputSchema,
   PathOpInputSchema,
+  MotionInputSchema,
   ChromaKeyInputSchema,
   RiggingInputSchema,
   GroupInputSchema,
@@ -2751,6 +2752,15 @@ You can now start creating new items on a clean canvas.`,
 
         // Small export — return inline (existing behavior)
         return executedResult(code, exportResult, exportBrowserResult.screenshot, description);
+      }
+
+      case 'pinepaper_motion': {
+        const input = MotionInputSchema.parse(args);
+        const code = codeGenerator.generateMotion(input);
+        const described = input.action === 'list'
+          ? 'Listed the generator motion catalogue'
+          : `Applied motion ${input.motion}`;
+        return executeOrGenerate(code, described, options, 'pinepaper_motion');
       }
 
       case 'pinepaper_path': {

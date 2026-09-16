@@ -2265,6 +2265,37 @@ RECIPE — a playable maze: create_tilemap with wall fills → batch_create colo
   },
 
   {
+    name: 'pinepaper_motion',
+    description: `The generators' Animation knob, pointed at anything — the same motion engine every generator's own animation runs on, reachable for any group or list of items.
+
+Two kinds, and the second is the one nothing else here can do:
+- GROUP motions (drift, sway, rotate, pulse, wave, bounce) move the target as one.
+- FIELD motions (ripple, breathe, undulate) sweep a crest THROUGH the children from an origin, with a chosen waveform — each element moves at its own moment in the cycle. That is a wave passing through a crowd, not a crowd moving together.
+
+Call action 'list' first. It returns the engine's own catalogue — every motion, waveform and origin it will accept — so the names come from the engine rather than from an enum here that can drift away from it.
+
+Origins apply to field motions: center, the four corners, the four edges, 'random' (every element on its own phase — a twinkle rather than a wave), and 'roam' (hopping between the corners and the centre). Pass a seed to make 'random' reproducible.
+
+Waveform 'spike' is a narrow bump. It was called 'pulse' until the engine noticed that one word was naming both a waveform and an animation; saved scenes still carry the old spelling and it is still accepted, but 'spike' is the name.
+
+This is not pinepaper_animate: that applies a loop preset to ONE item. This moves a group, or moves a wave through one.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['list', 'apply'], description: "'list' the catalogue · 'apply' a motion." },
+        itemId: { type: 'string', description: 'apply: a group or single item.' },
+        itemIds: { type: 'array', items: { type: 'string' }, description: 'apply: several items, wrapped in a new group that hosts the motion. Members keep their own ids.' },
+        motion: { type: 'string', description: "apply: the motion name. Call 'list' for the set the engine accepts." },
+        speed: { type: 'number', description: 'apply: roughly cycles per second.' },
+        intensity: { type: 'number', description: 'apply: amplitude (0.15 is the usual default elsewhere).' },
+        waveform: { type: 'string', enum: ['sine', 'triangle', 'square', 'sawtooth', 'spike'], description: 'apply: the shape of one cycle.' },
+        origin: { type: 'string', enum: ['center', 'topLeft', 'topRight', 'bottomLeft', 'bottomRight', 'left', 'right', 'top', 'bottom', 'random', 'roam'], description: 'apply, field motions only: where the crest sweeps from.' },
+        seed: { type: 'number', description: "apply: makes a 'random' origin reproducible." },
+      },
+      required: ['action'],
+    },
+  },
+  {
     name: 'pinepaper_path',
     description: `Destructive path operations — the ones that REPLACE or ADD items rather than restyling them.
 

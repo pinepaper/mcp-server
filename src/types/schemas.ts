@@ -4125,6 +4125,36 @@ export type World3DInput = z.infer<typeof World3DInputSchema>;
 // =============================================================================
 
 /**
+ * pinepaper_motion — the generators' Animation knob, pointed at anything.
+ *
+ * The same engine every generator's own animation runs on, reachable for any
+ * group or list of items. Two kinds: a GROUP motion (drift, sway, rotate,
+ * pulse, wave, bounce) moves the target as one; a FIELD motion (ripple,
+ * breathe, undulate) sweeps a crest through the children from an origin, with
+ * a chosen waveform. The field kind is the one nothing else here can do.
+ *
+ * `list` first. The catalogue is the engine's own and names every motion,
+ * waveform and origin it will accept — the alternative is guessing at an enum
+ * that moves.
+ */
+export const MotionInputSchema = z.object({
+  action: z.enum(['list', 'apply']).describe("'list' every motion, waveform and origin the engine offers · 'apply' one to a target."),
+  itemId: z.string().optional().describe('apply: a group or single item to move.'),
+  itemIds: z.array(z.string()).optional().describe('apply: several items, wrapped in a new group that becomes the motion host. The members keep their own identity and ids.'),
+  motion: z.string().optional().describe("apply: the motion name — a GROUP motion (drift, sway, rotate, pulse, wave, bounce) moves the target as one; a FIELD motion (ripple, breathe, undulate) sweeps a crest through its children. Call 'list' for the engine's own set rather than guessing."),
+  speed: z.number().optional().describe('apply: cycles per second, roughly. Higher is faster.'),
+  intensity: z.number().optional().describe('apply: amplitude. 0.15 is the usual default elsewhere in this surface.'),
+  waveform: z.enum(['sine', 'triangle', 'square', 'sawtooth', 'spike']).optional()
+    .describe("apply: the shape of one cycle. 'spike' is a narrow bump — it was called 'pulse' until the engine noticed one word was naming both a waveform and an animation; the old spelling is still accepted on the way in, but 'spike' is the name."),
+  origin: z.enum(['center', 'topLeft', 'topRight', 'bottomLeft', 'bottomRight', 'left', 'right', 'top', 'bottom', 'random', 'roam']).optional()
+    .describe("apply, FIELD motions only: where the crest starts and sweeps from. 'random' gives every element its own phase (a twinkle rather than a wave); 'roam' hops between the corners and the centre."),
+  seed: z.number().optional().describe('apply: makes a random origin reproducible — the same seed lays out the same phases every run.'),
+})
+  .refine((v) => v.action !== 'apply' || !!v.itemId || (Array.isArray(v.itemIds) && v.itemIds.length > 0), { message: 'apply requires itemId or itemIds', path: ['itemId'] })
+  .refine((v) => v.action !== 'apply' || !!v.motion, { message: "apply requires motion — call action 'list' for the names the engine accepts", path: ['motion'] });
+export type MotionInput = z.infer<typeof MotionInputSchema>;
+
+/**
  * pinepaper_path — the destructive path operations Paper.js has always had and
  * nothing here could reach: booleans, simplify, outline-stroke, open/close,
  * repeat patterns, plus read-back geometry and a lock.

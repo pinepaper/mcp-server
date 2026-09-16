@@ -189,6 +189,7 @@ import {
   MediaInput, TextStyleInput, TextEffectInput, DesignMediumInput, ShatterImageInput, ImportLayeredCharacterInput, GameInput, World3DInput,
   CropImageInput,
   PathOpInput,
+  MotionInput,
   ChromaKeyInput,
   RiggingInput,
   GroupInput,
@@ -7763,6 +7764,42 @@ ${needWorld}
   return { success: true, materials: app.listWorldMaterials() };
 })();`.trim();
     }
+  }
+
+  /**
+   * pinepaper_motion — the generators' Animation knob for any group.
+   *
+   * animateItems returns `{error}` on failure, NOT `{ok:false, reason}` like
+   * the path facades — reading the wrong key here turns "could not attach
+   * \"ripple\" (frame-callback limit reached?)" into undefined.
+   */
+  generateMotion(input: MotionInput): string {
+    const S = (v: unknown) => JSON.stringify(v);
+    if (input.action === 'list') {
+      return `
+// The engine's own motion catalogue — motions, waveforms, origins, knobs
+(async function() {
+  if (typeof app.listGeneratorMotions !== 'function') { return { success: false, error: 'app.listGeneratorMotions unavailable — update FxTool' }; }
+  const c = await app.listGeneratorMotions();
+  return { success: true, ...c };
+})();`.trim();
+    }
+
+    const target = input.itemIds && input.itemIds.length ? S(input.itemIds) : S(input.itemId);
+    const opts: Record<string, unknown> = { animation: input.motion };
+    for (const k of ['speed', 'intensity', 'waveform', 'origin', 'seed'] as const) {
+      if (input[k] !== undefined) opts[k] = input[k];
+    }
+    return `
+// Motion: ${input.motion} on ${input.itemIds?.length ? `${input.itemIds.length} items` : input.itemId}
+(async function() {
+  if (typeof app.animateItems !== 'function') { return { success: false, error: 'app.animateItems unavailable — update FxTool' }; }
+  const r = await app.animateItems(${target}, ${S(opts)});
+  // An unknown motion comes back with the known list attached, so a caller can
+  // correct itself without a second round trip.
+  if (!r || r.error) { return { success: false, error: (r && r.error) || 'the motion did not attach', motions: r && r.motions }; }
+  return { success: true, motion: ${S(input.motion)} };
+})();`.trim();
   }
 
   /**

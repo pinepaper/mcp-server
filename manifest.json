@@ -252,6 +252,10 @@
       "description": "Game logic: pathfind (A* world-coords waypoints for moves_along_path)|create_tilemap (board data + grid + merged collision rects). Pure data, draws nothing."
     },
     {
+      "name": "pinepaper_motion",
+      "description": "Generator motion engine for a group. {action: list|apply, itemId|itemIds, motion, speed, intensity, waveform, origin}"
+    },
+    {
       "name": "pinepaper_path",
       "description": "Destructive path operations — the ones that REPLACE or ADD items rather than restyling them."
     },

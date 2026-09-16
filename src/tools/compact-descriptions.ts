@@ -140,6 +140,11 @@ SHAPE TYPES: ${DIAGRAM_SHAPES}.`,
   pinepaper_agent_export: `Export as MP4, GIF, PNG, SVG, or PDF. Formats: svg, png, gif, mp4, webm, pdf. Quality: draft, standard, high. Framing: canvas (default) or camera (camera_animates viewport — video formats only).`,
 
   // -------------------------------------------------------------------------
+  // motion
+  // -------------------------------------------------------------------------
+  pinepaper_motion: `The generators' motion engine for any group. list → the engine's catalogue. apply → a GROUP motion (drift, sway, rotate, pulse, wave, bounce) moves the target as one; a FIELD motion (ripple, breathe, undulate) sweeps a crest through its children from an origin, with a waveform.`,
+
+  // -------------------------------------------------------------------------
   // path
   // -------------------------------------------------------------------------
   pinepaper_path: `Destructive path ops: boolean (unite|subtract|intersect|exclude|divide — CONSUMES its operands), simplify, outline_stroke (a stroked line becomes a filled shape), toggle_closed, pattern (concentric|radial|grid|extrude), get_geometry, set_locked, unlock_all.`,
