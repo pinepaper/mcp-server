@@ -63,6 +63,8 @@ import {
   MotionInputSchema,
   SoundInputSchema,
   InterchangeInputSchema,
+  StickInputSchema,
+  StoryInputSchema,
   ChromaKeyInputSchema,
   RiggingInputSchema,
   GroupInputSchema,
@@ -2754,6 +2756,16 @@ You can now start creating new items on a clean canvas.`,
 
         // Small export — return inline (existing behavior)
         return executedResult(code, exportResult, exportBrowserResult.screenshot, description);
+      }
+
+      case 'pinepaper_stick': {
+        const input = StickInputSchema.parse(args);
+        return executeOrGenerate(codeGenerator.generateStick(input), `Stick ${input.action}`, options, 'pinepaper_stick');
+      }
+
+      case 'pinepaper_story': {
+        const input = StoryInputSchema.parse(args);
+        return executeOrGenerate(codeGenerator.generateStory(input), `Story: ${input.action}`, options, 'pinepaper_story');
       }
 
       case 'pinepaper_interchange': {

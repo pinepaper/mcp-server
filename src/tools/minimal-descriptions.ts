@@ -55,6 +55,8 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_detect_objects: 'On-device image detection: DETR 80-class, or queries:[…] open-vocabulary (OWL-ViT). asNodes:true → image-anchored design nodes. {itemId?, threshold?, asNodes?, queries?}',
   pinepaper_extract_object: 'Detect + crop the best-matching object out of an imported image into a new item. {label?, itemId?, x?, y?, threshold?}',
   pinepaper_arrange: 'Change an item\'s z-order (stacking). {itemId, action: front|back|forward|backward}',
+  pinepaper_stick: 'Stick-figure kit. {action: figure|set, pose, walk, travel, prop, garment, hair, at, scale}',
+  pinepaper_story: 'Prose to scene. {action: distill|from_text|apply_spec|plan_book, text, spec, images}',
   pinepaper_interchange: 'Lottie / dotLottie / GLB / BVH / PNG-sequence import and export. {action, options, data, skeletonId}',
   pinepaper_sound: 'Synthesis: tones, chords, percussion, SFX, sound-from-text, and a two-way bridge between a sound and a drawn path. {action, note|root|name|text|itemId}',
   pinepaper_motion: 'Generator motion engine for a group. {action: list|apply, itemId|itemIds, motion, speed, intensity, waveform, origin}',

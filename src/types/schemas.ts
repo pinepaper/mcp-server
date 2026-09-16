@@ -4180,6 +4180,68 @@ export type World3DInput = z.infer<typeof World3DInputSchema>;
 // =============================================================================
 
 /**
+ * pinepaper_stick — the vendored stick-figure kit.
+ *
+ * A different construction from pinepaper_character, which places a figure
+ * from the design graph by concept. This is the stick kit: a rigged figure
+ * posed, walking, travelling, holding a prop, with a garment and hair — plus
+ * `set`, which builds the furniture it stands on and among.
+ *
+ * The geometry is vendored from mcp-cloud, so this is a three-repo artifact:
+ * a change to the kit lands there first and is re-vendored into FxTool.
+ */
+export const StickInputSchema = z.object({
+  action: z.enum(['figure', 'set']).describe("'figure' a posed, walking or travelling stick figure · 'set' the floor, wall and objects it stands on and among."),
+  id: z.string().optional().describe('Prefix for the created items.'),
+  kind: z.string().optional().describe("figure: which figure. set: which piece of the scene kit ('floor', 'wall', a named object) — list-free, because the kit is vendored and grows there."),
+  at: z.object({ x: z.number().optional(), y: z.number().optional() }).optional().describe('Where it goes.'),
+  scale: z.number().optional().describe('Size multiplier.'),
+  facing: z.enum(['left', 'right']).optional().describe('Which way the figure looks.'),
+  pose: z.string().optional().describe("figure: a named pose from the kit's POSES."),
+  poseAt: z.number().optional().describe('figure: the time, in seconds, at which that pose is struck.'),
+  expression: z.string().optional().describe("figure: a single facial expression from the kit's EXPRESSIONS."),
+  expressions: z.array(z.object({ at: z.number(), name: z.string() })).optional().describe('figure: expressions over time, each at a moment.'),
+  walk: z.union([z.boolean(), z.record(z.string(), z.unknown())]).optional().describe('figure: a walk cycle — true for the default, or a config.'),
+  travel: z.record(z.string(), z.unknown()).optional().describe('figure: move the figure across the scene while it walks, rather than walking in place.'),
+  prop: z.string().optional().describe('figure: something held in hand.'),
+  propSide: z.enum(['left', 'right']).optional().describe('figure: which hand holds it.'),
+  garment: z.string().optional().describe('figure: clothing.'),
+  trouser: z.string().optional().describe('figure: legwear.'),
+  hair: z.string().optional().describe('figure: hair style.'),
+  withHair: z.boolean().optional().describe('figure: draw hair at all.'),
+  groundY: z.number().optional().describe('The y the figure stands on.'),
+  surfaceY: z.number().optional().describe('The y of the surface an object sits on.'),
+  durationSeconds: z.number().optional().describe('figure: length of the performance, so every track spans it.'),
+  object: z.record(z.string(), z.unknown()).optional().describe('set: the object spec.'),
+  items: z.array(z.record(z.string(), z.unknown())).optional().describe('set: several pieces at once.'),
+  floor: z.union([z.boolean(), z.record(z.string(), z.unknown())]).optional().describe('set: draw a floor.'),
+  wall: z.union([z.boolean(), z.record(z.string(), z.unknown())]).optional().describe('set: draw a wall.'),
+});
+export type StickInput = z.infer<typeof StickInputSchema>;
+
+/**
+ * pinepaper_story — a piece of prose becomes a scene.
+ *
+ * `distill` reduces an article to its beats WITHOUT drawing anything, which is
+ * the half worth having on its own: a caller can read what the distiller made
+ * of the text, edit it, and only then assemble. `from_text` does both in one
+ * call, `apply_spec` assembles a spec you already have, and `plan_book` lays
+ * images out as pages.
+ */
+export const StoryInputSchema = z.object({
+  action: z.enum(['distill', 'from_text', 'apply_spec', 'plan_book'])
+    .describe("'distill' text → story beats, drawing NOTHING · 'from_text' distill and assemble in one call · 'apply_spec' assemble a spec you already have · 'plan_book' lay images out as pages."),
+  text: z.string().optional().describe('distill / from_text: the prose.'),
+  spec: z.record(z.string(), z.unknown()).optional().describe('apply_spec: the story spec — usually one from `distill`, edited.'),
+  images: z.array(z.union([z.string(), z.record(z.string(), z.unknown())])).optional().describe('plan_book: the images to lay out, as ids or specs.'),
+  options: z.record(z.string(), z.unknown()).optional().describe('Assembly or layout options, passed through.'),
+})
+  .refine((v) => !['distill', 'from_text'].includes(v.action) || !!v.text, { message: 'this action requires text', path: ['text'] })
+  .refine((v) => v.action !== 'apply_spec' || !!v.spec, { message: 'apply_spec requires spec', path: ['spec'] })
+  .refine((v) => v.action !== 'plan_book' || (Array.isArray(v.images) && v.images.length > 0), { message: 'plan_book requires images', path: ['images'] });
+export type StoryInput = z.infer<typeof StoryInputSchema>;
+
+/**
  * pinepaper_interchange — the formats other tools read and write.
  *
  * pinepaper_agent_export covers the PLATFORM formats: png, svg, mp4, webm,

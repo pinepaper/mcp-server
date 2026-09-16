@@ -192,6 +192,8 @@ import {
   MotionInput,
   SoundInput,
   InterchangeInput,
+  StickInput,
+  StoryInput,
   ChromaKeyInput,
   RiggingInput,
   GroupInput,
@@ -8028,6 +8030,82 @@ ${needWorld}
 ${needWorld}
   // x, y, z, scale, rotY (RADIANS, as everywhere on this path), variant.
   return { success: !!app.setWorldMeshInstances(${S(input.meshId)}, ${S(input.instances)}) };
+})();`.trim();
+    }
+  }
+
+  /**
+   * pinepaper_stick — the vendored stick-figure kit.
+   *
+   * Both facades take one options bag, so the schema's named fields are
+   * reassembled into it. Naming them individually is the point: the kit's
+   * options were discoverable only by reading FxTool's source.
+   */
+  generateStick(input: StickInput): string {
+    const S = (v: unknown) => JSON.stringify(v);
+    const { action, ...rest } = input;
+    const opts: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(rest)) if (v !== undefined) opts[k] = v;
+    const fn = action === 'figure' ? 'stickFigure' : 'stickSet';
+    return `
+// Stick: ${action}
+(async function() {
+  if (typeof app.${fn} !== 'function') { return { success: false, error: 'app.${fn} unavailable — update FxTool (the stick kit is vendored from mcp-cloud)' }; }
+  const r = await app.${fn}(${S(opts)});
+  if (!r || r.ok === false) { return { success: false, error: (r && (r.reason || r.error)) || 'the stick kit produced nothing' }; }
+  return { success: true, ...r };
+})();`.trim();
+  }
+
+  /**
+   * pinepaper_story — prose becomes a scene.
+   *
+   * `distill` deliberately draws nothing. A caller should be able to read what
+   * the distiller made of the text and edit it before a scene is assembled
+   * from it, rather than discovering the reading by looking at the result.
+   */
+  generateStory(input: StoryInput): string {
+    const S = (v: unknown) => JSON.stringify(v);
+    const opts = S(input.options ?? {});
+    switch (input.action) {
+      case 'distill':
+        return `
+// Story: reduce prose to beats, drawing NOTHING
+(async function() {
+  if (typeof app.distillArticle !== 'function') { return { success: false, error: 'app.distillArticle unavailable — update FxTool' }; }
+  const beats = await app.distillArticle(${S(input.text)});
+  if (!beats) { return { success: false, error: 'the distiller made nothing of that text' }; }
+  return { success: true, beats: beats };
+})();`.trim();
+
+      case 'from_text':
+        return `
+// Story: distill and assemble in one call
+(async function() {
+  if (typeof app.storyFromText !== 'function') { return { success: false, error: 'app.storyFromText unavailable — update FxTool' }; }
+  const r = await app.storyFromText(${S(input.text)}, ${opts});
+  if (!r || r.ok === false) { return { success: false, error: (r && (r.reason || r.error)) || 'the story did not assemble' }; }
+  return { success: true, ...r };
+})();`.trim();
+
+      case 'apply_spec':
+        return `
+// Story: assemble a spec you already have
+(async function() {
+  if (typeof app.applyStorySpec !== 'function') { return { success: false, error: 'app.applyStorySpec unavailable — update FxTool' }; }
+  const r = await app.applyStorySpec(${S(input.spec)}, ${opts});
+  if (!r || r.ok === false) { return { success: false, error: (r && (r.reason || r.error)) || 'the spec did not assemble' }; }
+  return { success: true, ...r };
+})();`.trim();
+
+      case 'plan_book':
+        return `
+// Story: lay images out as pages
+(function() {
+  if (typeof app.planBook !== 'function') { return { success: false, error: 'app.planBook unavailable — update FxTool' }; }
+  const plan = app.planBook(${S(input.images)}, ${opts});
+  if (!plan) { return { success: false, error: 'no plan came back for those images' }; }
+  return { success: true, plan: plan };
 })();`.trim();
     }
   }

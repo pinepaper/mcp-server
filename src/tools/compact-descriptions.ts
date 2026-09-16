@@ -140,6 +140,12 @@ SHAPE TYPES: ${DIAGRAM_SHAPES}.`,
   pinepaper_agent_export: `Export as MP4, GIF, PNG, SVG, or PDF. Formats: svg, png, gif, mp4, webm, pdf. Quality: draft, standard, high. Framing: canvas (default) or camera (camera_animates viewport — video formats only).`,
 
   // -------------------------------------------------------------------------
+  // stick / story
+  // -------------------------------------------------------------------------
+  pinepaper_stick: `The vendored stick-figure kit. figure: pose, walk, travel, prop, garment, hair, expressions over time. set: floor, wall and objects. Distinct from pinepaper_character, which places a figure from the design graph by concept.`,
+  pinepaper_story: `Prose becomes a scene. distill (beats only, draws nothing), from_text (distill + assemble), apply_spec, plan_book.`,
+
+  // -------------------------------------------------------------------------
   // interchange
   // -------------------------------------------------------------------------
   pinepaper_interchange: `Interchange formats the platform exporter does not cover: export_lottie, export_dotlottie, import_lottie, export_glb (needs perspective objects), export_bvh (needs a rig), export_png_sequence.`,

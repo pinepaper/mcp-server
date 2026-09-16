@@ -2265,6 +2265,68 @@ RECIPE — a playable maze: create_tilemap with wall fills → batch_create colo
   },
 
   {
+    name: 'pinepaper_stick',
+    description: `The vendored stick-figure kit — a rigged figure posed, walking, travelling, holding a prop, with a garment and hair, plus the set it stands on and among.
+
+A different construction from pinepaper_character, which places a figure from the DESIGN GRAPH by concept ("pp:Pigeon"). This is the stick kit specifically, and its options — pose, walk, travel, prop, garment, trouser, hair, expression and a timeline of expressions — were discoverable only by reading the engine's source.
+
+action 'figure' builds the figure. action 'set' builds the floor, the wall and the objects around it, so a figure has somewhere to be.
+
+The geometry is vendored from mcp-cloud, which makes this a three-repo artifact: a change to the kit lands there first and is re-vendored into the engine.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['figure', 'set'], description: "'figure' or 'set'." },
+        id: { type: 'string', description: 'Prefix for the created items.' },
+        kind: { type: 'string', description: 'figure: which figure. set: which piece of the kit.' },
+        at: { type: 'object', description: '{ x?, y? } — where it goes.' },
+        scale: { type: 'number', description: 'Size multiplier.' },
+        facing: { type: 'string', enum: ['left', 'right'], description: 'Which way the figure looks.' },
+        pose: { type: 'string', description: "figure: a named pose from the kit's POSES." },
+        poseAt: { type: 'number', description: 'figure: seconds at which that pose is struck.' },
+        expression: { type: 'string', description: 'figure: one facial expression.' },
+        expressions: { type: 'array', items: { type: 'object' }, description: 'figure: [{ at, name }] — expressions over time.' },
+        walk: { anyOf: [{ type: 'boolean' }, { type: 'object' }], description: 'figure: a walk cycle.' },
+        travel: { type: 'object', description: 'figure: move across the scene while walking, rather than walking in place.' },
+        prop: { type: 'string', description: 'figure: something held in hand.' },
+        propSide: { type: 'string', enum: ['left', 'right'], description: 'figure: which hand.' },
+        garment: { type: 'string', description: 'figure: clothing.' },
+        trouser: { type: 'string', description: 'figure: legwear.' },
+        hair: { type: 'string', description: 'figure: hair style.' },
+        withHair: { type: 'boolean', description: 'figure: draw hair at all.' },
+        groundY: { type: 'number', description: 'The y the figure stands on.' },
+        surfaceY: { type: 'number', description: 'The y a set object sits on.' },
+        durationSeconds: { type: 'number', description: 'figure: length of the performance.' },
+        object: { type: 'object', description: 'set: the object spec.' },
+        items: { type: 'array', items: { type: 'object' }, description: 'set: several pieces at once.' },
+        floor: { anyOf: [{ type: 'boolean' }, { type: 'object' }], description: 'set: draw a floor.' },
+        wall: { anyOf: [{ type: 'boolean' }, { type: 'object' }], description: 'set: draw a wall.' },
+      },
+      required: ['action'],
+    },
+  },
+
+  {
+    name: 'pinepaper_story',
+    description: `A piece of prose becomes a scene.
+
+- distill: reduce an article to its story beats and draw NOTHING. This is the half worth having on its own — a caller can read what the distiller made of the text, edit the beats, and only then assemble. Discovering the reading by looking at a finished scene is the expensive way round.
+- from_text: distill and assemble in one call, when the reading does not need checking.
+- apply_spec: assemble a spec you already have, usually a distilled one you edited.
+- plan_book: lay images out as pages.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['distill', 'from_text', 'apply_spec', 'plan_book'], description: 'Which story operation.' },
+        text: { type: 'string', description: 'distill / from_text: the prose.' },
+        spec: { type: 'object', description: 'apply_spec: the story spec, usually a distilled one you edited.' },
+        images: { type: 'array', items: { anyOf: [{ type: 'string' }, { type: 'object' }] }, description: 'plan_book: images as ids or specs.' },
+        options: { type: 'object', description: 'Assembly or layout options.' },
+      },
+      required: ['action'],
+    },
+  },
+  {
     name: 'pinepaper_interchange',
     description: `The formats other tools read and write — Lottie, dotLottie, GLB, BVH, PNG sequence.
 

@@ -25,7 +25,7 @@
 
 PinePaper MCP Server enables AI assistants to create and animate graphics in [PinePaper Studio](https://pinepaper.studio) via the Model Context Protocol (MCP). Works with any AI that supports MCP tool calling (Claude, GPT, Gemini, local models, etc.).
 
-The server exposes **148 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
+The server exposes **150 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
 
 - Create text, shapes, geometry, and complex graphics
 - Animate items with behavior-driven **relations** rather than keyframes
@@ -37,7 +37,7 @@ The server exposes **148 tools** across drawing, animation, diagrams, maps, typo
 
 ## Running it: local or hosted
 
-**Local is free and complete.** Every one of the 148 tools works when you run
+**Local is free and complete.** Every one of the 150 tools works when you run
 this server yourself. There is no reduced tier and nothing held back.
 
 What it needs:
@@ -233,6 +233,11 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 **Relation presets are adoptable.** `pinepaper_add_relation` takes a `presetId` — a community motion someone already tuned, with its symbols exposed as knobs — instead of making a caller name a type and guess at params. The preset decides the relation type, and any symbol you omit takes the midpoint of its declared range, so a preset applies sensibly with no values at all. List them through the new `catalogue`, which also returns what this build **rejected**: a preset for a relation type this engine does not have is a named absence, where dropping it silently would read as the catalogue simply being smaller.
 
 **`pinepaper_query_capabilities` gains `catalogue`** — the eight registries the engine's own aggregate does not gather: rig presets, shader effects, stroke decorations, the precomp list, the image library, segment-edit kinds, shatter orders and world meshes. Each was a capability an agent had to guess at, which by this project's rule is the same as its not existing. A missing facade is named rather than answered with an empty list, because an empty list reads as "none exist" and that is a different, worse answer.
+
+**New tools: `pinepaper_stick` and `pinepaper_story`.**
+
+- `pinepaper_stick` is the vendored stick-figure kit — a rigged figure posed, walking, travelling, holding a prop, with a garment and hair and a timeline of expressions, plus the floor and wall it stands on. Distinct from `pinepaper_character`, which places a figure from the *design graph* by concept. Its options were discoverable only by reading the engine's source. The geometry is vendored from mcp-cloud, which makes it a three-repo artifact, and the failure message says so — the fix for a missing kit is in another repository.
+- `pinepaper_story` turns prose into a scene. `distill` reduces an article to its beats and **draws nothing**, which is the half worth having on its own: read what the distiller made of the text, edit the beats, and only then assemble. Discovering that reading by looking at a finished scene is the expensive way round.
 
 **New tool: `pinepaper_interchange`** — Lottie, dotLottie, GLB, BVH and PNG sequence. `pinepaper_agent_export` covers the *platform* formats sized for Instagram or YouTube; these are the ones another tool reads, and they had no tool at all. Import is here too, because a format you can only write is half a bridge.
 
@@ -439,7 +444,7 @@ Fourteen new tools (121 → 135) and new actions across the surface — the rele
 
 ## Toolkits & Token Budget
 
-148 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
+150 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
 
 **Toolkit profiles** (`PINEPAPER_TOOLKIT`):
 
@@ -644,7 +649,7 @@ Generate instruction/code pairs for LLM fine-tuning:
 
 ## Tools Reference
 
-All 148 tools, grouped by the tag used for toolkit filtering.
+All 150 tools, grouped by the tag used for toolkit filtering.
 
 ### Canvas (`canvas`)
 | Tool | Description |
@@ -823,6 +828,8 @@ All 148 tools, grouped by the tag used for toolkit filtering.
 |------|-------------|
 | `pinepaper_rigging` | Skeletons, bones, IK, breakdown poses; BVH mocap import/retarget, Spine import |
 | `pinepaper_import_layered_character` | Decomposed character layers → role-bound parts (blink/smile work immediately) |
+| `pinepaper_stick` | The vendored stick-figure kit: figure and set |
+| `pinepaper_story` | Prose becomes a scene: distill, assemble, plan a book |
 | `pinepaper_character` | Place a figure from the design graph and direct it with beats — no geometry, no bones, no poses |
 
 ### Typography (`font`, `letter_collage`)

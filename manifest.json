@@ -252,6 +252,14 @@
       "description": "Game logic: pathfind (A* world-coords waypoints for moves_along_path)|create_tilemap (board data + grid + merged collision rects). Pure data, draws nothing."
     },
     {
+      "name": "pinepaper_stick",
+      "description": "Stick-figure kit. {action: figure|set, pose, walk, travel, prop, garment, hair, at, scale}"
+    },
+    {
+      "name": "pinepaper_story",
+      "description": "Prose to scene. {action: distill|from_text|apply_spec|plan_book, text, spec, images}"
+    },
+    {
       "name": "pinepaper_interchange",
       "description": "Lottie / dotLottie / GLB / BVH / PNG-sequence import and export. {action, options, data, skeletonId}"
     },
