@@ -2402,7 +2402,7 @@ RECIPE — a character walking through a forest: create {spec:'forest'} → impo
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['create', 'describe', 'configure', 'add_actor', 'remove_actor', 'list_actors', 'set_actor_pose', 'set_camera', 'add_object', 'remove_object', 'remove_world', 'extrude_path', 'lathe_path', 'list_meshes', 'remove_mesh', 'add_light', 'set_light', 'remove_light', 'list_lights', 'add_material', 'set_material', 'remove_material', 'list_materials', 'import_obj', 'import_gltf', 'list_mesh_clips', 'set_mesh_clip', 'set_nav_target', 'get_nav_target', 'ground_height', 'raycast', 'dolly_camera', 'pan_camera', 'world_to_canvas', 'canvas_to_ground'], description: 'World operation. extrude_path/lathe_path turn a canvas path into real geometry; lights are capped at 8; a material is shared by every object referencing it.' },
+        action: { type: 'string', enum: ['create', 'describe', 'configure', 'add_actor', 'remove_actor', 'list_actors', 'set_actor_pose', 'set_camera', 'add_object', 'remove_object', 'remove_world', 'extrude_path', 'lathe_path', 'list_meshes', 'remove_mesh', 'add_light', 'set_light', 'remove_light', 'list_lights', 'add_material', 'set_material', 'remove_material', 'list_materials', 'import_obj', 'import_gltf', 'list_mesh_clips', 'set_mesh_clip', 'set_nav_target', 'get_nav_target', 'ground_height', 'raycast', 'dolly_camera', 'pan_camera', 'world_to_canvas', 'canvas_to_ground', 'add_body', 'remove_body', 'list_bodies', 'step_physics', 'impulse', 'set_velocity', 'fire_projectile', 'line_of_sight', 'set_mesh_instances'], description: 'World operation. extrude_path/lathe_path turn a canvas path into real geometry; lights are capped at 8; a material is shared by every object referencing it.' },
         spec: {
           anyOf: [{ type: 'string' }, { type: 'object' }],
           description: "create: preset id ('forest'|'snowMountain'|'field'|'jungle') or a full spec object.",
@@ -2439,6 +2439,13 @@ RECIPE — a character walking through a forest: create {spec:'forest'} → impo
         multiplier: { type: 'number', description: 'dolly_camera: >1 away, <1 closer.' },
         dx: { type: 'number', description: 'pan_camera: horizontal pan in SCREEN pixels.' },
         dy: { type: 'number', description: 'pan_camera: vertical pan in SCREEN pixels.' },
+        body: { type: 'object', description: 'add_body / fire_projectile: the body spec. NARROW by design — a sphere or capsule under gravity colliding with the world. No stacking solver, no joints; pinepaper_physics is the 2D world and has those.' },
+        bodyId: { type: 'string', description: 'remove_body / impulse / set_velocity: the body id.' },
+        vector: { type: 'array', items: { type: 'number' }, description: 'impulse / set_velocity: [x, y, z].' },
+        dt: { type: 'number', description: 'step_physics: seconds to advance. Returns contacts made and bodies removed.' },
+        from: { type: 'array', items: { type: 'number' }, description: 'line_of_sight: eye point [x, y, z].' },
+        to: { type: 'array', items: { type: 'number' }, description: 'line_of_sight: target point [x, y, z].' },
+        instances: { type: 'array', items: { type: 'array', items: { type: 'number' } }, description: 'set_mesh_instances: one entry per copy, six numbers — x, y, z, scale, rotY (RADIANS), variant.' },
         objectId: { type: 'string', description: 'remove_object: object id.' },
       },
       required: ['action'],

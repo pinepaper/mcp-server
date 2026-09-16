@@ -7936,6 +7936,99 @@ ${needWorld}
   const p = ${S(input.point)};
   return { success: true, ground: app.canvasToGround(p.x, p.y) };
 })();`.trim();
+
+      // --- Physics in the world ---------------------------------------------
+      // addPhysicsBody3D and fireProjectile3D THROW without a world; the rest
+      // return false, [] or a hollow {contacts:[],removed:[]} — each of which
+      // is a plausible real answer. Both shapes are guarded the same way here.
+      case 'add_body':
+        return `
+// World3D: a body under gravity, colliding with the world
+(function() {
+  if (typeof app.addPhysicsBody3D !== 'function') { return { success: false, error: 'app.addPhysicsBody3D unavailable — update FxTool' }; }
+${needWorld}
+  const r = app.addPhysicsBody3D(${S(input.body)});
+  if (!r || r.ok === false) { return { success: false, error: (r && (r.error || r.reason)) || 'the world refused the body' }; }
+  return { success: true, bodyId: r.id, ...r };
+})();`.trim();
+
+      case 'fire_projectile':
+        return `
+// World3D: fire a projectile
+(function() {
+  if (typeof app.fireProjectile3D !== 'function') { return { success: false, error: 'app.fireProjectile3D unavailable — update FxTool' }; }
+${needWorld}
+  const r = app.fireProjectile3D(${S(input.body)});
+  if (!r || r.ok === false) { return { success: false, error: (r && (r.error || r.reason)) || 'the projectile was refused' }; }
+  return { success: true, ...r };
+})();`.trim();
+
+      case 'remove_body':
+        return `
+// World3D: drop a body
+(function() {
+  if (typeof app.removePhysicsBody3D !== 'function') { return { success: false, error: 'app.removePhysicsBody3D unavailable — update FxTool' }; }
+${needWorld}
+  return { success: !!app.removePhysicsBody3D(${S(input.bodyId)}) };
+})();`.trim();
+
+      case 'list_bodies':
+        return `
+// World3D: every physics body
+(function() {
+  if (typeof app.listPhysicsBodies3D !== 'function') { return { success: false, error: 'app.listPhysicsBodies3D unavailable — update FxTool' }; }
+${needWorld}
+  return { success: true, bodies: app.listPhysicsBodies3D() };
+})();`.trim();
+
+      case 'step_physics':
+        return `
+// World3D: advance the simulation, and report what touched what
+(function() {
+  if (typeof app.stepPhysics3D !== 'function') { return { success: false, error: 'app.stepPhysics3D unavailable — update FxTool' }; }
+${needWorld}
+  // Without a world this answers {contacts:[],removed:[]} — a perfectly
+  // ordinary quiet step. The guard above is what keeps those apart.
+  const r = app.stepPhysics3D(${S(input.dt)});
+  return { success: true, contacts: r && r.contacts, removed: r && r.removed };
+})();`.trim();
+
+      case 'impulse':
+        return `
+// World3D: apply an impulse
+(function() {
+  if (typeof app.applyPhysicsImpulse3D !== 'function') { return { success: false, error: 'app.applyPhysicsImpulse3D unavailable — update FxTool' }; }
+${needWorld}
+  return { success: !!app.applyPhysicsImpulse3D(${S(input.bodyId)}, ${S(input.vector)}) };
+})();`.trim();
+
+      case 'set_velocity':
+        return `
+// World3D: set a body's velocity outright
+(function() {
+  if (typeof app.setPhysicsVelocity3D !== 'function') { return { success: false, error: 'app.setPhysicsVelocity3D unavailable — update FxTool' }; }
+${needWorld}
+  return { success: !!app.setPhysicsVelocity3D(${S(input.bodyId)}, ${S(input.vector)}) };
+})();`.trim();
+
+      case 'line_of_sight':
+        return `
+// World3D: can one point see another
+(function() {
+  if (typeof app.worldLineOfSight !== 'function') { return { success: false, error: 'app.worldLineOfSight unavailable — update FxTool' }; }
+${needWorld}
+  return { success: true, clear: app.worldLineOfSight(${S(input.from)}, ${S(input.to)}) };
+})();`.trim();
+
+      case 'set_mesh_instances':
+        return `
+// World3D: replace a mesh's instance data — six floats each
+(function() {
+  if (typeof app.setWorldMeshInstances !== 'function') { return { success: false, error: 'app.setWorldMeshInstances unavailable — update FxTool' }; }
+${needWorld}
+  // x, y, z, scale, rotY (RADIANS, as everywhere on this path), variant.
+  return { success: !!app.setWorldMeshInstances(${S(input.meshId)}, ${S(input.instances)}) };
+})();`.trim();
     }
   }
 

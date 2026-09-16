@@ -4053,6 +4053,8 @@ export const World3DInputSchema = z.object({
     'import_obj', 'import_gltf', 'list_mesh_clips', 'set_mesh_clip',
     'set_nav_target', 'get_nav_target', 'ground_height', 'raycast',
     'dolly_camera', 'pan_camera', 'world_to_canvas', 'canvas_to_ground',
+    'add_body', 'remove_body', 'list_bodies', 'step_physics', 'impulse', 'set_velocity', 'fire_projectile',
+    'line_of_sight', 'set_mesh_instances',
   ])
     .describe("'create' (a preset world) · 'describe' (every parameter with type/range — CALL THIS before configure) · 'configure' (live deep-merge patch, schema-validated) · actor ops · 'set_camera' (follow|fixed|orbit) · object ops · 'remove_world' · MESH AUTHORING: 'extrude_path' / 'lathe_path' turn a canvas path into real geometry, 'list_meshes', 'remove_mesh' · 'add_light' / 'set_light' / 'remove_light' / 'list_lights' (at most 8 point lights) · 'add_material' / 'set_material' / 'remove_material' / 'list_materials'"),
   spec: z.union([z.string(), z.record(z.string(), z.unknown())]).optional().describe("create: a preset id ('forest', 'snowMountain', …) or a full world spec object."),
@@ -4131,6 +4133,17 @@ export const World3DInputSchema = z.object({
   multiplier: z.number().optional().describe('dolly_camera: greater than 1 moves away, less than 1 moves closer.'),
   dx: z.number().optional().describe('pan_camera: horizontal pan in SCREEN pixels.'),
   dy: z.number().optional().describe('pan_camera: vertical pan in SCREEN pixels.'),
+
+  // --- Physics in the world -------------------------------------------------
+  body: z.record(z.string(), z.unknown()).optional()
+    .describe('add_body / fire_projectile: the body spec. Deliberately NARROW — a sphere or a capsule under gravity, colliding with the world (terrain, objects, actors, imported meshes). There is no stacking solver and no joints; for those use pinepaper_physics, which is the 2D world.'),
+  bodyId: z.string().optional().describe('remove_body / impulse / set_velocity: the body id.'),
+  vector: z.array(z.number()).length(3).optional().describe('impulse: the impulse to apply, [x, y, z]. set_velocity: the velocity to set, [x, y, z].'),
+  dt: z.number().optional().describe('step_physics: seconds to advance. Returns the contacts made and the bodies removed in that step.'),
+  from: z.array(z.number()).length(3).optional().describe('line_of_sight: the eye point, [x, y, z].'),
+  to: z.array(z.number()).length(3).optional().describe('line_of_sight: the target point, [x, y, z].'),
+  instances: z.array(z.array(z.number())).optional()
+    .describe('set_mesh_instances: one entry per copy, six numbers each — x, y, z, scale, rotY (RADIANS), and a free variant a shader may read for per-instance colour or phase.'),
 })
   .refine((v) => v.action !== 'configure' || !!v.patch, { message: 'configure requires patch', path: ['patch'] })
   .refine((v) => !['remove_actor', 'set_actor_pose'].includes(v.action) || !!v.actorId, { message: 'this action requires actorId', path: ['actorId'] })
@@ -4153,7 +4166,13 @@ export const World3DInputSchema = z.object({
   .refine((v) => !['ground_height', 'canvas_to_ground', 'world_to_canvas'].includes(v.action) || !!v.point, { message: 'this action requires point', path: ['point'] })
   .refine((v) => v.action !== 'raycast' || (!!v.origin && !!v.direction), { message: 'raycast requires origin and direction', path: ['origin'] })
   .refine((v) => v.action !== 'dolly_camera' || v.multiplier !== undefined, { message: 'dolly_camera requires multiplier', path: ['multiplier'] })
-  .refine((v) => v.action !== 'pan_camera' || (v.dx !== undefined && v.dy !== undefined), { message: 'pan_camera requires dx and dy', path: ['dx'] });
+  .refine((v) => v.action !== 'pan_camera' || (v.dx !== undefined && v.dy !== undefined), { message: 'pan_camera requires dx and dy', path: ['dx'] })
+  .refine((v) => !['add_body', 'fire_projectile'].includes(v.action) || !!v.body, { message: 'this action requires body', path: ['body'] })
+  .refine((v) => !['remove_body', 'impulse', 'set_velocity'].includes(v.action) || !!v.bodyId, { message: 'this action requires bodyId', path: ['bodyId'] })
+  .refine((v) => !['impulse', 'set_velocity'].includes(v.action) || !!v.vector, { message: 'this action requires vector', path: ['vector'] })
+  .refine((v) => v.action !== 'step_physics' || v.dt !== undefined, { message: 'step_physics requires dt', path: ['dt'] })
+  .refine((v) => v.action !== 'line_of_sight' || (!!v.from && !!v.to), { message: 'line_of_sight requires from and to', path: ['from'] })
+  .refine((v) => v.action !== 'set_mesh_instances' || (!!v.meshId && !!v.instances), { message: 'set_mesh_instances requires meshId and instances', path: ['meshId'] });
 export type World3DInput = z.infer<typeof World3DInputSchema>;
 
 // =============================================================================

@@ -276,3 +276,61 @@ describe('navigation and picking', () => {
     }
   });
 });
+
+/**
+ * Physics in the world, and the last of the mesh surface.
+ *
+ * pinepaper_physics is the 2D physicsWorld. This is the 3D one, and it is
+ * deliberately narrower: a sphere or capsule under gravity colliding with the
+ * terrain, objects, actors and imported meshes. No stacking solver, no joints.
+ */
+describe('world physics', () => {
+  it('each action reaches its own facade and is guarded', () => {
+    const cases: Array<[Record<string, unknown>, string]> = [
+      [{ action: 'add_body', body: { kind: 'sphere' } }, 'app.addPhysicsBody3D'],
+      [{ action: 'fire_projectile', body: { speed: 20 } }, 'app.fireProjectile3D'],
+      [{ action: 'remove_body', bodyId: 'b1' }, 'app.removePhysicsBody3D("b1")'],
+      [{ action: 'list_bodies' }, 'app.listPhysicsBodies3D()'],
+      [{ action: 'step_physics', dt: 0.016 }, 'app.stepPhysics3D(0.016)'],
+      [{ action: 'impulse', bodyId: 'b1', vector: [0, 5, 0] }, 'app.applyPhysicsImpulse3D("b1", [0,5,0])'],
+      [{ action: 'set_velocity', bodyId: 'b1', vector: [1, 0, 0] }, 'app.setPhysicsVelocity3D("b1", [1,0,0])'],
+      [{ action: 'line_of_sight', from: [0, 1, 0], to: [5, 1, 5] }, 'app.worldLineOfSight'],
+      [{ action: 'set_mesh_instances', meshId: 'm', instances: [[0, 0, 0, 1, 0, 0]] }, 'app.setWorldMeshInstances'],
+    ];
+    for (const [input, call] of cases) {
+      const code = gen(input);
+      expect(code).toContain(call);
+      expect(code).toContain('no 3D world — call');
+      expect(() => new Function(code)).not.toThrow();
+    }
+  });
+
+  it('a quiet step and an absent world are not the same answer', () => {
+    // stepPhysics3D returns {contacts:[],removed:[]} with no world — which is
+    // exactly what a perfectly ordinary quiet step returns. Only the guard
+    // separates them, and the comment in the emitted code says so.
+    const code = gen({ action: 'step_physics', dt: 0.016 });
+    expect(code).toContain('perfectly\n  // ordinary quiet step');
+    expect(code).toContain('no 3D world — call');
+  });
+
+  it('instance rotation is radians here too, and says so', () => {
+    expect(gen({ action: 'set_mesh_instances', meshId: 'm', instances: [[0, 0, 0, 1, 0, 0]] }))
+      .toContain('rotY (RADIANS');
+  });
+
+  it('refuses an incomplete call by naming the field', () => {
+    for (const [input, field] of [
+      [{ action: 'add_body' }, 'body'],
+      [{ action: 'remove_body' }, 'bodyId'],
+      [{ action: 'impulse', bodyId: 'b' }, 'vector'],
+      [{ action: 'step_physics' }, 'dt'],
+      [{ action: 'line_of_sight', from: [0, 0, 0] }, 'from'],
+      [{ action: 'set_mesh_instances', meshId: 'm' }, 'meshId'],
+    ] as Array<[Record<string, unknown>, string]>) {
+      const r = World3DInputSchema.safeParse(input);
+      expect(r.success).toBe(false);
+      if (!r.success) expect(JSON.stringify(r.error.issues)).toContain(field);
+    }
+  });
+});
