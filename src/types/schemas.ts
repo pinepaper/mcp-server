@@ -640,12 +640,22 @@ export const DrivenByParamsSchema = z.object({
 // time_expression: self-relation (targetId=null). The source's `property` is
 // driven by a math expression of t (scene time) and v (baseValue). signal:true
 // parses the expression into the Expression IR and evaluates a pure f(t)
-// (replay-stable), falling back to per-frame if it uses random()/unknown symbols.
+// (replay-stable).
+//
+// THERE IS NO LONGER A PER-FRAME FALLBACK FOR random(). The engine used to
+// build a `new Function` from the scene's own text on the per-frame path, which
+// made the authoring language JavaScript rather than the grammar the other
+// renderers speak — `^` was bitwise XOR there and exponentiation everywhere
+// else, so one scene string drew two different pictures, and `random()` could
+// not be refused, so a scene could never be baked or exported deterministically.
+// Both paths now go through the same parser, `random` is rejected by name, and
+// `^` is exponentiation. This comment said "falls back to per-frame" until
+// 2026-09-15; it described behaviour the engine had removed.
 export const TimeExpressionParamsSchema = z.object({
   property: z.string().optional().default('y').describe('Property to drive: x, y, rotation, opacity, scale'),
-  expression: z.string().optional().default('sin(t * 2) * 50 + 300').describe('Math expression of t (time) and v (baseValue), e.g. "sin(t*2)*50 + v"'),
+  expression: z.string().optional().default('sin(t * 2) * 50 + 300').describe('Math expression of t (time) and v (baseValue), e.g. "sin(t*2)*50 + v". `^` is exponentiation, not XOR. Available: sin cos tan asin acos atan sinh cosh tanh abs floor ceil round trunc sign sqrt cbrt exp log log2 log10 · pow min max atan2 hypot clamp mod · fract pingpong inverseLerp remap noise sec csc cot · easeInQuad easeOutQuad easeInOutQuad easeInCubic easeOutCubic easeInOutCubic · constants PI, E, TAU. `random()` is REJECTED by name on both the signal and per-frame paths — a scene that cannot render the same way twice can never be baked or exported deterministically.'),
   baseValue: z.number().optional().default(0).describe('Base value accessible as v in the expression'),
-  signal: z.boolean().optional().default(false).describe('Deterministic IR mode — parse expression to IR, evaluate as pure f(t)'),
+  signal: z.boolean().optional().default(false).describe('Deterministic IR mode — parse expression to IR, evaluate as pure f(t). Both modes now use the same parser and the same grammar; signal additionally makes the result bakeable as a pure function of time.'),
 });
 
 // =============================================================================
