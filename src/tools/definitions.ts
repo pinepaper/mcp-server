@@ -4969,8 +4969,13 @@ EXAMPLE — Choose effect for a victory card:
       properties: {
         action: {
           type: 'string',
-          enum: ['list', 'choose', 'coverage', 'find'],
-          description: 'Query mode: list, choose, coverage, or find (default: list)',
+          enum: ['list', 'choose', 'coverage', 'find', 'catalogue'],
+          description: "Query mode: list, choose, coverage, find, or catalogue (default: list). 'catalogue' reads a registry the capabilities aggregate does not gather.",
+        },
+        catalogue: {
+          type: 'string',
+          enum: ['rig_presets', 'shader_effects', 'stroke_decorations', 'precomps', 'images', 'segment_edit_kinds', 'shatter_orders', 'world_meshes'],
+          description: "action 'catalogue': which registry to read. These sit OUTSIDE the aggregate, which already covers styles, effects, deforms, entrances, animations, collages, palettes, masks, maskShapes and cutouts — 'list' reaches all of those.",
         },
         kind: {
           anyOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],

@@ -230,6 +230,8 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - The parameters have to be the **merged** set. What a generator hands its registry is empty, or two keys of thirty for the GPU generators, and a recipe built from that names a generator it cannot reproduce — which is indistinguishable from a working one until someone re-runs it.
 - `pp:world` is a **sibling** of `pp:generator`, never nested inside it. A World3D scene has no generator, so a stage read inside `if (generator)` is dropped from exactly the scenes that cannot rebuild without it.
 
+**`pinepaper_query_capabilities` gains `catalogue`** — the eight registries the engine's own aggregate does not gather: rig presets, shader effects, stroke decorations, the precomp list, the image library, segment-edit kinds, shatter orders and world meshes. Each was a capability an agent had to guess at, which by this project's rule is the same as its not existing. A missing facade is named rather than answered with an empty list, because an empty list reads as "none exist" and that is a different, worse answer.
+
 **New tool: `pinepaper_motion`** — the generators' Animation knob, pointed at anything. The motion engine every generator's own animation runs on was reachable from the code console and from custom generators, and from no tool call.
 
 - A **group** motion (drift, sway, rotate, pulse, wave, bounce) moves the target as one. A **field** motion (ripple, breathe, undulate) sweeps a crest *through* the children from an origin, with a chosen waveform — a wave passing through a crowd rather than a crowd moving together. Nothing else on this surface could do the second kind: `pinepaper_animate` applies a loop preset to one item.

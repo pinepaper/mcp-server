@@ -6125,6 +6125,25 @@ case 'analyze_palette':
   const key = ${S(validated.key)};
   const exclude = ${S(validated.exclude)};
 
+  // The registries getCapabilities does NOT aggregate. Each is a capability an
+  // agent otherwise has to guess at, which by this project's rule is the same
+  // as its not existing. Read one at a time and name a missing facade rather
+  // than answering with an empty list, which would read as "none exist".
+  if (action === 'catalogue') {
+    const READERS = {
+      rig_presets: 'listRigPresets', shader_effects: 'listShaderEffects',
+      stroke_decorations: 'listStrokeDecorations', precomps: 'listPrecomps',
+      images: 'listImages', segment_edit_kinds: 'listSegmentEditKinds',
+      shatter_orders: 'listShatterOrders', world_meshes: 'listWorldMeshes',
+    };
+    const want = ${S(validated.catalogue)};
+    const fn = READERS[want];
+    if (!fn) { return { success: false, error: 'unknown catalogue ' + JSON.stringify(want) + ' — try ' + Object.keys(READERS).join(', ') }; }
+    if (typeof app[fn] !== 'function') { return { success: false, error: 'app.' + fn + ' unavailable — update FxTool' }; }
+    const entries = await app[fn]();
+    return { success: true, catalogue: want, reader: 'app.' + fn, count: Array.isArray(entries) ? entries.length : undefined, entries: entries };
+  }
+
   if (typeof app.getCapabilities !== 'function') {
     return { success: false, error: 'app.getCapabilities unavailable — update FxTool' };
   }

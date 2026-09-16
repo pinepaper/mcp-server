@@ -2981,8 +2981,12 @@ export type QueryOntologyInput = z.infer<typeof QueryOntologyInputSchema>;
 
 // Capabilities query schema: discover and match capabilities across text styles, text effects, generators, deforms, relations, etc.
 export const QueryCapabilitiesInputSchema = z.object({
-  action: z.enum(['list', 'choose', 'coverage', 'find']).default('list')
-    .describe("'list' (all capabilities or filtered by kind) · 'choose' (context/mood-weighted recommendation) · 'coverage' (breakdown of indexable capabilities) · 'find' (lookup by key)"),
+  action: z.enum(['list', 'choose', 'coverage', 'find', 'catalogue']).default('list')
+    .describe("'list' (all capabilities or filtered by kind) · 'choose' (context/mood-weighted recommendation) · 'coverage' (breakdown of indexable capabilities) · 'find' (lookup by key) · 'catalogue' (the registries the aggregate does NOT gather — see `catalogue`)"),
+  catalogue: z.enum([
+    'rig_presets', 'shader_effects', 'stroke_decorations', 'precomps', 'images',
+    'segment_edit_kinds', 'shatter_orders', 'world_meshes',
+  ]).optional().describe("action 'catalogue': which registry to read. These sit OUTSIDE app.getCapabilities' aggregate — that one already covers styles, effects, deforms, entrances, animations, collages, palettes, masks, maskShapes and cutouts, and 'list' reaches all of those. Use this for the ones it does not gather: rig presets, shader effects, stroke decorations, the precomp list, the image library, segment-edit kinds, shatter orders and world meshes."),
   kind: z.union([
     z.string(),
     z.array(z.string()),

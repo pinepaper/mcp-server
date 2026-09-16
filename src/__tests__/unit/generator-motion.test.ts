@@ -12,7 +12,7 @@
 
 import { describe, it, expect } from 'bun:test';
 import { codeGenerator } from '../../types/code-generator.js';
-import { MotionInputSchema } from '../../types/schemas.js';
+import { MotionInputSchema, QueryCapabilitiesInputSchema } from '../../types/schemas.js';
 import { PINEPAPER_TOOLS } from '../../tools/definitions.js';
 
 const gen = (input: Record<string, unknown>) =>
@@ -119,5 +119,49 @@ describe('the tool distinguishes itself from pinepaper_animate', () => {
     expect(tool.description).toContain('GROUP motions');
     expect(tool.description).toContain('FIELD motions');
     expect(tool.description).toContain('not pinepaper_animate');
+  });
+});
+
+/**
+ * The catalogues app.getCapabilities does NOT aggregate.
+ *
+ * Eight of the eleven registries first listed as "unreachable" were already
+ * reachable: getCapabilities gathers styles, effects, deforms, entrances,
+ * animations, collages, palettes, masks, maskShapes and cutouts, and
+ * pinepaper_query_capabilities has emitted it all along. Only the ones it does
+ * not gather were real gaps — the difference between "no method reference" and
+ * "no tool reaches this capability".
+ */
+describe('query_capabilities catalogue', () => {
+  const genCaps = (input: Record<string, unknown>) =>
+    codeGenerator.generateQueryCapabilities(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      input as any
+    );
+
+  it('reads each registry through its own facade', () => {
+    const code = genCaps({ action: 'catalogue', catalogue: 'rig_presets' });
+    expect(code).toContain('listRigPresets');
+    expect(code).toContain("'catalogue'");
+  });
+
+  it('names a missing facade instead of answering with an empty list', () => {
+    // An empty array would read as "none exist", which is a different and
+    // worse answer than "this studio cannot tell you".
+    const code = genCaps({ action: 'catalogue', catalogue: 'shader_effects' });
+    expect(code).toContain('unavailable — update FxTool');
+    expect(code).toContain("'app.' + fn");
+  });
+
+  it('offers only the registries the aggregate misses', () => {
+    const ok = ['rig_presets', 'shader_effects', 'stroke_decorations', 'precomps', 'images', 'segment_edit_kinds', 'shatter_orders', 'world_meshes'];
+    for (const c of ok) {
+      expect(QueryCapabilitiesInputSchema.safeParse({ action: 'catalogue', catalogue: c }).success).toBe(true);
+    }
+    // These ARE in the aggregate; offering them here would be a second door to
+    // one room, and the two would drift.
+    for (const covered of ['palettes', 'entrances', 'cutouts', 'animations']) {
+      expect(QueryCapabilitiesInputSchema.safeParse({ action: 'catalogue', catalogue: covered }).success).toBe(false);
+    }
   });
 });
