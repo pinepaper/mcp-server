@@ -62,6 +62,7 @@ import {
   PathOpInputSchema,
   MotionInputSchema,
   SoundInputSchema,
+  InterchangeInputSchema,
   ChromaKeyInputSchema,
   RiggingInputSchema,
   GroupInputSchema,
@@ -2753,6 +2754,12 @@ You can now start creating new items on a clean canvas.`,
 
         // Small export — return inline (existing behavior)
         return executedResult(code, exportResult, exportBrowserResult.screenshot, description);
+      }
+
+      case 'pinepaper_interchange': {
+        const input = InterchangeInputSchema.parse(args);
+        const code = codeGenerator.generateInterchange(input);
+        return executeOrGenerate(code, `Interchange: ${input.action}`, options, 'pinepaper_interchange');
       }
 
       case 'pinepaper_sound': {

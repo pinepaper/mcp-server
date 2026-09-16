@@ -2265,6 +2265,24 @@ RECIPE — a playable maze: create_tilemap with wall fills → batch_create colo
   },
 
   {
+    name: 'pinepaper_interchange',
+    description: `The formats other tools read and write — Lottie, dotLottie, GLB, BVH, PNG sequence.
+
+pinepaper_agent_export covers the PLATFORM formats: png, svg, mp4, webm, gif, pdf, sized for Instagram or YouTube. These are the interchange ones — a Lottie an app plays, a GLB a 3D tool opens, a BVH a rig imports, a PNG sequence an editor ingests. Import is here too, because a format you can only write is half a bridge.
+
+Three of these refuse quietly in the engine: exportGLB with no perspective objects and exportBVH with no rigging system both warn to the console and return nothing, and the production build strips the console. Over MCP there is no console to read, so the precondition is checked BEFORE the call and named — "no perspective objects to export — create one with createObject3D first" rather than an empty result and a guess.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['export_lottie', 'export_dotlottie', 'import_lottie', 'export_glb', 'export_bvh', 'export_png_sequence'], description: 'Which interchange operation.' },
+        options: { type: 'object', description: 'Format options passed through to the exporter: frame range, dimensions, fps, naming.' },
+        data: { anyOf: [{ type: 'string' }, { type: 'object' }], description: 'import_lottie: the Lottie JSON — object, JSON string, or URL.' },
+        skeletonId: { type: 'string', description: "export_bvh: which skeleton to write. A BVH is one skeleton's motion." },
+      },
+      required: ['action'],
+    },
+  },
+  {
     name: 'pinepaper_sound',
     description: `Synthesis — and the drawing that is the same object.
 

@@ -191,6 +191,7 @@ import {
   PathOpInput,
   MotionInput,
   SoundInput,
+  InterchangeInput,
   ChromaKeyInput,
   RiggingInput,
   GroupInput,
@@ -7934,6 +7935,86 @@ ${needWorld}
 ${needWorld}
   const p = ${S(input.point)};
   return { success: true, ground: app.canvasToGround(p.x, p.y) };
+})();`.trim();
+    }
+  }
+
+  /**
+   * pinepaper_interchange — Lottie, dotLottie, GLB, BVH, PNG sequence.
+   *
+   * Three of these refuse through `console.warn` and a falsy return, which the
+   * production build strips — exportGLB with no perspective objects and
+   * exportBVH with no rigging system both do exactly that. Over MCP there is no
+   * console to read, so the PRECONDITION is checked here and named, rather than
+   * letting a caller receive nothing and guess why.
+   */
+  generateInterchange(input: InterchangeInput): string {
+    const S = (v: unknown) => JSON.stringify(v);
+    const guard = (fn: string) =>
+      `  if (typeof app.${fn} !== 'function') { return { success: false, error: 'app.${fn} unavailable — update FxTool' }; }`;
+    const opts = S(input.options ?? {});
+
+    switch (input.action) {
+      case 'export_lottie':
+      case 'export_dotlottie': {
+        const fn = input.action === 'export_lottie' ? 'exportLottie' : 'exportDotLottie';
+        return `
+// Interchange: ${fn}
+(async function() {
+${guard(fn)}
+  const out = await app.${fn}(${opts});
+  if (!out) { return { success: false, error: '${fn} produced nothing — the scene may have no animatable content' }; }
+  return { success: true, format: ${S(input.action === 'export_lottie' ? 'lottie' : 'dotlottie')}, data: out };
+})();`.trim();
+      }
+
+      case 'import_lottie':
+        return `
+// Interchange: a Lottie back onto the canvas
+(async function() {
+${guard('importLottie')}
+  // importLottie logs and returns falsy when the importer is absent — a
+  // stripped console makes that indistinguishable from an empty animation.
+  const r = await app.importLottie(${S(input.data)}, ${opts});
+  if (!r) { return { success: false, error: 'the Lottie did not import — it may be malformed, or this build has no Lottie importer' }; }
+  return { success: true, imported: r };
+})();`.trim();
+
+      case 'export_glb':
+        return `
+// Interchange: GLB of the perspective 3D objects
+(async function() {
+${guard('exportGLB')}
+  // exportGLB warns and bails when nothing perspective exists. The warning is
+  // stripped in production, so the precondition is checked here instead.
+  const has3d = app._initialized && app._initialized.has && app._initialized.has('threeD');
+  if (!has3d) { return { success: false, error: 'no perspective objects to export — create one with createObject3D first' }; }
+  const out = await app.exportGLB(${opts});
+  if (!out) { return { success: false, error: 'GLB export produced nothing' }; }
+  return { success: true, format: 'glb', data: out };
+})();`.trim();
+
+      case 'export_bvh':
+        return `
+// Interchange: BVH of one skeleton's motion
+(async function() {
+${guard('exportBVH')}
+  // Same shape as GLB: exportBVH warns and bails without a RiggingSystem.
+  const rigged = app._initialized && app._initialized.has && app._initialized.has('riggingSystem');
+  if (!rigged) { return { success: false, error: 'no rig to export — create a skeleton first (pinepaper_rigging)' }; }
+  const out = await app.exportBVH(${S(input.skeletonId)}, ${opts});
+  if (!out) { return { success: false, error: 'BVH export produced nothing for skeleton ' + ${S(input.skeletonId)} }; }
+  return { success: true, format: 'bvh', skeletonId: ${S(input.skeletonId)}, data: out };
+})();`.trim();
+
+      case 'export_png_sequence':
+        return `
+// Interchange: one PNG per frame
+(async function() {
+${guard('exportPNGSequence')}
+  const out = await app.exportPNGSequence(${opts});
+  if (!out) { return { success: false, error: 'PNG sequence produced nothing' }; }
+  return { success: true, format: 'png-sequence', result: out };
 })();`.trim();
     }
   }

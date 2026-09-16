@@ -4161,6 +4161,28 @@ export type World3DInput = z.infer<typeof World3DInputSchema>;
 // =============================================================================
 
 /**
+ * pinepaper_interchange — the formats other tools read and write.
+ *
+ * pinepaper_agent_export covers the PLATFORM formats: png, svg, mp4, webm,
+ * gif, pdf, sized for Instagram or YouTube. These are the interchange ones —
+ * a Lottie an app plays, a GLB a 3D tool opens, a BVH a rig imports, a PNG
+ * sequence an editor ingests — and they had no tool at all.
+ *
+ * Import is here too, because a format you can only write is half a bridge.
+ */
+export const InterchangeInputSchema = z.object({
+  action: z.enum(['export_lottie', 'export_dotlottie', 'import_lottie', 'export_glb', 'export_bvh', 'export_png_sequence'])
+    .describe("'export_lottie' (JSON) · 'export_dotlottie' (the zipped .lottie) · 'import_lottie' (a Lottie or .lottie back onto the canvas) · 'export_glb' (the perspective 3D objects — needs some to exist) · 'export_bvh' (a skeleton's motion — needs a rig) · 'export_png_sequence' (one file per frame)."),
+  options: z.record(z.string(), z.unknown()).optional().describe('Format options, passed through to the exporter: frame range, dimensions, fps, naming.'),
+  data: z.union([z.string(), z.record(z.string(), z.unknown())]).optional()
+    .describe('import_lottie: the Lottie JSON — an object, a JSON string, or a URL.'),
+  skeletonId: z.string().optional().describe('export_bvh: which skeleton to write. A BVH is one skeleton\'s motion, so this is not optional in practice.'),
+})
+  .refine((v) => v.action !== 'import_lottie' || v.data !== undefined, { message: 'import_lottie requires data', path: ['data'] })
+  .refine((v) => v.action !== 'export_bvh' || !!v.skeletonId, { message: 'export_bvh requires skeletonId — a BVH is one skeleton\'s motion', path: ['skeletonId'] });
+export type InterchangeInput = z.infer<typeof InterchangeInputSchema>;
+
+/**
  * pinepaper_sound — synthesis, and the drawing that is the same object.
  *
  * The engine carries a whole audio graph: tones, chords, named percussion and

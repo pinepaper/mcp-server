@@ -25,7 +25,7 @@
 
 PinePaper MCP Server enables AI assistants to create and animate graphics in [PinePaper Studio](https://pinepaper.studio) via the Model Context Protocol (MCP). Works with any AI that supports MCP tool calling (Claude, GPT, Gemini, local models, etc.).
 
-The server exposes **147 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
+The server exposes **148 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
 
 - Create text, shapes, geometry, and complex graphics
 - Animate items with behavior-driven **relations** rather than keyframes
@@ -37,7 +37,7 @@ The server exposes **147 tools** across drawing, animation, diagrams, maps, typo
 
 ## Running it: local or hosted
 
-**Local is free and complete.** Every one of the 147 tools works when you run
+**Local is free and complete.** Every one of the 148 tools works when you run
 this server yourself. There is no reduced tier and nothing held back.
 
 What it needs:
@@ -233,6 +233,10 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 **Relation presets are adoptable.** `pinepaper_add_relation` takes a `presetId` — a community motion someone already tuned, with its symbols exposed as knobs — instead of making a caller name a type and guess at params. The preset decides the relation type, and any symbol you omit takes the midpoint of its declared range, so a preset applies sensibly with no values at all. List them through the new `catalogue`, which also returns what this build **rejected**: a preset for a relation type this engine does not have is a named absence, where dropping it silently would read as the catalogue simply being smaller.
 
 **`pinepaper_query_capabilities` gains `catalogue`** — the eight registries the engine's own aggregate does not gather: rig presets, shader effects, stroke decorations, the precomp list, the image library, segment-edit kinds, shatter orders and world meshes. Each was a capability an agent had to guess at, which by this project's rule is the same as its not existing. A missing facade is named rather than answered with an empty list, because an empty list reads as "none exist" and that is a different, worse answer.
+
+**New tool: `pinepaper_interchange`** — Lottie, dotLottie, GLB, BVH and PNG sequence. `pinepaper_agent_export` covers the *platform* formats sized for Instagram or YouTube; these are the ones another tool reads, and they had no tool at all. Import is here too, because a format you can only write is half a bridge.
+
+- `exportGLB` and `exportBVH` refuse through `console.warn` and a falsy return, and the production build strips the console — over MCP that is a silent nothing. Both preconditions are checked before the call and named: "no perspective objects to export — create one with `createObject3D` first", "no rig to export — create a skeleton first".
 
 **New tool: `pinepaper_sound`** — synthesis, and the drawing that is the same object. The engine carries a whole audio graph and nothing reached it; `pinepaper_audio_beats` *analyses* audio that already exists, and this *makes* audio.
 
@@ -434,7 +438,7 @@ Fourteen new tools (121 → 135) and new actions across the surface — the rele
 
 ## Toolkits & Token Budget
 
-147 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
+148 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
 
 **Toolkit profiles** (`PINEPAPER_TOOLKIT`):
 
@@ -639,7 +643,7 @@ Generate instruction/code pairs for LLM fine-tuning:
 
 ## Tools Reference
 
-All 147 tools, grouped by the tag used for toolkit filtering.
+All 148 tools, grouped by the tag used for toolkit filtering.
 
 ### Canvas (`canvas`)
 | Tool | Description |
@@ -875,6 +879,7 @@ All 147 tools, grouped by the tag used for toolkit filtering.
 | `pinepaper_agent_end_job` | End job with summary and recommendations |
 | `pinepaper_agent_reset` | Quick canvas reset without page refresh |
 | `pinepaper_agent_batch_execute` | Execute multiple operations in batch |
+| `pinepaper_interchange` | Lottie, dotLottie, GLB, BVH, PNG sequence |
 | `pinepaper_agent_export` | Smart export with platform auto-detection |
 | `pinepaper_agent_analyze` | Analyze content for export recommendations |
 

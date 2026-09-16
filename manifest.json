@@ -252,6 +252,10 @@
       "description": "Game logic: pathfind (A* world-coords waypoints for moves_along_path)|create_tilemap (board data + grid + merged collision rects). Pure data, draws nothing."
     },
     {
+      "name": "pinepaper_interchange",
+      "description": "Lottie / dotLottie / GLB / BVH / PNG-sequence import and export. {action, options, data, skeletonId}"
+    },
+    {
       "name": "pinepaper_sound",
       "description": "Synthesis: tones, chords, percussion, SFX, sound-from-text, and a two-way bridge between a sound and a drawn path. {action, note|root|name|text|itemId}"
     },

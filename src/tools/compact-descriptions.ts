@@ -140,6 +140,11 @@ SHAPE TYPES: ${DIAGRAM_SHAPES}.`,
   pinepaper_agent_export: `Export as MP4, GIF, PNG, SVG, or PDF. Formats: svg, png, gif, mp4, webm, pdf. Quality: draft, standard, high. Framing: canvas (default) or camera (camera_animates viewport — video formats only).`,
 
   // -------------------------------------------------------------------------
+  // interchange
+  // -------------------------------------------------------------------------
+  pinepaper_interchange: `Interchange formats the platform exporter does not cover: export_lottie, export_dotlottie, import_lottie, export_glb (needs perspective objects), export_bvh (needs a rig), export_png_sequence.`,
+
+  // -------------------------------------------------------------------------
   // sound
   // -------------------------------------------------------------------------
   pinepaper_sound: `Synthesis. Catalogues: list_instruments|list_percussion|list_sfx. Play: play_tone|play_chord|play_percussion|play_sfx|play_spec|play_from_text. Read: chord_frequencies|from_text|timbre_from_path. Canvas: create draws a sound AS an editable waveform path; timbre_from_path reads any drawn path back as harmonic content.`,
