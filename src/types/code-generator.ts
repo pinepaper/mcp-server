@@ -7317,6 +7317,52 @@ ${guard}
   };
 })();`.trim();
       }
+
+      case 'cursive':
+        return `
+// Text: write it as STROKED handwriting — a path, not a glyph
+(function() {
+  if (typeof app.createCursiveText !== 'function') { return { success: false, error: 'app.createCursiveText unavailable — update FxTool' }; }
+  const item = app.createCursiveText(${S(input.text)}, ${S(input.cursiveOptions ?? {})});
+  if (!item) { return { success: false, error: 'the cursive text produced no path' }; }
+  return { success: true, itemId: item.data && item.data.id };
+})();`.trim();
+
+      case 'wrap':
+        return `
+// Text: break to a width — reversibly
+(function() {
+  if (typeof app.wrapText !== 'function') { return { success: false, error: 'app.wrapText unavailable — update FxTool' }; }
+  const r = app.wrapText(${S(input.itemId)}, ${S(input.maxWidth)});
+  if (!r || r.ok === false) { return { success: false, error: (r && r.error) || 'that item could not be wrapped' }; }
+  return { success: true, ...r };
+})();`.trim();
+
+      case 'unwrap':
+        return `
+// Text: restore the single line wrap replaced
+(function() {
+  if (typeof app.unwrapText !== 'function') { return { success: false, error: 'app.unwrapText unavailable — update FxTool' }; }
+  // 'not wrapped' is the engine's own refusal and is more useful than
+  // anything this layer could infer, so it is passed through.
+  const r = app.unwrapText(${S(input.itemId)});
+  if (!r || r.ok === false) { return { success: false, error: (r && r.error) || 'that item is not wrapped' }; }
+  return { success: true, ...r };
+})();`.trim();
+
+      case 'to_collage':
+        return `
+// Text: turn an EXISTING text item into a letter collage, in place
+(function() {
+  if (typeof app.convertTextToCollage !== 'function') { return { success: false, error: 'app.convertTextToCollage unavailable — update FxTool' }; }
+  const item = app.getItemById ? app.getItemById(${S(input.itemId)}) : null;
+  if (!item) { return { success: false, error: 'no such item: ' + ${S(input.itemId)} }; }
+  // Returns null when there is no letterCollage subsystem — a bare null that
+  // would otherwise read as "the conversion did nothing to your text".
+  const r = app.convertTextToCollage(item, ${S(input.text ?? null)} || item.content, ${S(input.collageOptions ?? {})});
+  if (!r) { return { success: false, error: 'the collage system is unavailable in this build, so the text was left as it was' }; }
+  return { success: true, collage: r };
+})();`.trim();
     }
   }
 
@@ -8875,6 +8921,22 @@ ${guard('unlockAllItems')}${pass('app.unlockAllItems()')}
    * object. Guards on the app method so old FxTool builds degrade gracefully.
    */
   generateEquationPath(input: EquationPathInput): string {
+    // An ODE is INTEGRATED, not plotted: the caller gets the trajectory back as
+    // data rather than a drawn path, so it can be inspected, fed to a path, or
+    // used to drive keyframes. Branching here rather than in a separate tool
+    // keeps one place that knows the equation vocabulary.
+    if (input.solveOde) {
+      const ode = input.solveOde;
+      return `
+// Integrate an ODE and return the SOLUTION — nothing is drawn
+(async function() {
+  if (typeof app.solveODE !== 'function') { return { success: false, error: 'app.solveODE unavailable — update FxTool' }; }
+  const sol = await app.solveODE(${JSON.stringify({ equations: ode.equations, initialState: ode.initialState, tEnd: ode.tEnd, dt: ode.dt })}, ${JSON.stringify(ode.method ?? 'rk4')});
+  if (!sol) { return { success: false, error: 'the solver returned nothing — check the equations and the initial state length' }; }
+  return { success: true, method: ${JSON.stringify(ode.method ?? 'rk4')}, solution: sol };
+})();`.trim();
+    }
+
     const optsJson = JSON.stringify(input);
     const kindJson = JSON.stringify(input.kind);
     return `

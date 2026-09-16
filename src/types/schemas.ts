@@ -614,6 +614,13 @@ export const MovesAlongPathParamsSchema = z.object({
 // || opts) — so they must survive validation.
 export const EquationPathInputSchema = z.object({
   ...equationSpecShape,
+  solveOde: z.object({
+    equations: z.union([z.string(), z.array(z.string())]).describe("The derivative(s), as expressions — e.g. 'y' for dy/dt = y, or ['v', '-9.8'] for a falling body."),
+    initialState: z.array(z.number()).describe('The state at t = 0, one number per equation.'),
+    tEnd: z.number().optional().describe('How far to integrate (default 10).'),
+    dt: z.number().optional().describe('Step size (default 0.01). Smaller is more accurate and slower.'),
+    method: z.enum(['rk4', 'euler']).optional().describe("Integrator (default 'rk4' — fourth-order Runge-Kutta). 'euler' is faster and visibly wrong on anything stiff."),
+  }).optional().describe('Numerically integrate an ODE instead of plotting a closed-form expression, and return the SOLUTION rather than drawing it. The trajectory comes back as data, so a caller can inspect it, feed it to a path, or drive keyframes with it.'),
   x:     z.number().optional().describe('Canvas origin x (default: canvas center)'),
   y:     z.number().optional().describe('Canvas origin y (default: canvas center)'),
   style: z.record(z.unknown()).optional().describe('Path style forwarded to create (strokeColor, strokeWidth, fillColor, …)'),
@@ -3848,8 +3855,17 @@ export type MediaInput = z.infer<typeof MediaInputSchema>;
  * platform impossibility, not an omission.
  */
 export const TextStyleInputSchema = z.object({
-  action: z.enum(['apply_style', 'set_font_axes', 'list_styles'])
-    .describe("'apply_style' (stacked-layer display style) · 'set_font_axes' (variable-font weight/width/slant) · 'list_styles' (styles + palettes + axes, for pickers)"),
+  action: z.enum(['apply_style', 'set_font_axes', 'list_styles', 'cursive', 'wrap', 'unwrap', 'to_collage'])
+    .describe("'apply_style' (stacked-layer display style) · 'set_font_axes' (variable-font weight/width/slant) · 'list_styles' (styles + palettes + axes, for pickers) · 'cursive' (draw text as STROKED handwriting — a path, not a glyph, so it can be drawn on over time) · 'wrap' / 'unwrap' (break a text item to a width, reversibly) · 'to_collage' (turn an EXISTING text item into a letter collage, keeping its place)"),
+  text: z.string().optional().describe('cursive: the words to write. to_collage: the text to build the collage from, if it differs from the item.'),
+  maxWidth: z.number().optional().describe('wrap: the width to break at, in canvas units. unwrap restores the original single line, so this is not destructive.'),
+  cursiveOptions: z.object({
+    x: z.number().optional(), y: z.number().optional(),
+    scale: z.number().optional().describe('Size multiplier (default 1).'),
+    strokeColor: z.string().optional().describe("Ink colour (default '#ffffff')."),
+    strokeWidth: z.number().optional().describe('Pen width (default 2).'),
+  }).optional().describe('cursive: where and how it is written. The result is a STROKED PATH, so pinepaper_animate\'s draw-on and pinepaper_path\'s outline_stroke both apply to it — which is the reason to prefer it over a script font.'),
+  collageOptions: z.record(z.string(), z.unknown()).optional().describe('to_collage: style, palette and the rest, same vocabulary as pinepaper_create_letter_collage.'),
   itemId: z.string().optional().describe('Text item id — apply_style / set_font_axes.'),
   styleKey: z.string().optional().describe("apply_style: style name from list_styles (e.g. 'stacked', 'arcade' — the pixel/arcade styles suggest their own face)."),
   palette: z.union([z.string(), z.array(z.string())]).optional().describe('apply_style: a named colourway or an explicit color array.'),

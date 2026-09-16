@@ -1481,6 +1481,7 @@ EXAMPLES:
         y: { type: 'number', description: 'Canvas origin y (default: canvas center)' },
         flipY: { type: 'boolean', description: 'Math y-up → screen y-down (default true)' },
         style: { type: 'object', description: 'Path style forwarded to create (strokeColor, strokeWidth, fillColor, …)' },
+        solveOde: { type: 'object', description: "Integrate an ODE instead of plotting a closed form, and return the SOLUTION rather than drawing it: { equations, initialState, tEnd?, dt?, method? ('rk4' default, or 'euler' — faster and visibly wrong on anything stiff) }. The trajectory comes back as data, to inspect, feed to a path, or drive keyframes with." },
         warp: {
           anyOf: [{ type: 'object' }, { type: 'array', items: { type: 'object' } }],
           description: 'Chained parametric warp(s): { dx, dy } expressions of x, y, t — one object or an array',
@@ -1945,7 +1946,11 @@ EXAMPLE: { action: 'apply_style', itemId: 'title_1', styleKey: 'arcade', fontFam
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['apply_style', 'set_font_axes', 'list_styles'], description: 'Text style operation' },
+        action: { type: 'string', enum: ['apply_style', 'set_font_axes', 'list_styles', 'cursive', 'wrap', 'unwrap', 'to_collage'], description: "Text style operation. 'cursive' draws text as STROKED handwriting — a path, not a glyph, so draw-on animation and outline_stroke both apply. 'wrap'/'unwrap' break a text item to a width, reversibly. 'to_collage' converts an EXISTING text item into a letter collage in place." },
+        text: { type: 'string', description: 'cursive: the words to write. to_collage: the text to build from, if it differs from the item.' },
+        maxWidth: { type: 'number', description: 'wrap: the width to break at, in canvas units. unwrap restores the original, so this is not destructive.' },
+        cursiveOptions: { type: 'object', description: 'cursive: { x?, y?, scale?, strokeColor?, strokeWidth? }.' },
+        collageOptions: { type: 'object', description: 'to_collage: style, palette and the rest — same vocabulary as pinepaper_create_letter_collage.' },
         itemId: { type: 'string', description: 'Text item id — apply_style / set_font_axes.' },
         styleKey: { type: 'string', description: 'apply_style: style name from list_styles.' },
         palette: {
