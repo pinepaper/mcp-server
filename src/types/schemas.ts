@@ -4161,6 +4161,52 @@ export type World3DInput = z.infer<typeof World3DInputSchema>;
 // =============================================================================
 
 /**
+ * pinepaper_sound — synthesis, and the drawing that is the same object.
+ *
+ * The engine carries a whole audio graph: tones, chords, named percussion and
+ * SFX, plain-language sound descriptions, and — the part worth the tool — a
+ * two-way bridge between a sound and a Paper path. `create` draws a sound as a
+ * waveform path you can then edit; `timbre_from_path` reads any drawn path
+ * back as a timbre. A curve someone drew becomes the harmonic content of a
+ * note.
+ *
+ * None of it was reachable. `pinepaper_audio_beats` analyses audio that
+ * already exists; this makes audio.
+ */
+export const SoundInputSchema = z.object({
+  action: z.enum([
+    'list_instruments', 'list_percussion', 'list_sfx',
+    'play_tone', 'play_chord', 'chord_frequencies', 'play_percussion', 'play_sfx',
+    'play_spec', 'from_text', 'play_from_text',
+    'create', 'timbre_from_path', 'set_placement', 'remove', 'stop_all',
+  ]).describe("Catalogues: 'list_instruments' · 'list_percussion' · 'list_sfx'. Play: 'play_tone' · 'play_chord' · 'play_percussion' · 'play_sfx' · 'play_spec' · 'play_from_text'. Read without playing: 'chord_frequencies' · 'from_text' (a plain-language description resolved to a spec) · 'timbre_from_path'. Canvas: 'create' (a sound drawn AS a waveform path) · 'set_placement' · 'remove' · 'stop_all'."),
+  note: z.string().optional().describe("play_tone: scientific pitch, e.g. 'A4' or 'C#3'."),
+  root: z.string().optional().describe("play_chord / chord_frequencies: the root note, e.g. 'C4'."),
+  chord: z.string().optional().default('major').describe("play_chord / chord_frequencies: the chord kind, e.g. 'major', 'minor', 'maj7', 'dim'. Call the engine rather than guessing at exotic names."),
+  name: z.string().optional().describe("play_percussion / play_sfx: the named drum or effect — list them first (SFX include beep, pop, wind, whoosh, zap)."),
+  text: z.string().optional().describe("from_text / play_from_text: a plain-language description, e.g. 'a soft warm bell on A4'. 'from_text' resolves it to a spec WITHOUT playing, so a caller can inspect or edit before committing."),
+  spec: z.record(z.string(), z.unknown()).optional().describe('play_spec / create: the sound spec — partials, envelope, duration. Usually one you got from from_text or a catalogue entry rather than wrote by hand.'),
+  options: z.record(z.string(), z.unknown()).optional().describe('Playback options for the play_* actions: duration, gain, pan, and the rest the audio graph accepts.'),
+  itemId: z.string().optional().describe('timbre_from_path: the path whose SHAPE becomes the harmonic content. set_placement / remove: the sound item.'),
+  samples: z.number().int().positive().optional().describe('timbre_from_path: how many points to sample along the path (default 256). More is a finer timbre and a slower read.'),
+  placement: z.record(z.string(), z.unknown()).optional().describe('set_placement: where and when the sound sits on the timeline.'),
+  visual: z.object({
+    width: z.number().optional().describe('Waveform path width in canvas units (default 220).'),
+    height: z.number().optional().describe('Waveform path height in canvas units (default 64).'),
+    position: z.object({ x: z.number(), y: z.number() }).optional(),
+    color: z.string().optional(),
+  }).optional().describe('create: how the waveform path is drawn. The sound IS this item — edit the path and the timbre changes with it.'),
+})
+  .refine((v) => v.action !== 'play_tone' || !!v.note, { message: 'play_tone requires note', path: ['note'] })
+  .refine((v) => !['play_chord', 'chord_frequencies'].includes(v.action) || !!v.root, { message: 'this action requires root', path: ['root'] })
+  .refine((v) => !['play_percussion', 'play_sfx'].includes(v.action) || !!v.name, { message: 'this action requires name — list the catalogue first', path: ['name'] })
+  .refine((v) => !['from_text', 'play_from_text'].includes(v.action) || !!v.text, { message: 'this action requires text', path: ['text'] })
+  .refine((v) => v.action !== 'play_spec' || !!v.spec, { message: 'play_spec requires spec', path: ['spec'] })
+  .refine((v) => !['timbre_from_path', 'set_placement', 'remove'].includes(v.action) || !!v.itemId, { message: 'this action requires itemId', path: ['itemId'] })
+  .refine((v) => v.action !== 'set_placement' || !!v.placement, { message: 'set_placement requires placement', path: ['placement'] });
+export type SoundInput = z.infer<typeof SoundInputSchema>;
+
+/**
  * pinepaper_motion — the generators' Animation knob, pointed at anything.
  *
  * The same engine every generator's own animation runs on, reachable for any

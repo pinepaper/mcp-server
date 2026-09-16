@@ -140,6 +140,11 @@ SHAPE TYPES: ${DIAGRAM_SHAPES}.`,
   pinepaper_agent_export: `Export as MP4, GIF, PNG, SVG, or PDF. Formats: svg, png, gif, mp4, webm, pdf. Quality: draft, standard, high. Framing: canvas (default) or camera (camera_animates viewport — video formats only).`,
 
   // -------------------------------------------------------------------------
+  // sound
+  // -------------------------------------------------------------------------
+  pinepaper_sound: `Synthesis. Catalogues: list_instruments|list_percussion|list_sfx. Play: play_tone|play_chord|play_percussion|play_sfx|play_spec|play_from_text. Read: chord_frequencies|from_text|timbre_from_path. Canvas: create draws a sound AS an editable waveform path; timbre_from_path reads any drawn path back as harmonic content.`,
+
+  // -------------------------------------------------------------------------
   // motion
   // -------------------------------------------------------------------------
   pinepaper_motion: `The generators' motion engine for any group. list → the engine's catalogue. apply → a GROUP motion (drift, sway, rotate, pulse, wave, bounce) moves the target as one; a FIELD motion (ripple, breathe, undulate) sweeps a crest through its children from an origin, with a waveform.`,

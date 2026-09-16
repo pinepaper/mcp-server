@@ -61,6 +61,7 @@ import {
   CropImageInputSchema,
   PathOpInputSchema,
   MotionInputSchema,
+  SoundInputSchema,
   ChromaKeyInputSchema,
   RiggingInputSchema,
   GroupInputSchema,
@@ -2752,6 +2753,12 @@ You can now start creating new items on a clean canvas.`,
 
         // Small export — return inline (existing behavior)
         return executedResult(code, exportResult, exportBrowserResult.screenshot, description);
+      }
+
+      case 'pinepaper_sound': {
+        const input = SoundInputSchema.parse(args);
+        const code = codeGenerator.generateSound(input);
+        return executeOrGenerate(code, `Sound: ${input.action}`, options, 'pinepaper_sound');
       }
 
       case 'pinepaper_motion': {

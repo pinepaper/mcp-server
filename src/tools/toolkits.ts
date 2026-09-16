@@ -95,6 +95,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
     'pinepaper_flip',
     'pinepaper_animate',
     'pinepaper_motion',
+    'pinepaper_sound',
     'pinepaper_import_motion_capture',
     'pinepaper_keyframe_animate',
     'pinepaper_play_timeline',

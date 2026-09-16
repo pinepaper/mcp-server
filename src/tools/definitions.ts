@@ -2265,6 +2265,40 @@ RECIPE — a playable maze: create_tilemap with wall fills → batch_create colo
   },
 
   {
+    name: 'pinepaper_sound',
+    description: `Synthesis — and the drawing that is the same object.
+
+The engine carries a full audio graph, and none of it was reachable. pinepaper_audio_beats ANALYSES audio that already exists; this MAKES audio.
+
+- Catalogues: list_instruments, list_percussion, list_sfx. Call one before naming a drum or effect — the names are the engine's.
+- Play: play_tone ('A4'), play_chord (root + kind: major, minor, maj7, dim…), play_percussion, play_sfx (beep, pop, wind, whoosh, zap), play_spec, play_from_text.
+- Read without playing: chord_frequencies (the Hz a chord resolves to), from_text (a plain-language description — "a soft warm bell on A4" — resolved to a spec you can inspect or edit before committing), timbre_from_path.
+
+THE PART WORTH KNOWING: sound and drawing are the same object here, both ways.
+- create draws a sound AS a waveform path on the canvas. Edit the path and the timbre changes with it — it is not a picture of the sound, it is the sound.
+- timbre_from_path reads ANY drawn path back as harmonic content. A curve someone drew by hand becomes the partials of a note.
+
+A path with no length cannot be a timbre, and the engine answers a flat single-partial timbre for anything that is not one — a real answer and a refusal look identical — so the item is checked before the call and a non-path is refused by name.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['list_instruments', 'list_percussion', 'list_sfx', 'play_tone', 'play_chord', 'chord_frequencies', 'play_percussion', 'play_sfx', 'play_spec', 'from_text', 'play_from_text', 'create', 'timbre_from_path', 'set_placement', 'remove', 'stop_all'], description: 'Which sound operation.' },
+        note: { type: 'string', description: "play_tone: scientific pitch, e.g. 'A4'." },
+        root: { type: 'string', description: "play_chord / chord_frequencies: root note, e.g. 'C4'." },
+        chord: { type: 'string', description: "play_chord / chord_frequencies: chord kind (default 'major')." },
+        name: { type: 'string', description: 'play_percussion / play_sfx: the named drum or effect — list them first.' },
+        text: { type: 'string', description: "from_text / play_from_text: a plain-language description. 'from_text' resolves WITHOUT playing." },
+        spec: { type: 'object', description: 'play_spec / create: the sound spec, usually one from from_text or a catalogue.' },
+        options: { type: 'object', description: 'Playback options for the play_* actions.' },
+        itemId: { type: 'string', description: 'timbre_from_path: the path whose shape becomes the timbre. set_placement / remove: the sound item.' },
+        samples: { type: 'number', description: 'timbre_from_path: points sampled along the path (default 256).' },
+        placement: { type: 'object', description: 'set_placement: where and when the sound sits on the timeline.' },
+        visual: { type: 'object', description: 'create: { width?, height?, position?, color? } for the waveform path.' },
+      },
+      required: ['action'],
+    },
+  },
+  {
     name: 'pinepaper_motion',
     description: `The generators' Animation knob, pointed at anything — the same motion engine every generator's own animation runs on, reachable for any group or list of items.
 

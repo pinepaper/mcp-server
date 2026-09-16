@@ -190,6 +190,7 @@ import {
   CropImageInput,
   PathOpInput,
   MotionInput,
+  SoundInput,
   ChromaKeyInput,
   RiggingInput,
   GroupInput,
@@ -7934,6 +7935,81 @@ ${needWorld}
   const p = ${S(input.point)};
   return { success: true, ground: app.canvasToGround(p.x, p.y) };
 })();`.trim();
+    }
+  }
+
+  /**
+   * pinepaper_sound — synthesis, and the drawing that is the same object.
+   *
+   * Every facade here rides `app.audioGraph`, which is lazily built, so each
+   * action guards the METHOD rather than assuming the graph. The canvas half
+   * (`create`, `timbre_from_path`) goes through PinePaper directly.
+   */
+  generateSound(input: SoundInput): string {
+    const S = (v: unknown) => JSON.stringify(v);
+    const guard = (fn: string) =>
+      `  if (typeof app.${fn} !== 'function') { return { success: false, error: 'app.${fn} unavailable — update FxTool' }; }`;
+    const simple = (fn: string, args: string, key: string, label: string) => `
+// Sound: ${label}
+(function() {
+${guard(fn)}
+  return { success: true, ${key}: app.${fn}(${args}) };
+})();`.trim();
+
+    switch (input.action) {
+      case 'list_instruments': return simple('listInstruments', '', 'instruments', 'the instrument catalogue');
+      case 'list_percussion': return simple('listPercussion', '', 'percussion', 'the percussion catalogue');
+      case 'list_sfx': return simple('listSfx', '', 'sfx', 'the SFX catalogue');
+
+      case 'play_tone': return simple('playTone', `${S(input.note)}, ${S(input.options ?? {})}`, 'played', `tone ${input.note}`);
+      case 'play_chord': return simple('playChord', `${S(input.root)}, ${S(input.chord)}, ${S(input.options ?? {})}`, 'played', `${input.chord} chord on ${input.root}`);
+      case 'chord_frequencies': return simple('chordFrequencies', `${S(input.root)}, ${S(input.chord)}, ${S(input.options ?? {})}`, 'frequencies', `the Hz of ${input.chord} on ${input.root}`);
+      case 'play_percussion': return simple('playPercussion', `${S(input.name)}, ${S(input.options ?? {})}`, 'played', `percussion ${input.name}`);
+      case 'play_sfx': return simple('playSfx', `${S(input.name)}, ${S(input.options ?? {})}`, 'played', `sfx ${input.name}`);
+      case 'play_spec': return simple('playSound', S(input.spec), 'played', 'a raw spec');
+      case 'play_from_text': return simple('playSoundFromText', S(input.text), 'played', `"${input.text}"`);
+
+      case 'from_text':
+        return `
+// Sound: resolve "${input.text}" to a spec WITHOUT playing it
+(function() {
+${guard('buildSoundFromText')}
+  const spec = app.buildSoundFromText(${S(input.text)});
+  // A description the resolver cannot read comes back empty rather than
+  // throwing. Saying so beats handing back a spec that plays silence.
+  if (!spec) { return { success: false, error: 'could not resolve ' + ${S(input.text)} + ' into a sound' }; }
+  return { success: true, spec: spec };
+})();`.trim();
+
+      case 'create':
+        return `
+// Sound: draw it AS a waveform path — the item and the sound are one thing
+(function() {
+${guard('createSound')}
+  const item = app.createSound(${S(input.spec ?? {})}, ${S(input.visual ?? {})});
+  if (!item) { return { success: false, error: 'the sound produced no waveform path' }; }
+  return { success: true, itemId: item.data && item.data.id, itemType: 'sound' };
+})();`.trim();
+
+      case 'timbre_from_path':
+        return `
+// Sound: read a drawn path's shape as harmonic content
+(function() {
+${guard('timbreFromPath')}
+  const item = app.getItemById ? app.getItemById(${S(input.itemId)}) : null;
+  // timbreFromPath answers a flat {partials:[{h:1,amp:1}]} for anything that is
+  // not a path with length — a real timbre and a refusal look identical, so the
+  // item is checked HERE instead of reading that back as an answer.
+  if (!item) { return { success: false, error: 'no such item: ' + ${S(input.itemId)} }; }
+  if (typeof item.getPointAt !== 'function' || !(item.length > 0)) {
+    return { success: false, error: 'timbre needs a path with length — ' + ${S(input.itemId)} + ' is not one' };
+  }
+  return { success: true, timbre: app.timbreFromPath(item, ${S(input.samples ?? 256)}) };
+})();`.trim();
+
+      case 'set_placement': return simple('setSoundPlacement', `${S(input.itemId)}, ${S(input.placement ?? {})}`, 'placed', 'placement');
+      case 'remove': return simple('removeSound', S(input.itemId), 'removed', 'remove');
+      case 'stop_all': return simple('stopSounds', '', 'stopped', 'stop everything');
     }
   }
 

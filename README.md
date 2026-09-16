@@ -25,7 +25,7 @@
 
 PinePaper MCP Server enables AI assistants to create and animate graphics in [PinePaper Studio](https://pinepaper.studio) via the Model Context Protocol (MCP). Works with any AI that supports MCP tool calling (Claude, GPT, Gemini, local models, etc.).
 
-The server exposes **146 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
+The server exposes **147 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
 
 - Create text, shapes, geometry, and complex graphics
 - Animate items with behavior-driven **relations** rather than keyframes
@@ -37,7 +37,7 @@ The server exposes **146 tools** across drawing, animation, diagrams, maps, typo
 
 ## Running it: local or hosted
 
-**Local is free and complete.** Every one of the 146 tools works when you run
+**Local is free and complete.** Every one of the 147 tools works when you run
 this server yourself. There is no reduced tier and nothing held back.
 
 What it needs:
@@ -234,6 +234,12 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 
 **`pinepaper_query_capabilities` gains `catalogue`** — the eight registries the engine's own aggregate does not gather: rig presets, shader effects, stroke decorations, the precomp list, the image library, segment-edit kinds, shatter orders and world meshes. Each was a capability an agent had to guess at, which by this project's rule is the same as its not existing. A missing facade is named rather than answered with an empty list, because an empty list reads as "none exist" and that is a different, worse answer.
 
+**New tool: `pinepaper_sound`** — synthesis, and the drawing that is the same object. The engine carries a whole audio graph and nothing reached it; `pinepaper_audio_beats` *analyses* audio that already exists, and this *makes* audio.
+
+- Tones, chords (by name, with the Hz readable without playing), named percussion and SFX, and plain-language descriptions — `from_text` resolves "a soft warm bell on A4" to a spec **without** playing it, so a caller can inspect or edit before committing.
+- **Sound and drawing are one object, both ways.** `create` draws a sound *as* a waveform path: edit the path and the timbre changes with it. `timbre_from_path` reads any drawn path back as harmonic content — a curve someone drew by hand becomes the partials of a note.
+- `timbreFromPath` answers a flat single-partial timbre for anything that is not a path with length, which is a legitimate timbre *and* the refusal, indistinguishable once returned. So the item is checked before the call and a non-path is refused by name.
+
 **New tool: `pinepaper_motion`** — the generators' Animation knob, pointed at anything. The motion engine every generator's own animation runs on was reachable from the code console and from custom generators, and from no tool call.
 
 - A **group** motion (drift, sway, rotate, pulse, wave, bounce) moves the target as one. A **field** motion (ripple, breathe, undulate) sweeps a crest *through* the children from an origin, with a chosen waveform — a wave passing through a crowd rather than a crowd moving together. Nothing else on this surface could do the second kind: `pinepaper_animate` applies a loop preset to one item.
@@ -428,7 +434,7 @@ Fourteen new tools (121 → 135) and new actions across the surface — the rele
 
 ## Toolkits & Token Budget
 
-146 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
+147 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
 
 **Toolkit profiles** (`PINEPAPER_TOOLKIT`):
 
@@ -633,7 +639,7 @@ Generate instruction/code pairs for LLM fine-tuning:
 
 ## Tools Reference
 
-All 146 tools, grouped by the tag used for toolkit filtering.
+All 147 tools, grouped by the tag used for toolkit filtering.
 
 ### Canvas (`canvas`)
 | Tool | Description |
@@ -691,6 +697,7 @@ All 146 tools, grouped by the tag used for toolkit filtering.
 ### Animation (`animation`)
 | Tool | Description |
 |------|-------------|
+| `pinepaper_sound` | Synthesis: tones, chords, SFX, sound-as-waveform-path |
 | `pinepaper_motion` | Generator motion engine: group and field motions |
 | `pinepaper_animate` | Apply a simple loop animation |
 | `pinepaper_keyframe_animate` | Timed keyframe animation |
