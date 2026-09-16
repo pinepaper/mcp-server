@@ -59,6 +59,7 @@ import {
   TemplateParamsInputSchema,
   ComposeInputSchema,
   CropImageInputSchema,
+  PathOpInputSchema,
   ChromaKeyInputSchema,
   RiggingInputSchema,
   GroupInputSchema,
@@ -2750,6 +2751,15 @@ You can now start creating new items on a clean canvas.`,
 
         // Small export — return inline (existing behavior)
         return executedResult(code, exportResult, exportBrowserResult.screenshot, description);
+      }
+
+      case 'pinepaper_path': {
+        const input = PathOpInputSchema.parse(args);
+        const code = codeGenerator.generatePathOp(input);
+        const described = input.action === 'boolean'
+          ? `Path boolean (${input.op}) over ${input.itemIds?.length ?? 0} items`
+          : `Path ${input.action}${input.itemId ? ` on ${input.itemId}` : ''}`;
+        return executeOrGenerate(code, described, options, 'pinepaper_path');
       }
 
       case 'pinepaper_agent_analyze': {

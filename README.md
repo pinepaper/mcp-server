@@ -25,7 +25,7 @@
 
 PinePaper MCP Server enables AI assistants to create and animate graphics in [PinePaper Studio](https://pinepaper.studio) via the Model Context Protocol (MCP). Works with any AI that supports MCP tool calling (Claude, GPT, Gemini, local models, etc.).
 
-The server exposes **144 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
+The server exposes **145 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
 
 - Create text, shapes, geometry, and complex graphics
 - Animate items with behavior-driven **relations** rather than keyframes
@@ -37,7 +37,7 @@ The server exposes **144 tools** across drawing, animation, diagrams, maps, typo
 
 ## Running it: local or hosted
 
-**Local is free and complete.** Every one of the 144 tools works when you run
+**Local is free and complete.** Every one of the 145 tools works when you run
 this server yourself. There is no reduced tier and nothing held back.
 
 What it needs:
@@ -230,6 +230,12 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - The parameters have to be the **merged** set. What a generator hands its registry is empty, or two keys of thirty for the GPU generators, and a recipe built from that names a generator it cannot reproduce — which is indistinguishable from a working one until someone re-runs it.
 - `pp:world` is a **sibling** of `pp:generator`, never nested inside it. A World3D scene has no generator, so a stage read inside `if (generator)` is dropped from exactly the scenes that cannot rebuild without it.
 
+**New tool: `pinepaper_path`** — the destructive path operations Paper.js has always had and nothing here could reach. Booleans (`unite`, `subtract`, `intersect`, `exclude`, `divide`), `simplify`, `outline_stroke`, `toggle_closed`, repeat `pattern`s (concentric, radial, grid, extrude), `get_geometry`, and a lock.
+
+- They live apart from `pinepaper_modify_item` on purpose: modify restyles an item and keeps its id, while every action here changes what items *exist*. A boolean **consumes its operands** — they stop existing, and their relations and keyframes go with them. The tool description says so, because a caller who reads a boolean as a restyle loses work.
+- `outline_stroke` is the one worth knowing about: it turns a stroked line into a filled shape of the same width, which is what you do before exporting to a format with no stroke model, or before a boolean against a line.
+- Each refusal is the engine's own — "a boolean needs at least two paths", "that path has no stroke to outline", "simplify needs a path" — passed through rather than reworded, because two wordings for one condition is the defect this project keeps fixing. The single exception is `get_geometry`, whose facade returns a bare `null`; that one place supplies a wording.
+
 **`pinepaper_world3d` gains the mesh half — 12 actions.** The graph learned to record `meshProvenance` above, and nothing could author a mesh: it could describe a thing the tool surface could not make.
 
 - `extrude_path` sweeps a canvas path along a depth; `lathe_path` revolves its profile. The path itself is untouched — the mesh is new, and the engine records the op, the source path and the options as the mesh's provenance, so a captured scene can rebuild it rather than merely recognise it. **The option names on this action are exactly the names in that record**, pinned by a test, so `meshProvenance.opts` spreads straight back in.
@@ -347,7 +353,7 @@ The relation catalogue in the tool description now names families rather than al
 
 **`pinepaper_connect` / `connect_ports` accept an `id`.** `update_connector` and `remove_connector` address a connector by `connectorId`, and there was previously no value a caller could correctly pass — creation returns code rather than a result, and the engine's fallback is timestamp-based. Assign your own and reuse it.
 
-**`pinepaper_world3d` `add_object` forwards PBR material fields** — `metalness`, `roughness`, `emissiveIntensity`.
+**`pinepaper_world3d` `add_object` forwards PBR material fields** — `metalness`, `roughness`, `emissiveIntensity`. *(Corrected in 1.6.8: `metalness` and `roughness` are accepted and ignored on a plain object — the prop shader declares no such uniform. They render on the mesh path. Left here rather than quietly edited, because a drifted claim is worse than a missing one.)*
 
 Follows 1.6.6, whose dependency-security work is described below.
 
@@ -409,7 +415,7 @@ Fourteen new tools (121 → 135) and new actions across the surface — the rele
 
 ## Toolkits & Token Budget
 
-144 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
+145 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
 
 **Toolkit profiles** (`PINEPAPER_TOOLKIT`):
 
@@ -614,7 +620,7 @@ Generate instruction/code pairs for LLM fine-tuning:
 
 ## Tools Reference
 
-All 144 tools, grouped by the tag used for toolkit filtering.
+All 145 tools, grouped by the tag used for toolkit filtering.
 
 ### Canvas (`canvas`)
 | Tool | Description |
@@ -638,6 +644,7 @@ All 144 tools, grouped by the tag used for toolkit filtering.
 | `pinepaper_geometry` | Geometric construction primitives |
 | `pinepaper_group` | Group / ungroup / break apart |
 | `pinepaper_arrange` | Z-order: bring forward/back/front/back |
+| `pinepaper_path` | Booleans, simplify, outline stroke, repeat patterns, lock |
 
 ### Batch (`batch`)
 | Tool | Description |

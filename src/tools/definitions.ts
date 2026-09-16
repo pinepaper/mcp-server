@@ -2265,6 +2265,36 @@ RECIPE — a playable maze: create_tilemap with wall fills → batch_create colo
   },
 
   {
+    name: 'pinepaper_path',
+    description: `Destructive path operations — the ones that REPLACE or ADD items rather than restyling them.
+
+- boolean: unite | subtract | intersect | exclude | divide. CONSUMES its operands and leaves one result, so the input ids stop existing. The first id is the base; the rest apply to it in order.
+- simplify: fewer segments, same shape. Higher tolerance is fewer points and a looser curve.
+- outline_stroke: a stroked line becomes a FILLED SHAPE of the same width — the thing you do before exporting to a format with no stroke model, or before a boolean against a line.
+- toggle_closed: open a closed path or close an open one.
+- pattern: repeat an item — concentric rings, a radial ring, a grid, or a depth-wise extrude stack.
+- get_geometry: read the segments back (anchor and handle coordinates).
+- set_locked / unlock_all: a locked item is also unselectable and undraggable, so it cannot be grabbed by accident.
+
+These live apart from pinepaper_modify_item on purpose: modify restyles an item and keeps its id, every action here changes what items EXIST. A boolean's operands are gone afterwards, and their relations and keyframes go with them.
+
+The engine names each refusal — "a boolean needs at least two paths", "that path has no stroke to outline", "simplify needs a path" — and those come back verbatim rather than being reworded here.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['boolean', 'simplify', 'outline_stroke', 'toggle_closed', 'pattern', 'get_geometry', 'set_locked', 'unlock_all'], description: 'Which path operation.' },
+        itemId: { type: 'string', description: 'The item to operate on — every action except boolean and unlock_all.' },
+        itemIds: { type: 'array', items: { type: 'string' }, description: 'boolean: at least two path ids. The first is the base.' },
+        op: { type: 'string', enum: ['unite', 'subtract', 'intersect', 'exclude', 'divide'], description: 'boolean: which operation (default unite).' },
+        tolerance: { type: 'number', description: 'simplify: how far the new curve may stray, in canvas units (default 2.5). outline_stroke: flattening tolerance.' },
+        kind: { type: 'string', enum: ['concentric', 'radial', 'grid', 'extrude'], description: 'pattern: which repeat (default radial).' },
+        pattern: { type: 'object', description: 'pattern options: { count?, radius?, angle?, phase?, rows?, cols?, gapX?, gapY?, step?, depth?, rotateItems?, shade?, shadeStrength? }. angle and phase are DEGREES. Copies are capped — past a few hundred this is a generator, not a drawing aid.' },
+        locked: { type: 'boolean', description: 'set_locked: true locks, false unlocks (default true).' },
+      },
+      required: ['action'],
+    },
+  },
+  {
     name: 'pinepaper_world3d',
     annotations: {
       title: '3D World (Terrain / Actors / Camera)',

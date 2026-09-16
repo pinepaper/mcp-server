@@ -139,4 +139,9 @@ SHAPE TYPES: ${DIAGRAM_SHAPES}.`,
   // -------------------------------------------------------------------------
   pinepaper_agent_export: `Export as MP4, GIF, PNG, SVG, or PDF. Formats: svg, png, gif, mp4, webm, pdf. Quality: draft, standard, high. Framing: canvas (default) or camera (camera_animates viewport — video formats only).`,
 
+  // -------------------------------------------------------------------------
+  // path
+  // -------------------------------------------------------------------------
+  pinepaper_path: `Destructive path ops: boolean (unite|subtract|intersect|exclude|divide — CONSUMES its operands), simplify, outline_stroke (a stroked line becomes a filled shape), toggle_closed, pattern (concentric|radial|grid|extrude), get_geometry, set_locked, unlock_all.`,
+
 };

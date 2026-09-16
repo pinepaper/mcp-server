@@ -188,6 +188,7 @@ import {
   LintSceneInput,
   MediaInput, TextStyleInput, TextEffectInput, DesignMediumInput, ShatterImageInput, ImportLayeredCharacterInput, GameInput, World3DInput,
   CropImageInput,
+  PathOpInput,
   ChromaKeyInput,
   RiggingInput,
   GroupInput,
@@ -7760,6 +7761,87 @@ ${needWorld}
 (function() {
   if (typeof app.listWorldMaterials !== 'function') { return { success: false, error: 'app.listWorldMaterials unavailable — update FxTool' }; }
   return { success: true, materials: app.listWorldMaterials() };
+})();`.trim();
+    }
+  }
+
+  /**
+   * pinepaper_path — the destructive path operations.
+   *
+   * Every facade here returns `{ok:false, reason}` and names its own refusal
+   * ("a boolean needs at least two paths", "that path has no stroke to
+   * outline"), so the reason is passed through rather than reworded. A second
+   * wording for one condition is the thing to avoid, not the guard.
+   */
+  generatePathOp(input: PathOpInput): string {
+    const S = (v: unknown) => JSON.stringify(v);
+    const guard = (fn: string) =>
+      `  if (typeof app.${fn} !== 'function') { return { success: false, error: 'app.${fn} unavailable — update FxTool' }; }`;
+    const pass = (expr: string) => `
+  const r = ${expr};
+  if (!r || r.ok === false) { return { success: false, error: (r && r.reason) || 'the engine refused the operation' }; }
+  return { success: true, ...r };`;
+
+    switch (input.action) {
+      case 'boolean':
+        return `
+// Path boolean: ${input.op} — CONSUMES its operands and leaves one result
+(function() {
+${guard('booleanOp')}${pass(`app.booleanOp(${S(input.itemIds)}, ${S(input.op)})`)}
+})();`.trim();
+
+      case 'simplify':
+        return `
+// Simplify: fewer segments, same shape
+(function() {
+${guard('simplifyPath')}${pass(`app.simplifyPath(${S(input.itemId)}${input.tolerance !== undefined ? `, ${S(input.tolerance)}` : ''})`)}
+})();`.trim();
+
+      case 'outline_stroke':
+        return `
+// Outline stroke: a stroked line becomes a filled shape of the same width
+(function() {
+${guard('outlineStroke')}${pass(`app.outlineStroke(${S(input.itemId)}, ${S(input.tolerance !== undefined ? { tolerance: input.tolerance } : {})})`)}
+})();`.trim();
+
+      case 'toggle_closed':
+        return `
+// Open or close the path
+(function() {
+${guard('togglePathClosed')}${pass(`app.togglePathClosed(${S(input.itemId)})`)}
+})();`.trim();
+
+      case 'pattern':
+        return `
+// Pattern: repeat the item — ${input.kind}
+(function() {
+${guard('patternFrom')}${pass(`app.patternFrom(${S(input.itemId)}, ${S(input.kind)}, ${S(input.pattern ?? {})})`)}
+})();`.trim();
+
+      case 'get_geometry':
+        return `
+// Read the path's segments back
+(function() {
+${guard('getPathGeometry')}
+  const g = app.getPathGeometry(${S(input.itemId)}, {});
+  // null means no such item — the one facade here that does NOT name its
+  // refusal, so this is the one place a wording is supplied rather than passed.
+  if (!g) { return { success: false, error: 'no such item: ' + ${S(input.itemId)} }; }
+  return { success: true, geometry: g };
+})();`.trim();
+
+      case 'set_locked':
+        return `
+// Lock or unlock — a locked item is also unselectable and undraggable
+(function() {
+${guard('setItemLocked')}${pass(`app.setItemLocked(${S(input.itemId)}, ${S(input.locked)})`)}
+})();`.trim();
+
+      case 'unlock_all':
+        return `
+// Unlock everything on the canvas
+(function() {
+${guard('unlockAllItems')}${pass('app.unlockAllItems()')}
 })();`.trim();
     }
   }

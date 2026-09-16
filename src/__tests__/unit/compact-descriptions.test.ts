@@ -18,7 +18,7 @@ import {
   getToolsForVerbosity,
 } from '../../tools/definitions.js';
 
-const EXPECTED_COMPACT_COUNT = 28;
+const EXPECTED_COMPACT_COUNT = 29;
 const toolNameSet = new Set(PINEPAPER_TOOLS.map(t => t.name));
 
 describe('Compact Descriptions', () => {

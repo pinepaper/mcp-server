@@ -252,6 +252,10 @@
       "description": "Game logic: pathfind (A* world-coords waypoints for moves_along_path)|create_tilemap (board data + grid + merged collision rects). Pure data, draws nothing."
     },
     {
+      "name": "pinepaper_path",
+      "description": "Destructive path operations — the ones that REPLACE or ADD items rather than restyling them."
+    },
+    {
       "name": "pinepaper_world3d",
       "description": "3D world under the canvas: create (forest|snowMountain|field|jungle)|describe (engine schema)|configure|add_actor (live sprites)|set_actor_pose|set_camera (follow|fixed|orbit)|objects|remove_world."
     },

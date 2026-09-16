@@ -52,6 +52,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
     'pinepaper_geometry',
     'pinepaper_group',
     'pinepaper_arrange',
+    'pinepaper_path',
   ],
   import: [
     'pinepaper_import_svg',

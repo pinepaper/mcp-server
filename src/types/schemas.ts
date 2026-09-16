@@ -4124,6 +4124,50 @@ export type World3DInput = z.infer<typeof World3DInputSchema>;
 // ONE-SHOT IMAGE OPS (crop / chroma key — Track A agent parity, 2026-07-31)
 // =============================================================================
 
+/**
+ * pinepaper_path — the destructive path operations Paper.js has always had and
+ * nothing here could reach: booleans, simplify, outline-stroke, open/close,
+ * repeat patterns, plus read-back geometry and a lock.
+ *
+ * Every one of these REPLACES or ADDS items rather than restyling them, which
+ * is why they live together and away from `pinepaper_modify_item`: a boolean
+ * consumes its operands, and an outlined stroke is a new filled shape where a
+ * stroked line used to be. The engine refuses each by name — "a boolean needs
+ * at least two paths", "that path has no stroke to outline" — and those
+ * refusals are passed through rather than reworded.
+ */
+export const PathOpInputSchema = z.object({
+  action: z.enum(['boolean', 'simplify', 'outline_stroke', 'toggle_closed', 'pattern', 'get_geometry', 'set_locked', 'unlock_all'])
+    .describe("'boolean' (unite|subtract|intersect|exclude|divide, consumes its operands) · 'simplify' (fewer segments, same shape) · 'outline_stroke' (a stroked line becomes a filled shape) · 'toggle_closed' · 'pattern' (repeat an item: concentric|radial|grid|extrude) · 'get_geometry' (read segments back) · 'set_locked' / 'unlock_all'"),
+  itemId: z.string().optional().describe('The item to operate on — every action except boolean and unlock_all.'),
+  itemIds: z.array(z.string()).optional().describe('boolean: at least two paths. The FIRST is the base; the rest are applied to it in order.'),
+  op: z.enum(['unite', 'subtract', 'intersect', 'exclude', 'divide']).optional().default('unite')
+    .describe("boolean: 'unite' merges · 'subtract' removes the later shapes from the first · 'intersect' keeps the overlap · 'exclude' keeps everything but the overlap · 'divide' splits into every region."),
+  tolerance: z.number().positive().optional()
+    .describe('simplify: how far the new curve may stray, in canvas units (default 2.5 — higher is fewer points and a looser shape). outline_stroke: flattening tolerance (defaults to an eighth of the stroke radius).'),
+  kind: z.enum(['concentric', 'radial', 'grid', 'extrude']).optional().default('radial')
+    .describe("pattern: 'concentric' rings outward · 'radial' around a circle · 'grid' rows and columns · 'extrude' a depth-wise stack."),
+  pattern: z.object({
+    count: z.number().optional().describe('concentric / radial / extrude: how many copies.'),
+    radius: z.number().optional().describe('radial / concentric: distance from the original.'),
+    angle: z.number().optional().describe('radial: total sweep in DEGREES (360 is a full ring).'),
+    phase: z.number().optional().describe('radial: where the first copy starts, in DEGREES.'),
+    rows: z.number().optional().describe('grid: row count.'),
+    cols: z.number().optional().describe('grid: column count.'),
+    gapX: z.number().optional().describe('grid: horizontal spacing in canvas units.'),
+    gapY: z.number().optional().describe('grid: vertical spacing in canvas units.'),
+    step: z.number().optional().describe('extrude / concentric: spacing between successive copies.'),
+    depth: z.number().optional().describe('extrude: total depth the stack spans.'),
+    rotateItems: z.boolean().optional().describe('radial: turn each copy to face along the ring instead of keeping its original angle.'),
+    shade: z.boolean().optional().describe('extrude: darken copies with depth, so the stack reads as receding.'),
+    shadeStrength: z.number().optional().describe('extrude: how strong that darkening is.'),
+  }).optional().describe('pattern options. Copies are capped — past a few hundred this stops being a drawing aid and becomes a generator, which is a different tool.'),
+  locked: z.boolean().optional().default(true).describe('set_locked: true locks (also clearing selectable and draggable, so it cannot be grabbed), false unlocks.'),
+})
+  .refine((v) => v.action !== 'boolean' || (Array.isArray(v.itemIds) && v.itemIds.length >= 2), { message: 'boolean requires itemIds with at least two paths', path: ['itemIds'] })
+  .refine((v) => ['boolean', 'unlock_all'].includes(v.action) || !!v.itemId, { message: 'this action requires itemId', path: ['itemId'] });
+export type PathOpInput = z.infer<typeof PathOpInputSchema>;
+
 export const CropImageInputSchema = z.object({
   itemId: z.string().describe('Registry id of the raster item (or a group containing one).'),
   rect: z.object({
