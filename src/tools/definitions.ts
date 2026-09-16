@@ -2270,6 +2270,40 @@ RECIPE — a playable maze: create_tilemap with wall fills → batch_create colo
   },
 
   {
+    name: 'pinepaper_design_system',
+    description: `The design vocabulary, as data you can read — and eighteen styles that can build a scene.
+
+TWO DIFFERENT THINGS, kept apart on purpose:
+
+A DESIGN SYSTEM is a real, licensed, versioned product — Material Design 3, IBM Carbon, Shopify Polaris, Fluent 2, Adobe Spectrum, GitHub Primer, USWDS, GOV.UK and more. Its tokens are facts with a licence attached, in the W3C DTCG format ($value, $type, $description). Fifteen of them are here. Where a motion curve had to be filled in because the published system does not specify one, the token is marked "pinepaper:authored" — so you can tell a vendor's curve from ours instead of treating both as equally official.
+
+An AESTHETIC STYLE is a look: Bauhaus, Art Deco, Swiss typographic, De Stijl, vaporwave, risograph, brutalist, Memphis, claymorphism, op art, pixel art. No licence, no vendor. Twenty-eight are named; eighteen can COMPOSE a scene rather than only be described, and 'list_styles' says which.
+
+- list_systems / get_system: the licensed systems and their tokens, filterable by token type.
+- list_easings: every motion curve across every system as a named easing, with its licence and whether it was authored here. Use these to make a motion match a system it has to sit beside.
+- list_styles / compose: build a titled scene in a style. Layout is decided in this server by a pure function, so 'compose' with draw:false returns the scene and the ops as DATA and draws nothing — read it before committing, the same way pinepaper_story's distill works.
+
+A partial composition reports as a failure with the elements that did not create, rather than as a success with half a poster.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['list_systems', 'get_system', 'list_easings', 'list_styles', 'compose'], description: 'Which design-system operation.' },
+        systemId: { type: 'string', description: "get_system: e.g. 'material_3', 'ibm_carbon', 'uswds'. Call list_systems for ids." },
+        tokenType: { type: 'string', enum: ['dimension', 'duration', 'cubicBezier', 'color', 'fontFamily', 'fontWeight', 'number', 'shadow', 'grid'], description: 'get_system: return only tokens of this DTCG type.' },
+        style: { type: 'string', description: "compose: the aesthetic style, e.g. 'bauhaus_geometric'. Call list_styles for the composable ones." },
+        title: { type: 'string', description: 'compose: the headline most styles build around.' },
+        subtitle: { type: 'string', description: 'compose: the supporting line.' },
+        body: { type: 'string', description: 'compose: body copy, where the style has room for it.' },
+        width: { type: 'number', description: 'compose: canvas width (the style picks its own default otherwise).' },
+        height: { type: 'number', description: 'compose: canvas height.' },
+        variant: { type: 'string', description: "compose: a style-specific variant, e.g. art deco's 'emerald'." },
+        draw: { type: 'boolean', description: 'compose: draw it (default true). false returns the scene and ops as data and draws nothing.' },
+        authoredOnly: { type: 'boolean', description: 'list_easings: true for only the curves authored here, false for only what vendors publish.' },
+      },
+      required: ['action'],
+    },
+  },
+  {
     name: 'pinepaper_stick',
     description: `The vendored stick-figure kit — a rigged figure posed, walking, travelling, holding a prop, with a garment and hair, plus the set it stands on and among.
 

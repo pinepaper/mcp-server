@@ -25,7 +25,7 @@
 
 PinePaper MCP Server enables AI assistants to create and animate graphics in [PinePaper Studio](https://pinepaper.studio) via the Model Context Protocol (MCP). Works with any AI that supports MCP tool calling (Claude, GPT, Gemini, local models, etc.).
 
-The server exposes **150 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
+The server exposes **151 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
 
 - Create text, shapes, geometry, and complex graphics
 - Animate items with behavior-driven **relations** rather than keyframes
@@ -37,7 +37,7 @@ The server exposes **150 tools** across drawing, animation, diagrams, maps, typo
 
 ## Running it: local or hosted
 
-**Local is free and complete.** Every one of the 150 tools works when you run
+**Local is free and complete.** Every one of the 151 tools works when you run
 this server yourself. There is no reduced tier and nothing held back.
 
 What it needs:
@@ -237,6 +237,13 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 **Four more reachable things, and a note on the ones that turned out not to be gaps.** `pinepaper_text_style` gains `cursive` (text written as a **stroked path** rather than set in a glyph, so draw-on animation and `outline_stroke` both apply to it), `wrap`/`unwrap` (break a text item to a width, reversibly), and `to_collage` (convert an *existing* text item in place). `pinepaper_equation_path` gains `solveOde` — integrate an ODE and get the **trajectory back as data** rather than a drawn path, to inspect, feed to a path, or drive keyframes with.
 
 What was *not* a gap is worth saying too, because it was on the list: `createFoldedText`, `createGradientText`, `createMagazineText`, `createPaperCutText` and `createTileText` are one-line wrappers over the letter-collage styles this server already offers, and `plotFunction`/`plotParametric`/`plotSurface` wrap three generators it already exposes. A method-name diff cannot tell "no tool reaches this" from "a tool reaches it under another name."
+
+**New tool: `pinepaper_design_system`** — the design vocabulary as data, and eighteen styles that build a scene. Two different things, kept apart because they are not the same claim:
+
+- A **design system** is a real, licensed, versioned product — Material Design 3, IBM Carbon, Polaris, Fluent 2, Spectrum, Primer, USWDS, GOV.UK and more. Fifteen of them, as W3C DTCG tokens. `list_easings` returns every motion curve across all of them as a named easing with its licence — and with `pinepaper:authored` on the three we had to fill in, so a vendor's published curve and one of ours are never mistaken for each other.
+- An **aesthetic style** is a look: Bauhaus, Art Deco, Swiss, De Stijl, vaporwave, risograph, brutalist, Memphis, claymorphism, op art, pixel art. Twenty-eight named, eighteen of which `compose` a titled scene. `draw: false` returns the scene and the ops as data and draws nothing — read the composition before committing to it, the way `pinepaper_story`'s `distill` works.
+
+This runs in the server, not the browser: a design decision does not need the canvas to be open. The data is **vendored** from mcp-cloud by `scripts/sync-design-systems.mjs`, the same shape as the engine's stick-figure sync — one authored copy upstream, a mechanical mirror here, a sha256 in every header, and a provenance test that fails on a hand edit. A partial composition reports as a failure naming the elements that did not create, rather than as a success with half a poster.
 
 **New tools: `pinepaper_stick` and `pinepaper_story`.**
 
@@ -448,7 +455,7 @@ Fourteen new tools (121 → 135) and new actions across the surface — the rele
 
 ## Toolkits & Token Budget
 
-150 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
+151 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
 
 **Toolkit profiles** (`PINEPAPER_TOOLKIT`):
 
@@ -619,7 +626,7 @@ Choropleths, region styling, and data-driven map animation via `pinepaper_map`, 
 Search and import free SVG assets from multiple repositories:
 
 - **SVGRepo**: 500,000+ icons with various licenses
-- **OpenClipart**: 150,000+ public domain clipart (CC0)
+- **OpenClipart**: 151,000+ public domain clipart (CC0)
 - **Iconify**: 200,000+ icons from multiple icon sets
 - **Font Awesome**: 2,000+ free icons (CC BY 4.0)
 
@@ -653,7 +660,7 @@ Generate instruction/code pairs for LLM fine-tuning:
 
 ## Tools Reference
 
-All 150 tools, grouped by the tag used for toolkit filtering.
+All 151 tools, grouped by the tag used for toolkit filtering.
 
 ### Canvas (`canvas`)
 | Tool | Description |
@@ -832,6 +839,7 @@ All 150 tools, grouped by the tag used for toolkit filtering.
 |------|-------------|
 | `pinepaper_rigging` | Skeletons, bones, IK, breakdown poses; BVH mocap import/retarget, Spine import |
 | `pinepaper_import_layered_character` | Decomposed character layers → role-bound parts (blink/smile work immediately) |
+| `pinepaper_design_system` | DTCG design systems + 18 composable aesthetic styles |
 | `pinepaper_stick` | The vendored stick-figure kit: figure and set |
 | `pinepaper_story` | Prose becomes a scene: distill, assemble, plan a book |
 | `pinepaper_character` | Place a figure from the design graph and direct it with beats — no geometry, no bones, no poses |
@@ -926,7 +934,7 @@ All 150 tools, grouped by the tag used for toolkit filtering.
 1. Create a yellow circle as the sun (radius 60) at center
 2. Create a blue circle as Earth (radius 20)
 3. Create a gray circle as the Moon (radius 8)
-4. Add relation: Earth orbits Sun at radius 150, speed 0.3
+4. Add relation: Earth orbits Sun at radius 151, speed 0.3
 5. Add relation: Moon orbits Earth at radius 40, speed 0.8
 ```
 

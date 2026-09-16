@@ -64,6 +64,7 @@ import {
   SoundInputSchema,
   InterchangeInputSchema,
   StickInputSchema,
+  DesignSystemInputSchema,
   StoryInputSchema,
   ChromaKeyInputSchema,
   RiggingInputSchema,
@@ -163,6 +164,7 @@ import { fontHandlers } from './handlers/font.js';
 import { toolGuideHandlers } from './handlers/tool-guide.js';
 import { mapHandlers } from './handlers/maps.js';
 import { ontologyHandlers } from './handlers/ontology.js';
+import * as designSystems from '../design/design-systems.js';
 import { exportHandlers } from './handlers/export.js';
 import { planCharacter, generateCharacterCode } from './handlers/character.js';
 
@@ -397,6 +399,18 @@ function successResult(code: string, description?: string): CallToolResult {
   }
 
   return { content };
+}
+
+/**
+ * A plain data answer.
+ *
+ * successResult() fences its payload as "Generated PinePaper code", which is
+ * right for an emitter and wrong for a tool that computes its answer here —
+ * a caller reading design tokens should not be handed something that looks
+ * like a script to paste.
+ */
+function dataResult(value: unknown): CallToolResult {
+  return { content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] };
 }
 
 function executedResult(
@@ -2756,6 +2770,64 @@ You can now start creating new items on a clean canvas.`,
 
         // Small export — return inline (existing behavior)
         return executedResult(code, exportResult, exportBrowserResult.screenshot, description);
+      }
+
+      case 'pinepaper_design_system': {
+        const input = DesignSystemInputSchema.parse(args);
+        // Answered HERE, not in the browser — these are decisions over
+        // vendored data, and only `compose` with draw:true needs the canvas.
+        switch (input.action) {
+          case 'list_systems':
+            return dataResult({ systems: designSystems.listSystems() });
+          case 'get_system': {
+            const sys = designSystems.getSystem(input.systemId!, input.tokenType);
+            if (!sys) {
+              return errorResult(
+                ErrorCodes.INVALID_PARAMS,
+                `no design system "${input.systemId}" — call action 'list_systems' for the ids`,
+                { systemId: input.systemId },
+                { toolName: 'pinepaper_design_system' }
+              );
+            }
+            return dataResult(sys);
+          }
+          case 'list_easings':
+            return dataResult({ easings: designSystems.listEasings(input.authoredOnly) });
+          case 'list_styles':
+            return dataResult({ styles: designSystems.listStyles() });
+          case 'compose': {
+            let scene;
+            try {
+              scene = designSystems.compose(input.style!, {
+                title: input.title!, subtitle: input.subtitle, body: input.body,
+                width: input.width, height: input.height, variant: input.variant,
+              });
+            } catch (composeError) {
+              return errorResult(
+                ErrorCodes.EXECUTION_ERROR,
+                composeError instanceof Error ? composeError.message : 'the style could not compose',
+                { style: input.style },
+                { toolName: 'pinepaper_design_system' }
+              );
+            }
+            if (!scene) {
+              return errorResult(
+                ErrorCodes.INVALID_PARAMS,
+                `"${input.style}" cannot compose — it is a style this surface can name but not build. ` +
+                `Call action 'list_styles' and use one marked composable.`,
+                { style: input.style },
+                { toolName: 'pinepaper_design_system' }
+              );
+            }
+            const ops = designSystems.sceneToOps(scene);
+            if (input.draw === false) {
+              return dataResult({ scene, ops, drawn: false });
+            }
+            const code = codeGenerator.generateDesignCompose(scene, ops, scene.style);
+            return executeOrGenerate(code, `Composed a ${scene.style} scene (${ops.length} items)`, options, 'pinepaper_design_system');
+          }
+        }
+        break;
       }
 
       case 'pinepaper_stick': {

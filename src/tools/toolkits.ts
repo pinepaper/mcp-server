@@ -74,6 +74,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
     // above it, where the bones and poses are already known and only the
     // performance is asked for.
     'pinepaper_character',
+    'pinepaper_design_system',
     'pinepaper_stick',
     'pinepaper_story',
   ],

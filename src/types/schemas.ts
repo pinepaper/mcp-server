@@ -4196,6 +4196,48 @@ export type World3DInput = z.infer<typeof World3DInputSchema>;
 // =============================================================================
 
 /**
+ * pinepaper_design_system — the design vocabulary, as data an agent can read.
+ *
+ * TWO DIFFERENT THINGS, deliberately not merged, because the upstream is
+ * explicit that they are not the same:
+ *
+ *  - A DESIGN SYSTEM is a real, licensed, versioned product — Material 3,
+ *    IBM Carbon, Polaris, Fluent 2, USWDS, GOV.UK. Its tokens are facts with a
+ *    licence attached, expressed in the W3C DTCG format ($value, $type,
+ *    $description). Where a motion token had to be filled in because the
+ *    published system does not specify one, it is marked
+ *    `pinepaper:authored` — so a caller can tell a vendor's curve from ours.
+ *  - An AESTHETIC STYLE is a look: Bauhaus, Art Deco, Swiss, vaporwave,
+ *    risograph. It carries no licence and no vendor. Eighteen of them can
+ *    COMPOSE a scene rather than only describe one.
+ *
+ * These run in this server, not in the browser. The generators are pure
+ * functions over numbers, so the scene is computed here and arrives as items;
+ * nothing about a design vocabulary needs the canvas to be open to decide it.
+ */
+export const DesignSystemInputSchema = z.object({
+  action: z.enum(['list_systems', 'get_system', 'list_easings', 'list_styles', 'compose'])
+    .describe("'list_systems' every licensed design system with its vendor, licence and version · 'get_system' one system's full DTCG tokens · 'list_easings' every motion curve across all of them as named easings, with provenance · 'list_styles' the aesthetic styles and which can compose · 'compose' build a scene in a style."),
+  systemId: z.string().optional().describe("get_system: which system, e.g. 'material_3', 'ibm_carbon', 'uswds'. Call list_systems for the ids."),
+  tokenType: z.enum(['dimension', 'duration', 'cubicBezier', 'color', 'fontFamily', 'fontWeight', 'number', 'shadow', 'grid']).optional()
+    .describe('get_system: return only tokens of this DTCG type.'),
+  style: z.string().optional().describe("compose: the aesthetic style, e.g. 'bauhaus_geometric', 'art_deco_geometric', 'vaporwave_retro'. Call list_styles for the ones that can compose."),
+  title: z.string().optional().describe('compose: the headline. Most styles are poster-shaped and build around it.'),
+  subtitle: z.string().optional().describe('compose: the supporting line.'),
+  body: z.string().optional().describe('compose: optional body copy, where the style has somewhere to put it.'),
+  width: z.number().optional().describe('compose: canvas width (the style picks its own default otherwise).'),
+  height: z.number().optional().describe('compose: canvas height.'),
+  variant: z.string().optional().describe("compose: a style-specific variant where one exists, e.g. art deco's emerald colourway."),
+  draw: z.boolean().optional().default(true)
+    .describe('compose: draw the scene on the canvas (default). false returns the computed scene as DATA and draws nothing — the same distinction story\'s `distill` makes, and for the same reason: a caller should be able to read a composition before committing to it.'),
+  authoredOnly: z.boolean().optional().describe('list_easings: return only the curves PinePaper authored to fill a gap, or only the ones a vendor actually publishes, rather than both mixed together.'),
+})
+  .refine((v) => v.action !== 'get_system' || !!v.systemId, { message: 'get_system requires systemId — call list_systems for the ids', path: ['systemId'] })
+  .refine((v) => v.action !== 'compose' || !!v.style, { message: 'compose requires style — call list_styles for the ones that can compose', path: ['style'] })
+  .refine((v) => v.action !== 'compose' || !!v.title, { message: 'compose requires title', path: ['title'] });
+export type DesignSystemInput = z.infer<typeof DesignSystemInputSchema>;
+
+/**
  * pinepaper_stick — the vendored stick-figure kit.
  *
  * A different construction from pinepaper_character, which places a figure

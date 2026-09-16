@@ -252,6 +252,10 @@
       "description": "Game logic: pathfind (A* world-coords waypoints for moves_along_path)|create_tilemap (board data + grid + merged collision rects). Pure data, draws nothing."
     },
     {
+      "name": "pinepaper_design_system",
+      "description": "DTCG design systems + 18 composable aesthetic styles. {action: list_systems|get_system|list_easings|list_styles|compose, systemId, style, title}"
+    },
+    {
       "name": "pinepaper_stick",
       "description": "Stick-figure kit. {action: figure|set, pose, walk, travel, prop, garment, hair, at, scale}"
     },

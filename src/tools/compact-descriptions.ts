@@ -140,6 +140,11 @@ SHAPE TYPES: ${DIAGRAM_SHAPES}.`,
   pinepaper_agent_export: `Export as MP4, GIF, PNG, SVG, or PDF. Formats: svg, png, gif, mp4, webm, pdf. Quality: draft, standard, high. Framing: canvas (default) or camera (camera_animates viewport — video formats only).`,
 
   // -------------------------------------------------------------------------
+  // design_system
+  // -------------------------------------------------------------------------
+  pinepaper_design_system: `Licensed design systems (Material 3, Carbon, Polaris, Fluent 2, USWDS, GOV.UK…) as W3C DTCG tokens, plus 18 aesthetic styles that compose a scene. list_systems | get_system | list_easings (named curves with licence + authored provenance) | list_styles | compose (draw:false returns the scene as data).`,
+
+  // -------------------------------------------------------------------------
   // stick / story
   // -------------------------------------------------------------------------
   pinepaper_stick: `The vendored stick-figure kit. figure: pose, walk, travel, prop, garment, hair, expressions over time. set: floor, wall and objects. Distinct from pinepaper_character, which places a figure from the design graph by concept.`,

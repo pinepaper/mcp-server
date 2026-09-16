@@ -8081,6 +8081,42 @@ ${needWorld}
   }
 
   /**
+   * pinepaper_design_system — answered in this server, not in the browser.
+   *
+   * Only `compose` with `draw` produces code at all: the tokens, the easings
+   * and the style list are computed here and returned by the handler, because
+   * a design decision does not need the canvas to be open. When a scene IS
+   * drawn, it arrives as a finished list of create calls — the layout was
+   * already decided by a pure function, so nothing is left for the page to
+   * work out.
+   */
+  generateDesignCompose(scene: { width: number; height: number; backgroundHex?: string }, ops: Array<Record<string, unknown>>, style: string): string {
+    const S = (v: unknown) => JSON.stringify(v);
+    return `
+// Design: compose a ${style} scene — ${ops.length} items, laid out server-side
+(function() {
+  if (typeof app.create !== 'function') { return { success: false, error: 'app.create unavailable — update FxTool' }; }
+  const size = ${S({ width: scene.width, height: scene.height })};
+  if (typeof app.setCanvasSize === 'function') { try { app.setCanvasSize(size.width, size.height); } catch (_) { /* a fixed canvas is not a failure */ } }
+  ${scene.backgroundHex ? `if (typeof app.setBackgroundColor === 'function') { try { app.setBackgroundColor(${S(scene.backgroundHex)}); } catch (_) { /* ditto */ } }` : '// this style paints no background of its own'}
+  const ops = ${S(ops)};
+  const ids = [];
+  const failed = [];
+  for (const op of ops) {
+    const { type, note, name, ...props } = op;
+    try {
+      const item = app.create(type, props);
+      if (item) { ids.push(item.data && item.data.id); } else { failed.push({ name: name, type: type, reason: 'create returned nothing' }); }
+    } catch (e) { failed.push({ name: name, type: type, reason: (e && e.message) || String(e) }); }
+  }
+  if (app.historyManager) app.historyManager.saveState();
+  // A partial composition is reported as one. Half a poster that claims
+  // success is worse than a poster that says which four elements are missing.
+  return { success: failed.length === 0, style: ${S(style)}, itemIds: ids, itemCount: ids.length, failed: failed };
+})();`.trim();
+  }
+
+  /**
    * pinepaper_stick — the vendored stick-figure kit.
    *
    * Both facades take one options bag, so the schema's named fields are
