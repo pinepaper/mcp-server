@@ -2289,7 +2289,7 @@ RECIPE — a character walking through a forest: create {spec:'forest'} → impo
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['create', 'describe', 'configure', 'add_actor', 'remove_actor', 'list_actors', 'set_actor_pose', 'set_camera', 'add_object', 'remove_object', 'remove_world'], description: 'World operation' },
+        action: { type: 'string', enum: ['create', 'describe', 'configure', 'add_actor', 'remove_actor', 'list_actors', 'set_actor_pose', 'set_camera', 'add_object', 'remove_object', 'remove_world', 'extrude_path', 'lathe_path', 'list_meshes', 'remove_mesh', 'add_light', 'set_light', 'remove_light', 'list_lights', 'add_material', 'set_material', 'remove_material', 'list_materials'], description: 'World operation. extrude_path/lathe_path turn a canvas path into real geometry; lights are capped at 8; a material is shared by every object referencing it.' },
         spec: {
           anyOf: [{ type: 'string' }, { type: 'object' }],
           description: "create: preset id ('forest'|'snowMountain'|'field'|'jungle') or a full spec object.",
@@ -2307,7 +2307,14 @@ RECIPE — a character walking through a forest: create {spec:'forest'} → impo
         live: { type: 'boolean', description: 'add_actor: re-rasterize as the item animates.' },
         pose: { type: 'object', description: 'set_actor_pose: { x?, z?, angle? }.' },
         camera: { type: 'object', description: "set_camera: { mode: follow|fixed|orbit, target?, radius?, speed?, eye?, lookAt? }." },
-        object: { type: 'object', description: 'add_object: { x, z, height?, color?, y? }.' },
+        object: { type: 'object', description: 'add_object: { x, z, height?, color?, y? }. metalness/roughness are accepted and IGNORED here — a plain object is drawn by the prop shader, which declares no such uniform. They render on the mesh path only.' },
+        pathId: { type: 'string', description: 'extrude_path / lathe_path: the canvas path to turn into geometry. The path itself is unchanged.' },
+        mesh: { type: 'object', description: 'extrude_path / lathe_path options: { id?, depth?, unitsPerPixel?, caps?, segments?, arc?, flatness?, x?, y?, z?, rotY?, rotYDegrees?, scale?, doubleSided? }. arc is DEGREES; rotY is RADIANS (fed straight to cos/sin in the shader) — pass rotYDegrees to write degrees. These names are the ones the engine records as the mesh provenance, so a captured meshProvenance.opts spreads straight back in.' },
+        meshId: { type: 'string', description: 'remove_mesh: the mesh id.' },
+        light: { type: 'object', description: 'add_light / set_light: { id?, x?, y?, z?, color?, intensity?, range? }. At most 8 point lights; the ninth is refused by name because the shader array is fixed-size.' },
+        lightId: { type: 'string', description: 'set_light / remove_light: the light id.' },
+        material: { type: 'object', description: 'add_material / set_material: { id?, color?, emissive?, metalness?, roughness?, emissiveIntensity?, clearcoat?, clearcoatRoughness?, sheenColor?, sheenRoughness? }. A shared surface — one edit restyles every object using it. metalness/roughness render on the mesh path only.' },
+        materialId: { type: 'string', description: 'set_material / remove_material: the material id.' },
         objectId: { type: 'string', description: 'remove_object: object id.' },
       },
       required: ['action'],

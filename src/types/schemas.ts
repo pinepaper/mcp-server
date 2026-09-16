@@ -4035,8 +4035,14 @@ export type GameInput = z.infer<typeof GameInputSchema>;
  * itself — the tool does not restate it, so it cannot drift.
  */
 export const World3DInputSchema = z.object({
-  action: z.enum(['create', 'describe', 'configure', 'add_actor', 'remove_actor', 'list_actors', 'set_actor_pose', 'set_camera', 'add_object', 'remove_object', 'remove_world'])
-    .describe("'create' (a preset world) · 'describe' (every parameter with type/range — CALL THIS before configure) · 'configure' (live deep-merge patch, schema-validated) · actor ops · 'set_camera' (follow|fixed|orbit) · object ops · 'remove_world'"),
+  action: z.enum([
+    'create', 'describe', 'configure', 'add_actor', 'remove_actor', 'list_actors', 'set_actor_pose',
+    'set_camera', 'add_object', 'remove_object', 'remove_world',
+    'extrude_path', 'lathe_path', 'list_meshes', 'remove_mesh',
+    'add_light', 'set_light', 'remove_light', 'list_lights',
+    'add_material', 'set_material', 'remove_material', 'list_materials',
+  ])
+    .describe("'create' (a preset world) · 'describe' (every parameter with type/range — CALL THIS before configure) · 'configure' (live deep-merge patch, schema-validated) · actor ops · 'set_camera' (follow|fixed|orbit) · object ops · 'remove_world' · MESH AUTHORING: 'extrude_path' / 'lathe_path' turn a canvas path into real geometry, 'list_meshes', 'remove_mesh' · 'add_light' / 'set_light' / 'remove_light' / 'list_lights' (at most 8 point lights) · 'add_material' / 'set_material' / 'remove_material' / 'list_materials'"),
   spec: z.union([z.string(), z.record(z.string(), z.unknown())]).optional().describe("create: a preset id ('forest', 'snowMountain', …) or a full world spec object."),
   character: z.union([z.boolean(), z.record(z.string(), z.unknown())]).optional().describe('create: include the walkable character (true/config).'),
   patch: z.record(z.string(), z.unknown()).optional().describe('configure: partial world spec, deep-merged and validated — a wrong key errors naming the right one.'),
@@ -4048,15 +4054,70 @@ export const World3DInputSchema = z.object({
   live: z.boolean().optional().describe('add_actor: re-rasterize the item as it animates — a rigged character PERFORMS in the world instead of standing there as a photograph of itself.'),
   pose: z.record(z.string(), z.unknown()).optional().describe('set_actor_pose: { x?, z?, angle?, … } — the setter a timeline or agent drives.'),
   camera: z.record(z.string(), z.unknown()).optional().describe("set_camera: { mode: 'follow'|'fixed'|'orbit', target?, radius?, speed?, eye?, lookAt? }."),
-  object: z.record(z.string(), z.unknown()).optional().describe('add_object: { x, z, height?, color?, y?, metalness?, roughness?, emissiveIntensity? } (defaults to sitting on the terrain).'),
+  object: z.record(z.string(), z.unknown()).optional().describe("add_object: { x, z, height?, color?, y? } (defaults to sitting on the terrain). metalness and roughness are ACCEPTED AND IGNORED here: a plain object is drawn by the prop shader, which has no such uniform, so they are stored and listed and never reach a pixel. They render on the MESH path only — 'extrude_path' / 'lathe_path' and imported geometry. Use a material there instead of setting them here and seeing nothing."),
   objectId: z.string().optional().describe('remove_object: the object id.'),
+
+  // --- Mesh authoring: a canvas path becomes real geometry -----------------
+  pathId: z.string().optional().describe("extrude_path / lathe_path: the canvas path to turn into geometry. Extrude sweeps it along depth; lathe revolves its profile around the Y axis. The path is unchanged — the mesh is new."),
+  mesh: z.object({
+    id: z.string().optional().describe('Mesh id (generated if omitted).'),
+    depth: z.number().optional().describe('extrude_path: how far to sweep, in world units.'),
+    unitsPerPixel: z.number().optional().describe('Canvas pixels → world units. The whole scale relationship between the drawing and the world.'),
+    caps: z.boolean().optional().describe('extrude_path: close the two ends. A capped extrude is a solid; an uncapped one is a ribbon.'),
+    segments: z.number().optional().describe('extrude_path: segments along the sweep · lathe_path: segments around the revolution.'),
+    arc: z.number().optional().describe('lathe_path: how far round to revolve, in degrees. 360 is a full solid of revolution; less leaves it open.'),
+    flatness: z.number().optional().describe('Curve flattening tolerance when the path is sampled into rings — smaller is finer and heavier.'),
+    x: z.number().optional().describe('Placement in world space.'),
+    y: z.number().optional().describe('Placement in world space (omit to let it sit where the terrain puts it).'),
+    z: z.number().optional().describe('Placement in world space.'),
+    rotY: z.number().optional().describe('Rotation about the Y axis, in RADIANS — the value is stored raw and fed straight to cos()/sin() in the shader, with no conversion anywhere on the path. This is an exception to the degrees convention every other angle in this surface follows; pass rotYDegrees instead if you would rather write degrees. (`arc` on lathe_path IS degrees — the engine converts that one.)'),
+    rotYDegrees: z.number().optional().describe('Rotation about the Y axis in degrees, converted to radians for you. Convenience only — the engine and the mesh provenance record both speak rotY in radians, so a round-tripped capture uses rotY.'),
+    scale: z.number().optional().describe('Uniform scale applied after the geometry is built.'),
+    doubleSided: z.boolean().optional().describe('Draw back faces too. An uncapped extrude usually wants this.'),
+  }).optional().describe("extrude_path / lathe_path options. These field names ARE the ones the engine records as the mesh's provenance, so a mesh captured in a design graph can be rebuilt by spreading its meshProvenance.opts straight back in here."),
+  meshId: z.string().optional().describe('remove_mesh: the mesh id.'),
+
+  // --- Lights ---------------------------------------------------------------
+  light: z.object({
+    id: z.string().optional().describe('Light id (generated if omitted).'),
+    x: z.number().optional().describe('World-space x (default 0).'),
+    y: z.number().optional().describe('World-space y (default 3 — above the ground, not on it).'),
+    z: z.number().optional().describe('World-space z (default 0).'),
+    color: z.array(z.number()).length(3).optional().describe('Linear RGB, each component ≥ 0 (default [1, 0.86, 0.62], a warm lamp).'),
+    intensity: z.number().optional().describe('Brightness (default 6).'),
+    range: z.number().optional().describe('How far the light reaches, in world units (default 20).'),
+  }).optional().describe('add_light / set_light: the light spec. At most 8 point lights exist at once — the shader array is fixed-size, so a ninth is refused by name rather than ignored.'),
+  lightId: z.string().optional().describe('set_light / remove_light: the light id.'),
+
+  // --- Materials ------------------------------------------------------------
+  material: z.object({
+    id: z.string().optional().describe('Material id (generated if omitted).'),
+    color: z.array(z.number()).length(3).optional().describe('Base colour, linear RGB (default [0.8, 0.8, 0.82]).'),
+    emissive: z.array(z.number()).length(3).optional().describe('Light the surface emits regardless of the scene (default [0, 0, 0]).'),
+    metalness: z.number().min(0).max(1).optional().describe('0 dielectric → 1 metal.'),
+    roughness: z.number().min(0).max(1).optional().describe('0 mirror → 1 fully diffuse. Floored at 0.045: a true zero is a numerically unstable mirror.'),
+    emissiveIntensity: z.number().min(0).optional().describe('Scales `emissive` before the frame is built, so it reaches every path that draws emissive.'),
+    clearcoat: z.number().min(0).max(1).optional().describe('A lacquer layer over the base — car paint, varnished wood.'),
+    clearcoatRoughness: z.number().min(0).max(1).optional().describe("The coat's own roughness. NOT floored like the base, so a mirror-smooth lacquer stays expressible."),
+    sheenColor: z.array(z.number()).length(3).optional().describe('Retroreflective sheen colour — cloth, velvet.'),
+    sheenRoughness: z.number().min(0).max(1).optional().describe('How broad the sheen lobe is.'),
+  }).optional().describe("add_material / set_material: a NAMED, SHARED surface referenced by many objects, so one edit restyles all of them. metalness and roughness reach the shader on the MESH path only. There are no aoMapIntensity / normalScale / envMapIntensity knobs: each scales a map that does not exist, and a knob that scales nothing is worse than a missing one."),
+  materialId: z.string().optional().describe('set_material / remove_material: the material id.'),
 })
   .refine((v) => v.action !== 'configure' || !!v.patch, { message: 'configure requires patch', path: ['patch'] })
   .refine((v) => !['remove_actor', 'set_actor_pose'].includes(v.action) || !!v.actorId, { message: 'this action requires actorId', path: ['actorId'] })
   .refine((v) => v.action !== 'set_actor_pose' || !!v.pose, { message: 'set_actor_pose requires pose', path: ['pose'] })
   .refine((v) => v.action !== 'set_camera' || !!v.camera, { message: 'set_camera requires camera', path: ['camera'] })
   .refine((v) => v.action !== 'add_object' || !!v.object, { message: 'add_object requires object', path: ['object'] })
-  .refine((v) => v.action !== 'remove_object' || !!v.objectId, { message: 'remove_object requires objectId', path: ['objectId'] });
+  .refine((v) => v.action !== 'remove_object' || !!v.objectId, { message: 'remove_object requires objectId', path: ['objectId'] })
+  .refine((v) => !['extrude_path', 'lathe_path'].includes(v.action) || !!v.pathId, { message: 'this action requires pathId — the canvas path to turn into geometry', path: ['pathId'] })
+  .refine((v) => v.action !== 'remove_mesh' || !!v.meshId, { message: 'remove_mesh requires meshId', path: ['meshId'] })
+  .refine((v) => v.action !== 'add_light' || !!v.light, { message: 'add_light requires light', path: ['light'] })
+  .refine((v) => v.action !== 'set_light' || (!!v.lightId && !!v.light), { message: 'set_light requires lightId and light', path: ['lightId'] })
+  .refine((v) => v.action !== 'remove_light' || !!v.lightId, { message: 'remove_light requires lightId', path: ['lightId'] })
+  .refine((v) => v.action !== 'add_material' || !!v.material, { message: 'add_material requires material', path: ['material'] })
+  .refine((v) => v.action !== 'set_material' || (!!v.materialId && !!v.material), { message: 'set_material requires materialId and material', path: ['materialId'] })
+  .refine((v) => v.action !== 'remove_material' || !!v.materialId, { message: 'remove_material requires materialId', path: ['materialId'] });
 export type World3DInput = z.infer<typeof World3DInputSchema>;
 
 // =============================================================================

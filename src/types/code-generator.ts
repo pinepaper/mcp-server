@@ -7645,6 +7645,122 @@ ${needWorld}
   if (typeof app.removeWorld3D !== 'function') { return { success: false, error: 'app.removeWorld3D unavailable — update FxTool' }; }
   return { success: !!app.removeWorld3D() };
 })();`.trim();
+
+      // --- Mesh authoring ---------------------------------------------------
+      // extrudeToMesh / latheToMesh REFUSE by name when there is no world
+      // ({ok:false, reason}), so their reason is passed through rather than
+      // pre-empted with a second wording for the same condition. The facade
+      // check stays, because a studio without the method is a different fault.
+      case 'extrude_path':
+      case 'lathe_path': {
+        const fn = input.action === 'extrude_path' ? 'extrudeToMesh' : 'latheToMesh';
+        const mesh = { ...(input.mesh ?? {}) } as Record<string, unknown>;
+        // rotY is RADIANS on this path — stored raw and handed to cos()/sin()
+        // in the shader. rotYDegrees is the convenience spelling and is folded
+        // in here so only one of them ever reaches the engine.
+        if (typeof mesh.rotYDegrees === 'number') {
+          if (mesh.rotY === undefined) mesh.rotY = (mesh.rotYDegrees as number) * Math.PI / 180;
+          delete mesh.rotYDegrees;
+        }
+        return `
+// World3D: ${input.action} — a canvas path becomes real geometry
+(async function() {
+  if (typeof app.${fn} !== 'function') { return { success: false, error: 'app.${fn} unavailable — update FxTool to a world3d-capable build' }; }
+  const r = await app.${fn}(${S(input.pathId)}, ${S(mesh)});
+  if (!r || r.ok === false) { return { success: false, error: (r && r.reason) || 'the world refused the mesh' }; }
+  return { success: true, meshId: r.id, op: ${S(input.action === 'extrude_path' ? 'extrude' : 'lathe')}, sourceId: ${S(input.pathId)} };
+})();`.trim();
+      }
+
+      case 'list_meshes':
+        return `
+// World3D: every authored mesh on the stage
+(function() {
+  if (typeof app.listWorldMeshes !== 'function') { return { success: false, error: 'app.listWorldMeshes unavailable — update FxTool' }; }
+  return { success: true, meshes: app.listWorldMeshes() };
+})();`.trim();
+
+      case 'remove_mesh':
+        return `
+// World3D: drop a mesh
+(function() {
+  if (typeof app.removeWorldMesh !== 'function') { return { success: false, error: 'app.removeWorldMesh unavailable — update FxTool' }; }
+  return { success: !!app.removeWorldMesh(${S(input.meshId)}) };
+})();`.trim();
+
+      // --- Lights -----------------------------------------------------------
+      // addWorldLight THROWS when there is no world, so this one is guarded
+      // ahead of the call rather than reading a refusal back.
+      case 'add_light':
+        return `
+// World3D: add a point light — at most 8, and the ninth is refused by name
+(function() {
+  if (typeof app.addWorldLight !== 'function') { return { success: false, error: 'app.addWorldLight unavailable — update FxTool' }; }
+${needWorld}
+  const r = app.addWorldLight(${S(input.light ?? {})});
+  if (!r || r.ok === false) { return { success: false, error: (r && r.error) || 'the world refused the light' }; }
+  return { success: true, lightId: r.id, light: r.light };
+})();`.trim();
+
+      case 'set_light':
+        return `
+// World3D: edit a light in place
+(function() {
+  if (typeof app.setWorldLight !== 'function') { return { success: false, error: 'app.setWorldLight unavailable — update FxTool' }; }
+  return { success: !!app.setWorldLight(${S(input.lightId)}, ${S(input.light ?? {})}) };
+})();`.trim();
+
+      case 'remove_light':
+        return `
+// World3D: drop a light
+(function() {
+  if (typeof app.removeWorldLight !== 'function') { return { success: false, error: 'app.removeWorldLight unavailable — update FxTool' }; }
+  return { success: !!app.removeWorldLight(${S(input.lightId)}) };
+})();`.trim();
+
+      case 'list_lights':
+        return `
+// World3D: every light, with position, colour, intensity and range
+(function() {
+  if (typeof app.listWorldLights !== 'function') { return { success: false, error: 'app.listWorldLights unavailable — update FxTool' }; }
+  return { success: true, lights: app.listWorldLights() };
+})();`.trim();
+
+      // --- Materials --------------------------------------------------------
+      case 'add_material':
+        return `
+// World3D: a named, SHARED surface — one edit restyles every object using it
+(function() {
+  if (typeof app.addWorldMaterial !== 'function') { return { success: false, error: 'app.addWorldMaterial unavailable — update FxTool' }; }
+${needWorld}
+  const r = app.addWorldMaterial(${S(input.material ?? {})});
+  if (!r || r.ok === false) { return { success: false, error: (r && r.error) || 'the world refused the material' }; }
+  return { success: true, materialId: r.id, material: r.material };
+})();`.trim();
+
+      case 'set_material':
+        return `
+// World3D: patch a material — every object referencing it changes next frame
+(function() {
+  if (typeof app.setWorldMaterial !== 'function') { return { success: false, error: 'app.setWorldMaterial unavailable — update FxTool' }; }
+  return { success: !!app.setWorldMaterial(${S(input.materialId)}, ${S(input.material ?? {})}) };
+})();`.trim();
+
+      case 'remove_material':
+        return `
+// World3D: drop a material
+(function() {
+  if (typeof app.removeWorldMaterial !== 'function') { return { success: false, error: 'app.removeWorldMaterial unavailable — update FxTool' }; }
+  return { success: !!app.removeWorldMaterial(${S(input.materialId)}) };
+})();`.trim();
+
+      case 'list_materials':
+        return `
+// World3D: every material, with the knobs that actually render
+(function() {
+  if (typeof app.listWorldMaterials !== 'function') { return { success: false, error: 'app.listWorldMaterials unavailable — update FxTool' }; }
+  return { success: true, materials: app.listWorldMaterials() };
+})();`.trim();
     }
   }
 
