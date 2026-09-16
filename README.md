@@ -209,6 +209,35 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - Puppeteer mode launches Chrome with `--no-sandbox` and `--disable-setuid-sandbox`. That is routine for headless automation and it does weaken Chrome's own process sandbox. If that matters where you are running it, use `code` mode or put the server in a container.
 - Puppeteer itself is an **optional** peer dependency, kept out of the default tree precisely because a headless browser plus an install script is what scanners flag hardest. Install it only if you want the executing mode.
 
+## What's new in 1.6.8
+
+**Long-form export stops crossing the bridge as one string.** `pinepaper_agent_export` handed the bytes back as a base64 data URL. Two things were wrong with that and only one of them was a bug.
+
+- The bug: a **streamed** export returns a `{streamed:true}` marker rather than a Blob, and `FileReader.readAsDataURL` throws on it — so any export that streamed *broke* this path instead of extending it.
+- The ceiling: base64 of a ten-minute 1080p video is a ~1.6 GB string before JSON transport. No memory fix reaches that.
+- But the ceiling was never the MCP response. This server already wrote video and PDF to a file above 500 KB and handed back a `filePath` — the only real limit was the single `page.evaluate` return value. So the paging belongs *inside* the tool: the studio holds the encoded file in its export store and returns an id, and the server pages it into the file it was going to write anyway. One tool call, one `filePath`, at any size, with at most one 4 MB chunk in memory on either side. An agent-facing pager would only have exposed a transport limit the agent cannot act on.
+- `duration` goes from a 60-second cap to **600**. Ten minutes was unreachable regardless of how the bytes came back, so the cap was the other half of the ceiling. GIF keeps its own 15-second cap: it has a different encoder and does not stream.
+- Failure leaves the export **held**. The store is the only copy, so the error names the id and the bytes reached, deletes the partial file, and does not release. An eviction mid-read is reported as an eviction, never as a missing file, and re-exporting stays the caller's decision.
+- **This needs a studio with the export store.** That surface (`exportToStore` / `readExport` / `releaseExport`) is not in FxTool's main branch yet. Until it is, mp4/webm take the buffered path exactly as before — and both of its failures are now *named* instead of fatal: the marker says it streamed and there is nothing to page it from, and an export past a 96 MB inline ceiling gives its size, the ceiling and what to do. That ceiling sits above what the buffered path could already deliver, so nothing that worked before starts refusing.
+
+**`pinepaper_instantiate_ontology` builds through the studio's own compiler.** The server-side port placed items as boxes — no paint, no text, no keyframes, no masks. The engine's compiler reads every node facet and builds through the template loader's own paths, which is the round trip the studio's pixel tests verify. The box loop survives only as the fallback for studios that predate the facade, and says what it lost.
+
+- **A failed image reported success.** The door returned three of the counts the compiler gives it and dropped nine, `imagesFailed` among them — so a raster that never decoded read back as `success: true` with a full `itemIds` array. All the counts are surfaced now, and `imagesFailed` alone is enough to make the call unsuccessful, whether or not the compiler also logged an error diagnostic.
+
+**The design graph keeps the recipes for everything code drew.** Three kinds of node have no geometry to round-trip, because code drew them and the code's inputs *are* their geometry. The graph kept a generator's name and not its parameters — enough to name a generator, not enough to re-run one.
+
+- Nodes now carry `generator`, `generatorParams` and `generatorRole`; a mesh carries `meshProvenance` (`op`, the node it was derived from, and the options); the 3D stage rides at document level as `world`. All of it reaches the JSON-LD.
+- The parameters have to be the **merged** set. What a generator hands its registry is empty, or two keys of thirty for the GPU generators, and a recipe built from that names a generator it cannot reproduce — which is indistinguishable from a working one until someone re-runs it.
+- `pp:world` is a **sibling** of `pp:generator`, never nested inside it. A World3D scene has no generator, so a stage read inside `if (generator)` is dropped from exactly the scenes that cannot rebuild without it.
+
+**`attracts` was live in the engine and unnameable here.** The relation-parity guard compares the tool enum against a fixture of the engine's relation map — but the fixture is copied by hand, so the guard passed while the engine moved. The fixture is refreshed and `attracts` is callable. The exclusion list that keeps tool-emitted families (`deform_*`, `effect_*`, `geo_*`, the rigging set) out of `add_relation` is unchanged, and still written down with its reason.
+
+**`pinepaper_character` was defined and dispatched nowhere.** It shipped in 1.6.7 as a schema with no handler behind it — the worst version of the problem this project keeps naming, because the tool *listed*. It is wired now, and a test fails the build if any defined tool has nothing dispatching it.
+
+**Four chart types classified as `pp:Group`.** The graph's type lookup lowercased the item type before consulting its map, so every camelCase key in that map was unreachable — `barChart`, `lineChart`, `scatterPlot` and `areaChart` answered `pp:Group` instead of their own types. Nothing errored; a caller got a readable graph of the wrong thing. The lookup tries the key as spelled before folding case, and a test now asserts every key in the map is reachable, so the next camelCase key the engine adds fails a test instead of quietly answering `pp:Group`.
+
+**The error path could throw while reporting an error.** Canvas-state capture promises never to throw and returns whatever the studio handed back, but the formatter read its fields unguarded — so a partial state replaced a real failure with a `TypeError` from the error path itself. Every field is read defensively now.
+
 ## What's new in 1.6.7
 
 **Four more item-stage shader effects** — `electric_arc`, `vortex`, `rain_veil`, `caustics` (ABYSSAL's noise library). The `item` shader stage went from four built-ins to eight and nothing here named the new half.

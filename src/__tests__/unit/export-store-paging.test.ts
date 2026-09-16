@@ -81,6 +81,72 @@ describe('generateAgentExport — the export store', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// The legacy path, EXECUTED
+// ---------------------------------------------------------------------------
+
+/**
+ * `deliver()` is new code on the path every studio without an export store
+ * still takes, and asserting on the emitted strings does not prove a 5s mp4
+ * still comes back as a data URL. So run the emitted code against a fake
+ * studio and check the value, not the source.
+ */
+function runEmitted(
+  code: string,
+  blob: unknown
+): Promise<Record<string, unknown>> {
+  // Strip the leading banner comments so the IIFE can be returned; inner
+  // comments are indented and unaffected.
+  const body = 'return ' + code.split('\n').filter(l => !l.startsWith('//')).join('\n');
+  class FakeFileReader {
+    result: unknown;
+    onloadend: (() => void) | null = null;
+    readAsDataURL(b: { _b64?: string }) {
+      this.result = `data:video/mp4;base64,${b._b64 ?? ''}`;
+      setTimeout(() => this.onloadend?.(), 0);
+    }
+  }
+  const app = {
+    exportEngine: { videoExporter: { export: async () => blob } },
+    getCanvasSize: () => ({ width: 1920, height: 1080 }),
+    getItems: () => [],
+  };
+  return new Function('app', 'FileReader', body)(app, FakeFileReader);
+}
+
+describe('the buffered path still works where there is no store', () => {
+  const code = () => codeGenerator.generateAgentExport({ platform: 'youtube', format: 'mp4', duration: 5 });
+
+  it('a short mp4 still comes back as a data URL', async () => {
+    const blob: Record<string, unknown> = { size: 1234, type: 'video/mp4', _b64: 'AAAA' };
+    blob.slice = () => blob;
+    const r = await runEmitted(code(), blob);
+    expect(r.success).toBe(true);
+    expect(r.data).toBe('data:video/mp4;base64,AAAA');
+    expect(r.size).toBe(1234);
+    expect(r.retained).toBeUndefined();
+  });
+
+  it('the {streamed:true} marker is refused by name, not thrown on', async () => {
+    // This is what VideoExporter hands back for a streamed export. The old
+    // code passed it to readAsDataURL, which throws on a non-Blob.
+    const r = await runEmitted(code(), { streamed: true, type: 'video/mp4', name: 'x.mp4' });
+    expect(r.success).toBe(false);
+    expect(String(r.error)).toContain('streamed to a file');
+    expect(String(r.error)).toContain('update FxTool');
+  });
+
+  it('past the inline ceiling it names the size and the ceiling', async () => {
+    const blob: Record<string, unknown> = { size: INLINE_MAX_BYTES + 1, type: 'video/mp4', _b64: 'AAAA' };
+    blob.slice = () => blob;
+    const r = await runEmitted(code(), blob);
+    expect(r.success).toBe(false);
+    expect(String(r.error)).toContain('inline ceiling');
+    expect(String(r.error)).toMatch(/\d+\.\d MB/);
+    expect(r.size).toBe(INLINE_MAX_BYTES + 1);
+  });
+});
+
 describe('generateReadExportChunk / generateReleaseExport', () => {
   it('reads an explicit range and guards the facade', () => {
     const code = codeGenerator.generateReadExportChunk('pp-export-123.mp4', 4194304, 4194304);
