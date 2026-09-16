@@ -1400,7 +1400,7 @@ async function handleToolCallInner(
         const input = AddRelationInputSchema.parse(args);
         const code = codeGenerator.generateAddRelation(input);
         const description = getLocalizedSuccessMessage(i18n, 'relationAdded', {
-          relationType: input.relationType,
+          relationType: input.relationType ?? `preset:${input.presetId}`,
           sourceId: input.sourceId,
           targetId: input.targetId || 'self',
         });

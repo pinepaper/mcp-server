@@ -1380,10 +1380,34 @@ export class PinePaperCodeGenerator {
    */
   generateAddRelation(input: z.infer<typeof AddRelationInputSchema>): string {
     const validated = AddRelationInputSchema.parse(input);
+
+    // A PRESET decides its own relationType and params, so this is a different
+    // call, not a defaulted one. applyRelationPreset refuses with
+    // `{ok:false, errors:[{field, reason}]}` — a third refusal shape on this
+    // surface, after {ok, reason} and {error} — so the errors are joined rather
+    // than read as a single string, which would render "[object Object]".
+    if (validated.presetId) {
+      return `
+// Adopt relation preset "${validated.presetId}" on ${validated.sourceId}
+(async function() {
+  if (typeof app.applyRelationPreset !== 'function') { return { success: false, error: 'app.applyRelationPreset unavailable — update FxTool' }; }
+  const r = await app.applyRelationPreset(${JSON.stringify(validated.sourceId)}, ${JSON.stringify(validated.presetId)}, ${JSON.stringify(validated.presetValues ?? {})});
+  if (!r || r.ok === false) {
+    const why = (r && Array.isArray(r.errors))
+      ? r.errors.map(function(e) { return e.field + ': ' + e.reason; }).join('; ')
+      : 'the preset did not apply';
+    return { success: false, error: why };
+  }
+  // The preset's own type and resolved values come back, so the caller learns
+  // what it actually adopted rather than only that something worked.
+  return { success: true, presetId: ${JSON.stringify(validated.presetId)}, relationType: r.relationType, params: r.params, values: r.values };
+})();`.trim();
+    }
+
     return generateAddRelationCode(
       validated.sourceId,
       validated.targetId || validated.sourceId,
-      validated.relationType,
+      validated.relationType as RelationType,
       validated.params as Record<string, unknown>
     );
   }
@@ -6135,12 +6159,24 @@ case 'analyze_palette':
       stroke_decorations: 'listStrokeDecorations', precomps: 'listPrecomps',
       images: 'listImages', segment_edit_kinds: 'listSegmentEditKinds',
       shatter_orders: 'listShatterOrders', world_meshes: 'listWorldMeshes',
+      relation_presets: 'loadRelationPresets',
     };
     const want = ${S(validated.catalogue)};
     const fn = READERS[want];
     if (!fn) { return { success: false, error: 'unknown catalogue ' + JSON.stringify(want) + ' — try ' + Object.keys(READERS).join(', ') }; }
     if (typeof app[fn] !== 'function') { return { success: false, error: 'app.' + fn + ' unavailable — update FxTool' }; }
     const entries = await app[fn]();
+    // loadRelationPresets answers {presets, rejected, source} rather than a bare
+    // array, and REJECTED is the half worth surfacing: a preset this build
+    // cannot use is a named absence, where dropping it silently would read as
+    // the catalogue simply being smaller.
+    if (entries && !Array.isArray(entries) && Array.isArray(entries.presets)) {
+      return {
+        success: true, catalogue: want, reader: 'app.' + fn,
+        count: entries.presets.length, entries: entries.presets,
+        rejected: entries.rejected || [], source: entries.source || null,
+      };
+    }
     return { success: true, catalogue: want, reader: 'app.' + fn, count: Array.isArray(entries) ? entries.length : undefined, entries: entries };
   }
 

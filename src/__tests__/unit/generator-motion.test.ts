@@ -12,7 +12,7 @@
 
 import { describe, it, expect } from 'bun:test';
 import { codeGenerator } from '../../types/code-generator.js';
-import { MotionInputSchema, QueryCapabilitiesInputSchema } from '../../types/schemas.js';
+import { MotionInputSchema, QueryCapabilitiesInputSchema, AddRelationInputSchema } from '../../types/schemas.js';
 import { PINEPAPER_TOOLS } from '../../tools/definitions.js';
 
 const gen = (input: Record<string, unknown>) =>
@@ -163,5 +163,60 @@ describe('query_capabilities catalogue', () => {
     for (const covered of ['palettes', 'entrances', 'cutouts', 'animations']) {
       expect(QueryCapabilitiesInputSchema.safeParse({ action: 'catalogue', catalogue: covered }).success).toBe(false);
     }
+  });
+});
+
+/**
+ * Relation presets — a tuned motion someone already got right.
+ *
+ * loadRelationPresets / applyRelationPreset sat on the facade with nothing
+ * reaching them. The list half belongs with the other catalogues; the apply
+ * half belongs with relation creation, because that is what it does.
+ */
+describe('relation presets', () => {
+  const genRel = (input: Record<string, unknown>) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    codeGenerator.generateAddRelation(input as any);
+
+  it('a presetId takes the preset path, not the addRelation path', () => {
+    const code = genRel({ sourceId: 'a', presetId: 'gentle_orbit' });
+    expect(code).toContain('app.applyRelationPreset("a", "gentle_orbit", {})');
+    expect(code).not.toContain('app.addRelation(');
+  });
+
+  it('passes values through, and says what it actually adopted', () => {
+    // The preset's own relationType and resolved values come back, so a caller
+    // learns what it adopted rather than only that something worked.
+    const code = genRel({ sourceId: 'a', presetId: 'p1', presetValues: { speed: 2 } });
+    expect(code).toContain('{"speed":2}');
+    expect(code).toContain('relationType: r.relationType');
+    expect(code).toContain('values: r.values');
+  });
+
+  it('joins the error ARRAY rather than rendering [object Object]', () => {
+    // applyRelationPreset refuses with {ok:false, errors:[{field, reason}]} —
+    // a third refusal shape on this surface, after {ok, reason} and {error}.
+    const code = genRel({ sourceId: 'a', presetId: 'p1' });
+    expect(code).toContain('Array.isArray(r.errors)');
+    expect(code).toContain("e.field + ': ' + e.reason");
+  });
+
+  it('relationType stays required when there is no preset', () => {
+    expect(AddRelationInputSchema.safeParse({ sourceId: 'a' }).success).toBe(false);
+    expect(AddRelationInputSchema.safeParse({ sourceId: 'a', relationType: 'orbits' }).success).toBe(true);
+    expect(AddRelationInputSchema.safeParse({ sourceId: 'a', presetId: 'p1' }).success).toBe(true);
+  });
+
+  it('the catalogue surfaces what the build REJECTED, not just what it kept', () => {
+    // loadRelationPresets answers {presets, rejected, source}. A preset this
+    // build cannot use is a named absence; dropping it would read as the
+    // catalogue simply being smaller.
+    const code = codeGenerator.generateQueryCapabilities(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { action: 'catalogue', catalogue: 'relation_presets' } as any
+    );
+    expect(code).toContain('loadRelationPresets');
+    expect(code).toContain('rejected: entries.rejected');
+    expect(code).toContain('source: entries.source');
   });
 });

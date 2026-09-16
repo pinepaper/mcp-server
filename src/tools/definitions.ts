@@ -2779,8 +2779,17 @@ Relations are COMPOSITIONAL - an item can have multiple relations that work toge
           description: 'Relation-specific parameters',
           additionalProperties: true,
         },
+        presetId: {
+          type: 'string',
+          description: "Adopt a community relation PRESET instead of naming a type and params yourself — a tuned motion with its symbols exposed as knobs. List them with pinepaper_query_capabilities { action: 'catalogue', catalogue: 'relation_presets' }. The preset decides the relationType, so relationType is not needed alongside it.",
+        },
+        presetValues: {
+          type: 'object',
+          description: 'presetId: symbol → number. An omitted symbol takes the midpoint of its declared range, so a preset applies sensibly with no values at all.',
+          additionalProperties: true,
+        },
       },
-      required: ['sourceId', 'relationType'],
+      required: ['sourceId'],
     },
   },
 
@@ -4974,7 +4983,7 @@ EXAMPLE — Choose effect for a victory card:
         },
         catalogue: {
           type: 'string',
-          enum: ['rig_presets', 'shader_effects', 'stroke_decorations', 'precomps', 'images', 'segment_edit_kinds', 'shatter_orders', 'world_meshes'],
+          enum: ['rig_presets', 'shader_effects', 'stroke_decorations', 'precomps', 'images', 'segment_edit_kinds', 'shatter_orders', 'world_meshes', 'relation_presets'],
           description: "action 'catalogue': which registry to read. These sit OUTSIDE the aggregate, which already covers styles, effects, deforms, entrances, animations, collages, palettes, masks, maskShapes and cutouts — 'list' reaches all of those.",
         },
         kind: {

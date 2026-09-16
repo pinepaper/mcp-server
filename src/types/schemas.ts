@@ -1229,9 +1229,14 @@ export const DeleteItemInputSchema = z.object({
 export const AddRelationInputSchema = z.object({
   sourceId: z.string().describe('Registry ID of the source item'),
   targetId: z.string().nullish().describe('Registry ID of the target item; null/omitted for self-relations (animates, moves_along_path, construction_reveal, time_expression)'),
-  relationType: RelationTypeSchema,
+  relationType: RelationTypeSchema.optional().describe('The relation to create. Required unless presetId is given.'),
   params: z.record(z.unknown()).optional().default({}),
-});
+  presetId: z.string().optional()
+    .describe("Apply a community relation PRESET instead of naming a type and params yourself — a tuned motion someone already got right, with its symbols exposed as knobs. List them with pinepaper_query_capabilities { action: 'catalogue', catalogue: 'relation_presets' }. The preset decides the relationType, so relationType is not needed and is ignored if sent."),
+  presetValues: z.record(z.number()).optional()
+    .describe('presetId: symbol → number. Any symbol you omit takes the midpoint of its declared range, so a preset applies sensibly with no values at all.'),
+})
+  .refine((v) => !!v.relationType || !!v.presetId, { message: 'relationType is required unless presetId is given', path: ['relationType'] });
 
 // Remove Relation
 export const RemoveRelationInputSchema = z.object({
@@ -2985,7 +2990,7 @@ export const QueryCapabilitiesInputSchema = z.object({
     .describe("'list' (all capabilities or filtered by kind) · 'choose' (context/mood-weighted recommendation) · 'coverage' (breakdown of indexable capabilities) · 'find' (lookup by key) · 'catalogue' (the registries the aggregate does NOT gather — see `catalogue`)"),
   catalogue: z.enum([
     'rig_presets', 'shader_effects', 'stroke_decorations', 'precomps', 'images',
-    'segment_edit_kinds', 'shatter_orders', 'world_meshes',
+    'segment_edit_kinds', 'shatter_orders', 'world_meshes', 'relation_presets',
   ]).optional().describe("action 'catalogue': which registry to read. These sit OUTSIDE app.getCapabilities' aggregate — that one already covers styles, effects, deforms, entrances, animations, collages, palettes, masks, maskShapes and cutouts, and 'list' reaches all of those. Use this for the ones it does not gather: rig presets, shader effects, stroke decorations, the precomp list, the image library, segment-edit kinds, shatter orders and world meshes."),
   kind: z.union([
     z.string(),
