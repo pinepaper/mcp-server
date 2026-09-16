@@ -135,7 +135,6 @@ describe('the tool distinguishes itself from pinepaper_animate', () => {
 describe('query_capabilities catalogue', () => {
   const genCaps = (input: Record<string, unknown>) =>
     codeGenerator.generateQueryCapabilities(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       input as any
     );
 
@@ -175,7 +174,6 @@ describe('query_capabilities catalogue', () => {
  */
 describe('relation presets', () => {
   const genRel = (input: Record<string, unknown>) =>
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     codeGenerator.generateAddRelation(input as any);
 
   it('a presetId takes the preset path, not the addRelation path', () => {
@@ -212,7 +210,6 @@ describe('relation presets', () => {
     // build cannot use is a named absence; dropping it would read as the
     // catalogue simply being smaller.
     const code = codeGenerator.generateQueryCapabilities(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       { action: 'catalogue', catalogue: 'relation_presets' } as any
     );
     expect(code).toContain('loadRelationPresets');

@@ -7818,6 +7818,122 @@ ${needWorld}
   if (typeof app.listWorldMaterials !== 'function') { return { success: false, error: 'app.listWorldMaterials unavailable — update FxTool' }; }
   return { success: true, materials: app.listWorldMaterials() };
 })();`.trim();
+
+      // --- Import -----------------------------------------------------------
+      // Both importers THROW when there is no world, so both are guarded ahead.
+      case 'import_obj':
+      case 'import_gltf': {
+        const fn = input.action === 'import_obj' ? 'importOBJToWorld' : 'importGLTFToWorld';
+        return `
+// World3D: ${input.action}
+(async function() {
+  if (typeof app.${fn} !== 'function') { return { success: false, error: 'app.${fn} unavailable — update FxTool to a world3d-capable build' }; }
+${needWorld}
+  const r = await app.${fn}(${S(input.source)}, ${S(input.importOptions ?? {})});
+  if (!r || r.ok === false) { return { success: false, error: (r && (r.error || r.reason)) || 'the world refused the import' }; }
+  return { success: true, meshIds: r.ids, ...r };
+})();`.trim();
+      }
+
+      case 'list_mesh_clips':
+        return `
+// World3D: the animation clips an imported skinned mesh carries
+(function() {
+  if (typeof app.listWorldMeshClips !== 'function') { return { success: false, error: 'app.listWorldMeshClips unavailable — update FxTool' }; }
+${needWorld}
+  return { success: true, clips: app.listWorldMeshClips(${S(input.meshId)}) };
+})();`.trim();
+
+      case 'set_mesh_clip':
+        return `
+// World3D: choose which clip a skinned mesh plays
+(function() {
+  if (typeof app.setWorldMeshClip !== 'function') { return { success: false, error: 'app.setWorldMeshClip unavailable — update FxTool' }; }
+${needWorld}
+  return { success: !!app.setWorldMeshClip(${S(input.meshId)}, ${S(input.clip)}${input.crossfade !== undefined ? `, { crossfade: ${S(input.crossfade)} }` : ''}) };
+})();`.trim();
+
+      // --- Navigation, picking, camera --------------------------------------
+      // These facades answer `null` — or 0, for groundHeightAt — when there is
+      // NO WORLD, which is indistinguishable from a real answer: ground really
+      // can be at height 0, and a ray really can hit nothing. Guarded ahead so
+      // "there is no world" never arrives disguised as a measurement.
+      case 'set_nav_target':
+        return `
+// World3D: point the pointer at the 2D canvas or the 3D world
+(function() {
+  if (typeof app.setWorldNavTarget !== 'function') { return { success: false, error: 'app.setWorldNavTarget unavailable — update FxTool' }; }
+  const r = app.setWorldNavTarget(${S(input.navTarget)});
+  if (!r || r.ok === false) { return { success: false, error: (r && r.error) || 'the nav target was refused' }; }
+  return { success: true, navTarget: ${S(input.navTarget)} };
+})();`.trim();
+
+      case 'get_nav_target':
+        return `
+// World3D: which layer the pointer currently drives
+(function() {
+  if (typeof app.getWorldNavTarget !== 'function') { return { success: false, error: 'app.getWorldNavTarget unavailable — update FxTool' }; }
+  return { success: true, navTarget: app.getWorldNavTarget() };
+})();`.trim();
+
+      case 'ground_height':
+        return `
+// World3D: the terrain height under a world (x, z)
+(function() {
+  if (typeof app.groundHeightAt !== 'function') { return { success: false, error: 'app.groundHeightAt unavailable — update FxTool' }; }
+${needWorld}
+  const p = ${S(input.point)};
+  return { success: true, height: app.groundHeightAt(p.x, p.z !== undefined ? p.z : p.y) };
+})();`.trim();
+
+      case 'raycast':
+        return `
+// World3D: cast a ray and report what it hits
+(function() {
+  if (typeof app.raycastWorld !== 'function') { return { success: false, error: 'app.raycastWorld unavailable — update FxTool' }; }
+${needWorld}
+  const hit = app.raycastWorld(${S(input.origin)}, ${S(input.direction)}, {});
+  // A null here means MISSED, not "no world" — the guard above already
+  // separated those two, which is the whole reason it is there.
+  return { success: true, hit: hit || null, missed: !hit };
+})();`.trim();
+
+      case 'dolly_camera':
+        return `
+// World3D: dolly the camera — >1 away, <1 closer
+(function() {
+  if (typeof app.dollyWorldCamera !== 'function') { return { success: false, error: 'app.dollyWorldCamera unavailable — update FxTool' }; }
+${needWorld}
+  return { success: true, camera: app.dollyWorldCamera(${S(input.multiplier)}) };
+})();`.trim();
+
+      case 'pan_camera':
+        return `
+// World3D: pan the camera across the ground, in SCREEN pixels
+(function() {
+  if (typeof app.panWorldCamera !== 'function') { return { success: false, error: 'app.panWorldCamera unavailable — update FxTool' }; }
+${needWorld}
+  return { success: true, camera: app.panWorldCamera(${S(input.dx)}, ${S(input.dy)}) };
+})();`.trim();
+
+      case 'world_to_canvas':
+        return `
+// World3D: project a world point onto the Paper canvas
+(function() {
+  if (typeof app.worldToCanvas !== 'function') { return { success: false, error: 'app.worldToCanvas unavailable — update FxTool' }; }
+${needWorld}
+  return { success: true, point: app.worldToCanvas(${S(input.point)}) };
+})();`.trim();
+
+      case 'canvas_to_ground':
+        return `
+// World3D: where a canvas (x, y) lands on the world's ground
+(function() {
+  if (typeof app.canvasToGround !== 'function') { return { success: false, error: 'app.canvasToGround unavailable — update FxTool' }; }
+${needWorld}
+  const p = ${S(input.point)};
+  return { success: true, ground: app.canvasToGround(p.x, p.y) };
+})();`.trim();
     }
   }
 

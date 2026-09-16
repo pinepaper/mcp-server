@@ -171,3 +171,108 @@ describe('the tool stops advertising knobs that reach no pixel', () => {
     expect(props.mesh.description).toContain('RADIANS');
   });
 });
+
+/**
+ * Import and navigation.
+ *
+ * The interesting guard here is not the facade check. Several of these answer
+ * `null` — or 0, for groundHeightAt — when there is NO WORLD, which is
+ * indistinguishable from a real answer: ground really can be at height 0, and
+ * a ray really can miss. Guarding ahead of the call is what keeps "there is no
+ * world" from arriving disguised as a measurement.
+ */
+describe('import', () => {
+  it('both importers are guarded — they THROW without a world', () => {
+    for (const [action, fn] of [['import_obj', 'importOBJToWorld'], ['import_gltf', 'importGLTFToWorld']] as const) {
+      const code = gen({ action, source: 'x' });
+      expect(code).toContain(`app.${fn}(`);
+      expect(code).toContain('no 3D world — call');
+      expect(code).toContain('update FxTool');
+    }
+  });
+
+  it('a skinned mesh can be asked what clips it has, and told which to play', () => {
+    expect(gen({ action: 'list_mesh_clips', meshId: 'm1' })).toContain('app.listWorldMeshClips("m1")');
+    const set = gen({ action: 'set_mesh_clip', meshId: 'm1', clip: 'walk', crossfade: 0.3 });
+    expect(set).toContain('app.setWorldMeshClip("m1", "walk", { crossfade: 0.3 })');
+  });
+
+  it('omits crossfade when it was not asked for', () => {
+    expect(gen({ action: 'set_mesh_clip', meshId: 'm1', clip: 'walk' })).toContain('app.setWorldMeshClip("m1", "walk")');
+  });
+});
+
+describe('navigation and picking', () => {
+  it('guards the facades whose null is ambiguous', () => {
+    // ground_height, raycast, dolly, pan, and both projections.
+    const ambiguous: Array<Record<string, unknown>> = [
+      { action: 'ground_height', point: { x: 1, y: 0, z: 2 } },
+      { action: 'raycast', origin: [0, 5, 0], direction: [0, -1, 0] },
+      { action: 'dolly_camera', multiplier: 1.5 },
+      { action: 'pan_camera', dx: 10, dy: 0 },
+      { action: 'world_to_canvas', point: { x: 1, y: 2, z: 3 } },
+      { action: 'canvas_to_ground', point: { x: 100, y: 200 } },
+    ];
+    for (const input of ambiguous) {
+      expect(gen(input)).toContain('no 3D world — call');
+    }
+  });
+
+  it('distinguishes a MISS from the absence of a world', () => {
+    // Once the guard has separated them, a null from raycastWorld can only
+    // mean the ray hit nothing — so it is reported as a miss, not a failure.
+    const code = gen({ action: 'raycast', origin: [0, 5, 0], direction: [0, -1, 0] });
+    expect(code).toContain('missed: !hit');
+    expect(code).toContain('success: true');
+  });
+
+  it('the nav target is validated by the engine and its refusal passed through', () => {
+    const code = gen({ action: 'set_nav_target', navTarget: '3d' });
+    expect(code).toContain('app.setWorldNavTarget("3d")');
+    expect(code).toContain('r.error');
+    // The engine accepts exactly '2d' and '3d'; so does the schema.
+    expect(World3DInputSchema.safeParse({ action: 'set_nav_target', navTarget: 'vr' }).success).toBe(false);
+  });
+
+  it('reads z for a world point and falls back to y for a canvas one', () => {
+    // groundHeightAt takes (x, z). A caller passing a canvas-shaped {x, y}
+    // means the second number either way, so it is taken rather than refused.
+    const code = gen({ action: 'ground_height', point: { x: 1, y: 7 } });
+    expect(code).toContain('p.z !== undefined ? p.z : p.y');
+  });
+
+  it('every new action parses as JavaScript', () => {
+    const actions: Array<Record<string, unknown>> = [
+      { action: 'import_obj', source: 'v 0 0 0' },
+      { action: 'import_gltf', source: 'https://example.invalid/m.glb' },
+      { action: 'list_mesh_clips', meshId: 'm' },
+      { action: 'set_mesh_clip', meshId: 'm', clip: 'idle' },
+      { action: 'set_nav_target', navTarget: '2d' }, { action: 'get_nav_target' },
+      { action: 'ground_height', point: { x: 0, y: 0 } },
+      { action: 'raycast', origin: [0, 0, 0], direction: [0, -1, 0] },
+      { action: 'dolly_camera', multiplier: 2 }, { action: 'pan_camera', dx: 1, dy: 1 },
+      { action: 'world_to_canvas', point: { x: 0, y: 0, z: 0 } },
+      { action: 'canvas_to_ground', point: { x: 0, y: 0 } },
+    ];
+    for (const a of actions) expect(() => new Function(gen(a))).not.toThrow();
+  });
+
+  it('refuses an incomplete call by naming the field', () => {
+    const bad: Array<[Record<string, unknown>, string]> = [
+      [{ action: 'import_obj' }, 'source'],
+      [{ action: 'import_gltf' }, 'source'],
+      [{ action: 'list_mesh_clips' }, 'meshId'],
+      [{ action: 'set_mesh_clip', meshId: 'm' }, 'clip'],
+      [{ action: 'set_nav_target' }, 'navTarget'],
+      [{ action: 'ground_height' }, 'point'],
+      [{ action: 'raycast', origin: [0, 0, 0] }, 'origin'],
+      [{ action: 'dolly_camera' }, 'multiplier'],
+      [{ action: 'pan_camera', dx: 1 }, 'dx'],
+    ];
+    for (const [input, field] of bad) {
+      const r = World3DInputSchema.safeParse(input);
+      expect(r.success).toBe(false);
+      if (!r.success) expect(JSON.stringify(r.error.issues)).toContain(field);
+    }
+  });
+});

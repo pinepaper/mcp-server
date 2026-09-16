@@ -2350,7 +2350,7 @@ RECIPE — a character walking through a forest: create {spec:'forest'} → impo
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['create', 'describe', 'configure', 'add_actor', 'remove_actor', 'list_actors', 'set_actor_pose', 'set_camera', 'add_object', 'remove_object', 'remove_world', 'extrude_path', 'lathe_path', 'list_meshes', 'remove_mesh', 'add_light', 'set_light', 'remove_light', 'list_lights', 'add_material', 'set_material', 'remove_material', 'list_materials'], description: 'World operation. extrude_path/lathe_path turn a canvas path into real geometry; lights are capped at 8; a material is shared by every object referencing it.' },
+        action: { type: 'string', enum: ['create', 'describe', 'configure', 'add_actor', 'remove_actor', 'list_actors', 'set_actor_pose', 'set_camera', 'add_object', 'remove_object', 'remove_world', 'extrude_path', 'lathe_path', 'list_meshes', 'remove_mesh', 'add_light', 'set_light', 'remove_light', 'list_lights', 'add_material', 'set_material', 'remove_material', 'list_materials', 'import_obj', 'import_gltf', 'list_mesh_clips', 'set_mesh_clip', 'set_nav_target', 'get_nav_target', 'ground_height', 'raycast', 'dolly_camera', 'pan_camera', 'world_to_canvas', 'canvas_to_ground'], description: 'World operation. extrude_path/lathe_path turn a canvas path into real geometry; lights are capped at 8; a material is shared by every object referencing it.' },
         spec: {
           anyOf: [{ type: 'string' }, { type: 'object' }],
           description: "create: preset id ('forest'|'snowMountain'|'field'|'jungle') or a full spec object.",
@@ -2376,6 +2376,17 @@ RECIPE — a character walking through a forest: create {spec:'forest'} → impo
         lightId: { type: 'string', description: 'set_light / remove_light: the light id.' },
         material: { type: 'object', description: 'add_material / set_material: { id?, color?, emissive?, metalness?, roughness?, emissiveIntensity?, clearcoat?, clearcoatRoughness?, sheenColor?, sheenRoughness? }. A shared surface — one edit restyles every object using it. metalness/roughness render on the mesh path only.' },
         materialId: { type: 'string', description: 'set_material / remove_material: the material id.' },
+        source: { type: 'string', description: 'import_obj: the OBJ file TEXT. import_gltf: a URL or a data: URI of the .glb bytes.' },
+        importOptions: { type: 'object', description: 'import_obj / import_gltf: placement and scale options, passed through.' },
+        clip: { type: 'string', description: 'set_mesh_clip: which imported animation clip a skinned mesh plays.' },
+        crossfade: { type: 'number', description: 'set_mesh_clip: seconds to blend out of the previous clip (blended in LOCAL pose space).' },
+        navTarget: { type: 'string', enum: ['2d', '3d'], description: "set_nav_target: which layer the pointer drives." },
+        point: { type: 'object', description: 'ground_height / canvas_to_ground / world_to_canvas: { x, y, z? }.' },
+        origin: { type: 'array', items: { type: 'number' }, description: 'raycast: ray origin [x, y, z].' },
+        direction: { type: 'array', items: { type: 'number' }, description: 'raycast: ray direction [x, y, z], need not be normalised.' },
+        multiplier: { type: 'number', description: 'dolly_camera: >1 away, <1 closer.' },
+        dx: { type: 'number', description: 'pan_camera: horizontal pan in SCREEN pixels.' },
+        dy: { type: 'number', description: 'pan_camera: vertical pan in SCREEN pixels.' },
         objectId: { type: 'string', description: 'remove_object: object id.' },
       },
       required: ['action'],

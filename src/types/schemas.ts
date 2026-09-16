@@ -4050,6 +4050,9 @@ export const World3DInputSchema = z.object({
     'extrude_path', 'lathe_path', 'list_meshes', 'remove_mesh',
     'add_light', 'set_light', 'remove_light', 'list_lights',
     'add_material', 'set_material', 'remove_material', 'list_materials',
+    'import_obj', 'import_gltf', 'list_mesh_clips', 'set_mesh_clip',
+    'set_nav_target', 'get_nav_target', 'ground_height', 'raycast',
+    'dolly_camera', 'pan_camera', 'world_to_canvas', 'canvas_to_ground',
   ])
     .describe("'create' (a preset world) · 'describe' (every parameter with type/range — CALL THIS before configure) · 'configure' (live deep-merge patch, schema-validated) · actor ops · 'set_camera' (follow|fixed|orbit) · object ops · 'remove_world' · MESH AUTHORING: 'extrude_path' / 'lathe_path' turn a canvas path into real geometry, 'list_meshes', 'remove_mesh' · 'add_light' / 'set_light' / 'remove_light' / 'list_lights' (at most 8 point lights) · 'add_material' / 'set_material' / 'remove_material' / 'list_materials'"),
   spec: z.union([z.string(), z.record(z.string(), z.unknown())]).optional().describe("create: a preset id ('forest', 'snowMountain', …) or a full world spec object."),
@@ -4112,6 +4115,22 @@ export const World3DInputSchema = z.object({
     sheenRoughness: z.number().min(0).max(1).optional().describe('How broad the sheen lobe is.'),
   }).optional().describe("add_material / set_material: a NAMED, SHARED surface referenced by many objects, so one edit restyles all of them. metalness and roughness reach the shader on the MESH path only. There are no aoMapIntensity / normalScale / envMapIntensity knobs: each scales a map that does not exist, and a knob that scales nothing is worse than a missing one."),
   materialId: z.string().optional().describe('set_material / remove_material: the material id.'),
+
+  // --- Import ---------------------------------------------------------------
+  source: z.string().optional().describe('import_obj: the OBJ file TEXT. import_gltf: a URL, or a data: URI of the .glb bytes.'),
+  importOptions: z.record(z.string(), z.unknown()).optional().describe('import_obj / import_gltf: placement and scale options, passed through to the engine.'),
+  clip: z.string().optional().describe('set_mesh_clip: which imported animation clip a skinned mesh plays.'),
+  crossfade: z.number().optional().describe('set_mesh_clip: seconds to blend out of the clip that was playing. The blend happens in LOCAL pose space — a palette cannot be blended after the fact.'),
+
+  // --- Navigation, picking and the camera ----------------------------------
+  navTarget: z.enum(['2d', '3d']).optional().describe("set_nav_target: which layer the pointer drives — '2d' the Paper canvas, '3d' the world."),
+  point: z.object({ x: z.number(), y: z.number(), z: z.number().optional() }).optional()
+    .describe('ground_height / canvas_to_ground / world_to_canvas: the point to convert. ground_height and canvas_to_ground read x and y (canvas) or x and z (world); world_to_canvas takes a world point.'),
+  origin: z.array(z.number()).length(3).optional().describe('raycast: ray origin in world space, [x, y, z].'),
+  direction: z.array(z.number()).length(3).optional().describe('raycast: ray direction in world space, [x, y, z]. Need not be normalised.'),
+  multiplier: z.number().optional().describe('dolly_camera: greater than 1 moves away, less than 1 moves closer.'),
+  dx: z.number().optional().describe('pan_camera: horizontal pan in SCREEN pixels.'),
+  dy: z.number().optional().describe('pan_camera: vertical pan in SCREEN pixels.'),
 })
   .refine((v) => v.action !== 'configure' || !!v.patch, { message: 'configure requires patch', path: ['patch'] })
   .refine((v) => !['remove_actor', 'set_actor_pose'].includes(v.action) || !!v.actorId, { message: 'this action requires actorId', path: ['actorId'] })
@@ -4126,7 +4145,15 @@ export const World3DInputSchema = z.object({
   .refine((v) => v.action !== 'remove_light' || !!v.lightId, { message: 'remove_light requires lightId', path: ['lightId'] })
   .refine((v) => v.action !== 'add_material' || !!v.material, { message: 'add_material requires material', path: ['material'] })
   .refine((v) => v.action !== 'set_material' || (!!v.materialId && !!v.material), { message: 'set_material requires materialId and material', path: ['materialId'] })
-  .refine((v) => v.action !== 'remove_material' || !!v.materialId, { message: 'remove_material requires materialId', path: ['materialId'] });
+  .refine((v) => v.action !== 'remove_material' || !!v.materialId, { message: 'remove_material requires materialId', path: ['materialId'] })
+  .refine((v) => !['import_obj', 'import_gltf'].includes(v.action) || !!v.source, { message: 'this action requires source', path: ['source'] })
+  .refine((v) => !['list_mesh_clips', 'set_mesh_clip'].includes(v.action) || !!v.meshId, { message: 'this action requires meshId', path: ['meshId'] })
+  .refine((v) => v.action !== 'set_mesh_clip' || !!v.clip, { message: 'set_mesh_clip requires clip', path: ['clip'] })
+  .refine((v) => v.action !== 'set_nav_target' || !!v.navTarget, { message: 'set_nav_target requires navTarget', path: ['navTarget'] })
+  .refine((v) => !['ground_height', 'canvas_to_ground', 'world_to_canvas'].includes(v.action) || !!v.point, { message: 'this action requires point', path: ['point'] })
+  .refine((v) => v.action !== 'raycast' || (!!v.origin && !!v.direction), { message: 'raycast requires origin and direction', path: ['origin'] })
+  .refine((v) => v.action !== 'dolly_camera' || v.multiplier !== undefined, { message: 'dolly_camera requires multiplier', path: ['multiplier'] })
+  .refine((v) => v.action !== 'pan_camera' || (v.dx !== undefined && v.dy !== undefined), { message: 'pan_camera requires dx and dy', path: ['dx'] });
 export type World3DInput = z.infer<typeof World3DInputSchema>;
 
 // =============================================================================
