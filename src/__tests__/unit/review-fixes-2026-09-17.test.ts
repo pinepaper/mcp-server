@@ -121,56 +121,31 @@ describe('an inherited concept performs and inks like the one it inherits from',
   });
 });
 
-describe('stitchcraft stops guessing at its target', () => {
-  const gen = (input: Record<string, unknown>) =>
-    (codeGenerator as unknown as { generateStitchcraft(i: unknown): string }).generateStitchcraft(input);
-
-  it('an explicit itemId that misses is refused, not replaced', () => {
-    // It used to fall through to selection → last registered → last Paper
-    // child, so stitching a deleted id embroidered whatever was newest and
-    // returned success:true.
-    const code = gen({ preset: 'cross_stitch', itemId: 'item_99' });
-    expect(code).toContain('no such item: ');
-    const idx = code.indexOf('no such item: ');
-    const fallbackIdx = code.indexOf('getAll');
-    expect(idx).toBeGreaterThan(0);
-    expect(idx).toBeLessThan(fallbackIdx);
+describe('stitchcraft: four findings resolved by removal, not repair', () => {
+  /**
+   * The four stitchcraft findings were fixed, and then the tool they were in
+   * was removed — because fixing them exposed that its primary path calls
+   * `app.applyStitchcraftToItem`, which does not exist anywhere in the engine.
+   * With the lossy fallback made honest, the tool refused on every studio: I
+   * had turned a silently-wrong tool into a uniformly-useless one.
+   *
+   * So the capability moved to `apply_thread`, which calls the method that DOES
+   * exist, and the tool is gone. src/__tests__/unit/stitchcraft.test.ts is the
+   * record of that and asserts the destination; these two keep the reason.
+   */
+  it('the tool is not served, and nothing calls the phantom method', () => {
+    expect(PINEPAPER_TOOLS.find((t) => t.name === 'pinepaper_create_stitchcraft')).toBeUndefined();
+    expect(JSON.stringify(PINEPAPER_TOOLS)).not.toContain('applyStitchcraftToItem');
   });
 
-  it('reads the selection through the facade that exists', () => {
-    const code = gen({ preset: 'cross_stitch' });
-    expect(code).toContain('app.getSelectedItems()');
-    // The dead property may still be NAMED in the comment explaining why it is
-    // dead; what must not survive is a branch reading it.
-    expect(code).not.toMatch(/app\.selection\s*(&&|\.|\[)/);
-  });
-
-  it('the lossy fallback refuses and names the tool that can do it', () => {
-    // It forwarded colour, width and count only, dropping preset, roughness,
-    // bowing, sheen and seed — then echoed the preset back with success:true.
-    const code = gen({ preset: 'satin_fill' });
-    expect(code).toContain('cannot carry a preset');
-    expect(code).toContain('apply_thread');
-    expect(code).toContain('equivalentStitch');
-  });
-
-  it('roughness jitters every segment, not the first two', () => {
-    const code = gen({ preset: 'stem_outline', roughness: 0.5, seed: 2 });
-    expect(code).toContain('for (let j = 0; j < line.segments.length; j++)');
-    expect(code).not.toContain('line.segments[1].point.x -=');
-  });
-
-  it('every preset still emits parseable code', () => {
-    for (const preset of ['cross_stitch', 'satin_fill', 'long_and_short', 'stem_outline', 'seed_fill', 'running_seam']) {
-      expect(() => new Function(gen({ preset, itemId: 'i', roughness: 0.4, seed: 1 }))).not.toThrow();
-    }
-  });
-
-  it('the fidelity controls are reachable from tools/list', () => {
-    const tool = PINEPAPER_TOOLS.find((t) => t.name === 'pinepaper_create_stitchcraft')!;
+  it('every knob it advertised is either real in apply_thread or gone', () => {
+    const tool = PINEPAPER_TOOLS.find((t) => t.name === 'pinepaper_design_medium')!;
     const props = (tool.inputSchema as { properties: Record<string, unknown> }).properties;
-    for (const k of ['roughness', 'bowing', 'sheen', 'seed']) expect(props[k]).toBeTruthy();
-    expect(tool.description).toContain('roughness');
+    // roughness, sheen and seed were real ideas and are reachable now.
+    for (const k of ['roughness', 'sheen', 'seed']) expect(props[k]).toBeTruthy();
+    // `bowing` was never anything: the engine has no such option anywhere, so
+    // it is not re-offered under a new roof.
+    expect(props.bowing).toBeUndefined();
   });
 });
 

@@ -698,10 +698,6 @@
     {
       "name": "pinepaper_measurement",
       "description": "Rulers/grid. action: set_rulers|set_grid|get_dimensions|set_snap. enabled, itemId."
-    },
-    {
-      "name": "pinepaper_create_stitchcraft",
-      "description": "Procedural embroidery and thread presets. preset: embroidery_satin|running_seam|cross_stitch|needlepainting|stem_outline|seed_texture. itemId, threadColor, strokeWidth, density."
     }
   ]
 }

@@ -1,111 +1,105 @@
-import { describe, it, expect } from 'bun:test';
-import {
-  StitchcraftPresetSchema,
-  StitchcraftInputSchema,
-  STITCHCRAFT_PRESET_NAMES,
-} from '../../types/schemas.js';
-import { codeGenerator } from '../../types/code-generator.js';
-import { PINEPAPER_TOOLS } from '../../tools/definitions.js';
-import { handleToolCall } from '../../tools/handlers.js';
-import { I18nManager } from '../../i18n/index.js';
+/**
+ * Stitchcraft: the tool that was removed, and where its capability went.
+ *
+ * `pinepaper_create_stitchcraft` was built on `app.applyStitchcraftToItem`,
+ * which does not exist anywhere in the engine — zero hits on FxTool's
+ * origin/main. Every real call fell through to a fallback that forwarded
+ * colour, width and count and dropped preset, roughness, bowing, sheen and
+ * seed, then reported success with the preset it had not rendered. It also
+ * advertised `roughness` and `bowing`, and the engine has no such option
+ * anywhere; four of its six presets were renames of stitches
+ * `pinepaper_design_medium` already offered through the method that does exist.
+ *
+ * A tool whose primary path calls a phantom is the same defect as a tool
+ * nothing dispatches, one layer down — so it is gone, and the one genuinely new
+ * idea in it (hand wobble, applied to the group after the engine lays the
+ * stitches) moved to `apply_thread`, where the rest of the thread vocabulary
+ * already lives.
+ */
 
-describe('Stitchcraft Procedural Rendering', () => {
-  it('exposes all 6 canonical Stitchcraft presets', () => {
-    expect(STITCHCRAFT_PRESET_NAMES).toEqual([
-      'embroidery_satin',
-      'running_seam',
-      'cross_stitch',
-      'needlepainting',
-      'stem_outline',
-      'seed_texture',
-    ]);
+import { describe, it, expect } from 'bun:test';
+import { PINEPAPER_TOOLS } from '../../tools/definitions.js';
+import { codeGenerator } from '../../types/code-generator.js';
+import { DesignMediumInputSchema } from '../../types/schemas.js';
+import { PP_VOCABULARY } from '../../ontology/vocabulary.js';
+
+describe('the phantom tool is gone, everywhere', () => {
+  it('is not served', () => {
+    expect(PINEPAPER_TOOLS.find((t) => t.name === 'pinepaper_create_stitchcraft')).toBeUndefined();
   });
 
-  it('validates canonical preset names', () => {
-    for (const preset of STITCHCRAFT_PRESET_NAMES) {
-      const parsed = StitchcraftPresetSchema.parse(preset);
-      expect(parsed).toBe(preset);
+  it('leaves no emitter behind', () => {
+    expect((codeGenerator as unknown as Record<string, unknown>).generateStitchcraft).toBeUndefined();
+  });
+
+  it('and nothing emits the method that never existed', () => {
+    // applyStitchcraftToItem: zero hits in the engine, so any reference here
+    // is a call into nothing.
+    const gen = codeGenerator as unknown as Record<string, unknown>;
+    for (const key of Object.keys(Object.getPrototypeOf(gen) as object)) {
+      if (typeof (gen as Record<string, unknown>)[key] !== 'function') continue;
+    }
+    expect(JSON.stringify(PINEPAPER_TOOLS)).not.toContain('applyStitchcraftToItem');
+  });
+});
+
+describe('the capability lives in apply_thread, with more of the engine than before', () => {
+  const gen = (input: Record<string, unknown>) =>
+    codeGenerator.generateDesignMedium(DesignMediumInputSchema.parse(input) as never);
+
+  it('offers the engine\'s real stitch set, not an embroidery rename of part of it', () => {
+    // ThreadPainting ships satin, satinBetween, seed, seedFill, stem,
+    // stemAlong, flow, radial, fillRegion, spine, constant.
+    for (const stitch of ['satin', 'satinBetween', 'seed', 'seedFill', 'stem', 'stemAlong', 'flow', 'radial', 'fillRegion', 'spine', 'constant', 'longAndShort']) {
+      expect(DesignMediumInputSchema.safeParse({ action: 'apply_thread', itemId: 'i', stitch }).success).toBe(true);
+    }
+    // The two embroidery names the engine has no mark for stay refused rather
+    // than silently mapping onto something else.
+    for (const absent of ['cross_stitch', 'running_seam']) {
+      expect(DesignMediumInputSchema.safeParse({ action: 'apply_thread', itemId: 'i', stitch: absent }).success).toBe(false);
     }
   });
 
-  it('normalizes common aliases for open-source LLMs', () => {
-    expect(StitchcraftPresetSchema.parse('satin')).toBe('embroidery_satin');
-    expect(StitchcraftPresetSchema.parse('satin_stitch')).toBe('embroidery_satin');
-    expect(StitchcraftPresetSchema.parse('running')).toBe('running_seam');
-    expect(StitchcraftPresetSchema.parse('seam')).toBe('running_seam');
-    expect(StitchcraftPresetSchema.parse('cross')).toBe('cross_stitch');
-    expect(StitchcraftPresetSchema.parse('crossstitch')).toBe('cross_stitch');
-    expect(StitchcraftPresetSchema.parse('cross-stitch')).toBe('cross_stitch');
-    expect(StitchcraftPresetSchema.parse('stem')).toBe('stem_outline');
-    expect(StitchcraftPresetSchema.parse('stem_stitch')).toBe('stem_outline');
-    expect(StitchcraftPresetSchema.parse('seed')).toBe('seed_texture');
-    expect(StitchcraftPresetSchema.parse('seed_stitch')).toBe('seed_texture');
-    expect(StitchcraftPresetSchema.parse('needle')).toBe('needlepainting');
-    expect(StitchcraftPresetSchema.parse('thread')).toBe('needlepainting');
-    expect(StitchcraftPresetSchema.parse('thread_painting')).toBe('needlepainting');
-  });
-
-  it('coerces parameter aliases and string numbers gracefully', () => {
-    const input = StitchcraftInputSchema.parse({
-      preset: 'satin',
-      itemId: 'rect_1',
-      color: '#3b82f6',
-      width: '2.5',
-      density: '1.2',
-      roughness: '1.5',
-      bowing: '0.8',
-      sheen: true,
-      seed: 42,
+  it('forwards the eight options that existed and were unreachable', () => {
+    const code = gen({
+      action: 'apply_thread', itemId: 'i',
+      slant: 30, inset: 4, maxLen: 40, overlap: 0.3, pinch: 0.5, stagger: 0.5,
+      stitchLen: 12, variance: 0.2,
     });
-
-    expect(input.preset).toBe('embroidery_satin');
-    expect(input.itemId).toBe('rect_1');
-    expect(input.threadColor).toBe('#3b82f6');
-    expect(input.strokeWidth).toBe(2.5);
-    expect(input.density).toBe(1.2);
-    expect(input.roughness).toBe(1.5);
-    expect(input.bowing).toBe(0.8);
-    expect(input.sheen).toBe(true);
-    expect(input.seed).toBe(42);
+    for (const frag of ['"slant":30', '"inset":4', '"maxLen":40', '"overlap":0.3', '"pinch":0.5', '"stagger":0.5']) {
+      expect(code).toContain(frag);
+    }
   });
 
-  it('generates executable browser JavaScript with text guard and fallback', () => {
-    const code = codeGenerator.generateStitchcraft({
-      preset: 'embroidery_satin',
-      itemId: 'circle_1',
-      threadColor: '#d97706',
-      strokeWidth: 2,
-      density: 1.5,
-      roughness: 1,
-      sheen: true,
-    });
-
-    expect(code).toContain('app.applyStitchcraftToItem');
-    expect(code).toContain('window.applyStitchcraftToItem');
-    expect(code).toContain('app.applyThreadPainting');
-    expect(code).toContain('"embroidery_satin"');
-    expect(code).toContain('"circle_1"');
-    expect(code).toContain('#d97706');
-    expect(code).toContain('A text item has no outline to stitch directly');
+  it('applies hand wobble here, since the engine has no such option', () => {
+    const code = gen({ action: 'apply_thread', itemId: 'i', roughness: 0.6, seed: 4 });
+    expect(code).toContain('const rough = 0.6');
+    // Every point of every stitch, each with its own phase off the seed — not
+    // the first two points of whatever length the contour happens to be.
+    expect(code).toContain('for (let j = 0; j < line.segments.length; j++)');
+    expect(code).toContain('roughness: rough');
+    expect(() => new Function(code)).not.toThrow();
   });
 
-  it('is registered in PINEPAPER_TOOLS definitions', () => {
-    const tool = PINEPAPER_TOOLS.find((t) => t.name === 'pinepaper_create_stitchcraft');
-    expect(tool).toBeDefined();
-    expect(tool?.description).toContain('Create procedural embroidery');
-    expect(tool?.inputSchema.required).toEqual(['preset']);
+  it('roughness is NOT sent to the engine, which would ignore it', () => {
+    const code = gen({ action: 'apply_thread', itemId: 'i', roughness: 0.6 });
+    const call = code.slice(code.indexOf('app.applyThreadPainting'), code.indexOf('app.applyThreadPainting') + 200);
+    expect(call).not.toContain('roughness');
   });
 
-  it('executes via handleToolCall in dry-run code generation mode', async () => {
-    const i18n = new I18nManager();
-    const result = await handleToolCall('pinepaper_create_stitchcraft', {
-      preset: 'cross_stitch',
-      threadColor: '#10b981',
-      strokeWidth: 1.5,
-    }, { i18n });
+  it('zero roughness leaves the stitches exactly as the engine laid them', () => {
+    const code = gen({ action: 'apply_thread', itemId: 'i' });
+    expect(code).toContain('const rough = 0');
+    expect(code).toContain('if (rough > 0');
+  });
+});
 
-    expect(result.isError).toBeFalsy();
-    const text = result.content[0].type === 'text' ? result.content[0].text : '';
-    expect(text).toContain('cross_stitch');
+describe('the ontology points at the tool that can do it', () => {
+  it('pp:Stitchcraft names design_medium, not the removed tool', () => {
+    const t = (PP_VOCABULARY.types as Record<string, { mcpTool?: string; description: string }>)['pp:Stitchcraft'];
+    expect(t).toBeTruthy();
+    expect(t.mcpTool).toBe('pinepaper_design_medium');
+    // And the description no longer promises a cross-stitch the engine lacks.
+    expect(t.description).toContain('no cross-stitch');
   });
 });

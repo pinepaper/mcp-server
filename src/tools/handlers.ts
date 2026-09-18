@@ -44,7 +44,6 @@ import {
   TextStyleInputSchema,
   TextEffectInputSchema,
   DesignMediumInputSchema,
-  StitchcraftInputSchema,
   ShatterImageInputSchema,
   ImportLayeredCharacterInputSchema,
   CharacterInputSchema,
@@ -1311,11 +1310,6 @@ async function handleToolCallInner(
         return executeOrGenerate(code, `Medium: ${input.action}`, options, 'pinepaper_design_medium');
       }
 
-      case 'pinepaper_create_stitchcraft': {
-        const input = StitchcraftInputSchema.parse(args);
-        const code = codeGenerator.generateStitchcraft(input);
-        return executeOrGenerate(code, `Stitchcraft: ${input.preset}`, options, 'pinepaper_create_stitchcraft');
-      }
 
       case 'pinepaper_text_effect': {
         const input = TextEffectInputSchema.parse(args);

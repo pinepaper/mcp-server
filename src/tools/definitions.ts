@@ -2022,7 +2022,7 @@ EXAMPLE — a stitched leaf:
         action: { type: 'string', enum: ['list_media', 'resolve', 'list_stitches', 'apply_thread', 'apply_hatch', 'list_flow_fields', 'list_hatch_options'], description: 'Medium operation' },
         medium: { type: 'string', description: 'resolve: vector | thread | ink | cutPaper | charcoal | oil | encaustic' },
         itemId: { type: 'string', description: 'apply_thread / apply_hatch: a closed path, compound path, or a group of them.' },
-        stitch: { type: 'string', enum: ['longAndShort', 'satin', 'seed', 'stem'], description: 'apply_thread: default longAndShort.' },
+        stitch: { type: 'string', enum: ['longAndShort', 'satin', 'satinBetween', 'seed', 'seedFill', 'stem', 'stemAlong', 'flow', 'radial', 'fillRegion', 'spine', 'constant'], description: "apply_thread: default longAndShort. Embroidery names map on — a satin fill is 'satin', a stem outline is 'stem', a seed fill is 'seedFill'. There is no cross-stitch or running-seam mark in this engine." },
         field: { type: 'object', description: "apply_thread: { kind: 'radial'|'spine'|'constant', cx, cy, angle, spine[], across } — default radial from the shape centre." },
         stitchLen: { type: 'number', description: 'apply_thread: nominal stitch length px (default 18).' },
         rowGap: { type: 'number', description: 'apply_thread: row spacing px; defaults from thread width so rows abut.' },
@@ -2032,6 +2032,13 @@ EXAMPLE — a stitched leaf:
         color: { type: 'string', description: "apply_thread: thread colour (defaults to the item's fill)." },
         seed: { type: 'number', description: 'apply_thread: PRNG seed (default 1) — same seed stitches the same way.' },
         count: { type: 'number', description: 'apply_thread: stitch count for seed/satin.' },
+        slant: { type: 'number', description: 'apply_thread: stitch slant in DEGREES off the row direction — a satin fill laid at a slant is what separates embroidery from ruling.' },
+        inset: { type: 'number', description: 'apply_thread: how far inside the silhouette stitching starts, px — keeps the floss off the very edge.' },
+        maxLen: { type: 'number', description: 'apply_thread: hard cap on one stitch, px. Long floss sags; this stops a single stitch spanning a whole shape.' },
+        overlap: { type: 'number', description: 'apply_thread: how much consecutive rows overlap, 0..1 — closes the gaps a coarse rowGap leaves.' },
+        pinch: { type: 'number', description: 'apply_thread: narrows each stitch toward its ends, so the mark tapers like thread instead of reading as a rectangle.' },
+        stagger: { type: 'number', description: 'apply_thread: offsets alternate rows, 0..1 — stops stitch ends lining up into seams down the fill.' },
+        roughness: { type: 'number', description: 'apply_thread: hand wobble. Jitters every point of every stitch after the engine lays them, so the fill reads as sewn rather than plotted. 0 is machine-exact; reproducible for a given seed. Applied by the tool, not the engine.' },
         distance: { type: 'number', description: 'apply_hatch: line spacing px (default 6). THE VALUE CONTROL — 6 vs 3 is light vs dark.' },
         angle: { type: 'number', description: 'apply_hatch: ruling angle in DEGREES (default 45).' },
         gradient: { type: 'number', description: 'apply_hatch: 0..1 spacing growth per line (default 0, even) — a shaded ramp rather than a flat tone.' },
@@ -8482,94 +8489,6 @@ ACTIONS:
   // ---------------------------------------------------------------------------
   // STITCHCRAFT PROCEDURAL EMBROIDERY & THREAD
   // ---------------------------------------------------------------------------
-  {
-    name: 'pinepaper_create_stitchcraft',
-    annotations: {
-      title: 'Create Stitchcraft',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: false,
-      openWorldHint: false,
-    },
-    description: `Create procedural embroidery, thread painting, satin fills, seam lines, cross-stitching, or needlepainting on a target canvas item or region.
-
-USE WHEN:
-- Rendering realistic embroidery, patches, or stitched badges
-- Adding contour seam lines (running stitch) along garments or shapes
-- Applying satin fills, cross-stitch grids, stem stitch outlines, or seed textures
-- Creating textile art or handcrafted thread aesthetics on vector graphics
-
-PRESETS:
-- embroidery_satin: Dense satin stitch fill spanning across silhouettes
-- running_seam: Dashed running stitch contour along path borders
-- cross_stitch: Procedural X-stitch grid fill over shape area
-- needlepainting: Directional long-and-short thread painting fill
-- stem_outline: Twisted rope-like stem stitch following shape contour
-- seed_texture: Organic scattered seed stitch texture
-
-PARAMETERS:
-- preset (required): Preset name from the list above
-- itemId (optional): ID of target vector shape or path. If omitted, applies to active selection or last created item.
-- threadColor (optional): Hex/CSS color for the thread (defaults to item fill/stroke)
-- strokeWidth (optional): Thread stroke width in px (default 1.5)
-- density (optional): Stitch density multiplier or spacing override
-- roughness (optional): hand-crafted wobble — jitters every point of every stitch so the lines read as sewn rather than plotted. 0 is machine-exact.
-- bowing (optional): how far each stitch bows off a straight run — thread pulled over a curve rather than laid flat
-- sheen (optional): how much the floss catches light along its length
-- seed (optional): makes roughness and bowing reproducible — the same seed sews the same irregularities every run
-
-Four of the six presets (satin_fill, long_and_short, stem_outline, seed_fill) are also reachable through pinepaper_design_medium { action: 'apply_thread' }, which calls the same engine method. Prefer THIS tool: apply_thread carries colour, width and count only, so roughness, bowing, sheen and seed have nowhere to go there.`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        preset: {
-          type: 'string',
-          enum: [
-            'embroidery_satin',
-            'running_seam',
-            'cross_stitch',
-            'needlepainting',
-            'stem_outline',
-            'seed_texture',
-          ],
-          description: 'Stitchcraft procedural preset name',
-        },
-        itemId: {
-          type: 'string',
-          description: 'Target vector item ID (if omitted, applies to selection or last item)',
-        },
-        threadColor: {
-          type: 'string',
-          description: 'Thread color hex/CSS string',
-        },
-        strokeWidth: {
-          type: 'number',
-          description: 'Thread stroke width in pixels (default 1.5)',
-        },
-        density: {
-          type: 'number',
-          description: 'Stitch density multiplier / spacing override',
-        },
-        roughness: {
-          type: 'number',
-          description: 'Hand-crafted wobble: jitters every point of every stitch, so the lines read as sewn rather than plotted. 0 is machine-exact. Reproducible for a given seed.',
-        },
-        bowing: {
-          type: 'number',
-          description: 'How much each stitch bows away from a straight run — thread pulled taut over a curve rather than laid flat.',
-        },
-        sheen: {
-          type: 'number',
-          description: 'Thread sheen: how much the floss catches light along its length.',
-        },
-        seed: {
-          type: 'number',
-          description: 'Makes roughness and bowing reproducible — the same seed sews the same irregularities every run.',
-        },
-      },
-      required: ['preset'],
-    },
-  },
 
 ];
 

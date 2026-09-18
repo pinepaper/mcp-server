@@ -201,7 +201,6 @@ import {
   DetectObjectsInput,
   ExtractObjectInput,
   ArrangeInput,
-  StitchcraftInput,
 } from './schemas.js';
 import { OntologyCompiler } from '../ontology/ontology-compiler.js';
 import { z } from 'zod';
@@ -7414,7 +7413,15 @@ ${guard}
           ...(input.color !== undefined ? { color: input.color } : {}),
           ...(input.seed !== undefined ? { seed: input.seed } : {}),
           ...(input.count !== undefined ? { count: input.count } : {}),
+          ...(input.slant !== undefined ? { slant: input.slant } : {}),
+          ...(input.inset !== undefined ? { inset: input.inset } : {}),
+          ...(input.maxLen !== undefined ? { maxLen: input.maxLen } : {}),
+          ...(input.overlap !== undefined ? { overlap: input.overlap } : {}),
+          ...(input.pinch !== undefined ? { pinch: input.pinch } : {}),
+          ...(input.stagger !== undefined ? { stagger: input.stagger } : {}),
         });
+        const roughStr = JSON.stringify(input.roughness ?? 0);
+        const seedStr = JSON.stringify(input.seed ?? 1);
         return wrap('Medium: render in thread',
           `  if (typeof app.applyThreadPainting !== 'function') { return { success: false, error: 'thread medium unavailable — update FxTool' }; }
   const entry = app.itemRegistry && app.itemRegistry.get(${S(input.itemId)});
@@ -7427,7 +7434,23 @@ ${guard}
   }
   const g = app.applyThreadPainting(${S(input.itemId)}, ${opts});
   if (!g) { return { success: false, action: 'apply_thread', error: 'nothing stitchable here — thread needs a CLOSED path, a compound path, or a group containing them. An open stroke, a raster and an empty group all land here. (If you passed a stitch name, check it against list_stitches.)' }; }
-  return { success: true, action: 'apply_thread', groupId: (g.data && g.data.id) || null, stitches: g.children.length };`);
+  // HAND WOBBLE, applied here rather than in the engine, which has no such
+  // option. Every point of every stitch gets its own phase off the seed, so a
+  // long contour wobbles along its whole length instead of shearing at one end,
+  // and the same seed sews the same irregularities every run.
+  const rough = ${roughStr};
+  if (rough > 0 && g.children) {
+    const rseed = ${seedStr};
+    for (let i = 0; i < g.children.length; i++) {
+      const line = g.children[i];
+      if (!line || !line.segments) continue;
+      for (let j = 0; j < line.segments.length; j++) {
+        line.segments[j].point.x += Math.sin(rseed + i * 2.13 + j * 1.71) * rough * 0.4;
+        line.segments[j].point.y += Math.cos(rseed + i * 3.47 + j * 2.29) * rough * 0.4;
+      }
+    }
+  }
+  return { success: true, action: 'apply_thread', groupId: (g.data && g.data.id) || null, stitches: g.children.length, roughness: rough };`);
       }
       case 'list_flow_fields':
         return wrap('Medium: list flow fields',
@@ -9024,134 +9047,6 @@ ${guard('unlockAllItems')}${pass('app.unlockAllItems()')}
   }
   app.pulseEvent(${eventIdJson}, ${payloadJson});
   return { success: true, action: 'pulse', eventId: ${eventIdJson} };
-})();`.trim();
-  }
-
-  /**
-   * Generate code for pinepaper_create_stitchcraft.
-   * Procedural embroidery, thread painting, satin fills, seam lines, cross-stitch, and needlepainting.
-   */
-  generateStitchcraft(input: StitchcraftInput): string {
-    const presetStr = JSON.stringify(input.preset || 'embroidery_satin');
-    const itemIdStr = input.itemId ? JSON.stringify(input.itemId) : 'null';
-    const optsObj: Record<string, unknown> = {};
-    if (input.threadColor !== undefined) optsObj.threadColor = input.threadColor;
-    if (input.strokeWidth !== undefined) optsObj.strokeWidth = input.strokeWidth;
-    if (input.density !== undefined) optsObj.density = input.density;
-    if (input.roughness !== undefined) optsObj.roughness = input.roughness;
-    if (input.bowing !== undefined) optsObj.bowing = input.bowing;
-    if (input.sheen !== undefined) optsObj.sheen = input.sheen;
-    if (input.seed !== undefined) optsObj.seed = input.seed;
-    const optsStr = JSON.stringify(optsObj);
-
-    return `
-// Create stitchcraft procedural embroidery / thread artwork
-(function() {
-  const targetId = ${itemIdStr};
-  let targetItem = null;
-  if (targetId && app.itemRegistry) {
-    const entry = app.itemRegistry.get(targetId);
-    targetItem = entry && entry.item ? entry.item : null;
-    // AN EXPLICIT TARGET THAT MISSES IS A REFUSAL, not a reason to guess. This
-    // used to fall through to the selection, then the last registered item,
-    // then the last Paper child — so stitching a deleted id embroidered
-    // whatever happened to be newest and reported success. Naming a target and
-    // getting a different one silently is worse than being told it is gone.
-    if (!targetItem) {
-      return { success: false, error: 'no such item: ' + targetId + ' — it may have been deleted, or replaced by a tool that mints a new id' };
-    }
-  }
-  // app.getSelectedItems() is the facade. app.selection is not a property this
-  // engine exposes, so the documented "applies to the active selection" never
-  // fired: the check was always falsy and control dropped to the last-created
-  // item, silently, with success:true.
-  if (!targetItem && typeof app.getSelectedItems === 'function') {
-    const sel = app.getSelectedItems();
-    if (sel && sel.length > 0) targetItem = sel[0];
-  }
-  if (!targetItem && app.itemRegistry && typeof app.itemRegistry.getAll === 'function') {
-    const all = app.itemRegistry.getAll();
-    if (all && all.length > 0) targetItem = all[all.length - 1].item;
-  }
-  if (!targetItem && typeof paper !== 'undefined' && paper.project && paper.project.activeLayer && paper.project.activeLayer.children) {
-    const ch = paper.project.activeLayer.children;
-    targetItem = ch[ch.length - 1] || null;
-  }
-  if (!targetItem) {
-    return { success: false, error: 'No target item found for stitchcraft' + (targetId ? ': ' + targetId : '') };
-  }
-
-  // Text items must be converted to glyphs first
-  if (targetItem.content !== undefined && typeof targetItem.getPointAt !== 'function') {
-    return { success: false, error: 'A text item has no outline to stitch directly. Convert it to glyph paths first using pinepaper_text_style, then apply stitchcraft to the resulting paths.' };
-  }
-
-  const preset = ${presetStr};
-  const opts = ${optsStr};
-
-  let group = null;
-
-  if (typeof app.applyStitchcraftToItem === 'function') {
-    group = app.applyStitchcraftToItem(targetItem, preset, opts);
-  } else if (typeof window !== 'undefined' && typeof window.applyStitchcraftToItem === 'function') {
-    group = window.applyStitchcraftToItem(targetItem, preset, opts, (typeof paper !== 'undefined' ? paper : app.scope));
-  } else if (typeof app.applyThreadPainting === 'function') {
-    // THE FALLBACK CANNOT HONOUR A PRESET, so it no longer pretends to.
-    // applyThreadPainting takes only colour, width and count — preset,
-    // roughness, bowing, sheen and seed are all dropped — which meant all six
-    // presets rendered the same thread painting while the result still said
-    // preset: 'cross_stitch'. Four of the six are renames of stitches that
-    // pinepaper_design_medium's apply_thread already offers through this very
-    // method, so the honest answer is to name that tool rather than to
-    // half-render this one.
-    const threadStitch = { satin_fill: 'satin', long_and_short: 'longAndShort', stem_outline: 'stem', seed_fill: 'seed' }[preset];
-    return {
-      success: false,
-      error: 'this studio has no applyStitchcraftToItem, and the thread-painting fallback cannot carry a preset'
-        + ' (it takes colour, width and count only — roughness, bowing, sheen and seed would be silently dropped). '
-        + (threadStitch
-          ? 'Use pinepaper_design_medium { action: "apply_thread", stitch: "' + threadStitch + '" }, which is the same engine call with its own parameters.'
-          : 'Update FxTool for preset ' + preset + ', which has no thread-painting equivalent.'),
-      preset: preset,
-      ...(threadStitch ? { equivalentStitch: threadStitch } : {}),
-    };
-  }
-
-  if (!group) {
-    return { success: false, error: 'Stitchcraft generation failed for preset ' + preset + ' on item ' + (targetId || (targetItem.data && targetItem.data.id) || 'shape') };
-  }
-
-  // Apply organic hand-crafted fidelity if requested (jitter endpoints for tactile textile feel)
-  if (opts.roughness && group.children && group.children.length > 0) {
-    const r = opts.roughness;
-    const seed = opts.seed || 1;
-    for (let i = 0; i < group.children.length; i++) {
-      const line = group.children[i];
-      if (line && line.segments && line.segments.length >= 2) {
-        // EVERY SEGMENT, not the first two. Perturbing segments[0] and [1] is a
-        // whole-line shear on a two-point stitch (satin, cross-stitch) and a
-        // kink at the start of a long one — stem_outline and running_seam are
-        // multi-segment contours, so the first two points moved and the rest
-        // stayed exact, which reads as a defect rather than a hand.
-        // Each point gets its own phase off the same seed, so the wobble is
-        // per-point and still reproducible for a given seed.
-        for (let j = 0; j < line.segments.length; j++) {
-          const jx = Math.sin(seed + i * 2.13 + j * 1.71) * r;
-          const jy = Math.cos(seed + i * 3.47 + j * 2.29) * r;
-          line.segments[j].point.x += jx * 0.4;
-          line.segments[j].point.y += jy * 0.4;
-        }
-      }
-    }
-  }
-
-  if (app.historyManager) app.historyManager.saveState();
-  return {
-    success: true,
-    preset: preset,
-    groupId: (group.data && group.data.id) || group.name || null,
-    stitchCount: group.children ? group.children.length : (group.data && group.data.stitchCount) || 0
-  };
 })();`.trim();
   }
 }

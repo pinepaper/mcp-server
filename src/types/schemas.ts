@@ -3940,8 +3940,11 @@ export const DesignMediumInputSchema = z.object({
     .describe("'list_media' (7 media with fidelity + limitation) · 'resolve' (can this medium be made here, and how honestly) · 'list_stitches' · 'apply_thread' (render an item in thread) · 'apply_hatch' (rule an item with hatching — value through line density) · 'list_flow_fields' · 'list_hatch_options'"),
   medium: z.string().optional().describe("resolve: medium key — vector, thread, hatch, watercolor, ink, cutPaper, charcoal, oil, encaustic. Call list_media for the live set with each one's fidelity; the catalogue grows."),
   itemId: z.string().optional().describe('apply_thread / apply_hatch: a closed path, compound path, or a group of them. Its own silhouette is the region and its fill is the ink colour.'),
-  stitch: z.enum(['longAndShort', 'satin', 'seed', 'stem']).optional()
-    .describe("apply_thread: default longAndShort (the needlepainting fill). 'satin' spans the shape edge to edge — right for a narrow shape, wrong for a round one. 'seed' is texture. 'stem' is an outline mark and leaves the interior bare."),
+  stitch: z.enum([
+    'longAndShort', 'satin', 'satinBetween', 'seed', 'seedFill', 'stem', 'stemAlong',
+    'flow', 'radial', 'fillRegion', 'spine', 'constant',
+  ]).optional()
+    .describe("Which stitch, when the medium is thread. Default longAndShort. Call 'list_stitches' for the engine's own set — this enum is the one it ships with. Embroidery names map on: a satin fill is 'satin', a stem outline is 'stem', a seed fill is 'seedFill', long-and-short is 'longAndShort'. There is no cross-stitch or running-seam stitch in this engine; 'seed' and 'stem' are the nearest marks."),
   field: z.object({
     kind: z.enum(['radial', 'spine', 'constant']),
     cx: z.number().optional(), cy: z.number().optional(),
@@ -3957,6 +3960,18 @@ export const DesignMediumInputSchema = z.object({
   color: z.string().optional().describe("apply_thread: thread colour, defaulting to the item's own fill."),
   seed: z.number().int().optional().describe('apply_thread: PRNG seed (default 1). Same seed stitches the same way.'),
   count: z.number().int().positive().optional().describe('apply_thread: stitch count for seed/satin.'),
+  // THE OPTIONS THE ENGINE READS AND NOTHING NAMED. ThreadPainting.paint reads
+  // every one of these; apply_thread passed ten of its eighteen, so eight
+  // controls existed and were unreachable — the same gap that made the stick
+  // kit's options source-only.
+  slant: z.number().optional().describe('apply_thread: stitch slant in DEGREES away from the row direction. A satin fill laid at a slant is what separates embroidery from ruling.'),
+  inset: z.number().optional().describe('apply_thread: how far inside the silhouette the stitching starts, in px — keeps the floss off the very edge.'),
+  maxLen: z.number().positive().optional().describe('apply_thread: hard cap on a single stitch, in px. Long floss sags; this is what stops one stitch spanning a whole shape.'),
+  overlap: z.number().min(0).optional().describe('apply_thread: how much consecutive rows overlap, 0..1. Raising it closes the gaps a coarse rowGap leaves.'),
+  pinch: z.number().min(0).optional().describe('apply_thread: narrows each stitch toward its ends, so the mark tapers like real thread rather than reading as a rectangle.'),
+  stagger: z.number().min(0).max(1).optional().describe('apply_thread: offsets alternate rows, 0..1 — stops the stitch ends lining up into visible seams down the fill.'),
+  roughness: z.number().min(0).optional()
+    .describe('apply_thread: hand wobble. Jitters every point of every stitch after the engine lays them, so the fill reads as sewn rather than plotted. 0 is machine-exact. Reproducible for a given seed. This one is applied by the tool, not the engine.'),
 
   // --- Hatching (pp: the p5.brush marks, as vector) ---
   //
@@ -4627,58 +4642,4 @@ export const RiggingInputSchema = z.object({
   .refine((v) => v.action !== 'import_spine' || !!v.spineJson, { message: 'import_spine requires spineJson', path: ['spineJson'] });
 export type RiggingInput = z.infer<typeof RiggingInputSchema>;
 
-/**
- * Procedural stitchcraft embroidery and thread presets
- */
-export const STITCHCRAFT_PRESET_NAMES = [
-  'embroidery_satin',
-  'running_seam',
-  'cross_stitch',
-  'needlepainting',
-  'stem_outline',
-  'seed_texture',
-] as const;
 
-export const StitchcraftPresetSchema = z.string()
-  .transform((val) => {
-    const v = val.toLowerCase().trim().replace(/[- ]/g, '_');
-    if (v === 'satin' || v === 'satin_stitch' || v === 'embroidery_satin') return 'embroidery_satin';
-    if (v === 'running' || v === 'seam' || v === 'running_stitch' || v === 'running_seam') return 'running_seam';
-    if (v === 'cross' || v === 'crossstitch' || v === 'cross_stitch') return 'cross_stitch';
-    if (v === 'stem' || v === 'stem_stitch' || v === 'stem_outline' || v === 'outline') return 'stem_outline';
-    if (v === 'seed' || v === 'seed_stitch' || v === 'seed_texture' || v === 'texture') return 'seed_texture';
-    if (v === 'needle' || v === 'needlepainting' || v === 'needle_painting' || v === 'thread' || v === 'thread_painting') return 'needlepainting';
-    return v;
-  })
-  .pipe(z.enum(STITCHCRAFT_PRESET_NAMES));
-
-export type StitchcraftPreset = (typeof STITCHCRAFT_PRESET_NAMES)[number];
-
-export const StitchcraftInputSchema = z.object({
-  preset: StitchcraftPresetSchema.describe(
-    "Stitchcraft procedural preset ('embroidery_satin', 'running_seam', 'cross_stitch', 'needlepainting', 'stem_outline', 'seed_texture'). Also accepts common aliases: satin, seam, cross, needle, stem, seed."
-  ),
-  itemId: z.string().optional().describe('Target vector shape or path itemId. If omitted, applies to the active selection or last created item.'),
-  threadColor: z.string().optional().describe('Thread color hex/css string (defaults to target item fill or stroke color)'),
-  color: z.string().optional().describe('Alias for threadColor (supports open-source LLMs)'),
-  strokeWidth: z.union([z.number(), z.string().transform(Number)]).pipe(z.number().positive()).optional().describe('Thread stroke width in pixels (default 1.5)'),
-  width: z.union([z.number(), z.string().transform(Number)]).pipe(z.number().positive()).optional().describe('Alias for strokeWidth'),
-  density: z.union([z.number(), z.string().transform(Number)]).pipe(z.number().positive()).optional().describe('Stitch density multiplier / spacing override'),
-  // Hand-crafted fidelity controls
-  roughness: z.union([z.number(), z.string().transform(Number)]).optional().describe('Organic stitch jitter / roughness (0..5, default 0 for clean or 1-2 for hand-crafted look)'),
-  bowing: z.union([z.number(), z.string().transform(Number)]).optional().describe('Thread curve bowing/tension curvature (0..3)'),
-  sheen: z.boolean().optional().describe('Render thread highlight sheen along stitches (default true)'),
-  seed: z.number().int().optional().describe('PRNG seed for reproducible thread simulation'),
-}).transform((data) => ({
-  preset: data.preset,
-  itemId: data.itemId,
-  threadColor: data.threadColor || data.color,
-  strokeWidth: data.strokeWidth ?? data.width,
-  density: data.density,
-  roughness: data.roughness,
-  bowing: data.bowing,
-  sheen: data.sheen,
-  seed: data.seed,
-}));
-
-export type StitchcraftInput = z.infer<typeof StitchcraftInputSchema>;

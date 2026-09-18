@@ -25,7 +25,7 @@
 
 PinePaper MCP Server enables AI assistants to create and animate graphics in [PinePaper Studio](https://pinepaper.studio) via the Model Context Protocol (MCP). Works with any AI that supports MCP tool calling (Claude, GPT, Gemini, local models, etc.).
 
-The server exposes **152 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
+The server exposes **151 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
 
 - Create geometric shapes, text collages, diagrams, and data charts
 - Apply 37+ character-level text effects and 28+ vertex deformation presets
@@ -36,7 +36,7 @@ The server exposes **152 tools** across drawing, animation, diagrams, maps, typo
 
 ## Running it: local or hosted
 
-**Local is free and complete.** Every one of the 152 tools works when you run
+**Local is free and complete.** Every one of the 151 tools works when you run
 this server yourself. There is no reduced tier and nothing held back.
 
 What it needs:
@@ -236,6 +236,13 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 **Four more reachable things, and a note on the ones that turned out not to be gaps.** `pinepaper_text_style` gains `cursive` (text written as a **stroked path** rather than set in a glyph, so draw-on animation and `outline_stroke` both apply to it), `wrap`/`unwrap` (break a text item to a width, reversibly), and `to_collage` (convert an *existing* text item in place). `pinepaper_equation_path` gains `solveOde` — integrate an ODE and get the **trajectory back as data** rather than a drawn path, to inspect, feed to a path, or drive keyframes with.
 
 What was *not* a gap is worth saying too, because it was on the list: `createFoldedText`, `createGradientText`, `createMagazineText`, `createPaperCutText` and `createTileText` are one-line wrappers over the letter-collage styles this server already offers, and `plotFunction`/`plotParametric`/`plotSurface` wrap three generators it already exposes. A method-name diff cannot tell "no tool reaches this" from "a tool reaches it under another name."
+
+**`pinepaper_design_medium`'s thread surface is now the whole engine's, and a tool built on a phantom is gone.** `pinepaper_create_stitchcraft` called `app.applyStitchcraftToItem`, which does not exist anywhere in the engine — so every real call fell through to a fallback that forwarded colour, width and count, dropped preset, roughness, bowing, sheen and seed, and then reported success with the preset it had not rendered. It also advertised `bowing`, which the engine has no option for at any level, and four of its six presets were renames of stitches `apply_thread` already offered through the method that *does* exist.
+
+- A tool whose primary path calls a method that isn't there is the phantom-tool defect one layer down, so it was removed rather than patched.
+- `apply_thread` gained the engine's real stitch set (twelve marks, not four) and the **eight options `ThreadPainting` reads and nothing named** — `slant`, `inset`, `maxLen`, `overlap`, `pinch`, `stagger` among them.
+- The one genuinely new idea, hand wobble, moved with it as `roughness`, applied by the tool after the engine lays the stitches because the engine has no such option. Every point of every stitch gets its own phase off the seed, so a long contour wobbles along its whole length instead of shearing at one end.
+- There is no cross-stitch or running-seam mark in this engine, and the enum now refuses those two names rather than mapping them onto something else. `pp:Stitchcraft` points at `pinepaper_design_medium` and its description says what the engine actually has.
 
 **New tool: `pinepaper_design_system`** — the design vocabulary as data, and eighteen styles that build a scene. Two different things, kept apart because they are not the same claim:
 
@@ -454,7 +461,7 @@ Fourteen new tools (121 → 135) and new actions across the surface — the rele
 
 ## Toolkits & Token Budget
 
-152 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
+151 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
 
 **Toolkit profiles** (`PINEPAPER_TOOLKIT`):
 
@@ -659,7 +666,7 @@ Generate instruction/code pairs for LLM fine-tuning:
 
 ## Tools Reference
 
-All 152 tools, grouped by the tag used for toolkit filtering.
+All 151 tools, grouped by the tag used for toolkit filtering.
 
 ### Canvas (`canvas`)
 | Tool | Description |
@@ -772,7 +779,6 @@ All 152 tools, grouped by the tag used for toolkit filtering.
 | `pinepaper_history` | Undo / redo |
 | `pinepaper_compose` | Arrange items into a named collage pattern and film it |
 | `pinepaper_design_medium` | What makes the marks — media with honest fidelity, and needlepainting |
-| `pinepaper_create_stitchcraft` | Procedural embroidery, thread painting, seam lines, satin fills, cross-stitch |
 | `pinepaper_brand_kit` | Apply brand colours / fonts by role, with a contrast audit |
 | `pinepaper_component` | Reusable master + instances, with per-instance overrides |
 | `pinepaper_artboard` | Resize the artboard; per-item reflow constraints |
