@@ -18,7 +18,7 @@
  */
 
 import { describe, it, expect } from 'bun:test';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { PINEPAPER_TOOLS } from '../../tools/definitions.js';
 import { codeGenerator } from '../../types/code-generator.js';
@@ -291,5 +291,82 @@ describe('the stitch list has exactly one definition', () => {
       expect(DesignMediumInputSchema.safeParse({ action: 'apply_thread', itemId: 'i', stitch }).success).toBe(true);
       expect(ComposeInputSchema.safeParse({ action: 'apply', medium: 'thread', stitch }).success).toBe(true);
     }
+  });
+});
+
+/**
+ * THE SOURCE-LEVEL SCAN, and why its scope is what it is.
+ *
+ * The detector above reads SERVED schemas. That is a scope choice, and an
+ * unstated scope choice is indistinguishable in a diff from the hand-listed
+ * file set that was this guard's original hole — so the reason has to be
+ * written down or it is not there at all (FxTool's point, and they had to make
+ * the same argument for their js/-only walk).
+ *
+ * The gap it leaves is real: this repo mirrors every Zod schema into a JSON
+ * `inputSchema` by hand, so a stale `z.enum(['satin','seed','stem'])` never
+ * reaches the served surface the detector walks, and would be covered only by
+ * the two hand-named positive tests below — which is the hand-listed hole
+ * wearing a different hat.
+ *
+ * So this scans SOURCE for pure stitch array literals and asserts there is
+ * exactly one: THREAD_STITCHES' own declaration. It covers the Zod side, the
+ * JSON side, and any surface added later.
+ *
+ * Two directories are excluded, both for a measured reason rather than by
+ * habit:
+ *  - `__tests__`, because the fixtures above deliberately CONTAIN stale copies.
+ *    Including it would make the suite flag itself.
+ *  - `vendor`, because it is generated from mcp-cloud and guarded by its own
+ *    provenance check; a literal there is upstream's to fix, not ours to edit.
+ */
+describe('the source-level scan', () => {
+  const SRC = join(import.meta.dir, '..', '..');
+
+  const tsFiles = (dir: string): string[] => {
+    const out: string[] = [];
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      if (e.isDirectory()) {
+        if (e.name === '__tests__' || e.name === 'vendor' || e.name === 'node_modules') continue;
+        out.push(...tsFiles(join(dir, e.name)));
+      } else if (e.name.endsWith('.ts')) out.push(join(dir, e.name));
+    }
+    return out;
+  };
+
+  /** Pure stitch array literals in source, comments stripped. */
+  const pureStitchArrays = (): Array<{ file: string; values: string[] }> => {
+    const found: Array<{ file: string; values: string[] }> = [];
+    const set = new Set<string>(THREAD_STITCHES as readonly string[]);
+    for (const f of tsFiles(SRC)) {
+      // Comments stripped, because prose quoting the list looks exactly like
+      // the list — the evasion that bit FxTool four times in a month.
+      const src = readFileSync(f, 'utf-8')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/^\s*\/\/.*$/gm, '');
+      for (const m of src.matchAll(/\[[^[\]]{0,400}?\]/g)) {
+        const values = [...m[0].matchAll(/'([^']+)'|"([^"]+)"/g)].map((x) => x[1] ?? x[2]!);
+        if (values.length >= 2 && values.every((v) => set.has(v))) {
+          found.push({ file: f.replace(SRC, 'src'), values });
+        }
+      }
+    }
+    return found;
+  };
+
+  it('the stitch list is written out exactly once in source', () => {
+    const found = pureStitchArrays();
+    // One declaration: THREAD_STITCHES itself. Everything else spreads it.
+    expect(found).toHaveLength(1);
+    expect(found[0]!.file).toContain('schemas.ts');
+    expect([...found[0]!.values].sort()).toEqual([...THREAD_STITCHES].sort());
+  });
+
+  it('and that one declaration is complete', () => {
+    // The single surviving literal IS the constant, so if it is ever trimmed
+    // the whole surface trims with it silently — every other site spreads it.
+    // This is the only place that can notice.
+    const only = pureStitchArrays()[0]!;
+    expect(only.values).toHaveLength(THREAD_STITCHES.length);
   });
 });
