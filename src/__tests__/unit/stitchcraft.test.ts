@@ -154,18 +154,28 @@ describe('the stitch list has exactly one definition', () => {
     const out: Found[] = [];
     if (Array.isArray(n.enum)) {
       const values = n.enum.filter((v): v is string => typeof v === 'string');
-      // STITCH-SHAPED: every value is a stitch, and there are at least two.
+      // STITCH-SHAPED: NON-EMPTY, and every value is a stitch. No sentinel, no
+      // threshold — nothing that decides in advance what the guard bothers to
+      // look at.
       //
-      // The first version looked for a SENTINEL — longAndShort, crossStitch or
-      // runningSeam — and the nested fixture below exposed why that is wrong:
-      // ['satin','seed','stem'] is a stale stitch enum containing none of the
-      // three, so the very copies most likely to be stale (the ones missing the
-      // names the sentinels were chosen from) were the ones it could not see.
+      // Version 1 keyed on a sentinel (longAndShort / crossStitch /
+      // runningSeam) and could not see ['satin','seed','stem'] — the copies
+      // most likely to be stale are exactly the ones missing the names the
+      // sentinels were chosen from.
       //
-      // A subset test has no such blind spot and still cannot match an
-      // unrelated enum, because any non-stitch value disqualifies it. Read off
-      // enum VALUES only, so a description quoting the names never registers.
-      const allStitches = values.length >= 2 && values.every((v) => (THREAD_STITCHES as readonly string[]).includes(v));
+      // Version 2 kept `length >= 2`, which is the same defect over cardinality
+      // rather than over names, and filters in the wrong direction for the same
+      // reason: a SHORTER copy is more likely to be stale, not less. FxTool hit
+      // the identical twin at `>= 3`, which missed ['satin','seed']. Measured
+      // before dropping it: of every enum in every served schema, exactly two
+      // contain any stitch name, both are pure and complete, and none has a
+      // single value — so the threshold was protecting against nothing.
+      //
+      // PURITY does the disqualifying instead: one foreign value and it is not
+      // a stitch list, so ['red','green','blue'] cannot match and neither can
+      // ['satin','seed','banana']. Read off enum VALUES only, so a description
+      // quoting the names never registers.
+      const allStitches = values.length >= 1 && values.every((v) => (THREAD_STITCHES as readonly string[]).includes(v));
       if (allStitches) out.push({ path, values });
     }
     for (const [k, v] of Object.entries(n)) out.push(...detect(v, `${path}.${k}`));
@@ -196,6 +206,25 @@ describe('the stitch list has exactly one definition', () => {
       const found = detect({ properties: { batch: { items: { anyOf: [{ enum: ['satin', 'seed', 'stem'] }] } } } });
       expect(found).toHaveLength(1);
       expect(isComplete(found[0]!)).toBe(false);
+    });
+
+    it('flags a SINGLE-NAME stale copy — the threshold twin', () => {
+      // `length >= 2` would have filtered this out, which is the sentinel hole
+      // over cardinality. A one-name copy is the most stale thing there is.
+      const found = detect({ properties: { stitch: { enum: ['satin'] } } });
+      expect(found).toHaveLength(1);
+      expect(isComplete(found[0]!)).toBe(false);
+    });
+
+    it('does NOT flag a stitch list with one foreign value', () => {
+      // Purity, which I had asserted by construction and never tested. A false
+      // positive is the worse half: it teaches the next reader to skim the guard.
+      expect(detect({ properties: { x: { enum: ['satin', 'seed', 'stem', 'banana'] } } })).toHaveLength(0);
+    });
+
+    it('does NOT flag an unrelated enum', () => {
+      expect(detect({ properties: { x: { enum: ['red', 'green', 'blue'] } } })).toHaveLength(0);
+      expect(detect({ properties: { x: { enum: ['history', 'version'] } } })).toHaveLength(0);
     });
 
     it('does NOT flag a complete copy', () => {
