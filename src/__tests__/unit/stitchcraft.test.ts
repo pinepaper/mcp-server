@@ -126,63 +126,116 @@ describe('the ontology points at the tool that can do it', () => {
  */
 describe('the stitch list has exactly one definition', () => {
   /**
-   * STRUCTURAL, not textual — and the reason is worth keeping.
+   * A DETECTOR, TESTED ON FIXTURES — and then pointed at the live schemas.
    *
-   * The first version of this guard asserted that no served schema contained
-   * the exact JSON of the stale four. A REORDERED copy — ['satin',
-   * 'longAndShort', 'stem', 'seed'], the same regression with the same two
-   * omissions — walked straight past it, so the guard would have gone green on
-   * the very bug it was written for. The FxTool session hit the mirror of this
-   * writing its own version: a containment scan matched the COMMENT explaining
-   * the defect, because prose quoting the code looks exactly like the code.
+   * Three versions of this guard, each broken in a way only planting the defect
+   * revealed:
    *
-   * So this walks the served schemas and compares stitch-shaped enums as SETS.
-   * Order cannot evade it, a description string cannot satisfy it, and a tool
-   * added later is covered without anyone remembering to list it here.
+   * 1. Exact-JSON containment. A REORDERED copy walked past it, so it would
+   *    have gone green on the very bug it was written for.
+   * 2. A set comparison plus "at least two stitch enums must exist". The
+   *    FxTool session took that assertion, applied it to a healthy tree, and it
+   *    FAILED — because on their side every hardcoded copy had been removed, so
+   *    finding zero was the success state. Asserting offenders exist makes a
+   *    guard depend on the defect persisting. It happens to hold here because
+   *    these enums ARE the product — JSON Schema needs literal arrays, so the
+   *    served schemas always carry them — but the day one becomes a $ref or a
+   *    tool is retired, that assertion fails and reads as a regression.
+   * 3. This. The detector is tested against fixtures, so it cannot pass by
+   *    covering nothing and does not require the tree to stay broken; then it
+   *    is run over what the server actually serves.
    */
-  const stitchEnums = (): Array<{ tool: string; values: string[] }> => {
-    const out: Array<{ tool: string; values: string[] }> = [];
-    const walk = (tool: string, node: unknown) => {
-      if (!node || typeof node !== 'object') return;
-      const n = node as Record<string, unknown>;
-      if (Array.isArray(n.enum)) {
-        const vals = n.enum.filter((v): v is string => typeof v === 'string');
-        // Stitch-shaped: names only this vocabulary uses.
-        if (vals.some((v) => v === 'longAndShort' || v === 'crossStitch' || v === 'runningSeam')) {
-          out.push({ tool, values: vals });
-        }
-      }
-      for (const v of Object.values(n)) walk(tool, v);
-    };
-    for (const t of PINEPAPER_TOOLS) walk(t.name, t.inputSchema);
+  type Found = { path: string; values: string[] };
+
+  /** Every stitch-shaped enum anywhere in a schema, however deeply nested. */
+  const detect = (node: unknown, path = '$'): Found[] => {
+    if (!node || typeof node !== 'object') return [];
+    const n = node as Record<string, unknown>;
+    const out: Found[] = [];
+    if (Array.isArray(n.enum)) {
+      const values = n.enum.filter((v): v is string => typeof v === 'string');
+      // STITCH-SHAPED: every value is a stitch, and there are at least two.
+      //
+      // The first version looked for a SENTINEL — longAndShort, crossStitch or
+      // runningSeam — and the nested fixture below exposed why that is wrong:
+      // ['satin','seed','stem'] is a stale stitch enum containing none of the
+      // three, so the very copies most likely to be stale (the ones missing the
+      // names the sentinels were chosen from) were the ones it could not see.
+      //
+      // A subset test has no such blind spot and still cannot match an
+      // unrelated enum, because any non-stitch value disqualifies it. Read off
+      // enum VALUES only, so a description quoting the names never registers.
+      const allStitches = values.length >= 2 && values.every((v) => (THREAD_STITCHES as readonly string[]).includes(v));
+      if (allStitches) out.push({ path, values });
+    }
+    for (const [k, v] of Object.entries(n)) out.push(...detect(v, `${path}.${k}`));
     return out;
   };
 
-  it('every stitch enum the server publishes is the full six', () => {
-    const found = stitchEnums();
-    // At least the two known homes. Fewer would mean one stopped being
-    // stitch-shaped and this guard silently stopped covering it.
-    expect(found.length).toBeGreaterThanOrEqual(2);
-    const expected = [...THREAD_STITCHES].sort();
-    for (const { tool, values } of found) {
-      expect([...values].sort(), `${tool} drifted from THREAD_STITCHES`).toEqual(expected);
+  const complete = [...THREAD_STITCHES];
+  const isComplete = (f: Found) => JSON.stringify([...f.values].sort()) === JSON.stringify([...complete].sort());
+
+  describe('the detector itself', () => {
+    it('flags a stale copy', () => {
+      const found = detect({ properties: { stitch: { enum: ['longAndShort', 'satin', 'seed', 'stem'] } } });
+      expect(found).toHaveLength(1);
+      expect(isComplete(found[0]!)).toBe(false);
+    });
+
+    it('flags a REORDERED stale copy — the shape that defeated version 1', () => {
+      const found = detect({ properties: { stitch: { enum: ['satin', 'longAndShort', 'stem', 'seed'] } } });
+      expect(found).toHaveLength(1);
+      expect(isComplete(found[0]!)).toBe(false);
+    });
+
+    it('flags one nested deeper than a top-level property', () => {
+      // My analogue of FxTool's line-by-line layout hole: a copy the walk does
+      // not reach is covered by nothing at all.
+      // And note WHICH names: satin, seed and stem are stale-copy material that
+      // contains none of the sentinels the first detector keyed on.
+      const found = detect({ properties: { batch: { items: { anyOf: [{ enum: ['satin', 'seed', 'stem'] }] } } } });
+      expect(found).toHaveLength(1);
+      expect(isComplete(found[0]!)).toBe(false);
+    });
+
+    it('does NOT flag a complete copy', () => {
+      const found = detect({ properties: { stitch: { enum: [...THREAD_STITCHES] } } });
+      expect(found).toHaveLength(1);
+      expect(isComplete(found[0]!)).toBe(true);
+    });
+
+    it('does NOT flag prose that merely quotes the names', () => {
+      // The evasion I claimed was impossible two messages ago and had not
+      // tested. A description is a string, and the detector reads enum VALUES.
+      const found = detect({
+        properties: {
+          stitch: {
+            enum: [...THREAD_STITCHES],
+            description: 'was ["longAndShort","satin","seed","stem"] before runningSeam and crossStitch',
+          },
+          other: { description: 'satin, longAndShort, seed, stem — the old four' },
+        },
+      });
+      expect(found).toHaveLength(1);
+      expect(isComplete(found[0]!)).toBe(true);
+    });
+
+    it('finds nothing in a schema with no stitch enum, and says so', () => {
+      // The zero case is a legitimate answer, not a broken scan — which is
+      // exactly why the old "at least two must exist" assertion was wrong.
+      expect(detect({ properties: { color: { type: 'string' } } })).toHaveLength(0);
+    });
+  });
+
+  it('every stitch enum the server serves is complete', () => {
+    const offenders: string[] = [];
+    for (const tool of PINEPAPER_TOOLS) {
+      for (const f of detect(tool.inputSchema, tool.name)) {
+        if (!isComplete(f)) offenders.push(`${f.path}: ${JSON.stringify(f.values)}`);
+      }
     }
+    expect(offenders).toEqual([]);
   });
-
-  it('and both known homes are among them', () => {
-    const tools = new Set(stitchEnums().map((e) => e.tool));
-    expect(tools.has('pinepaper_design_medium')).toBe(true);
-    expect(tools.has('pinepaper_compose')).toBe(true);
-  });
-
-  it('the guard fires on a REORDERED stale copy, which defeated the first version', () => {
-    const reordered = ['satin', 'longAndShort', 'stem', 'seed'];
-    expect([...reordered].sort()).not.toEqual([...THREAD_STITCHES].sort());
-    // And the textual form it replaced could NOT tell: exact-JSON containment
-    // misses any permutation, which is why this compares sets.
-    expect(JSON.stringify(reordered)).not.toContain(JSON.stringify(['longAndShort', 'satin', 'seed', 'stem']));
-  });
-
 
   it('both Zod schemas accept the two that were missing', () => {
     for (const stitch of ['runningSeam', 'crossStitch']) {
