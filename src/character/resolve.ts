@@ -152,8 +152,20 @@ function composeDepiction(
     ordered[pid] = parts[pid]!;
   }
 
-  // The ink comes from the STYLE the drawing names, not from the drawing.
-  const styleId = String(depictions.find((x) => x.concept === conceptId)?.style ?? style ?? '');
+  // The ink comes from the STYLE the drawing names, not from the drawing — and
+  // the drawing is whichever ANCESTOR actually supplied the parts, not the
+  // concept that was asked for. Keyed on the request, an inherited depiction
+  // found no style row, so `pp:Bus` drew 0 stroked parts where `pp:Vehicle` —
+  // the same geometry — drew 3. That is the "flat art dropped into an inked
+  // scene reads as pasted in from somewhere else" failure this ink exists to
+  // avoid, and it hit exactly the concepts that inherit rather than declare.
+  const composedFrom = ancestry(conceptId).find((cid) => depictions.some((x) => x.concept === cid));
+  const styleId = String(
+    depictions.find((x) => x.concept === conceptId)?.style
+    ?? (composedFrom ? depictions.find((x) => x.concept === composedFrom)?.style : undefined)
+    ?? style
+    ?? '',
+  );
   const st = styles.find((x) => x.id === styleId);
   return { concept: conceptId, height: height || 100, palette, parts: ordered, ...(st?.ink ? { ink: st.ink } : {}) };
 }
@@ -239,7 +251,14 @@ export function resolveCharacter(args: CharacterArgs): CharacterResult {
     beats.push({ at: t.at, channel: 'say', ...(typeof t.until === 'number' ? { until: t.until } : {}) });
   }
 
-  const declared = new Set((concept.channels ?? []).map((c) => c.name));
+  // CHANNELS ARE INHERITED, and reading them off the concept alone is how a
+  // drawable figure came to perform nothing. `pp:Bus` composes `pp:Vehicle`'s
+  // parts and inherits its `jounce` and `travel`; keyed on the concept itself
+  // it declared none, so every beat was reported ignored and the call returned
+  // ZERO tracks while claiming success. `channelsOf` already walks the chain —
+  // it existed and only a test was calling it.
+  const inherited = channelsOf(conceptId);
+  const declared = new Set(inherited.map((c) => c.name));
   for (const b of beats) {
     if (b?.channel && !declared.has(b.channel)) {
       notes.push(
@@ -254,7 +273,7 @@ export function resolveCharacter(args: CharacterArgs): CharacterResult {
     depiction: dep,
     at: { x: Number(pos.x ?? 400), y: Number(pos.y ?? 300) },
     height: Number(args.height ?? (args.scale != null ? 300 * Number(args.scale) : 300)),
-    channels: concept.channels ?? [],
+    channels: inherited,
     beats,
     durationSeconds: Number(args.durationSeconds ?? 5),
   });

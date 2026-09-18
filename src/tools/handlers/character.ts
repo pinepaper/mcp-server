@@ -52,7 +52,7 @@ export interface CharacterOp { tool: string; args: Record<string, unknown> }
  * than guessed at: it will be misplaced, which is visible, instead of being
  * silently dropped, which is not.
  */
-export function toEngineConvention(op: CharacterOp): CharacterOp {
+export function toEngineConvention(op: CharacterOp, centres?: Map<string, { cx: number; cy: number }>): CharacterOp {
   if (op.tool === 'pinepaper_keyframe_animate') {
     // TWO CHANGES, BOTH REQUIRED FOR THE OP TO VALIDATE OR BEHAVE.
     //
@@ -67,6 +67,45 @@ export function toEngineConvention(op: CharacterOp): CharacterOp {
     // is right for old scenes and would collapse a two-minute performance into
     // its first tenth of a second. `timeUnits` is the documented way off it.
     const kfs = (op.args.keyframes ?? []) as Array<Record<string, unknown>>;
+
+    // (3) ORIGIN. The create branch below re-places each part at its path's
+    // BBOX CENTRE, because that is the point PinePaper's `position` names. The
+    // cloud's tracks are anchored on the depiction's DECLARED anchor instead —
+    // `baseX = at.x + p.at[0]*k` — and the two are not the same point. Left
+    // alone, every animated part jumps from its placed centre to its anchor the
+    // instant the t=0 keyframe evaluates: measured at 19.6px for a pigeon's
+    // beak, which detaches it from the head. That is the very failure the
+    // `carriedBy` machinery exists to prevent, arriving through the back door.
+    //
+    // A track is RELATIVE MOTION around a base, so re-basing it on the centre
+    // the item was actually placed at preserves every displacement and removes
+    // the snap. The alternative — recentring `pathData` on the anchor so the
+    // two agree by construction — also works, and was not chosen because it
+    // moves the scale and rotation pivot off the shape's centre, changing how
+    // every non-animated part renders to fix the animated ones.
+    //
+    // A part whose path could not be measured records no centre and is left
+    // exactly as it came: misplaced and visible, never silently adjusted.
+    const centre = centres?.get(String(op.args.itemId ?? ''));
+    const times = kfs.map((k) => (typeof k.time === 'number' ? k.time : Infinity));
+    const firstIdx = times.indexOf(Math.min(...times));
+    const baseline = (axis: 'x' | 'y'): number | null => {
+      if (!centre || firstIdx < 0) return null;
+      const first = kfs[firstIdx];
+      const flat = first?.[axis];
+      const nested = (first?.properties as Record<string, unknown> | undefined)?.[axis];
+      const v = typeof flat === 'number' ? flat : (typeof nested === 'number' ? nested : null);
+      return v === null ? null : (axis === 'x' ? centre.cx : centre.cy) - v;
+    };
+    const dx = baseline('x');
+    const dy = baseline('y');
+    const rebase = (props: Record<string, unknown>): Record<string, unknown> => {
+      const out = { ...props };
+      if (dx !== null && typeof out.x === 'number') out.x = out.x + dx;
+      if (dy !== null && typeof out.y === 'number') out.y = out.y + dy;
+      return out;
+    };
+
     return {
       ...op,
       args: {
@@ -77,7 +116,7 @@ export function toEngineConvention(op: CharacterOp): CharacterOp {
           return {
             time,
             ...(typeof easing === 'string' ? { easing } : {}),
-            properties: { ...((properties as Record<string, unknown>) ?? {}), ...rest },
+            properties: rebase({ ...((properties as Record<string, unknown>) ?? {}), ...rest }),
           };
         }),
       },
@@ -116,6 +155,29 @@ export function toEngineConvention(op: CharacterOp): CharacterOp {
 }
 
 /**
+ * Convert a whole program, not one op at a time.
+ *
+ * The keyframe tracks cannot be converted without knowing where the create ops
+ * actually placed each part, so the creates go first and record their centres.
+ * Converting op-by-op is what left the tracks anchored on a different point
+ * from the items they drive.
+ */
+export function convertOps(ops: CharacterOp[]): CharacterOp[] {
+  const centres = new Map<string, { cx: number; cy: number }>();
+  const converted = ops.map((op) => {
+    if (op.tool !== 'pinepaper_create_item') return op;
+    const out = toEngineConvention(op);
+    const id = ((op.args.properties ?? {}) as Record<string, unknown>).id;
+    const pos = out.args.position as { x: number; y: number } | undefined;
+    // Only a part that was actually re-placed records a centre: an unmeasurable
+    // path is passed through untouched and must not re-base anything.
+    if (typeof id === 'string' && pos && out !== op) centres.set(id, { cx: pos.x, cy: pos.y });
+    return out;
+  });
+  return converted.map((op) => (op.tool === 'pinepaper_keyframe_animate' ? toEngineConvention(op, centres) : op));
+}
+
+/**
  * Plan a character call: ops in PinePaper's convention, or a refusal.
  *
  * Separated from the handler so it can be tested WITHOUT `handleToolCall`,
@@ -128,7 +190,7 @@ export function planCharacter(args: CharacterArgs):
   if (!r.ok) return r;
   return {
     ...r,
-    ops: r.ops.map(toEngineConvention),
+    ops: convertOps(r.ops),
     concept: String(args.concept ?? ''),
     root: figureRoot(r.parts),
   };

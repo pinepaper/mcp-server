@@ -1243,7 +1243,20 @@ export const AddRelationInputSchema = z.object({
   presetValues: z.record(z.number()).optional()
     .describe('presetId: symbol → number. Any symbol you omit takes the midpoint of its declared range, so a preset applies sensibly with no values at all.'),
 })
-  .refine((v) => !!v.relationType || !!v.presetId, { message: 'relationType is required unless presetId is given', path: ['relationType'] });
+  .refine((v) => !!v.relationType || !!v.presetId, { message: 'relationType is required unless presetId is given', path: ['relationType'] })
+  // A PRESET IS A SELF-RELATION and has no target slot. applyRelationPreset
+  // takes (item, presetId, values) — pass a targetId alongside one and the
+  // emitted call has nowhere to put it, so a caller adopting a preset for a
+  // two-item relation silently got a self-relation with no diagnostic.
+  // Refused here rather than dropped there.
+  .refine((v) => !v.presetId || v.targetId == null, {
+    message: 'presetId cannot be combined with targetId — a relation preset applies to one item. Name the relationType directly for a two-item relation.',
+    path: ['targetId'],
+  })
+  .refine((v) => !v.presetId || !v.relationType, {
+    message: 'presetId cannot be combined with relationType — the preset decides its own type. Send one or the other.',
+    path: ['relationType'],
+  });
 
 // Remove Relation
 export const RemoveRelationInputSchema = z.object({
@@ -1302,6 +1315,18 @@ export const CharacterInputSchema = z.object({
   beats: z.array(CharacterBeatSchema).optional().describe('What happens, in order.'),
   timings: z.array(z.object({ at: z.number(), until: z.number().optional() })).optional()
     .describe('Word or syllable timings from a voice track; each entry drives one mouth opening.'),
+  // THESE WERE HANDLED AND UNDECLARED. resolveCharacter reads all four and its
+  // own comment says a call written the way the rest of the vocabulary reads
+  // must not land dead-centre at the default size — but zod strips unknown
+  // keys, so `{concept, position, scale}` did exactly that, silently.
+  position: z.object({ x: z.number().optional(), y: z.number().optional() }).optional()
+    .describe('Where the figure stands. A synonym for `at`, because the rest of this surface says position; `at` wins if both are sent.'),
+  scale: z.number().optional()
+    .describe('Size as a multiplier of the 300px default, for callers who think in scale rather than pixels. `height` wins if both are sent.'),
+  palette: z.record(z.string(), z.string()).optional()
+    .describe("Override the depiction's own colours: part id → colour. Only the parts you name change."),
+  ink: z.string().optional()
+    .describe("Ink colour for the stroked copies that make the figure read as drawn rather than filled. The style supplies its own; this overrides it."),
 });
 
 // Motion Capture (BVH)

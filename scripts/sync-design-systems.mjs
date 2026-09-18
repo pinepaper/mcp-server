@@ -18,10 +18,16 @@
  * edit is repointing the single type-only import at the extracted union below.
  * Every edit is applied by rule, described here, and asserted by the test.
  *
- * Each output carries a sha256 of the source it came from, so
- * src/__tests__/unit/design-vendor-provenance.test.ts can regenerate and
- * byte-compare whenever the sibling repo is present. Drift becomes a failing
- * test rather than a style that renders slightly wrong in one of two places.
+ * Each output carries a sha256 of the source it came from. Two guards read it:
+ * src/__tests__/unit/design-systems.test.ts asserts every vendored file still
+ * carries a header and a hash, and `bun run check:design` — wired into
+ * prepublishOnly — regenerates and byte-compares whenever the sibling repo is
+ * present. Drift becomes a failing build rather than a style that renders
+ * slightly wrong in one of two places.
+ *
+ * Those are different checks and both are needed: the test runs everywhere and
+ * proves the files are generated, while only check:design can prove they match
+ * TODAY'S upstream, and it can only do that where mcp-cloud is checked out.
  *
  *   node scripts/sync-design-systems.mjs [--check]
  *

@@ -9052,9 +9052,22 @@ ${guard('unlockAllItems')}${pass('app.unlockAllItems()')}
   if (targetId && app.itemRegistry) {
     const entry = app.itemRegistry.get(targetId);
     targetItem = entry && entry.item ? entry.item : null;
+    // AN EXPLICIT TARGET THAT MISSES IS A REFUSAL, not a reason to guess. This
+    // used to fall through to the selection, then the last registered item,
+    // then the last Paper child — so stitching a deleted id embroidered
+    // whatever happened to be newest and reported success. Naming a target and
+    // getting a different one silently is worse than being told it is gone.
+    if (!targetItem) {
+      return { success: false, error: 'no such item: ' + targetId + ' — it may have been deleted, or replaced by a tool that mints a new id' };
+    }
   }
-  if (!targetItem && app.selection && app.selection.length > 0) {
-    targetItem = app.selection[0];
+  // app.getSelectedItems() is the facade. app.selection is not a property this
+  // engine exposes, so the documented "applies to the active selection" never
+  // fired: the check was always falsy and control dropped to the last-created
+  // item, silently, with success:true.
+  if (!targetItem && typeof app.getSelectedItems === 'function') {
+    const sel = app.getSelectedItems();
+    if (sel && sel.length > 0) targetItem = sel[0];
   }
   if (!targetItem && app.itemRegistry && typeof app.itemRegistry.getAll === 'function') {
     const all = app.itemRegistry.getAll();
@@ -9083,12 +9096,25 @@ ${guard('unlockAllItems')}${pass('app.unlockAllItems()')}
   } else if (typeof window !== 'undefined' && typeof window.applyStitchcraftToItem === 'function') {
     group = window.applyStitchcraftToItem(targetItem, preset, opts, (typeof paper !== 'undefined' ? paper : app.scope));
   } else if (typeof app.applyThreadPainting === 'function') {
-    // Fallback to thread painting
-    group = app.applyThreadPainting(targetId || (targetItem.data && targetItem.data.id), {
-      color: opts.threadColor,
-      width: opts.strokeWidth,
-      count: opts.density ? Math.round(opts.density * 100) : undefined,
-    });
+    // THE FALLBACK CANNOT HONOUR A PRESET, so it no longer pretends to.
+    // applyThreadPainting takes only colour, width and count — preset,
+    // roughness, bowing, sheen and seed are all dropped — which meant all six
+    // presets rendered the same thread painting while the result still said
+    // preset: 'cross_stitch'. Four of the six are renames of stitches that
+    // pinepaper_design_medium's apply_thread already offers through this very
+    // method, so the honest answer is to name that tool rather than to
+    // half-render this one.
+    const threadStitch = { satin_fill: 'satin', long_and_short: 'longAndShort', stem_outline: 'stem', seed_fill: 'seed' }[preset];
+    return {
+      success: false,
+      error: 'this studio has no applyStitchcraftToItem, and the thread-painting fallback cannot carry a preset'
+        + ' (it takes colour, width and count only — roughness, bowing, sheen and seed would be silently dropped). '
+        + (threadStitch
+          ? 'Use pinepaper_design_medium { action: "apply_thread", stitch: "' + threadStitch + '" }, which is the same engine call with its own parameters.'
+          : 'Update FxTool for preset ' + preset + ', which has no thread-painting equivalent.'),
+      preset: preset,
+      ...(threadStitch ? { equivalentStitch: threadStitch } : {}),
+    };
   }
 
   if (!group) {
@@ -9102,12 +9128,19 @@ ${guard('unlockAllItems')}${pass('app.unlockAllItems()')}
     for (let i = 0; i < group.children.length; i++) {
       const line = group.children[i];
       if (line && line.segments && line.segments.length >= 2) {
-        const jx = (Math.sin(seed + i * 2.13) * r);
-        const jy = (Math.cos(seed + i * 3.47) * r);
-        line.segments[0].point.x += jx * 0.4;
-        line.segments[0].point.y += jy * 0.4;
-        line.segments[1].point.x -= jx * 0.4;
-        line.segments[1].point.y -= jy * 0.4;
+        // EVERY SEGMENT, not the first two. Perturbing segments[0] and [1] is a
+        // whole-line shear on a two-point stitch (satin, cross-stitch) and a
+        // kink at the start of a long one — stem_outline and running_seam are
+        // multi-segment contours, so the first two points moved and the rest
+        // stayed exact, which reads as a defect rather than a hand.
+        // Each point gets its own phase off the same seed, so the wobble is
+        // per-point and still reproducible for a given seed.
+        for (let j = 0; j < line.segments.length; j++) {
+          const jx = Math.sin(seed + i * 2.13 + j * 1.71) * r;
+          const jy = Math.cos(seed + i * 3.47 + j * 2.29) * r;
+          line.segments[j].point.x += jx * 0.4;
+          line.segments[j].point.y += jy * 0.4;
+        }
       }
     }
   }

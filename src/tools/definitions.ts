@@ -2595,6 +2595,10 @@ NOT LIP SYNC. \`say\` opens and closes a mouth for the length of a line. Matchin
           description: 'Where the figure stands.',
         },
         height: { type: 'number', description: 'Drawn height in pixels. Every amplitude in the graph is a fraction, so the performance scales with it.' },
+        position: { type: 'object', description: 'Where the figure stands — a synonym for `at`, because the rest of this surface says position. `at` wins if both are sent.' },
+        scale: { type: 'number', description: 'Size as a multiplier of the 300px default, for callers who think in scale rather than pixels. `height` wins if both are sent.' },
+        palette: { type: 'object', description: "Override the depiction's own colours: part id → colour. Only the parts you name change." },
+        ink: { type: 'string', description: 'Ink colour for the stroked copies that make the figure read as drawn rather than filled. Overrides the style\'s own.' },
         id: { type: 'string', description: 'Prefix for the created items (default: the concept name).' },
         style: { type: 'string', description: 'Style id for the depiction (default: the concept\'s own).' },
         variant: { type: 'string', description: 'Depiction variant (default: "default").' },
@@ -8508,7 +8512,13 @@ PARAMETERS:
 - itemId (optional): ID of target vector shape or path. If omitted, applies to active selection or last created item.
 - threadColor (optional): Hex/CSS color for the thread (defaults to item fill/stroke)
 - strokeWidth (optional): Thread stroke width in px (default 1.5)
-- density (optional): Stitch density multiplier or spacing override`,
+- density (optional): Stitch density multiplier or spacing override
+- roughness (optional): hand-crafted wobble — jitters every point of every stitch so the lines read as sewn rather than plotted. 0 is machine-exact.
+- bowing (optional): how far each stitch bows off a straight run — thread pulled over a curve rather than laid flat
+- sheen (optional): how much the floss catches light along its length
+- seed (optional): makes roughness and bowing reproducible — the same seed sews the same irregularities every run
+
+Four of the six presets (satin_fill, long_and_short, stem_outline, seed_fill) are also reachable through pinepaper_design_medium { action: 'apply_thread' }, which calls the same engine method. Prefer THIS tool: apply_thread carries colour, width and count only, so roughness, bowing, sheen and seed have nowhere to go there.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -8539,6 +8549,22 @@ PARAMETERS:
         density: {
           type: 'number',
           description: 'Stitch density multiplier / spacing override',
+        },
+        roughness: {
+          type: 'number',
+          description: 'Hand-crafted wobble: jitters every point of every stitch, so the lines read as sewn rather than plotted. 0 is machine-exact. Reproducible for a given seed.',
+        },
+        bowing: {
+          type: 'number',
+          description: 'How much each stitch bows away from a straight run — thread pulled taut over a curve rather than laid flat.',
+        },
+        sheen: {
+          type: 'number',
+          description: 'Thread sheen: how much the floss catches light along its length.',
+        },
+        seed: {
+          type: 'number',
+          description: 'Makes roughness and bowing reproducible — the same seed sews the same irregularities every run.',
         },
       },
       required: ['preset'],
