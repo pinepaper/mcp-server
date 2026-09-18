@@ -18,6 +18,8 @@
  */
 
 import { describe, it, expect } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { PINEPAPER_TOOLS } from '../../tools/definitions.js';
 import { codeGenerator } from '../../types/code-generator.js';
 import { DesignMediumInputSchema, ComposeInputSchema, THREAD_STITCHES } from '../../types/schemas.js';
@@ -154,28 +156,35 @@ describe('the stitch list has exactly one definition', () => {
     const out: Found[] = [];
     if (Array.isArray(n.enum)) {
       const values = n.enum.filter((v): v is string => typeof v === 'string');
-      // STITCH-SHAPED: NON-EMPTY, and every value is a stitch. No sentinel, no
-      // threshold — nothing that decides in advance what the guard bothers to
-      // look at.
+      // STITCH-SHAPED: at least TWO values, and every one a stitch.
       //
-      // Version 1 keyed on a sentinel (longAndShort / crossStitch /
-      // runningSeam) and could not see ['satin','seed','stem'] — the copies
-      // most likely to be stale are exactly the ones missing the names the
-      // sentinels were chosen from.
+      // The threshold came back after a wider measurement reversed the last
+      // one. Scoped to served enums, no single-valued stitch enum exists and the
+      // filter looked free. Scanning every array literal in src/ instead found
+      // the reason to keep it: `seed` is a stitch AND a live motion knob
+      // (code-generator.ts:8394, ['speed','intensity','waveform','origin',
+      // 'seed']), and `stem` is a stitch and a word this vocabulary uses
+      // elsewhere. So a lone ['seed'] is far more likely a knob list than a
+      // one-entry stale stitch enum, and `>= 1` would false-positive on it.
       //
-      // Version 2 kept `length >= 2`, which is the same defect over cardinality
-      // rather than over names, and filters in the wrong direction for the same
-      // reason: a SHORTER copy is more likely to be stale, not less. FxTool hit
-      // the identical twin at `>= 3`, which missed ['satin','seed']. Measured
-      // before dropping it: of every enum in every served schema, exactly two
-      // contain any stitch name, both are pure and complete, and none has a
-      // single value — so the threshold was protecting against nothing.
+      // FxTool reached the same conclusion from a different collision — 'stem'
+      // is also their STEM education tag — which is the transferable lesson:
+      // the METHOD carries (ask what the filter protects against, require a
+      // count), the NUMBER does not. I ran their measurement, got the opposite
+      // answer, and had to run my own at a wider scope to find that out.
       //
-      // PURITY does the disqualifying instead: one foreign value and it is not
-      // a stitch list, so ['red','green','blue'] cannot match and neither can
-      // ['satin','seed','banana']. Read off enum VALUES only, so a description
-      // quoting the names never registers.
-      const allStitches = values.length >= 1 && values.every((v) => (THREAD_STITCHES as readonly string[]).includes(v));
+      // The cost is real and accepted: a single-name stale copy is not caught.
+      // A stale copy truncated to one of six names is far less likely than a
+      // legitimate one-value enum containing a colliding word.
+      //
+      // PURITY is what disqualifies, and it is load-bearing rather than
+      // decorative — one foreign value and it is not a stitch list, which is
+      // exactly what keeps the motion-knob array below from matching.
+      //
+      // Read off enum VALUES only, so a description quoting the names never
+      // registers.
+      const allStitches = values.length >= 2
+        && values.every((v) => (THREAD_STITCHES as readonly string[]).includes(v));
       if (allStitches) out.push({ path, values });
     }
     for (const [k, v] of Object.entries(n)) out.push(...detect(v, `${path}.${k}`));
@@ -208,18 +217,29 @@ describe('the stitch list has exactly one definition', () => {
       expect(isComplete(found[0]!)).toBe(false);
     });
 
-    it('flags a SINGLE-NAME stale copy — the threshold twin', () => {
-      // `length >= 2` would have filtered this out, which is the sentinel hole
-      // over cardinality. A one-name copy is the most stale thing there is.
-      const found = detect({ properties: { stitch: { enum: ['satin'] } } });
-      expect(found).toHaveLength(1);
-      expect(isComplete(found[0]!)).toBe(false);
+    it('does NOT flag a single colliding name — the real reason for the threshold', () => {
+      // `seed` is a stitch and a motion knob. A lone ['seed'] is a knob list,
+      // not a one-entry stale stitch enum, so flagging it would be a false
+      // positive on live vocabulary.
+      expect(detect({ properties: { x: { enum: ['seed'] } } })).toHaveLength(0);
+      expect(detect({ properties: { x: { enum: ['stem'] } } })).toHaveLength(0);
     });
 
-    it('does NOT flag a stitch list with one foreign value', () => {
-      // Purity, which I had asserted by construction and never tested. A false
-      // positive is the worse half: it teaches the next reader to skim the guard.
-      expect(detect({ properties: { x: { enum: ['satin', 'seed', 'stem', 'banana'] } } })).toHaveLength(0);
+    it('does NOT flag a REAL mixed array from this repo', () => {
+      // Was ['satin','seed','stem','banana'] — invented, and therefore unable
+      // to tell whether purity is load-bearing or decorative. This is the
+      // actual motion-knob list from code-generator.ts:8394, which contains a
+      // stitch name and must not match.
+      expect(detect({ properties: { x: { enum: ['speed', 'intensity', 'waveform', 'origin', 'seed'] } } })).toHaveLength(0);
+    });
+
+    it('and that collision is REAL, so the fixture above is not fiction', () => {
+      // A fixture drawn from the tree can rot: if `seed` ever leaves the motion
+      // knobs, the case above stops proving anything and purity starts looking
+      // like over-engineering with nothing to point at.
+      const src = readFileSync(join(import.meta.dir, '..', '..', 'types', 'code-generator.ts'), 'utf-8');
+      expect(src).toContain("['speed', 'intensity', 'waveform', 'origin', 'seed']");
+      expect((THREAD_STITCHES as readonly string[])).toContain('seed');
     });
 
     it('does NOT flag an unrelated enum', () => {
