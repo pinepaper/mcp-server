@@ -44,6 +44,7 @@ import {
   TextStyleInputSchema,
   TextEffectInputSchema,
   DesignMediumInputSchema,
+  StitchcraftInputSchema,
   ShatterImageInputSchema,
   ImportLayeredCharacterInputSchema,
   CharacterInputSchema,
@@ -173,14 +174,16 @@ import { planCharacter, generateCharacterCode } from './handlers/character.js';
  * main switch at dispatch time (see handleToolCallInner). New domains are
  * folded in incrementally as they are migrated out of the monolithic switch.
  */
-const DOMAIN_HANDLERS: Array<Record<string, (args: Record<string, unknown>, options: HandlerOptions) => Promise<CallToolResult>>> = [
-  cameraHandlers,
-  fontHandlers,
-  toolGuideHandlers,
-  mapHandlers,
-  ontologyHandlers,
-  exportHandlers,
-];
+function getDomainHandlers(): Array<Record<string, (args: Record<string, unknown>, options: HandlerOptions) => Promise<CallToolResult>>> {
+  return [
+    cameraHandlers,
+    fontHandlers,
+    toolGuideHandlers,
+    mapHandlers,
+    ontologyHandlers,
+    exportHandlers,
+  ];
+}
 
 // =============================================================================
 // SCREENSHOT MODE CONFIGURATION
@@ -872,7 +875,7 @@ async function handleToolCallInner(
     // Domain-module dispatch: tools migrated to per-domain handler files
     // short-circuit before the main switch. See DOMAIN_HANDLERS for the
     // current registry.
-    for (const domainMap of DOMAIN_HANDLERS) {
+    for (const domainMap of getDomainHandlers()) {
       const handler = domainMap[toolName];
       if (handler) return await handler(args, options);
     }
@@ -1306,6 +1309,12 @@ async function handleToolCallInner(
         const input = DesignMediumInputSchema.parse(args);
         const code = codeGenerator.generateDesignMedium(input);
         return executeOrGenerate(code, `Medium: ${input.action}`, options, 'pinepaper_design_medium');
+      }
+
+      case 'pinepaper_create_stitchcraft': {
+        const input = StitchcraftInputSchema.parse(args);
+        const code = codeGenerator.generateStitchcraft(input);
+        return executeOrGenerate(code, `Stitchcraft: ${input.preset}`, options, 'pinepaper_create_stitchcraft');
       }
 
       case 'pinepaper_text_effect': {
@@ -2772,8 +2781,24 @@ You can now start creating new items on a clean canvas.`,
         return executedResult(code, exportResult, exportBrowserResult.screenshot, description);
       }
 
+      case 'pinepaper_design_styles':
+        return dataResult({ styles: designSystems.listStyles() });
+
+      case 'pinepaper_design_systems':
       case 'pinepaper_design_system': {
-        const input = DesignSystemInputSchema.parse(args);
+        const rawArgs = { ...args } as Record<string, unknown>;
+        if (!rawArgs.action && rawArgs.systemName) {
+          if (rawArgs.systemName === 'all') {
+            rawArgs.action = 'list_systems';
+          } else {
+            rawArgs.action = 'get_system';
+            rawArgs.systemId = String(rawArgs.systemName);
+          }
+        }
+        if (!rawArgs.action && rawArgs.style && !rawArgs.title) {
+          rawArgs.action = 'list_styles';
+        }
+        const input = DesignSystemInputSchema.parse(rawArgs);
         // Answered HERE, not in the browser — these are decisions over
         // vendored data, and only `compose` with draw:true needs the canvas.
         switch (input.action) {
@@ -2830,6 +2855,7 @@ You can now start creating new items on a clean canvas.`,
         break;
       }
 
+      case 'pinepaper_stick_figure':
       case 'pinepaper_stick': {
         const input = StickInputSchema.parse(args);
         return executeOrGenerate(codeGenerator.generateStick(input), `Stick ${input.action}`, options, 'pinepaper_stick');

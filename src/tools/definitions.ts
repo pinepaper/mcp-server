@@ -2275,9 +2275,9 @@ RECIPE — a playable maze: create_tilemap with wall fills → batch_create colo
 
 TWO DIFFERENT THINGS, kept apart on purpose:
 
-A DESIGN SYSTEM is a real, licensed, versioned product — Material Design 3, IBM Carbon, Shopify Polaris, Fluent 2, Adobe Spectrum, GitHub Primer, USWDS, GOV.UK and more. Its tokens are facts with a licence attached, in the W3C DTCG format ($value, $type, $description). Fifteen of them are here. Where a motion curve had to be filled in because the published system does not specify one, the token is marked "pinepaper:authored" — so you can tell a vendor's curve from ours instead of treating both as equally official.
+A DESIGN SYSTEM is a real, licensed, versioned product — Material Design 3, IBM Carbon, Shopify Polaris, Fluent 2, Adobe Spectrum, GitHub Primer, USWDS, GOV.UK, Shadcn/Radix, SLDS 2, Tailwind, Chakra and more. Its tokens are facts with a licence attached, in the W3C DTCG format ($value, $type, $description). Twenty-one of them are here. Where a motion curve had to be filled in because the published system does not specify one, the token is marked "pinepaper:authored" — so you can tell a vendor's curve from ours instead of treating both as equally official.
 
-An AESTHETIC STYLE is a look: Bauhaus, Art Deco, Swiss typographic, De Stijl, vaporwave, risograph, brutalist, Memphis, claymorphism, op art, pixel art. No licence, no vendor. Twenty-eight are named; eighteen can COMPOSE a scene rather than only be described, and 'list_styles' says which.
+An AESTHETIC STYLE is a look: Bauhaus, Art Deco, Swiss typographic, De Stijl, vaporwave, risograph, brutalist, Memphis, claymorphism, op art, pixel art. No licence, no vendor. Thirty-one are named; eighteen can COMPOSE a scene rather than only be described, and 'list_styles' says which.
 
 - list_systems / get_system: the licensed systems and their tokens, filterable by token type.
 - list_easings: every motion curve across every system as a named easing, with its licence and whether it was authored here. Use these to make a motion match a system it has to sit beside.
@@ -8472,6 +8472,76 @@ ACTIONS:
         itemId: { type: 'string', description: 'Item ID (for get_dimensions)' },
       },
       required: ['action'],
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // STITCHCRAFT PROCEDURAL EMBROIDERY & THREAD
+  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_create_stitchcraft',
+    annotations: {
+      title: 'Create Stitchcraft',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Create procedural embroidery, thread painting, satin fills, seam lines, cross-stitching, or needlepainting on a target canvas item or region.
+
+USE WHEN:
+- Rendering realistic embroidery, patches, or stitched badges
+- Adding contour seam lines (running stitch) along garments or shapes
+- Applying satin fills, cross-stitch grids, stem stitch outlines, or seed textures
+- Creating textile art or handcrafted thread aesthetics on vector graphics
+
+PRESETS:
+- embroidery_satin: Dense satin stitch fill spanning across silhouettes
+- running_seam: Dashed running stitch contour along path borders
+- cross_stitch: Procedural X-stitch grid fill over shape area
+- needlepainting: Directional long-and-short thread painting fill
+- stem_outline: Twisted rope-like stem stitch following shape contour
+- seed_texture: Organic scattered seed stitch texture
+
+PARAMETERS:
+- preset (required): Preset name from the list above
+- itemId (optional): ID of target vector shape or path. If omitted, applies to active selection or last created item.
+- threadColor (optional): Hex/CSS color for the thread (defaults to item fill/stroke)
+- strokeWidth (optional): Thread stroke width in px (default 1.5)
+- density (optional): Stitch density multiplier or spacing override`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        preset: {
+          type: 'string',
+          enum: [
+            'embroidery_satin',
+            'running_seam',
+            'cross_stitch',
+            'needlepainting',
+            'stem_outline',
+            'seed_texture',
+          ],
+          description: 'Stitchcraft procedural preset name',
+        },
+        itemId: {
+          type: 'string',
+          description: 'Target vector item ID (if omitted, applies to selection or last item)',
+        },
+        threadColor: {
+          type: 'string',
+          description: 'Thread color hex/CSS string',
+        },
+        strokeWidth: {
+          type: 'number',
+          description: 'Thread stroke width in pixels (default 1.5)',
+        },
+        density: {
+          type: 'number',
+          description: 'Stitch density multiplier / spacing override',
+        },
+      },
+      required: ['preset'],
     },
   },
 

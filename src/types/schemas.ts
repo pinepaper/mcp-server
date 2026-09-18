@@ -4601,3 +4601,59 @@ export const RiggingInputSchema = z.object({
   .refine((v) => v.action !== 'retarget_bvh' || v.skeletonId != null, { message: 'retarget_bvh requires skeletonId (the existing rig to drive)', path: ['skeletonId'] })
   .refine((v) => v.action !== 'import_spine' || !!v.spineJson, { message: 'import_spine requires spineJson', path: ['spineJson'] });
 export type RiggingInput = z.infer<typeof RiggingInputSchema>;
+
+/**
+ * Procedural stitchcraft embroidery and thread presets
+ */
+export const STITCHCRAFT_PRESET_NAMES = [
+  'embroidery_satin',
+  'running_seam',
+  'cross_stitch',
+  'needlepainting',
+  'stem_outline',
+  'seed_texture',
+] as const;
+
+export const StitchcraftPresetSchema = z.string()
+  .transform((val) => {
+    const v = val.toLowerCase().trim().replace(/[- ]/g, '_');
+    if (v === 'satin' || v === 'satin_stitch' || v === 'embroidery_satin') return 'embroidery_satin';
+    if (v === 'running' || v === 'seam' || v === 'running_stitch' || v === 'running_seam') return 'running_seam';
+    if (v === 'cross' || v === 'crossstitch' || v === 'cross_stitch') return 'cross_stitch';
+    if (v === 'stem' || v === 'stem_stitch' || v === 'stem_outline' || v === 'outline') return 'stem_outline';
+    if (v === 'seed' || v === 'seed_stitch' || v === 'seed_texture' || v === 'texture') return 'seed_texture';
+    if (v === 'needle' || v === 'needlepainting' || v === 'needle_painting' || v === 'thread' || v === 'thread_painting') return 'needlepainting';
+    return v;
+  })
+  .pipe(z.enum(STITCHCRAFT_PRESET_NAMES));
+
+export type StitchcraftPreset = (typeof STITCHCRAFT_PRESET_NAMES)[number];
+
+export const StitchcraftInputSchema = z.object({
+  preset: StitchcraftPresetSchema.describe(
+    "Stitchcraft procedural preset ('embroidery_satin', 'running_seam', 'cross_stitch', 'needlepainting', 'stem_outline', 'seed_texture'). Also accepts common aliases: satin, seam, cross, needle, stem, seed."
+  ),
+  itemId: z.string().optional().describe('Target vector shape or path itemId. If omitted, applies to the active selection or last created item.'),
+  threadColor: z.string().optional().describe('Thread color hex/css string (defaults to target item fill or stroke color)'),
+  color: z.string().optional().describe('Alias for threadColor (supports open-source LLMs)'),
+  strokeWidth: z.union([z.number(), z.string().transform(Number)]).pipe(z.number().positive()).optional().describe('Thread stroke width in pixels (default 1.5)'),
+  width: z.union([z.number(), z.string().transform(Number)]).pipe(z.number().positive()).optional().describe('Alias for strokeWidth'),
+  density: z.union([z.number(), z.string().transform(Number)]).pipe(z.number().positive()).optional().describe('Stitch density multiplier / spacing override'),
+  // Hand-crafted fidelity controls
+  roughness: z.union([z.number(), z.string().transform(Number)]).optional().describe('Organic stitch jitter / roughness (0..5, default 0 for clean or 1-2 for hand-crafted look)'),
+  bowing: z.union([z.number(), z.string().transform(Number)]).optional().describe('Thread curve bowing/tension curvature (0..3)'),
+  sheen: z.boolean().optional().describe('Render thread highlight sheen along stitches (default true)'),
+  seed: z.number().int().optional().describe('PRNG seed for reproducible thread simulation'),
+}).transform((data) => ({
+  preset: data.preset,
+  itemId: data.itemId,
+  threadColor: data.threadColor || data.color,
+  strokeWidth: data.strokeWidth ?? data.width,
+  density: data.density,
+  roughness: data.roughness,
+  bowing: data.bowing,
+  sheen: data.sheen,
+  seed: data.seed,
+}));
+
+export type StitchcraftInput = z.infer<typeof StitchcraftInputSchema>;

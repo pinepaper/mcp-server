@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
  * Source:    mcp-cloud/src/services/design-systems-dtcg.ts
- * sha256:    6d711edc6dd6ff0d129f113586481bcc78a9bc21ac27e9dfe386e0949c25dd36
+ * sha256:    5b76ed156ab9b07348209f6700cb1731ed0fa031ccaa154d08792de6e79cf7ac
  * Generator: scripts/sync-design-systems.mjs
  *
  * Edit the TypeScript upstream and re-run the generator. A hand edit here is
@@ -481,6 +481,136 @@ export const OPEN_DESIGN_SYSTEMS: Record<string, DTCGDesignSystem> = {
     },
     typography: { basePx: 16, ratio: 1.25, scalePx: [13, 14, 16, 20, 24, 32, 40, 48] },
     space: { gridPx: 8, scalePx: [4, 8, 16, 24, 32, 40, 48, 64] },
+  },
+
+  radix_shadcn: {
+    id: "radix_shadcn",
+    name: "Shadcn UI / Radix UI Tokens",
+    license: "MIT",
+    version: "1.0",
+    vendor: "Shadcn / WorkOS",
+    category: "corporate",
+    tokens: {
+      "motion.easing.default": { $value: [0.16, 1.0, 0.3, 1.0], $type: "cubicBezier", $description: "Radix UI spring/ease default curve" },
+      "motion.duration.fast": { $value: "150ms", $type: "duration" },
+      "motion.duration.normal": { $value: "250ms", $type: "duration" },
+      "space.grid": { $value: "4px", $type: "dimension" },
+    },
+    motion: {
+      easings: { default: "cubic-bezier(0.16, 1.0, 0.3, 1.0)" },
+      durations: { fast: 150, normal: 250, slow: 400 },
+      staggers: { tight: 35, base: 70, relaxed: 110 },
+    },
+    typography: { basePx: 16, ratio: 1.25, scalePx: [12, 14, 16, 18, 20, 24, 30, 36] },
+    space: { gridPx: 4, scalePx: [4, 8, 12, 16, 24, 32, 40, 48] },
+  },
+
+  salesforce_slds2: {
+    id: "salesforce_slds2",
+    name: "Salesforce Lightning Design System 2",
+    license: "BSD-3-Clause",
+    version: "2.5",
+    vendor: "Salesforce",
+    category: "corporate",
+    tokens: {
+      "motion.easing.spring": { $value: [0.2, 0.9, 0.3, 1.0], $type: "cubicBezier", $description: "SLDS 2 spring transition curve" },
+      "motion.duration.prompt": { $value: "120ms", $type: "duration" },
+      "motion.duration.expressive": { $value: "280ms", $type: "duration" },
+      "space.grid": { $value: "4px", $type: "dimension" },
+    },
+    motion: {
+      easings: { spring: "cubic-bezier(0.2, 0.9, 0.3, 1.0)" },
+      durations: { prompt: 120, standard: 200, expressive: 280 },
+      staggers: { tight: 30, base: 60, relaxed: 90 },
+    },
+    typography: { basePx: 14, ratio: 1.2, scalePx: [11, 13, 14, 16, 18, 20, 24, 32] },
+    space: { gridPx: 4, scalePx: [4, 8, 12, 16, 24, 32, 48, 64] },
+  },
+
+  adobe_spectrum2: {
+    id: "adobe_spectrum2",
+    name: "Adobe Spectrum 2",
+    license: "Apache-2.0",
+    version: "2.0",
+    vendor: "Adobe",
+    category: "corporate",
+    tokens: {
+      "motion.easing.fluid": { $value: [0.25, 0.0, 0.15, 1.0], $type: "cubicBezier", $description: "Spectrum 2 fluid responsive motion curve" },
+      "motion.duration.responsive": { $value: "180ms", $type: "duration" },
+      "space.grid": { $value: "8px", $type: "dimension" },
+    },
+    motion: {
+      easings: { fluid: "cubic-bezier(0.25, 0.0, 0.15, 1.0)" },
+      durations: { fast: 100, responsive: 180, slow: 320 },
+      staggers: { tight: 25, base: 50, relaxed: 80 },
+    },
+    typography: { basePx: 15, ratio: 1.22, scalePx: [11, 13, 15, 18, 22, 28, 36, 46] },
+    space: { gridPx: 8, scalePx: [4, 8, 16, 24, 32, 40, 48, 64] },
+  },
+
+  ant_design_mobile: {
+    id: "ant_design_mobile",
+    name: "Ant Design Mobile",
+    license: "MIT",
+    version: "5.0",
+    vendor: "Ant Group",
+    category: "corporate",
+    tokens: {
+      "motion.easing.touch": { $value: [0.1, 0.8, 0.2, 1.0], $type: "cubicBezier", $description: "Ant Design Mobile responsive touch curve" },
+      "motion.duration.fast": { $value: "120ms", $type: "duration" },
+      "space.grid": { $value: "4px", $type: "dimension" },
+    },
+    motion: {
+      easings: { touch: "cubic-bezier(0.1, 0.8, 0.2, 1.0)" },
+      durations: { fast: 120, base: 220, slow: 350 },
+      staggers: { tight: 30, base: 60, relaxed: 90 },
+    },
+    typography: { basePx: 15, ratio: 1.2, scalePx: [12, 13, 15, 17, 20, 24, 30] },
+    space: { gridPx: 4, scalePx: [4, 8, 12, 16, 20, 24, 32, 40] },
+  },
+
+  tailwind_tokens: {
+    id: "tailwind_tokens",
+    name: "Tailwind CSS Token System",
+    license: "MIT",
+    version: "3.4",
+    vendor: "Tailwind Labs",
+    category: "corporate",
+    tokens: {
+      "motion.easing.in_out": { $value: [0.4, 0.0, 0.2, 1.0], $type: "cubicBezier" },
+      "motion.duration.150": { $value: "150ms", $type: "duration" },
+      "motion.duration.300": { $value: "300ms", $type: "duration" },
+      "space.grid": { $value: "4px", $type: "dimension" },
+    },
+    motion: {
+      easings: { inOut: "cubic-bezier(0.4, 0.0, 0.2, 1.0)", out: "cubic-bezier(0.0, 0.0, 0.2, 1.0)", in: "cubic-bezier(0.4, 0.0, 1.0, 1.0)" },
+      durations: { d75: 75, d100: 100, d150: 150, d200: 200, d300: 300, d500: 500, d700: 700, d1000: 1000 },
+      staggers: { tight: 30, base: 75, relaxed: 150 },
+    },
+    typography: { basePx: 16, ratio: 1.25, scalePx: [12, 14, 16, 18, 20, 24, 30, 36, 48, 60, 72, 96] },
+    space: { gridPx: 4, scalePx: [2, 4, 8, 12, 16, 20, 24, 32, 40, 48, 64, 80, 96] },
+  },
+
+  chakra_ui: {
+    id: "chakra_ui",
+    name: "Chakra UI Tokens",
+    license: "MIT",
+    version: "2.8",
+    vendor: "Chakra Systems",
+    category: "corporate",
+    tokens: {
+      "motion.easing.ease_in_out": { $value: [0.4, 0.0, 0.2, 1.0], $type: "cubicBezier" },
+      "motion.duration.fast": { $value: "150ms", $type: "duration" },
+      "motion.duration.normal": { $value: "200ms", $type: "duration" },
+      "space.grid": { $value: "4px", $type: "dimension" },
+    },
+    motion: {
+      easings: { easeInOut: "cubic-bezier(0.4, 0.0, 0.2, 1.0)" },
+      durations: { ultraFast: 50, faster: 100, fast: 150, normal: 200, slow: 300, slower: 400 },
+      staggers: { tight: 30, base: 60, relaxed: 100 },
+    },
+    typography: { basePx: 16, ratio: 1.25, scalePx: [12, 14, 16, 18, 20, 24, 30, 36, 48] },
+    space: { gridPx: 4, scalePx: [4, 8, 12, 16, 20, 24, 32, 40, 48, 64] },
   },
 };
 

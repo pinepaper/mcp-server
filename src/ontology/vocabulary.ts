@@ -133,6 +133,9 @@ export const PP_VOCABULARY: PinePaperVocabulary = {
     // front of Paper's geometry and forfeit SVG export and the relation graph.
     'pp:Hatching':  { anchor: 'wd:Q1194492', description: 'Ruling a region with closely spaced lines so that DENSITY states value — the same shape at 6px and 3px spacing reads as light and dark with no change of colour. Distinguished from needlepainting (pp:ThreadPainting) by direction: hatch lines all lie the same way; stitches follow the form.', parentType: 'pp:Concept', mcpTool: 'pinepaper_design_medium' },
     'pp:FlowField': { anchor: null, description: 'A per-cell direction field that bends a mark along it — walked as a particle, so a line drifts the way a pen does rather than being displaced sideways. hand | curved | zigzag | waves | seabed | spiral | columns. What makes a ruling read as drawn rather than printed.', parentType: 'pp:Concept', mcpTool: 'pinepaper_design_medium' },
+    // Stitchcraft & Procedural Hand-Drawn Animation (parity with FxTool)
+    'pp:Stitchcraft':     { anchor: 'schema:VisualArtwork', description: 'Procedural embroidery, thread painting, seam lines, satin fills, and cross-stitch artwork applied onto canvas vector items.', parentType: 'pp:CanvasElement', createdWith: 'pp:CanvasShape', mcpTool: 'pinepaper_create_stitchcraft' },
+    'pp:HandDrawnAnimation': { anchor: 'schema:VisualArtwork', description: 'Procedural hand-drawn canvas animation, sketchy stroke jitter, and stop-motion line reveals.', parentType: 'pp:Concept', mcpTool: 'pinepaper_animate' },
     // Escape hatch — items that don't match any vocabulary type
     'pp:Unclassified':  { anchor: null, description: 'Item type not expressible in current vocabulary.', parentType: 'pp:CanvasElement' },
   },

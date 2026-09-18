@@ -20,6 +20,7 @@ export interface VocabularyType {
   geometricSupertype?: string;
   defaultCurveType?: string;
   bpmnEquivalent?: string;
+  createdWith?: string;
   i18nKey?: string;
 }
 

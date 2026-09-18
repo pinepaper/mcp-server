@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
  * Source:    mcp-cloud/src/services/content-recipes.ts (DesignStyle union only)
- * sha256:    a34c1e834b4429c0fb0285129274e75638164640892ddaba6ae972681dc70693
+ * sha256:    a4671987c9119f393447569b90e7ce9a838dbc992044092c4eae4fae75239a16
  * Generator: scripts/sync-design-systems.mjs
  *
  * Edit the TypeScript upstream and re-run the generator. A hand edit here is
@@ -38,4 +38,7 @@ export type DesignStyle =
   | "claymorphism"
   | "constructivism_suprematism"
   | "art_nouveau"
-  | "op_art_psychedelic";
+  | "op_art_psychedelic"
+  | "print_monochrome_crisp"
+  | "print_early_learner"
+  | "print_stem_technical";

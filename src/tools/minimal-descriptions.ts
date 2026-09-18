@@ -234,6 +234,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_magic: 'Auto-animation. action: animate|remix. mood: calm|professional|energetic|dramatic|whimsical. selectionOnly.',
   pinepaper_physics: 'Rigid body sim. action: init|add_body|remove_body|apply_force|apply_impulse|set_velocity|get_state|create_ground|create_joint. gravity, bodyType, mass, friction.',
   pinepaper_measurement: 'Rulers/grid. action: set_rulers|set_grid|get_dimensions|set_snap. enabled, itemId.',
+  pinepaper_create_stitchcraft: 'Procedural embroidery and thread presets. preset: embroidery_satin|running_seam|cross_stitch|needlepainting|stem_outline|seed_texture. itemId, threadColor, strokeWidth, density.',
 
   // --- Guide & runtime config ---
   pinepaper_tool_guide: 'Get detailed guidance for any tool, category, or the full AI Agent Guide.',

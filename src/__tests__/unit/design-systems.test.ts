@@ -23,6 +23,7 @@ import {
 } from '../../design/design-systems.js';
 import { DesignSystemInputSchema } from '../../types/schemas.js';
 import { PINEPAPER_TOOLS } from '../../tools/definitions.js';
+import { handleToolCall } from '../../tools/handlers.js';
 
 const VENDOR_DIR = join(import.meta.dir, '..', '..', 'vendor', 'design');
 
@@ -181,5 +182,48 @@ describe('the schema and the tool surface', () => {
     expect(tool.description).toContain('licensed, versioned product');
     expect(tool.description).toContain('AESTHETIC STYLE');
     expect(tool.description).toContain('pinepaper:authored');
+  });
+
+  it('recognizes 21 licensed design systems including the 6 added upstream', () => {
+    const systems = listSystems();
+    expect(systems).toHaveLength(21);
+    const ids = systems.map((s) => s.id);
+    expect(ids).toContain('radix_shadcn');
+    expect(ids).toContain('salesforce_slds2');
+    expect(ids).toContain('adobe_spectrum2');
+    expect(ids).toContain('ant_design_mobile');
+    expect(ids).toContain('tailwind_tokens');
+    expect(ids).toContain('chakra_ui');
+  });
+
+  it('recognizes 31 styles in ALL_STYLES including the 3 print additions', () => {
+    expect(ALL_STYLES).toHaveLength(31);
+    expect(ALL_STYLES).toContain('print_monochrome_crisp');
+    expect(ALL_STYLES).toContain('print_early_learner');
+    expect(ALL_STYLES).toContain('print_stem_technical');
+  });
+
+  it('handles cloud tool aliases seamlessly', async () => {
+    // pinepaper_design_systems with systemName="all"
+    const listRes = await handleToolCall('pinepaper_design_systems', { systemName: 'all' });
+    expect(listRes.isError).toBeFalsy();
+    const listText = (listRes.content[0] as any).text;
+    expect(listText).toContain('radix_shadcn');
+
+    // pinepaper_design_systems with systemName="material3" (normalized to material_3)
+    const getRes = await handleToolCall('pinepaper_design_systems', { systemName: 'material3' });
+    expect(getRes.isError).toBeFalsy();
+    const getText = (getRes.content[0] as any).text;
+    expect(getText).toContain('Material Design 3');
+
+    // pinepaper_design_styles
+    const stylesRes = await handleToolCall('pinepaper_design_styles', {});
+    expect(stylesRes.isError).toBeFalsy();
+    const stylesText = (stylesRes.content[0] as any).text;
+    expect(stylesText).toContain('swiss_typographic');
+
+    // pinepaper_stick_figure
+    const stickRes = await handleToolCall('pinepaper_stick_figure', { action: 'figure', style: 'plain' });
+    expect(stickRes.isError).toBeFalsy();
   });
 });

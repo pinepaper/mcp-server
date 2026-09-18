@@ -55,7 +55,7 @@ export const MODULES = ['design-systems-dtcg'];
 export function discoverGenerators() {
   if (!existsSync(UPSTREAM_DIR)) return [];
   return readdirSync(UPSTREAM_DIR)
-    .filter((f) => f.endsWith('-generator.ts'))
+    .filter((f) => f.endsWith('-generator.ts') && !f.startsWith('typesafe-'))
     .map((f) => basename(f, '.ts'))
     .sort();
 }

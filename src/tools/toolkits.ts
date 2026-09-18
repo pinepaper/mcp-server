@@ -163,6 +163,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
     // The medium axis belongs with the design system, not with effects: it is
     // a choice about what makes the marks, alongside register and level.
     'pinepaper_design_medium',
+    'pinepaper_create_stitchcraft',
   ],
   // Review surface (1.6.4): anchored feedback, and where things came from.
   review: [

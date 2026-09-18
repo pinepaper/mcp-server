@@ -202,6 +202,7 @@ export const ALL_STYLES: DesignStyle[] = [
   'corporate_memphis', 'y2k_frutiger_aero', 'mid_century_upa', 'comic_benday',
   'pixel_art_8bit', 'isometric_lowpoly', 'hand_drawn_sketch', 'claymorphism',
   'constructivism_suprematism', 'art_nouveau', 'op_art_psychedelic',
+  'print_monochrome_crisp', 'print_early_learner', 'print_stem_technical',
 ];
 
 export function listStyles(): Array<{ style: string; composable: boolean }> {

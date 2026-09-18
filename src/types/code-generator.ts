@@ -201,6 +201,7 @@ import {
   DetectObjectsInput,
   ExtractObjectInput,
   ArrangeInput,
+  StitchcraftInput,
 } from './schemas.js';
 import { OntologyCompiler } from '../ontology/ontology-compiler.js';
 import { z } from 'zod';
@@ -9023,6 +9024,101 @@ ${guard('unlockAllItems')}${pass('app.unlockAllItems()')}
   }
   app.pulseEvent(${eventIdJson}, ${payloadJson});
   return { success: true, action: 'pulse', eventId: ${eventIdJson} };
+})();`.trim();
+  }
+
+  /**
+   * Generate code for pinepaper_create_stitchcraft.
+   * Procedural embroidery, thread painting, satin fills, seam lines, cross-stitch, and needlepainting.
+   */
+  generateStitchcraft(input: StitchcraftInput): string {
+    const presetStr = JSON.stringify(input.preset || 'embroidery_satin');
+    const itemIdStr = input.itemId ? JSON.stringify(input.itemId) : 'null';
+    const optsObj: Record<string, unknown> = {};
+    if (input.threadColor !== undefined) optsObj.threadColor = input.threadColor;
+    if (input.strokeWidth !== undefined) optsObj.strokeWidth = input.strokeWidth;
+    if (input.density !== undefined) optsObj.density = input.density;
+    if (input.roughness !== undefined) optsObj.roughness = input.roughness;
+    if (input.bowing !== undefined) optsObj.bowing = input.bowing;
+    if (input.sheen !== undefined) optsObj.sheen = input.sheen;
+    if (input.seed !== undefined) optsObj.seed = input.seed;
+    const optsStr = JSON.stringify(optsObj);
+
+    return `
+// Create stitchcraft procedural embroidery / thread artwork
+(function() {
+  const targetId = ${itemIdStr};
+  let targetItem = null;
+  if (targetId && app.itemRegistry) {
+    const entry = app.itemRegistry.get(targetId);
+    targetItem = entry && entry.item ? entry.item : null;
+  }
+  if (!targetItem && app.selection && app.selection.length > 0) {
+    targetItem = app.selection[0];
+  }
+  if (!targetItem && app.itemRegistry && typeof app.itemRegistry.getAll === 'function') {
+    const all = app.itemRegistry.getAll();
+    if (all && all.length > 0) targetItem = all[all.length - 1].item;
+  }
+  if (!targetItem && typeof paper !== 'undefined' && paper.project && paper.project.activeLayer && paper.project.activeLayer.children) {
+    const ch = paper.project.activeLayer.children;
+    targetItem = ch[ch.length - 1] || null;
+  }
+  if (!targetItem) {
+    return { success: false, error: 'No target item found for stitchcraft' + (targetId ? ': ' + targetId : '') };
+  }
+
+  // Text items must be converted to glyphs first
+  if (targetItem.content !== undefined && typeof targetItem.getPointAt !== 'function') {
+    return { success: false, error: 'A text item has no outline to stitch directly. Convert it to glyph paths first using pinepaper_text_style, then apply stitchcraft to the resulting paths.' };
+  }
+
+  const preset = ${presetStr};
+  const opts = ${optsStr};
+
+  let group = null;
+
+  if (typeof app.applyStitchcraftToItem === 'function') {
+    group = app.applyStitchcraftToItem(targetItem, preset, opts);
+  } else if (typeof window !== 'undefined' && typeof window.applyStitchcraftToItem === 'function') {
+    group = window.applyStitchcraftToItem(targetItem, preset, opts, (typeof paper !== 'undefined' ? paper : app.scope));
+  } else if (typeof app.applyThreadPainting === 'function') {
+    // Fallback to thread painting
+    group = app.applyThreadPainting(targetId || (targetItem.data && targetItem.data.id), {
+      color: opts.threadColor,
+      width: opts.strokeWidth,
+      count: opts.density ? Math.round(opts.density * 100) : undefined,
+    });
+  }
+
+  if (!group) {
+    return { success: false, error: 'Stitchcraft generation failed for preset ' + preset + ' on item ' + (targetId || (targetItem.data && targetItem.data.id) || 'shape') };
+  }
+
+  // Apply organic hand-crafted fidelity if requested (jitter endpoints for tactile textile feel)
+  if (opts.roughness && group.children && group.children.length > 0) {
+    const r = opts.roughness;
+    const seed = opts.seed || 1;
+    for (let i = 0; i < group.children.length; i++) {
+      const line = group.children[i];
+      if (line && line.segments && line.segments.length >= 2) {
+        const jx = (Math.sin(seed + i * 2.13) * r);
+        const jy = (Math.cos(seed + i * 3.47) * r);
+        line.segments[0].point.x += jx * 0.4;
+        line.segments[0].point.y += jy * 0.4;
+        line.segments[1].point.x -= jx * 0.4;
+        line.segments[1].point.y -= jy * 0.4;
+      }
+    }
+  }
+
+  if (app.historyManager) app.historyManager.saveState();
+  return {
+    success: true,
+    preset: preset,
+    groupId: (group.data && group.data.id) || group.name || null,
+    stitchCount: group.children ? group.children.length : (group.data && group.data.stitchCount) || 0
+  };
 })();`.trim();
   }
 }
