@@ -19,7 +19,7 @@
  */
 
 import { describe, it, expect } from 'bun:test';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { REQUIRED_ENGINE_METHODS, OPTIONAL_ENGINE_METHODS } from '../../tools/engine-methods.js';
@@ -77,6 +77,32 @@ describe('the derived engine-method list stays derived', () => {
     }
   });
 
+});
+
+describe('the vendored character modules have a generator, not a transcription', () => {
+  const UPSTREAM = process.env.PP_MCP_CLOUD_DIR
+    ? join(process.env.PP_MCP_CLOUD_DIR, 'src', 'services')
+    : resolve(REPO, '..', 'mcp-cloud', 'src', 'services');
+  const present = existsSync(UPSTREAM);
+
+  it(present ? 'match upstream' : 'skip cleanly with mcp-cloud absent', () => {
+    // These two were hand-vendored: a header saying "re-vendor", a parity test
+    // comparing byte for byte, and no tool to re-vendor WITH. So honouring the
+    // instruction meant transcribing 36KB of timing logic by hand — the exact
+    // failure the header warns about. It drifted on 2026-09-18 when upstream
+    // moved and there was no mechanical way to fix it.
+    const r = run('sync-character-modules.mjs');
+    expect(r.status).toBe(0);
+    if (present) expect(r.stdout + r.stderr).not.toContain('DRIFT');
+    else expect(r.stderr).toContain('no upstream at');
+  });
+
+  it('carries a hash, so a hand edit is visible', () => {
+    const head = readFileSync(join(REPO, 'src', 'character', 'perform.ts'), 'utf-8').slice(0, 500);
+    expect(head).toContain('VENDORED from mcp-cloud');
+    expect(head).toMatch(/sha256:\s+[0-9a-f]{64}/);
+    expect(head).toContain('sync-character-modules.mjs');
+  });
 });
 
 describe('the vendored design data is checked in the suite, not only at publish', () => {

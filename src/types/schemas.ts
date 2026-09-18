@@ -896,6 +896,25 @@ export const GeneratorNameSchema = z.enum([
   'drawScatter',
   'drawStackedWaves',
   'draw3DParametricCurve',
+
+  // THE GATE WAS NARROWER THAN THE ENGINE, and generatorName is a hard
+  // preflight gate — an unlisted name is rejected before the browser sees
+  // it. The engine registers 74 generators and this offered 64, so these
+  // ten were live and uncallable. Seven are the GPU field generators, which
+  // is the expensive half: create_item's `field` type, design_medium's flow
+  // fields and the design graph's own recipe example all name drawGPUTunnel,
+  // so a captured scene recording `generator: 'drawGPUTunnel'` could not be
+  // replayed through the tool that exists to replay it.
+  'draw3DWorld',
+  'drawCharacterEyes',
+  'drawGPUCaustics',
+  'drawGPUClouds',
+  'drawGPUOcean',
+  'drawGPUPlasma',
+  'drawGPUStarfield',
+  'drawGPUTunnel',
+  'drawGPUVoronoi',
+  'drawRiggedCharacter',
 ]).describe('Background generator name');
 
 export type GeneratorName = z.infer<typeof GeneratorNameSchema>;

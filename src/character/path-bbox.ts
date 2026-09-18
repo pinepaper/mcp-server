@@ -1,7 +1,10 @@
-/* VENDORED from mcp-cloud/src/services/path-bbox.ts @ a3557b7.
- * Do NOT edit here — change it in mcp-cloud and re-vendor, or the two
- * implementations drift and a figure performs differently depending on which
- * surface a caller reached. Guarded by character-vendor-parity.test.ts.
+/* VENDORED from mcp-cloud/src/services/path-bbox.ts.
+ * sha256: ab22b612e8355355552c2db1f07e48b11c17ab6c1bb44bf66c51d973c201d585
+ * Generator: scripts/sync-character-modules.mjs
+ *
+ * Do NOT edit here — change it in mcp-cloud and re-run the generator, or the
+ * two implementations drift and a figure performs differently depending on
+ * which surface a caller reached. Guarded by character.test.ts.
  */
 /**
  * THE TRUE BOUNDING BOX OF AN SVG PATH.

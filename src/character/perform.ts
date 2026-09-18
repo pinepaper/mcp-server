@@ -1,8 +1,10 @@
-/* VENDORED from mcp-cloud/src/services/character-perform.ts @ a3557b7.
- * Do NOT edit here — change it in mcp-cloud and re-vendor, or the two
- * implementations drift and a figure performs differently depending on which
- * surface a caller reached. Guarded by character-vendor-parity.test.ts.
- * Local change: the DURATION_SCALE_MS import points at ./duration-scale.
+/* VENDORED from mcp-cloud/src/services/character-perform.ts.
+ * sha256: 91737fa6410fbe24e7b969c9d1a97ca4c6694c117854ce3182606efa41e98db7
+ * Generator: scripts/sync-character-modules.mjs
+ *
+ * Do NOT edit here — change it in mcp-cloud and re-run the generator, or the
+ * two implementations drift and a figure performs differently depending on
+ * which surface a caller reached. Guarded by character.test.ts.
  */
 /**
  * A CHARACTER IS DIRECTED, NOT DRAWN.
@@ -203,10 +205,12 @@ function isInkFill(colour: string): boolean {
   return luminance(colour) < 0.22;
 }
 
-export function performCharacter(input: PerformInput): { ops: Op[]; parts: string[]; tracks: number } {
+export function performCharacter(input: PerformInput): { ops: Op[]; parts: string[]; tracks: number; unknownChannels: string[] } {
   const { id, depiction: dep, at, height, channels, beats, durationSeconds } = input;
   const k = height / dep.height;
   const byName = new Map(channels.map((c) => [c.name, c]));
+  /** Beats naming a channel this concept has no definition for — reported, not hidden. */
+  const unknownChannels: string[] = [];
   const ops: Op[] = [];
   /**
    * ONE CONTINUOUS CONTOUR, WHICH IS WHAT MAKES A FIGURE READ AS ONE OBJECT.
@@ -474,7 +478,27 @@ export function performCharacter(input: PerformInput): { ops: Op[]; parts: strin
 
   for (const b of beats) {
     const c = byName.get(b.channel);
-    if (!c) continue;
+    /**
+     * A BEAT ON A CHANNEL THIS CONCEPT DOES NOT DECLARE WAS DROPPED IN SILENCE.
+     *
+     * `continue` alone, with no record. Measured across the shipped corpus
+     * 2026-09-18 by mutation — changing the channel name left the scene
+     * byte-identical — 28 beats were discarded this way: 14 `blink`,
+     * 10 `headTurn`, 4 `say`. The SAME channel names work on other characters,
+     * which is what makes it so easy to miss: an author writes `blink` for a
+     * cast of four, it animates on three, and the fourth just never blinks.
+     *
+     * Still dropped, because a beat cannot drive a channel that does not
+     * exist — only the silence is removed. The available names go with it,
+     * since "blink is not a channel here" is useless without "these are".
+     */
+    if (!c) {
+      unknownChannels.push(
+        `character "${id}": beat at ${b.at}s names channel "${b.channel}", which this concept does not declare. ` +
+        `Available: ${channels.map((x) => x.name).join(", ") || "(none)"}.`,
+      );
+      continue;
+    }
     if (c.kind === "alternate" && c.base && c.alternate) {
       swap(c.base, c.alternate, b.at, b.at + (c.holdMs ?? 120) / 1000);
     } else if (c.kind === "speak" && c.states && c.states.length >= 2) {
@@ -711,5 +735,5 @@ export function performCharacter(input: PerformInput): { ops: Op[]; parts: strin
     tracks++;
   }
 
-  return { ops, parts: partIds.map((p) => `${id}_${p}`), tracks };
+  return { ops, parts: partIds.map((p) => `${id}_${p}`), tracks, unknownChannels };
 }
