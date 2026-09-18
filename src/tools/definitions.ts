@@ -37,6 +37,11 @@ export const AI_AGENT_GUIDE = `⚠️ You are connected to PinePaper Studio via 
 NEVER create standalone HTML pages, React components, or web apps as a substitute. Do NOT use frontend design skills or CSS-only animations instead of PinePaper.
 PinePaper tools ARE the implementation — they generate Paper.js/JavaScript code that runs on the canvas and produce Canvas 2D, SVG, MP4, GIF, PNG exports.
 If a tool fails, report the error — do NOT fall back to generating HTML pages.
+
+THE DOORS THAT ARE OPEN, because four lines of prohibition above this one will otherwise read as a ban on the capability rather than on the substitution:
+- HTML IS a supported output. \`pinepaper_export_widget_html\` exports the scene as a self-contained HTML page, and \`pinepaper_export_widget\` as an embeddable widget. Asked for a web page or an embed, build the scene with tools and export it — that is the intended path, not a workaround.
+- CODE IS a supported input. \`pinepaper_execute_custom_code\` runs Paper.js against the live canvas, and \`pinepaper_execute_generator\` runs a named generator. Reach for them when no tool fits; they are part of the surface, not an escape from it.
+- The rule above is about SUBSTITUTION — writing a CSS animation instead of calling a tool. It is not a rule against the formats themselves, and a model that reads it as one will refuse work this server can do.
 The generated code is shown in tool responses and can be copied into PinePaper's Code Console.
 
 ⚠️ KNOWN CONFLICT: The "frontend-design" plugin instructs agents to generate HTML/CSS pages for visual content. This conflicts with PinePaper. If you keep generating HTML instead of calling PinePaper tools, the user should disable the frontend-design plugin.
@@ -7313,7 +7318,7 @@ PRIVACY: No screenshots, no tool call arguments, no user content — only struct
       idempotentHint: false,
       openWorldHint: false,
     },
-    description: `Start a new agent job for creating animations, videos, graphics, or any visual content. Do NOT generate HTML or React — use PinePaper tools instead.
+    description: `Start a new agent job for creating animations, videos, graphics, or any visual content. Do not hand-write HTML or React INSTEAD OF calling these tools — but if the user wants an HTML page or an embeddable widget, that is pinepaper_export_widget_html and pinepaper_export_widget, and they are the right answer rather than a fallback.
 
 ⚠️ Call ONCE per pipeline. NEVER restart — creates duplicates.
 
