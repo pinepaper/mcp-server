@@ -5,6 +5,7 @@
  * This code is designed to run in the browser context where window.PinePaper is available.
  */
 
+import { REQUIRED_ENGINE_METHODS, OPTIONAL_ENGINE_METHODS } from '../tools/engine-methods.js';
 import { generateP5DrawCode } from '../tools/p5-compat/p5-helpers.js';
 import {
   ItemType,
@@ -6153,6 +6154,48 @@ case 'analyze_palette':
   const key = ${S(validated.key)};
   const exclude = ${S(validated.exclude)};
 
+  // WHICH ENGINE METHODS THIS STUDIO HAS.
+  //
+  // Every tool guards the methods it needs and refuses by name without them,
+  // which is right per call and useless in advance: an agent otherwise learns a
+  // studio is too old one tool at a time. getCapabilities cannot answer this —
+  // it reports the engine's VOCABULARY (styles, palettes, relations), not which
+  // of its methods exist.
+  //
+  // The list is DERIVED from the emitters' own guards by
+  // scripts/sync-engine-methods.mjs, so it cannot drift from what the tools
+  // actually check. Required and optional are kept apart because an older
+  // studio that degrades is not an unusable one.
+  if (action === 'studio') {
+    const required = ${S(REQUIRED_ENGINE_METHODS)};
+    const optional = ${S(OPTIONAL_ENGINE_METHODS)};
+    const has = (path) => {
+      // Dotted paths: thirteen methods live behind a sub-facade
+      // (exportEngine.exportToStore, mapSystem.worldTour).
+      let node = app;
+      for (const part of path.split('.')) {
+        if (!node) return false;
+        node = node[part];
+      }
+      return typeof node === 'function';
+    };
+    const missingRequired = required.filter((m) => !has(m));
+    const missingOptional = optional.filter((m) => !has(m));
+    return {
+      success: true,
+      studio: {
+        requiredTotal: required.length,
+        requiredPresent: required.length - missingRequired.length,
+        missingRequired: missingRequired,
+        optionalTotal: optional.length,
+        missingOptional: missingOptional,
+        // A studio missing nothing required can serve every tool this server
+        // publishes. Missing something optional only narrows an answer.
+        complete: missingRequired.length === 0,
+      },
+    };
+  }
+
   // The registries getCapabilities does NOT aggregate. Each is a capability an
   // agent otherwise has to guess at, which by this project's rule is the same
   // as its not existing. Read one at a time and name a missing facade rather
@@ -6789,6 +6832,7 @@ case 'analyze_palette':
    * (bringToFront / sendToBack / bringForward / sendBackward).
    */
   generateArrange(input: ArrangeInput): string {
+    // @engine-methods bringToFront sendToBack bringForward sendBackward
     const method = {
       front: 'bringToFront',
       back: 'sendToBack',
@@ -7795,6 +7839,7 @@ ${needWorld}
         return `
 // World3D: ${input.action} — a canvas path becomes real geometry
 (async function() {
+  // @engine-methods extrudeToMesh latheToMesh importOBJToWorld importGLTFToWorld
   if (typeof app.${fn} !== 'function') { return { success: false, error: 'app.${fn} unavailable — update FxTool to a world3d-capable build' }; }
   const r = await app.${fn}(${S(input.pathId)}, ${S(mesh)});
   if (!r || r.ok === false) { return { success: false, error: (r && r.reason) || 'the world refused the mesh' }; }
@@ -7900,6 +7945,7 @@ ${needWorld}
         return `
 // World3D: ${input.action}
 (async function() {
+  // @engine-methods extrudeToMesh latheToMesh importOBJToWorld importGLTFToWorld
   if (typeof app.${fn} !== 'function') { return { success: false, error: 'app.${fn} unavailable — update FxTool to a world3d-capable build' }; }
 ${needWorld}
   const r = await app.${fn}(${S(input.source)}, ${S(input.importOptions ?? {})});
@@ -8155,6 +8201,7 @@ ${needWorld}
     return `
 // Stick: ${action}
 (async function() {
+  // @engine-methods stickFigure stickSet
   if (typeof app.${fn} !== 'function') { return { success: false, error: 'app.${fn} unavailable — update FxTool (the stick kit is vendored from mcp-cloud)' }; }
   const r = await app.${fn}(${S(opts)});
   if (!r || r.ok === false) { return { success: false, error: (r && (r.reason || r.error)) || 'the stick kit produced nothing' }; }
@@ -8224,6 +8271,7 @@ ${needWorld}
    * console to read, so the PRECONDITION is checked here and named, rather than
    * letting a caller receive nothing and guess why.
    */
+  // @engine-methods exportLottie exportDotLottie exportEngine.exportToStore exportEngine.readExport exportEngine.releaseExport
   generateInterchange(input: InterchangeInput): string {
     const S = (v: unknown) => JSON.stringify(v);
     const guard = (fn: string) =>

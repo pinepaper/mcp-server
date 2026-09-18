@@ -5160,8 +5160,8 @@ EXAMPLE — Choose effect for a victory card:
       properties: {
         action: {
           type: 'string',
-          enum: ['list', 'choose', 'coverage', 'find', 'catalogue'],
-          description: "Query mode: list, choose, coverage, find, or catalogue (default: list). 'catalogue' reads a registry the capabilities aggregate does not gather.",
+          enum: ['list', 'choose', 'coverage', 'find', 'catalogue', 'studio'],
+          description: "Query mode: list, choose, coverage, find, catalogue, or studio (default: list). 'catalogue' reads a registry the aggregate does not gather. 'studio' reports which engine METHODS this studio has, so you learn what will refuse BEFORE calling it — long-form export needs exportEngine.exportToStore, mesh authoring needs extrudeToMesh, and this is how you find out without trying each.",
         },
         catalogue: {
           type: 'string',

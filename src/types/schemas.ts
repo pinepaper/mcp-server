@@ -3018,8 +3018,8 @@ export type QueryOntologyInput = z.infer<typeof QueryOntologyInputSchema>;
 
 // Capabilities query schema: discover and match capabilities across text styles, text effects, generators, deforms, relations, etc.
 export const QueryCapabilitiesInputSchema = z.object({
-  action: z.enum(['list', 'choose', 'coverage', 'find', 'catalogue']).default('list')
-    .describe("'list' (all capabilities or filtered by kind) · 'choose' (context/mood-weighted recommendation) · 'coverage' (breakdown of indexable capabilities) · 'find' (lookup by key) · 'catalogue' (the registries the aggregate does NOT gather — see `catalogue`)"),
+  action: z.enum(['list', 'choose', 'coverage', 'find', 'catalogue', 'studio']).default('list')
+    .describe("'list' (all capabilities or filtered by kind) · 'choose' (context/mood-weighted recommendation) · 'coverage' (breakdown of indexable capabilities) · 'find' (lookup by key) · 'catalogue' (the registries the aggregate does NOT gather — see `catalogue`) · 'studio' (which engine METHODS this studio has, so you learn what will refuse BEFORE calling it)"),
   catalogue: z.enum([
     'rig_presets', 'shader_effects', 'stroke_decorations', 'precomps', 'images',
     'segment_edit_kinds', 'shatter_orders', 'world_meshes', 'relation_presets',
