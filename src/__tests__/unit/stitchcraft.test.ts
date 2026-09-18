@@ -125,25 +125,64 @@ describe('the ontology points at the tool that can do it', () => {
  * drifted in the same direction — because neither read the published table.
  */
 describe('the stitch list has exactly one definition', () => {
-  it('every served copy is the same six', () => {
-    const six = [...THREAD_STITCHES];
-    expect(six).toHaveLength(6);
-    for (const toolName of ['pinepaper_design_medium', 'pinepaper_compose']) {
-      const tool = PINEPAPER_TOOLS.find((t) => t.name === toolName)!;
-      const props = (tool.inputSchema as { properties: Record<string, { enum?: string[] }> }).properties;
-      expect(props.stitch?.enum, `${toolName} has no stitch enum`).toBeTruthy();
-      expect(props.stitch!.enum, `${toolName} drifted from THREAD_STITCHES`).toEqual(six);
+  /**
+   * STRUCTURAL, not textual — and the reason is worth keeping.
+   *
+   * The first version of this guard asserted that no served schema contained
+   * the exact JSON of the stale four. A REORDERED copy — ['satin',
+   * 'longAndShort', 'stem', 'seed'], the same regression with the same two
+   * omissions — walked straight past it, so the guard would have gone green on
+   * the very bug it was written for. The FxTool session hit the mirror of this
+   * writing its own version: a containment scan matched the COMMENT explaining
+   * the defect, because prose quoting the code looks exactly like the code.
+   *
+   * So this walks the served schemas and compares stitch-shaped enums as SETS.
+   * Order cannot evade it, a description string cannot satisfy it, and a tool
+   * added later is covered without anyone remembering to list it here.
+   */
+  const stitchEnums = (): Array<{ tool: string; values: string[] }> => {
+    const out: Array<{ tool: string; values: string[] }> = [];
+    const walk = (tool: string, node: unknown) => {
+      if (!node || typeof node !== 'object') return;
+      const n = node as Record<string, unknown>;
+      if (Array.isArray(n.enum)) {
+        const vals = n.enum.filter((v): v is string => typeof v === 'string');
+        // Stitch-shaped: names only this vocabulary uses.
+        if (vals.some((v) => v === 'longAndShort' || v === 'crossStitch' || v === 'runningSeam')) {
+          out.push({ tool, values: vals });
+        }
+      }
+      for (const v of Object.values(n)) walk(tool, v);
+    };
+    for (const t of PINEPAPER_TOOLS) walk(t.name, t.inputSchema);
+    return out;
+  };
+
+  it('every stitch enum the server publishes is the full six', () => {
+    const found = stitchEnums();
+    // At least the two known homes. Fewer would mean one stopped being
+    // stitch-shaped and this guard silently stopped covering it.
+    expect(found.length).toBeGreaterThanOrEqual(2);
+    const expected = [...THREAD_STITCHES].sort();
+    for (const { tool, values } of found) {
+      expect([...values].sort(), `${tool} drifted from THREAD_STITCHES`).toEqual(expected);
     }
   });
 
-  it('no served schema hardcodes the stale four', () => {
-    // The shape of the bug: a list that reads plausibly and is missing exactly
-    // the two marks a caller reaching for embroidery wants.
-    const stale = JSON.stringify(['longAndShort', 'satin', 'seed', 'stem']);
-    for (const tool of PINEPAPER_TOOLS) {
-      expect(JSON.stringify(tool.inputSchema), `${tool.name} carries a hardcoded stitch list`).not.toContain(stale);
-    }
+  it('and both known homes are among them', () => {
+    const tools = new Set(stitchEnums().map((e) => e.tool));
+    expect(tools.has('pinepaper_design_medium')).toBe(true);
+    expect(tools.has('pinepaper_compose')).toBe(true);
   });
+
+  it('the guard fires on a REORDERED stale copy, which defeated the first version', () => {
+    const reordered = ['satin', 'longAndShort', 'stem', 'seed'];
+    expect([...reordered].sort()).not.toEqual([...THREAD_STITCHES].sort());
+    // And the textual form it replaced could NOT tell: exact-JSON containment
+    // misses any permutation, which is why this compares sets.
+    expect(JSON.stringify(reordered)).not.toContain(JSON.stringify(['longAndShort', 'satin', 'seed', 'stem']));
+  });
+
 
   it('both Zod schemas accept the two that were missing', () => {
     for (const stitch of ['runningSeam', 'crossStitch']) {
