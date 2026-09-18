@@ -20,7 +20,7 @@
 import { describe, it, expect } from 'bun:test';
 import { PINEPAPER_TOOLS } from '../../tools/definitions.js';
 import { codeGenerator } from '../../types/code-generator.js';
-import { DesignMediumInputSchema } from '../../types/schemas.js';
+import { DesignMediumInputSchema, ComposeInputSchema, THREAD_STITCHES } from '../../types/schemas.js';
 import { PP_VOCABULARY } from '../../ontology/vocabulary.js';
 
 describe('the phantom tool is gone, everywhere', () => {
@@ -111,5 +111,44 @@ describe('the ontology points at the tool that can do it', () => {
     expect(t.description).toContain('six stitches');
     expect(t.description).toContain('crossStitch');
     expect(t.description).not.toContain('no cross-stitch');
+  });
+});
+
+/**
+ * One list, not four.
+ *
+ * This list had four copies here — two Zod enums and their two JSON mirrors —
+ * and correcting one left pinepaper_compose unable to ask for two stitches
+ * apply_thread could. FxTool had the identical split for the identical reason
+ * on the same day: MEDIA.thread.stitches was hardcoded to the same stale four
+ * while STITCH_OPS published six (6aaa9069). Two repos, four copies, one list,
+ * drifted in the same direction — because neither read the published table.
+ */
+describe('the stitch list has exactly one definition', () => {
+  it('every served copy is the same six', () => {
+    const six = [...THREAD_STITCHES];
+    expect(six).toHaveLength(6);
+    for (const toolName of ['pinepaper_design_medium', 'pinepaper_compose']) {
+      const tool = PINEPAPER_TOOLS.find((t) => t.name === toolName)!;
+      const props = (tool.inputSchema as { properties: Record<string, { enum?: string[] }> }).properties;
+      expect(props.stitch?.enum, `${toolName} has no stitch enum`).toBeTruthy();
+      expect(props.stitch!.enum, `${toolName} drifted from THREAD_STITCHES`).toEqual(six);
+    }
+  });
+
+  it('no served schema hardcodes the stale four', () => {
+    // The shape of the bug: a list that reads plausibly and is missing exactly
+    // the two marks a caller reaching for embroidery wants.
+    const stale = JSON.stringify(['longAndShort', 'satin', 'seed', 'stem']);
+    for (const tool of PINEPAPER_TOOLS) {
+      expect(JSON.stringify(tool.inputSchema), `${tool.name} carries a hardcoded stitch list`).not.toContain(stale);
+    }
+  });
+
+  it('both Zod schemas accept the two that were missing', () => {
+    for (const stitch of ['runningSeam', 'crossStitch']) {
+      expect(DesignMediumInputSchema.safeParse({ action: 'apply_thread', itemId: 'i', stitch }).success).toBe(true);
+      expect(ComposeInputSchema.safeParse({ action: 'apply', medium: 'thread', stitch }).success).toBe(true);
+    }
   });
 });

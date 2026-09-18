@@ -3376,6 +3376,23 @@ export const ProvenanceInputSchema = z.object({
 });
 export type ProvenanceInput = z.infer<typeof ProvenanceInputSchema>;
 
+/**
+ * The stitches the thread medium publishes — ONE list, because it had four copies.
+ *
+ * Mirrors FxTool's `STITCH_OPS` in js/core/ThreadPainting.js, which is the
+ * vocabulary `applyThreadPainting` dispatches on; it refuses an unknown name
+ * rather than falling through to a default fill.
+ *
+ * There were four copies of this list here — two Zod enums and their two JSON
+ * mirrors — and fixing one left `pinepaper_compose` unable to ask for two
+ * stitches `apply_thread` could. The engine had the identical split for the
+ * identical reason: `MEDIA.thread.stitches` was hardcoded to the same stale
+ * four while STITCH_OPS published six (FxTool 6aaa9069). Two repos, four
+ * copies, one list, drifted the same direction on the same day — so it is
+ * declared once here and spread everywhere it is needed.
+ */
+export const THREAD_STITCHES = ['longAndShort', 'satin', 'seed', 'stem', 'runningSeam', 'crossStitch'] as const;
+
 export const SceneDiffInputSchema = z.object({
   /** 'history' compares two undo states; 'version' compares live vs a saved version. */
   action: z.enum(['history', 'version']),
@@ -3429,7 +3446,7 @@ export const ComposeInputSchema = z.object({
    * colours.
    */
   medium: z.enum(['vector', 'thread']).optional().describe("Render the composition in a medium. 'thread' stitches every closed path; photographs and text CANNOT be stitched and come back in `medium.skipped` with the reason, so read that count — a composition can render completely and be entirely unstitched."),
-  stitch: z.enum(['longAndShort', 'satin', 'seed', 'stem']).optional().describe('Which stitch, when medium is thread. Default longAndShort.'),
+  stitch: z.enum(THREAD_STITCHES).optional().describe('Which stitch, when medium is thread. Default longAndShort. The same six pinepaper_design_medium offers — call its list_stitches for each one.'),
   stitchBudget: z.number().int().min(200).max(20000).optional().describe('Total marks across the composition (default 6000). The stitch is scaled to fit rather than the fill being truncated — a half-stitched shape looks broken, coarser thread does not.'),
 });
 export type ComposeInput = z.infer<typeof ComposeInputSchema>;
@@ -3940,7 +3957,7 @@ export const DesignMediumInputSchema = z.object({
     .describe("'list_media' (7 media with fidelity + limitation) · 'resolve' (can this medium be made here, and how honestly) · 'list_stitches' · 'apply_thread' (render an item in thread) · 'apply_hatch' (rule an item with hatching — value through line density) · 'list_flow_fields' · 'list_hatch_options'"),
   medium: z.string().optional().describe("resolve: medium key — vector, thread, hatch, watercolor, ink, cutPaper, charcoal, oil, encaustic. Call list_media for the live set with each one's fidelity; the catalogue grows."),
   itemId: z.string().optional().describe('apply_thread / apply_hatch: a closed path, compound path, or a group of them. Its own silhouette is the region and its fill is the ink colour.'),
-  stitch: z.enum(['longAndShort', 'satin', 'seed', 'stem', 'runningSeam', 'crossStitch']).optional()
+  stitch: z.enum(THREAD_STITCHES).optional()
     .describe("Which stitch, when the medium is thread. Default longAndShort. These six are THE_STITCH_OPS the engine publishes — call 'list_stitches' for each one's description and its own parameters. An unknown name is refused by the engine rather than quietly stitched as a default fill."),
   field: z.object({
     kind: z.enum(['radial', 'spine', 'constant']),

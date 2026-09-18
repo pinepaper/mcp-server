@@ -242,6 +242,7 @@ What was *not* a gap is worth saying too, because it was on the list: `createFol
 - `apply_thread` now offers **all six stitches the engine publishes**, not four: `runningSeam` and `crossStitch` were missing, and they are what a caller reaching for stitchcraft wanted. It also gained the per-stitch parameters `STITCH_OPS` declares and nothing named — `slant`, `overlap`, `stagger`, `gapLen`, `gridSize`. `slant` is the one that matters most: a satin fill laid at a slant is what separates embroidery from ruling.
 - `roughness` is hand wobble, applied by the tool *after* the engine lays the stitches, since the engine has no such option. Every point of every stitch takes its own phase off the seed, so a long contour wobbles along its whole length rather than shearing at one end, and a given seed sews the same irregularities every run.
 - `pp:Stitchcraft` points at `pinepaper_design_medium` now.
+- **And the list has one definition.** It had four copies here — two Zod enums and their two JSON mirrors — so correcting one left `pinepaper_compose` unable to ask for two stitches `apply_thread` could. The engine had the identical split for the identical reason on the same day: `MEDIA.thread.stitches` was hardcoded to the same stale four while `STITCH_OPS` published six. Two repos, four copies, one list, drifted the same direction — because neither read the published table. It is `THREAD_STITCHES`, declared once and spread, with a test asserting every served copy matches.
 
 *Two corrections to this note, made in place rather than quietly edited.*
 

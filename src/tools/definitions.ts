@@ -16,6 +16,7 @@ import {
   EffectTypeSchema,
   SimpleAnimationTypeSchema,
   GEOMETRY_OPERATIONS,
+  THREAD_STITCHES,
 } from '../types/schemas.js';
 
 /**
@@ -2022,7 +2023,7 @@ EXAMPLE — a stitched leaf:
         action: { type: 'string', enum: ['list_media', 'resolve', 'list_stitches', 'apply_thread', 'apply_hatch', 'list_flow_fields', 'list_hatch_options'], description: 'Medium operation' },
         medium: { type: 'string', description: 'resolve: vector | thread | ink | cutPaper | charcoal | oil | encaustic' },
         itemId: { type: 'string', description: 'apply_thread / apply_hatch: a closed path, compound path, or a group of them.' },
-        stitch: { type: 'string', enum: ['longAndShort', 'satin', 'seed', 'stem', 'runningSeam', 'crossStitch'], description: "apply_thread: default longAndShort. These six are the stitches the engine publishes; call 'list_stitches' for each one's description and its own parameters. An unknown name is refused rather than quietly stitched as a default fill." },
+        stitch: { type: 'string', enum: [...THREAD_STITCHES], description: "apply_thread: default longAndShort. These six are the stitches the engine publishes; call 'list_stitches' for each one's description and its own parameters. An unknown name is refused rather than quietly stitched as a default fill." },
         field: { type: 'object', description: "apply_thread: { kind: 'radial'|'spine'|'constant', cx, cy, angle, spine[], across } — default radial from the shape centre." },
         stitchLen: { type: 'number', description: 'apply_thread: nominal stitch length px (default 18).' },
         rowGap: { type: 'number', description: 'apply_thread: row spacing px; defaults from thread width so rows abut.' },
@@ -4571,7 +4572,7 @@ flags as a badly-composed scene, and they do not survive an artboard change.`,
         register: { type: 'string', enum: ['naive', 'playful', 'poster', 'editorial', 'technical'], description: 'Which design language. Resolves gutter, margin, hue budget and type scale together; an explicit craft still overrides it.' },
         level: { type: 'number', description: 'Craft level 1-4 within the register: sketch, competent, refined, art-directed.' },
         medium: { type: 'string', enum: ['vector', 'thread'], description: "What makes the marks. 'thread' stitches every closed path AFTER arranging; photographs and text cannot be stitched and return in medium.skipped with the reason. Other media are refused with their own reason rather than faked." },
-        stitch: { type: 'string', enum: ['longAndShort', 'satin', 'seed', 'stem'], description: 'Which stitch when medium is thread (default longAndShort).' },
+        stitch: { type: 'string', enum: [...THREAD_STITCHES], description: 'Which stitch when medium is thread (default longAndShort) — the same six pinepaper_design_medium offers.' },
         stitchBudget: { type: 'number', description: 'Total marks across the composition (default 6000); the stitch scales to fit rather than the fill being cut short.' },
         action: { type: 'string', enum: ['list_patterns', 'list_treatments', 'apply', 'set_treatment'] },
         pattern: { type: 'string', description: 'Pattern key from list_patterns' },
