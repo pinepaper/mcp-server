@@ -3940,11 +3940,8 @@ export const DesignMediumInputSchema = z.object({
     .describe("'list_media' (7 media with fidelity + limitation) · 'resolve' (can this medium be made here, and how honestly) · 'list_stitches' · 'apply_thread' (render an item in thread) · 'apply_hatch' (rule an item with hatching — value through line density) · 'list_flow_fields' · 'list_hatch_options'"),
   medium: z.string().optional().describe("resolve: medium key — vector, thread, hatch, watercolor, ink, cutPaper, charcoal, oil, encaustic. Call list_media for the live set with each one's fidelity; the catalogue grows."),
   itemId: z.string().optional().describe('apply_thread / apply_hatch: a closed path, compound path, or a group of them. Its own silhouette is the region and its fill is the ink colour.'),
-  stitch: z.enum([
-    'longAndShort', 'satin', 'satinBetween', 'seed', 'seedFill', 'stem', 'stemAlong',
-    'flow', 'radial', 'fillRegion', 'spine', 'constant',
-  ]).optional()
-    .describe("Which stitch, when the medium is thread. Default longAndShort. Call 'list_stitches' for the engine's own set — this enum is the one it ships with. Embroidery names map on: a satin fill is 'satin', a stem outline is 'stem', a seed fill is 'seedFill', long-and-short is 'longAndShort'. There is no cross-stitch or running-seam stitch in this engine; 'seed' and 'stem' are the nearest marks."),
+  stitch: z.enum(['longAndShort', 'satin', 'seed', 'stem', 'runningSeam', 'crossStitch']).optional()
+    .describe("Which stitch, when the medium is thread. Default longAndShort. These six are THE_STITCH_OPS the engine publishes — call 'list_stitches' for each one's description and its own parameters. An unknown name is refused by the engine rather than quietly stitched as a default fill."),
   field: z.object({
     kind: z.enum(['radial', 'spine', 'constant']),
     cx: z.number().optional(), cy: z.number().optional(),
@@ -3964,12 +3961,11 @@ export const DesignMediumInputSchema = z.object({
   // every one of these; apply_thread passed ten of its eighteen, so eight
   // controls existed and were unreachable — the same gap that made the stick
   // kit's options source-only.
-  slant: z.number().optional().describe('apply_thread: stitch slant in DEGREES away from the row direction. A satin fill laid at a slant is what separates embroidery from ruling.'),
-  inset: z.number().optional().describe('apply_thread: how far inside the silhouette the stitching starts, in px — keeps the floss off the very edge.'),
-  maxLen: z.number().positive().optional().describe('apply_thread: hard cap on a single stitch, in px. Long floss sags; this is what stops one stitch spanning a whole shape.'),
-  overlap: z.number().min(0).optional().describe('apply_thread: how much consecutive rows overlap, 0..1. Raising it closes the gaps a coarse rowGap leaves.'),
-  pinch: z.number().min(0).optional().describe('apply_thread: narrows each stitch toward its ends, so the mark tapers like real thread rather than reading as a rectangle.'),
-  stagger: z.number().min(0).max(1).optional().describe('apply_thread: offsets alternate rows, 0..1 — stops the stitch ends lining up into visible seams down the fill.'),
+  slant: z.number().optional().describe('apply_thread: stitch slant in DEGREES — satin (default 0) and stem (default 22). A satin fill laid at a slant is what separates embroidery from ruling.'),
+  overlap: z.number().min(0).optional().describe('apply_thread: how far consecutive stem stitches overlap (default 0.4) — what makes a stem outline read as rope rather than a dashed line.'),
+  stagger: z.number().min(0).max(1).optional().describe('apply_thread: offsets alternate longAndShort rows (default 0.5) — stops stitch ends lining up into seams down the fill.'),
+  gapLen: z.number().positive().optional().describe('apply_thread: gap between runningSeam stitches, px (default 4). With stitchLen, this is the dash rhythm of a machine seam.'),
+  gridSize: z.number().positive().optional().describe('apply_thread: crossStitch grid pitch, px (default 12) — the size of each X, and so the resolution of the whole fill.'),
   roughness: z.number().min(0).optional()
     .describe('apply_thread: hand wobble. Jitters every point of every stitch after the engine lays them, so the fill reads as sewn rather than plotted. 0 is machine-exact. Reproducible for a given seed. This one is applied by the tool, not the engine.'),
 

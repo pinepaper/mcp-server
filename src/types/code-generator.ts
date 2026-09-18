@@ -7414,11 +7414,10 @@ ${guard}
           ...(input.seed !== undefined ? { seed: input.seed } : {}),
           ...(input.count !== undefined ? { count: input.count } : {}),
           ...(input.slant !== undefined ? { slant: input.slant } : {}),
-          ...(input.inset !== undefined ? { inset: input.inset } : {}),
-          ...(input.maxLen !== undefined ? { maxLen: input.maxLen } : {}),
           ...(input.overlap !== undefined ? { overlap: input.overlap } : {}),
-          ...(input.pinch !== undefined ? { pinch: input.pinch } : {}),
           ...(input.stagger !== undefined ? { stagger: input.stagger } : {}),
+          ...(input.gapLen !== undefined ? { gapLen: input.gapLen } : {}),
+          ...(input.gridSize !== undefined ? { gridSize: input.gridSize } : {}),
         });
         const roughStr = JSON.stringify(input.roughness ?? 0);
         const seedStr = JSON.stringify(input.seed ?? 1);

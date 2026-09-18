@@ -47,26 +47,32 @@ describe('the capability lives in apply_thread, with more of the engine than bef
   const gen = (input: Record<string, unknown>) =>
     codeGenerator.generateDesignMedium(DesignMediumInputSchema.parse(input) as never);
 
-  it('offers the engine\'s real stitch set, not an embroidery rename of part of it', () => {
-    // ThreadPainting ships satin, satinBetween, seed, seedFill, stem,
-    // stemAlong, flow, radial, fillRegion, spine, constant.
-    for (const stitch of ['satin', 'satinBetween', 'seed', 'seedFill', 'stem', 'stemAlong', 'flow', 'radial', 'fillRegion', 'spine', 'constant', 'longAndShort']) {
+  it("offers exactly the six stitches the engine publishes", () => {
+    // STITCH_OPS is the published vocabulary: longAndShort, satin, seed, stem,
+    // runningSeam, crossStitch. applyThreadPainting dispatches on it and
+    // REFUSES an unknown name rather than falling through to a default fill —
+    // so an enum wider than STITCH_OPS is a set of names that error, and one
+    // narrower is a capability nothing can reach.
+    for (const stitch of ['longAndShort', 'satin', 'seed', 'stem', 'runningSeam', 'crossStitch']) {
       expect(DesignMediumInputSchema.safeParse({ action: 'apply_thread', itemId: 'i', stitch }).success).toBe(true);
     }
-    // The two embroidery names the engine has no mark for stay refused rather
-    // than silently mapping onto something else.
-    for (const absent of ['cross_stitch', 'running_seam']) {
-      expect(DesignMediumInputSchema.safeParse({ action: 'apply_thread', itemId: 'i', stitch: absent }).success).toBe(false);
+    // These are PLANNER function names and field kinds, not stitches. They read
+    // like stitches in a grep over the module, which is how they briefly got
+    // into this enum; the engine would refuse every one.
+    for (const notAStitch of ['satinBetween', 'seedFill', 'stemAlong', 'fillRegion', 'radial', 'spine', 'constant', 'flow']) {
+      expect(
+        DesignMediumInputSchema.safeParse({ action: 'apply_thread', itemId: 'i', stitch: notAStitch }).success,
+        `${notAStitch} is a planner or a field kind, not a stitch`,
+      ).toBe(false);
     }
   });
 
-  it('forwards the eight options that existed and were unreachable', () => {
+  it('carries the per-stitch parameters STITCH_OPS declares', () => {
     const code = gen({
-      action: 'apply_thread', itemId: 'i',
-      slant: 30, inset: 4, maxLen: 40, overlap: 0.3, pinch: 0.5, stagger: 0.5,
-      stitchLen: 12, variance: 0.2,
+      action: 'apply_thread', itemId: 'i', stitch: 'runningSeam',
+      stitchLen: 8, gapLen: 4, gridSize: 12, slant: 22, overlap: 0.4, stagger: 0.5,
     });
-    for (const frag of ['"slant":30', '"inset":4', '"maxLen":40', '"overlap":0.3', '"pinch":0.5', '"stagger":0.5']) {
+    for (const frag of ['"gapLen":4', '"gridSize":12', '"slant":22', '"overlap":0.4', '"stagger":0.5']) {
       expect(code).toContain(frag);
     }
   });
@@ -99,7 +105,11 @@ describe('the ontology points at the tool that can do it', () => {
     const t = (PP_VOCABULARY.types as Record<string, { mcpTool?: string; description: string }>)['pp:Stitchcraft'];
     expect(t).toBeTruthy();
     expect(t.mcpTool).toBe('pinepaper_design_medium');
-    // And the description no longer promises a cross-stitch the engine lacks.
-    expect(t.description).toContain('no cross-stitch');
+    // And the description names the six stitches the engine publishes rather
+    // than claiming absent any that are real — it briefly said the engine has
+    // no cross-stitch, which was false: crossStitchFill is one of its six.
+    expect(t.description).toContain('six stitches');
+    expect(t.description).toContain('crossStitch');
+    expect(t.description).not.toContain('no cross-stitch');
   });
 });
