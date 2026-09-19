@@ -397,28 +397,28 @@ ITEM TYPES:
 - diamond: 4-sided diamond/rhombus (properties: radius, color)
 - arrow: Right-pointing block arrow (properties: width, height, color)
 - heart: Heart shape (properties: color)
-- disk: Filled circle (properties: radius, color)
-- circle-outline: Ring — circle with a hole (properties: radius, strokeColor, strokeWidth)
-- arrow-right: Right-pointing block arrow, squared tail (properties: width, height, color)
+- disk: Filled disk — the region inside a circle (properties: radius, color)
+- circle-outline: The circle CURVE — stroked, no interior (properties: radius,
+  strokeColor, strokeWidth)
+- arrow-right: Alias for arrow — the same definition under the name the shape
+  grids use. Identical output; both are listed because both are accepted.
 
-SPEECH AND ANNOTATION SHAPES — the engine draws these; use them instead of
-hand-building an outline from a path. Every one takes width, height, color.
-The six with a tail also take tailDirection (bottom-left | bottom-right |
-bottom | top-left | top-right | top | left | right) and tailSize (0-1, default
-0.35):
-- speech-bubble: Rounded bubble with a tail. Comics, dialogue, callouts.
-- speech-bubble-square: Rectangular bubble with a tail — a flatter, more
-  editorial voice than the rounded one.
-- speech-bubble-pointed: Bubble with a sharp spike tail (default direction
-  "bottom") — a shout or an exclamation.
-- thought-bubble: Cloud-lobed bubble with a trail of dots. Interior thought.
-- comment-box: Rectangular annotation box with a tail — margin notes, review
-  comments, UI callouts.
-- callout-box: Annotation box whose tail defaults to "left" — labelling a
-  diagram from the side.
-- double-bubble: Two joined lobes (properties: secondaryColor). Two speakers,
-  or a reply.
-- quote-bubble: Bubble carrying quotation marks. Pull quotes, testimonials.
+SPEECH AND ANNOTATION SHAPES — the engine draws these; use one instead of
+hand-building an outline from a path. All take width, height and color, and the
+descriptions below are the engine's own. The six with a tail also take
+tailDirection (bottom-left | bottom-right | bottom | top-left | top-right | top
+| left | right) and tailSize (0-1, default 0.35):
+- speech-bubble: Classic round speech bubble with triangular tail.
+- speech-bubble-square: Rectangular speech bubble with sharp corners and
+  pointed tail.
+- speech-bubble-pointed: Tooltip-style bubble with arrow pointer (tail defaults
+  to "bottom").
+- thought-bubble: Cloud-like thought bubble with trailing dots.
+- comment-box: Modern chat message bubble with high corner radius.
+- callout-box: Annotation callout with narrow arrow (tail defaults to "left").
+- double-bubble: Two overlapping bubbles for conversation (properties:
+  secondaryColor).
+- quote-bubble: Stylized bubble with quotation marks.
 
 PATH FOR CUSTOM SHAPES:
 Use itemType: "path" with either:

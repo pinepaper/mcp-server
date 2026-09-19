@@ -21,6 +21,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PINEPAPER_TOOLS } from '../../tools/definitions.js';
 import { ItemTypeSchema } from '../../types/schemas.js';
+import { PinePaperCodeGenerator } from '../../types/code-generator.js';
 
 const REGISTRY = readFileSync(join(import.meta.dir, '..', 'fixtures', 'engine-shape-registry.txt'), 'utf-8')
   .split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'))
@@ -82,5 +83,60 @@ describe('the engine shape registry is reachable', () => {
       ?.inputSchema as any)?.properties?.itemType?.enum as string[] | undefined;
     expect(served, 'create_item serves no itemType enum').toBeTruthy();
     expect([...served!].sort()).toEqual([...ItemTypeSchema.options].sort());
+  });
+});
+
+describe('the widened shapes actually reach the engine', () => {
+  /**
+   * EXECUTED, NOT INFERRED.
+   *
+   * I widened the enum after reading generateCreateItemCode and seeing
+   * `...baseProperties` spread into params. That is the "grep correct,
+   * inference wrong" shape that has cost this repo twice already: the function
+   * has type-specific branches — shader and field never call create at all —
+   * and reading one of them tells you nothing about the default path. If the
+   * emitter dropped the type or emitted a refusal, widening the enum would
+   * have shipped a dead door, which is a worse version of the bug it fixed.
+   *
+   * So the emitted code RUNS against a stub that records what create() was
+   * handed.
+   */
+  const emit = (itemType: string, properties: Record<string, unknown>) => {
+    const calls: unknown[][] = [];
+    const app = {
+      create: (...a: unknown[]) => { calls.push(a); return { id: 'i1', data: {} }; },
+      historyManager: { saveState: () => {} },
+      getItems: () => [],
+      updateLayersList: () => {},
+    };
+    const code = new PinePaperCodeGenerator().generateCreateItem({
+      itemType, position: { x: 100, y: 100 }, properties,
+    } as any);
+    try { new Function('app', 'return eval(' + JSON.stringify(code) + ');')(app); } catch { /* the stub is partial; the call is what matters */ }
+    return calls[0] as [string, Record<string, unknown>] | undefined;
+  };
+
+  it('a bubble reaches create with its tail parameters intact', () => {
+    const call = emit('speech-bubble', { tailDirection: 'right', tailSize: 0.5, color: '#f00' });
+    expect(call, 'create was never called for speech-bubble').toBeTruthy();
+    expect(call![0]).toBe('speech-bubble');
+    // tailDirection/tailSize exist ONLY for bubbles and the engine reads them
+    // off the same config object. Dropped here, every bubble silently takes
+    // the default tail and the parameter looks broken rather than unsupported.
+    expect(call![1].tailDirection).toBe('right');
+    expect(call![1].tailSize).toBe(0.5);
+  });
+
+  it('double-bubble carries secondaryColor, its one distinctive property', () => {
+    const call = emit('double-bubble', { secondaryColor: '#00f' });
+    expect(call![0]).toBe('double-bubble');
+    expect(call![1].secondaryColor).toBe('#00f');
+  });
+
+  it('a newly exposed basic shape reaches create under its own name', () => {
+    for (const t of ['disk', 'circle-outline', 'arrow-right']) {
+      const call = emit(t, { radius: 40, color: '#0f0' });
+      expect(call?.[0], `${t} never reached app.create`).toBe(t);
+    }
   });
 });
