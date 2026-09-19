@@ -19,7 +19,7 @@ import { describe, it, expect } from 'bun:test';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  listSystems, getSystem, listEasings, listStyles, compose, sceneToOps, styleTokens, ALL_STYLES,
+  listSystems, getSystem, listEasings, listDurations, listStyles, compose, sceneToOps, styleTokens, ALL_STYLES,
 } from '../../design/design-systems.js';
 import { DesignSystemInputSchema } from '../../types/schemas.js';
 import { PINEPAPER_TOOLS } from '../../tools/definitions.js';
@@ -367,5 +367,48 @@ describe('the schema and the tool surface', () => {
     // pinepaper_stick_figure
     const stickRes = await handleToolCall('pinepaper_stick_figure', { action: 'figure', style: 'plain' });
     expect(stickRes.isError).toBeFalsy();
+  });
+});
+
+/**
+ * A motion token is a shape AND a length. The 27 cubicBezier tokens were
+ * published; the 47 duration tokens beside them in the same store were read by
+ * nothing — so an agent could match a system's curve and had to invent its
+ * timing, which is the half that is easy to get wrong.
+ */
+describe('the duration half of the motion vocabulary', () => {
+  it('publishes the durations that were sitting unexposed', () => {
+    const durations = listDurations();
+    expect(durations.length).toBeGreaterThan(40);
+    // Both units: DTCG writes ms, every animation tool here takes seconds, and
+    // making each caller divide is how one of them divides wrong.
+    for (const d of durations) {
+      expect(d.ms).toBeGreaterThan(0);
+      expect(d.seconds).toBeCloseTo(d.ms / 1000, 6);
+      expect(d.license.length).toBeGreaterThan(0);
+      expect(d.name).toContain('.');
+    }
+  });
+
+  it('names are system-qualified and do not collide with the easings', () => {
+    const names = listDurations().map((d) => d.name);
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it('splits by provenance the same way easings do', () => {
+    const all = listDurations().length;
+    const authored = listDurations(true);
+    const vendor = listDurations(false);
+    expect(authored.length + vendor.length).toBe(all);
+    for (const d of authored) expect(d.authored).toBe(true);
+    for (const d of vendor) expect(d.authored).toBe(false);
+  });
+
+  it('a curve and a duration from the same system can be paired by name', () => {
+    // The point of publishing both: motion.duration.* and motion.easing.* come
+    // from one system and are meant to be used together.
+    const systems = new Set(listEasings().map((e) => e.system));
+    const withBoth = listDurations().filter((d) => systems.has(d.system));
+    expect(withBoth.length).toBeGreaterThan(0);
   });
 });

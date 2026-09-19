@@ -2317,6 +2317,7 @@ An AESTHETIC STYLE is a look: Bauhaus, Art Deco, Swiss typographic, De Stijl, va
 
 - list_systems / get_system: the licensed systems and their tokens, filterable by token type.
 - list_easings: every motion curve across every system as a named easing, with its licence and whether it was authored here. Use these to make a motion match a system it has to sit beside.
+- list_motion: those curves AND the duration scale sitting beside them — the other half of a motion token, published nowhere until now. A curve is a shape; a motion is a shape over a length, and matching a system's easing while inventing its timing gets only the easy half right. Durations come back in ms and in seconds, because every animation tool here takes seconds. These are the licensed SYSTEMS' motion scales: an aesthetic style carries no upstream motion data, so pair one of these with a style rather than expecting the style to name its own.
 - list_styles: every style with its TOKENS — palette, background, font stacks, type sizes and any variants — derived by composing it, so they are what the generator will actually draw. Read these to hand-build in a style rather than reverse-engineering its colours.
 - compose: build a titled scene in a style. Layout is decided in this server by a pure function, so 'compose' with draw:false returns the scene and the ops as DATA and draws nothing — read it before committing, the same way pinepaper_story's distill works. Element boxes are converted to the centre anchor app.create wants, and text carries its alignment, so a left-aligned headline starts at its x instead of centring on it.
 
@@ -2324,7 +2325,7 @@ A partial composition reports as a failure with the elements that did not create
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['list_systems', 'get_system', 'list_easings', 'list_styles', 'compose'], description: 'Which design-system operation.' },
+        action: { type: 'string', enum: ['list_systems', 'get_system', 'list_easings', 'list_motion', 'list_styles', 'compose'], description: 'Which design-system operation.' },
         systemId: { type: 'string', description: "get_system: e.g. 'material_3', 'ibm_carbon', 'uswds'. Call list_systems for ids." },
         tokenType: { type: 'string', enum: ['dimension', 'duration', 'cubicBezier', 'color', 'fontFamily', 'fontWeight', 'number', 'shadow', 'grid'], description: 'get_system: return only tokens of this DTCG type.' },
         style: { type: 'string', description: "compose: the aesthetic style, e.g. 'bauhaus_geometric'. Call list_styles for the composable ones." },

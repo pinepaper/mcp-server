@@ -358,6 +358,79 @@ export interface NamedEasing {
  * usable, and they are not the same claim — so `authored` rides along instead
  * of the two being flattened into one list of equally-official numbers.
  */
+export interface NamedDuration {
+  /** Stable name: system id + token path, matching a NamedEasing's. */
+  name: string;
+  system: string;
+  systemName: string;
+  token: string;
+  /** Milliseconds, parsed from the DTCG string. */
+  ms: number;
+  /** Seconds — what every animation tool on this surface actually takes. */
+  seconds: number;
+  description?: string;
+  license: string;
+  authored: boolean;
+}
+
+/**
+ * A duration token in milliseconds. DTCG writes them as strings.
+ *
+ * Every value in the vendored systems is `<n>ms` today, and `<n>s` is parsed
+ * too rather than silently returning null on an upstream change — a dropped
+ * token would thin the listing without anything saying so.
+ */
+function tokenToMilliseconds(token: DTCGToken): number | null {
+  if (token.$type !== 'duration') return null;
+  const raw = String(token.$value).trim();
+  const ms = /^(\d+(?:\.\d+)?)ms$/.exec(raw);
+  if (ms) return Number(ms[1]);
+  const s = /^(\d+(?:\.\d+)?)s$/.exec(raw);
+  if (s) return Number(s[1]) * 1000;
+  return null;
+}
+
+/**
+ * The other half of a motion token, which this surface was not publishing.
+ *
+ * `listEasings` exposed the 27 cubicBezier tokens and nothing read the 47
+ * duration tokens sitting beside them in the same store — so an agent could
+ * match a system's CURVE and had to invent its TIMING, which is half a motion
+ * vocabulary and the half that is easy to get wrong. A curve is a shape; a
+ * motion is a shape over a length.
+ *
+ * These are the licensed SYSTEMS' motion scales — Material's duration ladder,
+ * Carbon's, and so on. They are NOT per-aesthetic-style motion: a style like
+ * bauhaus_geometric has no upstream motion data at all, and manufacturing some
+ * would be inventing a fact about someone else's design system.
+ */
+export function listDurations(authoredOnly?: boolean): NamedDuration[] {
+  const out: NamedDuration[] = [];
+  for (const sys of Object.values(OPEN_DESIGN_SYSTEMS) as DTCGDesignSystem[]) {
+    for (const [path, token] of Object.entries(sys.tokens ?? {})) {
+      const ms = tokenToMilliseconds(token);
+      if (ms === null) continue;
+      const authored = token.$extensions?.['pinepaper:authored'] === true;
+      if (authoredOnly !== undefined && authored !== authoredOnly) continue;
+      out.push({
+        name: `${sys.id}.${path}`,
+        system: sys.id,
+        systemName: sys.name,
+        token: path,
+        ms,
+        // Every animation tool here takes seconds. Publishing only the DTCG
+        // unit would make each caller do the same division, and one of them
+        // would do it wrong.
+        seconds: Math.round((ms / 1000) * 1000) / 1000,
+        description: token.$description,
+        license: sys.license,
+        authored,
+      });
+    }
+  }
+  return out;
+}
+
 export function listEasings(authoredOnly?: boolean): NamedEasing[] {
   const out: NamedEasing[] = [];
   for (const sys of Object.values(OPEN_DESIGN_SYSTEMS) as DTCGDesignSystem[]) {

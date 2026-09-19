@@ -610,3 +610,58 @@ describe('a range refusal is a correction, not a dead end', () => {
     expect(textOf(r)).toContain('exceeds export');
   });
 });
+
+/**
+ * SIZE CONTROL, and why it is a resolution knob rather than a bitrate one.
+ *
+ * A five-minute render came out at 188 MB and had to be re-encoded with ffmpeg
+ * to be deliverable, and the obvious ask was "let me set a bitrate". There is
+ * nowhere to put one: VideoExporter computes its own target from resolution,
+ * quality and fps and never reads a caller-supplied value, so a `bitrate`
+ * parameter would be a knob that silently does nothing — this surface has spent
+ * a whole release removing those. Resolution is an INPUT to that calculation,
+ * so `scale` is the control that actually reaches the encoder, and it is the
+ * same knob that makes a preview render fast.
+ */
+describe('export scale', () => {
+  const dims = (code: string) => JSON.parse(/const dimensions = ([^;]+);/.exec(code)![1]);
+
+  it('leaves the emitted code untouched when no scale is asked for', () => {
+    const code = codeGenerator.generateAgentExport({ platform: 'youtube', format: 'mp4', duration: 5 });
+    expect(dims(code)).toEqual({ width: 1920, height: 1080 });
+    // The buffered fallback paths export at canvas size today. A new optional
+    // knob does not quietly change that for every existing caller.
+    expect(/baseVideoSettings = \{[^}]*width/.test(code)).toBe(false);
+  });
+
+  it('scales the platform preset, and carries the dimensions to every path', () => {
+    const code = codeGenerator.generateAgentExport({ platform: 'youtube', format: 'mp4', duration: 5, scale: 0.5 });
+    expect(dims(code)).toEqual({ width: 960, height: 540 });
+    expect(/baseVideoSettings = \{[^}]*width/.test(code)).toBe(true);
+  });
+
+  it('rounds to EVEN dimensions, which H.264 requires', () => {
+    // 4:2:0 chroma subsampling: an odd dimension is rejected by the encoder
+    // rather than rounded for you, so a scale that lands odd must not ship one.
+    for (const scale of [0.33, 0.37, 0.41, 0.7, 0.9]) {
+      for (const platform of ['youtube', 'twitter', 'tiktok', 'instagram']) {
+        const d = dims(codeGenerator.generateAgentExport({ platform, format: 'mp4', duration: 5, scale }));
+        expect(d.width % 2, `${platform}@${scale} width ${d.width}`).toBe(0);
+        expect(d.height % 2, `${platform}@${scale} height ${d.height}`).toBe(0);
+        expect(d.width).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('the estimate sees the scaled frame, so a preflight is not measuring a different export', () => {
+    const code = codeGenerator.generateAgentExport({ platform: 'youtube', format: 'mp4', duration: 5, scale: 0.5, estimateOnly: true });
+    expect(dims(code)).toEqual({ width: 960, height: 540 });
+  });
+
+  it('is refused on formats that carry no encode target, rather than accepted and dropped', () => {
+    for (const format of ['png', 'svg', 'pdf', 'wav']) {
+      expect(() => codeGenerator.generateAgentExport({ platform: 'web', format, scale: 0.5 } as never))
+        .toThrow(/scale applies to video formats/);
+    }
+  });
+});

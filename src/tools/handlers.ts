@@ -3067,6 +3067,18 @@ You can now start creating new items on a clean canvas.`,
             }
             return dataResult(sys);
           }
+          case 'list_motion': {
+            // Curves and durations together, because a motion token is a shape
+            // AND a length. The curves were published and the durations beside
+            // them in the same store were not, so a caller could match a
+            // system's easing and had to invent its timing.
+            const easings = designSystems.listEasings(input.authoredOnly);
+            const durations = designSystems.listDurations(input.authoredOnly);
+            return dataResult({
+              easings, durations,
+              note: 'These are the licensed SYSTEMS\' motion scales. An aesthetic style (bauhaus_geometric, memphis_group) carries no upstream motion data — pair one of these with a style rather than expecting the style to name its own.',
+            });
+          }
           case 'list_easings':
             return dataResult({ easings: designSystems.listEasings(input.authoredOnly) });
           case 'list_styles':

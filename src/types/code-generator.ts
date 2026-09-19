@@ -3151,7 +3151,7 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
 
   generateAgentExport(input: AgentExportInput): string {
     const validated = AgentExportInputSchema.parse(input);
-    const { platform, format, quality, framing, duration, estimateOnly } = validated;
+    const { platform, format, quality, framing, duration, estimateOnly, scale } = validated;
     const qualityLevel = quality || 'standard';
     const videoDuration = duration ?? 5;
 
@@ -3177,6 +3177,23 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
     };
 
     const preset = platformPresets[platform] || platformPresets['web'];
+
+    // SCALE is the only honest size control this surface has.
+    //
+    // A caller who wants a smaller file reaches for a bitrate, and there is
+    // nowhere to put one: VideoExporter computes its own target from
+    // resolution, quality and fps via _calculateBitrate and never reads a
+    // caller-supplied value — passing one would be a knob that silently does
+    // nothing. Resolution is an INPUT to that calculation, so halving the
+    // frame genuinely halves the encode target, and it is also what makes a
+    // preview render fast. One number, both jobs, and it is real.
+    //
+    // Rounded to EVEN: H.264 chroma subsampling is 4:2:0, and an odd dimension
+    // is rejected by the encoder rather than rounded for you.
+    const even = (n: number) => Math.max(2, Math.round(n / 2) * 2);
+    const scaled = scale !== undefined && scale !== 1
+      ? { width: even(preset.width * scale), height: even(preset.height * scale) }
+      : { width: preset.width, height: preset.height };
     // Resolve "auto" format to the platform's recommended format
     const exportFormat = (!format || format === 'auto') ? preset.staticFormat : format;
 
@@ -3259,7 +3276,7 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
   const quality = '${qualityLevel}';
   const framing = '${framing}';
   const settings = ${JSON.stringify(qualitySettings)};
-  const dimensions = ${JSON.stringify({ width: preset.width, height: preset.height })};
+  const dimensions = ${JSON.stringify(scaled)};
 
   // Preflight: same resolved settings as the real export, but render nothing.
   // Branching HERE rather than in a separate tool is deliberate — the estimate
@@ -3374,7 +3391,10 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
         // ExportEngine._quickExportVideo overrides quality with undefined for
         // mp4/webm, _calculateBitrate yields NaN, and VideoEncoder.configure
         // rejects with 'malformed bitrate value'.
-        const baseVideoSettings = { format, fps: settings.fps, quality: settings.compression, duration: ${videoDuration} };
+        // width/height ride along ONLY when a scale was asked for. The buffered
+        // fallback paths otherwise export at canvas size, and quietly changing
+        // that for every existing caller is not what a new optional knob does.
+        const baseVideoSettings = { format, fps: settings.fps, quality: settings.compression, duration: ${videoDuration}${scale !== undefined && scale !== 1 ? ', width: dimensions.width, height: dimensions.height' : ''} };
         const blobToDataUrl = (b) => new Promise(resolve => {
           const r = new FileReader();
           r.onloadend = () => resolve(r.result);

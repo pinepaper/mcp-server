@@ -2461,6 +2461,7 @@ export const AgentExportInputSchema = z.object({
   framing: z.enum(['canvas', 'camera']).optional().default('canvas').describe('Output framing: "canvas" (full canvas, default) or "camera" (camera_animates first-keyframe viewport — fails if no walkthrough exists). Camera animation still drives motion within the fixed output frame.'),
   duration: z.number().min(0.5).max(VIDEO_MAX_DURATION_S).optional().default(5).describe(`Video duration in seconds for animated formats (mp4/webm/gif). Default 5. Max ${VIDEO_MAX_DURATION_S} for mp4/webm, max ${GIF_MAX_DURATION_S} for gif (GIF is not codec-bounded, so file size scales with frames × dimensions, and it cannot stream to the export store). Static formats (png/svg/pdf) ignore this. Past roughly a minute the export is held in the studio's export store and paged back to a file rather than returned inline; a studio without that store refuses by name and says so.`),
   estimateOnly: z.boolean().optional().default(false).describe('Preflight only: return the estimated file size for these EXACT settings and render nothing. Use before a long or high-quality export to check the size first. Modeled for mp4/webm/gif; png/pdf/svg return confidence "none" because no dimension-based model exists for them; wav is reported as "exact", because uncompressed PCM size is arithmetic rather than a guess.'),
+  scale: z.number().min(0.1).max(1).optional().describe('Video only: render at this fraction of the platform preset\'s dimensions (0.1-1). The engine derives its encode target from RESOLUTION, so this is the size control — there is no bitrate to set, and halving the frame roughly quarters the pixels and the file. It is also the preview knob: scale 0.5 with quality "draft" is the fast look-check before committing to a full render. Rounded to even dimensions, which H.264 requires.'),
   sampleRate: z.number().int().positive().optional().describe('wav only: samples per second (default 48000). Ignored by every other format.'),
   bitDepth: z.union([z.literal(16), z.literal(32)]).optional().describe('wav only: 16 (default) or 32-bit float. Ignored by every other format.'),
 }).describe('Smart export options')
@@ -2473,6 +2474,16 @@ export const AgentExportInputSchema = z.object({
         code: z.ZodIssueCode.custom,
         path: ['framing'],
         message: 'framing does not apply to a wav export — it renders no frames. Drop framing, or export mp4/webm if you want the picture with the sound.',
+      });
+    }
+    // Same shape as the wav refusal below: a knob that cannot apply is said
+    // once rather than accepted and dropped. png/svg/pdf carry no encode
+    // target, so scaling them here would promise a resize that never happens.
+    if (val.scale !== undefined && !['mp4', 'webm', 'gif', 'auto'].includes(String(val.format))) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['scale'],
+        message: `scale applies to video formats (mp4/webm/gif), not "${val.format}" — it sets the render resolution the encoder derives its bitrate from. For a static export, set the platform or the canvas size instead.`,
       });
     }
     if (val.format !== 'wav' && (val.sampleRate !== undefined || val.bitDepth !== undefined)) {
@@ -4388,8 +4399,8 @@ export type World3DInput = z.infer<typeof World3DInputSchema>;
  * nothing about a design vocabulary needs the canvas to be open to decide it.
  */
 export const DesignSystemInputSchema = z.object({
-  action: z.enum(['list_systems', 'get_system', 'list_easings', 'list_styles', 'compose'])
-    .describe("'list_systems' every licensed design system with its vendor, licence and version · 'get_system' one system's full DTCG tokens · 'list_easings' every motion curve across all of them as named easings, with provenance · 'list_styles' the aesthetic styles and which can compose · 'compose' build a scene in a style."),
+  action: z.enum(['list_systems', 'get_system', 'list_easings', 'list_motion', 'list_styles', 'compose'])
+    .describe("'list_systems' every licensed design system with its vendor, licence and version · 'get_system' one system's full DTCG tokens · 'list_easings' every motion CURVE across all of them as named easings, with provenance · 'list_motion' those curves AND the duration scale beside them, which is the other half of a motion token · 'list_styles' the aesthetic styles with their palette, fonts and type sizes · 'compose' build a scene in a style."),
   systemId: z.string().optional().describe("get_system: which system, e.g. 'material_3', 'ibm_carbon', 'uswds'. Call list_systems for the ids."),
   tokenType: z.enum(['dimension', 'duration', 'cubicBezier', 'color', 'fontFamily', 'fontWeight', 'number', 'shadow', 'grid']).optional()
     .describe('get_system: return only tokens of this DTCG type.'),
@@ -4402,7 +4413,7 @@ export const DesignSystemInputSchema = z.object({
   variant: z.string().optional().describe("compose: a style-specific variant where one exists, e.g. art deco's emerald colourway."),
   draw: z.boolean().optional().default(true)
     .describe('compose: draw the scene on the canvas (default). false returns the computed scene as DATA and draws nothing — the same distinction story\'s `distill` makes, and for the same reason: a caller should be able to read a composition before committing to it.'),
-  authoredOnly: z.boolean().optional().describe('list_easings: return only the curves PinePaper authored to fill a gap, or only the ones a vendor actually publishes, rather than both mixed together.'),
+  authoredOnly: z.boolean().optional().describe('list_easings / list_motion: return only the curves and durations PinePaper authored to fill a gap, or only the ones a vendor actually publishes, rather than both mixed together.'),
 })
   .refine((v) => v.action !== 'get_system' || !!v.systemId, { message: 'get_system requires systemId — call list_systems for the ids', path: ['systemId'] })
   .refine((v) => v.action !== 'compose' || !!v.style, { message: 'compose requires style — call list_styles for the ones that can compose', path: ['style'] })
