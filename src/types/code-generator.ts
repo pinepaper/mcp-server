@@ -8412,6 +8412,110 @@ ${guard('buildSoundFromText')}
   return { success: true, spec: spec };
 })();`.trim();
 
+      // DEFINING A SOUND. The engine's three tables are "a curated starting set,
+      // not a claim that music contains six instruments" — its words. Anything
+      // it does not model can be registered at runtime and is then first-class:
+      // listInstruments() reads the LIVE table, so a defined instrument shows
+      // up in list_instruments and plays by name like any built-in.
+      //
+      // The canonical name is RETURNED rather than assumed. Registration
+      // normalises to [a-z][a-z0-9_-]{0,31}, so a model that registers
+      // 'Rhodes' and then plays 'Rhodes' is playing something that does not
+      // exist — the name it actually got is 'rhodes', and it needs to be told.
+      case 'define_instrument':
+      case 'define_percussion':
+      case 'define_sfx': {
+        const fn = input.action === 'define_instrument' ? 'registerInstrument'
+          : input.action === 'define_percussion' ? 'registerPercussion' : 'registerSfx';
+        const listFn = input.action === 'define_instrument' ? 'listInstruments'
+          : input.action === 'define_percussion' ? 'listPercussion' : 'listSfx';
+        const spec = {
+          ...(input.partials ? { partials: input.partials } : {}),
+          ...(input.envelope ? { envelope: input.envelope } : {}),
+          ...(input.gain !== undefined ? { gain: input.gain } : {}),
+          ...(input.aliases ? { aliases: input.aliases } : {}),
+          ...(input.noise !== undefined ? { noise: input.noise } : {}),
+          ...(input.noiseFreq !== undefined ? { noiseFreq: input.noiseFreq } : {}),
+          ...(input.hz !== undefined ? { hz: input.hz } : {}),
+          ...(input.pitch ? { pitch: input.pitch } : {}),
+        };
+        // @engine-methods registerInstrument registerPercussion registerSfx
+        // The guard below is INTERPOLATED — `guard(fn)` takes a variable, not a
+        // literal — so sync-engine-methods.mjs cannot read the names out of it
+        // and the studio probe would report a studio as complete while never
+        // checking the method a caller needs. It extracted only
+        // renderSoundtrackWav until this line existed.
+        return `
+// Sound: define ${input.name} at runtime
+(function() {
+${guard(fn)}
+  var name;
+  // The engine THROWS on an unusable name or a silent spec, with a message
+  // naming what was wrong. That is the useful answer, so it is caught and
+  // returned rather than allowed to surface as a bridge error with no subject.
+  try { name = app.${fn}(${S(input.name)}, ${S(spec)}); }
+  catch (e) { return { success: false, error: (e && e.message) || String(e) }; }
+  var listed = typeof app.${listFn} === 'function' ? app.${listFn}() : null;
+  var found = Array.isArray(listed)
+    ? listed.some(function (x) { return (x && x.name) === name; })
+    : null;
+  return {
+    success: true,
+    // The name the engine CHOSE, which is what plays. Registering 'Rhodes'
+    // returns 'rhodes'.
+    canonicalName: name,
+    requestedName: ${S(input.name)},
+    normalised: name !== ${S(input.name)},
+    // Defined but unlistable would be a capability nobody can name. Proven per
+    // call rather than assumed, because it is one table lookup.
+    listed: found,
+  };
+})();`.trim();
+      }
+
+      case 'render_soundtrack': {
+        const opts = {
+          ...(typeof input.options?.duration === 'number' ? { duration: input.options.duration } : {}),
+          ...(input.sampleRate !== undefined ? { sampleRate: input.sampleRate } : {}),
+          ...(input.bitDepth !== undefined ? { bitDepth: input.bitDepth } : {}),
+        };
+        return `
+// Sound: mix every placed sound to a WAV, offline
+(function() {
+${guard('renderSoundtrackWav')}
+  var r = app.renderSoundtrackWav(${S(opts)});
+  // BARE NULL MEANS "NO SOUNDS PLACED". Returned for an empty scene and for a
+  // scene whose sounds all failed to mix — indistinguishable from a malfunction
+  // unless it is named, and "the export produced nothing" is the report that
+  // sends someone debugging the exporter instead of placing a sound.
+  if (!r || !r.wav) {
+    return { success: false, error: 'no sounds are placed on this scene, so there is no soundtrack to render. Create one with action "create", or place an existing sound with "set_placement".' };
+  }
+  var bytes = r.wav;
+  // Uint8Array cannot cross the bridge; base64 in chunks, because
+  // String.fromCharCode.apply over a multi-megabyte array blows the stack.
+  var bin = '';
+  for (var i = 0; i < bytes.length; i += 8192) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+  }
+  return {
+    success: true,
+    wavBase64: btoa(bin),
+    byteLength: bytes.length,
+    duration: r.duration,
+    sampleRate: r.sampleRate,
+    sounds: r.sounds,
+    placed: r.placed,
+    // DROPPED IS THE SECOND SILENT REFUSAL. A mix with placed > 0 and dropped
+    // > 0 is a valid WAV that is quietly missing sounds — the same shape as an
+    // item list capped below its own itemCount. Reported only when it happened,
+    // so the marker stays meaningful.
+    ...(r.dropped > 0 ? { dropped: r.dropped, incomplete:
+      'mixed ' + r.placed + ' sound(s); ' + r.dropped + ' could not be rendered and are absent from this file' } : {}),
+  };
+})();`.trim();
+      }
+
       case 'create':
         return `
 // Sound: draw it AS a waveform path — the item and the sound are one thing

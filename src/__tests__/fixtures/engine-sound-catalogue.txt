@@ -1,0 +1,26 @@
+# The built-in sound tables FxTool ships, from js/audio/SoundPresets.js.
+# Format: kind name. Read from the INSTRUMENTS / PERCUSSION / SFX object
+# literals, not scraped from prose.
+#
+# These are a STARTING SET, not a ceiling: registerInstrument /
+# registerPercussion / registerSfx add to the same live tables at runtime, and
+# listInstruments() reads the live table — so a defined sound is listed and
+# playable exactly like one of these. The fixture pins the built-ins so the
+# tool's own documentation of them cannot drift.
+instrument sine
+instrument pad
+instrument pluck
+instrument bell
+instrument organ
+instrument strings
+percussion kick
+percussion snare
+percussion tom
+percussion hat
+percussion clap
+sfx beep
+sfx pop
+sfx noise
+sfx wind
+sfx whoosh
+sfx zap

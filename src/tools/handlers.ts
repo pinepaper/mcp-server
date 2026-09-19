@@ -2869,7 +2869,72 @@ You can now start creating new items on a clean canvas.`,
       case 'pinepaper_sound': {
         const input = SoundInputSchema.parse(args);
         const code = codeGenerator.generateSound(input);
-        return executeOrGenerate(code, `Sound: ${input.action}`, options, 'pinepaper_sound');
+        const soundDescription = `Sound: ${input.action}`;
+
+        // A RENDERED SOUNDTRACK IS A FILE, not a response field. 48kHz 16-bit
+        // mono is ~96 KB/s, so a minute is ~5.8 MB of base64 and the ten
+        // minutes the schema allows is ~77 MB — deliverable across the bridge,
+        // useless pasted into a conversation. This mirrors what agent_export
+        // already does for video and PDF, and reuses the same helper rather
+        // than growing a second copy of the save path.
+        if (input.action === 'render_soundtrack') {
+          const execMode = options.executionMode ?? getExecutionMode();
+          if (execMode === 'code' || !options.executeInBrowser) {
+            return executeOrGenerate(code, soundDescription, options, 'pinepaper_sound');
+          }
+          const soundController = options.browserController || getBrowserController();
+          if (!soundController.connected) {
+            try { await soundController.connect(); }
+            catch { return executeOrGenerate(code, soundDescription, options, 'pinepaper_sound'); }
+          }
+          const wavResult = await soundController.executeCode(code, false);
+          if (!wavResult.success) {
+            const canvasState = await captureCanvasState(soundController);
+            return errorResult(
+              ErrorCodes.EXECUTION_ERROR,
+              wavResult.error || 'Rendering the soundtrack failed',
+              { code },
+              { toolName: 'pinepaper_sound', canvasState: canvasState || undefined }
+            );
+          }
+          const soundtrack = wavResult.result as {
+            success?: boolean; wavBase64?: string; byteLength?: number; duration?: number;
+            sampleRate?: number; placed?: number; dropped?: number; incomplete?: string;
+          } | undefined;
+
+          // A refusal is a real answer — "no sounds are placed" travels intact
+          // rather than becoming an empty file.
+          if (!soundtrack?.success || !soundtrack.wavBase64) {
+            return executedResult(code, soundtrack, wavResult.screenshot, soundDescription);
+          }
+          try {
+            const { filePath, fileSize } = await saveExportToFile(
+              `data:audio/wav;base64,${soundtrack.wavBase64}`, 'wav', 'soundtrack');
+            const clean = { ...soundtrack, wavBase64: undefined, filePath, fileSize };
+            return {
+              content: [{
+                type: 'text' as const,
+                text: `Soundtrack rendered to file:\n\nFile: ${filePath}\n`
+                  + `Size: ${(fileSize / 1024).toFixed(1)} KB\n`
+                  + `Duration: ${soundtrack.duration}s at ${soundtrack.sampleRate} Hz\n`
+                  + `Mixed: ${soundtrack.placed} sound(s)\n`
+                  // The drop count rides on the success path, because a file
+                  // that wrote fine while missing sounds is the case nobody
+                  // goes looking for.
+                  + (soundtrack.dropped ? `DROPPED: ${soundtrack.incomplete}\n` : '')
+                  + `\nResult: ${JSON.stringify(clean, null, 2)}`,
+              }],
+            };
+          } catch (saveError) {
+            const stripped = {
+              ...soundtrack,
+              wavBase64: `[${soundtrack.byteLength} bytes of WAV — file save failed: ${saveError instanceof Error ? saveError.message : 'unknown error'}]`,
+            };
+            return executedResult(code, stripped, wavResult.screenshot, soundDescription);
+          }
+        }
+
+        return executeOrGenerate(code, soundDescription, options, 'pinepaper_sound');
       }
 
       case 'pinepaper_motion': {

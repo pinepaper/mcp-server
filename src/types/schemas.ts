@@ -4455,11 +4455,33 @@ export const SoundInputSchema = z.object({
     'play_tone', 'play_chord', 'chord_frequencies', 'play_percussion', 'play_sfx',
     'play_spec', 'from_text', 'play_from_text',
     'create', 'timbre_from_path', 'set_placement', 'remove', 'stop_all',
-  ]).describe("Catalogues: 'list_instruments' · 'list_percussion' · 'list_sfx'. Play: 'play_tone' · 'play_chord' · 'play_percussion' · 'play_sfx' · 'play_spec' · 'play_from_text'. Read without playing: 'chord_frequencies' · 'from_text' (a plain-language description resolved to a spec) · 'timbre_from_path'. Canvas: 'create' (a sound drawn AS a waveform path) · 'set_placement' · 'remove' · 'stop_all'."),
+    'define_instrument', 'define_percussion', 'define_sfx', 'render_soundtrack',
+  ]).describe("Catalogues: 'list_instruments' · 'list_percussion' · 'list_sfx'. Play: 'play_tone' · 'play_chord' · 'play_percussion' · 'play_sfx' · 'play_spec' · 'play_from_text'. Read without playing: 'chord_frequencies' · 'from_text' (a plain-language description resolved to a spec) · 'timbre_from_path'. Canvas: 'create' (a sound drawn AS a waveform path) · 'set_placement' · 'remove' · 'stop_all'. Define: 'define_instrument' · 'define_percussion' · 'define_sfx' — the six built-in instruments are a starting set, not a claim that music contains six; anything missing can be defined here and is then first-class, listed by the list_* actions and playable by name. Render: 'render_soundtrack' — mix every placed sound to a WAV file offline, with no Web Audio and no playback."),
   note: z.string().optional().describe("play_tone: scientific pitch, e.g. 'A4' or 'C#3'."),
   root: z.string().optional().describe("play_chord / chord_frequencies: the root note, e.g. 'C4'."),
   chord: z.string().optional().default('major').describe("play_chord / chord_frequencies: the chord kind, e.g. 'major', 'minor', 'maj7', 'dim'. Call the engine rather than guessing at exotic names."),
-  name: z.string().optional().describe("play_percussion / play_sfx: the named drum or effect — list them first (SFX include beep, pop, wind, whoosh, zap)."),
+  name: z.string().optional().describe("play_percussion / play_sfx: the named drum or effect — list them first (SFX include beep, pop, wind, whoosh, zap). define_*: the name to register under. It is NORMALISED to [a-z][a-z0-9_-]{0,31}, so 'Rhodes' registers as 'rhodes' — the response returns the canonical name the engine chose, and that is the name to play."),
+  partials: z.array(z.object({
+    h: z.number().positive().describe('Harmonic number — 1 is the fundamental, 2 the octave above.'),
+    amp: z.number().min(0).describe('Relative amplitude of this partial.'),
+  })).optional().describe("define_*: the harmonic table that IS the timbre. Required for define_instrument — a melodic instrument with no partials renders pure silence, and the engine refuses rather than handing back a note nobody can hear. Percussion and SFX may use noise instead."),
+  envelope: z.object({
+    attack: z.number().min(0).optional(),
+    decay: z.number().min(0).optional(),
+    sustain: z.number().min(0).max(1).optional(),
+    release: z.number().min(0).optional(),
+  }).optional().describe('define_*: ADSR shape, in seconds except sustain which is a level (0-1).'),
+  gain: z.number().min(0).max(1).optional().describe('define_*: output level. Defaults differ by kind — 0.8 instrument, 0.85 percussion, 0.65 sfx.'),
+  aliases: z.array(z.string()).optional().describe("define_*: extra names reaching the same sound, so 'rhodes' can also answer to 'electric piano'. An alias NEVER shadows a real catalogue entry — the table is consulted first — so aliasing an existing name is silently ignored rather than overriding it."),
+  noise: z.number().min(0).max(1).optional().describe('define_percussion / define_sfx: noise content. A hat, a clap, wind and whoosh are pure noise, so these two kinds accept a partial table OR noise > 0; with neither the engine refuses, because the result is silent.'),
+  noiseFreq: z.number().positive().optional().describe('define_percussion / define_sfx: centre frequency of the noise band, in Hz.'),
+  hz: z.number().positive().optional().describe('define_percussion / define_sfx: base frequency in Hz.'),
+  pitch: z.object({
+    from: z.number().positive().describe('Starting frequency in Hz.'),
+    tau: z.number().positive().max(5).describe('Glide time constant in seconds (max 5).'),
+  }).optional().describe("define_percussion / define_sfx: the pitch glide, which is what makes a kick a kick — the engine's own note is that the glide IS the drum. Omit it and a defined kick comes out a beep."),
+  sampleRate: z.number().int().positive().optional().describe('render_soundtrack: samples per second (default 48000).'),
+  bitDepth: z.union([z.literal(16), z.literal(32)]).optional().describe('render_soundtrack: 16 (default) or 32-bit float.'),
   text: z.string().optional().describe("from_text / play_from_text: a plain-language description, e.g. 'a soft warm bell on A4'. 'from_text' resolves it to a spec WITHOUT playing, so a caller can inspect or edit before committing."),
   spec: z.record(z.string(), z.unknown()).optional().describe('play_spec / create: the sound spec — partials, envelope, duration. Usually one you got from from_text or a catalogue entry rather than wrote by hand.'),
   options: z.record(z.string(), z.unknown()).optional().describe('Playback options for the play_* actions: duration, gain, pan, and the rest the audio graph accepts.'),
@@ -4479,7 +4501,21 @@ export const SoundInputSchema = z.object({
   .refine((v) => !['from_text', 'play_from_text'].includes(v.action) || !!v.text, { message: 'this action requires text', path: ['text'] })
   .refine((v) => v.action !== 'play_spec' || !!v.spec, { message: 'play_spec requires spec', path: ['spec'] })
   .refine((v) => !['timbre_from_path', 'set_placement', 'remove'].includes(v.action) || !!v.itemId, { message: 'this action requires itemId', path: ['itemId'] })
-  .refine((v) => v.action !== 'set_placement' || !!v.placement, { message: 'set_placement requires placement', path: ['placement'] });
+  .refine((v) => v.action !== 'set_placement' || !!v.placement, { message: 'set_placement requires placement', path: ['placement'] })
+  .refine((v) => !['define_instrument', 'define_percussion', 'define_sfx'].includes(v.action) || !!v.name,
+    { message: 'defining a sound requires name', path: ['name'] })
+  // The engine's own rule, stated here so the refusal arrives before the round
+  // trip: a melodic instrument needs partials, while percussion and SFX may be
+  // pure noise. Mirrored rather than tightened — tightening it would refuse a
+  // hat, which is exactly the sound that has no partials.
+  .refine((v) => v.action !== 'define_instrument' || (v.partials?.length ?? 0) > 0,
+    { message: 'define_instrument requires at least one partial — an instrument with none renders silence', path: ['partials'] })
+  .refine((v) => !['define_percussion', 'define_sfx'].includes(v.action)
+    || (v.partials?.length ?? 0) > 0 || (v.noise ?? 0) > 0,
+    { message: 'this action needs a partial table or noise > 0 — with neither the sound is silent', path: ['noise'] })
+  // Bound by the scene, like every other timed export.
+  .refine((v) => v.action !== 'render_soundtrack' || (v.options?.duration as number | undefined ?? 1) <= VIDEO_MAX_DURATION_S,
+    { message: `render_soundtrack duration is capped at ${VIDEO_MAX_DURATION_S}s, the same ceiling as video`, path: ['options'] });
 export type SoundInput = z.infer<typeof SoundInputSchema>;
 
 /**

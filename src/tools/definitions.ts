@@ -2431,11 +2431,28 @@ THE PART WORTH KNOWING: sound and drawing are the same object here, both ways.
 - create draws a sound AS a waveform path on the canvas. Edit the path and the timbre changes with it — it is not a picture of the sound, it is the sound.
 - timbre_from_path reads ANY drawn path back as harmonic content. A curve someone drew by hand becomes the partials of a note.
 
-A path with no length cannot be a timbre, and the engine answers a flat single-partial timbre for anything that is not one — a real answer and a refusal look identical — so the item is checked before the call and a non-path is refused by name.`,
+A path with no length cannot be a timbre, and the engine answers a flat single-partial timbre for anything that is not one — a real answer and a refusal look identical — so the item is checked before the call and a non-path is refused by name.
+
+THE CATALOGUE IS A STARTING SET, NOT THE LIMIT. Six instruments, five drums and six effects are what the engine ships with; that is not a claim about how many instruments exist. define_instrument, define_percussion and define_sfx register a new one at runtime — a rhodes, a koto, a taiko, a specific synth patch — and it is first-class from then on: it appears in the list_* catalogues and plays by name like any built-in.
+- A melodic instrument needs a partial table, because one with no partials renders silence. Percussion and SFX may be pure noise instead, because a hat and a whoosh are.
+- For a drum, pass pitch: { from, tau }. The glide is what makes a kick a kick; without it you get a beep.
+- Names are normalised to [a-z][a-z0-9_-]. Register 'Rhodes' and the response returns canonicalName 'rhodes' — play THAT.
+
+render_soundtrack mixes every placed sound to a WAV and writes it to a file. It runs offline, with no Web Audio and no playback, so it works in a headless studio. An empty scene is refused by name rather than producing a silent file, and any sound that could not be mixed is reported as dropped — a soundtrack missing a track otherwise looks exactly like a complete one.`,
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['list_instruments', 'list_percussion', 'list_sfx', 'play_tone', 'play_chord', 'chord_frequencies', 'play_percussion', 'play_sfx', 'play_spec', 'from_text', 'play_from_text', 'create', 'timbre_from_path', 'set_placement', 'remove', 'stop_all'], description: 'Which sound operation.' },
+        action: { type: 'string', enum: ['list_instruments', 'list_percussion', 'list_sfx', 'play_tone', 'play_chord', 'chord_frequencies', 'play_percussion', 'play_sfx', 'play_spec', 'from_text', 'play_from_text', 'create', 'timbre_from_path', 'set_placement', 'remove', 'stop_all', 'define_instrument', 'define_percussion', 'define_sfx', 'render_soundtrack'], description: 'Which sound operation.' },
+        partials: { type: 'array', items: { type: 'object' }, description: 'define_*: [{ h, amp }] — the harmonic table that IS the timbre. Required for define_instrument.' },
+        envelope: { type: 'object', description: 'define_*: { attack, decay, sustain, release } — seconds, except sustain which is a level 0-1.' },
+        gain: { type: 'number', description: 'define_*: output level 0-1 (0.8 instrument, 0.85 percussion, 0.65 sfx).' },
+        aliases: { type: 'array', items: { type: 'string' }, description: "define_*: extra names for the same sound. An alias never shadows a real catalogue entry." },
+        noise: { type: 'number', description: 'define_percussion / define_sfx: noise content 0-1. A hat and a clap are pure noise, so these kinds take partials OR noise.' },
+        noiseFreq: { type: 'number', description: 'define_percussion / define_sfx: noise band centre in Hz.' },
+        hz: { type: 'number', description: 'define_percussion / define_sfx: base frequency in Hz.' },
+        pitch: { type: 'object', description: 'define_percussion / define_sfx: { from, tau } pitch glide. The glide IS the drum — omit it and a kick comes out a beep.' },
+        sampleRate: { type: 'number', description: 'render_soundtrack: samples per second (default 48000).' },
+        bitDepth: { type: 'number', enum: [16, 32], description: 'render_soundtrack: 16 (default) or 32-bit float.' },
         note: { type: 'string', description: "play_tone: scientific pitch, e.g. 'A4'." },
         root: { type: 'string', description: "play_chord / chord_frequencies: root note, e.g. 'C4'." },
         chord: { type: 'string', description: "play_chord / chord_frequencies: chord kind (default 'major')." },
