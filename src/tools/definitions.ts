@@ -3173,10 +3173,15 @@ USE WHEN:
 - Custom item registration
 - Accessing PinePaper APIs directly
 - Prototyping new features
+- A scene whose repetition is the point: dozens of items built in a loop. This is the cheapest route by an order of magnitude — a 63-item animated scene is ~4k characters here against ~147k as keyframe tool calls — because the loop collapses the repetition instead of restating it per item. Synchronous build work is bounded by the governor's 4s deadline, which such a scene fits easily.
+
+WHAT THE CHEAP ROUTE COSTS, so the choice is deliberate: items built and animated in raw JS carry NO behavioral record. No graph edge, nothing SMIL or widget export can lift, nothing the ontology can read — the scene renders and cannot describe itself. Relations are the canonical behavior surface here, so for motion that is a function of time prefer pinepaper_add_relation with 'time_expression' (still ~5.7x cheaper than keyframes), and for a whole group moving together staggered_with or wave_through. Reach for a loop when the geometry is procedural, not merely to avoid the typing.
 
 AVAILABLE GLOBALS:
 - app: PinePaper application instance
   - app.create(type, params): Create items
+  - app.addAnimation(itemId, keyframes, options): Attach keyframe TRACKS programmatically — the other half of a procedural scene, and what makes the loop route cheap: the keyframes are generated, not typed. Accepts an id or the item itself; options.timeUnits ('seconds'|'ms') overrides the ms auto-detect, which long-form timelines need
+  - app.animate(item, params): Attach a LOOP animation (pulse, bounce, wobble, …) — the other kind of motion, and not what addAnimation does
   - app.addRelation(sourceId, targetId, type, params): Add relations
   - app.registerRelationRule(name, definition): Register custom relations
   - app.itemRegistry: Access all registered items
@@ -3296,6 +3301,13 @@ USE WHEN:
 - "change color from red to blue"
 - "first fade in, then rotate, then fade out"
 - Any animation with specific timing or sequential stages
+
+BEFORE AUTHORING DENSE TRACKS — three routes are cheaper, and two of them keep the scene describable. Measured on the same 63-item, 32-keyframes-each scene:
+- Motion that is a FUNCTION OF TIME (bob, pulse, sweep, phase-offset wave) → pinepaper_add_relation with relationType 'time_expression'. One call per property instead of one keyframe per sample: 26k characters against 147k. It also survives into the design graph, save/reload and widget export, which keyframes generated from a formula do not describe.
+- PER-ITEM VARIATION across many items → staggered_with or wave_through express the whole group in ONE call. That collapses the 63-fold repetition a per-item time_expression still pays for.
+- GENUINELY PROCEDURAL scenes → pinepaper_execute_custom_code with app.create + app.addAnimation (which attaches keyframe tracks programmatically, so the keyframes are generated rather than typed), at 4k characters for the same scene — cheapest by an order of magnitude, because a loop collapses the repetition entirely. The trade is real and worth making deliberately: raw JS leaves NO behavioral record — no graph edge, nothing SMIL or widget export can lift, nothing the ontology can read. Scene building fits the governor's 4s synchronous deadline easily (it is the injected loop guards, not the 10s async-tail budget, that bites a build loop).
+
+Keyframes are for motion that is AUTHORED, not computed. A track of hundreds of entries produced from a formula is the signal that one of the three above is the right route.
 
 ANIMATABLE PROPERTIES:
 - position: [x, y] array (a { x, y } object is also accepted and normalized)
