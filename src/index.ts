@@ -64,7 +64,7 @@ export const SERVER_INFO = {
 // RESOURCES (Documentation & Examples)
 // =============================================================================
 
-const RESOURCES = [
+export const RESOURCES = [
   // === CORE GUIDES (Start here) ===
   {
     uri: 'pinepaper://docs/agent-guide',

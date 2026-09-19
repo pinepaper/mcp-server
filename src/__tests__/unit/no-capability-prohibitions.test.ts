@@ -25,7 +25,11 @@
 
 import { describe, it, expect } from 'bun:test';
 import { PINEPAPER_TOOLS, AI_AGENT_GUIDE } from '../../tools/definitions.js';
-import { SERVER_INFO, RESOURCE_CONTENTS } from '../../index.js';
+import { SERVER_INFO, RESOURCE_CONTENTS, RESOURCES } from '../../index.js';
+import { COMPACT_DESCRIPTIONS } from '../../tools/compact-descriptions.js';
+import { MINIMAL_DESCRIPTIONS } from '../../tools/minimal-descriptions.js';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { PROMPTS, getPromptMessages } from '../../prompts/index.js';
 
 /**
@@ -56,11 +60,37 @@ const DOORS: Array<{ capability: string; forbidPattern: RegExp; tool: string }> 
  * bans with "as a substitute" / "instead of" / "fall back" — but nothing held
  * them that way, and "currently correct" is not a guard.
  */
+const REPO = join(import.meta.dir, '..', '..', '..');
+
+function manifestToolText(): Array<{ where: string; text: string }> {
+  const m = JSON.parse(readFileSync(join(REPO, 'manifest.json'), 'utf-8')) as {
+    long_description?: string; tools?: Array<{ name: string; description?: string }>;
+  };
+  return [
+    { where: 'manifest.long_description', text: String(m.long_description ?? '') },
+    ...(m.tools ?? []).map((t) => ({ where: `manifest:${t.name}`, text: String(t.description ?? '') })),
+  ];
+}
+
 const servedText = (): Array<{ where: string; text: string }> => [
   { where: 'SERVER_INFO.description', text: SERVER_INFO.description },
   { where: 'pinepaper://docs/agent-guide', text: AI_AGENT_GUIDE },
   ...Object.entries(RESOURCE_CONTENTS).map(([uri, text]) => ({ where: uri, text })),
   ...PINEPAPER_TOOLS.map((t) => ({ where: t.name, text: String(t.description ?? '') })),
+  // THE OTHER TWO VERBOSITY TIERS. A model on a compact client never sees the
+  // full description — it reads these. A ban here would be invisible to a
+  // sweep of `t.description` while reaching most of the users.
+  ...Object.entries(COMPACT_DESCRIPTIONS).map(([n, text]) => ({ where: `compact:${n}`, text })),
+  ...Object.entries(MINIMAL_DESCRIPTIONS).map(([n, text]) => ({ where: `minimal:${n}`, text })),
+  // MANIFEST descriptions are a SEPARATE copy, not a projection: check-manifest
+  // -tools.mjs preserves curated text rather than regenerating it, so it can
+  // hold a ban the served description no longer does — and registries show it.
+  ...manifestToolText(),
+  // README is served as pinepaper://docs/readme, read from disk at request
+  // time, so RESOURCE_CONTENTS never contains it. Translations are deliberately
+  // OUT of scope: the door patterns are English regex, and running them over
+  // README.zh-CN.md scans nothing while reading as a pass.
+  { where: 'pinepaper://docs/readme', text: readFileSync(join(REPO, 'README.md'), 'utf-8') },
   ...PROMPTS.flatMap((p) => {
     // Built, not read from source: a prompt is assembled at request time, and
     // scanning the builder's source would miss what it interpolates.
@@ -70,15 +100,37 @@ const servedText = (): Array<{ where: string; text: string }> => [
   }),
 ];
 
-it('the sweep reaches every served surface', () => {
-  // LIVENESS. Every assertion below is satisfied by finding nothing, so a
-  // servedText() that silently returned less would read as a pass. These
-  // floors are the difference between "no offence" and "no look".
+it('the sweep reaches every declared surface', () => {
+  // LIVENESS, BY DERIVATION RATHER THAN THRESHOLD. Every assertion in this
+  // file is satisfied by finding nothing, so a servedText() that quietly
+  // returned less reads as a pass. My first version used floors — ">15
+  // resources, >0 prompts" — which is the sentinel-over-cardinality hole this
+  // repo has now hit three times: nineteen of twenty prompt builders could
+  // throw and one scanned prompt would satisfy ">0".
+  //
+  // So the floor is the DECLARED list, compared name by name. It cannot be
+  // satisfied by a survivor.
   const seen = servedText();
-  expect(seen.filter((s) => s.where.startsWith('pinepaper://')).length).toBeGreaterThan(15);
-  expect(seen.filter((s) => s.where.startsWith('prompt:')).length).toBeGreaterThan(0);
-  expect(seen.filter((s) => s.where === 'SERVER_INFO.description')[0]?.text.length).toBeGreaterThan(20);
-  expect(seen.every((s) => typeof s.text === 'string')).toBe(true);
+  const where = new Set(seen.map((s) => s.where));
+
+  const declaredUris = RESOURCES.map((r) => String(r.uri)).filter((u) => !u.includes('/readme'));
+  expect(declaredUris.filter((u) => !where.has(u)), 'declared resources the sweep never read').toEqual([]);
+  expect(where.has('pinepaper://docs/readme')).toBe(true);
+
+  expect(PROMPTS.map((p) => p.name).filter((n) => !where.has(`prompt:${n}#0`)),
+    'prompts whose builder threw, so nothing was scanned').toEqual([]);
+
+  for (const tier of ['compact', 'minimal'] as const) {
+    const table = tier === 'compact' ? COMPACT_DESCRIPTIONS : MINIMAL_DESCRIPTIONS;
+    expect(Object.keys(table).filter((n) => !where.has(`${tier}:${n}`)), `${tier} entries unscanned`).toEqual([]);
+  }
+
+  expect(seen.filter((s) => s.where.startsWith('manifest:')).length).toBe(
+    (JSON.parse(readFileSync(join(REPO, 'manifest.json'), 'utf-8')).tools ?? []).length);
+
+  // And nothing in the sweep is silently empty — a surface present by name but
+  // carrying '' is scanned in form only.
+  expect(seen.filter((s) => typeof s.text !== 'string' || s.text.length === 0).map((s) => s.where)).toEqual([]);
 });
 
 describe('no served instruction forbids a shipped capability', () => {
