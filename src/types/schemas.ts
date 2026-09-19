@@ -2419,6 +2419,40 @@ export const VIDEO_MAX_DURATION_S = 600;
 /**
  * Smart export input schema
  */
+/**
+ * The export store, as an operation rather than a hidden step.
+ *
+ * Paging lived entirely inside `pinepaper_agent_export`: it rendered, paged the
+ * bytes out and released them, and if the paging half failed the caller was
+ * handed an error saying the bytes were "still held in the studio ... it can be
+ * paged again" with no call that could do it. A true statement and a dead end.
+ *
+ * `readExport` is stateless and idempotent — it opens the file handle fresh and
+ * slices it, so a failed page mutates nothing and the same call with the same
+ * or a smaller range simply works. There was never resume state to keep; there
+ * was only a missing door.
+ */
+export const ExportStoreInputSchema = z.object({
+  action: z.enum(['list', 'save', 'release']).describe(
+    "'list' — what the studio is still holding, newest first (ids survive a page reload; the id IS the stored filename). "
+    + "'save' — page a held export out to a file here, the same way agent_export does, and release it once the file is whole. "
+    + "'release' — drop a held export WITHOUT saving it. The store is the only copy, so this is not undoable."
+  ),
+  exportId: z.string().optional().describe("Required for 'save' and 'release'. Comes from a failed export's error or from 'list'."),
+  platform: z.string().optional().describe("save: a label for the saved filename only. Defaults to 'recovered'."),
+}).describe('Export store operations')
+  .superRefine((val, ctx) => {
+    if ((val.action === 'save' || val.action === 'release') && !val.exportId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['exportId'],
+        message: `action '${val.action}' needs an exportId — call action 'list' for the ids the studio is holding.`,
+      });
+    }
+  });
+
+export type ExportStoreInput = z.infer<typeof ExportStoreInputSchema>;
+
 export const AgentExportInputSchema = z.object({
   platform: z.union([AgentPlatformSchema, z.literal('auto')]).optional().default('auto').describe('Target platform'),
   format: z.union([AgentExportFormatSchema, z.literal('auto')]).optional().default('auto').describe('Export format'),

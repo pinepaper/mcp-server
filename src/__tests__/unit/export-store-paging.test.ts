@@ -192,10 +192,18 @@ interface FakeOpts {
   pipeLimit?: number;
   /** Make the emitted export code report its own failure under a successful run. */
   innerFailure?: string;
+  /** What listExports() reports the studio is holding. */
+  heldExports?: Array<{ id: string; format: string; size: number; createdAt: number }>;
+  /**
+   * Refuse the first read with an out-of-range reason carrying this size, the
+   * way readExport corrects a miscounting caller instead of clamping.
+   */
+  correctSizeTo?: number;
 }
 
 function fakeController(opts: FakeOpts = {}) {
   const calls: string[] = [];
+  let corrected = false;
   const runOptions: Array<{ governorTimeoutMs?: number } | undefined> = [];
   let released: string | null = null;
 
@@ -226,6 +234,10 @@ function fakeController(opts: FakeOpts = {}) {
         };
       }
 
+      if (code.includes('listExports')) {
+        return { success: true, result: { ok: true, exports: opts.heldExports ?? [] } };
+      }
+
       if (code.includes('readExport')) {
         const offset = Number(/"offset":(\d+)/.exec(code)?.[1] ?? 0);
         const length = Number(/"length":(\d+)/.exec(code)?.[1] ?? CHUNK);
@@ -233,6 +245,13 @@ function fakeController(opts: FakeOpts = {}) {
         // no result to inspect, which is what makes it look like a dead store.
         if (opts.pipeLimit !== undefined && length > opts.pipeLimit) {
           return { success: false, error: 'Failed to write data to data pipe' };
+        }
+        if (opts.correctSizeTo !== undefined && !corrected) {
+          corrected = true;
+          return {
+            success: true,
+            result: { ok: false, reason: `range ${offset}..${offset + length} exceeds export "pp-export-42.mp4" (size ${opts.correctSizeTo})` },
+          };
         }
         if (opts.failAt === offset) {
           return {
@@ -452,5 +471,142 @@ describe('the handler pages a retained export into a file', () => {
     // One read at the failing offset, not a ladder of them.
     const atOffset = fake.calls.filter((c) => c.includes(`"offset":${CHUNK}`)).length;
     expect(atOffset).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The door: paging as an operation, not a hidden step
+// ---------------------------------------------------------------------------
+
+/**
+ * Paging lived entirely inside agent_export. When its paging half failed, the
+ * render had already succeeded and the error said the bytes were "still held
+ * ... it can be paged again" — true, and unreachable, because no call could do
+ * it. readExport is stateless and idempotent (it opens the handle fresh and
+ * slices), so there was never resume state to keep. There was only a missing
+ * door.
+ */
+describe('pinepaper_export_store', () => {
+  const written: string[] = [];
+  afterEach(async () => {
+    for (const f of written.splice(0)) await rm(f, { force: true });
+  });
+
+  const HELD = [
+    { id: 'pp-export-42.mp4', format: 'mp4', size: SOURCE.length, createdAt: 2 },
+    { id: 'pp-export-7.webm', format: 'webm', size: 1024, createdAt: 1 },
+  ];
+
+  const call = (args: Record<string, unknown>, fake: ReturnType<typeof fakeController>) =>
+    handleToolCall('pinepaper_export_store', args,
+      { executeInBrowser: true, browserController: fake.controller, executionMode: 'puppeteer' });
+
+  it('lists what is held, and warns about eviction once there is more than one', async () => {
+    const fake = fakeController({ heldExports: HELD });
+    const r = await call({ action: 'list' }, fake);
+    expect(r.isError).toBeFalsy();
+    const text = textOf(r);
+    expect(text).toContain('pp-export-42.mp4');
+    expect(text).toContain('pp-export-7.webm');
+    // The hazard that loses work in a multi-chunk render, said where it lands.
+    expect(text).toContain('evicts the OLDEST');
+  });
+
+  it('recovers a held export to a file, byte for byte, and releases it', async () => {
+    const fake = fakeController({ heldExports: HELD });
+    const r = await call({ action: 'save', exportId: 'pp-export-42.mp4' }, fake);
+    expect(r.isError).toBeFalsy();
+    const filePath = /File: (\S+)/.exec(textOf(r))![1];
+    written.push(filePath);
+    expect(await readFile(filePath)).toEqual(SOURCE);
+    expect(fake.released).toBe('pp-export-42.mp4');
+  });
+
+  it('releases without saving, and says what that freed', async () => {
+    const fake = fakeController({ heldExports: HELD });
+    const r = await call({ action: 'release', exportId: 'pp-export-42.mp4' }, fake);
+    expect(r.isError).toBeFalsy();
+    expect(fake.released).toBe('pp-export-42.mp4');
+  });
+
+  it('an id the store does not have names BOTH possibilities, because they cannot be told apart', async () => {
+    // The eviction tombstone is in memory. After a page reload an evicted id
+    // reads exactly like one that never existed, so claiming either as fact
+    // would be inventing a cause.
+    const fake = fakeController({ heldExports: HELD });
+    const r = await call({ action: 'save', exportId: 'pp-export-nope.mp4' }, fake);
+    expect(r.isError).toBeTruthy();
+    const text = textOf(r);
+    expect(text).toContain('released');
+    expect(text).toContain('evicted');
+    // and it hands back the ids that ARE there, so the caller can act
+    expect(text).toContain('pp-export-42.mp4');
+  });
+
+  it('refuses save and release without an id, naming the action that lists them', async () => {
+    const fake = fakeController({ heldExports: HELD });
+    for (const action of ['save', 'release']) {
+      const r = await call({ action }, fake);
+      expect(r.isError).toBeTruthy();
+      expect(textOf(r)).toContain('exportId');
+    }
+  });
+
+  it('an empty store is an empty list, not an error', async () => {
+    const fake = fakeController({ heldExports: [] });
+    const r = await call({ action: 'list' }, fake);
+    expect(r.isError).toBeFalsy();
+    expect(textOf(r)).toContain('"held": 0');
+  });
+});
+
+describe('a range refusal is a correction, not a dead end', () => {
+  const written: string[] = [];
+  afterEach(async () => {
+    for (const f of written.splice(0)) await rm(f, { force: true });
+  });
+
+  /**
+   * readExport refuses an out-of-range read BY NAME rather than clamping, and
+   * the reason carries the real size — deliberately, so a miscounting caller is
+   * told instead of handed a short chunk it treats as the tail. That failure
+   * would otherwise arrive later as a truncated video with nothing pointing
+   * back at the cause.
+   */
+  it('takes the size the store states and finishes the file', async () => {
+    const fake = fakeController({
+      // The export result lies about the size; the store corrects it.
+      reportedSize: SOURCE.length + 5000,
+      correctSizeTo: SOURCE.length,
+    });
+    const r = await handleToolCall(
+      'pinepaper_agent_export',
+      { platform: 'youtube', format: 'mp4' },
+      { executeInBrowser: true, browserController: fake.controller, executionMode: 'puppeteer' }
+    );
+    expect(r.isError).toBeFalsy();
+    const filePath = /File: (\S+)/.exec(textOf(r))![1];
+    written.push(filePath);
+    expect(await readFile(filePath)).toEqual(SOURCE);
+  });
+
+  /**
+   * EVERY range refusal quotes the real size, including the ones refusing for
+   * another reason. Matching the number alone read an ordinary refusal as a
+   * miscount, spent the single correction on a no-op re-read, and hid the real
+   * reason for an iteration. Only a size that DISAGREES is a correction.
+   */
+  it('does not treat a refusal that agrees about the size as a correction', async () => {
+    const fake = fakeController({ failAt: CHUNK });
+    const r = await handleToolCall(
+      'pinepaper_agent_export',
+      { platform: 'youtube', format: 'mp4' },
+      { executeInBrowser: true, browserController: fake.controller, executionMode: 'puppeteer' }
+    );
+    expect(r.isError).toBeTruthy();
+    // One read at the refusing offset. A no-op correction would make it two.
+    expect(fake.calls.filter((c) => c.includes(`"offset":${CHUNK}`)).length).toBe(1);
+    // and the refusal's own words survive rather than being swallowed
+    expect(textOf(r)).toContain('exceeds export');
   });
 });

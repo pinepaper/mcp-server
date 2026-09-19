@@ -3113,6 +3113,26 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
   }
 
   /**
+   * What the studio is still holding.
+   *
+   * `id` IS the OPFS filename and OPFS is origin-persistent, so this survives a
+   * page reload: an export whose id was lost — to a dropped tool result, a
+   * crashed session, a reload — is recoverable from here rather than only by
+   * rendering it again. Newest first, which is the order a caller looking for
+   * "the one I just made" wants.
+   */
+  generateListExports(): string {
+    return `
+// What the export store is holding
+(async function() {${ENSURE_EXPORT_ENGINE}
+  if (!app.exportEngine || typeof app.exportEngine.listExports !== 'function') {
+    return { ok: false, reason: 'app.exportEngine.listExports unavailable — update FxTool' };
+  }
+  return { ok: true, exports: await app.exportEngine.listExports() };
+})();`.trim();
+  }
+
+  /**
    * Drop a held export once its bytes are safely on disk here.
    *
    * Called only after the whole file has been written. A release before that

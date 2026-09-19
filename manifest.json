@@ -640,6 +640,10 @@
       "description": "Execute multiple operations in a single batch for optimal performance"
     },
     {
+      "name": "pinepaper_export_store",
+      "description": "Recover a held export. action: list|save|release. 'save' needs exportId — pages the bytes to a file instead of re-rendering. Call 'list' before re-rendering a failed export."
+    },
+    {
       "name": "pinepaper_agent_export",
       "description": "Smart export with auto-detection for target platform (Instagram, TikTok, YouTube, etc.)"
     },

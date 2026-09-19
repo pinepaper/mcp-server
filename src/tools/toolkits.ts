@@ -24,6 +24,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
     'pinepaper_agent_reset',
     'pinepaper_agent_batch_execute',
     'pinepaper_agent_export',
+    'pinepaper_export_store',
     'pinepaper_interchange',
     'pinepaper_agent_analyze',
   ],

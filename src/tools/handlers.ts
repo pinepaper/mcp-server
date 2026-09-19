@@ -95,6 +95,7 @@ import {
   AgentResetInputSchema,
   AgentBatchExecuteInputSchema,
   AgentExportInputSchema,
+  ExportStoreInputSchema,
   AgentAnalyzeInputSchema,
   // Letter collage schemas
   CreateLetterCollageInputSchema,
@@ -305,6 +306,8 @@ async function streamRetainedExportToFile(
   retained: { exportId: string; size: number; format: string; chunkBytes?: number },
   platform: string
 ): Promise<{ filePath: string; fileSize: number; chunks: number }> {
+  // Reassigned once if the store corrects the size below.
+  let corrected = false;
   const exportDir = getExportDir();
   await mkdir(exportDir, { recursive: true });
 
@@ -324,8 +327,13 @@ async function streamRetainedExportToFile(
   const abandon = async (why: string): Promise<Error> => {
     try { await unlink(filePath); } catch { /* nothing written yet */ }
     return new Error(
+      // The promise now names the call that keeps it. It was true before and
+      // unreachable: reading a held export mutates nothing, so "it can be paged
+      // again" was always correct and there was no door to page it through.
       `${why} (export "${retained.exportId}" is still held in the studio, ${offset} of ${retained.size} bytes read; ` +
-      `it can be paged again, and is released only once a whole file is written)`
+      `page it out with pinepaper_export_store action 'save', exportId "${retained.exportId}" — reading is idempotent, ` +
+      'so retrying costs nothing and the export is released only once a whole file is written. Do it BEFORE the next ' +
+      'export: a new one evicts the oldest held bytes to make room)'
     );
   };
 
@@ -369,8 +377,35 @@ async function streamRetainedExportToFile(
 
     const chunk = run.result as { ok?: boolean; reason?: string; evicted?: boolean; data?: string; length?: number; eof?: boolean } | undefined;
     if (!chunk || chunk.ok !== true) {
+      // A RANGE REFUSAL IS A CORRECTION, and it carries the real size.
+      //
+      // readExport refuses an out-of-range read by name rather than clamping —
+      // deliberately, so a miscounting caller is told instead of handed a short
+      // chunk it treats as the tail, which surfaces later as a truncated video
+      // with nothing pointing back at the cause. The size this loop is working
+      // from came from the export result, and `save` works from a listing; when
+      // either disagrees with the file, the refusal is the authority. Take it
+      // ONCE — a second disagreement is not a miscount, it is a moving target.
+      // Only when it DISAGREES. Every range refusal quotes the real size,
+      // including the ones that are refusing for some other reason — so
+      // matching the number alone treated an eviction as a miscount, spent the
+      // one correction on a no-op re-read, and hid the actual reason for an
+      // iteration.
+      const stated = /\(size (\d+)\)/.exec(chunk?.reason ?? '');
+      if (stated && !corrected && Number(stated[1]) !== retained.size) {
+        corrected = true;
+        const was = retained.size;
+        retained = { ...retained, size: Number(stated[1]) };
+        console.error(
+          `[PinePaper] the store reports "${retained.exportId}" as ${retained.size} bytes, not ${was}; `
+          + "taking the store's number and continuing",
+        );
+        continue;
+      }
       // An evicted id is its own failure: a later export reclaimed the space.
-      // Re-exporting is the caller's decision, never this loop's.
+      // Re-exporting is the caller's decision, never this loop's. After a page
+      // reload the tombstone is gone and the same id reads as "not found", so
+      // an unrecognised id is not proof it never existed.
       throw await abandon(chunk?.evicted
         ? `the export was evicted mid-read: ${chunk.reason}`
         : `the studio refused the read: ${chunk?.reason || 'no reason given'}`);
@@ -2729,6 +2764,109 @@ You can now start creating new items on a clean canvas.`,
         return batchResult;
       }
 
+      case 'pinepaper_export_store': {
+        const input = ExportStoreInputSchema.parse(args);
+        const controller = options.browserController || getBrowserController();
+        if (!controller.connected) {
+          try {
+            await controller.connect();
+          } catch (connectError) {
+            return errorResult(
+              ErrorCodes.EXECUTION_ERROR,
+              `the export store lives in the studio, and connecting to it failed: ${connectError instanceof Error ? connectError.message : 'unknown error'}`,
+              {},
+              { toolName: 'pinepaper_export_store' }
+            );
+          }
+        }
+
+        const held = await controller.executeCode(codeGenerator.generateListExports(), false);
+        if (!held.success) {
+          return errorResult(
+            ErrorCodes.EXECUTION_ERROR,
+            `listing the export store failed: ${held.error || 'unknown error'}`,
+            {},
+            { toolName: 'pinepaper_export_store' }
+          );
+        }
+        const listing = held.result as { ok?: boolean; reason?: string; exports?: Array<{ id: string; format: string; size: number; createdAt: number }> };
+        if (!listing || listing.ok !== true) {
+          return errorResult(
+            ErrorCodes.EXECUTION_ERROR,
+            listing?.reason || 'the studio did not answer with a listing',
+            {},
+            { toolName: 'pinepaper_export_store' }
+          );
+        }
+        const exports = listing.exports ?? [];
+
+        if (input.action === 'list') {
+          return dataResult({
+            exports,
+            held: exports.length,
+            heldBytes: exports.reduce((n, e) => n + (e.size || 0), 0),
+            note: exports.length > 1
+              ? 'A later export evicts the OLDEST held ones to make room. Save or release each before starting the next.'
+              : undefined,
+          });
+        }
+
+        // Both remaining actions name an id, and an id the store does not have
+        // is the one thing worth saying carefully: after a page reload an
+        // EVICTED id is indistinguishable from one that never existed, so
+        // neither answer can be given as fact.
+        const entry = exports.find((e) => e.id === input.exportId);
+        if (!entry) {
+          return errorResult(
+            ErrorCodes.INVALID_PARAMS,
+            `the studio is not holding "${input.exportId}". It was either released, evicted to make room for a later export, `
+            + `or belongs to a session whose store is gone — after a page reload those cannot be told apart. `
+            + `${exports.length ? `Held right now: ${exports.map((e) => e.id).join(', ')}.` : 'The store is empty.'}`,
+            { exportId: input.exportId, held: exports.map((e) => e.id) },
+            { toolName: 'pinepaper_export_store' }
+          );
+        }
+
+        if (input.action === 'release') {
+          const dropped = await controller.executeCode(codeGenerator.generateReleaseExport(entry.id), false);
+          const outcome = dropped.result as { ok?: boolean; reason?: string } | undefined;
+          if (!dropped.success || outcome?.ok !== true) {
+            return errorResult(
+              ErrorCodes.EXECUTION_ERROR,
+              `releasing "${entry.id}" failed: ${dropped.error || outcome?.reason || 'unknown error'}`,
+              { exportId: entry.id },
+              { toolName: 'pinepaper_export_store' }
+            );
+          }
+          return dataResult({ released: entry.id, freedBytes: entry.size });
+        }
+
+        // save: the same pager agent_export uses, pointed at an id instead of a
+        // fresh render. Reading is idempotent, so a save that failed halfway
+        // can simply be run again — there is no partial state to clean up here.
+        try {
+          const { filePath, fileSize, chunks } = await streamRetainedExportToFile(
+            controller,
+            { exportId: entry.id, size: entry.size, format: entry.format },
+            input.platform || 'recovered'
+          );
+          return {
+            content: [{
+              type: 'text' as const,
+              text: `Export recovered from the studio's store:\n\nFile: ${filePath}\nFormat: ${entry.format}\n`
+                + `Size: ${(fileSize / 1024).toFixed(1)} KB\nPaged out in ${chunks} chunk${chunks === 1 ? '' : 's'}, then released\n`,
+            }],
+          };
+        } catch (streamError) {
+          return errorResult(
+            ErrorCodes.EXECUTION_ERROR,
+            streamError instanceof Error ? streamError.message : 'paging the export out of the store failed',
+            { exportId: entry.id, size: entry.size },
+            { toolName: 'pinepaper_export_store' }
+          );
+        }
+      }
+
       case 'pinepaper_agent_export': {
         const input = AgentExportInputSchema.parse(args);
         const code = codeGenerator.generateAgentExport(input);
@@ -2794,9 +2932,21 @@ You can now start creating new items on a clean canvas.`,
         // downstream has any reason to look again.
         if (exportResult && exportResult.success === false) {
           const canvasState = await captureCanvasState(controller);
+          // A "data pipe" failure is the BROWSER TRANSPORT refusing to carry
+          // the result back, not the encoder refusing to make it — the string
+          // exists nowhere in the engine. So the render may well have finished
+          // and the bytes may be sitting in the export store right now. Saying
+          // so is the difference between recovering an export and re-rendering
+          // one, and re-rendering is what evicts an earlier chunk's bytes.
+          const looksLikeTransport = /data pipe/i.test(String(exportResult.error ?? ''));
           return errorResult(
             ErrorCodes.EXECUTION_ERROR,
-            `export failed: ${exportResult.error || 'the studio reported failure without naming a reason'}`,
+            `export failed: ${exportResult.error || 'the studio reported failure without naming a reason'}`
+            + (looksLikeTransport
+              ? ' — that is the browser transport failing to carry the result back, not necessarily the render failing.'
+                + " Call pinepaper_export_store action 'list' BEFORE re-rendering: the bytes may already be held, and a"
+                + ' fresh export can evict an earlier one to make room.'
+              : ''),
             { code, format: exportResult.format ?? input.format, result: exportResult },
             { toolName: 'pinepaper_agent_export', canvasState: canvasState || undefined }
           );

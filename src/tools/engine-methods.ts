@@ -76,6 +76,7 @@ export const REQUIRED_ENGINE_METHODS: readonly string[] = [
   'exportBVH',
   'exportDotLottie',
   'exportEngine.exportToStore',
+  'exportEngine.listExports',
   'exportEngine.readExport',
   'exportEngine.releaseExport',
   'exportEngine.sceneHasAudio',

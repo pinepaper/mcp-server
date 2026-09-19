@@ -373,6 +373,7 @@ IMPORTANT:
 - If there's a welcome template on the canvas, use pinepaper_clear_canvas first
 - Position defaults to canvas center (400, 300). Use position: {x, y} or [x, y] (both forms accepted) to place elsewhere. Position is the item's bounding-box CENTRE, not its top-left corner.
 - ROTATION is a property, at creation: properties: { rotation: 45 } — degrees, clockwise, about the item's own centre. It does not need a second call, and pinepaper_update_item takes the same property afterwards; keyframe_animate and the driven_by relation both animate it. A radial figure — a sunburst of thin triangles, a clock face, a compass rose — is N creates at rotation: i * (360/N), which is what pinepaper_agent_batch_execute is for. Nothing here needs to be faked with arcs or chevrons.
+  ⚠️ Rotation applies at create and in keyframes; it is BAKED INTO THE GEOMETRY, so reading item.rotation back returns 0. Verify by geometry or pixels, never by re-reading the property — a 12-ray sunburst has 12 visibly different rays that every report rotation 0, and checking the property is how you conclude a working feature does nothing.
 - DO NOT take screenshots after every create operation. Trust the API response - if it returns success, the item was created. Take ONE screenshot at the end to verify the final result.
 
 ⚠️ COMPLEX CHARACTERS/ILLUSTRATIONS:
@@ -7707,6 +7708,51 @@ EXAMPLE — Animated sky scene with timed reveals:
         },
       },
       required: ['operations'],
+    },
+  },
+
+  {
+    name: 'pinepaper_export_store',
+    annotations: {
+      title: 'Export Store',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Recover an export the studio is still holding.
+
+A long export is not returned inline — the studio keeps the encoded file and pinepaper_agent_export pages it out to a file for you. When that PAGING half fails, the render has already succeeded and the bytes are sitting in the store. This is how you go and get them, instead of re-rendering something that already exists.
+
+ACTIONS:
+- list: {} — what is held, newest first: {id, format, size, createdAt}. The id IS the stored filename and the store is origin-persistent, so ids survive a page reload; an id lost with a dropped tool result is recoverable here.
+- save: {exportId} — page it out to a file and release it once the file is whole. Returns a filePath, the same shape agent_export returns. Safe to repeat: reading a held export mutates nothing, so a failed save can simply be run again.
+- release: {exportId} — drop it WITHOUT saving. The store is the only copy; this is not undoable.
+
+WHEN TO REACH FOR IT:
+- An export failed with "Failed to write data to data pipe". That is the browser's transport refusing to carry one oversized value, not the encoder failing — the bytes may already be in the store. Call 'list' BEFORE re-rendering.
+- An export error named an exportId and a byte count reached. That error is a true promise: call 'save' with the id.
+
+RETENTION, AND THE ONE WAY TO LOSE WORK:
+Held exports last until released, or until a LATER export needs the space — and eviction drops the OLDEST first. Rendering five chunks and paging them out at the end can evict chunk 1 to make room for chunk 5. Save or release each export before starting the next one. An id evicted in this session says so; after a page reload the same id reads as simply not found, so the two are indistinguishable then.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['list', 'save', 'release'],
+          description: "'list' (what is held), 'save' (page it to a file, then release), 'release' (drop it unsaved).",
+        },
+        exportId: {
+          type: 'string',
+          description: "Required for 'save' and 'release'. From a failed export's error, or from 'list'.",
+        },
+        platform: {
+          type: 'string',
+          description: "save: a label for the saved filename only. Defaults to 'recovered'.",
+        },
+      },
+      required: ['action'],
     },
   },
 
