@@ -1731,8 +1731,29 @@ throw new Error('Either svgString or url must be provided');
     };
   }
   const ctx = app.exportCanvasOntology(${optsJson});
+  // SAY WHEN THE ANSWER IS PARTIAL. The engine returns itemCount =
+  // allItems.length (the TRUE total) beside items = allItems.slice(0,
+  // maxItems), and childCount beside a children array capped at maxChildren.
+  // So a caller receives itemCount 800 with 500 items and nothing marking the
+  // gap — an answer indistinguishable from a complete one unless the reader
+  // thinks to compare two fields. That is the silent-refusal shape this repo
+  // has fixed elsewhere; the marker below is the same idiom generateHatching
+  // uses for its 40-path cap.
+  var _shown = Array.isArray(ctx.items) ? ctx.items.length : 0;
+  var _total = typeof ctx.itemCount === 'number' ? ctx.itemCount : _shown;
+  var _clipped = (Array.isArray(ctx.items) ? ctx.items : []).filter(function (i) {
+    return i && typeof i.childCount === 'number' && Array.isArray(i.children)
+      && i.children.length < i.childCount;
+  });
   return {
     success: true,
+    ...(_total > _shown ? { truncated:
+      'showing ' + _shown + ' of ' + _total + ' items. Raise maxItems (up to 500) '
+      + 'to see more; past 500 the scene is truncated rather than paginated, so '
+      + 'narrow with pinepaper_get_items or read a group at a time.' } : {}),
+    ...(_clipped.length ? { childrenTruncated: _clipped.map(function (i) {
+      return i.id + ': ' + i.children.length + ' of ' + i.childCount + ' children';
+    }) } : {}),
     canvasWidth: ctx.canvasWidth,
     canvasHeight: ctx.canvasHeight,
     canvasPreset: ctx.canvasPreset,
