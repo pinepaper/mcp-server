@@ -122,6 +122,32 @@ export const ItemTypeSchema = z.enum([
   'diamond',
   'arrow',
   'heart',
+  // THE REST OF THE ENGINE'S SHAPE REGISTRY — same argument as the two below,
+  // applied to shapes that were already being drawn.
+  //
+  // js/shapes/index.js registers 34 shapes across five modules. Flowchart, UML
+  // and network route through pinepaper_create_diagram_shape, so 23 were
+  // reachable. These eleven were reachable from NOTHING: three basic shapes,
+  // and the whole `comment` module — every speech bubble, thought bubble and
+  // callout the engine can draw.
+  //
+  // The engine was never the limit. PinePaper.create() delegates any registry
+  // type — "basic shapes, comment/bubble shapes, etc." in its own comment —
+  // and already forwards `tailDirection` and `tailSize`, which exist only for
+  // bubbles. It has been able to draw a speech bubble the whole time; no tool
+  // could name one, so an agent asked for a comic panel or an annotated
+  // diagram had to hand-build the outline or decline.
+  'disk',
+  'circle-outline',
+  'arrow-right',
+  'speech-bubble',
+  'speech-bubble-square',
+  'speech-bubble-pointed',
+  'thought-bubble',
+  'double-bubble',
+  'quote-bubble',
+  'comment-box',
+  'callout-box',
   // RENDER-TIME SURFACES. These two are not Paper items and never enter the
   // scene tree: they are drawn per pixel by the cloud rasterizer, straight from
   // the scene document. They are here because a capability nobody can name is a

@@ -19,7 +19,11 @@ function shortList(items: readonly string[], maxShown: number): string {
   return `${items.slice(0, maxShown).join('|')}…(${items.length} total via pinepaper_query_ontology)`;
 }
 
-const ITEM_TYPES = shortList(ItemTypeSchema.options, ItemTypeSchema.options.length);
+// TRUNCATED ON PURPOSE, AND IT HIDES NOTHING. Listing all 28 blows the
+// minimal tier's 200-char budget. getToolsForVerbosity swaps DESCRIPTIONS only
+// — inputSchema is identical at every tier — so the complete itemType enum is
+// served to a minimal client regardless, and the pointer says where to look.
+const ITEM_TYPES = shortList(ItemTypeSchema.options, 8);
 const RELATION_TYPES = shortList(RelationTypeSchema.options, 8);
 const DIAGRAM_SHAPES = shortList(Object.keys(DIAGRAM_SHAPE_MAP), 12);
 
@@ -32,7 +36,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_refresh_page: 'Reload the PinePaper browser page.',
 
   // --- Item CRUD ---
-  pinepaper_create_item: `Create item. itemType: ${ITEM_TYPES}. position: {x,y}. properties: {color, radius, ...}.`,
+  pinepaper_create_item: `Create item. itemType: ${ITEM_TYPES} (all in the itemType enum). position: {x,y}. properties: {color, radius, ...}.`,
   pinepaper_modify_item: 'Modify item. itemId, properties: {color, opacity, x, y, scaleX, scaleY, rotation, ...}. Letter-collage non-destructive: palette, collageStyle, bgColor, textColor.',
   pinepaper_delete_item: 'Remove item by itemId.',
   pinepaper_create_glossy_sphere: 'Create a 3D-looking glossy sphere with lighting.',

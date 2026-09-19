@@ -508,6 +508,21 @@ export const ITEM_TYPE_MAP: Record<string, string> = {
   'diamond':        'pp:Polygon',
   'arrow':          'pp:ClosedPath',
   'heart':          'pp:ClosedPath',
+  // The rest of the engine's shape registry. Bubbles and callouts are closed
+  // outlines and are typed as such — FxTool's Vocabulary has no bubble concept
+  // to mirror, and inventing one here would put a pp: type in the graph that
+  // the engine cannot read back.
+  'disk':           'pp:Circle',
+  'circle-outline': 'pp:Circle',
+  'arrow-right':    'pp:ClosedPath',
+  'speech-bubble':         'pp:ClosedPath',
+  'speech-bubble-square':  'pp:ClosedPath',
+  'speech-bubble-pointed': 'pp:ClosedPath',
+  'thought-bubble':        'pp:ClosedPath',
+  'double-bubble':         'pp:ClosedPath',
+  'quote-bubble':          'pp:ClosedPath',
+  'comment-box':           'pp:ClosedPath',
+  'callout-box':           'pp:ClosedPath',
   'ellipse':        'pp:Ellipse',
   'line':           'pp:Line',
   'arc':            'pp:Arc',

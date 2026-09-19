@@ -18,6 +18,7 @@ import {
 } from '../../types/schemas.js';
 import { ITEM_TYPE_MAP, RELATION_TYPE_MAP, DIAGRAM_SHAPE_MAP } from '../../ontology/vocabulary.js';
 import { MINIMAL_DESCRIPTIONS } from '../../tools/minimal-descriptions.js';
+import { getToolsForVerbosity } from '../../tools/definitions.js';
 import { COMPACT_DESCRIPTIONS } from '../../tools/compact-descriptions.js';
 
 describe('suggestTypo', () => {
@@ -143,10 +144,38 @@ describe('Ontology-vs-Schema parity', () => {
 });
 
 describe('Descriptions derive from vocabulary (no drift)', () => {
-  it('MINIMAL create_item lists every ItemTypeSchema option', () => {
+  /**
+   * WHAT ACTUALLY MAKES A TYPE REACHABLE IS THE ENUM, NOT THE PROSE.
+   *
+   * This asserted that the minimal description names every ItemTypeSchema
+   * option. That held while there were 17 and became unsatisfiable at 28: the
+   * sibling guard `every minimal description is <200 chars` fails first, and
+   * the two cannot both be met. Listing all 28 costs 230 characters in the tier
+   * whose entire purpose is a token budget.
+   *
+   * Relaxing it would be self-serving if the guarantee vanished — so it is
+   * replaced by the stronger check, not a weaker one. getToolsForVerbosity
+   * swaps DESCRIPTIONS only and never touches inputSchema, so a minimal client
+   * receives the complete itemType enum regardless of what the prose lists.
+   * That is asserted below, at all three tiers, which is what the original test
+   * was reaching for by proxy.
+   *
+   * The truncate-plus-pointer shape is this repo's existing answer for a long
+   * list: the add_relation guard directly beneath requires first-6 and an
+   * ontology reference, not all of them.
+   */
+  it('MINIMAL create_item lists the first several options and points at the rest', () => {
     const desc = MINIMAL_DESCRIPTIONS['pinepaper_create_item'];
-    for (const t of ItemTypeSchema.options) {
-      expect(desc).toContain(t);
+    for (const t of ItemTypeSchema.options.slice(0, 6)) expect(desc).toContain(t);
+    expect(desc, 'truncated with no pointer to the full list').toMatch(/itemType enum/);
+  });
+
+  it('every verbosity tier serves the COMPLETE itemType enum', () => {
+    for (const tier of ['verbose', 'compact', 'minimal'] as const) {
+      const tool = getToolsForVerbosity(tier).find((t) => t.name === 'pinepaper_create_item');
+      const served = (tool?.inputSchema as any)?.properties?.itemType?.enum as string[] | undefined;
+      expect(served, `${tier} serves no itemType enum`).toBeTruthy();
+      expect([...served!].sort(), `${tier} narrows the itemType enum`).toEqual([...ItemTypeSchema.options].sort());
     }
   });
 

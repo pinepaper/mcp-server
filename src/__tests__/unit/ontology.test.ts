@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from 'bun:test';
-import { RelationTypeSchema } from '../../types/schemas.js';
+import { RelationTypeSchema, ItemTypeSchema } from '../../types/schemas.js';
 import {
   PP_VOCABULARY,
   ITEM_TYPE_MAP,
@@ -166,11 +166,26 @@ describe('Mapping Tables', () => {
     }
   });
 
-  it('ITEM_TYPE_MAP has 31 entries', () => {
-    // 29 + shader and field, the two render-time surfaces. A count assertion is
-    // here so a type cannot be added to the schema without someone deciding
-    // where it sits in the ontology — which is exactly what it caught.
-    expect(Object.keys(ITEM_TYPE_MAP).length).toBe(31);
+  it('ITEM_TYPE_MAP covers every createable item type', () => {
+    // Was a bare count of 31, for the reason stated one test below about
+    // RELATION_TYPE_MAP: a number tells you it changed, not whether it is
+    // right. It did its job once — it caught shader and field arriving without
+    // an ontology decision — and then cost a hand-edit when eleven registry
+    // shapes were exposed, which is the edit someone eventually makes without
+    // re-deciding anything.
+    //
+    // The invariant it was standing in for is that no itemType reaches the
+    // graph untyped. That is now asserted directly, which the count never did:
+    // 31 entries covering 30 of the schema's types would have passed.
+    for (const t of ItemTypeSchema.options) {
+      expect(ITEM_TYPE_MAP[t], `itemType "${t}" has no pp: type`).toBeTruthy();
+      expect(ITEM_TYPE_MAP[t]).toMatch(/^pp:/);
+    }
+    // The map is deliberately WIDER than the schema — it also reads back types
+    // the engine emits but no tool creates (group, image, raster, compound
+    // paths, open/closed path). A floor keeps it from collapsing to the
+    // schema's list alone.
+    expect(Object.keys(ITEM_TYPE_MAP).length).toBeGreaterThanOrEqual(ItemTypeSchema.options.length + 8);
   });
 
   it('RELATION_TYPE_MAP covers every callable relation', () => {

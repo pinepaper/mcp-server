@@ -1,0 +1,42 @@
+# Every shape FxTool's ShapeRegistry registers, from js/shapes/*.js
+# (registerBasicShapes, registerFlowchartShapes, registerUMLShapes,
+# registerNetworkShapes, registerCommentShapes). Format: id module.
+#
+# PinePaper.create() delegates ANY of these — "basic shapes, comment/bubble
+# shapes, etc." — so a shape absent from every tool enum is a shape the engine
+# draws and no caller can ask for. Eleven were in that state, including the
+# entire comment module.
+rectangle basic
+circle basic
+disk basic
+circle-outline basic
+triangle basic
+star basic
+polygon basic
+ellipse basic
+pentagon basic
+hexagon basic
+diamond basic
+arrow basic
+arrow-right basic
+heart basic
+process flowchart
+decision flowchart
+terminal flowchart
+data flowchart
+document flowchart
+database flowchart
+preparation flowchart
+uml-class uml
+uml-usecase uml
+uml-actor uml
+cloud network
+server network
+speech-bubble comment
+speech-bubble-square comment
+thought-bubble comment
+comment-box comment
+speech-bubble-pointed comment
+double-bubble comment
+quote-bubble comment
+callout-box comment

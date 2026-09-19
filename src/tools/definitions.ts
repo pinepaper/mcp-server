@@ -397,6 +397,28 @@ ITEM TYPES:
 - diamond: 4-sided diamond/rhombus (properties: radius, color)
 - arrow: Right-pointing block arrow (properties: width, height, color)
 - heart: Heart shape (properties: color)
+- disk: Filled circle (properties: radius, color)
+- circle-outline: Ring — circle with a hole (properties: radius, strokeColor, strokeWidth)
+- arrow-right: Right-pointing block arrow, squared tail (properties: width, height, color)
+
+SPEECH AND ANNOTATION SHAPES — the engine draws these; use them instead of
+hand-building an outline from a path. Every one takes width, height, color.
+The six with a tail also take tailDirection (bottom-left | bottom-right |
+bottom | top-left | top-right | top | left | right) and tailSize (0-1, default
+0.35):
+- speech-bubble: Rounded bubble with a tail. Comics, dialogue, callouts.
+- speech-bubble-square: Rectangular bubble with a tail — a flatter, more
+  editorial voice than the rounded one.
+- speech-bubble-pointed: Bubble with a sharp spike tail (default direction
+  "bottom") — a shout or an exclamation.
+- thought-bubble: Cloud-lobed bubble with a trail of dots. Interior thought.
+- comment-box: Rectangular annotation box with a tail — margin notes, review
+  comments, UI callouts.
+- callout-box: Annotation box whose tail defaults to "left" — labelling a
+  diagram from the side.
+- double-bubble: Two joined lobes (properties: secondaryColor). Two speakers,
+  or a reply.
+- quote-bubble: Bubble carrying quotation marks. Pull quotes, testimonials.
 
 PATH FOR CUSTOM SHAPES:
 Use itemType: "path" with either:
@@ -452,7 +474,7 @@ For glossy 3D spheres, use pinepaper_create_glossy_sphere instead. For diagonal 
       properties: {
         itemType: {
           type: 'string',
-          enum: ['text', 'circle', 'star', 'rectangle', 'triangle', 'polygon', 'ellipse', 'path', 'line', 'arc', 'pentagon', 'hexagon', 'diamond', 'arrow', 'heart', 'shader', 'field'],
+          enum: ['text', 'circle', 'star', 'rectangle', 'triangle', 'polygon', 'ellipse', 'path', 'line', 'arc', 'pentagon', 'hexagon', 'diamond', 'arrow', 'heart', 'disk', 'circle-outline', 'arrow-right', 'speech-bubble', 'speech-bubble-square', 'speech-bubble-pointed', 'thought-bubble', 'double-bubble', 'quote-bubble', 'comment-box', 'callout-box', 'shader', 'field'],
           description: "Type of item to create. 'shader' and 'field' are RENDER-TIME SURFACES drawn per pixel by the cloud renderer — locally they stand in as a flat plate. See the shader/field properties below.",
         },
         position: {
