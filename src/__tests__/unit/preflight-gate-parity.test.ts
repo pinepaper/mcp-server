@@ -31,7 +31,7 @@
  */
 
 import { describe, it, expect } from 'bun:test';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { GeneratorNameSchema, EffectTypeSchema, RelationTypeSchema, ItemTypeSchema, THREAD_STITCHES } from '../../types/schemas.js';
 
@@ -161,5 +161,63 @@ describe('the gates that guard, and the one that is not verified here', () => {
     expect(ItemTypeSchema.options.length).toBeGreaterThan(10);
     const doc = readFileSync(join(import.meta.dir, 'preflight-gate-parity.test.ts'), 'utf-8');
     expect(doc).toContain('itemType is NOT verified');
+  });
+});
+
+/**
+ * A parity claim must cite the test that enforces it, and the citation must be true.
+ *
+ * FxTool's rule, from sweeping their own tree: `WorkerPool` says "Math ops
+ * mirror ExpressionIR.MATH exactly" and NAMES its guard,
+ * `__tests__/WorkerIRParity.test.js`, which exists and is green — checkable in
+ * one command. `MagicSystem` has three "Mirrors TemplateManager._doLoadTemplate
+ * lines 1274-1432" references whose line numbers cannot survive an edit and
+ * which nothing verifies.
+ *
+ * Every engine-parity claim in this repo's schemas was the second kind until
+ * now: five engine fixtures existed and not one source comment named the test
+ * reading them. THREAD_STITCHES' claim to mirror STITCH_OPS was a memory of
+ * someone having checked once, for six commits of guards built on top of it.
+ */
+describe('parity claims cite a guard that exists', () => {
+  const SCHEMAS = readFileSync(join(import.meta.dir, '..', '..', 'types', 'schemas.ts'), 'utf-8');
+
+  it('every ENFORCED BY citation names a test file that is on disk', () => {
+    // `[\s*]+`, not `\s+`: a citation that wraps across a JSDoc line has a
+    // ` * ` continuation marker between the words, and the first version of
+    // this regex could not cross it — so it saw three of four citations and
+    // called the fourth missing. FxTool's LAYOUT hole, in the assertion rather
+    // than the source. The liveness floor below is what caught it.
+    const cited = [...SCHEMAS.matchAll(/ENFORCED BY[\s*]+src\/__tests__\/unit\/([a-z0-9-]+\.test\.ts)/g)]
+      .map((m) => m[1]!);
+    // Every ENFORCED BY must resolve to a path: one that does not is a citation
+    // to nothing, which is worse than no citation at all.
+    expect(cited.length, 'an ENFORCED BY citation names no test path').toBe((SCHEMAS.match(/ENFORCED BY/g) ?? []).length);
+    // Liveness: no citations means the convention was dropped, not satisfied.
+    expect(cited.length, 'no parity claim cites a guard').toBeGreaterThanOrEqual(4);
+    for (const file of new Set(cited)) {
+      expect(existsSync(join(import.meta.dir, file)), `${file} is cited but does not exist`).toBe(true);
+    }
+  });
+
+  it('every cited fixture is on disk and non-empty', () => {
+    const fixtures = [...SCHEMAS.matchAll(/fixture[s]?:\s+(engine-[a-z-]+\.txt)/g)].map((m) => m[1]!);
+    expect(fixtures.length).toBeGreaterThanOrEqual(3);
+    for (const f of new Set(fixtures)) {
+      const rows = fixture(f);
+      // An emptied fixture makes every parity test that reads it vacuous.
+      expect(rows.length, `${f} is empty — parity against it proves nothing`).toBeGreaterThan(0);
+    }
+  });
+
+  it('the four gated enums all carry a citation', () => {
+    for (const marker of ['STITCH_OPS', 'RelationTypeSchema', 'EffectTypeSchema', 'GeneratorNameSchema']) {
+      const idx = SCHEMAS.indexOf(marker);
+      expect(idx, `${marker} not found`).toBeGreaterThan(-1);
+      // The citation must be NEAR the claim, not anywhere in a 5000-line file —
+      // a citation two hundred lines away is the line-number problem again.
+      const window = SCHEMAS.slice(Math.max(0, idx - 800), idx + 200);
+      expect(window, `${marker} has no nearby ENFORCED BY citation`).toContain('ENFORCED BY');
+    }
   });
 });

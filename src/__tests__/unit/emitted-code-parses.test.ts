@@ -56,6 +56,10 @@ describe('emitted rigging code is valid JavaScript', () => {
       time: 0, pose: 'pose_1', boneIds: ['bone_1', 'bone_2'], options: {},
       bvhText: "HIERARCHY\nROOT hips\n", spineJson: '{}',
     };
+    // LIVENESS: an empty collection makes `expect(broken).toEqual([])` pass
+    // while exercising nothing. FxTool's third guard-the-guard — an empty
+    // derivation passes louder than a wrong one.
+    expect(actions.length, 'nothing was exercised').toBeGreaterThan(0);
     const broken: string[] = [];
     for (const action of actions) {
       const code = G.generateRigging({ action, ...args } as never);
@@ -67,6 +71,10 @@ describe('emitted rigging code is valid JavaScript', () => {
   it('parses when the optional arguments are absent', () => {
     // The refusal branches are built from prose, and prose is where quoting
     // goes wrong — so exercise the shape where most fields are missing.
+    // LIVENESS: an empty collection makes `expect(broken).toEqual([])` pass
+    // while exercising nothing. FxTool's third guard-the-guard — an empty
+    // derivation passes louder than a wrong one.
+    expect(actions.length, 'nothing was exercised').toBeGreaterThan(0);
     const broken: string[] = [];
     for (const action of actions) {
       const code = G.generateRigging({ action, skeletonId: 'skeleton_1' } as never);
@@ -78,6 +86,10 @@ describe('emitted rigging code is valid JavaScript', () => {
 
 describe('emitted medium code is valid JavaScript', () => {
   it('parses for every action', () => {
+    // LIVENESS: an empty collection makes `expect(broken).toEqual([])` pass
+    // while exercising nothing. FxTool's third guard-the-guard — an empty
+    // derivation passes louder than a wrong one.
+    expect(actionsOf(DesignMediumInputSchema).length, 'nothing was exercised').toBeGreaterThan(0);
     const broken: string[] = [];
     for (const action of actionsOf(DesignMediumInputSchema)) {
       for (const extra of [{}, { medium: "someone's medium", itemId: 'item_1', stitch: 'satin' }]) {
@@ -110,6 +122,10 @@ describe('emitted sequence / stagger / flip code is valid JavaScript', () => {
   const PROSE = "a clip's name — with `backticks`, a ${brace} and a \"quote\"";
 
   it('parses for every action, with punctuation in every string', () => {
+    // LIVENESS: an empty collection makes `expect(broken).toEqual([])` pass
+    // while exercising nothing. FxTool's third guard-the-guard — an empty
+    // derivation passes louder than a wrong one.
+    expect(cases.length, 'nothing was exercised').toBeGreaterThan(0);
     const broken: string[] = [];
     for (const [name, schema, gen] of cases) {
       for (const action of actionsOf(schema)) {
@@ -142,6 +158,10 @@ describe('emitted sequence / stagger / flip code is valid JavaScript', () => {
 
 describe('emitted play_timeline code is valid JavaScript', () => {
   it('parses for every action, including the new rate/progress/scroll ones', () => {
+    // LIVENESS: an empty collection makes `expect(broken).toEqual([])` pass
+    // while exercising nothing. FxTool's third guard-the-guard — an empty
+    // derivation passes louder than a wrong one.
+    expect(actionsOf(PlayTimelineInputSchema).length, 'nothing was exercised').toBeGreaterThan(0);
     const broken: string[] = [];
     for (const action of actionsOf(PlayTimelineInputSchema)) {
       const code = G.generatePlayTimeline(action as never, 5, true, 2.5, true, {

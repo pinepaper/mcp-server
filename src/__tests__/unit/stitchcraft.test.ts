@@ -277,12 +277,23 @@ describe('the stitch list has exactly one definition', () => {
   });
 
   it('every stitch enum the server serves is complete', () => {
-    const offenders: string[] = [];
-    for (const tool of PINEPAPER_TOOLS) {
-      for (const f of detect(tool.inputSchema, tool.name)) {
-        if (!isComplete(f)) offenders.push(`${f.path}: ${JSON.stringify(f.values)}`);
-      }
-    }
+    const found: Found[] = [];
+    for (const tool of PINEPAPER_TOOLS) found.push(...detect(tool.inputSchema, tool.name));
+
+    // LIVENESS FLOOR, because `expect(offenders).toEqual([])` passes loudest
+    // when the derivation finds nothing at all. A broken walk yields no
+    // offenders and reads as a clean tree.
+    //
+    // Zero is impossible HERE for a reason about the artefact, which is the
+    // question to ask before accepting any floor: JSON Schema has no $ref in
+    // these tools, so a served stitch enum is always a literal array and the
+    // walk must see both of them. (FxTool's equivalent floor would be WRONG —
+    // they scan for duplicates to eliminate, where zero is the success state.
+    // Same assertion, opposite meaning; the difference is whether the thing
+    // counted is the product or the defect.)
+    expect(found.length, 'the stitch-enum walk found nothing — it is broken, not the tree').toBeGreaterThanOrEqual(2);
+
+    const offenders = found.filter((f) => !isComplete(f)).map((f) => `${f.path}: ${JSON.stringify(f.values)}`);
     expect(offenders).toEqual([]);
   });
 

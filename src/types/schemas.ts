@@ -287,6 +287,7 @@ export type Keyframe = z.infer<typeof KeyframeSchema>;
 // deliberately absent: the agent authors those THROUGH that tool, and a second
 // name here would be a worse way to do the same thing. The test file holds that
 // exclusion list, with the reason.
+/** Engine parity ENFORCED BY src/__tests__/unit/relation-parity.test.ts (fixture: engine-relations.txt). */
 export const RelationTypeSchema = z.enum([
   // --- Motion, spatial and transform ---
   'orbits',
@@ -822,6 +823,7 @@ export type ExecuteCustomCodeInput = z.infer<typeof ExecuteCustomCodeInputSchema
 // GENERATOR TYPES
 // =============================================================================
 
+/** Engine parity ENFORCED BY src/__tests__/unit/preflight-gate-parity.test.ts (fixture: engine-generators.txt). */
 export const GeneratorNameSchema = z.enum([
   // Classic generators
   'drawSunburst',
@@ -1087,6 +1089,7 @@ export const NoiseTextureParamsSchema = z.object({
 // EFFECT TYPES
 // =============================================================================
 
+/** Engine parity ENFORCED BY src/__tests__/unit/preflight-gate-parity.test.ts (fixture: engine-effects.txt). */
 export const EffectTypeSchema = z.enum([
   'sparkle',
   'blast',
@@ -3406,7 +3409,13 @@ export type ProvenanceInput = z.infer<typeof ProvenanceInputSchema>;
 /**
  * The stitches the thread medium publishes — ONE list, because it had four copies.
  *
- * Mirrors FxTool's `STITCH_OPS` in js/core/ThreadPainting.js, which is the
+ * Mirrors FxTool's `STITCH_OPS` in js/core/ThreadPainting.js — ENFORCED BY
+ * src/__tests__/unit/preflight-gate-parity.test.ts against the fixture
+ * src/__tests__/fixtures/engine-stitches.txt, both directions, with a
+ * guard-the-guard that plants a seventh stitch and asserts the comparison
+ * fails. A parity claim that cites the test enforcing it is checkable in one
+ * command; one that does not is a memory of someone having checked once, and
+ * this sentence was that memory for six commits. The table is
  * vocabulary `applyThreadPainting` dispatches on; it refuses an unknown name
  * rather than falling through to a default fill.
  *
