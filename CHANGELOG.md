@@ -71,8 +71,22 @@ Exports now land in the engine's export store and are read back in chunks.
   "NEVER generate HTML or React" while shipping an HTML exporter and a React
   exporter, and that string is the first text a client shows a model. Same shape
   in `agent_start_job`. The rule is substitution, not format, and a test now
-  sweeps every served surface — resources, prompts, all three verbosity tiers,
-  manifest, README — for prohibitions that rule out a capability.
+  sweeps every served surface — all 19 resources, every prompt, all three
+  verbosity tiers, the manifest and the README — for prohibitions that rule out
+  a capability.
+- **Eleven shapes the engine draws were reachable from no tool** — `disk`,
+  `circle-outline`, `arrow-right`, and the whole annotation set: speech
+  bubbles, thought bubbles, comment boxes, callouts, double and quote bubbles.
+  The renderer had always handled them (it forwards `tailDirection` and
+  `tailSize`, which exist only for bubbles); nothing on the tool surface could
+  name one. `itemType` goes 17 → 28, with the tail directions documented.
+- **The media list advertised seven of nine.** `hatch` and `watercolor`, both
+  native fidelity, were missing from the served description while the Zod copy
+  and the agent guide both listed them.
+- **A partial scene read now says it is partial.** `scene_graph` returns the
+  true `itemCount` beside an item list capped at `maxItems`, so a caller could
+  receive 500 of 800 items, `success: true`, and no way to tell. It now names
+  both numbers and the knob to raise, and only when something was clipped.
 - `pinepaper_create_stitchcraft` **removed**: all six presets were redundant
   with `design_medium { action: 'apply_thread' }`, which gained the six knobs
   they were hiding.
