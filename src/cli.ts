@@ -55,6 +55,18 @@ ENVIRONMENT VARIABLES:
   PINEPAPER_SCREENSHOT_MODE   Screenshot behavior ('on_request', 'always', 'never')
   PINEPAPER_LOCALE            UI locale (e.g., 'en', 'ja', 'zh-CN')
 
+  Browser connection:
+  PINEPAPER_WAIT_UNTIL        What a navigation waits for: 'load',
+                              'domcontentloaded' (default), 'networkidle0',
+                              'networkidle2'
+  PINEPAPER_TIMEOUT           Navigation/readiness timeout in ms (default 30000)
+  PINEPAPER_PROXY             Chrome --proxy-server value; also ignores
+                              certificate errors, for an intercepting proxy
+  PINEPAPER_EXPORT_TIMEOUT    Governor budget for an export run in ms
+                              (default 300000)
+  PINEPAPER_GOVERNOR          'off' runs code by raw eval, giving up the
+                              governor report, error codes and seeding
+
   Legacy: PINEPAPER_TOOL_VERBOSITY (use PINEPAPER_VERBOSITY instead)
 
 DOCUMENTATION:

@@ -225,6 +225,37 @@ function getExportDir(): string {
 export const ALWAYS_SAVE_FORMATS = new Set(['mp4', 'webm', 'gif', 'pdf', 'wav']);
 const SAVE_THRESHOLD_BYTES = 500_000; // ~500KB base64 ≈ 375KB decoded
 
+/**
+ * Governor budget for the export run itself.
+ *
+ * FxTool's runGenerated defaults to a 10s async-tail timeout — right for a
+ * scene-building script that has no business running longer, and fatal for an
+ * export, which renders frame by frame and is capped at 600s of footage. The
+ * export died at ten seconds with a PP_TIMEOUT that read like a bug in the
+ * scene. This raises the budget rather than bypassing the governor, so the
+ * report, the item budget and the seeded PRNG all survive.
+ *
+ * PINEPAPER_EXPORT_TIMEOUT overrides it. The default matches the floor put on
+ * CDP's own per-call timeout (MIN_PROTOCOL_TIMEOUT_MS in
+ * puppeteer-controller.ts), so raising this past the default without also
+ * raising PINEPAPER_TIMEOUT just moves the execution to a protocol error —
+ * which is why that case says so out loud rather than failing obscurely later.
+ */
+const EXPORT_GOVERNOR_DEFAULT_MS = 300_000;
+
+function exportGovernorTimeoutMs(): number {
+  const raw = Number(process.env.PINEPAPER_EXPORT_TIMEOUT);
+  if (!Number.isFinite(raw) || raw <= 0) return EXPORT_GOVERNOR_DEFAULT_MS;
+  const protocolFloor = Math.max(Number(process.env.PINEPAPER_TIMEOUT) || 0, EXPORT_GOVERNOR_DEFAULT_MS);
+  if (raw > protocolFloor) {
+    console.error(
+      `[PinePaper] PINEPAPER_EXPORT_TIMEOUT=${raw}ms is above the browser's protocol timeout (${protocolFloor}ms) — ` +
+      'raise PINEPAPER_TIMEOUT to match, or an export past that point fails as a protocol error rather than a governor timeout.',
+    );
+  }
+  return raw;
+}
+
 export function getFileExtension(format: string): string {
   const extMap: Record<string, string> = { mp4: 'mp4', webm: 'webm', gif: 'gif', pdf: 'pdf', png: 'png', svg: 'svg', wav: 'wav' };
   return extMap[format] || format;
@@ -300,6 +331,9 @@ async function streamRetainedExportToFile(
 
   for (;;) {
     const code = codeGenerator.generateReadExportChunk(retained.exportId, offset, Math.min(chunkBytes, retained.size - offset));
+    // Deliberately governed at the default budget: a chunk read is a slice of a
+    // string already in memory. If one of these ever needs ten seconds, the
+    // store is wedged and a timeout is the correct answer, not a longer wait.
     const run = await controller.executeCode(code, false);
     if (!run.success) throw await abandon(`reading the export failed: ${run.error || 'unknown error'}`);
 
@@ -2696,7 +2730,9 @@ You can now start creating new items on a clean canvas.`,
           exportSessionManager.startJob({ name: 'auto_session', screenshotPolicy: 'on_complete' });
         }
 
-        const exportBrowserResult = await controller.executeCode(code, false);
+        const exportBrowserResult = await controller.executeCode(code, false, {
+          governorTimeoutMs: exportGovernorTimeoutMs(),
+        });
 
         if (!exportBrowserResult.success) {
           const canvasState = await captureCanvasState(controller);

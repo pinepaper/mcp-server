@@ -208,6 +208,23 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - Puppeteer mode launches Chrome with `--no-sandbox` and `--disable-setuid-sandbox`. That is routine for headless automation and it does weaken Chrome's own process sandbox. If that matters where you are running it, use `code` mode or put the server in a container.
 - Puppeteer itself is an **optional** peer dependency, kept out of the default tree precisely because a headless browser plus an install script is what scanners flag hardest. Install it only if you want the executing mode.
 
+## What's new in 1.6.9
+
+**The browser connection stopped lying about being ready.** Four defects in one file, found by running this server against a studio behind a proxy rather than by anything failing in the suite. Each was silent in its own way, and the readiness one was silent in the worst way — it reported success.
+
+- **"Ready" meant Paper.js had loaded.** The check was `window.app || window.pinepaper || window.paper` tested for mere *existence*, hand-copied into four places. `window.paper` is Paper.js, which attaches the moment the canvas script does — long before the studio has built its API — so every one of those four sites could return ready against a page that throws on the first call. The failure then surfaces later and somewhere else, as a broken tool call rather than a failed connect. All four now route through one predicate, and it is **the engine's own**: `js/app.js` polls `app && app.itemRegistry && typeof app.create === 'function'` under the comment "No global ready event exists". Mirrored rather than invented, because two ordering details make both halves earn their place — `window.PinePaper` holds the *class* at module load (`create()` is an instance method) and the instance only later, and the instance assigns itself to the global from inside its own constructor. Every candidate global is tested rather than the first truthy one: short-circuiting on a `window.app` that fails would trade a false ready for a false *not*-ready, which costs the entire timeout.
+- **Every navigation waited for `networkidle2`** — two-or-fewer connections held for half a second. A studio with analytics or a polling socket open never clears that bar, and behind a proxy it never clears it at all, so `connect()` burned its whole 30s against a page that had been usable for seconds. The default is now `domcontentloaded` at all six `goto`/`reload` sites, which is only safe *because* readiness above does the real gating. `PINEPAPER_WAIT_UNTIL` sets it back, and a value that is not one of puppeteer's four is rejected out loud — a typo there silently reinstates the hang it was set to avoid, and a 30s connect failure looks nothing like a bad environment variable.
+- **The 30s timeout was not reachable from outside.** `PINEPAPER_TIMEOUT` now sets it.
+- **There was no way to put Chrome behind an intercepting proxy**, which is what an origin that rejects headless-Chrome TLS fingerprints needs. `PINEPAPER_PROXY` passes `--proxy-server`, and with it `--ignore-certificate-errors` — a proxy that intercepts TLS presents its own certificate, so without the second flag the first is useless on its own. Strictly gated on the variable being set: relaxing certificate checking on every run would be a silent downgrade, where here it is the consequence of a flag an operator set for their own proxy. Both flags come from one shared builder, so a proxy configured once cannot go missing from whichever of the two launch paths a caller happens to take.
+
+**An export died at ten seconds and blamed the scene.** FxTool's governor races generated code against `RUN_DEFAULTS.timeoutMs` — right for a scene-building script that has no business running longer, and wrong for the one operation that legitimately runs for minutes. `pinepaper_agent_export` renders frame by frame and its `duration` cap is 600 seconds, so it hit the ceiling and came back as a `PP_TIMEOUT` that reads like a broken scene.
+
+- The budget is **raised** for the export run, not bypassed. `runGenerated` has taken a `timeoutMs` option since the governor's first commit, and passing it keeps the report, the structured error codes, the item budget and the seeded PRNG — all four of which a bypass throws away. `PINEPAPER_EXPORT_TIMEOUT` overrides it; raising it past the default without also raising `PINEPAPER_TIMEOUT` is called out, because past that point the export fails as a *protocol* error and the message would blame the wrong layer.
+- Puppeteer's `protocolTimeout` now has a floor matching that budget. Its 180s default is shorter than a long export, so CDP would have cut the call before the governor ever reported.
+- The stale-frame retry forwards the budget. A recovered export that silently reverted to ten seconds would die at exactly the place the retry exists to get past.
+- Export **chunk reads** stay on the default budget, deliberately. A chunk read slices a string already in memory; if one needs ten seconds the store is wedged, and a timeout is the correct answer rather than a longer wait.
+- `PINEPAPER_GOVERNOR=off` is the escape hatch for a studio whose governor ignores the budget. It gives up the report, the error codes and the seeded determinism, which is why it is a switch and not a default.
+
 ## What's new in 1.6.8
 
 **Long-form export stops crossing the bridge as one string.** `pinepaper_agent_export` handed the bytes back as a base64 data URL. Two things were wrong with that and only one of them was a bug.
@@ -1197,6 +1214,16 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 | `PINEPAPER_METRICS_ENABLED` | Enable performance metrics tracking | `true` |
 | `PINEPAPER_METRICS_RETENTION` | Max metrics to retain in memory | `1000` |
 | `PINEPAPER_SCREENSHOT_MODE` | Screenshot mode (`on_request`/`always`/`never`) | `on_request` |
+| `PINEPAPER_WAIT_UNTIL` | What a navigation waits for (`load`/`domcontentloaded`/`networkidle0`/`networkidle2`) | `domcontentloaded` |
+| `PINEPAPER_TIMEOUT` | Navigation and readiness timeout, in ms | `30000` |
+| `PINEPAPER_PROXY` | Chrome `--proxy-server` value; also ignores certificate errors, for an intercepting proxy | unset |
+| `PINEPAPER_EXPORT_TIMEOUT` | Governor budget for an export run, in ms (raise `PINEPAPER_TIMEOUT` alongside it) | `300000` |
+| `PINEPAPER_GOVERNOR` | `off` runs code by raw eval — no governor report, no error codes, no seeded determinism | on |
+
+Behind a proxy, or against a Studio with analytics or polling connections open,
+`networkidle2` may never settle: set `PINEPAPER_WAIT_UNTIL` only if you need the
+old behaviour back. Readiness does not depend on it — the connection waits for
+Studio's `app.create` either way.
 
 ### Performance Metrics
 

@@ -188,13 +188,15 @@ interface FakeOpts {
 
 function fakeController(opts: FakeOpts = {}) {
   const calls: string[] = [];
+  const runOptions: Array<{ governorTimeoutMs?: number } | undefined> = [];
   let released: string | null = null;
 
   const controller = {
     connected: true,
     connect: async () => undefined,
-    executeCode: async (code: string) => {
+    executeCode: async (code: string, _screenshot?: boolean, options?: { governorTimeoutMs?: number }) => {
       calls.push(code);
+      runOptions.push(options);
 
       if (code.includes('exportToStore')) {
         return {
@@ -250,6 +252,7 @@ function fakeController(opts: FakeOpts = {}) {
   return {
     controller: controller as unknown as PinePaperBrowserController,
     calls,
+    runOptions,
     get released() { return released; },
   };
 }
@@ -350,5 +353,32 @@ describe('the handler pages a retained export into a file', () => {
     const after = await readdir(join(tmpdir(), 'pinepaper-exports')).catch(() => []);
     const added = after.filter((f) => !before.has(f));
     expect(added).toEqual([]);
+  });
+
+  /**
+   * FxTool's runGenerated races the code against RUN_DEFAULTS.timeoutMs — ten
+   * seconds. An export renders frame by frame and the schema allows 600s of
+   * footage, so it hit that ceiling and came back as a PP_TIMEOUT that read
+   * like a broken scene. The budget is raised for the export run only.
+   */
+  it('gives the export run a governor budget, and leaves the chunk reads on the default', async () => {
+    const fake = fakeController();
+    const result = await handleToolCall(
+      'pinepaper_agent_export',
+      { platform: 'youtube', format: 'mp4', duration: 600 },
+      { executeInBrowser: true, browserController: fake.controller, executionMode: 'puppeteer' }
+    );
+    expect(result.isError).toBeFalsy();
+    written.push(/File: (\S+)/.exec(textOf(result))![1]);
+
+    const exportRun = fake.runOptions[fake.calls.findIndex((c) => c.includes('exportToStore'))];
+    expect(exportRun?.governorTimeoutMs).toBeGreaterThan(10_000);
+
+    // A chunk read slices a string already in memory. If one of those needs ten
+    // seconds the store is wedged, and a timeout is the right answer.
+    // `"offset"` rather than `readExport`: the export code names readExport too,
+    // in the capability check it makes before choosing the store path.
+    const readRun = fake.runOptions[fake.calls.findIndex((c) => c.includes('"offset"'))];
+    expect(readRun?.governorTimeoutMs).toBeUndefined();
   });
 });

@@ -11,6 +11,15 @@ import type { Browser, Page } from 'puppeteer';
 // TYPES
 // =============================================================================
 
+/**
+ * What a navigation waits for. Puppeteer's own union, spelled out here so the
+ * env var can be validated against it without importing puppeteer — which is
+ * an optional peer, absent on most installs (see connect()).
+ */
+export type PageWaitUntil = 'load' | 'domcontentloaded' | 'networkidle0' | 'networkidle2';
+
+export const PAGE_WAIT_UNTIL: readonly PageWaitUntil[] = ['load', 'domcontentloaded', 'networkidle0', 'networkidle2'];
+
 export interface BrowserControllerConfig {
   /** PinePaper Studio URL (default: https://pinepaper.studio) */
   studioUrl?: string;
@@ -24,6 +33,46 @@ export interface BrowserControllerConfig {
   timeout?: number;
   /** Enable agent mode with ?agent=1 URL parameter */
   agentMode?: boolean;
+  /**
+   * What navigations wait for (default: 'domcontentloaded').
+   *
+   * Every goto/reload used to be networkidle2, which asks for two-or-fewer
+   * connections held for half a second — a bar Studio never clears behind a
+   * proxy, or with analytics and polling sockets open. Connect then burned the
+   * entire timeout and failed against a page that had been usable for seconds.
+   * Readiness is waitForPinePaper()'s job; a navigation only has to hand us a
+   * document.
+   */
+  waitUntil?: PageWaitUntil;
+  /**
+   * Chrome --proxy-server value (e.g. 'http://127.0.0.1:8080'). Setting it also
+   * passes --ignore-certificate-errors, because a proxy that intercepts TLS
+   * presents its own certificate and Chrome would otherwise refuse every
+   * origin. Unset → neither flag, and certificate checking stays on.
+   */
+  proxy?: string;
+  /**
+   * Run code through FxTool's governor (app.runGenerated) when the build has
+   * one. Default true. False raw-evals instead — see ExecuteCodeOptions.
+   */
+  governor?: boolean;
+}
+
+export interface ExecuteCodeOptions {
+  /**
+   * Governor budget for this run, in ms. FxTool's runGenerated defaults to
+   * 10_000 (RUN_DEFAULTS.timeoutMs, an async-tail Promise.race): a sane guard
+   * against a runaway script, and the wrong number for an export — the one
+   * operation that legitimately runs for minutes.
+   */
+  governorTimeoutMs?: number;
+  /**
+   * Skip app.runGenerated entirely and raw-eval the code. That gives up the
+   * governor report, the structured error codes and the seeded PRNG, so it is
+   * the escape hatch for a deployed build whose governor ignores the budget
+   * above — never a fast path. Defaults to the controller's `governor: false`.
+   */
+  bypassGovernor?: boolean;
 }
 
 export interface AgentConnectOptions {
@@ -73,6 +122,44 @@ export interface ExecuteResult {
   canvasReset?: boolean;
 }
 
+/**
+ * Is PinePaper Studio actually usable? Evaluated IN THE PAGE, so it closes over
+ * nothing.
+ *
+ * The old test was `app !== undefined || pinepaper !== undefined || paper !==
+ * undefined`, hand-copied into four places. `window.paper` is Paper.js, which
+ * attaches the moment the canvas script loads — long before Studio has built
+ * its API — so all four sites could report ready against a page that would
+ * throw on the first call.
+ *
+ * The test is FxTool's own, mirrored rather than invented: js/app.js polls
+ * `app && app.itemRegistry && typeof app.create === 'function'` under the
+ * comment "No global ready event exists — poll for the app surface the executor
+ * needs". Two ordering details make both halves earn their place:
+ * `window.PinePaper` is first assigned the CLASS at module load (no `create` —
+ * create() is an instance method) and only later the instance, and the instance
+ * assigns itself to the global from INSIDE its own constructor.
+ *
+ * Every candidate global is tested, not just the first truthy one: picking
+ * `window.app` because it exists and then failing it would trade a false ready
+ * for a false not-ready, which costs the whole timeout.
+ */
+export function pinePaperIsReady(): boolean {
+  const w = window as unknown as Record<string, { create?: unknown; itemRegistry?: unknown } | undefined>;
+  return [w.app, w.PinePaper, w.pinepaper].some(
+    (api) => !!api && typeof api.create === 'function' && !!api.itemRegistry,
+  );
+}
+
+/**
+ * Floor for how long CDP waits on a single call. Puppeteer's default is 180s,
+ * which is shorter than a long video export's governor budget (handlers.ts,
+ * EXPORT_GOVERNOR_DEFAULT_MS — this number, deliberately) — the protocol must
+ * not be the thing that kills an export first, or the error blames the wrong
+ * layer. PINEPAPER_TIMEOUT raises it past this floor.
+ */
+const MIN_PROTOCOL_TIMEOUT_MS = 300_000;
+
 // =============================================================================
 // BROWSER CONTROLLER CLASS
 // =============================================================================
@@ -116,12 +203,51 @@ export class PinePaperBrowserController {
       viewportHeight: config.viewportHeight || 800,
       timeout: config.timeout || 30000,
       agentMode: true, // MCP server always uses agent mode
+      waitUntil: config.waitUntil || 'domcontentloaded',
+      proxy: config.proxy || '',
+      governor: config.governor ?? true,
     };
 
     console.error(`[PinePaper] Controller initialized:`);
     console.error(`[PinePaper]   Original URL: ${originalUrl}`);
     console.error(`[PinePaper]   Agent URL: ${studioUrl}`);
     console.error(`[PinePaper]   Headless: ${this.config.headless}`);
+    console.error(`[PinePaper]   waitUntil: ${this.config.waitUntil}, timeout: ${this.config.timeout}ms`);
+    if (this.config.proxy) {
+      console.error(`[PinePaper]   Proxy: ${this.config.proxy} — certificate errors ignored for this session`);
+    }
+    if (!this.config.governor) {
+      console.error('[PinePaper]   Governor: OFF — raw eval, no report, no seeded determinism');
+    }
+  }
+
+  /**
+   * Chrome flags shared by both launch paths, so a proxy configured once does
+   * not go missing from whichever path the caller happens to take.
+   */
+  private launchArgs(viewportWidth: number, viewportHeight: number, extra: string[] = []): string[] {
+    const args = [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      `--window-size=${viewportWidth},${viewportHeight}`,
+      ...extra,
+    ];
+    // Strictly gated on an explicitly configured proxy. Relaxing certificate
+    // checking for every run would be a silent downgrade; here it is the
+    // consequence of a flag the operator set for their own interception proxy.
+    if (this.config.proxy) {
+      args.push(`--proxy-server=${this.config.proxy}`, '--ignore-certificate-errors');
+    }
+    return args;
+  }
+
+  /** Launch options shared by both paths — see MIN_PROTOCOL_TIMEOUT_MS. */
+  private launchOptions(headless: boolean, args: string[]): Record<string, unknown> {
+    return {
+      headless,
+      args,
+      protocolTimeout: Math.max(this.config.timeout, MIN_PROTOCOL_TIMEOUT_MS),
+    };
   }
 
   /**
@@ -167,6 +293,20 @@ export class PinePaperBrowserController {
    */
   get isHeadless(): boolean {
     return this.config.headless;
+  }
+
+  /**
+   * The resolved connection settings. Read-only, and a copy: these are what the
+   * env vars and the caller's config actually worked out to, which is otherwise
+   * only observable by launching a browser.
+   */
+  get connectionSettings(): Readonly<Required<BrowserControllerConfig>> {
+    return { ...this.config };
+  }
+
+  /** The Chrome flags this controller would launch with. Exposed for tests. */
+  chromeArgs(): string[] {
+    return this.launchArgs(this.config.viewportWidth, this.config.viewportHeight);
   }
 
   /**
@@ -232,14 +372,12 @@ export class PinePaperBrowserController {
       }
 
       console.error('[PinePaper] Launching browser...');
-      this.browser = await puppeteer.default.launch({
-        headless: this.config.headless,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          `--window-size=${this.config.viewportWidth},${this.config.viewportHeight}`,
-        ],
-      });
+      this.browser = await puppeteer.default.launch(
+        this.launchOptions(
+          this.config.headless,
+          this.launchArgs(this.config.viewportWidth, this.config.viewportHeight),
+        ),
+      );
 
       // Get existing pages first, reuse if available (avoid creating multiple tabs)
       const pages = await this.browser.pages();
@@ -260,23 +398,11 @@ export class PinePaperBrowserController {
 
       console.error(`[PinePaper] Navigating to ${this.config.studioUrl}...`);
       await this.page.goto(this.config.studioUrl, {
-        waitUntil: 'networkidle2',
+        waitUntil: this.config.waitUntil,
         timeout: this.config.timeout,
       });
 
-      // Wait for PinePaper to be ready (check for app object)
-      console.error('[PinePaper] Waiting for PinePaper Studio to initialize...');
-      await this.page.waitForFunction(
-        () => {
-          // Check if PinePaper's global app or API is available
-          return (
-            typeof (window as any).app !== 'undefined' ||
-            typeof (window as any).pinepaper !== 'undefined' ||
-            typeof (window as any).paper !== 'undefined'
-          );
-        },
-        { timeout: this.config.timeout }
-      );
+      await this.waitForPinePaper();
 
       this.isConnected = true;
       console.error('[PinePaper] Connected to PinePaper Studio');
@@ -369,7 +495,7 @@ export class PinePaperBrowserController {
   /**
    * Execute JavaScript code in PinePaper Studio
    */
-  async executeCode(code: string, takeScreenshot = true): Promise<ExecuteResult> {
+  async executeCode(code: string, takeScreenshot = true, options: ExecuteCodeOptions = {}): Promise<ExecuteResult> {
     if (!this.page || !this.isConnected) {
       return {
         success: false,
@@ -383,11 +509,17 @@ export class PinePaperBrowserController {
       // budgets, bulk-create perf, and a machine-readable report. It returns the
       // code's trailing-expression value as result.value (FxTool captures it).
       // Fall back to raw eval on older builds that lack runGenerated.
-      const result = await this.page.evaluate(async (codeToRun: string) => {
+      const runOptions = {
+        bypass: options.bypassGovernor ?? !this.config.governor,
+        timeoutMs: options.governorTimeoutMs,
+      };
+      const result = await this.page.evaluate(async (codeToRun: string, opts: { bypass: boolean; timeoutMs?: number }) => {
         const app = (window as any).app || (window as any).PinePaper;
-        if (app && typeof app.runGenerated === 'function') {
+        if (!opts.bypass && app && typeof app.runGenerated === 'function') {
           try {
-            const run = await app.runGenerated(codeToRun, { source: 'agent' });
+            // timeoutMs is runGenerated's own option (RUN_DEFAULTS.timeoutMs,
+            // 10s) — passing undefined leaves the default in place.
+            const run = await app.runGenerated(codeToRun, { source: 'agent', timeoutMs: opts.timeoutMs });
             if (run && run.ok === false) {
               return {
                 success: false,
@@ -402,7 +534,9 @@ export class PinePaperBrowserController {
             return { success: false, error: e instanceof Error ? e.message : 'Execution error', executedVia: 'governed' as const };
           }
         }
-        // Fallback: raw eval (pre-governor FxTool build).
+        // Fallback: raw eval — a pre-governor FxTool build, or an explicit
+        // bypass. Both generated-code shapes are `(`-led expression statements,
+        // so eval returns the same trailing value runGenerated captures.
         try {
           // eslint-disable-next-line no-eval
           const evalResult = eval(codeToRun);
@@ -417,7 +551,7 @@ export class PinePaperBrowserController {
             executedVia: 'eval' as const,
           };
         }
-      }, code);
+      }, code, runOptions);
 
       // Take screenshot if requested
       let screenshot: string | undefined;
@@ -436,7 +570,10 @@ export class PinePaperBrowserController {
       // the canvas. Re-bind to the live page and retry ONCE instead.
       if (PinePaperBrowserController.isStaleFrameError(error) && await this.reacquirePage()) {
         try {
-          const retry = await this.executeCode(code, takeScreenshot);
+          // Forward `options`: a recovered export that silently reverted to the
+          // 10s governor budget would die at the same place the retry exists to
+          // get past.
+          const retry = await this.executeCode(code, takeScreenshot, options);
           // The page reloaded under us, so the scene may be gone even though
           // execution now succeeds. Say so explicitly — silently continuing
           // against vanished item ids is how this bug wasted a whole rebuild.
@@ -508,7 +645,7 @@ export class PinePaperBrowserController {
       throw new Error('Not connected to browser');
     }
     await this.page.goto(url, {
-      waitUntil: 'networkidle2',
+      waitUntil: this.config.waitUntil,
       timeout: this.config.timeout,
     });
   }
@@ -521,7 +658,7 @@ export class PinePaperBrowserController {
       throw new Error('Not connected to browser');
     }
     await this.page.reload({
-      waitUntil: 'networkidle2',
+      waitUntil: this.config.waitUntil,
       timeout: this.config.timeout,
     });
   }
@@ -537,22 +674,12 @@ export class PinePaperBrowserController {
 
     console.error('[PinePaper] Refreshing page...');
     await this.page.reload({
-      waitUntil: 'networkidle2',
+      waitUntil: this.config.waitUntil,
       timeout: this.config.timeout,
     });
 
     // Wait for PinePaper to be ready again
-    console.error('[PinePaper] Waiting for PinePaper Studio to reinitialize...');
-    await this.page.waitForFunction(
-      () => {
-        return (
-          typeof (window as any).app !== 'undefined' ||
-          typeof (window as any).pinepaper !== 'undefined' ||
-          typeof (window as any).paper !== 'undefined'
-        );
-      },
-      { timeout: this.config.timeout }
-    );
+    await this.waitForPinePaper();
 
     console.error('[PinePaper] Page refreshed and ready');
   }
@@ -566,13 +693,7 @@ export class PinePaperBrowserController {
     }
 
     try {
-      return await this.page.evaluate(() => {
-        return (
-          typeof (window as any).app !== 'undefined' ||
-          typeof (window as any).pinepaper !== 'undefined' ||
-          typeof (window as any).paper !== 'undefined'
-        );
-      });
+      return await this.page.evaluate(pinePaperIsReady);
     } catch {
       return false;
     }
@@ -598,7 +719,7 @@ export class PinePaperBrowserController {
           const agentUrl = this.getAgentUrl(this.config.studioUrl);
           console.error(`[PinePaper] Switching to agent mode: ${agentUrl}`);
           await this.page.goto(agentUrl, {
-            waitUntil: 'networkidle2',
+            waitUntil: this.config.waitUntil,
             timeout: this.config.timeout,
           });
           await this.waitForPinePaper();
@@ -644,18 +765,17 @@ export class PinePaperBrowserController {
       const viewportHeight = options.viewportHeight ?? this.config.viewportHeight;
 
       console.error(`[PinePaper] Launching browser in agent mode (headless: ${useHeadless})...`);
-      this.browser = await puppeteer.default.launch({
-        headless: useHeadless,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          `--window-size=${viewportWidth},${viewportHeight}`,
-          // Additional optimization flags for agent mode
-          '--disable-gpu',
-          '--disable-dev-shm-usage',
-          '--disable-extensions',
-        ],
-      });
+      this.browser = await puppeteer.default.launch(
+        this.launchOptions(
+          useHeadless,
+          this.launchArgs(viewportWidth, viewportHeight, [
+            // Additional optimization flags for agent mode
+            '--disable-gpu',
+            '--disable-dev-shm-usage',
+            '--disable-extensions',
+          ]),
+        ),
+      );
 
       // Get existing pages first, reuse if available (avoid creating multiple tabs)
       const pages = await this.browser.pages();
@@ -689,7 +809,7 @@ export class PinePaperBrowserController {
 
       // Navigate the existing page to PinePaper (converts about:blank to PinePaper)
       await this.page.goto(targetUrl, {
-        waitUntil: 'networkidle2',
+        waitUntil: this.config.waitUntil,
         timeout: this.config.timeout,
       });
 
@@ -714,16 +834,7 @@ export class PinePaperBrowserController {
     if (!this.page) return;
 
     console.error('[PinePaper] Waiting for PinePaper Studio to initialize...');
-    await this.page.waitForFunction(
-      () => {
-        return (
-          typeof (window as any).app !== 'undefined' ||
-          typeof (window as any).pinepaper !== 'undefined' ||
-          typeof (window as any).paper !== 'undefined'
-        );
-      },
-      { timeout: this.config.timeout }
-    );
+    await this.page.waitForFunction(pinePaperIsReady, { timeout: this.config.timeout });
   }
 
   /**
@@ -841,13 +952,19 @@ ${codes.map((code, i) => `
   async executeWithTimeout(
     code: string,
     timeoutMs: number,
-    takeScreenshot = false
+    takeScreenshot = false,
+    options: ExecuteCodeOptions = {}
   ): Promise<ExecuteResult> {
     const timeoutPromise = new Promise<ExecuteResult>((_, reject) => {
       setTimeout(() => reject(new Error('Execution timeout')), timeoutMs);
     });
 
-    const executePromise = this.executeCode(code, takeScreenshot);
+    // The caller's outer deadline is the governor's too unless they said
+    // otherwise — a governor that fires first would report the wrong cause.
+    const executePromise = this.executeCode(code, takeScreenshot, {
+      governorTimeoutMs: timeoutMs,
+      ...options,
+    });
 
     try {
       return await Promise.race([executePromise, timeoutPromise]);
@@ -932,12 +1049,33 @@ export function getBrowserController(
   config?: BrowserControllerConfig
 ): PinePaperBrowserController {
   if (!globalController) {
-    // Resolve headless: explicit config > env var > default (true)
+    // Env resolution lives here, not in the controller: explicit config wins,
+    // then the env var, then the default — the shape PINEPAPER_HEADLESS and
+    // PINEPAPER_STUDIO_URL already use.
     const envHeadless = process.env.PINEPAPER_HEADLESS;
     const headless = config?.headless ?? (envHeadless !== undefined ? envHeadless !== 'false' : true);
+
+    const envWaitUntil = process.env.PINEPAPER_WAIT_UNTIL?.trim() as PageWaitUntil | undefined;
+    if (envWaitUntil && !PAGE_WAIT_UNTIL.includes(envWaitUntil)) {
+      // Loudly, because a typo here silently reinstates the hang it was set to
+      // avoid — and a 30s connect failure looks nothing like a bad env var.
+      console.error(
+        `[PinePaper] PINEPAPER_WAIT_UNTIL="${envWaitUntil}" is not one of ${PAGE_WAIT_UNTIL.join(', ')} — ignoring it.`,
+      );
+    }
+
+    const envTimeout = Number(process.env.PINEPAPER_TIMEOUT);
+    if (process.env.PINEPAPER_TIMEOUT && !Number.isFinite(envTimeout)) {
+      console.error(`[PinePaper] PINEPAPER_TIMEOUT="${process.env.PINEPAPER_TIMEOUT}" is not a number — ignoring it.`);
+    }
+
     const mcpConfig: BrowserControllerConfig = {
       ...config,
       headless,
+      waitUntil: config?.waitUntil ?? (envWaitUntil && PAGE_WAIT_UNTIL.includes(envWaitUntil) ? envWaitUntil : undefined),
+      timeout: config?.timeout ?? (Number.isFinite(envTimeout) && envTimeout > 0 ? envTimeout : undefined),
+      proxy: config?.proxy ?? process.env.PINEPAPER_PROXY?.trim(),
+      governor: config?.governor ?? (process.env.PINEPAPER_GOVERNOR?.trim().toLowerCase() !== 'off'),
     };
     globalController = new PinePaperBrowserController(mcpConfig);
   } else if (config) {
