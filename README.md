@@ -210,47 +210,77 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 
 ## What's new in 1.6.9
 
-**The browser connection stopped lying about being ready.** Four defects in one file, found by running this server against a studio behind a proxy rather than by anything failing in the suite. Each was silent in its own way, and the readiness one was silent in the worst way — it reported success.
+### New: `pinepaper_export_store`
 
-- **"Ready" meant Paper.js had loaded.** The check was `window.app || window.pinepaper || window.paper` tested for mere *existence*, hand-copied into four places. `window.paper` is Paper.js, which attaches the moment the canvas script does — long before the studio has built its API — so every one of those four sites could return ready against a page that throws on the first call. The failure then surfaces later and somewhere else, as a broken tool call rather than a failed connect. All four now route through one predicate, and it is **the engine's own**: `js/app.js` polls `app && app.itemRegistry && typeof app.create === 'function'` under the comment "No global ready event exists". Mirrored rather than invented, because two ordering details make both halves earn their place — `window.PinePaper` holds the *class* at module load (`create()` is an instance method) and the instance only later, and the instance assigns itself to the global from inside its own constructor. Every candidate global is tested rather than the first truthy one: short-circuiting on a `window.app` that fails would trade a false ready for a false *not*-ready, which costs the entire timeout.
-- **Every navigation waited for `networkidle2`** — two-or-fewer connections held for half a second. A studio with analytics or a polling socket open never clears that bar, and behind a proxy it never clears it at all, so `connect()` burned its whole 30s against a page that had been usable for seconds. The default is now `domcontentloaded` at all six `goto`/`reload` sites, which is only safe *because* readiness above does the real gating. `PINEPAPER_WAIT_UNTIL` sets it back, and a value that is not one of puppeteer's four is rejected out loud — a typo there silently reinstates the hang it was set to avoid, and a 30s connect failure looks nothing like a bad environment variable.
-- **The 30s timeout was not reachable from outside.** `PINEPAPER_TIMEOUT` now sets it.
-- **There was no way to put Chrome behind an intercepting proxy**, which is what an origin that rejects headless-Chrome TLS fingerprints needs. `PINEPAPER_PROXY` passes `--proxy-server`, and with it `--ignore-certificate-errors` — a proxy that intercepts TLS presents its own certificate, so without the second flag the first is useless on its own. Strictly gated on the variable being set: relaxing certificate checking on every run would be a silent downgrade, where here it is the consequence of a flag an operator set for their own proxy. Both flags come from one shared builder, so a proxy configured once cannot go missing from whichever of the two launch paths a caller happens to take.
+Recover an export the studio is still holding, instead of re-rendering it.
 
-**An export died at ten seconds and blamed the scene.** FxTool's governor races generated code against `RUN_DEFAULTS.timeoutMs` — right for a scene-building script that has no business running longer, and wrong for the one operation that legitimately runs for minutes. `pinepaper_agent_export` renders frame by frame and its `duration` cap is 600 seconds, so it hit the ceiling and came back as a `PP_TIMEOUT` that reads like a broken scene.
+- `list` — what is held: `{id, format, size, createdAt}`, newest first. IDs survive a page reload.
+- `save` — page it out to a file and release it. Returns a `filePath`, and is safe to repeat.
+- `release` — drop it without saving.
 
-- The budget is **raised** for the export run, not bypassed. `runGenerated` has taken a `timeoutMs` option since the governor's first commit, and passing it keeps the report, the structured error codes, the item budget and the seeded PRNG — all four of which a bypass throws away. `PINEPAPER_EXPORT_TIMEOUT` overrides it; raising it past the default without also raising `PINEPAPER_TIMEOUT` is called out, because past that point the export fails as a *protocol* error and the message would blame the wrong layer.
-- Puppeteer's `protocolTimeout` now has a floor matching that budget. Its 180s default is shorter than a long export, so CDP would have cut the call before the governor ever reported.
-- The stale-frame retry forwards the budget. A recovered export that silently reverted to ten seconds would die at exactly the place the retry exists to get past.
-- Export **chunk reads** stay on the default budget, deliberately. A chunk read slices a string already in memory; if one needs ten seconds the store is wedged, and a timeout is the correct answer rather than a longer wait.
-- `PINEPAPER_GOVERNOR=off` is the escape hatch for a studio whose governor ignores the budget. It gives up the report, the error codes and the seeded determinism, which is why it is a switch and not a default.
+Reach for it when an export fails with `Failed to write data to data pipe` — that is the browser's transport, not the encoder, so the bytes are often already stored — or when an error names an `exportId`.
 
-**`compose` was unusable, and this is why.** `pinepaper_design_system`'s `compose` passed the generators' coordinates straight through, under a comment calling itself "a rename, not a layout pass". The generators author CSS-shaped **top-left boxes**; `app.create` is **centre-anchored** — the engine builds a rectangle at `position - size/2` and a circle at `center: position`. So every composed scene rendered half a box up and to the left of where the generator put it, and left-aligned copy was worse than that: Bauhaus authors its title at 0.1 × width, which on a 1080 canvas is 108, so a 600px headline centred on 108 started at −192. Half the title was off the canvas, and the tester abandoned composing and hand-built every style scene from raw primitives instead.
+**Retention:** held exports last until released, or until a later export needs the space, and eviction drops the oldest first. Save or release each export before starting the next one.
 
-- Three conventions now resolve **per element**, because one blanket shift breaks two of them. A box moves to its centre. An explicit `radius` is *already* a centre and must not move — art nouveau's halo and op art's concentric rings are authored from a ring centre, so shifting them would break the styles that were already right. Text carries its **alignment**, which the engine reads to make `x` the left or right edge; that was being dropped entirely, so every left-aligned string centred on its anchor even once the boxes were correct.
-- Where a text element has no box — the layout-shape generators author text as x/y/fontSize — the vertical position is left alone rather than shifted by a guess. The horizontal fix, which is the one that put titles off-canvas, applies either way.
+### New: `scale` on `pinepaper_agent_export`
 
-**A style's palette and type were one layer below the API.** `list_styles` returned `{style, composable}` and nothing else, so building an authentic Bauhaus or Memphis scene by hand meant grepping this server's own vendored generators for `PALETTE` constants. It now returns the **tokens** — palette, background, font stacks, type sizes, and any variants — for every style. They are *derived by composing the style*, never transcribed: 18 hand-copied constants under 18 different names would drift the first time `sync:design` pulled an upstream change, which is the failure this repo keeps paying to remove. Safe to derive because no vendored generator is procedural, so one run is the whole palette.
+Render video at a fraction of the platform preset (`0.1`–`1`).
 
-**An export could report success while failing.** `pinepaper_agent_export` read only whether the *code ran*. The export's own verdict — `success: false` with a reason — was never checked, so it fell through to the inline return and came back as a finished export. Measured on a five-chunk video where two chunks reported `"error": "Failed to write data to data pipe"` under an outer `"success": true`: the caller shipped three chunks believing it had five. A silent success is the one failure this surface cannot afford, because nothing downstream has any reason to look again.
+- `scale: 0.5` with `quality: "draft"` is a fast look-check before committing to a full render.
+- Smaller frames also mean smaller files: the encoder derives its target from resolution, so this is the size control. There is no bitrate option.
+- Video only (`mp4`/`webm`/`gif`) — passing it to `png`/`svg`/`pdf`/`wav` is rejected rather than ignored. Omitting it leaves exports exactly as before.
 
-**New tool: `pinepaper_export_store`** — `list`, `save`, `release`. A long export is held in the studio and paged out to a file; when the *paging* half failed, the render had already succeeded and the error said the bytes were "still held … it can be paged again". True, and unreachable, because no call could do it. `readExport` is stateless and idempotent, so there was never resume state to keep — only a missing door. The failure message now names the call that keeps its promise.
+### New: `list_motion` on `pinepaper_design_system`
 
-- **"Failed to write data to data pipe" is the browser's transport, not the encoder.** The string appears nowhere in the engine. So an export reporting it may well have finished with its bytes in the store — the error now says to `list` before re-rendering, which matters because a fresh export **evicts the oldest held bytes** to make room. In a five-chunk render, re-rendering chunk 5 is what takes chunk 1 away. Save or release each export before starting the next.
-- A read that fails on **size** is not a read that fails: the window halves and retries the same offset down to a 256 KB floor. A refusal from the *store* — evicted, out of range — is not retried, because that answer will not change.
-- An out-of-range refusal is a **correction**: it carries the real size, so a caller working from a stale count is told rather than handed a short chunk it treats as the tail. Taken once, and only when the stated size *disagrees* — every refusal quotes the size, including ones refusing for another reason.
+Returns each licensed design system's motion curves **and** its durations; previously only the curves were reachable. Durations come back in milliseconds and in seconds.
 
-**Export no longer fails on a fresh session.** `app.exportEngine` is a lazy getter over a code-split chunk, undefined until the engine's idle prefetch lands about 1.2s after boot. An agent that connects and exports immediately — which is the shape of every automated session — beat that prefetch, and the generated code reported the studio as too old to export. The build was fine; the chunk had not arrived. Both cold-start doors now await it.
+These are the design systems' motion scales — Material's duration ladder, and so on. Aesthetic styles such as `bauhaus_geometric` carry no motion data of their own, so pair a system's motion with a style.
 
-**Rotation was never missing.** It works at create (`properties: { rotation: 45 }`), on update, and in keyframes. It was *undiscoverable*, and there is a trap that explains the report: `create` bakes the angle into the geometry, so reading `item.rotation` back returns **0**. A twelve-ray sunburst has twelve visibly different rays that all report rotation 0 — verifying by re-reading the property is how a working feature gets written off as missing, and a radial figure gets faked with a chevron arc. Said plainly on `pinepaper_create_item`, including that a sunburst is N creates at `rotation: i * (360/N)`.
+### `list_styles` now returns style tokens
 
-**Dense motion is routed where the decision is actually made.** Building a 60-second chunk as per-keyframe tool calls cost roughly 300k characters, and the report asked for a generator/expression parameter on `pinepaper_keyframe_animate`. That parameter already ships as the `time_expression` relation, fully documented on this surface. What was missing was a signpost: `keyframe_animate`'s description is good about what it does and pointed at nothing cheaper, so an agent landing there got everything needed to emit 2,002 keyframes correctly and no signal that it should not. Three routes are now named there — `time_expression` for motion that is a function of time (measured at 26k characters against 147k for the same scene), `staggered_with` / `wave_through` for a whole group in one call, and `pinepaper_execute_custom_code` for genuinely procedural scenes, which is cheapest by an order of magnitude because a loop collapses the repetition. `execute_custom_code` now states the other half of that trade: items built in raw JS carry **no behavioral record** — no graph edge, nothing SMIL or widget export can lift, nothing the ontology can read. A scene that renders and cannot describe itself is a real cost, so reach for a loop when the geometry is procedural, not merely to avoid the typing. No second parameter was added; a vocabulary with two ways to say the same thing is a failure this changelog has a long record of.
+`pinepaper_design_system` `list_styles` returns each style's palette, background, font stacks, type sizes and variants, not just its name. Building in a style by hand no longer means reading the generator source to find its colours.
 
-**A five-minute render came out at 188 MB, and the fix is not a bitrate.** The obvious ask is a bitrate parameter, and there is nowhere honest to put one: `VideoExporter` computes its own encode target from resolution, quality and frame rate and never reads a caller-supplied value, so a `bitrate` option would be a knob that silently does nothing — which is the exact failure the rest of this release is about. Resolution is an *input* to that calculation, so `pinepaper_agent_export` gains **`scale`** (0.1–1) instead: it renders at a fraction of the platform preset, the encoder's target falls with the frame, and the same knob is what makes a preview fast. `scale: 0.5` with `quality: "draft"` is the look-check before committing to a full render. Dimensions are rounded to even, which H.264's chroma subsampling requires — an odd one is rejected by the encoder rather than rounded for you. Passing it to a format with no encode target (png/svg/pdf/wav) is refused by name rather than accepted and dropped, and without it the emitted code is unchanged, so no existing export renders differently.
+### Fixed: `compose` placed everything off-centre
 
-**Design systems had no temporal dimension, and half of one was already in the data.** `list_easings` published the 27 motion curves; the 47 **duration** tokens sitting beside them in the same store were read by nothing. So an agent could match a system's easing and then had to invent its timing — a curve is a shape, a motion is a shape over a length, and the invented half is the one that is easy to get wrong. The new `list_motion` action returns both, durations in milliseconds *and* seconds because every animation tool here takes seconds. These are the licensed **systems'** motion scales — Material's duration ladder, and so on. An aesthetic style like `bauhaus_geometric` carries no upstream motion data, and manufacturing some would be inventing a fact about someone else's design system, so the result says to pair a system's motion with a style rather than expecting the style to name its own.
+`compose` positioned items by their top-left corner while the canvas positions by centre, so every composed scene was displaced and left-aligned headlines ran off the edge of the canvas. Composed scenes now land where the layout intends.
 
-**`pinepaper_animate_letter_collage` passed its arguments wrongly.** The engine signature is `animateLetterCollage(collageId, animationType, options)` and this server passed a single object, so it landed in the `animationType` slot and the requested type was discarded on **every** call — silently, since the call still returned and still reported success. **This fix needs an engine change to take effect:** the other half is a `staggered_with` relation inside FxTool that targeted the collage's own map key, so the relation registered and was skipped every frame. That fix is on FxTool's `export/long-form-streaming` branch and is not yet on its main, so until it ships the collage still will not animate.
+### Fixed: exports could report success while failing
+
+`pinepaper_agent_export` could return success when the export itself had failed, so a failed render passed silently and a batch could lose chunks without saying so. A failed export is now an error, and names a recovery path when the failure looks like a transport problem.
+
+### Fixed: long exports timed out at ten seconds
+
+Video exports running longer than about ten seconds failed with a `PP_TIMEOUT` that looked like a problem with the scene.
+
+- `PINEPAPER_EXPORT_TIMEOUT` sets the budget (default `300000` ms). For exports over five minutes, raise `PINEPAPER_TIMEOUT` to match.
+- `PINEPAPER_GOVERNOR=off` is an escape hatch for older studio builds.
+
+### Fixed: exports failed on a fresh session
+
+Exporting immediately after connecting failed with a message blaming the studio's version. The export now waits for the studio's export subsystem to finish loading.
+
+### Fixed: large exports could be left undeliverable
+
+A read failure partway through paging a large export left the file unrecoverable. Reads now retry at a smaller size, and anything still held can be recovered with `pinepaper_export_store`.
+
+### Fixed: connection failures behind proxies, and a false "ready"
+
+Connecting could burn the full timeout against a studio that was already usable, and the connection had no configuration.
+
+- `PINEPAPER_WAIT_UNTIL` — what a navigation waits for (default `domcontentloaded`; set `networkidle2` for the previous behaviour).
+- `PINEPAPER_TIMEOUT` — navigation and readiness timeout in ms (default `30000`).
+- `PINEPAPER_PROXY` — routes Chrome through a proxy, for origins that reject headless Chrome. Setting it also relaxes certificate checking, which an intercepting proxy requires.
+
+Connections now wait for the studio's API rather than for its canvas library, so "connected" means tool calls will work.
+
+### Fixed: `pinepaper_animate_letter_collage` ignored its animation type
+
+The requested animation type was discarded on every call. **This fix also needs a studio update** — the other half is an engine change that has not shipped yet, so collage animation stays static until it does.
+
+### Documentation
+
+- **Rotation** — `pinepaper_create_item` documents `properties: { rotation: 45 }`, and that rotation is baked into the geometry, so reading `item.rotation` back returns `0`. Verify a rotation by geometry or pixels, not by re-reading the property.
+- **Dense motion** — `pinepaper_keyframe_animate` points at cheaper routes before you author hundreds of keyframes: the `time_expression` relation for motion that is a function of time, `staggered_with` / `wave_through` for a whole group, and `pinepaper_execute_custom_code` for procedural scenes.
 
 ## What's new in 1.6.8
 
