@@ -1112,6 +1112,14 @@ export const EffectTypeSchema = z.enum([
   'vortex',
   'rain_veil',
   'caustics',
+
+  // ink_bleed was the LAST aura and the gate rejected it. The engine's own
+  // comment says it 'has shipped unroutable through applyEffect since it was
+  // added' — past tense, describing a bug it then fixed: _publishNames()
+  // publishes every aura definition, and PinePaper.applyEffect warms the
+  // subsystem before routing, so all eight route now. Reading the comment
+  // would have kept it out; reading the mechanism put it in.
+  'ink_bleed',
 ]).describe('Visual effect type (particle effects + shader auras)');
 
 export const SparkleParamsSchema = z.object({

@@ -1,0 +1,6 @@
+crossStitch
+longAndShort
+runningSeam
+satin
+seed
+stem

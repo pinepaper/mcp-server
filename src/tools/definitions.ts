@@ -485,7 +485,7 @@ Without these every item is on screen for the whole render, which is what makes
 a long piece read as one crowded frame instead of a sequence of shots.
 
 SHADER (itemType 'shader') — a lit surface, drawn per pixel:
-- shader: 'water' (open sea, lit swell) | 'liquid_metal' (chrome) | 'heatmap' (thermal halo) | 'gem_smoke' (smoke) | 'electric_arc' (branching discharge, stepped flicker) | 'vortex' (hollow bright RING, sheared by differential rotation) | 'rain_veil' | 'caustics'
+- shader: 'water' (open sea, lit swell) | 'liquid_metal' (chrome) | 'heatmap' (thermal halo) | 'gem_smoke' (smoke) | 'electric_arc' (branching discharge, stepped flicker) | 'vortex' (hollow bright RING, sheared by differential rotation) | 'rain_veil' | 'caustics' | 'ink_bleed'
 - width, height: the quad it fills
 - shaderIntensity: 0..2, the effect's amplitude (water: chop)
 - shaderPalette: 0 day | 1 low sun | 2 night
@@ -6812,6 +6812,7 @@ SHADER AURAS (WebGL2, silhouette-clipped — same tool, routed to the aura syste
 - vortex: The bright band is a RING, not a disc — condensation tracks the steepest pressure gradient, so the core is hollow, and differential rotation shears the field rather than spinning one picture round.
 - rain_veil: Drifting sheets of falling rain across the silhouette.
 - caustics: Refracted light patterns, as through moving water.
+- ink_bleed: Ink wicking outward into the surface, as on absorbent paper. Routable since the engine began publishing every aura name and warming the subsystem before routing; it was defined-but-unreachable before that, which is why it arrived last.
 Aura params: { intensity, radius, palette, mode ('inside'|'outside'|'overlay'), tint, tintStrength, offsetX, offsetY, channels: { a: {speed, curve}, b: {speed, curve} } } — curves: linear, sawtooth, sine, triangle, pulse, ease, bounce, noise.
 
 EXAMPLE — bubbles with magenta interior over a blue rim:
@@ -6824,7 +6825,7 @@ EXAMPLE — gold liquid-metal aura outside a logo:
         itemId: { type: 'string', description: 'Registry ID of the item' },
         effectType: {
           type: 'string',
-          enum: ['sparkle', 'blast', 'smoke', 'fire', 'rain', 'snow', 'confetti', 'ripple', 'glow', 'electric', 'bubbles', 'dust', 'fireflies', 'shockwave', 'trail', 'heatmap', 'liquid_metal', 'gem_smoke', 'electric_arc', 'vortex', 'rain_veil', 'caustics'],
+          enum: ['sparkle', 'blast', 'smoke', 'fire', 'rain', 'snow', 'confetti', 'ripple', 'glow', 'electric', 'bubbles', 'dust', 'fireflies', 'shockwave', 'trail', 'heatmap', 'liquid_metal', 'gem_smoke', 'electric_arc', 'vortex', 'rain_veil', 'caustics', 'ink_bleed'],
           description: 'Type of effect',
         },
         params: {

@@ -33,7 +33,7 @@
 import { describe, it, expect } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { GeneratorNameSchema, EffectTypeSchema, RelationTypeSchema, ItemTypeSchema } from '../../types/schemas.js';
+import { GeneratorNameSchema, EffectTypeSchema, RelationTypeSchema, ItemTypeSchema, THREAD_STITCHES } from '../../types/schemas.js';
 
 const fixture = (name: string) =>
   readFileSync(join(import.meta.dir, '..', 'fixtures', name), 'utf-8')
@@ -71,16 +71,77 @@ describe('generatorName ↔ the engine registry', () => {
   });
 });
 
-describe('effectType covers both dispatch paths', () => {
-  it('has the EffectSystem cases and the shader auras', () => {
-    const switchCases = ['blast', 'bubbles', 'confetti', 'dust', 'electric', 'fire', 'fireflies',
-      'glow', 'rain', 'ripple', 'shockwave', 'smoke', 'snow', 'sparkle', 'trail'];
-    const auras = ['heatmap', 'liquid_metal', 'gem_smoke', 'electric_arc', 'vortex', 'rain_veil', 'caustics'];
-    for (const e of [...switchCases, ...auras]) {
-      expect(EffectTypeSchema.safeParse(e).success, `${e} would be refused at preflight`).toBe(true);
-    }
-    // And nothing beyond those two paths, which would be a phantom.
-    expect(EffectTypeSchema.options.length).toBe(switchCases.length + auras.length);
+describe('effectType ↔ the engine, from a fixture rather than my own typing', () => {
+  /**
+   * THIS GUARD USED TO AGREE WITH ITSELF.
+   *
+   * The first version typed the engine's fifteen EffectSystem cases and seven
+   * shader auras INTO THIS FILE and compared the enum against them, including
+   * an assertion that the enum's length equalled the two lists added together.
+   * Both sides were my own typing, so it proved the enum matched what I had
+   * written down — and would have passed for a sixteenth engine effect it had
+   * never seen.
+   *
+   * It did worse than fail to catch drift: it CONCEALED a live gap. The engine
+   * has eight auras, not seven, and `ink_bleed` was being rejected by the
+   * preflight the whole time. Typing seven into the test made the count add up.
+   *
+   * (FxTool's session hit the same shape the same day — an ontology test
+   * comparing a vocabulary against a hardcoded list in the test file, which
+   * would have passed for a seventh preset. Two repos, one mistake, neither
+   * visible by inspection.)
+   */
+  const engine = fixture('engine-effects.txt');
+
+  it('every effect the engine can apply is callable', () => {
+    const missing = engine.filter((e) => !EffectTypeSchema.options.includes(e as never));
+    expect(missing).toEqual([]);
+  });
+
+  it('offers no effect the engine cannot apply', () => {
+    const phantom = EffectTypeSchema.options.filter((e) => !engine.includes(e));
+    expect(phantom).toEqual([]);
+  });
+
+  it('ink_bleed specifically, because the engine comment argues against it', () => {
+    // "has shipped unroutable through applyEffect since it was added" is past
+    // tense describing a bug the engine then fixed — _publishNames() publishes
+    // every aura and applyEffect warms the subsystem before routing. Trusting
+    // the prose would have kept a working effect gated out. A doc claiming a
+    // mechanism is worth zero; the mechanism is worth everything.
+    expect(EffectTypeSchema.safeParse('ink_bleed').success).toBe(true);
+    expect(engine).toContain('ink_bleed');
+  });
+
+  it('THE GUARD, GUARDED — a planted extra engine effect must fail it', () => {
+    // The only reason to believe the three tests above. If the comparison can
+    // be satisfied by a list that disagrees with the fixture, it proves nothing.
+    const planted = [...engine, 'effect_that_does_not_exist_here'];
+    const missing = planted.filter((e) => !EffectTypeSchema.options.includes(e as never));
+    expect(missing).toEqual(['effect_that_does_not_exist_here']);
+  });
+});
+
+describe('THREAD_STITCHES ↔ STITCH_OPS, which only a comment claimed', () => {
+  /**
+   * The constant's own doc says "Mirrors FxTool's STITCH_OPS in
+   * js/core/ThreadPainting.js". Nothing checked that. Six commits of guards
+   * were built around a constant whose parity with the engine existed only as
+   * prose — verified by hand once, days ago, and never again.
+   *
+   * FxTool found the same class today: a function whose comment said it
+   * mirrored another function's condition, and it did not. "The doc says it
+   * mirrors X" is worth zero as evidence.
+   */
+  const engine = fixture('engine-stitches.txt');
+
+  it('is exactly the engine-published table', () => {
+    expect([...THREAD_STITCHES].sort()).toEqual([...engine].sort());
+  });
+
+  it('THE GUARD, GUARDED — a planted seventh stitch must fail it', () => {
+    const planted = [...engine, 'chainStitch'];
+    expect([...THREAD_STITCHES].sort()).not.toEqual([...planted].sort());
   });
 });
 
