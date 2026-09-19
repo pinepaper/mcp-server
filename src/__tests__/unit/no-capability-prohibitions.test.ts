@@ -42,7 +42,12 @@ import { PROMPTS, getPromptMessages } from '../../prompts/index.js';
 const DOORS: Array<{ capability: string; forbidPattern: RegExp; tool: string }> = [
   { capability: 'HTML', forbidPattern: /\b(do not|don't|never)\s+(generate|create|write|produce)\s+(an?\s+)?HTML\b/i, tool: 'pinepaper_export_widget_html' },
   { capability: 'React', forbidPattern: /\b(do not|don't|never)\s+(generate|create|write|produce)\s+(an?\s+)?React\b/i, tool: 'pinepaper_export_widget' },
-  { capability: 'code', forbidPattern: /\b(do not|don't|never)\s+(answer|reply|respond)\s+in\s+(prose\s+or\s+)?code\b/i, tool: 'pinepaper_execute_custom_code' },
+  // THE VERB SET IS THE DEFECT, NOT THE SENTENCE. This matched only
+  // mcp-cloud's exact wording — "answer in prose or code" — because that was
+  // the instance in front of me when I wrote it. "Do not generate code",
+  // unqualified, walked through a guard named for exactly that ban. Same
+  // form-guess as citing `File.ext:NNN` and missing "lines 1274-1432".
+  { capability: 'code', forbidPattern: /\b(do not|don't|never)\s+(?:(?:answer|reply|respond)\s+in\s+(?:prose\s+or\s+)?code|(?:generate|create|write|produce)\s+(?:any\s+)?code)\b/i, tool: 'pinepaper_execute_custom_code' },
 ];
 
 /**
@@ -159,7 +164,7 @@ describe('no served instruction forbids a shipped capability', () => {
       // v3: the qualifier must follow the ban CLOSELY. "Do not write HTML
       // instead of calling a tool" qualifies; a qualifier two clauses later
       // does not.
-      const QUALIFIED = /\b(instead of|in place of|rather than calling|as a substitute|as a fallback|fall back)\b/i;
+      const QUALIFIED = /\b(instead|in place of|rather than calling|as a substitute|as a fallback|fall back)\b/i;
       const WINDOW = 60;
       const offenders = servedText()
         .filter(({ text }) => {
@@ -190,11 +195,25 @@ describe('no served instruction forbids a shipped capability', () => {
     // Proving the guard rather than trusting it: mcp-cloud's exact sentence,
     // and the one this repo actually shipped.
     expect(DOORS[2]!.forbidPattern.test('Do NOT answer in prose or code; issue tool calls.')).toBe(true);
+    // The widened verbs — the form that walked through the narrow pattern.
+    expect(DOORS[2]!.forbidPattern.test('Do not generate code.')).toBe(true);
+    expect(DOORS[2]!.forbidPattern.test('Never write any code for the user.')).toBe(true);
+    // AND the live sentence in pinepaper://docs/getting-started, which the
+    // widening now MATCHES and the bare `instead` must rescue. Asserting both
+    // halves separately: a pattern that silently stopped matching would also
+    // make the sweep pass, and that is the failure this fixture exists to
+    // distinguish from the rescue actually happening.
+    const LIVE = 'This is the ONLY workflow. Do not skip steps. Do not generate code files instead.';
+    const hit = DOORS[2]!.forbidPattern.exec(LIVE);
+    expect(hit, 'the widened pattern should FIRE on the live sentence').not.toBeNull();
+    expect(/\b(instead|in place of|rather than calling|as a substitute|as a fallback|fall back)\b/i
+      .test(LIVE.slice(hit!.index + hit![0].length, hit!.index + hit![0].length + 60)),
+      'and the trailing `instead` should rescue it as routing').toBe(true);
     expect(DOORS[0]!.forbidPattern.test('Do NOT generate HTML or React — use PinePaper tools instead.')).toBe(true);
     // And the qualifier, not a nearby tool name, is what makes it routing.
     // Attachment, not presence: a qualifier two clauses away belongs to
     // something else.
-    const QUALIFIED = /\b(instead of|in place of|rather than calling|as a substitute|as a fallback|fall back)\b/i;
+    const QUALIFIED = /\b(instead|in place of|rather than calling|as a substitute|as a fallback|fall back)\b/i;
     const after = (t: string, re: RegExp) => { const m = re.exec(t)!; return t.slice(m.index + m[0].length, m.index + m[0].length + 60); };
     expect(QUALIFIED.test(after('Do NOT generate HTML instead of calling these tools', DOORS[0]!.forbidPattern))).toBe(true);
     expect(QUALIFIED.test(after('Do NOT generate HTML or React, and they are the right answer rather than a fallback', DOORS[0]!.forbidPattern))).toBe(false);
