@@ -1,0 +1,6 @@
+# COMPOSABLE_MEDIA, from js/core/CollagePatterns.js — the media a WHOLE
+# composition can be rendered in. Deliberately smaller than the media list:
+# ink, watercolor, hatch and cutPaper have mark-makers but apply per item, and
+# the engine refuses them from compose with that exact advice.
+vector
+thread

@@ -1,0 +1,12 @@
+# The nine media FxTool PUBLISHES, from js/core/DesignMedia.js MEDIA.
+# Each line: key fidelity. Diffed against what this server advertises.
+# Refreshed by reading the engine's table, never by scraping prose.
+vector native
+thread native
+ink native
+watercolor native
+hatch native
+cutPaper native
+charcoal stylised
+oil stylised
+encaustic absent

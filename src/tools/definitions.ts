@@ -2026,7 +2026,7 @@ EXAMPLE — a stitched leaf:
       type: 'object',
       properties: {
         action: { type: 'string', enum: ['list_media', 'resolve', 'list_stitches', 'apply_thread', 'apply_hatch', 'list_flow_fields', 'list_hatch_options'], description: 'Medium operation' },
-        medium: { type: 'string', description: 'resolve: vector | thread | ink | cutPaper | charcoal | oil | encaustic' },
+        medium: { type: 'string', description: 'resolve: vector | thread | ink | watercolor | hatch | cutPaper | charcoal | oil | encaustic. Six are native (vector, thread, ink, watercolor, hatch, cutPaper), two stylised, one absent — call list_media for the live table rather than trusting this line.' },
         itemId: { type: 'string', description: 'apply_thread / apply_hatch: a closed path, compound path, or a group of them.' },
         stitch: { type: 'string', enum: [...THREAD_STITCHES], description: "apply_thread: default longAndShort. These six are the stitches the engine publishes; call 'list_stitches' for each one's description and its own parameters. An unknown name is refused rather than quietly stitched as a default fill." },
         field: { type: 'object', description: "apply_thread: { kind: 'radial'|'spine'|'constant', cx, cy, angle, spine[], across } — default radial from the shape centre." },
