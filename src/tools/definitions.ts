@@ -185,7 +185,7 @@ Measurement: pinepaper_measurement — rulers, grid, snap-to-grid, get item dime
 ─── CANVAS & EXPORT ───
 
 Presets: instagram (1080x1080), youtube (1920x1080), tiktok (1080x1920), twitter (1200x675)
-Export: pinepaper_agent_export (SVG/PNG/GIF/MP4/WebM/PDF), pinepaper_export_svg
+Export: pinepaper_agent_export (SVG/PNG/GIF/MP4/WebM/PDF, plus WAV for the soundtrack alone), pinepaper_export_svg
 Widget: pinepaper_export_widget (pp:PinePaper ontology JSON), pinepaper_export_widget_html (self-contained HTML with tree-shaken runtime)`;
 
 /*
@@ -7752,8 +7752,17 @@ EXAMPLES:
         },
         format: {
           type: 'string',
-          enum: ['svg', 'png', 'gif', 'mp4', 'webm', 'pdf'],
-          description: 'Override format (auto-detected if not specified)',
+          enum: ['svg', 'png', 'gif', 'mp4', 'webm', 'pdf', 'wav'],
+          description: "Override format (auto-detected if not specified). 'wav' exports the SOUNDTRACK ON ITS OWN, with no frames rendered — no platform preset resolves to it, so it must be asked for by name, and platform dimensions, framing and quality do not apply.",
+        },
+        sampleRate: {
+          type: 'number',
+          description: 'wav only: samples per second (default 48000). Rejected for any other format.',
+        },
+        bitDepth: {
+          type: 'number',
+          enum: [16, 32],
+          description: 'wav only: 16 (default) or 32-bit float. Rejected for any other format.',
         },
         quality: {
           type: 'string',
@@ -7767,7 +7776,7 @@ EXAMPLES:
         },
         estimateOnly: {
           type: 'boolean',
-          description: 'Preflight only — return the estimated file size for these exact settings and render nothing. Modeled for mp4/webm/gif; png/pdf/svg report confidence "none" (no dimension-based model exists for them).',
+          description: 'Preflight only — return the estimated file size for these exact settings and render nothing. Modeled for mp4/webm/gif; png/pdf/svg report confidence "none" (no dimension-based model exists for them); wav reports confidence "exact", because uncompressed PCM size is arithmetic.',
         },
         duration: {
           type: 'number',

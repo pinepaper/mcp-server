@@ -219,11 +219,14 @@ function getExportDir(): string {
   return process.env.PINEPAPER_EXPORT_DIR || join(tmpdir(), 'pinepaper-exports');
 }
 
-const ALWAYS_SAVE_FORMATS = new Set(['mp4', 'webm', 'gif', 'pdf']);
+// wav joins them: a minute of 48kHz 16-bit is ~5.8 MB of base64 and the ten
+// minutes the schema allows is ~77 MB. Deliverable across the bridge, useless
+// pasted into a response.
+export const ALWAYS_SAVE_FORMATS = new Set(['mp4', 'webm', 'gif', 'pdf', 'wav']);
 const SAVE_THRESHOLD_BYTES = 500_000; // ~500KB base64 ≈ 375KB decoded
 
-function getFileExtension(format: string): string {
-  const extMap: Record<string, string> = { mp4: 'mp4', webm: 'webm', gif: 'gif', pdf: 'pdf', png: 'png', svg: 'svg' };
+export function getFileExtension(format: string): string {
+  const extMap: Record<string, string> = { mp4: 'mp4', webm: 'webm', gif: 'gif', pdf: 'pdf', png: 'png', svg: 'svg', wav: 'wav' };
   return extMap[format] || format;
 }
 
@@ -2757,10 +2760,16 @@ You can now start creating new items on a clean canvas.`,
           try {
             const { filePath, fileSize } = await saveExportToFile(data, format, input.platform || 'auto');
             const cleanResult = { ...exportResult, data: undefined, filePath, fileSize };
+            // A mix that dropped sounds wrote a perfectly good file that is
+            // missing tracks. It rides the SUCCESS path, which is exactly why
+            // it has to be said out loud here rather than left in the JSON.
+            const dropNote = (exportResult as { incomplete?: string }).incomplete;
             return {
               content: [{
                 type: 'text' as const,
-                text: `Export saved to file:\n\nFile: ${filePath}\nFormat: ${format}\nSize: ${(fileSize / 1024).toFixed(1)} KB\nPlatform: ${input.platform}\n\nResult: ${JSON.stringify(cleanResult, null, 2)}`,
+                text: `Export saved to file:\n\nFile: ${filePath}\nFormat: ${format}\nSize: ${(fileSize / 1024).toFixed(1)} KB\nPlatform: ${input.platform}\n`
+                  + (dropNote ? `DROPPED: ${dropNote}\n` : '')
+                  + `\nResult: ${JSON.stringify(cleanResult, null, 2)}`,
               }],
             };
           } catch (saveError) {

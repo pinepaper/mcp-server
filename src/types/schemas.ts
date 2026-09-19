@@ -2187,6 +2187,10 @@ export type AgentPlatform = z.infer<typeof AgentPlatformSchema>;
  */
 export const AgentExportFormatSchema = z.enum([
   'svg', 'png', 'gif', 'mp4', 'webm', 'pdf',
+  // AUDIO-ONLY. The soundtrack on its own, with no frames rendered — so
+  // platform dimensions, framing and quality do not apply to it, and no
+  // platform preset resolves to it. It has to be asked for by name.
+  'wav',
 ]).describe('Export file format');
 
 export type AgentExportFormat = z.infer<typeof AgentExportFormatSchema>;
@@ -2422,9 +2426,28 @@ export const AgentExportInputSchema = z.object({
   includeRecommendations: z.boolean().optional().default(true).describe('Include alternative format recommendations'),
   framing: z.enum(['canvas', 'camera']).optional().default('canvas').describe('Output framing: "canvas" (full canvas, default) or "camera" (camera_animates first-keyframe viewport — fails if no walkthrough exists). Camera animation still drives motion within the fixed output frame.'),
   duration: z.number().min(0.5).max(VIDEO_MAX_DURATION_S).optional().default(5).describe(`Video duration in seconds for animated formats (mp4/webm/gif). Default 5. Max ${VIDEO_MAX_DURATION_S} for mp4/webm, max ${GIF_MAX_DURATION_S} for gif (GIF is not codec-bounded, so file size scales with frames × dimensions, and it cannot stream to the export store). Static formats (png/svg/pdf) ignore this. Past roughly a minute the export is held in the studio's export store and paged back to a file rather than returned inline; a studio without that store refuses by name and says so.`),
-  estimateOnly: z.boolean().optional().default(false).describe('Preflight only: return the estimated file size for these EXACT settings and render nothing. Use before a long or high-quality export to check the size first. Modeled for mp4/webm/gif; png/pdf/svg return confidence "none" because no dimension-based model exists for them.'),
+  estimateOnly: z.boolean().optional().default(false).describe('Preflight only: return the estimated file size for these EXACT settings and render nothing. Use before a long or high-quality export to check the size first. Modeled for mp4/webm/gif; png/pdf/svg return confidence "none" because no dimension-based model exists for them; wav is reported as "exact", because uncompressed PCM size is arithmetic rather than a guess.'),
+  sampleRate: z.number().int().positive().optional().describe('wav only: samples per second (default 48000). Ignored by every other format.'),
+  bitDepth: z.union([z.literal(16), z.literal(32)]).optional().describe('wav only: 16 (default) or 32-bit float. Ignored by every other format.'),
 }).describe('Smart export options')
   .superRefine((val, ctx) => {
+    // wav carries no picture, so the visual knobs are not merely ignored — a
+    // caller who set them believes something about the output that is not
+    // true. Said once, rather than silently dropped.
+    if (val.format === 'wav' && val.framing === 'camera') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['framing'],
+        message: 'framing does not apply to a wav export — it renders no frames. Drop framing, or export mp4/webm if you want the picture with the sound.',
+      });
+    }
+    if (val.format !== 'wav' && (val.sampleRate !== undefined || val.bitDepth !== undefined)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['sampleRate'],
+        message: `sampleRate and bitDepth apply only to format "wav" (got "${val.format}").`,
+      });
+    }
     if (val.format === 'gif' && val.duration > GIF_MAX_DURATION_S) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

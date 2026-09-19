@@ -3137,6 +3137,77 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
     // Resolve "auto" format to the platform's recommended format
     const exportFormat = (!format || format === 'auto') ? preset.staticFormat : format;
 
+    // AUDIO-ONLY EXPORT, off the visual path entirely.
+    //
+    // It takes the OFFLINE renderer, not exportEngine.exportAudio. The latter
+    // is async, needs the videoExporter's Web Audio path, hands back a Blob
+    // that cannot cross page.evaluate, and downloads unless told not to.
+    // renderSoundtrackWav is synchronous, returns bytes, and needs no audio
+    // context — the engine commit that added it is titled "the soundtrack
+    // without Web Audio", and this is the context it was written for.
+    //
+    // No platform preset resolves to wav, so reaching here means it was asked
+    // for by name. Dimensions, framing, fps and bitrate are all absent rather
+    // than passed and ignored.
+    // @engine-methods renderSoundtrackWav exportEngine.sceneHasAudio
+    if (exportFormat === 'wav') {
+      const sr = (validated as { sampleRate?: number }).sampleRate ?? 48000;
+      const bd = (validated as { bitDepth?: number }).bitDepth ?? 16;
+      return `
+// Export: the soundtrack on its own, rendered offline
+(function() {
+  if (typeof app.renderSoundtrackWav !== 'function') {
+    return { success: false, format: 'wav', error: 'app.renderSoundtrackWav unavailable — update FxTool. This build cannot export audio on its own; mp4/webm still mux the soundtrack into the video.' };
+  }
+  // EXACT, not estimated. Uncompressed PCM is header + rate x bytes x channels
+  // x seconds, so a model is not needed and would only be less true. The mix
+  // is mono — the engine encodes a single channel.
+  var exact = 44 + Math.round(${sr} * (${bd} / 8) * 1 * ${videoDuration});
+  if (${estimateOnly ? 'true' : 'false'}) {
+    return { success: true, estimateOnly: true, format: 'wav', bytes: exact,
+      expected: exact, confidence: 'exact',
+      note: 'uncompressed PCM: ' + ${videoDuration} + 's at ' + ${sr} + ' Hz, ' + ${bd} + '-bit mono' };
+  }
+  var r = app.renderSoundtrackWav({ duration: ${videoDuration}, sampleRate: ${sr}, bitDepth: ${bd} });
+  if (!r || !r.wav) {
+    // WHY IT IS EMPTY, NOT JUST THAT IT IS. The offline renderer bakes
+    // SYNTHESIZED sounds only, while the engine's sceneHasAudio() counts
+    // uploaded audio files too. A scene carrying an uploaded track would
+    // otherwise be told it has no audio, which is false and sends the caller
+    // to add a sound they already have.
+    var anyAudio = null;
+    try {
+      if (app.exportEngine && typeof app.exportEngine.sceneHasAudio === 'function') {
+        anyAudio = app.exportEngine.sceneHasAudio();
+      }
+    } catch (_) { /* predicate absent — fall back to the generic answer */ }
+    return {
+      success: false, format: 'wav',
+      error: anyAudio === true
+        ? 'this scene has audio, but it is uploaded file(s) rather than synthesized sounds, and the offline renderer bakes only what it can synthesize. Export mp4 or webm to get that audio muxed with the picture.'
+        : 'no synthesized sounds are placed on this scene, so there is no soundtrack to render. Create one with pinepaper_sound action "create", or place an existing one with "set_placement".',
+      sceneHasAudio: anyAudio,
+    };
+  }
+  var bytes = r.wav;
+  // Chunked: String.fromCharCode.apply over a multi-megabyte array blows the
+  // stack, and a ten-minute soundtrack is tens of megabytes.
+  var bin = '';
+  for (var i = 0; i < bytes.length; i += 8192) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+  }
+  return {
+    success: true, format: 'wav', platform: '${platform}',
+    data: 'data:audio/wav;base64,' + btoa(bin),
+    size: bytes.length,
+    duration: r.duration, sampleRate: r.sampleRate, sounds: r.sounds, placed: r.placed,
+    // A mix that dropped sounds is a valid file quietly missing tracks.
+    ...(r.dropped > 0 ? { dropped: r.dropped, incomplete:
+      'mixed ' + r.placed + ' sound(s); ' + r.dropped + ' could not be rendered and are absent from this file' } : {}),
+  };
+})();`.trim();
+    }
+
     return `
 // Smart export for ${platform}
 (async function() {
