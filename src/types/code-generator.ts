@@ -3155,7 +3155,12 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
 
   // Resolve camera-view framing dims when requested. Reads the first
   // camera_animates keyframe's zoom and divides the canvas dims by it
-  // (mirrors FxTool ExportEngine.js:466-485). Camera animation still
+  // (mirrors the camera-view framing block in FxTool's
+  // ExportEngine.showVideoExportOptions). Cited by METHOD, not by line: the
+  // previous citation named a line range that had rotted to point at
+  // DPI/canvas-size code in a file nobody here edits. A cross-file line range
+  // cannot be kept accurate — it breaks on any edit above it — so this repo
+  // does not use them. Camera animation still
   // drives motion during export — framing only fixes the output frame.
   let cameraDims = null;
   if (framing === 'camera') {

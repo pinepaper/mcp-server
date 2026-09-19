@@ -31,7 +31,7 @@
  */
 
 import { describe, it, expect } from 'bun:test';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { GeneratorNameSchema, EffectTypeSchema, RelationTypeSchema, ItemTypeSchema, THREAD_STITCHES } from '../../types/schemas.js';
 
@@ -219,5 +219,75 @@ describe('parity claims cite a guard that exists', () => {
       const window = SCHEMAS.slice(Math.max(0, idx - 800), idx + 200);
       expect(window, `${marker} has no nearby ENFORCED BY citation`).toContain('ENFORCED BY');
     }
+  });
+});
+
+/**
+ * No citation may point at a line number in another file.
+ *
+ * FxTool swept their tree for this after the citation rule landed and found
+ * four rotted claims — three line ranges naming a method that had moved by a
+ * hundred lines, one of them landing on a bare return, another inside an HTML
+ * template string, and two sitting entirely before the function they named.
+ * They banned the shape rather than correcting it, because correcting a line
+ * range only resets a clock: it rots again on the next edit above it, in a file
+ * neither author is looking at.
+ *
+ * This repo had one, and it had already rotted — a citation into FxTool's
+ * exporter that pointed at DPI and canvas-size code rather than the
+ * camera-framing block it claimed to mirror. Cite the method; a name survives
+ * an edit.
+ *
+ * The comment above deliberately DESCRIBES the banned shape without writing an
+ * example of one. FxTool tripped their own guard twice by quoting the artefact
+ * they were explaining, which is the fourth instance of that collision in their
+ * session; describing rather than reproducing is the rule that avoids it.
+ */
+describe('citations name methods, not line numbers', () => {
+  const sourceFiles = (dir: string): string[] => {
+    const out: string[] = [];
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      if (e.isDirectory()) {
+        if (e.name === '__tests__' || e.name === 'vendor' || e.name === 'node_modules') continue;
+        out.push(...sourceFiles(join(dir, e.name)));
+      } else if (e.name.endsWith('.ts')) out.push(join(dir, e.name));
+    }
+    return out;
+  };
+
+  /**
+   * A reference to another file that carries a line locator.
+   *
+   * Held as a SOURCE string and compiled per use, because a shared `/g` regex
+   * carries `lastIndex` between calls: the second assertion below starts
+   * scanning where the first stopped and fails on a string it should match.
+   * The guard-the-guard caught that before this shipped, which is the whole
+   * argument for writing the both-directions test first.
+   */
+  const CROSS_FILE_LINE_SRC = String.raw`[A-Za-z][A-Za-z0-9_]*\.(?:ts|js)` + '[:#]' + String.raw`\d{2,5}`;
+  const crossFileLine = (flags = '') => new RegExp(CROSS_FILE_LINE_SRC, flags);
+
+  it('the pattern matches a known-bad sample and not innocent prose', () => {
+    // Guard-the-guard, both directions: a rule that succeeds by finding nothing
+    // is satisfied just as well by a pattern that can no longer match.
+    expect('see ExportEngine.js' + ':466').toMatch(crossFileLine());
+    expect('see Renderer.ts' + '#1200').toMatch(crossFileLine());
+    expect('see ExportEngine.js, the framing block').not.toMatch(crossFileLine());
+    expect('line 466 of the exporter').not.toMatch(crossFileLine());
+  });
+
+  it('no source file cites another file by line', () => {
+    const SRC = join(import.meta.dir, '..', '..');
+    const files = sourceFiles(SRC);
+    // Liveness: zero files scanned would satisfy the assertion below while
+    // proving nothing. This repo has hundreds of source modules.
+    expect(files.length, 'the source walk found no files — it is broken').toBeGreaterThan(20);
+
+    const offenders: string[] = [];
+    for (const f of files) {
+      const hits = readFileSync(f, 'utf-8').match(crossFileLine('g'));
+      if (hits) offenders.push(`${f.replace(SRC, 'src')}: ${[...new Set(hits)].join(', ')}`);
+    }
+    expect(offenders).toEqual([]);
   });
 });

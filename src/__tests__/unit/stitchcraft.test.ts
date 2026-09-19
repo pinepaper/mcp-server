@@ -355,8 +355,25 @@ describe('the source-level scan', () => {
       const src = readFileSync(f, 'utf-8')
         .replace(/\/\*[\s\S]*?\*\//g, '')
         .replace(/^\s*\/\/.*$/gm, '');
-      for (const m of src.matchAll(/\[[^[\]]{0,400}?\]/g)) {
-        const values = [...m[0].matchAll(/'([^']+)'|"([^"]+)"/g)].map((x) => x[1] ?? x[2]!);
+      // DEFINITION CONTEXTS ONLY — `z.enum([…])` or an assignment — not any
+      // bracketed group anywhere in the file.
+      //
+      // FxTool predicted this exposure before it bit: "your served-schema walk
+      // will have the same exposure the moment someone documents a stale enum
+      // by pasting it." Confirmed by trying it — comments are stripped, but a
+      // `.describe("was ['longAndShort','satin','seed','stem'] before …")` is a
+      // STRING, and the old scan flagged it. That is a false positive, and a
+      // false positive is the worse half: it teaches the next reader to skim
+      // the guard.
+      //
+      // Narrowing the scan is a filter, so it needs the test FxTool set: does
+      // it encode a property of the defect, or a guess about where the defect
+      // will be? The defect is a second DEFINITION of the list. Prose naming
+      // the old values is documentation, and documentation is the thing this
+      // session keeps arguing should describe a bad artefact rather than
+      // reproduce it — but it must not be punished for doing so.
+      for (const m of src.matchAll(/(?:z\.enum\(|=\s*)(\[[^[\]]{0,400}?\])/g)) {
+        const values = [...m[1]!.matchAll(/'([^']+)'|"([^"]+)"/g)].map((x) => x[1] ?? x[2]!);
         if (values.length >= 2 && values.every((v) => set.has(v))) {
           found.push({ file: f.replace(SRC, 'src'), values });
         }
@@ -364,6 +381,25 @@ describe('the source-level scan', () => {
     }
     return found;
   };
+
+  it('flags a DEFINITION and not prose describing one', () => {
+    // Both directions, on the exact shapes: a second definition must be caught,
+    // and a description quoting the old values must not.
+    const set = new Set<string>(THREAD_STITCHES as readonly string[]);
+    const scan = (text: string) => {
+      const out: string[][] = [];
+      const stripped = text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+      for (const m of stripped.matchAll(/(?:z\.enum\(|=\s*)(\[[^[\]]{0,400}?\])/g)) {
+        const v = [...m[1]!.matchAll(/'([^']+)'|"([^"]+)"/g)].map((x) => x[1] ?? x[2]!);
+        if (v.length >= 2 && v.every((n) => set.has(n))) out.push(v);
+      }
+      return out;
+    };
+    expect(scan("stitch: z.enum(['satin', 'seed', 'stem'])")).toHaveLength(1);
+    expect(scan("const OLD = ['satin', 'seed', 'stem'];")).toHaveLength(1);
+    expect(scan('.describe("was [\'satin\', \'seed\', \'stem\'] before runningSeam")')).toHaveLength(0);
+    expect(scan("// the old set was ['satin', 'seed', 'stem']")).toHaveLength(0);
+  });
 
   it('the stitch list is written out exactly once in source', () => {
     const found = pureStitchArrays();
