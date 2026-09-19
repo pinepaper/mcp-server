@@ -403,9 +403,11 @@ async function streamRetainedExportToFile(
         continue;
       }
       // An evicted id is its own failure: a later export reclaimed the space.
-      // Re-exporting is the caller's decision, never this loop's. After a page
-      // reload the tombstone is gone and the same id reads as "not found", so
-      // an unrecognised id is not proof it never existed.
+      // Re-exporting is the caller's decision, never this loop's. The engine
+      // records an eviction in browser storage so it survives a reload, but
+      // that storage is best-effort — a private window, cleared site data or
+      // storage switched off all fall back to memory-only. So `evicted` being
+      // ABSENT means unknown, never that the export was not there.
       throw await abandon(chunk?.evicted
         ? `the export was evicted mid-read: ${chunk.reason}`
         : `the studio refused the read: ${chunk?.reason || 'no reason given'}`);
@@ -2812,15 +2814,18 @@ You can now start creating new items on a clean canvas.`,
         }
 
         // Both remaining actions name an id, and an id the store does not have
-        // is the one thing worth saying carefully: after a page reload an
-        // EVICTED id is indistinguishable from one that never existed, so
-        // neither answer can be given as fact.
+        // is the one thing worth saying carefully. The engine records an
+        // eviction durably enough to survive a reload, so a read of that id
+        // will usually say "evicted" — but the record is best-effort browser
+        // storage and a listing cannot consult it at all. Absence of the id
+        // here is therefore "gone, cause unknown", and stating one cause as
+        // fact would be inventing the more interesting half of the answer.
         const entry = exports.find((e) => e.id === input.exportId);
         if (!entry) {
           return errorResult(
             ErrorCodes.INVALID_PARAMS,
-            `the studio is not holding "${input.exportId}". It was either released, evicted to make room for a later export, `
-            + `or belongs to a session whose store is gone — after a page reload those cannot be told apart. `
+            `the studio is not holding "${input.exportId}". It was released, evicted to make room for a later export, `
+            + `or never existed here — a listing cannot tell which. `
             + `${exports.length ? `Held right now: ${exports.map((e) => e.id).join(', ')}.` : 'The store is empty.'}`,
             { exportId: input.exportId, held: exports.map((e) => e.id) },
             { toolName: 'pinepaper_export_store' }

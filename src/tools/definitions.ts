@@ -7734,7 +7734,7 @@ WHEN TO REACH FOR IT:
 - An export error named an exportId and a byte count reached. That error is a true promise: call 'save' with the id.
 
 RETENTION, AND THE ONE WAY TO LOSE WORK:
-Held exports last until released, or until a LATER export needs the space — and eviction drops the OLDEST first. Rendering five chunks and paging them out at the end can evict chunk 1 to make room for chunk 5. Save or release each export before starting the next one. An id evicted in this session says so; after a page reload the same id reads as simply not found, so the two are indistinguishable then.`,
+Held exports last until released, or until a LATER export needs the space — and eviction drops the OLDEST first. Rendering five chunks and paging them out at the end can evict chunk 1 to make room for chunk 5. Save or release each export before starting the next one. An id dropped this way usually says "evicted" rather than "not found", including after a page reload — but that record is best-effort browser storage, so a miss can still be genuinely ambiguous. Treat the absence of "evicted" as "unknown", never as proof the export never existed.`,
     inputSchema: {
       type: 'object',
       properties: {
