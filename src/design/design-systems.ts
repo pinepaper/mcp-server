@@ -205,8 +205,113 @@ export const ALL_STYLES: DesignStyle[] = [
   'print_monochrome_crisp', 'print_early_learner', 'print_stem_technical',
 ];
 
-export function listStyles(): Array<{ style: string; composable: boolean }> {
-  return ALL_STYLES.map((style) => ({ style, composable: !!COMPOSERS[style] }));
+/**
+ * Styles whose palette a named variant changes. Only art deco has one today,
+ * and it is listed rather than inferred because `emeraldVariant` is a bespoke
+ * boolean on that one generator, not a shape the others share.
+ */
+const STYLE_VARIANTS: Partial<Record<DesignStyle, string[]>> = {
+  art_deco_geometric: ['emerald'],
+};
+
+export interface StyleTokens {
+  style: string;
+  composable: boolean;
+  /** Distinct fills and strokes the generator actually emits, most-used first. */
+  palette: string[];
+  /** The ground it paints, when it paints one. */
+  background?: string;
+  /** Font stacks verbatim, as the generator writes them — a CSS stack, not one family. */
+  fonts: string[];
+  /** Type sizes in use, ascending. */
+  fontSizes: number[];
+  /** Named variants that change the palette; compose with `variant`. */
+  variants?: string[];
+}
+
+/**
+ * A style's palette and type, DERIVED by composing it — never transcribed.
+ *
+ * The data was always one layer below the API: every generator holds its colours
+ * in a `*_PALETTE` constant and its type in per-element `fontFamily` strings,
+ * and `listStyles` published neither. The only way to build an authentic
+ * bauhaus or memphis scene by hand was to read this server's own source, which
+ * is the report that prompted this.
+ *
+ * Reading the 18 `*_PALETTE` constants would have been the obvious fix and the
+ * wrong one: they are 18 different shapes under 18 different names, so a
+ * hand-written map is a second copy that drifts the first time `sync:design`
+ * pulls an upstream change — the exact failure this repo keeps paying to
+ * remove. Composing a throwaway poster and reading what comes out cannot drift:
+ * it reports what the generator will actually draw.
+ *
+ * Safe to do eagerly because no generator is procedural — there is no
+ * `Math.random` in any vendored file, so one run is the whole palette for that
+ * variant, and a style with variants says so rather than pretending its first
+ * variant is all of it.
+ */
+export function styleTokens(style: string): StyleTokens | null {
+  if (!ALL_STYLES.includes(style as DesignStyle)) return null;
+  const composable = !!COMPOSERS[style as DesignStyle];
+  const variants = STYLE_VARIANTS[style as DesignStyle];
+  if (!composable) {
+    // Describable but not composable: there is no generator to ask, and an
+    // invented palette would be worse than an empty one.
+    return { style, composable, palette: [], fonts: [], fontSizes: [] };
+  }
+
+  let scene: ComposedScene | null = null;
+  try {
+    scene = compose(style, { title: 'Title', subtitle: 'Subtitle', body: 'Body' });
+  } catch {
+    // normalise() throws when an upstream shape changed. That is a real signal
+    // and design-systems.test.ts asserts on it through compose(); here it only
+    // means the tokens are unavailable, and losing the whole listing to one
+    // broken generator would be the worse trade.
+    return { style, composable, palette: [], fonts: [], fontSizes: [], ...(variants ? { variants } : {}) };
+  }
+  if (!scene) return { style, composable, palette: [], fonts: [], fontSizes: [] };
+
+  const uses = new Map<string, number>();
+  const count = (hex?: string) => {
+    if (!hex || hex === 'transparent' || hex === 'none') return;
+    uses.set(hex, (uses.get(hex) ?? 0) + 1);
+  };
+  const fonts = new Set<string>();
+  const sizes = new Set<number>();
+  for (const el of scene.elements) {
+    count(el.fillHex);
+    count(el.strokeHex);
+    if (el.fontFamily) fonts.add(el.fontFamily);
+    if (el.fontSize !== undefined) sizes.add(el.fontSize);
+  }
+
+  // A declared palette leads, in its own order: the eleven layout-shape
+  // generators publish one, and the author's ordering carries intent that a
+  // frequency count does not. Observed colours follow, so a hue used once in a
+  // motif is still reachable.
+  const declared = (scene.palette ?? []).filter((c) => c && c !== 'transparent');
+  const observed = [...uses.entries()].sort((a, b) => b[1] - a[1]).map(([hex]) => hex);
+  const palette = [...new Set([...declared, ...observed])];
+
+  return {
+    style, composable, palette,
+    ...(scene.backgroundHex ? { background: scene.backgroundHex } : {}),
+    fonts: [...fonts],
+    fontSizes: [...sizes].sort((a, b) => a - b),
+    ...(variants ? { variants } : {}),
+  };
+}
+
+/**
+ * Every style, with its tokens.
+ *
+ * The tokens ride along rather than sitting behind a second call: an agent that
+ * did not know palettes existed here will not go looking for the action that
+ * reveals them, and undiscoverability is the complaint this answers.
+ */
+export function listStyles(): StyleTokens[] {
+  return ALL_STYLES.map((style) => styleTokens(style)!);
 }
 
 export function listSystems(): Array<{
@@ -298,35 +403,85 @@ export function compose(style: string, options: ComposeOptions): ComposedScene |
 /**
  * A composed scene as create-item ops.
  *
- * Every generator returns absolutely-positioned elements with hex fills, which
- * is already what `app.create` wants — so this is a rename, not a layout pass.
- * Text keeps its content and size; everything else becomes a rectangle at the
- * element's bounds, because a style's "fan_motif" is a named shape upstream
- * and a filled box here rather than a silently dropped element.
+ * Every generator returns absolutely-positioned elements with hex fills. Text
+ * keeps its content and size; everything else becomes a rectangle at the
+ * element's bounds, because a style's "fan_motif" is a named shape upstream and
+ * a filled box here rather than a silently dropped element.
+ *
+ * IT IS NOT A RENAME, which is what this used to claim while passing `x`/`y`
+ * straight through. The generators author CSS-shaped layout — a TOP-LEFT box —
+ * and `app.create` is CENTRE-anchored: js/shapes/basic.js builds a rectangle at
+ * `point: position - size/2` and a circle at `center: position`. So every
+ * composed scene rendered half a box up and to the left of where the generator
+ * put it, and a left-aligned headline was worse than that: bauhaus authors its
+ * title at x = 0.1 × width, which on a 1080 canvas is 108, and a 600px-wide
+ * string centred on 108 starts at -192. That is the "title half off-canvas"
+ * this surface was reported with, and why composing was abandoned for
+ * hand-built primitives.
+ *
+ * Three conventions, resolved per element, because one blanket shift breaks two
+ * of them:
+ *
+ *  - **A box** (`width`/`height`, no radius) → the centre is (x + w/2, y + h/2).
+ *  - **An explicit `radius`** → x/y is ALREADY the centre. art-nouveau's halo
+ *    and op-art's concentric rings are authored from a ring centre, so shifting
+ *    them by a radius would break the styles that are currently *correct*.
+ *  - **Text** → PinePaper reads `alignment` ('left' makes x the LEFT edge,
+ *    'right' the right edge, y the bounds centre either way). That accommodation
+ *    exists in the engine specifically for scene authors, and this function was
+ *    dropping `textAlign` on the floor — so every left-aligned string centred on
+ *    its anchor even once the boxes were right.
+ *
+ * The one place this stops short of certain: the layout-shape generators author
+ * text as x/y/fontSize with no box at all, and nothing upstream says whether
+ * that y is the top or the baseline. Where there is a box, y moves by half of
+ * it; where there is not, y is left alone rather than shifted by a guess. The
+ * horizontal fix — the one that put titles off-canvas — applies either way.
  */
 export function sceneToOps(scene: ComposedScene): Array<Record<string, unknown>> {
   const ops: Array<Record<string, unknown>> = [];
   for (const el of scene.elements) {
+    const isText = el.content !== undefined && el.content !== '';
+    const authorsOwnCentre = el.radius !== undefined;
+    const w = el.width ?? 0;
+    const h = el.height ?? 0;
+
+    // 'center' is the engine's default and the only other value it reads.
+    const alignment = el.textAlign === 'left' || el.textAlign === 'right' ? el.textAlign : 'center';
+
+    let x = el.x;
+    let y = el.y;
+    if (isText) {
+      if (alignment === 'center') x = el.x + w / 2;
+      else if (alignment === 'right') x = el.x + w;
+      // 'left': x is the left edge, which is what the engine wants for it.
+      if (el.height !== undefined) y = el.y + h / 2;
+    } else if (!authorsOwnCentre) {
+      x = el.x + w / 2;
+      y = el.y + h / 2;
+    }
+
     const common: Record<string, unknown> = {
-      x: el.x, y: el.y,
+      x, y,
       fillColor: el.fillHex,
       ...(el.strokeHex ? { strokeColor: el.strokeHex } : {}),
       ...(el.strokeWidthPx !== undefined ? { strokeWidth: el.strokeWidthPx } : {}),
     };
 
-    if (el.content !== undefined && el.content !== '') {
+    if (isText) {
       ops.push({
         type: 'text', name: el.id, ...common, content: el.content,
         ...(el.fontSize !== undefined ? { fontSize: el.fontSize } : {}),
         ...(el.fontFamily ? { fontFamily: el.fontFamily } : {}),
         ...(el.fontWeight !== undefined ? { fontWeight: el.fontWeight } : {}),
+        alignment,
       });
-    } else if (el.type === 'circle' || el.radius !== undefined) {
-      ops.push({ type: 'circle', name: el.id, ...common, radius: el.radius ?? (el.width ?? 0) / 2 });
+    } else if (el.type === 'circle' || authorsOwnCentre) {
+      ops.push({ type: 'circle', name: el.id, ...common, radius: el.radius ?? w / 2 });
     } else {
       ops.push({
         type: 'rectangle', name: el.id, ...common,
-        width: el.width ?? 0, height: el.height ?? 0,
+        width: w, height: h,
         // The upstream type is kept as a note rather than dropped: a caller
         // re-reading the scene can tell a frame from a fan motif even though
         // both arrive as rectangles.

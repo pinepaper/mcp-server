@@ -184,6 +184,14 @@ interface FakeOpts {
   evicted?: boolean;
   /** Lie about the size in the export result. */
   reportedSize?: number;
+  /**
+   * Refuse any read asking for more than this many bytes, the way CDP does
+   * when one value is too large to cross the bridge ("Failed to write data to
+   * data pipe"). A transport failure, not a store failure.
+   */
+  pipeLimit?: number;
+  /** Make the emitted export code report its own failure under a successful run. */
+  innerFailure?: string;
 }
 
 function fakeController(opts: FakeOpts = {}) {
@@ -199,6 +207,10 @@ function fakeController(opts: FakeOpts = {}) {
       runOptions.push(options);
 
       if (code.includes('exportToStore')) {
+        if (opts.innerFailure) {
+          // The run SUCCEEDS; the export reports its own failure inside.
+          return { success: true, result: { success: false, format: 'mp4', error: opts.innerFailure } };
+        }
         return {
           success: true,
           result: {
@@ -217,6 +229,11 @@ function fakeController(opts: FakeOpts = {}) {
       if (code.includes('readExport')) {
         const offset = Number(/"offset":(\d+)/.exec(code)?.[1] ?? 0);
         const length = Number(/"length":(\d+)/.exec(code)?.[1] ?? CHUNK);
+        // The transport refuses the VALUE, so the run itself fails — there is
+        // no result to inspect, which is what makes it look like a dead store.
+        if (opts.pipeLimit !== undefined && length > opts.pipeLimit) {
+          return { success: false, error: 'Failed to write data to data pipe' };
+        }
         if (opts.failAt === offset) {
           return {
             success: true,
@@ -380,5 +397,60 @@ describe('the handler pages a retained export into a file', () => {
     // in the capability check it makes before choosing the store path.
     const readRun = fake.runOptions[fake.calls.findIndex((c) => c.includes('"offset"'))];
     expect(readRun?.governorTimeoutMs).toBeUndefined();
+  });
+
+  /**
+   * The export's own verdict rides INSIDE a run that succeeded. Reading only
+   * the run meant an encoder that died reported as a finished export: measured
+   * on a five-chunk video where two chunks came back `success: false, error:
+   * "Failed to write data to data pipe"` under an outer `"success": true`, and
+   * the caller shipped three chunks believing it had five.
+   */
+  it('an inner export failure is a failure, not a success with an error in it', async () => {
+    const fake = fakeController({ innerFailure: 'export failed: Failed to write data to data pipe' });
+    const result = await handleToolCall(
+      'pinepaper_agent_export',
+      { platform: 'youtube', format: 'mp4' },
+      { executeInBrowser: true, browserController: fake.controller, executionMode: 'puppeteer' }
+    );
+
+    expect(result.isError).toBeTruthy();
+    expect(textOf(result)).toContain('Failed to write data to data pipe');
+  });
+
+  /**
+   * A 17 MB export died on its fourth 4 MB read with "Failed to write data to
+   * data pipe" — CDP refusing to carry one oversized value, with the bytes
+   * sitting right there in the store. Halving the window and asking again is
+   * the difference between a delivered file and an export held hostage.
+   */
+  it('halves the read window when the transport refuses the value, and still reassembles exactly', async () => {
+    // Refuses anything above 1 MB, so the 4 MB default must step down twice.
+    const fake = fakeController({ pipeLimit: 1024 * 1024 });
+    const result = await handleToolCall(
+      'pinepaper_agent_export',
+      { platform: 'youtube', format: 'mp4' },
+      { executeInBrowser: true, browserController: fake.controller, executionMode: 'puppeteer' }
+    );
+
+    expect(result.isError).toBeFalsy();
+    const filePath = /File: (\S+)/.exec(textOf(result))![1];
+    written.push(filePath);
+    expect(await readFile(filePath)).toEqual(SOURCE);
+    expect(fake.released).toBe('pp-export-42.mp4');
+  });
+
+  it('does not retry a refusal from the STORE — a smaller window cannot change that answer', async () => {
+    const fake = fakeController({ failAt: CHUNK, evicted: true });
+    const result = await handleToolCall(
+      'pinepaper_agent_export',
+      { platform: 'youtube', format: 'mp4' },
+      { executeInBrowser: true, browserController: fake.controller, executionMode: 'puppeteer' }
+    );
+    expect(result.isError).toBeTruthy();
+    expect(textOf(result)).toContain('evicted');
+    // One read at the failing offset, not a ladder of them.
+    const atOffset = fake.calls.filter((c) => c.includes(`"offset":${CHUNK}`)).length;
+    expect(atOffset).toBe(1);
   });
 });

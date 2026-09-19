@@ -71,6 +71,7 @@ export const REQUIRED_ENGINE_METHODS: readonly string[] = [
   'diffHistoryStates',
   'distillArticle',
   'dollyWorldCamera',
+  'ensureHeavyModules',
   'estimateExportSize',
   'exportBVH',
   'exportDotLottie',

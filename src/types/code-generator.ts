@@ -1343,6 +1343,29 @@ export function canvasPresetFor(platform: string): string {
  */
 export const INLINE_MAX_BYTES = 96 * 1024 * 1024;
 
+/**
+ * Wait for the export subsystem before reading it.
+ *
+ * `app.exportEngine` is a LAZY getter over a code-split chunk: it returns
+ * undefined until `ensureHeavyModules()` has run, which the engine idle-prefetches
+ * roughly 1.2s after boot. An agent connecting and exporting immediately —
+ * which is the whole shape of an automated session — beats that prefetch, so
+ * every `app.exportEngine.*` read below found undefined and the generated code
+ * reported the studio as too old to export. The build was fine; the chunk had
+ * not landed yet. Awaiting it is the difference between a check and a race.
+ *
+ * The guards that follow this are left exactly as they are: after the await,
+ * an absent exportEngine really does mean a studio that cannot export.
+ *
+ * Emitted only into the two doors an agent can reach cold. `readExport` and
+ * `releaseExport` are only reachable after an export has already succeeded, by
+ * which point the chunk is resident by construction.
+ */
+const ENSURE_EXPORT_ENGINE = `
+  if (!app.exportEngine && typeof app.ensureHeavyModules === 'function') {
+    try { await app.ensureHeavyModules(); } catch (_) { /* the guards below still speak */ }
+  }`;
+
 export class PinePaperCodeGenerator {
   /**
    * Generate code for creating an item
@@ -3149,13 +3172,13 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
     // No platform preset resolves to wav, so reaching here means it was asked
     // for by name. Dimensions, framing, fps and bitrate are all absent rather
     // than passed and ignored.
-    // @engine-methods renderSoundtrackWav exportEngine.sceneHasAudio
+    // @engine-methods renderSoundtrackWav exportEngine.sceneHasAudio ensureHeavyModules
     if (exportFormat === 'wav') {
       const sr = (validated as { sampleRate?: number }).sampleRate ?? 48000;
       const bd = (validated as { bitDepth?: number }).bitDepth ?? 16;
       return `
 // Export: the soundtrack on its own, rendered offline
-(function() {
+(async function() {${ENSURE_EXPORT_ENGINE}
   if (typeof app.renderSoundtrackWav !== 'function') {
     return { success: false, format: 'wav', error: 'app.renderSoundtrackWav unavailable — update FxTool. This build cannot export audio on its own; mp4/webm still mux the soundtrack into the video.' };
   }
@@ -3210,7 +3233,7 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
 
     return `
 // Smart export for ${platform}
-(async function() {
+(async function() {${ENSURE_EXPORT_ENGINE}
   const platform = '${platform}';
   const format = '${exportFormat}';
   const quality = '${qualityLevel}';
@@ -3702,8 +3725,15 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
     return { success: false, error: 'Letter collage animation not available' };
   }
 
-  const result = app.animateLetterCollage(collageId, {
-    animationType,
+  // POSITIONAL, and it was not: the engine signature is
+  // animateLetterCollage(collageId, animationType, options), in PinePaper.js.
+  // Passing one object put it in the animationType slot, so the type the caller
+  // asked for was discarded on EVERY call and the collage animated as whatever
+  // the engine falls back to. Silent: the call still returned, still reported
+  // success, and the collage still moved a little, which is why it read as
+  // "the flagship text effect doesn't survive export" rather than as a
+  // dropped argument.
+  const result = app.animateLetterCollage(collageId, animationType, {
     staggerDelay,
     animationSpeed
   });

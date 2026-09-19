@@ -26,8 +26,15 @@ import { ALWAYS_SAVE_FORMATS, getFileExtension } from '../../tools/handlers.js';
 const gen = new PinePaperCodeGenerator();
 const emit = (input: Record<string, unknown>) => gen.generateAgentExport(input as any);
 
-function run(code: string, app: Record<string, unknown>): any {
-  const out = new Function('app', 'btoa', 'return eval(' + JSON.stringify(code) + ');')(
+/**
+ * The emitted export IIFEs are ASYNC — they await app.ensureHeavyModules()
+ * before reading the lazily code-split app.exportEngine, which is undefined on
+ * a fresh session until that chunk lands. So the harness awaits too; a sync
+ * harness would assert against a Promise and report `undefined` for every
+ * field, which says nothing about the code under test.
+ */
+async function run(code: string, app: Record<string, unknown>): Promise<any> {
+  const out = await new Function('app', 'btoa', 'return eval(' + JSON.stringify(code) + ');')(
     app, (s: string) => Buffer.from(s, 'binary').toString('base64'));
   if (out === undefined) throw new Error('emitted code returned nothing — the harness is broken');
   return out;
@@ -37,9 +44,9 @@ const WAV = new Uint8Array([82, 73, 70, 70, 9, 9, 9, 9]);
 const ok = { wav: WAV, duration: 5, sampleRate: 48000, sounds: 2, placed: 2, dropped: 0 };
 
 describe('wav export', () => {
-  it('routes through the offline renderer, not exportAudio', () => {
+  it('routes through the offline renderer, not exportAudio', async () => {
     const calls: unknown[][] = [];
-    const out = run(emit({ format: 'wav', duration: 5 }), {
+    const out = await run(emit({ format: 'wav', duration: 5 }), {
       renderSoundtrackWav: (...a: unknown[]) => { calls.push(a); return ok; },
       exportEngine: { exportAudio: () => { throw new Error('exportAudio must not be reached'); } },
     });
@@ -50,9 +57,9 @@ describe('wav export', () => {
     expect(Buffer.from(out.data.split(',')[1], 'base64')).toEqual(Buffer.from(WAV));
   });
 
-  it('passes duration, sampleRate and bitDepth through', () => {
+  it('passes duration, sampleRate and bitDepth through', async () => {
     const calls: unknown[][] = [];
-    run(emit({ format: 'wav', duration: 12, sampleRate: 44100, bitDepth: 32 }), {
+    await run(emit({ format: 'wav', duration: 12, sampleRate: 44100, bitDepth: 32 }), {
       renderSoundtrackWav: (...a: unknown[]) => { calls.push(a); return ok; },
     });
     expect(calls[0]![0]).toEqual({ duration: 12, sampleRate: 44100, bitDepth: 32 });
@@ -67,8 +74,8 @@ describe('wav export', () => {
     }
   });
 
-  it('says WHY it is empty — uploaded audio is not "no audio"', () => {
-    const out = run(emit({ format: 'wav' }), {
+  it('says WHY it is empty — uploaded audio is not "no audio"', async () => {
+    const out = await run(emit({ format: 'wav' }), {
       renderSoundtrackWav: () => null,
       exportEngine: { sceneHasAudio: () => true },
     });
@@ -79,8 +86,8 @@ describe('wav export', () => {
     expect(out.error).toMatch(/mp4|webm/);
   });
 
-  it('and gives the other answer when there is genuinely nothing', () => {
-    const out = run(emit({ format: 'wav' }), {
+  it('and gives the other answer when there is genuinely nothing', async () => {
+    const out = await run(emit({ format: 'wav' }), {
       renderSoundtrackWav: () => null,
       exportEngine: { sceneHasAudio: () => false },
     });
@@ -89,36 +96,36 @@ describe('wav export', () => {
     expect(out.error).toMatch(/pinepaper_sound/);
   });
 
-  it('falls back to the generic answer when the predicate is absent', () => {
+  it('falls back to the generic answer when the predicate is absent', async () => {
     // An older studio with no sceneHasAudio must not be reported as either
     // case — unknown is not the same as empty.
-    const out = run(emit({ format: 'wav' }), { renderSoundtrackWav: () => null, exportEngine: {} });
+    const out = await run(emit({ format: 'wav' }), { renderSoundtrackWav: () => null, exportEngine: {} });
     expect(out.success).toBe(false);
     expect(out.sceneHasAudio).toBeNull();
     expect(out.error).not.toContain('uploaded');
   });
 
-  it('marks a mix that dropped sounds, and stays quiet otherwise', () => {
-    const dropped = run(emit({ format: 'wav' }), {
+  it('marks a mix that dropped sounds, and stays quiet otherwise', async () => {
+    const dropped = await run(emit({ format: 'wav' }), {
       renderSoundtrackWav: () => ({ ...ok, sounds: 5, placed: 3, dropped: 2 }),
     });
     expect(dropped.dropped).toBe(2);
     expect(dropped.incomplete).toContain('2 could not be rendered');
 
-    const clean = run(emit({ format: 'wav' }), { renderSoundtrackWav: () => ok });
+    const clean = await run(emit({ format: 'wav' }), { renderSoundtrackWav: () => ok });
     expect(clean.dropped).toBeUndefined();
     expect(clean.incomplete).toBeUndefined();
   });
 
-  it('refuses a studio without the renderer by name, and names the alternative', () => {
-    const out = run(emit({ format: 'wav' }), {});
+  it('refuses a studio without the renderer by name, and names the alternative', async () => {
+    const out = await run(emit({ format: 'wav' }), {});
     expect(out.success).toBe(false);
     expect(out.error).toContain('renderSoundtrackWav');
     expect(out.error).toMatch(/mp4|webm/);
   });
 
-  it('estimates EXACTLY, because PCM size is arithmetic', () => {
-    const out = run(emit({ format: 'wav', duration: 10, sampleRate: 48000, bitDepth: 16, estimateOnly: true }), {
+  it('estimates EXACTLY, because PCM size is arithmetic', async () => {
+    const out = await run(emit({ format: 'wav', duration: 10, sampleRate: 48000, bitDepth: 16, estimateOnly: true }), {
       renderSoundtrackWav: () => { throw new Error('estimate must render nothing'); },
     });
     expect(out.estimateOnly).toBe(true);

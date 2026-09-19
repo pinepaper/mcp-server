@@ -19,7 +19,7 @@ import { describe, it, expect } from 'bun:test';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  listSystems, getSystem, listEasings, listStyles, compose, sceneToOps, ALL_STYLES,
+  listSystems, getSystem, listEasings, listStyles, compose, sceneToOps, styleTokens, ALL_STYLES,
 } from '../../design/design-systems.js';
 import { DesignSystemInputSchema } from '../../types/schemas.js';
 import { PINEPAPER_TOOLS } from '../../tools/definitions.js';
@@ -155,6 +155,148 @@ describe('composing a scene', () => {
     const texts = ops.filter((o) => o.type === 'text');
     expect(texts.length).toBeGreaterThan(0);
     expect(JSON.stringify(texts)).toContain('HELLO');
+  });
+});
+
+/**
+ * The generators author a TOP-LEFT box; app.create is CENTRE-anchored
+ * (js/shapes/basic.js: `point: position - size/2` for a rectangle,
+ * `center: position` for a circle). Passing x/y through put every composed
+ * scene half a box off, and left-aligned headlines far worse than that — which
+ * is why composing was reported unusable and every style scene hand-built from
+ * primitives instead.
+ */
+describe('sceneToOps anchors where the engine anchors', () => {
+  const composable = listStyles().filter((s) => s.composable).map((s) => s.style);
+
+  it('moves a box to its centre', () => {
+    // bauhaus authors its colour block as a top-left box.
+    const scene = compose('bauhaus_geometric', { title: 'T' })!;
+    const el = scene.elements.find((e) => e.width && e.height && e.content === undefined)!;
+    const op = sceneToOps(scene).find((o) => o.name === el.id)!;
+    expect(op.x).toBe(el.x + el.width! / 2);
+    expect(op.y).toBe(el.y + el.height! / 2);
+  });
+
+  it('leaves a radius-authored circle exactly where it is', () => {
+    // art-nouveau's halo and op-art's rings are authored FROM a centre. A
+    // blanket shift would break the styles that were already correct.
+    const scene = compose('art_nouveau', { title: 'T' })!;
+    const el = scene.elements.find((e) => e.radius !== undefined)!;
+    const op = sceneToOps(scene).find((o) => o.name === el.id)!;
+    expect(op.x).toBe(el.x);
+    expect(op.y).toBe(el.y);
+    expect(op.radius).toBe(el.radius);
+  });
+
+  it('carries textAlign through as alignment, which the engine reads', () => {
+    // The engine's own comment: templates and scenes author `alignment`, and
+    // reading only `justification` is what "silently centered on its anchor"
+    // meant. Dropping it here had the same effect one layer up.
+    const scene = compose('bauhaus_geometric', { title: 'HEADLINE' })!;
+    const el = scene.elements.find((e) => e.content === 'HEADLINE')!;
+    expect(el.textAlign).toBe('left');
+    const op = sceneToOps(scene).find((o) => o.name === el.id)!;
+    expect(op.alignment).toBe('left');
+    // left-aligned: x IS the left edge, so it must not move…
+    expect(op.x).toBe(el.x);
+    // …and a 600px headline at x=108 must not start at -192.
+    expect(op.x as number).toBeGreaterThan(0);
+  });
+
+  it('every op carries an alignment the engine understands', () => {
+    for (const style of composable) {
+      for (const op of sceneToOps(compose(style, { title: 'T', subtitle: 'S' })!)) {
+        if (op.type !== 'text') continue;
+        expect(['left', 'center', 'right'], `${style}`).toContain(op.alignment as string);
+      }
+    }
+  });
+
+  it('every box lands on its own centre, in every style', () => {
+    // The general form of the first case. A radius-authored shape is exempt
+    // because it already carries its centre; everything else is a top-left box.
+    for (const style of composable) {
+      const scene = compose(style, { title: 'Title', subtitle: 'Subtitle' })!;
+      const ops = sceneToOps(scene);
+      for (const el of scene.elements) {
+        if (el.radius !== undefined || el.content) continue;
+        const op = ops.find((o) => o.name === el.id)!;
+        expect(op.x, `${style}/${el.id}`).toBe(el.x + (el.width ?? 0) / 2);
+        expect(op.y, `${style}/${el.id}`).toBe(el.y + (el.height ?? 0) / 2);
+      }
+    }
+  });
+
+  it('no style anchors its TEXT off-canvas any more', () => {
+    // Deliberately text-only. A decorative motif may be anchored outside the
+    // frame on purpose — frutiger-aero's hill is a width*0.8 circle centred at
+    // y = 1.3 x height, a horizon bleeding in from below — and an invariant
+    // that failed on it would be measuring the wrong thing. Copy that never
+    // should have left the canvas is what was reported, and what this pins.
+    for (const style of composable) {
+      const scene = compose(style, { title: 'Title', subtitle: 'Subtitle' })!;
+      for (const op of sceneToOps(scene)) {
+        if (op.type !== 'text') continue;
+        const x = op.x as number;
+        const y = op.y as number;
+        expect(x, `${style}/${op.name} anchored off-canvas in x`).toBeGreaterThanOrEqual(0);
+        expect(x, `${style}/${op.name} anchored off-canvas in x`).toBeLessThanOrEqual(scene.width);
+        expect(y, `${style}/${op.name} anchored off-canvas in y`).toBeGreaterThanOrEqual(0);
+        expect(y, `${style}/${op.name} anchored off-canvas in y`).toBeLessThanOrEqual(scene.height);
+      }
+    }
+  });
+});
+
+/**
+ * The palettes and type were always one layer below the API: every generator
+ * holds them, `listStyles` published neither, and the only way to build in a
+ * style by hand was to read this server's source. Derived by composing, never
+ * transcribed — 18 hand-copied `*_PALETTE` constants would drift the first time
+ * sync:design pulled an upstream change.
+ */
+describe('style tokens are discoverable from the tool surface', () => {
+  it('a composable style reports a palette, fonts and type sizes', () => {
+    const t = styleTokens('bauhaus_geometric')!;
+    expect(t.composable).toBe(true);
+    expect(t.palette.length).toBeGreaterThan(0);
+    for (const c of t.palette) expect(c).toMatch(/^#|^rgb|^hsl/);
+    expect(t.fonts.length).toBeGreaterThan(0);
+    expect(t.fontSizes.length).toBeGreaterThan(0);
+    expect([...t.fontSizes].sort((a, b) => a - b)).toEqual(t.fontSizes);
+  });
+
+  it('every composable style has tokens, and no describable-only style invents any', () => {
+    for (const { style, composable, palette, fonts } of listStyles()) {
+      if (composable) {
+        expect(palette.length, `${style} has no palette`).toBeGreaterThan(0);
+        expect(fonts.length, `${style} has no fonts`).toBeGreaterThan(0);
+      } else {
+        // No generator to ask. An invented palette would be worse than none.
+        expect(palette, `${style} invented a palette`).toEqual([]);
+        expect(fonts, `${style} invented fonts`).toEqual([]);
+      }
+    }
+  });
+
+  it('derives from the generator, so it cannot drift from what gets drawn', () => {
+    const t = styleTokens('bauhaus_geometric')!;
+    const scene = compose('bauhaus_geometric', { title: 'T' })!;
+    const drawn = new Set(scene.elements.map((e) => e.fillHex));
+    for (const hex of drawn) {
+      if (hex === 'transparent') continue;
+      expect(t.palette, `${hex} is drawn but not published`).toContain(hex);
+    }
+  });
+
+  it('names the variants that change a palette rather than passing one off as all of it', () => {
+    expect(styleTokens('art_deco_geometric')!.variants).toEqual(['emerald']);
+    expect(styleTokens('bauhaus_geometric')!.variants).toBeUndefined();
+  });
+
+  it('an unknown style is null, not an empty token set', () => {
+    expect(styleTokens('not_a_style')).toBeNull();
   });
 });
 

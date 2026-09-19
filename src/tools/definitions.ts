@@ -371,7 +371,8 @@ USE WHEN:
 IMPORTANT:
 - Save the returned itemId! You need it for pinepaper_add_relation, pinepaper_modify_item, pinepaper_delete_item, etc.
 - If there's a welcome template on the canvas, use pinepaper_clear_canvas first
-- Position defaults to canvas center (400, 300). Use position: {x, y} or [x, y] (both forms accepted) to place elsewhere.
+- Position defaults to canvas center (400, 300). Use position: {x, y} or [x, y] (both forms accepted) to place elsewhere. Position is the item's bounding-box CENTRE, not its top-left corner.
+- ROTATION is a property, at creation: properties: { rotation: 45 } — degrees, clockwise, about the item's own centre. It does not need a second call, and pinepaper_update_item takes the same property afterwards; keyframe_animate and the driven_by relation both animate it. A radial figure — a sunburst of thin triangles, a clock face, a compass rose — is N creates at rotation: i * (360/N), which is what pinepaper_agent_batch_execute is for. Nothing here needs to be faked with arcs or chevrons.
 - DO NOT take screenshots after every create operation. Trust the API response - if it returns success, the item was created. Take ONE screenshot at the end to verify the final result.
 
 ⚠️ COMPLEX CHARACTERS/ILLUSTRATIONS:
@@ -2315,7 +2316,8 @@ An AESTHETIC STYLE is a look: Bauhaus, Art Deco, Swiss typographic, De Stijl, va
 
 - list_systems / get_system: the licensed systems and their tokens, filterable by token type.
 - list_easings: every motion curve across every system as a named easing, with its licence and whether it was authored here. Use these to make a motion match a system it has to sit beside.
-- list_styles / compose: build a titled scene in a style. Layout is decided in this server by a pure function, so 'compose' with draw:false returns the scene and the ops as DATA and draws nothing — read it before committing, the same way pinepaper_story's distill works.
+- list_styles: every style with its TOKENS — palette, background, font stacks, type sizes and any variants — derived by composing it, so they are what the generator will actually draw. Read these to hand-build in a style rather than reverse-engineering its colours.
+- compose: build a titled scene in a style. Layout is decided in this server by a pure function, so 'compose' with draw:false returns the scene and the ops as DATA and draws nothing — read it before committing, the same way pinepaper_story's distill works. Element boxes are converted to the centre anchor app.create wants, and text carries its alignment, so a left-aligned headline starts at its x instead of centring on it.
 
 A partial composition reports as a failure with the elements that did not create, rather than as a success with half a poster.`,
     inputSchema: {

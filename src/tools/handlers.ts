@@ -329,13 +329,43 @@ async function streamRetainedExportToFile(
     );
   };
 
+  // A READ THAT FAILS ON SIZE IS NOT A READ THAT FAILS.
+  //
+  // A 17 MB memphis chunk died on its FOURTH 4 MB read — three had already
+  // landed — with "Failed to write data to data pipe". That is CDP refusing to
+  // carry one oversized value across the bridge, not the store refusing to
+  // serve it: the render had succeeded and the bytes were sitting right there.
+  // The loop abandoned the whole export anyway, and the caller was left with an
+  // error that explained the bytes were still held and no way to go get them.
+  //
+  // So a transport failure halves the request and asks again, down to a floor,
+  // before giving up. The offset does not move, so a retry costs one re-read,
+  // never a corrupt file. A refusal from the STORE (evicted, out of range) is
+  // NOT retried — that answer will not change with a smaller window, and
+  // retrying it would only spend the caller's time to reach the same place.
+  const MIN_CHUNK_BYTES = 256 * 1024;
+  let window = chunkBytes;
+
   for (;;) {
-    const code = codeGenerator.generateReadExportChunk(retained.exportId, offset, Math.min(chunkBytes, retained.size - offset));
+    const want = Math.min(window, retained.size - offset);
+    const code = codeGenerator.generateReadExportChunk(retained.exportId, offset, want);
     // Deliberately governed at the default budget: a chunk read is a slice of a
     // string already in memory. If one of these ever needs ten seconds, the
     // store is wedged and a timeout is the correct answer, not a longer wait.
     const run = await controller.executeCode(code, false);
-    if (!run.success) throw await abandon(`reading the export failed: ${run.error || 'unknown error'}`);
+    if (!run.success) {
+      if (want > MIN_CHUNK_BYTES) {
+        window = Math.max(MIN_CHUNK_BYTES, Math.floor(want / 2));
+        console.error(
+          `[PinePaper] a ${want}-byte read of "${retained.exportId}" failed (${run.error || 'unknown error'}); `
+          + `retrying the same offset at ${window} bytes`,
+        );
+        continue;
+      }
+      throw await abandon(
+        `reading the export failed even at the ${MIN_CHUNK_BYTES}-byte floor: ${run.error || 'unknown error'}`,
+      );
+    }
 
     const chunk = run.result as { ok?: boolean; reason?: string; evicted?: boolean; data?: string; length?: number; eof?: boolean } | undefined;
     if (!chunk || chunk.ok !== true) {
@@ -2745,6 +2775,33 @@ You can now start creating new items on a clean canvas.`,
         }
 
         const exportResult = exportBrowserResult.result as Record<string, any>;
+
+        // TWO VERDICTS, and only one of them was being read.
+        //
+        // `exportBrowserResult.success` says the CODE RAN. The export's own
+        // verdict is `exportResult.success`, and every emitted branch that
+        // cannot deliver returns `{ success: false, error }` — a studio without
+        // the renderer, an encoder that died, a blob past the inline ceiling.
+        // None of that was checked: the value fell through to the inline return
+        // below, which reports a success and hands back a result object nobody
+        // reads past the first line.
+        //
+        // Measured cost: a five-chunk video where two chunks came back
+        // `success: false, error: "export failed: Failed to write data to data
+        // pipe"` under an outer `"success": true`. The caller shipped a
+        // three-chunk video believing it had five. A silent success is the one
+        // failure mode this surface can never afford, because nothing
+        // downstream has any reason to look again.
+        if (exportResult && exportResult.success === false) {
+          const canvasState = await captureCanvasState(controller);
+          return errorResult(
+            ErrorCodes.EXECUTION_ERROR,
+            `export failed: ${exportResult.error || 'the studio reported failure without naming a reason'}`,
+            { code, format: exportResult.format ?? input.format, result: exportResult },
+            { toolName: 'pinepaper_agent_export', canvasState: canvasState || undefined }
+          );
+        }
+
         const format = exportResult?.format || input.format || 'png';
         const data = exportResult?.data;
 
