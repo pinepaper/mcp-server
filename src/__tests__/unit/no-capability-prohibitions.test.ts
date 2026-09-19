@@ -25,6 +25,8 @@
 
 import { describe, it, expect } from 'bun:test';
 import { PINEPAPER_TOOLS, AI_AGENT_GUIDE } from '../../tools/definitions.js';
+import { SERVER_INFO, RESOURCE_CONTENTS } from '../../index.js';
+import { PROMPTS, getPromptMessages } from '../../prompts/index.js';
 
 /**
  * Capability → the tool that provides it.
@@ -39,10 +41,45 @@ const DOORS: Array<{ capability: string; forbidPattern: RegExp; tool: string }> 
   { capability: 'code', forbidPattern: /\b(do not|don't|never)\s+(answer|reply|respond)\s+in\s+(prose\s+or\s+)?code\b/i, tool: 'pinepaper_execute_custom_code' },
 ];
 
+/**
+ * EVERY surface the server puts in front of a model — not the two I thought of.
+ *
+ * This started as the agent guide plus tool descriptions, a scope chosen by
+ * what came to mind rather than by asking what a model actually reads.
+ * Measuring the rest found the defect again in the worst place available:
+ * SERVER_INFO.description said "NEVER generate HTML or React", and that string
+ * is what a client shows BEFORE any tool, in every session, while the server
+ * ships an HTML exporter and a React exporter.
+ *
+ * The other nineteen resources and every prompt were unguarded too. They
+ * happened to be written correctly — getting-started qualifies each of its
+ * bans with "as a substitute" / "instead of" / "fall back" — but nothing held
+ * them that way, and "currently correct" is not a guard.
+ */
 const servedText = (): Array<{ where: string; text: string }> => [
+  { where: 'SERVER_INFO.description', text: SERVER_INFO.description },
   { where: 'pinepaper://docs/agent-guide', text: AI_AGENT_GUIDE },
+  ...Object.entries(RESOURCE_CONTENTS).map(([uri, text]) => ({ where: uri, text })),
   ...PINEPAPER_TOOLS.map((t) => ({ where: t.name, text: String(t.description ?? '') })),
+  ...PROMPTS.flatMap((p) => {
+    // Built, not read from source: a prompt is assembled at request time, and
+    // scanning the builder's source would miss what it interpolates.
+    let msgs;
+    try { msgs = getPromptMessages(p.name, {}).messages; } catch { return []; }
+    return msgs.map((m, i) => ({ where: `prompt:${p.name}#${i}`, text: m.content.text }));
+  }),
 ];
+
+it('the sweep reaches every served surface', () => {
+  // LIVENESS. Every assertion below is satisfied by finding nothing, so a
+  // servedText() that silently returned less would read as a pass. These
+  // floors are the difference between "no offence" and "no look".
+  const seen = servedText();
+  expect(seen.filter((s) => s.where.startsWith('pinepaper://')).length).toBeGreaterThan(15);
+  expect(seen.filter((s) => s.where.startsWith('prompt:')).length).toBeGreaterThan(0);
+  expect(seen.filter((s) => s.where === 'SERVER_INFO.description')[0]?.text.length).toBeGreaterThan(20);
+  expect(seen.every((s) => typeof s.text === 'string')).toBe(true);
+});
 
 describe('no served instruction forbids a shipped capability', () => {
   for (const door of DOORS) {

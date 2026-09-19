@@ -46,10 +46,18 @@ import { PROMPTS, getPromptMessages } from './prompts/index.js';
 
 import { SERVER_VERSION } from './version.js';
 
-const SERVER_INFO = {
+/**
+ * SUBSTITUTION, NOT FORMAT. This string said "NEVER generate HTML or React"
+ * while the server ships pinepaper_export_widget_html and
+ * pinepaper_export_widget, which produce exactly those. It is also the FIRST
+ * text a client puts in front of a model — before any tool, every session — so
+ * it was the widest-read instance of the defect mcp-cloud found and the one
+ * fixed in agent_start_job. Guarded by no-capability-prohibitions.test.ts.
+ */
+export const SERVER_INFO = {
   name: 'pinepaper-mcp',
   version: SERVER_VERSION,
-  description: 'PinePaper Studio — canvas animation engine. Use PinePaper tools to create animations, videos, and graphics. NEVER generate HTML or React.',
+  description: 'PinePaper Studio — canvas animation engine. Build animations, videos and graphics with PinePaper tools rather than hand-writing HTML or React; it exports to both itself (export_widget_html, export_widget).',
 };
 
 // =============================================================================
@@ -184,7 +192,7 @@ const RESOURCES = [
   },
 ];
 
-const RESOURCE_CONTENTS: Record<string, string> = {
+export const RESOURCE_CONTENTS: Record<string, string> = {
   // Agent guide — single source of truth for the canonical workflow + tool
   // categories text. Mirrors what pinepaper_tool_guide returns with no args
   // so MCP clients can pull it via the resources API without a tool call.
