@@ -248,7 +248,20 @@ describe('citations name methods, not line numbers', () => {
     const out: string[] = [];
     for (const e of readdirSync(dir, { withFileTypes: true })) {
       if (e.isDirectory()) {
-        if (e.name === '__tests__' || e.name === 'vendor' || e.name === 'node_modules') continue;
+        // TESTS ARE IN SCOPE HERE, and excluding them was a reflex.
+        //
+        // The stitch scan excludes __tests__ for a measured reason: its
+        // fixtures deliberately contain stale copies, so including it would
+        // make the suite flag itself. I carried that exclusion to this rule
+        // without asking whether the reason transferred. It does not — a
+        // citation in a test comment rots exactly like one in source, and
+        // measuring found FOUR here, two of them mine, two pointing into
+        // FxTool at coordinates that had already decayed to a comment about
+        // `.content` and to `analysis.totalItems++`.
+        //
+        // `vendor` stays out: it is generated, and a citation there is
+        // upstream's to fix.
+        if (e.name === 'vendor' || e.name === 'node_modules') continue;
         out.push(...sourceFiles(join(dir, e.name)));
       } else if (e.name.endsWith('.ts')) out.push(join(dir, e.name));
     }
@@ -264,7 +277,14 @@ describe('citations name methods, not line numbers', () => {
    * The guard-the-guard caught that before this shipped, which is the whole
    * argument for writing the both-directions test first.
    */
-  const CROSS_FILE_LINE_SRC = String.raw`[A-Za-z][A-Za-z0-9_]*\.(?:ts|js)` + '[:#]' + String.raw`\d{2,5}`;
+  const CROSS_FILE_LINE_SRC = [
+    // a filename followed by a coordinate separator and digits
+    String.raw`[A-Za-z][A-Za-z0-9_]*\.(?:ts|js|mjs)` + '[:#]' + String.raw`\d{2,5}`,
+    // a named symbol or file followed by the word line(s) and digits — the same
+    // defect in prose form, which a single-syntax pattern would miss
+    String.raw`[A-Za-z][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*\s+(?:at\s+)?lines?\s+\d{2,5}`,
+    String.raw`[A-Za-z][A-Za-z0-9_]*\.(?:ts|js|mjs)\s+(?:at\s+)?lines?\s+\d{2,5}`,
+  ].join('|');
   const crossFileLine = (flags = '') => new RegExp(CROSS_FILE_LINE_SRC, flags);
 
   it('the pattern matches a known-bad sample and not innocent prose', () => {
@@ -272,8 +292,19 @@ describe('citations name methods, not line numbers', () => {
     // is satisfied just as well by a pattern that can no longer match.
     expect('see ExportEngine.js' + ':466').toMatch(crossFileLine());
     expect('see Renderer.ts' + '#1200').toMatch(crossFileLine());
+    // The prose form, which a single-syntax pattern misses. FxTool's criterion:
+    // rotting requires a TARGET plus coordinates that the target's file is free
+    // to change. Both forms have both; the syntax is incidental.
+    // Split, like the two above: this file is IN SCOPE for its own rule, so a
+    // literal sample here would be an offence the scan reports. Splitting keeps
+    // the file clean without exempting it — and an exemption for the file that
+    // DEFINES the rule is the self-agreeing hole in its purest form.
+    expect('TemplateManager._doLoadTemplate lines ' + '1274-1432').toMatch(crossFileLine());
+    expect('ExportEngine.js line ' + '892').toMatch(crossFileLine());
+    // A description points nowhere and cannot rot.
     expect('see ExportEngine.js, the framing block').not.toMatch(crossFileLine());
     expect('line 466 of the exporter').not.toMatch(crossFileLine());
+    expect('the method at the top of the file').not.toMatch(crossFileLine());
   });
 
   it('no source file cites another file by line', () => {

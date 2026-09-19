@@ -162,7 +162,7 @@ describe('the stitch list has exactly one definition', () => {
       // one. Scoped to served enums, no single-valued stitch enum exists and the
       // filter looked free. Scanning every array literal in src/ instead found
       // the reason to keep it: `seed` is a stitch AND a live motion knob
-      // (code-generator.ts:8394, ['speed','intensity','waveform','origin',
+      // (generateMotion's knob list, ['speed','intensity','waveform','origin',
       // 'seed']), and `stem` is a stitch and a word this vocabulary uses
       // elsewhere. So a lone ['seed'] is far more likely a knob list than a
       // one-entry stale stitch enum, and `>= 1` would false-positive on it.
@@ -228,7 +228,7 @@ describe('the stitch list has exactly one definition', () => {
     it('does NOT flag a REAL mixed array from this repo', () => {
       // Was ['satin','seed','stem','banana'] — invented, and therefore unable
       // to tell whether purity is load-bearing or decorative. This is the
-      // actual motion-knob list from code-generator.ts:8394, which contains a
+      // actual motion-knob list from generateMotion's knob list, which contains a
       // stitch name and must not match.
       expect(detect({ properties: { x: { enum: ['speed', 'intensity', 'waveform', 'origin', 'seed'] } } })).toHaveLength(0);
     });

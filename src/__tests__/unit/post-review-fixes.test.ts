@@ -276,7 +276,8 @@ describe('Relation alignment — group_morphs_to + moves_along_path', () => {
 
 describe('Mask codegen — FxTool symbol mismatches (1.5.5)', () => {
   // FxTool exposes app.applyMask/applyAnimatedMask/removeMask as convenience
-  // wrappers (PinePaper.js:6822-6859), plus app.maskingSystem.applyCustomMask
+  // wrappers (PinePaper's applyMask / applyAnimatedMask / removeMask), plus
+  // app.maskingSystem.applyCustomMask
   // for keyframe-based masks. Pre-1.5.5 the codegen called the non-existent
   // app.maskSystem.* — "Masks aren't available in this build" was always thrown.
 
@@ -334,7 +335,8 @@ describe('Mask codegen — FxTool symbol mismatches (1.5.5)', () => {
 describe('Widget export codegen — route through app.exportEngine (1.5.5)', () => {
   // Pre-1.5.5 the codegen called app.exportWidget(opts) / app.exportWidgetHTML(opts)
   // directly on the app object, but FxTool only exposes these on app.exportEngine
-  // (ExportEngine.js:4351, 4747). Result: every export_widget* call returned
+  // (ExportEngine.exportWidget / ExportEngine.exportWidgetHTML). Result: every
+  // export_widget* call returned
   // "Widget export not available".
 
   it('pinepaper_export_widget: calls app.exportEngine.exportWidget', () => {
