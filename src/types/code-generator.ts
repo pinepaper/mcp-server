@@ -1002,9 +1002,24 @@ function generateSetCanvasSizeCode(
     : `{ width: ${width}, height: ${height} }`;
   return `
 // Set canvas size
-app.setCanvasSize(${sizeArg});
-app.historyManager.saveState();
-({ success: true, width: ${width}, height: ${height} });
+(function() {
+  // READ THE VERDICT. This called setCanvasSize and then declared success with
+  // the dimensions it had ASKED for — so an unknown preset, or a width of -5,
+  // came back as a successful resize while the canvas was left exactly as it
+  // was. The engine now refuses by name; older builds return undefined, which
+  // is not a refusal and must not be read as one.
+  const r = app.setCanvasSize(${sizeArg});
+  if (r && r.ok === false) {
+    return { success: false, error: r.reason || 'the canvas size was refused',
+      ...(r.known ? { knownPresets: r.known } : {}) };
+  }
+  app.historyManager.saveState();
+  // Report what the canvas ACTUALLY took where the engine says so, rather than
+  // echoing the request back.
+  return { success: true, width: (r && r.width) || ${width}, height: (r && r.height) || ${height},
+    ...(r && r.preset ? { preset: r.preset } : {}),
+    ...(r && r.unbounded !== undefined ? { unbounded: r.unbounded } : {}) };
+})();
 `.trim();
 }
 

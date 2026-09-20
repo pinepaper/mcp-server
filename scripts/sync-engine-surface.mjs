@@ -168,6 +168,12 @@ export function readBootstrap(src = existsSync(BOOTSTRAP) ? readCommitted(BOOTST
   const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   const names = new Set();
   for (const m of code.matchAll(/(?:window\.)?\bapp\.([A-Za-z_]\w*)\s*=(?!=)/g)) names.add(m[1]);
+  // A FOURTH way a name lands, and missing it read as the name disappearing.
+  // app.fontStudio moved from a plain assignment to a defineProperty getter —
+  // so the surface lost it, the parity guard called a working call drifted, and
+  // the boot-race test asserted a kind that no longer existed. Three ways were
+  // never the complete set; they were the ways that existed when I looked.
+  for (const m of code.matchAll(/Object\.defineProperty\(\s*(?:window\.)?app\s*,\s*['"]([A-Za-z_]\w*)['"]/g)) names.add(m[1]);
   return names;
 }
 

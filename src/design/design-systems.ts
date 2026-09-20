@@ -19,7 +19,7 @@ import {
   type DTCGToken,
   type DTCGTokenType,
 } from '../vendor/design/design-systems-dtcg.js';
-import type { DesignStyle } from '../vendor/design/design-style.js';
+import { DESIGN_STYLES, type DesignStyle } from '../vendor/design/design-style.js';
 
 import { generateArtDecoPoster } from '../vendor/design/art-deco-generator.js';
 import { generateArtNouveauPoster } from '../vendor/design/art-nouveau-generator.js';
@@ -193,17 +193,17 @@ const COMPOSERS: Partial<Record<DesignStyle, (o: ComposeOptions) => unknown>> = 
   vaporwave_retro: (o) => generateVaporwavePoster(o as never),
 };
 
-/** Every style the union declares, whether or not it can compose. */
-export const ALL_STYLES: DesignStyle[] = [
-  'minimal', 'editorial', 'playful', 'cinematic', 'energetic', 'scrapbook',
-  'swiss_typographic', 'neumorphic_glass', 'risograph_print', 'cyberpunk_neon',
-  'bauhaus_geometric', 'art_deco_geometric', 'memphis_group', 'brutalist_raw',
-  'de_stijl_neoplasticism', 'pop_art_expression', 'vaporwave_retro',
-  'corporate_memphis', 'y2k_frutiger_aero', 'mid_century_upa', 'comic_benday',
-  'pixel_art_8bit', 'isometric_lowpoly', 'hand_drawn_sketch', 'claymorphism',
-  'constructivism_suprematism', 'art_nouveau', 'op_art_psychedelic',
-  'print_monochrome_crisp', 'print_early_learner', 'print_stem_technical',
-];
+/**
+ * Every style the union declares, whether or not it can compose.
+ *
+ * DERIVED, not listed. This was a hand-written array, and when the upstream
+ * union gained embroidery_tapestry and woven_textile it did not — so two styles
+ * the vocabulary declares were invisible to list_styles, and no test could
+ * catch it, because a TypeScript union cannot be compared to a runtime array.
+ * The sync script now emits the members as data beside the type, from the same
+ * slice, so the two cannot disagree.
+ */
+export const ALL_STYLES: readonly DesignStyle[] = DESIGN_STYLES;
 
 /**
  * Styles whose palette a named variant changes. Only art deco has one today,

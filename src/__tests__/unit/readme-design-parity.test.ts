@@ -22,7 +22,7 @@ const README = readFileSync(join(import.meta.dir, '..', '..', '..', 'README.md')
 /** Written-out numbers, because the note reads as prose rather than a table. */
 const WORDS: Record<number, string> = {
   3: 'three', 15: 'Fifteen', 18: 'eighteen', 21: 'Twenty-one',
-  28: 'Twenty-eight', 31: 'Thirty-one',
+  28: 'Twenty-eight', 31: 'Thirty-one', 33: 'Thirty-three',
 };
 
 describe('README ↔ vendored design data', () => {

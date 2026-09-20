@@ -21,6 +21,7 @@ import { join } from 'node:path';
 import {
   listSystems, getSystem, listEasings, listDurations, listStyles, compose, sceneToOps, styleTokens, ALL_STYLES,
 } from '../../design/design-systems.js';
+import { DESIGN_STYLES } from '../../vendor/design/design-style.js';
 import { DesignSystemInputSchema } from '../../types/schemas.js';
 import { PINEPAPER_TOOLS } from '../../tools/definitions.js';
 import { handleToolCall } from '../../tools/handlers.js';
@@ -339,7 +340,10 @@ describe('the schema and the tool surface', () => {
   });
 
   it('recognizes 31 styles in ALL_STYLES including the 3 print additions', () => {
-    expect(ALL_STYLES).toHaveLength(31);
+    // Derived from the vendored union now, so this tracks upstream rather than
+    // pinning a number somebody has to remember to bump.
+    expect(ALL_STYLES).toHaveLength(DESIGN_STYLES.length);
+    expect(ALL_STYLES.length).toBeGreaterThan(30);
     expect(ALL_STYLES).toContain('print_monochrome_crisp');
     expect(ALL_STYLES).toContain('print_early_learner');
     expect(ALL_STYLES).toContain('print_stem_technical');

@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 79d3ec21c7bb09b825fb92e39d8d6f2b40025ccd
- * sha256:    f9a3fcd0ad7798a0954a76b17bac729a73165a90aadfe39fb2077186326d11d4   (of PinePaper.js as committed)
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 867b72e3dd76286feb57518f7b7e098dd4b54258
+ * sha256:    183392cd491c502e69ed9582ea6c96b037ec2c15cc3a0fbbc4a4cd18fdcc9464   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on `window.app`, with how it gets there. The parity
@@ -16,7 +16,7 @@
 /** How a name lands on `app`. */
 export type EngineMemberKind = 'method' | 'accessor' | 'property' | 'lazy' | 'lazyHeavy' | 'bootstrap';
 
-/** 1111 names, from FxTool/js/PinePaper.js. */
+/** 1112 names, from FxTool/js/PinePaper.js. */
 export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object.freeze({
   _activeByGroup: 'property',
   _activeDrawingGroup: 'method',
@@ -530,6 +530,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   endRenderHold: 'method',
   ensureBoneAttachedRule: 'method',
   ensureCapabilityRegistries: 'method',
+  ensureFontsLoaded: 'method',
   ensureHeavy: 'method',
   ensureHeavyModules: 'method',
   ensurePartOfRule: 'method',

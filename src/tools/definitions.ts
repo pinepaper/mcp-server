@@ -2313,7 +2313,7 @@ TWO DIFFERENT THINGS, kept apart on purpose:
 
 A DESIGN SYSTEM is a real, licensed, versioned product — Material Design 3, IBM Carbon, Shopify Polaris, Fluent 2, Adobe Spectrum, GitHub Primer, USWDS, GOV.UK, Shadcn/Radix, SLDS 2, Tailwind, Chakra and more. Its tokens are facts with a licence attached, in the W3C DTCG format ($value, $type, $description). Twenty-one of them are here. Where a motion curve had to be filled in because the published system does not specify one, the token is marked "pinepaper:authored" — so you can tell a vendor's curve from ours instead of treating both as equally official.
 
-An AESTHETIC STYLE is a look: Bauhaus, Art Deco, Swiss typographic, De Stijl, vaporwave, risograph, brutalist, Memphis, claymorphism, op art, pixel art. No licence, no vendor. Thirty-one are named; eighteen can COMPOSE a scene rather than only be described, and 'list_styles' says which.
+An AESTHETIC STYLE is a look: Bauhaus, Art Deco, Swiss typographic, De Stijl, vaporwave, risograph, brutalist, Memphis, claymorphism, op art, pixel art. No licence, no vendor. Thirty-three are named; eighteen can COMPOSE a scene rather than only be described, and 'list_styles' says which.
 
 - list_systems / get_system: the licensed systems and their tokens, filterable by token type.
 - list_easings: every motion curve across every system as a named easing, with its licence and whether it was authored here. Use these to make a motion match a system it has to sit beside.

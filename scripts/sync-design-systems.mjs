@@ -40,6 +40,7 @@
  * transcribes three thousand lines of geometry by hand in the meantime.
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { dirname, join, resolve, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -56,12 +57,38 @@ export const UPSTREAM_DIR = process.env.PP_MCP_CLOUD_DIR
 /** Self-contained modules, copied whole. */
 export const MODULES = ['design-systems-dtcg'];
 
+/**
+ * The upstream repo root, for reading COMMITTED state rather than the tree.
+ *
+ * mcp-cloud is a live checkout with its own sessions editing it. Vendoring from
+ * the working tree means a file being written right now can land here — and an
+ * UNTRACKED file, which is work in progress by definition, would be mirrored as
+ * though it were published. It also makes this sync non-reproducible: two runs
+ * minutes apart can differ for reasons that have nothing to do with this repo.
+ *
+ * Same fix as scripts/sync-engine-surface.mjs, which hit this against FxTool.
+ */
+const UPSTREAM_REPO = resolve(UPSTREAM_DIR, '..', '..');
+
+/** Is this path committed upstream? An untracked file is not ready to vendor. */
+export function isTracked(relPath) {
+  try {
+    execFileSync('git', ['-C', UPSTREAM_REPO, 'ls-files', '--error-unmatch', relPath],
+      { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Every *-generator.ts upstream, discovered rather than listed — a new style
- *  should arrive by being written, not by someone remembering to edit an array. */
+ *  should arrive by being written, not by someone remembering to edit an array.
+ *  Untracked files are skipped: unpublished work is not a style this ships. */
 export function discoverGenerators() {
   if (!existsSync(UPSTREAM_DIR)) return [];
   return readdirSync(UPSTREAM_DIR)
     .filter((f) => f.endsWith('-generator.ts') && !f.startsWith('typesafe-'))
+    .filter((f) => isTracked(join('src', 'services', f)))
     .map((f) => basename(f, '.ts'))
     .sort();
 }
@@ -118,9 +145,22 @@ export function generateStyleUnion() {
       'The declaration moved or changed shape — fix the slice rather than letting a stale union ship.'
     );
   }
+  // A RUNTIME COPY OF THE UNION, emitted beside the type.
+  //
+  // ALL_STYLES in src/design/design-systems.ts used to be hand-written, and
+  // when the upstream union gained embroidery_tapestry and woven_textile the
+  // list did not — so two styles the vocabulary declares were invisible to
+  // list_styles, and nothing failed, because a TYPE cannot be checked against a
+  // hand-written array at runtime. Emitting the members as data means the
+  // surface is derived from the same slice as the type.
+  const members = [...m[0].matchAll(/"([a-z0-9_]+)"/g)].map((x) => x[1]);
   return header('content-recipes.ts (DesignStyle union only)', sha256(src))
     + '\n/** Every aesthetic style the generators speak. Sliced from the upstream union. */\n'
-    + m[0];
+    + m[0]
+    + `\n\n/** The same ${members.length} styles as DATA, so a runtime list cannot drift from the type. */\n`
+    + `export const DESIGN_STYLES: readonly DesignStyle[] = Object.freeze([\n`
+    + members.map((v) => `  '${v}',`).join('\n')
+    + `\n]);\n`;
 }
 
 function main() {
