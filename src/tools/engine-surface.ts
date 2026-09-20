@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 0b6e336f186e4babb5f17593d66ae57b0f36ffba
- * sha256:    158d2a2980e056d9fe0a5b8cfaf5ad523ddb32496e68ae954944a0ab2cc42ae0   (of PinePaper.js as committed)
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main e7bdcd3de783a664ce8dbb232e0705fe29f4f13d
+ * sha256:    efebd88f5dec35eef2f7361a9e2c69f29b1436c6500bd606657eccb20a2a8803   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on `window.app`, with how it gets there. The parity
@@ -16,7 +16,7 @@
 /** How a name lands on `app`. */
 export type EngineMemberKind = 'method' | 'accessor' | 'property' | 'lazy' | 'lazyHeavy' | 'bootstrap';
 
-/** 1105 names, from FxTool/js/PinePaper.js. */
+/** 1106 names, from FxTool/js/PinePaper.js. */
 export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object.freeze({
   _activeByGroup: 'property',
   _activeDrawingGroup: 'method',
@@ -742,6 +742,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   listEntrancePresets: 'method',
   listFlowFields: 'method',
   listFontAxes: 'method',
+  listFonts: 'method',
   listGeneratorMotions: 'method',
   listHatchOptions: 'method',
   listImages: 'method',

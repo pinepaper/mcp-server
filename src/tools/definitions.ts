@@ -3639,7 +3639,9 @@ Requires maskType and keyframes array.`,
       idempotentHint: true,
       openWorldHint: false,
     },
-    description: `[Utility] Get animatable properties for each mask type. Useful for building custom keyframe animations.`,
+    description: `[Utility] MASK properties only, despite the name: which properties each MASK TYPE can animate.
+
+If you are asking what you can animate on a canvas ITEM, this is the wrong tool and its name will not tell you so. The item-side list lives in pinepaper_keyframe_animate's ANIMATABLE PROPERTIES section, and two entries there are DISCRETE rather than interpolated - content and blendMode hold their value until the next keyframe instead of blending toward it. Treating content as tweenable is what makes every word in a cycler appear half a beat early.`,
     inputSchema: {
       type: 'object',
       properties: {},

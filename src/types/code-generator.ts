@@ -4695,7 +4695,15 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
         if (item.strokeColor) itemData.properties.strokeColor = item.strokeColor.toCSS ? item.strokeColor.toCSS() : item.strokeColor;
         if (item.strokeWidth) itemData.properties.strokeWidth = item.strokeWidth;
         if (item.opacity !== undefined) itemData.properties.opacity = item.opacity;
-        if (item.rotation) itemData.properties.rotation = item.rotation;
+        // TRUE ROTATION, not the property. create() BAKES an angle into the path
+        // segments under Paper's applyMatrix default, so item.rotation reads back 0 on
+        // an item that is visibly rotated. Reporting that 0 is why "I could not rotate
+        // a rectangle" was filed against an engine that rotates correctly. The engine
+        // records the baked offset at item.data._bakedRotation and sums the two itself
+        // (PinePaper.js does exactly this); read the same sum rather than the half of
+        // it that happens to be zero.
+        const _rot = (item.data?._bakedRotation || 0) + (item.rotation || 0);
+        if (_rot) itemData.properties.rotation = _rot;
         if (item.data?.content) itemData.properties.content = item.data.content;
         if (item.visible === false) itemData.properties.visible = false;
 
@@ -6414,7 +6422,7 @@ case 'analyze_palette':
     bounds: item.bounds ? { x: item.bounds.x, y: item.bounds.y, width: item.bounds.width, height: item.bounds.height } : null,
     visible: item.visible,
     opacity: item.opacity,
-    rotation: item.rotation,
+    rotation: (item.data?._bakedRotation || 0) + (item.rotation || 0),
     selected: item.selected,
   };
 })();`.trim();
@@ -7142,7 +7150,7 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
   const entry = app.itemRegistry.get(${itemIdStr});
   if (!entry || !entry.item) return { error: 'Item not found: ' + ${itemIdStr} };
   const b = entry.item.bounds;
-  return { success: true, action: 'get_dimensions', itemId: ${itemIdStr}, x: b.x, y: b.y, width: b.width, height: b.height, rotation: entry.item.rotation || 0 };
+  return { success: true, action: 'get_dimensions', itemId: ${itemIdStr}, x: b.x, y: b.y, width: b.width, height: b.height, rotation: (entry.item.data?._bakedRotation || 0) + (entry.item.rotation || 0) };
 })();`.trim();
       }
       case 'set_snap': {

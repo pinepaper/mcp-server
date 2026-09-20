@@ -277,6 +277,10 @@ Writing JavaScript opts out of the schema protection tool callers get, and six e
 - **Does this survive export?** Answered once, as a rule rather than a per-tool label: if it ticks inside the engine's update loop, it exports — loop animations, relations, keyframes, generators and camera moves all do. Anything driven by the wall clock outside that loop does not. And if exported frames look frozen, check the sampling first: a loop at speed 1 has a one-second period, so frames a whole second apart are identical by design.
 - **Bone angles** are sent as degrees *and* radians, so the studio reads the units you meant rather than inferring them.
 
+### Fixed: rotation read back as 0 on a rotated item
+
+`pinepaper_get_items`, `get_by_id` and `get_dimensions` reported `rotation: 0` for items that are visibly rotated. Creating an item with a rotation bakes the angle into its geometry, so the property really is 0 — and reporting that is why rotation got filed as broken against an engine that rotates correctly. All three now report the true angle.
+
 ### Under the hood
 
 Every engine call this server emits is now checked against the studio's actual API before release, including calls made through sub-objects. That check found and fixed nine more dead calls beyond the ones reported, including one in the agent guide that was teaching a method that does not exist.
