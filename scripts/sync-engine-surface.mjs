@@ -31,6 +31,7 @@
  * no FxTool checkout it exits 0 and says so: an absent sibling is not drift.
  */
 import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -58,6 +59,37 @@ const ENGINE = join(FXTOOL, 'js', 'PinePaper.js');
 const BOOTSTRAP = join(FXTOOL, 'js', 'app.js');
 
 /**
+ * Read a source file from FxTool's COMMITTED state, not its working tree.
+ *
+ * FxTool is a live checkout with its own sessions editing it. Generating from
+ * the working tree made this snapshot non-reproducible: two runs minutes apart
+ * produced different method lists because a file was being edited between
+ * them, and `--check` would then fail for reasons that have nothing to do with
+ * this repo. A guard that fails at random is a guard people learn to re-run
+ * until it passes.
+ *
+ * Falls back to the working tree when FxTool is not a git checkout, which is
+ * the only case where there is nothing better to read.
+ */
+function readCommitted(absPath) {
+  const rel = absPath.slice(FXTOOL.length + 1);
+  try {
+    return execFileSync('git', ['-C', FXTOOL, 'show', `HEAD:${rel}`], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  } catch {
+    return readFileSync(absPath, 'utf8');
+  }
+}
+
+/** The FxTool commit this snapshot describes, so a difference is explainable. */
+function engineRevision() {
+  try {
+    return execFileSync('git', ['-C', FXTOOL, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+  } catch {
+    return 'unknown (not a git checkout)';
+  }
+}
+
+/**
  * Read the engine's own surface out of its source.
  *
  * Four ways a name lands on `app`, and missing any one of them produces a FALSE
@@ -76,7 +108,7 @@ const BOOTSTRAP = join(FXTOOL, 'js', 'app.js');
  * heavy one without awaiting that has a cold-start race — which is precisely
  * the `app.exportEngine` bug fixed in 1.6.9, and there are eight of these.
  */
-export function readEngineSurface(src = readFileSync(ENGINE, 'utf8'), bootstrap = readBootstrap()) {
+export function readEngineSurface(src = readCommitted(ENGINE), bootstrap = readBootstrap()) {
   const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   /** @type {Map<string, string>} name → kind */
   const surface = new Map();
@@ -107,7 +139,7 @@ export function readEngineSurface(src = readFileSync(ENGINE, 'utf8'), bootstrap 
 }
 
 /** `app.X = …` / `window.app.X = …` from the editor bootstrap. */
-export function readBootstrap(src = existsSync(BOOTSTRAP) ? readFileSync(BOOTSTRAP, 'utf8') : '') {
+export function readBootstrap(src = existsSync(BOOTSTRAP) ? readCommitted(BOOTSTRAP) : '') {
   const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   const names = new Set();
   for (const m of code.matchAll(/(?:window\.)?\bapp\.([A-Za-z_]\w*)\s*=(?!=)/g)) names.add(m[1]);
@@ -134,7 +166,7 @@ export function readFacades(names) {
     for (const rel of [`js/${cls}.js`, `js/diagram/${cls}.js`, `js/export/${cls}.js`]) {
       const file = join(FXTOOL, rel);
       if (!existsSync(file)) continue;
-      const body = readFileSync(file, 'utf8')
+      const body = readCommitted(file)
         .replace(/\/\*[\s\S]*?\*\//g, '')
         .replace(/^\s*\/\/.*$/gm, '');
       if (!new RegExp(`class\\s+${cls}\\b`).test(body)) continue;
@@ -167,8 +199,9 @@ function facadesInUse() {
 }
 
 function generate() {
-  const src = readFileSync(ENGINE, 'utf8');
+  const src = readCommitted(ENGINE);
   const sha = createHash('sha256').update(src).digest('hex');
+  const rev = engineRevision();
   const surface = readEngineSurface(src);
   const rows = [...surface.entries()].sort(([a], [b]) => a.localeCompare(b));
   const heavy = rows.filter(([, k]) => k === 'lazyHeavy').map(([n]) => n);
@@ -176,8 +209,8 @@ function generate() {
 
   return `/* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool/js/PinePaper.js
- * sha256:    ${sha}
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit ${rev}
+ * sha256:    ${sha}   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on \`window.app\`, with how it gets there. The parity
