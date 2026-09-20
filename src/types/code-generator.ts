@@ -1716,12 +1716,41 @@ throw new Error('Either svgString or url must be provided');
   if (!app.importMermaid) return { success: false, error: 'importMermaid not available — diagramSystem missing' };
   const mermaidText = \`${escaped}\`;
   const result = app.importMermaid(mermaidText, ${optsJson});
+
+  // NEVER RETURN THE RAW NODES. They are Paper.js items, and a Paper item
+  // refers to its project, which refers back — JSON.stringify dies on the cycle
+  // with "property '_scope' closes the circle", and the tool reported "Failed
+  // to execute code in browser" for an import that had worked. Summarised to
+  // ids, labels and bounds, which is what a caller can act on anyway.
+  const safeNode = (n) => {
+    const item = n && (n.item || n);
+    const b = item && item.bounds;
+    return {
+      id: (item && item.data && item.data.registryId) || (n && n.id) || null,
+      label: (n && (n.label ?? n.text)) ?? null,
+      bounds: b ? { x: Math.round(b.x), y: Math.round(b.y), width: Math.round(b.width), height: Math.round(b.height) } : null,
+    };
+  };
+  const nodes = (result.nodes || []).map(safeNode);
+  const edges = (result.edges || []).map((e) => ({ from: e?.from ?? e?.source ?? null, to: e?.to ?? e?.target ?? null, label: e?.label ?? null }));
+
+  // A zero-item import is NOT a success. The engine reported success:true with
+  // itemsCreated:0 and the tool passed it on, so a diagram that drew nothing
+  // read as a diagram that drew.
+  if (!nodes.length) {
+    return {
+      success: false,
+      error: 'the mermaid import created no items. The text parsed but produced nothing to draw — check the diagram type is one this build supports, and that the body is not empty.',
+      nodeCount: 0, edgeCount: edges.length, errors: result.errors || [],
+    };
+  }
+
   return {
     success: !!result.success,
-    nodeCount: result.nodes ? result.nodes.length : 0,
-    edgeCount: result.edges ? result.edges.length : 0,
-    nodes: result.nodes || [],
-    edges: result.edges || [],
+    nodeCount: nodes.length,
+    edgeCount: edges.length,
+    nodes,
+    edges,
     errors: result.errors || [],
   };
 })();
@@ -6211,8 +6240,23 @@ case 'analyze_palette':
 (function() {
   const itemIds = ${JSON.stringify(input.itemIds || [])};
   const opts = ${JSON.stringify(opts)};
-  const precomp = app.createPrecomp(itemIds, opts);
-  return { success: true, action: 'create', precompId: precomp?.id || precomp, name: ${JSON.stringify(input.name || '')} };
+
+  // createPrecomp wants LIVE ITEMS. Handing it registry ids put strings into
+  // Paper.js's insertChildren, which fails as "l._remove is not a function" —
+  // a minified internal, from a schema that promises ids work. Resolved here,
+  // and a missing one is named rather than silently dropped from the group.
+  const items = [];
+  const missing = [];
+  for (const id of itemIds) {
+    const item = app.getItemById(id);
+    if (item) items.push(item); else missing.push(id);
+  }
+  if (missing.length) return { success: false, error: 'precomp: no such item(s): ' + missing.join(', ') };
+  if (!items.length) return { success: false, error: 'precomp needs at least one item' };
+
+  const precomp = app.createPrecomp(items, opts);
+  if (!precomp) return { success: false, error: 'createPrecomp returned nothing' };
+  return { success: true, action: 'create', precompId: precomp?.id || precomp, itemCount: items.length, name: ${JSON.stringify(input.name || '')} };
 })();`.trim();
       }
       case 'add':
@@ -8921,11 +8965,17 @@ ${guard('unlockAllItems')}${pass('app.unlockAllItems()')}
   return { success: true, action: 'create_skeleton', skeletonId: skeletonId };`);
       }
       case 'add_bone': {
+        // DEGREES IN, RADIANS OUT. The schema says degrees and every other
+        // angle on this surface is degrees, but RiggingSystem stores what it is
+        // given and _solveFKRecursive feeds it straight to Math.cos/Math.sin.
+        // So a documented 90 was read as 90 radians and the character exploded
+        // on the first pose — silently, because a wrong pose is not an error.
+        // Converted here so the tool keeps the vocabulary it advertises.
         const config = S({
           ...(input.name !== undefined ? { name: input.name } : {}),
           ...(input.parentBoneId !== undefined ? { parentBoneId: input.parentBoneId } : {}),
           ...(input.length !== undefined ? { length: input.length } : {}),
-          ...(input.angle !== undefined ? { angle: input.angle } : {}),
+          ...(input.angle !== undefined ? { angle: (input.angle * Math.PI) / 180 } : {}),
           ...(input.flexibility !== undefined ? { flexibility: input.flexibility } : {}),
           ...(input.segments !== undefined ? { segments: input.segments } : {}),
         });
@@ -8968,8 +9018,16 @@ ${guard('unlockAllItems')}${pass('app.unlockAllItems()')}
           ...(input.movingHold !== undefined ? { movingHold: input.movingHold } : {}),
           ...(input.holdDrift !== undefined ? { holdDrift: input.holdDrift } : {}),
         });
+        // Same unit conversion as add_bone: an inline pose is { boneId: angleDeg }
+        // by the schema, and the solver reads radians. A SAVED pose is a string
+        // id and is passed through untouched — those angles are already in the
+        // engine's own units.
+        const poseArg = (input.pose !== null && typeof input.pose === 'object')
+          ? S(Object.fromEntries(Object.entries(input.pose as Record<string, number>)
+              .map(([bone, deg]) => [bone, (deg * Math.PI) / 180])))
+          : S(input.pose);
         return wrap('Rigging: add pose keyframe',
-          `  const ok = R.addPoseKeyframe(${S(input.skeletonId)}, ${input.time}, ${S(input.pose)}, ${S(input.easing ?? 'linear')}, ${opts});
+          `  const ok = R.addPoseKeyframe(${S(input.skeletonId)}, ${input.time}, ${poseArg}, ${S(input.easing ?? 'linear')}, ${opts});
   if (app.historyManager) app.historyManager.saveState();
   if (!ok) { return { success: false, action: 'add_pose_keyframe', error: "no such skeleton, or 'pose' named a saved pose that does not exist. Pass an inline { boneId: angleDeg } map instead, or list_poses for the saved ones" }; }
   return { success: true, action: 'add_pose_keyframe', time: ${input.time} };`);

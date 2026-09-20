@@ -4779,7 +4779,7 @@ export const RiggingInputSchema = z.object({
   // add_bone
   parentBoneId: z.string().optional().describe('Parent bone id (omit for root) — add_bone.'),
   length: z.number().positive().optional().describe('Bone length px (default 80) — add_bone.'),
-  angle: z.number().optional().describe('Bone rest angle in degrees — add_bone.'),
+  angle: z.number().optional().describe('Bone rest angle in DEGREES — add_bone. RELATIVE TO THE PARENT bone, not to the world: a child at 0 points the same way its parent does, and the solver adds the chain up (worldAngle = parentWorldAngle + angle). A bone also has no position of its own — it starts at its parent BONE TIP, so length and angle together are what place it.'),
   flexibility: z.number().min(0).max(1).optional().describe('0 rigid … 1 fully flexible — add_bone.'),
   segments: z.number().int().min(0).optional().describe('Curve segments (0 = auto) — add_bone.'),
   // attach_item

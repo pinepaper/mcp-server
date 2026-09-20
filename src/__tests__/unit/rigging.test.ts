@@ -48,7 +48,15 @@ describe('generateRigging codegen', () => {
       action: 'add_pose_keyframe', skeletonId: 's1', time: 1.5, pose: { b1: 45 },
       easing: 'easeInOut', favor: -0.3, breakdown: true, boneOffsets: { b1: 0.2 }, movingHold: true,
     });
-    expect(c).toContain('R.addPoseKeyframe("s1", 1.5, {"b1":45}, "easeInOut"');
+    // 45 DEGREES ARRIVES AS RADIANS. The schema says degrees and so does every
+    // other angle on this surface, but _solveFKRecursive feeds the stored value
+    // straight to Math.cos/sin — so a documented 90 was read as 90 radians and
+    // the character exploded on its first pose, silently, because a wrong pose
+    // is not an error. This test asserted the unconverted value and so pinned
+    // the bug in place.
+    expect(c).toContain(`R.addPoseKeyframe("s1", 1.5, {"b1":${(45 * Math.PI) / 180}}, "easeInOut"`);
+    // boneOffsets is a timing LAG in [0, 0.95), not an angle — unconverted.
+    expect(c).toContain('"boneOffsets":{"b1":0.2}');
     expect(c).toContain('"favor":-0.3');
     expect(c).toContain('"breakdown":true');
     expect(c).toContain('"boneOffsets":{"b1":0.2}');
