@@ -185,6 +185,26 @@ describe('the emitters only call what the engine has', () => {
  * skipped rather than failed — an incomplete map must make a guard quieter,
  * never louder, or it starts failing working code and gets switched off.
  */
+/**
+ * Methods the emitters PROBE before calling: `typeof app.x.y === 'function'`.
+ *
+ * A guarded call to a method the snapshotted engine does not have is not drift
+ * — it is forward compatibility, and it is the shape this repo already uses for
+ * every capability that arrived after some studio build. Counting it as drift
+ * would make the guard punish exactly the careful pattern it wants, and the
+ * only way to satisfy it would be to snapshot an engine users do not have yet.
+ */
+export function probedFacadeMethods(files = emitterFiles()): Set<string> {
+  const probed = new Set<string>();
+  for (const file of files) {
+    const src = readFileSync(file, 'utf8');
+    for (const m of src.matchAll(/typeof\s+app\.([A-Za-z_]\w*)[?]?\.([A-Za-z_]\w*)\s*===?\s*'function'/g)) {
+      probed.add(`${m[1]}.${m[2]}`);
+    }
+  }
+  return probed;
+}
+
 export function referencedFacadeMethods(files = emitterFiles()): Array<[string, string]> {
   const out: Array<[string, string]> = [];
   for (const file of files) {
@@ -256,6 +276,7 @@ describe('facade methods exist too', () => {
   });
 
   it('every app.<facade>.<method> the emitters call exists on that facade', () => {
+    const probed = probedFacadeMethods();
     const unknown = new Set<string>();
     for (const [facade, method] of referencedFacadeMethods()) {
       const known = ENGINE_FACADES[facade];
@@ -263,9 +284,20 @@ describe('facade methods exist too', () => {
       if (JS_BUILTINS.has(method)) continue;
       if (known.includes(method)) continue;
       if (KNOWN_FACADE_DRIFT.includes(`${facade}.${method}`)) continue;
+      if (probed.has(`${facade}.${method}`)) continue;
       unknown.add(`app.${facade}.${method}`);
     }
     expect([...unknown].sort()).toEqual([]);
+  });
+
+  it('a probe is only an excuse where the call is actually guarded', () => {
+    // The exemption must not become a blanket one: a method that is probed
+    // somewhere and called unguarded elsewhere is still drift in that second
+    // place. Pinned by checking the probe set is small and specific rather
+    // than swallowing the facade surface.
+    const probed = probedFacadeMethods();
+    expect(probed.size).toBeLessThan(20);
+    for (const entry of probed) expect(entry).toContain('.');
   });
 
   it('the facade-drift list only ever shrinks', () => {

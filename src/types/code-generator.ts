@@ -2517,6 +2517,17 @@ const updates = ${updatesStr};
 //
 // Applied directly where the property is a plain Paper.js one, and refused by
 // name where it is not, rather than claiming a change that did not happen.
+// The engine gained getConnector(id) / updateConnector(id, style), which is
+// the call this tool always wanted: addressable by the id a connector is
+// created and serialised with. Guarded, because a studio predating that still
+// has to do something sensible rather than throw.
+if (typeof app.diagramSystem?.updateConnector === 'function') {
+  const res = app.diagramSystem.updateConnector('${connectorId}', updates);
+  if (res && res.ok === false) { return { success: false, error: res.reason || 'the connector could not be updated' }; }
+  app.historyManager.saveState();
+  return { connectorId: '${connectorId}', updated: true, applied: Object.keys(updates) };
+}
+
 const _applied = [];
 const _unsupported = [];
 for (const [k, v] of Object.entries(updates)) {
@@ -2528,8 +2539,9 @@ if (_applied.length) { app.historyManager.saveState(); app._scheduleRepaint?.();
 if (_unsupported.length && !_applied.length) {
   throw new Error(
     'this build cannot update ' + _unsupported.join(', ') + ' on an existing connector — '
-    + 'ConnectorManager has no per-connector update. Remove it with pinepaper_remove_connector '
-    + 'and recreate it with pinepaper_connect using the properties you want.'
+    + 'this build has no per-connector update — app.diagramSystem.updateConnector arrived later. '
+    + 'Update the studio for it. Removing and recreating the connector works, but mints a NEW id '
+    + 'and orphans anything holding the old one, so it is a last resort rather than the fix.'
   );
 }
 
@@ -8554,7 +8566,15 @@ ${needWorld}
   if (typeof app.storyFromText !== 'function') { return { success: false, error: 'app.storyFromText unavailable — update FxTool' }; }
   const r = await app.storyFromText(${S(input.text)}, ${opts});
   if (!r || r.ok === false) { return { success: false, error: (r && (r.reason || r.error)) || 'the story did not assemble' }; }
-  return { success: true, ...r };
+  // NAMED FIELDS, not a spread. assembleStory returns its parts as live Paper
+  // Groups, and a Paper item's graph reaches the editor's EVENT HANDLERS.
+  // Structured clone — which is what the bridge uses — refuses to carry a
+  // function, so the whole result threw DataCloneError and the message did not
+  // survive the wrapping: an empty error string for a story that assembled
+  // fine in-page. Not a cycle; JSON.stringify succeeded on this the whole time.
+  // The groups have to stay for in-page callers, so the wrapper takes what
+  // travels: the spec, the ids, the count.
+  return { success: true, spec: r.spec, partIds: r.partIds, partCount: r.partCount, beats: r.beats };
 })();`.trim();
 
       case 'apply_spec':

@@ -537,6 +537,44 @@ export class PinePaperBrowserController {
         needsHeavy,
       };
       const result = await this.page.evaluate(async (codeToRun: string, opts: { bypass: boolean; timeoutMs?: number; needsHeavy: boolean }) => {
+        // THE BRIDGE USES STRUCTURED CLONE, AND JSON.stringify DOES NOT PROVE IT.
+        //
+        // A result crosses CDP by structured clone, which refuses to carry a
+        // FUNCTION and throws DataCloneError. JSON.stringify drops functions
+        // silently and honours toJSON, so a value can serialise perfectly and
+        // still fail to cross — which is why `pinepaper_story from_text` came
+        // back with an EMPTY error string while the same call worked in-page.
+        // Its result holds live Paper Groups, and a Paper item's graph reaches
+        // the editor's event handlers.
+        //
+        // Fourteen emitters spread raw engine results, so this is fixed once
+        // here rather than fourteen times. The probe is the real predicate —
+        // attempt the clone, and only walk the value when it refuses.
+        const toBridgeSafe = (value: unknown, depth = 0): unknown => {
+          if (value === null || typeof value !== 'object') {
+            return typeof value === 'function' ? undefined : value;
+          }
+          if (depth > 6) return '[deep]';
+          if (Array.isArray(value)) return value.map((v) => toBridgeSafe(v, depth + 1));
+          const out: Record<string, unknown> = {};
+          for (const key of Object.keys(value as Record<string, unknown>)) {
+            let v: unknown;
+            try { v = (value as Record<string, unknown>)[key]; } catch { continue; }
+            if (typeof v === 'function') continue;
+            const safe = toBridgeSafe(v, depth + 1);
+            if (safe !== undefined) out[key] = safe;
+          }
+          return out;
+        };
+        const bridgeSafe = (value: unknown): unknown => {
+          try {
+            (globalThis as { structuredClone?: (v: unknown) => unknown }).structuredClone?.(value);
+            return value;
+          } catch {
+            return toBridgeSafe(value);
+          }
+        };
+
         const app = (window as any).app || (window as any).PinePaper;
         if (opts.needsHeavy && app && typeof app.ensureHeavyModules === 'function') {
           // Failure is not fatal here: the emitted code still carries its own
@@ -557,7 +595,7 @@ export class PinePaperBrowserController {
                 executedVia: 'governed' as const,
               };
             }
-            return { success: true, result: run?.value, report: run?.report, executedVia: 'governed' as const };
+            return { success: true, result: bridgeSafe(run?.value), report: run?.report, executedVia: 'governed' as const };
           } catch (e) {
             return { success: false, error: e instanceof Error ? e.message : 'Execution error', executedVia: 'governed' as const };
           }
@@ -569,9 +607,9 @@ export class PinePaperBrowserController {
           // eslint-disable-next-line no-eval
           const evalResult = eval(codeToRun);
           if (evalResult instanceof Promise) {
-            return evalResult.then((r) => ({ success: true, result: r, executedVia: 'eval' as const }));
+            return evalResult.then((r) => ({ success: true, result: bridgeSafe(r), executedVia: 'eval' as const }));
           }
-          return { success: true, result: evalResult, executedVia: 'eval' as const };
+          return { success: true, result: bridgeSafe(evalResult), executedVia: 'eval' as const };
         } catch (e) {
           return {
             success: false,
