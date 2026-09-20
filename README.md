@@ -277,6 +277,12 @@ Writing JavaScript opts out of the schema protection tool callers get, and six e
 - **Does this survive export?** Answered once, as a rule rather than a per-tool label: if it ticks inside the engine's update loop, it exports — loop animations, relations, keyframes, generators and camera moves all do. Anything driven by the wall clock outside that loop does not. And if exported frames look frozen, check the sampling first: a loop at speed 1 has a one-second period, so frames a whole second apart are identical by design.
 - **Bone angles** are sent as degrees *and* radians, so the studio reads the units you meant rather than inferring them.
 
+### Fixed: `pinepaper_execute_custom_code` could not do anything asynchronous
+
+Your snippet was wrapped in a synchronous function. A top-level `await` is a syntax error inside one, so any snippet that awaited something failed to parse — and async work started without `await` was simply dropped, with the tool reporting success before it happened.
+
+That is the whole async half of the engine — export, image import, rigging bake, layout — unreachable from the one tool that exists for reaching what the other tools do not cover. Snippets now run in an async wrapper, so `await` works and the result is the resolved value.
+
 ### Fixed: rotation read back as 0 on a rotated item
 
 `pinepaper_get_items`, `get_by_id` and `get_dimensions` reported `rotation: 0` for items that are visibly rotated. Creating an item with a rotation bakes the angle into its geometry, so the property really is 0 — and reporting that is why rotation got filed as broken against an engine that rotates correctly. All three now report the true angle.

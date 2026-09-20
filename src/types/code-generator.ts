@@ -4966,9 +4966,25 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
     const validated = ExecuteCustomCodeInputSchema.parse(input);
     const description = validated.description || 'Execute custom code';
 
+    // ASYNC, because the code inside is not ours.
+    //
+    // This wrapped the caller's snippet in a SYNC IIFE, which does two things
+    // to async work. A top-level `await` is a syntax error inside a
+    // non-async function, so a snippet that awaits anything fails to parse at
+    // all. And async work started without await returns a promise nobody
+    // holds: the IIFE returns immediately, the tool reports success, and the
+    // next call reads a canvas where the work has not happened yet.
+    //
+    // That is the whole async half of the engine — export, image import,
+    // rigging bake, layout — unreachable from the one tool whose entire
+    // purpose is reaching things the tool surface does not cover.
+    //
+    // An async IIFE is still a `(`-led expression statement, so the governor
+    // captures its value, and executeCode's eval fallback already resolves a
+    // returned promise. Both paths await it; neither needed changing.
     return `
 // ${description}
-(function() {
+(async function() {
   try {
     ${validated.code}
   } catch (error) {
