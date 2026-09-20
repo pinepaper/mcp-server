@@ -57,9 +57,18 @@ install one, or your machine cannot spare the browser.
 
 Hosting costs money, so the hosted option is paid — it runs on credits. See
 [cloud.pinepaper.studio](https://cloud.pinepaper.studio) for current pricing. Run it
-locally if you can, but it is not identical: the hosted service runs a tested
-set of LLMs and repairs generated code before it reaches the canvas, which a
-local server structurally cannot do for itself. Which model to trust is a
+locally if you can, but it is not identical, and the differences run both ways.
+
+The hosted service runs a tested set of LLMs, repairs generated code before it
+reaches the canvas — which a local server structurally cannot do for itself —
+and **encodes video server-side**, in an ffmpeg container that owns the job
+durably. Locally, an export runs in your own browser: it needs Chrome and
+Puppeteer, it is bounded by your machine, and a long render occupies that
+browser for its duration.
+
+What the local server has instead is the whole tool surface. Tools that need
+the editor's UI — selection, drag-and-drop, mode toggles — work here against a
+visible browser and are excluded from headless operation. Which model to trust is a
 question you can answer yourself rather than take on trust: a benchmark runs one
 prompt across several models and puts the results side by side, any run
 shareable. It is in invite-only beta.
