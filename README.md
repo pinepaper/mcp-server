@@ -208,6 +208,54 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - Puppeteer mode launches Chrome with `--no-sandbox` and `--disable-setuid-sandbox`. That is routine for headless automation and it does weaken Chrome's own process sandbox. If that matters where you are running it, use `code` mode or put the server in a container.
 - Puppeteer itself is an **optional** peer dependency, kept out of the default tree precisely because a headless browser plus an install script is what scanners flag hardest. Install it only if you want the executing mode.
 
+## What's new in 1.6.10
+
+### Fixed: the nine diagram tools called an object that does not exist
+
+Every diagram tool — shapes, connectors, ports, auto-layout, diagram mode — called `app.diagramManager`, which has never existed in the studio. All nine failed with "Cannot read properties of undefined", which read as "diagrams are broken" when the studio side was fine. Fixed, along with three argument bugs behind it: shape type is passed separately from its config, `add_ports` takes a port-type name, and auto-layout takes items rather than ids and is awaited.
+
+`update_connector` now applies colour and width directly and **refuses the rest by name**, pointing you at remove-and-recreate. It previously reported success over a connector it had not changed.
+
+### Fixed: six of sixteen font actions
+
+`set_name`, `get_required_chars`, `get_status`, `create_space` and `export` all called renamed methods and failed. `show_studio` now says plainly that opening the panel has no engine entry point — the other fifteen actions work without it.
+
+### Fixed: local image files, and errors that say why
+
+`pinepaper_import_image` now accepts a **local file path** (absolute, relative, or `file://`) as well as http(s) and data URLs. A browser page cannot open `file://`, so the server reads the file and hands the page the data.
+
+Remote failures now report the reason — HTTP status, refused connection, or a URL that returned a web page instead of an image — instead of a bare "Failed to load image from URL".
+
+### Fixed: tools could report success when the work failed
+
+Any tool whose underlying operation failed could return success with the error buried in the payload. A failed operation is now an error. This is the general form of the export fix in 1.6.9, and it covers every tool.
+
+### Fixed: tools failed when called immediately after connecting
+
+Map, physics, rigging, sprite-sheet and Lottie tools could report the studio as too old for a capability it has, if called within the first second or so of connecting. They now wait for the relevant subsystem to finish loading.
+
+### Fixed: `pinepaper_batch_modify`
+
+It passed item ids in the field meant for live items, so every modification was rejected, and then misread the result as a list. It now reports how many items changed and names any it skipped, with the reason.
+
+### Fixed: rigging bone angles were read as radians
+
+`add_bone` and inline poses document degrees, and the solver read the number as radians — so a documented 90° came out as 90 radians and characters came apart on the first pose. Angles are now converted.
+
+Two things the tool never told you, now in its description: a bone angle is **relative to its parent**, and a bone has no position — it starts at its parent's tip, so length and angle are what place it.
+
+### Fixed: `pinepaper_precomp` and `pinepaper_import_mermaid`
+
+`precomp` passed ids where live items were required, and now names any id that does not resolve instead of quietly leaving it out. `import_mermaid` returned raw canvas objects that could not be serialised, so a working import reported a failure; it now returns ids, labels and bounds — and an import that creates nothing is no longer reported as a success.
+
+### Letter-collage animation works again
+
+The animation type was discarded on every call (fixed in 1.6.9) and the studio was skipping the relation that drives it. Both halves are in place. **Needs a studio build from 2026-09-20 or later.**
+
+### Under the hood
+
+Every engine call this server emits is now checked against the studio's actual API before release, including calls made through sub-objects. That check found and fixed nine more dead calls beyond the ones reported, including one in the agent guide that was teaching a method that does not exist.
+
 ## What's new in 1.6.9
 
 ### New: `pinepaper_export_store`
