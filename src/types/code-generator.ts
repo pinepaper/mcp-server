@@ -3304,7 +3304,7 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
 
   generateAgentExport(input: AgentExportInput): string {
     const validated = AgentExportInputSchema.parse(input);
-    const { platform, format, quality, framing, duration, estimateOnly, scale } = validated;
+    const { platform, format, quality, framing, duration, estimateOnly, scale, fps } = validated;
     const qualityLevel = quality || 'standard';
     const videoDuration = duration ?? 5;
 
@@ -3428,7 +3428,11 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
   const format = '${exportFormat}';
   const quality = '${qualityLevel}';
   const framing = '${framing}';
-  const settings = ${JSON.stringify(qualitySettings)};
+  // An explicit fps wins over the tier's. The tiers bundle frame rate with
+  // compression (draft 15 / standard 30 / high 60), so "higher quality" also
+  // doubled the frame count and the render time — a surprise the schema used
+  // to hide because there was no way to ask for one without the other.
+  const settings = ${JSON.stringify(fps !== undefined ? { ...qualitySettings, fps } : qualitySettings)};
   const dimensions = ${JSON.stringify(scaled)};
 
   // Preflight: same resolved settings as the real export, but render nothing.
@@ -7753,8 +7757,19 @@ ${guard}
   const r = app.setFontAxes(${S(input.itemId)}, ${S(input.axes)});
   if (!r || !r.ok) { return { success: false, error: (r && r.error) || 'axes failed' }; }
   // rejected is the interesting half: an axis silently ignored is the failure
-  // mode this surface exists to prevent.
-  return { success: true, action: 'set_font_axes', applied: r.applied, rejected: r.rejected || [] };
+  // mode this surface exists to prevent. And NOTHING applied while something
+  // was rejected is not a success — it is the call doing nothing under a
+  // success, which is the same shape as an empty batch reporting ok.
+  const _applied = r.applied || {};
+  const _rejected = r.rejected || [];
+  const _appliedCount = Array.isArray(_applied) ? _applied.length : Object.keys(_applied).length;
+  if (_appliedCount === 0 && _rejected.length) {
+    return { success: false, action: 'set_font_axes', applied: _applied, rejected: _rejected,
+      error: 'no axis was applied. The font does not have: ' + _rejected.join(', ')
+        + (r.note ? '. ' + r.note : '') };
+  }
+  return { success: true, action: 'set_font_axes', applied: _applied, rejected: _rejected,
+    ...(r.note ? { note: r.note } : {}) };
 })();`.trim();
       }
       case 'list_styles': {

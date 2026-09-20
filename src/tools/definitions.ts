@@ -7799,6 +7799,8 @@ Held exports last until released, or until a LATER export needs the space — an
     },
     description: `Smart export with automatic format detection and platform optimization.
 
+WHAT quality ACTUALLY SETS, because it bundles three things and only one of them is "quality": draft = 15fps / 72dpi / compression 0.6, standard = 30fps / 150dpi / 0.85, high = 60fps / 300dpi / 0.95. So asking for high DOUBLES the frame count and the render time against standard. Override either half directly - fps for frame rate, scale for resolution - and leave quality to mean compression.
+
 DOES THIS SURVIVE EXPORT? It is a PATH fact, not a per-feature one, so the rule is short and does not go stale as capabilities land: IF IT TICKS INSIDE THE ENGINE'S UPDATE LOOP, IT EXPORTS. Loop animations, relations, keyframes, generators and camera moves all do - measured frame-by-frame, not assumed. What does NOT survive is anything driven by the wall clock outside that loop, or anything on the realtime recorder path.
 
 If exported frames look frozen, check the SAMPLING before believing it: a loop animation at animationSpeed 1 has a one-second period, so two frames a whole second apart are identical by design. Compare frames that are not a whole number of periods apart.

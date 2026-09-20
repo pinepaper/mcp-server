@@ -277,6 +277,14 @@ Writing JavaScript opts out of the schema protection tool callers get, and six e
 - **Does this survive export?** Answered once, as a rule rather than a per-tool label: if it ticks inside the engine's update loop, it exports — loop animations, relations, keyframes, generators and camera moves all do. Anything driven by the wall clock outside that loop does not. And if exported frames look frozen, check the sampling first: a loop at speed 1 has a one-second period, so frames a whole second apart are identical by design.
 - **Bone angles** are sent as degrees *and* radians, so the studio reads the units you meant rather than inferring them.
 
+### Fixed: unknown font axes were dropped before the studio saw them
+
+`set_font_axes` declared the three standard axes and silently discarded anything else, so asking for an axis the tool didn't name reached the studio as an empty request — which then reported nothing rejected, and the tool reported success over axes that were never applied. Axes are passed through as written now; the studio says which it took and which it did not, including OpenType tags like `wght`. And nothing applied while something was rejected is an error rather than a success.
+
+### `quality` no longer hides what it changes
+
+`quality` sets three things: draft = 15fps/72dpi, standard = 30fps/150dpi, high = 60fps/300dpi. So asking for high doubled your frame count and render time against standard, with nothing saying so. That's now in the tool description, and `fps` is a parameter — as `scale` already was for resolution — so you can raise compression quality without also doubling the frames.
+
 ### Fixed: a batch could report success when an operation failed
 
 `pinepaper_agent_batch_execute` wrapped each operation in try/catch and treated *not throwing* as succeeding. Most failures here do not throw — a missing preset, an unloaded subsystem, an unmet precondition all come back as a returned error — so the operation reported the problem correctly and the batch said the scene was built.

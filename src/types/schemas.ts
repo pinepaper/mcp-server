@@ -2461,6 +2461,7 @@ export const AgentExportInputSchema = z.object({
   framing: z.enum(['canvas', 'camera']).optional().default('canvas').describe('Output framing: "canvas" (full canvas, default) or "camera" (camera_animates first-keyframe viewport — fails if no walkthrough exists). Camera animation still drives motion within the fixed output frame.'),
   duration: z.number().min(0.5).max(VIDEO_MAX_DURATION_S).optional().default(5).describe(`Video duration in seconds for animated formats (mp4/webm/gif). Default 5. Max ${VIDEO_MAX_DURATION_S} for mp4/webm, max ${GIF_MAX_DURATION_S} for gif (GIF is not codec-bounded, so file size scales with frames × dimensions, and it cannot stream to the export store). Static formats (png/svg/pdf) ignore this. Past roughly a minute the export is held in the studio's export store and paged back to a file rather than returned inline; a studio without that store refuses by name and says so.`),
   estimateOnly: z.boolean().optional().default(false).describe('Preflight only: return the estimated file size for these EXACT settings and render nothing. Use before a long or high-quality export to check the size first. Modeled for mp4/webm/gif; png/pdf/svg return confidence "none" because no dimension-based model exists for them; wav is reported as "exact", because uncompressed PCM size is arithmetic rather than a guess.'),
+  fps: z.number().int().min(1).max(120).optional().describe('Video only: frames per second, overriding whatever `quality` implies. The tiers set it — draft 15, standard 30, high 60 — so asking for higher quality DOUBLES the frame count and the render time unless you say otherwise. File size is bitrate x duration and does not move with fps, but the picture gets fewer bits per frame at a higher one.'),
   scale: z.number().min(0.1).max(1).optional().describe('Video only: render at this fraction of the platform preset\'s dimensions (0.1-1). The engine derives its encode target from RESOLUTION, so this is the size control — there is no bitrate to set, and halving the frame roughly quarters the pixels and the file. It is also the preview knob: scale 0.5 with quality "draft" is the fast look-check before committing to a full render. Rounded to even dimensions, which H.264 requires.'),
   sampleRate: z.number().int().positive().optional().describe('wav only: samples per second (default 48000). Ignored by every other format.'),
   bitDepth: z.union([z.literal(16), z.literal(32)]).optional().describe('wav only: 16 (default) or 32-bit float. Ignored by every other format.'),
@@ -2479,6 +2480,13 @@ export const AgentExportInputSchema = z.object({
     // Same shape as the wav refusal below: a knob that cannot apply is said
     // once rather than accepted and dropped. png/svg/pdf carry no encode
     // target, so scaling them here would promise a resize that never happens.
+    if (val.fps !== undefined && !['mp4', 'webm', 'gif', 'auto'].includes(String(val.format))) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['fps'],
+        message: `fps applies to video formats (mp4/webm/gif), not "${val.format}" — a still has no frame rate.`,
+      });
+    }
     if (val.scale !== undefined && !['mp4', 'webm', 'gif', 'auto'].includes(String(val.format))) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -4045,11 +4053,19 @@ export const TextStyleInputSchema = z.object({
   content: z.string().optional().describe('apply_style: replace the text content while styling.'),
   fontFamily: z.string().optional().describe("apply_style: font override. 'suggested' opts into the face the style was designed around (arcade wants a pixel face) — never automatic."),
   fontSize: z.number().positive().optional().describe('apply_style: font size (defaults to the item\'s).'),
+  // PASSTHROUGH, because the ENGINE is what knows which axes a font has.
+  //
+  // A closed object here stripped every unrecognised key before the call, so
+  // { GRAD: 100, nonsense: 5 } reached the engine as {} — it had nothing to
+  // refuse, returned `rejected: []`, and the tool reported a clean success
+  // over two axes that were never applied. The engine populates `rejected`
+  // with every spelling it did not take, which is the useful half, and it also
+  // accepts OpenType tags (wght/wdth/slnt) that this list does not name.
   axes: z.object({
     weight: z.number().optional().describe('wght 1–1000'),
     width: z.union([z.number(), z.string()]).optional().describe('wdth % or a keyword'),
     slant: z.number().optional().describe('slnt degrees'),
-  }).optional().describe('set_font_axes: standard axes only. All three are animatable properties (addKeyframe with fontWeight interpolates).'),
+  }).passthrough().optional().describe('set_font_axes: weight/width/slant, or OpenType tags (wght/wdth/slnt). Unknown axes are passed to the engine and come back in `rejected` rather than being dropped here. All three named axes are animatable (addKeyframe with fontWeight interpolates).'),
 })
   .refine((v) => v.action !== 'apply_style' || (!!v.itemId && !!v.styleKey), { message: 'apply_style requires itemId and styleKey', path: ['styleKey'] })
   .refine((v) => v.action !== 'set_font_axes' || (!!v.itemId && !!v.axes && Object.keys(v.axes).length > 0), { message: 'set_font_axes requires itemId and at least one axis', path: ['axes'] });

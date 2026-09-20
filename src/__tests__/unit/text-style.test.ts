@@ -54,8 +54,28 @@ describe('generateTextStyle codegen', () => {
       action: 'set_font_axes', itemId: 't1', axes: { weight: 700, slant: -8 },
     }));
     expect(c).toContain('app.setFontAxes("t1", {"weight":700,"slant":-8})');
-    expect(c).toContain('applied: r.applied');
-    expect(c).toContain('rejected: r.rejected');
+    expect(c).toContain('applied: _applied');
+    expect(c).toContain('rejected: _rejected');
+  });
+
+  it('passes UNKNOWN axes through, because the engine is what knows the font', () => {
+    // A closed zod object used to strip these, so the engine received {} — it
+    // had nothing to refuse, returned rejected: [], and the tool reported a
+    // clean success over axes that were never applied.
+    const c = codeGenerator.generateTextStyle(TextStyleInputSchema.parse({
+      action: 'set_font_axes', itemId: 't1', axes: { GRAD: 100, wght: 650 },
+    }));
+    expect(c).toContain('"GRAD":100');
+    expect(c).toContain('"wght":650');
+  });
+
+  it('nothing applied while something was rejected is NOT a success', () => {
+    const c = codeGenerator.generateTextStyle(TextStyleInputSchema.parse({
+      action: 'set_font_axes', itemId: 't1', axes: { GRAD: 100 },
+    }));
+    expect(c).toContain('_appliedCount === 0 && _rejected.length');
+    expect(c).toContain('success: false');
+    expect(c).toContain('The font does not have');
   });
 
   it('list_styles degrades per-facade — palettes/axes may be older builds', () => {
