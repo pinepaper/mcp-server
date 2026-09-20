@@ -2077,8 +2077,11 @@ bg.sendToBack();
     if (backgroundGenerator) {
       codeParts.push(`
 // Execute background generator
-if (typeof app.generators !== 'undefined' && app.generators['${backgroundGenerator}']) {
-  app.generators['${backgroundGenerator}']();
+const _gen = app.generatorRegistry?.get('${backgroundGenerator}');
+if (typeof _gen === 'function') {
+  _gen();
+} else if (_gen && typeof _gen.generate === 'function') {
+  _gen.generate();
 }
 `);
     }
@@ -2229,8 +2232,9 @@ results;
 
     return `
 // Create diagram shape: ${shapeType}
+// POSITIONAL: createShape(shapeType, config). The type was being passed
+// INSIDE the config object, where nothing reads it.
 const shapeConfig = {
-  shapeType: '${shapeType}',
   position: { x: ${position.x}, y: ${position.y} },
   width: ${widthVal},
   height: ${heightVal},
@@ -2238,7 +2242,8 @@ const shapeConfig = {
   style: ${styleStr}
 };
 
-const shape = app.diagramManager.createShape(shapeConfig);
+const shape = app.diagramSystem.createShape('${shapeType}', shapeConfig);
+if (!shape) throw new Error('createShape returned nothing for shapeType "${shapeType}" — call pinepaper_get_diagram_shapes for the registered types.');
 const itemId = shape.data?.registryId || shape.id;
 app.historyManager.saveState();
 
@@ -2297,7 +2302,7 @@ if (!sourceItem) throw new Error('Source item not found: ${sourceItemId}');
 if (!targetItem) throw new Error('Target item not found: ${targetItemId}');
 
 const config = ${JSON.stringify(config, null, 2)};
-const connector = app.diagramManager.connect(sourceItem, targetItem, config);
+const connector = app.diagramSystem.connect(sourceItem, targetItem, config);
 const connectorId = connector.data?.registryId || connector.id;
 app.historyManager.saveState();
 
@@ -2328,7 +2333,7 @@ if (!sourceItem) throw new Error('Source item not found: ${sourceItemId}');
 if (!targetItem) throw new Error('Target item not found: ${targetItemId}');
 
 const config = ${configStr};
-const connector = app.diagramManager.connectPorts(
+const connector = app.diagramSystem.connectPorts(
   sourceItem, '${sourcePort}',
   targetItem, '${targetPort}',
   config
@@ -2347,22 +2352,34 @@ app.historyManager.saveState();
     const validated = AddPortsInputSchema.parse(input);
     const { itemId, portType, ports, count } = validated;
 
-    const portsStr = ports ? JSON.stringify(ports, null, 2) : 'undefined';
-    const countVal = count !== undefined ? count : 'undefined';
+    // THE SCHEMA PROMISES MORE THAN THE ENGINE HAS. `addPorts(item, type)` takes
+    // a type string and lays out that type's port set; there is no per-port
+    // placement and no count. The old emitter passed {portType, ports, count}
+    // as the second argument, which the engine tried to iterate — "t.forEach is
+    // not a function" — so every call failed and the two extra fields looked
+    // like they might have worked. Refused by name instead of dropped.
+    if (ports !== undefined || count !== undefined) {
+      const named = [ports !== undefined && 'ports', count !== undefined && 'count'].filter(Boolean).join(' and ');
+      throw new Error(
+        `add_ports cannot honour ${named}: this engine lays out a whole port SET by type `
+        + `(portType '${portType}'), with no per-port placement or count. Drop ${named}, or place `
+        + 'individual connection points as items and join them with pinepaper_connect.',
+      );
+    }
 
     return `
 // Add ports to item: ${itemId}
 const item = app.getItemById('${itemId}');
 if (!item) throw new Error('Item not found: ${itemId}');
 
-const result = app.diagramManager.addPorts(item, {
-  portType: '${portType}',
-  ports: ${portsStr},
-  count: ${countVal}
-});
+// The second argument is a TYPE STRING, not a config object. Passing an
+// object made the engine iterate it as a list — "t.forEach is not a function".
+const result = app.diagramSystem.addPorts(item, '${portType}');
 app.historyManager.saveState();
 
-({ itemId: '${itemId}', portsAdded: result.portsAdded || 0, portType: '${portType}' });
+// addPorts returns the ports it made; older builds returned a count object.
+const _added = Array.isArray(result) ? result.length : (result?.portsAdded ?? 0);
+({ itemId: '${itemId}', portsAdded: _added, portType: '${portType}' });
 `.trim();
   }
 
@@ -2378,13 +2395,26 @@ app.historyManager.saveState();
 
     return `
 // Apply auto-layout: ${layoutType}
+// Wrapped: applyLayout is async, and a bare top-level await only works on the
+// governed path. A paren-led IIFE also keeps the trailing-expression capture.
+(async function() {
 const itemIds = ${itemIdsStr};
 const options = ${optionsStr};
 
-const result = app.diagramManager.autoLayout('${layoutType}', itemIds, options);
+// applyLayout(items, type, options) — ITEMS first, and it takes live items
+// rather than ids. It is async, and it resolves to undefined: reading
+// result.itemsAffected off that throws, which is how a layout that worked
+// reported as a crash.
+const items = itemIds
+  ? itemIds.map((id) => app.getItemById(id)).filter(Boolean)
+  : (app.itemRegistry?.getAll?.() ?? []);
+if (!items.length) throw new Error('auto_layout found no items to lay out' + (itemIds ? ' for the given itemIds' : ' on the canvas'));
+
+await app.diagramSystem.applyLayout(items, '${layoutType}', options);
 app.historyManager.saveState();
 
-({ layoutType: '${layoutType}', itemsAffected: result.itemsAffected || 0, success: result.success });
+return { layoutType: '${layoutType}', itemsAffected: items.length, success: true };
+})();
 `.trim();
   }
 
@@ -2400,7 +2430,10 @@ app.historyManager.saveState();
     return `
 // Get available diagram shapes
 const category = ${categoryFilter};
-const shapes = app.diagramManager.getAvailableShapes(category);
+// The library is the registry; diagramSystem has no getAvailableShapes.
+const _lib = app.diagramSystem?.shapeLibrary;
+if (!_lib) throw new Error('app.diagramSystem.shapeLibrary unavailable — update FxTool');
+const shapes = category ? _lib.getByCategory(category) : _lib.getAll();
 
 ({ shapes, count: shapes.length, category: ${categoryFilter} || 'all' });
 `.trim();
@@ -2433,10 +2466,32 @@ const connector = app.getItemById('${connectorId}');
 if (!connector) throw new Error('Connector not found: ${connectorId}');
 
 const updates = ${updatesStr};
-app.diagramManager.updateConnector(connector, updates);
-app.historyManager.saveState();
 
-({ connectorId: '${connectorId}', updated: true });
+// THERE IS NO updateConnector. ConnectorManager publishes removeConnector,
+// findConnector and updateSelectedStyle — nothing that edits one connector's
+// properties in place. The old emitter called app.diagramSystem.updateConnector
+// and reported updated:true, so a caller changing a connector's colour got a
+// success and an unchanged connector.
+//
+// Applied directly where the property is a plain Paper.js one, and refused by
+// name where it is not, rather than claiming a change that did not happen.
+const _applied = [];
+const _unsupported = [];
+for (const [k, v] of Object.entries(updates)) {
+  if (k === 'lineColor' && connector.strokeColor !== undefined) { connector.strokeColor = v; _applied.push(k); }
+  else if (k === 'lineWidth' && connector.strokeWidth !== undefined) { connector.strokeWidth = v; _applied.push(k); }
+  else _unsupported.push(k);
+}
+if (_applied.length) { app.historyManager.saveState(); app._scheduleRepaint?.(); }
+if (_unsupported.length && !_applied.length) {
+  throw new Error(
+    'this build cannot update ' + _unsupported.join(', ') + ' on an existing connector — '
+    + 'ConnectorManager has no per-connector update. Remove it with pinepaper_remove_connector '
+    + 'and recreate it with pinepaper_connect using the properties you want.'
+  );
+}
+
+({ connectorId: '${connectorId}', updated: _applied.length > 0, applied: _applied, unsupported: _unsupported });
 `.trim();
   }
 
@@ -2452,7 +2507,7 @@ app.historyManager.saveState();
 const connector = app.getItemById('${connectorId}');
 if (!connector) throw new Error('Connector not found: ${connectorId}');
 
-app.diagramManager.removeConnector(connector);
+app.diagramSystem.connectorManager.removeConnector(connector);
 app.historyManager.saveState();
 
 ({ connectorId: '${connectorId}', removed: true });
@@ -2470,21 +2525,21 @@ app.historyManager.saveState();
       case 'activate':
         return `
 // Activate diagram mode
-app.diagramManager.activate();
+app.diagramSystem.activate();
 ({ action: 'activate', active: true });
 `.trim();
 
       case 'deactivate':
         return `
 // Deactivate diagram mode
-app.diagramManager.deactivate();
+app.diagramSystem.deactivate();
 ({ action: 'deactivate', active: false });
 `.trim();
 
       case 'toggle':
         return `
 // Toggle diagram mode
-const isActive = app.diagramManager.toggle();
+const isActive = app.diagramSystem.toggle();
 ({ action: 'toggle', active: isActive });
 `.trim();
 
@@ -2493,7 +2548,7 @@ const isActive = app.diagramManager.toggle();
         const shapeStr = shapeType ? `, '${shapeType}'` : '';
         return `
 // Set diagram tool mode
-app.diagramManager.setMode(${modeStr}${shapeStr});
+app.diagramSystem.setMode(${modeStr}${shapeStr});
 ({ action: 'setMode', mode: ${modeStr}${shapeType ? `, shapeType: '${shapeType}'` : ''} });
 `.trim();
 
@@ -2666,7 +2721,7 @@ throw new Error('Unknown diagram mode action: ${action}');
 
   // FxTool has no animationManager — animations are detected via item.data.animationType walk above
   // Check timeline for active animations
-  if (app.timeline && (app.timeline.isPlaying || app.timeline.animations?.length > 0)) {
+  if (app.timelineState?.isPlaying || app.animatedItems?.size > 0) {
     analysis.hasAnimations = true;
     animationSet.add('timeline');
   }
@@ -3342,7 +3397,7 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
   try {
     switch (format) {
       case 'svg':
-        const svgString = app.exportAnimatedSVG ? app.exportAnimatedSVG() : app.exportSVG();
+        const svgString = app.exportAnimatedSVG ? app.exportAnimatedSVG() : app.exportSVGWithCSS();
         result = {
           success: true,
           platform,
@@ -3599,7 +3654,7 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
 
   // FxTool has no animationManager — animations are detected via item.data.animationType walk above
   // Check timeline for active animations
-  if (app.timeline && (app.timeline.isPlaying || app.timeline.animations?.length > 0)) {
+  if (app.timelineState?.isPlaying || app.animatedItems?.size > 0) {
     analysis.hasAnimations = true;
     animationSet.add('timeline');
   }
@@ -4636,7 +4691,7 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
     }
 
     // Get background color and canvas size
-    const backgroundColor = app.getBackgroundColor ? app.getBackgroundColor() : null;
+    const backgroundColor = app.canvasEl?.style?.backgroundColor || null;
     const canvasSize = app.getCanvasSize ? app.getCanvasSize() : { width: 800, height: 600 };
 
     return {
@@ -6576,7 +6631,11 @@ case 'analyze_palette':
   // ===========================================================================
 
   generateSpriteSheet(input: SpriteSheetInput): string {
-    const guard = `if (!app.spriteSheetSystem) return { error: 'SpriteSheetSystem not available' };`;
+    // spriteSystem is _defineLazyHeavy: undefined until ensureHeavyModules()
+    // lands, so the bare guard reported "not available" on a fresh session for
+    // a studio that has it. Same bug as app.exportEngine in 1.6.9.
+    const guard = `if (!app.spriteSystem && typeof app.ensureHeavyModules === 'function') { try { await app.ensureHeavyModules(); } catch (_) {} }
+if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
     switch (input.action) {
       case 'generate': {
         const opts: Record<string, unknown> = {};
@@ -6590,7 +6649,7 @@ case 'analyze_palette':
 // Generate sprite sheet from skeleton
 (async function() {
   ${guard}
-  const sheet = await app.spriteSheetSystem.generateSpriteSheet(${JSON.stringify(input.skeletonId || '')}, ${JSON.stringify(opts)});
+  const sheet = await app.generateSpriteSheet(${JSON.stringify(input.skeletonId || '')}, ${JSON.stringify(opts)});
   return { success: true, action: 'generate', spriteSheetId: sheet.id, name: sheet.name, width: sheet.atlasWidth, height: sheet.atlasHeight, frameCount: sheet.frames?.size ?? sheet.frames?.length ?? 0 };
 })();`.trim();
       }
@@ -6605,7 +6664,7 @@ case 'analyze_palette':
 // Play sprite sheet animation
 (async function() {
   ${guard}
-  const player = await app.spriteSheetSystem.playSpriteSheet(${JSON.stringify(input.spriteSheetId || '')}, ${JSON.stringify(opts)});
+  const player = await app.playSpriteSheet(${JSON.stringify(input.spriteSheetId || '')}, ${JSON.stringify(opts)});
   return { success: true, action: 'play', playerId: player.id };
 })();`.trim();
       }
@@ -6614,7 +6673,7 @@ case 'analyze_palette':
 // Export sprite sheet
 (async function() {
   ${guard}
-  const result = await app.spriteSheetSystem.exportSpriteSheet(${JSON.stringify(input.spriteSheetId || '')}, { format: '${input.format || 'png'}', download: true, includeMetadata: true });
+  const result = await app.exportSpriteSheet(${JSON.stringify(input.spriteSheetId || '')}, { format: '${input.format || 'png'}', download: true, includeMetadata: true });
   return { success: true, action: 'export', format: '${input.format || 'png'}' };
 })();`.trim();
       default:

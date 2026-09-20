@@ -720,23 +720,36 @@ describe('SpriteSheetInputSchema', () => {
   });
 });
 
+/**
+ * These three asserted `app.spriteSheetSystem.*`, which the engine has never
+ * had — the facade is `app.spriteSystem` and the three methods live on `app`
+ * itself. So the tests passed for years while the emitted code called into
+ * nothing, because they pinned the emitter to itself rather than to the engine.
+ * That is the failure the engine-surface guard now catches mechanically; these
+ * are corrected to the names FxTool actually publishes.
+ */
 describe('Sprite sheet code generation', () => {
-  it('generate is async IIFE with spriteSheetSystem guard', () => {
+  it('generate awaits the lazy subsystem, then calls the method on app', () => {
     const code = codeGenerator.generateSpriteSheet({ action: 'generate', skeletonId: 'skel_1' });
     expect(code).toContain('async function');
-    expect(code).toContain("if (!app.spriteSheetSystem) return { error: 'SpriteSheetSystem not available' }");
-    expect(code).toContain('app.spriteSheetSystem.generateSpriteSheet');
+    // spriteSystem is _defineLazyHeavy — undefined until ensureHeavyModules().
+    expect(code).toContain('ensureHeavyModules');
+    expect(code).toContain("if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' }");
+    expect(code).toContain('app.generateSpriteSheet');
+    expect(code).not.toContain('app.spriteSheetSystem');
   });
 
   it('play generates playSpriteSheet call', () => {
     const code = codeGenerator.generateSpriteSheet({ action: 'play', spriteSheetId: 'sheet_1', x: 50, y: 50 });
-    expect(code).toContain('app.spriteSheetSystem.playSpriteSheet');
+    expect(code).toContain('app.playSpriteSheet');
+    expect(code).not.toContain('app.spriteSheetSystem');
     expect(code).toContain('sheet_1');
   });
 
   it('export generates exportSpriteSheet call', () => {
     const code = codeGenerator.generateSpriteSheet({ action: 'export', spriteSheetId: 'sheet_1', format: 'webp' });
-    expect(code).toContain('app.spriteSheetSystem.exportSpriteSheet');
+    expect(code).toContain('app.exportSpriteSheet');
+    expect(code).not.toContain('app.spriteSheetSystem');
     expect(code).toContain("'webp'");
   });
 });

@@ -45,21 +45,26 @@ const EMITTER = join(REPO, 'src', 'types', 'code-generator.ts');
  * the guard was inverted (2026-09-20, FxTool eb786a3a). `clearAllRelations`
  * was on the first draft of this list and is NOT here: it appears only inside
  * an emitted comment, which the extractor below strips. A guard that counted
- * prose would have sent someone to fix a call that does not exist.
+ * prose would have sent someone to fix a call that does not exist. Three more
+ * — groupManager, templateManager and magicSystem — came off when the surface
+ * learned to read js/app.js, which bolts ~65 names onto the instance after
+ * construction. All three are real and working. The "nothing in the list is
+ * secretly fine" check below is what caught them.
  *
  * To fix one: correct the references, drop the entry, watch the total fall.
  * Adding an entry here is not a fix and the reviewer should say so.
  */
 const KNOWN_DRIFT: Readonly<Record<string, number>> = Object.freeze({
-  diagramManager: 12,
-  groupManager: 7,
-  timeline: 6,
-  templateManager: 4,
-  spriteSheetSystem: 4,
-  generators: 3,
-  magicSystem: 3,
-  getBackgroundColor: 2,
-  exportSVG: 1,
+  // EMPTY, and that is the point of the shape. All six were fixed in the same
+  // change that inverted the guard: diagramManager → diagramSystem (with three
+  // signature corrections behind it), timeline → timelineState / animatedItems,
+  // spriteSheetSystem → the methods that live on app itself, generators →
+  // generatorRegistry.get, getBackgroundColor → the canvas element's own style,
+  // exportSVG → exportSVGWithCSS.
+  //
+  // An entry here is a bug with a name. Zero entries is the only correct
+  // resting state, and the tests below make an empty list mean something: a new
+  // drifted name fails outright rather than being added here.
 });
 
 /**

@@ -43,8 +43,19 @@ export const FXTOOL = process.env.PP_FXTOOL_DIR
   ? process.env.PP_FXTOOL_DIR
   : resolve(REPO, '..', 'FxTool');
 
-/** The engine file that defines what `window.app` is. */
+/**
+ * TWO files define what `window.app` is, and reading only the first is a
+ * FALSE-POSITIVE FACTORY.
+ *
+ * `js/PinePaper.js` is the class. `js/app.js` is the editor bootstrap, and it
+ * attaches ~65 more names to the instance afterwards — `app.magicSystem`,
+ * `app.groupManager`, `app.templateManager`, `app.fontStudio`, `app.batchModify`.
+ * The first draft of this generator read only the class, and three working
+ * subsystems were reported as drift. A guard that cries wolf over working code
+ * is worse than no guard, because the next person switches it off.
+ */
 const ENGINE = join(FXTOOL, 'js', 'PinePaper.js');
+const BOOTSTRAP = join(FXTOOL, 'js', 'app.js');
 
 /**
  * Read the engine's own surface out of its source.
@@ -65,7 +76,7 @@ const ENGINE = join(FXTOOL, 'js', 'PinePaper.js');
  * heavy one without awaiting that has a cold-start race — which is precisely
  * the `app.exportEngine` bug fixed in 1.6.9, and there are eight of these.
  */
-export function readEngineSurface(src = readFileSync(ENGINE, 'utf8')) {
+export function readEngineSurface(src = readFileSync(ENGINE, 'utf8'), bootstrap = readBootstrap()) {
   const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   /** @type {Map<string, string>} name → kind */
   const surface = new Map();
@@ -83,11 +94,24 @@ export function readEngineSurface(src = readFileSync(ENGINE, 'utf8')) {
   // Constructor-assigned properties.
   for (const m of code.matchAll(/\bthis\.([A-Za-z_]\w*)\s*=(?!=)/g)) put(m[1], 'property');
 
+  // Names the bootstrap bolts on after construction. Kind 'bootstrap' because
+  // they are neither class members nor lazy — they exist only once app.js has
+  // run, which is true for every studio this server talks to.
+  for (const name of bootstrap) put(name, 'bootstrap');
+
   // Keywords the member regex picks up from control flow inside the class body.
   for (const kw of ['if', 'for', 'while', 'switch', 'catch', 'return', 'function', 'constructor']) {
     surface.delete(kw);
   }
   return surface;
+}
+
+/** `app.X = …` / `window.app.X = …` from the editor bootstrap. */
+export function readBootstrap(src = existsSync(BOOTSTRAP) ? readFileSync(BOOTSTRAP, 'utf8') : '') {
+  const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  const names = new Set();
+  for (const m of code.matchAll(/(?:window\.)?\bapp\.([A-Za-z_]\w*)\s*=(?!=)/g)) names.add(m[1]);
+  return names;
 }
 
 function generate() {
@@ -113,7 +137,7 @@ function generate() {
  */
 
 /** How a name lands on \`app\`. */
-export type EngineMemberKind = 'method' | 'accessor' | 'property' | 'lazy' | 'lazyHeavy';
+export type EngineMemberKind = 'method' | 'accessor' | 'property' | 'lazy' | 'lazyHeavy' | 'bootstrap';
 
 /** ${rows.length} names, from FxTool/js/PinePaper.js. */
 export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object.freeze({
