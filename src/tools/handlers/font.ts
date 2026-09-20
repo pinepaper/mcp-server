@@ -67,7 +67,17 @@ async function dispatchFontAction(args: Record<string, unknown>, options: Handle
       if (typeof character !== 'string' || typeof pathId !== 'string') {
         return errorResult(ErrorCodes.INVALID_INPUT, 'font create_glyph requires { character, pathId }');
       }
-      const code = `app.fontStudio.createGlyph(${JSON.stringify(character)}, ${JSON.stringify(pathId)});`;
+      // createGlyph(char, paperPath) wants the PAPER PATH — it clones it and
+      // reads .bounds and .curves. This passed the registry id string, so the
+      // engine read .curves off a string and built a glyph from nothing.
+      const code = `(function() {
+  const _item = app.getItemById(${JSON.stringify(pathId)});
+  if (!_item) { return { success: false, error: 'no item ${pathId} — create_glyph needs the id of a PATH already on the canvas' }; }
+  if (typeof _item.clone !== 'function' || !_item.curves) {
+    return { success: false, error: 'item ${pathId} is a ' + (_item.className || 'non-path') + '; create_glyph needs a path. Convert it first, or break a group apart and pass one of its paths.' };
+  }
+  return app.fontStudio.createGlyph(${JSON.stringify(character)}, _item);
+})();`;
       return executeOrGenerate(code, `Create glyph for "${character}" from path ${pathId}`, options, 'pinepaper_font');
     }
     case 'create_space': {

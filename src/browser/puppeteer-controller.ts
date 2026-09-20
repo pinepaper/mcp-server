@@ -6,7 +6,7 @@
  */
 
 import type { Browser, Page } from 'puppeteer';
-import { LAZY_HEAVY_SUBSYSTEMS } from '../tools/engine-surface.js';
+import { LAZY_HEAVY_SUBSYSTEMS, LAZY_HEAVY_CLASSES, ENGINE_SURFACE } from '../tools/engine-surface.js';
 
 // =============================================================================
 // TYPES
@@ -160,6 +160,24 @@ export function pinePaperIsReady(): boolean {
  * layer. PINEPAPER_TIMEOUT raises it past this floor.
  */
 const MIN_PROTOCOL_TIMEOUT_MS = 300_000;
+
+/**
+ * Names the editor bootstrap attaches AFTER the instance exists.
+ *
+ * Readiness waits for `app.create` and `app.itemRegistry`, which exist the
+ * moment the constructor has run — but js/app.js goes on to bolt roughly
+ * sixty-five more names on, and sets `_appReady` when it is done. A tool
+ * reaching one of those in that window finds undefined on a studio that has
+ * it, which is the same shape as the code-split race and a different cause.
+ *
+ * Derived from the generated surface: anything marked 'bootstrap' and reached
+ * by an emitter. Not hand-listed, so a name the bootstrap gains is covered.
+ */
+const BOOTSTRAP_SUBSYSTEMS: readonly string[] = Object.freeze(
+  Object.entries(ENGINE_SURFACE)
+    .filter(([, kind]) => kind === 'bootstrap')
+    .map(([name]) => name),
+);
 
 // =============================================================================
 // BROWSER CONTROLLER CLASS
@@ -529,14 +547,28 @@ export class PinePaperBrowserController {
       // Only when the code actually reaches one: ensureHeavyModules memoises on
       // its own promise, so this costs nothing after the first call, but an
       // unrelated create has no reason to wait for the first one either.
-      const needsHeavy = LAZY_HEAVY_SUBSYSTEMS.some((name) => code.includes(`app.${name}`));
+      // WHICH module, not just "some heavy module". ensureHeavyModules() never
+      // rejects by design — a chunk that fails is warned about, skipped and
+      // recorded, so one bad module cannot take the other eight down. Awaiting
+      // it therefore means "the prefetch settled", not "the thing I am about to
+      // call arrived". ensureHeavy(className) waits for the NAMED one and
+      // retries, so it answers the question actually being asked.
+      const heavyClass = LAZY_HEAVY_SUBSYSTEMS
+        .filter((name) => code.includes(`app.${name}`))
+        .map((name) => LAZY_HEAVY_CLASSES[name])
+        .find(Boolean);
+
+      // Subsystems the BOOTSTRAP attaches rather than the constructor: present
+      // only once app.js has finished, so an early caller races init itself.
+      const awaitBoot = BOOTSTRAP_SUBSYSTEMS.some((name) => code.includes(`app.${name}`));
 
       const runOptions = {
         bypass: options.bypassGovernor ?? !this.config.governor,
         timeoutMs: options.governorTimeoutMs,
-        needsHeavy,
+        heavyClass: heavyClass ?? null,
+        awaitBoot,
       };
-      const result = await this.page.evaluate(async (codeToRun: string, opts: { bypass: boolean; timeoutMs?: number; needsHeavy: boolean }) => {
+      const result = await this.page.evaluate(async (codeToRun: string, opts: { bypass: boolean; timeoutMs?: number; heavyClass: string | null; awaitBoot: boolean }) => {
         // THE BRIDGE USES STRUCTURED CLONE, AND JSON.stringify DOES NOT PROVE IT.
         //
         // A result crosses CDP by structured clone, which refuses to carry a
@@ -576,10 +608,31 @@ export class PinePaperBrowserController {
         };
 
         const app = (window as any).app || (window as any).PinePaper;
-        if (opts.needsHeavy && app && typeof app.ensureHeavyModules === 'function') {
+        // BOOT, which is a different wait from the code-split one.
+        //
+        // app.fontStudio is NOT code-split: app.js constructs it synchronously
+        // during init, so a caller that arrives early is simply ahead of boot
+        // and ensureHeavy will never help. app._appReady is the flag init sets
+        // and the guard the rest of the agent surface uses.
+        //
+        // Bounded and gated: only for code that touches a subsystem the
+        // bootstrap attaches, and it gives up rather than hanging, because a
+        // build that never sets the flag must not make every call wait forever.
+        if (opts.awaitBoot && app && !app._appReady) {
+          await new Promise<void>((resolve) => {
+            const started = Date.now();
+            const tick = () => (app._appReady || Date.now() - started > 5000 ? resolve() : setTimeout(tick, 50));
+            tick();
+          });
+        }
+
+        if (opts.heavyClass && app) {
           // Failure is not fatal here: the emitted code still carries its own
           // guard, and that guard gives a better message than this could.
-          try { await app.ensureHeavyModules(); } catch { /* fall through to the guard */ }
+          try {
+            if (typeof app.ensureHeavy === 'function') await app.ensureHeavy(opts.heavyClass);
+            else if (typeof app.ensureHeavyModules === 'function') await app.ensureHeavyModules();
+          } catch { /* fall through to the guard */ }
         }
         if (!opts.bypass && app && typeof app.runGenerated === 'function') {
           try {

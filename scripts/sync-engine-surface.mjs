@@ -143,7 +143,7 @@ export function readEngineSurface(src = readCommitted(ENGINE), bootstrap = readB
   };
 
   // Lazy definitions first: they are the most specific claim about a name.
-  for (const m of code.matchAll(/_defineLazyHeavy\(\s*['"]([A-Za-z_]\w*)['"]/g)) put(m[1], 'lazyHeavy');
+  for (const m of code.matchAll(/_defineLazyHeavy\(\s*['"]([A-Za-z_]\w*)['"]\s*,\s*['"]([A-Za-z_]\w*)['"]/g)) put(m[1], 'lazyHeavy');
   for (const m of code.matchAll(/_defineLazy\(\s*['"]([A-Za-z_]\w*)['"]/g)) put(m[1], 'lazy');
   // Class members at two-space indent — the PinePaper class body.
   for (const m of code.matchAll(/^ {2}get\s+([A-Za-z_]\w*)\s*\(/gm)) put(m[1], 'accessor');
@@ -231,6 +231,9 @@ function generate() {
   const rows = [...surface.entries()].sort(([a], [b]) => a.localeCompare(b));
   const heavy = rows.filter(([, k]) => k === 'lazyHeavy').map(([n]) => n);
   const facades = readFacades(facadesInUse());
+  // property name -> CLASS name, which is what ensureHeavy() takes.
+  const heavyClasses = {};
+  for (const m of src.matchAll(/_defineLazyHeavy\(\s*['"]([A-Za-z_]\w*)['"]\s*,\s*['"]([A-Za-z_]\w*)['"]/g)) heavyClasses[m[1]] = m[2];
 
   return `/* GENERATED — DO NOT EDIT.
  *
@@ -267,6 +270,18 @@ ${rows.map(([n, k]) => `  ${/^[A-Za-z_]\w*$/.test(n) ? n : JSON.stringify(n)}: '
 export const LAZY_HEAVY_SUBSYSTEMS: readonly string[] = Object.freeze([
 ${heavy.map((n) => `  '${n}',`).join('\n')}
 ]);
+
+/**
+ * \`app.<property>\` -> the CLASS name \`app.ensureHeavy(name)\` takes.
+ *
+ * ensureHeavyModules() never rejects by design — a chunk that fails is warned
+ * about, skipped and recorded, so one bad module cannot take the other eight
+ * down. Awaiting it therefore means "the prefetch settled", NOT "this module
+ * arrived". ensureHeavy(className) waits for the named one and retries.
+ */
+export const LAZY_HEAVY_CLASSES: Readonly<Record<string, string>> = Object.freeze({
+${heavy.map((n) => `  ${n}: '${heavyClasses[n] ?? n}',`).join('\n')}
+});
 
 /**
  * What \`app.<facade>.<method>\` may name, for the facades the emitters reach

@@ -277,6 +277,12 @@ Writing JavaScript opts out of the schema protection tool callers get, and six e
 - **Does this survive export?** Answered once, as a rule rather than a per-tool label: if it ticks inside the engine's update loop, it exports — loop animations, relations, keyframes, generators and camera moves all do. Anything driven by the wall clock outside that loop does not. And if exported frames look frozen, check the sampling first: a loop at speed 1 has a one-second period, so frames a whole second apart are identical by design.
 - **Bone angles** are sent as degrees *and* radians, so the studio reads the units you meant rather than inferring them.
 
+### Fixed: tools called just after connecting could find a subsystem missing
+
+Two different races wore the same symptom, and only one of them was already handled.
+
+Some subsystems are code-split and arrive about a second after boot; those are now waited for **by name**, which matters because the studio's bulk loader deliberately never fails — waiting on it meant "the prefetch finished", not "the thing I need is here". Others, like Font Studio, are built during startup itself, so no amount of module loading helps them; those now wait for the editor to finish initialising. Both waits are bounded and apply only to calls that actually touch such a subsystem.
+
 ### Fixed: unknown font axes were dropped before the studio saw them
 
 `set_font_axes` declared the three standard axes and silently discarded anything else, so asking for an axis the tool didn't name reached the studio as an empty request — which then reported nothing rejected, and the tool reported success over axes that were never applied. Axes are passed through as written now; the studio says which it took and which it did not, including OpenType tags like `wght`. And nothing applied while something was rejected is an error rather than a success.

@@ -29,7 +29,7 @@
 import { describe, it, expect } from 'bun:test';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { ENGINE_SURFACE, ENGINE_FACADES, LAZY_HEAVY_SUBSYSTEMS } from '../../tools/engine-surface.js';
+import { ENGINE_SURFACE, ENGINE_FACADES, LAZY_HEAVY_SUBSYSTEMS, LAZY_HEAVY_CLASSES } from '../../tools/engine-surface.js';
 
 const REPO = join(import.meta.dir, '..', '..', '..');
 const SRC = join(REPO, 'src');
@@ -334,9 +334,23 @@ describe('lazy-heavy subsystems are awaited before they are touched', () => {
     expect(LAZY_HEAVY_SUBSYSTEMS).toContain('exportEngine');
   });
 
-  it('the controller awaits ensureHeavyModules before running emitted code', () => {
+  it('the controller waits for the NAMED module before running emitted code', () => {
+    // ensureHeavyModules() never rejects by design: a chunk that fails is
+    // warned about, skipped and recorded, so awaiting it means "the prefetch
+    // settled", not "the module I am about to call arrived". ensureHeavy takes
+    // the class name and retries, so it answers the question being asked.
+    expect(controller).toContain('ensureHeavy(');
+    expect(controller).toContain('heavyClass');
+    // The older call stays as the fallback for a studio without ensureHeavy.
     expect(controller).toContain('ensureHeavyModules');
-    expect(controller).toContain('needsHeavy');
+  });
+
+  it('it resolves the CLASS name from the generated map, not by guessing', () => {
+    // exportEngine -> ExportEngine is a convention, not a rule
+    // (spriteSystem -> SpriteSheetSystem), so it must be read from the engine.
+    expect(controller).toContain('LAZY_HEAVY_CLASSES');
+    expect(LAZY_HEAVY_CLASSES.spriteSystem).toBe('SpriteSheetSystem');
+    expect(controller).not.toContain("'ExportEngine'");
   });
 
   it('it decides from the GENERATED list, not a hand-written copy', () => {
@@ -349,16 +363,58 @@ describe('lazy-heavy subsystems are awaited before they are touched', () => {
     }
   });
 
-  it('the await is gated on the code actually reaching one', () => {
-    // ensureHeavyModules memoises, so this costs nothing after the first call —
-    // but an unrelated create has no reason to wait for the first one either.
-    expect(controller).toMatch(/LAZY_HEAVY_SUBSYSTEMS\.some\(/);
+  it('the wait is gated on the code actually reaching one', () => {
+    // An unrelated create has no reason to wait for a module it never touches.
+    expect(controller).toMatch(/LAZY_HEAVY_SUBSYSTEMS\s*\n?\s*\.filter\(/);
   });
 
   it('a failed load falls through to the emitted guard rather than throwing', () => {
     // The emitter's own guard gives a better message than this layer can, and
     // one unparseable chunk must not take every tool down with it.
-    const around = controller.slice(controller.indexOf('opts.needsHeavy'), controller.indexOf('opts.needsHeavy') + 400);
-    expect(around).toContain('catch');
+    const at = controller.indexOf('opts.heavyClass');
+    expect(at).toBeGreaterThan(-1);
+    expect(controller.slice(at, at + 500)).toContain('catch');
+  });
+});
+
+/**
+ * A THIRD kind of "not there yet", distinct from the other two.
+ *
+ * Readiness waits for `app.create` and `app.itemRegistry` — both present the
+ * moment the constructor has run. But js/app.js then bolts ~65 more names on
+ * and sets `_appReady` when it finishes. A tool reaching one of those in that
+ * window finds undefined on a studio that has it.
+ *
+ * It is NOT the code-split race: `app.fontStudio` is constructed synchronously
+ * during init, so ensureHeavy would never help it. Same symptom, different
+ * cause, different wait — which is exactly why it went undiagnosed.
+ */
+describe('bootstrap-attached subsystems wait for boot', () => {
+  const controller = readFileSync(join(SRC, 'browser', 'puppeteer-controller.ts'), 'utf8');
+
+  it('the surface distinguishes bootstrap names from constructor ones', () => {
+    const bootstrap = Object.entries(ENGINE_SURFACE).filter(([, k]) => k === 'bootstrap');
+    expect(bootstrap.length).toBeGreaterThan(20);
+    // The one that prompted this, and one that is NOT bootstrap.
+    expect(ENGINE_SURFACE.fontStudio).toBe('bootstrap');
+    expect(ENGINE_SURFACE.exportEngine).toBe('lazyHeavy');
+  });
+
+  it('the controller waits on _appReady, bounded', () => {
+    expect(controller).toContain('_appReady');
+    expect(controller).toContain('awaitBoot');
+    // Bounded: a build that never sets the flag must not hang every call.
+    const at = controller.indexOf('opts.awaitBoot');
+    expect(controller.slice(at, at + 400)).toMatch(/Date\.now\(\) - started > \d+/);
+  });
+
+  it('the list is DERIVED, not hand-written', () => {
+    // A second copy of sixty-five names is the drift this file exists to stop.
+    expect(controller).toContain("kind === 'bootstrap'");
+    expect(controller).not.toContain("'fontStudio'");
+  });
+
+  it('it is gated, so an unrelated call does not wait for boot', () => {
+    expect(controller).toMatch(/BOOTSTRAP_SUBSYSTEMS\.some\(/);
   });
 });
