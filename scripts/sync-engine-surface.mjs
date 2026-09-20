@@ -71,22 +71,47 @@ const BOOTSTRAP = join(FXTOOL, 'js', 'app.js');
  * Falls back to the working tree when FxTool is not a git checkout, which is
  * the only case where there is nothing better to read.
  */
+const ENGINE_REF = process.env.PP_FXTOOL_REF || 'origin/main';
+
+/**
+ * WHICH engine to describe: the one users run.
+ *
+ * Not the working tree — FxTool is a live checkout and a file being edited
+ * mid-run made this snapshot non-reproducible. And not local HEAD either,
+ * which sits on whatever feature branch that session is working on: a method
+ * that exists only on an unmerged branch would then pass this guard and fail
+ * in a user's browser, which is the exact failure the guard exists to catch,
+ * arriving with the guard's blessing.
+ *
+ * So `origin/main` by default. A call to something newer than that is legal
+ * when it is GUARDED — the parity test exempts `typeof app.x.y === 'function'`
+ * probes for precisely this — and is caught when it is not. PP_FXTOOL_REF
+ * overrides for anyone deliberately checking against a branch.
+ */
+function resolveRef() {
+  for (const ref of [ENGINE_REF, 'HEAD']) {
+    try {
+      return { ref, sha: execFileSync('git', ['-C', FXTOOL, 'rev-parse', ref], { encoding: 'utf8' }).trim() };
+    } catch { /* try the next */ }
+  }
+  return null;
+}
+
 function readCommitted(absPath) {
   const rel = absPath.slice(FXTOOL.length + 1);
-  try {
-    return execFileSync('git', ['-C', FXTOOL, 'show', `HEAD:${rel}`], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
-  } catch {
-    return readFileSync(absPath, 'utf8');
+  const resolved = resolveRef();
+  if (resolved) {
+    try {
+      return execFileSync('git', ['-C', FXTOOL, 'show', `${resolved.ref}:${rel}`], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+    } catch { /* file absent at that ref — fall through */ }
   }
+  return readFileSync(absPath, 'utf8');
 }
 
 /** The FxTool commit this snapshot describes, so a difference is explainable. */
 function engineRevision() {
-  try {
-    return execFileSync('git', ['-C', FXTOOL, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
-  } catch {
-    return 'unknown (not a git checkout)';
-  }
+  const resolved = resolveRef();
+  return resolved ? `${resolved.ref} ${resolved.sha}` : 'unknown (not a git checkout)';
 }
 
 /**

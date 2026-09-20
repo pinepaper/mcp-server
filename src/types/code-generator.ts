@@ -1259,6 +1259,12 @@ const results = app.batchModify(modifications.map(mod => ({
 
 // The engine records what it could not do rather than throwing — read it,
 // instead of reporting a clean success over a half-applied batch.
+//
+// @engine-surface-exempt lastBatchModifySkipped — NEWER THAN origin/main.
+// The property arrived with the engine-side batchModify fix and is not in the
+// shipped build yet. Read defensively (|| []), so an older studio reports a
+// count and no skip list rather than failing: the batch still works, the
+// explanation is just thinner until the engine ships.
 const skipped = app.lastBatchModifySkipped || [];
 const count = typeof results === 'number' ? results : (Array.isArray(results) ? results.length : 0);
 
