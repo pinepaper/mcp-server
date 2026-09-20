@@ -3176,6 +3176,14 @@ USE WHEN:
 - Prototyping new features
 - A scene whose repetition is the point: dozens of items built in a loop. This is the cheapest route by an order of magnitude — a 63-item animated scene is ~4k characters here against ~147k as keyframe tool calls — because the loop collapses the repetition instead of restating it per item. Synchronous build work is bounded by the governor's 4s deadline, which such a scene fits easily.
 
+ENGINE SEMANTICS THAT BITE RAW-JS AUTHORS. The tool schemas protect tool callers from these; writing JS opts out of that protection, and each of these fails SILENTLY:
+- app.create() returns a Paper.js item whose .id is a NUMBER. The id every tool and relation wants is the STRING at item.data.registryId ('item_1'). Passing the number to addAnimation throws "Cannot create property 'data' on number".
+- app.create() with an unknown type returns undefined and creates nothing — 'rect' is not 'rectangle'. The schema catches that for tool callers; a loop does not.
+- app.addAnimation(id, keyframeArray, options) takes a real ARRAY. A JSON string installs nothing, silently, and the scene exports frozen. It also returns without error on an id that does not resolve.
+- Keyframes live at item.data.keyframes. app.keyframeItems is not the live store, so probing it reports false negatives.
+- transformOrigin is IGNORED by the keyframe engine: rotation always pivots on the item centre. For true joint pivots use pinepaper_rigging bones, or keyframe computed x/y per joint.
+- Bone angles are RADIANS in the engine and relative to the parent, though pinepaper_rigging converts degrees for you — that conversion is the tool's, not the engine's.
+
 WHAT THE CHEAP ROUTE COSTS, so the choice is deliberate: items built and animated in raw JS carry NO behavioral record. No graph edge, nothing SMIL or widget export can lift, nothing the ontology can read — the scene renders and cannot describe itself. Relations are the canonical behavior surface here, so for motion that is a function of time prefer pinepaper_add_relation with 'time_expression' (still ~5.7x cheaper than keyframes), and for a whole group moving together staggered_with or wave_through. Reach for a loop when the geometry is procedural, not merely to avoid the typing.
 
 AVAILABLE GLOBALS:

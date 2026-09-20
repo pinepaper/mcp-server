@@ -589,10 +589,25 @@ function executedResult(
     if (Object.keys(governor).length) resultObj.governor = governor;
   }
 
+  // THE CODE ECHO WAS 90% OF THE RESPONSE, AND THE AGENT WROTE THE REQUEST.
+  //
+  // Measured on a 50-item batch create: 8,740 characters of echoed source
+  // against 983 characters of actual result. A tester's cost study found the
+  // same thing from outside — response verbosity alone was 86% of the native
+  // path's token cost, and it is what makes enumerating 50 creates through
+  // tools 33x more expensive than a loop that produces the same picture.
+  //
+  // On a SUCCESSFUL browser run the code has already done its job and the
+  // caller knows what it asked for. It is still returned where it is the
+  // deliverable — 'code' execution mode — and where it is the evidence: every
+  // error path passes it in `details`. PINEPAPER_ECHO_CODE=1 brings it back
+  // for anyone debugging a generator.
   const content: (TextContent | ImageContent)[] = [
     { type: 'text', text: JSON.stringify(resultObj, null, 2) },
-    { type: 'text', text: `Generated code:\n\`\`\`javascript\n${code}\n\`\`\`` },
   ];
+  if (process.env.PINEPAPER_ECHO_CODE === '1') {
+    content.push({ type: 'text', text: `Generated code:\n\`\`\`javascript\n${code}\n\`\`\`` });
+  }
 
   if (screenshot) {
     content.push({

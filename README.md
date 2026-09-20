@@ -261,6 +261,16 @@ Two things the tool never told you, now in its description: a bone angle is **re
 
 The animation type was discarded on every call (fixed in 1.6.9) and the studio was skipping the relation that drives it. Both halves are in place. **Needs a studio build from 2026-09-20 or later.**
 
+### Responses are ~90% smaller on batch work
+
+A successful tool call no longer reads your own request back to you. On a 50-item batch create that was 8,740 characters of echoed source against 983 characters of actual result — and it grew with every item you spelled out, which is what made enumerating through tools far more expensive than writing the equivalent loop.
+
+The generated code is still returned where it is the point: `PINEPAPER_EXECUTION_MODE=code`, and every error, which carries the code as evidence. `PINEPAPER_ECHO_CODE=1` restores it everywhere if you are debugging.
+
+### `pinepaper_execute_custom_code` documents the traps
+
+Writing JavaScript opts out of the schema protection tool callers get, and six engine behaviours fail silently when you do: `app.create` returns a numeric Paper.js id where everything else wants the `item.data.registryId` string, an unknown item type creates nothing, `addAnimation` ignores a JSON-string argument and an unresolvable id, keyframes live at `item.data.keyframes`, and `transformOrigin` is ignored so rotation always pivots on the item centre. All six are now in the tool description.
+
 ### Under the hood
 
 Every engine call this server emits is now checked against the studio's actual API before release, including calls made through sub-objects. That check found and fixed nine more dead calls beyond the ones reported, including one in the agent guide that was teaching a method that does not exist.
