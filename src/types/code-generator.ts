@@ -1260,11 +1260,9 @@ const results = app.batchModify(modifications.map(mod => ({
 // The engine records what it could not do rather than throwing — read it,
 // instead of reporting a clean success over a half-applied batch.
 //
-// @engine-surface-exempt lastBatchModifySkipped — NEWER THAN origin/main.
-// The property arrived with the engine-side batchModify fix and is not in the
-// shipped build yet. Read defensively (|| []), so an older studio reports a
-// count and no skip list rather than failing: the batch still works, the
-// explanation is just thinner until the engine ships.
+// Read defensively (|| []): the property arrived with the engine-side
+// batchModify fix, so an older studio reports a count and no skip list rather
+// than failing. The batch still works; only the explanation is thinner.
 const skipped = app.lastBatchModifySkipped || [];
 const count = typeof results === 'number' ? results : (Array.isArray(results) ? results.length : 0);
 
@@ -9044,11 +9042,17 @@ ${guard('unlockAllItems')}${pass('app.unlockAllItems()')}
         // So a documented 90 was read as 90 radians and the character exploded
         // on the first pose — silently, because a wrong pose is not an error.
         // Converted here so the tool keeps the vocabulary it advertises.
+        // BOTH SPELLINGS, deliberately. The engine's _angleRad prefers
+        // `angleDegrees` and converts it, so the new build reads the caller's
+        // intent verbatim instead of trusting arithmetic done out here. `angle`
+        // carries the same value already in radians, which is what an older
+        // build reads — it has no angleDegrees and would see 0. Identical
+        // result on both, and the units are stated rather than implied.
         const config = S({
           ...(input.name !== undefined ? { name: input.name } : {}),
           ...(input.parentBoneId !== undefined ? { parentBoneId: input.parentBoneId } : {}),
           ...(input.length !== undefined ? { length: input.length } : {}),
-          ...(input.angle !== undefined ? { angle: (input.angle * Math.PI) / 180 } : {}),
+          ...(input.angle !== undefined ? { angleDegrees: input.angle, angle: (input.angle * Math.PI) / 180 } : {}),
           ...(input.flexibility !== undefined ? { flexibility: input.flexibility } : {}),
           ...(input.segments !== undefined ? { segments: input.segments } : {}),
         });

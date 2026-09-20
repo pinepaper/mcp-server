@@ -3316,6 +3316,8 @@ BEFORE AUTHORING DENSE TRACKS — three routes are cheaper, and two of them keep
 - PER-ITEM VARIATION across many items → staggered_with or wave_through express the whole group in ONE call. That collapses the 63-fold repetition a per-item time_expression still pays for.
 - GENUINELY PROCEDURAL scenes → pinepaper_execute_custom_code with app.create + app.addAnimation (which attaches keyframe tracks programmatically, so the keyframes are generated rather than typed), at 4k characters for the same scene — cheapest by an order of magnitude, because a loop collapses the repetition entirely. The trade is real and worth making deliberately: raw JS leaves NO behavioral record — no graph edge, nothing SMIL or widget export can lift, nothing the ontology can read. Scene building fits the governor's 4s synchronous deadline easily (it is the injected loop guards, not the 10s async-tail budget, that bites a build loop).
 
+- TEXT THAT CHANGES OVER TIME -> 'content' is NOT a keyframeable property: the keyframe engine applies fontSize on a text item and nothing else, so a content track is accepted and ignored. Use pinepaper_execute_custom_code with app.textSequence(itemOrId, words, { interval }) - ONE item cycling its words, instead of one item per word with opacity tracks faking the cut. It returns { ok: false, reason } on an id it cannot resolve.
+
 Keyframes are for motion that is AUTHORED, not computed. A track of hundreds of entries produced from a formula is the signal that one of the three above is the right route.
 
 ANIMATABLE PROPERTIES:
@@ -7787,6 +7789,10 @@ Held exports last until released, or until a LATER export needs the space — an
       openWorldHint: false,
     },
     description: `Smart export with automatic format detection and platform optimization.
+
+DOES THIS SURVIVE EXPORT? It is a PATH fact, not a per-feature one, so the rule is short and does not go stale as capabilities land: IF IT TICKS INSIDE THE ENGINE'S UPDATE LOOP, IT EXPORTS. Loop animations, relations, keyframes, generators and camera moves all do - measured frame-by-frame, not assumed. What does NOT survive is anything driven by the wall clock outside that loop, or anything on the realtime recorder path.
+
+If exported frames look frozen, check the SAMPLING before believing it: a loop animation at animationSpeed 1 has a one-second period, so two frames a whole second apart are identical by design. Compare frames that are not a whole number of periods apart.
 
 PLATFORMS & OPTIMAL FORMATS:
 | Platform        | Dimensions | Static | Animated |

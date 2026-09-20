@@ -271,6 +271,12 @@ The generated code is still returned where it is the point: `PINEPAPER_EXECUTION
 
 Writing JavaScript opts out of the schema protection tool callers get, and six engine behaviours fail silently when you do: `app.create` returns a numeric Paper.js id where everything else wants the `item.data.registryId` string, an unknown item type creates nothing, `addAnimation` ignores a JSON-string argument and an unresolvable id, keyframes live at `item.data.keyframes`, and `transformOrigin` is ignored so rotation always pivots on the item centre. All six are now in the tool description.
 
+### Three routes you had to find by reading source
+
+- **Text that changes over time.** `content` is not keyframeable — the keyframe engine applies `fontSize` on a text item and nothing else, so a `content` track is accepted and ignored. `pinepaper_keyframe_animate` now says so and points at `app.textSequence(item, words, { interval })`: one item cycling its words, instead of one item per word with opacity tracks faking the cut.
+- **Does this survive export?** Answered once, as a rule rather than a per-tool label: if it ticks inside the engine's update loop, it exports — loop animations, relations, keyframes, generators and camera moves all do. Anything driven by the wall clock outside that loop does not. And if exported frames look frozen, check the sampling first: a loop at speed 1 has a one-second period, so frames a whole second apart are identical by design.
+- **Bone angles** are sent as degrees *and* radians, so the studio reads the units you meant rather than inferring them.
+
 ### Under the hood
 
 Every engine call this server emits is now checked against the studio's actual API before release, including calls made through sub-objects. That check found and fixed nine more dead calls beyond the ones reported, including one in the agent guide that was teaching a method that does not exist.
