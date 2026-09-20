@@ -1,6 +1,6 @@
 /* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 95de69339d10c4ee6f071213368e659892db1b66
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 79d3ec21c7bb09b825fb92e39d8d6f2b40025ccd
  * sha256:    f9a3fcd0ad7798a0954a76b17bac729a73165a90aadfe39fb2077186326d11d4   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *

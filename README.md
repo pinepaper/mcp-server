@@ -307,6 +307,8 @@ A failed operation now fails the batch, and the result **names which one and why
 
 The rest of that tool authors a typeface. These three are about using one, which previously had no answer short of reading the server's source.
 
+`check` and `fallbacks` **need a studio build from 2026-09-20 or later** and say so plainly if yours is older; `list_available` works today.
+
 ### Fixed: `pinepaper_execute_custom_code` could not do anything asynchronous
 
 Your snippet was wrapped in a synchronous function. A top-level `await` is a syntax error inside one, so any snippet that awaited something failed to parse — and async work started without `await` was simply dropped, with the tool reporting success before it happened.
