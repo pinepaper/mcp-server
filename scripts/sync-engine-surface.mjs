@@ -30,7 +30,7 @@
  * `--check` regenerates into memory and exits non-zero on any difference. With
  * no FxTool checkout it exits 0 and says so: an absent sibling is not drift.
  */
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -114,12 +114,65 @@ export function readBootstrap(src = existsSync(BOOTSTRAP) ? readFileSync(BOOTSTR
   return names;
 }
 
+/**
+ * Sub-facade surfaces: what `app.<facade>.<method>` may name.
+ *
+ * Checking only the top-level name catches `app.diagramManager` and misses
+ * `app.fontStudio.getRequiredChars` — six broken font actions whose FACADE is
+ * real and whose methods are not. The drift lives one dot deeper than the first
+ * version of this guard looked.
+ *
+ * Resolved by convention: a camelCase facade maps to a PascalCase class of the
+ * same name (`fontStudio` → `class FontStudio`). A facade with no such class is
+ * simply not snapshotted rather than guessed at — an incomplete map must make
+ * the guard quieter, never louder, or it starts failing working code.
+ */
+export function readFacades(names) {
+  const out = {};
+  for (const name of names) {
+    const cls = name.charAt(0).toUpperCase() + name.slice(1);
+    for (const rel of [`js/${cls}.js`, `js/diagram/${cls}.js`, `js/export/${cls}.js`]) {
+      const file = join(FXTOOL, rel);
+      if (!existsSync(file)) continue;
+      const body = readFileSync(file, 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/^\s*\/\/.*$/gm, '');
+      if (!new RegExp(`class\\s+${cls}\\b`).test(body)) continue;
+      const methods = new Set();
+      for (const m of body.matchAll(/^ {2}(?:async\s+|\*\s*|get\s+)?([A-Za-z_]\w*)\s*\(/gm)) methods.add(m[1]);
+      for (const m of body.matchAll(/\bthis\.([A-Za-z_]\w*)\s*=(?!=)/g)) methods.add(m[1]);
+      for (const kw of ['if', 'for', 'while', 'switch', 'catch', 'return', 'function', 'constructor']) methods.delete(kw);
+      if (methods.size) out[name] = [...methods].sort();
+      break;
+    }
+  }
+  return out;
+}
+
+/** Facades the emitters actually reach through, so the snapshot stays relevant. */
+function facadesInUse() {
+  const names = new Set();
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name !== '__tests__' && entry.name !== 'vendor') walk(full);
+      } else if (entry.name.endsWith('.ts') && !entry.name.endsWith('.test.ts')) {
+        for (const m of readFileSync(full, 'utf8').matchAll(/\bapp\.([A-Za-z_]\w*)\.([A-Za-z_]\w*)/g)) names.add(m[1]);
+      }
+    }
+  };
+  walk(join(REPO, 'src'));
+  return [...names].sort();
+}
+
 function generate() {
   const src = readFileSync(ENGINE, 'utf8');
   const sha = createHash('sha256').update(src).digest('hex');
   const surface = readEngineSurface(src);
   const rows = [...surface.entries()].sort(([a], [b]) => a.localeCompare(b));
   const heavy = rows.filter(([, k]) => k === 'lazyHeavy').map(([n]) => n);
+  const facades = readFacades(facadesInUse());
 
   return `/* GENERATED — DO NOT EDIT.
  *
@@ -156,6 +209,15 @@ ${rows.map(([n, k]) => `  ${/^[A-Za-z_]\w*$/.test(n) ? n : JSON.stringify(n)}: '
 export const LAZY_HEAVY_SUBSYSTEMS: readonly string[] = Object.freeze([
 ${heavy.map((n) => `  '${n}',`).join('\n')}
 ]);
+
+/**
+ * What \`app.<facade>.<method>\` may name, for the facades the emitters reach
+ * through. A facade absent from this map is not checked — an incomplete map
+ * must make the guard quieter, never louder.
+ */
+export const ENGINE_FACADES: Readonly<Record<string, readonly string[]>> = Object.freeze({
+${Object.entries(facades).map(([f, ms]) => `  ${f}: Object.freeze([${ms.map((m) => `'${m}'`).join(', ')}]),`).join('\n')}
+});
 `;
 }
 

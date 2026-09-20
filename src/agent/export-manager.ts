@@ -329,9 +329,11 @@ export class SmartExportManager {
   private generatePNGExportCode(dpi: number): string {
     return `
 (async function() {
-  // Use exportPrintPNG if available for high DPI
-  if (app.exportPrintPNG && ${dpi} >= 150) {
-    const dataUrl = await app.exportPrintPNG(${dpi});
+  // High-DPI PNG goes through the export engine. This guarded
+  // app.exportPrintPNG, which has never existed, so the branch never fired and
+  // every print-resolution export quietly took the screen-resolution path.
+  if (app.exportEngine && typeof app.exportEngine.exportPNG === 'function' && ${dpi} >= 150) {
+    const dataUrl = await app.exportEngine.exportPNG({ dpi: ${dpi} });
     return {
       success: true,
       format: 'png',

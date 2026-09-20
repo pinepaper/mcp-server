@@ -610,9 +610,10 @@ app.addRelation(sourceId, targetId, type, {startTime: 2, endTime: 5, autoRemove:
 app.addRelation(sourceId, targetId, type, {relationBehavior: 'keyframeFirst', ...params})
 \`\`\`
 
-**Per-item timing** — offset an item into the global timeline:
+**Per-item timing** — offset an item into the global timeline. It is an
+ANIMATION OPTION, not a method (\`delay\` is an accepted alias):
 \`\`\`
-app.setTimeOffset(registryId, offsetSeconds)
+app.addAnimation(registryId, keyframes, { timeOffset: offsetSeconds })
 \`\`\`
 
 **Atomic relation replace** — swap relation params without remove+add:

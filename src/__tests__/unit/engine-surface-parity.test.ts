@@ -27,12 +27,37 @@
  */
 
 import { describe, it, expect } from 'bun:test';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { ENGINE_SURFACE, LAZY_HEAVY_SUBSYSTEMS } from '../../tools/engine-surface.js';
+import { ENGINE_SURFACE, ENGINE_FACADES, LAZY_HEAVY_SUBSYSTEMS } from '../../tools/engine-surface.js';
 
 const REPO = join(import.meta.dir, '..', '..', '..');
-const EMITTER = join(REPO, 'src', 'types', 'code-generator.ts');
+const SRC = join(REPO, 'src');
+
+/**
+ * EVERY file that emits engine calls, not just the big one.
+ *
+ * The first version of this guard scanned only code-generator.ts, and
+ * src/tools/handlers/font.ts — six broken method names — was invisible to it.
+ * That is the same opt-in failure one level up: a guard that checks the file
+ * somebody remembered is a guard against the bugs somebody was already thinking
+ * about. Walked, not listed, so a new emitter file is covered the day it lands.
+ */
+export function emitterFiles(dir = SRC): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (entry.name === '__tests__' || entry.name === 'vendor') continue;
+      out.push(...emitterFiles(full));
+    } else if (entry.name.endsWith('.ts') && !entry.name.endsWith('.test.ts')) {
+      // The generated surface lists the engine's names; it does not call them.
+      if (full.endsWith('engine-surface.ts') || full.endsWith('engine-methods.ts')) continue;
+      if (/\bapp\.[A-Za-z_]/.test(readFileSync(full, 'utf8'))) out.push(full);
+    }
+  }
+  return out.sort();
+}
 
 /**
  * Names the emitters reference that the engine does not have.
@@ -77,14 +102,19 @@ const KNOWN_DRIFT: Readonly<Record<string, number>> = Object.freeze({
  * lines whose first non-space characters are `//` are removed, so a `//` inside
  * a URL or a string survives.
  */
-export function referencedAppNames(src = readFileSync(EMITTER, 'utf8')): Map<string, number> {
+export function referencedAppNames(files = emitterFiles()): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const file of files) countInto(counts, readFileSync(file, 'utf8'));
+  return counts;
+}
+
+function countInto(counts: Map<string, number>, src: string): void {
   const code = src
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .split('\n')
     .filter((line) => !/^\s*\/\//.test(line))
     .join('\n');
 
-  const counts = new Map<string, number>();
   for (const m of code.matchAll(/\bapp\.([A-Za-z_]\w*)/g)) {
     counts.set(m[1], (counts.get(m[1]) ?? 0) + 1);
   }
@@ -93,7 +123,6 @@ export function referencedAppNames(src = readFileSync(EMITTER, 'utf8')): Map<str
   for (const m of src.matchAll(/@engine-surface-exempt\s+([A-Za-z_]\w*)/g)) {
     counts.delete(m[1]);
   }
-  return counts;
 }
 
 describe('the emitters only call what the engine has', () => {
@@ -103,6 +132,9 @@ describe('the emitters only call what the engine has', () => {
     // failure mode of the guard this one replaces.
     expect(Object.keys(ENGINE_SURFACE).length).toBeGreaterThan(500);
     expect(referencedAppNames().size).toBeGreaterThan(100);
+    // More than one emitter file, or the walk has silently narrowed back to
+    // the single file that let font.ts through.
+    expect(emitterFiles().length).toBeGreaterThan(3);
   });
 
   it('every `app.X` exists on the engine, or is known drift', () => {
@@ -141,6 +173,118 @@ describe('the emitters only call what the engine has', () => {
   });
 });
 
+/**
+ * `app.<facade>.<method>` — the drift one dot deeper.
+ *
+ * Checking only the top-level name catches `app.diagramManager` and misses
+ * `app.fontStudio.getRequiredChars`: six font actions whose facade is real and
+ * whose methods are not, so every one returned "Cannot read properties of
+ * undefined" and the tool looked like a missing feature.
+ *
+ * Only facades present in the snapshot are checked. An unmapped facade is
+ * skipped rather than failed — an incomplete map must make a guard quieter,
+ * never louder, or it starts failing working code and gets switched off.
+ */
+export function referencedFacadeMethods(files = emitterFiles()): Array<[string, string]> {
+  const out: Array<[string, string]> = [];
+  for (const file of files) {
+    const code = readFileSync(file, 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .split('\n')
+      .filter((line) => !/^\s*\/\//.test(line))
+      .join('\n');
+    for (const m of code.matchAll(/\bapp\.([A-Za-z_]\w*)[?]?\.([A-Za-z_]\w*)/g)) {
+      out.push([m[1], m[2]]);
+    }
+  }
+  return out;
+}
+
+/**
+ * Members every JavaScript object has, or that a Map/Set-backed facade has for
+ * free. A registry that IS a Map answers `.size` and `.get` without declaring
+ * them, and reporting those as drift would be the guard inventing bugs.
+ */
+const JS_BUILTINS = new Set([
+  'constructor', 'toString', 'valueOf', 'hasOwnProperty', 'length', 'name',
+  'size', 'get', 'set', 'has', 'delete', 'clear', 'forEach', 'keys', 'values', 'entries',
+]);
+
+/**
+ * Facade methods the emitters name that their facade does not publish.
+ *
+ * Same ratchet as the top-level list, and the same meaning: every entry is a
+ * call into undefined. They are listed rather than fixed in one pass because
+ * each needs its own answer — a rename, a different facade, or an engine that
+ * genuinely cannot do it — and the guard is worth more landed than perfect.
+ *
+ * The six `fontStudio.*` entries this guard first found are NOT here: they were
+ * fixed in the same change (setName → setFontName, getRequiredChars →
+ * getRequiredCharacters, getStatus → getCompletionStatus, createSpace →
+ * createSpaceGlyph, export → exportAsOTF/downloadFont, and show_studio refused
+ * by name because opening the panel has no engine entry point at all).
+ */
+const KNOWN_FACADE_DRIFT: readonly string[] = Object.freeze([
+  'filterSystem.addFilter',
+  'historyManager.getState',
+  'interactionSystem.triggerAction',
+  'magicSystem.autoAnimate',
+  'magicSystem.remixStyle',
+  'mapSystem.addLabels',
+  'mapSystem.animateWave',
+  'mapSystem.exportMap',
+  'mapSystem.exportOriginalGeoJSON',
+  'mapSystem.exportRegionCSV',
+  'mapSystem.getRegionAtPoint',
+  'mapSystem.getSourceInfo',
+  'mapSystem.importRegionCSV',
+  'mapSystem.panTo',
+  'mapSystem.stopAnimations',
+  'mapSystem.zoomTo',
+  'measurementSystem.setGridVisible',
+  'measurementSystem.setRulersVisible',
+  'measurementSystem.setSnapToUnitEnabled',
+  'relationRegistry.getAll',
+  'sceneManager.setLoop',
+]);
+
+describe('facade methods exist too', () => {
+  it('maps the facades the emitters actually reach through', () => {
+    expect(Object.keys(ENGINE_FACADES).length).toBeGreaterThan(5);
+    expect(ENGINE_FACADES.fontStudio?.length ?? 0).toBeGreaterThan(10);
+    expect(referencedFacadeMethods().length).toBeGreaterThan(50);
+  });
+
+  it('every app.<facade>.<method> the emitters call exists on that facade', () => {
+    const unknown = new Set<string>();
+    for (const [facade, method] of referencedFacadeMethods()) {
+      const known = ENGINE_FACADES[facade];
+      if (!known) continue; // unmapped facade — not checked, by design
+      if (JS_BUILTINS.has(method)) continue;
+      if (known.includes(method)) continue;
+      if (KNOWN_FACADE_DRIFT.includes(`${facade}.${method}`)) continue;
+      unknown.add(`app.${facade}.${method}`);
+    }
+    expect([...unknown].sort()).toEqual([]);
+  });
+
+  it('the facade-drift list only ever shrinks', () => {
+    const called = new Set(referencedFacadeMethods().map(([f, m]) => `${f}.${m}`));
+    const stale = KNOWN_FACADE_DRIFT.filter((e) => !called.has(e));
+    // An entry nothing calls any more is fixed — delete it, or the list stops
+    // being a backlog and starts being decoration.
+    expect(stale, 'these are no longer called — delete them from KNOWN_FACADE_DRIFT').toEqual([]);
+  });
+
+  it('nothing in the facade-drift list is secretly fine', () => {
+    const wrong = KNOWN_FACADE_DRIFT.filter((e) => {
+      const [facade, method] = e.split('.');
+      return ENGINE_FACADES[facade]?.includes(method);
+    });
+    expect(wrong, 'these exist on their facade and are not drift').toEqual([]);
+  });
+});
+
 describe('lazy-heavy subsystems are awaited before they are touched', () => {
   /**
    * `_defineLazyHeavy` members are UNDEFINED until `ensureHeavyModules()` has
@@ -159,7 +303,7 @@ describe('lazy-heavy subsystems are awaited before they are touched', () => {
    * anybody remembering. These tests pin that arrangement, because it is load
    * bearing and invisible: nothing in an emitter says it is being waited for.
    */
-  const controller = readFileSync(join(REPO, 'src', 'browser', 'puppeteer-controller.ts'), 'utf8');
+  const controller = readFileSync(join(SRC, 'browser', 'puppeteer-controller.ts'), 'utf8');
 
   it('the engine really does have several, so this is not a vacuous check', () => {
     expect(LAZY_HEAVY_SUBSYSTEMS.length).toBeGreaterThan(1);

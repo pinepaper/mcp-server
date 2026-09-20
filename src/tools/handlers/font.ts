@@ -19,23 +19,30 @@ async function dispatchFontAction(args: Record<string, unknown>, options: Handle
   const action = args.action as string;
   switch (action) {
     case 'show_studio': {
-      const code = `app.fontStudio && app.fontStudio.show ? app.fontStudio.show() : null;`;
-      return executeOrGenerate(code, 'Opens Font Studio UI', options, 'pinepaper_font');
+      // FontStudio has no `show`. The panel is FontStudioUI's, and nothing on
+      // the app facade opens it — the old call resolved to null and reported
+      // success, so an agent believed it had opened a UI that never appeared.
+      return errorResult(
+        ErrorCodes.INVALID_INPUT,
+        'show_studio cannot be driven from here: opening the Font Studio panel is a UI action with no engine entry point. '
+        + 'Every other font action works headlessly — create_glyph, set_name, get_status, export — so build the font through those '
+        + 'and open the panel by hand in the studio if you want to look at it.',
+      );
     }
     case 'set_name': {
       const { name } = args as { name: string };
       if (typeof name !== 'string') return errorResult(ErrorCodes.INVALID_INPUT, 'font set_name requires { name: string }');
-      const code = `app.fontStudio.setName(${JSON.stringify(name)});`;
+      const code = `app.fontStudio.setFontName(${JSON.stringify(name)});`;
       return executeOrGenerate(code, `Set font name to "${name}"`, options, 'pinepaper_font');
     }
     case 'get_required_chars': {
       const { set } = args as { set?: string };
       const setArg = set ? JSON.stringify(set) : '"minimum"';
-      const code = `app.fontStudio.getRequiredChars(${setArg});`;
+      const code = `app.fontStudio.getRequiredCharacters(${setArg});`;
       return executeOrGenerate(code, `Get required characters (${set || 'minimum'} set)`, options, 'pinepaper_font');
     }
     case 'get_status': {
-      const code = `app.fontStudio.getStatus();`;
+      const code = `app.fontStudio.getCompletionStatus();`;
       return executeOrGenerate(code, 'Get font completion status', options, 'pinepaper_font');
     }
     case 'create_glyph': {
@@ -49,8 +56,8 @@ async function dispatchFontAction(args: Record<string, unknown>, options: Handle
     case 'create_space': {
       const { width } = args as { width?: number };
       const code = width !== undefined
-        ? `app.fontStudio.createSpace(${width});`
-        : `app.fontStudio.createSpace();`;
+        ? `app.fontStudio.createSpaceGlyph(${width});`
+        : `app.fontStudio.createSpaceGlyph();`;
       return executeOrGenerate(code, `Create space glyph${width ? ` (width: ${width})` : ''}`, options, 'pinepaper_font');
     }
     case 'remove_glyph': {
@@ -70,9 +77,13 @@ async function dispatchFontAction(args: Record<string, unknown>, options: Handle
     }
     case 'export': {
       const { download } = args as { download?: boolean };
+      // Two methods, not one with a flag: exportAsOTF() builds and RETURNS the
+      // font, downloadFont() builds and hands it to the browser. `export()` has
+      // never existed on FontStudio, so every export action failed with
+      // "Cannot read properties of undefined".
       const code = download === false
-        ? `app.fontStudio.export({ download: false });`
-        : `app.fontStudio.export();`;
+        ? `app.fontStudio.exportAsOTF();`
+        : `app.fontStudio.downloadFont('otf');`;
       return executeOrGenerate(code, 'Export font as OTF', options, 'pinepaper_font');
     }
     case 'load_into_document': {
