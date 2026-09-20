@@ -273,7 +273,7 @@ Writing JavaScript opts out of the schema protection tool callers get, and six e
 
 ### Three routes you had to find by reading source
 
-- **Text that changes over time.** `content` is not keyframeable — the keyframe engine applies `fontSize` on a text item and nothing else, so a `content` track is accepted and ignored. `pinepaper_keyframe_animate` now says so and points at `app.textSequence(item, words, { interval })`: one item cycling its words, instead of one item per word with opacity tracks faking the cut.
+- **Text that changes over time.** `content` *is* keyframeable, and it holds rather than tweening — `pinepaper_keyframe_animate` now says so, and names the case where it is dropped (an item that also carries a matrix `transform` track). For a word cascade it points at `app.textSequence(item, words, { interval })`: one item cycling its words in one call, instead of one item per word with opacity tracks faking the cut.
 - **Does this survive export?** Answered once, as a rule rather than a per-tool label: if it ticks inside the engine's update loop, it exports — loop animations, relations, keyframes, generators and camera moves all do. Anything driven by the wall clock outside that loop does not. And if exported frames look frozen, check the sampling first: a loop at speed 1 has a one-second period, so frames a whole second apart are identical by design.
 - **Bone angles** are sent as degrees *and* radians, so the studio reads the units you meant rather than inferring them.
 
