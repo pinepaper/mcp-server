@@ -145,80 +145,52 @@ describe('lazy-heavy subsystems are awaited before they are touched', () => {
   /**
    * `_defineLazyHeavy` members are UNDEFINED until `ensureHeavyModules()` has
    * run — idle-prefetched about 1.2s after boot. An agent that connects and
-   * immediately calls a tool beats that prefetch, and the emitted guard reports
-   * the studio as too old for a capability it has.
+   * immediately calls a tool beats that prefetch, and the emitted guard then
+   * reports the studio as too old for a capability it has.
    *
-   * That was the `app.exportEngine` bug fixed in 1.6.9. The engine has EIGHT of
-   * these, so fixing one left seven. This names the rest.
+   * That was the `app.exportEngine` bug fixed in 1.6.9 inside one emitter. When
+   * this guard was inverted it found FORTY-EIGHT more emitted blocks with the
+   * same race, across map, physics and rigging.
+   *
+   * Forty-eight awaits would be forty-eight chances to miss the forty-ninth, so
+   * the wait lives at the single place every emitted string passes through —
+   * `executeCode` — and reads the list from the GENERATED surface. A subsystem
+   * FxTool makes lazy tomorrow is covered by re-running the generator, not by
+   * anybody remembering. These tests pin that arrangement, because it is load
+   * bearing and invisible: nothing in an emitter says it is being waited for.
    */
-  const src = readFileSync(EMITTER, 'utf8');
+  const controller = readFileSync(join(REPO, 'src', 'browser', 'puppeteer-controller.ts'), 'utf8');
 
   it('the engine really does have several, so this is not a vacuous check', () => {
     expect(LAZY_HEAVY_SUBSYSTEMS.length).toBeGreaterThan(1);
     expect(LAZY_HEAVY_SUBSYSTEMS).toContain('exportEngine');
   });
 
-  it('every emitter touching one awaits ensureHeavyModules', () => {
-    for (const [subsystem, budget] of Object.entries(KNOWN_COLD_START_RACES)) {
-      expect(
-        unawaitedBlocks(subsystem),
-        `app.${subsystem} is reached without awaiting ensureHeavyModules in more emitters than before`,
-      ).toBeLessThanOrEqual(budget);
+  it('the controller awaits ensureHeavyModules before running emitted code', () => {
+    expect(controller).toContain('ensureHeavyModules');
+    expect(controller).toContain('needsHeavy');
+  });
+
+  it('it decides from the GENERATED list, not a hand-written copy', () => {
+    // A second copy of the eight names is the drift this whole file exists to
+    // stop. The controller must import the generated constant.
+    expect(controller).toContain('LAZY_HEAVY_SUBSYSTEMS');
+    expect(controller).toMatch(/import\s*\{[^}]*LAZY_HEAVY_SUBSYSTEMS[^}]*\}\s*from\s*'\.\.\/tools\/engine-surface\.js'/);
+    for (const name of LAZY_HEAVY_SUBSYSTEMS) {
+      expect(controller, `${name} must not be hand-listed in the controller`).not.toContain(`'${name}'`);
     }
   });
 
-  it('a subsystem with no races left is removed from the budget', () => {
-    const done = Object.keys(KNOWN_COLD_START_RACES).filter((s) => unawaitedBlocks(s) === 0);
-    expect(done, 'these are clean — delete them from KNOWN_COLD_START_RACES').toEqual([]);
+  it('the await is gated on the code actually reaching one', () => {
+    // ensureHeavyModules memoises, so this costs nothing after the first call —
+    // but an unrelated create has no reason to wait for the first one either.
+    expect(controller).toMatch(/LAZY_HEAVY_SUBSYSTEMS\.some\(/);
   });
 
-  it('a subsystem absent from the budget has no races at all', () => {
-    // The budget is the whole allowance. A subsystem nobody listed must be
-    // clean, or the guard is only watching the ones somebody remembered.
-    const unlisted = LAZY_HEAVY_SUBSYSTEMS.filter((s) => !(s in KNOWN_COLD_START_RACES));
-    for (const s of unlisted) {
-      expect(unawaitedBlocks(s), `app.${s} has an unawaited reach and is not in the budget`).toBe(0);
-    }
+  it('a failed load falls through to the emitted guard rather than throwing', () => {
+    // The emitter's own guard gives a better message than this layer can, and
+    // one unparseable chunk must not take every tool down with it.
+    const around = controller.slice(controller.indexOf('opts.needsHeavy'), controller.indexOf('opts.needsHeavy') + 400);
+    expect(around).toContain('catch');
   });
-
-  /**
-   * How many emitted IIFEs touch `app.<subsystem>` without awaiting
-   * ensureHeavyModules first.
-   *
-   * Counted per BLOCK, because the block is what runs in the page — an await at
-   * the top of one emitted function does nothing for the next one. Counted
-   * rather than labelled: the labels come from emitted comments and churn with
-   * every wording change, which would make the ratchet fail for reasons that
-   * are not bugs.
-   */
-  function unawaitedBlocks(subsystem: string): number {
-    const blocks = src.split(/\(\s*(?:async\s+)?function\s*\(\s*\)\s*\{/);
-    return blocks.filter((b) => b.includes(`app.${subsystem}`) && !b.includes('ensureHeavyModules')).length;
-  }
-});
-
-/**
- * Emitters that reach a lazy-heavy subsystem without awaiting it, per subsystem.
- *
- * Every one is a cold-start bug with the same shape as the `app.exportEngine`
- * one fixed in 1.6.9: the subsystem is undefined for the first ~1.2s, so a tool
- * called immediately after connecting reports the studio as too old for a
- * capability it has.
- *
- * `exportEngine` is still 6 rather than 0, and that is not a mistake in the
- * 1.6.9 fix. Two of the six are the cold-start DOORS and they were fixed; the
- * rest are the paging helpers (readExport, releaseExport and friends), which
- * are only reachable after an export has already succeeded and therefore after
- * the chunk is resident. The guard counts reachability, not intent, so the
- * number stays 6 and the reasoning lives here. Do not "fix" them by adding
- * awaits nobody needs — drop the budget only when a block genuinely stops
- * touching the subsystem.
- *
- * Same ratchet as KNOWN_DRIFT: the numbers may only fall.
- */
-const KNOWN_COLD_START_RACES: Readonly<Record<string, number>> = Object.freeze({
-  exportEngine: 6,
-  mapSystem: 31,
-  physicsWorld: 10,
-  riggingSystem: 1,
 });

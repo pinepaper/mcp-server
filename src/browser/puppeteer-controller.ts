@@ -6,6 +6,7 @@
  */
 
 import type { Browser, Page } from 'puppeteer';
+import { LAZY_HEAVY_SUBSYSTEMS } from '../tools/engine-surface.js';
 
 // =============================================================================
 // TYPES
@@ -509,12 +510,39 @@ export class PinePaperBrowserController {
       // budgets, bulk-create perf, and a machine-readable report. It returns the
       // code's trailing-expression value as result.value (FxTool captures it).
       // Fall back to raw eval on older builds that lack runGenerated.
+      // CODE-SPLIT SUBSYSTEMS, WAITED FOR ONCE, HERE.
+      //
+      // Eight of the engine's subsystems are `_defineLazyHeavy`: undefined
+      // until `ensureHeavyModules()` has run, which the engine idle-prefetches
+      // about 1.2s after boot. An agent that connects and immediately calls a
+      // tool beats that prefetch, and the tool's own guard then reports the
+      // studio as too old for a capability it has. 1.6.9 fixed that inside the
+      // export emitter; the guard added with this change found FORTY-EIGHT more
+      // emitted blocks with the same race, across map, physics and rigging.
+      //
+      // Forty-eight copies of an await is forty-eight chances to miss the
+      // forty-ninth. It belongs at the one place every emitted string passes
+      // through, and the list comes from the GENERATED engine surface, so a
+      // subsystem FxTool makes lazy tomorrow is covered by re-running the
+      // generator rather than by remembering.
+      //
+      // Only when the code actually reaches one: ensureHeavyModules memoises on
+      // its own promise, so this costs nothing after the first call, but an
+      // unrelated create has no reason to wait for the first one either.
+      const needsHeavy = LAZY_HEAVY_SUBSYSTEMS.some((name) => code.includes(`app.${name}`));
+
       const runOptions = {
         bypass: options.bypassGovernor ?? !this.config.governor,
         timeoutMs: options.governorTimeoutMs,
+        needsHeavy,
       };
-      const result = await this.page.evaluate(async (codeToRun: string, opts: { bypass: boolean; timeoutMs?: number }) => {
+      const result = await this.page.evaluate(async (codeToRun: string, opts: { bypass: boolean; timeoutMs?: number; needsHeavy: boolean }) => {
         const app = (window as any).app || (window as any).PinePaper;
+        if (opts.needsHeavy && app && typeof app.ensureHeavyModules === 'function') {
+          // Failure is not fatal here: the emitted code still carries its own
+          // guard, and that guard gives a better message than this could.
+          try { await app.ensureHeavyModules(); } catch { /* fall through to the guard */ }
+        }
         if (!opts.bypass && app && typeof app.runGenerated === 'function') {
           try {
             // timeoutMs is runGenerated's own option (RUN_DEFAULTS.timeoutMs,

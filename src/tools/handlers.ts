@@ -839,7 +839,51 @@ ${code}
     );
   }
 
+  // TWO VERDICTS. `result.success` says the CODE RAN. The emitted code has its
+  // own verdict, and almost every emitter in this repo returns
+  // `{ success: false, error }` when it cannot do the thing — a guard that
+  // found a subsystem missing, an engine call that refused, a precondition that
+  // was not met. Nothing here read it, so every one of those came back to the
+  // agent as a success with an error buried in the payload.
+  //
+  // Measured twice by a beta tester: two of five video chunks silently lost,
+  // and a rigging session where "app.riggingSystem unavailable" rode inside an
+  // outer success and the agent kept building on a rig that did not exist.
+  // pinepaper_agent_export got this check in 1.6.9; it belongs HERE, where
+  // every tool inherits it.
+  const inner = innerFailure(result.result);
+  if (inner) {
+    const canvasState = await captureCanvasState(controller);
+    return errorResult(
+      ErrorCodes.EXECUTION_ERROR,
+      inner,
+      { code, result: result.result, governorReport: result.report },
+      { toolName, canvasState: canvasState || undefined }
+    );
+  }
+
   return executedResult(code, result.result, result.screenshot, description, result.report);
+}
+
+/**
+ * The emitted code's own verdict, when it reported one and it was a failure.
+ *
+ * Deliberately narrow. `success: false` is the shape this repo's emitters use
+ * and the only one treated as a failure — a result merely LACKING `success` is
+ * not a failure, because plenty of emitters return a bare value (an id, a
+ * count, a list) and reading absence as refusal would turn every one of those
+ * into an error. `ok: false` is included because the export-store emitters use
+ * it, and it carries a `reason` rather than an `error`.
+ */
+export function innerFailure(value: unknown): string | null {
+  if (!value || typeof value !== 'object') return null;
+  const r = value as { success?: unknown; ok?: unknown; error?: unknown; reason?: unknown };
+  const failed = r.success === false || r.ok === false;
+  if (!failed) return null;
+  const why = typeof r.error === 'string' ? r.error
+    : typeof r.reason === 'string' ? r.reason
+    : 'the studio reported failure without naming a reason';
+  return why;
 }
 
 // =============================================================================
