@@ -18,6 +18,36 @@ export type FontHandler = (
 async function dispatchFontAction(args: Record<string, unknown>, options: HandlerOptions): Promise<CallToolResult> {
   const action = args.action as string;
   switch (action) {
+    case 'check': {
+      const { name, text } = args as { name?: string; text?: string };
+      if (typeof name !== 'string' || !name) {
+        return errorResult(ErrorCodes.INVALID_INPUT, 'font check requires { name } — the font family to test.');
+      }
+      // INSTALLED and CAN-DRAW-MY-STRING are different answers, and the second
+      // is the one that decides the pixels. A font with four glyphs is present
+      // and will still render most text in the fallback face — which is the
+      // shape Font Studio produces, and the shape a naive probe gets wrong.
+      const code = `(function() {
+  if (typeof app.checkFont !== 'function') {
+    return { success: false, error: 'app.checkFont unavailable — update the studio. document.fonts.check() is not a substitute: it returns true for a family that does not exist.' };
+  }
+  const r = app.checkFont(${JSON.stringify(name)}${text !== undefined ? `, ${JSON.stringify(text)}` : ''});
+  return { success: true, ...r };
+})();`;
+      return executeOrGenerate(code, `Check font "${name}"${text ? ' against the given text' : ''}`, options, 'pinepaper_font');
+    }
+    case 'fallbacks': {
+      // Which text items are SILENTLY drawing in something other than what
+      // they asked for — the failure nobody notices until the export.
+      const code = `(function() {
+  if (typeof app.fontFallbacks !== 'function') {
+    return { success: false, error: 'app.fontFallbacks unavailable — update the studio.' };
+  }
+  const items = app.fontFallbacks();
+  return { success: true, fallingBack: items, count: Array.isArray(items) ? items.length : 0 };
+})();`;
+      return executeOrGenerate(code, 'Find text items rendering in a fallback font', options, 'pinepaper_font');
+    }
     case 'list_available': {
       const { category, loadedOnly } = args as { category?: string; loadedOnly?: boolean };
       const opts: Record<string, unknown> = {};

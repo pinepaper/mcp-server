@@ -6458,6 +6458,8 @@ ACTIONS:
 Most of this tool is glyph authoring — drawing a typeface. If you just want to know what font families are available to set on a text item, that is ONE action:
 
 - list_available       — { category?, loadedOnly? }  every family the studio can render, with whether its file is loaded yet
+- check                — { name, text? }             is this family really there, and can it draw THIS string? Pass the text: a font with four glyphs is installed and will still render most characters in the fallback face, and that second answer is the one that decides the pixels. Do NOT rely on document.fonts.check() — it returns true for a family that does not exist.
+- fallbacks            — {}                          which text items on the canvas are silently drawing in something other than the family they asked for
 
 ACTIONS (authoring):
 - show_studio          — {}                          open the Font Studio UI
@@ -6482,7 +6484,7 @@ ACTIONS (authoring):
         action: {
           type: 'string',
           enum: [
-            'list_available',
+            'list_available', 'check', 'fallbacks',
             'show_studio', 'set_name', 'get_required_chars', 'get_status',
             'create_glyph', 'create_space', 'remove_glyph', 'set_metrics',
             'export', 'load_into_document', 'export_data', 'import_data',
@@ -6490,6 +6492,7 @@ ACTIONS (authoring):
           ],
           description: 'Font Studio action',
         },
+        text: { type: 'string', description: 'check: the string you intend to draw. Without it you learn only whether the family is installed, not whether it has glyphs for your characters.' },
         category: { type: 'string', description: 'list_available: narrow to one category (e.g. display, serif, mono).' },
         loadedOnly: { type: 'boolean', description: 'list_available: only families whose font file has already loaded. Unloaded ones still render once the studio fetches them.' },
         name: { type: 'string', description: 'Font name (set_name)' },

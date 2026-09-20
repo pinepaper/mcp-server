@@ -299,7 +299,13 @@ A failed operation now fails the batch, and the result **names which one and why
 
 ### New: find out which fonts you can use
 
-`pinepaper_font` gains `list_available` — every font family the studio can render, optionally filtered by category, each marked with whether its file has loaded yet. The rest of that tool authors a typeface; this is the one action that answers "what can I already set on a text item", which previously had no answer short of reading the server's source.
+`pinepaper_font` gains three actions that answer questions the tool could not answer before:
+
+- `list_available` — every font family the studio can render, optionally filtered by category, each marked with whether its file has loaded yet.
+- `check` — is a family really there, and **can it draw your string**? Those are different questions: a font with four glyphs is installed and will still render most characters in a fallback face, and the second answer is the one that decides the pixels. Pass the text you mean to draw.
+- `fallbacks` — which text items on the canvas are silently rendering in something other than the family they asked for.
+
+The rest of that tool authors a typeface. These three are about using one, which previously had no answer short of reading the server's source.
 
 ### Fixed: `pinepaper_execute_custom_code` could not do anything asynchronous
 
