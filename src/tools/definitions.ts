@@ -3316,7 +3316,7 @@ BEFORE AUTHORING DENSE TRACKS — three routes are cheaper, and two of them keep
 - PER-ITEM VARIATION across many items → staggered_with or wave_through express the whole group in ONE call. That collapses the 63-fold repetition a per-item time_expression still pays for.
 - GENUINELY PROCEDURAL scenes → pinepaper_execute_custom_code with app.create + app.addAnimation (which attaches keyframe tracks programmatically, so the keyframes are generated rather than typed), at 4k characters for the same scene — cheapest by an order of magnitude, because a loop collapses the repetition entirely. The trade is real and worth making deliberately: raw JS leaves NO behavioral record — no graph edge, nothing SMIL or widget export can lift, nothing the ontology can read. Scene building fits the governor's 4s synchronous deadline easily (it is the injected loop guards, not the 10s async-tail budget, that bites a build loop).
 
-- TEXT THAT CHANGES OVER TIME -> 'content' IS keyframeable, and it is DISCRETE: it holds the current word until the next keyframe and does not tween. Two caveats worth knowing before you build a cascade out of it. It is dropped on an item that also carries a 'transform' (matrix) track - a Lottie text layer, an SVG transform-attr import - because that path applies the matrix and only opacity, fillColor, strokeColor and fontSize with it. And a cascade of N words is N keyframes you have to write out. For the common case prefer pinepaper_execute_custom_code with app.textSequence(itemOrId, words, { interval }): ONE item cycling its words in one call, against one item per word with opacity tracks faking the cut. It returns { ok: false, reason } on an id it cannot resolve.
+- TEXT THAT CHANGES OVER TIME -> 'content' IS keyframeable, and it is DISCRETE: it holds the current word until the next keyframe and does not tween. One thing worth knowing before you build a cascade out of it. A cascade of N words is N keyframes you have to write out, which is the reason to prefer the call below rather than any limitation. For the common case prefer pinepaper_execute_custom_code with app.textSequence(itemOrId, words, { interval }): ONE item cycling its words in one call, against one item per word with opacity tracks faking the cut. It returns { ok: false, reason } on an id it cannot resolve.
 
 Keyframes are for motion that is AUTHORED, not computed. A track of hundreds of entries produced from a formula is the signal that one of the three above is the right route.
 
@@ -6453,9 +6453,13 @@ ACTIONS:
       idempotentHint: false,
       openWorldHint: false,
     },
-    description: `Font Studio control — single action-dispatched tool covering the full Studio API. Sixteen previous thin wrappers collapse into this one entry to reduce the tool list footprint without losing capability.
+    description: `Fonts: which ones you can USE, and authoring new ones.
 
-ACTIONS:
+Most of this tool is glyph authoring — drawing a typeface. If you just want to know what font families are available to set on a text item, that is ONE action:
+
+- list_available       — { category?, loadedOnly? }  every family the studio can render, with whether its file is loaded yet
+
+ACTIONS (authoring):
 - show_studio          — {}                          open the Font Studio UI
 - set_name             — { name }                    name the in-progress font
 - get_required_chars   — { set?: string }            list chars to draw (default: minimum)
@@ -6478,6 +6482,7 @@ ACTIONS:
         action: {
           type: 'string',
           enum: [
+            'list_available',
             'show_studio', 'set_name', 'get_required_chars', 'get_status',
             'create_glyph', 'create_space', 'remove_glyph', 'set_metrics',
             'export', 'load_into_document', 'export_data', 'import_data',
@@ -6485,6 +6490,8 @@ ACTIONS:
           ],
           description: 'Font Studio action',
         },
+        category: { type: 'string', description: 'list_available: narrow to one category (e.g. display, serif, mono).' },
+        loadedOnly: { type: 'boolean', description: 'list_available: only families whose font file has already loaded. Unloaded ones still render once the studio fetches them.' },
         name: { type: 'string', description: 'Font name (set_name)' },
         set: { type: 'string', description: 'Character set name (get_required_chars; default "minimum")' },
         character: { type: 'string', description: 'Single-character glyph identifier (create_glyph, remove_glyph)' },

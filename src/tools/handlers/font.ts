@@ -18,6 +18,23 @@ export type FontHandler = (
 async function dispatchFontAction(args: Record<string, unknown>, options: HandlerOptions): Promise<CallToolResult> {
   const action = args.action as string;
   switch (action) {
+    case 'list_available': {
+      const { category, loadedOnly } = args as { category?: string; loadedOnly?: boolean };
+      const opts: Record<string, unknown> = {};
+      if (category) opts.category = category;
+      if (loadedOnly) opts.loadedOnly = true;
+      // Guarded: listFonts is newer than some studios. Everything else in this
+      // tool authors a font; this is the one action that answers "what can I
+      // already use", which previously had no answer short of reading source.
+      const code = `(async function() {
+  if (typeof app.listFonts !== 'function') {
+    return { success: false, error: 'app.listFonts unavailable — update the studio. Font families can still be SET by name on a text item; this action only lists them.' };
+  }
+  const r = await app.listFonts(${JSON.stringify(opts)});
+  return { success: true, ...r };
+})();`;
+      return executeOrGenerate(code, 'List available font families', options, 'pinepaper_font');
+    }
     case 'show_studio': {
       // FontStudio has no `show`. The panel is FontStudioUI's, and nothing on
       // the app facade opens it — the old call resolved to null and reported
