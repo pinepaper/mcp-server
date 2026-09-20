@@ -2919,6 +2919,17 @@ throw new Error('Unknown diagram mode action: ${action}');
     let code = `
 // Batch execute ${operations.length} operations
 (async function() {
+  // An op's own verdict. Deliberately narrow, matching the server-side rule:
+  // only an explicit success:false or ok:false is a failure, because most ops
+  // return a bare value (an id, a count) and treating a missing field as
+  // refusal would fail every one of them.
+  const _opFailure = (v) => {
+    if (!v || typeof v !== 'object') return null;
+    if (v.success !== false && v.ok !== false) return null;
+    return (typeof v.error === 'string' && v.error)
+      || (typeof v.reason === 'string' && v.reason)
+      || 'the operation reported failure without naming a reason';
+  };
   const results = [];
   const itemIds = [];
   let success = true;
@@ -2944,10 +2955,24 @@ throw new Error('Unknown diagram mode action: ${action}');
       const result${index} = await (async () => {
         ${opCode}
       })();
-      results.push({ index: ${index}, success: true, result: result${index} });
-      ${claimsItemSlot ? `if (result${index} && result${index}.itemId) {
-        itemIds.push(result${index}.itemId);
-      }` : ''}
+      // NOT THROWING IS NOT SUCCEEDING. An op that RETURNS { success: false }
+      // — a guard that found a facade missing, a preset the engine does not
+      // have, a precondition unmet — raises nothing, so this recorded it as a
+      // success and the batch reported success over it. Measured on
+      // applyAnimatedMask(item, 'star'): the per-op error was perfectly good
+      // and the batch still said everything worked.
+      const failed${index} = _opFailure(result${index});
+      if (failed${index}) {
+        // ATOMIC: throw WITHOUT recording, and let the catch below record it
+        // once. Doing both put two entries in for one failed op.
+        ${isAtomic ? `throw new Error(failed${index});` : `results.push({ index: ${index}, success: false, error: failed${index}, result: result${index} });
+        success = false;`}
+      } else {
+        results.push({ index: ${index}, success: true, result: result${index} });
+        ${claimsItemSlot ? `if (result${index} && result${index}.itemId) {
+          itemIds.push(result${index}.itemId);
+        }` : ''}
+      }
     } catch (opError) {
       results.push({ index: ${index}, success: false, error: opError.message });
       ${isAtomic ? 'throw opError;' : 'success = false;'}
@@ -2960,7 +2985,14 @@ throw new Error('Unknown diagram mode action: ${action}');
     if (app.historyManager) app.historyManager.saveState();
 
     const _cs = app.getCanvasSize ? app.getCanvasSize() : { width: 800, height: 600 };
-    return { success, itemIds, results, operationCount: ${operations.length}, canvasSize: { width: _cs.width || 800, height: _cs.height || 600 } };
+    // Name WHICH ops failed on the result itself. A caller reading a failed
+    // 60-op batch should not have to scan sixty entries to learn that op 41
+    // could not find a preset.
+    const _failed = results.filter((r) => !r.success);
+    return { success, itemIds, results, operationCount: ${operations.length},
+      failedCount: _failed.length,
+      ...(_failed.length ? { error: _failed.map((r) => 'op ' + r.index + ': ' + r.error).join('; ') } : {}),
+      canvasSize: { width: _cs.width || 800, height: _cs.height || 600 } };
   } catch (e) {
     const _cs = app.getCanvasSize ? app.getCanvasSize() : { width: 800, height: 600 };
     return { success: false, error: e.message, itemIds, results, operationCount: ${operations.length}, canvasSize: { width: _cs.width || 800, height: _cs.height || 600 } };
@@ -3167,7 +3199,15 @@ return { success: !!maskedGroup, itemId: targetId, preset: '${preset}' };
 const targetId = ${effItemRef};
 const item = app.getItemById(targetId);
 if (!item) throw new Error('Item not found: ' + targetId);
-app.applyEffect(item, '${op.effectType || 'sparkle'}', ${effParams});
+// PROPAGATE the engine's verdict. This discarded it and returned its own
+// shape, so an effect the engine refused — an unknown preset, a facade that
+// is not loaded — was recorded as applied. The batch cannot report what the
+// op never tells it.
+const _eff = app.applyEffect(item, '${op.effectType || 'sparkle'}', ${effParams});
+if (_eff && (_eff.success === false || _eff.ok === false)) {
+  return { success: false, itemId: targetId, effectType: '${op.effectType || 'sparkle'}',
+    error: _eff.error || _eff.reason || 'the effect was refused without a reason' };
+}
 return { itemId: targetId, effectType: '${op.effectType || 'sparkle'}' };
 `;
       }

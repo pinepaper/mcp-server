@@ -277,6 +277,12 @@ Writing JavaScript opts out of the schema protection tool callers get, and six e
 - **Does this survive export?** Answered once, as a rule rather than a per-tool label: if it ticks inside the engine's update loop, it exports — loop animations, relations, keyframes, generators and camera moves all do. Anything driven by the wall clock outside that loop does not. And if exported frames look frozen, check the sampling first: a loop at speed 1 has a one-second period, so frames a whole second apart are identical by design.
 - **Bone angles** are sent as degrees *and* radians, so the studio reads the units you meant rather than inferring them.
 
+### Fixed: a batch could report success when an operation failed
+
+`pinepaper_agent_batch_execute` wrapped each operation in try/catch and treated *not throwing* as succeeding. Most failures here do not throw — a missing preset, an unloaded subsystem, an unmet precondition all come back as a returned error — so the operation reported the problem correctly and the batch said the scene was built.
+
+A failed operation now fails the batch, and the result **names which one and why**, so a failure in a sixty-operation batch does not mean reading sixty entries. `apply_effect` also discarded the engine's verdict entirely and returned its own; it passes failures through now.
+
 ### New: find out which fonts you can use
 
 `pinepaper_font` gains `list_available` — every font family the studio can render, optionally filtered by category, each marked with whether its file has loaded yet. The rest of that tool authors a typeface; this is the one action that answers "what can I already set on a text item", which previously had no answer short of reading the server's source.
