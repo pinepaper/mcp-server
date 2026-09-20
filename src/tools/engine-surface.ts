@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
  * Source:    FxTool/js/PinePaper.js
- * sha256:    69abfa49bac75f9d68b40b010d1c3e2f968fb5a928b1e1190899d99be966d7dc
+ * sha256:    fd123a61aaa05f51970552faa685b6bc6350806fbb554e9f42ad985c7fb8d309
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on `window.app`, with how it gets there. The parity
@@ -16,7 +16,7 @@
 /** How a name lands on `app`. */
 export type EngineMemberKind = 'method' | 'accessor' | 'property' | 'lazy' | 'lazyHeavy' | 'bootstrap';
 
-/** 1102 names, from FxTool/js/PinePaper.js. */
+/** 1103 names, from FxTool/js/PinePaper.js. */
 export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object.freeze({
   _activeByGroup: 'property',
   _activeDrawingGroup: 'method',
@@ -724,6 +724,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   keyframeStartTime: 'property',
   keyframeStore: 'bootstrap',
   lassoTool: 'lazy',
+  lastBatchModifySkipped: 'property',
   latheToMesh: 'method',
   letterCollage: 'lazy',
   lintScene: 'method',

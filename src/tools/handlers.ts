@@ -146,9 +146,10 @@ import {
   ItemType,
 } from '../types/schemas.js';
 import { ZodError } from 'zod';
-import { writeFile, mkdir, appendFile, unlink } from 'node:fs/promises';
+import { writeFile, mkdir, appendFile, unlink, readFile, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, extname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { I18nManager } from '../i18n/index.js';
 import {
   PinePaperBrowserController,
@@ -255,6 +256,52 @@ function exportGovernorTimeoutMs(): number {
     );
   }
   return raw;
+}
+
+/**
+ * Turn whatever the caller named into something the page can load.
+ *
+ * http(s) and data URLs pass straight through — the page fetches those itself,
+ * and it reports the reason when it cannot. A LOCAL PATH is read here, because
+ * a browser page cannot open file:// and refusing it outright left an agent
+ * holding images it could not import with nothing to try instead.
+ *
+ * Bounded deliberately: an image extension, an existing regular file, and a
+ * size cap. This reads the user's disk on their instruction, the same as the
+ * export side writes to it, and neither should be a wildcard.
+ */
+const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp', '.avif']);
+const MAX_LOCAL_IMAGE_BYTES = 32 * 1024 * 1024;
+const IMAGE_MIME: Record<string, string> = {
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif',
+  '.webp': 'image/webp', '.svg': 'image/svg+xml', '.bmp': 'image/bmp', '.avif': 'image/avif',
+};
+
+export async function resolveImageSource(input: string): Promise<{ src: string } | { error: string }> {
+  const raw = input.trim();
+  if (/^(https?:|data:)/i.test(raw)) return { src: raw };
+
+  const path = raw.startsWith('file://') ? fileURLToPath(raw) : raw;
+  const ext = extname(path).toLowerCase();
+  if (!IMAGE_EXTENSIONS.has(ext)) {
+    return {
+      error: `"${input}" is neither an http(s) URL nor a path to an image file. `
+        + `Recognised image extensions: ${[...IMAGE_EXTENSIONS].join(', ')}.`,
+    };
+  }
+  let bytes: Buffer;
+  try {
+    const info = await stat(path);
+    if (!info.isFile()) return { error: `"${path}" is not a file.` };
+    if (info.size > MAX_LOCAL_IMAGE_BYTES) {
+      return { error: `"${path}" is ${(info.size / 1024 / 1024).toFixed(1)} MB, above the ${MAX_LOCAL_IMAGE_BYTES / 1024 / 1024} MB import cap. Resize it, or serve it over http.` };
+    }
+    bytes = await readFile(path);
+  } catch (e) {
+    const why = e instanceof Error ? e.message : 'unknown error';
+    return { error: `could not read "${path}": ${why}. Paths are resolved from the server's working directory, so pass an absolute path if in doubt.` };
+  }
+  return { src: `data:${IMAGE_MIME[ext] ?? 'application/octet-stream'};base64,${bytes.toString('base64')}` };
 }
 
 export function getFileExtension(format: string): string {
@@ -3321,7 +3368,19 @@ You can now start creating new items on a clean canvas.`,
 
       case 'pinepaper_import_image': {
         const parsed = ImportImageInputSchema.parse(args);
-        const code = codeGenerator.generateImportImage(parsed);
+        // A LOCAL PATH IS THE COMMON CASE AND WAS THE REJECTED ONE.
+        //
+        // The browser cannot open file:// from a page, so this tool took URLs
+        // only — which leaves an agent that has just generated or downloaded
+        // ten images with no way in, and no alternative named. The server CAN
+        // read the file, so it reads it and hands the page a data URL. Nothing
+        // about the page changes; the bytes simply arrive by a route the
+        // browser is allowed to use.
+        const resolved = await resolveImageSource(parsed.url);
+        if ('error' in resolved) {
+          return errorResult(ErrorCodes.INVALID_PARAMS, resolved.error, { url: parsed.url }, { toolName: 'pinepaper_import_image' });
+        }
+        const code = codeGenerator.generateImportImage({ ...parsed, url: resolved.src });
         return executeOrGenerate(code, 'Imports image', options, 'pinepaper_import_image');
       }
 

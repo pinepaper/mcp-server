@@ -1243,19 +1243,32 @@ function generateBatchModifyCode(modifications: BatchModifyItem[]): string {
   return `
 // Batch modify ${modifications.length} items
 const modifications = ${modsJson};
+// TWO BUGS, ONE CALL, AND BOTH FAILED LOUDLY IN THE WRONG PLACE.
+//
+// 1. The engine takes { item, params } with a LIVE ITEM, or { itemId, params }
+//    with a registry id. This put the id STRING into the item field, which is
+//    truthy — so the engine's own id lookup never ran, the string was treated
+//    as an item, and Object.assign got a string: "Cannot convert undefined or
+//    null to object", from a call that named the id correctly.
+// 2. batchModify returns a COUNT, not an array. Calling .map on a number
+//    is the second reported error, and it fires even when the modify worked.
 const results = app.batchModify(modifications.map(mod => ({
-  item: mod.itemId,
+  itemId: mod.itemId,
   params: mod.params
 })));
 
-// Return modification results
-const formatted = results.map(r => ({
-  itemId: r.item?.data?.registryId || r.itemId,
-  success: r.success,
-  error: r.error || null
-}));
+// The engine records what it could not do rather than throwing — read it,
+// instead of reporting a clean success over a half-applied batch.
+const skipped = app.lastBatchModifySkipped || [];
+const count = typeof results === 'number' ? results : (Array.isArray(results) ? results.length : 0);
 
-({ success: formatted.every(r => r.success), results: formatted, count: formatted.length });
+({
+  success: skipped.length === 0 && count === modifications.length,
+  count,
+  requested: modifications.length,
+  skipped: skipped.map(s => ({ itemId: s.itemId, reason: s.reason })),
+  ...(skipped.length ? { error: 'batch_modify changed ' + count + ' of ' + modifications.length + ' items; skipped: ' + skipped.map(s => s.itemId + ' (' + s.reason + ')').join(', ') } : {}),
+});
 `.trim();
 }
 
@@ -5203,7 +5216,41 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
     return { error: 'Image tools not available. Make sure PinePaper Studio is loaded.' };
   }
   try {
-    const entry = await app.imageTools.uploadFromURL('${url}');
+    // FETCH IT OURSELVES FIRST, to find out WHY when it fails.
+    //
+    // uploadFromURL sets img.src and rejects with a bare "Failed to load image
+    // from URL" — an <img> onerror genuinely carries no reason, so that message
+    // is the browser's limit rather than the engine being unhelpful. fetch()
+    // has the reason: a status code, a CORS rejection, a refused connection, a
+    // DNS failure. A caller cannot debug what the tool will not show them.
+    //
+    // The bytes then go in as a DATA URL, which img.src loads without touching
+    // the network again — so a host that allows fetch but blocks the image
+    // load (CORS on <img>, a tainted-canvas refusal) now works too.
+    let src = '${url}';
+    if (!src.startsWith('data:')) {
+      let res;
+      try {
+        res = await fetch(src);
+      } catch (netErr) {
+        return { success: false, error: 'could not reach ' + src + ' — ' + (netErr && netErr.message ? netErr.message : 'network request failed')
+          + '. This is the browser\'s network stack: check the host resolves, the port is open, and that any proxy passes plain HTTP as well as HTTPS CONNECT.' };
+      }
+      if (!res.ok) {
+        return { success: false, error: 'the server refused ' + src + ' — HTTP ' + res.status + ' ' + (res.statusText || ''), status: res.status };
+      }
+      const blob = await res.blob();
+      if (!blob.type.startsWith('image/')) {
+        return { success: false, error: src + ' returned ' + (blob.type || 'an unknown content type') + ', not an image. Check the URL serves the file itself rather than a web page around it.', contentType: blob.type };
+      }
+      src = await new Promise((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onloadend = () => resolve(fr.result);
+        fr.onerror = () => reject(new Error('could not read the downloaded image'));
+        fr.readAsDataURL(blob);
+      });
+    }
+    const entry = await app.imageTools.uploadFromURL(src);
     const opts = ${optsLiteral};
     const raster = await app.imageTools.placeImage(entry.id, Object.keys(opts).length > 0 ? opts : undefined);
 ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    // The REGISTRY id is \`data.id\`. \`data.itemId\` has never existed, so this

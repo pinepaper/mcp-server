@@ -3077,7 +3077,7 @@ export const ImageMaskSchema = z.enum(['circle', 'rounded', 'hexagon', 'star']).
 export type ImageMask = z.infer<typeof ImageMaskSchema>;
 
 export const ImportImageInputSchema = z.object({
-  url: z.string().describe('URL of the image to import'),
+  url: z.string().describe('The image: an http(s) URL, a data: URL, or a PATH TO A LOCAL FILE (absolute, or relative to the server working directory; file:// accepted). A local file is read by the server and handed to the page as data, because a browser page cannot open file:// itself. Remote images are fetched and their failure REASON is reported — status code, refused connection, wrong content type — rather than a bare load failure.'),
   position: PositionSchema.optional().describe('Position on canvas (defaults to center)'),
   maxWidth: z.number().optional().describe('Maximum width constraint in pixels'),
   maxHeight: z.number().optional().describe('Maximum height constraint in pixels'),
