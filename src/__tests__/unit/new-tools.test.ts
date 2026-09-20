@@ -1151,14 +1151,21 @@ describe('MeasurementInputSchema', () => {
 });
 
 describe('Measurement code generation', () => {
-  it('set_rulers generates setRulersVisible call', () => {
+  // These asserted setRulersVisible / setGridVisible / setSnapToUnitEnabled,
+  // none of which MeasurementSystem has ever had. They passed for years while
+  // the emitted code called into undefined, because they pinned the emitter to
+  // itself rather than to the engine — the same self-agreeing shape the sprite
+  // tests had. The engine publishes showX()/hideX(), not boolean setters.
+  it('set_rulers shows the rulers', () => {
     const code = codeGenerator.generateMeasurement({ action: 'set_rulers', enabled: true });
-    expect(code).toContain('app.measurementSystem.setRulersVisible(true)');
+    expect(code).toContain("app.measurementSystem[true ? 'showRulers' : 'hideRulers']()");
+    expect(code).not.toContain('.setRulersVisible(');
   });
 
-  it('set_grid generates setGridVisible call', () => {
+  it('set_grid hides the grid when asked to', () => {
     const code = codeGenerator.generateMeasurement({ action: 'set_grid', enabled: false });
-    expect(code).toContain('app.measurementSystem.setGridVisible(false)');
+    expect(code).toContain("app.measurementSystem[false ? 'showGrid' : 'hideGrid']()");
+    expect(code).not.toContain('.setGridVisible(');
   });
 
   it('get_dimensions returns bounds info', () => {
@@ -1167,9 +1174,14 @@ describe('Measurement code generation', () => {
     expect(code).toContain('"item_1"');
   });
 
-  it('set_snap generates setSnapToUnitEnabled call', () => {
+  it('set_snap REFUSES, because there is no snap mode to set', () => {
+    // MeasurementSystem publishes snapCoordinate() — it snaps a coordinate you
+    // hand it — and nothing that holds snapping on. The old call reported
+    // success over a setting that never changed.
     const code = codeGenerator.generateMeasurement({ action: 'set_snap', enabled: true });
-    expect(code).toContain('app.measurementSystem.setSnapToUnitEnabled(true)');
+    expect(code).not.toContain('.setSnapToUnitEnabled(');
+    expect(code).toContain('success: false');
+    expect(code).toContain('snaps a coordinate on request');
   });
 
   it('includes measurementSystem guard', () => {
@@ -1187,19 +1199,19 @@ describe('Measurement code generation', () => {
     expect(code).not.toContain('measurementSystem');
   });
 
-  it('set_rulers with enabled: false generates false', () => {
+  it('set_rulers with enabled: false hides them', () => {
     const code = codeGenerator.generateMeasurement({ action: 'set_rulers', enabled: false });
-    expect(code).toContain('setRulersVisible(false)');
+    expect(code).toContain("'hideRulers'");
   });
 
-  it('set_grid with enabled: false generates false', () => {
+  it('set_grid with enabled: false hides it', () => {
     const code = codeGenerator.generateMeasurement({ action: 'set_grid', enabled: false });
-    expect(code).toContain('setGridVisible(false)');
+    expect(code).toContain("'hideGrid'");
   });
 
-  it('set_snap with enabled: false generates false', () => {
+  it('set_snap refuses either way, since neither value is reachable', () => {
     const code = codeGenerator.generateMeasurement({ action: 'set_snap', enabled: false });
-    expect(code).toContain('setSnapToUnitEnabled(false)');
+    expect(code).toContain('success: false');
   });
 });
 

@@ -1201,7 +1201,7 @@ describe('handleToolCall', () => {
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
-      expect(text).toContain('stopAnimations');
+      expect(text).toContain('stopRegionAnimations');
     });
 
     it('should generate code to stop specific regions', async () => {
@@ -1212,7 +1212,7 @@ describe('handleToolCall', () => {
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
-      expect(text).toContain('stopAnimations');
+      expect(text).toContain('stopRegionAnimations');
       expect(text).toContain('USA');
     });
   });
@@ -1233,7 +1233,7 @@ describe('handleToolCall', () => {
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
-      expect(text).toContain('exportRegionCSV');
+      expect(text).toContain('exportRegionDataCSV');
     });
 
     it('should generate code with options', async () => {
@@ -1257,7 +1257,7 @@ describe('handleToolCall', () => {
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
-      expect(text).toContain('importRegionCSV');
+      expect(text).toContain('importRegionDataCSV');
     });
 
     it('should require csvText', async () => {
@@ -1357,7 +1357,7 @@ describe('handleToolCall', () => {
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
-      expect(text).toContain('getSourceInfo');
+      expect(text).toContain('getMapSourceInfo');
     });
   });
 

@@ -4286,7 +4286,7 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
   }
 
   try {
-    app.mapSystem.stopAnimations({
+    app.mapSystem.stopRegionAnimations({
       regions: ${regionsStr},
       resetColors: ${validated.resetColors !== false}
     });
@@ -4333,7 +4333,7 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
   }
 
   try {
-    const result = app.mapSystem.exportRegionCSV({
+    const result = app.mapSystem.exportRegionDataCSV({
       includeHighlighted: ${validated.includeHighlighted !== false},
       includeSelected: ${validated.includeSelected !== false},
       includeColors: ${validated.includeColors !== false},
@@ -4364,8 +4364,9 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
   }
 
   try {
-    const result = app.mapSystem.importRegionCSV({
-      csvText: \`${escapedCsv}\`,
+    // importRegionDataCSV(csvText, options) — the TEXT is positional, and it
+    // was being passed inside the options bag where nothing read it.
+    const result = app.mapSystem.importRegionDataCSV(\`${escapedCsv}\`, {
       applyColors: ${validated.applyColors !== false},
       applyHighlight: ${validated.applyHighlight !== false},
       applySelection: ${validated.applySelection !== false}
@@ -4834,10 +4835,15 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
   }
 
   try {
-    const result = app.mapSystem.exportOriginalGeoJSON({
-      download: ${download},
-      filename: ${JSON.stringify(filename)}
-    });
+    // Two methods, not one with a flag: getOriginalGeoJSON() returns the data,
+    // downloadOriginalGeoJSON(filename) hands it to the browser.
+    // exportOriginalGeoJSON has never existed.
+    const result = ${download}
+      ? app.mapSystem.downloadOriginalGeoJSON(${JSON.stringify(filename)})
+      : app.mapSystem.getOriginalGeoJSON();
+    if (result === null || result === undefined) {
+      return { success: false, error: 'no map is loaded, so there is no source GeoJSON to return' };
+    }
     return result;
   } catch (error) {
     return { success: false, error: error.message };
@@ -4858,7 +4864,7 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
   }
 
   try {
-    const result = app.mapSystem.getSourceInfo();
+    const result = app.mapSystem.getMapSourceInfo();
     return result;
   } catch (error) {
     return { success: false, error: error.message };
@@ -7142,7 +7148,8 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
 // Toggle rulers
 (function() {
   ${guard}
-  app.measurementSystem.setRulersVisible(${enabled});
+  // showRulers()/hideRulers(), not a boolean setter — setRulersVisible never existed.
+  app.measurementSystem[${enabled} ? 'showRulers' : 'hideRulers']();
   return { success: true, action: 'set_rulers', enabled: ${enabled} };
 })();`.trim();
       }
@@ -7152,7 +7159,8 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
 // Toggle grid
 (function() {
   ${guard}
-  app.measurementSystem.setGridVisible(${enabled});
+  // showGrid()/hideGrid(), not a boolean setter — setGridVisible never existed.
+  app.measurementSystem[${enabled} ? 'showGrid' : 'hideGrid']();
   return { success: true, action: 'set_grid', enabled: ${enabled} };
 })();`.trim();
       }
@@ -7170,13 +7178,17 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
 })();`.trim();
       }
       case 'set_snap': {
-        const enabled = input.enabled !== false;
+        // `enabled` is deliberately unread: there is no mode to set either way.
         return `
-// Toggle snap to grid
+// Snap to grid — refused, see below
 (function() {
   ${guard}
-  app.measurementSystem.setSnapToUnitEnabled(${enabled});
-  return { success: true, action: 'set_snap', enabled: ${enabled} };
+  // NO EQUIVALENT. MeasurementSystem publishes snapCoordinate(), which snaps a
+  // coordinate you hand it, and nothing that turns snapping on as a mode —
+  // setSnapToUnitEnabled has never existed, so this reported success over a
+  // setting that was never changed. Refused by name, with the thing that works.
+  return { success: false, action: 'set_snap',
+    error: 'this build has no snap-to-unit MODE to switch: the measurement system snaps a coordinate on request rather than holding a setting. Snap positions yourself before creating or moving items, or set a grid with the grid action and place on its multiples.' };
 })();`.trim();
       }
       default:
