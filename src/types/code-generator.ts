@@ -3170,9 +3170,16 @@ return { success: true, generator: '${genName}'${op.generatorRegion ? ', region:
         const h = op.height || 1080;
         const sizeArg = op.preset ? `'${op.preset}'` : `{ width: ${w}, height: ${h} }`;
         return `
-app.setCanvasSize(${sizeArg});
+// Read the verdict, as the standalone tool now does: an unknown preset or an
+// out-of-range dimension is refused by name, and reporting the size we ASKED
+// for left the batch claiming a resize that never happened.
+const _cs = app.setCanvasSize(${sizeArg});
+if (_cs && _cs.ok === false) {
+  return { success: false, error: _cs.reason || 'the canvas size was refused',
+    ...(_cs.known ? { knownPresets: _cs.known } : {}) };
+}
 await new Promise(r => setTimeout(r, 50));
-return { success: true, width: ${w}, height: ${h} };
+return { success: true, width: (_cs && _cs.width) || ${w}, height: (_cs && _cs.height) || ${h} };
 `;
       }
 

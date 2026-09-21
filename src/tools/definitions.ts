@@ -86,6 +86,15 @@ Choose based on mood:
   Abstract:     drawGeometricAbstract, drawFluidFlow, drawNoiseTexture
   Decorative:   drawPattern, drawStackedCircles
 
+Generators paint the canvas WITHOUT fully registering what they paint — by
+design, so a large procedural field does not cost memory per path. How much is
+registered varies by generator: drawSunsetScene registers 6 of its 27 objects,
+drawSunburst 1 of 18, drawPattern none of 15. So get_items, modify and the
+ontology see a partial view or nothing at all after one runs. Ask
+app.config.currentBackgroundGenerator and generatorParams for what actually
+ran. To go beyond the parameters, write your own generator function — see
+pinepaper_execute_generator.
+
 ─── ITEMS ───
 
 Shapes: circle, rectangle, star, ellipse, triangle, polygon, line, arc, path, pentagon, hexagon, diamond, arrow, heart
@@ -3189,6 +3198,7 @@ WHAT THE CHEAP ROUTE COSTS, so the choice is deliberate: items built and animate
 AVAILABLE GLOBALS:
 - app: PinePaper application instance
   - app.create(type, params): Create items
+  - app.executeGenerator(name, params): Run a generator — including a CUSTOM one you defined as app.<name> = function(params, options) { ...draw with paper... }. That is the whole draw contract: no registration step is required. If you do register with app.generatorRegistry.register(), definition.fn (or legacy onGenerate) is mandatory and a {draw} shape is refused. Generator output is only partly registered, so get_items and the ontology may not see what you painted
   - app.addAnimation(itemId, keyframes, options): Attach keyframe TRACKS programmatically — the other half of a procedural scene, and what makes the loop route cheap: the keyframes are generated, not typed. Accepts an id or the item itself; options.timeUnits ('seconds'|'ms') overrides the ms auto-detect, which long-form timelines need
   - app.animate(item, params): Attach a LOOP animation (pulse, bounce, wobble, …) — the other kind of motion, and not what addAnimation does
   - app.addRelation(sourceId, targetId, type, params): Add relations
@@ -6709,6 +6719,11 @@ EXAMPLES:
   // ---------------------------------------------------------------------------
   // DOMAIN: GENERATOR TOOLS
   // ---------------------------------------------------------------------------
+  // @engine-surface-exempt drawMyArt — it is the ILLUSTRATIVE NAME in the draw
+  // contract example below, not a call. Exempted narrowly rather than by
+  // exempting tool descriptions wholesale: descriptions DO name real engine
+  // methods, and checking them is what caught app.setTimeOffset being taught in
+  // the agent guide when no such method exists.
   {
     name: 'pinepaper_execute_generator',
     annotations: {
@@ -6719,6 +6734,14 @@ EXAMPLES:
       openWorldHint: false,
     },
     description: `Execute a background generator to create procedural patterns.
+
+CUSTOM GENERATORS — the draw contract. Define one as an app method through pinepaper_execute_custom_code:
+  app.drawMyArt = function(params, options) { ...draw with paper... };
+then invoke it with await app.executeGenerator('drawMyArt', params) in custom code, or through the batch execute_generator op with skipValidation:true. NO REGISTRATION IS REQUIRED — that is the whole contract. If you do register with app.generatorRegistry.register(), definition.fn (or the legacy onGenerate) is mandatory and a {draw} shape is refused by name.
+
+THIS TOOL cannot invoke a custom generator: it hard-rejects any name outside its enum, deliberately, because the enum is what makes the built-ins discoverable and typo-proof. The two routes above are how you run your own.
+
+Generator output is only PARTLY registered — drawSunsetScene registers 6 of its 27 objects, drawPattern none of 15 — so pinepaper_get_items and ontology queries see a partial view or nothing. The engine records the invocation instead: re-invoke with new params to "edit".
 
 USE WHEN:
 - "add a sunburst background", "bokeh effect", "gradient mesh"
@@ -6995,10 +7018,12 @@ Filters can be stacked - call multiple times to combine effects.`,
     description: `[Utility] Get all or filtered items from the canvas.
 
 USE WHEN:
-- Listing what's on the canvas
+- Listing REGISTERED items
 - Finding items by type
 - Checking animated items
-- Scene inspection`,
+- Scene inspection
+
+AFTER A GENERATOR, THIS IS A PARTIAL VIEW. A generator may register some, all or none of what it paints: measured on a cleared canvas, drawSunsetScene registers 6 of its 27 objects, drawSunburst 1 of 18, and drawPattern none of its 15. That is by design — a large procedural field would cost memory per path — but it means the canvas can look partly addressable while the rest is silently absent, which is worse for a caller than either extreme. Do not infer canvas contents from this after running a generator; ask app.config.currentBackgroundGenerator / generatorParams for what ran.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -7580,7 +7605,7 @@ OPERATION TYPES (13) — use in this order:
 CANVAS SETUP:
   set_canvas_size — {width, height} or {preset: "instagram"|"youtube"|"tiktok"|...}
   set_background — {backgroundColor: "#hex"}
-  execute_generator — {generatorName, generatorParams} → fills canvas with procedural art
+  execute_generator — {generatorName, generatorParams} → fills canvas with procedural art (paints WITHOUT fully registering items — see get_items; custom generator names need skipValidation:true)
     Generators: drawBokeh, drawGradientMesh, drawWaves, drawSunburst, drawSunsetScene, drawGrid, drawCircuit, drawPattern, drawStackedCircles, drawGeometricAbstract, drawWindField, drawFluidFlow, drawOrganicFlow, drawNoiseTexture, drawGlobeWireframe
     PineMath: drawFunctionPlot (y=f(x) plots), drawParametricCurve (x(t),y(t)), drawSimulation (pendulum, Lorenz, spring-mass), drawSpectrumAnalyzer (FFT), draw3DSurface (torus, sphere, Klein bottle)
 
@@ -8118,7 +8143,9 @@ EXAMPLES:
       idempotentHint: true,
       openWorldHint: false,
     },
-    description: `Capture the live canvas as compact pp: ontology triples + a structured item summary.
+    description: `Capture the REGISTERED canvas as compact pp: ontology triples + a structured item summary.
+
+It reads the item registry, so it inherits the same blind spot as pinepaper_get_items: a generator may register some, all or none of what it paints — drawSunsetScene 6 of 27 objects, drawPattern none of 15 — so a scene built by a generator is described partially or not at all. That is deliberate (memory per path), not a gap to work around.
 
 USE THIS instead of pinepaper_get_items when you need to REASON about composition (what's on the canvas, how items relate, what's animated). Typical scenes shrink 3-10× compared to a raw item dump while preserving relations, animations, effects, masks, and collage styling.
 
