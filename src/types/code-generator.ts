@@ -1704,19 +1704,33 @@ export class PinePaperCodeGenerator {
     if (url) {
       return `
 // Import SVG from URL${source === 'figma' ? ' (Figma-normalised)' : ''}
-const response = await fetch('${url}');
-const svgText = await response.text();
-const _r = ${importExpr('svgText')};
-const imported = _r.item;
-if (imported) {
+// WRAPPED, because these were bare top-level statements with an await. That
+// parses under the governor, which builds an AsyncFunction, and is a SYNTAX
+// ERROR on the eval fallback — so importing an SVG by URL never ran at all on
+// a studio without runGenerated. A paren-led async IIFE parses on both and
+// still gives the governor a trailing expression to capture.
+(async function() {
+  let response;
+  try {
+    response = await fetch('${url}');
+  } catch (netErr) {
+    return { success: false, error: 'could not reach ${url} — ' + ((netErr && netErr.message) || 'network request failed') };
+  }
+  if (!response.ok) {
+    return { success: false, error: 'the server refused ${url} — HTTP ' + response.status + ' ' + (response.statusText || ''), status: response.status };
+  }
+  const svgText = await response.text();
+  const _r = ${importExpr('svgText')};
+  const imported = _r.item;
+  if (!imported) {
+    return { success: false, error: 'the response from ${url} did not parse as SVG. Check the URL serves the file itself rather than a page around it.' };
+  }
   imported.position = new paper.Point(${position.x}, ${position.y});
   imported.scale(${scale});
   const itemId = app.registerItem(imported, 'svg-import', { source: 'mcp' });
   app.historyManager.saveState();
-  ({ success: true, itemId, changes: _r.changes, position: { x: ${position.x}, y: ${position.y} } });
-} else {
-  throw new Error('Failed to import SVG from URL');
-}
+  return { success: true, itemId, changes: _r.changes, position: { x: ${position.x}, y: ${position.y} } };
+})();
 `.trim();
     }
 
@@ -7822,10 +7836,25 @@ ${guard}
         });
         return `
 // Display text style: ${input.styleKey} — stacked-layer title, id adopted from the text
-(function() {
+(async function() {
   if (typeof app.applyTextStyle !== 'function') { return { success: false, error: 'app.applyTextStyle unavailable — update FxTool to a text-styles build' }; }
+  // LOAD THE FACES FIRST. The decorative stylesheet is fetched on pointerenter
+  // over the style grid — a gesture no agent ever makes — so every decorative
+  // family was missing in production and a style asking for one silently drew
+  // the fallback and reported success. ensureFontsLoaded is the fix; guarded,
+  // because a studio without it behaves as it always did.
+  if (typeof app.ensureFontsLoaded === 'function') {
+    try { await app.ensureFontsLoaded('decorative'); } catch (_) { /* the pending flag below still reports it */ }
+  }
   const r = app.applyTextStyle(${S(input.itemId)}, ${S(input.styleKey)}, ${opts});
   if (!r || !r.ok) { return { success: false, error: (r && r.error) || 'style failed' }; }
+  // fontPending: the face is not there YET, so this drew in the fallback. Said
+  // out loud rather than left to be discovered in the export.
+  if (r.fontPending) {
+    return { success: true, action: 'apply_style', id: r.id, style: r.style, layers: r.layers,
+      palette: r.palette, bounds: r.bounds, fontPending: true,
+      warning: 'the face for this style had not loaded, so it drew in a FALLBACK font. Re-apply the style, or call pinepaper_font check with the family and your text to see what is really being used.' };
+  }
   // The styled group ADOPTS the text item's registry id — r.id is the SAME id
   // the caller passed, so their handle keeps working. Say so in the result.
   return { success: true, action: 'apply_style', id: r.id, style: r.style, layers: r.layers, palette: r.palette, bounds: r.bounds };

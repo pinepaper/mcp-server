@@ -232,6 +232,7 @@ export const OPTIONAL_ENGINE_METHODS: readonly string[] = [
   'authoredRotation',
   'captureFrameDataURL',
   'clearCanvas',
+  'ensureFontsLoaded',
   'instantiateOntology',
   'itemRegistry.getAll',
   'listFontAxes',
