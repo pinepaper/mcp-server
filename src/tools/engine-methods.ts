@@ -109,6 +109,7 @@ export const REQUIRED_ENGINE_METHODS: readonly string[] = [
   'instantiateComponent',
   'latheToMesh',
   'lintScene',
+  'listAnimatableProperties',
   'listArtboardPresets',
   'listCameraTreatments',
   'listCollagePatterns',
@@ -228,6 +229,7 @@ export const REQUIRED_ENGINE_METHODS: readonly string[] = [
 export const OPTIONAL_ENGINE_METHODS: readonly string[] = [
   '_resolveRaster',
   'activeWindowOf',
+  'authoredRotation',
   'captureFrameDataURL',
   'clearCanvas',
   'instantiateOntology',

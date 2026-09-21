@@ -3639,12 +3639,17 @@ Requires maskType and keyframes array.`,
       idempotentHint: true,
       openWorldHint: false,
     },
-    description: `[Utility] MASK properties only, despite the name: which properties each MASK TYPE can animate.
+    description: `Which properties can be animated — on an ITEM, or on each mask type.
 
-If you are asking what you can animate on a canvas ITEM, this is the wrong tool and its name will not tell you so. The item-side list lives in pinepaper_keyframe_animate's ANIMATABLE PROPERTIES section, and two entries there are DISCRETE rather than interpolated - content and blendMode hold their value until the next keyframe instead of blending toward it. Treating content as tweenable is what makes every word in a cycler appear half a beat early.`,
+- With { itemId }: what THAT item can animate, filtered by its type, from the engine's own table. Each entry carries an 'interpolates' flag, and two of them are FALSE: content and blendMode are DISCRETE — they hold until the next keyframe rather than blending toward it. Treating content as tweenable is what makes every word in a cycler land half a beat early. The result also reports the default easing and every easing name the engine accepts.
+- With no itemId: the older MASK-TYPE table.
+
+Needs a studio that publishes the item-side table; without one, the tool says so and pinepaper_keyframe_animate's own ANIMATABLE PROPERTIES section is the fallback.`,
     inputSchema: {
       type: 'object',
-      properties: {},
+      properties: {
+        itemId: { type: 'string', description: 'Ask about THIS item rather than the mask-type table. Answers what its own type can animate, and which of those are discrete.' },
+      },
     },
   },
 

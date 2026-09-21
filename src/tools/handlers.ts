@@ -1799,6 +1799,15 @@ async function handleToolCallInner(
       }
 
       case 'pinepaper_get_animatable_properties': {
+        // WITH an itemId this finally answers the question its NAME asks.
+        // Without one it keeps its old job — the mask-type table — because that
+        // is what existing callers get today.
+        const itemId = typeof (args as { itemId?: unknown }).itemId === 'string'
+          ? (args as { itemId: string }).itemId : undefined;
+        if (itemId) {
+          const code = codeGenerator.generateListItemAnimatableProperties(itemId);
+          return executeOrGenerate(code, `Animatable properties of ${itemId}`, options, 'pinepaper_get_animatable_properties');
+        }
         const code = codeGenerator.generateGetAnimatableProperties();
         return executeOrGenerate(code, 'Gets animatable properties for mask types', options, 'pinepaper_get_animatable_properties');
       }

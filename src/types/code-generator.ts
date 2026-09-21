@@ -4762,7 +4762,7 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
         // records the baked offset at item.data._bakedRotation and sums the two itself
         // (PinePaper.js does exactly this); read the same sum rather than the half of
         // it that happens to be zero.
-        const _rot = (item.data?._bakedRotation || 0) + (item.rotation || 0);
+        const _rot = typeof app.authoredRotation === 'function' ? app.authoredRotation(item) : ((item.data?._bakedRotation || 0) + (item.rotation || 0));
         if (_rot) itemData.properties.rotation = _rot;
         if (item.data?.content) itemData.properties.content = item.data.content;
         if (item.visible === false) itemData.properties.visible = false;
@@ -5156,6 +5156,34 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
   }
 })();
 `.trim();
+  }
+
+  /**
+   * What THIS item can animate, from the engine's own table.
+   *
+   * The table is derived from the applier rather than written beside it, so it
+   * cannot drift from what actually gets applied — and it is filtered by item
+   * type, because the trim/dash four only exist on a path and a rectangle has
+   * no fontSize.
+   *
+   * `interpolates: false` is passed through VERBATIM and never flattened away.
+   * `content` and `blendMode` are DISCRETE — they hold their value until the
+   * next keyframe rather than blending toward it — and treating content as
+   * tweenable is what made every word in a cycler appear half a beat early.
+   * A list that says only "animatable" rebuilds that bug in the next agent.
+   */
+  generateListItemAnimatableProperties(itemId: string): string {
+    return `
+// Animatable properties of ${JSON.stringify(itemId)}
+(function() {
+  if (typeof app.listAnimatableProperties !== 'function') {
+    return { success: false, error: 'app.listAnimatableProperties unavailable — update the studio. The keyframe tool lists the properties it accepts in its own description meanwhile.' };
+  }
+  const item = app.getItemById(${JSON.stringify(itemId)});
+  if (!item) { return { success: false, error: 'no item ${itemId}' }; }
+  const r = app.listAnimatableProperties(item);
+  return { success: true, ...r };
+})();`.trim();
   }
 
   generateGetAnimatableProperties(): string {
@@ -6503,7 +6531,7 @@ case 'analyze_palette':
     bounds: item.bounds ? { x: item.bounds.x, y: item.bounds.y, width: item.bounds.width, height: item.bounds.height } : null,
     visible: item.visible,
     opacity: item.opacity,
-    rotation: (item.data?._bakedRotation || 0) + (item.rotation || 0),
+    rotation: typeof app.authoredRotation === 'function' ? app.authoredRotation(item) : ((item.data?._bakedRotation || 0) + (item.rotation || 0)),
     selected: item.selected,
   };
 })();`.trim();
@@ -7233,7 +7261,7 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
   const entry = app.itemRegistry.get(${itemIdStr});
   if (!entry || !entry.item) return { error: 'Item not found: ' + ${itemIdStr} };
   const b = entry.item.bounds;
-  return { success: true, action: 'get_dimensions', itemId: ${itemIdStr}, x: b.x, y: b.y, width: b.width, height: b.height, rotation: (entry.item.data?._bakedRotation || 0) + (entry.item.rotation || 0) };
+  return { success: true, action: 'get_dimensions', itemId: ${itemIdStr}, x: b.x, y: b.y, width: b.width, height: b.height, rotation: typeof app.authoredRotation === 'function' ? app.authoredRotation(entry.item) : ((entry.item.data?._bakedRotation || 0) + (entry.item.rotation || 0)) };
 })();`.trim();
       }
       case 'set_snap': {
