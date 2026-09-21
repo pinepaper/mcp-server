@@ -95,6 +95,13 @@ app.config.currentBackgroundGenerator and generatorParams for what actually
 ran. To go beyond the parameters, write your own generator function — see
 pinepaper_execute_generator.
 
+Writing your own also hands you the registration decision, which is what makes
+a thing EDITABLE. app.registerItem(item, type, props) gives an item a registry
+id: the user can select it and change its colour, and tools can modify,
+animate, keyframe and relate it. Without that it is pixels — it exports the
+same and can never be touched again. Register what a person might want to
+change; leave the dense decorative bulk unregistered.
+
 ─── ITEMS ───
 
 Shapes: circle, rectangle, star, ellipse, triangle, polygon, line, arc, path, pentagon, hexagon, diamond, arrow, heart
@@ -3198,7 +3205,8 @@ WHAT THE CHEAP ROUTE COSTS, so the choice is deliberate: items built and animate
 AVAILABLE GLOBALS:
 - app: PinePaper application instance
   - app.create(type, params): Create items
-  - app.executeGenerator(name, params): Run a generator — including a CUSTOM one you defined as app.<name> = function(params, options) { ...draw with paper... }. That is the whole draw contract: no registration step is required. If you do register with app.generatorRegistry.register(), definition.fn (or legacy onGenerate) is mandatory and a {draw} shape is refused. Generator output is only partly registered, so get_items and the ontology may not see what you painted
+  - app.executeGenerator(name, params): Run a generator — including a CUSTOM one you defined as app.<name> = function(params, options) { ...draw with paper... }. That is the whole draw contract: no registration step is required
+  - app.registerItem(item, type, properties): THE DECISION THAT MATTERS when you draw your own. It returns a registry id and makes that item a first-class object: the USER can click it, select it and change its colour, and you can address it afterwards with modify_item, animate it, keyframe it, point a relation at it, or read it back through get_items and the ontology. An UNregistered path is pixels — it renders and exports identically, and nothing can ever touch it again without redrawing the scene. So register what someone might want to change (the kettle, the title, the sun) and leave the bulk unregistered (a thousand snow specks, a hatch field), which is exactly why generator output is only partly registered: it is a memory decision, and when you write the generator it is YOUR decision
   - app.addAnimation(itemId, keyframes, options): Attach keyframe TRACKS programmatically — the other half of a procedural scene, and what makes the loop route cheap: the keyframes are generated, not typed. Accepts an id or the item itself; options.timeUnits ('seconds'|'ms') overrides the ms auto-detect, which long-form timelines need
   - app.animate(item, params): Attach a LOOP animation (pulse, bounce, wobble, …) — the other kind of motion, and not what addAnimation does
   - app.addRelation(sourceId, targetId, type, params): Add relations
@@ -6742,6 +6750,8 @@ then invoke it with await app.executeGenerator('drawMyArt', params) in custom co
 THIS TOOL cannot invoke a custom generator: it hard-rejects any name outside its enum, deliberately, because the enum is what makes the built-ins discoverable and typo-proof. The two routes above are how you run your own.
 
 Generator output is only PARTLY registered — drawSunsetScene registers 6 of its 27 objects, drawPattern none of 15 — so pinepaper_get_items and ontology queries see a partial view or nothing. The engine records the invocation instead: re-invoke with new params to "edit".
+
+WHEN YOU WRITE THE GENERATOR, THAT IS YOUR CHOICE TO MAKE, and it is the important one. app.registerItem(item, type, properties) returns an id and makes the item selectable by the USER and addressable by you — colour changes, modify_item, keyframes, relations, ontology. Unregistered output is pixels: identical on screen and in the export, and untouchable afterwards without redrawing. Register the handful anyone might want to edit; leave the dense decorative bulk out, which is the memory reason the built-ins do the same.
 
 USE WHEN:
 - "add a sunburst background", "bokeh effect", "gradient mesh"

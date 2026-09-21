@@ -2870,7 +2870,12 @@ var planet = new Path.Circle({
   fillColor: '#3b82f6'
 });
 
-// Register with PinePaper (enables relations, training data export)
+// REGISTER IT. This is the difference between a picture and a thing.
+// Registered: the USER can click it and change its colour, and you can address
+// it later — modify_item, animate, keyframe, relations, get_items, ontology.
+// Unregistered: pixels. Renders and exports identically, and nothing can touch
+// it again without redrawing the scene.
+// Register what someone might want to edit; leave dense decorative bulk out.
 var itemId = app.registerItem(planet, 'circle', { source: 'paperjs' });
 
 // Now you can use relations
