@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 5d13ddecd26bbc872b7e96ddf91d9596fe1a033e
- * sha256:    183392cd491c502e69ed9582ea6c96b037ec2c15cc3a0fbbc4a4cd18fdcc9464   (of PinePaper.js as committed)
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 005c20f6f382ced15e1827dc7dfb530ffe765192
+ * sha256:    1ce4311cc34baa2f87273ced81c453a82c5b716f25bc2ace4462734143afd415   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on `window.app`, with how it gets there. The parity
@@ -591,7 +591,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   generateCSSKeyframes: 'method',
   generateSMILKeyframes: 'method',
   generateSpriteSheet: 'method',
-  generatorRegistry: 'property',
+  generatorRegistry: 'lazyHeavy',
   geometry: 'lazy',
   getActiveInGroup: 'method',
   getAlignmentGuidesEnabled: 'method',
@@ -1143,6 +1143,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
  */
 export const LAZY_HEAVY_SUBSYSTEMS: readonly string[] = Object.freeze([
   'exportEngine',
+  'generatorRegistry',
   'lottieExporter',
   'lottieImporter',
   'lottieTokenizer',
@@ -1162,6 +1163,7 @@ export const LAZY_HEAVY_SUBSYSTEMS: readonly string[] = Object.freeze([
  */
 export const LAZY_HEAVY_CLASSES: Readonly<Record<string, string>> = Object.freeze({
   exportEngine: 'ExportEngine',
+  generatorRegistry: 'GeneratorRegistry',
   lottieExporter: 'LottieExporter',
   lottieImporter: 'LottieImporter',
   lottieTokenizer: 'LottieTokenizer',

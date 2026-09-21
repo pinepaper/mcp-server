@@ -66,7 +66,7 @@ describe('handleToolCall', () => {
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
-      expect(text).toContain("app.select('item_1')");
+      expect(text).toContain("app.modifyItem('item_1'");
       expect(text).toContain('app.modify');
       expect(text).toContain('#00ff00');
     });

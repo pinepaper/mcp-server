@@ -144,6 +144,12 @@ export function readEngineSurface(src = readCommitted(ENGINE), bootstrap = readB
 
   // Lazy definitions first: they are the most specific claim about a name.
   for (const m of code.matchAll(/_defineLazyHeavy\(\s*['"]([A-Za-z_]\w*)['"]\s*,\s*['"]([A-Za-z_]\w*)['"]/g)) put(m[1], 'lazyHeavy');
+  // A SECOND kind of heavy subsystem, and missing it is how generatorRegistry
+  // went unguarded: ensureHeavyModules also assigns plain properties directly
+  // (`this.generatorRegistry = new m.GeneratorRegistry(this)`), which is not a
+  // _defineLazyHeavy and so was invisible to the list above. Same lateness,
+  // same cold-start race, different spelling.
+  for (const m of code.matchAll(/this\.([A-Za-z_]\w*)\s*=\s*new\s+m\.([A-Za-z_]\w*)\(/g)) put(m[1], 'lazyHeavy');
   for (const m of code.matchAll(/_defineLazy\(\s*['"]([A-Za-z_]\w*)['"]/g)) put(m[1], 'lazy');
   // Class members at two-space indent — the PinePaper class body.
   for (const m of code.matchAll(/^ {2}get\s+([A-Za-z_]\w*)\s*\(/gm)) put(m[1], 'accessor');
@@ -240,6 +246,7 @@ function generate() {
   // property name -> CLASS name, which is what ensureHeavy() takes.
   const heavyClasses = {};
   for (const m of src.matchAll(/_defineLazyHeavy\(\s*['"]([A-Za-z_]\w*)['"]\s*,\s*['"]([A-Za-z_]\w*)['"]/g)) heavyClasses[m[1]] = m[2];
+  for (const m of src.matchAll(/this\.([A-Za-z_]\w*)\s*=\s*new\s+m\.([A-Za-z_]\w*)\(/g)) heavyClasses[m[1]] = m[2];
 
   return `/* GENERATED — DO NOT EDIT.
  *

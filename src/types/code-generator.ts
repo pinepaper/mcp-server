@@ -419,13 +419,27 @@ function generateModifyItemCode(
 ): string {
   const { contentType, contentFormat, countdownTarget, countdownEndText, ...restProperties } = properties;
 
+  // modifyItem(id, changes), NOT select() + modify().
+  //
+  // modify() operates on the SELECTION, so this selected an id and then edited
+  // whatever was selected — on an id that does not resolve, select changes
+  // nothing and modify edits the PREVIOUS selection instead. modifyItem takes
+  // the reference and returns false when it cannot resolve it, which is the
+  // answer this emitter needs and never asked for.
+  //
+  // The warning the engine logs on that path is console.warn, which production
+  // strips, so the failure was invisible twice over.
   let code = `
 // Modify item ${itemId}
-app.select('${itemId}');`;
+let _modified = true;`;
 
-  // Pass non-dynamic-content properties to app.modify
   if (Object.keys(restProperties).length > 0) {
-    code += `\napp.modify(${JSON.stringify(restProperties, null, 2)});`;
+    code += `
+_modified = app.modifyItem('${itemId}', ${JSON.stringify(restProperties, null, 2)}) !== false;
+if (!_modified) { return { success: false, error: 'no item ${itemId} — nothing was modified' }; }`;
+  } else {
+    code += `
+if (!app.getItemById('${itemId}')) { return { success: false, error: 'no item ${itemId}' }; }`;
   }
 
   // Handle dynamic content type changes
@@ -449,11 +463,11 @@ if (entry && entry.item && app.setDynamicContent) app.setDynamicContent(entry.it
 
   code += `
 app.historyManager.saveState();
+return { success: true, itemId: '${itemId}' };`;
 
-// Return success
-({ success: true, itemId: '${itemId}' });`;
-
-  return code.trim();
+  // Wrapped, because the body now RETURNS early on a miss rather than falling
+  // through to an unconditional success.
+  return `(function() {\n${code.trim()}\n})();`;
 }
 
 /**
@@ -3067,8 +3081,12 @@ return { itemId };
         const modifyProps = JSON.stringify(op.properties || {});
         return `
 const targetId = ${itemRef};
-app.select(targetId);
-app.modify(${modifyProps});
+// modifyItem(id, changes), not select() + modify(). modify() edits the
+// SELECTION, so an id that does not resolve left the PREVIOUS selection to be
+// edited instead — and this then reported modified:true either way.
+if (app.modifyItem(targetId, ${modifyProps}) === false) {
+  return { success: false, itemId: targetId, error: 'no item ' + targetId + ' — nothing was modified' };
+}
 return { itemId: targetId, modified: true };
 `;
 

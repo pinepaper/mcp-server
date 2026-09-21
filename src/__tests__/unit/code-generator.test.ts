@@ -108,20 +108,26 @@ describe('PinePaperCodeGenerator', () => {
         properties: { color: '#ff0000', opacity: 0.5 },
       });
 
-      expect(code).toContain("app.select('item_1')");
-      expect(code).toContain('app.modify(');
+      // modifyItem, not select+modify: modify() operates on the SELECTION, so a
+      // bad id left the previous selection to be edited instead.
+      expect(code).toContain("app.modifyItem('item_1'");
+      expect(code).not.toContain("app.select('item_1')");
+      expect(code).toContain('app.modifyItem(');
       expect(code).toContain('#ff0000');
       expect(code).toContain('0.5');
     });
 
-    it('should use select then modify pattern', () => {
+    it('addresses the item rather than editing the selection', () => {
       const code = codeGenerator.generateModifyItem({
         itemId: 'item_1',
         properties: { color: '#ff0000' },
       });
 
-      expect(code).toContain("app.select('item_1')");
-      expect(code).toContain('app.modify(');
+      // modifyItem, not select+modify: modify() operates on the SELECTION, so a
+      // bad id left the previous selection to be edited instead.
+      expect(code).toContain("app.modifyItem('item_1'");
+      expect(code).not.toContain("app.select('item_1')");
+      expect(code).toContain('app.modifyItem(');
     });
   });
 
@@ -486,8 +492,10 @@ describe('PinePaperCodeGenerator', () => {
         operations: [{ type: 'modify', itemId: 'item_1', properties: { color: '#00ff00' } }],
       });
       expect(code).toContain("'item_1'");
-      expect(code).toContain('app.select(targetId)');
-      expect(code).toContain('app.modify(');
+      // The batch op addresses the item too — select+modify edited whatever
+      // happened to be selected when the id did not resolve.
+      expect(code).toContain('app.modifyItem(targetId');
+      expect(code).not.toContain('app.select(targetId)');
       expect(code).toContain('#00ff00');
     });
 

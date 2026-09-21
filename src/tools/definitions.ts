@@ -8282,7 +8282,7 @@ QUERIES (14):
 Listing:
 - list_types: All item types (filter by category, includeAbstract)
 - list_edges: All relation/edge types (filter by category)
-- list_generators: All background generators (filter by category)
+- list_generators: the BUILT-IN background generators, from a fixed table in the engine. It is not a view of what is registered: a generator you registered at runtime will never appear here, and neither will a custom draw function. Use it to discover the built-ins and their parameters, not to check whether something exists.
 - list_effects: All visual effect types
 - list_patterns: All detected design patterns
 - list_math_functions: All math functions used in animations
