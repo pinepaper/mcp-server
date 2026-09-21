@@ -257,7 +257,6 @@ const KNOWN_FACADE_DRIFT: readonly string[] = Object.freeze([
   'mapSystem.panTo',
   'mapSystem.zoomTo',
   'relationRegistry.getAll',
-  'sceneManager.setLoop',
 ]);
 
 describe('facade methods exist too', () => {

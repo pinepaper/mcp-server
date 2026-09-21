@@ -239,6 +239,7 @@ export const OPTIONAL_ENGINE_METHODS: readonly string[] = [
   'registerItem',
   'relationRegistry.exportForSave',
   'sceneAt',
+  'sceneManager.setLoop',
   'setBackgroundColor',
   'setCanvasSize',
 ];

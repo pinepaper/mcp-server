@@ -5629,7 +5629,21 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    // The RE
 // Toggle loop mode
 (function() {
   ${guard}
-  app.sceneManager.setLoop(${input.enabled ?? true});
+  // chainLoop is a PROPERTY, set by createChain({loop}) and read by the chain
+  // advance. setLoop has never existed, so this reported a toggle it had not
+  // performed — and a chain built without loop went on not looping.
+  if (typeof app.sceneManager.setLoop === 'function') {
+    app.sceneManager.setLoop(${input.enabled ?? true});
+  } else if ('chainLoop' in app.sceneManager) {
+    app.sceneManager.chainLoop = ${input.enabled ?? true};
+  } else {
+    return { success: false, action: 'toggle_loop',
+      error: 'this build has no chain-loop control to set. Pass loop:true to create_chain instead, which is where the setting is read from.' };
+  }
+  if (!app.sceneManager.sceneChain || !app.sceneManager.sceneChain.length) {
+    return { success: true, action: 'toggle_loop', enabled: ${input.enabled ?? true},
+      note: 'no chain exists yet — this setting applies to the next one created, and create_chain takes loop directly.' };
+  }
   return { success: true, action: 'toggle_loop', enabled: ${input.enabled ?? true} };
 })();
 `.trim();
