@@ -217,6 +217,42 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - Puppeteer mode launches Chrome with `--no-sandbox` and `--disable-setuid-sandbox`. That is routine for headless automation and it does weaken Chrome's own process sandbox. If that matters where you are running it, use `code` mode or put the server in a container.
 - Puppeteer itself is an **optional** peer dependency, kept out of the default tree precisely because a headless browser plus an install script is what scanners flag hardest. Install it only if you want the executing mode.
 
+## What's new in 1.6.11
+
+### Fixed: modifying an item could edit a different one
+
+`pinepaper_modify_item` selected an item by id and then edited *the selection*. When the id didn't resolve, the selection didn't change — so the edit landed on whatever was selected before, and the call reported success. It now addresses the item directly and tells you when the id isn't there. The same bug in `pinepaper_agent_batch_execute`'s modify operation is fixed with it.
+
+### Fixed: display text styles drew in the wrong font
+
+Decorative font files are fetched when you hover the style grid in the editor — a gesture no automated caller makes — so a style asking for one of those faces silently drew a fallback and reported success. Styles now load the faces first, and say so when a face still isn't ready instead of leaving it to be discovered in the export.
+
+### Fixed: importing an SVG by URL
+
+The generated code used a top-level `await` outside an async function, which some studio builds refuse to parse — so the import never ran at all on those. It also now reports why a URL failed: a refused connection, an HTTP status, or a response that's a web page rather than an SVG.
+
+### Fixed: three operations that reported success without doing anything
+
+`set_canvas_size` reported the size you asked for even when the studio refused it — an unknown preset or an out-of-range dimension left the canvas untouched. Scene chains' `toggle_loop` called a studio method that has never existed, so a chain built without looping went on not looping. And `pinepaper_get_items` and friends reported `rotation: 0` for items that are visibly rotated.
+
+### Two styles were missing from the catalogue
+
+`embroidery_tapestry` and `woven_textile` existed in the design vocabulary but not in the list the tools return. The list is now derived from the vocabulary itself, so it can't fall behind again.
+
+### `get_animatable_properties` answers for an item
+
+Pass an `itemId` and it reports what *that* item can animate, from the studio's own table — including which properties are **discrete**. `content` and `blendMode` hold their value until the next keyframe rather than blending toward it, and treating `content` as tweenable is what makes a word cascade land half a beat early. Without an `itemId` it still answers the older mask-type question.
+
+### Custom generators, and what registering an item buys you
+
+The tool descriptions now explain the draw contract: you can define a generator as an app method through `pinepaper_execute_custom_code` and invoke it with `app.executeGenerator`, with no registration step at all.
+
+More importantly they explain the decision that registration *is*. `app.registerItem(item, type, props)` is what makes something editable — the person using the studio can click it and change its colour, and tools can modify, animate, keyframe and relate it. An unregistered path is pixels: it renders and exports identically and can never be touched again without redrawing. Built-in generators register some of what they paint and not the rest — `drawSunsetScene` 6 of its 27 objects, `drawPattern` none of 15 — which is a memory trade, and one you make yourself when you write your own generator.
+
+### Corrections to earlier release notes
+
+The 1.6.9 note said letter-collage animation needed a newer studio, and 1.6.10 said the same of the font `check` and `fallbacks` actions. Both studio updates have since shipped, so both work.
+
 ## What's new in 1.6.10
 
 ### Fixed: the nine diagram tools called an object that does not exist
