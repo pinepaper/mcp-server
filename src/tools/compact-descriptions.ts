@@ -137,7 +137,7 @@ SHAPE TYPES: ${DIAGRAM_SHAPES}.`,
   // -------------------------------------------------------------------------
   // agent_export
   // -------------------------------------------------------------------------
-  pinepaper_agent_export: `Export as MP4, GIF, PNG, SVG, or PDF. Formats: svg, png, gif, mp4, webm, pdf. Quality: draft, standard, high. Framing: canvas (default) or camera (camera_animates viewport — video formats only).`,
+  pinepaper_agent_export: `Export as MP4, GIF, PNG, SVG, or PDF. Formats: svg, png, gif, mp4, webm, pdf. Quality: draft, standard, high — compression, and a default frame rate (15/30/60) that fps overrides. Video size control is scale 0.1-1, not a bitrate; scale 0.5 + quality draft is the fast preview. Framing: canvas (default) or camera (camera_animates viewport — video formats only).`,
 
   // -------------------------------------------------------------------------
   // design_system

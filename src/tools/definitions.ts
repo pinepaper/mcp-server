@@ -7896,7 +7896,19 @@ EXAMPLES:
         quality: {
           type: 'string',
           enum: ['draft', 'standard', 'high'],
-          description: 'Export quality level (default: standard)',
+          description: 'Compression level (default: standard). It ALSO carries a default frame rate — draft 15, standard 30, high 60 — so "high" doubles the frame count and the render time against "standard" unless you set fps yourself. Set fps and scale to control those halves directly and leave quality meaning compression.',
+        },
+        fps: {
+          type: 'integer',
+          minimum: 1,
+          maximum: 120,
+          description: 'Video only: frames per second, overriding whatever `quality` implies. File size is bitrate x duration and does not move with fps, but the picture gets fewer bits per frame at a higher one.',
+        },
+        scale: {
+          type: 'number',
+          minimum: 0.1,
+          maximum: 1,
+          description: 'Video only: render at this fraction of the platform preset dimensions (0.1-1). The engine derives its encode target from RESOLUTION, so this is the size control — there is no bitrate to set, and halving the frame roughly quarters the pixels and the file. It is also the preview knob: scale 0.5 with quality "draft" is the fast look-check before committing to a full render. Rounded to even dimensions, which H.264 requires.',
         },
         framing: {
           type: 'string',
