@@ -7876,8 +7876,8 @@ EXAMPLES:
       properties: {
         platform: {
           type: 'string',
-          enum: ['instagram', 'instagram-story', 'tiktok', 'youtube', 'youtube-thumbnail', 'twitter', 'linkedin', 'web', 'print-a4', 'print-letter'],
-          description: 'Target platform for export',
+          enum: ['auto', 'instagram', 'instagram-story', 'tiktok', 'youtube', 'youtube-thumbnail', 'twitter', 'linkedin', 'web', 'print-a4', 'print-letter'],
+          description: "Target platform, which sets the output DIMENSIONS. 'auto' (the default) renders the canvas at its own size — use it when the canvas is already the size you want, otherwise a preset REPLACES your dimensions. Every other value forces that platform's frame regardless of the canvas.",
         },
         format: {
           type: 'string',
@@ -7926,7 +7926,10 @@ EXAMPLES:
           description: 'Video duration in seconds for mp4/webm/gif (default 5). Max 60 for mp4/webm; GIF is capped at 15 because it has no bitrate target, so size scales with frames × dimensions — use mp4/webm for longer clips. Static formats ignore this. If you set play_timeline to N seconds, pass the same N here.',
         },
       },
-      required: ['platform'],
+      // Nothing is required: platform defaults to 'auto', which is the canvas's
+      // own size. Requiring it forced every caller to pick a preset, and a
+      // preset silently replaces the dimensions they had already chosen.
+      required: [],
     },
   },
 

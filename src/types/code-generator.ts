@@ -3401,6 +3401,19 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
     const scaled = scale !== undefined && scale !== 1
       ? { width: even(preset.width * scale), height: even(preset.height * scale) }
       : { width: preset.width, height: preset.height };
+    // 'auto' MEANS THE CANVAS, NOT A PRESET THAT HAPPENS TO BE FIRST.
+    //
+    // `platform` defaults to 'auto', 'auto' is not a key in platformPresets,
+    // and the lookup falls through to `web` — so an export that named no
+    // platform silently rendered 800x600. A beta probe measured exactly that:
+    // three exports of a 960x540 canvas all came back 800x600, reported as a
+    // dimension mismatch because from outside it is one. Nothing said the
+    // canvas had been replaced by a preset.
+    //
+    // Resolved in the generated code rather than here, because the canvas size
+    // is only known in the page. The preset stays the fallback for a studio
+    // too old to report one, and `scale` still applies either way.
+    const usesCanvasSize = !platformPresets[platform];
     // Resolve "auto" format to the platform's recommended format
     const exportFormat = (!format || format === 'auto') ? preset.staticFormat : format;
 
@@ -3487,7 +3500,15 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
   // doubled the frame count and the render time — a surprise the schema used
   // to hide because there was no way to ask for one without the other.
   const settings = ${JSON.stringify(fps !== undefined ? { ...qualitySettings, fps } : qualitySettings)};
-  const dimensions = ${JSON.stringify(scaled)};
+${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as a fallback for a
+  // studio too old to report one. Named platforms emit a plain object literal
+  // just below, so what they render stays readable in the code itself.
+  const __presetDims = ${JSON.stringify(scaled)};
+  const __canvasDims = app.canvasSize || (app.view && app.view.viewSize) || null;
+  const __even = (n) => Math.max(2, Math.round((n * ${scale !== undefined ? scale : 1}) / 2) * 2);
+  const dimensions = (__canvasDims && __canvasDims.width && __canvasDims.height)
+    ? { width: __even(__canvasDims.width), height: __even(__canvasDims.height) }
+    : __presetDims;` : `  const dimensions = ${JSON.stringify(scaled)};`}
 
   // Preflight: same resolved settings as the real export, but render nothing.
   // Branching HERE rather than in a separate tool is deliberate — the estimate

@@ -58,3 +58,44 @@ describe('pinepaper_agent_export publishes what it accepts', () => {
     expect(quality.toLowerCase()).toContain('fps');
   });
 });
+
+describe("platform 'auto' means the canvas, not a preset that happens to be first", () => {
+  it('is offered, and is not required to be named', () => {
+    const tool = (PINEPAPER_TOOLS as any[]).find((t) => t.name === 'pinepaper_agent_export');
+    expect(tool.inputSchema.properties.platform.enum).toContain('auto');
+    // Requiring a platform forced every caller to pick a preset, and a preset
+    // silently REPLACES the dimensions they had already chosen.
+    expect(tool.inputSchema.required ?? []).not.toContain('platform');
+  });
+
+  it('a named platform still emits its preset as a readable literal', async () => {
+    const { PinePaperCodeGenerator } = await import('../../types/code-generator.js');
+    const code = new PinePaperCodeGenerator().generateAgentExport({
+      platform: 'youtube', format: 'mp4', duration: 5,
+    } as any);
+    expect(code).toContain('const dimensions = {"width":1920,"height":1080}');
+    expect(code).not.toContain('__canvasDims');
+  });
+
+  it("'auto' reads the canvas size at runtime instead of baking 800x600", async () => {
+    // The probe measured three exports of a 960x540 canvas all returning
+    // 800x600 — the `web` preset, reached because 'auto' was not a key in the
+    // preset table and the lookup fell through to it.
+    const { PinePaperCodeGenerator } = await import('../../types/code-generator.js');
+    const code = new PinePaperCodeGenerator().generateAgentExport({
+      format: 'mp4', duration: 5,
+    } as any);
+    expect(code).toContain('app.canvasSize');
+    expect(code).toContain('__presetDims');
+    // The preset survives only as the fallback, never as the answer.
+    expect(code).not.toContain('const dimensions = {"width":800,"height":600}');
+  });
+
+  it('scale still applies when the size comes from the canvas', async () => {
+    const { PinePaperCodeGenerator } = await import('../../types/code-generator.js');
+    const code = new PinePaperCodeGenerator().generateAgentExport({
+      format: 'mp4', duration: 5, scale: 0.5,
+    } as any);
+    expect(code).toMatch(/__even = \(n\) => Math\.max\(2, Math\.round\(\(n \* 0\.5\)/);
+  });
+});
