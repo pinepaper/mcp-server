@@ -108,7 +108,7 @@ export function referencedAppNames(files = emitterFiles()): Map<string, number> 
   return counts;
 }
 
-function countInto(counts: Map<string, number>, src: string): void {
+export function countInto(counts: Map<string, number>, src: string): void {
   const code = src
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .split('\n')
@@ -121,6 +121,14 @@ function countInto(counts: Map<string, number>, src: string): void {
   // An emitter may declare a deliberate exception:
   //   @engine-surface-exempt <name> — why
   for (const m of src.matchAll(/@engine-surface-exempt\s+([A-Za-z_]\w*)/g)) {
+    counts.delete(m[1]);
+  }
+  // A PROBED top-level name is forward compatibility, exactly as a probed
+  // facade method is. The two were asymmetric: `typeof app.x.y === 'function'`
+  // was exempt and `typeof app.x === 'function'` was not, so calling ahead of
+  // the shipped engine was allowed one dot deep and reported as drift at the
+  // top level. Same principle, so the same exemption.
+  for (const m of src.matchAll(/typeof\s+app\.([A-Za-z_]\w*)\s*===?\s*'function'/g)) {
     counts.delete(m[1]);
   }
 }
@@ -279,6 +287,26 @@ describe('facade methods exist too', () => {
       unknown.add(`app.${facade}.${method}`);
     }
     expect([...unknown].sort()).toEqual([]);
+  });
+
+  it('an UNguarded top-level call is still drift', () => {
+    // The exemption must not become a blanket one. A name nobody probes and
+    // the engine does not have is the original bug this guard exists for.
+    // This runs the REAL extractor, so weakening the regex fails it.
+    const counts = new Map<string, number>();
+    countInto(counts, 'const x = app.notProbedAtAll();');
+    expect(counts.get('notProbedAtAll')).toBe(1);
+    expect('notProbedAtAll' in ENGINE_SURFACE).toBe(false);
+  });
+
+  it('a top-level probe clears exactly the name it guards', () => {
+    const counts = new Map<string, number>();
+    countInto(
+      counts,
+      "if (typeof app.aheadOfShipped === 'function') { app.aheadOfShipped(); }\nawait app.alsoNotShipped();",
+    );
+    expect(counts.has('aheadOfShipped')).toBe(false);
+    expect(counts.get('alsoNotShipped')).toBe(1);
   });
 
   it('a probe is only an excuse where the call is actually guarded', () => {

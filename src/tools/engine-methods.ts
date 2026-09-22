@@ -236,6 +236,7 @@ export const OPTIONAL_ENGINE_METHODS: readonly string[] = [
   'instantiateOntology',
   'itemRegistry.getAll',
   'listFontAxes',
+  'listGenerators',
   'listTextPalettes',
   'registerItem',
   'relationRegistry.exportForSave',

@@ -1137,15 +1137,43 @@ const stats = app.getRelationStats();
 function generateListGeneratorsCode(): string {
   return `
 // List available generators
-const generators = app.getAvailableBackgroundGenerators();
-const formatted = generators.map(g => ({
-  name: g.name,
-  displayName: g.displayName || g.name,
-  category: g.category || 'background',
-  description: g.description || ''
-}));
+//
+// THREE OF SEVENTY-FOUR. getAvailableBackgroundGenerators() returned a
+// hand-written literal of three names while the registry held 74 — nothing was
+// broken, the other seventy-one executed fine BY NAME, they were simply
+// invisible to anyone asking what exists. listGenerators() merges the registry
+// and awaits it; it is newer than some studios, so the old call stays as the
+// fallback and the result says which answer you got.
+//
+// Wrapped in an async IIFE deliberately: a bare top-level await parses under
+// the governor and is a syntax error on the eval path.
+(async function() {
+  let generators;
+  let complete = true;
+  if (typeof app.listGenerators === 'function') {
+    generators = await app.listGenerators();
+  } else {
+    generators = app.getAvailableBackgroundGenerators();
+    // The merged array carries a non-enumerable pending flag when the registry
+    // chunk has not landed, so a cold page honestly answers three.
+    complete = !generators || generators.pending !== true;
+  }
+  const formatted = (generators || []).map(g => ({
+    name: g.name,
+    displayName: g.displayName || g.name,
+    category: g.category || 'background',
+    description: g.description || ''
+  }));
 
-({ generators: formatted });
+  return {
+    generators: formatted,
+    count: formatted.length,
+    ...(complete ? {} : {
+      partial: true,
+      note: 'the generator registry had not finished loading, so this is a partial list — the built-ins only. Retry for the full set.',
+    }),
+  };
+})();
 `.trim();
 }
 
