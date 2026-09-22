@@ -410,7 +410,7 @@ ITEM TYPES:
   A star is always radially symmetric — given width and height it uses the
   smaller — and the size you give is the radius BOX, the circle the tips
   touch. The visible bounds are never larger than that box and usually
-  smaller: only at points: 4 do the tips reach all four edges.
+  smaller — they fill it only when points is a multiple of 4.
 - rectangle: Rectangle (properties: width, height, color, cornerRadius)
 - triangle: Triangular shape (properties: width, height, color, angles, kind)
   Defaults to a 100x86 isosceles. For any OTHER triangle, do not hand-build it
@@ -452,10 +452,17 @@ ITEM TYPES:
 
 SPEECH AND ANNOTATION SHAPES — the engine draws these; use one instead of
 hand-building an outline from a path. All take width, height and color, and the
-descriptions below are the engine's own. Every one of them also accepts
-cornerRadius. The six with a tail also take tailDirection (bottom-left |
-bottom-right | bottom | top-left | top-right | top | left | right) and tailSize
-(0-1, default 0.35):
+descriptions below are the engine's own. Three further parameters are each
+read by six of these eight shapes, and THE THREE SIXES ARE NOT THE SAME SIX —
+a shape missing from a list ignores that parameter silently, so check before
+you pass it:
+  cornerRadius — speech-bubble, speech-bubble-pointed, comment-box,
+    callout-box, double-bubble, quote-bubble
+  tailDirection (bottom-left | bottom-right | bottom | top-left | top-right |
+    top | left | right) — speech-bubble, speech-bubble-square,
+    speech-bubble-pointed, thought-bubble, comment-box, callout-box
+  tailSize (0-1, default 0.35) — speech-bubble, speech-bubble-square,
+    speech-bubble-pointed, comment-box, callout-box, double-bubble
 - speech-bubble: Classic round speech bubble with triangular tail.
 - speech-bubble-square: Rectangular speech bubble with sharp corners and
   pointed tail.

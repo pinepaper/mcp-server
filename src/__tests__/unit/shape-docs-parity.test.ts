@@ -73,6 +73,26 @@ const KNOWN_UNREACHABLE: Readonly<Record<string, readonly string[]>> = {
   'uml-usecase': ['labelPosition'],
 };
 
+/**
+ * Registered shapes with no ITEM TYPES entry, because they belong to
+ * pinepaper_create_diagram_shape's vocabulary instead. Listed so that a NEW
+ * registered shape landing undocumented fails rather than being skipped.
+ */
+const KNOWN_UNDOCUMENTED: readonly string[] = [
+  'cloud',
+  'data',
+  'database',
+  'decision',
+  'document',
+  'preparation',
+  'process',
+  'server',
+  'terminal',
+  'uml-actor',
+  'uml-class',
+  'uml-usecase',
+];
+
 interface Entry {
   id: string;
   /** The entry's own lines PLUS the preamble of the block it sits in. */
@@ -154,7 +174,7 @@ describe('shape docs match what the engine reads', () => {
     const gaps: Record<string, string[]> = {};
     for (const [id, keys] of Object.entries(SHAPE_CONFIG_READS)) {
       const doc = documented.get(id);
-      if (doc === undefined) continue; // undocumented shapes: the test below
+      if (doc === undefined) continue; // no entry at all — KNOWN_UNDOCUMENTED below
       const missing: string[] = [];
       for (const key of keys) {
         if (UNIVERSAL_CONFIG_KEYS.includes(key)) continue;
@@ -174,6 +194,13 @@ describe('shape docs match what the engine reads', () => {
     // The other direction: a property named in a `(properties: …)` list that
     // create() never reads is worse than an omission, because the caller
     // writes it, sees success, and never learns it was thrown away.
+    //
+    // SCOPE, so nobody trusts this further than it goes: only `(properties: …)`
+    // lists are checked. A claim made in a block's PREAMBLE prose is on the
+    // honour system — "all of them also accept cornerRadius" was written here
+    // and was wrong for two of the eight bubbles, and this test was silent.
+    // Preamble claims that name specific shapes have to be checked by hand
+    // against SHAPE_CONFIG_READS.
     const invented: Record<string, string[]> = {};
     for (const { id, doc } of entries) {
       if (!(id in SHAPE_CONFIG_READS)) continue; // not a registry-backed shape
@@ -205,6 +232,19 @@ describe('shape docs match what the engine reads', () => {
       if (dead.length > 0) unreachable[id] = dead;
     }
     expect(unreachable).toEqual(KNOWN_UNREACHABLE as Record<string, string[]>);
+  });
+
+  it('every registered shape has an entry, or is on the list', () => {
+    // Without this, a shape FxTool registers tomorrow that nobody documents is
+    // B10 again and the guard above says nothing — it skips what it cannot
+    // find. The flowchart / UML / network ids are reached through
+    // pinepaper_create_diagram_shape, which documents its own shapeType
+    // vocabulary, so they are absent from ITEM TYPES by design rather than by
+    // omission. A RATCHET: delete, never extend.
+    const undocumented = Object.keys(SHAPE_CONFIG_READS)
+      .filter((id) => !documented.has(id))
+      .sort();
+    expect(undocumented).toEqual([...KNOWN_UNDOCUMENTED].sort());
   });
 
   it('the ratchets only shrink', () => {
