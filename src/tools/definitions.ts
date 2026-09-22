@@ -400,6 +400,16 @@ For requests like "draw a witch", "draw a cat face", "draw a person", or any det
 - DO NOT attempt pixel-level character drawing with paths
 
 ITEM TYPES:
+
+EVERY type below also takes a label, which wraps the item in a labelled group —
+you do not need a second create call and a hand-computed position to caption a
+shape. A string is the short form; the object form places and styles it:
+label: { content: 'Start', position: 'top', offset: [0, 10], fontSize: 14,
+fontFamily: 'Inter, sans-serif', color: '#ffffff', backgroundColor: null }.
+position takes center (default), top, bottom, left, right or a corner. Use
+label.position for placement — a sibling labelPosition is accepted by the
+diagram tools, not by this one.
+
 - text: Text content with font styling (properties: content, fontSize, color, fontFamily)
 - circle: Circular shape (properties: radius, color, strokeColor, strokeWidth)
 - star: Star shape (properties: radius1, radius2, points, color)

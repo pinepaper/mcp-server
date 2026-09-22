@@ -42,25 +42,39 @@ const DEFINITIONS = join(import.meta.dir, '..', '..', 'tools', 'definitions.ts')
 const KNOWN_DOC_GAPS: Readonly<Record<string, readonly string[]>> = {};
 
 /**
- * Config keys no caller can reach: registryConfig never forwards a `params.*`
- * into them AND no other branch of `create()` reads that name either.
+ * Keys a shape reads that `app.create()` does not carry — reachable only
+ * through the OTHER door.
  *
- * That second clause is what keeps this list honest. Twenty-two shapes read
- * `config.label`, which registryConfig does not forward — but `create()` does
- * read `params.label`, one branch up, and hands it to `_createLabeledItem`,
- * which wraps the shape in its own text item. Labels work; the shapes' own
- * label path is simply not the route taken. Reporting those as broken would be
- * the guard crying wolf over working code, so membership in
- * ACCEPTED_CREATE_PARAMS excuses a key — mechanically, not by assertion.
+ * This list said "read by these shapes and written by nothing" and that was
+ * WRONG. fxtool-f2 measured the second route: `DiagramSystem.createShape(type,
+ * config)` hands its config to `ShapeLibrary.create`, which hands it to
+ * `shapeRegistry.createGeometry`, which normalises `label` and `labelPosition`
+ * itself and then spreads `...config` over them. So the shapes' own label
+ * rendering is live and addressable — `createShape('process', {label: 'Top',
+ * labelPosition: 'top'})` puts the label 32px above the shape's centre. None of
+ * this is dead code and none of it should be deleted.
  *
- * What survives that test is genuinely dead: `labelPosition` is read by these
- * shapes and written by nothing. An ENGINE gap, not a doc gap — documenting it
- * would promise something that cannot work. Raised with FxTool; listed so the
- * set cannot grow unnoticed.
+ * Which makes "unreachable" the wrong question, because that door passes
+ * EVERYTHING through and the answer is always yes. The question worth asking is
+ * per-door, and the door this package uses is `app.create()`: pinepaper_create_item
+ * emits it, so a key missing from it is silently ignored for every caller of
+ * that tool however well it works elsewhere. That is the real bug this found —
+ * `create('process', {labelPosition: 'top'})` was accepted and did nothing —
+ * and FxTool has since folded labelPosition into the label config (5fef0664 on
+ * export/long-form-streaming), so these entries close themselves when it merges.
+ *
+ * On what excuses a key: membership in ACCEPTED_CREATE_PARAMS means create()
+ * READS the name, not that it does anything with it — it would have excused
+ * labelPosition the moment a read-and-discard appeared. It is a cheap check
+ * against a guard that cries wolf, not proof of effect. `label`'s excusal is
+ * the one that has been confirmed behaviourally rather than inferred: create()
+ * hands it to `_createLabeledItem`, which wraps the shape in its own text item,
+ * and that was measured too. Anything else here wants a probe before it is
+ * believed.
  *
  * A RATCHET, on the same terms as above: delete, never zero out.
  */
-const KNOWN_UNREACHABLE: Readonly<Record<string, readonly string[]>> = {
+const KNOWN_CREATE_DOOR_GAPS: Readonly<Record<string, readonly string[]>> = {
   data: ['labelPosition'],
   database: ['labelPosition'],
   decision: ['labelPosition'],
@@ -216,10 +230,11 @@ describe('shape docs match what the engine reads', () => {
     expect(invented).toEqual({});
   });
 
-  it('the unreachable-key list is exactly what the engine cannot wire', () => {
-    // Keys a shape reads that registryConfig has no `params.*` for. Nothing
-    // the docs can do about these; the point is that the set cannot GROW
-    // without someone noticing.
+  it('the create()-door gap list is exactly what app.create cannot carry', () => {
+    // Keys a shape reads that registryConfig has no `params.*` for and that no
+    // other branch of create() names. They are reachable through
+    // DiagramSystem.createShape — see the list's own comment — so this is not a
+    // liveness claim about the key, only about the door this package emits.
     const unreachable: Record<string, string[]> = {};
     for (const [id, keys] of Object.entries(SHAPE_CONFIG_READS)) {
       const dead = keys.filter(
@@ -231,7 +246,7 @@ describe('shape docs match what the engine reads', () => {
       );
       if (dead.length > 0) unreachable[id] = dead;
     }
-    expect(unreachable).toEqual(KNOWN_UNREACHABLE as Record<string, string[]>);
+    expect(unreachable).toEqual(KNOWN_CREATE_DOOR_GAPS as Record<string, string[]>);
   });
 
   it('every registered shape has an entry, or is on the list', () => {
@@ -254,8 +269,8 @@ describe('shape docs match what the engine reads', () => {
       expect(keys.length, `KNOWN_DOC_GAPS.${id} is empty — delete the entry`).toBeGreaterThan(0);
       expect(SHAPE_CONFIG_READS[id], `KNOWN_DOC_GAPS.${id} names no registered shape`).toBeDefined();
     }
-    for (const [id, keys] of Object.entries(KNOWN_UNREACHABLE)) {
-      expect(keys.length, `KNOWN_UNREACHABLE.${id} is empty — delete the entry`).toBeGreaterThan(0);
+    for (const [id, keys] of Object.entries(KNOWN_CREATE_DOOR_GAPS)) {
+      expect(keys.length, `KNOWN_CREATE_DOOR_GAPS.${id} is empty — delete the entry`).toBeGreaterThan(0);
     }
   });
 });
