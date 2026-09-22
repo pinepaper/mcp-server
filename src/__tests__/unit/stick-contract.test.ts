@@ -144,16 +144,30 @@ describe('load_map speaks the engine vocabulary', () => {
     expect(optsOf({ mapId: 'world', projection: 'mercator' })).not.toHaveProperty('styles');
   });
 
-  it('strips hoverStroke and names it, since the engine implements it nowhere', () => {
-    const code = codeGenerator.generateLoadMap({ mapId: 'world', hoverStroke: '#f00' } as never);
+  it('puts hoverStroke where mergedStyles reads it, beside hoverFill', () => {
+    // It was documented in two MCP specs long before any source file read it.
+    // Now that _resolveRegionStyle takes it, it is a styles key like any
+    // other — mapped rather than stripped, so it starts working on a studio
+    // that has it without a change here.
+    expect(optsOf({ mapId: 'world', hoverStroke: '#f00', hoverFill: '#00f' }))
+      .toMatchObject({ styles: { hoverStroke: '#f00', hoverFill: '#00f' } });
+  });
+
+  it('never leaves hoverStroke at the top level, where nothing reads it', () => {
     expect(optsOf({ mapId: 'world', hoverStroke: '#f00' })).not.toHaveProperty('hoverStroke');
-    expect(code).toContain('ignored: ["hoverStroke"]');
-    expect(code).toContain('implemented nowhere in it');
+  });
+
+  it('warns that an older studio will ignore hoverStroke', () => {
+    // Silent degradation is the class this whole pass exists to remove, so a
+    // caller on a studio without it learns why the outline did not move.
+    const code = codeGenerator.generateLoadMap({ mapId: 'world', hoverStroke: '#f00' } as never);
+    expect(code).toContain('conditional: ["hoverStroke"]');
+    expect(code).toContain('recent enough to read it');
   });
 
   it('says nothing about hoverStroke when it was not passed', () => {
     const code = codeGenerator.generateLoadMap({ mapId: 'world' } as never);
-    expect(code).not.toContain('ignored:');
+    expect(code).not.toContain('conditional:');
     expect(code).not.toContain('hoverStroke');
   });
 });

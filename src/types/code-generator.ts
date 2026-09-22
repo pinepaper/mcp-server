@@ -4074,22 +4074,24 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
     // top-level one with the quality preset's value.
     if (strokeWidth !== undefined) styles.strokeWidth = strokeWidth;
     if (hoverFill !== undefined) styles.hoverFill = hoverFill;
+    // hoverStroke reads from mergedStyles beside hoverFill, so it belongs in
+    // the same place. It landed late — the two MCP specs documented it for a
+    // long time before any source file did — and an older studio merges it,
+    // finds nothing that reads it, and leaves the outline at the base stroke.
+    // Mapped rather than stripped so it simply starts working on such a studio
+    // without a change here, and reported below so a caller on an older one
+    // learns why their outline did not move.
+    if (hoverStroke !== undefined) styles.hoverStroke = hoverStroke;
 
     const engineOptions: Record<string, unknown> = { ...passthrough };
     if (Object.keys(styles).length > 0) engineOptions.styles = styles;
     if (enableHover !== undefined) engineOptions.interactive = enableHover;
     if (enableClick !== undefined) engineOptions.selectable = enableClick;
 
-    // hoverStroke IS IN TWO SPEC DOCUMENTS AND NO SOURCE FILE. FxTool lists it
-    // in docs/guides/mcp-integration.md and docs/mcp/tools-spec.md; `js/` has
-    // never contained the identifier, and it is not a style-preset key either,
-    // so there is nowhere to map it. Not refused — failing a whole map load
-    // over one cosmetic key helps nobody — but named in the result, so the
-    // caller learns it did nothing at the moment they used it.
     const ignored = hoverStroke !== undefined ? ['hoverStroke'] : [];
     const optionsStr = Object.keys(engineOptions).length > 0 ? JSON.stringify(engineOptions) : '{}';
     const warn = ignored.length
-      ? `\n      ignored: ${JSON.stringify(ignored)},\n      note: 'hoverStroke is documented by the engine but implemented nowhere in it — this map loaded without it.',`
+      ? `\n      conditional: ${JSON.stringify(ignored)},\n      note: 'hoverStroke needs a studio recent enough to read it; an older one ignores it and the hover outline stays the base stroke.',`
       : '';
 
     return `
