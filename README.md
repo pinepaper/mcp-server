@@ -217,6 +217,22 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - Puppeteer mode launches Chrome with `--no-sandbox` and `--disable-setuid-sandbox`. That is routine for headless automation and it does weaken Chrome's own process sandbox. If that matters where you are running it, use `code` mode or put the server in a container.
 - Puppeteer itself is an **optional** peer dependency, kept out of the default tree precisely because a headless browser plus an install script is what scanners flag hardest. Install it only if you want the executing mode.
 
+## What's new in 1.6.12
+
+### Fixed: exporting without naming a platform ignored your canvas
+
+`platform` defaults to `auto`, but `auto` wasn't a real preset — the lookup fell through to the `web` preset, so an export that named no platform silently rendered **800×600** over whatever size your canvas actually was. Measured: three exports of a 960×540 canvas all came back 800×600, which reads from outside as a dimension mismatch with nothing saying the canvas had been replaced.
+
+`auto` now means the canvas's own size, read at export time, with the preset kept only as a fallback for older studios. Naming a platform still uses its preset exactly as before — and `platform` is no longer required, so you can export at your canvas size without picking a preset that overrides it.
+
+### Fixed: `fps` and `scale` were accepted but undiscoverable
+
+Both parameters worked and were documented in the tool's own text, but were missing from the machine-readable schema — which is the only part a model actually reads. So callers were told to use them and had no way to find them. Published now, along with `quality`'s description admitting that it carries a **frame rate** (15/30/60) as well as compression.
+
+### Three design generators are now included
+
+`device-mockup`, `recursive-subdivision` and `textile-weave` existed upstream but had never been copied into the package.
+
 ## What's new in 1.6.11
 
 ### Fixed: modifying an item could edit a different one

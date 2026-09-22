@@ -29,6 +29,13 @@ export default [
       'coverage/**',
       '**/*.d.ts',
       'src/p5-compat/**',   // vendored compatibility shim, not ours to restyle
+      // Generated mirrors of mcp-cloud, every file stamped GENERATED — DO NOT
+      // EDIT and pinned byte-for-byte by the provenance test. A finding here
+      // has exactly one honest fix, upstream, and silencing it locally would
+      // mean hand-editing a file the sync script overwrites. Same reasoning as
+      // the shim above: a newly synced generator tripping no-unused-vars is a
+      // note about somebody else's source, not a defect in this package.
+      'src/vendor/**',
     ],
   },
   {

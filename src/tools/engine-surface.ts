@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 005c20f6f382ced15e1827dc7dfb530ffe765192
- * sha256:    1ce4311cc34baa2f87273ced81c453a82c5b716f25bc2ace4462734143afd415   (of PinePaper.js as committed)
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 3708165a6864d6de4147fff0505bd097783979d3
+ * sha256:    1a30565bac9761ca896cb758583963b09304e44d6854d7a14f21a1a7dd925e45   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on `window.app`, with how it gets there. The parity
@@ -16,7 +16,7 @@
 /** How a name lands on `app`. */
 export type EngineMemberKind = 'method' | 'accessor' | 'property' | 'lazy' | 'lazyHeavy' | 'bootstrap';
 
-/** 1112 names, from FxTool/js/PinePaper.js. */
+/** 1113 names, from FxTool/js/PinePaper.js. */
 export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object.freeze({
   _activeByGroup: 'property',
   _activeDrawingGroup: 'method',
@@ -182,6 +182,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _procMotion: 'method',
   _propertyCache: 'property',
   _qualityLevel: 'property',
+  _rasterMissReason: 'method',
   _rebaseRestBounds: 'method',
   _rebuildGradientToBounds: 'method',
   _recordingExportState: 'property',
