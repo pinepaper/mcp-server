@@ -8781,6 +8781,42 @@ ${needWorld}
     const { action, ...rest } = input;
     const opts: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(rest)) if (v !== undefined) opts[k] = v;
+
+    // SPREAD-THROUGH IS NOT THE SAME AS AGREEING.
+    //
+    // Everything above this line reaches app.stickFigure verbatim, which made
+    // the schema look consumed to every guard we have while four fields meant
+    // something the engine does not. The engine compares propSide against
+    // 'L' | 'R', so 'right' — which the schema declared and advertised —
+    // matched neither arm of that test and every prop went to the LEFT hand.
+    // Nothing failed; the figure just held it in the wrong hand, forever.
+    if (action === 'figure') {
+      const side = typeof opts.propSide === 'string' ? opts.propSide : undefined;
+      if (side) opts.propSide = side.toUpperCase().startsWith('R') ? 'R' : 'L';
+
+      // The engine iterates opts.walk, so `true` — the form the schema itself
+      // advertised as "the default" — walked exactly nowhere.
+      if (opts.walk === true) opts.walk = [{ seconds: 1.2, from: 0 }];
+      else if (opts.walk === false) delete opts.walk;
+
+      // `facing` is read for chairs and for nothing else. Passing it here
+      // would be accepted and ignored, which is the thing being fixed, so it
+      // is refused by name instead — the add_ports precedent.
+      if (opts.facing !== undefined) {
+        // Built through S() rather than interpolated: the message names two
+        // quoted values, and hand-escaping them into a single-quoted emitted
+        // string produced a syntax error the first time.
+        const msg =
+          `facing is a property of a chair, not of a figure — app.stickFigure `
+          + `never reads it, so ${String(opts.facing)} would have been accepted and ignored. `
+          + `A figure faces the way it travels, so give it travel, or a pose that turns it. `
+          + `facing belongs on action "set" with kind "chair".`;
+        return `
+// Stick: figure — refused, rather than accepted and ignored
+({ success: false, error: ${S(msg)} });`.trim();
+      }
+    }
+
     const fn = action === 'figure' ? 'stickFigure' : 'stickSet';
     return `
 // Stick: ${action}

@@ -59,7 +59,20 @@ function consumerSource(): string {
  * adding it here is not a fix.
  */
 const KNOWN_UNCONSUMED: Readonly<Record<string, readonly string[]>> = Object.freeze({
-  StickInputSchema: ['poseAt', 'propSide', 'trouser', 'withHair', 'groundY', 'surfaceY'],
+  // SPREAD-THROUGH, AND VERIFIED AT THE FAR END. generateStick does
+  // `const { action, ...rest }`, so these never appear by name on this side —
+  // which is the limit of what this guard can see, not evidence of a bug. Each
+  // was checked against FxTool origin/main and IS read: opts.poseAt (2 sites),
+  // opts.trouser, opts.withHair, opts.groundY, opts.surfaceY. `propSide` left
+  // this list by being named in the emitter, which it now is because 'right'
+  // had to be normalised to the 'R' the engine tests against.
+  //
+  // They sit here because the guard cannot prove it mechanically, not because
+  // they are broken. What the guard genuinely could not see is worse and is
+  // fixed elsewhere: four stick fields were spread through and MEANT something
+  // the engine does not — see stick-contract.test.ts. A name appearing is not
+  // the same as a name agreeing.
+  StickInputSchema: ['poseAt', 'trouser', 'withHair', 'groundY', 'surfaceY'],
   WorldTourInputSchema: ['dwell', 'highlightColors', 'showLabels', 'labelColor'],
   GetHighlightedMapRegionsInputSchema: ['momentum', 'showOcean'],
   LoadMapInputSchema: ['hoverStroke'],

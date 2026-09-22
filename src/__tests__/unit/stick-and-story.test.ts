@@ -21,11 +21,15 @@ describe('stick', () => {
     const fig = stick({ action: 'figure', pose: 'wave', walk: true });
     expect(fig).toContain('app.stickFigure(');
     expect(fig).toContain('"pose":"wave"');
-    expect(fig).toContain('"walk":true');
+    // NOT `"walk":true`, which this test used to assert. The engine iterates
+    // opts.walk, so the literal `true` the schema advertised as "the default"
+    // walked nowhere — see stick-contract.test.ts.
+    expect(fig).toContain('"walk":[{"seconds":1.2,"from":0}]');
     // `action` is this tool's routing, not the kit's option.
     expect(fig).not.toContain('"action"');
 
-    expect(stick({ action: 'set', floor: true })).toContain('app.stickSet(');
+    // floor is a COLOUR the room is painted, not a boolean asking for one.
+    expect(stick({ action: 'set', kind: 'room', floor: '#333' })).toContain('app.stickSet(');
   });
 
   it('omits fields that were not given, rather than sending nulls', () => {
@@ -36,14 +40,21 @@ describe('stick', () => {
   });
 
   it('carries the whole option surface the engine reads', () => {
+    // Every value here is now the shape app.stickFigure actually reads. The
+    // previous version of this test asserted `"propSide":"left"`, a `name`-keyed
+    // expression beat and an object `travel` — all three were accepted by the
+    // engine and silently discarded, and this test agreed with them for as long
+    // as the tool existed. `facing` is gone: a figure has none, and passing it
+    // is now refused by name.
     const code = stick({
       action: 'figure', pose: 'wave', poseAt: 1.5, expression: 'smile',
-      expressions: [{ at: 0.5, name: 'blink' }], walk: true, travel: { to: 400 },
+      expressions: [{ at: 0.5, expression: 'blink' }], walk: true,
+      travel: [{ t: 0, x: 100, y: 500 }, { t: 4, x: 400, y: 500 }],
       prop: 'umbrella', propSide: 'left', garment: 'coat', trouser: 'jeans',
-      hair: 'bob', withHair: true, facing: 'left', scale: 1.4,
+      hair: 'bob', withHair: true, scale: 1.4,
       groundY: 500, durationSeconds: 6, id: 'walker',
     });
-    for (const frag of ['"poseAt":1.5', '"expressions"', '"travel"', '"propSide":"left"', '"trouser":"jeans"', '"withHair":true', '"groundY":500']) {
+    for (const frag of ['"poseAt":1.5', '"expressions"', '"travel"', '"propSide":"L"', '"trouser":"jeans"', '"withHair":true', '"groundY":500']) {
       expect(code).toContain(frag);
     }
     expect(() => new Function(code)).not.toThrow();
