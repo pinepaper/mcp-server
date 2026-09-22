@@ -447,13 +447,15 @@ ITEM TYPES:
 - circle-outline: The circle CURVE — stroked, no interior (properties: radius,
   strokeColor, strokeWidth)
 - arrow-right: Alias for arrow — the same definition under the name the shape
-  grids use. Identical output; both are listed because both are accepted.
+  grids use. Identical output and the same width, height and color; both are
+  listed because both are accepted.
 
 SPEECH AND ANNOTATION SHAPES — the engine draws these; use one instead of
 hand-building an outline from a path. All take width, height and color, and the
-descriptions below are the engine's own. The six with a tail also take
-tailDirection (bottom-left | bottom-right | bottom | top-left | top-right | top
-| left | right) and tailSize (0-1, default 0.35):
+descriptions below are the engine's own. Every one of them also accepts
+cornerRadius. The six with a tail also take tailDirection (bottom-left |
+bottom-right | bottom | top-left | top-right | top | left | right) and tailSize
+(0-1, default 0.35):
 - speech-bubble: Classic round speech bubble with triangular tail.
 - speech-bubble-square: Rectangular speech bubble with sharp corners and
   pointed tail.
