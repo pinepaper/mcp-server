@@ -100,3 +100,60 @@ describe('the stick schema types match what the engine coerces', () => {
     expect(() => StickInputSchema.parse({ action: 'set', kind: 'shelf', items: [{ a: 1 }] })).toThrow();
   });
 });
+
+/**
+ * load_map and loadMap() shared almost no vocabulary.
+ *
+ * loadMap(source, options) destructures projection, center, scale, rotate,
+ * fitBounds, parent, styles, style, interactive, selectable, showOcean,
+ * oceanColor, quality, smoothPaths, simplifyTolerance. Seven of this tool's
+ * twelve options were none of those — the style keys nest under `styles` and
+ * are spelled differently there, the interactivity flags have other names —
+ * so all seven were accepted, stringified into the call, and dropped.
+ */
+describe('load_map speaks the engine vocabulary', () => {
+  const optsOf = (input: unknown): Record<string, unknown> => {
+    const code = codeGenerator.generateLoadMap(input as never);
+    const m = /loadMap\('[^']*',\s*(\{[\s\S]*?\})\)/.exec(code);
+    if (!m) throw new Error(`no loadMap call in:\n${code}`);
+    return JSON.parse(m[1]) as Record<string, unknown>;
+  };
+
+  it('nests the style keys under styles, spelled as the presets spell them', () => {
+    expect(optsOf({ mapId: 'world', fillColor: '#eee', strokeColor: '#333', strokeWidth: 2, hoverFill: '#00f' }))
+      .toMatchObject({ styles: { fill: '#eee', stroke: '#333', strokeWidth: 2, hoverFill: '#00f' } });
+  });
+
+  it('does not leave the flat spellings where the engine will ignore them', () => {
+    const opts = optsOf({ mapId: 'world', fillColor: '#eee', strokeColor: '#333' });
+    expect(opts).not.toHaveProperty('fillColor');
+    expect(opts).not.toHaveProperty('strokeColor');
+  });
+
+  it('renames the interactivity flags to what loadMap destructures', () => {
+    expect(optsOf({ mapId: 'world', enableHover: false, enableClick: false }))
+      .toMatchObject({ interactive: false, selectable: false });
+  });
+
+  it('passes the options the engine really does destructure straight through', () => {
+    expect(optsOf({ mapId: 'world', projection: 'mercator', quality: 'professional' }))
+      .toMatchObject({ projection: 'mercator', quality: 'professional' });
+  });
+
+  it('sends no styles key when no styling was asked for', () => {
+    expect(optsOf({ mapId: 'world', projection: 'mercator' })).not.toHaveProperty('styles');
+  });
+
+  it('strips hoverStroke and names it, since the engine implements it nowhere', () => {
+    const code = codeGenerator.generateLoadMap({ mapId: 'world', hoverStroke: '#f00' } as never);
+    expect(optsOf({ mapId: 'world', hoverStroke: '#f00' })).not.toHaveProperty('hoverStroke');
+    expect(code).toContain('ignored: ["hoverStroke"]');
+    expect(code).toContain('implemented nowhere in it');
+  });
+
+  it('says nothing about hoverStroke when it was not passed', () => {
+    const code = codeGenerator.generateLoadMap({ mapId: 'world' } as never);
+    expect(code).not.toContain('ignored:');
+    expect(code).not.toContain('hoverStroke');
+  });
+});

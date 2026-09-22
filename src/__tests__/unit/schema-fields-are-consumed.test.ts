@@ -31,53 +31,102 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-/** Every field declared on an input schema, by schema name. */
-function declaredFields(): Array<{ schema: string; fields: string[] }> {
-  const src = readFileSync(join(SRC, 'types', 'schemas.ts'), 'utf8');
+/**
+ * Every field declared on an input schema, by schema name.
+ *
+ * Brace-matched, not `[\s\S]*?\n\}\)`. That pattern could not match an
+ * EMPTY object — `z.object({})` on one line has no newline before its close —
+ * so it ran past the schema it was reading and swallowed the next one:
+ * GetHighlightedMapRegionsInputSchema, which declares nothing at all, was
+ * credited with GlobeEnableInputSchema's `momentum` and `showOcean`, and both
+ * sat in the allowance below under a schema that does not have them. A parser
+ * that mis-attributes fields makes every verdict about them meaningless.
+ */
+export function declaredFields(
+  src = readFileSync(join(SRC, 'types', 'schemas.ts'), 'utf8'),
+): Array<{ schema: string; fields: string[] }> {
   const out: Array<{ schema: string; fields: string[] }> = [];
-  for (const m of src.matchAll(/export const (\w*InputSchema)\s*=\s*z\.object\(\{([\s\S]*?)\n\}\)/g)) {
-    out.push({ schema: m[1], fields: [...m[2].matchAll(/^\s{2}(\w+):\s*z\./gm)].map((x) => x[1]) });
+  for (const m of src.matchAll(/export const (\w*InputSchema)\s*=\s*z\.object\(/g)) {
+    const open = src.indexOf('{', m.index + m[0].length - 1);
+    if (open === -1) continue;
+    let depth = 0;
+    let close = -1;
+    for (let i = open; i < src.length; i++) {
+      if (src[i] === '{') depth++;
+      else if (src[i] === '}' && --depth === 0) { close = i; break; }
+    }
+    if (close === -1) continue;
+    const body = src.slice(open + 1, close);
+    out.push({ schema: m[1], fields: [...body.matchAll(/^\s{2}(\w+):\s*z\./gm)].map((x) => x[1]) });
   }
   return out;
 }
 
-/** Everything that could READ a field — not the declaration, not the advert. */
+/**
+ * Everything that could READ a field — not the declaration, not the advert,
+ * and NOT A COMMENT.
+ *
+ * Comments are stripped because a text search cannot tell mention from use. A
+ * comment added here listing loadMap's own destructured options — showOcean
+ * among them — was enough to mark `showOcean` consumed, which is the guard
+ * marking a field safe because someone wrote its name in prose about it.
+ *
+ * The `[^:]` guard keeps `http://` intact.
+ */
 function consumerSource(): string {
   return walk(SRC)
     .filter((f) => !f.endsWith(join('types', 'schemas.ts')) && !f.endsWith(join('tools', 'definitions.ts')))
     .map((f) => readFileSync(f, 'utf8'))
-    .join('\n');
+    .join('\n')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 }
 
 /**
- * Fields accepted and read by nothing, at the time this guard was written.
+ * Fields this guard cannot SEE, because an emitter spreads the whole input.
  *
- * Every entry is a parameter a caller can set and be quietly ignored on. Same
- * ratchet as the engine-surface lists: it may only shrink, a fixed entry must
- * be DELETED rather than left, and a new one fails outright. Fixing one means
- * either wiring it through or refusing it by name the way add_ports now does —
- * adding it here is not a fix.
+ * `generateStick`, `generateWorldTour`, `generateGlobeEnable` and
+ * `generateTourItem` all JSON.stringify their validated input straight into an
+ * engine call, so the field names never appear on this side. That is the limit
+ * of a text search, not evidence of a bug — and calling it one was the mistake
+ * this list used to make.
+ *
+ * Every entry below was checked against FxTool origin/main and IS read:
+ *   stick     opts.poseAt (2 sites), opts.trouser, opts.withHair,
+ *             opts.groundY, opts.surfaceY
+ *   worldTour options.dwell, options.highlightColors, options.showLabels,
+ *             options.labelColor
+ *   globe     enableGlobeMode destructures { momentum, showOcean } and uses
+ *             both — _globeMomentum and _reRenderGlobe(showOcean)
+ *   tourItem  options.dwell, in the shared waypoint timing
+ *
+ * These are exemptions with provenance, not debt. What a text search genuinely
+ * cannot catch is worse, and is not fixed by a list: four stick fields were
+ * spread through and MEANT something the engine does not — 'right' tested
+ * equal to neither arm of an 'L'|'R' comparison, so every prop went to the
+ * left hand. A name appearing is not a name agreeing. See
+ * stick-contract.test.ts, and prefer a behavioural pin to an entry here.
  */
-const KNOWN_UNCONSUMED: Readonly<Record<string, readonly string[]>> = Object.freeze({
-  // SPREAD-THROUGH, AND VERIFIED AT THE FAR END. generateStick does
-  // `const { action, ...rest }`, so these never appear by name on this side —
-  // which is the limit of what this guard can see, not evidence of a bug. Each
-  // was checked against FxTool origin/main and IS read: opts.poseAt (2 sites),
-  // opts.trouser, opts.withHair, opts.groundY, opts.surfaceY. `propSide` left
-  // this list by being named in the emitter, which it now is because 'right'
-  // had to be normalised to the 'R' the engine tests against.
-  //
-  // They sit here because the guard cannot prove it mechanically, not because
-  // they are broken. What the guard genuinely could not see is worse and is
-  // fixed elsewhere: four stick fields were spread through and MEANT something
-  // the engine does not — see stick-contract.test.ts. A name appearing is not
-  // the same as a name agreeing.
+const SPREAD_THROUGH_VERIFIED: Readonly<Record<string, readonly string[]>> = Object.freeze({
   StickInputSchema: ['poseAt', 'trouser', 'withHair', 'groundY', 'surfaceY'],
   WorldTourInputSchema: ['dwell', 'highlightColors', 'showLabels', 'labelColor'],
-  GetHighlightedMapRegionsInputSchema: ['momentum', 'showOcean'],
-  LoadMapInputSchema: ['hoverStroke'],
+  GlobeEnableInputSchema: ['momentum', 'showOcean'],
   TourItemInputSchema: ['dwell'],
 });
+
+/**
+ * Fields accepted and read by nothing at all.
+ *
+ * EMPTY, and that is the point — it is not decoration. It held
+ * LoadMapInputSchema.hoverStroke, which FxTool documents in two spec files and
+ * implements in none; loadMap now strips it and names it in the result instead
+ * of passing it to something that ignores it.
+ *
+ * A RATCHET: entries may be deleted, never added. Fixing one means wiring it
+ * through, refusing it by name, or reporting it in the result — adding it here
+ * is not a fix.
+ */
+const KNOWN_UNCONSUMED: Readonly<Record<string, readonly string[]>> = Object.freeze({});
 
 describe('every parameter a tool accepts is read by something', () => {
   const consumers = consumerSource();
@@ -91,7 +140,7 @@ describe('every parameter a tool accepts is read by something', () => {
   it('no field is accepted and then read by nothing', () => {
     const unconsumed: string[] = [];
     for (const { schema, fields } of schemas) {
-      const allowed = KNOWN_UNCONSUMED[schema] ?? [];
+      const allowed = [...(KNOWN_UNCONSUMED[schema] ?? []), ...(SPREAD_THROUGH_VERIFIED[schema] ?? [])];
       for (const f of fields) {
         if (allowed.includes(f)) continue;
         if (new RegExp(`\\b${f}\\b`).test(consumers)) continue;
@@ -101,9 +150,36 @@ describe('every parameter a tool accepts is read by something', () => {
     expect(unconsumed.sort()).toEqual([]);
   });
 
+  it('an empty z.object({}) does not swallow the next schema', () => {
+    // The regression that mis-filed momentum/showOcean. `z.object({})` has no
+    // newline before its close, so the old non-greedy pattern ran past it and
+    // credited the NEXT schema's fields to the empty one.
+    const src = [
+      'export const EmptyInputSchema = z.object({}).describe(\'nothing\');',
+      '',
+      'export const NextInputSchema = z.object({',
+      '  momentum: z.boolean().optional(),',
+      '  showOcean: z.boolean().optional(),',
+      '});',
+    ].join('\n');
+    const parsed = declaredFields(src);
+    expect(parsed.find((p) => p.schema === 'EmptyInputSchema')?.fields).toEqual([]);
+    expect(parsed.find((p) => p.schema === 'NextInputSchema')?.fields).toEqual(['momentum', 'showOcean']);
+  });
+
+  it('reads nested objects without ending the schema early', () => {
+    const src = [
+      'export const NestedInputSchema = z.object({',
+      '  at: z.object({ x: z.number() }).optional(),',
+      '  after: z.string().optional(),',
+      '});',
+    ].join('\n');
+    expect(declaredFields(src)[0].fields).toEqual(['at', 'after']);
+  });
+
   it('the allowance only ever shrinks', () => {
     const stale: string[] = [];
-    for (const [schema, fields] of Object.entries(KNOWN_UNCONSUMED)) {
+    for (const [schema, fields] of Object.entries({ ...KNOWN_UNCONSUMED, ...SPREAD_THROUGH_VERIFIED })) {
       const declared = schemas.find((s) => s.schema === schema)?.fields ?? [];
       for (const f of fields) {
         // Either it is now read, or it is gone from the schema: both are fixes,
@@ -111,6 +187,6 @@ describe('every parameter a tool accepts is read by something', () => {
         if (!declared.includes(f) || new RegExp(`\\b${f}\\b`).test(consumers)) stale.push(`${schema}.${f}`);
       }
     }
-    expect(stale, 'these are resolved — delete them from KNOWN_UNCONSUMED').toEqual([]);
+    expect(stale, 'these are resolved — delete them from the list that names them').toEqual([]);
   });
 });

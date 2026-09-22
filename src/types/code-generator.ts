@@ -4052,8 +4052,45 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
    */
   generateLoadMap(input: LoadMapInput): string {
     const validated = LoadMapInputSchema.parse(input);
-    const { mapId, ...mapOptions } = validated;
-    const optionsStr = Object.keys(mapOptions).length > 0 ? JSON.stringify(mapOptions) : '{}';
+    const { mapId, ...raw } = validated;
+
+    // THIS SCHEMA AND loadMap() SHARED ALMOST NO VOCABULARY.
+    //
+    // loadMap(source, options) destructures projection, center, scale, rotate,
+    // fitBounds, parent, styles, style, interactive, selectable, showOcean,
+    // oceanColor, quality, smoothPaths and simplifyTolerance. Of the twelve
+    // options this tool offered, SEVEN were none of those: the styling keys
+    // live nested under `styles` and are spelled differently there, and the two
+    // interactivity flags have other names entirely. Every one was accepted,
+    // JSON-stringified into the call and dropped — a caller who set fillColor
+    // got the default grey with no indication why.
+    const { fillColor, strokeColor, strokeWidth, hoverFill, hoverStroke, enableHover, enableClick, ...passthrough } = raw;
+
+    // The engine's own style vocabulary — see stylePresets in MapSystem.js.
+    const styles: Record<string, unknown> = {};
+    if (fillColor !== undefined) styles.fill = fillColor;
+    if (strokeColor !== undefined) styles.stroke = strokeColor;
+    // strokeWidth only survives inside `styles`; the merge overwrites a
+    // top-level one with the quality preset's value.
+    if (strokeWidth !== undefined) styles.strokeWidth = strokeWidth;
+    if (hoverFill !== undefined) styles.hoverFill = hoverFill;
+
+    const engineOptions: Record<string, unknown> = { ...passthrough };
+    if (Object.keys(styles).length > 0) engineOptions.styles = styles;
+    if (enableHover !== undefined) engineOptions.interactive = enableHover;
+    if (enableClick !== undefined) engineOptions.selectable = enableClick;
+
+    // hoverStroke IS IN TWO SPEC DOCUMENTS AND NO SOURCE FILE. FxTool lists it
+    // in docs/guides/mcp-integration.md and docs/mcp/tools-spec.md; `js/` has
+    // never contained the identifier, and it is not a style-preset key either,
+    // so there is nowhere to map it. Not refused — failing a whole map load
+    // over one cosmetic key helps nobody — but named in the result, so the
+    // caller learns it did nothing at the moment they used it.
+    const ignored = hoverStroke !== undefined ? ['hoverStroke'] : [];
+    const optionsStr = Object.keys(engineOptions).length > 0 ? JSON.stringify(engineOptions) : '{}';
+    const warn = ignored.length
+      ? `\n      ignored: ${JSON.stringify(ignored)},\n      note: 'hoverStroke is documented by the engine but implemented nowhere in it — this map loaded without it.',`
+      : '';
 
     return `
 // Load geographic map
@@ -4069,7 +4106,7 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
       mapId: result.mapId || '${mapId}',
       regions: result.regions?.length || 0,
       bounds: result.bounds,
-      center: result.center
+      center: result.center,${warn}
     };
   } catch (error) {
     return { success: false, error: error.message };
