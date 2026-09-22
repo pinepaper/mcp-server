@@ -403,10 +403,38 @@ ITEM TYPES:
 - text: Text content with font styling (properties: content, fontSize, color, fontFamily)
 - circle: Circular shape (properties: radius, color, strokeColor, strokeWidth)
 - star: Star shape (properties: radius1, radius2, points, color)
+  radius1 is the OUTER radius and is what sizes the star; radius or
+  width/height size it equally well. radius2 is read ONLY as a ratio to
+  radius1 (inner/outer, default 0.4), so radius2 passed WITHOUT radius1 is
+  ignored completely and you get the default waist. points defaults to 5.
+  A star is always radially symmetric — given width and height it uses the
+  smaller — and the size you give is the radius BOX, the circle the tips
+  touch. The visible bounds are never larger than that box and usually
+  smaller: only at points: 4 do the tips reach all four edges.
 - rectangle: Rectangle (properties: width, height, color, cornerRadius)
-- triangle: Triangular shape (properties: color)
+- triangle: Triangular shape (properties: width, height, color, angles, kind)
+  Defaults to a 100x86 isosceles. For any OTHER triangle, do not hand-build it
+  from a path — name it: kind: 'right' | 'equilateral' | 'isosceles' |
+  'obtuse' | 'acute' | 'scalene', or give exact interior angles in degrees,
+  angles: [30, 60] (the third is inferred) or [30, 60, 90]. Angles that nearly
+  sum to 180 are normalized, so rounding is safe. With angles or kind the
+  triangle scales UNIFORMLY into the width x height box — the angles are fixed
+  and win, so one axis comes out smaller than requested. That is the only way
+  to keep a 'right' triangle actually right.
+  An angle set the engine cannot use — fewer than two entries, or any angle
+  outside 0.5-179.5 degrees — falls back to the default isosceles SILENTLY,
+  with no error. If you asked for a right triangle and got an isosceles one,
+  the angles were rejected.
 - polygon: Regular polygon with N sides (properties: sides, radius, color)
-- ellipse: Oval shape (properties: color)
+  points additionally accepts an explicit VERTEX LIST — [[x, y], ...] or
+  [{x, y}, ...], three or more, in canvas coordinates — which builds that
+  exact, possibly IRREGULAR polygon and ignores sides. Reach for this before
+  path when the outline is straight-edged. A plain number in points is not a
+  vertex list and falls through to sides (default 6).
+  In the vertex-list form the coordinates are ABSOLUTE canvas coordinates and
+  position is ignored — the polygon lands where its points say, not where you
+  positioned it. Offset the points yourself, or use sides + radius + position.
+- ellipse: Oval shape (properties: width, height, color) — defaults to 100x60
 - path: Custom path with segments or SVG data (properties: segments, pathData, strokeColor, fillColor, closed, smooth)
 - line: Line between two points (properties: from, to, strokeColor, strokeWidth)
 - arc: Curved arc through three points (properties: from, through, to, strokeColor)
@@ -414,7 +442,7 @@ ITEM TYPES:
 - hexagon: Regular 6-sided polygon (properties: radius, color)
 - diamond: 4-sided diamond/rhombus (properties: radius, color)
 - arrow: Right-pointing block arrow (properties: width, height, color)
-- heart: Heart shape (properties: color)
+- heart: Heart shape (properties: width, height, color) — defaults to 80x80
 - disk: Filled disk — the region inside a circle (properties: radius, color)
 - circle-outline: The circle CURVE — stroked, no interior (properties: radius,
   strokeColor, strokeWidth)
