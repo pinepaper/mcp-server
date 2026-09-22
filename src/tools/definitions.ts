@@ -407,8 +407,11 @@ shape. A string is the short form; the object form places and styles it:
 label: { content: 'Start', position: 'top', offset: [0, 10], fontSize: 14,
 fontFamily: 'Inter, sans-serif', color: '#ffffff', backgroundColor: null }.
 position takes center (default), top, bottom, left, right or a corner. Use
-label.position for placement — a sibling labelPosition is accepted by the
-diagram tools, not by this one.
+label.position for placement: it works here today, and where the sibling
+labelPosition spelling is also accepted, label.position wins.
+Labelling a text item gives you TWO text items in the group — the body and the
+label. That is what you want for a caption; it is a surprise if you expected
+the label to replace the content.
 
 - text: Text content with font styling (properties: content, fontSize, color, fontFamily)
 - circle: Circular shape (properties: radius, color, strokeColor, strokeWidth)
