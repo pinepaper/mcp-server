@@ -351,6 +351,30 @@ const item = app.create('rectangle', ${JSON.stringify(plate, null, 2)});
 if (item && item.data) { item.data.renderAs = ${JSON.stringify(itemType)}; item.data.renderParams = ${JSON.stringify(params)}; }`;
   }
 
+  // AN UNKNOWN ANCHOR IS INVISIBLE OVER MCP.
+  //
+  // The engine names a bad anchor through console.warn and leaves (x, y) as
+  // the centre — good behaviour in the editor, and nothing at all here, since
+  // the production build strips console.warn. A typo would therefore displace
+  // the item by half its own size, which is the exact bug `anchor` exists to
+  // remove, arriving silently. Checked before it is sent instead.
+  const ANCHORS = ['top-left', 'top-right', 'bottom-left', 'bottom-right', 'center', 'centre'];
+  const anchorGiven = params.anchor ?? params.origin;
+  if (anchorGiven !== undefined) {
+    const normalized = String(anchorGiven).toLowerCase().replace(/[\s_]+/g, '-');
+    if (!ANCHORS.includes(normalized)) {
+      return `
+// Create ${itemType} — refused, rather than silently centred
+({ success: false, error: ${JSON.stringify(
+        `anchor ${JSON.stringify(String(anchorGiven))} is not one of ${ANCHORS.slice(0, 5).join(', ')}. `
+        + 'The engine would leave x/y as the CENTRE and say so only in a console this tool cannot read, '
+        + 'so the item would land half its own size away with nothing to explain it.',
+      )} });`.trim();
+    }
+    if (params.anchor !== undefined) params.anchor = normalized;
+    if (params.origin !== undefined) params.origin = normalized;
+  }
+
   // Build the code
   let code = `
 // Create ${itemType} item

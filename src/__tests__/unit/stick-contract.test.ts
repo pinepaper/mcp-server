@@ -171,3 +171,53 @@ describe('load_map speaks the engine vocabulary', () => {
     expect(code).not.toContain('hoverStroke');
   });
 });
+
+/**
+ * anchor: the B1 fix, and the one parameter whose typo is invisible.
+ *
+ * (x, y) is the bounding-box CENTRE. Anything that computed a layout box
+ * authored the TOP-LEFT, so passing those coordinates straight in displaces
+ * every item by half its own size — which is what "design-system compose
+ * mispositions everything" was. `anchor` states which corner was meant.
+ *
+ * The engine names an unknown anchor through console.warn and falls back to
+ * the centre. Production strips console.warn, so over MCP that fallback is
+ * silent and reproduces the exact displacement the option removes.
+ */
+describe('anchor is checked before it can be silently ignored', () => {
+  const codeFor = (properties: Record<string, unknown>): string =>
+    codeGenerator.generateCreateItem({
+      itemType: 'rectangle', position: { x: 10, y: 20 }, properties,
+    } as never);
+
+  it('passes the anchors the engine implements', () => {
+    for (const a of ['top-left', 'top-right', 'bottom-left', 'bottom-right', 'center']) {
+      const code = codeFor({ anchor: a, width: 100, height: 50 });
+      expect(code).toContain('app.create(');
+      expect(code).toContain(`"anchor": "${a}"`);
+    }
+  });
+
+  it('normalises spacing and case the way the engine does', () => {
+    expect(codeFor({ anchor: 'Top_Left' })).toContain('"anchor": "top-left"');
+    expect(codeFor({ anchor: 'TOP LEFT' })).toContain('"anchor": "top-left"');
+  });
+
+  it('refuses an unknown anchor instead of letting it fall back to centre', () => {
+    const code = codeFor({ anchor: 'topleft' });
+    expect(code).not.toContain('app.create(');
+    expect(code).toContain('success: false');
+    expect(code).toContain('half its own size away');
+  });
+
+  it('treats origin as the alias the engine treats it as', () => {
+    expect(codeFor({ origin: 'top-left' })).toContain('"origin": "top-left"');
+    expect(codeFor({ origin: 'nonsense' })).toContain('success: false');
+  });
+
+  it('says nothing about anchors when none was given', () => {
+    const code = codeFor({ width: 100, height: 50 });
+    expect(code).toContain('app.create(');
+    expect(code).not.toContain('anchor');
+  });
+});

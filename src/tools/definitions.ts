@@ -401,6 +401,15 @@ For requests like "draw a witch", "draw a cat face", "draw a person", or any det
 
 ITEM TYPES:
 
+EVERY type below also takes an anchor, which says WHICH CORNER your x/y meant.
+Position is the bounding-box CENTRE by default. Anything that computed a layout
+box — a design system, or any CSS-shaped mental model — authored the TOP-LEFT
+instead, and passing those coordinates straight in displaces every item by half
+its own size. anchor: 'top-left' (also top-right, bottom-left, bottom-right,
+center; origin is an alias for the parameter) fixes that without you computing
+bounds you cannot know until the item exists. It is applied after size and
+rotation, so it uses the item's real box.
+
 EVERY type below also takes a label, which wraps the item in a labelled group —
 you do not need a second create call and a hand-computed position to caption a
 shape. A string is the short form; the object form places and styles it:
@@ -419,7 +428,8 @@ the label to replace the content.
   radius1 is the OUTER radius and is what sizes the star; radius or
   width/height size it equally well. radius2 is read ONLY as a ratio to
   radius1 (inner/outer, default 0.4), so radius2 passed WITHOUT radius1 is
-  ignored completely and you get the default waist. points defaults to 5.
+  ignored completely and you get the default waist. innerRadiusRatio sets that
+  same waist directly and needs no radii at all. points defaults to 5.
   A star is always radially symmetric — given width and height it uses the
   smaller — and the size you give is the radius BOX, the circle the tips
   touch. The visible bounds are never larger than that box and usually
@@ -8384,7 +8394,7 @@ QUERIES (14):
 Listing:
 - list_types: All item types (filter by category, includeAbstract)
 - list_edges: All relation/edge types (filter by category)
-- list_generators: the BUILT-IN background generators, from a fixed table in the engine. It is not a view of what is registered: a generator you registered at runtime will never appear here, and neither will a custom draw function. Use it to discover the built-ins and their parameters, not to check whether something exists.
+- list_generators: every generator the engine can run — the built-ins AND the registry, merged and awaited, which on a current studio is about 74 rather than the 3 this once reported. A generator you registered at runtime DOES appear. A custom draw function passed to execute_generator does not, because it was never registered; that is the one gap. If the registry chunk has not finished loading the result says partial: true and names the retry rather than presenting the built-ins as the whole set, and an older studio that cannot merge the registry answers with the built-ins under that same flag.
 - list_effects: All visual effect types
 - list_patterns: All detected design patterns
 - list_math_functions: All math functions used in animations

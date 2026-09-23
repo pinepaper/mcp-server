@@ -3,9 +3,9 @@
  *
  * What each registry-backed shape reads, and how a caller reaches it.
  *
- * Source: FxTool origin/main 3708165a6864d6de4147fff0505bd097783979d3
+ * Source: FxTool origin/main 7661a67e4822fc20bc4644551cf2c86451f2b151
  *   js/PinePaper.js + 5 shape modules
- * sha256: 29cd0eec6f6eceaa
+ * sha256: 199eb6de376bed14
  *
  * A shape's `create` receives a `config`, never the caller's `params`.
  * PinePaper.js's registryConfig literal is the only bridge between the two, so
@@ -18,6 +18,7 @@
 export const ACCEPTED_CREATE_PARAMS: readonly string[] = Object.freeze([
   '_bulkCreate',
   'alignment',
+  'anchor',
   'angle',
   'angles',
   'animationDelay',
@@ -41,13 +42,16 @@ export const ACCEPTED_CREATE_PARAMS: readonly string[] = Object.freeze([
   'from',
   'height',
   'id',
+  'innerRadiusRatio',
   'justification',
   'keyframes',
   'kind',
   'label',
+  'labelPosition',
   'layer',
   'name',
   'opacity',
+  'origin',
   'pathData',
   'payloadType',
   'points',
@@ -95,7 +99,7 @@ export const CONFIG_KEY_SOURCES: Readonly<Record<string, readonly string[]>> = O
   "angles": Object.freeze(['angles']),
   "cornerRadius": Object.freeze(['cornerRadius']),
   "height": Object.freeze(['height', 'radius', 'radius1']),
-  "innerRadiusRatio": Object.freeze(['radius1', 'radius2']),
+  "innerRadiusRatio": Object.freeze(['innerRadiusRatio', 'radius1', 'radius2']),
   "kind": Object.freeze(['kind']),
   "points": Object.freeze(['points']),
   "position": Object.freeze([]),

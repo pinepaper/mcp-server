@@ -75,16 +75,13 @@ const KNOWN_DOC_GAPS: Readonly<Record<string, readonly string[]>> = {};
  * A RATCHET, on the same terms as above: delete, never zero out.
  */
 const KNOWN_CREATE_DOOR_GAPS: Readonly<Record<string, readonly string[]>> = {
-  data: ['labelPosition'],
-  database: ['labelPosition'],
-  decision: ['labelPosition'],
-  document: ['labelPosition'],
-  preparation: ['labelPosition'],
-  process: ['labelPosition'],
-  'speech-bubble': ['labelPosition'],
-  'speech-bubble-square': ['labelPosition'],
-  terminal: ['labelPosition'],
-  'uml-usecase': ['labelPosition'],
+  // EMPTY, and it emptied itself. This held `labelPosition` for ten shapes —
+  // read by them, carried by DiagramSystem.createShape, and not by app.create,
+  // which is the door pinepaper_create_item emits. FxTool folded it into the
+  // label config (5fef0664, on origin/main since 7661a67e) and the entries
+  // became stale on the next snapshot, which is the shape a ratchet should
+  // have: it shrank because the underlying thing was fixed, with nobody
+  // tending the list.
 };
 
 /**
