@@ -12,6 +12,7 @@ import { Tool } from '@modelcontextprotocol/sdk/types.js';
 import { I18nManager } from '../i18n/index.js';
 import { COMPACT_DESCRIPTIONS } from './compact-descriptions.js';
 import { MINIMAL_DESCRIPTIONS } from './minimal-descriptions.js';
+import { STICK_GAITS, STICK_POSES, STICK_SEQUENCES, STICK_EXPRESSIONS, STICK_PROPS } from './stick-vocabulary.js';
 import {
   EffectTypeSchema,
   SimpleAnimationTypeSchema,
@@ -2421,7 +2422,9 @@ A partial composition reports as a failure with the elements that did not create
     name: 'pinepaper_stick',
     description: `The vendored stick-figure kit — a rigged figure posed, walking, travelling, holding a prop, with a garment and hair, plus the set it stands on and among.
 
-A different construction from pinepaper_character, which places a figure from the DESIGN GRAPH by concept ("pp:Pigeon"). This is the stick kit specifically, and its options — pose, walk, travel, prop, garment, trouser, hair, expression and a timeline of expressions — were discoverable only by reading the engine's source.
+A different construction from pinepaper_character, which places a figure from the DESIGN GRAPH by concept ("pp:Pigeon"). This is the stick kit specifically.
+
+TO MAKE IT ACT, not just stand: gait is how it walks and is never just walking; poses is the body over time, [{at, pose}]; sequence is a named track of those. Pass gait and travel in the SAME call to cross the frame — they share one track and two calls fight over it. A mistyped gait, pose or sequence comes back NAMED in warnings with the valid list, and the figure is still built.
 
 action 'figure' builds the figure. action 'set' builds the floor, the wall and the objects around it, so a figure has somewhere to be.
 
@@ -2434,26 +2437,48 @@ The geometry is vendored from mcp-cloud, which makes this a three-repo artifact:
         kind: { type: 'string', description: 'figure: which figure. set: which piece of the kit.' },
         at: { type: 'object', description: '{ x?, y? } — where it goes.' },
         scale: { type: 'number', description: 'Size multiplier.' },
-        facing: { type: 'string', enum: ['left', 'right'], description: 'Which way the figure looks.' },
-        pose: { type: 'string', description: "figure: a named pose from the kit's POSES." },
+        facing: { type: 'string', enum: ['left', 'right'], description: "set: which way a CHAIR faces. A figure has none and passing it here is refused — a figure faces the way it travels." },
+        pose: { type: 'string', enum: [...STICK_POSES], description: 'figure: ONE pose, held.' },
         poseAt: { type: 'number', description: 'figure: seconds at which that pose is struck.' },
-        expression: { type: 'string', description: 'figure: one facial expression.' },
-        expressions: { type: 'array', items: { type: 'object' }, description: 'figure: [{ at, name }] — expressions over time.' },
-        walk: { anyOf: [{ type: 'boolean' }, { type: 'object' }], description: 'figure: a walk cycle.' },
-        travel: { type: 'object', description: 'figure: move across the scene while walking, rather than walking in place.' },
-        prop: { type: 'string', description: 'figure: something held in hand.' },
-        propSide: { type: 'string', enum: ['left', 'right'], description: 'figure: which hand.' },
-        garment: { type: 'string', description: 'figure: clothing.' },
-        trouser: { type: 'string', description: 'figure: legwear.' },
-        hair: { type: 'string', description: 'figure: hair style.' },
+        poses: {
+          type: 'array',
+          description: 'figure: THE BODY OVER TIME — [{at: seconds, pose: name}]. The counterpart of expressions, and the difference between a figure that acts and one that holds a single attitude while captions do the work.',
+          items: { type: 'object', properties: { at: { type: 'number' }, pose: { type: 'string', enum: [...STICK_POSES] } }, required: ['at', 'pose'] },
+        },
+        gait: { type: 'string', enum: [...STICK_GAITS], description: 'figure: HOW it walks, and it is never just walking — trudge leans away from where it is going, sneak crouches, tiptoe raises the cadence. Pass travel in the SAME call to cross the frame; they share one track.' },
+        gaitSeconds: { type: 'number', description: 'figure: how long the gait runs. Defaults to durationSeconds.' },
+        gaitFrom: { type: 'number', description: 'figure: when the gait starts, in seconds.' },
+        sequence: { type: 'string', enum: [...STICK_SEQUENCES], description: 'figure: a named pose track. Shorthand that resolves to beats and joins any poses you also pass.' },
+        sequenceFrom: { type: 'number', description: 'figure: when the sequence starts (default 0).' },
+        sequenceSeconds: { type: 'number', description: 'figure: how long it spans (default 4).' },
+        expression: { type: 'string', enum: [...STICK_EXPRESSIONS], description: 'figure: one face. An unknown name costs the face, not the figure.' },
+        expressions: {
+          type: 'array',
+          description: 'figure: faces over time — [{at: seconds, expression: name}]. Pass durationSeconds with these or the last face lasts one second.',
+          items: { type: 'object', properties: { at: { type: 'number' }, expression: { type: 'string', enum: [...STICK_EXPRESSIONS] } }, required: ['at', 'expression'] },
+        },
+        walk: {
+          anyOf: [{ type: 'boolean' }, { type: 'array', items: { type: 'object', properties: { seconds: { type: 'number' }, from: { type: 'number' } } } }],
+          description: 'figure: walk cycles — true for one default cycle, or [{seconds, from}] for several. For anything other than a plain walk, use gait.',
+        },
+        travel: {
+          type: 'array',
+          description: 'figure: waypoints [{t, x, y}] carrying the figure across the scene rather than walking in place. FEWER THAN TWO IS IGNORED. Pass walk or gait in the same call or it slides without moving its legs.',
+          items: { type: 'object', properties: { t: { type: 'number' }, x: { type: 'number' }, y: { type: 'number' } }, required: ['t', 'x', 'y'] },
+        },
+        prop: { type: 'string', enum: [...STICK_PROPS], description: 'figure: something held in hand.' },
+        propSide: { type: 'string', enum: ['L', 'R'], description: "figure: which hand. 'left'/'right' are accepted and normalised." },
+        garment: { type: 'string', description: 'figure: clothing colour.' },
+        trouser: { type: 'string', description: 'figure: legwear colour.' },
+        hair: { type: 'string', description: 'figure: hair colour.' },
         withHair: { type: 'boolean', description: 'figure: draw hair at all.' },
-        groundY: { type: 'number', description: 'The y the figure stands on.' },
-        surfaceY: { type: 'number', description: 'The y a set object sits on.' },
-        durationSeconds: { type: 'number', description: 'figure: length of the performance.' },
-        object: { type: 'object', description: 'set: the object spec.' },
-        items: { type: 'array', items: { type: 'object' }, description: 'set: several pieces at once.' },
-        floor: { anyOf: [{ type: 'boolean' }, { type: 'object' }], description: 'set: draw a floor.' },
-        wall: { anyOf: [{ type: 'boolean' }, { type: 'object' }], description: 'set: draw a wall.' },
+        groundY: { type: 'number', description: 'set: the y a ROOM floor sits at.' },
+        surfaceY: { type: 'number', description: 'set: the y a TABLETOP object sits on.' },
+        durationSeconds: { type: 'number', description: 'figure: when the tracks end, on the same clock as expressions, poses and travel.' },
+        object: { type: 'string', description: "set: the NAME of the thing to put on a surface, with kind 'tabletop'." },
+        items: { type: 'number', description: 'set: how many things stand on a shelf (default 3). A COUNT, not a list.' },
+        floor: { type: 'string', description: "set: the floor COLOUR, for kind 'room'." },
+        wall: { type: 'string', description: "set: the wall COLOUR, for kind 'room'." },
       },
       required: ['action'],
     },

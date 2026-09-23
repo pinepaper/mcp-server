@@ -21,6 +21,7 @@
 import { describe, it, expect } from 'bun:test';
 import { codeGenerator } from '../../types/code-generator.js';
 import { StickInputSchema } from '../../types/schemas.js';
+import { PINEPAPER_TOOLS } from '../../tools/definitions.js';
 
 
 /** The opts object literal the emitter hands to app.stickFigure / app.stickSet. */
@@ -219,5 +220,56 @@ describe('anchor is checked before it can be silently ignored', () => {
     const code = codeFor({ width: 100, height: 50 });
     expect(code).toContain('app.create(');
     expect(code).not.toContain('anchor');
+  });
+});
+
+/**
+ * gait, pose tracks and named sequences — held back until the engine had them.
+ *
+ * These shipped in the vendored kit long before FxTool's adapter imported
+ * them, so the cloud path could run them and the local one could not. Adding
+ * them to this schema while origin/main still lacked them would have made an
+ * old studio ignore them in silence, which is the class the rest of this file
+ * exists to remove. They went in when the engine did.
+ */
+describe('the stick vocabulary is the kit s own', () => {
+  it('advertises the names the engine validates against, not a copy', async () => {
+    const { STICK_GAITS, STICK_POSES, STICK_SEQUENCES } = await import('../../tools/stick-vocabulary.js');
+    // Counts are the kit's: drift here means the generator did not run.
+    expect(STICK_GAITS).toContain('trudge');
+    expect(STICK_GAITS).toContain('tiptoe');
+    expect(STICK_POSES.length).toBeGreaterThan(20);
+    expect(STICK_SEQUENCES).toContain('celebrate');
+
+    const tool = PINEPAPER_TOOLS.find((t) => t.name === 'pinepaper_stick')!;
+    const props = (tool.inputSchema as { properties: Record<string, { enum?: string[] }> }).properties;
+    expect(props.gait.enum).toEqual([...STICK_GAITS]);
+    expect(props.sequence.enum).toEqual([...STICK_SEQUENCES]);
+    expect(props.pose.enum).toEqual([...STICK_POSES]);
+  });
+
+  it('carries gait, poses and sequence through to the engine', () => {
+    const opts = emittedOpts({
+      action: 'figure', gait: 'trudge', gaitSeconds: 3, gaitFrom: 0.5,
+      poses: [{ at: 0, pose: 'stand' }, { at: 2, pose: 'wave' }],
+      sequence: 'greet', sequenceFrom: 1, sequenceSeconds: 5,
+    });
+    expect(opts).toMatchObject({
+      gait: 'trudge', gaitSeconds: 3, gaitFrom: 0.5,
+      sequence: 'greet', sequenceFrom: 1, sequenceSeconds: 5,
+    });
+    expect(opts.poses).toEqual([{ at: 0, pose: 'stand' }, { at: 2, pose: 'wave' }]);
+  });
+
+  it('keeps the advertised schema and the validated schema in step', () => {
+    // These are two hand-maintained descriptions of one contract, and the JSON
+    // one is what a model actually reads. It went on advertising `[{at, name}]`
+    // expressions and a boolean `walk` after the Zod side was corrected.
+    const tool = PINEPAPER_TOOLS.find((t) => t.name === 'pinepaper_stick')!;
+    const props = (tool.inputSchema as { properties: Record<string, unknown> }).properties;
+    for (const field of ['gait', 'poses', 'sequence', 'gaitSeconds', 'gaitFrom', 'sequenceFrom', 'sequenceSeconds']) {
+      expect(props, `${field} is validated but never advertised`).toHaveProperty(field);
+      expect(() => StickInputSchema.parse({ action: 'figure', [field]: undefined })).not.toThrow();
+    }
   });
 });
