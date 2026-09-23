@@ -5495,7 +5495,51 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
   }
   try {
     await app.templateManager.loadTemplate('${templateId}', true);
-    return { success: true, templateId: '${templateId}', message: 'Template applied successfully. Canvas has been replaced with template content.' };
+
+    // DID THE CLIPPED CHARACTER PARTS SURVIVE?
+    //
+    // A clipped character group is saved with its nested texture and mask in
+    // paperJSON. A studio whose restore predates the reader for that key
+    // rebuilds it through the generic group branch instead — an empty,
+    // unclipped group — so the part is written to the template correctly and
+    // dropped on the way back in, with nothing raised.
+    //
+    // Checked by BEHAVIOUR, not by version: the template says how many clipped
+    // groups it carries, the canvas says how many came back. An engine that
+    // restores them makes this condition unreachable, so it needs no removing
+    // later; an older studio is exactly where it still matters, and this
+    // package ships independently of the studio it drives.
+    //
+    // THE WARNING MATTERS MORE THAN THE LOAD. Loading is harmless and
+    // reversible — the file on disk still holds the paperJSON, so the same
+    // template reloads intact on a studio that can read it. Re-SAVING from
+    // this canvas is not: the exporter would serialise the empty group it can
+    // see, and the texture and mask would leave the file for good.
+    let fidelity = {};
+    try {
+      const tpl = (app.templateManager.getAllTemplates() || [])
+        .find(function(t) { return t && (t.id === '${templateId}' || t.templateId === '${templateId}'); });
+      const items = tpl && tpl.data && Array.isArray(tpl.data.items) ? tpl.data.items : null;
+      const declared = items ? items.filter(function(i) { return i && i.type === 'group' && i.paperJSON; }).length : 0;
+      if (declared > 0 && app.itemRegistry && typeof app.itemRegistry.getAll === 'function') {
+        const clipped = (app.itemRegistry.getAll() || []).filter(function(e) {
+          const it = e && (e.item || e);
+          return it && it.className === 'Group' && it.clipped === true;
+        }).length;
+        if (clipped === 0) {
+          fidelity = {
+            clippedPartsLost: declared,
+            warning: 'This template carries ' + declared + ' clipped character part(s) with a nested texture and mask, '
+              + 'and this studio restored none of them — they are on the canvas as empty groups. '
+              + 'DO NOT SAVE THIS CANVAS BACK OVER THE TEMPLATE: the export would write the empty groups and the '
+              + 'texture would be lost from the file permanently. The template itself is still intact; update the '
+              + 'studio and load it again.',
+          };
+        }
+      }
+    } catch (e) { /* a check that cannot run must not fail the load */ }
+
+    return { success: true, templateId: '${templateId}', message: 'Template applied successfully. Canvas has been replaced with template content.', ...fidelity };
   } catch (e) {
     return { error: 'Failed to apply template: ' + e.message };
   }

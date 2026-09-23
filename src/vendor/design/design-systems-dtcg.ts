@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
  * Source:    mcp-cloud/src/services/design-systems-dtcg.ts
- * sha256:    5b76ed156ab9b07348209f6700cb1731ed0fa031ccaa154d08792de6e79cf7ac
+ * sha256:    f4d96a7983595af5396007eec2cd5ef9a12c4555501894a2c0760f132e87d9e2
  * Generator: scripts/sync-design-systems.mjs
  *
  * Edit the TypeScript upstream and re-run the generator. A hand edit here is
@@ -642,4 +642,56 @@ export function tokenToCubicBezier(token: DTCGToken): string | null {
     return `cubic-bezier(${token.$value.join(", ")})`;
   }
   return null;
+}
+
+/**
+ * THE CATEGORY FILTER THE TOOL ALREADY ADVERTISED.
+ *
+ * `pinepaper_design_systems` took `tokenCategory` ("color" | "motion" |
+ * "spacing" | "typography" | "all"), echoed it back in the query, and returned
+ * every token regardless — a filter that reports success without filtering.
+ * The keys carry their own category as the first segment, so this is that
+ * segment and nothing more.
+ *
+ * COLOUR IS NOT ONE OF THEM, and this is where that becomes visible instead of
+ * silently returning everything: these fifteen systems were captured for their
+ * motion ladders, spacing grids and type scales. `colourAvailable: false` is
+ * the honest answer, and the caller is pointed at the styles tool, which does
+ * carry palettes.
+ */
+const CATEGORY_PREFIX: Record<string, string> = {
+  motion: "motion.",
+  spacing: "space.",
+  typography: "type.",
+};
+
+export function categoryPrefixes(): Record<string, string> {
+  return { ...CATEGORY_PREFIX };
+}
+
+/** A copy of the system carrying only the tokens of one category. `all` returns it unchanged. */
+export function filterSystemTokens(system: DTCGDesignSystem, category: string): DTCGDesignSystem {
+  if (!category || category === "all") return system;
+  const prefix = CATEGORY_PREFIX[category];
+  // An unknown category (including "color", which these systems do not carry)
+  // yields NO tokens rather than all of them.
+  const tokens: Record<string, DTCGToken> = {};
+  if (prefix) {
+    for (const [k, v] of Object.entries(system.tokens)) if (k.startsWith(prefix)) tokens[k] = v;
+  }
+  return { ...system, tokens };
+}
+
+/**
+ * Every cubic-bezier token as the CSS string it stands for, keyed by token
+ * name. `convertToCss` used to call tokenToCubicBezier on the SYSTEM object,
+ * whose $type is undefined, so it always produced null.
+ */
+export function cssEasingsOf(system: DTCGDesignSystem): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(system.tokens)) {
+    const css = tokenToCubicBezier(v);
+    if (css) out[k] = css;
+  }
+  return out;
 }

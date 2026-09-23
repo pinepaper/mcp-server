@@ -312,3 +312,51 @@ describe('export says what the scene loses', () => {
     expect(fn.slice(0, fn.indexOf('\n  }'))).toContain('catch');
   });
 });
+
+/**
+ * A template's clipped character parts can be dropped on restore, silently.
+ *
+ * A clipped character group is saved WITH its nested texture and mask in
+ * `paperJSON`. A studio whose restore predates the reader for that key rebuilds
+ * it through the generic group branch — an empty, unclipped group — so the part
+ * is written to the template correctly and lost on the way back in.
+ *
+ * Loading is reversible: the file still holds the paperJSON. RE-SAVING is not,
+ * because the exporter would serialise the empty group it can see. So the load
+ * is allowed and the warning names the one action that destroys work.
+ */
+describe('template load notices dropped character parts', () => {
+  const code = (): string => codeGenerator.generateApplyTemplate({ templateId: 'hero' } as never);
+
+  it('compares what the template declares against what came back', () => {
+    expect(code()).toContain("i.type === 'group' && i.paperJSON");
+    expect(code()).toContain('it.clipped === true');
+  });
+
+  it('is a BEHAVIOUR check, so a studio that restores them never sees it', () => {
+    // No version test anywhere: the condition is declared > 0 && restored 0,
+    // which a working engine makes unreachable. Nothing to remove on merge.
+    //
+    // Asserted against the CODE, not the comments — the first draft of this
+    // matched the word "version" in its own explanation of why it does not
+    // test the version. Same mistake as a consumer search counting a comment
+    // as a read.
+    const executable = code().split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
+    expect(executable).toContain('declared > 0');
+    expect(executable).not.toMatch(/version|buildNumber|semver/i);
+  });
+
+  it('warns against the destructive action rather than the harmless one', () => {
+    const c = code();
+    expect(c).toContain('DO NOT SAVE THIS CANVAS BACK OVER THE TEMPLATE');
+    expect(c).toContain('The template itself is still intact');
+    // The load still succeeds — it is reversible, and refusing it would strand
+    // a caller who only wanted to look at the template.
+    expect(c).toContain('success: true');
+  });
+
+  it('never lets the check itself break a load', () => {
+    expect(code()).toContain('a check that cannot run must not fail the load');
+    expect(code()).toContain("typeof app.itemRegistry.getAll === 'function'");
+  });
+});
