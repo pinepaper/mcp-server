@@ -7955,7 +7955,9 @@ EXAMPLES:
 - {platform: "instagram", format: "mp4"} — force MP4
 - {platform: "web", format: "svg"} — animated SVG
 - {platform: "youtube", format: "mp4", framing: "camera"} — render only what the camera frames during the walkthrough
-- {platform: "youtube", format: "mp4", duration: 30, estimateOnly: true} — how big would that be? (renders nothing)`,
+- {platform: "youtube", format: "mp4", duration: 30, estimateOnly: true} — how big would that be, and what would it lose? (renders nothing)
+
+Every export answers the second question too: where this scene loses something to the format you chose, the result carries "fidelity" naming it. Its ABSENCE means this scene has nothing that format would drop — not that the format is lossless.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -8002,7 +8004,7 @@ EXAMPLES:
         },
         estimateOnly: {
           type: 'boolean',
-          description: 'Preflight only — return the estimated file size for these exact settings and render nothing. Modeled for mp4/webm/gif; png/pdf/svg report confidence "none" (no dimension-based model exists for them); wav reports confidence "exact", because uncompressed PCM size is arithmetic.',
+          description: 'Preflight only — return the estimated file size for these exact settings and render nothing. Modeled for mp4/webm/gif; png/pdf/svg report confidence "none" (no dimension-based model exists for them); wav reports confidence "exact", because uncompressed PCM size is arithmetic. Also answers what THIS scene would lose to this format — a png of an animated scene is one frame, a gif drops the soundtrack — under "fidelity", which is present only when there is something to lose.',
         },
         duration: {
           type: 'number',

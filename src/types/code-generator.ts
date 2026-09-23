@@ -3562,6 +3562,26 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
     ? { width: __even(__canvasDims.width), height: __even(__canvasDims.height) }
     : __presetDims;` : `  const dimensions = ${JSON.stringify(scaled)};`}
 
+  // WHAT THIS SCENE LOSES TO THIS FORMAT, asked at the moment you would care.
+  //
+  // exportFidelity walks the actual scene: a PNG of an animated scene is one
+  // frame, a GIF with a soundtrack drops it, a wav of a silent scene is
+  // silence. The engine derived it so that 117 tool descriptions would not
+  // have to answer "does this survive export?" by hand and drift.
+  //
+  // Reported ONLY when there is something to report. An empty list would read
+  // as "this format is lossless", and it does not mean that — it means this
+  // scene has nothing THIS format will lose. Omitting it entirely is the one
+  // shape that cannot be misread, and it keeps a clean export quiet.
+  function fidelity(fmt) {
+    try {
+      if (!app.exportEngine || typeof app.exportEngine.exportFidelity !== 'function') return {};
+      const r = app.exportEngine.exportFidelity(fmt);
+      if (!r || !r.warnings || r.warnings.length === 0) return {};
+      return { fidelity: { warnings: r.warnings, checked: r.checked } };
+    } catch (e) { return {}; }
+  }
+
   // Preflight: same resolved settings as the real export, but render nothing.
   // Branching HERE rather than in a separate tool is deliberate — the estimate
   // has to see the same platform dimensions, fps and quality the export would
@@ -3586,6 +3606,7 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
       fps: settings.fps,
       dimensions: dimensions.width + 'x' + dimensions.height,
       estimate: est,
+      ...fidelity(format),
     };
   }
 
@@ -3814,6 +3835,11 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
   } catch (e) {
     result = { success: false, error: e.message, platform, format };
   }
+
+  // One site, after every branch has set its result: a successful export says
+  // what this scene lost to this format, rather than the caller finding out by
+  // opening the file. Only when there is something to say — see fidelity().
+  if (result && result.success) Object.assign(result, fidelity(format));
 
   return result;
 })();

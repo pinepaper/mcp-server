@@ -273,3 +273,42 @@ describe('the stick vocabulary is the kit s own', () => {
     }
   });
 });
+
+/**
+ * exportFidelity: what THIS scene loses to THAT format.
+ *
+ * The engine derives it by walking the actual scene, so that 117 tool
+ * descriptions do not have to answer "does this survive export?" by hand and
+ * drift apart. Reported here only when there is something to report — an empty
+ * warnings list would read as "this format is lossless", which is not what it
+ * means, and omitting it is the one shape that cannot be misread.
+ */
+describe('export says what the scene loses', () => {
+  it('asks the engine at preflight and on a real export', () => {
+    const code = codeGenerator.generateAgentExport({ format: 'gif', estimateOnly: true } as never);
+    expect(code).toContain('exportFidelity');
+    expect(code).toContain('...fidelity(format)');
+
+    const real = codeGenerator.generateAgentExport({ format: 'gif' } as never);
+    expect(real).toContain('if (result && result.success) Object.assign(result, fidelity(format));');
+  });
+
+  it('guards the call, so an older studio exports rather than throwing', () => {
+    const code = codeGenerator.generateAgentExport({ format: 'png' } as never);
+    expect(code).toContain("typeof app.exportEngine.exportFidelity !== 'function'");
+  });
+
+  it('reports nothing when the scene loses nothing', () => {
+    // The whole point of the shape: `fidelity` is absent rather than empty,
+    // because an empty list invites "so this format is lossless" and the
+    // engine's own contract says that is not what it means.
+    const code = codeGenerator.generateAgentExport({ format: 'png' } as never);
+    expect(code).toContain('if (!r || !r.warnings || r.warnings.length === 0) return {};');
+  });
+
+  it('never lets a fidelity failure break the export', () => {
+    const code = codeGenerator.generateAgentExport({ format: 'mp4' } as never);
+    const fn = code.slice(code.indexOf('function fidelity('));
+    expect(fn.slice(0, fn.indexOf('\n  }'))).toContain('catch');
+  });
+});

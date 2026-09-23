@@ -75,6 +75,7 @@ export const REQUIRED_ENGINE_METHODS: readonly string[] = [
   'estimateExportSize',
   'exportBVH',
   'exportDotLottie',
+  'exportEngine.exportFidelity',
   'exportEngine.exportToStore',
   'exportEngine.listExports',
   'exportEngine.readExport',
