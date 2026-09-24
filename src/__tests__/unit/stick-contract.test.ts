@@ -298,12 +298,18 @@ describe('export says what the scene loses', () => {
     expect(code).toContain("typeof app.exportEngine.exportFidelity !== 'function'");
   });
 
-  it('reports nothing when the scene loses nothing', () => {
-    // The whole point of the shape: `fidelity` is absent rather than empty,
-    // because an empty list invites "so this format is lossless" and the
-    // engine's own contract says that is not what it means.
+  it('distinguishes checked-and-clean from never-checked', () => {
+    // The first version reported fidelity ONLY when there was something to
+    // report, so an empty list could not be misread as "this format is
+    // lossless". That solved one misreading and created a worse one: a pilot
+    // saw fidelity null in EVERY scene and could not tell good news from a
+    // broken check. All three states are explicit now.
     const code = codeGenerator.generateAgentExport({ format: 'png' } as never);
-    expect(code).toContain('if (!r || !r.warnings || r.warnings.length === 0) return {};');
+    expect(code).toContain('available: false');
+    expect(code).toContain('available: true');
+    expect(code).toContain('loses nothing to');
+    // The caveat absence used to stand in for is carried in the note.
+    expect(code).toContain('not a claim that the format is lossless');
   });
 
   it('never lets a fidelity failure break the export', () => {

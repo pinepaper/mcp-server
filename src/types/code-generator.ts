@@ -3810,17 +3810,38 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
   // silence. The engine derived it so that 117 tool descriptions would not
   // have to answer "does this survive export?" by hand and drift.
   //
-  // Reported ONLY when there is something to report. An empty list would read
-  // as "this format is lossless", and it does not mean that — it means this
-  // scene has nothing THIS format will lose. Omitting it entirely is the one
-  // shape that cannot be misread, and it keeps a clean export quiet.
+  // THREE STATES, ALL DISTINGUISHABLE. This used to be reported only when
+  // there was something to report, so that an empty list could not be misread
+  // as "this format is lossless". That solved one misreading and created a
+  // worse one: a caller could not tell "checked, nothing lost" from "never
+  // checked", and a pilot reported fidelity as null in EVERY scene with no way
+  // to know whether that was good news or a broken check.
+  //
+  // So it is always present: available:false when the studio cannot check,
+  // warnings:[] plus a note when it checked and found nothing, and the
+  // warnings themselves otherwise. The note carries the caveat that absence
+  // was standing in for.
   function fidelity(fmt) {
     try {
-      if (!app.exportEngine || typeof app.exportEngine.exportFidelity !== 'function') return {};
+      if (!app.exportEngine || typeof app.exportEngine.exportFidelity !== 'function') {
+        return { fidelity: { available: false, reason: 'this studio cannot check export fidelity — update PinePaper Studio.' } };
+      }
       const r = app.exportEngine.exportFidelity(fmt);
-      if (!r || !r.warnings || r.warnings.length === 0) return {};
-      return { fidelity: { warnings: r.warnings, checked: r.checked } };
-    } catch (e) { return {}; }
+      if (!r) { return { fidelity: { available: false, reason: 'the fidelity check returned nothing.' } }; }
+      const warnings = r.warnings || [];
+      return {
+        fidelity: {
+          available: true,
+          warnings: warnings,
+          checked: r.checked,
+          ...(warnings.length === 0
+            ? { note: 'this scene loses nothing to ' + fmt + '. That is a statement about THIS SCENE, not a claim that the format is lossless.' }
+            : {}),
+        },
+      };
+    } catch (e) {
+      return { fidelity: { available: false, reason: (e && e.message) || 'the fidelity check threw.' } };
+    }
   }
 
   // Preflight: same resolved settings as the real export, but render nothing.

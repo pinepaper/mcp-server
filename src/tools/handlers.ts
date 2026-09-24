@@ -1062,13 +1062,41 @@ ${code}
  */
 export function innerFailure(value: unknown): string | null {
   if (!value || typeof value !== 'object') return null;
-  const r = value as { success?: unknown; ok?: unknown; error?: unknown; reason?: unknown };
-  const failed = r.success === false || r.ok === false;
+  const r = value as {
+    success?: unknown; ok?: unknown; error?: unknown; reason?: unknown;
+    diagnostics?: unknown; errors?: unknown;
+  };
+
+  // `ok` IS A DOMAIN VERDICT, NOT A TRANSPORT ONE — when `success` disagrees.
+  //
+  // pinepaper_validate answers {success: true, ok: false, diagnostics: [...]}:
+  // the call worked and the SCENE has problems, which is the entire point of
+  // the tool. Treating ok:false as a failure turned that into "the studio
+  // reported failure without naming a reason" and dropped the diagnostics —
+  // this guard, built to stop silent failures, silencing the one tool whose
+  // job is to report them. An explicit success:true wins; ok is only consulted
+  // when nothing else says.
+  const failed = r.success === false || (r.success !== true && r.ok === false);
   if (!failed) return null;
-  const why = typeof r.error === 'string' ? r.error
-    : typeof r.reason === 'string' ? r.reason
-    : 'the studio reported failure without naming a reason';
-  return why;
+
+  if (typeof r.error === 'string') return r.error;
+  if (typeof r.reason === 'string') return r.reason;
+
+  // A refusal that carries diagnostics is not reasonless — say what they were
+  // rather than reporting that nothing was said.
+  const detail = Array.isArray(r.diagnostics) ? r.diagnostics
+    : Array.isArray(r.errors) ? r.errors
+    : null;
+  if (detail && detail.length > 0) {
+    const first = detail.slice(0, 3).map((d) => {
+      if (typeof d === 'string') return d;
+      const o = d as { message?: unknown; reason?: unknown; code?: unknown; field?: unknown };
+      return String(o.message ?? o.reason ?? o.code ?? JSON.stringify(o));
+    });
+    return `${detail.length} problem${detail.length > 1 ? 's' : ''}: ${first.join('; ')}`
+      + (detail.length > first.length ? ` (+${detail.length - first.length} more)` : '');
+  }
+  return 'the studio reported failure without naming a reason';
 }
 
 // =============================================================================

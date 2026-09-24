@@ -7979,7 +7979,9 @@ EXAMPLES:
 - {platform: "youtube", format: "mp4", framing: "camera"} — render only what the camera frames during the walkthrough
 - {platform: "youtube", format: "mp4", duration: 30, estimateOnly: true} — how big would that be, and what would it lose? (renders nothing)
 
-Every export answers the second question too: where this scene loses something to the format you chose, the result carries "fidelity" naming it. Its ABSENCE means this scene has nothing that format would drop — not that the format is lossless.`,
+Every export answers the second question too: the result carries "fidelity", which says whether the check could run at all (available), what this scene loses to the format you chose (warnings), and what that verdict was derived from (checked). An empty warnings list with a note means this SCENE loses nothing to this format — not that the format is lossless.
+
+VERIFY MOTION BEFORE YOU RENDER. An export takes seconds to minutes and shows you the result only at the end, by which time a frozen animation has cost you the whole render. pinepaper_capture_frames samples the timeline and reports allIdentical plus per-frame hashes, so a scene that is not moving is one cheap call away — it is the fastest way to catch a frozen chart, an animation whose tail never fires, or a curve that was never drawn. Run it before a long export, not after.`,
     inputSchema: {
       type: 'object',
       properties: {

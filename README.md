@@ -227,6 +227,25 @@ trips — and nothing about the work needed one each. Failures come back by
 index, because a bed where three of a hundred cues didn't sound is neither a
 success nor a failure.
 
+### Fixed: the validator's own findings were being swallowed
+
+`pinepaper_validate` answers `{success: true, ok: false, diagnostics: [...]}` —
+the call worked and the *scene* has problems, which is the whole point of the
+tool. An internal guard treated `ok: false` as a tool failure, so the result
+became "the studio reported failure without naming a reason" and the
+diagnostics were discarded. A refusal that carries diagnostics now names them.
+
+### Changed: export fidelity is always reported
+
+It used to appear only when there was something to lose, so that an empty list
+could not be misread as "this format is lossless". That traded one misreading
+for a worse one — you could not tell "checked, nothing lost" from "never
+checked". All three states are explicit now, and the caveat lives in a note
+rather than in the absence.
+
+`pinepaper_agent_export` also points at `pinepaper_capture_frames` as the cheap
+way to confirm a scene is actually moving **before** committing to a render.
+
 ### Fixed: documentation that described the wrong contract
 
 - **`solveOde` state variables are positional** — `t`, `y0`, `y1`, `y2` …

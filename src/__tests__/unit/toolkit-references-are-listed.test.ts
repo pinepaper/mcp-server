@@ -67,7 +67,12 @@ describe('every tool a profile points at, that profile lists', () => {
     // being told where the other spelling comes from, which is worth more than
     // the reference costs.
     font: 11,
-    minimal: 6,
+    // 7 rather than 6: the export tool now tells you to verify motion with
+    // pinepaper_capture_frames before committing to a long render, and minimal
+    // does not carry it. Kept because the advice is worth more than the
+    // reference costs — minimal also renders trimmed descriptions, and anyone
+    // who wants the tool can widen with set_toolkit.
+    minimal: 7,
   };
 
   it('the domain profiles dangle only as much as they are known to', () => {
