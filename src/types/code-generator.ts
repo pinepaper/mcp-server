@@ -564,6 +564,11 @@ function emitTextStyle(itemExpr: string, props: Record<string, unknown>): string
  * before, the item's own opacity during, 0 after, with cuts CUT apart so a
  * sampled frame never draws both sides of one.
  *
+ * HALF-OPEN, [bornAt, bornAt + ttl). The off-cut lands AT bornAt + ttl, not
+ * after it, so back-to-back lifetimes (a boil: bornAt i/12, ttl 1/12) hand over
+ * on the boundary instead of both showing on a frame sampled exactly there —
+ * measured as double frames at t = k/12 when the window was closed at the end.
+ *
  * Re-applied lifetimes REPLACE the previous one: the cut keys are tagged, and
  * dropped before new ones are added, so re-timing an act does not stack cuts.
  * bornAt / ttl are also kept on item.data, where the scene document carries them.
@@ -587,7 +592,7 @@ function emitLifetime(itemExpr: string, bornAt: unknown, ttl: unknown): string {
   const kf = function(time, opacity) { time = Math.max(0, time); times.push(time); app.addKeyframe(it, time, { opacity: opacity }, 'linear'); };
   if (${born} > 0) { kf(0, 0); kf(${born} - CUT, 0); }
   kf(${born}, on);
-  ${span === null ? '' : `kf(${born + span}, on); kf(${born + span} + CUT, 0);`}
+  ${span === null ? '' : `kf(${born + span} - CUT, on); kf(${born + span}, 0);`}
   (it.data.keyframes || []).forEach(function(k) {
     if (k && times.indexOf(k.time) !== -1 && k.properties && Object.keys(k.properties).length === 1 && 'opacity' in k.properties) k._lifetime = true;
   });
