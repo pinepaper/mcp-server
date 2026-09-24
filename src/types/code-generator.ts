@@ -4019,6 +4019,33 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
     cameraDims = { width: camBase.width, height: camBase.height };
   }
 
+  // AN EXPORTER ANSWERS A BLOB OR A RECORD AROUND ONE.
+  //
+  // Declared ABOVE the switch. They used to be consts inside the video case's
+  // block, so the pdf case — which 04ea8d2 pointed at asBlob — threw
+  // "asBlob is not defined" on every PDF export.
+  //
+  // exportPDF resolves to {blob, width, height, format}, and this passed
+  // the whole record to FileReader.readAsDataURL — "parameter 1 is not of
+  // type 'Blob'", every PDF export, with an error naming FileReader and
+  // nothing about PDFs. The engine has the same normaliser for the same
+  // reason (AgentMode._asBlob), so this matches its behaviour rather than
+  // inventing a second convention.
+  const asBlob = (r) => {
+    if (typeof Blob !== 'undefined' && r instanceof Blob) return r;
+    if (r && typeof Blob !== 'undefined' && r.blob instanceof Blob) return r.blob;
+    // Duck-typed last resort: a studio may hand back something Blob-like
+    // that fails instanceof across a realm boundary.
+    if (r && typeof r.size === 'number' && typeof r.slice === 'function') return r;
+    if (r && r.blob && typeof r.blob.size === 'number') return r.blob;
+    return null;
+  };
+  const blobToDataUrl = (b) => new Promise(resolve => {
+    const r = new FileReader();
+    r.onloadend = () => resolve(r.result);
+    r.readAsDataURL(b);
+  });
+
   let result = { success: false, platform, format, quality, framing };
 
   try {
@@ -4098,28 +4125,6 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
         // fallback paths otherwise export at canvas size, and quietly changing
         // that for every existing caller is not what a new optional knob does.
         const baseVideoSettings = { format, fps: settings.fps, quality: settings.compression, duration: ${videoDuration}${scale !== undefined && scale !== 1 ? ', width: dimensions.width, height: dimensions.height' : ''} };
-        // AN EXPORTER ANSWERS A BLOB OR A RECORD AROUND ONE.
-        //
-        // exportPDF resolves to {blob, width, height, format}, and this passed
-        // the whole record to FileReader.readAsDataURL — "parameter 1 is not of
-        // type 'Blob'", every PDF export, with an error naming FileReader and
-        // nothing about PDFs. The engine has the same normaliser for the same
-        // reason (AgentMode._asBlob), so this matches its behaviour rather than
-        // inventing a second convention.
-        const asBlob = (r) => {
-          if (typeof Blob !== 'undefined' && r instanceof Blob) return r;
-          if (r && typeof Blob !== 'undefined' && r.blob instanceof Blob) return r.blob;
-          // Duck-typed last resort: a studio may hand back something Blob-like
-          // that fails instanceof across a realm boundary.
-          if (r && typeof r.size === 'number' && typeof r.slice === 'function') return r;
-          if (r && r.blob && typeof r.blob.size === 'number') return r.blob;
-          return null;
-        };
-        const blobToDataUrl = (b) => new Promise(resolve => {
-          const r = new FileReader();
-          r.onloadend = () => resolve(r.result);
-          r.readAsDataURL(b);
-        });
 
         // THE EXPORT STORE. A long export cannot come back as one base64
         // string: base64 of a gigabyte is larger than the gigabyte, and it

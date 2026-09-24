@@ -130,3 +130,27 @@ describe('an export result is normalised before it is read', () => {
     expect(code).toContain('paperFormat');
   });
 });
+
+// Round 6 T, 8.4: the pdf case called asBlob, which was a const inside the
+// VIDEO case's block — "asBlob is not defined" on every PDF export. Extracting
+// the function as text (above) could not see scope; this runs the whole snippet.
+describe('pdf export runs end to end against a stub studio', () => {
+  it('resolves to a successful pdf result', async () => {
+    const { codeGenerator } = await import('../../types/code-generator.js');
+    const code = codeGenerator.generateAgentExport({ platform: 'print-a4', format: 'pdf' } as never);
+    const blob = new Blob(['%PDF-1.4'], { type: 'application/pdf' });
+    const app = {
+      canvasSize: { width: 2480, height: 3508 },
+      exportEngine: {
+        exportPDF: async () => ({ blob, width: 595, height: 842, format: 'a4' }),
+        exportFidelity: () => ({ warnings: [], checked: {} }),
+      },
+    };
+    class FR { result: string | null = null; onloadend: (() => void) | null = null;
+      readAsDataURL() { this.result = 'data:application/pdf;base64,JVBERi0xLjQ='; this.onloadend?.(); } }
+    const body = code.replace('(async function()', 'return (async function()');
+    const r = await new Function('app', 'FileReader', 'document', body)(app, FR, {});
+    expect(r.error).toBeUndefined();
+    expect(r).toMatchObject({ success: true, format: 'pdf', mimeType: 'application/pdf', paperFormat: 'a4' });
+  });
+});
