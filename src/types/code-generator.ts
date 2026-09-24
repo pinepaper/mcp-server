@@ -349,7 +349,14 @@ function generateCreateItemCode(
 // ${itemType} — a render-time surface. Drawn per pixel by the cloud renderer;
 // stood in for locally by a flat plate so the layout still reads.
 const item = app.create('rectangle', ${JSON.stringify(plate, null, 2)});
-if (item && item.data) { item.data.renderAs = ${JSON.stringify(itemType)}; item.data.renderParams = ${JSON.stringify(params)}; }`;
+if (item && item.data) { item.data.renderAs = ${JSON.stringify(itemType)}; item.data.renderParams = ${JSON.stringify(params)}; }
+// The snippet's value is its last statement's, which was the assignment above:
+// the caller got renderParams back and no itemId to address the item by.
+(item && item.data)
+  ? { itemId: item.data.registryId, type: ${JSON.stringify(itemType)}, position: { x: ${position.x}, y: ${position.y} },
+      localStandIn: true,
+      note: 'drawn here as a flat plate; the ${itemType} itself appears only in a cloud render. A local export shows the plate.' }
+  : { success: false, error: 'the stand-in plate for this ${itemType} was not created.' };`;
   }
 
   // RTL IS NOT SUPPORTED, AND SILENCE WAS THE WORST WAY TO SAY SO.
@@ -3832,14 +3839,43 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
   // warnings:[] plus a note when it checked and found nothing, and the
   // warnings themselves otherwise. The note carries the caveat that absence
   // was standing in for.
+  //
+  // STAND-INS ARE THIS TOOL'S OWN DOING, SO THIS TOOL REPORTS THEM. create_item
+  // draws 'shader' and 'field' locally as a flat plate tagged data.renderAs; the
+  // engine's check sees an ordinary rectangle and cannot know a surface was
+  // meant. So a local export of a sea came out a flat blue slab with nothing
+  // said. Reported whatever the engine check can or cannot do.
+  function standIns() {
+    try {
+      // Probed with === : a studio without it degrades to "no stand-ins".
+      const canList = app.itemRegistry && typeof app.itemRegistry.getAll === 'function';
+      if (!canList) return [];
+      const found = {};
+      for (const entry of app.itemRegistry.getAll()) {
+        const kind = entry && entry.item && entry.item.data && entry.item.data.renderAs;
+        if (kind === 'shader' || kind === 'field') (found[kind] = found[kind] || []).push(entry.itemId);
+      }
+      return Object.keys(found).map(function(kind) {
+        const ids = found[kind];
+        return {
+          code: 'render_time_surface_stand_in',
+          message: ids.length + ' ' + kind + ' item' + (ids.length > 1 ? 's are' : ' is')
+            + ' exported as the flat plate that stands in for ' + (ids.length > 1 ? 'them' : 'it')
+            + ' on a local canvas. The surface itself is drawn only by a cloud render.',
+          items: ids.slice(0, 6),
+        };
+      });
+    } catch (e) { return []; }
+  }
   function fidelity(fmt) {
+    const own = standIns();
     try {
       if (!app.exportEngine || typeof app.exportEngine.exportFidelity !== 'function') {
-        return { fidelity: { available: false, reason: 'this studio cannot check export fidelity — update PinePaper Studio.' } };
+        return { fidelity: { available: false, reason: 'this studio cannot check export fidelity — update PinePaper Studio.', ...(own.length ? { warnings: own } : {}) } };
       }
       const r = app.exportEngine.exportFidelity(fmt);
-      if (!r) { return { fidelity: { available: false, reason: 'the fidelity check returned nothing.' } }; }
-      const warnings = r.warnings || [];
+      if (!r) { return { fidelity: { available: false, reason: 'the fidelity check returned nothing.', ...(own.length ? { warnings: own } : {}) } }; }
+      const warnings = (r.warnings || []).concat(own);
       return {
         fidelity: {
           available: true,
@@ -3851,7 +3887,7 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
         },
       };
     } catch (e) {
-      return { fidelity: { available: false, reason: (e && e.message) || 'the fidelity check threw.' } };
+      return { fidelity: { available: false, reason: (e && e.message) || 'the fidelity check threw.', ...(own.length ? { warnings: own } : {}) } };
     }
   }
 
