@@ -69,3 +69,64 @@ describe('an export is sized by the request, not by the renderer', () => {
     expect(block).not.toContain('document.querySelector');
   });
 });
+
+/**
+ * An exporter answers a Blob OR a record around one.
+ *
+ * exportPDF resolves to {blob, width, height, format}, and this passed the
+ * whole record to FileReader.readAsDataURL — "parameter 1 is not of type
+ * 'Blob'", on every PDF export, with an error naming FileReader and nothing
+ * about PDFs. The engine carries the same normaliser for the same reason
+ * (AgentMode._asBlob), so this matches its behaviour rather than inventing a
+ * second convention.
+ */
+describe('an export result is normalised before it is read', () => {
+  const pdf = (): string => codeGenerator.generateAgentExport({ format: 'pdf', platform: 'auto' } as never);
+
+  /** Run the emitted normaliser for real. */
+  const normaliser = (code: string): ((r: unknown) => unknown) => {
+    const start = code.indexOf('const asBlob = (r) =>');
+    const end = code.indexOf('};', code.indexOf('return null;', start)) + 2;
+    const src = code.slice(start, end).replace('const asBlob = ', '').replace(/;\s*$/, '');
+    return new Function(`return (${src})`)() as (r: unknown) => unknown;
+  };
+
+  class FakeBlob { size = 42; type = 'application/pdf'; slice(): FakeBlob { return this; } }
+
+  it('accepts both shapes the engine can answer with', () => {
+    (globalThis as never as Record<string, unknown>).Blob = FakeBlob;
+    const asBlob = normaliser(pdf());
+    const b = new FakeBlob();
+    expect(asBlob(b)).toBe(b);
+    expect(asBlob({ blob: b, width: 595, height: 842, format: 'a4' })).toBe(b);
+  });
+
+  it('falls back to duck typing, for a Blob from another realm', () => {
+    (globalThis as never as Record<string, unknown>).Blob = FakeBlob;
+    const asBlob = normaliser(pdf());
+    expect(asBlob({ size: 9, slice: () => null })).not.toBeNull();
+  });
+
+  it('returns null rather than guessing at something that is not a file', () => {
+    (globalThis as never as Record<string, unknown>).Blob = FakeBlob;
+    const asBlob = normaliser(pdf());
+    expect(asBlob({ nope: 1 })).toBeNull();
+    expect(asBlob(null)).toBeNull();
+  });
+
+  it('names the PDF and what came back, not FileReader', () => {
+    // The old failure said "parameter 1 is not of type 'Blob'" — true, and it
+    // names nothing a caller can act on.
+    const code = pdf();
+    expect(code).toContain('the PDF export did not produce a file');
+    expect(code).toContain('an object with keys [');
+  });
+
+  it('carries the page geometry the record holds', () => {
+    // width/height/format are only knowable from the record; dropping it lost
+    // the one place a caller could learn the page size the engine chose.
+    const code = pdf();
+    expect(code).toContain('pdfOut.width');
+    expect(code).toContain('paperFormat');
+  });
+});

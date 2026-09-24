@@ -227,6 +227,15 @@ trips — and nothing about the work needed one each. Failures come back by
 index, because a bed where three of a hundred cues didn't sound is neither a
 success nor a failure.
 
+### Fixed: PDF export failed on every scene
+
+`pinepaper_agent_export` with `format: "pdf"` died with "parameter 1 is not of
+type 'Blob'" — an error naming `FileReader` and nothing about PDFs. The engine
+resolves a record `{blob, width, height, format}` and this passed the whole
+record where a `Blob` was expected. It now accepts either shape, reports the
+page geometry the record carries, and when something really is not a file it
+says so about the PDF rather than about `FileReader`.
+
 ### Fixed: the validator's own findings were being swallowed
 
 `pinepaper_validate` answers `{success: true, ok: false, diagnostics: [...]}` —

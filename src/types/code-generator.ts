@@ -4008,6 +4008,23 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
         // fallback paths otherwise export at canvas size, and quietly changing
         // that for every existing caller is not what a new optional knob does.
         const baseVideoSettings = { format, fps: settings.fps, quality: settings.compression, duration: ${videoDuration}${scale !== undefined && scale !== 1 ? ', width: dimensions.width, height: dimensions.height' : ''} };
+        // AN EXPORTER ANSWERS A BLOB OR A RECORD AROUND ONE.
+        //
+        // exportPDF resolves to {blob, width, height, format}, and this passed
+        // the whole record to FileReader.readAsDataURL — "parameter 1 is not of
+        // type 'Blob'", every PDF export, with an error naming FileReader and
+        // nothing about PDFs. The engine has the same normaliser for the same
+        // reason (AgentMode._asBlob), so this matches its behaviour rather than
+        // inventing a second convention.
+        const asBlob = (r) => {
+          if (typeof Blob !== 'undefined' && r instanceof Blob) return r;
+          if (r && typeof Blob !== 'undefined' && r.blob instanceof Blob) return r.blob;
+          // Duck-typed last resort: a studio may hand back something Blob-like
+          // that fails instanceof across a realm boundary.
+          if (r && typeof r.size === 'number' && typeof r.slice === 'function') return r;
+          if (r && r.blob && typeof r.blob.size === 'number') return r.blob;
+          return null;
+        };
         const blobToDataUrl = (b) => new Promise(resolve => {
           const r = new FileReader();
           r.onloadend = () => resolve(r.result);
@@ -4077,7 +4094,11 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
         // refusing.
         const INLINE_MAX_BYTES = ${INLINE_MAX_BYTES};
         const mb = (n) => (n / (1024 * 1024)).toFixed(1);
-        const deliver = async (blob) => {
+        const deliver = async (raw) => {
+          // Normalise first: a {blob, …} record would otherwise be reported as
+          // "streamed to a file instead of returning bytes", which is a true
+          // sentence about the wrong problem.
+          const blob = asBlob(raw) || raw;
           if (!blob || typeof blob.size !== 'number' || typeof blob.slice !== 'function') {
             return {
               success: false, platform, format,
@@ -4125,13 +4146,25 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
 
       case 'pdf':
         if (app.exportEngine && app.exportEngine.exportPDF) {
-          const blob = await app.exportEngine.exportPDF({ dpi: settings.dpi });
-          const reader = new FileReader();
-          const dataUrl = await new Promise(resolve => {
-            reader.onloadend = () => resolve(reader.result);
-            reader.readAsDataURL(blob);
-          });
-          result = { success: true, platform, format: 'pdf', data: dataUrl, mimeType: 'application/pdf', size: blob.size, dpi: settings.dpi };
+          const pdfOut = await app.exportEngine.exportPDF({ dpi: settings.dpi });
+          const blob = asBlob(pdfOut);
+          if (!blob) {
+            const got = pdfOut === null ? 'null'
+              : typeof pdfOut === 'object' ? 'an object with keys [' + Object.keys(pdfOut).join(', ') + ']'
+                : typeof pdfOut;
+            result = { success: false, platform, format: 'pdf',
+              error: 'the PDF export did not produce a file: expected a Blob, got ' + got + '.' };
+            break;
+          }
+          const dataUrl = await blobToDataUrl(blob);
+          result = {
+            success: true, platform, format: 'pdf', data: dataUrl,
+            mimeType: 'application/pdf', size: blob.size, dpi: settings.dpi,
+            // The record carries the page geometry the engine chose; it is the
+            // only place a caller can learn it.
+            ...(pdfOut && pdfOut.width ? { dimensions: { width: pdfOut.width, height: pdfOut.height } } : {}),
+            ...(pdfOut && pdfOut.format ? { paperFormat: pdfOut.format } : {}),
+          };
         } else {
           result = { success: false, error: 'PDF export failed' };
         }
