@@ -888,8 +888,30 @@ export class PinePaperBrowserController {
         this.launchOptions(
           useHeadless,
           this.launchArgs(viewportWidth, viewportHeight, [
-            // Additional optimization flags for agent mode
-            '--disable-gpu',
+            // '--disable-gpu' USED TO BE HERE, AND IT TURNED OFF WEBGL.
+            //
+            // It was carried in as a headless convention under "optimization
+            // flags", and the cost was never measured: with it, webgl1 and
+            // webgl2 both report false in the page, so world3d, drawShaderArt,
+            // drawFormulaArt and every shader aura (liquid_metal, caustics,
+            // heatmap, gem_smoke, electric_arc, vortex) were dead through this
+            // controller. liquid_metal and drawFormulaArt still answered
+            // success:true and rendered nothing — the flag turned a whole
+            // class of features into silent no-ops.
+            //
+            // Removing it lets Chrome use the real GPU where there is one (on
+            // this Mac, WebGL2 through Metal ANGLE). --enable-unsafe-swiftshader
+            // then covers the case there is NOT: Chrome stopped falling back to
+            // software GL silently, so without the flag a headless server or a
+            // container gets no WebGL at all rather than a slow one. "Unsafe"
+            // here means software rasterisation, not a security relaxation —
+            // unlike --ignore-certificate-errors, which stays gated on an
+            // explicitly configured proxy.
+            //
+            // Same shape as mcp-cloud's encoder/gl-probe.mjs, which already
+            // ships --use-gl=angle --use-angle=swiftshader
+            // --enable-unsafe-swiftshader --enable-webgl for the same reason.
+            '--enable-unsafe-swiftshader',
             '--disable-dev-shm-usage',
             '--disable-extensions',
           ]),

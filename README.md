@@ -219,6 +219,21 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 
 ## What's new in 1.6.13
 
+### Fixed: WebGL was switched off, so every shader feature silently did nothing
+
+The browser was launched with `--disable-gpu`, carried in as a headless
+convention. With it, `webgl1` and `webgl2` both report **false** in the page —
+so `pinepaper_world3d`, `drawShaderArt`, `drawFormulaArt` and every shader aura
+(`liquid_metal`, `caustics`, `heatmap`, `gem_smoke`, `electric_arc`, `vortex`)
+could not run. Worse, some of them reported `success: true` and rendered
+nothing.
+
+The flag is gone, so Chrome uses the real GPU where there is one, and
+`--enable-unsafe-swiftshader` covers machines without: Chrome no longer falls
+back to software GL on its own, so without it a headless server gets no WebGL
+at all rather than a slow one. Measured on the same machine, only the flags
+differing: false/false before, WebGL 1 and 2 both available after.
+
 ### Fixed: photos could not be imported from a URL at all
 
 1.6.12 stopped an imported image from tainting the canvas, and in doing so made
