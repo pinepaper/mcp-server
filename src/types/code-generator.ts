@@ -8391,7 +8391,14 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
     return { success: false, error: 'app.captureFramesAt unavailable — update FxTool to a build with the deterministic capture entrypoint' };
   }
   const includeDataUrls = ${includeDataUrls};
-  const hashStr = function(s) { let h = 5381; for (let i = 0; i < s.length; i++) { h = (((h << 5) + h) ^ s.charCodeAt(i)) >>> 0; } return h.toString(16); };
+  // THE HASH LOOP RAN ONCE PER CHARACTER OF A DATA URL, inside generated code,
+  // where every loop site is budgeted at 2,000,000 iterations — so any frame
+  // over ~2 MB (three photos, a shader backdrop) died "Loop budget exceeded".
+  // app.hashFrame is the same djb2-xor in engine code, outside the budget, so
+  // hashes stay comparable with builds that only have the fallback.
+  const hashStr = (typeof app.hashFrame === 'function')
+    ? function(s) { return app.hashFrame(s); }
+    : function(s) { let h = 5381; for (let i = 0; i < s.length; i++) { h = (((h << 5) + h) ^ s.charCodeAt(i)) >>> 0; } return h.toString(16); };
   const frames = app.captureFramesAt(${timesJson}, {
     seed: ${seed},
     capture: function(c, t, i) {

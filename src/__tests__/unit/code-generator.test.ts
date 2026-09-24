@@ -1162,6 +1162,17 @@ describe('PinePaperCodeGenerator', () => {
       expect(code).toContain('app.captureFrameDataURL()');
       expect(code).toContain('c.toDataURL()'); // fallback retained for old builds
     });
+
+    it('capture_frames hashes through app.hashFrame, outside the generated-loop budget', () => {
+      const code = codeGenerator.generateCaptureFrames({ times: [0] });
+      const hashStr = new Function('app', `${/const hashStr = [\s\S]*?\};\n/.exec(code)![0]}; return hashStr;`);
+      const viaEngine = hashStr({ hashFrame: () => 'engine' });
+      expect(viaEngine('x')).toBe('engine');
+      // The fallback is the same djb2-xor, so hashes compare across builds.
+      expect(hashStr({})('data:image/png;base64,AAAA')).toBe((() => {
+        let h = 5381; for (const ch of 'data:image/png;base64,AAAA') h = (((h << 5) + h) ^ ch.charCodeAt(0)) >>> 0; return h.toString(16);
+      })());
+    });
   });
 
   // The governor (app.runGenerated) captures a run's value only when the emitted
