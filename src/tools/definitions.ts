@@ -6913,7 +6913,7 @@ S6 Procedural (seeded, OKLCH palettes, curated presets, optional Motion). All ta
 GPU / GLSL math-art (transpiled to a fragment shader, 60fps; all take renderScale 0.25–1, transparentBg, speed):
 - drawFormulaArt: type a math expression in x,y,t → scalar mapped through a 3-stop palette (formula, domain, color1/color2/color3). Try sin(x*5+t)*cos(y*3).
 - drawParametricCollection: N circles or line segments indexed by k, expressions in k,N,t — Yeganeh-style (mode: circles|lines, count, xExpression/yExpression/radiusExpression or x1..y2Expression, scale, palette, bgColor).
-- drawShaderArt: paste your own GLSL fragment shader (fragmentSource; uniforms u_time, u_resolution, u_color1/2/3) or pick a preset.
+- drawShaderArt: a GLSL fragment shader. PASSING fragmentSource ALONE DOES NOTHING — preset defaults to 'wavefield' and wins, so your shader is ignored and a preset renders instead, reporting success. Pass preset: 'custom' to use fragmentSource verbatim. The shader is GLSL ES 3.00: inputs 'in vec2 v_uv', output 'out vec4 outColor' — NOT gl_FragColor, and there is no u_uv. Uniforms: u_time, u_resolution (vec2), u_color1/2/3 (vec3). Other presets: wavefield, gradient_glow, noise_clouds, voronoi, simplex_noise, perlin, pulsing_border. renderScale 0.25-1 (default 0.5) trades resolution for speed.
 - drawYeganehMountains: GLSL port of Hamid Naderi Yeganeh's "Mountains" (mountainCount, timeOffset, skyTop, skyBottom, ridgeColor, valleyColor).
 
 OKLCH seeded backgrounds (palette + seed → reproducible):

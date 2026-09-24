@@ -4174,6 +4174,8 @@ export const TextEffectInputSchema = z.object({
   gradientDirection: z.enum(['vertical', 'horizontal', 'radial', 'diagonal']).optional().describe('apply: gradient axis across the text block.'),
   gradientSteps: z.number().int().positive().optional().describe('apply: quantization steps in the gradient ramp.'),
   keepSource: z.boolean().optional().describe('apply: leave the original text item in place instead of removing it — the escape hatch when relations/keyframes reference its id.'),
+  startAt: z.number().min(0).optional().describe('apply: seconds to delay the whole effect. Every effect plays from t=0 otherwise, so in a multi-shot video they all fire on the opening frame and only the first title reads. The characters are held invisible until this time rather than sitting in their end state.'),
+  hideAfter: z.number().positive().optional().describe('apply: seconds after which the characters disappear. They survive to the end of the clip otherwise, so a caption from shot one is still on screen in shot four.'),
   options: z.record(z.string(), z.unknown()).optional().describe('apply: per-effect knobs, passed through verbatim (each of the 37 has its own). Spread FIRST, so named fields above win on collision.'),
 })
   .refine((v) => v.action !== 'apply' || (!!v.itemId && !!v.effect), { message: 'apply requires itemId and effect', path: ['effect'] });

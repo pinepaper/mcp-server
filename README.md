@@ -234,6 +234,45 @@ back to software GL on its own, so without it a headless server gets no WebGL
 at all rather than a slow one. Measured on the same machine, only the flags
 differing: false/false before, WebGL 1 and 2 both available after.
 
+### Fixed: sixteen parameters that were accepted and then ignored
+
+A stress-test pass across six designs found the same failure repeatedly — a
+parameter the schema takes, validates, and drops before it reaches the engine.
+All of them now either work or say why not:
+
+- **Choropleth maps** rendered near-black: `colorScale: "greens"` was sent
+  where the engine indexes a two-stop `['#from', '#to']` ramp, so it indexed a
+  string. `minValue`/`maxValue`/`showLegend` weren't mapped either.
+- **Region highlights** came out default blue — the colour was stripped, and
+  the engine reads `style.fill`.
+- **`pinepaper_map load`** documented an `options` parameter the schema threw
+  away, so `{style: "dark"}` never arrived.
+- **Mask keyframe `time`** was capped at 0–1 while the engine reads **seconds**
+  — a keyframe at 2.0s was a validation error.
+- **Animated masks (mode 3)** passed the animation preset where the mask
+  *shape* goes, so the keyframes drove the wrong geometry.
+- **Sound cues** needed two calls each because `visual.startTime` was stripped;
+  one call places a cue now.
+- **`text_effect`** gained `startAt` and `hideAfter` — every effect played from
+  t=0, so in a multi-shot video they all fired on the opening frame.
+- **`import_asset` by URL** is implemented rather than refused.
+- **`drawShaderArt`** documented `fragmentSource` without mentioning that it is
+  ignored unless you pass `preset: "custom"`, and that the shader is GLSL ES
+  3.00 (`in v_uv` / `out outColor`), not `gl_FragColor`.
+- **Asset search** showed `[object Object]` as the author, and claimed
+  "Various Licenses" for icons whose licence it had simply failed to read.
+
+Where the engine genuinely cannot do the thing, the tool now refuses by name
+instead of accepting the parameter and ignoring it: right-to-left text has no
+engine support, and a connector id you supply is dropped by the engine, so the
+result tells you which id you actually got.
+
+### Fixed: an unknown item id reported success
+
+`pinepaper_keyframe_animate` on an id that doesn't exist returned success and
+animated nothing — the engine warns through a console this tool cannot read.
+It now refuses and names the id.
+
 ### Fixed: photos could not be imported from a URL at all
 
 1.6.12 stopped an imported image from tainting the canvas, and in doing so made

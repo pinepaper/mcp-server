@@ -18,7 +18,10 @@ interface IconifySearchResponse {
   collections?: Record<string, {
     name: string;
     total: number;
-    author?: string;
+    // Iconify returns an OBJECT here — {name, url} — and this said string, so
+    // it was interpolated straight to "[object Object]" in every search
+    // result. Typed as both, and normalised at the point of use.
+    author?: string | { name?: string; url?: string };
     license?: {
       title?: string;
       spdx?: string;
@@ -32,6 +35,12 @@ interface IconifySearchResponse {
  *
  * Uses the Iconify API to search and download icons from multiple icon sets
  */
+/** Iconify gives a collection author as a string OR {name, url}. */
+function authorName(author?: string | { name?: string; url?: string }): string | undefined {
+  if (!author) return undefined;
+  return typeof author === 'string' ? author : author.name;
+}
+
 export class IconifyAdapter implements AssetRepository {
   name = 'iconify';
 
@@ -84,7 +93,7 @@ export class IconifyAdapter implements AssetRepository {
           downloadUrl: `https://api.iconify.design/${iconName}.svg`,
           license,
           tags: [query, collection],
-          author: collectionInfo?.author,
+          author: authorName(collectionInfo?.author),
         });
       }
 
@@ -175,8 +184,8 @@ export class IconifyAdapter implements AssetRepository {
       repository: this.name,
       title: assetId.replace('iconify_', ''),
       license: {
-        type: 'Mixed',
-        name: 'Various Licenses (check collection)',
+        type: 'Unknown',
+        name: 'not read — check the icon set on iconify.design before relying on it',
         requiresAttribution: true,
         allowsCommercial: false,
       },
@@ -189,9 +198,15 @@ export class IconifyAdapter implements AssetRepository {
    */
   private parseLicense(collectionInfo?: any): AssetLicense {
     if (!collectionInfo?.license) {
+      // NOT KNOWING IS NOT THE SAME AS "MIXED".
+      //
+      // This reported "Various Licenses" with allowsCommercial: false for an
+      // icon whose collection is Apache-2.0 — two assertions about a licence
+      // it had simply failed to read. An unknown licence should say it is
+      // unknown and name where to check.
       return {
-        type: 'Mixed',
-        name: 'Various Licenses',
+        type: 'Unknown',
+        name: 'not read — check the icon set on iconify.design before relying on it',
         requiresAttribution: true,
         allowsCommercial: false,
       };

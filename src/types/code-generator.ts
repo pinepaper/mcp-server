@@ -8707,9 +8707,42 @@ ${guard}
   // r.items are live Paper objects — NOT serializable, deliberately dropped.
   // The source item id is GONE unless keepSource was set, so r.ids is now the
   // caller's entire handle set; returning it is what makes the tool usable.
+  // EVERY EFFECT PLAYS FROM t=0, so in a multi-shot video they all fire on the
+  // opening frame and only the first title reads. The engine has no start
+  // delay, so the keyframes it just wrote are shifted here — the same thing a
+  // caller was doing by hand through execute_custom_code.
+  //
+  // Shifted, then held: without an explicit invisible keyframe at 0 the
+  // characters sit in their FIRST pose until the effect starts, which for most
+  // of the 37 is a scatter that looks like a bug. hideAfter closes the other
+  // end, because they otherwise survive to the end of the clip.
+  const _startAt = ${S(input.startAt ?? 0)};
+  const _hideAfter = ${S(input.hideAfter ?? null)};
+  let _shifted = 0;
+  if ((_startAt > 0 || _hideAfter) && Array.isArray(r.ids)) {
+    for (const _id of r.ids) {
+      const _it = app.getItemById && app.getItemById(_id);
+      const _kfs = _it && _it.data && _it.data.keyframes;
+      if (!Array.isArray(_kfs) || _kfs.length === 0) continue;
+      if (_startAt > 0) {
+        for (const _k of _kfs) _k.time += _startAt;
+        _kfs.unshift({ time: 0, properties: { opacity: 0 }, easing: 'linear' });
+        _kfs.splice(1, 0, { time: Math.max(0, _startAt - 0.001), properties: { opacity: 0 }, easing: 'linear' });
+      }
+      if (_hideAfter) {
+        _kfs.push({ time: Math.max(0, _hideAfter - 0.001), properties: { opacity: 1 }, easing: 'linear' });
+        _kfs.push({ time: _hideAfter, properties: { opacity: 0 }, easing: 'linear' });
+      }
+      _kfs.sort((a, b) => a.time - b.time);
+      _shifted++;
+    }
+  }
   return {
     success: true, action: 'apply', effect: r.effect, ids: r.ids, count: r.count,
-    duration: r.duration, sourceRemoved: ${S(input.keepSource !== true)},
+    duration: (r.duration || 0) + _startAt, sourceRemoved: ${S(input.keepSource !== true)},
+    ...(_startAt > 0 ? { startAt: _startAt } : {}),
+    ...(_hideAfter ? { hideAfter: _hideAfter } : {}),
+    ...((_startAt > 0 || _hideAfter) ? { retimed: _shifted } : {}),
   };
 })();`.trim();
       }

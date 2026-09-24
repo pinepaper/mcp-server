@@ -73,7 +73,10 @@ describe('generateTextEffect codegen', () => {
     }));
     expect(c).toContain('ids: r.ids');
     expect(c).toContain('count: r.count');
-    expect(c).toContain('duration: r.duration');
+    // duration now carries the start delay, since the caller's clip has to
+    // cover the whole thing: (r.duration || 0) + _startAt.
+    expect(c).toContain('r.duration');
+    expect(c).toContain('_startAt');
     // r.items can't cross the bridge; forwarding it yields a broken payload.
     expect(c).not.toContain('items: r.items');
   });
@@ -173,5 +176,45 @@ describe('pinepaper_text_effect registration', () => {
     const tags = Object.entries(TOOL_TAGS).filter(([, names]) => names.includes('pinepaper_text_effect'));
     expect(tags.map(([t]) => t)).toEqual(['effects']);
     expect(getToolsForToolkit(PINEPAPER_TOOLS, 'agent').map((t) => t.name)).toContain('pinepaper_text_effect');
+  });
+});
+
+describe('an effect can start late and end early', () => {
+  const apply = (extra: Record<string, unknown>): string =>
+    codeGenerator.generateTextEffect(TextEffectInputSchema.parse({
+      action: 'apply', itemId: 't1', effect: 'matrix', ...extra,
+    }));
+
+  it('shifts the keyframes the engine just wrote', () => {
+    // Every effect plays from t=0, so in a multi-shot video they all fire on
+    // the opening frame. The engine has no start delay; the shift is the same
+    // thing a caller was doing by hand through execute_custom_code.
+    const c = apply({ startAt: 4 });
+    expect(c).toContain('_k.time += _startAt');
+    expect(c).toContain('data.keyframes');
+  });
+
+  it('holds the characters invisible until it starts', () => {
+    // Without this they sit in their FIRST pose, which for most of the 37 is a
+    // scatter that reads as a bug rather than a caption waiting its turn.
+    const c = apply({ startAt: 4 });
+    expect(c).toContain('opacity: 0');
+    expect(c).toContain('_kfs.unshift');
+  });
+
+  it('hides them again when asked', () => {
+    const c = apply({ startAt: 1, hideAfter: 5 });
+    expect(c).toContain('_hideAfter');
+    expect(c).toContain('_kfs.push');
+  });
+
+  it('keeps the track time-sorted, because the engine inserts in order', () => {
+    expect(apply({ startAt: 2 })).toContain('_kfs.sort');
+  });
+
+  it('touches nothing when neither was asked for', () => {
+    const c = apply({}).split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
+    expect(c).toContain('_startAt = 0');
+    expect(c).toContain('_hideAfter = null');
   });
 });
