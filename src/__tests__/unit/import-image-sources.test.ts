@@ -27,11 +27,29 @@ const PNG_1PX = Buffer.from(
 );
 
 describe('resolveImageSource', () => {
-  it('passes remote and data URLs straight through', async () => {
-    // The page fetches these itself and reports its own reasons.
-    expect(await resolveImageSource('https://example.test/a.png')).toEqual({ src: 'https://example.test/a.png' });
-    expect(await resolveImageSource('http://localhost:8080/b.jpg')).toEqual({ src: 'http://localhost:8080/b.jpg' });
+  it('passes a data URL straight through', async () => {
     expect(await resolveImageSource('data:image/png;base64,AAAA')).toEqual({ src: 'data:image/png;base64,AAAA' });
+  });
+
+  it('no longer hands an http URL to the page to fetch', async () => {
+    // This test used to assert the opposite, on the reasoning that "the page
+    // fetches these itself and reports its own reasons". It cannot:
+    // pinepaper.studio's connect-src forbids a third-party fetch, so the page
+    // reported only failure. Resolved in this process instead — see
+    // node-side-image-fetch.test.ts for the fetch behaviour itself.
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async () => ({
+      ok: true, status: 200, statusText: 'OK',
+      headers: { get: () => 'image/png' },
+      arrayBuffer: async () => new TextEncoder().encode('PNG').buffer,
+    })) as never;
+    try {
+      const got = await resolveImageSource('https://example.test/a.png') as { src: string };
+      expect(got.src).toStartWith('data:image/png;base64,');
+      expect(got.src).not.toContain('example.test');
+    } finally {
+      globalThis.fetch = realFetch;
+    }
   });
 
   it('reads a local file and hands back a data URL', async () => {

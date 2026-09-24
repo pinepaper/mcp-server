@@ -283,9 +283,84 @@ const IMAGE_MIME: Record<string, string> = {
   '.webp': 'image/webp', '.svg': 'image/svg+xml', '.bmp': 'image/bmp', '.avif': 'image/avif',
 };
 
+/**
+ * THE PAGE CANNOT FETCH A THIRD-PARTY IMAGE. THIS PROCESS CAN.
+ *
+ * pinepaper.studio serves `connect-src 'self' https://cloud.pinepaper.studio`,
+ * so an in-page fetch() of ANY other host fails outright. `img-src` still
+ * allows https:, which is why the old path could LOAD a remote image — and
+ * tainted the canvas doing it, killing every later export. The taint fix
+ * replaced that load with a fetch, which is safe and, under this CSP, can
+ * never succeed: import by URL stopped being broken-and-dangerous and became
+ * simply impossible.
+ *
+ * Node has no CSP. Fetching here and handing the page a data: URL is the only
+ * shape that both works and cannot taint, so a URL is resolved BEFORE it
+ * reaches the browser. Verified end to end by the session that found it: a
+ * 157KB data: URL imports and exports cleanly.
+ */
+const MAX_REMOTE_IMAGE_BYTES = 32 * 1024 * 1024;
+
+export async function fetchImageAsDataUrl(url: string): Promise<{ src: string } | { error: string }> {
+  let res: Response;
+  try {
+    res = await fetch(url, { redirect: 'follow' });
+  } catch (e) {
+    const why = e instanceof Error ? e.message : 'network request failed';
+    return { error: `could not reach ${url} — ${why}. This fetch runs in the MCP server, not the page, so it is not a CSP problem: check the host resolves and any proxy is reachable.` };
+  }
+  if (!res.ok) {
+    return { error: `the server refused ${url} — HTTP ${res.status} ${res.statusText || ''}`.trim() };
+  }
+  const type = (res.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
+  if (!type.startsWith('image/')) {
+    return { error: `${url} served "${type || 'no content-type'}", not an image. A URL that returns an HTML page around the image will do this — link the file itself.` };
+  }
+  const buf = Buffer.from(await res.arrayBuffer());
+  if (buf.length > MAX_REMOTE_IMAGE_BYTES) {
+    return { error: `${url} is ${(buf.length / 1024 / 1024).toFixed(1)} MB, above the ${MAX_REMOTE_IMAGE_BYTES / 1024 / 1024} MB import cap.` };
+  }
+  return { src: `data:${type};base64,${buf.toString('base64')}` };
+}
+
+/**
+ * Resolve an SVG to a string with every remote <image> already inlined.
+ *
+ * The emitted code does this in the page as a backstop, and under
+ * pinepaper.studio's CSP that backstop can only ever DROP images — the page
+ * may not fetch a third-party host. Doing it here means the page receives a
+ * document with no remote references at all: nothing to fetch, nothing to
+ * taint, and the pictures actually arrive.
+ *
+ * An href that cannot be fetched is still removed rather than left in, on the
+ * same reasoning as the in-page pass: a missing picture is visible and
+ * recoverable, a tainted canvas is neither.
+ */
+async function inlineSvgImages(svg: string): Promise<{ svg: string; warnings: Array<Record<string, string>> }> {
+  const warnings: Array<Record<string, string>> = [];
+  const hrefs = [...new Set(
+    [...svg.matchAll(/(?:xlink:)?href\s*=\s*("|')(https?:\/\/[^"']+)\1/gi)].map((m) => m[2]),
+  )];
+  let out = svg;
+  for (const href of hrefs) {
+    const got = await fetchImageAsDataUrl(href);
+    if ('src' in got) {
+      out = out.split(href).join(got.src);
+      continue;
+    }
+    const esc = href.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    out = out
+      .replace(new RegExp(`<image\\b[^>]*${esc}[^>]*\\/?>`, 'gi'), '')
+      .replace(new RegExp(`<image\\b[^>]*${esc}[\\s\\S]*?<\\/image>`, 'gi'), '');
+    warnings.push({ url: href, action: 'removed', reason: 'unfetchable', message: got.error });
+  }
+  return { svg: out, warnings };
+}
+
 export async function resolveImageSource(input: string): Promise<{ src: string } | { error: string }> {
   const raw = input.trim();
-  if (/^(https?:|data:)/i.test(raw)) return { src: raw };
+  if (/^data:/i.test(raw)) return { src: raw };
+  if (/^https?:/i.test(raw)) return fetchImageAsDataUrl(raw);
 
   const path = raw.startsWith('file://') ? fileURLToPath(raw) : raw;
   const ext = extname(path).toLowerCase();
@@ -1986,14 +2061,51 @@ You can now start creating new items on a clean canvas.`,
       // -----------------------------------------------------------------------
       case 'pinepaper_import_svg': {
         const input = ImportSVGInputSchema.parse(args);
+        // Resolve the document HERE, so the page never has to fetch anything.
+        //
+        // Under pinepaper.studio's CSP (connect-src 'self' + the cloud origin)
+        // the page cannot fetch a third-party host at all, so the in-page
+        // inlining could only ever DROP remote images. Fetching the SVG and
+        // its images in this process means the browser receives a document
+        // with no remote references: nothing to fetch, nothing to taint, and
+        // the pictures arrive. The in-page pass stays as a backstop for an
+        // svgString handed straight to the generator elsewhere.
+        let svgText = input.svgString;
+        let svgWarnings: Array<Record<string, string>> = [];
+        if (input.url) {
+          try {
+            const res = await fetch(input.url, { redirect: 'follow' });
+            if (!res.ok) {
+              return errorResult(
+                ErrorCodes.EXECUTION_ERROR,
+                `the server refused ${input.url} — HTTP ${res.status} ${res.statusText || ''}`.trim(),
+              );
+            }
+            svgText = await res.text();
+          } catch (e) {
+            const why = e instanceof Error ? e.message : 'network request failed';
+            return errorResult(
+              ErrorCodes.EXECUTION_ERROR,
+              `could not reach ${input.url} — ${why}. This fetch runs in the MCP server rather than the page, so it is not a CSP problem.`,
+            );
+          }
+        }
+        if (svgText && /(?:xlink:)?href\s*=\s*["']https?:/i.test(svgText)) {
+          const inlined = await inlineSvgImages(svgText);
+          svgText = inlined.svg;
+          svgWarnings = inlined.warnings;
+        }
+
         const code = codeGenerator.generateImportSVG(
-          input.svgString,
-          input.url,
+          svgText,
+          svgText ? undefined : input.url,
           input.position,
           input.scale,
           input.source
         );
-        const description = 'Imports SVG onto the canvas';
+        const description = svgWarnings.length
+          ? `Imports SVG onto the canvas (${svgWarnings.length} unreachable image(s) removed)`
+          : 'Imports SVG onto the canvas';
         return executeOrGenerate(code, description, options, 'pinepaper_import_svg');
       }
 
