@@ -1573,7 +1573,7 @@ warp (optional): chained parametric warp(s) — displace each sampled point by {
 
 RETURNS: { success, kind, itemId } — itemId is the created path. Bad expressions / empty ranges return { success:false, error }.
 
-To make an item TRAVEL along an equation curve (instead of drawing it), use pinepaper_add_relation relationType moves_along_path with params.equation instead.
+To make an item TRAVEL along an equation curve (instead of drawing it), use pinepaper_add_relation relationType moves_along_path with params.equation — but note that equation is read ONLY on the relation's signal path. An option that leaves that path takes the equation with it and the item simply does not move: easing 'bounce' is piecewise and falls back, so bounce + equation is a static item reporting success. Use a signal-friendly easing (linear, easeIn, easeOut, easeInOut, sine, pingpong) with an equation, or supply params.path instead.
 
 EXAMPLES:
 - Sine wave: { kind: "function", expr: "sin(x/40) * 60", min: -300, max: 300, style: { strokeColor: "#4f46e5" } }
@@ -1598,7 +1598,7 @@ EXAMPLES:
         y: { type: 'number', description: 'Canvas origin y (default: canvas center)' },
         flipY: { type: 'boolean', description: 'Math y-up → screen y-down (default true)' },
         style: { type: 'object', description: 'Path style forwarded to create (strokeColor, strokeWidth, fillColor, …)' },
-        solveOde: { type: 'object', description: "Integrate an ODE instead of plotting a closed form, and return the SOLUTION rather than drawing it: { equations, initialState, tEnd?, dt?, method? ('rk4' default, or 'euler' — faster and visibly wrong on anything stiff) }. The trajectory comes back as data, to inspect, feed to a path, or drive keyframes with." },
+        solveOde: { type: 'object', description: "Integrate an ODE instead of plotting a closed form, and return the SOLUTION rather than drawing it: { equations, initialState, tEnd?, dt?, method? ('rk4' default, or 'euler' — faster and visibly wrong on anything stiff) }. STATE VARIABLES ARE POSITIONAL: each expression is written in terms of t, y0, y1, y2 ... where yN is the Nth entry of initialState. There is no x or y, so a Lorenz system is ['10*(y1-y0)', 'y0*(28-y2)-y1', 'y0*y1-(8/3)*y2'] with initialState [1,1,1] — writing it as '10*(y-x)' fails with \"Undefined symbol y\". The trajectory comes back as data, to inspect, feed to a path, or drive keyframes with." },
         warp: {
           anyOf: [{ type: 'object' }, { type: 'array', items: { type: 'object' } }],
           description: 'Chained parametric warp(s): { dx, dy } expressions of x, y, t — one object or an array',
@@ -2570,7 +2570,8 @@ render_soundtrack mixes every placed sound to a WAV and writes it to a file. It 
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['list_instruments', 'list_percussion', 'list_sfx', 'play_tone', 'play_chord', 'chord_frequencies', 'play_percussion', 'play_sfx', 'play_spec', 'from_text', 'play_from_text', 'create', 'timbre_from_path', 'set_placement', 'remove', 'stop_all', 'define_instrument', 'define_percussion', 'define_sfx', 'render_soundtrack'], description: 'Which sound operation.' },
+        action: { type: 'string', enum: ['list_instruments', 'list_percussion', 'list_sfx', 'play_tone', 'play_chord', 'chord_frequencies', 'play_percussion', 'play_sfx', 'play_spec', 'from_text', 'play_from_text', 'create', 'sequence', 'timbre_from_path', 'set_placement', 'remove', 'stop_all', 'define_instrument', 'define_percussion', 'define_sfx', 'render_soundtrack'], description: 'Which sound operation.' },
+        cues: { type: 'array', description: "sequence: every cue in ONE call — [{t, spec|preset, note?, duration?, visual?}]. Each is created and placed at its own t, so a music bed is one call rather than one per cue. Failures come back by index in failed[], because a bed where three of a hundred cues did not sound is neither a success nor a failure.", items: { type: 'object' } },
         partials: { type: 'array', items: { type: 'object' }, description: 'define_*: [{ h, amp }] — the harmonic table that IS the timbre. Required for define_instrument.' },
         envelope: { type: 'object', description: 'define_*: { attack, decay, sustain, release } — seconds, except sustain which is a level 0-1.' },
         gain: { type: 'number', description: 'define_*: output level 0-1 (0.8 instrument, 0.85 percussion, 0.65 sfx).' },
@@ -3071,7 +3072,7 @@ RELATION COMPATIBILITY:
   Text→Text: font blend
   Cross-type: particle denoising transition
 - group_morphs_to: pair-by-index morph between two paper.Groups (any two — graph vertices+edges, letter collages, dashboard clusters). Path.Line children deform via endpoints; other children translate; excess children fade. Params: duration, hold, loop, easing (linear|easeIn|easeOut|easeInOut), deformLines.
-- moves_along_path: self-relation (targetId=null); item is driven along a path. Source the path EITHER from params.path (array of {x,y} or [x,y]) OR from params.equation (S10 B5) — a math curve the item TRAVERSES, sampled deterministically on the Expression IR: params.equation = { kind: function|parametric|fourier|preset, expr | xExpr/yExpr | harmonics | preset, min, max, samples, scale, cx, cy, flipY, warp } (same equation contract as pinepaper_equation_path, but origin is cx/cy, default 0). Params: path OR equation, speed, closed, phase, easing (linear|easeIn|easeOut|easeInOut|sine|bounce|pingpong).
+- moves_along_path: self-relation (targetId=null); item is driven along a path. Source the path EITHER from params.path (array of {x,y} or [x,y]) OR from params.equation (S10 B5) — a math curve the item TRAVERSES, sampled deterministically on the Expression IR: params.equation = { kind: function|parametric|fourier|preset, expr | xExpr/yExpr | harmonics | preset, min, max, samples, scale, cx, cy, flipY, warp } (same equation contract as pinepaper_equation_path, but origin is cx/cy, default 0). READ ONLY ON THE SIGNAL PATH: easing 'bounce' is piecewise and leaves it, which silently discards the equation and leaves the item where it started. Params: path OR equation, speed, closed, phase, easing (linear|easeIn|easeOut|easeInOut|sine|bounce|pingpong).
 
 GEOMETRIC CONSTRUCTION CONSTRAINTS (Layer 2) — the source item is RE-DERIVED every frame from its anchor item(s), so dragging an anchor updates the dependent live (GeoGebra-style), and the construction persists as relation graph data (edit it by editing relations, not by re-running code). Anchor A is the relation target; extra anchors ride in params:
 - is_midpoint_of: source = midpoint(target, params.other). params.other = id of the second endpoint (B).

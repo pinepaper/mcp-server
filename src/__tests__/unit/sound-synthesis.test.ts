@@ -162,3 +162,49 @@ describe('a cue is one call, not two', () => {
     expect(code).not.toContain('setSoundPlacement');
   });
 });
+
+/**
+ * A whole music bed in one call.
+ *
+ * Every cue was create + set_placement, so a 112-cue bed cost 112 round trips
+ * once visual.startTime landed, and 224 before it. Nothing about the work needs
+ * a trip each: the cues are independent, differ only in time and spec, and the
+ * page can loop.
+ */
+describe('sequence places a whole bed in one call', () => {
+  const seq = (cues: unknown[]): string => gen({ action: 'sequence', cues } as never);
+
+  it('loops the cues in the page instead of one call each', () => {
+    const code = seq([{ t: 0, spec: { partials: [{ h: 1, amp: 1 }] } }, { t: 1.5, preset: 'kick' }]);
+    expect(code).toContain('for (let i = 0');
+    expect(code).toContain('app.createSound');
+    expect(code).toContain('app.setSoundPlacement');
+  });
+
+  it('places each cue at its own time', () => {
+    const code = seq([{ t: 2.25, preset: 'snare' }]);
+    expect(code).toContain('"t":2.25');
+    expect(code).toContain('startTime: c.t');
+  });
+
+  it('accepts a preset instead of a spec', () => {
+    expect(seq([{ t: 0, preset: 'kick', note: 'A2' }])).toContain('"preset":"kick"');
+  });
+
+  it('reports WHICH cues failed, not just that some did', () => {
+    // A bed where three of 112 failed is neither a success nor a failure; the
+    // caller needs the indices to fix it.
+    const code = seq([{ t: 0, preset: 'kick' }]);
+    expect(code).toContain('failed.push({ index: i');
+    expect(code).toContain('see failed[] for which');
+  });
+
+  it('refuses a cue with neither spec nor preset rather than skipping it quietly', () => {
+    expect(seq([{ t: 0 }])).toContain('neither spec nor preset');
+  });
+
+  it('emits valid JavaScript', () => {
+    const code = seq([{ t: 0, preset: 'kick' }, { t: 1, spec: { partials: [{ h: 2, amp: 0.5 }] } }]);
+    expect(() => new Function(`return (function(app){ ${code} });`)).not.toThrow();
+  });
+});

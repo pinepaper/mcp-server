@@ -217,6 +217,29 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - Puppeteer mode launches Chrome with `--no-sandbox` and `--disable-setuid-sandbox`. That is routine for headless automation and it does weaken Chrome's own process sandbox. If that matters where you are running it, use `code` mode or put the server in a container.
 - Puppeteer itself is an **optional** peer dependency, kept out of the default tree precisely because a headless browser plus an install script is what scanners flag hardest. Install it only if you want the executing mode.
 
+## What's new in 1.6.14
+
+### New: a whole music bed in one call
+
+`pinepaper_sound` gained a `sequence` action taking `[{t, spec|preset, note?,
+duration?}]`. Every cue used to be its own call — a 112-cue bed cost 112 round
+trips — and nothing about the work needed one each. Failures come back by
+index, because a bed where three of a hundred cues didn't sound is neither a
+success nor a failure.
+
+### Fixed: documentation that described the wrong contract
+
+- **`solveOde` state variables are positional** — `t`, `y0`, `y1`, `y2` …
+  matching `initialState`. There is no `x` or `y`, so the natural way to write
+  a Lorenz system failed with "Undefined symbol y". The working form is now in
+  the description.
+- **`moves_along_path` with `params.equation`** only works on the relation's
+  signal path. Easing `bounce` is piecewise and leaves that path, which
+  silently discards the equation and leaves the item where it started.
+- **`grid.blocked` in `pathfind`** is a **mask**, one entry per cell, not a
+  list of blocked indices. Both are arrays of numbers, so the wrong one used to
+  produce a plausible "no path" instead of an error; the length is now checked.
+
 ## What's new in 1.6.13
 
 ### Fixed: WebGL was switched off, so every shader feature silently did nothing

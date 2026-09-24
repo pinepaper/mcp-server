@@ -4231,10 +4231,20 @@ export const GameInputSchema = z.object({
     rows: z.number().int().positive(),
     cellSize: z.number().positive().optional().describe('World units per cell (default 1).'),
     origin: PositionSchema.optional().describe('World position of cell (0,0).'),
-    blocked: z.array(z.number()).optional().describe('Flat cols×rows array, 1 = blocked.'),
+    blocked: z.array(z.number()).optional().describe('A MASK, not a list of indices: one entry per cell, cols*rows long, row-major, non-zero meaning blocked. The engine reads blocked[y * cols + x].'),
     obstacles: z.array(z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() }))
       .optional().describe('World-space rects to block — pass item bounds and the walls block the board.'),
-  }).optional().describe('pathfind: the board.'),
+  }).optional().describe('pathfind: the board.')
+    // A MASK AND AN INDEX LIST LOOK IDENTICAL TO A TYPE CHECKER.
+    //
+    // `blocked` is read as blocked[y * cols + x], so passing the INDICES of the
+    // blocked cells — the other obvious reading — blocks cells 0..n-1 by their
+    // values instead, and the answer comes back as a plausible "no path" with
+    // nothing wrong on the face of it. The length tells the two apart for free.
+    .refine((g) => !g?.blocked || g.blocked.length === g.cols * g.rows, {
+      message: 'grid.blocked must have exactly cols*rows entries — one per cell, non-zero meaning blocked. A list of blocked cell INDICES is a different thing and produces a wrong board rather than an error.',
+      path: ['blocked'],
+    }),
   start: PositionSchema.optional().describe('pathfind: start, WORLD coordinates.'),
   goal: PositionSchema.optional().describe('pathfind: goal, WORLD coordinates.'),
   diagonal: z.boolean().optional().describe('pathfind: 8-way movement (default true). Never cuts corners.'),
@@ -4552,9 +4562,9 @@ export const SoundInputSchema = z.object({
     'list_instruments', 'list_percussion', 'list_sfx',
     'play_tone', 'play_chord', 'chord_frequencies', 'play_percussion', 'play_sfx',
     'play_spec', 'from_text', 'play_from_text',
-    'create', 'timbre_from_path', 'set_placement', 'remove', 'stop_all',
+    'create', 'sequence', 'timbre_from_path', 'set_placement', 'remove', 'stop_all',
     'define_instrument', 'define_percussion', 'define_sfx', 'render_soundtrack',
-  ]).describe("Catalogues: 'list_instruments' · 'list_percussion' · 'list_sfx'. Play: 'play_tone' · 'play_chord' · 'play_percussion' · 'play_sfx' · 'play_spec' · 'play_from_text'. Read without playing: 'chord_frequencies' · 'from_text' (a plain-language description resolved to a spec) · 'timbre_from_path'. Canvas: 'create' (a sound drawn AS a waveform path) · 'set_placement' · 'remove' · 'stop_all'. Define: 'define_instrument' · 'define_percussion' · 'define_sfx' — the six built-in instruments are a starting set, not a claim that music contains six; anything missing can be defined here and is then first-class, listed by the list_* actions and playable by name. Render: 'render_soundtrack' — mix every placed sound to a WAV file offline, with no Web Audio and no playback."),
+  ]).describe("Catalogues: 'list_instruments' · 'list_percussion' · 'list_sfx'. Play: 'play_tone' · 'play_chord' · 'play_percussion' · 'play_sfx' · 'play_spec' · 'play_from_text'. Read without playing: 'chord_frequencies' · 'from_text' (a plain-language description resolved to a spec) · 'timbre_from_path'. Canvas: 'create' (a sound drawn AS a waveform path) · 'sequence' (MANY cues in ONE call — a 112-cue music bed was 112 calls) · 'set_placement' · 'remove' · 'stop_all'. Define: 'define_instrument' · 'define_percussion' · 'define_sfx' — the six built-in instruments are a starting set, not a claim that music contains six; anything missing can be defined here and is then first-class, listed by the list_* actions and playable by name. Render: 'render_soundtrack' — mix every placed sound to a WAV file offline, with no Web Audio and no playback."),
   note: z.string().optional().describe("play_tone: scientific pitch, e.g. 'A4' or 'C#3'."),
   root: z.string().optional().describe("play_chord / chord_frequencies: the root note, e.g. 'C4'."),
   chord: z.string().optional().default('major').describe("play_chord / chord_frequencies: the chord kind, e.g. 'major', 'minor', 'maj7', 'dim'. Call the engine rather than guessing at exotic names."),
@@ -4586,6 +4596,14 @@ export const SoundInputSchema = z.object({
   itemId: z.string().optional().describe('timbre_from_path: the path whose SHAPE becomes the harmonic content. set_placement / remove: the sound item.'),
   samples: z.number().int().positive().optional().describe('timbre_from_path: how many points to sample along the path (default 256). More is a finer timbre and a slower read.'),
   placement: z.record(z.string(), z.unknown()).optional().describe('set_placement: where and when the sound sits on the timeline.'),
+  cues: z.array(z.object({
+    t: z.number().min(0).describe('When this cue sounds, in seconds.'),
+    spec: z.record(z.string(), z.unknown()).optional().describe('The synthesis spec, as create takes it.'),
+    preset: z.string().optional().describe("A named instrument, percussion or sfx instead of a spec — whatever the list_* actions report."),
+    note: z.string().optional().describe("Pitch for a preset instrument, e.g. 'A4'."),
+    duration: z.number().positive().optional().describe('Seconds this cue lasts.'),
+    visual: z.record(z.string(), z.unknown()).optional().describe('Per-cue waveform drawing options, as create takes them.'),
+  })).optional().describe('sequence: every cue in one call. Each is created and placed at its own t, so a music bed is ONE call rather than one per cue — a pilot spent 112 calls on a bed this expresses in a single array.'),
   visual: z.object({
     width: z.number().optional().describe('Waveform path width in canvas units (default 220).'),
     height: z.number().optional().describe('Waveform path height in canvas units (default 64).'),

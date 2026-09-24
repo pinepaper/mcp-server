@@ -9,7 +9,7 @@
  * across five lists is exactly the shape that drifts, and every enum this repo
  * hand-maintained against FxTool drifted silently.
  *
- * Source: FxTool origin/main c1940b6c60137f8d5187496fa32d24aee1a6fa65
+ * Source: FxTool origin/main 2367f7952003611e0a90da02dc077ed553726d61
  *   js/vendor/stick/figure-rigged.js
  * sha256: bb2faa1ff5f0f83a
  */

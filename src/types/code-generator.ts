@@ -9781,6 +9781,52 @@ ${guard('createSound')}
 })();`.trim();
       }
 
+      case 'sequence': {
+        // ONE CALL FOR A WHOLE BED.
+        //
+        // Every cue was create + set_placement, so a 112-cue music bed cost 112
+        // round trips once visual.startTime landed and 224 before it. Nothing
+        // about the work needs a trip each: the cues are independent, they
+        // differ only in time and spec, and the page can loop.
+        //
+        // Each cue is reported individually. A bed where three cues failed and
+        // 109 worked is not a failure, and it is not a success either — the
+        // caller needs to know WHICH, so placed/failed come back by index.
+        const cues = (input.cues ?? []) as Array<Record<string, unknown>>;
+        return `
+// Sound: a whole sequence of cues, created and placed in one pass
+(function() {
+${guard('createSound')}
+  const cues = ${S(cues)};
+  const placed = [];
+  const failed = [];
+  for (let i = 0; i < cues.length; i++) {
+    const c = cues[i];
+    try {
+      const spec = c.spec || (c.preset ? { preset: c.preset, note: c.note } : null);
+      if (!spec) { failed.push({ index: i, t: c.t, error: 'neither spec nor preset' }); continue; }
+      const item = app.createSound(spec, c.visual || {});
+      if (!item) { failed.push({ index: i, t: c.t, error: 'the cue produced no waveform path' }); continue; }
+      const id = item.data && item.data.id;
+      if (id && app.setSoundPlacement) {
+        app.setSoundPlacement(id, { startTime: c.t, ...(c.duration ? { duration: c.duration } : {}) });
+      }
+      placed.push({ index: i, itemId: id, t: c.t });
+    } catch (e) {
+      failed.push({ index: i, t: c.t, error: (e && e.message) || 'cue failed' });
+    }
+  }
+  return {
+    success: failed.length === 0,
+    action: 'sequence',
+    placed: placed.length,
+    itemIds: placed.map(function(p) { return p.itemId; }),
+    cues: placed,
+    ...(failed.length ? { failed: failed, error: failed.length + ' of ' + cues.length + ' cues did not sound — see failed[] for which.' } : {}),
+  };
+})();`.trim();
+      }
+
       case 'timbre_from_path':
         return `
 // Sound: read a drawn path's shape as harmonic content
