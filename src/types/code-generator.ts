@@ -6,6 +6,7 @@
  */
 
 import { REQUIRED_ENGINE_METHODS, OPTIONAL_ENGINE_METHODS } from '../tools/engine-methods.js';
+import { ACCEPTED_CREATE_PARAMS, NORMALIZE_PARAM_READS } from '../tools/shape-params.js';
 import { generateP5DrawCode } from '../tools/p5-compat/p5-helpers.js';
 import {
   ItemType,
@@ -399,6 +400,17 @@ if (item && item.data) { item.data.renderAs = ${JSON.stringify(itemType)}; item.
     if (params.origin !== undefined) params.origin = normalized;
   }
 
+  // AN UNREAD PROPERTY IS DROPPED WITHOUT A WORD — SO SAY THE WORD HERE.
+  //
+  // `properties` is free-form and create() returns an item whatever it is
+  // given, so {blur: 12, backdropFilter: 'blur(8px)'} produced a crisp shape and
+  // a successful call; the caller learned only by rendering. The allowlist is
+  // generated from the engine (what create() and normalizeParams() read), and
+  // the handful this emitter consumes itself are added. Reported back, not
+  // refused: the item is still what the caller asked for in every other way,
+  // and a refusal would cost a re-issue over one typo.
+  const ignored = Object.keys(properties).filter((k) => !CREATE_KNOWN_KEYS.has(k));
+
   // Build the code
   let code = `
 // Create ${itemType} item
@@ -453,10 +465,32 @@ const itemId = item.data.registryId;
 app.historyManager.saveState();
 
 // Return item info
-({ itemId, type: '${itemType}', position: { x: ${position.x}, y: ${position.y} } });`;
+({ itemId, type: '${itemType}', position: { x: ${position.x}, y: ${position.y} }${ignored.length > 0
+    ? `, ignoredProperties: ${JSON.stringify(ignored)}, warning: ${JSON.stringify(
+      `${ignored.join(', ')} ${ignored.length > 1 ? 'are' : 'is'} not read when creating an item, so ${ignored.length > 1 ? 'they had' : 'it had'} no effect. `
+      + 'Check the spelling against this item type\'s documented properties.',
+    )}`
+    : ''} });`;
 
   return code.trim();
 }
+
+/**
+ * Every `properties` key create_item can act on: what the engine's create()
+ * and normalizeParams() read (generated — see shape-params.ts), plus the keys
+ * generateCreateItemCode consumes itself before the engine sees them.
+ */
+const CREATE_KNOWN_KEYS: ReadonlySet<string> = new Set([
+  ...ACCEPTED_CREATE_PARAMS,
+  ...NORMALIZE_PARAM_READS,
+  // withRadiusAxes, gradients / shadow / blend / opacity emitted here, and
+  // setDynamicContent for text.
+  'radiusX', 'radiusY', 'contentType', 'contentFormat', 'countdownTarget', 'countdownEndText',
+  // Lifetimes. The editor's create() does not read them, but they are
+  // documented on ANY item and the scene renderer schedules by them — calling
+  // them "no effect" would steer a caller off the only way to cut between shots.
+  'bornAt', 'ttl',
+]);
 
 /**
  * Template for modifying items

@@ -91,6 +91,33 @@ export const ACCEPTED_CREATE_PARAMS: readonly string[] = Object.freeze([
 ]);
 
 /**
+ * Every `params.*` that normalizeParams() reads before create() sees them —
+ * the aliases (fill → fillColor, delay → timeOffset, radiusX → width…).
+ * Together with ACCEPTED_CREATE_PARAMS, the full set a caller may pass.
+ */
+export const NORMALIZE_PARAM_READS: readonly string[] = Object.freeze([
+  'color',
+  'delay',
+  'fill',
+  'fillColor',
+  'height',
+  'keyframes',
+  'points',
+  'position',
+  'radiusX',
+  'radiusY',
+  'segments',
+  'stroke',
+  'strokeColor',
+  'timeOffset',
+  'timeUnits',
+  'units',
+  'width',
+  'x',
+  'y',
+]);
+
+/**
  * config key → the `params.*` names that feed it. Several names for one key
  * are ALTERNATIVES: a star's outer size arrives as radius1, radius, width or
  * height, and documenting any one of them makes the key reachable.

@@ -178,6 +178,20 @@ function acceptedParams(engineRaw) {
 }
 
 /**
+ * Every `params.*` normalizeParams() looks at. create() runs it first, so these
+ * are aliases (fill, stroke, delay, radiusX…) a caller may pass even though
+ * create()'s own body never names them. Without this list a guard built on
+ * ACCEPTED_CREATE_PARAMS alone would call `fill` unknown — the one spelling
+ * the engine went out of its way to accept.
+ */
+function normalizeParamReads(engineRaw) {
+  const engine = stripComments(engineRaw);
+  const m = /^function normalizeParams\(params, kind\) \{/m.exec(engine);
+  if (!m) throw new Error('sync-shape-params: normalizeParams(params, kind) not found in PinePaper.js');
+  return names(/\bparams\.([A-Za-z_]\w*)/g, blockAfter(engine, m.index + m[0].length - 1));
+}
+
+/**
  * Per registered shape id, the `config.*` keys its `create` reads.
  *
  * A registration whose definition is a shared identifier (`regularPolygon(4, …)`,
@@ -216,6 +230,7 @@ function generate() {
 
   const toParams = configToParams(engine);
   const accepted = acceptedParams(engine);
+  const normalized = normalizeParamReads(engine);
   const reads = shapeConfigReads(sources);
 
   const digest = createHash('sha256')
@@ -246,6 +261,15 @@ function generate() {
 /** Every \`params.*\` that \`create(type, params)\` reads. Anything else is dropped. */
 export const ACCEPTED_CREATE_PARAMS: readonly string[] = Object.freeze([
 ${accepted.map((n) => `  '${n}',`).join('\n')}
+]);
+
+/**
+ * Every \`params.*\` that normalizeParams() reads before create() sees them —
+ * the aliases (fill → fillColor, delay → timeOffset, radiusX → width…).
+ * Together with ACCEPTED_CREATE_PARAMS, the full set a caller may pass.
+ */
+export const NORMALIZE_PARAM_READS: readonly string[] = Object.freeze([
+${normalized.map((n) => `  '${n}',`).join('\n')}
 ]);
 
 /**
