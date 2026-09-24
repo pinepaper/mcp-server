@@ -1466,6 +1466,60 @@ const ENSURE_EXPORT_ENGINE = `
     try { await app.ensureHeavyModules(); } catch (_) { /* the guards below still speak */ }
   }`;
 
+/**
+ * A REMOTE <image> INSIDE AN SVG TAINTS THE CANVAS, PERMANENTLY.
+ *
+ * paper.importSVG draws a cross-origin raster straight onto the canvas. The
+ * canvas then has an origin-dirty flag, and every export afterwards throws
+ * "Tainted canvases may not be exported" — not just the one containing the
+ * image. Nothing recovers it but a page reload, so ONE import poisons the
+ * whole session, long after the call that did it returned success.
+ *
+ * Reported from production: import_svg with a picsum href answered
+ * success/itemsCreated:0 and then broke every later export.
+ *
+ * So each remote href is fetched and inlined as a data: URL before the SVG
+ * goes anywhere near the importer — the same thing import_image does, for the
+ * same reason. An href that CANNOT be inlined has its element removed: a
+ * missing picture is a visible, local, recoverable problem, and leaving it in
+ * is an unrecoverable one that surfaces somewhere else entirely.
+ */
+const INLINE_REMOTE_IMAGES = `
+  async function inlineRemoteImages(svgText) {
+    const notes = [];
+    const hrefs = [];
+    const re = /(?:xlink:)?href\\s*=\\s*("|')(https?:\\/\\/[^"']+)\\1/gi;
+    let m;
+    while ((m = re.exec(svgText)) !== null) if (hrefs.indexOf(m[2]) === -1) hrefs.push(m[2]);
+    if (hrefs.length === 0) return { svg: svgText, notes: notes };
+    for (const href of hrefs) {
+      let dataUrl = null;
+      try {
+        const r = await fetch(href, { mode: 'cors' });
+        if (r.ok) {
+          const blob = await r.blob();
+          dataUrl = await new Promise(function(res, rej) {
+            const fr = new FileReader();
+            fr.onload = function() { res(fr.result); };
+            fr.onerror = function() { rej(new Error('could not read ' + href)); };
+            fr.readAsDataURL(blob);
+          });
+        }
+      } catch (e) { /* fall through to removal */ }
+      if (dataUrl) {
+        svgText = svgText.split(href).join(dataUrl);
+      } else {
+        // Drop the element rather than let it taint the canvas.
+        const esc = href.replace(/[.*+?^\\\${}()|[\\]\\\\]/g, '\\\\$&');
+        svgText = svgText.replace(new RegExp('<image\\\\b[^>]*' + esc + '[^>]*\\\\/?>', 'gi'), '');
+        svgText = svgText.replace(new RegExp('<image\\\\b[^>]*' + esc + '[\\\\s\\\\S]*?<\\\\/image>', 'gi'), '');
+        notes.push('removed an embedded image this page could not fetch (' + href + '). It was dropped rather than imported, because a cross-origin raster taints the canvas and every later export would have failed with "Tainted canvases may not be exported" until a reload.');
+      }
+    }
+    return { svg: svgText, notes: notes };
+  }
+`;
+
 export class PinePaperCodeGenerator {
   /**
    * Generate code for creating an item
@@ -1773,7 +1827,10 @@ export class PinePaperCodeGenerator {
   if (!response.ok) {
     return { success: false, error: 'the server refused ${url} — HTTP ' + response.status + ' ' + (response.statusText || ''), status: response.status };
   }
-  const svgText = await response.text();
+  let svgText = await response.text();
+${INLINE_REMOTE_IMAGES}
+  const _inl = await inlineRemoteImages(svgText);
+  svgText = _inl.svg;
   const _r = ${importExpr('svgText')};
   const imported = _r.item;
   if (!imported) {
@@ -1783,7 +1840,8 @@ export class PinePaperCodeGenerator {
   imported.scale(${scale});
   const itemId = app.registerItem(imported, 'svg-import', { source: 'mcp' });
   app.historyManager.saveState();
-  return { success: true, itemId, changes: _r.changes, position: { x: ${position.x}, y: ${position.y} } };
+  return { success: true, itemId, changes: _r.changes, position: { x: ${position.x}, y: ${position.y} },
+    ...(_inl.notes.length ? { imageWarnings: _inl.notes } : {}) };
 })();
 `.trim();
     }
@@ -1793,18 +1851,23 @@ export class PinePaperCodeGenerator {
       const escapedSvg = svgString.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
       return `
 // Import SVG string${source === 'figma' ? ' (Figma-normalised)' : ''}
-const svgString = \`${escapedSvg}\`;
+(async function() {
+let svgString = \`${escapedSvg}\`;
+${INLINE_REMOTE_IMAGES}
+const _inl = await inlineRemoteImages(svgString);
+svgString = _inl.svg;
 const _r = ${importExpr('svgString')};
 const imported = _r.item;
-if (imported) {
-  imported.position = new paper.Point(${position.x}, ${position.y});
-  imported.scale(${scale});
-  const itemId = app.registerItem(imported, 'svg-import', { source: 'mcp' });
-  app.historyManager.saveState();
-  ({ success: true, itemId, changes: _r.changes, position: { x: ${position.x}, y: ${position.y} } });
-} else {
+if (!imported) {
   throw new Error('Failed to import SVG');
 }
+imported.position = new paper.Point(${position.x}, ${position.y});
+imported.scale(${scale});
+const itemId = app.registerItem(imported, 'svg-import', { source: 'mcp' });
+app.historyManager.saveState();
+return { success: true, itemId, changes: _r.changes, position: { x: ${position.x}, y: ${position.y} },
+  ...(_inl.notes.length ? { imageWarnings: _inl.notes } : {}) };
+})();
 `.trim();
     }
 
