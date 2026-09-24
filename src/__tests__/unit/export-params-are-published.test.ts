@@ -73,7 +73,7 @@ describe("platform 'auto' means the canvas, not a preset that happens to be firs
     const code = new PinePaperCodeGenerator().generateAgentExport({
       platform: 'youtube', format: 'mp4', duration: 5,
     } as any);
-    expect(code).toContain('const dimensions = {"width":1920,"height":1080}');
+    expect(code).toContain('const __presetBox = {"width":1920,"height":1080}');
     expect(code).not.toContain('__canvasDims');
   });
 

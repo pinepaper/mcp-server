@@ -3839,7 +3839,30 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
   const __even = (n) => Math.max(2, Math.round((n * ${scale !== undefined ? scale : 1}) / 2) * 2);
   const dimensions = (__canvasDims && __canvasDims.width && __canvasDims.height)
     ? { width: __even(__canvasDims.width), height: __even(__canvasDims.height) }
-    : __presetDims;` : `  const dimensions = ${JSON.stringify(scaled)};`}
+    : __presetDims;
+  const __fit = null;` : `  // A PRESET IS A SIZE, NOT PERMISSION TO STRETCH.
+  //
+  // 'instagram' is 1080x1080, and a 4:5 (1080x1350) canvas exported under it
+  // came out squashed to 0.8 vertically, text distorted, with nothing said —
+  // 4:5 is itself a valid Instagram feed size. When the canvas aspect differs
+  // from the preset's, the canvas aspect is kept and its SHORT edge takes the
+  // preset's short edge: 4:5 on instagram is 1080x1350, a square canvas on
+  // youtube is 1080x1080. The result says so in platformFit.
+  const __presetBox = ${JSON.stringify(scaled)};
+  const __cv = app.canvasSize || (app.view && app.view.viewSize) || null;
+  let dimensions = __presetBox;
+  let __fit = null;
+  if (__cv && __cv.width > 0 && __cv.height > 0) {
+    const ca = __cv.width / __cv.height, pa = __presetBox.width / __presetBox.height;
+    if (Math.abs(ca / pa - 1) > 0.01) {
+      const short = Math.min(__presetBox.width, __presetBox.height);
+      const ev = (n) => Math.max(2, Math.round(n / 2) * 2);
+      dimensions = ca >= 1 ? { width: ev(short * ca), height: ev(short) } : { width: ev(short), height: ev(short / ca) };
+      __fit = { preset: __presetBox.width + 'x' + __presetBox.height, used: dimensions.width + 'x' + dimensions.height,
+        canvas: __cv.width + 'x' + __cv.height,
+        note: 'the canvas aspect differs from the ' + platform + ' preset, so the canvas aspect was kept rather than stretched. Resize the canvas to the preset to get exactly ' + __presetBox.width + 'x' + __presetBox.height + '.' };
+    }
+  }`}
 
   // WHAT THIS SCENE LOSES TO THIS FORMAT, asked at the moment you would care.
   //
@@ -4248,6 +4271,7 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
   // what this scene lost to this format, rather than the caller finding out by
   // opening the file. Only when there is something to say — see fidelity().
   if (result && result.success) Object.assign(result, fidelity(format));
+  if (result && result.success && __fit) result.platformFit = __fit;
 
   return result;
 })();

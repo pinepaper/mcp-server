@@ -7977,6 +7977,8 @@ PLATFORMS & OPTIMAL FORMATS:
 | twitter         | 1200x675   | PNG    | GIF      |
 | web             | flexible   | SVG    | SVG      |
 
+A preset's dimensions assume the canvas has the same aspect. When it does not, the canvas aspect is KEPT (never stretched) and its short edge takes the preset's short edge — a 4:5 canvas on instagram exports 1080x1350 — and the result carries platformFit saying so.
+
 FORMATS: svg, png, gif, mp4, webm, pdf.
 QUALITY: draft, standard, high.
 FRAMING: canvas (default, full canvas) | camera (camera_animates first-keyframe viewport — video formats only, requires a keyframe-mode walkthrough on the canvas; camera animation still drives motion within the fixed output frame).

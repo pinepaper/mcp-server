@@ -624,7 +624,7 @@ describe('a range refusal is a correction, not a dead end', () => {
  * same knob that makes a preview render fast.
  */
 describe('export scale', () => {
-  const dims = (code: string) => JSON.parse(/const dimensions = ([^;]+);/.exec(code)![1]);
+  const dims = (code: string) => JSON.parse(/const __presetBox = ([^;]+);/.exec(code)![1]);
 
   it('leaves the emitted code untouched when no scale is asked for', () => {
     const code = codeGenerator.generateAgentExport({ platform: 'youtube', format: 'mp4', duration: 5 });
