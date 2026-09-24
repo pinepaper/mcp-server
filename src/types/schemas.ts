@@ -2803,6 +2803,7 @@ export const LoadMapInputSchema = z.object({
   enableClick: z.boolean().optional().describe('Enable click events'),
   hoverFill: z.string().optional().describe('Hover fill color'),
   hoverStroke: z.string().optional().describe('Hover stroke color'),
+  options: z.record(z.string(), z.unknown()).optional().describe("Passed to the engine's loadMap as-is, for the options this schema does not name individually: style ('standard' | 'dark' | 'light' | 'satellite' | 'outdoors' — a whole preset), styles (per-key overrides), showOcean, oceanColor, fitBounds, smoothPaths, simplifyTolerance, preserve. The tool's own description has always documented this; it used to be stripped before it reached the engine."),
 }).describe('Load map input');
 
 export type LoadMapInput = z.infer<typeof LoadMapInputSchema>;
@@ -2810,8 +2811,11 @@ export type LoadMapInput = z.infer<typeof LoadMapInputSchema>;
 export const HighlightRegionsInputSchema = z.object({
   regionIds: z.array(z.string()).describe('Array of region IDs to highlight'),
   options: z.object({
+    color: z.string().optional().describe('Highlight fill colour. The natural name, and an alias for fillColor — it used to be stripped here and the highlight came out the default blue.'),
     fillColor: z.string().optional().describe('Highlight fill color'),
+    fill: z.string().optional().describe("The engine's own name for the fill; accepted so a caller who read the engine is not wrong here."),
     strokeColor: z.string().optional().describe('Highlight stroke color'),
+    stroke: z.string().optional().describe("The engine's own name for the stroke."),
     strokeWidth: z.number().optional().describe('Highlight stroke width'),
     animate: z.boolean().optional().describe('Animate the highlight'),
   }).optional().describe('Highlight options'),

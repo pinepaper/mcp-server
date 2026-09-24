@@ -680,6 +680,29 @@ function normalizeKeyframePositions<T extends { properties?: Record<string, unkn
 /**
  * Template for keyframe animation
  */
+/**
+ * AN UNKNOWN itemId IS A SILENT SUCCESS, ACROSS A WHOLE FAMILY OF TOOLS.
+ *
+ * `app.addAnimation('c0', …)` on an id that does not exist calls
+ * console.warn and returns undefined — and production strips console.warn, so
+ * over MCP nothing is said at all. The emitter then returned
+ * `{success: true}` because the call did not throw. A pilot animated a
+ * connector id that was never registered and got success for every keyframe.
+ *
+ * Emitted as a shared preamble so the check reads the same everywhere and a
+ * new tool taking an itemId can adopt it in one line. It resolves through the
+ * registry the way the engine does, and names the id it could not find —
+ * "item_7 is not on the canvas" is actionable, silence is not.
+ */
+function requireItem(itemId: string, what: string): string {
+  return `
+const _target = (app.getItemById && app.getItemById(${JSON.stringify(itemId)}))
+  || (app.itemRegistry && app.itemRegistry.get && app.itemRegistry.get(${JSON.stringify(itemId)}));
+if (!_target) {
+  return { success: false, error: ${JSON.stringify(itemId)} + ' is not on the canvas, so ' + ${JSON.stringify(what)} + ' would have done nothing. Check the id with pinepaper_get_items — create returns the registry id, not the Paper id.' };
+}`.trim();
+}
+
 function generateKeyframeAnimateCode(
   itemId: string,
   keyframes: Keyframe[],
@@ -701,9 +724,11 @@ function generateKeyframeAnimateCode(
 
   return `
 // Apply keyframe animation to ${itemId}
-app.addAnimation('${itemId}', ${keyframesJson}, ${JSON.stringify(opts)});
-
-({ success: true, itemId: '${itemId}', duration: ${calculatedDuration}, loop: ${loop}${timeOffset !== undefined ? `, timeOffset: ${timeOffset}` : ''}${clipInPoint !== undefined ? `, clipInPoint: ${clipInPoint}` : ''}${clipOutPoint !== undefined ? `, clipOutPoint: ${clipOutPoint}` : ''} });
+(function() {
+  ${requireItem(itemId, 'the animation')}
+  app.addAnimation('${itemId}', ${keyframesJson}, ${JSON.stringify(opts)});
+  return { success: true, itemId: '${itemId}', duration: ${calculatedDuration}, loop: ${loop}${timeOffset !== undefined ? `, timeOffset: ${timeOffset}` : ''}${clipInPoint !== undefined ? `, clipInPoint: ${clipInPoint}` : ''}${clipOutPoint !== undefined ? `, clipOutPoint: ${clipOutPoint}` : ''} };
+})();
 `.trim();
 }
 
@@ -4315,7 +4340,7 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
     // interactivity flags have other names entirely. Every one was accepted,
     // JSON-stringified into the call and dropped — a caller who set fillColor
     // got the default grey with no indication why.
-    const { fillColor, strokeColor, strokeWidth, hoverFill, hoverStroke, enableHover, enableClick, ...passthrough } = raw;
+    const { fillColor, strokeColor, strokeWidth, hoverFill, hoverStroke, enableHover, enableClick, options: extraOptions, ...passthrough } = raw;
 
     // The engine's own style vocabulary — see stylePresets in MapSystem.js.
     const styles: Record<string, unknown> = {};
@@ -4334,7 +4359,15 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
     // learns why their outline did not move.
     if (hoverStroke !== undefined) styles.hoverStroke = hoverStroke;
 
-    const engineOptions: Record<string, unknown> = { ...passthrough };
+    // `options` was declared by the tool's description and stripped by the
+    // schema, so `{style: 'dark'}` never reached loadMap. It carries the
+    // options not named individually above — style presets, showOcean,
+    // fitBounds, preserve — and is spread FIRST so an explicitly named field
+    // still wins over the same key inside it.
+    const engineOptions: Record<string, unknown> = {
+      ...(extraOptions && typeof extraOptions === 'object' ? extraOptions as Record<string, unknown> : {}),
+      ...passthrough,
+    };
     if (Object.keys(styles).length > 0) engineOptions.styles = styles;
     if (enableHover !== undefined) engineOptions.interactive = enableHover;
     if (enableClick !== undefined) engineOptions.selectable = enableClick;
@@ -4374,7 +4407,26 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
   generateHighlightRegions(input: HighlightRegionsInput): string {
     const validated = HighlightRegionsInputSchema.parse(input);
     const regionIds = JSON.stringify(validated.regionIds);
-    const optionsStr = validated.options ? JSON.stringify(validated.options) : '{}';
+
+    // highlightRegions(ids, style) reads style.fill / .stroke / .strokeWidth.
+    // This passed fillColor / strokeColor / strokeWidth, so the first two were
+    // dropped and every highlight came out the default blue. A caller reaching
+    // for `color` — the obvious name, and the one a pilot actually used — was
+    // rejected by the schema before it got this far; it is accepted now and
+    // means the fill.
+    const ho = (validated.options ?? {}) as Record<string, unknown>;
+    const style: Record<string, unknown> = {};
+    const fill = ho.color ?? ho.fillColor ?? ho.fill;
+    if (fill !== undefined) style.fill = fill;
+    const stroke = ho.strokeColor ?? ho.stroke;
+    if (stroke !== undefined) style.stroke = stroke;
+    if (ho.strokeWidth !== undefined) style.strokeWidth = ho.strokeWidth;
+    for (const [k, v] of Object.entries(ho)) {
+      if (!['color', 'fillColor', 'fill', 'strokeColor', 'stroke', 'strokeWidth'].includes(k) && v !== undefined) {
+        style[k] = v;
+      }
+    }
+    const optionsStr = JSON.stringify(style);
 
     return `
 // Highlight map regions
@@ -4423,7 +4475,44 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
   generateApplyDataColors(input: ApplyDataColorsInput): string {
     const validated = ApplyDataColorsInputSchema.parse(input);
     const dataStr = JSON.stringify(validated.data);
-    const optionsStr = validated.options ? JSON.stringify(validated.options) : '{}';
+
+    // THE ENGINE TAKES A COLOUR RAMP, NOT THE NAME OF ONE.
+    //
+    // applyDataColors destructures `colorScale = ['#f7fbff', '#08519c']` — two
+    // endpoints it interpolates between — plus `domain` and `legend`. This tool
+    // published a preset NAME ('greens'), which the engine then indexed as an
+    // array: colorScale[0] of a string is 'g', and every region came out
+    // near-black. It also published minValue/maxValue/showLegend, none of which
+    // the engine reads.
+    //
+    // Translated here rather than in the schema: the names are the friendlier
+    // surface and this is ordinary cross-repo vocabulary drift, which is what
+    // the emitter exists to absorb.
+    const RAMPS: Record<string, [string, string]> = {
+      blues: ['#f7fbff', '#08519c'],
+      greens: ['#f7fcf5', '#006d2c'],
+      reds: ['#fff5f0', '#a50f15'],
+      oranges: ['#fff5eb', '#a63603'],
+      purples: ['#fcfbfd', '#54278f'],
+      heat: ['#ffffb2', '#bd0026'],
+    };
+    const o = validated.options ?? {};
+    const engineOptions: Record<string, unknown> = {};
+    if (o.colorScale) engineOptions.colorScale = RAMPS[o.colorScale] ?? RAMPS.blues;
+    if (o.minValue !== undefined || o.maxValue !== undefined) {
+      const values = Object.values(validated.data);
+      engineOptions.domain = [
+        o.minValue ?? Math.min(...values),
+        o.maxValue ?? Math.max(...values),
+      ];
+    }
+    if (o.showLegend !== undefined) engineOptions.legend = o.showLegend;
+    for (const [k, v] of Object.entries(o)) {
+      if (!['colorScale', 'minValue', 'maxValue', 'showLegend'].includes(k) && v !== undefined) {
+        engineOptions[k] = v;
+      }
+    }
+    const optionsStr = JSON.stringify(engineOptions);
 
     return `
 // Apply choropleth data colors

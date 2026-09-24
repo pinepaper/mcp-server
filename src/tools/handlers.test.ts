@@ -1030,7 +1030,13 @@ describe('handleToolCall', () => {
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
       expect(text).toContain('applyDataColors');
-      expect(text).toContain('blues');
+      // NOT 'blues' — the engine destructures colorScale as ['#from', '#to']
+      // and indexed the preset NAME as an array, so colorScale[0] was 'b' and
+      // every region came out near-black. The name is translated to the ramp
+      // before it is sent, and showLegend becomes the engine's `legend`.
+      expect(text).not.toContain("'blues'");
+      expect(text).toContain('colorScale');
+      expect(text).toContain('"legend":true');
     });
   });
 
