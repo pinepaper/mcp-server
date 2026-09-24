@@ -420,7 +420,8 @@ if (item && item.data) { item.data.renderAs = ${JSON.stringify(itemType)}; item.
   // the handful this emitter consumes itself are added. Reported back, not
   // refused: the item is still what the caller asked for in every other way,
   // and a refusal would cost a re-issue over one typo.
-  const ignored = Object.keys(properties).filter((k) => !CREATE_KNOWN_KEYS.has(k));
+  const ignored = Object.keys(properties).filter((k) => !CREATE_KNOWN_KEYS.has(k)
+    && !(itemType === 'text' && (TEXT_STYLE_KEYS as readonly string[]).includes(k)));
 
   // Build the code
   let code = `
@@ -458,6 +459,8 @@ const item = app.create('${itemType}', ${JSON.stringify(params, null, 2)});`;
   if (opacity !== undefined) {
     code += `\nitem.opacity = ${opacity};`;
   }
+
+  if (itemType === 'text') code += emitTextStyle('item', properties);
 
   // After opacity, so the "on" level of the lifetime is the item's own.
   const hasLifetime = properties.bornAt !== undefined || properties.ttl !== undefined;
@@ -513,6 +516,42 @@ const CREATE_KNOWN_KEYS: ReadonlySet<string> = new Set([
   // them "no effect" would steer a caller off the only way to cut between shots.
   'bornAt', 'ttl',
 ]);
+
+/**
+ * Paper text properties the engine's create() and modifyItem() never pass on.
+ *
+ * Line spacing, weight and italic are what editorial, Swiss and zine layouts
+ * are made of, and all three were dropped without a word: create('text')
+ * builds a PointText from content / fontFamily / fontSize / justification
+ * only. PointText itself supports them (`leading`, and `fontWeight`, which
+ * Paper writes into the canvas font shorthand — so italic rides in it as
+ * "italic 700"). Set after the fact, then re-anchored to the edge the engine
+ * anchored to, because a heavier weight or taller leading moves the bounds.
+ *
+ * lineHeight is the CSS habit: <= 4 is a multiple of fontSize, above that px.
+ */
+const TEXT_STYLE_KEYS = ['fontWeight', 'fontStyle', 'leading', 'lineHeight'] as const;
+function emitTextStyle(itemExpr: string, props: Record<string, unknown>): string {
+  const weight = props.fontWeight;
+  const italic = props.fontStyle === 'italic' || props.fontStyle === 'oblique';
+  const lh = typeof props.lineHeight === 'number' ? props.lineHeight : undefined;
+  const leading = typeof props.leading === 'number' ? props.leading : undefined;
+  if (weight === undefined && props.fontStyle === undefined && leading === undefined && lh === undefined) return '';
+  return `
+(function(it) {
+  if (!it || it.className !== 'PointText') return;
+  const j = it.justification;
+  const edge = function(b) { return j === 'left' ? b.left : j === 'right' ? b.right : b.center.x; };
+  const b0 = it.bounds, ax = edge(b0), ay = b0.center.y;
+  ${weight !== undefined || props.fontStyle !== undefined
+    ? `it.fontWeight = ${JSON.stringify(`${italic ? 'italic ' : ''}${weight ?? 'normal'}`)};`
+    : ''}
+  ${leading !== undefined ? `it.leading = ${leading};` : ''}
+  ${lh !== undefined ? `it.leading = ${lh} <= 4 ? ${lh} * it.fontSize : ${lh};` : ''}
+  const b1 = it.bounds;
+  it.position = it.position.add([ax - edge(b1), ay - b1.center.y]);
+})(${itemExpr});`;
+}
 
 /**
  * A lifetime (bornAt / ttl, seconds) as hard-cut opacity keyframes.
@@ -626,6 +665,12 @@ if (_ae && _ae.type === 'audio') {
   const _m = _A && typeof _A.listMedia === 'function' ? _A.listMedia().find(function(x) { return x.registryId === '${itemId}'; }) : null;
   if (_m && app.audioLayer && typeof app.audioLayer.setVolume === 'function') app.audioLayer.setVolume(${level}, _m.id);
 }`;
+  }
+
+  const textStyle = emitTextStyle('_ts && _ts.item', properties);
+  if (textStyle) {
+    code += `
+const _ts = app.itemRegistry.get('${itemId}');${textStyle}`;
   }
 
   const modLifetime = properties.bornAt !== undefined || properties.ttl !== undefined;

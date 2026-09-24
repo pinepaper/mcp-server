@@ -433,7 +433,8 @@ Labelling a text item gives you TWO text items in the group — the body and the
 label. That is what you want for a caption; it is a surprise if you expected
 the label to replace the content.
 
-- text: Text content with font styling (properties: content, fontSize, color, fontFamily)
+- text: Text content with font styling (properties: content, fontSize, color, fontFamily, justification, fontWeight, fontStyle, leading, lineHeight)
+  fontWeight: 400 / 700 / 'bold'. fontStyle: 'italic'. leading: line spacing in px; lineHeight: a multiple of fontSize (<= 4) or px. Multi-line content splits on \n.
 - circle: Circular shape (properties: radius, color, strokeColor, strokeWidth)
 - star: Star shape (properties: radius1, radius2, points, color)
   radius1 is the OUTER radius and is what sizes the star; radius or
