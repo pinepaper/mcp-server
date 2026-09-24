@@ -3769,10 +3769,29 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
     }
     const firstKf = params.keyframes[0];
     const firstZoom = firstKf && firstKf.zoom > 0 ? firstKf.zoom : 1;
-    const canvasEl = document.querySelector('canvas');
+    // THE ARTBOARD, NOT THE BACKING STORE — the same mistake as analyze.
+    //
+    // This divided canvasEl.width, which is in DEVICE pixels, so a camera
+    // export came out 2234x1472 whatever the canvas was: a 1920x1080 board at
+    // zoom 1 and a 3840x2160 board at zoom 2 both produced it, because both
+    // are (backing store / zoom). The ratio is not the device pixel ratio, so
+    // it cannot be divided back out afterwards either.
+    //
+    // getCanvasSize() is the board the caller set. The export target is the
+    // last resort rather than canvasEl: it is already resolved,
+    // and wrong by a preset at worst instead of wrong by an unknown factor.
+    let camBase = null;
+    if (typeof app.getCanvasSize === 'function') {
+      const cs = app.getCanvasSize();
+      if (cs && cs.width) camBase = { width: cs.width, height: cs.height };
+    }
+    if (!camBase && app.canvasSize && app.canvasSize.width) {
+      camBase = { width: app.canvasSize.width, height: app.canvasSize.height };
+    }
+    if (!camBase) camBase = { width: dimensions.width, height: dimensions.height };
     cameraDims = {
-      width: Math.round((canvasEl ? canvasEl.width : dimensions.width) / firstZoom),
-      height: Math.round((canvasEl ? canvasEl.height : dimensions.height) / firstZoom),
+      width: Math.round(camBase.width / firstZoom),
+      height: Math.round(camBase.height / firstZoom),
     };
   }
 
