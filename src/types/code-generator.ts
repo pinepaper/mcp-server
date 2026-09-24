@@ -801,6 +801,16 @@ app.applyEffect(item, '${effectType}', ${JSON.stringify(params, null, 2)});
  * describe an ellipse, the conversion is unambiguous (a radius is half its
  * axis), and a caller who already wrote radiusX should not have to rewrite it.
  * An explicit width/height wins, so nothing that works today changes.
+ *
+ * A COMPATIBILITY SHIM WITH A REMOVAL CONDITION. FxTool aaaf98ae aliases the
+ * same pair in the engine's shared param normaliser, which is the better place
+ * — it fixes every door at once, not just this one. This stays until that
+ * reaches the studios this package is pointed at, which is not the same moment
+ * it reaches origin/main: mcp-server ships independently and drives whatever
+ * studio it is given. The two cannot fight, because this deletes radiusX
+ * before the call, so the engine's alias never sees it.
+ *
+ * Delete this when a studio without aaaf98ae is no longer worth supporting.
  */
 function withRadiusAxes(props: Record<string, unknown>): Record<string, unknown> {
   const { radiusX, radiusY, ...rest } = props;
@@ -1546,7 +1556,12 @@ const INLINE_REMOTE_IMAGES = `
         const esc = href.replace(/[.*+?^\\\${}()|[\\]\\\\]/g, '\\\\$&');
         svgText = svgText.replace(new RegExp('<image\\\\b[^>]*' + esc + '[^>]*\\\\/?>', 'gi'), '');
         svgText = svgText.replace(new RegExp('<image\\\\b[^>]*' + esc + '[\\\\s\\\\S]*?<\\\\/image>', 'gi'), '');
-        notes.push('removed an embedded image this page could not fetch (' + href + '). It was dropped rather than imported, because a cross-origin raster taints the canvas and every later export would have failed with "Tainted canvases may not be exported" until a reload.');
+        notes.push({
+          url: href,
+          action: 'removed',
+          reason: 'unfetchable',
+          message: 'removed an embedded image this page could not fetch (' + href + '). It was dropped rather than imported, because a cross-origin raster taints the canvas and every later export would have failed with "Tainted canvases may not be exported" until a reload.',
+        });
       }
     }
     return { svg: svgText, notes: notes };
@@ -2937,11 +2952,28 @@ throw new Error('Unknown diagram mode action: ${action}');
     hasImages: false,
   };
 
-  // Get canvas size
-  if (app.canvasEl) {
-    analysis.canvasSize = { width: app.canvasEl.width, height: app.canvasEl.height };
-  } else if (paper.view) {
-    analysis.canvasSize = { width: paper.view.size.width, height: paper.view.size.height };
+  // THE ARTBOARD, NOT THE BACKING STORE.
+  //
+  // canvasEl.width and paper.view.size are both in device pixels, so a
+  // 1920x1080 artboard was reported as 2233x1472 — measured from production.
+  // That is not even the device pixel ratio (a 2233px store in a 924px box is
+  // 2.4166), so a caller cannot divide it back out. Anything derived from it
+  // is wrong by an unknown factor, and synthetic clicks computed from it miss
+  // in silence. getCanvasSize() is the artboard the caller set.
+  if (typeof app.getCanvasSize === 'function') {
+    const cs = app.getCanvasSize();
+    if (cs && cs.width) analysis.canvasSize = { width: cs.width, height: cs.height };
+  }
+  if (!analysis.canvasSize.width) {
+    if (app.canvasSize && app.canvasSize.width) {
+      analysis.canvasSize = { width: app.canvasSize.width, height: app.canvasSize.height };
+    } else if (app.canvasEl) {
+      // Last resort on a studio with neither: a backing-store size is better
+      // than zero, and it is flagged so nobody treats it as the artboard.
+      analysis.canvasSize = { width: app.canvasEl.width, height: app.canvasEl.height, backingStore: true };
+    } else if (paper.view) {
+      analysis.canvasSize = { width: paper.view.size.width, height: paper.view.size.height, backingStore: true };
+    }
   }
 
   // Count items and analyze
@@ -3967,11 +3999,28 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
     hasImages: false,
   };
 
-  // Get canvas size
-  if (app.canvasEl) {
-    analysis.canvasSize = { width: app.canvasEl.width, height: app.canvasEl.height };
-  } else if (paper.view) {
-    analysis.canvasSize = { width: paper.view.size.width, height: paper.view.size.height };
+  // THE ARTBOARD, NOT THE BACKING STORE.
+  //
+  // canvasEl.width and paper.view.size are both in device pixels, so a
+  // 1920x1080 artboard was reported as 2233x1472 — measured from production.
+  // That is not even the device pixel ratio (a 2233px store in a 924px box is
+  // 2.4166), so a caller cannot divide it back out. Anything derived from it
+  // is wrong by an unknown factor, and synthetic clicks computed from it miss
+  // in silence. getCanvasSize() is the artboard the caller set.
+  if (typeof app.getCanvasSize === 'function') {
+    const cs = app.getCanvasSize();
+    if (cs && cs.width) analysis.canvasSize = { width: cs.width, height: cs.height };
+  }
+  if (!analysis.canvasSize.width) {
+    if (app.canvasSize && app.canvasSize.width) {
+      analysis.canvasSize = { width: app.canvasSize.width, height: app.canvasSize.height };
+    } else if (app.canvasEl) {
+      // Last resort on a studio with neither: a backing-store size is better
+      // than zero, and it is flagged so nobody treats it as the artboard.
+      analysis.canvasSize = { width: app.canvasEl.width, height: app.canvasEl.height, backingStore: true };
+    } else if (paper.view) {
+      analysis.canvasSize = { width: paper.view.size.width, height: paper.view.size.height, backingStore: true };
+    }
   }
 
   // Count items and analyze types

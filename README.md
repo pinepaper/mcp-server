@@ -219,6 +219,47 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 
 ## What's new in 1.6.12
 
+### Fixed: images could not be imported at all
+
+Two separate bugs meant no photo could be placed into a scene over MCP.
+
+`pinepaper_import_image` failed on **every** URL with a syntax error before it ran — an apostrophe in one of its own error messages closed a string early. And `pinepaper_import_svg` with an external `<image href>` reported success, created nothing, and then broke **every later export** in the session with "Tainted canvases may not be exported", including scenes that never touched the image; only a page reload recovered it.
+
+SVGs now have their remote images fetched and inlined before importing. One that can't be fetched has its element removed and the removal named in `imageWarnings` — a missing picture is visible and recoverable, a tainted canvas is neither.
+
+### Fixed: parameters that were accepted and then ignored
+
+A tool that takes a parameter, validates it, and drops it is worse than one that refuses it, because the caller has no way to tell. This release removes every instance found:
+
+- **Ellipses** took `radiusX`/`radiusY` — the pair documented in this package's own examples — and built the default size instead. They now map to the axes the engine reads.
+- **`pinepaper_stick`** accepted eight: `propSide: 'right'` put the prop in the *left* hand (the engine compares against `'L'`/`'R'`), `walk: true` walked nowhere, expression beats keyed `name` were dropped entirely, and `facing` did nothing on a figure — it is now refused by name rather than ignored.
+- **`pinepaper_load_map`** accepted seven the engine never reads. Style keys nest under `styles` and are spelled differently there; `enableHover`/`enableClick` are `interactive`/`selectable`.
+- **`hoverStroke`** was documented by the engine and implemented nowhere; it now reaches the renderer.
+
+`pinepaper_agent_end_job` also reported the canvas as **2233×1472** for a 1920×1080 artboard — it was reading the backing store, whose ratio to the artboard is not the device pixel ratio and so cannot be divided back out. It reports the artboard now.
+
+### New: `anchor` — say which corner your x/y meant
+
+Position has always been the bounding-box **centre**. Anything that computed a layout box authored the **top-left**, so passing those coordinates displaced every item by half its own size. `anchor: 'top-left'` (also `top-right`, `bottom-left`, `bottom-right`, `center`) states which corner you meant, applied after size and rotation so it uses the item's real box. A misspelled anchor is now refused rather than silently falling back to centre.
+
+### New: figures that act, and exports that tell you what they cost
+
+`pinepaper_stick` gained `gait` (9 named walks — `trudge` leans away from where it's going, `sneak` crouches), `poses` as a track over time, and named `sequence`s. Every valid name is read from the engine's own kit, so the list cannot drift.
+
+Exports now report what **this scene** loses to the format you chose — a PNG of an animated scene is one frame, a GIF drops the soundtrack — on both `estimateOnly` and a real export. It appears only when there is something to lose: its absence is a statement about your scene, not a claim that the format is lossless.
+
+### Fixed: discovery
+
+`pinepaper_list_generators` reported **3 generators when the engine has 74**, and dropped the parameters it promised to list. The batch tool advertised 15 of those 74, so 59 working generators were invisible to anyone reading it. All lists now come from one source.
+
+Loading a template that carries clipped character parts now warns when the studio dropped them, and says not to save over the template — the file is still intact until you do.
+
+### Documentation: shapes described a fraction of what they accept
+
+`triangle` was documented as taking `color` and nothing else, while the engine accepts width, height, and either `kind` (`'right'`, `'equilateral'`, `'obtuse'`…) or exact interior `angles` and builds the triangle by the law of sines. `polygon` accepts an explicit **vertex list** for irregular shapes. `ellipse` and `heart` were `color`-only. Six of the eight speech bubbles take `cornerRadius`. And **every** item type accepts a `label` — a string, or a full config with position, offset, font and colour — so captioning no longer needs a second call and hand-computed coordinates.
+
+Two silent fallbacks are now stated: an angle set the engine rejects gives you the default isosceles with no error, and the vertex-list polygon uses absolute coordinates and ignores `position`.
+
 ### Fixed: exporting without naming a platform ignored your canvas
 
 `platform` defaults to `auto`, but `auto` wasn't a real preset — the lookup fell through to the `web` preset, so an export that named no platform silently rendered **800×600** over whatever size your canvas actually was. Measured: three exports of a 960×540 canvas all came back 800×600, which reads from outside as a dimension mismatch with nothing saying the canvas had been replaced.

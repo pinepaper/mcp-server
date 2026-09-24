@@ -234,6 +234,7 @@ export const OPTIONAL_ENGINE_METHODS: readonly string[] = [
   'captureFrameDataURL',
   'clearCanvas',
   'ensureFontsLoaded',
+  'getCanvasSize',
   'instantiateOntology',
   'itemRegistry.getAll',
   'listFontAxes',

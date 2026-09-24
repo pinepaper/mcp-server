@@ -19,12 +19,14 @@ import { describe, it, expect, beforeEach } from 'bun:test';
 import { codeGenerator } from '../../types/code-generator.js';
 
 /** Lift the emitted helper out of the generated code and run it for real. */
-function inliner(code: string): (svg: string) => Promise<{ svg: string; notes: string[] }> {
+interface ImageNote { url: string; action: string; reason: string; message: string }
+
+function inliner(code: string): (svg: string) => Promise<{ svg: string; notes: ImageNote[] }> {
   const start = code.indexOf('async function inlineRemoteImages');
   expect(start, 'emitted code no longer carries the inliner').toBeGreaterThan(-1);
   const end = code.indexOf('\n  }\n', start) + 4;
   const src = code.slice(start, end).replace('async function inlineRemoteImages', 'async function');
-  return new Function(`return (${src})`)() as (svg: string) => Promise<{ svg: string; notes: string[] }>;
+  return new Function(`return (${src})`)() as (svg: string) => Promise<{ svg: string; notes: ImageNote[] }>;
 }
 
 const SVG = '<svg xmlns="http://www.w3.org/2000/svg">'
@@ -54,7 +56,14 @@ describe('an imported SVG cannot taint the canvas', () => {
     const out = await inliner(codeGenerator.generateImportSVG(SVG, undefined, { x: 0, y: 0 }, 1))(SVG);
     expect(out.svg).not.toContain('broken.example');
     expect(out.notes).toHaveLength(1);
-    expect(out.notes[0]).toContain('taints the canvas');
+    // Structured, because fxtool-f2 is mirroring this shape for the console
+    // and UI import routes — one vocabulary, not two.
+    expect(out.notes[0]).toMatchObject({
+      url: 'https://broken.example/x.png',
+      action: 'removed',
+      reason: 'unfetchable',
+    });
+    expect(out.notes[0].message).toContain('taints the canvas');
   });
 
   it('leaves the rest of the document alone', async () => {
