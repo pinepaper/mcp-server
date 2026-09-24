@@ -254,6 +254,31 @@ Exports now report what **this scene** loses to the format you chose — a PNG o
 
 Loading a template that carries clipped character parts now warns when the studio dropped them, and says not to save over the template — the file is still intact until you do.
 
+### Fixed: results that were too big to read
+
+An error carried the whole generated script in its details — ~12KB of
+JavaScript in front of a one-line failure. It now carries the script's size and
+a switch (`PINEPAPER_ECHO_CODE=1`) to get it back.
+
+`pinepaper_agent_end_job` returned a 263,000-character screenshot inline, which
+is over the tool-result limit of the clients reading it, so an agent could not
+read its own verification step. The threshold for saving to a file instead was
+set against the bridge's limits rather than the caller's, and is now low enough
+that this cannot happen.
+
+### Fixed: map tools that called into nothing
+
+Nine tools called engine methods that have never existed on any studio —
+`pan_map`, `zoom_map`, `export_map`, `add_map_labels`, `animate_map_wave`,
+region-at-point, history `get_state`, `trigger_action`, and the relation lookup
+used by scene analysis. The last one was the quiet one: it was guarded, so it
+never threw — it just reported every scene as having **no relations**, always.
+
+Where the engine has the same capability under another name, they now call it.
+Where it has no such capability at all — there is no lat/lon pan, no numeric
+zoom level, and no region hit test — the tool now says so by name and points at
+what does work, instead of failing with `undefined is not a function`.
+
 ### Documentation: shapes described a fraction of what they accept
 
 `triangle` was documented as taking `color` and nothing else, while the engine accepts width, height, and either `kind` (`'right'`, `'equilateral'`, `'obtuse'`…) or exact interior `angles` and builds the triangle by the law of sines. `polygon` accepts an explicit **vertex list** for irregular shapes. `ellipse` and `heart` were `color`-only. Six of the eight speech bubbles take `cornerRadius`. And **every** item type accepts a `label` — a string, or a full config with position, offset, font and colour — so captioning no longer needs a second call and hand-computed coordinates.

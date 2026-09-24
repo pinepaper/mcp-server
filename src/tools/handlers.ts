@@ -225,7 +225,13 @@ function getExportDir(): string {
 // minutes the schema allows is ~77 MB. Deliverable across the bridge, useless
 // pasted into a response.
 export const ALWAYS_SAVE_FORMATS = new Set(['mp4', 'webm', 'gif', 'pdf', 'wav']);
-const SAVE_THRESHOLD_BYTES = 500_000; // ~500KB base64 ≈ 375KB decoded
+// 500_000 was chosen against the bridge's limits, not the CALLER's. A pilot
+// session hit a 263K-character end_job result — comfortably under this, so it
+// was returned inline, and over the tool-result limit of the client reading
+// it, so the agent could not read its own verification step. A value that
+// lets a result through to be rejected downstream is the wrong value; saving
+// to a file and naming the path costs one line of text and always works.
+const SAVE_THRESHOLD_BYTES = 180_000; // ~180KB base64 ≈ 135KB decoded
 
 /**
  * Governor budget for the export run itself.
@@ -632,12 +638,48 @@ function screenshotResult(screenshot: string): CallToolResult {
   };
 }
 
+/**
+ * Swap a `code` field carrying the emitted script for a description of it.
+ *
+ * Only a long string is touched: a short `code` is usually a status or an
+ * error code, not a program, and stripping those would take information away.
+ */
+function redactGeneratedCode(details: unknown): unknown {
+  if (process.env.PINEPAPER_ECHO_CODE === '1') return details;
+  if (!details || typeof details !== 'object' || Array.isArray(details)) return details;
+  const d = details as Record<string, unknown>;
+  const script = d.code;
+  if (typeof script !== 'string' || script.length < 400) return details;
+  const { code: _dropped, ...rest } = d;
+  return {
+    ...rest,
+    generatedCode: {
+      bytes: script.length,
+      lines: script.split('\n').length,
+      firstLine: script.split('\n').find((l) => l.trim()) ?? '',
+      hint: 'omitted — set PINEPAPER_ECHO_CODE=1 to return the generated script with the error',
+    },
+  };
+}
+
 export function errorResult(
   code: string,
   message: string,
-  details?: unknown,
+  rawDetails?: unknown,
   context?: ErrorContext
 ): CallToolResult {
+  // THE GENERATED SCRIPT IS NOT THE ERROR.
+  //
+  // Most error paths pass the emitted code in `details` as evidence, and for a
+  // long script that is ~12KB of JavaScript in front of a one-line failure —
+  // measured from a pilot session. An agent reading the result pays for all of
+  // it and learns nothing the message does not already say, and on a big
+  // export it can crowd out the result entirely.
+  //
+  // Replaced with its shape and a way to get it back. PINEPAPER_ECHO_CODE=1
+  // returns the script in full, the same switch that governs it on success.
+  const details = redactGeneratedCode(rawDetails);
+
   // Build error object
   const errorObj: any = {
     success: false,
@@ -2772,7 +2814,12 @@ You can now start creating new items on a clean canvas.`,
 
             const content: (TextContent | ImageContent)[] = [{
               type: 'text' as const,
-              text: `Executed PinePaper code:\n\n\`\`\`javascript\n${code}\n\`\`\`\n\nFull screenshot saved to: ${filePath} (${(fileSize / 1024).toFixed(1)} KB)\n\nResult: ${JSON.stringify(cleanResult, null, 2)}`,
+              // The script is not part of the answer here either — same reason
+              // errors no longer carry it. PINEPAPER_ECHO_CODE=1 brings it back.
+              text: (process.env.PINEPAPER_ECHO_CODE === '1'
+                ? `Executed PinePaper code:\n\n\`\`\`javascript\n${code}\n\`\`\`\n\n`
+                : '')
+                + `Full screenshot saved to: ${filePath} (${(fileSize / 1024).toFixed(1)} KB)\n\nResult: ${JSON.stringify(cleanResult, null, 2)}`,
             }];
 
             if (previewScreenshot) {

@@ -357,10 +357,19 @@ USE WHEN:
 
 IMPORTANT NOTES:
 - This reloads the entire page, which resets everything
-- The welcome template will NOT appear after refresh (only shows for first-time visitors)
-- After refresh, the canvas will be completely empty
 - All unsaved work will be lost
-- You may need to wait a moment after refresh before executing other commands`,
+- You may need to wait a moment after refresh before executing other commands
+
+WHAT YOU ACTUALLY GET, which is not always an empty canvas:
+- The template picker and a "Restore your previous work?" dialog can both
+  appear after a reload — observed in agent mode. A screenshot taken straight
+  afterwards shows those, not your scene, so do not read one as evidence that
+  the canvas is broken or that your items failed to draw.
+- Dismiss or clear whatever appears before judging the result, and prefer
+  pinepaper_agent_reset when you want a clean canvas rather than a clean PAGE:
+  it skips the reload and the dialogs entirely.
+- This description used to promise the welcome template would not appear and
+  that the canvas would be empty. Neither is reliable, so neither is claimed.`,
     inputSchema: {
       type: 'object',
       properties: {},
