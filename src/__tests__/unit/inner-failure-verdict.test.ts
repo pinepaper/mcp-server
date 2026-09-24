@@ -53,3 +53,42 @@ describe('a validation verdict is not a tool failure', () => {
     expect(innerFailure(null)).toBeNull();
   });
 });
+
+/**
+ * "No changes" and "could not read them" are different answers.
+ *
+ * diffHistoryStates passes raw history entries to diffScenes, and
+ * HistoryManager stores them as JSON STRINGS. A string has no .items, so both
+ * sides read as empty and the diff answers "no changes" for a scene that
+ * plainly has items — a pilot added six items and six tracks and was told
+ * nothing had changed.
+ *
+ * The engine owns the fix. This layer owns not repeating the claim.
+ */
+describe('scene_diff does not report an unreadable diff as no changes', () => {
+  it('checks the live registry before believing an empty diff', async () => {
+    const { codeGenerator } = await import('../../types/code-generator.js');
+    const code = codeGenerator.generateSceneDiff({ action: 'history', indexA: 0, indexB: 1 } as never);
+    expect(code).toContain('app.itemRegistry');
+    expect(code).toContain('saw === 0 && live > 0');
+  });
+
+  it('says which of the two answers it is', async () => {
+    const { codeGenerator } = await import('../../types/code-generator.js');
+    const code = codeGenerator.generateSceneDiff({ action: 'history', indexA: 0, indexB: 1 } as never);
+    expect(code).toContain('not "nothing changed"');
+    expect(code).toContain('stored as JSON strings');
+  });
+
+  it('names something that does work instead', async () => {
+    const { codeGenerator } = await import('../../types/code-generator.js');
+    const code = codeGenerator.generateSceneDiff({ action: 'history', indexA: 0, indexB: 1 } as never);
+    expect(code).toContain('pinepaper_get_items');
+  });
+
+  it('passes a real diff straight through', async () => {
+    const { codeGenerator } = await import('../../types/code-generator.js');
+    const code = codeGenerator.generateSceneDiff({ action: 'history', indexA: 0, indexB: 1 } as never);
+    expect(code).toContain('return { success: true, ...d }');
+  });
+});

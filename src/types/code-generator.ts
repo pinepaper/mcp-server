@@ -6832,7 +6832,52 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    // The RE
     if (input.action === 'version') {
       return this._facadeCall('diffAgainstVersion', JSON.stringify(input.versionId || ''), 'Scene diff: vs version');
     }
-    return this._facadeCall('diffHistoryStates', `${input.indexA ?? 0}, ${input.indexB ?? 0}`, 'Scene diff: history');
+
+    // "NO CHANGES" AND "COULD NOT READ THEM" ARE DIFFERENT ANSWERS.
+    //
+    // diffHistoryStates passes the raw history entries to diffScenes, and
+    // HistoryManager stores them as JSON STRINGS (history.push(stateStr), with
+    // images interned). A string has no .items, so both sides read as empty and
+    // the diff answers added:[], removed:[], changed:[], unchanged:0,
+    // "no changes" — for a scene that plainly has items. A pilot added six
+    // items and six tracks and was told nothing had changed.
+    //
+    // That is the engine's to fix (_asSnapshot already normalises a
+    // string-or-object, and diffAgainstVersion unwraps where this one does
+    // not) and is raised with fxtool. What this layer can do is refuse to
+    // repeat the claim: if the diff saw nothing at all while the canvas holds
+    // items, the honest answer is that it could not read the snapshots.
+    //
+    // HistoryManager's own _itemIdsOf has the right instinct in its comment —
+    // "null means could not tell, never empty" — which is exactly the
+    // distinction the diff drops.
+    return `
+// Scene diff: what changed between two history states
+(function() {
+  if (typeof app.diffHistoryStates !== 'function') {
+    return { success: false, error: 'app.diffHistoryStates unavailable — update PinePaper Studio.' };
+  }
+  const d = app.diffHistoryStates(${input.indexA ?? 0}, ${input.indexB ?? 0});
+  if (!d || d.ok === false) {
+    return { success: false, error: (d && (d.error || d.reason)) || 'the diff refused without saying why' };
+  }
+  const saw = (d.added || []).length + (d.removed || []).length + (d.changed || []).length + (d.unchanged || 0);
+  const live = (app.itemRegistry && typeof app.itemRegistry.getAll === 'function')
+    ? (app.itemRegistry.getAll() || []).length
+    : 0;
+  if (saw === 0 && live > 0) {
+    return {
+      success: false,
+      error: 'the diff read NO items from either history state while the canvas holds ' + live
+        + ' — so this is "could not read those snapshots", not "nothing changed". '
+        + 'History entries are stored as JSON strings and this engine build diffs them without parsing. '
+        + 'Compare with pinepaper_get_items before and after instead, or use action "version".',
+      liveItems: live,
+      raw: d,
+    };
+  }
+  return { success: true, ...d };
+})();`.trim();
   }
 
   generateTransform(input: TransformInput): string {
