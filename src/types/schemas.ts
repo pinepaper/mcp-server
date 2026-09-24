@@ -2114,7 +2114,7 @@ export const MaskKeyframePropertiesSchema = z.object({
 }).describe('Mask keyframe properties');
 
 export const MaskKeyframeSchema = z.object({
-  time: z.number().min(0).max(1).describe('Normalized time (0-1)'),
+  time: z.number().min(0).describe("SECONDS, not a 0-1 fraction. The engine compares this against the animation's startTime, so the units are the same as startTime and duration. The 0-1 cap this used to carry made a keyframe at 2.0s a validation error, and it is also why 0-1 LOOKED mandatory: `duration` defaults to 1, so anything past 1s does nothing until you raise it. Set duration to cover your last keyframe."),
   properties: MaskKeyframePropertiesSchema.describe('Mask properties at this keyframe'),
   easing: MaskEasingSchema.optional().describe('Easing function for this keyframe'),
 }).describe('Mask animation keyframe');
@@ -3174,7 +3174,8 @@ export const QueryCapabilitiesInputSchema = z.object({
     z.array(z.string()),
   ]).optional().describe('For choose: mood terms or feelings to penalize'),
   seed: z.string().optional().describe('For choose: deterministic seed string for reproducible selection'),
-  key: z.string().optional().describe('For find: exact capability key to look up'),
+  key: z.string().optional().describe('For find: exact capability key to look up.'),
+  query: z.string().optional().describe("An alias for `key`, because that is what callers reach for on an action named 'find'. A rejected field name is a dead end rather than a hint, so both work."),
   exclude: z.array(z.string()).optional().describe('For choose: list of capability keys to exclude from recommendation'),
   warm: z.boolean().optional()
     .describe('Load the lazy registries before answering (default true). The generator registry and the rigging/blending/deform relation rules only exist once touched, so a cold answer omits them — pass false only to re-read what is already resident, cheaply.'),

@@ -1407,6 +1407,10 @@ async function handleToolCallInner(
 
       case 'pinepaper_query_capabilities': {
         const input = QueryCapabilitiesInputSchema.parse(args);
+        // `query` is what callers reach for on an action named 'find'; `key`
+        // is what the emitter reads. Accepted as an alias rather than left as
+        // a validation dead end.
+        if (!input.key && input.query) input.key = input.query;
         const code = codeGenerator.generateQueryCapabilities(input);
         return executeOrGenerate(code, `Capabilities: ${input.action || 'list'}`, options, 'pinepaper_query_capabilities');
       }
@@ -2742,13 +2746,42 @@ You can now start creating new items on a clean canvas.`,
             svg = result.svg;
             metadata = result.metadata;
           } else if (input.url) {
-            // For URL imports, we'd need to fetch the SVG
-            // For now, delegate to pinepaper_import_svg
-            return errorResult(
-              ErrorCodes.INVALID_PARAMS,
-              'URL imports not yet implemented - use pinepaper_import_svg with url parameter instead',
-              { url: input.url }
-            );
+            // IMPLEMENTED NOW, rather than redirected.
+            //
+            // This used to refuse with "URL imports not yet implemented" while
+            // the agent guide documented the url parameter — the redirect
+            // named a working alternative, which made it a good refusal, but
+            // it was still a documented parameter that did nothing. The reason
+            // it could not be done here was that fetching belonged to the
+            // page; it does not any more, because the page cannot fetch a
+            // third-party host under the studio's CSP and this process can.
+            let res: Response;
+            try {
+              res = await fetch(input.url, { redirect: 'follow' });
+            } catch (e) {
+              const why = e instanceof Error ? e.message : 'network request failed';
+              return errorResult(
+                ErrorCodes.EXECUTION_ERROR,
+                `could not reach ${input.url} — ${why}. This fetch runs in the MCP server rather than the page, so it is not a CSP problem.`,
+              );
+            }
+            if (!res.ok) {
+              return errorResult(
+                ErrorCodes.EXECUTION_ERROR,
+                `the server refused ${input.url} — HTTP ${res.status} ${res.statusText || ''}`.trim(),
+              );
+            }
+            const body = await res.text();
+            if (!/<svg[\s>]/i.test(body)) {
+              const type = (res.headers.get('content-type') ?? '').split(';')[0].trim();
+              return errorResult(
+                ErrorCodes.INVALID_PARAMS,
+                `${input.url} served "${type || 'no content-type'}" and its body is not SVG. `
+                + 'For a raster image use pinepaper_import_image, which accepts a url and inlines it.',
+              );
+            }
+            svg = body;
+            metadata = { source: 'url', url: input.url };
           }
 
           // Import the SVG onto canvas using existing import_svg tool

@@ -5571,6 +5571,18 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
     const maskOptionsStr = validated.maskOptions ? JSON.stringify(validated.maskOptions) : '{}';
 
     const preset = validated.preset || validated.maskType || 'wipeLeft';
+
+    // MODE 3 PASSED AN ANIMATION PRESET WHERE A MASK SHAPE GOES.
+    //
+    // applyCustomMask(item, maskType, keyframes, options) wants a SHAPE —
+    // 'rectangle', 'circle', 'star'. With preset + keyframes this handed it
+    // 'iris' or 'wipeLeft', which is an animation name, so the shape was
+    // whatever the engine falls back to and the keyframes drove the wrong
+    // geometry. maskType is the field that carries the shape, and it is only
+    // used as the preset above when no preset was given at all.
+    const customShape = validated.maskType && validated.maskType !== preset
+      ? validated.maskType
+      : 'rectangle';
     // Per-preset options. Custom keyframes are an animated-mask extension —
     // when supplied, fall through to maskingSystem.applyCustomMask instead.
     return `
@@ -5586,7 +5598,7 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
     const mergedOpts = Object.assign({}, ${optionsStr}, ${maskOptionsStr});
     let maskedGroup;
     if (${keyframesStr} && app.maskingSystem && app.maskingSystem.applyCustomMask) {
-      maskedGroup = app.maskingSystem.applyCustomMask(item, '${preset}', ${keyframesStr}, mergedOpts);
+      maskedGroup = app.maskingSystem.applyCustomMask(item, '${customShape}', ${keyframesStr}, mergedOpts);
     } else {
       maskedGroup = app.applyAnimatedMask(item, '${preset}', mergedOpts);
     }

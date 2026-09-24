@@ -333,6 +333,29 @@ export function getSystem(systemId: string, tokenType?: DTCGTokenType) {
   for (const [k, t] of Object.entries(sys.tokens ?? {})) {
     if (t.$type === tokenType) tokens[k] = t;
   }
+
+  // AN EMPTY RESULT USED TO LOOK LIKE AN EMPTY SYSTEM.
+  //
+  // These systems were captured for their MOTION ladders, spacing grids and
+  // type scales; none of them carries colour. Asking material_3 for
+  // tokenType 'color' returned `{tokens: {}}`, which reads as "this system has
+  // no colours" rather than "this tool does not carry them" — and the caller
+  // had no way to tell those apart or learn where colours do live.
+  if (Object.keys(tokens).length === 0) {
+    const available = [...new Set(
+      Object.values(sys.tokens ?? {}).map((t) => t.$type).filter((t): t is DTCGTokenType => !!t),
+    )].sort();
+    return {
+      ...sys,
+      tokens,
+      requested: tokenType,
+      available,
+      note: available.includes(tokenType)
+        ? `${sys.id} declares no ${tokenType} tokens, though other systems here do.`
+        : `no design system here carries ${tokenType} tokens — these were captured for ${available.join(', ')}. `
+          + 'For palettes, use pinepaper_design_styles (styleTokens), which does carry them.',
+    };
+  }
   return { ...sys, tokens };
 }
 
