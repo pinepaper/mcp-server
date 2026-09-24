@@ -459,6 +459,12 @@ const item = app.create('${itemType}', ${JSON.stringify(params, null, 2)});`;
     code += `\nitem.opacity = ${opacity};`;
   }
 
+  // After opacity, so the "on" level of the lifetime is the item's own.
+  const hasLifetime = properties.bornAt !== undefined || properties.ttl !== undefined;
+  if (hasLifetime) {
+    code += `\nlet __lifetime = null;${emitLifetime('item', properties.bornAt, properties.ttl)}`;
+  }
+
   // Ensure item is visible above backgrounds/generators
   code += `\nif (item.bringToFront) item.bringToFront();`;
 
@@ -481,7 +487,7 @@ const itemId = item.data.registryId;
 app.historyManager.saveState();
 
 // Return item info
-({ itemId, type: '${itemType}', position: { x: ${position.x}, y: ${position.y} }${ignored.length > 0
+({ itemId, type: '${itemType}', position: { x: ${position.x}, y: ${position.y} }${hasLifetime ? ', lifetime: __lifetime' : ''}${ignored.length > 0
     ? `, ignoredProperties: ${JSON.stringify(ignored)}, warning: ${JSON.stringify(
       `${ignored.join(', ')} ${ignored.length > 1 ? 'are' : 'is'} not read when creating an item, so ${ignored.length > 1 ? 'they had' : 'it had'} no effect. `
       + 'Check the spelling against this item type\'s documented properties.',
@@ -507,6 +513,48 @@ const CREATE_KNOWN_KEYS: ReadonlySet<string> = new Set([
   // them "no effect" would steer a caller off the only way to cut between shots.
   'bornAt', 'ttl',
 ]);
+
+/**
+ * A lifetime (bornAt / ttl, seconds) as hard-cut opacity keyframes.
+ *
+ * THE ENGINE HAS NO LIFETIME. create() and modifyItem() never read bornAt or
+ * ttl, so a 36-frame boil built from lifetimes showed all 36 frames at once
+ * locally — while the docs call these the only way to cut between shots, and
+ * create_item's unread-property warning had exempted them. FxTool's StickOps
+ * already answers the same question this way (applyLifetime): opacity 0
+ * before, the item's own opacity during, 0 after, with cuts CUT apart so a
+ * sampled frame never draws both sides of one.
+ *
+ * Re-applied lifetimes REPLACE the previous one: the cut keys are tagged, and
+ * dropped before new ones are added, so re-timing an act does not stack cuts.
+ * bornAt / ttl are also kept on item.data, where the scene document carries them.
+ */
+function emitLifetime(itemExpr: string, bornAt: unknown, ttl: unknown): string {
+  const b = Number(bornAt);
+  const t = Number(ttl);
+  const born = Number.isFinite(b) && b > 0 ? b : 0;
+  const span = Number.isFinite(t) && t > 0 ? t : null;
+  return `
+(function(it) {
+  if (!it || !it.data) return;
+  it.data.bornAt = ${born};
+  ${span === null ? 'delete it.data.ttl;' : `it.data.ttl = ${span};`}
+  const canKey = typeof app.addKeyframe === 'function';
+  if (!canKey) { __lifetime = { bornAt: ${born}, ttl: ${span}, applied: false, note: 'stored on the item, but this studio has no keyframe API, so it shows for the whole local render.' }; return; }
+  const CUT = 0.001;
+  if (Array.isArray(it.data.keyframes)) it.data.keyframes = it.data.keyframes.filter(function(k) { return !(k && k._lifetime); });
+  const on = typeof it.opacity === 'number' && it.opacity > 0 ? it.opacity : 1;
+  const times = [];
+  const kf = function(time, opacity) { time = Math.max(0, time); times.push(time); app.addKeyframe(it, time, { opacity: opacity }, 'linear'); };
+  if (${born} > 0) { kf(0, 0); kf(${born} - CUT, 0); }
+  kf(${born}, on);
+  ${span === null ? '' : `kf(${born + span}, on); kf(${born + span} + CUT, 0);`}
+  (it.data.keyframes || []).forEach(function(k) {
+    if (k && times.indexOf(k.time) !== -1 && k.properties && Object.keys(k.properties).length === 1 && 'opacity' in k.properties) k._lifetime = true;
+  });
+  __lifetime = { bornAt: ${born}, ttl: ${span}, applied: true };
+})(${itemExpr});`;
+}
 
 /**
  * Template for modifying items
@@ -580,6 +628,13 @@ if (_ae && _ae.type === 'audio') {
 }`;
   }
 
+  const modLifetime = properties.bornAt !== undefined || properties.ttl !== undefined;
+  if (modLifetime) {
+    code += `
+let __lifetime = null;
+const _lt = app.itemRegistry.get('${itemId}');${emitLifetime('_lt && _lt.item', properties.bornAt, properties.ttl)}`;
+  }
+
   if (dataFlags && Object.keys(dataFlags).length > 0) {
     code += `
 const _flagged = app.itemRegistry.get('${itemId}');
@@ -588,7 +643,7 @@ if (_flagged && _flagged.item && _flagged.item.data) Object.assign(_flagged.item
 
   code += `
 app.historyManager.saveState();
-return { success: true, itemId: '${itemId}' };`;
+return { success: true, itemId: '${itemId}'${modLifetime ? ', lifetime: __lifetime' : ''} };`;
 
   // Wrapped, because the body now RETURNS early on a miss rather than falling
   // through to an unconditional success.
