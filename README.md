@@ -217,6 +217,46 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - Puppeteer mode launches Chrome with `--no-sandbox` and `--disable-setuid-sandbox`. That is routine for headless automation and it does weaken Chrome's own process sandbox. If that matters where you are running it, use `code` mode or put the server in a container.
 - Puppeteer itself is an **optional** peer dependency, kept out of the default tree precisely because a headless browser plus an install script is what scanners flag hardest. Install it only if you want the executing mode.
 
+## What's new in 1.6.13
+
+### Fixed: photos could not be imported from a URL at all
+
+1.6.12 stopped an imported image from tainting the canvas, and in doing so made
+URL imports impossible on pinepaper.studio. The studio sends
+`connect-src 'self' …`, so the page may not fetch any third-party host — the
+old code got around this by *loading* the image instead, which is exactly what
+tainted the canvas.
+
+The fetch now happens in the MCP server, which has no such restriction, and the
+page is handed a `data:` URL. Nothing to fetch, nothing to taint, and the
+picture actually arrives. `pinepaper_import_svg` resolves its document the same
+way, so embedded remote images are kept rather than dropped.
+
+### Fixed: results that were too big to read
+
+An error carried the whole generated script in its details — ~12KB of
+JavaScript in front of a one-line failure. It now carries the script's size and
+a switch (`PINEPAPER_ECHO_CODE=1`) to get it back.
+
+`pinepaper_agent_end_job` returned a 263,000-character screenshot inline, which
+is over the tool-result limit of the clients reading it, so an agent could not
+read its own verification step. The threshold for saving to a file instead was
+set against the bridge's limits rather than the caller's, and is now low enough
+that this cannot happen.
+
+### Fixed: map tools that called into nothing
+
+Nine tools called engine methods that have never existed on any studio —
+`pan_map`, `zoom_map`, `export_map`, `add_map_labels`, `animate_map_wave`,
+region-at-point, history `get_state`, `trigger_action`, and the relation lookup
+used by scene analysis. The last one was the quiet one: it was guarded, so it
+never threw — it just reported every scene as having **no relations**, always.
+
+Where the engine has the same capability under another name, they now call it.
+Where it has no such capability at all — there is no lat/lon pan, no numeric
+zoom level, and no region hit test — the tool now says so by name and points at
+what does work, instead of failing with `undefined is not a function`.
+
 ## What's new in 1.6.12
 
 ### Fixed: images could not be imported at all
@@ -253,31 +293,6 @@ Exports now report what **this scene** loses to the format you chose — a PNG o
 `pinepaper_list_generators` reported **3 generators when the engine has 74**, and dropped the parameters it promised to list. The batch tool advertised 15 of those 74, so 59 working generators were invisible to anyone reading it. All lists now come from one source.
 
 Loading a template that carries clipped character parts now warns when the studio dropped them, and says not to save over the template — the file is still intact until you do.
-
-### Fixed: results that were too big to read
-
-An error carried the whole generated script in its details — ~12KB of
-JavaScript in front of a one-line failure. It now carries the script's size and
-a switch (`PINEPAPER_ECHO_CODE=1`) to get it back.
-
-`pinepaper_agent_end_job` returned a 263,000-character screenshot inline, which
-is over the tool-result limit of the clients reading it, so an agent could not
-read its own verification step. The threshold for saving to a file instead was
-set against the bridge's limits rather than the caller's, and is now low enough
-that this cannot happen.
-
-### Fixed: map tools that called into nothing
-
-Nine tools called engine methods that have never existed on any studio —
-`pan_map`, `zoom_map`, `export_map`, `add_map_labels`, `animate_map_wave`,
-region-at-point, history `get_state`, `trigger_action`, and the relation lookup
-used by scene analysis. The last one was the quiet one: it was guarded, so it
-never threw — it just reported every scene as having **no relations**, always.
-
-Where the engine has the same capability under another name, they now call it.
-Where it has no such capability at all — there is no lat/lon pan, no numeric
-zoom level, and no region hit test — the tool now says so by name and points at
-what does work, instead of failing with `undefined is not a function`.
 
 ### Documentation: shapes described a fraction of what they accept
 
