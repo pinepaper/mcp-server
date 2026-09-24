@@ -287,7 +287,8 @@ function generateBlendModeCode(itemVarName: string, blendMode: string): string {
 function generateCreateItemCode(
   itemType: ItemType,
   position: { x: number; y: number },
-  properties: Record<string, unknown>
+  properties: Record<string, unknown>,
+  dataFlags?: Record<string, unknown>
 ): string {
   // Extract special properties that need separate handling
   const {
@@ -458,6 +459,11 @@ const item = app.create('${itemType}', ${JSON.stringify(params, null, 2)});`;
   // Ensure item is visible above backgrounds/generators
   code += `\nif (item.bringToFront) item.bringToFront();`;
 
+  // selectable / isDraggable / isDecorative live on item.data, not in params.
+  if (dataFlags && Object.keys(dataFlags).length > 0) {
+    code += `\nif (item.data) Object.assign(item.data, ${JSON.stringify(dataFlags)});`;
+  }
+
   // Add dynamic content support for text items
   if (contentType && itemType === 'text') {
     const opts: Record<string, unknown> = {};
@@ -504,7 +510,8 @@ const CREATE_KNOWN_KEYS: ReadonlySet<string> = new Set([
  */
 function generateModifyItemCode(
   itemId: string,
-  properties: Record<string, unknown>
+  properties: Record<string, unknown>,
+  dataFlags?: Record<string, unknown>
 ): string {
   const { contentType, contentFormat, countdownTarget, countdownEndText, ...restProperties } = properties;
 
@@ -548,6 +555,12 @@ if (entry && entry.item && app.removeDynamicContent) app.removeDynamicContent(en
 const entry = app.itemRegistry.get('${itemId}');
 if (entry && entry.item && app.setDynamicContent) app.setDynamicContent(entry.item, '${contentType}', ${JSON.stringify(opts)});`;
     }
+  }
+
+  if (dataFlags && Object.keys(dataFlags).length > 0) {
+    code += `
+const _flagged = app.itemRegistry.get('${itemId}');
+if (_flagged && _flagged.item && _flagged.item.data) Object.assign(_flagged.item.data, ${JSON.stringify(dataFlags)});`;
   }
 
   code += `
@@ -1713,7 +1726,8 @@ export class PinePaperCodeGenerator {
     return generateCreateItemCode(
       validated.itemType,
       validated.position,
-      properties
+      properties,
+      validated.data
     );
   }
 
@@ -1724,7 +1738,8 @@ export class PinePaperCodeGenerator {
     const validated = ModifyItemInputSchema.parse(input);
     return generateModifyItemCode(
       validated.itemId,
-      validated.properties as Record<string, unknown>
+      validated.properties as Record<string, unknown>,
+      validated.data
     );
   }
 
@@ -3047,7 +3062,9 @@ throw new Error('Unknown diagram mode action: ${action}');
    */
   generateAgentEndJob(input: AgentEndJobInput): string {
     const validated = AgentEndJobInputSchema.parse(input);
-    const { takeScreenshot, analyzeContent } = validated;
+    const { analyzeContent } = validated;
+    // includeScreenshot is the published name; takeScreenshot the older one.
+    const takeScreenshot = validated.includeScreenshot ?? validated.takeScreenshot;
 
     const shouldAnalyze = analyzeContent !== false;
 
@@ -7100,12 +7117,20 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    // The RE
     // schema example told callers to write exactly that. The example is fixed;
     // the alias stays because the wrong spelling was documented and anyone who
     // followed it should not have to discover the difference twice.
-    const rawParams = (input.params ?? {}) as Record<string, unknown>;
-    const filterParams: Record<string, unknown> = { ...rawParams };
-    if (filterParams.amount !== undefined && filterParams.radius === undefined) {
-      filterParams.radius = filterParams.amount;
-      delete filterParams.amount;
-    }
+    //
+    // BLUR ONLY. grain, bloom, chromaticAberration, displace, datamosh and
+    // paletteMap all read a real `amount`; renaming it for them would turn a
+    // working call into the same silent no-op this alias exists to prevent.
+    const blurAlias = (name: string | undefined, params: Record<string, unknown> | undefined) => {
+      const out: Record<string, unknown> = { ...(params ?? {}) };
+      if (name === 'blur' && out.amount !== undefined && out.radius === undefined) {
+        out.radius = out.amount;
+        delete out.amount;
+      }
+      return out;
+    };
+    const filterParams = blurAlias(input.filterName, input.params as Record<string, unknown> | undefined);
+    const chainFilters = (input.filters || []).map((f) => ({ ...f, params: blurAlias(f.name, f.params as Record<string, unknown> | undefined) }));
     // Resolve the raster from the registry id (unwrapping groups when the
     // build has the _resolveRaster helper), then use the real GPU-filter
     // facades. The previous emitter called app.imageTools.applyFilter, a
@@ -7140,7 +7165,7 @@ ${resolve}
 (async function() {
 ${resolve}
   try {
-    const filters = ${JSON.stringify(input.filters || [])};
+    const filters = ${JSON.stringify(chainFilters)};
     await app.applyImageFilterChain(item, filters);
     return { success: true, action: 'chain', itemId: ${JSON.stringify(input.itemId)}, filterCount: filters.length };
   } catch (e) {

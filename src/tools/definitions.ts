@@ -5120,26 +5120,27 @@ ACTIONS:
 
 Available filters (GPU raster set):
 - Color: grayscale, sepia, brightness, contrast, saturation, invert, posterize (levels), hsl (hue/saturation/lightness), colorTint (color, intensity, blendMode), colorMatrix (matrix), duotone (shadow, highlight, mix), paletteMap (swatches[], amount, preserveShading — recolor to a fixed palette)
-- Stylize: vignette (intensity, radius), edgeDetect, halftoneDots (size, angle), halftoneCMYK (size), dither (levels), grain (amount, seed), scanlines (intensity, period), chromaticAberration (amount), blur
+- Stylize: vignette (intensity, radius), edgeDetect, halftoneDots (size, angle), halftoneCMYK (size), dither (levels), grain (amount, seed), scanlines (intensity, period), chromaticAberration (amount), blur (radius)
 - Light (additive): bloom (amount, threshold, radius), glow, halation (warm-fringed bloom; color), lightShafts (amount, threshold, decay, density, x, y, color — volumetric rays from a point)
 - Keying: lumaKey (threshold, softness, invert)
 - SECOND-INPUT (params.map = another item's id, resolved to its pixels): displace (amount, dispersion, map, mapChannel — the map's brightness pushes pixels), refract (displace with per-channel dispersion — glass), trackMatte (channel, invert, strength — prefer pinepaper_media apply_track_matte for the live version), datamosh (amount, block, map? — self-moshes without a map)
 
 RECIPE — grunge poster: chain [grain, scanlines, vignette]. Glass header: refract with map = a gradient item.
+CHAIN ORDER MATTERS: each filter runs on the previous one's output. duotone then halftoneDots comes out grey (the ink colour is lost); halftoneDots then duotone keeps it. If a chain loses its colour, move the colour-mapping filter (duotone, paletteMap, colorTint) to the end.
 (Scene-wide filters — sharpen/emboss/noise/vintage etc. — are a different surface: use pinepaper_add_filter.)`,
     inputSchema: {
       type: 'object',
       properties: {
         action: {
           type: 'string',
-          enum: ['apply', 'chain'],
+          enum: ['apply', 'chain', 'analyze_palette', 'recolor_palette'],
           description: 'Filter action',
         },
         itemId: { type: 'string', description: 'Target raster item ID' },
         filterName: { type: 'string', description: 'Filter name (for apply)' },
         params: {
           type: 'object',
-          description: "Filter parameters. Blur takes {radius: 5} — an out-of-range or misspelled parameter blurs by NOTHING rather than erroring, so check the name. 'amount' is accepted as an alias for radius because this example used to say so.",
+          description: "Filter parameters, named per filter in the list above. Blur takes {radius: 5} — a misspelled parameter is ignored rather than refused, so check the name. For blur only, 'amount' is accepted as an alias for radius because this example used to say so; every other filter that lists amount reads amount.",
         },
         filters: {
           type: 'array',
@@ -5151,8 +5152,18 @@ RECIPE — grunge poster: chain [grain, scanlines, vignette]. Glass header: refr
             },
             required: ['name'],
           },
-          description: 'Filter chain (for chain action)',
+          description: 'Filter chain (for chain action). Order matters — see CHAIN ORDER above.',
         },
+        maxSwatches: { type: 'integer', minimum: 1, maximum: 32, description: 'analyze_palette: swatch count cap (default 8).' },
+        mapping: {
+          oneOf: [
+            { type: 'array', items: { type: 'object', properties: { from: { type: 'string' }, to: { type: 'string' } }, required: ['from', 'to'] } },
+            { type: 'object', additionalProperties: { type: 'string' } },
+          ],
+          description: "recolor_palette: {from,to}[] or {'#old':'#new'} — colours swap, shading survives.",
+        },
+        amount: { type: 'number', minimum: 0, maximum: 1, description: 'recolor_palette: blend 0–1. (A filter\'s own amount goes in params.)' },
+        preserveShading: { type: 'number', minimum: 0, maximum: 1, description: 'recolor_palette: how much of the original luminance detail survives (default 1).' },
       },
       required: ['action', 'itemId'],
     },
@@ -7086,13 +7097,14 @@ AVAILABLE FILTERS:
 - blur: Gaussian blur effect (params: radius 0-20)
 - brightness: Adjust brightness (params: value -100 to 100)
 - contrast: Adjust contrast (params: value -100 to 100)
-- saturate: Adjust color saturation (params: value -100 to 100)
+- saturation: Adjust color saturation (params: value -100 to 100). 'saturate' is accepted as the same filter.
 - invert: Invert colors (params: intensity 0-1)
 - noise: Add film grain (params: intensity 0-100, monochrome: true/false)
 - vignette: Darken edges (params: intensity 0-1, radius 0-1)
 - vintage: Preset combining sepia, vignette, noise
 - colorOverlay: Add color tint (params: color, intensity, blendMode)
 - sharpen: Increase sharpness (params: intensity 0-100)
+- emboss: 3D emboss (params: intensity 0-1)
 - posterize: Reduce color levels (params: levels 2-32)
 
 EXAMPLES:
@@ -7107,7 +7119,7 @@ Filters can be stacked - call multiple times to combine effects.`,
       properties: {
         filterType: {
           type: 'string',
-          enum: ['grayscale', 'sepia', 'blur', 'brightness', 'contrast', 'saturate', 'invert', 'noise', 'vignette', 'vintage', 'colorOverlay', 'sharpen', 'posterize'],
+          enum: ['grayscale', 'sepia', 'blur', 'brightness', 'contrast', 'saturation', 'invert', 'noise', 'vignette', 'vintage', 'colorOverlay', 'sharpen', 'emboss', 'posterize', 'saturate'],
           description: 'Type of filter to apply',
         },
         params: {
@@ -7565,8 +7577,8 @@ CANVAS PRESETS: instagram (1080x1080), instagram-story (1080x1920), tiktok (1080
         },
         screenshotPolicy: {
           type: 'string',
-          enum: ['on_complete', 'on_error', 'never', 'on_request'],
-          description: 'When to take screenshots (default: on_complete)',
+          enum: ['on_complete', 'on_error', 'none', 'on_request', 'never'],
+          description: "When to take screenshots (default: on_complete). 'never' is accepted as 'none'.",
         },
         canvasPreset: {
           type: 'string',

@@ -73,6 +73,18 @@ describe('generateImageFilter uses the real engine entry points', () => {
     const both = codeGenerator.generateImageFilter({ action: 'apply', itemId: 'item_2', filterName: 'blur', params: { amount: 3, radius: 9 } });
     expect(both).toContain('{"amount":3,"radius":9}');
   });
+  it('the alias is blur-only: grain / bloom keep their real amount', () => {
+    const grain = codeGenerator.generateImageFilter({ action: 'apply', itemId: 'item_2', filterName: 'grain', params: { amount: 0.4 } });
+    expect(grain).toContain('app.applyImageFilter(item, "grain", {"amount":0.4})');
+    const bloom = codeGenerator.generateImageFilter({ action: 'apply', itemId: 'item_2', filterName: 'bloom', params: { amount: 1, threshold: 0.7 } });
+    expect(bloom).toContain('{"amount":1,"threshold":0.7}');
+  });
+  it('chain applies the blur alias per entry, and only to blur', () => {
+    const code = codeGenerator.generateImageFilter({ action: 'chain', itemId: 'item_2', filters: [
+      { name: 'blur', params: { amount: 6 } }, { name: 'grain', params: { amount: 0.3 } },
+    ] });
+    expect(code).toContain('[{"name":"blur","params":{"radius":6}},{"name":"grain","params":{"amount":0.3}}]');
+  });
   it('apply refuses a falsy engine answer instead of claiming success', () => {
     const code = codeGenerator.generateImageFilter({ action: 'apply', itemId: 'item_2', filterName: 'blur', params: { radius: 4 } });
     expect(code).toMatch(/if \(r === false \|\| r === null\)[\s\S]*success: false/);

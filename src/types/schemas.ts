@@ -1167,7 +1167,10 @@ export const BlastParamsSchema = z.object({
 // FILTER TYPES
 // =============================================================================
 
-export const FilterTypeSchema = z.enum([
+// 'saturate' is what the published JSON schema offered for releases, while
+// the engine registers 'saturation' and this enum rejected 'saturate' — a
+// caller who followed the docs got a validation error. Accepted and mapped.
+export const FilterTypeSchema = z.preprocess((v) => (v === 'saturate' ? 'saturation' : v), z.enum([
   'grayscale',
   'sepia',
   'blur',
@@ -1182,7 +1185,7 @@ export const FilterTypeSchema = z.enum([
   'sharpen',
   'emboss',
   'posterize',
-]).describe('Type of visual filter to apply');
+])).describe('Type of visual filter to apply');
 
 export type FilterType = z.infer<typeof FilterTypeSchema>;
 
@@ -1226,6 +1229,15 @@ export const AddFilterInputSchema = z.object({
 });
 
 // Create Item
+// Item data flags. Advertised on create_item and modify_item for releases while
+// z.object() stripped them, so {data: {selectable: false}} was accepted and
+// did nothing. The engine reads all three off item.data.
+export const ItemDataFlagsSchema = z.object({
+  selectable: z.boolean().optional(),
+  isDraggable: z.boolean().optional(),
+  isDecorative: z.boolean().optional(),
+});
+
 export const CreateItemInputSchema = z.object({
   itemType: ItemTypeSchema,
   position: PositionSchema.optional().default({ x: 400, y: 300 }),
@@ -1235,6 +1247,7 @@ export const CreateItemInputSchema = z.object({
   animationIntensity: z.number().optional().describe('Loop animation amplitude (0.1 = ±10%, default 0.15). Drives pulse/wobble/bounce/breathe amplitude; honored by SVG/SMIL/widget export.'),
   animationDelay: z.number().optional().describe('Loop animation start delay in seconds.'),
   keyframes: z.array(KeyframeSchema).optional().describe('Required when animationType is "keyframe". Inline keyframe array attached at creation.'),
+  data: ItemDataFlagsSchema.optional(),
 });
 
 // Light direction for 3D effects
@@ -1281,6 +1294,7 @@ export type CreateDiagonalStripesInput = z.infer<typeof CreateDiagonalStripesInp
 export const ModifyItemInputSchema = z.object({
   itemId: z.string().describe('Registry ID of the item'),
   properties: z.record(z.unknown()).describe('Properties to update'),
+  data: ItemDataFlagsSchema.optional(),
 });
 
 // Delete Item
@@ -2206,9 +2220,13 @@ export type AgentExportFormat = z.infer<typeof AgentExportFormatSchema>;
 /**
  * Screenshot policy for agent jobs
  */
-export const AgentScreenshotPolicySchema = z.enum([
-  'none', 'on_error', 'on_complete', 'on_request',
-]).describe('When to take screenshots during agent job');
+// 'never' is what the published JSON schema offered for releases while this
+// enum rejected it, so a caller who followed the docs got a validation error.
+// Accepted and read as 'none'.
+export const AgentScreenshotPolicySchema = z.preprocess(
+  (v) => (v === 'never' ? 'none' : v),
+  z.enum(['none', 'on_error', 'on_complete', 'on_request']),
+).describe('When to take screenshots during agent job');
 
 export type AgentScreenshotPolicy = z.infer<typeof AgentScreenshotPolicySchema>;
 
@@ -2237,6 +2255,10 @@ export type AgentStartJobInput = z.infer<typeof AgentStartJobInputSchema>;
  */
 export const AgentEndJobInputSchema = z.object({
   takeScreenshot: z.boolean().optional().default(true).describe('Take final screenshot'),
+  // The JSON schema has always published this name, and z.object() stripped it,
+  // so includeScreenshot:false still took a screenshot. It wins when given —
+  // see generateAgentEndJob.
+  includeScreenshot: z.boolean().optional(),
   analyzeContent: z.boolean().optional().default(true).describe('Analyze content for export recommendations'),
 }).describe('Options for ending an agent job');
 
