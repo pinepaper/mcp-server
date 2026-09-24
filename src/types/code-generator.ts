@@ -6833,24 +6833,32 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    // The RE
       return this._facadeCall('diffAgainstVersion', JSON.stringify(input.versionId || ''), 'Scene diff: vs version');
     }
 
-    // "NO CHANGES" AND "COULD NOT READ THEM" ARE DIFFERENT ANSWERS.
+    // "NO CHANGES" AND "THE SNAPSHOTS DO NOT REFLECT THE CANVAS" ARE DIFFERENT
+    // ANSWERS.
     //
-    // diffHistoryStates passes the raw history entries to diffScenes, and
-    // HistoryManager stores them as JSON STRINGS (history.push(stateStr), with
-    // images interned). A string has no .items, so both sides read as empty and
-    // the diff answers added:[], removed:[], changed:[], unchanged:0,
-    // "no changes" — for a scene that plainly has items. A pilot added six
-    // items and six tracks and was told nothing had changed.
+    // A pilot added six items and six tracks and was told nothing had changed,
+    // with unchanged:0 — the tell, since a real "no changes" compares items and
+    // finds them equal, so it can never report zero of everything.
     //
-    // That is the engine's to fix (_asSnapshot already normalises a
-    // string-or-object, and diffAgainstVersion unwraps where this one does
-    // not) and is raised with fxtool. What this layer can do is refuse to
-    // repeat the claim: if the diff saw nothing at all while the canvas holds
-    // items, the honest answer is that it could not read the snapshots.
+    // I FIRST DIAGNOSED THIS WRONG, and the wrong cause was in this file's
+    // emitted error for one commit. I read that HistoryManager stores entries
+    // as JSON strings and concluded diffScenes never parsed them. It does:
+    // SceneDiff's asObject() JSON.parses a string at the extraction entry, and
+    // fxtool-f2 verified it two ways — a stringified Paper tree diffs correctly,
+    // and a live browser run on string-stored history returned real added ids.
     //
-    // HistoryManager's own _itemIdsOf has the right instinct in its comment —
-    // "null means could not tell, never empty" — which is exactly the
-    // distinction the diff drops.
+    // The actual cause was GeneratedCodeRunner writing its single history entry
+    // only when items were CREATED, so a run that merely applied an effect, a
+    // style or a keyframe track wrote none. The two entries in those histories
+    // were both empty scenes, and two empty snapshots honestly diffed ARE "no
+    // changes". Fixed in FxTool c95c1d72.
+    //
+    // The backstop stays, for a reason that outlives that fix: a snapshot pair
+    // that does not reflect the canvas must never present as an affirmative
+    // nothing-changed. HistoryManager's own _itemIdsOf states the rule —
+    // "null means could not tell, never empty" — and this is the same rule at
+    // the tool boundary. It no longer guesses WHY, because guessing why is
+    // exactly what went wrong.
     return `
 // Scene diff: what changed between two history states
 (function() {
@@ -6869,8 +6877,9 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    // The RE
     return {
       success: false,
       error: 'the diff read NO items from either history state while the canvas holds ' + live
-        + ' — so this is "could not read those snapshots", not "nothing changed". '
-        + 'History entries are stored as JSON strings and this engine build diffs them without parsing. '
+        + ' — so those snapshots do not reflect this canvas, which is not the same as "nothing changed". '
+        + 'The usual cause is that no history entry was written for the changes you made: some studio builds '
+        + 'snapshot only when items are CREATED, so applying an effect, a style or a keyframe track records nothing. '
         + 'Compare with pinepaper_get_items before and after instead, or use action "version".',
       liveItems: live,
       raw: d,

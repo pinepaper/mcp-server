@@ -13,6 +13,7 @@
  */
 import { describe, it, expect } from 'bun:test';
 import { innerFailure } from '../../tools/handlers.js';
+import { codeGenerator } from '../../types/code-generator.js';
 
 describe('a validation verdict is not a tool failure', () => {
   it('trusts an explicit success:true over ok:false', () => {
@@ -66,28 +67,31 @@ describe('a validation verdict is not a tool failure', () => {
  * The engine owns the fix. This layer owns not repeating the claim.
  */
 describe('scene_diff does not report an unreadable diff as no changes', () => {
-  it('checks the live registry before believing an empty diff', async () => {
-    const { codeGenerator } = await import('../../types/code-generator.js');
+  it('checks the live registry before believing an empty diff', () => {
     const code = codeGenerator.generateSceneDiff({ action: 'history', indexA: 0, indexB: 1 } as never);
     expect(code).toContain('app.itemRegistry');
     expect(code).toContain('saw === 0 && live > 0');
   });
 
-  it('says which of the two answers it is', async () => {
-    const { codeGenerator } = await import('../../types/code-generator.js');
+  it('says which of the two answers it is, without asserting a cause it cannot know', () => {
+    // The first version of this named a specific mechanism — "history entries
+    // are stored as JSON strings and this build diffs them without parsing" —
+    // and that was WRONG: SceneDiff's asObject() parses a string. The real
+    // cause was a history entry never being written for changes that created
+    // no items. The message now describes the SYMPTOM it can actually observe
+    // and names the usual cause as usual, not as fact.
     const code = codeGenerator.generateSceneDiff({ action: 'history', indexA: 0, indexB: 1 } as never);
-    expect(code).toContain('not "nothing changed"');
-    expect(code).toContain('stored as JSON strings');
+    expect(code).toContain('not the same as "nothing changed"');
+    expect(code).toContain('no history entry was written');
+    expect(code).not.toContain('stored as JSON strings');
   });
 
-  it('names something that does work instead', async () => {
-    const { codeGenerator } = await import('../../types/code-generator.js');
+  it('names something that does work instead', () => {
     const code = codeGenerator.generateSceneDiff({ action: 'history', indexA: 0, indexB: 1 } as never);
     expect(code).toContain('pinepaper_get_items');
   });
 
-  it('passes a real diff straight through', async () => {
-    const { codeGenerator } = await import('../../types/code-generator.js');
+  it('passes a real diff straight through', () => {
     const code = codeGenerator.generateSceneDiff({ action: 'history', indexA: 0, indexB: 1 } as never);
     expect(code).toContain('return { success: true, ...d }');
   });
