@@ -6000,6 +6000,18 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
     // the network again — so a host that allows fetch but blocks the image
     // load (CORS on <img>, a tainted-canvas refusal) now works too.
     let src = '${url}';
+    // A STAGED KEY, not the bytes. The handler writes anything over ~64KB to
+    // window.__ppStage and passes the key instead, because the governor's
+    // loop-guard transform bails on a code string that large and takes the
+    // run's return value with it. See ExecuteCodeOptions.stage.
+    if (src.indexOf('__ppStage:') === 0) {
+      const _key = src.slice('__ppStage:'.length);
+      const _staged = window.__ppStage && window.__ppStage[_key];
+      if (!_staged) {
+        return { success: false, error: 'the image bytes were staged as ' + _key + ' and are not on the page — this is a bug in the MCP server, not your call.' };
+      }
+      src = _staged;
+    }
     if (!src.startsWith('data:')) {
       let res;
       try {

@@ -821,7 +821,13 @@ export async function executeOrGenerate(
   code: string,
   description: string,
   options: HandlerOptions,
-  toolName: string
+  toolName: string,
+  /**
+   * Values too large to live inside the generated code. Written to
+   * window.__ppStage before the run and read back by key — see
+   * ExecuteCodeOptions.stage for why inlining them breaks the governor.
+   */
+  stage?: Record<string, string>,
 ): Promise<CallToolResult> {
   const { executeInBrowser, browserController, screenshotMode, executionMode } = options;
   const effectiveExecutionMode = executionMode ?? getExecutionMode();
@@ -967,7 +973,7 @@ ${code}
     tracker.startTimer(`${timerId}_screenshot`);
   }
 
-  const result = await controller.executeCode(code, shouldTakeScreenshot);
+  const result = await controller.executeCode(code, shouldTakeScreenshot, stage ? { stage } : {});
 
   const browserDuration = tracker.endTimer(`${timerId}_browser_execution`);
   tracker.recordMetric({
@@ -3600,8 +3606,25 @@ You can now start creating new items on a clean canvas.`,
         if ('error' in resolved) {
           return errorResult(ErrorCodes.INVALID_PARAMS, resolved.error, { url: parsed.url }, { toolName: 'pinepaper_import_image' });
         }
-        const code = codeGenerator.generateImportImage({ ...parsed, url: resolved.src });
-        return executeOrGenerate(code, 'Imports image', options, 'pinepaper_import_image');
+        // THE BYTES GO BESIDE THE CODE, NOT INSIDE IT.
+        //
+        // Inlining the data: URL turned a 3000x800 photo into ~630KB of
+        // generated JavaScript. app.runGenerated rewrites what it runs, and its
+        // loop-guard transform bails at that size — "Loop-guard transform
+        // bailed (unusual syntax)" — after which the run reported
+        // itemsCreated: 0 and lost the return value, so the import answered
+        // success with no itemId. Smaller photos were fine, which is exactly
+        // what made it look like a registration bug rather than a size one.
+        const staged = resolved.src.startsWith('data:') && resolved.src.length > 64_000;
+        const stageKey = staged ? `img_${Date.now().toString(36)}` : undefined;
+        const code = codeGenerator.generateImportImage({
+          ...parsed,
+          url: staged ? `__ppStage:${stageKey}` : resolved.src,
+        });
+        return executeOrGenerate(
+          code, 'Imports image', options, 'pinepaper_import_image',
+          staged ? { [stageKey!]: resolved.src } : undefined,
+        );
       }
 
       // -----------------------------------------------------------------------

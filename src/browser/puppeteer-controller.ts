@@ -68,6 +68,22 @@ export interface ExecuteCodeOptions {
    */
   governorTimeoutMs?: number;
   /**
+   * LARGE VALUES TRAVEL BESIDE THE CODE, NOT INSIDE IT.
+   *
+   * Inlining an image as a data: URL turned a 3000x800 photo into ~630KB of
+   * generated JavaScript. The code still reached the page fine — it is an
+   * evaluate ARGUMENT, not a script string — but app.runGenerated parses and
+   * rewrites it, and its loop-guard transform bails on input that size:
+   * "Loop-guard transform bailed (unusual syntax)". The run then produced
+   * itemsCreated: 0 and lost the return value entirely, so the import reported
+   * success with no itemId. Smaller photos worked, which is what made it look
+   * like a registration bug rather than a size one.
+   *
+   * Anything staged here is written to window.__ppStage before the code runs
+   * and read back by key, so the bytes never pass through the transform.
+   */
+  stage?: Record<string, string>;
+  /**
    * Skip app.runGenerated entirely and raw-eval the code. That gives up the
    * governor report, the structured error codes and the seeded PRNG, so it is
    * the escape hatch for a deployed build whose governor ignores the budget
@@ -567,8 +583,9 @@ export class PinePaperBrowserController {
         timeoutMs: options.governorTimeoutMs,
         heavyClass: heavyClass ?? null,
         awaitBoot,
+        stage: options.stage ?? null,
       };
-      const result = await this.page.evaluate(async (codeToRun: string, opts: { bypass: boolean; timeoutMs?: number; heavyClass: string | null; awaitBoot: boolean }) => {
+      const result = await this.page.evaluate(async (codeToRun: string, opts: { bypass: boolean; timeoutMs?: number; heavyClass: string | null; awaitBoot: boolean; stage: Record<string, string> | null }) => {
         // THE BRIDGE USES STRUCTURED CLONE, AND JSON.stringify DOES NOT PROVE IT.
         //
         // A result crosses CDP by structured clone, which refuses to carry a
@@ -618,6 +635,14 @@ export class PinePaperBrowserController {
         // Bounded and gated: only for code that touches a subsystem the
         // bootstrap attaches, and it gives up rather than hanging, because a
         // build that never sets the flag must not make every call wait forever.
+        // Staged values land BEFORE the code runs, so the generated script can
+        // read megabytes by key while staying small enough for the governor's
+        // transform. See ExecuteCodeOptions.stage.
+        if (opts.stage) {
+          const w = window as unknown as { __ppStage?: Record<string, string> };
+          w.__ppStage = { ...(w.__ppStage ?? {}), ...opts.stage };
+        }
+
         if (opts.awaitBoot && app && !app._appReady) {
           await new Promise<void>((resolve) => {
             const started = Date.now();

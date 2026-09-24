@@ -294,6 +294,12 @@ page is handed a `data:` URL. Nothing to fetch, nothing to taint, and the
 picture actually arrives. `pinepaper_import_svg` resolves its document the same
 way, so embedded remote images are kept rather than dropped.
 
+Large photos are handed over **beside** the generated code rather than inside
+it. A 3000×800 image inlined as a data URL made ~630KB of JavaScript, which the
+engine's code governor could not rewrite — it gave up and took the return value
+with it, so the import reported success with no item id while smaller photos
+worked fine.
+
 ### Fixed: the caption system was invisible to the agents told to use it
 
 `pinepaper_text_style` and `pinepaper_execute_custom_code` were callable but
