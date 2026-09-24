@@ -485,17 +485,27 @@ const item = app.create('${itemType}', ${JSON.stringify(params, null, 2)});`;
     code += `\nif (app.setDynamicContent) app.setDynamicContent(item, '${contentType}', ${JSON.stringify(opts)});`;
   }
 
+  const loadsFont = itemType === 'text' && typeof properties.fontFamily === 'string' && properties.fontFamily.trim() !== '';
+
   code += `
 const itemId = item.data.registryId;
 app.historyManager.saveState();
 
 // Return item info
-({ itemId, type: '${itemType}', position: { x: ${position.x}, y: ${position.y} }${hasLifetime ? ', lifetime: __lifetime' : ''}${ignored.length > 0
+({ itemId, type: '${itemType}', position: { x: ${position.x}, y: ${position.y} }${hasLifetime ? ', lifetime: __lifetime' : ''}${loadsFont ? ', ...(__font ? { font: __font } : {})' : ''}${ignored.length > 0
     ? `, ignoredProperties: ${JSON.stringify(ignored)}, warning: ${JSON.stringify(
       `${ignored.join(', ')} ${ignored.length > 1 ? 'are' : 'is'} not read when creating an item, so ${ignored.length > 1 ? 'they had' : 'it had'} no effect. `
       + 'Check the spelling against this item type\'s documented properties.',
     )}`
     : ''} });`;
+
+  // Loading a font is async, and it has to happen BEFORE create() measures the
+  // text — so only this case becomes an async IIFE; every other create stays a
+  // plain snippet ending in its (-led result.
+  if (loadsFont) {
+    const body = code.trim().replace(/\(\{ itemId([\s\S]*)\}\);$/, 'return { itemId$1 };');
+    return `(async function() {${emitEnsureFont(properties.fontFamily as string)}\n${body}\n})();`;
+  }
 
   return code.trim();
 }
@@ -516,6 +526,40 @@ const CREATE_KNOWN_KEYS: ReadonlySet<string> = new Set([
   // them "no effect" would steer a caller off the only way to cut between shots.
   'bornAt', 'ttl',
 ]);
+
+/**
+ * Load a font family before text is drawn with it, and say if it still is not there.
+ *
+ * `font list_available` names ~60 families, and drawing with one (Anton,
+ * Playfair Display) came out in a serif fallback with a console warning
+ * nobody over MCP can read. They are real — the studio's decorative Google
+ * Fonts sheet carries them — but it is fetched only when the editor's own UI
+ * asks, and text measures its bounds at creation, so a face arriving later
+ * leaves the layout measured in the fallback.
+ *
+ * So: ask checkFont; if missing, ensureFontsLoaded('all') and force the fetch
+ * with document.fonts.load (a registered @font-face is not a fetched one),
+ * then ask again. `__font` is set only when the first answer was "missing",
+ * so an available font adds nothing to the result. Needs an async context.
+ */
+function emitEnsureFont(family: string): string {
+  const primary = family.split(',')[0].trim().replace(/^['"]|['"]$/g, '');
+  return `
+let __font = null;
+if (typeof app.checkFont === 'function') {
+  const __v0 = app.checkFont(${JSON.stringify(family)});
+  if (__v0 && __v0.available === false) {
+    if (typeof app.ensureFontsLoaded === 'function') { try { await app.ensureFontsLoaded('all'); } catch (_) { /* reported below */ } }
+    try { if (typeof document !== 'undefined' && document.fonts) await document.fonts.load('16px ' + ${JSON.stringify(JSON.stringify(primary))}); } catch (_) { /* reported below */ }
+    const __v1 = app.checkFont(${JSON.stringify(family)});
+    __font = (__v1 && __v1.available === true)
+      ? { family: ${JSON.stringify(primary)}, available: true, loadedNow: true }
+      : { family: ${JSON.stringify(primary)}, available: false,
+          warning: ${JSON.stringify(primary)} + ' could not be loaded, so this text is drawn in a fallback face. '
+            + ((__v1 && __v1.reason) || '') + ' font list_available names the families this studio can load.' };
+  }
+}`;
+}
 
 /**
  * Paper text properties the engine's create() and modifyItem() never pass on.
@@ -691,12 +735,17 @@ const _flagged = app.itemRegistry.get('${itemId}');
 if (_flagged && _flagged.item && _flagged.item.data) Object.assign(_flagged.item.data, ${JSON.stringify(dataFlags)});`;
   }
 
+  const modFont = typeof properties.fontFamily === 'string' && properties.fontFamily.trim() !== '';
   code += `
 app.historyManager.saveState();
-return { success: true, itemId: '${itemId}'${modLifetime ? ', lifetime: __lifetime' : ''} };`;
+return { success: true, itemId: '${itemId}'${modLifetime ? ', lifetime: __lifetime' : ''}${modFont ? ', ...(__font ? { font: __font } : {})' : ''} };`;
 
   // Wrapped, because the body now RETURNS early on a miss rather than falling
-  // through to an unconditional success.
+  // through to an unconditional success. Async only when a font must load
+  // before modifyItem re-measures the text.
+  if (modFont) {
+    return `(async function() {${emitEnsureFont(properties.fontFamily as string)}\n${code.trim()}\n})();`;
+  }
   return `(function() {\n${code.trim()}\n})();`;
 }
 

@@ -235,6 +235,7 @@ export const OPTIONAL_ENGINE_METHODS: readonly string[] = [
   'audioLayer.setVolume',
   'authoredRotation',
   'captureFrameDataURL',
+  'checkFont',
   'clearCanvas',
   'ensureFontsLoaded',
   'getCanvasSize',
