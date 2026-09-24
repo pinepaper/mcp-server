@@ -58,7 +58,13 @@ describe('what a tool advertises is what it validates', () => {
    * the canonical vocabulary does not contain, and where a tool means the
    * whole vocabulary, advertise the whole vocabulary.
    */
-  const NARROWER_BY_DESIGN = new Set(['pinepaper_create_scene']);
+  // EMPTY. create_scene used to be here: it validated against its own
+  // ten-name enum because it hand-built four shapes and turned the rest into a
+  // 30px circle. Now that it routes through app.create it accepts everything
+  // the engine does, so there is nothing narrower left to excuse — and the
+  // exemption had to go with the narrowing, or the guard would have kept
+  // ignoring the one tool whose advert had just become wrong.
+  const NARROWER_BY_DESIGN = new Set<string>();
 
   it('no tool advertises an item type that does not exist', () => {
     const canonical = new Set<string>(ItemTypeSchema.options);

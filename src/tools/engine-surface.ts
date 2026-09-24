@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 2367f7952003611e0a90da02dc077ed553726d61
- * sha256:    b602012087356d9abaaf650ad39371a42e2b07edbbb62dbc03482129bbfb0526   (of PinePaper.js as committed)
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main b3591f71c1399c57011a7b385f80841b03f3c72d
+ * sha256:    f8d160b05402475702f4938a058f66b280b03f151f88e7fe39ec8ba06330fc25   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on `window.app`, with how it gets there. The parity
@@ -16,7 +16,7 @@
 /** How a name lands on `app`. */
 export type EngineMemberKind = 'method' | 'accessor' | 'property' | 'lazy' | 'lazyHeavy' | 'bootstrap';
 
-/** 1130 names, from FxTool/js/PinePaper.js. */
+/** 1131 names, from FxTool/js/PinePaper.js. */
 export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object.freeze({
   _activeByGroup: 'property',
   _activeDrawingGroup: 'method',
@@ -1095,6 +1095,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   templateManager: 'bootstrap',
   textItemGroup: 'property',
   textLayer: 'property',
+  textMetrics: 'method',
   textSequence: 'method',
   threadPainting: 'accessor',
   threeD: 'lazy',

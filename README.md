@@ -227,6 +227,28 @@ trips — and nothing about the work needed one each. Failures come back by
 index, because a bed where three of a hundred cues didn't sound is neither a
 success nor a failure.
 
+### Fixed: create_scene drew the wrong shape for six of its ten types
+
+It built shapes itself instead of asking the engine — a hand-written branch per
+type covering circle, rectangle, star and text, and **a 30px circle for
+everything else**. So `ellipse`, `triangle`, `polygon`, `path`, `line` and
+`arc` silently came out as a small blue circle, and any property that branch
+didn't name was dropped (which is why an ellipse ignored `width`/`height` while
+the same values worked through `agent_batch_execute`).
+
+It now creates items the same way every other tool does, so all 28 item types
+work, along with every property they accept. Two related corrections: scene
+relations accepted 8 types while the catalogue documented ~90 — following the
+documentation failed validation — and scene animations gained `startTime`, so a
+scene can be staggered instead of everything moving from frame zero.
+
+### Fixed: layered-character import described the wrong manifest
+
+The docs implied a `layers[]` array; the engine reads `info.parts` keyed by tag.
+An array imports nothing. The description also implied `pinepaper_animate`
+could blink — only an `expresses` relation drives blink/smile/talk, and asking
+`animate` for it is a silent no-op.
+
 ### Fixed: PDF export failed on every scene
 
 `pinepaper_agent_export` with `format: "pdf"` died with "parameter 1 is not of

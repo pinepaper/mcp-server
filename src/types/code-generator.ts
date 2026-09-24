@@ -2434,74 +2434,42 @@ if (typeof _gen === 'function') {
       const { name, itemType, position = { x: 400, y: 300 }, properties = {} } = item;
 
       // Build properties string
-      const propsEntries = Object.entries(properties)
-        .map(([key, value]) => `${key}: ${JSON.stringify(value)}`)
-        .join(', ');
-
-      const propsStr = propsEntries ? `, ${propsEntries}` : '';
+      // CREATE_SCENE HAND-BUILT ITS OWN SHAPES, AND MOST OF THEM WERE WRONG.
+      //
+      // This emitted a per-type switch of raw Paper constructors — a parallel
+      // implementation of app.create covering four cases, whose DEFAULT branch
+      // made a 30px circle. So ellipse, triangle, polygon, path, line and arc —
+      // six of the ten types this schema declares — silently rendered as a
+      // small blue circle, and every property the switch did not name was
+      // dropped. A pilot reported ellipse width/height being ignored; the same
+      // values work through batch because batch calls app.create.
+      //
+      // Routed through app.create now, which is the only thing that knows all
+      // 28 item types, the shape registry's own parameters, anchor, label,
+      // rotation and the registry id. Deleting the copy is the fix: a second
+      // implementation of "make a shape" could only ever drift from the first.
+      const sceneParams: Record<string, unknown> = {
+        x: position.x,
+        y: position.y,
+        ...properties,
+      };
 
       codeParts.push(`
 // Create item: ${name}
 (function() {
-  const itemParams = {
-    type: '${itemType}',
-    position: { x: ${position.x}, y: ${position.y} }${propsStr}
-  };
-
-  let item;
-  switch ('${itemType}') {
-    case 'circle':
-      item = new paper.Path.Circle({
-        center: [${position.x}, ${position.y}],
-        radius: ${properties.radius || 50},
-        fillColor: '${properties.color || properties.fillColor || '#3b82f6'}',
-        parent: app.textItemGroup
-      });
-      break;
-    case 'rectangle':
-      item = new paper.Path.Rectangle({
-        point: [${position.x - ((properties.width as number) || 100) / 2}, ${position.y - ((properties.height as number) || 60) / 2}],
-        size: [${properties.width || 100}, ${properties.height || 60}],
-        fillColor: '${properties.color || properties.fillColor || '#3b82f6'}',
-        parent: app.textItemGroup
-      });
-      break;
-    case 'star':
-      item = new paper.Path.Star({
-        center: [${position.x}, ${position.y}],
-        points: ${properties.points || 5},
-        radius1: ${properties.radius1 || 40},
-        radius2: ${properties.radius2 || 20},
-        fillColor: '${properties.color || properties.fillColor || '#fbbf24'}',
-        parent: app.textItemGroup
-      });
-      break;
-    case 'text':
-      item = new paper.PointText({
-        point: [${position.x}, ${position.y}],
-        content: '${properties.content || 'Text'}',
-        fontSize: ${properties.fontSize || 24},
-        fillColor: '${properties.color || properties.fillColor || '#ffffff'}',
-        fontFamily: '${properties.fontFamily || 'Inter'}',
-        justification: 'center',
-        parent: app.textItemGroup
-      });
-      break;
-    default:
-      item = new paper.Path.Circle({
-        center: [${position.x}, ${position.y}],
-        radius: 30,
-        fillColor: '${properties.color || properties.fillColor || '#3b82f6'}',
-        parent: app.textItemGroup
-      });
+  const item = app.create('${itemType}', ${JSON.stringify(sceneParams)});
+  if (!item) {
+    results.items.push({ name: '${name}', error: 'app.create returned nothing for type ${itemType} — check the type and its properties.' });
+    return;
   }
-
-  const itemId = app.registerItem(item, '${name}', { source: 'mcp-scene' });
+  // create() registers and mints the id; only fall back for an older studio.
+  const itemId = (item.data && item.data.id)
+    ? item.data.id
+    : app.registerItem(item, '${itemType}', { source: 'mcp-scene' });
   if (item.bringToFront) item.bringToFront();
   nameToId['${name}'] = itemId;
   results.items.push({ name: '${name}', itemId, type: '${itemType}' });
-})();
-`);
+})();`);
     }
 
     // Establish relations
@@ -2525,8 +2493,12 @@ if (typeof _gen === 'function') {
 
     // Apply animations
     for (const animation of animations) {
-      const { target, type, speed = 1.0, params = {} } = animation;
-      const paramsStr = JSON.stringify({ ...params, speed });
+      const { target, type, speed = 1.0, startTime, params = {} } = animation;
+      const paramsStr = JSON.stringify({
+        ...params,
+        speed,
+        ...(startTime !== undefined ? { animationDelay: startTime } : {}),
+      });
 
       codeParts.push(`
 // Apply animation: ${type} to ${target}
@@ -2536,8 +2508,13 @@ if (typeof _gen === 'function') {
     const targetItem = app.itemRegistry.get(targetId);
     if (targetItem) {
       const params = ${paramsStr};
+      // startTime becomes animationDelay, which is what the engine reads
+      // (PinePaper.js stores it on item.data.animationDelay). These are ambient
+      // loops with no end, so there is no duration to map and none is invented
+      // — staggering the STARTS is what makes a scene read as choreographed
+      // rather than everything moving at once from frame zero.
       app.animate(targetItem, { animationType: '${type}', ...params });
-      results.animations.push({ target: '${target}', type: '${type}' });
+      results.animations.push({ target: '${target}', type: '${type}'${startTime !== undefined ? `, startTime: ${startTime}` : ''} });
     }
   }
 })();

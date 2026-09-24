@@ -2349,9 +2349,9 @@ RECIPE — assemble-from-pieces: shatter with keepSource, keyframe each tile fro
 
 Input is the output of a single-image layer decomposer (See-through — one flat anime drawing in, ~20 occlusion-inpainted layers out — or any PSD-style layer dump with the same manifest shape). The decomposition model does NOT run here: it needs a GPU and minutes per image; run it where it fits and import the folder.
 
-Layer tags map onto the exact role tokens the expresses presets read (eye_left, pupil_right, mouth…), so pinepaper_animate/expresses blink-smile-talk work on the imported character immediately.
+Layer tags map onto the exact role tokens the expresses presets read (eye_left, pupil_right, mouth…), so blink / smile / talk work on the imported character immediately — through an 'expresses' RELATION (pinepaper_add_relation relationType expresses), which is the only thing that drives them. pinepaper_animate applies ambient motion (bounce, pulse, wobble) and cannot blink: asking it to is a silent no-op.
 
-Params: { info (the decomposer manifest: tags, xyxy rects, depth_median draw order, frame_size [h,w]), images ({tag: PNG data URL or CORS-reachable https URL} — data URLs are the reliable path; ~20 layers of base64 is a big call, use URLs when you can), position?, scale?, name? }
+Params: { info — the decomposer manifest, whose parts live under info.parts (or info.tag2pinfo) as an OBJECT KEYED BY TAG, not a layers[] array: { eye_left: { xyxy: [x0,y0,x1,y1], depth_median: <draw order> }, … } plus frame_size [h,w]. An array here imports nothing and reports no parts. images ({tag: PNG data URL or CORS-reachable https URL} — data URLs are the reliable path; ~20 layers of base64 is a big call, use URLs when you can), position?, scale?, name? }
 Returns: { groupId, parts, roles, rolesWired, warnings }
 
 CHECK rolesWired: a character importing with 0 roles renders perfectly and silently refuses to animate — that number is the difference between a picture and a puppet.`,
@@ -4098,8 +4098,8 @@ SUPPORTED ANIMATIONS: bounce, breathe, fade, glow, jelly, path, pulse, rotate, s
               },
               itemType: {
                 type: 'string',
-                enum: ['text', 'circle', 'star', 'rectangle', 'triangle', 'polygon', 'ellipse', 'path', 'line', 'arc'],
-                description: 'Type of item to create',
+                enum: [...ItemTypeSchema.options],
+                description: 'Type of item to create. Every type the engine has — this used to advertise ten while the tool hand-built four and turned the rest into a small circle.',
               },
               position: {
                 type: 'object',

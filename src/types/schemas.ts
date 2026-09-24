@@ -1686,7 +1686,10 @@ export const SceneItemSchema = z.object({
   /** Temporary ID for referencing in relations (e.g., "sun", "earth") */
   name: z.string().describe('Reference name for this item (used in relations)'),
   /** Item type to create */
-  itemType: z.enum(['text', 'circle', 'star', 'rectangle', 'triangle', 'polygon', 'ellipse', 'path', 'line', 'arc']),
+  // The canonical list, not a subset. This declared ten types while the tool
+  // hand-built four and turned the other six into a 30px circle; now that it
+  // routes through app.create, every type the engine has works here.
+  itemType: ItemTypeSchema,
   /** Position on canvas */
   position: PositionSchema.optional(),
   /** Item-specific properties */
@@ -1699,7 +1702,11 @@ export const SceneRelationSchema = z.object({
   /** Reference name of the target item */
   target: z.string().describe('Name of the item to relate to'),
   /** Type of relation */
-  type: z.enum(['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to']),
+  // THE DOCS LISTED ~90 AND THIS ACCEPTED 8. A caller following the relation
+  // catalogue — grows_from, say — was rejected by validation before the call
+  // was made, with nothing to suggest the tool simply carried a smaller list
+  // than the documentation it shares. The catalogue is the contract.
+  type: RelationTypeSchema,
   /** Relation-specific parameters */
   params: z.record(z.unknown()).optional().describe('Relation parameters (radius, speed, distance, etc.)'),
 });
@@ -1712,6 +1719,7 @@ export const SceneAnimationSchema = z.object({
 
   /** Animation speed (default: 1.0) */
   speed: z.number().optional(),
+  startTime: z.number().min(0).optional().describe('Seconds before this animation begins. These are ambient LOOPS, so this staggers when each one starts rather than scheduling a one-shot — which is what makes a scene read as choreographed instead of everything moving at once from frame zero.'),
   /** Animation parameters */
   params: z.record(z.unknown()).optional().describe('Animation-specific parameters'),
 });
