@@ -4589,7 +4589,9 @@ export const SoundInputSchema = z.object({
     height: z.number().optional().describe('Waveform path height in canvas units (default 64).'),
     position: z.object({ x: z.number(), y: z.number() }).optional(),
     color: z.string().optional(),
-  }).optional().describe('create: how the waveform path is drawn. The sound IS this item — edit the path and the timbre changes with it.'),
+    startTime: z.number().optional().describe('When the cue sounds, in seconds. Applied at create, so a cue is ONE call: this used to be stripped here and every sound needed a second set_placement, which turned 80 cues into 160 calls.'),
+    duration: z.number().optional().describe('How long the cue lasts, in seconds. Applied at create alongside startTime.'),
+  }).optional().describe('create: how the waveform path is drawn, and when it sounds. The sound IS this item — edit the path and the timbre changes with it.'),
 })
   .refine((v) => v.action !== 'play_tone' || !!v.note, { message: 'play_tone requires note', path: ['note'] })
   .refine((v) => !['play_chord', 'chord_frequencies'].includes(v.action) || !!v.root, { message: 'this action requires root', path: ['root'] })

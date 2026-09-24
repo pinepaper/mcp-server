@@ -351,6 +351,30 @@ const item = app.create('rectangle', ${JSON.stringify(plate, null, 2)});
 if (item && item.data) { item.data.renderAs = ${JSON.stringify(itemType)}; item.data.renderParams = ${JSON.stringify(params)}; }`;
   }
 
+  // RTL IS NOT SUPPORTED, AND SILENCE WAS THE WORST WAY TO SAY SO.
+  //
+  // create('text', {direction:'rtl'}) dropped the property with no error and
+  // left the base direction LTR, so an Arabic sentence's final period landed
+  // at the reader's START — visibly wrong, and attributable to nothing. The
+  // engine has no text-direction support at all: `direction` there is an arc
+  // sweep and an animation direction, and `justification` is the only
+  // text-related alignment it reads.
+  //
+  // Refused by name rather than accepted-and-dropped, and rather than adding a
+  // prop that would be dropped one layer further on. The alignment half is
+  // real and is named, because it is what a caller can actually use today.
+  const rtlAsked = params.direction ?? params.textDirection;
+  if (rtlAsked !== undefined) {
+    return `
+// Create ${itemType} — refused, rather than silently left ltr
+({ success: false, error: ${JSON.stringify(
+      `direction / textDirection is not supported: this studio has no text-direction support, so ${String(rtlAsked)} would have been accepted and the text left LTR. `
+      + 'That is visible as a right-to-left sentence whose final punctuation lands at the start. '
+      + "You can align with justification: 'right', which is read, but the BASE direction needs engine support — "
+      + 'pass pre-shaped text, or split the line, until it lands.',
+    )} });`.trim();
+  }
+
   // AN UNKNOWN ANCHOR IS INVISIBLE OVER MCP.
   //
   // The engine names a bad anchor through console.warn and leaves (x, y) as
@@ -2585,7 +2609,25 @@ const connector = app.diagramSystem.connect(sourceItem, targetItem, config);
 const connectorId = connector.data?.registryId || connector.id;
 app.historyManager.saveState();
 
-({ connectorId, sourceItemId: '${sourceItemId}', targetItemId: '${targetItemId}' });
+// A REQUESTED id IS NOT NECESSARILY THE id YOU GOT.
+//
+// Connector itself honours 'config.id || <generated>', but DiagramSystem.connect
+// rebuilds the config from an allowlist — routing, lineColor, lineWidth,
+// headStyle, headSize, boltEnabled — and 'id' is not on it. So a caller's id is
+// dropped before the Connector sees it and a timestamp id is minted instead,
+// which then makes update_connector / remove_connector say "not found" for the
+// id the caller chose. Engine-side, raised with fxtool; until it lands, the
+// mismatch is REPORTED rather than left for a later call to trip over.
+({
+  connectorId,
+  sourceItemId: '${sourceItemId}',
+  targetItemId: '${targetItemId}',
+  ...(${JSON.stringify(id ?? null)} && connectorId !== ${JSON.stringify(id ?? null)}
+    ? { requestedId: ${JSON.stringify(id ?? null)},
+        idHonoured: false,
+        note: 'this studio dropped the id you asked for and minted its own — use connectorId above for update_connector and remove_connector, not the one you passed.' }
+    : {}),
+});
 `.trim();
   }
 
@@ -9603,15 +9645,27 @@ ${guard('renderSoundtrackWav')}
 })();`.trim();
       }
 
-      case 'create':
+      case 'create': {
+        const v = (input.visual ?? {}) as Record<string, unknown>;
+        const { startTime, duration, ...visualOnly } = v;
+        const placement = (startTime !== undefined || duration !== undefined)
+          ? { ...(startTime !== undefined ? { startTime } : {}), ...(duration !== undefined ? { duration } : {}) }
+          : null;
         return `
 // Sound: draw it AS a waveform path — the item and the sound are one thing
 (function() {
 ${guard('createSound')}
-  const item = app.createSound(${S(input.spec ?? {})}, ${S(input.visual ?? {})});
+  const item = app.createSound(${S(input.spec ?? {})}, ${S(visualOnly)});
   if (!item) { return { success: false, error: 'the sound produced no waveform path' }; }
-  return { success: true, itemId: item.data && item.data.id, itemType: 'sound' };
+  const _sid = item.data && item.data.id;
+  // ONE CALL PER CUE, NOT TWO. startTime/duration were stripped from visual,
+  // so placing a cue meant create + set_placement every time — a pilot made
+  // 160 calls where 80 would do. Applied here when given, using the same
+  // setSoundPlacement the separate action calls.
+  ${placement ? `if (_sid && app.setSoundPlacement) { app.setSoundPlacement(_sid, ${S(placement)}); }` : ''}
+  return { success: true, itemId: _sid, itemType: 'sound'${placement ? `, placement: ${S(placement)}` : ''} };
 })();`.trim();
+      }
 
       case 'timbre_from_path':
         return `

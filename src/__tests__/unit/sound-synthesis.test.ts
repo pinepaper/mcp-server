@@ -55,7 +55,10 @@ describe('the two-way bridge between a sound and a path', () => {
   it('create returns the item id, because the item IS the sound', () => {
     const code = gen({ action: 'create', spec: { partials: [{ h: 1, amp: 1 }] }, visual: { width: 400 } });
     expect(code).toContain('"width":400');
-    expect(code).toContain('itemId: item.data && item.data.id');
+    // The id is read into _sid first now, so a placement can be applied to it
+    // in the same call — see the startTime test below.
+    expect(code).toContain('const _sid = item.data && item.data.id');
+    expect(code).toContain('itemId: _sid');
     // A spec that draws nothing is a failure, not an empty success.
     expect(code).toContain('produced no waveform path');
   });
@@ -134,5 +137,28 @@ describe('the tool says what it is not', () => {
     expect(tool.description).toContain('ANALYSES');
     expect(tool.description).toContain('MAKES audio');
     expect(tool.description).toContain('it is the sound');
+  });
+});
+
+describe('a cue is one call, not two', () => {
+  it('applies visual.startTime at create instead of needing set_placement', () => {
+    // startTime and duration were stripped from `visual`, so every cue took a
+    // create AND a set_placement — a pilot made 160 calls where 80 would do.
+    const code = gen({ action: 'create', spec: { partials: [{ h: 1, amp: 1 }] }, visual: { width: 400, startTime: 2.5, duration: 0.4 } });
+    expect(code).toContain('app.setSoundPlacement');
+    expect(code).toContain('"startTime":2.5');
+    expect(code).toContain('"duration":0.4');
+    // The timing must not leak into the waveform's own geometry options.
+    const create = code.slice(code.indexOf('app.createSound('), code.indexOf('if (!item)'));
+    expect(create).not.toContain('startTime');
+    expect(create).toContain('"width":400');
+  });
+
+  it('does not place anything when no timing was given', () => {
+    // Comments stripped: the emitted code explains WHY placement exists and
+    // names setSoundPlacement in prose, which would satisfy a naive search.
+    const code = gen({ action: 'create', spec: { partials: [{ h: 1, amp: 1 }] }, visual: { width: 400 } })
+      .split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
+    expect(code).not.toContain('setSoundPlacement');
   });
 });
