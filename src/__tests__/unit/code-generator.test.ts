@@ -1184,6 +1184,10 @@ describe('PinePaperCodeGenerator', () => {
     const endsInParenExpr = (code: string) => /\)\s*;?\s*$/.test(code.trim());
     const cases: Array<[string, string]> = [
       ['create_item', codeGenerator.generateCreateItem(mockCircleItem)],
+      // A bare `(a) ? {…} : {…};` is NOT captured: the engine reads the first
+      // literal's `}` as a statement end. Retest of 40b6656 got no itemId.
+      ['create_item shader', codeGenerator.generateCreateItem({ itemType: 'shader', position: { x: 0, y: 0 }, properties: { width: 400, height: 400 } })],
+      ['create_item field', codeGenerator.generateCreateItem({ itemType: 'field', position: { x: 0, y: 0 }, properties: {} })],
       ['add_relation', codeGenerator.generateAddRelation({ sourceId: 'a', targetId: 'b', relationType: 'orbits', params: { radius: 50 } })],
       ['event create', codeGenerator.generateEvent({ action: 'create', name: 'e0' })],
       ['event pulse', codeGenerator.generateEvent({ action: 'pulse', eventId: 'e0' })],

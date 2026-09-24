@@ -353,11 +353,14 @@ const item = app.create('rectangle', ${JSON.stringify(plate, null, 2)});
 if (item && item.data) { item.data.renderAs = ${JSON.stringify(itemType)}; item.data.renderParams = ${JSON.stringify(params)}; }
 // The snippet's value is its last statement's, which was the assignment above:
 // the caller got renderParams back and no itemId to address the item by.
-(item && item.data)
+// ONE outer paren pair: the governor's wrapTrailingReturn reads a top-level
+// \`}\` as a statement end, so a bare ternary of object literals is not wrapped
+// and its value is lost.
+((item && item.data)
   ? { itemId: item.data.registryId, type: ${JSON.stringify(itemType)}, position: { x: ${position.x}, y: ${position.y} },
       localStandIn: true,
       note: 'drawn here as a flat plate; the ${itemType} itself appears only in a cloud render. A local export shows the plate.' }
-  : { success: false, error: 'the stand-in plate for this ${itemType} was not created.' };`;
+  : { success: false, error: 'the stand-in plate for this ${itemType} was not created.' });`;
   }
 
   // RTL IS NOT SUPPORTED, AND SILENCE WAS THE WORST WAY TO SAY SO.
