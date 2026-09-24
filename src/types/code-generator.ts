@@ -6964,24 +6964,61 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    // The RE
   }
 
   generateAudioBeats(input: AudioBeatsInput): string {
+    // UPLOADED MEDIA IS THE AUDIO A CALLER HAS, AND IT WAS NOT A SOURCE.
+    //
+    // analyzeAudio treats a bare id as a storage asset and wants its data as a
+    // string, so the id or registryId that upload_audio returned gave "could not
+    // decode audio" — while the detector itself is accurate (3.4 ms mean error,
+    // measured). An uploaded clip's player already holds its bytes at a blob:
+    // URL, which analyzeAudio does accept; either id resolves to that here.
+    // Anything else (asset id, data:, URL) passes through untouched.
+    // @engine-methods analyzeAudio animateToBeat
+    const resolveSource = `  let __src = ${JSON.stringify(input.source || '')};
+  const __A = (typeof window !== 'undefined') && window.PinePaperAgent;
+  const __m = (__src && __A && typeof __A.listMedia === 'function')
+    ? __A.listMedia().find(function(x) { return x.id === __src || x.registryId === __src; })
+    : null;
+  if (__m) {
+    const layer = __m.kind === 'video' ? app.videoLayer && app.videoLayer.videos : app.audioLayer && app.audioLayer.audios;
+    const raster = layer && typeof layer.get === 'function' ? layer.get(__m.id) : null;
+    if (!raster || !raster.url) {
+      return { success: false, error: 'uploaded media ' + JSON.stringify(__src) + ' has no playable source to analyse in this studio.' };
+    }
+    __src = raster.url;
+  }`;
+    const call = (method: string, args: string, label: string) => `
+// ${label}
+(async function() {
+  if (typeof app.${method} !== 'function') {
+    return { success: false, error: 'app.${method}() unavailable — update PinePaper Studio to a build that has it.' };
+  }
+${resolveSource}
+  const r = await app.${method}(${args});
+  if (r && typeof r === 'object' && 'ok' in r) {
+    return { success: r.ok !== false, ...r };
+  }
+  return { success: true, result: r };
+})();`.trim();
+
     if (input.action === 'analyze') {
-      return this._facadeCall('analyzeAudio',
-        `${JSON.stringify(input.source || '')}, ${JSON.stringify({
+      return call('analyzeAudio',
+        `__src, ${JSON.stringify({
           ...(input.sensitivity !== undefined ? { sensitivity: input.sensitivity } : {}),
           ...(input.minGap !== undefined ? { minGap: input.minGap } : {}),
         })}`, 'Audio: analyze beats');
     }
-    return this._facadeCall('animateToBeat',
-      `${JSON.stringify(input.itemId || '')}, ${JSON.stringify({
-        ...(input.source ? { source: input.source } : {}),
-        ...(input.beats ? { beats: input.beats } : {}),
-        ...(input.grid ? { grid: true } : {}),
-        ...(input.property ? { property: input.property } : {}),
-        ...(input.base !== undefined ? { base: input.base } : {}),
-        ...(input.accent !== undefined ? { accent: input.accent } : {}),
-        ...(input.decay !== undefined ? { decay: input.decay } : {}),
-        ...(input.sensitivity !== undefined ? { sensitivity: input.sensitivity } : {}),
-      })}`, 'Audio: animate to beat');
+    const opts = JSON.stringify({
+      ...(input.beats ? { beats: input.beats } : {}),
+      ...(input.grid ? { grid: true } : {}),
+      ...(input.property ? { property: input.property } : {}),
+      ...(input.base !== undefined ? { base: input.base } : {}),
+      ...(input.accent !== undefined ? { accent: input.accent } : {}),
+      ...(input.decay !== undefined ? { decay: input.decay } : {}),
+      ...(input.sensitivity !== undefined ? { sensitivity: input.sensitivity } : {}),
+    });
+    return call('animateToBeat',
+      `${JSON.stringify(input.itemId || '')}, Object.assign(${opts}, __src ? { source: __src } : {})`,
+      'Audio: animate to beat');
   }
 
   generateTemplateParams(input: TemplateParamsInput): string {

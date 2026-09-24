@@ -97,3 +97,37 @@ describe('gain keyframes on audio items are refused, not ignored (6.22)', () => 
     expect(r.success).toBe(true);
   });
 });
+
+describe('audio_beats analyses uploaded media (6.23)', () => {
+  function beatStudio() {
+    const seen: unknown[] = [];
+    const A = { listMedia: () => [{ id: 'araster_1', registryId: 'item_3', kind: 'audio' }] };
+    const app = {
+      audioLayer: { audios: new Map([['araster_1', { url: 'blob:studio/abc' }]]) },
+      analyzeAudio: async (src: unknown) => { seen.push(src); return { ok: true, onsets: [0.5], bpm: 120 }; },
+      animateToBeat: async (_id: string, opts: { source?: unknown }) => { seen.push(opts.source); return { ok: true }; },
+    };
+    return { seen, globals: { window: { PinePaperAgent: A }, app } };
+  }
+
+  for (const id of ['item_3', 'araster_1']) {
+    it(`analyze with ${id} reads the clip's own bytes`, async () => {
+      const s = beatStudio();
+      const r = await run(codeGenerator.generateAudioBeats({ action: 'analyze', source: id }), s.globals);
+      expect(r).toMatchObject({ success: true, bpm: 120 });
+      expect(s.seen).toEqual(['blob:studio/abc']);
+    });
+  }
+
+  it('a URL or asset id passes through untouched', async () => {
+    const s = beatStudio();
+    await run(codeGenerator.generateAudioBeats({ action: 'analyze', source: 'https://x/a.mp3' }), s.globals);
+    expect(s.seen).toEqual(['https://x/a.mp3']);
+  });
+
+  it('animate_to_beat resolves its source the same way', async () => {
+    const s = beatStudio();
+    await run(codeGenerator.generateAudioBeats({ action: 'animate_to_beat', itemId: 'item_9', source: 'item_3' }), s.globals);
+    expect(s.seen).toEqual(['blob:studio/abc']);
+  });
+});

@@ -5029,7 +5029,7 @@ node survives none of them.`,
       type: 'object',
       properties: {
         action: { type: 'string', enum: ['analyze', 'animate_to_beat'] },
-        source: { type: 'string', description: 'Asset id, data URL, or URL' },
+        source: { type: 'string', description: 'Asset id, data URL, URL — or an uploaded clip\'s id / registryId from pinepaper_media upload_audio / upload_video.' },
         itemId: { type: 'string' },
         beats: { type: 'array', items: { type: 'number' }, description: 'Beat times (s) you already have' },
         grid: { type: 'boolean', description: 'Even pulse from the tempo instead of raw onsets' },
