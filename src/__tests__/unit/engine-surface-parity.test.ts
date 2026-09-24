@@ -253,18 +253,26 @@ const JS_BUILTINS = new Set([
  * by name because opening the panel has no engine entry point at all).
  */
 const KNOWN_FACADE_DRIFT: readonly string[] = Object.freeze([
-  'filterSystem.addFilter',
-  'historyManager.getState',
-  'interactionSystem.triggerAction',
-  'magicSystem.autoAnimate',
-  'magicSystem.remixStyle',
-  'mapSystem.addLabels',
-  'mapSystem.animateWave',
-  'mapSystem.exportMap',
-  'mapSystem.getRegionAtPoint',
-  'mapSystem.panTo',
-  'mapSystem.zoomTo',
-  'relationRegistry.getAll',
+  // EMPTY. Twelve entries, resolved two different ways.
+  //
+  // NINE were real: every one called a method no studio has ever had.
+  // Renamed where the engine had the same thing under another name
+  // (triggerAction → executeAction, animateWave → animateRegionsWave,
+  // getState → getInfo, getAll → getStats), rebuilt where the shape differed
+  // (addLabels is a loop over addRegionLabel; exportMap is exportGeoJSON), and
+  // REFUSED BY NAME where the engine has no such capability at all — pan_map
+  // wants a lat/lon pan and zoom_map a numeric level, neither of which exists,
+  // and there is no region hit test behind getRegionAtPoint.
+  //
+  // THREE WERE THIS GUARD'S OWN FAULT. addFilter, autoAnimate and remixStyle
+  // are real and always were; the snapshot could not see them because its
+  // method regex demanded exactly two spaces of indentation and those classes
+  // use four. Both facades still entered the snapshot on their `this.X =` data
+  // fields, so they were PARTIALLY captured — and a partial facade is worse
+  // than a missing one, because an absent facade is skipped while a partial
+  // one is checked and reports working code as broken. Fixed in
+  // sync-engine-surface.mjs; the corrected snapshot gained 300-odd methods
+  // across six facades, so this was suppressing far more than these three.
 ]);
 
 describe('facade methods exist too', () => {

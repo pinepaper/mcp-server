@@ -3013,12 +3013,16 @@ throw new Error('Unknown diagram mode action: ${action}');
 
   // Check relations
   if (app.relationRegistry) {
-    const relations = app.relationRegistry.getAll ? app.relationRegistry.getAll() : [];
-    analysis.hasRelations = relations.length > 0;
-    relations.forEach(rel => {
-      if (rel.relationType) relationSet.add(rel.relationType);
-    });
+    // getAll() has never existed on the registry, so this branch always took
+    // the empty fallback and every analysis reported NO relations. getStats()
+    // is the real accessor and answers both questions directly:
+    // associationsByType is keyed by relation type.
+    const relStats = typeof app.relationRegistry.getStats === 'function'
+      ? app.relationRegistry.getStats()
+      : null;
+    (Object.keys((relStats && relStats.associationsByType) || {})).forEach(t => relationSet.add(t));
     analysis.relationTypes = Array.from(relationSet);
+    analysis.hasRelations = !!relStats && (relStats.activeItems > 0 || analysis.relationTypes.length > 0);
     if (analysis.hasRelations) analysis.hasAnimations = true;
   }
 
@@ -4067,12 +4071,16 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
 
   // Check relations
   if (app.relationRegistry) {
-    const relations = app.relationRegistry.getAll ? app.relationRegistry.getAll() : [];
-    analysis.hasRelations = relations.length > 0;
-    relations.forEach(rel => {
-      if (rel.relationType) relationSet.add(rel.relationType);
-    });
+    // getAll() has never existed on the registry, so this branch always took
+    // the empty fallback and every analysis reported NO relations. getStats()
+    // is the real accessor and answers both questions directly:
+    // associationsByType is keyed by relation type.
+    const relStats = typeof app.relationRegistry.getStats === 'function'
+      ? app.relationRegistry.getStats()
+      : null;
+    (Object.keys((relStats && relStats.associationsByType) || {})).forEach(t => relationSet.add(t));
     analysis.relationTypes = Array.from(relationSet);
+    analysis.hasRelations = !!relStats && (relStats.activeItems > 0 || analysis.relationTypes.length > 0);
     if (analysis.hasRelations) analysis.hasAnimations = true;
   }
 
@@ -4436,8 +4444,18 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
   }
 
   try {
-    app.mapSystem.addLabels({ regions: ${regionsStr}, ...${optionsStr} });
-    return { success: true };
+    // addLabels() has never existed. addRegionLabel(regionId, options) is the
+    // engine's own per-region call, and this tool's input is a list of regions,
+    // so the loop IS the mapping — applyCustomLabels takes a
+    // {regionId: text} map instead, which is a different question.
+    const _labelled = [];
+    const _missed = [];
+    for (const _r of ${regionsStr}) {
+      const _item = app.mapSystem.addRegionLabel(_r, ${optionsStr});
+      (_item ? _labelled : _missed).push(_r);
+    }
+    return { success: _labelled.length > 0, labelled: _labelled, count: _labelled.length,
+      ...(_missed.length ? { notLabelled: _missed, note: 'no region on this map matched these ids — check get_highlighted_map_regions or the map you loaded.' } : {}) };
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -4462,8 +4480,13 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
   }
 
   try {
-    app.mapSystem.panTo(${validated.lat}, ${validated.lon}${Object.keys(options).length > 0 ? ', ' + JSON.stringify(options) : ''});
-    return { success: true, panTo: [${validated.lat}, ${validated.lon}] };
+    // panTo() has never existed on any studio, and there is no lat/lon pan for
+    // a flat map to route this to. Refused by NAME with the calls that do work,
+    // rather than letting the caller take an undefined-is-not-a-function.
+    return { success: false, error: 'pan_map is not supported: the engine has no lat/lon pan. '
+      + 'On a globe, rotateGlobeTo brings a coordinate to the front; on a flat map, zoom to a REGION '
+      + '(zoomToRegion) or call resetView for the whole view. This tool accepted coordinates and did '
+      + 'nothing for as long as it existed.' };
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -4488,8 +4511,11 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
   }
 
   try {
-    app.mapSystem.zoomTo(${validated.level}${Object.keys(options).length > 0 ? ', ' + JSON.stringify(options) : ''});
-    return { success: true, zoomLevel: ${validated.level} };
+    // zoomTo(level) has never existed. The engine zooms to a REGION, not to a
+    // numeric level, so there is nothing to convert a level into.
+    return { success: false, error: 'zoom_map takes a numeric level and the engine has no such call: it zooms to a REGION. '
+      + 'Use zoomToRegion with a region id, or resetView for the full view. A level was accepted here and did '
+      + 'nothing for as long as this tool existed.' };
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -4509,8 +4535,15 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
   }
 
   try {
-    const mapData = app.mapSystem.exportMap();
-    return { success: true, ...mapData };
+    // exportMap() has never existed. exportGeoJSON() is the real one, and it
+    // returns the geometry rather than a "configuration" — named accordingly
+    // instead of being spread into a shape the caller cannot rely on.
+    if (typeof app.mapSystem.exportGeoJSON !== 'function') {
+      return { success: false, error: 'this studio cannot export map data — app.mapSystem.exportGeoJSON is unavailable.' };
+    }
+    const geojson = app.mapSystem.exportGeoJSON();
+    const info = typeof app.mapSystem.getMapSourceInfo === 'function' ? app.mapSystem.getMapSourceInfo() : null;
+    return { success: true, geojson, ...(info ? { source: info } : {}) };
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -4581,7 +4614,16 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
   }
 
   try {
-    const region = app.mapSystem.getRegionAtPoint({ x: ${validated.x}, y: ${validated.y} });
+    // getRegionAtPoint() has never existed; the engine exposes no hit test.
+    // canvasToGeo turns a point into COORDINATES, which is a different answer,
+    // so it is offered rather than quietly substituted.
+    if (typeof app.mapSystem.canvasToGeo === 'function') {
+      const coord = app.mapSystem.canvasToGeo(${validated.x}, ${validated.y});
+      return { success: false, coordinate: coord,
+        error: 'the engine has no region hit test. That point is at ' + JSON.stringify(coord)
+          + ' — find regions by id with get_highlighted_map_regions or getSelectedRegions.' };
+    }
+    const region = null;
     if (region) {
       return { success: true, regionId: region.id, regionName: region.name, properties: region.properties };
     }
@@ -4640,7 +4682,7 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
   }
 
   try {
-    const result = app.mapSystem.animateWave({
+    const result = app.mapSystem.animateRegionsWave({
       duration: ${validated.duration || 10},
       loop: ${validated.loop !== false},
       colors: ${colorsStr},
@@ -6641,7 +6683,7 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    // The RE
 // Get history state
 (function() {
   ${guard}
-  const state = app.historyManager.getState();
+  const state = app.historyManager.getInfo();
   return { success: true, action: 'get_state', ...state };
 })();`.trim();
       default:
@@ -7326,7 +7368,7 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
 // Trigger interaction action
 (function() {
   ${guard}
-  app.interactionSystem.triggerAction('${input.actionType}', ${params});
+  app.interactionSystem.executeAction('${input.actionType}', ${params});
   return { success: true, action: 'trigger_action', actionType: '${input.actionType}' };
 })();`.trim();
       }

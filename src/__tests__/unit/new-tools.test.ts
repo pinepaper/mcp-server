@@ -232,9 +232,11 @@ describe('History code generation', () => {
     expect(code).toContain('app.historyManager.redo()');
   });
 
-  it('get_state calls getState()', () => {
+  it('get_state calls getInfo(), which is the accessor that exists', () => {
     const code = codeGenerator.generateHistory({ action: 'get_state' });
-    expect(code).toContain('app.historyManager.getState()');
+    // NOT getState() — no studio has ever had it. This test asserted the
+    // broken name and passed while the call threw.
+    expect(code).toContain('app.historyManager.getInfo()');
   });
 
   it('includes historyManager guard', () => {
@@ -796,9 +798,10 @@ describe('Interaction code generation', () => {
     expect(code).toContain('beh_1');
   });
 
-  it('trigger_action generates triggerAction call', () => {
+  it('trigger_action calls executeAction, which is the real name', () => {
     const code = codeGenerator.generateInteraction({ action: 'trigger_action', actionType: 'incrementScore', params: { points: 10 } });
-    expect(code).toContain('app.interactionSystem.triggerAction');
+    // triggerAction has never existed on InteractionSystem; executeAction has.
+    expect(code).toContain('app.interactionSystem.executeAction');
     expect(code).toContain("'incrementScore'");
   });
 

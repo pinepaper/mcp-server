@@ -208,7 +208,21 @@ export function readFacades(names) {
         .replace(/^\s*\/\/.*$/gm, '');
       if (!new RegExp(`class\\s+${cls}\\b`).test(body)) continue;
       const methods = new Set();
-      for (const m of body.matchAll(/^ {2}(?:async\s+|\*\s*|get\s+)?([A-Za-z_]\w*)\s*\(/gm)) methods.add(m[1]);
+      // INDENTATION-AGNOSTIC, and requiring the brace on the same line.
+      //
+      // This used to demand EXACTLY two spaces. MagicSystem.js and
+      // FilterSystem.js indent their methods with four, so neither contributed
+      // a single method — and both still landed in the snapshot, because their
+      // `this.X =` data tables matched the second pattern below and made the
+      // set non-empty. A PARTIALLY captured facade is worse than a missing
+      // one: the rule above is that an absent facade is not checked, but a
+      // partial one IS, so `addFilter`, `autoAnimate` and `remixStyle` were
+      // reported as drift while being perfectly real. Three of twelve entries
+      // on the drift ratchet were this bug, not the engine's.
+      //
+      // Requiring `{` on the same line keeps `if (`, `for (` and ordinary
+      // calls out without relying on a keyword blacklist to be complete.
+      for (const m of body.matchAll(/^[ \t]{2,}(?:static\s+)?(?:async\s+|\*\s*|get\s+|set\s+)?([A-Za-z_]\w*)\s*\([^)]*\)\s*\{/gm)) methods.add(m[1]);
       for (const m of body.matchAll(/\bthis\.([A-Za-z_]\w*)\s*=(?!=)/g)) methods.add(m[1]);
       for (const kw of ['if', 'for', 'while', 'switch', 'catch', 'return', 'function', 'constructor']) methods.delete(kw);
       if (methods.size) out[name] = [...methods].sort();

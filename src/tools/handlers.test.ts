@@ -1099,8 +1099,13 @@ describe('handleToolCall', () => {
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
-      expect(text).toContain('zoomTo');
-      expect(text).toContain('2');
+      // zoomTo(level) has never existed — the engine zooms to a REGION — so
+      // this tool now refuses by name instead of calling into undefined.
+      expect(text).toContain('zoom_map takes a numeric level');
+      // The level is no longer echoed into the code, because nothing consumes
+      // it — asserting it appeared was asserting that the argument survived to
+      // a call that never existed.
+      expect(text).toContain('zoomToRegion');
     });
   });
 
@@ -1179,7 +1184,8 @@ describe('handleToolCall', () => {
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
-      expect(text).toContain('animateWave');
+      // animateWave -> animateRegionsWave, the method the engine actually has.
+      expect(text).toContain('animateRegionsWave');
       expect(text).toContain('horizontal');
     });
 

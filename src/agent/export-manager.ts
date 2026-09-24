@@ -124,14 +124,16 @@ export class SmartExportManager {
 
   // Check for relations
   if (app.relationRegistry) {
-    const relations = app.relationRegistry.getAll ? app.relationRegistry.getAll() : [];
-    analysis.hasRelations = relations.length > 0;
-    relations.forEach(rel => {
-      if (rel.relationType) {
-        relationSet.add(rel.relationType);
-      }
-    });
+    // getAll() has never existed on the registry, so this always took the
+    // empty fallback and every analysis reported NO relations. getStats() is
+    // the real accessor and answers both questions: associationsByType is
+    // keyed by relation type, and activeItems counts the items carrying one.
+    const relStats = typeof app.relationRegistry.getStats === 'function'
+      ? app.relationRegistry.getStats()
+      : null;
+    Object.keys((relStats && relStats.associationsByType) || {}).forEach(t => relationSet.add(t));
     analysis.relationTypes = Array.from(relationSet);
+    analysis.hasRelations = !!relStats && (relStats.activeItems > 0 || analysis.relationTypes.length > 0);
 
     // Relations imply animations
     if (analysis.hasRelations) {
