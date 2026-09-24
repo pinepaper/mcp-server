@@ -232,6 +232,43 @@ page is handed a `data:` URL. Nothing to fetch, nothing to taint, and the
 picture actually arrives. `pinepaper_import_svg` resolves its document the same
 way, so embedded remote images are kept rather than dropped.
 
+### Fixed: the caption system was invisible to the agents told to use it
+
+`pinepaper_text_style` and `pinepaper_execute_custom_code` were callable but
+absent from `tools/list` in the default toolkit — while `pinepaper_text_effect`,
+`pinepaper_design_medium`, `pinepaper_keyframe_animate` and
+`pinepaper_execute_generator` all tell an agent to use them. So the whole
+15-style caption system was reachable only by someone who already knew the name.
+Profiles filter by tag, so these fell out because of the group they belong to,
+not because anyone decided they were unnecessary.
+
+The default toolkit now lists everything its own descriptions point at, and
+`pinepaper_text_style` accepts `list` as well as `list_styles`, because
+`pinepaper_text_effect` spells the same action `list`.
+
+Its description also now carries what a real render found: over photographs,
+pass a palette — `chrome`, `cutout` and `glitch` are off-brief at the default
+and `neon` needs one on dark images — and `glitch` at 80px monospace overflows
+a 1920 canvas at 36 characters.
+
+### Fixed: camera-framed exports ignored your canvas size
+
+`framing: "camera"` produced **2234×1472** whatever the canvas was, because it
+sized the frame from the browser's backing store rather than the artboard. A
+1920×1080 board and a 3840×2160 board both landed there. It reads the canvas
+size now.
+
+### Fixed: cutout styles and the lasso called into nothing
+
+`pinepaper_cutout_style` called `app.imageTools.applyCutoutStyle`, which has
+never existed — so it reported success with the real error nested inside. It
+now uses the engine's actual cutout API and resolves the item id first.
+
+`pinepaper_lasso` has no headless form at all: the lasso is a mouse tool whose
+extraction is driven by strokes a user draws. It now says so and points at
+`pinepaper_extract_object`, instead of failing with
+`undefined is not a function`.
+
 ### Fixed: results that were too big to read
 
 An error carried the whole generated script in its details — ~12KB of
