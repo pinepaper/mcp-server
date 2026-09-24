@@ -306,7 +306,16 @@ export const TOOLKIT_PROFILES: Record<ToolkitProfile, string[]> = {
     'agent', 'browser', 'canvas',
     'core', 'import', 'media', 'assets', 'batch',
     'relations', 'animation', 'masks', 'camera',
-    'generators', 'effects', 'template',
+    'generators', 'effects', 'filters', 'template',
+    // font, custom_code and filters are here because LISTED tools point at
+    // them. pinepaper_text_effect and pinepaper_design_medium tell an agent to
+    // use pinepaper_text_style; keyframe_animate and execute_generator point at
+    // pinepaper_execute_custom_code; image_filter points at pinepaper_add_filter.
+    // All three were excluded from this profile, so an agent read an
+    // instruction naming a tool it could not see or call — the whole 15-style
+    // caption system was reachable only by someone who already knew the name.
+    // toolkit-references-are-listed.test.ts fails if that happens again.
+    'font', 'custom_code', 'letter_collage',
     'scene', 'diagram', 'map',
     'selection', 'transform', 'history',
     'image_processing', 'precomp',

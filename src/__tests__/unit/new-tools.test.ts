@@ -316,17 +316,21 @@ describe('LassoInputSchema', () => {
 });
 
 describe('Lasso code generation', () => {
-  it('activate is async with guard', () => {
-    const code = codeGenerator.generateLasso({ action: 'activate', itemId: 'item_1' });
-    expect(code).toContain('async function');
-    expect(code).toContain('app.imageTools.activateLasso');
-    expect(code).toContain("if (!app.imageTools)");
-  });
-
-  it('apply calls applyLasso', () => {
-    const code = codeGenerator.generateLasso({ action: 'apply' });
-    expect(code).toContain('app.imageTools.applyLasso()');
-  });
+  // These asserted app.imageTools.activateLasso and .applyLasso. Neither has
+  // ever existed: imageTools is an ImageToolsManager, the lasso lives on
+  // app.lassoTool, and the extraction there is driven by mouse strokes the
+  // user draws. There is no headless call that finishes one, so the tool
+  // could not work over MCP at all — it now says so instead of throwing.
+  for (const action of ['activate', 'apply'] as const) {
+    it(`${action} refuses by name rather than calling into nothing`, () => {
+      const code = codeGenerator.generateLasso({ action });
+      expect(code).not.toContain('app.imageTools');
+      expect(code).toContain('success: false');
+      expect(code).toContain('interactive mouse tool');
+      // Names what to use instead, the add_ports precedent.
+      expect(code).toContain('pinepaper_extract_object');
+    });
+  }
 });
 
 // =============================================================================
@@ -349,16 +353,24 @@ describe('CutoutStyleInputSchema', () => {
 });
 
 describe('CutoutStyle code generation', () => {
-  it('apply is async with guard', () => {
+  // These asserted app.imageTools.applyCutoutStyle / .getCutoutStyles, and
+  // neither exists anywhere in the engine. The real surface is
+  // app.cutoutStyles (a CutoutStylePresets): applyPreset(item, name, options)
+  // and getPresets().
+  it('apply resolves the id and calls applyPreset on the right facade', () => {
     const code = codeGenerator.generateCutoutStyle({ action: 'apply', itemId: 'item_1', preset: 'sticker' });
     expect(code).toContain('async function');
-    expect(code).toContain('app.imageTools.applyCutoutStyle');
+    expect(code).toContain('app.cutoutStyles.applyPreset(target');
+    expect(code).not.toContain('app.imageTools');
+    // applyPreset takes a live item, so an unresolvable id has to fail first.
+    expect(code).toContain('app.getItemById');
   });
 
-  it('list is sync', () => {
+  it('list reads the presets the engine publishes', () => {
     const code = codeGenerator.generateCutoutStyle({ action: 'list' });
-    expect(code).toContain('app.imageTools.getCutoutStyles()');
-    expect(code).not.toContain('async');
+    expect(code).toContain('getCutoutStylePresets');
+    expect(code).toContain('app.cutoutStyles.getPresets()');
+    expect(code).not.toContain('app.imageTools');
   });
 });
 

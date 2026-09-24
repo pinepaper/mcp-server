@@ -4035,7 +4035,7 @@ export type MediaInput = z.infer<typeof MediaInputSchema>;
  * platform impossibility, not an omission.
  */
 export const TextStyleInputSchema = z.object({
-  action: z.enum(['apply_style', 'set_font_axes', 'list_styles', 'cursive', 'wrap', 'unwrap', 'to_collage'])
+  action: z.enum(['apply_style', 'set_font_axes', 'list_styles', 'list', 'cursive', 'wrap', 'unwrap', 'to_collage'])
     .describe("'apply_style' (stacked-layer display style) · 'set_font_axes' (variable-font weight/width/slant) · 'list_styles' (styles + palettes + axes, for pickers) · 'cursive' (draw text as STROKED handwriting — a path, not a glyph, so it can be drawn on over time) · 'wrap' / 'unwrap' (break a text item to a width, reversibly) · 'to_collage' (turn an EXISTING text item into a letter collage, keeping its place)"),
   text: z.string().optional().describe('cursive: the words to write. to_collage: the text to build the collage from, if it differs from the item.'),
   maxWidth: z.number().optional().describe('wrap: the width to break at, in canvas units. unwrap restores the original single line, so this is not destructive.'),

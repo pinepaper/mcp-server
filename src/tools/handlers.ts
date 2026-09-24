@@ -1626,7 +1626,11 @@ async function handleToolCallInner(
       }
 
       case 'pinepaper_text_style': {
+        // 'list' is an alias for 'list_styles'. pinepaper_text_effect spells
+        // the same action 'list', so an agent moving between the two guesses
+        // wrong — and a rejected enum value is a dead end rather than a hint.
         const input = TextStyleInputSchema.parse(args);
+        if (input.action === 'list') input.action = 'list_styles';
         const code = codeGenerator.generateTextStyle(input);
         return executeOrGenerate(code, `Text style: ${input.action}`, options, 'pinepaper_text_style');
       }

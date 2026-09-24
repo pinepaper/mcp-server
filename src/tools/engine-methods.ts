@@ -236,6 +236,7 @@ export const OPTIONAL_ENGINE_METHODS: readonly string[] = [
   'clearCanvas',
   'ensureFontsLoaded',
   'getCanvasSize',
+  'getCutoutStylePresets',
   'instantiateOntology',
   'itemRegistry.getAll',
   'listFontAxes',

@@ -196,10 +196,34 @@ export function readBootstrap(src = existsSync(BOOTSTRAP) ? readCommitted(BOOTST
  * simply not snapshotted rather than guessed at — an incomplete map must make
  * the guard quieter, never louder, or it starts failing working code.
  */
-export function readFacades(names) {
+/**
+ * property name -> the CLASS the engine actually constructs for it.
+ *
+ * The convention below (camelCase property -> PascalCase class) is right most
+ * of the time and silently wrong otherwise: `app.imageTools` is a
+ * `ImageToolsManager`, so no `js/ImageTools.js` exists, so the facade was never
+ * mapped — and an unmapped facade is NOT CHECKED, which is how two tools went
+ * on calling `imageTools.getCutoutStyles` and `applyCutoutStyle`, neither of
+ * which exists anywhere in the engine. Reading the assignment removes the
+ * guesswork for every facade that names its class.
+ */
+function facadeClasses(src) {
+  const map = {};
+  const patterns = [
+    /_defineLazyHeavy\(\s*'([A-Za-z_]\w*)'\s*,\s*'([A-Za-z_]\w*)'/g,
+    /_defineLazy\(\s*'([A-Za-z_]\w*)'\s*,\s*\(\)\s*=>\s*new\s+([A-Za-z_]\w*)/g,
+    /this\.([A-Za-z_]\w*)\s*=\s*new\s+(?:m\.)?([A-Za-z_]\w*)\s*\(/g,
+  ];
+  for (const re of patterns) {
+    for (const m of src.matchAll(re)) if (!map[m[1]]) map[m[1]] = m[2];
+  }
+  return map;
+}
+
+export function readFacades(names, classOf = {}) {
   const out = {};
   for (const name of names) {
-    const cls = name.charAt(0).toUpperCase() + name.slice(1);
+    const cls = classOf[name] || name.charAt(0).toUpperCase() + name.slice(1);
     for (const rel of [`js/${cls}.js`, `js/diagram/${cls}.js`, `js/export/${cls}.js`]) {
       const file = join(FXTOOL, rel);
       if (!existsSync(file)) continue;
@@ -256,7 +280,7 @@ function generate() {
   const surface = readEngineSurface(src);
   const rows = [...surface.entries()].sort(([a], [b]) => a.localeCompare(b));
   const heavy = rows.filter(([, k]) => k === 'lazyHeavy').map(([n]) => n);
-  const facades = readFacades(facadesInUse());
+  const facades = readFacades(facadesInUse(), facadeClasses(src));
   // property name -> CLASS name, which is what ensureHeavy() takes.
   const heavyClasses = {};
   for (const m of src.matchAll(/_defineLazyHeavy\(\s*['"]([A-Za-z_]\w*)['"]\s*,\s*['"]([A-Za-z_]\w*)['"]/g)) heavyClasses[m[1]] = m[2];

@@ -6763,39 +6763,46 @@ case 'analyze_palette':
   }
 
   generateLasso(input: LassoInput): string {
-    const guard = `if (!app.imageTools) return { error: 'ImageTools not available' };`;
+    // LASSO IS A MOUSE TOOL. IT HAS NO HEADLESS FORM.
+    //
+    // These called app.imageTools.activateLasso and .applyLasso, neither of
+    // which exists — imageTools is an ImageToolsManager and the lasso lives on
+    // app.lassoTool. `activate` is real there, but the extraction is driven by
+    // startStroke / continueStroke / endStroke: a freehand path the USER draws.
+    // There is no applyLasso to finish it, so wiring activate alone would leave
+    // a caller in a mode it cannot get out of or complete.
+    //
+    // Refused by name, with the tools that do the same job without a pointer.
+    const why = 'the lasso is an interactive mouse tool (app.lassoTool: activate, then startStroke/continueStroke/endStroke as the user draws). '
+      + 'There is no headless call that completes an extraction, so this tool could never work over MCP. '
+      + 'To cut a region without a pointer, use pinepaper_extract_object (detects and extracts by description), '
+      + 'or pinepaper_cutout_style / the mask actions on pinepaper_image_tools to shape an existing raster.';
     switch (input.action) {
       case 'activate':
-        return `
-// Activate lasso selection
-(async function() {
-  ${guard}
-  try {
-    await app.imageTools.activateLasso(${JSON.stringify(input.itemId || '')});
-    return { success: true, action: 'activate', itemId: ${JSON.stringify(input.itemId || '')} };
-  } catch (e) {
-    return { error: 'Failed to activate lasso: ' + e.message };
-  }
-})();`.trim();
       case 'apply':
         return `
-// Apply lasso selection
-(async function() {
-  ${guard}
-  try {
-    const result = await app.imageTools.applyLasso();
-    return { success: true, action: 'apply' };
-  } catch (e) {
-    return { error: 'Failed to apply lasso: ' + e.message };
-  }
-})();`.trim();
+// Lasso — refused, rather than calling into a method that does not exist
+({ success: false, action: ${JSON.stringify(input.action)}, error: ${JSON.stringify(why)} });`.trim();
       default:
         return `(function() { return { error: 'Unknown lasso action: ${(input as any).action}' }; })();`;
     }
   }
 
   generateCutoutStyle(input: CutoutStyleInput): string {
-    const guard = `if (!app.imageTools) return { error: 'ImageTools not available' };`;
+    // THE FACADE WAS THE WRONG ONE ENTIRELY.
+    //
+    // These called app.imageTools.applyCutoutStyle / .getCutoutStyles, and
+    // neither exists anywhere in the engine — imageTools is an
+    // ImageToolsManager and knows nothing about cutout presets. Reported from
+    // production as "apply returns success:true with the error nested inside",
+    // which is what awaiting a call on undefined inside a try looks like.
+    //
+    // The real surface is app.cutoutStyles (a CutoutStylePresets), with
+    // applyPreset(item, name, options) and getPresets(). The parity guard
+    // could not see this: readFacades resolved a class by CONVENTION —
+    // imageTools -> ImageTools, which is not the class's name — so the facade
+    // was never mapped, and an unmapped facade is not checked.
+    const guard = `if (!app.cutoutStyles) return { success: false, error: 'cutout styles are unavailable on this studio (app.cutoutStyles is absent) — update PinePaper Studio.' };`;
     switch (input.action) {
       case 'apply':
         return `
@@ -6803,7 +6810,11 @@ case 'analyze_palette':
 (async function() {
   ${guard}
   try {
-    const result = await app.imageTools.applyCutoutStyle(${JSON.stringify(input.itemId || '')}, ${JSON.stringify(input.preset || '')}, ${JSON.stringify(input.options || {})});
+    const target = app.getItemById && app.getItemById(${JSON.stringify(input.itemId || '')});
+    if (!target) {
+      return { success: false, action: 'apply', error: 'no item ' + ${JSON.stringify(input.itemId || '')} + ' — applyPreset takes a live item, so the id has to resolve first.' };
+    }
+    const result = await app.cutoutStyles.applyPreset(target, ${JSON.stringify(input.preset || '')}, ${JSON.stringify(input.options || {})});
     // An unknown preset returns the very item it was given, unchanged — so a
     // truthy result proves nothing. The engine records the refusal on it.
     const cutRej = result && result.data && result.data.cutoutStyleRejected;
@@ -6820,7 +6831,9 @@ case 'analyze_palette':
 // List available cutout styles
 (function() {
   ${guard}
-  const styles = app.imageTools.getCutoutStyles();
+  const styles = typeof app.getCutoutStylePresets === 'function'
+    ? app.getCutoutStylePresets()
+    : app.cutoutStyles.getPresets();
   return { success: true, action: 'list', styles };
 })();`.trim();
       default:
@@ -8254,6 +8267,9 @@ ${guard}
     ...(r.note ? { note: r.note } : {}) };
 })();`.trim();
       }
+      // 'list' is the spelling pinepaper_text_effect uses for the same action,
+      // accepted here so moving between the two tools does not dead-end.
+      case 'list':
       case 'list_styles': {
         return `
 // Text styles + palettes + font axes — the picker surface

@@ -2059,11 +2059,24 @@ ACTIONS:
 - set_font_axes: { itemId, axes: { weight?, width?, slant? } } — STANDARD variable-font axes only (Canvas 2D has no font-variation-settings, so custom foundry axes are unreachable — platform limit, stated, not silent). Returns {applied, rejected}: CHECK rejected — an axis silently ignored is the failure this surface exists to prevent. All three are ordinary animatable properties: keyframe fontWeight and type breathes between weights.
 - list_styles: {} — styles + palettes + axes, for pickers. Call this first; styleKey strings come from here.
 
+OVER PHOTOGRAPHS, PASS A PALETTE — NEVER THE DEFAULT. Measured on a real
+render of captions over photographs: highlighter, sticker, caption and badge
+read correctly at the default palette. neon needs one on a dark photo. chrome,
+cutout and glitch are off-brief at the default palette over any photograph —
+they are designed against flat backgrounds and the default palette assumes one.
+A style that is hard to read still reports success, so this is a judgement the
+tool cannot make for you.
+
+MEASURE THE WIDTH BEFORE COMMITTING TO A SIZE. glitch at 80px in a monospace
+face overflows a 1920 canvas at 36 characters. Layered styles draw offset
+copies, so the group is WIDER than the text — use 'wrap' first, or shorten the
+line, rather than discovering it in an export.
+
 EXAMPLE: { action: 'apply_style', itemId: 'title_1', styleKey: 'arcade', fontFamily: 'suggested' }`,
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['apply_style', 'set_font_axes', 'list_styles', 'cursive', 'wrap', 'unwrap', 'to_collage'], description: "Text style operation. 'cursive' draws text as STROKED handwriting — a path, not a glyph, so draw-on animation and outline_stroke both apply. 'wrap'/'unwrap' break a text item to a width, reversibly. 'to_collage' converts an EXISTING text item into a letter collage in place." },
+        action: { type: 'string', enum: ['apply_style', 'set_font_axes', 'list_styles', 'list', 'cursive', 'wrap', 'unwrap', 'to_collage'], description: "Text style operation. 'list' is accepted as an alias for 'list_styles', because pinepaper_text_effect spells the same action 'list' and an agent moving between them guesses wrong. 'cursive' draws text as STROKED handwriting — a path, not a glyph, so draw-on animation and outline_stroke both apply. 'wrap'/'unwrap' break a text item to a width, reversibly. 'to_collage' converts an EXISTING text item into a letter collage in place." },
         text: { type: 'string', description: 'cursive: the words to write. to_collage: the text to build from, if it differs from the item.' },
         maxWidth: { type: 'number', description: 'wrap: the width to break at, in canvas units. unwrap restores the original, so this is not destructive.' },
         cursiveOptions: { type: 'object', description: 'cursive: { x?, y?, scale?, strokeColor?, strokeWidth? }.' },

@@ -87,9 +87,13 @@ describe('applyCutoutStyle surfaces a refused preset', () => {
   it('an unchanged item is a failure, not a success', async () => {
     // The applier returns the very item it was given, so a truthy result
     // proves nothing at all about whether anything happened.
+    // The stub used to be `imageTools.applyCutoutStyle`, a method the engine
+    // has never had — so this exercised the refusal path against a facade that
+    // did not exist. The real one is app.cutoutStyles.applyPreset.
     const item = { data: { cutoutStyleRejected: { requested: 'nope', known: ['sticker'] } } };
     const res = await new Function('app', runnable(code))({
-      imageTools: { applyCutoutStyle: async () => item },
+      getItemById: () => item,
+      cutoutStyles: { applyPreset: async () => item },
     });
     expect(res.success).toBe(false);
     expect(res.error).toContain('UNCHANGED');
