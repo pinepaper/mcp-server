@@ -267,6 +267,14 @@ instead of accepting the parameter and ignoring it: right-to-left text has no
 engine support, and a connector id you supply is dropped by the engine, so the
 result tells you which id you actually got.
 
+### Fixed: one 3D colour broke every export in the session
+
+`pinepaper_world3d add_object` with `color: "#ef4444"` reported success and
+then made **every later MP4 export fail** with a WebGL error, because the
+colour goes to a shader uniform that needs three floats. Hex is what every
+other tool here takes, so the conversion happens for you now — as does
+`[255, 0, 0]`, the other common form.
+
 ### Fixed: an unknown item id reported success
 
 `pinepaper_keyframe_animate` on an id that doesn't exist returned success and

@@ -3671,7 +3671,7 @@ export const PrecompInputSchema = z.object({
   name: z.string().optional(),
   loop: z.boolean().optional(),
   duration: z.number().optional(),
-  precompId: z.string().optional(),
+  precompId: z.union([z.string(), z.number()]).transform(String).optional().describe('The id create returned. Accepts a number too: the engine mints numeric ids and this used to demand a string, so an id straight out of create was rejected on the way back in.'),
   itemId: z.string().optional(),
 });
 export type PrecompInput = z.infer<typeof PrecompInputSchema>;

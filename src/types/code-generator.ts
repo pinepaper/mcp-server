@@ -1617,6 +1617,46 @@ const INLINE_REMOTE_IMAGES = `
   }
 `;
 
+/**
+ * A HEX COLOUR IN THE 3D WORLD POISONS EVERY LATER EXPORT.
+ *
+ * addWorldObject hands `color` to a WebGL uniform — its own example is
+ * `color: [0.9, 0.3, 0.2]`, three floats in 0..1. Give it '#ef4444' and
+ * uniform3fv throws "cannot be converted to a sequence"; the object is
+ * reported as added, and then EVERY subsequent MP4 export fails, because the
+ * broken uniform is in the scene from then on. Same shape as the tainted
+ * canvas: one bad value, success reported, and the damage surfaces somewhere
+ * else entirely.
+ *
+ * Converted here. A caller writing '#ef4444' is not wrong — it is the colour
+ * spelling every other tool in this package takes — so the emitter absorbs the
+ * difference rather than the caller learning a second convention.
+ */
+function world3dColor(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    // Already a triple. Accept 0-255 too, since that is the other common form.
+    const nums = value.filter((v): v is number => typeof v === 'number');
+    if (nums.length < 3) return value;
+    return nums.slice(0, 3).map((n) => (n > 1 ? n / 255 : n));
+  }
+  if (typeof value !== 'string') return value;
+  const hex = value.trim().replace(/^#/, '');
+  const full = hex.length === 3 ? hex.split('').map((c) => c + c).join('') : hex;
+  if (!/^[0-9a-f]{6}$/i.test(full)) return value;
+  return [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16) / 255);
+}
+
+/** Recursively convert every `color` field in a world3d payload. */
+function world3dColors<T>(value: T): T {
+  if (Array.isArray(value)) return value.map((v) => world3dColors(v)) as unknown as T;
+  if (!value || typeof value !== 'object') return value;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    out[k] = k === 'color' ? world3dColor(v) : world3dColors(v);
+  }
+  return out as unknown as T;
+}
+
 export class PinePaperCodeGenerator {
   /**
    * Generate code for creating an item
@@ -7062,14 +7102,25 @@ case 'analyze_palette':
 
   const precomp = app.createPrecomp(items, opts);
   if (!precomp) return { success: false, error: 'createPrecomp returned nothing' };
-  return { success: true, action: 'create', precompId: precomp?.id || precomp, itemCount: items.length, name: ${JSON.stringify(input.name || '')} };
+  // STRINGIFIED, because the schema declares precompId as a string and the
+  // engine mints a NUMBER. Returning the number meant the id could not be
+  // round-tripped: pass it back to add/remove and zod rejects it before the
+  // call is made.
+  const _pid = precomp && precomp.id !== undefined ? precomp.id : precomp;
+  return { success: true, action: 'create', precompId: String(_pid), itemCount: items.length, name: ${JSON.stringify(input.name || '')} };
 })();`.trim();
       }
       case 'add':
         return `
 // Add item to precomp
 (function() {
-  app.addToPrecomp(${JSON.stringify(input.precompId || '')}, ${JSON.stringify(input.itemId || '')});
+  // addToPrecomp answers falsy when the precomp or the item is not found, and
+  // this reported success regardless — the same silent-success shape as an
+  // unknown itemId elsewhere.
+  const _ok = app.addToPrecomp(${JSON.stringify(input.precompId || '')}, ${JSON.stringify(input.itemId || '')});
+  if (_ok === false || _ok === null || _ok === undefined) {
+    return { success: false, action: 'add', error: 'nothing was added — check the precompId (create returns it as a string) and the itemId with pinepaper_get_items.' };
+  }
   return { success: true, action: 'add', precompId: ${JSON.stringify(input.precompId || '')}, itemId: ${JSON.stringify(input.itemId || '')} };
 })();`.trim();
       case 'remove':
@@ -8869,7 +8920,7 @@ ${guard}
 // World3D: create — terrain, sky, shadows, walkable character, under the Paper canvas
 (async function() {
   if (typeof app.createWorld3D !== 'function') { return { success: false, error: 'app.createWorld3D unavailable — update FxTool to a world3d-capable build' }; }
-  await app.createWorld3D(${S(input.spec ?? 'forest')}, ${opts});
+  await app.createWorld3D(${S(world3dColors(input.spec ?? 'forest'))}, ${opts});
   // describe() is the world's own parameter schema — return the preset list +
   // top-level keys so the agent knows what configure can touch, without the
   // full multi-KB schema on every create.
@@ -8890,7 +8941,7 @@ ${guard}
 (function() {
   if (typeof app.configureWorld3D !== 'function') { return { success: false, error: 'app.configureWorld3D unavailable — update FxTool' }; }
 ${needWorld}
-  const r = app.configureWorld3D(${S(input.patch)});
+  const r = app.configureWorld3D(${S(world3dColors(input.patch))});
   // The validator names the right key on a wrong one — forward it verbatim.
   return r && r.ok ? { success: true, action: 'configure' } : { success: false, error: (r && r.error) || 'configure failed' };
 })();`.trim();
@@ -8946,7 +8997,7 @@ ${needWorld}
 // World3D: place an object (y defaults to sitting on the terrain)
 (function() {
 ${needWorld}
-  const id = app.addWorldObject(${S(input.object)});
+  const id = app.addWorldObject(${S(world3dColors(input.object))});
   return id ? { success: true, objectId: id } : { success: false, error: 'object not added' };
 })();`.trim();
       case 'remove_object':
@@ -9526,6 +9577,24 @@ ${guard('exportBVH')}
 ${guard('exportPNGSequence')}
   const out = await app.exportPNGSequence(${opts});
   if (!out) { return { success: false, error: 'PNG sequence produced nothing' }; }
+  // A BLOB SERIALISES TO {}. exporter.export() answers a Blob, and returning it
+  // raw produced a success whose result was an empty object — which reads as
+  // "it worked and gave me nothing" rather than "the bytes could not cross
+  // the bridge". Structured clone drops a Blob's
+  // contents; only a string survives.
+  if (typeof Blob !== 'undefined' && out instanceof Blob) {
+    const dataUrl = await new Promise(function(res, rej) {
+      const fr = new FileReader();
+      fr.onload = function() { res(fr.result); };
+      fr.onerror = function() { rej(new Error('could not read the PNG sequence')); };
+      fr.readAsDataURL(out);
+    });
+    return { success: true, format: 'png-sequence', data: dataUrl, mimeType: out.type || 'application/zip', size: out.size };
+  }
+  if (Array.isArray(out)) {
+    return { success: true, format: 'png-sequence', frames: out.length,
+      note: 'the frames stayed in the page — pass download: true to write them out.' };
+  }
   return { success: true, format: 'png-sequence', result: out };
 })();`.trim();
     }
