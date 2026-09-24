@@ -55,4 +55,14 @@ describe('innerFailure', () => {
     expect(innerFailure({ success: 0 })).toBeNull();
     expect(innerFailure({ success: '' })).toBeNull();
   });
+  it('treats a bare { error } as a failure — the shape every emitter catch returns', () => {
+    expect(innerFailure({ error: 'Failed to apply filter: Item is not a raster' }))
+      .toBe('Failed to apply filter: Item is not a raster');
+  });
+
+  it('lets success:true win over a nested error, and ignores empty or non-string errors', () => {
+    expect(innerFailure({ success: true, error: 'domain note' })).toBeNull();
+    expect(innerFailure({ error: '' })).toBeNull();
+    expect(innerFailure({ error: null, itemId: 'item_1' })).toBeNull();
+  });
 });

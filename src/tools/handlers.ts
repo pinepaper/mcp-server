@@ -1058,7 +1058,9 @@ ${code}
  * not a failure, because plenty of emitters return a bare value (an id, a
  * count, a list) and reading absence as refusal would turn every one of those
  * into an error. `ok: false` is included because the export-store emitters use
- * it, and it carries a `reason` rather than an `error`.
+ * it, and it carries a `reason` rather than an `error`. A non-empty `error`
+ * string with no `success: true` beside it is a failure too — it is what the
+ * emitters' catch blocks return.
  */
 export function innerFailure(value: unknown): string | null {
   if (!value || typeof value !== 'object') return null;
@@ -1076,7 +1078,20 @@ export function innerFailure(value: unknown): string | null {
   // this guard, built to stop silent failures, silencing the one tool whose
   // job is to report them. An explicit success:true wins; ok is only consulted
   // when nothing else says.
-  const failed = r.success === false || (r.success !== true && r.ok === false);
+  // A PAYLOAD CARRYING AN `error` IS A FAILURE, even with no success flag.
+  //
+  // 89 emitted returns in code-generator.ts are `{ error: '…' }` with no
+  // success:false beside them — the shape a try/catch naturally produces. This
+  // guard only looked at success and ok, so those reached the caller wrapped
+  // in a successful tool result with the error nested inside it. Reported for
+  // image_filter on a vector item, where applyImageFilter throws and the catch
+  // returns exactly that shape.
+  //
+  // An explicit success:true still wins, so a tool that legitimately reports a
+  // domain error alongside a successful call is unaffected.
+  const hasError = typeof r.error === 'string' && r.error.length > 0;
+  const failed = r.success === false
+    || (r.success !== true && (r.ok === false || hasError));
   if (!failed) return null;
 
   if (typeof r.error === 'string') return r.error;

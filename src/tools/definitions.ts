@@ -5139,7 +5139,7 @@ RECIPE — grunge poster: chain [grain, scanlines, vignette]. Glass header: refr
         filterName: { type: 'string', description: 'Filter name (for apply)' },
         params: {
           type: 'object',
-          description: 'Filter parameters (e.g. {amount: 5} for blur)',
+          description: "Filter parameters. Blur takes {radius: 5} — an out-of-range or misspelled parameter blurs by NOTHING rather than erroring, so check the name. 'amount' is accepted as an alias for radius because this example used to say so.",
         },
         filters: {
           type: 'array',

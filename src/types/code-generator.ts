@@ -7022,6 +7022,20 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    // The RE
   // ===========================================================================
 
   generateImageFilter(input: ImageFilterInput): string {
+    // BLUR TAKES `radius`, AND THIS TOOL'S OWN EXAMPLE SAID `amount`.
+    //
+    // FilterSystem's blur reads params.radius and does Math.floor(undefined) =
+    // NaN, which passes its own `radius <= 0` guard and then blurs by nothing.
+    // So {amount: 18} was accepted, ran, and changed no pixels — while the
+    // schema example told callers to write exactly that. The example is fixed;
+    // the alias stays because the wrong spelling was documented and anyone who
+    // followed it should not have to discover the difference twice.
+    const rawParams = (input.params ?? {}) as Record<string, unknown>;
+    const filterParams: Record<string, unknown> = { ...rawParams };
+    if (filterParams.amount !== undefined && filterParams.radius === undefined) {
+      filterParams.radius = filterParams.amount;
+      delete filterParams.amount;
+    }
     // Resolve the raster from the registry id (unwrapping groups when the
     // build has the _resolveRaster helper), then use the real GPU-filter
     // facades. The previous emitter called app.imageTools.applyFilter, a
@@ -7038,7 +7052,13 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    // The RE
 (async function() {
 ${resolve}
   try {
-    await app.applyImageFilter(item, ${JSON.stringify(input.filterName || '')}, ${JSON.stringify(input.params || {})});
+    const r = await app.applyImageFilter(item, ${JSON.stringify(input.filterName || '')}, ${JSON.stringify(filterParams)});
+    // applyImageFilter THROWS for a missing raster and answers the item
+    // otherwise; a falsy answer is a refusal it did not raise.
+    if (r === false || r === null) {
+      return { success: false, action: 'apply', itemId: ${JSON.stringify(input.itemId)},
+        error: 'the filter did not apply — ${input.filterName || ''} may not be available on this studio.' };
+    }
     return { success: true, action: 'apply', itemId: ${JSON.stringify(input.itemId)}, filter: ${JSON.stringify(input.filterName || '')} };
   } catch (e) {
     return { error: 'Failed to apply filter: ' + e.message };

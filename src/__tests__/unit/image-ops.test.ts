@@ -67,6 +67,16 @@ describe('generateImageFilter uses the real engine entry points', () => {
     expect(code).toContain('_resolveRaster');
     expect(code).not.toContain('imageTools.applyFilter');
   });
+  it('blur: the documented-then-wrong {amount} is passed on as {radius}', () => {
+    const code = codeGenerator.generateImageFilter({ action: 'apply', itemId: 'item_2', filterName: 'blur', params: { amount: 18 } });
+    expect(code).toContain('app.applyImageFilter(item, "blur", {"radius":18})');
+    const both = codeGenerator.generateImageFilter({ action: 'apply', itemId: 'item_2', filterName: 'blur', params: { amount: 3, radius: 9 } });
+    expect(both).toContain('{"amount":3,"radius":9}');
+  });
+  it('apply refuses a falsy engine answer instead of claiming success', () => {
+    const code = codeGenerator.generateImageFilter({ action: 'apply', itemId: 'item_2', filterName: 'blur', params: { radius: 4 } });
+    expect(code).toMatch(/if \(r === false \|\| r === null\)[\s\S]*success: false/);
+  });
   it('chain → app.applyImageFilterChain', () => {
     const code = codeGenerator.generateImageFilter({ action: 'chain', itemId: 'item_2', filters: [{ name: 'grayscale', params: {} }] });
     expect(code).toContain('app.applyImageFilterChain(item, filters)');
