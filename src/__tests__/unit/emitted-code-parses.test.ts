@@ -174,3 +174,99 @@ describe('emitted play_timeline code is valid JavaScript', () => {
     expect(broken).toEqual([]);
   });
 });
+
+/**
+ * EVERY generator, not just the four that broke before.
+ *
+ * This file grew one describe-block per incident: rigging, medium, sequence,
+ * play_timeline. Each was added after something shipped broken, and the next
+ * one shipped broken anyway — `import_image` emitted
+ *
+ *     '. This is the browser\'s network stack: …'
+ *
+ * inside a template literal, where `\'` collapses to a bare `'` and closes the
+ * single-quoted string early. Every URL import failed with a syntax error
+ * before anything ran, in published 1.6.11 and 1.6.12, found by a session
+ * driving production rather than by this suite.
+ *
+ * So the sweep is mechanical: call every generator with one permissive input
+ * and require that whatever comes back is parseable JavaScript. It cannot
+ * check that the code is CORRECT — only that it can run at all — which is
+ * exactly the class that keeps escaping.
+ */
+describe('every generator emits parseable JavaScript', () => {
+  // Enough keys to satisfy most generators' validation. A generator that
+  // rejects it is skipped, not failed: this is a syntax net, and a wrong
+  // argument shape is not evidence of a bug (generateP5Draw takes a bare
+  // string, and handing it this object emitted a literal "[object Object]").
+  const KITCHEN_SINK: Record<string, unknown> = {
+    action: 'create', itemType: 'rectangle', id: 'item_1', itemId: 'item_1',
+    itemIds: ['item_1', 'item_2'], name: 'thing', templateId: 'hero',
+    url: 'https://example.com/a.png', text: 'hi', content: 'hi',
+    position: { x: 10, y: 20 }, properties: { width: 10, height: 10 },
+    width: 100, height: 50, format: 'png', platform: 'auto', duration: 5,
+    seconds: 1, at: { x: 1, y: 2 }, regions: ['fr'], coords: [[0, 0], [1, 1]],
+    mapId: 'world', operations: [], items: [], relationType: 'follows',
+    sourceId: 'item_1', targetId: 'item_2', effectType: 'glow',
+    generatorName: 'drawSunburst', shapeType: 'terminal', label: 'Start',
+    code: 'app.create("circle",{})', color: '#fff', easing: 'linear',
+    keyframes: [], exportId: 'exp_1', query: 'x', skeletonId: 'skeleton_1',
+  };
+
+  /** Generators whose signature is not an options object, so the sink misleads. */
+  const NOT_AN_OPTIONS_BAG = new Set(['generateP5Draw']);
+
+  const sweep = (): { produced: string[]; broken: string[] } => {
+    const proto = Object.getPrototypeOf(G) as object;
+    const names = Object.getOwnPropertyNames(proto).filter((n) => /^generate[A-Z]/.test(n));
+    const produced: string[] = [];
+    const broken: string[] = [];
+    for (const n of names) {
+      if (NOT_AN_OPTIONS_BAG.has(n)) continue;
+      const fn = (G as unknown as Record<string, (a: unknown) => unknown>)[n];
+      let code: unknown;
+      try { code = fn.call(G, KITCHEN_SINK); } catch { continue; }
+      if (typeof code !== 'string' || !code.trim()) continue;
+      produced.push(n);
+      try { parses(code); } catch (e) { broken.push(`${n}: ${(e as Error).message}`); }
+    }
+    return { produced, broken };
+  };
+
+  it('covers most of the surface, so a pass means something', () => {
+    // Liveness. A sink that stopped satisfying anything would make the
+    // assertion below vacuous — which is how a guard quietly stops guarding.
+    const { produced } = sweep();
+    expect(produced.length).toBeGreaterThan(100);
+    expect(produced).toContain('generateImportImage');
+    expect(produced).toContain('generateGetItems');
+  });
+
+  it('emits nothing that fails to parse', () => {
+    expect(sweep().broken).toEqual([]);
+  });
+
+  it('catches the escape that collapses inside a template literal', () => {
+    // The exact shape of the import_image bug, so a rewrite that reintroduces
+    // it fails here rather than in production.
+    expect(() => parses(`const e = 'the browser\'s network stack';`)).toThrow();
+    expect(() => parses(`const e = 'the browser\\'s network stack';`)).not.toThrow();
+  });
+
+  it('import_image parses with every option it accepts', () => {
+    const code = G.generateImportImage({
+      url: 'https://picsum.photos/id/0/1320/880.jpg',
+      position: { x: 556, y: 548 }, maxWidth: 660, maxHeight: 440,
+    } as never);
+    expect(() => parses(code)).not.toThrow();
+  });
+
+  it('get_items parses for a filter object that matches no known key', () => {
+    // `entries.filter(entry => )` — a filter with keys but no recognised ones
+    // produced an empty predicate, which is a syntax error rather than a wrong
+    // answer: the whole call dies before it runs.
+    for (const filter of [{}, { type: undefined }, { nope: 1 }, { hasRelation: true }] as never[]) {
+      expect(() => parses(G.generateGetItems(filter)), JSON.stringify(filter)).not.toThrow();
+    }
+  });
+});

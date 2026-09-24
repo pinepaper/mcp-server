@@ -792,7 +792,23 @@ function generateGetItemsCode(filter?: {
   hasAnimation?: boolean;
   hasRelation?: boolean;
 }): string {
-  if (!filter || Object.keys(filter).length === 0) {
+  // A filter OBJECT is not the same as a filter. `{}` is already handled, but
+  // so is `{ type: undefined }` and anything whose keys this function does not
+  // recognise: those have a non-zero key count and contribute no conditions,
+  // and the emitted `entries.filter(entry => )` is a SYNTAX ERROR rather than
+  // a wrong answer — the whole call dies before it runs. Decide on the
+  // conditions, not on the keys.
+  const conditions: string[] = [];
+  if (filter?.type) conditions.push(`entry.type === '${filter.type}'`);
+  if (filter?.source) conditions.push(`entry.source === '${filter.source}'`);
+  if (filter?.hasAnimation !== undefined) {
+    conditions.push(`!!entry.item.data?.animationType === ${filter.hasAnimation}`);
+  }
+  if (filter?.hasRelation !== undefined) {
+    conditions.push(`(app.getRelations(entry.id || entry.itemId).length > 0) === ${filter.hasRelation}`);
+  }
+
+  if (conditions.length === 0) {
     return `
 // Get all items
 const entries = app.itemRegistry.getAll();
@@ -806,20 +822,6 @@ const items = entries.map(entry => ({
 
 ({ items, count: items.length });
 `.trim();
-  }
-
-  const conditions: string[] = [];
-  if (filter.type) {
-    conditions.push(`entry.type === '${filter.type}'`);
-  }
-  if (filter.source) {
-    conditions.push(`entry.source === '${filter.source}'`);
-  }
-  if (filter.hasAnimation !== undefined) {
-    conditions.push(`!!entry.item.data?.animationType === ${filter.hasAnimation}`);
-  }
-  if (filter.hasRelation !== undefined) {
-    conditions.push(`(app.getRelations(entry.id || entry.itemId).length > 0) === ${filter.hasRelation}`);
   }
 
   return `
@@ -5588,7 +5590,7 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
         res = await fetch(src);
       } catch (netErr) {
         return { success: false, error: 'could not reach ' + src + ' — ' + (netErr && netErr.message ? netErr.message : 'network request failed')
-          + '. This is the browser\'s network stack: check the host resolves, the port is open, and that any proxy passes plain HTTP as well as HTTPS CONNECT.' };
+          + '. The failure is in the browser network stack: check the host resolves, the port is open, and that any proxy passes plain HTTP as well as HTTPS CONNECT.' };
       }
       if (!res.ok) {
         return { success: false, error: 'the server refused ' + src + ' — HTTP ' + res.status + ' ' + (res.statusText || ''), status: res.status };
