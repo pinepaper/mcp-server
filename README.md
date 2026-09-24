@@ -251,12 +251,29 @@ pass a palette — `chrome`, `cutout` and `glitch` are off-brief at the default
 and `neon` needs one on dark images — and `glitch` at 80px monospace overflows
 a 1920 canvas at 36 characters.
 
-### Fixed: camera-framed exports ignored your canvas size
+### Fixed: exports sized by the renderer instead of by your request
 
-`framing: "camera"` produced **2234×1472** whatever the canvas was, because it
-sized the frame from the browser's backing store rather than the artboard. A
-1920×1080 board and a 3840×2160 board both landed there. It reads the canvas
-size now.
+Three tools reported a pixel count that came from how the browser happened to
+be rendering, not from what you asked for:
+
+- `framing: "camera"` produced **2234×1472** whatever the canvas was — a
+  1920×1080 board and a 3840×2160 board both landed there.
+- `format: "png"` ignored `platform` completely: both `youtube-thumbnail`
+  (1280×720) and `auto` on a 1920×1080 canvas returned **3000×1688**, which is
+  the board scaled by 150/96 DPI.
+- `pinepaper_agent_end_job` reported the canvas as 2233×1472.
+
+None of those ratios is the device pixel ratio, so the number could not be
+divided back out afterwards — which is why it forced ffmpeg and `sips`
+workarounds rather than a quick correction. All three now read the canvas size
+you set, and PNG reports the dimensions it actually produced.
+
+### Fixed: `size` on an effect is a multiplier, not pixels
+
+Every effect scales from the item's own bounds and `size` multiplies that, so
+`size: 30` asks for a disc thousands of pixels across and gets one, reporting
+success. Typical values are 1.5 to 3. The parameter was not in the tool's
+schema at all, so "pixels" was the only natural reading; it is documented now.
 
 ### Fixed: cutout styles and the lasso called into nothing
 

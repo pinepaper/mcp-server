@@ -3814,14 +3814,35 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
 
       case 'png':
         if (app.exportEngine && app.exportEngine.exportPNG) {
-          const dataUrl = await app.exportEngine.exportPNG({ dpi: settings.dpi });
+          // PNG IGNORED THE PLATFORM ENTIRELY.
+          //
+          // exportPNG takes dpi or scale and no dimensions, so passing only
+          // dpi scaled the CANVAS by dpi/96 and the preset was never applied:
+          // platform 'youtube-thumbnail' (1280x720) and platform 'auto' on a
+          // 1920x1080 board both returned 3000x1688, which is 1920 x 150/96.
+          // Third member of the same family as the camera dims and analyze —
+          // a pixel count that came from the rendering scale rather than from
+          // what the caller asked for.
+          //
+          // dimensions is already resolved: the preset for a named platform,
+          // the board itself for auto. Turning it into a scale is the only
+          // lever exportPNG offers, so that is what it gets.
+          const pngBoard = (typeof app.getCanvasSize === 'function' && app.getCanvasSize())
+            || app.canvasSize
+            || { width: dimensions.width, height: dimensions.height };
+          const pngScale = pngBoard.width > 0 ? dimensions.width / pngBoard.width : 1;
+          const png = await app.exportEngine.exportPNG({ scale: pngScale });
+          const dataUrl = (png && png.dataUrl) ? png.dataUrl : png;
           result = {
             success: true,
             platform,
             format: 'png',
             data: dataUrl,
             mimeType: 'image/png',
-            size: Math.round(dataUrl.length * 0.75)
+            size: Math.round(String(dataUrl).length * 0.75),
+            dimensions: (png && png.width)
+              ? { width: png.width, height: png.height }
+              : { width: dimensions.width, height: dimensions.height },
           };
         } else {
           const canvas = document.querySelector('canvas');

@@ -6999,6 +6999,15 @@ USE WHEN:
 - Celebration effects (confetti)
 - Enhancing visual impact (ripple, glow, electric)
 
+SIZE IS A MULTIPLIER, NOT PIXELS — and this is the one that bites hardest.
+Every effect derives its scale from the ITEM'S OWN BOUNDS, and 'size' multiplies
+that. glow computes a radius from max(width, height) and pulses it to
+'1 + (size - 1)', so size: 30 on a modest item asks for a disc thousands of
+pixels across, gets one, and reports success. Typical values are 1.5 to 3 —
+glow's own default is 1.5. Pass a pixel count here and you will be wrong by
+about two orders of magnitude. A recent studio warns about it
+(kind: 'glow-size-unit'); an older one does not.
+
 EFFECTS (15 particle + 7 shader auras):
 - sparkle: Glitter/sparkle particles (color, speed, size)
 - blast: Explosion burst effect (color, radius, count)
