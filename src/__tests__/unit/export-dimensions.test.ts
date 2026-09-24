@@ -45,10 +45,20 @@ describe('an export is sized by the request, not by the renderer', () => {
     expect(png({ format: 'png', platform: 'instagram' })).toContain('dimensions:');
   });
 
-  it('camera framing divides the artboard, not the backing store', () => {
+  it('camera framing asks for the artboard, not the backing store', () => {
     const code = png({ format: 'mp4', framing: 'camera' });
-    expect(code).toContain('camBase.width / firstZoom');
+    expect(code).toContain('cameraDims = { width: camBase.width');
     expect(code).not.toContain('canvasEl ? canvasEl.width');
+  });
+
+  it('camera framing does not second-guess the zoom', () => {
+    // VideoExporter._frameCropRect returns the WHOLE canvas whenever a camera
+    // animation exists, so dividing by the first keyframe's zoom never
+    // reframed anything — it only shrank the output, making a zoom-2 export a
+    // half-size video of identical content. The frame is now exactly the one
+    // the engine's _exportFrameSize() computes, so the two cannot disagree.
+    const code = png({ format: 'mp4', framing: 'camera' });
+    expect(code).not.toContain('firstZoom');
   });
 
   it('camera framing falls back to a known frame, never to the element', () => {

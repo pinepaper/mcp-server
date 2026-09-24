@@ -3767,32 +3767,38 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
     if (!params || (params.mode || 'keyframes') !== 'keyframes' || !params.keyframes || !params.keyframes.length) {
       return { success: false, platform, format, framing, error: 'framing: "camera" requires a keyframe-mode camera walkthrough with at least one keyframe.' };
     }
-    const firstKf = params.keyframes[0];
-    const firstZoom = firstKf && firstKf.zoom > 0 ? firstKf.zoom : 1;
-    // THE ARTBOARD, NOT THE BACKING STORE — the same mistake as analyze.
+    // MATCH THE ENGINE'S FRAME EXACTLY, AND DO NOT SECOND-GUESS THE ZOOM.
     //
-    // This divided canvasEl.width, which is in DEVICE pixels, so a camera
-    // export came out 2234x1472 whatever the canvas was: a 1920x1080 board at
-    // zoom 1 and a 3840x2160 board at zoom 2 both produced it, because both
-    // are (backing store / zoom). The ratio is not the device pixel ratio, so
-    // it cannot be divided back out afterwards either.
+    // This divided canvasEl.width — device pixels — so a camera export came
+    // out 2234x1472 whatever the board was. That is fixed by reading the
+    // artboard, and the chain below is deliberately the same one the engine's
+    // own _exportFrameSize() uses: getCanvasSize(), then app.canvasSize, then
+    // a known frame. Two places computing one number is how they drift.
     //
-    // getCanvasSize() is the board the caller set. The export target is the
-    // last resort rather than canvasEl: it is already resolved,
-    // and wrong by a preset at worst instead of wrong by an unknown factor.
+    // The zoom divide is gone too, and that is the part worth explaining.
+    // VideoExporter._frameCropRect returns the WHOLE canvas element whenever a
+    // camera animation exists — the camera owns the view, so it captures
+    // everything the camera frames. Dividing by the first keyframe's zoom
+    // therefore never reframed anything; it only shrank the output, so a
+    // zoom-2 export produced a half-size video of the same content. Asking for
+    // the artboard's own size is both simpler and right.
+    //
+    // NOTE: the engine currently scales that whole-canvas crop into the output
+    // frame without preserving aspect, so the picture is squashed by the ratio
+    // between the workspace canvas and the board (measured: 1.17 landscape,
+    // 0.37 portrait). That is VideoExporter._frameCropRect, not this — raised
+    // with fxtool-f2. Matching frames here means that when it is fixed, these
+    // two cannot disagree about the aspect on top of it.
     let camBase = null;
     if (typeof app.getCanvasSize === 'function') {
       const cs = app.getCanvasSize();
-      if (cs && cs.width) camBase = { width: cs.width, height: cs.height };
+      if (cs && cs.width > 0) camBase = { width: cs.width, height: cs.height };
     }
-    if (!camBase && app.canvasSize && app.canvasSize.width) {
+    if (!camBase && app.canvasSize && app.canvasSize.width > 0) {
       camBase = { width: app.canvasSize.width, height: app.canvasSize.height };
     }
     if (!camBase) camBase = { width: dimensions.width, height: dimensions.height };
-    cameraDims = {
-      width: Math.round(camBase.width / firstZoom),
-      height: Math.round(camBase.height / firstZoom),
-    };
+    cameraDims = { width: camBase.width, height: camBase.height };
   }
 
   let result = { success: false, platform, format, quality, framing };
