@@ -308,7 +308,7 @@ function generateCreateItemCode(
   const params: Record<string, unknown> = {
     x: position.x,
     y: position.y,
-    ...baseProperties,
+    ...withRadiusAxes(baseProperties),
   };
 
   // Handle simple solid colors in params
@@ -786,6 +786,31 @@ app.applyEffect(item, '${effectType}', ${JSON.stringify(params, null, 2)});
 /**
  * Template for getting items
  */
+/**
+ * radiusX / radiusY REACH NOTHING.
+ *
+ * The engine's create() feeds a shape's config from width, height and radius.
+ * radiusX and radiusY are not among them, so an ellipse asked for
+ * `{radiusX: 250, radiusY: 72}` was built at the DEFAULT 100x60 and reported
+ * success — measured from production as "about 90x50". This package documented
+ * that exact pair as the ellipse's properties and used it in two worked
+ * examples, so a model following the guide got the wrong size every time and
+ * nothing anywhere said why.
+ *
+ * Mapped rather than merely re-documented: the radii are the natural way to
+ * describe an ellipse, the conversion is unambiguous (a radius is half its
+ * axis), and a caller who already wrote radiusX should not have to rewrite it.
+ * An explicit width/height wins, so nothing that works today changes.
+ */
+function withRadiusAxes(props: Record<string, unknown>): Record<string, unknown> {
+  const { radiusX, radiusY, ...rest } = props;
+  if (radiusX === undefined && radiusY === undefined) return props;
+  const out: Record<string, unknown> = { ...rest };
+  if (typeof radiusX === 'number' && out.width === undefined) out.width = radiusX * 2;
+  if (typeof radiusY === 'number' && out.height === undefined) out.height = radiusY * 2;
+  return out;
+}
+
 function generateGetItemsCode(filter?: {
   type?: ItemType;
   source?: string;
@@ -1184,11 +1209,19 @@ function generateListGeneratorsCode(): string {
     // chunk has not landed, so a cold page honestly answers three.
     complete = !generators || generators.pending !== true;
   }
+  // PARAMS ARE THE WHOLE POINT OF ASKING.
+  //
+  // The tool says it lists generators "with their parameters" and this mapper
+  // dropped the params key, so every answer was a name and a sentence. A
+  // caller who wanted to know what drawGradientMesh accepts had to guess, and
+  // an unknown generatorParams key is accepted in silence — so a guess that
+  // was wrong looked exactly like one that was right.
   const formatted = (generators || []).map(g => ({
     name: g.name,
     displayName: g.displayName || g.name,
     category: g.category || 'background',
-    description: g.description || ''
+    description: g.description || '',
+    ...(g.params ? { params: g.params } : {})
   }));
 
   return {
@@ -3170,7 +3203,7 @@ throw new Error('Unknown diagram mode action: ${action}');
     switch (op.type) {
       case 'create': {
         const pos = op.position || { x: 400, y: 300 };
-        const createProps = (op.properties || {}) as Record<string, unknown>;
+        const createProps = withRadiusAxes((op.properties || {}) as Record<string, unknown>);
         const props = JSON.stringify(createProps);
         let createCode = `
 const item = app.create('${op.itemType}', { position: { x: ${pos.x}, y: ${pos.y} }, ...${props} });

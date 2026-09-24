@@ -13,6 +13,7 @@ import { I18nManager } from '../i18n/index.js';
 import { COMPACT_DESCRIPTIONS } from './compact-descriptions.js';
 import { MINIMAL_DESCRIPTIONS } from './minimal-descriptions.js';
 import { STICK_GAITS, STICK_POSES, STICK_SEQUENCES, STICK_EXPRESSIONS, STICK_PROPS } from './stick-vocabulary.js';
+import { GeneratorNameSchema, ItemTypeSchema } from '../types/schemas.js';
 import {
   EffectTypeSchema,
   SimpleAnimationTypeSchema,
@@ -6910,18 +6911,7 @@ COMMON PARAMS (all generators):
       properties: {
         generatorName: {
           type: 'string',
-          enum: [
-            'drawSunburst', 'drawSunsetScene', 'drawGrid', 'drawStackedCircles',
-            'drawCircuit', 'drawWaves', 'drawPattern',
-            'drawBokeh', 'drawGradientMesh', 'drawGeometricAbstract', 'drawWindField',
-            'drawFluidFlow', 'drawOrganicFlow', 'drawNoiseTexture',
-            'drawGlobeWireframe',
-            'drawFunctionPlot', 'drawParametricCurve', 'drawSimulation',
-            'drawSpectrumAnalyzer', 'draw3DSurface',
-            'drawTruchet', 'drawHalftone', 'drawRibbons',
-            'drawFormulaArt', 'drawParametricCollection', 'drawShaderArt', 'drawYeganehMountains',
-            'drawBlobs', 'drawLowPoly', 'drawPeaks', 'drawScatter', 'drawStackedWaves', 'draw3DParametricCurve',
-          ],
+          enum: [...GeneratorNameSchema.options],
           description: 'Generator name',
         },
         params: {
@@ -7780,14 +7770,14 @@ EXAMPLE — Animated sky scene with timed reveals:
               backgroundColor: { type: 'string', description: 'For set_background: hex color' },
               generatorName: {
                 type: 'string',
-                enum: ['drawSunburst', 'drawSunsetScene', 'drawGrid', 'drawWaves', 'drawCircuit', 'drawStackedCircles', 'drawPattern', 'drawBokeh', 'drawGradientMesh', 'drawGeometricAbstract', 'drawWindField', 'drawFluidFlow', 'drawOrganicFlow', 'drawNoiseTexture', 'drawGlobeWireframe'],
+                enum: [...GeneratorNameSchema.options],
                 description: 'For execute_generator: generator name',
               },
               generatorParams: { type: 'object', description: 'For execute_generator: parameters' },
               // Items
               itemType: {
                 type: 'string',
-                enum: ['text', 'circle', 'rectangle', 'star', 'triangle', 'polygon', 'ellipse', 'path', 'line', 'arc', 'pentagon', 'hexagon', 'diamond', 'arrow', 'heart'],
+                enum: [...ItemTypeSchema.options],
                 description: 'For create: item type',
               },
               position: {
