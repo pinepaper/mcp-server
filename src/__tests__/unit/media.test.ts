@@ -53,14 +53,18 @@ describe('generateMedia codegen', () => {
 
   it('list / remove / set_playback_rate emit the right calls', () => {
     expect(codeGenerator.generateMedia({ action: 'list' })).toContain('A.listMedia()');
-    expect(codeGenerator.generateMedia({ action: 'remove', id: 'v1' })).toContain('A.removeMedia("v1")');
+    // The id is resolved (media id OR registryId) before the call — see
+    // media-audio-contract.test.ts for the behaviour.
+    const remove = codeGenerator.generateMedia({ action: 'remove', id: 'v1' });
+    expect(remove).toContain('const __ref = "v1"');
+    expect(remove).toContain('A.removeMedia(__mid)');
     const rate = codeGenerator.generateMedia({ action: 'set_playback_rate', id: 'v1', rate: 2 });
-    expect(rate).toContain('A.setMediaPlaybackRate("v1", 2)');
+    expect(rate).toContain('A.setMediaPlaybackRate(__mid, 2)');
   });
 
   it('set_clip → A.setMediaClip with in/out points and its own availability guard', () => {
     const code = codeGenerator.generateMedia({ action: 'set_clip', id: 'v1', inPoint: 1.5, outPoint: 6 });
-    expect(code).toContain('A.setMediaClip("v1", 1.5, 6)');
+    expect(code).toContain('A.setMediaClip(__mid, 1.5, 6)');
     expect(code).toContain('setMediaClip unavailable');
     guarded(code); trailingExpr(code);
   });

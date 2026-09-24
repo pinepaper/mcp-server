@@ -560,6 +560,26 @@ if (entry && entry.item && app.setDynamicContent) app.setDynamicContent(entry.it
     }
   }
 
+  // AN AUDIO ITEM'S LEVEL IS NOT AN ITEM PROPERTY. modifyItem applies changes
+  // to the Paper item (an audio item's is an invisible sentinel), so
+  // {audioGain} / {volume} answered success and moved nothing (measured 0.0 dB).
+  // The mix reads registry properties.audioGain; the live player has its own
+  // volume. Both are set, and gain is kept in step for the editor.
+  const levelKey = ['audioGain', 'volume', 'gain'].find((k) => typeof properties[k] === 'number');
+  if (levelKey) {
+    const level = Math.max(0, Math.min(1, properties[levelKey] as number));
+    code += `
+const _ae = app.itemRegistry.get('${itemId}');
+if (_ae && _ae.type === 'audio') {
+  _ae.properties = _ae.properties || {};
+  _ae.properties.audioGain = ${level};
+  _ae.properties.gain = ${level};
+  const _A = (typeof window !== 'undefined') && window.PinePaperAgent;
+  const _m = _A && typeof _A.listMedia === 'function' ? _A.listMedia().find(function(x) { return x.registryId === '${itemId}'; }) : null;
+  if (_m && app.audioLayer && typeof app.audioLayer.setVolume === 'function') app.audioLayer.setVolume(${level}, _m.id);
+}`;
+  }
+
   if (dataFlags && Object.keys(dataFlags).length > 0) {
     code += `
 const _flagged = app.itemRegistry.get('${itemId}');
@@ -803,10 +823,26 @@ function generateKeyframeAnimateCode(
   if (clipOutPoint !== undefined) opts.clipOutPoint = clipOutPoint;
   if (timeUnits !== undefined) opts.timeUnits = timeUnits;
 
+  // A FADE ON AN AUDIO ITEM WAS ACCEPTED AND NEVER HEARD. addAnimation keyframes
+  // the audio item's sentinel, and the mix reads one static audioGain per clip,
+  // so {audioGain: 0→1} answered success, duration 15, and exported at a flat
+  // level (measured). Refused by name, before anything is added, and only for
+  // audio items — a `volume` key on a shape is some other thing.
+  const levelKeys = [...new Set(keyframes.flatMap((k) => Object.keys((k as { properties?: object }).properties ?? {})))]
+    .filter((k) => k === 'audioGain' || k === 'volume' || k === 'gain');
+  const audioLevelGuard = levelKeys.length === 0 ? '' : `
+  const __ae = app.itemRegistry && app.itemRegistry.get('${itemId}');
+  if (__ae && __ae.type === 'audio') {
+    return { success: false, itemId: '${itemId}', error: ${JSON.stringify(
+      `${levelKeys.join(', ')} cannot be keyframed on an audio item: this studio mixes each audio clip at one fixed level, so a fade would be accepted and not heard. Nothing was added. `
+      + 'Set a static level with pinepaper_modify_item {audioGain: 0..1}.',
+    )} };
+  }`;
+
   return `
 // Apply keyframe animation to ${itemId}
 (function() {
-  ${requireItem(itemId, 'the animation')}
+  ${requireItem(itemId, 'the animation')}${audioLevelGuard}
   app.addAnimation('${itemId}', ${keyframesJson}, ${JSON.stringify(opts)});
   return { success: true, itemId: '${itemId}', duration: ${calculatedDuration}, loop: ${loop}${timeOffset !== undefined ? `, timeOffset: ${timeOffset}` : ''}${clipInPoint !== undefined ? `, clipInPoint: ${clipInPoint}` : ''}${clipOutPoint !== undefined ? `, clipOutPoint: ${clipOutPoint}` : ''} };
 })();
@@ -8551,6 +8587,20 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
   generateMedia(input: MediaInput): string {
     const guard = `  const A = (typeof window !== 'undefined') && window.PinePaperAgent;
   if (!A || typeof A.uploadVideo !== 'function') { return { success: false, error: 'window.PinePaperAgent media API unavailable — update FxTool to a media-capable build' }; }`;
+    // TWO ID SPACES, AND THE CALLER HOLDS THE WRONG ONE.
+    //
+    // upload answers {id, registryId}; every other tool on this surface speaks
+    // registry ids (item_N), so that is the one callers keep. But remove,
+    // setMediaPlaybackRate and setMediaClip look the id up in the audio/video
+    // layers, which are keyed by MEDIA id — so set_playback_rate with the
+    // registryId returned false, reported as a failure with no reason. Either
+    // form is resolved here; a miss names the id and what was looked for.
+    const resolveMedia = `  const __ref = ${JSON.stringify(input.id ?? '')};
+  const __m = (typeof A.listMedia === 'function')
+    ? A.listMedia().find(function(x) { return x.id === __ref || x.registryId === __ref; })
+    : null;
+  const __mid = __m ? __m.id : __ref;
+  const __miss = { success: false, error: 'no uploaded audio or video matches ' + JSON.stringify(__ref) + ' — pass the id or registryId that upload returned (media list shows both).' };`;
     switch (input.action) {
       case 'upload_video': {
         const opts = JSON.stringify({
@@ -8579,7 +8629,13 @@ ${guard}
 // Upload audio from URL
 (async function() {
 ${guard}
-  const info = await A.uploadAudio(${JSON.stringify(input.url)}, ${opts});
+  const info = await A.uploadAudio(${JSON.stringify(input.url)}, ${opts});${input.volume !== undefined ? `
+  // THE LEVEL IS STORED UNDER ONE KEY AND EXPORTED FROM ANOTHER. The upload
+  // records volume as \`gain\` on the registry entry; the video exporter's mix
+  // reads \`audioGain\`. So a bed uploaded at 0.25 exported at unity (measured:
+  // 0.0 dB change). Written to both until the engine reads one.
+  const __ae = info && info.registryId && app.itemRegistry ? app.itemRegistry.get(info.registryId) : null;
+  if (__ae) { __ae.properties = __ae.properties || {}; __ae.properties.audioGain = ${input.volume}; }` : ''}
   return { success: true, action: 'upload_audio', media: info };
 })();`.trim();
       }
@@ -8595,16 +8651,24 @@ ${guard}
 // Remove media
 (function() {
 ${guard}
-  const removed = A.removeMedia(${JSON.stringify(input.id)});
-  return { success: removed, action: 'remove', id: ${JSON.stringify(input.id)}, removed: removed };
+${resolveMedia}
+  if (!__m) return __miss;
+  const removed = A.removeMedia(__mid);
+  return removed
+    ? { success: true, action: 'remove', id: __mid, registryId: __m.registryId, removed: true }
+    : { success: false, action: 'remove', id: __mid, error: 'the studio did not remove ' + __mid + '.' };
 })();`.trim();
       case 'set_playback_rate':
         return `
 // Set media playback rate
 (function() {
 ${guard}
-  const ok = A.setMediaPlaybackRate(${JSON.stringify(input.id)}, ${input.rate});
-  return { success: ok, action: 'set_playback_rate', id: ${JSON.stringify(input.id)}, rate: ${input.rate} };
+${resolveMedia}
+  if (!__m) return __miss;
+  const ok = A.setMediaPlaybackRate(__mid, ${input.rate});
+  return ok
+    ? { success: true, action: 'set_playback_rate', id: __mid, registryId: __m.registryId, rate: ${input.rate} }
+    : { success: false, action: 'set_playback_rate', id: __mid, error: 'the studio refused rate ${input.rate} for ' + __mid + '.' };
 })();`.trim();
       case 'set_clip':
         return `
@@ -8612,8 +8676,12 @@ ${guard}
 (function() {
 ${guard}
   if (typeof A.setMediaClip !== 'function') { return { success: false, error: 'setMediaClip unavailable — update FxTool' }; }
-  const ok = A.setMediaClip(${JSON.stringify(input.id)}, ${input.inPoint}, ${input.outPoint});
-  return { success: ok, action: 'set_clip', id: ${JSON.stringify(input.id)}, inPoint: ${input.inPoint}, outPoint: ${input.outPoint} };
+${resolveMedia}
+  if (!__m) return __miss;
+  const ok = A.setMediaClip(__mid, ${input.inPoint}, ${input.outPoint});
+  return ok
+    ? { success: true, action: 'set_clip', id: __mid, registryId: __m.registryId, inPoint: ${input.inPoint}, outPoint: ${input.outPoint} }
+    : { success: false, action: 'set_clip', id: __mid, error: 'the studio refused the clip window ${input.inPoint}–${input.outPoint} for ' + __mid + '.' };
 })();`.trim();
 
       // ── Video-editing actions (v1.6.4) — these live on `app` (PinePaper

@@ -231,6 +231,7 @@ export const REQUIRED_ENGINE_METHODS: readonly string[] = [
 export const OPTIONAL_ENGINE_METHODS: readonly string[] = [
   '_resolveRaster',
   'activeWindowOf',
+  'audioLayer.setVolume',
   'authoredRotation',
   'captureFrameDataURL',
   'clearCanvas',
