@@ -4025,7 +4025,11 @@ export type LintSceneInput = z.infer<typeof LintSceneInputSchema>;
 export const MediaInputSchema = z.object({
   action: z.enum(['upload_video', 'upload_audio', 'list', 'remove', 'set_playback_rate', 'set_clip', 'set_time_remap', 'speed_ramp', 'match_cut', 'apply_track_matte', 'stop_live_matte'])
     .describe("'upload_video' / 'upload_audio' (from a URL) · 'list' media · 'remove' by id · 'set_playback_rate' · 'set_clip' (re-trim) · 'set_time_remap' (canvas-time→source-time curve: ramps, freezes, reverse) · 'speed_ramp' ({duration, speed} segments — the human way to say a remap) · 'match_cut' (cut between two shots aligning the SUBJECT via on-device detection) · 'apply_track_matte' (an item's alpha driven by another item's luma/alpha — type-filled-with-footage; live:true keeps it tracking as the matte animates) · 'stop_live_matte'"),
-  url: z.string().url().optional().describe('Media URL — required for upload_video / upload_audio (fetched then imported).'),
+  // Not .url(): a bare absolute path is not a URL, and 48f3a2a made the server
+  // read local files — so `/Users/…/broll1.mp4` was advertised and then rejected
+  // by the schema before anything could read it. resolveMediaSource validates
+  // what it is given and names the problem.
+  url: z.string().min(1).optional().describe('Required for upload_video / upload_audio: an http(s) URL, a data: URL, or a local file path (absolute, relative to the server, or file://).'),
   id: z.string().optional().describe('Media id — required for remove / set_playback_rate / set_clip.'),
   rate: z.number().min(0.25).max(4).optional().describe('Playback rate 0.25–4 — required for set_playback_rate.'),
   inPoint: z.number().min(0).optional().describe('Clip in-point in media-time seconds — required for set_clip.'),

@@ -67,3 +67,16 @@ describe('detect_objects names a blocked model download (1.36)', () => {
     expect((await run('Item is not a raster')).error).toBe('Item is not a raster');
   });
 });
+
+describe('the media schema accepts what the server can read (1.46)', () => {
+  it('takes a bare absolute path', async () => {
+    const { MediaInputSchema } = await import('../../types/schemas.js');
+    expect(MediaInputSchema.safeParse({ action: 'upload_video', url: '/Users/x/broll1.mp4' }).success).toBe(true);
+    expect(MediaInputSchema.safeParse({ action: 'upload_audio', url: 'file:///x/a.wav' }).success).toBe(true);
+  });
+
+  it('a path that is not media is refused by the resolver, by name', async () => {
+    const r = await resolveMediaSource('/Users/x/notes.txt');
+    expect('error' in r && r.error).toContain('Recognised extensions');
+  });
+});
