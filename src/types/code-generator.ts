@@ -947,6 +947,58 @@ app.historyManager.saveState();
 }
 
 /**
+ * moves_along_path, from the parameters a caller actually writes.
+ *
+ * The rule is a SELF relation reading params.path as a point array, with speed
+ * (1 = 150 px/s), closed, phase, easing, signal, equation. The natural call —
+ * targetId: <a path item>, params {pathId, duration, delay} — named none of
+ * those, so the relation had no path, returned success:true, and the whiteboard
+ * hand never moved (round 7 AA, 2.25). Here:
+ *   - a path ITEM (targetId other than the source, or params.pathId) is
+ *     sampled into points in the page, closed taken from the item;
+ *   - duration (seconds for one traversal) becomes speed;
+ *   - delay becomes the relation's window start (relation time is
+ *     window-relative, so the ride starts at `delay`);
+ *   - with neither points, a path item nor an equation, it is refused by name.
+ */
+function generateMovesAlongPathCode(sourceId: string, targetId: string | undefined, raw: Record<string, unknown>): string {
+  const { pathId, duration, delay, ...params } = raw;
+  const ref = (typeof pathId === 'string' && pathId) || (targetId && targetId !== sourceId ? targetId : null);
+  return `
+// moves_along_path: ${sourceId}${ref ? ` along ${ref}` : ''}
+(function() {
+  const params = ${JSON.stringify(params)};
+  const hasPoints = Array.isArray(params.path) && params.path.length >= 2;
+  if (!hasPoints && !params.equation) {
+    ${ref ? `const e = app.itemRegistry && app.itemRegistry.get(${JSON.stringify(ref)});
+    let p = e && e.item;
+    if (p && p.className !== 'Path' && p.className !== 'CompoundPath' && typeof p.getItem === 'function') {
+      p = p.getItem({ className: 'Path' });
+    }
+    if (!p || typeof p.getPointAt !== 'function' || !(p.length > 0)) {
+      return { success: false, error: ${JSON.stringify(ref)} + ' is not a path with length — moves_along_path needs a path item, or params.path as points [[x, y], …].' };
+    }
+    const N = Math.min(240, Math.max(16, Math.ceil(p.length / 6)));
+    params.path = Array.from({ length: N + 1 }, function(_, i) { const q = p.getPointAt(Math.min(p.length, p.length * i / N)); return [q.x, q.y]; });
+    if (params.closed === undefined) params.closed = !!p.closed;` : `return { success: false, error: 'moves_along_path needs a path: pass targetId (or params.pathId) naming a path item, or params.path as points [[x, y], …], or params.equation. With none, the item would not move.' };`}
+  }
+  ${typeof duration === 'number' && duration > 0 ? `if (params.speed === undefined && Array.isArray(params.path)) {
+    const pts = params.path.map(function(q) { return Array.isArray(q) ? { x: q[0], y: q[1] } : q; });
+    const len = pts.slice(1).reduce(function(acc, q, i) { return acc + Math.hypot(q.x - pts[i].x, q.y - pts[i].y); }, 0);
+    if (len > 0) params.speed = len / (150 * ${duration});
+    if (params.closed === undefined) params.closed = false;
+  }` : ''}
+  ${typeof delay === 'number' && delay > 0 ? `if (!params.window) params.window = { start: ${delay} };` : ''}
+  const ok = app.addRelation(${JSON.stringify(sourceId)}, ${JSON.stringify(sourceId)}, 'moves_along_path', params);
+  if (!ok) return { success: false, error: 'the studio refused the moves_along_path relation.' };
+  app.historyManager.saveState();
+  return { success: true, sourceId: ${JSON.stringify(sourceId)}, relationType: 'moves_along_path',
+    points: Array.isArray(params.path) ? params.path.length : 0, speed: params.speed, closed: params.closed,
+    ${ref ? `pathFrom: ${JSON.stringify(ref)},` : ''} window: params.window };
+})();`.trim();
+}
+
+/**
  * Template for removing relations
  */
 function generateRemoveRelationCode(
@@ -2129,6 +2181,10 @@ export class PinePaperCodeGenerator {
   // what it actually adopted rather than only that something worked.
   return { success: true, presetId: ${JSON.stringify(validated.presetId)}, relationType: r.relationType, params: r.params, values: r.values };
 })();`.trim();
+    }
+
+    if (validated.relationType === 'moves_along_path') {
+      return generateMovesAlongPathCode(validated.sourceId, validated.targetId ?? undefined, (validated.params ?? {}) as Record<string, unknown>);
     }
 
     return generateAddRelationCode(

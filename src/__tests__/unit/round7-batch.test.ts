@@ -111,3 +111,43 @@ describe('dashArray / strokeCap / strokeJoin on every shape (1.54)', () => {
     expect(item.strokeCap).toBe('round');
   });
 });
+
+describe('moves_along_path from a path item (2.25)', () => {
+  function relStudio(pathItem: Record<string, unknown> | null) {
+    const added: unknown[] = [];
+    const app = {
+      itemRegistry: { get: (id: string) => (id === 'path_1' && pathItem ? { item: pathItem } : null) },
+      addRelation: (...a: unknown[]) => { added.push(a); return true; },
+      historyManager: { saveState() {} },
+    };
+    return { app, added };
+  }
+  const line = { className: 'Path', length: 300, closed: false, getPointAt: (o: number) => ({ x: o, y: 0 }) };
+
+  it('samples the target path, maps duration to speed and delay to the window', () => {
+    const s = relStudio(line);
+    const r = runIIFE(codeGenerator.generateAddRelation({ sourceId: 'hand', targetId: 'path_1', relationType: 'moves_along_path',
+      params: { duration: 4, delay: 1, easing: 'linear' } } as never), { app: s.app });
+    expect(r.success).toBe(true);
+    const [src, tgt, type, params] = s.added[0] as [string, string, string, Record<string, any>];
+    expect([src, tgt, type]).toEqual(['hand', 'hand', 'moves_along_path']);
+    expect(params.path[0]).toEqual([0, 0]);
+    expect(params.path.at(-1)).toEqual([300, 0]);
+    expect(params.speed).toBeCloseTo(300 / (150 * 4), 5);
+    expect(params.closed).toBe(false);
+    expect(params.window).toEqual({ start: 1 });
+    expect(params.pathId).toBeUndefined();
+  });
+
+  it('refuses by name when there is no path at all', () => {
+    const r = runIIFE(codeGenerator.generateAddRelation({ sourceId: 'hand', relationType: 'moves_along_path', params: { duration: 2 } } as never), { app: relStudio(null).app });
+    expect(r.success).toBe(false);
+    expect(r.error).toContain('needs a path');
+  });
+
+  it('explicit points pass straight through', () => {
+    const s = relStudio(null);
+    runIIFE(codeGenerator.generateAddRelation({ sourceId: 'hand', relationType: 'moves_along_path', params: { path: [[0, 0], [10, 0]], speed: 2 } } as never), { app: s.app });
+    expect((s.added[0] as any[])[3]).toEqual({ path: [[0, 0], [10, 0]], speed: 2 });
+  });
+});

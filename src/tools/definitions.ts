@@ -3023,6 +3023,11 @@ PARAMS: { eps? (bounds-match tolerance px, default 4), cap? (max suggestions, de
     },
     description: `Create a behavior relationship between two items. Relations are the PRIMARY way to add animation in PinePaper - they describe HOW items should behave relative to each other.
 
+MOVES_ALONG_PATH — ride a path (a hand tracing a stroke, a car on a road):
+- sourceId: the item that moves. The path comes from ONE of: targetId (or params.pathId) naming a PATH ITEM, sampled into points for you; params.path as points [[x, y], …]; or params.equation.
+- params.duration: seconds for one traversal (converted to the engine's speed; or pass speed directly, 1 ≈ 150 px/s). params.delay: seconds before it starts. closed (loop back to the start; default from the path item), phase (0–1 start point), easing (linear | easeIn | easeOut | easeInOut | sine | bounce | pingpong), signal (deterministic, frame-rate-invariant — prefer it for export).
+- With no path from any of those it is refused, not accepted as a still item.
+
 USE WHEN:
 - "moon orbits earth" → relationType: orbits
 - "label follows player" → relationType: follows
