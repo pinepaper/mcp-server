@@ -1264,7 +1264,7 @@ describe('PinePaperCodeGenerator', () => {
           }],
         } as never);
 
-        expect(code).toContain('item.position');
+        expect(code).toContain('__it.position = new paper.Point');
         expect(code).toContain('620');
         expect(code).toContain('420');
       });

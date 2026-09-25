@@ -3824,21 +3824,32 @@ throw new Error('Unknown diagram mode action: ${action}');
   private generateBatchOperationCode(op: z.infer<typeof AgentBatchExecuteInputSchema>['operations'][0], index: number, mergePlan?: KeyframeMergePlan): string {
     switch (op.type) {
       case 'create': {
+        // THE SAME CREATE AS create_item, NOT A SECOND ONE.
+        //
+        // This case was its own app.create call, and every create_item fix since
+        // — fontWeight / leading, font loading, countdown content, no-fill,
+        // dashes, lifetimes, the unread-property report — passed it by: a batch
+        // read fontWeight 700 back as normal and a countdown stayed at 00:10
+        // for a 12 s MP4 (round 8 DD, 1.67). It now runs generateCreateItemCode,
+        // the exact emitter create_item uses, adapted to return its result
+        // inside this op's function.
         const pos = op.position || { x: 400, y: 300 };
         const createProps = withRadiusAxes((op.properties || {}) as Record<string, unknown>);
-        const props = JSON.stringify(createProps);
+        const single = generateCreateItemCode(op.itemType as ItemType, pos, { ...(op.properties || {}) } as Record<string, unknown>).trim();
+        const returning = single.startsWith('(async function()')
+          ? `return await ${single.replace(/;\s*$/, '')};`
+          : (() => {
+            // The snippet's value is its LAST top-level (-led statement.
+            const lines = single.split('\n');
+            let at = -1;
+            lines.forEach((l, i) => { if (l.startsWith('(')) at = i; });
+            if (at >= 0) lines[at] = 'return ' + lines[at];
+            return lines.join('\n');
+          })();
         let createCode = `
-const item = app.create('${op.itemType}', { position: { x: ${pos.x}, y: ${pos.y} }, ...${props} });
-const itemId = item.data && item.data.id ? item.data.id : app.registerItem(item, '${op.itemType}', { source: 'mcp-batch' });`;
-        // app.create() does not read blendMode/opacity from its params, but the
-        // underlying Paper.js item supports them directly — apply post-create so
-        // callers can pass them inline in `properties` and have them take effect.
-        if (createProps.blendMode !== undefined) {
-          createCode += `\nif ('blendMode' in item) item.blendMode = ${JSON.stringify(createProps.blendMode)};`;
-        }
-        if (createProps.opacity !== undefined) {
-          createCode += `\nif ('opacity' in item) item.opacity = ${JSON.stringify(createProps.opacity)};`;
-        }
+const __created = await (async function() {
+${returning}
+})();`;
         // Coordinate-built items (path from segments/pathData, line/arc from
         // from/through/to) derive their geometry from those coordinates and
         // IGNORE params.position — so `create` at a point silently produced an
@@ -3850,12 +3861,11 @@ const itemId = item.data && item.data.id ? item.data.id : app.registerItem(item,
           createCode += `
 // create() builds this item type from its own coordinates and ignores
 // params.position — apply the caller's explicit position after the fact.
-if (item.position) item.position = new paper.Point(${pos.x}, ${pos.y});`;
+const __it = __created && __created.itemId ? app.getItemById(__created.itemId) : null;
+if (__it && __it.position) __it.position = new paper.Point(${pos.x}, ${pos.y});`;
         }
         createCode += `
-// Ensure item is visible above backgrounds/generators
-if (item.bringToFront) item.bringToFront();
-return { itemId };
+return __created;
 `;
         return createCode;
       }

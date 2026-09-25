@@ -231,3 +231,27 @@ describe('moves_along_path: native route, offset, start position (1.60 / 1.61)',
     expect(s.hand.position).toEqual({ x: 20, y: -10 });
   });
 });
+
+describe('batch create is create_item (1.67)', () => {
+  it('keeps fontWeight and a countdown, and returns the created id', async () => {
+    const calls: unknown[] = [];
+    const item: Record<string, any> = { className: 'PointText', justification: 'center', fontSize: 40, data: { registryId: 'item_5' }, bringToFront() {},
+      _pos: { x: 0, y: 0 } };
+    const P = (x: number, y: number) => ({ x, y, add: ([dx, dy]: number[]) => P(x + dx, y + dy) });
+    Object.defineProperty(item, 'position', { get: () => P(item._pos.x, item._pos.y), set: (p) => { item._pos = { x: p.x, y: p.y }; } });
+    Object.defineProperty(item, 'bounds', { get: () => ({ left: item._pos.x - 50, right: item._pos.x + 50, center: { x: item._pos.x, y: item._pos.y } }) });
+    const app = {
+      create: () => item,
+      setDynamicContent: (_i: unknown, type: string) => calls.push(['dynamic', type]),
+      historyManager: { saveState() {} },
+      getItemById: () => item,
+    };
+    const code = codeGenerator.generateAgentBatchExecute({ operations: [
+      { type: 'create', itemType: 'text', position: { x: 100, y: 100 }, properties: { content: '00:10', fontWeight: 700, contentType: 'countdown', countdownTarget: 10 } },
+    ] } as never);
+    const r = await new Function('app', 'paper', 'window', 'document', code.replace('(async function()', 'return (async function()'))(app, {}, {}, {});
+    expect(item.fontWeight).toBe('700');
+    expect(calls).toContainEqual(['dynamic', 'countdown']);
+    expect(r.itemIds).toEqual(['item_5']);
+  });
+});
