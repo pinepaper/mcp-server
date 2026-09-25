@@ -1936,24 +1936,56 @@ export function planKeyframeMerges(
 }
 
 /**
- * Template for batch create - creates multiple items with single history save
+ * A create / modify snippet as the body of a function that RETURNS its value.
+ * Such a snippet's value is its last top-level (-led statement; the
+ * font-loading form is an async IIFE, which is awaited instead.
+ */
+function asReturningBody(snippet: string): string {
+  const single = snippet.trim();
+  if (single.startsWith('(async function()')) return `return await ${single.replace(/;\s*$/, '')};`;
+  const lines = single.split('\n');
+  let at = -1;
+  lines.forEach((l, i) => { if (l.startsWith('(')) at = i; });
+  if (at >= 0) lines[at] = 'return ' + lines[at];
+  return lines.join('\n');
+}
+
+/**
+ * Template for batch create — create_item for each item, one history save.
+ *
+ * This called app.batchCreate, a third create path, and dropped fontWeight
+ * (and every other create_item fix) with no ignoredProperties (round 9 II,
+ * 1.79) — the same drift f1d0b05 removed from agent_batch_execute. Each item
+ * now runs create_item's own emitter with its per-item history save taken
+ * out, and the batch saves once at the end, which is what batchCreate was
+ * for. An item that fails is reported by index; the rest are still created.
  */
 function generateBatchCreateCode(items: BatchCreateItem[]): string {
-  const itemsJson = JSON.stringify(items, null, 2);
+  const blocks = items.map((it, i) => {
+    const { x, y, position, ...props } = (it.params || {}) as Record<string, unknown>;
+    const p = Array.isArray(position) ? { x: Number(position[0]), y: Number(position[1]) }
+      : (position && typeof position === 'object') ? { x: Number((position as { x: unknown }).x), y: Number((position as { y: unknown }).y) }
+        : { x: typeof x === 'number' ? x : 400, y: typeof y === 'number' ? y : 300 };
+    const body = asReturningBody(generateCreateItemCode(it.type as ItemType, p, props))
+      .replace(/app\.historyManager\.saveState\(\);/g, '');
+    return `
+  try {
+    const r${i} = await (async function() {
+${body}
+    })();
+    if (r${i} && r${i}.success === false) errors.push({ index: ${i}, error: r${i}.error });
+    else results.push(Object.assign({ index: ${i} }, r${i}));
+  } catch (e) { errors.push({ index: ${i}, error: (e && e.message) || String(e) }); }`;
+  });
   return `
-// Batch create ${items.length} items
-const itemSpecs = ${itemsJson};
-const createdItems = app.batchCreate(itemSpecs);
-
-// Return created item IDs and info
-const results = createdItems.map(item => ({
-  itemId: item.data?.registryId || item.id,
-  type: item.className || 'unknown',
-  position: item.position ? { x: item.position.x, y: item.position.y } : null
-}));
-
-({ success: true, items: results, count: results.length });
-`.trim();
+// Batch create ${items.length} items — create_item for each, one history save
+(async function() {
+  const results = [];
+  const errors = [];
+${blocks.join('\n')}
+  if (app.historyManager) app.historyManager.saveState();
+  return { success: errors.length === 0, items: results, count: results.length, errors: errors };
+})();`.trim();
 }
 
 /**
@@ -3890,17 +3922,7 @@ throw new Error('Unknown diagram mode action: ${action}');
         // inside this op's function.
         const pos = op.position || { x: 400, y: 300 };
         const createProps = withRadiusAxes((op.properties || {}) as Record<string, unknown>);
-        const single = generateCreateItemCode(op.itemType as ItemType, pos, { ...(op.properties || {}) } as Record<string, unknown>).trim();
-        const returning = single.startsWith('(async function()')
-          ? `return await ${single.replace(/;\s*$/, '')};`
-          : (() => {
-            // The snippet's value is its LAST top-level (-led statement.
-            const lines = single.split('\n');
-            let at = -1;
-            lines.forEach((l, i) => { if (l.startsWith('(')) at = i; });
-            if (at >= 0) lines[at] = 'return ' + lines[at];
-            return lines.join('\n');
-          })();
+        const returning = asReturningBody(generateCreateItemCode(op.itemType as ItemType, pos, { ...(op.properties || {}) } as Record<string, unknown>));
         let createCode = `
 const __created = await (async function() {
 ${returning}

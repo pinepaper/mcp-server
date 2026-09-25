@@ -412,3 +412,27 @@ describe('export_widget embed fits the scene and names its dependencies (8.32)',
     expect(r.note).toContain('export_widget_html');
   });
 });
+
+describe('batch_create is create_item for each item (1.79)', () => {
+  it('keeps fontWeight, reports ignoredProperties, saves history once', async () => {
+    let saves = 0;
+    const made: Record<string, any>[] = [];
+    const mk = (id: string) => {
+      const it: Record<string, any> = { className: 'PointText', justification: 'center', fontSize: 30, data: { registryId: id }, bringToFront() {}, _pos: { x: 0, y: 0 } };
+      const P = (x: number, y: number) => ({ x, y, add: ([dx, dy]: number[]) => P(x + dx, y + dy) });
+      Object.defineProperty(it, 'position', { get: () => P(it._pos.x, it._pos.y), set: (p) => { it._pos = { x: p.x, y: p.y }; } });
+      Object.defineProperty(it, 'bounds', { get: () => ({ left: it._pos.x - 5, right: it._pos.x + 5, center: { x: it._pos.x, y: it._pos.y } }) });
+      return it;
+    };
+    const app = { create: () => { const it = mk('item_' + (made.length + 1)); made.push(it); return it; }, historyManager: { saveState() { saves++; } } };
+    const code = codeGenerator.generateBatchCreate({ items: [
+      { type: 'text', params: { x: 10, y: 20, content: 'A', fontWeight: 700 } },
+      { type: 'text', params: { position: [30, 40], content: 'B', glow: 3 } },
+    ] } as never);
+    const r = await new Function('app', 'document', 'window', code.replace('(async function()', 'return (async function()'))(app, {}, {});
+    expect(r.count).toBe(2);
+    expect(made[0].fontWeight).toBe('700');
+    expect(r.items[1].ignoredProperties).toEqual(['glow']);
+    expect(saves).toBe(1);
+  });
+});
