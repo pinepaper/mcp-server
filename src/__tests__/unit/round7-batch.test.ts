@@ -436,3 +436,24 @@ describe('batch_create is create_item for each item (1.79)', () => {
     expect(saves).toBe(1);
   });
 });
+
+describe('batch_modify is modify_item for each item', () => {
+  it('applies modify_item fixes, names skipped ids, saves once', async () => {
+    let saves = 0;
+    const items: Record<string, Record<string, any>> = { item_1: { fillColor: '#123' } };
+    const app = {
+      modifyItem: (id: string) => (items[id] ? true : false),
+      itemRegistry: { get: (id: string) => (items[id] ? { item: items[id] } : null) },
+      historyManager: { saveState() { saves++; } },
+    };
+    const code = codeGenerator.generateBatchModify({ modifications: [
+      { itemId: 'item_1', params: { fillColor: 'none' } },
+      { itemId: 'item_9', params: { opacity: 0.5 } },
+    ] } as never);
+    const r = await new Function('app', 'window', code.replace('(async function()', 'return (async function()'))(app, {});
+    expect(items.item_1.fillColor).toBeNull();
+    expect(r).toMatchObject({ success: false, count: 1, requested: 2 });
+    expect(r.skipped[0].itemId).toBe('item_9');
+    expect(saves).toBe(1);
+  });
+});

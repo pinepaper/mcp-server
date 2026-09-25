@@ -1989,44 +1989,45 @@ ${blocks.join('\n')}
 }
 
 /**
- * Template for batch modify - modifies multiple items with single history save
+ * Template for batch modify — modify_item for each item, one history save.
+ *
+ * This called app.batchModify, which applies raw params and so missed every
+ * modify_item fix (text weight / leading, font loading, audio level, no-fill,
+ * lifetimes, smoothing, the unread-property report) — the drift f1d0b05 and
+ * 8f9b075 removed from the other batch paths. Each item now runs modify_item's
+ * own emitter with its history save removed; the batch saves once. The
+ * result keeps the old shape (count, requested, skipped with reasons, and an
+ * error naming the skipped when any were).
  */
 function generateBatchModifyCode(modifications: BatchModifyItem[]): string {
-  const modsJson = JSON.stringify(modifications, null, 2);
+  const blocks = modifications.map((m, i) => {
+    const snippet = generateModifyItemCode(m.itemId, (m.params || {}) as Record<string, unknown>).trim()
+      .replace(/app\.historyManager\.saveState\(\);/g, '')
+      .replace(/;\s*$/, '');
+    return `
+  try {
+    const r${i} = await ${snippet};
+    if (r${i} && r${i}.success === false) skipped.push({ itemId: ${JSON.stringify(m.itemId)}, reason: r${i}.error || 'not modified' });
+    else { count++; if (r${i} && r${i}.ignoredProperties) ignored.push({ itemId: ${JSON.stringify(m.itemId)}, ignoredProperties: r${i}.ignoredProperties }); }
+  } catch (e) { skipped.push({ itemId: ${JSON.stringify(m.itemId)}, reason: (e && e.message) || String(e) }); }`;
+  });
   return `
-// Batch modify ${modifications.length} items
-const modifications = ${modsJson};
-// TWO BUGS, ONE CALL, AND BOTH FAILED LOUDLY IN THE WRONG PLACE.
-//
-// 1. The engine takes { item, params } with a LIVE ITEM, or { itemId, params }
-//    with a registry id. This put the id STRING into the item field, which is
-//    truthy — so the engine's own id lookup never ran, the string was treated
-//    as an item, and Object.assign got a string: "Cannot convert undefined or
-//    null to object", from a call that named the id correctly.
-// 2. batchModify returns a COUNT, not an array. Calling .map on a number
-//    is the second reported error, and it fires even when the modify worked.
-const results = app.batchModify(modifications.map(mod => ({
-  itemId: mod.itemId,
-  params: mod.params
-})));
-
-// The engine records what it could not do rather than throwing — read it,
-// instead of reporting a clean success over a half-applied batch.
-//
-// Read defensively (|| []): the property arrived with the engine-side
-// batchModify fix, so an older studio reports a count and no skip list rather
-// than failing. The batch still works; only the explanation is thinner.
-const skipped = app.lastBatchModifySkipped || [];
-const count = typeof results === 'number' ? results : (Array.isArray(results) ? results.length : 0);
-
-({
-  success: skipped.length === 0 && count === modifications.length,
-  count,
-  requested: modifications.length,
-  skipped: skipped.map(s => ({ itemId: s.itemId, reason: s.reason })),
-  ...(skipped.length ? { error: 'batch_modify changed ' + count + ' of ' + modifications.length + ' items; skipped: ' + skipped.map(s => s.itemId + ' (' + s.reason + ')').join(', ') } : {}),
-});
-`.trim();
+// Batch modify ${modifications.length} items — modify_item for each, one history save
+(async function() {
+  let count = 0;
+  const skipped = [];
+  const ignored = [];
+${blocks.join('\n')}
+  if (app.historyManager) app.historyManager.saveState();
+  return {
+    success: skipped.length === 0 && count === ${modifications.length},
+    count: count,
+    requested: ${modifications.length},
+    skipped: skipped,
+    ...(ignored.length ? { ignoredProperties: ignored } : {}),
+    ...(skipped.length ? { error: 'batch_modify changed ' + count + ' of ${modifications.length} items; skipped: ' + skipped.map(function(s) { return s.itemId + ' (' + s.reason + ')'; }).join(', ') } : {}),
+  };
+})();`.trim();
 }
 
 /**
