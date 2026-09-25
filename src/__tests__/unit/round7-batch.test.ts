@@ -689,3 +689,59 @@ describe('1.90: the fit holds the anchored edge', () => {
     expect(s.boxes).toHaveLength(0);
   });
 });
+
+describe('paragraph direction (FxTool a3b4e7c3, 1.16)', () => {
+  const studio = (records: boolean) => {
+    const item: Record<string, any> = { className: 'PointText', data: { registryId: 'item_1' }, bringToFront() {} };
+    const seen: Array<Record<string, unknown>> = [];
+    const app = {
+      create: (_t: string, p: Record<string, unknown>) => { seen.push(p); if (records && p.direction) item.data.direction = p.direction; return item; },
+      modifyItem: (_id: string, ch: Record<string, unknown>) => { seen.push(ch); if (records && ch.direction) item.data.direction = ch.direction; return true; },
+      getItemById: () => item, itemRegistry: { get: () => ({ item }) }, historyManager: { saveState() {} },
+    };
+    return { app, seen, item };
+  };
+  const create = (app: object, properties: Record<string, unknown>) => {
+    const code = codeGenerator.generateCreateItem({ itemType: 'text', position: { x: 0, y: 0 }, properties } as never);
+    return new Function('app', code.replace(/\(\{ itemId[\s\S]*\}\);\s*$/, (m) => `return ${m.slice(0, -1)}`))(app);
+  };
+  const modify = (app: object, properties: Record<string, unknown>) =>
+    new Function('app', 'window', `return ${codeGenerator.generateModifyItem({ itemId: 'item_1', properties })}`)(app, {});
+
+  it('reaches the engine as `direction` under any spelling, and is not reported as ignored', () => {
+    for (const key of ['direction', 'textDirection', 'dir']) {
+      const s = studio(true);
+      const r = create(s.app, { content: 'مرحبا.', [key]: 'RTL' });
+      expect(s.seen[0]).toMatchObject({ direction: 'rtl' });
+      expect(s.seen[0]).not.toHaveProperty('dir');
+      expect(r.direction).toEqual({ applied: true, value: 'rtl' });
+      expect(r.ignoredProperties).toBeUndefined();
+    }
+  });
+
+  it('modify sends `direction`, including for `dir`, which the engine\'s modify does not read', () => {
+    const s = studio(true);
+    const r = modify(s.app, { dir: 'ltr' });
+    expect(s.seen[0]).toEqual({ direction: 'ltr' });
+    expect(r.direction).toEqual({ applied: true, value: 'ltr' });
+    expect(r.ignoredProperties).toBeUndefined();
+  });
+
+  it('a studio without RTL support says the direction was not applied', () => {
+    const s = studio(false);
+    expect(create(s.app, { content: 'שלום', direction: 'rtl' }).direction).toMatchObject({ applied: false });
+  });
+
+  it('a value that is not a direction is refused, not sent', () => {
+    const s = studio(true);
+    const r = create(s.app, { content: 'x', direction: 'right' });
+    expect(s.seen[0]).not.toHaveProperty('direction');
+    expect(r.direction).toMatchObject({ applied: false, error: expect.stringContaining('auto, ltr, rtl') });
+  });
+
+  it('survives the handler schema', async () => {
+    const { handleToolCall } = await import('../../tools/handlers.js');
+    const out = JSON.stringify(await handleToolCall('pinepaper_create_item', { itemType: 'text', properties: { content: 'x', dir: 'rtl' } }, { executionMode: 'code' } as never));
+    expect(out).toContain('"direction\\": \\"rtl\\"');
+  });
+});

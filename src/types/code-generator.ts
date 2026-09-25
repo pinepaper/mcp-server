@@ -365,6 +365,7 @@ function generateCreateItemCode(
   const textFit = itemType === 'text' && baseProperties.fit && typeof baseProperties.fit === 'object' ? baseProperties.fit as Record<string, unknown> : null;
   const { fit: _fitDropped, ...createProps } = baseProperties;
   void _fitDropped;
+  const textDirection = itemType === 'text' ? takeDirection(createProps) : null;
   const params: Record<string, unknown> = {
     ...(omitXY ? {} : { x: position.x, y: position.y }),
     ...withRadiusAxes(createProps),
@@ -443,30 +444,6 @@ if (item && item.data) { item.data.renderAs = ${JSON.stringify(itemType)}; item.
   : { success: false, error: 'the stand-in plate for this ${itemType} was not created.' });`;
   }
 
-  // RTL IS NOT SUPPORTED, AND SILENCE WAS THE WORST WAY TO SAY SO.
-  //
-  // create('text', {direction:'rtl'}) dropped the property with no error and
-  // left the base direction LTR, so an Arabic sentence's final period landed
-  // at the reader's START — visibly wrong, and attributable to nothing. The
-  // engine has no text-direction support at all: `direction` there is an arc
-  // sweep and an animation direction, and `justification` is the only
-  // text-related alignment it reads.
-  //
-  // Refused by name rather than accepted-and-dropped, and rather than adding a
-  // prop that would be dropped one layer further on. The alignment half is
-  // real and is named, because it is what a caller can actually use today.
-  const rtlAsked = params.direction ?? params.textDirection;
-  if (rtlAsked !== undefined) {
-    return `
-// Create ${itemType} — refused, rather than silently left ltr
-({ success: false, error: ${JSON.stringify(
-      `direction / textDirection is not supported: this studio has no text-direction support, so ${String(rtlAsked)} would have been accepted and the text left LTR. `
-      + 'That is visible as a right-to-left sentence whose final punctuation lands at the start. '
-      + "You can align with justification: 'right', which is read, but the BASE direction needs engine support — "
-      + 'pass pre-shaped text, or split the line, until it lands.',
-    )} });`.trim();
-  }
-
   // AN UNKNOWN ANCHOR IS INVISIBLE OVER MCP.
   //
   // The engine names a bad anchor through console.warn and leaves (x, y) as
@@ -501,7 +478,7 @@ if (item && item.data) { item.data.renderAs = ${JSON.stringify(itemType)}; item.
   // refused: the item is still what the caller asked for in every other way,
   // and a refusal would cost a re-issue over one typo.
   const ignored = Object.keys(properties).filter((k) => !CREATE_KNOWN_KEYS.has(k)
-    && !(itemType === 'text' && ((TEXT_STYLE_KEYS as readonly string[]).includes(k) || k === 'fit')));
+    && !(itemType === 'text' && ((TEXT_STYLE_KEYS as readonly string[]).includes(k) || k === 'fit' || (DIRECTION_KEYS as readonly string[]).includes(k))));
 
   // Build the code
   let code = `
@@ -558,6 +535,7 @@ const item = app.create('${itemType}', ${JSON.stringify(params, null, 2)});`;
   // The vertical hold follows the anchor, as the engine's own create step
   // derives it (1.90): without it the fit held the centre, and a top-left
   // anchored headline's top edge drifted on every refit.
+  if (textDirection) code += emitDirectionCheck('item', textDirection);
   if (textFit) code += `\nlet __textFit = null;${emitTextFit('item', textFit, JSON.stringify(anchorHold(properties.anchor ?? properties.origin) ?? null))}`;
 
   // After opacity, so the "on" level of the lifetime is the item's own.
@@ -590,7 +568,7 @@ const itemId = item.data.registryId;
 app.historyManager.saveState();
 
 // Return item info
-({ itemId, type: '${itemType}'${textFit ? ', textFit: __textFit' : ''}, position: ${omitXY ? `(item.position ? { x: item.position.x, y: item.position.y } : null)` : `{ x: ${position.x}, y: ${position.y} }`}${hasLifetime ? ', lifetime: __lifetime' : ''}${loadsFont ? ', ...(__font ? { font: __font } : {})' : ''}${ignored.length > 0
+({ itemId, type: '${itemType}'${textFit ? ', textFit: __textFit' : ''}${textDirection ? ', direction: __direction' : ''}, position: ${omitXY ? `(item.position ? { x: item.position.x, y: item.position.y } : null)` : `{ x: ${position.x}, y: ${position.y} }`}${hasLifetime ? ', lifetime: __lifetime' : ''}${loadsFont ? ', ...(__font ? { font: __font } : {})' : ''}${ignored.length > 0
     ? `, ignoredProperties: ${JSON.stringify(ignored)}, warning: ${JSON.stringify(
       `${ignored.join(', ')} ${ignored.length > 1 ? 'are' : 'is'} not read when creating an item, so ${ignored.length > 1 ? 'they had' : 'it had'} no effect. `
       + 'Check the spelling against this item type\'s documented properties.',
@@ -619,7 +597,7 @@ const MODIFY_KNOWN_KEYS: ReadonlySet<string> = new Set([
   ...NORMALIZE_PARAM_READS,
   'contentType', 'contentFormat', 'countdownTarget', 'countdownEndText',
   'audioGain', 'volume', 'gain', 'bornAt', 'ttl', 'smoothing',
-  'fontStyle', 'leading', 'lineHeight', 'skewX', 'skewY', 'matrix', 'fit',
+  'fontStyle', 'leading', 'lineHeight', 'skewX', 'skewY', 'matrix', 'fit', 'direction', 'textDirection', 'dir',
 ]);
 
 /** Spellings callers reach for, and the key the engine actually reads. */
@@ -705,6 +683,48 @@ if (typeof app.checkFont === 'function') {
  * without fitText the result says so rather than leaving the text as it was
  * in silence. `__textFit` must be declared by the caller.
  */
+/**
+ * A text paragraph's base direction (FxTool a3b4e7c3, gap 1.16): 'auto' (the
+ * first strong character decides), 'ltr' or 'rtl', under three spellings.
+ *
+ * Pulled out of the changes and normalised to `direction`, the one spelling
+ * the engine reads on both create and modify (modify does not read `dir`). A
+ * value that is not a direction is refused here: the engine only console.warns
+ * it, which production strips.
+ */
+const DIRECTION_KEYS = ['direction', 'textDirection', 'dir'] as const;
+type DirectionRequest = { value: 'auto' | 'ltr' | 'rtl' } | { error: string };
+function takeDirection(props: Record<string, unknown>): DirectionRequest | null {
+  const key = DIRECTION_KEYS.find((k) => props[k] !== undefined && props[k] !== null && props[k] !== '');
+  const raw = key ? props[key] : undefined;
+  for (const k of DIRECTION_KEYS) delete props[k];
+  if (raw === undefined) return null;
+  const v = String(raw).trim().toLowerCase();
+  if (v === 'auto' || v === 'ltr' || v === 'rtl') {
+    props.direction = v;
+    return { value: v };
+  }
+  return { error: `direction ${JSON.stringify(String(raw))} is not one of auto, ltr, rtl — the text keeps its current direction.` };
+}
+
+/**
+ * Sets `__direction` (declared here) to whether the studio took the direction:
+ * an engine without RTL support accepts the key and draws left-to-right, so
+ * the only evidence is the value it records on the item.
+ */
+function emitDirectionCheck(itemExpr: string, req: DirectionRequest): string {
+  if ('error' in req) return `
+const __direction = ${JSON.stringify({ applied: false, error: req.error })};`;
+  const v = JSON.stringify(req.value);
+  return `
+const __direction = (function(it) {
+  if (!it || it.className !== 'PointText') return { applied: false, note: 'direction applies to text items only.' };
+  return it.data && it.data.direction === ${v}
+    ? { applied: true, value: ${v} }
+    : { applied: false, note: 'this studio does not set a paragraph direction (it needs an engine with RTL text support): the text is laid out left-to-right.' };
+})(${itemExpr});`;
+}
+
 /** 'top' / 'bottom' from a top-* / bottom-* anchor, as the engine derives it. */
 function anchorHold(anchor: unknown): 'top' | 'bottom' | undefined {
   const a = String(anchor ?? '').toLowerCase();
@@ -915,6 +935,7 @@ function generateModifyItemCode(
   // the one this reads back. fit: null still goes through — that is the
   // engine's "stop fitting".
   if (restProperties.fit && typeof restProperties.fit === 'object') delete restProperties.fit;
+  const modDirection = takeDirection(restProperties);
 
   // modifyItem(id, changes), NOT select() + modify().
   //
@@ -1056,7 +1077,8 @@ if (_flagged && _flagged.item && _flagged.item.data) Object.assign(_flagged.item
   )}`;
   code += `
 app.historyManager.saveState();
-return { success: true, itemId: '${itemId}'${modFit ? ', textFit: __textFit' : ''}${affine ? `, affine: ${JSON.stringify({ skewX, skewY, matrix, note: 'applied to the current shape: calling again compounds it. To undo, apply the inverse (negative skew, or the inverse matrix).' })}` : ''}${modLifetime ? ', lifetime: __lifetime' : ''}${modFont ? ', ...(__font ? { font: __font } : {})' : ''}${modWarning} };`;
+${modDirection ? emitDirectionCheck(`app.getItemById('${itemId}')`, modDirection) : ''}
+return { success: true, itemId: '${itemId}'${modFit ? ', textFit: __textFit' : ''}${modDirection ? ', direction: __direction' : ''}${affine ? `, affine: ${JSON.stringify({ skewX, skewY, matrix, note: 'applied to the current shape: calling again compounds it. To undo, apply the inverse (negative skew, or the inverse matrix).' })}` : ''}${modLifetime ? ', lifetime: __lifetime' : ''}${modFont ? ', ...(__font ? { font: __font } : {})' : ''}${modWarning} };`;
 
   // Wrapped, because the body now RETURNS early on a miss rather than falling
   // through to an unconditional success. Async only when a font must load
