@@ -80,6 +80,15 @@ describe('regions away from the origin (c68524a2)', () => {
     expect(s.calls.map((c) => (c[2] as { region: unknown }).region)).toEqual(boxes);
   });
 
+  it('an explicit instance id reaches the engine, from both tools', async () => {
+    const s = studio();
+    await run(s.app, { x: 0, y: 0, width: 100, height: 100, id: 'waves-left' });
+    expect((s.calls[0][2] as { region: { id: string } }).region.id).toBe('waves-left');
+    expect(ExecuteGeneratorInputSchema.safeParse({ generatorName: 'drawWaves', region: { id: 'a' } }).success).toBe(false); // an id is not a box
+    const code = codeGenerator.generateAgentBatchExecute({ operations: [{ type: 'execute_generator', generatorName: 'drawWaves', generatorRegion: { x: 0, y: 0, width: 50, height: 50, id: 'w2' } }] } as never);
+    expect(code).toContain('"id":"w2"');
+  });
+
   it('the batch op carries the region, shape and checks alike', async () => {
     const code = codeGenerator.generateAgentBatchExecute({ operations: [{ type: 'execute_generator', generatorName: 'drawSunburst', generatorRegion: { shape: { itemId: 'nope' } } }] } as never);
     expect(code).toContain('names no item');

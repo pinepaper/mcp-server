@@ -1430,8 +1430,10 @@ export const ImportMotionCaptureInputSchema = z.object({
 //
 // Region (added FxTool c81781c): when set, the generator draws into a clipped
 // sub-group translated to (x,y) sized (width × height). Region runs imply
-// preserve (won't wipe the canvas) and re-running the same generator replaces
-// its prior region. Different generators' regions coexist. Invalid/zero-size
+// preserve (won't wipe the canvas). An instance is generator + box, or an
+// explicit region.id (FxTool 5adfcf1c): the same box or id replaces, another
+// box adds an instance. (Before 5adfcf1c a second box silently replaced the
+// first — "drawWaves in a roundedRect draws nothing".) Invalid/zero-size
 // regions fall back to full-canvas FxTool-side.
 //
 // Shape (FxTool c68524a2): the clip may be a rounded rect, ellipse, circle,
@@ -1449,6 +1451,7 @@ export const GeneratorRegionSchema = z.object({
   sides: z.number().int().min(3).max(64).optional().describe('polygon sides (default 6).'),
   points: z.number().int().min(3).max(64).optional().describe('star points (default 5).'),
   innerRatio: z.number().min(0.05).max(0.95).optional().describe('star inner radius as a fraction of the outer (default 0.5).'),
+  id: z.string().trim().min(1).max(64).optional().describe('Names this region instance. Without it an instance is the generator plus its box: the same box replaces, a different box adds another. With it, re-running under the same id replaces that instance wherever its box now is.'),
 }).superRefine((r, ctx) => {
   const box = [r.x, r.y, r.width, r.height].filter((v) => v !== undefined).length;
   const fromItem = typeof r.shape === 'object';

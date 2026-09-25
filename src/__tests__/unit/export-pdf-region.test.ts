@@ -520,6 +520,9 @@ describe('broadcast luma is measured, and a legaliser named (8.35, FxTool 4f1ec3
     const z = await run({ broadcast: true, broadcastHeadroom: 0 }, { broadcast: true, bitrate: 8e6, achievedBitrate: 8e6 });
     expect(z.calls[0].broadcastHeadroom).toBe(0);
     expect(z.r.broadcastHeadroom).toBeUndefined();
+    // Where the studio reports the applied headroom, the result says that.
+    const rep = await run({ broadcast: true }, { broadcast: true, bitrate: 8e6, achievedBitrate: 8e6, headroom: 10 });
+    expect(rep.r.broadcastHeadroom.value).toBe(10);
     const plain = await run({}, { broadcast: false, bitrate: 2e6 });
     expect(plain.calls[0].broadcastHeadroom).toBeUndefined();
   });

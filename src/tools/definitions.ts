@@ -7013,7 +7013,7 @@ COMMON PARAMS (all generators):
         },
         region: {
           type: 'object',
-          description: 'Optional sub-region {x, y, width, height} (canvas coords) — generator draws into a clipped, translated sub-group instead of full-canvas. Region runs imply preserve (won\'t wipe the canvas) and re-running the same generator replaces its prior region; different generators\' regions coexist, so several generators side by side is regions. Invalid/zero-size regions fall back to full-canvas. shape clips the region to a rounded rect, ellipse, circle, polygon or star, or to an existing path ({itemId}: x/y/width/height may then be omitted and default to its bounds). A studio without region shapes says so in the result (regionShapeApplied: false). On older studios, some generators also paint a page-wide background when confined to a region.',
+          description: 'Optional sub-region {x, y, width, height} (canvas coords) — generator draws into a clipped, translated sub-group instead of full-canvas. Region runs imply preserve (won\'t wipe the canvas). An instance is the generator plus its box, or an explicit region.id: re-running with the same box (or id) replaces it, and the same generator in a different box adds another — so one generator several times, or several generators side by side, is regions. Older studios keep one region per generator (a second box replaces the first). Invalid/zero-size regions fall back to full-canvas. shape clips the region to a rounded rect, ellipse, circle, polygon or star, or to an existing path ({itemId}: x/y/width/height may then be omitted and default to its bounds). A studio without region shapes says so in the result (regionShapeApplied: false). On older studios, some generators also paint a page-wide background when confined to a region.',
           properties: {
             x: { type: 'number', description: 'Region top-left X in canvas coords' },
             y: { type: 'number', description: 'Region top-left Y in canvas coords' },
@@ -7024,6 +7024,7 @@ COMMON PARAMS (all generators):
             sides: { type: 'integer', minimum: 3, maximum: 64, description: 'polygon sides (default 6).' },
             points: { type: 'integer', minimum: 3, maximum: 64, description: 'star points (default 5).' },
             innerRatio: { type: 'number', minimum: 0.05, maximum: 0.95, description: 'star inner radius / outer (default 0.5).' },
+            id: { type: 'string', minLength: 1, maxLength: 64, description: 'Names this region instance, so re-running under the same id replaces it even if its box moved.' },
           },
         },
       },

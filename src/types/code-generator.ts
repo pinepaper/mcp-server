@@ -5464,14 +5464,16 @@ ${stillTime !== undefined ? `
   // that rebuilt its settings without them) is named, not assumed.
   const __vr = __vx && __vx.lastVideoReport;
   if (result && result.success && __vr && typeof __vr === 'object') result.video = __vr;${headroomDefaulted ? `
-  if (result && result.success) result.broadcastHeadroom = { value: 12, defaulted: true, note: 'broadcast defaults to 12 luma codes of headroom, which keeps encoder ringing legal; pass broadcastHeadroom: 0 for the full range.' };` : ''}
+  // The applied value is the engine's own report where it gives one
+  // (5adfcf1c: lastVideoReport.headroom), so the result and the report agree.
+  if (result && result.success) result.broadcastHeadroom = { value: (__vr && typeof __vr.headroom === 'number') ? __vr.headroom : 12, defaulted: true, note: 'broadcast defaults to 12 luma codes of headroom, which keeps encoder ringing legal; pass broadcastHeadroom: 0 for the full range.' };` : ''}
   // LUMA OUTSIDE 16-235 (8.35, FxTool 4f1ec3ae). The broadcast encode is
   // decoded back and measured: H.264 ringing at hard edges puts a fraction of
   // a percent of samples out of range, which QC rejects. broadcastHeadroom
   // cuts it but never to zero, so a legaliser pass is the requirement.
   if (result && result.success && __vr && __vr.luma && __vr.luma.outOfRange > 0 && result.fidelity) {
     result.fidelity.warnings = (result.fidelity.warnings || []).concat([{ code: 'luma_out_of_range',
-      message: 'broadcast QC will reject this as delivered: ' + ((__vr.luma.outOfRangeFraction || 0) * 100).toFixed(3) + '% of decoded luma is outside 16-235 (min ' + __vr.luma.min + ', max ' + __vr.luma.max + ', broadcastHeadroom ' + ${JSON.stringify(broadcastHeadroom ?? 12)} + '). First re-export with a larger broadcastHeadroom (12 measured clean on hard white-on-black edges; up to 40). Otherwise a legaliser pass is REQUIRED before delivery — clip into a NARROWER band and re-encode at high quality, because a plain 16-235 clip followed by a re-encode brings the edge overshoot back: ffmpeg -i in.mp4 -vf "lutyuv=y=clip(val\\\\,28\\\\,223):u=clip(val\\\\,16\\\\,240):v=clip(val\\\\,16\\\\,240)" -c:v libx264 -crf 18 -color_range tv -colorspace bt709 -color_primaries bt709 -color_trc bt709 -c:a copy out.mp4 (measured 20-229). Verify the luma range after re-encoding.' }]);
+      message: 'broadcast QC will reject this as delivered: ' + ((__vr.luma.outOfRangeFraction || 0) * 100).toFixed(3) + '% of decoded luma is outside 16-235 (min ' + __vr.luma.min + ', max ' + __vr.luma.max + ', broadcastHeadroom ' + (typeof __vr.headroom === 'number' ? __vr.headroom : ${JSON.stringify(broadcastHeadroom ?? 12)}) + '). First re-export with a larger broadcastHeadroom (12 measured clean on hard white-on-black edges; up to 40). Otherwise a legaliser pass is REQUIRED before delivery — clip into a NARROWER band and re-encode at high quality, because a plain 16-235 clip followed by a re-encode brings the edge overshoot back: ffmpeg -i in.mp4 -vf "lutyuv=y=clip(val\\\\,28\\\\,223):u=clip(val\\\\,16\\\\,240):v=clip(val\\\\,16\\\\,240)" -c:v libx264 -crf 18 -color_range tv -colorspace bt709 -color_primaries bt709 -color_trc bt709 -c:a copy out.mp4 (measured 20-229). Verify the luma range after re-encoding.' }]);
     if (result.fidelity.note) delete result.fidelity.note;
   }
 ${Object.keys(videoEncodeOpts).length ? `  if (result && result.success) {
