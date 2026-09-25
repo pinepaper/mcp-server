@@ -114,7 +114,11 @@ export const cameraHandlers: Record<string, CameraHandler> = {
       yaw?: number;
       easing?: string;
     }>;
-    const duration = args.duration as number;
+    // Optional (retest): omitted, the camera runs to its last keyframe. The
+    // last key's time is passed rather than nothing, so every studio does the
+    // same — a newer engine infers it, an older one clamped at 2 s.
+    const lastKey = Array.isArray(keyframes) && keyframes.length ? Math.max(...keyframes.map((k) => Number(k.time) || 0)) : 0;
+    const duration = typeof args.duration === 'number' && args.duration > 0 ? args.duration as number : (lastKey > 0 ? lastKey : 2);
     const loop = (args.loop as boolean) ?? false;
     const delay = (args.delay as number) ?? 0;
     const fov = (args.fov as number) ?? 60;

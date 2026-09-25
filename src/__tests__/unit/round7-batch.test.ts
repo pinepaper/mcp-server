@@ -588,3 +588,11 @@ describe('1.81 through the HANDLER, not just the generator', () => {
     expect(withPos).toContain('\\"x\\": 50');
   });
 });
+
+describe('camera_animate duration is optional (retest)', () => {
+  it('runs to the last keyframe when omitted', async () => {
+    const { handleToolCall } = await import('../../tools/handlers.js');
+    const out = JSON.stringify(await handleToolCall('pinepaper_camera_animate', { keyframes: [{ time: 0, zoom: 1 }, { time: 7.5, zoom: 2 }] }, { executionMode: 'code' } as never));
+    expect(out).toContain('over 7.5s');
+  });
+});
