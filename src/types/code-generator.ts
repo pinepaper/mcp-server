@@ -910,6 +910,11 @@ function generateModifyItemCode(
   dataFlags?: Record<string, unknown>
 ): string {
   const { contentType, contentFormat, countdownTarget, countdownEndText, ...restProperties } = properties;
+  // A new fit box is applied here (emitTextFit, with the hold carried over),
+  // not by modifyItem: the engine's modify fits it with no hold, overwriting
+  // the one this reads back. fit: null still goes through — that is the
+  // engine's "stop fitting".
+  if (restProperties.fit && typeof restProperties.fit === 'object') delete restProperties.fit;
 
   // modifyItem(id, changes), NOT select() + modify().
   //

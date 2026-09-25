@@ -648,8 +648,10 @@ describe('1.90: the fit holds the anchored edge', () => {
   const run = (props: Record<string, unknown>, fitData?: unknown) => {
     const boxes: Array<Record<string, unknown>> = [];
     const item = { className: 'PointText', data: { registryId: 'item_1', fitBox: fitData }, bringToFront() {} };
-    const app = { create: () => item, historyManager: { saveState() {} }, itemRegistry: { get: () => ({ item }) }, modifyItem: () => true,
-      fitText: (_i: unknown, box: Record<string, unknown>) => { boxes.push(box); return { ok: true, fontSize: 80, lines: 2, fits: true }; } };
+    // modifyItem as the engine's: a fit in the changes is fitted with no hold.
+    const app: Record<string, any> = { create: () => item, historyManager: { saveState() {} }, itemRegistry: { get: () => ({ item }) }, getItemById: () => item,
+      modifyItem: (_id: string, ch: Record<string, unknown>) => { if (ch.fit) app.fitText(item, ch.fit); return true; },
+      fitText: (_i: unknown, box: Record<string, unknown>) => { boxes.push(box); item.data.fitBox = { ...box, hold: box.hold ?? 'center' }; return { ok: true, fontSize: 80, lines: 2, fits: true }; } };
     return { app, boxes };
   };
   const create = (app: object, properties: Record<string, unknown>) => {
@@ -674,6 +676,16 @@ describe('1.90: the fit holds the anchored edge', () => {
   it('modify with a new box keeps the hold the old box had', () => {
     const s = run({}, { maxWidth: 500, hold: 'top' });
     new Function('app', 'window', `return ${codeGenerator.generateModifyItem({ itemId: 'item_1', properties: { fit: { maxWidth: 600 } } })}`)(s.app, {});
+    expect(s.boxes).toHaveLength(1);
     expect(s.boxes[0].hold).toBe('top');
+  });
+
+  it('fit: null reaches the engine, which stops fitting', () => {
+    const s = run({}, { maxWidth: 500, hold: 'top' });
+    let changes: Record<string, unknown> = {};
+    s.app.modifyItem = (_id: string, ch: Record<string, unknown>) => { changes = ch; return true; };
+    new Function('app', 'window', `return ${codeGenerator.generateModifyItem({ itemId: 'item_1', properties: { fit: null } })}`)(s.app, {});
+    expect(changes).toEqual({ fit: null });
+    expect(s.boxes).toHaveLength(0);
   });
 });
