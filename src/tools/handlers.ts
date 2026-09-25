@@ -170,6 +170,7 @@ import * as designSystems from '../design/design-systems.js';
 import { exportHandlers } from './handlers/export.js';
 import { planCharacter, generateCharacterCode } from './handlers/character.js';
 import { buildZip } from '../utils/zip.js';
+import { buildScc, type SccCue } from '../utils/scc.js';
 import { buildHtml5Ad, buildPlayable, externalRequests, type CtaBox } from '../utils/ad-package.js';
 
 /**
@@ -226,7 +227,7 @@ function getExportDir(): string {
 // wav joins them: a minute of 48kHz 16-bit is ~5.8 MB of base64 and the ten
 // minutes the schema allows is ~77 MB. Deliverable across the bridge, useless
 // pasted into a response.
-export const ALWAYS_SAVE_FORMATS = new Set(['mp4', 'webm', 'gif', 'apng', 'pdf', 'wav', 'srt', 'vtt', 'html5-ad', 'playable']);
+export const ALWAYS_SAVE_FORMATS = new Set(['mp4', 'webm', 'gif', 'apng', 'pdf', 'wav', 'srt', 'vtt', 'scc', 'html5-ad', 'playable']);
 // 500_000 was chosen against the bridge's limits, not the CALLER's. A pilot
 // session hit a 263K-character end_job result — comfortably under this, so it
 // was returned inline, and over the tool-result limit of the client reading
@@ -455,7 +456,7 @@ export async function resolveMediaSource(input: string): Promise<{ src: string }
 }
 
 export function getFileExtension(format: string): string {
-  const extMap: Record<string, string> = { mp4: 'mp4', webm: 'webm', gif: 'gif', apng: 'png', 'html5-ad': 'zip', playable: 'html', pdf: 'pdf', png: 'png', svg: 'svg', wav: 'wav', jpg: 'jpg', webp: 'webp', srt: 'srt', vtt: 'vtt' };
+  const extMap: Record<string, string> = { mp4: 'mp4', webm: 'webm', gif: 'gif', apng: 'png', 'html5-ad': 'zip', playable: 'html', pdf: 'pdf', png: 'png', svg: 'svg', wav: 'wav', jpg: 'jpg', webp: 'webp', srt: 'srt', vtt: 'vtt', scc: 'scc' };
   return extMap[format] || format;
 }
 
@@ -3569,6 +3570,19 @@ You can now start creating new items on a clean canvas.`,
 
         // AN AD (8.21 / 8.24): the studio sent its widget page; the network
         // wrapper, the zip and the size check are done here.
+        // SCC (CEA-608, 8.37): the studio sent the cues; encoded here.
+        if (format === 'scc' && Array.isArray(exportResult?.sccCues)) {
+          const scc = buildScc(exportResult.sccCues as SccCue[]);
+          const { filePath, fileSize } = await saveExportToFile(scc.text, 'scc', input.platform || 'auto');
+          const warnings: Array<{ code: string; message: string }> = [];
+          if (scc.truncated) warnings.push({ code: 'caption_truncated', message: `${scc.truncated} caption(s) did not fit two rows of 32 characters and were cut. Split long captions into more cues.` });
+          if (scc.replacedChars.length) warnings.push({ code: 'caption_chars_dropped', message: `characters outside the CEA-608 set were left out: ${scc.replacedChars.join(' ')}. 608 carries Latin letters, digits, common punctuation and a few accented letters.` });
+          if (scc.delayed.length) warnings.push({ code: 'caption_delayed', message: `${scc.delayed.length} caption(s) went on late — 608 carries two bytes a frame, so a caption needs time to load before it shows: ${scc.delayed.slice(0, 5).map((d) => `cue ${d.cue + 1} by ${d.frames} frame(s)`).join(', ')}. Leave more time between captions.` });
+          const { sccCues: _c, ...rest } = exportResult as Record<string, unknown>;
+          void _c;
+          const cleanResult = { ...rest, filePath, fileSize, frameRate: '29.97 drop-frame', fidelity: { warnings } };
+          return { content: [{ type: 'text' as const, text: `Export saved to file:\n\nFile: ${filePath}\nFormat: scc (CEA-608, CC1, pop-on)\nSize: ${fileSize} bytes\n\nResult: ${JSON.stringify(cleanResult, null, 2)}` }] };
+        }
         if ((format === 'html5-ad' || format === 'playable') && typeof exportResult?.adPage === 'string') {
           return saveAdExport(exportResult as AdExportResult, input, input.platform || 'auto');
         }

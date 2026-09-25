@@ -4645,7 +4645,9 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
     // lifetime becomes one cue, in start order; a text item without one is
     // on screen for the whole piece and is not a caption, so it is left out
     // and counted.
-    if (exportFormat === 'srt' || exportFormat === 'vtt') {
+    // scc (CEA-608, 8.37) takes the same cues; the server encodes them
+    // (src/utils/scc.ts), where the byte work is testable.
+    if (exportFormat === 'srt' || exportFormat === 'vtt' || exportFormat === 'scc') {
       const fmt = exportFormat;
       return `
 // Export: captions (${fmt}) from text items with a lifetime
@@ -4674,7 +4676,8 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
     const stop = typeof d.ttl === 'number' ? start + d.ttl : end;
     return { start: start, stop: Math.max(start, stop), text: e.item.content.trim() };
   }).sort(function(a, b) { return a.start - b.start; });
-  const body = cues.map(function(c, i) {
+${fmt === 'scc' ? `  return { success: true, format: 'scc', sccCues: cues, cues: cues.length, untimedText: texts.length - timed.length };
+` : ''}  const body = cues.map(function(c, i) {
     return ${fmt === 'srt' ? `(i + 1) + '\\n' + ts(c.start, ',') + ' --> ' + ts(c.stop, ',')` : `ts(c.start, '.') + ' --> ' + ts(c.stop, '.')`} + '\\n' + c.text;
   }).join('\\n\\n') + '\\n';
   const text = ${fmt === 'vtt' ? `'WEBVTT\\n\\n' + body` : 'body'};
