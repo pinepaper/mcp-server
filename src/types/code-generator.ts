@@ -4445,7 +4445,14 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
 
   generateAgentExport(input: AgentExportInput): string {
     const validated = AgentExportInputSchema.parse(input);
-    const { platform, format, quality, framing, duration, estimateOnly, scale, fps, pdf: pdfOpts, region, time: stillTime, maxBytes, loop: gifLoop } = validated;
+    const { platform, format, quality, framing, duration, estimateOnly, scale, fps, pdf: pdfOpts, region, time: stillTime, maxBytes, loop: gifLoop, broadcast, bitrate, minBitrate, bitrateMode } = validated;
+  // Encoder options (FxTool 16719759); the schema keeps them to mp4 / webm.
+  const videoEncodeOpts: Record<string, unknown> = {};
+  if (broadcast) videoEncodeOpts.broadcast = true;
+  if (bitrate !== undefined) videoEncodeOpts.bitrate = bitrate;
+  if (minBitrate !== undefined) videoEncodeOpts.minBitrate = minBitrate;
+  if (bitrateMode !== undefined) videoEncodeOpts.bitrateMode = bitrateMode;
+  const encodeOptsJs = Object.keys(videoEncodeOpts).length ? `, ...${JSON.stringify(videoEncodeOpts)}` : '';
     const qualityLevel = quality || 'standard';
     const videoDuration = duration ?? 5;
 
@@ -4891,6 +4898,7 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
   // first so a report left by an earlier export is never read as this one's.
   const __vx = app.exportEngine && app.exportEngine.videoExporter;
   if (__vx && 'lastAudioReport' in __vx) __vx.lastAudioReport = null;
+  if (__vx && 'lastVideoReport' in __vx) __vx.lastVideoReport = null;
 ${stillTime !== undefined ? `
   // A STILL AT A CHOSEN MOMENT (round 7 X, 1.57). Without this a png is
   // whatever frame the playhead is on — two identical builds gave PNGs that
@@ -5022,7 +5030,7 @@ ${stillTime !== undefined ? `
         // loop rides in the BASE settings for a gif, so every route carries it:
         // the direct one below, and also camera framing and a studio without
         // _quickExportVideo, which build from these and used to drop it.
-        const baseVideoSettings = { format, fps: settings.fps, quality: settings.compression, duration: ${videoDuration}${scale !== undefined && scale !== 1 ? ', width: dimensions.width, height: dimensions.height' : ''}${gifLoop !== undefined ? `, ...(format === 'gif' ? { loop: ${JSON.stringify(gifLoop)} } : {})` : ''} };
+        const baseVideoSettings = { format, fps: settings.fps, quality: settings.compression, duration: ${videoDuration}${scale !== undefined && scale !== 1 ? ', width: dimensions.width, height: dimensions.height' : ''}${gifLoop !== undefined ? `, ...(format === 'gif' ? { loop: ${JSON.stringify(gifLoop)} } : {})` : ''}${encodeOptsJs} };
 
         // THE EXPORT STORE. A long export cannot come back as one base64
         // string: base64 of a gigabyte is larger than the gigabyte, and it
@@ -5051,7 +5059,10 @@ ${stillTime !== undefined ? `
             // VideoEncoder.configure.
             quality: settings.compression,
             width: cameraDims ? cameraDims.width : dimensions.width,
-            height: cameraDims ? cameraDims.height : dimensions.height,
+            height: cameraDims ? cameraDims.height : dimensions.height,${encodeOptsJs ? `
+            // Broadcast / bitrate. A store that rebuilds its options without
+            // them is caught by the video report below, not assumed.
+            ${encodeOptsJs.slice(2)},` : ''}
           });
           if (!stored || stored.ok === false) {
             result = { success: false, platform, format, error: (stored && stored.reason) || 'the export store refused the export without saying why' };
@@ -5332,7 +5343,29 @@ ${stillTime !== undefined ? `
   // then failed its cap. The engine now reports the track; it is surfaced as
   // result.audio, and its warning (sound in the trimmed lead-in) and any audio
   // longer than the picture go into fidelity.warnings, where a caller looks.
-  const __ar = __vx && __vx.lastAudioReport;
+  // WHAT THE ENCODER WAS GIVEN AND WHAT IT MADE (FxTool 16719759, 8.34-8.36).
+  // The browser's H.264 treats a bitrate as a ceiling, so an 8 Mbps broadcast
+  // request can come out at 1.8 — the engine measures it and warns. A request
+  // the report does not reflect (an engine without the options, or a route
+  // that rebuilt its settings without them) is named, not assumed.
+  const __vr = __vx && __vx.lastVideoReport;
+  if (result && result.success && __vr && typeof __vr === 'object') result.video = __vr;
+${Object.keys(videoEncodeOpts).length ? `  if (result && result.success) {
+    const __asked = ${JSON.stringify(videoEncodeOpts)};
+    const __vw = [];
+    if (__vr && __vr.warning) __vw.push({ code: 'bitrate_below_floor', message: String(__vr.warning) });
+    if (!__vr || typeof __vr !== 'object') {
+      __vw.push({ code: 'encode_options_not_applied', message: 'this studio did not report its encode, so ' + Object.keys(__asked).join(', ') + ' cannot be confirmed — it likely has no broadcast / bitrate support, and the file is an ordinary web encode.' });
+    } else {
+      if (__asked.broadcast && __vr.broadcast !== true) __vw.push({ code: 'broadcast_not_applied', message: 'broadcast was asked for but the encode was not broadcast-safe (the export route dropped the option): full-range, untagged colour.' });
+      if (__asked.bitrate !== undefined && typeof __vr.bitrate === 'number' && __vr.bitrate < __asked.bitrate * 0.99) __vw.push({ code: 'bitrate_not_applied', message: 'bitrate ' + __asked.bitrate + ' was asked for; the encoder was given ' + __vr.bitrate + '.' });
+    }
+    if (__vw.length && result.fidelity) {
+      result.fidelity.warnings = (result.fidelity.warnings || []).concat(__vw);
+      if (result.fidelity.note) delete result.fidelity.note;
+    }
+  }
+` : ''}  const __ar = __vx && __vx.lastAudioReport;
   if (result && result.success && __ar && typeof __ar === 'object') {
     result.audio = __ar;
     const __aw = [];

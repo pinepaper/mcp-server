@@ -328,3 +328,72 @@ describe('the audio track report is surfaced (6.27)', () => {
     expect(r.audio).toBeUndefined();
   });
 });
+
+describe('broadcast-safe mp4 and a bitrate (FxTool 16719759, 8.34-8.36)', () => {
+  class FR { result = 'data:video/mp4;base64,AA'; onloadend: (() => void) | null = null; readAsDataURL() { this.onloadend?.(); } }
+  // videoExporter.export as the engine's: it records what it gave the encoder
+  // (only for options it received) and what it measured.
+  const run = async (args: Record<string, unknown>, opts: { reports?: boolean; achieved?: number } = {}) => {
+    const calls: Array<Record<string, unknown>> = [];
+    const vx: Record<string, unknown> = { lastVideoReport: { stale: true },
+      export: async (o: Record<string, unknown>) => {
+        calls.push(o);
+        if (opts.reports !== false) {
+          const floor = o.broadcast ? 8e6 : Number(o.minBitrate) || 0;
+          const bitrate = Math.max(Number(o.bitrate) || 2e6, floor);
+          const achieved = opts.achieved ?? bitrate;
+          vx.lastVideoReport = { broadcast: o.broadcast === true, bitrate, achievedBitrate: achieved,
+            ...(floor && achieved < floor * 0.95 ? { bitrateFloor: floor, warning: `achieved ${(achieved / 1e6).toFixed(2)} Mbps against a ${(floor / 1e6).toFixed(1)} Mbps floor` } : {}) };
+        } else delete vx.lastVideoReport;
+        return { size: 10, slice() { return this; } };
+      } };
+    const app = { canvasSize: { width: 1920, height: 1080 }, canvasEl: { style: { backgroundColor: '#000' } }, exportEngine: { exportFidelity: () => ({ warnings: [] }), videoExporter: vx } };
+    const r = await new Function('app', 'FileReader', 'document', body(codeGenerator.generateAgentExport({ format: 'mp4', duration: 2, ...args } as never)))(app, FR, {});
+    return { r, calls, codes: (r.fidelity?.warnings ?? []).map((w: { code: string }) => w.code) as string[] };
+  };
+
+  it('reaches the encoder, and result.video is what it did', async () => {
+    const { r, calls, codes } = await run({ broadcast: true, minBitrate: 8_000_000 });
+    expect(calls[0]).toMatchObject({ broadcast: true, minBitrate: 8_000_000 });
+    expect(r.video).toMatchObject({ broadcast: true, bitrate: 8e6 });
+    expect(codes.filter((c) => /bitrate|broadcast|encode/.test(c))).toEqual([]);
+  });
+
+  it('a bitrate the encoder capped below the floor is a fidelity warning', async () => {
+    const { r, codes } = await run({ broadcast: true }, { achieved: 1_840_000 });
+    expect(r.video.achievedBitrate).toBe(1_840_000);
+    expect(codes).toContain('bitrate_below_floor');
+  });
+
+  it('a studio that reports nothing is not claimed to have applied it', async () => {
+    const { r, codes } = await run({ broadcast: true, bitrate: 10_000_000 }, { reports: false });
+    expect(r.video).toBeUndefined();
+    expect(codes).toContain('encode_options_not_applied');
+  });
+
+  it('no options asked, no new warnings — only the report', async () => {
+    const { r, codes } = await run({});
+    expect(r.video).toMatchObject({ broadcast: false });
+    expect(codes.filter((c) => /bitrate|broadcast|encode/.test(c))).toEqual([]);
+  });
+
+  it('the store route is given the options too, and a route that drops them is named', async () => {
+    const storeArgs: Array<Record<string, unknown>> = [];
+    const app = { canvasSize: { width: 1920, height: 1080 }, exportEngine: {
+      exportFidelity: () => ({ warnings: [] }), videoExporter: {},
+      exportToStore: async (o: Record<string, unknown>) => { storeArgs.push(o); return { ok: false, reason: 'stub' }; }, readExport: async () => null } };
+    await new Function('app', 'FileReader', 'document', body(codeGenerator.generateAgentExport({ format: 'mp4', duration: 2, broadcast: true, bitrate: 9_000_000 } as never)))(app, FR, {});
+    expect(storeArgs[0]).toMatchObject({ broadcast: true, bitrate: 9_000_000 });
+  });
+
+  it('the schema keeps them to video, and survives the handler', async () => {
+    expect(AgentExportInputSchema.safeParse({ format: 'webm', broadcast: true }).success).toBe(false);
+    expect(AgentExportInputSchema.safeParse({ format: 'gif', bitrate: 1_000_000 }).success).toBe(false);
+    expect(AgentExportInputSchema.safeParse({ format: 'mp4', bitrate: 4_000_000, minBitrate: 8_000_000 }).success).toBe(false);
+    expect(AgentExportInputSchema.safeParse({ format: 'webm', bitrate: 4_000_000, bitrateMode: 'constant' }).success).toBe(true);
+    const { handleToolCall } = await import('../../tools/handlers.js');
+    const out = JSON.stringify(await handleToolCall('pinepaper_agent_export', { format: 'mp4', broadcast: true, minBitrate: 8000000 }, { executionMode: 'code' } as never));
+    expect(out).toContain('broadcast');
+    expect(out).toContain('8000000');
+  });
+});

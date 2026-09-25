@@ -8079,6 +8079,10 @@ VERIFY MOTION BEFORE YOU RENDER. An export takes seconds to minutes and shows yo
           description: 'wav only: 16 (default) or 32-bit float. Rejected for any other format.',
         },
         loop: { anyOf: [{ type: 'boolean' }, { type: 'integer', minimum: 0, maximum: 1000 }], description: 'gif only: true = loop forever, false / 0 / 1 = play once, n = play n times (email clients often want a few plays, not forever). Refused on video formats — see SEAMLESS LOOPS.' },
+        broadcast: { type: 'boolean', description: 'mp4 only: broadcast-safe — BT.709, limited range (16-235), tagged bt709, constant bitrate with an 8 Mbps floor at 720p+ (4 below). result.video reports what the encoder did.' },
+        bitrate: { type: 'integer', minimum: 100000, maximum: 200000000, description: 'mp4 / webm: target bits/s, replacing the quality-derived one. The browser encoder treats it as a CEILING; result.video.achievedBitrate is what it produced.' },
+        minBitrate: { type: 'integer', minimum: 100000, maximum: 200000000, description: 'mp4 / webm: a floor; a miss is a fidelity warning naming the re-encode a delivery spec needs.' },
+        bitrateMode: { type: 'string', enum: ['constant', 'variable'], description: "mp4 / webm: 'constant' (the default with broadcast) or 'variable'." },
         maxBytes: { type: 'integer', minimum: 1, description: 'gif only: size budget in bytes (email: 1000000). Over it, the GIF is re-encoded at a smaller frame size, at most twice; result.budget reports each attempt.' },
         time: { type: 'number', minimum: 0, description: 'Stills only (png / jpg / webp / svg / pdf): render at this time in seconds; the playhead is put back afterwards. Without it a still is whatever frame the playhead is on, so repeated runs can differ.' },
         pdf: {
@@ -8116,7 +8120,7 @@ VERIFY MOTION BEFORE YOU RENDER. An export takes seconds to minutes and shows yo
           type: 'number',
           minimum: 0.1,
           maximum: 1,
-          description: 'Video only: render at this fraction of the platform preset dimensions (0.1-1). The engine derives its encode target from RESOLUTION, so this is the size control — there is no bitrate to set, and halving the frame roughly quarters the pixels and the file. It is also the preview knob: scale 0.5 with quality "draft" is the fast look-check before committing to a full render. Rounded to even dimensions, which H.264 requires.',
+          description: 'Video only: render at this fraction of the platform preset dimensions (0.1-1). The engine derives its encode target from RESOLUTION unless bitrate is given, so this is the size control; halving the frame roughly quarters the pixels and the file. It is also the preview knob: scale 0.5 with quality "draft" is the fast look-check before committing to a full render. Rounded to even dimensions, which H.264 requires.',
         },
         framing: {
           type: 'string',

@@ -2527,7 +2527,7 @@ export const AgentExportInputSchema = z.object({
     const ntsc: Record<string, number> = { '23.976': 24000 / 1001, '29.97': 30000 / 1001, '59.94': 60000 / 1001, '119.88': 120000 / 1001 };
     return ntsc[(Math.round(n * 1000) / 1000).toString()] ?? ntsc[(Math.round(n * 100) / 100).toString()] ?? n;
   })).optional().describe('Video only: frames per second — an integer, an NTSC rate (23.976, 29.97, 59.94; snapped to the exact 24000/1001 …), or a rational string like "30000/1001". Overrides whatever `quality` implies. The tiers set it — draft 15, standard 30, high 60 — so asking for higher quality DOUBLES the frame count and the render time unless you say otherwise. File size is bitrate x duration and does not move with fps, but the picture gets fewer bits per frame at a higher one.'),
-  scale: z.number().min(0.1).max(1).optional().describe('Video only: render at this fraction of the platform preset\'s dimensions (0.1-1). The engine derives its encode target from RESOLUTION, so this is the size control — there is no bitrate to set, and halving the frame roughly quarters the pixels and the file. It is also the preview knob: scale 0.5 with quality "draft" is the fast look-check before committing to a full render. Rounded to even dimensions, which H.264 requires.'),
+  scale: z.number().min(0.1).max(1).optional().describe('Video only: render at this fraction of the platform preset\'s dimensions (0.1-1). The engine derives its encode target from RESOLUTION unless bitrate is given, so this is the size control; halving the frame roughly quarters the pixels and the file. It is also the preview knob: scale 0.5 with quality "draft" is the fast look-check before committing to a full render. Rounded to even dimensions, which H.264 requires.'),
   sampleRate: z.number().int().positive().optional().describe('wav only: samples per second (default 48000). Ignored by every other format.'),
   bitDepth: z.union([z.literal(16), z.literal(32)]).optional().describe('wav only: 16 (default) or 32-bit float. Ignored by every other format.'),
   pdf: z.object({
@@ -2543,6 +2543,10 @@ export const AgentExportInputSchema = z.object({
   }).optional().describe('pdf only: print options.'),
   loop: z.union([z.boolean(), z.number().int().min(0).max(1000)]).optional().describe('gif only: true = loop forever, false / 0 / 1 = play once, n = play n times.'),
   maxBytes: z.number().int().positive().optional().describe('gif only: a size budget in bytes (email wants <= 1 MB). Over it, the GIF is re-encoded smaller — frame size scaled from the overshoot — at most twice; the result reports each attempt and whether the budget was met.'),
+  broadcast: z.boolean().optional().describe('mp4 only: broadcast-safe — BT.709, limited range (samples 16-235), tagged bt709, constant bitrate with an 8 Mbps floor at 720p and up (4 below). result.video reports what the encoder did.'),
+  bitrate: z.number().int().min(100_000).max(200_000_000).optional().describe('mp4 / webm: target bits per second, replacing the quality-derived one. The browser encoder treats it as a CEILING: simple content comes out lower, and result.video.achievedBitrate says what it was.'),
+  minBitrate: z.number().int().min(100_000).max(200_000_000).optional().describe('mp4 / webm: a floor under the target. If the achieved bitrate misses it, fidelity warns and names the re-encode a delivery spec needs.'),
+  bitrateMode: z.enum(['constant', 'variable']).optional().describe("mp4 / webm: 'constant' (the default with broadcast) or 'variable'."),
   time: z.number().min(0).optional().describe('Stills only (png / jpg / webp / svg / pdf): render the scene at this time in seconds. Without it a still is taken at wherever the playhead happens to be, so two identical runs can differ.'),
   region: z.object({
     x: z.number(), y: z.number(),
@@ -2554,6 +2558,17 @@ export const AgentExportInputSchema = z.object({
   .superRefine((val, ctx) => {
     if (val.time !== undefined && ['mp4', 'webm', 'gif', 'wav', 'srt', 'vtt'].includes(String(val.format))) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['time'], message: "time picks the moment a STILL is taken; a video or audio export runs from 0 for its duration. Drop time, or export png / jpg / webp / svg / pdf." });
+    }
+    if (val.broadcast && val.format !== 'mp4') {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['broadcast'], message: 'broadcast is an mp4 setting (BT.709 H.264). Export format: "mp4".' });
+    }
+    for (const k of ['bitrate', 'minBitrate', 'bitrateMode'] as const) {
+      if (val[k] !== undefined && val.format !== 'mp4' && val.format !== 'webm') {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: [k], message: `${k} is a video setting: mp4 or webm. A gif's size is set by maxBytes and scale.` });
+      }
+    }
+    if (val.bitrate !== undefined && val.minBitrate !== undefined && val.minBitrate > val.bitrate) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['minBitrate'], message: 'minBitrate is above bitrate; the floor would override the target. Drop one, or lower minBitrate.' });
     }
     if (val.loop !== undefined && val.format !== 'gif') {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['loop'], message: "loop is a gif setting. A video cannot carry a loop flag — for a seamless loop, key t = 0 and t = duration to the same state and export exactly that duration." });
