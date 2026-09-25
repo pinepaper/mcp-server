@@ -3635,6 +3635,10 @@ EXAMPLE — Reveal at 2s, skip first second of keyframe data, end at 4s of keyfr
           type: 'number',
           description: 'Stop at N seconds into the keyframe data (tail trim). Default: lastKeyframeTime.',
         },
+        append: {
+          type: 'boolean',
+          description: 'Add these keys to the item\'s existing track (same-time keys merge, new values win) instead of replacing it — e.g. a button press after an entrance. Without it, a second call replaces the track. result.track says whether the track was appended to or replaced; studios without merge replace, and say so.',
+        },
       },
       required: ['itemId', 'keyframes'],
     },

@@ -1365,6 +1365,7 @@ export const KeyframeAnimateInputSchema = z.object({
   timeUnits: z.enum(['seconds', 'ms']).optional().describe("Explicit units for keyframe times/duration. 'seconds' disables the legacy >100→ms auto-detect — REQUIRED for long-form timelines with second values over 100."),
   clipInPoint: z.number().optional().describe('Skip the first N seconds of keyframe data — clip head trim.'),
   clipOutPoint: z.number().optional().describe('Stop at N seconds into the keyframe data — clip tail trim. Default: lastKeyframeTime.'),
+  append: z.boolean().optional().describe('Add these keys to the item\'s existing track instead of replacing it (a key at the same time merges, the new values win). Without it, a second keyframe_animate on an item replaces its track. result.track says which happened.'),
 });
 
 // Character — a symbol and some beats, expanded against the design graph.

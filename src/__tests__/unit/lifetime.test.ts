@@ -159,3 +159,44 @@ describe('retest of 28a4a0e', () => {
     expect(s.registry.get('item_2')!.item.visible).toBe(false);
   });
 });
+
+describe('keyframe_animate append (FxTool 2475333b)', () => {
+  // addAnimation as the engine's: replaces, or with mode 'merge' adds (same time: new wins).
+  const withEngine = (merges: boolean) => {
+    const s = studio();
+    s.app.addAnimation = (id: string, kfs: Array<{ time: number }>, opts: { mode?: string }) => {
+      const it = s.registry.get(id)!.item;
+      if (merges && opts && opts.mode === 'merge' && Array.isArray(it.data.keyframes)) {
+        const byT = new Map(it.data.keyframes.map((k: { time: number }) => [k.time, k]));
+        for (const k of kfs) byT.set(k.time, k);
+        it.data.keyframes = [...byT.values()].sort((a: any, b: any) => a.time - b.time);
+      } else it.data.keyframes = kfs;
+    };
+    create(s.app, {});
+    return s;
+  };
+  const kf = (app: object, keyframes: unknown[], append?: boolean) =>
+    new Function('app', `return ${codeGenerator.generateKeyframeAnimate({ itemId: 'item_1', keyframes, ...(append ? { append } : {}) } as never).replace(/^\/\/[^\n]*\n/, '')}`)(app);
+
+  it('append adds to the track and says so', () => {
+    const s = withEngine(true);
+    kf(s.app, [{ time: 0, properties: { x: 0 } }, { time: 1, properties: { x: 100 } }]);
+    const r = kf(s.app, [{ time: 2, properties: { scale: 1.2 } }], true);
+    expect(s.registry.get('item_1')!.item.data.keyframes.map((k: { time: number }) => k.time)).toEqual([0, 1, 2]);
+    expect(r.track).toEqual({ appended: true, previousKeys: 2, keys: 3 });
+  });
+
+  it('a studio without merge replaced the track: the result says so', () => {
+    const s = withEngine(false);
+    kf(s.app, [{ time: 0, properties: { x: 0 } }, { time: 1, properties: { x: 100 } }]);
+    const r = kf(s.app, [{ time: 2, properties: { scale: 1.2 } }], true);
+    expect(r.track).toMatchObject({ appended: false, replaced: true, previousKeys: 2 });
+    expect(r.track.warning).toContain('no merge mode');
+  });
+
+  it('without append, replacing an existing track is noted; a first track has no note', () => {
+    const s = withEngine(true);
+    expect(kf(s.app, [{ time: 0, properties: { x: 0 } }]).track).toBeUndefined();
+    expect(kf(s.app, [{ time: 1, properties: { x: 5 } }]).track).toMatchObject({ replaced: true, previousKeys: 1 });
+  });
+});

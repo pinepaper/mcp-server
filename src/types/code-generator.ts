@@ -1523,7 +1523,8 @@ function generateKeyframeAnimateCode(
   timeOffset?: number,
   clipInPoint?: number,
   clipOutPoint?: number,
-  timeUnits?: 'seconds' | 'ms'
+  timeUnits?: 'seconds' | 'ms',
+  append = false
 ): string {
   const keyframesJson = JSON.stringify(normalizeKeyframePositions(keyframes), null, 2);
   const calculatedDuration = duration || Math.max(...keyframes.map(k => k.time));
@@ -1533,6 +1534,9 @@ function generateKeyframeAnimateCode(
   if (clipInPoint !== undefined) opts.clipInPoint = clipInPoint;
   if (clipOutPoint !== undefined) opts.clipOutPoint = clipOutPoint;
   if (timeUnits !== undefined) opts.timeUnits = timeUnits;
+  // addAnimation SETS the item's track; mode 'merge' adds to it (FxTool
+  // 2475333b). An engine without merge ignores the option and replaces.
+  if (append) opts.mode = 'merge';
 
   // A FADE ON AN AUDIO ITEM WAS ACCEPTED AND NEVER HEARD. addAnimation keyframes
   // the audio item's sentinel, and the mix reads one static audioGain per clip,
@@ -1591,8 +1595,20 @@ function generateKeyframeAnimateCode(
 // Apply keyframe animation to ${itemId}
 (function() {
   ${requireItem(itemId, 'the animation')}${audioLevelGuard}
+  // The track as it was, so the result can say what happened to it: merged
+  // (every earlier key still there) or replaced. That is the evidence of
+  // merge support — an older engine takes the option and replaces anyway.
+  const __ki = _target && (_target.item || _target);
+  const __prev = (__ki && __ki.data && Array.isArray(__ki.data.keyframes)) ? __ki.data.keyframes.map(function(k) { return k && k.time; }) : [];
   app.addAnimation('${itemId}', ${keyframesJson}, ${JSON.stringify(opts)});
-  return { success: true, itemId: '${itemId}', duration: ${calculatedDuration}, loop: ${loop}${timeOffset !== undefined ? `, timeOffset: ${timeOffset}` : ''}${clipInPoint !== undefined ? `, clipInPoint: ${clipInPoint}` : ''}${clipOutPoint !== undefined ? `, clipOutPoint: ${clipOutPoint}` : ''}${easingNote}${loopNote}${gapNote} };
+  const __now = (__ki && __ki.data && Array.isArray(__ki.data.keyframes)) ? __ki.data.keyframes.map(function(k) { return k && k.time; }) : [];
+  const __kept = __prev.every(function(t) { return __now.indexOf(t) >= 0; });
+  const __track = !__prev.length ? null
+    : ${append ? `(__kept
+      ? { appended: true, previousKeys: __prev.length, keys: __now.length }
+      : { appended: false, replaced: true, previousKeys: __prev.length, warning: 'append was asked for, but this studio replaced the existing track (' + __prev.length + ' key(s)) instead of adding to it: it has no merge mode. Put every key in one keyframe_animate call.' })`
+    : `{ replaced: true, previousKeys: __prev.length, note: 'the item already had a keyframe track (' + __prev.length + ' key(s)); this call replaced it. To add keys to it instead, pass append: true.' }`};
+  return { success: true, itemId: '${itemId}', duration: ${calculatedDuration}, loop: ${loop}${append ? ', append: true' : ''}, ...(__track ? { track: __track } : {})${timeOffset !== undefined ? `, timeOffset: ${timeOffset}` : ''}${clipInPoint !== undefined ? `, clipInPoint: ${clipInPoint}` : ''}${clipOutPoint !== undefined ? `, clipOutPoint: ${clipOutPoint}` : ''}${easingNote}${loopNote}${gapNote} };
 })();
 `.trim();
 }
@@ -2708,7 +2724,8 @@ export class PinePaperCodeGenerator {
       validated.timeOffset,
       validated.clipInPoint,
       validated.clipOutPoint,
-      validated.timeUnits
+      validated.timeUnits,
+      validated.append
     );
   }
 
