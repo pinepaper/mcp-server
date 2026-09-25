@@ -44,7 +44,7 @@ What it needs:
 | | |
 |---|---|
 | Node | 18 or newer |
-| Disk | Puppeteer downloads Chrome on install — roughly **320 MB** per version |
+| Disk | With Puppeteer (below), Chrome is downloaded on install — roughly **320 MB** per version |
 | Memory | a Chrome process plus the Studio canvas, so budget ~1 GB while a job runs |
 
 That is fine on a laptop and awkward on a small VPS, a locked-down work machine,
@@ -72,6 +72,30 @@ visible browser and are excluded from headless operation. Which model to trust i
 question you can answer yourself rather than take on trust: a benchmark runs one
 prompt across several models and puts the results side by side, any run
 shareable. It is in invite-only beta.
+
+### Quick start
+
+Puppeteer is an **optional** install, so a plain `npx @pinepaper.studio/mcp-server`
+has no browser: every tool then returns the code it would run instead of running
+it (the result says so). To execute in a real browser, install Puppeteer **in the
+same `npx` call** — a separate `npm i puppeteer` in your project is not visible to
+`npx`'s copy of the server:
+
+```json
+{
+  "mcpServers": {
+    "pinepaper": {
+      "command": "npx",
+      "args": ["-y", "-p", "puppeteer", "-p", "@pinepaper.studio/mcp-server", "pinepaper-mcp"]
+    }
+  }
+}
+```
+
+For code-only use (no Chrome, no 320 MB download), use
+`"args": ["-y", "@pinepaper.studio/mcp-server"]` and set
+`"env": { "PINEPAPER_EXECUTION_MODE": "code" }`. A global install works too:
+`npm i -g @pinepaper.studio/mcp-server puppeteer`, then `"command": "pinepaper-mcp"`.
 
 ## Made with tool calls
 
@@ -153,7 +177,7 @@ The same graph drives visuals, keyboard access, and screen-reader roles (WCAG 2.
 
 The snippets above are MCP tool-call arguments — they execute when an AI agent invokes the tool. Three ways to make that happen:
 
-**1 · Ask your agent (any MCP client).** With this server [configured](#2-configure-your-ai-client), paste a prompt like:
+**1 · Ask your agent (any MCP client).** With this server [configured](#quick-start), paste a prompt like:
 
 > Create a blue circle and make it ride a diamond-shaped path with easeInOut, looping. Add an orange rotating square beside it. Then export the scene as animated SVG.
 

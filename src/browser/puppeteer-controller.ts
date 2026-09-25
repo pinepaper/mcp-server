@@ -402,7 +402,7 @@ export class PinePaperBrowserController {
         puppeteer = await import('puppeteer');
       } catch {
         throw new Error(
-          'The browser tools need puppeteer, which is an optional install: run `npm i puppeteer` (or `npm i -g puppeteer` for a global CLI) and retry. It is kept out of the default dependency tree for supply-chain hygiene.',
+          'The browser tools need puppeteer, which is an optional install. Under npx, add it to the same call — args ["-y", "-p", "puppeteer", "-p", "@pinepaper.studio/mcp-server", "pinepaper-mcp"] — since a separate `npm i puppeteer` is not visible to npx\'s copy. Installed globally: `npm i -g puppeteer`; in a project: `npm i puppeteer`. Then retry. It is kept out of the default dependency tree for supply-chain hygiene.',
         );
       }
 
@@ -899,7 +899,7 @@ export class PinePaperBrowserController {
         puppeteer = await import('puppeteer');
       } catch {
         throw new Error(
-          'The browser tools need puppeteer, which is an optional install: run `npm i puppeteer` (or `npm i -g puppeteer` for a global CLI) and retry. It is kept out of the default dependency tree for supply-chain hygiene.',
+          'The browser tools need puppeteer, which is an optional install. Under npx, add it to the same call — args ["-y", "-p", "puppeteer", "-p", "@pinepaper.studio/mcp-server", "pinepaper-mcp"] — since a separate `npm i puppeteer` is not visible to npx\'s copy. Installed globally: `npm i -g puppeteer`; in a project: `npm i puppeteer`. Then retry. It is kept out of the default dependency tree for supply-chain hygiene.',
         );
       }
 
