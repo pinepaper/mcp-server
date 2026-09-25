@@ -56,3 +56,20 @@ describe('fonts load before the text is measured', () => {
     expect(r).toMatchObject({ success: true, font: { family: 'Playfair Display', available: true } });
   });
 });
+
+describe('brand_kit apply loads the kit fonts first', () => {
+  it('loads before applyBrandKit and reports it', async () => {
+    const s = studio({ loadable: true });
+    const order = s.order;
+    (s.app as Record<string, unknown>).applyBrandKit = async () => { order.push('apply'); return { ok: true, changed: 3 }; };
+    const code = codeGenerator.generateBrandKit({ action: 'apply', kit: { name: 'k', colors: { primary: '#000' }, fonts: { heading: 'Anton', body: 'Anton' } } } as never);
+    const r = await new Function('app', 'document', `return ${code.replace(/^\/\/[^\n]*\n/, '')}`)(s.app, s.document);
+    expect(order).toEqual(['check', 'ensure', 'fonts.load', 'check', 'apply']);
+    expect(r).toMatchObject({ success: true, changed: 3, fonts: [{ family: 'Anton', available: true }] });
+  });
+
+  it('plan never loads anything', () => {
+    const code = codeGenerator.generateBrandKit({ action: 'plan', kit: { name: 'k', colors: { primary: '#000' }, fonts: { heading: 'Anton' } } } as never);
+    expect(code).not.toContain('ensureFontsLoaded');
+  });
+});

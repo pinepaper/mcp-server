@@ -6973,8 +6973,25 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    // The RE
   generateBrandKit(input: BrandKitInput): string {
     const opts = JSON.stringify({ ...(input.selectionOnly ? { selectionOnly: true } : {}) });
     const method = input.action === 'plan' ? 'planBrandKit' : 'applyBrandKit';
-    return this._facadeCall(method, `${JSON.stringify(input.kit)}, ${opts}`,
+    const facade = this._facadeCall(method, `${JSON.stringify(input.kit)}, ${opts}`,
       `Brand kit: ${input.action}`);
+    // A KIT'S FONTS ARE LOADED BEFORE IT RESTYLES TEXT — the same fallback as
+    // create_item (see emitEnsureFont): the kit named Anton, the headings were
+    // re-measured in Times. Each family is checked, loaded if missing, and the
+    // outcome for any that needed it rides on the facade's own result.
+    const fonts = (input.kit as { fonts?: Record<string, unknown> }).fonts;
+    const families = [...new Set(Object.values(fonts ?? {}).filter((f): f is string => typeof f === 'string' && f.trim() !== ''))];
+    if (input.action !== 'apply' || families.length === 0) return facade;
+    const loads = families.map((f) => `  r = await (async function() {${emitEnsureFont(f).replace(/\n/g, '\n  ')}\n    return __font;\n  })();\n  if (r) __fonts.push(r);`).join('\n');
+    return `
+// Brand kit: load the kit's fonts, then apply
+(async function() {
+  const __fonts = [];
+  let r;
+${loads}
+  const out = await ${facade.replace(/^\/\/[^\n]*\n/, '').replace(/;\s*$/, '')};
+  return __fonts.length && out && typeof out === 'object' ? { ...out, fonts: __fonts } : out;
+})();`.trim();
   }
 
   generateComponent(input: ComponentInput): string {
