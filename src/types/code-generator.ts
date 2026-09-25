@@ -5571,7 +5571,13 @@ ${stillTime !== undefined ? `
   if (result && result.success && __pr && typeof __pr === 'object') {
     result.pdf = __pr;
     const __pw = [];
-    if (__pr.searchableText && __pr.linesSkipped > 0) __pw.push({ code: 'pdf_text_lines_skipped', message: __pr.linesSkipped + ' text line(s) are not in the searchable layer: the built-in PDF font covers Latin (WinAnsi) only, so lines in Arabic, Hebrew, CJK and other non-Latin scripts are drawn but cannot be selected, searched or read by a screen reader.' });
+    // Which scripts a PDF can carry depends on the studio: older ones have
+    // only the built-in Latin font, newer ones embed the scene's fonts. So the
+    // cause is the engine's report (fonts it could not embed), not a claim here.
+    const __ff = (__pr.fonts && Array.isArray(__pr.fonts.families)) ? __pr.fonts.families.filter(function(f) { return f && f.reason; }) : [];
+    const __fnames = __ff.slice(0, 4).map(function(f) { return f.family + ' (' + f.reason + ')'; }).join('; ');
+    if (__pr.searchableText && __pr.linesSkipped > 0) __pw.push({ code: 'pdf_text_lines_skipped', message: __pr.linesSkipped + ' text line(s) are not in the searchable layer — no font in the PDF covers their characters — so they are drawn but cannot be selected, searched or read by a screen reader.' + (__fnames ? ' Fonts that could not be embedded: ' + __fnames + '.' : '') });
+    if (__ff.length && !(__pr.linesSkipped > 0)) __pw.push({ code: 'pdf_font_not_embedded', message: 'these fonts could not be embedded, so their text uses a fallback font in the searchable layer: ' + __fnames + '.' });
     if (__pr.searchableText && __pr.pagesWithoutLayer) __pw.push({ code: 'pdf_no_text_layer', message: 'some pages have no searchable text layer — ' + __pr.pagesWithoutLayer.join('; ') });
     if (!__pr.searchableText && __pr.reason && __pr.reason !== 'off') __pw.push({ code: 'pdf_no_text_layer', message: 'no searchable text layer was written (' + __pr.reason + '): the text is drawn but cannot be selected, searched or read by a screen reader.' });
     if (__pw.length) {

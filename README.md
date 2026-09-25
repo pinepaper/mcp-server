@@ -264,7 +264,7 @@ not do.
 - **`apng`** — animation with full transparency, for overlays and stickers.
 - **`jpg` / `webp`** stills for byte-budgeted ad specs; **`srt` / `vtt`**
   captions from the scene's timed text; **multi-page PDF**, one page per saved
-  scene, with a searchable text layer (Latin script) and print options (paper
+  scene, with a searchable text layer and print options (paper
   size, orientation, bleed, trim marks, dpi).
 - **`region`** exports a part of the canvas — carousel slices, sheets of cards.
   A cell leaves out a neighbour's overflowing items and names the items that

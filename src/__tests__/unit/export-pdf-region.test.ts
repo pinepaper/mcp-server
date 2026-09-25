@@ -598,7 +598,16 @@ describe('pdf searchable text layer (8.10, FxTool 9917cfa5)', () => {
     const { codes } = await run(undefined, { searchableText: true, linesWritten: 10, linesSkipped: 3 });
     const w = codes.find((c) => c.code === 'pdf_text_lines_skipped')!;
     expect(w.message).toContain('3 text line(s)');
-    expect(w.message).toContain('Arabic');
+    expect(w.message).toContain('no font in the PDF covers');
+  });
+
+  it('fonts the studio could not embed are named, with its reason (FxTool dbe8441d)', async () => {
+    const fonts = { embedded: 1, families: [{ family: 'Inter', weight: 400 }, { family: 'Noto Sans JP', weight: 400, reason: 'blocked by the page CSP' }] };
+    const skipped = (await run(undefined, { searchableText: true, linesWritten: 4, linesSkipped: 2, fonts })).codes.find((c) => c.code === 'pdf_text_lines_skipped')!;
+    expect(skipped.message).toContain('Noto Sans JP (blocked by the page CSP)');
+    expect(skipped.message).not.toContain('Inter');
+    const none = await run(undefined, { searchableText: true, linesWritten: 6, linesSkipped: 0, fonts });
+    expect(none.codes.map((c) => c.code)).toContain('pdf_font_not_embedded');
   });
 
   it('a layer not written for a reason is said; turned off on request is not', async () => {
