@@ -5199,20 +5199,28 @@ CHAIN ORDER MATTERS: each filter runs on the previous one's output. duotone then
       idempotentHint: false,
       openWorldHint: false,
     },
-    description: `Freeform lasso selection for image items.
+    description: `Cut a region out of an image along a polygon — the subject cutout behind 2.5D parallax, stickers and collage.
 
 ACTIONS:
-- activate: Start lasso mode on an image item. Params: itemId
-- apply: Confirm and apply the lasso selection`,
+- cut: { itemId, points: [[x, y], …] (canvas coordinates, at least 3 vertices, in order around the subject), keepOriginal? (default true) } → { cutoutId, originalId, originalKept }. The cutout is a NEW image item, placed exactly over the region it came from, transparent outside the polygon. keepOriginal:false consumes the source image (the studio's own lasso deletes it); the default keeps it, so you can layer the cutout over the photo.
+- activate / apply: the interactive, mouse-driven lasso. Refused over MCP — use cut.
+
+Vertices closer than 12 px to the FIRST vertex are skipped (the lasso reads a click there as "close the shape"), so trace with points at least that far from where you started.`,
     inputSchema: {
       type: 'object',
       properties: {
         action: {
           type: 'string',
-          enum: ['activate', 'apply'],
-          description: 'Lasso action',
+          enum: ['cut', 'activate', 'apply'],
+          description: 'Lasso action — cut is the one that works over MCP',
         },
-        itemId: { type: 'string', description: 'Target image item ID (for activate)' },
+        itemId: { type: 'string', description: 'The image item to cut from' },
+        points: {
+          type: 'array',
+          description: 'cut: polygon vertices in canvas coordinates, [x, y] or {x, y}, at least 3',
+          items: { anyOf: [{ type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2 }, { type: 'object', properties: { x: { type: 'number' }, y: { type: 'number' } }, required: ['x', 'y'] }] },
+        },
+        keepOriginal: { type: 'boolean', description: 'cut: keep the source image (default true). false = the source is consumed.' },
       },
       required: ['action'],
     },

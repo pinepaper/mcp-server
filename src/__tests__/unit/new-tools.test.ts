@@ -326,7 +326,8 @@ describe('Lasso code generation', () => {
       const code = codeGenerator.generateLasso({ action });
       expect(code).not.toContain('app.imageTools');
       expect(code).toContain('success: false');
-      expect(code).toContain('interactive mouse tool');
+      // Now points at the headless route rather than only saying it cannot.
+      expect(code).toContain('Use action \\"cut\\"');
       // Names what to use instead, the add_ports precedent.
       expect(code).toContain('pinepaper_extract_object');
     });

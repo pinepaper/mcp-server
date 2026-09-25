@@ -7718,11 +7718,75 @@ case 'analyze_palette':
     // a caller in a mode it cannot get out of or complete.
     //
     // Refused by name, with the tools that do the same job without a pointer.
-    const why = 'the lasso is an interactive mouse tool (app.lassoTool: activate, then startStroke/continueStroke/endStroke as the user draws). '
-      + 'There is no headless call that completes an extraction, so this tool could never work over MCP. '
+    const why = 'activate / apply drive the interactive, mouse-based lasso. Use action "cut" with itemId and points (a polygon in canvas coordinates) — it drives the same lasso headlessly. '
       + 'To cut a region without a pointer, use pinepaper_extract_object (detects and extracts by description), '
       + 'or pinepaper_cutout_style / the mask actions on pinepaper_image_tools to shape an existing raster.';
     switch (input.action) {
+      case 'cut': {
+        // A POLYGON CUT, DRIVEN THROUGH THE LASSO'S OWN CLICK PATH (round 7 X,
+        // 1.55). The interactive tool has no headless form, but its polygon
+        // mode is click-by-click: startStroke/endStroke at a point adds a vertex,
+        // and a click within 12 px of the first vertex closes the shape. That is
+        // public API, so this drives it exactly as a user would, then applies.
+        //
+        // applyLasso DELETES the image it cut from ("chosen behaviour" in the
+        // editor). Over MCP that removed the photo a parallax needs underneath,
+        // silently. keepOriginal (default) cuts from a temporary clone, which is
+        // what gets consumed; the result says which happened.
+        const pts = (input.points ?? []).map((p) => (Array.isArray(p) ? { x: p[0], y: p[1] } : p));
+        if (!input.itemId) return `({ success: false, action: 'cut', error: 'cut needs itemId — the image to cut from.' });`;
+        if (pts.length < 3) return `({ success: false, action: 'cut', error: 'cut needs at least 3 points (canvas coordinates) around the region.' });`;
+        const keep = input.keepOriginal !== false;
+        return `
+// Lasso cut along a polygon
+(async function() {
+  const L = app.lassoTool;
+  if (!L || typeof L.activate !== 'function' || typeof L.applyLasso !== 'function') {
+    return { success: false, action: 'cut', error: 'app.lassoTool unavailable — update PinePaper Studio.' };
+  }
+  const entry = app.itemRegistry && app.itemRegistry.get(${JSON.stringify(input.itemId)});
+  const original = entry && entry.item;
+  if (!original) return { success: false, action: 'cut', error: 'no item ' + ${JSON.stringify(input.itemId)} };
+  const target = ${keep} ? original.clone() : original;
+  // A clone carries a COPY of data — including the registry id — and
+  // applyLasso deletes by that id, which would take the original anyway.
+  if (${keep} && target.data) {
+    target.data = Object.assign({}, target.data);
+    delete target.data.registryId; delete target.data.id;
+  }
+  const pts = ${JSON.stringify(pts)}.map(function(p) { return new paper.Point(p.x, p.y); });
+  const first = pts[0];
+  let skipped = 0;
+  L.activate(target);
+  try {
+    L.startStroke(first); L.endStroke(first);
+    for (let i = 1; i < pts.length; i++) {
+      if (pts[i].getDistance(first) < 12) { skipped++; continue; }
+      L.startStroke(pts[i]); L.endStroke(pts[i]);
+    }
+    L.startStroke(first); L.endStroke(first); // a click at the first vertex closes it
+    if (!L.isDrawn()) {
+      L.cancel();
+      if (${keep}) target.remove();
+      return { success: false, action: 'cut', error: 'the polygon did not close — it needs at least 3 vertices at least 12 px from the first one.', skipped: skipped };
+    }
+    const cutout = await L.applyLasso();
+    if (!cutout) {
+      if (${keep} && target.parent) target.remove();
+      return { success: false, action: 'cut', error: 'the lasso produced no cutout — the item may not be an image.' };
+    }
+    let cutoutId = cutout.data && (cutout.data.registryId || cutout.data.id);
+    if (!cutoutId && typeof app.registerItem === 'function') cutoutId = app.registerItem(cutout, 'image', { source: 'mcp-lasso' });
+    return { success: true, action: 'cut', cutoutId: cutoutId, originalId: ${JSON.stringify(input.itemId)},
+      originalKept: ${keep}, vertices: pts.length - skipped, skipped: skipped,
+      bounds: { x: cutout.bounds.x, y: cutout.bounds.y, width: cutout.bounds.width, height: cutout.bounds.height } };
+  } catch (e) {
+    try { L.cancel(); } catch (_) { /* already down */ }
+    if (${keep} && target && target.parent) target.remove();
+    return { success: false, action: 'cut', error: (e && e.message) || String(e) };
+  }
+})();`.trim();
+      }
       case 'activate':
       case 'apply':
         return `

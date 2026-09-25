@@ -3705,8 +3705,13 @@ export const ImageFilterInputSchema = z.object({
 export type ImageFilterInput = z.infer<typeof ImageFilterInputSchema>;
 
 export const LassoInputSchema = z.object({
-  action: z.enum(['activate', 'apply']),
+  action: z.enum(['cut', 'activate', 'apply']),
   itemId: z.string().optional(),
+  points: z.array(z.union([
+    z.tuple([z.number(), z.number()]),
+    z.object({ x: z.number(), y: z.number() }),
+  ])).optional(),
+  keepOriginal: z.boolean().optional(),
 });
 export type LassoInput = z.infer<typeof LassoInputSchema>;
 
