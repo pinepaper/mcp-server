@@ -731,6 +731,16 @@ if (_ae && _ae.type === 'audio') {
 }`;
   }
 
+  // Raster resampling (pixel art: 'off'). A Paper Raster property modifyItem
+  // does not pass on; applied to a raster, or to the raster an image group holds.
+  if (typeof properties.smoothing === 'string') {
+    code += `
+const _sm = app.itemRegistry.get('${itemId}');
+const _smR = _sm && _sm.item && (_sm.item.className === 'Raster' ? _sm.item
+  : (typeof _sm.item.getItem === 'function' ? _sm.item.getItem({ className: 'Raster' }) : null));
+if (_smR) _smR.smoothing = ${JSON.stringify(properties.smoothing)};`;
+  }
+
   const textStyle = emitTextStyle('_ts && _ts.item', properties);
   if (textStyle) {
     code += `
@@ -6330,7 +6340,7 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
   }
 
   generateImportImage(input: ImportImageInput): string {
-    const { url, position, maxWidth, maxHeight, mask } = input;
+    const { url, position, maxWidth, maxHeight, mask, smoothing } = input;
 
     // Each fragment used to be written with a LEADING comma, as if it followed
     // an entry that no longer exists — so the first one opened the object with
@@ -6401,7 +6411,10 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
     const entry = await app.imageTools.uploadFromURL(src);
     const opts = ${optsLiteral};
     const raster = await app.imageTools.placeImage(entry.id, Object.keys(opts).length > 0 ? opts : undefined);
-${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}    // The REGISTRY id is \`data.id\`. \`data.itemId\` has never existed, so this
+${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}${smoothing ? `    // Pixel art wants 'off': Paper's Raster draws with smoothing 'low' by
+    // default, which blurs every scaled-up pixel edge. Read at every draw,
+    // export frames included.
+    if (raster && 'smoothing' in raster) raster.smoothing = ${JSON.stringify(smoothing)};\n` : ''}    // The REGISTRY id is \`data.id\`. \`data.itemId\` has never existed, so this
     // fell through to \`raster.id\` — a Paper.js NUMBER — and the handle the tool
     // returned could not be used as a relation endpoint or with modify/animate.
     // Register the raster if placeImage somehow left it unregistered, so the

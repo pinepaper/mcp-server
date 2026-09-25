@@ -1162,6 +1162,11 @@ EXAMPLES:
           enum: ['circle', 'rounded', 'hexagon', 'star'],
           description: 'Optional mask shape to apply to the image',
         },
+        smoothing: {
+          type: 'string',
+          enum: ['off', 'low', 'medium', 'high'],
+          description: "Resampling when the image is scaled. 'off' = nearest-neighbour, hard pixel edges — use it for pixel art. Default 'low'. Change it later with pinepaper_modify_item {smoothing}.",
+        },
       },
       required: ['url'],
     },

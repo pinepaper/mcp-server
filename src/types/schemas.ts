@@ -3124,6 +3124,7 @@ export const ImportImageInputSchema = z.object({
   maxWidth: z.number().optional().describe('Maximum width constraint in pixels'),
   maxHeight: z.number().optional().describe('Maximum height constraint in pixels'),
   mask: ImageMaskSchema.optional().describe('Optional mask shape to apply to the image'),
+  smoothing: z.enum(['off', 'low', 'medium', 'high']).optional().describe("Resampling when the image is scaled. 'off' = nearest-neighbour, hard pixel edges (pixel art). Default 'low'."),
 }).describe('Import image input');
 
 export type ImportImageInput = z.infer<typeof ImportImageInputSchema>;
