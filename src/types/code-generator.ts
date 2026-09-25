@@ -766,24 +766,30 @@ function resolveChartFields(
 }
 
 /**
- * A lifetime (bornAt / ttl, seconds) as hard-cut opacity keyframes.
+ * A lifetime (bornAt / ttl, seconds) as a VISIBILITY WINDOW, [bornAt, bornAt + ttl).
  *
- * THE ENGINE HAS NO LIFETIME. create() and modifyItem() never read bornAt or
- * ttl, so a 36-frame boil built from lifetimes showed all 36 frames at once
- * locally — while the docs call these the only way to cut between shots, and
- * create_item's unread-property warning had exempted them. FxTool's StickOps
- * already answers the same question this way (applyLifetime): opacity 0
- * before, the item's own opacity during, 0 after, with cuts CUT apart so a
- * sampled frame never draws both sides of one.
+ * THE ENGINE HAS NO LIFETIME, and the first answer here (5bfc480) wrote one as
+ * hard-cut opacity keys merged into the item's own track. That failed four
+ * ways once items also had keyframes (ads production): keyframe_animate
+ * replaced the track and the ttl cut was lost (1.83); opacity-only cut keys
+ * broke the position track through the engine's missing-property rule (2.30 →
+ * 1.84); authored opacity and the cuts blended instead of multiplying (1.85);
+ * and exact-time hand-offs left a blank frame (1.86).
  *
- * HALF-OPEN, [bornAt, bornAt + ttl). The off-cut lands AT bornAt + ttl, not
- * after it, so back-to-back lifetimes (a boil: bornAt i/12, ttl 1/12) hand over
- * on the boundary instead of both showing on a frame sampled exactly there —
- * measured as double frames at t = k/12 when the window was closed at the end.
+ * So it is no longer keys. ONE frame callback ('pp_lifetimes') sets
+ * item.visible from the window for every item with a lifetime, reading each
+ * item's live data.bornAt / ttl, from the frame's own time: event.sceneTime,
+ * which both the export's step and sceneAt supply, else app.playbackTime. The
+ * export runs frame callbacks inside app.update() before it draws each step
+ * (VideoExporter._advanceToTime), so exports honour it. visible, not opacity,
+ * so it composes with any keyframes — the engine's own clip window hides the
+ * same way for the same reason. A 1-microsecond tolerance makes a hand-off at
+ * an exact frame time show exactly one item.
  *
- * Re-applied lifetimes REPLACE the previous one: the cut keys are tagged, and
- * dropped before new ones are added, so re-timing an act does not stack cuts.
- * bornAt / ttl are also kept on item.data, where the scene document carries them.
+ * Runtime-only: a scene saved and reopened keeps data.bornAt / ttl (the cloud
+ * renderer reads those) but not the callback, until the studio reads the
+ * fields itself — the result says so. Lifetimes applied the old way are
+ * migrated: their tagged opacity keys are removed.
  */
 function emitLifetime(itemExpr: string, bornAt: unknown, ttl: unknown): string {
   const b = Number(bornAt);
@@ -795,20 +801,45 @@ function emitLifetime(itemExpr: string, bornAt: unknown, ttl: unknown): string {
   if (!it || !it.data) return;
   it.data.bornAt = ${born};
   ${span === null ? 'delete it.data.ttl;' : `it.data.ttl = ${span};`}
-  const canKey = typeof app.addKeyframe === 'function';
-  if (!canKey) { __lifetime = { bornAt: ${born}, ttl: ${span}, applied: false, note: 'stored on the item, but this studio has no keyframe API, so it shows for the whole local render.' }; return; }
-  const CUT = 0.001;
-  if (Array.isArray(it.data.keyframes)) it.data.keyframes = it.data.keyframes.filter(function(k) { return !(k && k._lifetime); });
-  const on = typeof it.opacity === 'number' && it.opacity > 0 ? it.opacity : 1;
-  const times = [];
-  const kf = function(time, opacity) { time = Math.max(0, time); times.push(time); app.addKeyframe(it, time, { opacity: opacity }, 'linear'); };
-  if (${born} > 0) { kf(0, 0); kf(${born} - CUT, 0); }
-  kf(${born}, on);
-  ${span === null ? '' : `kf(${born + span} - CUT, on); kf(${born + span}, 0);`}
-  (it.data.keyframes || []).forEach(function(k) {
-    if (k && times.indexOf(k.time) !== -1 && k.properties && Object.keys(k.properties).length === 1 && 'opacity' in k.properties) k._lifetime = true;
-  });
-  __lifetime = { bornAt: ${born}, ttl: ${span}, applied: true };
+  if (Array.isArray(it.data.keyframes) && it.data.keyframes.some(function(k) { return k && k._lifetime; })) {
+    it.data.keyframes = it.data.keyframes.filter(function(k) { return !(k && k._lifetime); });
+  }
+  const rid = it.data.registryId || it.data.id;
+  // MCP-owned page state lives on globalThis, not on app: it is not an engine
+  // member, and the engine-surface guard reads app.X as a claim that it is.
+  const __pp = globalThis.__ppMcp = globalThis.__ppMcp || {};
+  // Keyed to THIS studio: a re-initialised app has none of the old one's
+  // callbacks, so the registration and the id set start again with it.
+  if (__pp.lifetimeApp !== app) { __pp.lifetimeApp = app; __pp.lifetimeIds = new Set(); __pp.lifetimeCb = false; }
+  if (typeof app.addOnFrameCallback !== 'function' || !rid) {
+    __lifetime = { bornAt: ${born}, ttl: ${span}, applied: false, note: 'stored on the item, but this studio has no frame callbacks, so it shows for the whole local render (a cloud render honours it).' };
+    return;
+  }
+  __pp.lifetimeIds = __pp.lifetimeIds || new Set();
+  __pp.lifetimeIds.add(rid);
+  const within = function(x, now) {
+    const b0 = x.data.bornAt, t0 = x.data.ttl;
+    return now >= b0 - 1e-6 && (typeof t0 !== 'number' || now < b0 + t0 - 1e-6);
+  };
+  if (!__pp.lifetimeCb) {
+    __pp.lifetimeCb = true;
+    app.addOnFrameCallback('pp_lifetimes', function(ev) {
+      const now = ev && typeof ev.sceneTime === 'number' ? ev.sceneTime : (typeof app.playbackTime === 'number' ? app.playbackTime : 0);
+      __pp.lifetimeIds.forEach(function(id) {
+        const e = app.itemRegistry && app.itemRegistry.get(id);
+        const x = e && e.item;
+        if (!x || !x.data || typeof x.data.bornAt !== 'number') { __pp.lifetimeIds.delete(id); return; }
+        const vis = within(x, now);
+        if (x.visible !== vis) x.visible = vis;
+      });
+    });
+  }
+  it.visible = within(it, typeof app.playbackTime === 'number' ? app.playbackTime : 0);
+  __lifetime = { bornAt: ${born}, ttl: ${span}, applied: true, via: 'visibility',
+    note: 'applied as visibility, so it composes with keyframes. Runtime-only until the studio reads bornAt / ttl itself: a scene reopened in the editor keeps the fields (and a cloud render honours them) but must be re-timed to play locally.' };
+  if (it.data.clipInPoint !== undefined || it.data.clipOutPoint !== undefined) {
+    __lifetime.warning = 'this item also has a clip window (clipInPoint / clipOutPoint), which hides it by the same means — the two can fight. Use one.';
+  }
 })(${itemExpr});`;
 }
 

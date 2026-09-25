@@ -606,10 +606,11 @@ LIFETIME — on ANY item, and the only way to build a piece that CUTS between sh
 - ttl: seconds it lives for. Omit for "until the end".
 Without these every item is on screen for the whole render, which is what makes
 a long piece read as one crowded frame instead of a sequence of shots.
-They are applied as hard-cut OPACITY keyframes (0 before, the item's opacity
-during, 0 after), so do not also keyframe opacity on the same item. Re-timing
-with pinepaper_modify_item {bornAt, ttl} replaces the previous lifetime — pass
-both. The result's lifetime field says whether it was applied.
+They set the item's VISIBILITY for [bornAt, bornAt + ttl) — not its opacity —
+so they compose with any keyframes, opacity fades included. Re-timing with
+pinepaper_modify_item {bornAt, ttl} replaces the previous lifetime — pass both.
+The result's lifetime field says whether it was applied; it is runtime-only
+until the studio reads bornAt / ttl itself, so re-time a reopened scene.
 
 SHADER (itemType 'shader') — a lit surface, drawn per pixel:
 - shader: 'water' (open sea, lit swell) | 'liquid_metal' (chrome) | 'heatmap' (thermal halo) | 'gem_smoke' (smoke) | 'electric_arc' (branching discharge, stepped flicker) | 'vortex' (hollow bright RING, sheared by differential rotation) | 'rain_veil' | 'caustics' | 'ink_bleed'

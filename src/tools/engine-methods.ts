@@ -18,6 +18,7 @@
  */
 export const REQUIRED_ENGINE_METHODS: readonly string[] = [
   'addComment',
+  'addOnFrameCallback',
   'addPhysicsBody3D',
   'addRelation',
   'addWorldActor',
@@ -240,7 +241,6 @@ export const OPTIONAL_ENGINE_METHODS: readonly string[] = [
   '_resolveRaster',
   '_resolveRelationEndpoint',
   'activeWindowOf',
-  'addKeyframe',
   'audioLayer.setVolume',
   'authoredRotation',
   'checkFont',
