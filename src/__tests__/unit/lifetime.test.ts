@@ -132,3 +132,30 @@ describe('the studio\'s own lifetime is used when it has one (FxTool bf1a656b)',
     expect(r.lifetime).toMatchObject({ applied: false, error: 'ttl must be positive' });
   });
 });
+
+describe('retest of 28a4a0e', () => {
+  it('a lifetime applied after the callbacks were cleared (start_job clearCanvas) registers again', () => {
+    const s = studio();
+    create(s.app, { bornAt: 0, ttl: 1 });
+    s.callbacks.clear(); // what clearCanvas does to frame callbacks
+    create(s.app, { bornAt: 2, ttl: 1 });
+    expect(s.callbacks.has('pp_lifetimes')).toBe(true);
+    s.frame(2.5);
+    expect(s.registry.get('item_2')!.item.visible).toBe(true);
+  });
+
+  it('a still export at time t shows what is alive at t, without a frame tick', async () => {
+    const s = studio();
+    create(s.app, { bornAt: 0.8, ttl: 1 });   // item_1: alive at 0.8
+    create(s.app, { bornAt: 11, ttl: 1 });    // item_2: dead at 0.8
+    s.registry.get('item_1')!.item.visible = false;
+    s.registry.get('item_2')!.item.visible = true;
+    s.app.canvasSize = { width: 10, height: 10 };
+    s.app.setPlaybackTime = () => {};
+    s.app.exportEngine = { exportPNG: async () => ({ dataUrl: 'data:image/png;base64,AA' }), exportFidelity: () => ({ warnings: [] }) };
+    const code = codeGenerator.generateAgentExport({ format: 'png', time: 0.8 } as never);
+    await new Function('app', 'document', code.replace('(async function()', 'return (async function()'))(s.app, {});
+    expect(s.registry.get('item_1')!.item.visible).toBe(true);
+    expect(s.registry.get('item_2')!.item.visible).toBe(false);
+  });
+});

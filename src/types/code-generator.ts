@@ -825,7 +825,7 @@ function emitLifetime(itemExpr: string, bornAt: unknown, ttl: unknown): string {
   const __pp = globalThis.__ppMcp = globalThis.__ppMcp || {};
   // Keyed to THIS studio: a re-initialised app has none of the old one's
   // callbacks, so the registration and the id set start again with it.
-  if (__pp.lifetimeApp !== app) { __pp.lifetimeApp = app; __pp.lifetimeIds = new Set(); __pp.lifetimeCb = false; }
+  if (__pp.lifetimeApp !== app) { __pp.lifetimeApp = app; __pp.lifetimeIds = new Set(); }
   if (typeof app.addOnFrameCallback !== 'function' || !rid) {
     __lifetime = { bornAt: ${born}, ttl: ${span}, applied: false, note: 'stored on the item, but this studio has no frame callbacks, so it shows for the whole local render (a cloud render honours it).' };
     return;
@@ -836,19 +836,25 @@ function emitLifetime(itemExpr: string, bornAt: unknown, ttl: unknown): string {
     const b0 = x.data.bornAt, t0 = x.data.ttl;
     return now >= b0 - 1e-6 && (typeof t0 !== 'number' || now < b0 + t0 - 1e-6);
   };
-  if (!__pp.lifetimeCb) {
-    __pp.lifetimeCb = true;
-    app.addOnFrameCallback('pp_lifetimes', function(ev) {
-      const now = ev && typeof ev.sceneTime === 'number' ? ev.sceneTime : (typeof app.playbackTime === 'number' ? app.playbackTime : 0);
-      __pp.lifetimeIds.forEach(function(id) {
-        const e = app.itemRegistry && app.itemRegistry.get(id);
-        const x = e && e.item;
-        if (!x || !x.data || typeof x.data.bornAt !== 'number') { __pp.lifetimeIds.delete(id); return; }
-        const vis = within(x, now);
-        if (x.visible !== vis) x.visible = vis;
-      });
+  // The visibility pass itself, kept where a still export can call it too
+  // (a seek alone does not run frame callbacks).
+  __pp.applyLifetimes = function(now) {
+    __pp.lifetimeIds.forEach(function(id) {
+      const e = app.itemRegistry && app.itemRegistry.get(id);
+      const x = e && e.item;
+      if (!x || !x.data || typeof x.data.bornAt !== 'number') { __pp.lifetimeIds.delete(id); return; }
+      const vis = within(x, now);
+      if (x.visible !== vis) x.visible = vis;
     });
-  }
+  };
+  // Registered EVERY time, not once behind a flag: clearCanvas / start_job
+  // remove frame callbacks, and a stale "already registered" flag left every
+  // later scene's lifetimes doing nothing (retest of 28a4a0e). Re-adding the
+  // same id replaces it.
+  app.addOnFrameCallback('pp_lifetimes', function(ev) {
+    const now = ev && typeof ev.sceneTime === 'number' ? ev.sceneTime : (typeof app.playbackTime === 'number' ? app.playbackTime : 0);
+    __pp.applyLifetimes(now);
+  });
   it.visible = within(it, typeof app.playbackTime === 'number' ? app.playbackTime : 0);
   __lifetime = { bornAt: ${born}, ttl: ${span}, applied: true, via: 'visibility',
     note: 'applied as visibility, so it composes with keyframes. Runtime-only until the studio reads bornAt / ttl itself: a scene reopened in the editor keeps the fields (and a cloud render honours them) but must be re-timed to play locally.' };
@@ -4788,6 +4794,16 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
   });
 
   let result = { success: false, platform, format, quality, framing };
+  // A STILL SHOWS WHAT IS ALIVE AT ITS MOMENT. Lifetimes that fall back to the
+  // MCP's frame callback are applied by the frame loop, and a seek does not run
+  // it — so a png at time 0.8 s drew nothing staged at 0.8 s, and an item past
+  // its ttl still showed (retest). The visibility pass runs here for stills.
+  if (['png', 'jpg', 'webp', 'svg', 'pdf'].indexOf(format) !== -1) {
+    const __L = globalThis.__ppMcp;
+    if (__L && __L.lifetimeApp === app && typeof __L.applyLifetimes === 'function') {
+      try { __L.applyLifetimes(${stillTime !== undefined ? stillTime : "typeof app.playbackTime === 'number' ? app.playbackTime : 0"}); } catch (_) { /* the still renders either way */ }
+    }
+  }
   // The engine's report on the audio track of THIS export (FxTool b41860aa:
   // encoder delay compensated, padding past the picture dropped). Cleared
   // first so a report left by an earlier export is never read as this one's.
