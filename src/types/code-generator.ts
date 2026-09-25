@@ -5434,7 +5434,7 @@ ${stillTime !== undefined ? `
           // the per-page reports are summed into result.pdf.
           const __wantLayer = ${pdfOpts.searchableText !== false};
           const __layer = __wantLayer && typeof app.exportEngine.addTextLayer === 'function';
-          const __tl = { written: 0, skipped: 0, reasons: [] };
+          const __tl = { written: 0, skipped: 0, reasons: [], fonts: null };
           try {
             for (const spec of pageSpecs) {
               const id = spec.id;
@@ -5446,8 +5446,14 @@ ${stillTime !== undefined ? `
               const orient = wMM > hMM ? 'landscape' : 'portrait';
               const png = app.captureFrameDataURL(Math.max(1, targetDpi / dpi));
               const jpg = await toJpeg(png);
-              if (!doc) doc = new lib.jsPDF({ orientation: orient, unit: 'mm', format: [wMM, hMM] });
-              else doc.addPage([wMM, hMM], orient);
+              if (!doc) {
+                doc = new lib.jsPDF({ orientation: orient, unit: 'mm', format: [wMM, hMM] });
+                // The scene's fonts, fetched once per document (FxTool
+                // dbe8441d): every page's text layer then writes in them.
+                if (__layer && typeof app.exportEngine.embedTextFonts === 'function') {
+                  try { __tl.fonts = await app.exportEngine.embedTextFonts(doc); } catch (e) { __tl.fonts = { embedded: 0, reason: e && e.message }; }
+                }
+              } else doc.addPage([wMM, hMM], orient);
               if (jpg) doc.addImage(jpg, 'JPEG', 0, 0, wMM, hMM); else doc.addImage(png, 'PNG', 0, 0, wMM, hMM);
               if (__layer) {
                 try {
@@ -5468,6 +5474,7 @@ ${stillTime !== undefined ? `
             pdf: !__wantLayer ? { searchableText: false, reason: 'off' }
               : !__layer ? { searchableText: false, reason: 'this studio adds no text layer to multi-page PDFs' }
               : Object.assign({ searchableText: __tl.written > 0 || __tl.reasons.length < pagesOut.length, linesWritten: __tl.written, linesSkipped: __tl.skipped },
+                  __tl.fonts ? { fonts: __tl.fonts } : {},
                   __tl.reasons.length ? { pagesWithoutLayer: __tl.reasons } : {},
                   __tl.written === 0 && __tl.reasons.length === pagesOut.length ? { reason: __tl.reasons.join('; ') } : {}) };
           if (!sized) result.warning = 'every page used the current canvas size: saved scenes do not record theirs. To give a page its own size, pass pages as [{sceneId, width, height}, …].';

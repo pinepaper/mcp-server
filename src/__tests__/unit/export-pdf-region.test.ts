@@ -160,10 +160,13 @@ describe('multi-page pdf from scenes (8.16)', () => {
     const s = sceneStudio();
     const seen: unknown[] = [];
     s.app.exportEngine.addTextLayer = (_doc: unknown, box: unknown) => { seen.push([s.app.sceneManager.currentSceneId, box]); return s.app.sceneManager.currentSceneId === 's2' ? { ok: true, linesWritten: 3, linesSkipped: 1 } : { ok: true, linesWritten: 5, linesSkipped: 0 }; };
+    let embeds = 0;
+    s.app.exportEngine.embedTextFonts = async () => { embeds++; return { embedded: 1, families: [{ family: 'Inter', weight: 400, source: 'mirror' }] }; };
     const r = await run(s, 'scenes');
     expect(seen.map((x) => (x as unknown[])[0])).toEqual(['s1', 's2']);
     expect((seen[0] as unknown[])[1]).toMatchObject({ x: 0, y: 0 });
-    expect(r.pdf).toEqual({ searchableText: true, linesWritten: 8, linesSkipped: 1 });
+    expect(embeds).toBe(1); // once per document, before any page's layer
+    expect(r.pdf).toEqual({ searchableText: true, linesWritten: 8, linesSkipped: 1, fonts: { embedded: 1, families: [{ family: 'Inter', weight: 400, source: 'mirror' }] } });
     expect(r.fidelity.warnings.map((w: { code: string }) => w.code)).toContain('pdf_text_lines_skipped');
   });
 

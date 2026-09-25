@@ -248,6 +248,7 @@ export const OPTIONAL_ENGINE_METHODS: readonly string[] = [
   'clearCanvas',
   'ensureFontsLoaded',
   'exportEngine.addTextLayer',
+  'exportEngine.embedTextFonts',
   'fitText',
   'generatorRegistry._regionClipPath',
   'getCanvasSize',
