@@ -379,3 +379,23 @@ describe('widget HTML lang / dir / alt (8.20)', () => {
     expect(r.a11y).toEqual(['widget-label', 'widget-desc', 'meta']);
   });
 });
+
+describe('add_relation refuses unknown endpoints (1.74)', () => {
+  const app = (known: string[]) => ({
+    _isKnownRelationEndpoint: (id: string) => known.includes(id),
+    _resolveRelationEndpoint: (id: string) => id.replace(/^#/, ''),
+    addRelation: () => true,
+    historyManager: { saveState() {} },
+  });
+  const code = (t: string) => codeGenerator.generateAddRelation({ sourceId: 'item_1', targetId: t, relationType: 'orbits', params: {} } as never);
+
+  it('refuses a target that is not on the canvas', () => {
+    const r = runIIFE(code('item_404'), { app: app(['item_1']) });
+    expect(r.success).toBe(false);
+    expect(r.error).toContain('"item_404" is not an item');
+  });
+
+  it("accepts the engine's '#id' habit and real ids", () => {
+    expect(runIIFE(code('#item_2'), { app: app(['item_1', 'item_2']) }).success).toBe(true);
+  });
+});

@@ -933,16 +933,30 @@ function generateAddRelationCode(
   relationType: RelationType,
   params: Record<string, unknown>
 ): string {
+  // AN UNKNOWN ENDPOINT IS REFUSED, NOT STORED (round 9 GG, 1.74). The engine
+  // stores a relation to an id it cannot resolve, returns true, and says "it
+  // will be skipped every frame and nothing will move" only in a warning this
+  // tool never sees. Its own test for that warning — _isKnownRelationEndpoint:
+  // an item, the camera, a cursor target — is asked first here, after the same
+  // '#id' forgiveness the engine applies.
   return `
 // Add ${relationType} relation: ${sourceId} -> ${targetId}
-const success = app.addRelation('${sourceId}', '${targetId}', '${relationType}', ${JSON.stringify(params, null, 2)});
-if (!success) {
-  throw new Error('Failed to add relation');
-}
-app.historyManager.saveState();
-
-// Return success
-({ success: true, sourceId: '${sourceId}', targetId: '${targetId}', relationType: '${relationType}' });
+(function() {
+  const norm = function(id) { return typeof app._resolveRelationEndpoint === 'function' ? app._resolveRelationEndpoint(id) : id; };
+  if (typeof app._isKnownRelationEndpoint === 'function') {
+    const bad = [${JSON.stringify(sourceId)}, ${JSON.stringify(targetId)}].filter(function(id) { return !app._isKnownRelationEndpoint(norm(id)); });
+    if (bad.length) {
+      return { success: false, relationType: '${relationType}', error: bad.map(function(id) { return JSON.stringify(id); }).join(' and ')
+        + ' ' + (bad.length > 1 ? 'are not items' : 'is not an item') + ' on the canvas, so the relation would be stored and skipped every frame. Check the id (pinepaper_get_items lists them).' };
+    }
+  }
+  const success = app.addRelation('${sourceId}', '${targetId}', '${relationType}', ${JSON.stringify(params, null, 2)});
+  if (!success) {
+    return { success: false, relationType: '${relationType}', error: 'the studio refused the ${relationType} relation between ${sourceId} and ${targetId}.' };
+  }
+  app.historyManager.saveState();
+  return { success: true, sourceId: '${sourceId}', targetId: '${targetId}', relationType: '${relationType}' };
+})();
 `.trim();
 }
 
