@@ -59,13 +59,17 @@ describe('README images', () => {
   });
 
   it('the hero every localized README shows is one of the shipped assets', () => {
-    // All eight localized READMEs open with assets/hero.svg; the English one
-    // opens with edit-whenever.svg and shows hero.svg further down. Both must
-    // travel with the package.
-    for (const f of READMES.filter((r) => r !== 'README.md')) {
-      expect({ file: f, hero: localImages(f)[0] }).toEqual({ file: f, hero: 'assets/hero.svg' });
+    // Every README opens with the brand lockup (light; the dark variant is a
+    // <picture> source). The eight localized ones then show assets/hero.svg;
+    // the English one shows edit-whenever.svg first and hero.svg further
+    // down. All of them must travel with the package.
+    for (const f of READMES) {
+      expect({ file: f, first: localImages(f)[0] }).toEqual({ file: f, first: 'assets/brand/pinepaper-lockup-horizontal.svg' });
     }
-    expect(localImages('README.md')).toContain('assets/edit-whenever.svg');
+    for (const f of READMES.filter((r) => r !== 'README.md')) {
+      expect({ file: f, hero: localImages(f)[1] }).toEqual({ file: f, hero: 'assets/hero.svg' });
+    }
+    expect(localImages('README.md')[1]).toBe('assets/edit-whenever.svg');
     expect(localImages('README.md')).toContain('assets/hero.svg');
   });
 });

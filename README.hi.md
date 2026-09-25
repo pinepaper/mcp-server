@@ -5,6 +5,11 @@
 [English](README.md) · [简体中文](README.zh-CN.md) · [日本語](README.ja.md) · [한국어](README.ko.md) · [Español](README.es.md) · [Português (BR)](README.pt-BR.md) · [Français](README.fr.md) · [Deutsch](README.de.md) · **हिन्दी**
 
 <p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/pinepaper-lockup-horizontal-white.svg">
+    <img src="assets/brand/pinepaper-lockup-horizontal.svg" alt="PinePaper" width="360">
+  </picture>
+  <br>
   <img src="assets/hero.svg" alt="PinePaper MCP — टूल कॉल से बने एनिमेटेड ग्राफ़िक्स" width="840">
 </p>
 

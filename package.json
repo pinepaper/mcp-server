@@ -94,6 +94,8 @@
   "files": [
     "dist",
     "manifest.json",
+    "icon.png",
+    "icon.svg",
     "README.md",
     "LICENSE",
     "assets",

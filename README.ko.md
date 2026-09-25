@@ -5,6 +5,11 @@
 [English](README.md) · [简体中文](README.zh-CN.md) · [日本語](README.ja.md) · **한국어** · [Español](README.es.md) · [Português (BR)](README.pt-BR.md) · [Français](README.fr.md) · [Deutsch](README.de.md) · [हिन्दी](README.hi.md)
 
 <p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/pinepaper-lockup-horizontal-white.svg">
+    <img src="assets/brand/pinepaper-lockup-horizontal.svg" alt="PinePaper" width="360">
+  </picture>
+  <br>
   <img src="assets/hero.svg" alt="PinePaper MCP — 툴 콜로 만든 애니메이션" width="840">
 </p>
 

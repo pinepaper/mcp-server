@@ -8,6 +8,11 @@
 **English** · [简体中文](README.zh-CN.md) · [日本語](README.ja.md) · [한국어](README.ko.md) · [Español](README.es.md) · [Português (BR)](README.pt-BR.md) · [Français](README.fr.md) · [Deutsch](README.de.md) · [हिन्दी](README.hi.md)
 
 <p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/pinepaper-lockup-horizontal-white.svg">
+    <img src="assets/brand/pinepaper-lockup-horizontal.svg" alt="PinePaper" width="360">
+  </picture>
+  <br>
   <img src="assets/edit-whenever.svg" alt="Generate once. Edit whenever. — animated PinePaper poster: the headline assembles from scatter, a color wave runs through every letter, and 'generate twice / thrice' get struck out before 'once' is highlighted" width="720">
 </p>
 

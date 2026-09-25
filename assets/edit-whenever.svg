@@ -3,7 +3,7 @@
      Effects showcased: print (kicker), scattered (headline assembly), colorwave (per-letter
      fill), wipe (underline bar), orbit (dot around period), pulse (period), fireworks,
      rings, swarm. Pure SMIL, no scripts. -->
-<rect width="800" height="600" fill="#0d1117"/>
+<rect width="800" height="600" fill="#0f172a"/>
 <!-- rings -->
 <g stroke="#22c55e" fill="none" stroke-width="2">
 <circle cx="132" cy="140" r="4"><animate attributeName="r" values="4;48" dur="3s" begin="0s" repeatCount="indefinite"/><animate attributeName="opacity" values=".7;0" dur="3s" begin="0s" repeatCount="indefinite"/></circle>
