@@ -2554,7 +2554,7 @@ Three of these refuse quietly in the engine: exportGLB with no perspective objec
       type: 'object',
       properties: {
         action: { type: 'string', enum: ['export_lottie', 'export_dotlottie', 'import_lottie', 'export_glb', 'export_bvh', 'export_png_sequence'], description: 'Which interchange operation.' },
-        options: { type: 'object', description: "Format options passed through to the exporter. export_png_sequence: { duration (seconds), fps, width, height } — PASS duration and fps: the studio does not size the sequence to the scene, and without them it writes its default (measured: 3 s at 15 fps = 45 frames whatever the scene length). The result's defaultsUsed says when that happened." },
+        options: { type: 'object', description: "Format options passed through to the exporter. export_png_sequence: { duration (seconds), fps, width, height } — PASS duration and fps: the studio does not size the sequence to the scene, and without them it writes its own default length, which does not follow the scene (runs have measured 45 and 90 frames). The result's defaultsUsed says when that happened." },
         data: { anyOf: [{ type: 'string' }, { type: 'object' }], description: 'import_lottie: the Lottie JSON — object, JSON string, or URL.' },
         skeletonId: { type: 'string', description: "export_bvh: which skeleton to write. A BVH is one skeleton's motion." },
       },

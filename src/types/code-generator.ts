@@ -10736,7 +10736,7 @@ ${guard('exportPNGSequence')}
   const __pngSeqDefaults = ${JSON.stringify((() => {
     const o = (input.options ?? {}) as Record<string, unknown>;
     const missing = ['duration', 'fps'].filter((k) => o[k] === undefined);
-    return missing.length ? { defaultsUsed: missing, note: `${missing.join(' and ')} not given, so the studio's default was used (measured: 3 s at 15 fps = 45 frames, whatever the scene length). Pass options.duration and options.fps to match the scene.` } : {};
+    return missing.length ? { defaultsUsed: missing, note: `${missing.join(' and ')} not given, so the studio's own default length was used — it does not follow the scene (runs have measured 45 and 90 frames). Pass options.duration and options.fps to match the scene.` } : {};
   })())};
   const out = await app.exportPNGSequence(${opts});
   if (!out) { return { success: false, error: 'PNG sequence produced nothing' }; }
