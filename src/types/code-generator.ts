@@ -4533,7 +4533,11 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
             // The record carries the page geometry the engine chose; it is the
             // only place a caller can learn it.
             ...(pdfOut && pdfOut.width ? { dimensions: { width: pdfOut.width, height: pdfOut.height } } : {}),
-            ...(pdfOut && pdfOut.format ? { paperFormat: pdfOut.format } : {}),
+            ...(pdfOut && pdfOut.format ? { paperFormat: pdfOut.format } : {}),${pdfOpts?.paperFormat && pdfOpts.paperFormat !== 'custom' && ((pdfOpts.bleed ?? 0) > 0 || pdfOpts.trimMarks) ? `
+            // Bleed and trim marks on a NAMED paper size: the studio keeps the
+            // page at that size and centres the art, so neither appears (prod
+            // retest: MediaBox = TrimBox = A4, no marks). Said, not silent.
+            warnings: [${JSON.stringify(`bleed / trimMarks were passed with paperFormat '${pdfOpts.paperFormat}', and this studio applies them only to paperFormat 'custom' (page = canvas + bleed): the page stayed ${pdfOpts.paperFormat} with no bleed and no marks. For print with bleed, size the canvas with a PRINT preset (agent_start_job canvasPreset 'print-a4' / 'print-letter', which carry 300 dpi — a plain 2480x3508 canvas is read at 96 dpi and comes out ~656 mm wide) and pass paperFormat 'custom'.`)}],` : ''}
           };
         } else {
           result = { success: false, error: 'PDF export failed' };
@@ -4552,8 +4556,8 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
   // opening the file. Only when there is something to say — see fidelity().
   // RE-ENCODE A STILL FOR A BYTE BUDGET. The png path rendered it (whole board
   // or region); the browser's own encoder makes jpg / webp at the tier's
-  // compression. jpg has no alpha, so it is flattened onto white rather than
-  // left to the encoder's black.
+  // compression. jpg has no alpha, so it is flattened onto the scene background
+  // (white when there is none) rather than left to the encoder's black.
   if (result && result.success && (format === 'jpg' || format === 'webp') && typeof result.data === 'string') {
     const mime = format === 'jpg' ? 'image/jpeg' : 'image/webp';
     try {
@@ -4563,7 +4567,13 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
           const c = document.createElement('canvas');
           c.width = img.naturalWidth; c.height = img.naturalHeight;
           const x = c.getContext('2d');
-          if (mime === 'image/jpeg') { x.fillStyle = '#ffffff'; x.fillRect(0, 0, c.width, c.height); }
+          // The scene's own background when one is set — white text on a
+          // transparent board vanished into a white flatten. White otherwise.
+          if (mime === 'image/jpeg') {
+            const bg = app.canvasEl && app.canvasEl.style && app.canvasEl.style.backgroundColor;
+            x.fillStyle = (bg && !/^(transparent|rgba\([^)]*,\s*0\))$/i.test(bg)) ? bg : '#ffffff';
+            x.fillRect(0, 0, c.width, c.height);
+          }
           x.drawImage(img, 0, 0);
           resolve(c.toDataURL(mime, settings.compression));
         };

@@ -8025,7 +8025,7 @@ VERIFY MOTION BEFORE YOU RENDER. An export takes seconds to minutes and shows yo
         format: {
           type: 'string',
           enum: ['svg', 'png', 'gif', 'mp4', 'webm', 'pdf', 'jpg', 'webp', 'wav'],
-          description: "Override format (auto-detected if not specified). 'jpg' / 'webp' are stills for a byte budget (ad specs): the png render re-encoded at the quality tier's compression — draft 0.6, standard 0.85, high 0.95 — so lower quality means a smaller file; jpg has no transparency, and a transparent canvas is flattened onto white. 'wav' exports the SOUNDTRACK ON ITS OWN, with no frames rendered — no platform preset resolves to it, so it must be asked for by name, and platform dimensions, framing and quality do not apply.",
+          description: "Override format (auto-detected if not specified). 'jpg' / 'webp' are stills for a byte budget (ad specs): the png render re-encoded at the quality tier's compression — draft 0.6, standard 0.85, high 0.95 — so lower quality means a smaller file; jpg has no transparency: it is flattened onto the scene's background colour, or white when none is set. 'wav' exports the SOUNDTRACK ON ITS OWN, with no frames rendered — no platform preset resolves to it, so it must be asked for by name, and platform dimensions, framing and quality do not apply.",
         },
         sampleRate: {
           type: 'number',
@@ -8038,7 +8038,7 @@ VERIFY MOTION BEFORE YOU RENDER. An export takes seconds to minutes and shows yo
         },
         pdf: {
           type: 'object',
-          description: "pdf only: print options. paperFormat 'a4' | 'a3' | 'letter' | … | 'custom' (canvas size, default); orientation; bleed in mm (> 0 includes the bleed area); trimMarks adds crop marks; dpi 72–600.",
+          description: "pdf only: print options. paperFormat 'a4' | 'a3' | 'letter' | … | 'custom' (canvas size, default); orientation; bleed in mm (> 0 includes the bleed area); trimMarks adds crop marks; dpi 72–600. Bleed and trim marks take effect with paperFormat 'custom' (the page is the canvas plus bleed) — on a named size the page stays that size and they are dropped, which the result's warnings say. The canvas's physical size comes from its preset's DPI: start the job with canvasPreset 'print-a4' / 'print-letter' (300 dpi) for print; a hand-sized canvas is read at 96 dpi.",
           properties: {
             paperFormat: { type: 'string' },
             orientation: { type: 'string', enum: ['portrait', 'landscape'] },

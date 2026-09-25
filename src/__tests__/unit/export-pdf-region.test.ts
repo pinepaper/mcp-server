@@ -81,3 +81,25 @@ describe('jpg / webp stills (1.35)', () => {
     if (SetCanvasSizeInputSchema) expect(SetCanvasSizeInputSchema.safeParse({ width: 5400, height: 1350 }).success).toBe(true);
   });
 });
+
+describe('round 6 retest follow-ups', () => {
+  it('bleed / trimMarks on a named paper size come back as a warning with the working recipe', () => {
+    const code = codeGenerator.generateAgentExport({ format: 'pdf', pdf: { paperFormat: 'a4', bleed: 3, trimMarks: true } } as never);
+    expect(code).toContain("applies them only to paperFormat 'custom'");
+    expect(code).toContain("canvasPreset 'print-a4'");
+    const custom = codeGenerator.generateAgentExport({ format: 'pdf', pdf: { paperFormat: 'custom', bleed: 3, trimMarks: true } } as never);
+    expect(custom).not.toContain("applies them only to paperFormat 'custom'");
+  });
+
+  it('jpg flattens onto the scene background when one is set', async () => {
+    const fills: string[] = [];
+    class Img { naturalWidth = 4; naturalHeight = 4; onload: (() => void) | null = null; set src(_v: string) { queueMicrotask(() => this.onload?.()); } }
+    const document = { createElement: () => ({ getContext: () => ({ set fillStyle(v: string) { fills.push(v); }, fillRect() {}, drawImage() {} }),
+      toDataURL: (m: string) => `data:${m};base64,AA` }) };
+    const app = { canvasSize: { width: 4, height: 4 }, canvasEl: { style: { backgroundColor: 'rgb(12, 18, 40)' } },
+      exportEngine: { exportPNG: async () => ({ dataUrl: 'data:image/png;base64,AA' }), exportFidelity: () => ({ warnings: [] }) } };
+    const r = await new Function('app', 'document', 'Image', body(codeGenerator.generateAgentExport({ format: 'jpg' } as never)))(app, document, Img);
+    expect(r.success).toBe(true);
+    expect(fills).toEqual(['rgb(12, 18, 40)']);
+  });
+});
