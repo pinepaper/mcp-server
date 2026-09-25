@@ -420,6 +420,10 @@ its own size. anchor: 'top-left' (also top-right, bottom-left, bottom-right,
 center; origin is an alias for the parameter) fixes that without you computing
 bounds you cannot know until the item exists. It is applied after size and
 rotation, so it uses the item's real box.
+PIXEL-EXACT SLOTS (a spec'd 615x345 end-screen box, a UI frame): use anchor
+'top-left' with WHOLE-NUMBER x, y, width and height. A centred box with an odd
+width or height has its edges on half pixels, which renders 1 px short with a
+soft anti-aliased edge (measured: 615x345 centred came out 614x344).
 
 EVERY type below also takes a label, which wraps the item in a labelled group —
 you do not need a second create call and a hand-computed position to caption a
