@@ -3885,7 +3885,6 @@ USE WHEN:
 - Building presentation zoom sequences
 - Making dramatic reveals with camera motion
 - Tour animations showing different parts of canvas
-- 3D perspective effects (pitch/yaw tilt via equirectangular projection)
 
 The camera follows a keyframe sequence. For an orbit-style camera (revolving
 around a subject), add 4-8 keyframes around the pivot using pathMode: "arc"
@@ -3900,8 +3899,7 @@ KEYFRAME PROPERTIES:
     'item-id'                      itemRegistry lookup → item bounds center (tracks the item as it moves)
     { item: 'id', offset: [dx, dy] } item center + offset
 - center: [x, y] — legacy alias, honored only when focus is absent
-- pitch: 3D tilt in degrees (0=flat, positive=tilt forward). Uses equirectangular projection
-- yaw: 3D rotation in degrees. Uses equirectangular projection
+- pitch / yaw: accepted, but measured to have NO visible effect (identical frames through a ±25° yaw). Do not rely on them for perspective; use a world3d scene for a tilted object.
 - easing: Timing function (linear, easeIn, easeOut, easeInOut, bounce, elastic)
 
 CURVED INTER-KEYFRAME PATHS (optional; default is linear):
@@ -3953,8 +3951,8 @@ EXAMPLE (curved arc between waypoints):
                 items: { type: 'number' },
                 description: 'Legacy view center [x, y] — honored only when focus is absent',
               },
-              pitch: { type: 'number', description: '3D tilt in degrees (0=flat, positive=forward tilt)' },
-              yaw: { type: 'number', description: '3D rotation in degrees' },
+              pitch: { type: 'number', description: 'Accepted; measured to have no visible effect — see the note above.' },
+              yaw: { type: 'number', description: 'Accepted; measured to have no visible effect — see the note above.' },
               easing: {
                 type: 'string',
                 enum: ['linear', 'easeIn', 'easeOut', 'easeInOut', 'bounce', 'elastic'],

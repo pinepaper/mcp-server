@@ -505,3 +505,13 @@ describe('keyframe property gaps are named (2.30)', () => {
     expect(full).not.toContain('propertyGaps');
   });
 });
+
+describe('camera pitch / yaw carry a no-effect note (3.6)', () => {
+  it('notes a non-zero yaw, and says nothing without one', async () => {
+    const { handleToolCall } = await import('../../tools/handlers.js');
+    const withYaw = JSON.stringify(await handleToolCall('pinepaper_camera_animate', { keyframes: [{ time: 0, zoom: 1 }, { time: 2, zoom: 1, yaw: 25 }], duration: 2 }, { executionMode: 'code' } as never));
+    expect(withYaw).toContain('NO visible effect');
+    const plain = JSON.stringify(await handleToolCall('pinepaper_camera_animate', { keyframes: [{ time: 0, zoom: 1 }, { time: 2, zoom: 2 }], duration: 2 }, { executionMode: 'code' } as never));
+    expect(plain).not.toContain('NO visible effect');
+  });
+});

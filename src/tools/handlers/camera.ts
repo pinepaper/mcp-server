@@ -123,7 +123,18 @@ export const cameraHandlers: Record<string, CameraHandler> = {
     const relParams: Record<string, unknown> = { keyframes: JSON.parse(keyframesStr), duration, loop, delay, fov };
     const relParamsStr = JSON.stringify(relParams);
     const code = `app.camera && app.camera.animate ? app.camera.animate(${keyframesStr}, ${duration}, ${loop}, ${delay}, { fov: ${fov} }) : app.addRelation('camera', 'camera', 'camera_animates', ${relParamsStr});`;
-    return executeOrGenerate(code, `Animates camera with ${keyframes.length} keyframes over ${duration}s`, options, 'pinepaper_camera_animate');
+    const result = await executeOrGenerate(code, `Animates camera with ${keyframes.length} keyframes over ${duration}s`, options, 'pinepaper_camera_animate');
+    // pitch / yaw ARE ACCEPTED AND MEASURED TO DO NOTHING (round 9 HH, 3.6):
+    // a yaw of 0 -> +-25 degrees gave identical frames on production (bezel
+    // width 0.995 throughout, one unique hash). The engine interpolates them
+    // but nothing it draws reads them yet. Said whenever a key sets one, so a
+    // "3D tilt" is not believed to be on screen.
+    const tilted = (keyframes || []).some((k) => (typeof k.pitch === 'number' && k.pitch !== 0) || (typeof k.yaw === 'number' && k.yaw !== 0));
+    if (tilted) {
+      result.content = [...(result.content ?? []), { type: 'text' as const, text:
+        'NOTE: pitch / yaw have been measured to have NO visible effect (identical frames through a +-25 degree yaw). zoom and focus work. For a tilted device or box face, use a world3d scene instead.' }];
+    }
+    return result;
   },
 
   pinepaper_camera: dispatchCameraAction,
