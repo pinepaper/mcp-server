@@ -4094,7 +4094,7 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
 
   generateAgentExport(input: AgentExportInput): string {
     const validated = AgentExportInputSchema.parse(input);
-    const { platform, format, quality, framing, duration, estimateOnly, scale, fps, pdf: pdfOpts, region } = validated;
+    const { platform, format, quality, framing, duration, estimateOnly, scale, fps, pdf: pdfOpts, region, time: stillTime } = validated;
     const qualityLevel = quality || 'standard';
     const videoDuration = duration ?? 5;
 
@@ -4469,7 +4469,18 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
   });
 
   let result = { success: false, platform, format, quality, framing };
-
+${stillTime !== undefined ? `
+  // A STILL AT A CHOSEN MOMENT (round 7 X, 1.57). Without this a png is
+  // whatever frame the playhead is on — two identical builds gave PNGs that
+  // differed in the animated streak while their MP4s were byte-identical.
+  // Seek, render, and put the playhead back afterwards.
+  const __prevT = typeof app.playbackTime === 'number' ? app.playbackTime : 0;
+  if (typeof app.setPlaybackTime !== 'function') {
+    return { success: false, platform, format, error: 'app.setPlaybackTime unavailable — this studio cannot render a still at a chosen time.' };
+  }
+  app.setPlaybackTime(${stillTime});
+  if (typeof paper !== 'undefined' && paper.view && typeof paper.view.update === 'function') paper.view.update();
+` : ''}
   try {
     // jpg / webp render as png, then re-encode below.
     switch ((format === 'jpg' || format === 'webp') ? 'png' : format) {
@@ -4807,6 +4818,8 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
 
   if (result && result.success) Object.assign(result, fidelity(format));
   if (result && result.success && __fit) result.platformFit = __fit;
+${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) { /* the still is already rendered */ }
+  if (result && result.success) result.time = ${stillTime};` : ''}
 
   return result;
 })();

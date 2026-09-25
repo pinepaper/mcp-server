@@ -188,6 +188,7 @@ export const REQUIRED_ENGINE_METHODS: readonly string[] = [
   'setItemConstraints',
   'setItemLocked',
   'setPhysicsVelocity3D',
+  'setPlaybackTime',
   'setProgress',
   'setSoundPlacement',
   'setTimeRemap',

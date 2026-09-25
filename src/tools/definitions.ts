@@ -8059,6 +8059,7 @@ VERIFY MOTION BEFORE YOU RENDER. An export takes seconds to minutes and shows yo
           enum: [16, 32],
           description: 'wav only: 16 (default) or 32-bit float. Rejected for any other format.',
         },
+        time: { type: 'number', minimum: 0, description: 'Stills only (png / jpg / webp / svg / pdf): render at this time in seconds; the playhead is put back afterwards. Without it a still is whatever frame the playhead is on, so repeated runs can differ.' },
         pdf: {
           type: 'object',
           description: "pdf only: print options. paperFormat 'a4' | 'a3' | 'letter' | … | 'custom' (canvas size, default); orientation; bleed in mm (> 0 includes the bleed area); trimMarks adds crop marks; dpi 72–600. Bleed and trim marks take effect with paperFormat 'custom' (the page is the canvas plus bleed) — on a named size the page stays that size and they are dropped, which the result's warnings say. The canvas's physical size comes from its preset's DPI: start the job with canvasPreset 'print-a4' / 'print-letter' (300 dpi) for print; a hand-sized canvas is read at 96 dpi.",

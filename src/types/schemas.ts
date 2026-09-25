@@ -2510,6 +2510,7 @@ export const AgentExportInputSchema = z.object({
     dpi: z.number().int().min(72).max(600).optional().describe('Rasterisation DPI (default: the quality tier\'s).'),
     pages: z.union([z.literal('scenes'), z.array(z.string()).min(1)]).optional().describe("Multi-page: 'scenes' = one page per saved scene in timeline order, or a list of scene ids in the order you want."),
   }).optional().describe('pdf only: print options.'),
+  time: z.number().min(0).optional().describe('Stills only (png / jpg / webp / svg / pdf): render the scene at this time in seconds. Without it a still is taken at wherever the playhead happens to be, so two identical runs can differ.'),
   region: z.object({
     x: z.number(), y: z.number(),
     width: z.number().positive(), height: z.number().positive(),
@@ -2518,6 +2519,9 @@ export const AgentExportInputSchema = z.object({
   }).optional().describe('png / jpg / webp only: export just this canvas region (canvas coordinates, top-left x/y) — carousel slices, crops. Output is the region\'s size unless outputWidth/outputHeight say otherwise; a different aspect is covered, not stretched.'),
 }).describe('Smart export options')
   .superRefine((val, ctx) => {
+    if (val.time !== undefined && ['mp4', 'webm', 'gif', 'wav'].includes(String(val.format))) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['time'], message: "time picks the moment a STILL is taken; a video or audio export runs from 0 for its duration. Drop time, or export png / jpg / webp / svg / pdf." });
+    }
     if (val.pdf !== undefined && val.format !== 'pdf') {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['pdf'], message: "pdf options apply only to format: 'pdf'." });
     }

@@ -170,3 +170,19 @@ describe('multi-page pdf from scenes (8.16)', () => {
     expect(r.error).toContain('no saved scene nope');
   });
 });
+
+describe('a still at a chosen time (1.57)', () => {
+  it('seeks, renders, and puts the playhead back', async () => {
+    const seeks: number[] = [];
+    const app: Record<string, any> = { playbackTime: 2.5, canvasSize: { width: 10, height: 10 },
+      setPlaybackTime: (t: number) => { seeks.push(t); app.playbackTime = t; },
+      exportEngine: { exportPNG: async () => { seeks.push(-1); return { dataUrl: 'data:image/png;base64,AA' }; }, exportFidelity: () => ({ warnings: [] }) } };
+    const r = await new Function('app', 'document', body(codeGenerator.generateAgentExport({ format: 'png', time: 1 } as never)))(app, {});
+    expect(r).toMatchObject({ success: true, time: 1 });
+    expect(seeks).toEqual([1, -1, 2.5]); // seek, render, restore
+  });
+
+  it('is refused on a video format', () => {
+    expect(AgentExportInputSchema.safeParse({ format: 'mp4', time: 1 }).success).toBe(false);
+  });
+});
