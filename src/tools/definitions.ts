@@ -273,12 +273,12 @@ COMMON PRESETS:
 - hd-landscape: 1920x1080
 - hd-portrait: 1080x1920
 
-Max canvas size: 4096x4096. For wedding invitations, event cards, or detailed designs, use at least 1080x1080 or larger.`,
+Max canvas size: 8192x8192 (a 5400x1350 carousel panorama fits). For wedding invitations, event cards, or detailed designs, use at least 1080x1080 or larger.`,
     inputSchema: {
       type: 'object',
       properties: {
-        width: { type: 'number', description: 'Canvas width in pixels (100-4096)' },
-        height: { type: 'number', description: 'Canvas height in pixels (100-4096)' },
+        width: { type: 'number', description: 'Canvas width in pixels (100-8192)' },
+        height: { type: 'number', description: 'Canvas height in pixels (100-8192)' },
         preset: {
           type: 'string',
           description: 'Optional preset name',
@@ -7737,7 +7737,7 @@ NOTE: For diagrams (flowcharts, UML), use pinepaper_create_diagram_shape + pinep
 
 ⚠️ EVERY operation executes LIVE on the canvas. Calling this twice DOUBLES all items. Call ONCE per pipeline.
 
-⚠️ SIZING: All positions/sizes MUST fit within the canvas. start_job returns canvasSize. Keep items within 5%-95% of canvas width/height. Max canvas: 4096x4096.
+⚠️ SIZING: All positions/sizes MUST fit within the canvas. start_job returns canvasSize. Keep items within 5%-95% of canvas width/height. Max canvas: 8192x8192.
 
 ONTOLOGY PREFLIGHT: Before code generation, this tool validates itemType, relationType, effectType, and generatorName against the canonical PinePaper vocabulary. A typo (e.g. "circel") returns a structured VALIDATION_ERROR with the operation index, the offending field, the canonical valid list, and a suggested fix — fix and retry rather than guessing. Pass skipValidation: true to bypass when intentionally using experimental vocabulary.
 
@@ -7824,8 +7824,8 @@ EXAMPLE — Animated sky scene with timed reveals:
                 description: 'Operation type',
               },
               // Canvas setup
-              width: { type: 'number', description: 'Canvas width for set_canvas_size (100-4096)' },
-              height: { type: 'number', description: 'Canvas height for set_canvas_size (100-4096)' },
+              width: { type: 'number', description: 'Canvas width for set_canvas_size (100-8192)' },
+              height: { type: 'number', description: 'Canvas height for set_canvas_size (100-8192)' },
               preset: { type: 'string', description: 'Canvas preset for set_canvas_size' },
               backgroundColor: { type: 'string', description: 'For set_background: hex color' },
               generatorName: {
@@ -8022,8 +8022,8 @@ VERIFY MOTION BEFORE YOU RENDER. An export takes seconds to minutes and shows yo
         },
         format: {
           type: 'string',
-          enum: ['svg', 'png', 'gif', 'mp4', 'webm', 'pdf', 'wav'],
-          description: "Override format (auto-detected if not specified). 'wav' exports the SOUNDTRACK ON ITS OWN, with no frames rendered — no platform preset resolves to it, so it must be asked for by name, and platform dimensions, framing and quality do not apply.",
+          enum: ['svg', 'png', 'gif', 'mp4', 'webm', 'pdf', 'jpg', 'webp', 'wav'],
+          description: "Override format (auto-detected if not specified). 'jpg' / 'webp' are stills for a byte budget (ad specs): the png render re-encoded at the quality tier's compression — draft 0.6, standard 0.85, high 0.95 — so lower quality means a smaller file; jpg has no transparency, and a transparent canvas is flattened onto white. 'wav' exports the SOUNDTRACK ON ITS OWN, with no frames rendered — no platform preset resolves to it, so it must be asked for by name, and platform dimensions, framing and quality do not apply.",
         },
         sampleRate: {
           type: 'number',
@@ -8047,7 +8047,7 @@ VERIFY MOTION BEFORE YOU RENDER. An export takes seconds to minutes and shows yo
         },
         region: {
           type: 'object',
-          description: 'png only: export just this part of the canvas (canvas coordinates, x/y = TOP-LEFT) — carousel slices, crops. Output is the region\'s own size unless outputWidth/outputHeight say otherwise; a different aspect is covered, not stretched.',
+          description: 'png / jpg / webp only: export just this part of the canvas (canvas coordinates, x/y = TOP-LEFT) — carousel slices, crops. Output is the region\'s own size unless outputWidth/outputHeight say otherwise; a different aspect is covered, not stretched.',
           properties: {
             x: { type: 'number' }, y: { type: 'number' },
             width: { type: 'number', exclusiveMinimum: 0 }, height: { type: 'number', exclusiveMinimum: 0 },

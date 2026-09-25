@@ -1501,8 +1501,11 @@ export const SetBackgroundColorInputSchema = z.object({
 });
 
 export const SetCanvasSizeInputSchema = z.object({
-  width: z.number().min(100).max(4096).describe('Canvas width (100-4096)'),
-  height: z.number().min(100).max(4096).describe('Canvas height (100-4096)'),
+  // 8192, not 4096: the artboard tool takes any size and a 5400x1350 carousel
+  // panorama exported exactly, while this refused it. 8192 stays well inside
+  // the browser's per-side canvas limit.
+  width: z.number().min(100).max(8192).describe('Canvas width (100-8192)'),
+  height: z.number().min(100).max(8192).describe('Canvas height (100-8192)'),
   preset: z.string().optional().describe('Optional preset name'),
 });
 
@@ -2209,6 +2212,10 @@ export type AgentPlatform = z.infer<typeof AgentPlatformSchema>;
  */
 export const AgentExportFormatSchema = z.enum([
   'svg', 'png', 'gif', 'mp4', 'webm', 'pdf',
+  // STILLS UNDER A BYTE BUDGET. Ad specs cap an image at ~150 KB, and PNG could
+  // not get there. Rendered as the png path (region included) and re-encoded in
+  // the page at the quality tier's compression. jpg has no alpha — see the tool text.
+  'jpg', 'webp',
   // AUDIO-ONLY. The soundtrack on its own, with no frames rendered — so
   // platform dimensions, framing and quality do not apply to it, and no
   // platform preset resolves to it. It has to be asked for by name.
@@ -2319,8 +2326,8 @@ export const AgentBatchOperationSchema = z.object({
   generatorParams: z.record(z.unknown()).optional().describe('Generator parameters'),
   generatorRegion: GeneratorRegionSchema.optional().describe('Optional sub-region {x, y, width, height} for execute_generator'),
   // Set canvas size fields
-  width: z.number().min(100).max(4096).optional().describe('Canvas width for set_canvas_size (100-4096)'),
-  height: z.number().min(100).max(4096).optional().describe('Canvas height for set_canvas_size (100-4096)'),
+  width: z.number().min(100).max(8192).optional().describe('Canvas width for set_canvas_size (100-8192)'),
+  height: z.number().min(100).max(8192).optional().describe('Canvas height for set_canvas_size (100-8192)'),
   preset: z.string().optional().describe('Canvas preset for set_canvas_size (e.g. instagram, youtube)'),
   // Keyframe animate fields
   keyframes: z.array(z.object({
@@ -2507,14 +2514,14 @@ export const AgentExportInputSchema = z.object({
     width: z.number().positive(), height: z.number().positive(),
     outputWidth: z.number().int().positive().max(8192).optional(),
     outputHeight: z.number().int().positive().max(8192).optional(),
-  }).optional().describe('png only: export just this canvas region (canvas coordinates, top-left x/y) — carousel slices, crops. Output is the region\'s size unless outputWidth/outputHeight say otherwise; a different aspect is covered, not stretched.'),
+  }).optional().describe('png / jpg / webp only: export just this canvas region (canvas coordinates, top-left x/y) — carousel slices, crops. Output is the region\'s size unless outputWidth/outputHeight say otherwise; a different aspect is covered, not stretched.'),
 }).describe('Smart export options')
   .superRefine((val, ctx) => {
     if (val.pdf !== undefined && val.format !== 'pdf') {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['pdf'], message: "pdf options apply only to format: 'pdf'." });
     }
-    if (val.region !== undefined && val.format !== 'png') {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['region'], message: "region applies only to format: 'png' — it renders one still of that part of the canvas." });
+    if (val.region !== undefined && !['png', 'jpg', 'webp'].includes(String(val.format))) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['region'], message: "region applies only to a still — format 'png', 'jpg' or 'webp'. It renders one image of that part of the canvas." });
     }
     // wav carries no picture, so the visual knobs are not merely ignored — a
     // caller who set them believes something about the output that is not

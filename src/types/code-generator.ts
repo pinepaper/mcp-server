@@ -4302,7 +4302,8 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
   let result = { success: false, platform, format, quality, framing };
 
   try {
-    switch (format) {
+    // jpg / webp render as png, then re-encode below.
+    switch ((format === 'jpg' || format === 'webp') ? 'png' : format) {
       case 'svg':
         const svgString = app.exportAnimatedSVG ? app.exportAnimatedSVG() : app.exportSVGWithCSS();
         result = {
@@ -4549,6 +4550,36 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
   // One site, after every branch has set its result: a successful export says
   // what this scene lost to this format, rather than the caller finding out by
   // opening the file. Only when there is something to say — see fidelity().
+  // RE-ENCODE A STILL FOR A BYTE BUDGET. The png path rendered it (whole board
+  // or region); the browser's own encoder makes jpg / webp at the tier's
+  // compression. jpg has no alpha, so it is flattened onto white rather than
+  // left to the encoder's black.
+  if (result && result.success && (format === 'jpg' || format === 'webp') && typeof result.data === 'string') {
+    const mime = format === 'jpg' ? 'image/jpeg' : 'image/webp';
+    try {
+      const encoded = await new Promise(function(resolve, reject) {
+        const img = new Image();
+        img.onload = function() {
+          const c = document.createElement('canvas');
+          c.width = img.naturalWidth; c.height = img.naturalHeight;
+          const x = c.getContext('2d');
+          if (mime === 'image/jpeg') { x.fillStyle = '#ffffff'; x.fillRect(0, 0, c.width, c.height); }
+          x.drawImage(img, 0, 0);
+          resolve(c.toDataURL(mime, settings.compression));
+        };
+        img.onerror = function() { reject(new Error('the rendered frame could not be decoded for re-encoding')); };
+        img.src = result.data;
+      });
+      if (String(encoded).indexOf('data:' + mime) !== 0) {
+        result = { success: false, platform, format, error: 'this browser cannot encode ' + format + ' (it returned ' + String(encoded).slice(5, 20) + '…).' };
+      } else {
+        result = Object.assign({}, result, { format, data: encoded, mimeType: mime, size: Math.round(String(encoded).length * 0.75), encodeQuality: settings.compression });
+      }
+    } catch (e) {
+      result = { success: false, platform, format, error: (e && e.message) || String(e) };
+    }
+  }
+
   if (result && result.success) Object.assign(result, fidelity(format));
   if (result && result.success && __fit) result.platformFit = __fit;
 

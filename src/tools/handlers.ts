@@ -453,7 +453,7 @@ export async function resolveMediaSource(input: string): Promise<{ src: string }
 }
 
 export function getFileExtension(format: string): string {
-  const extMap: Record<string, string> = { mp4: 'mp4', webm: 'webm', gif: 'gif', pdf: 'pdf', png: 'png', svg: 'svg', wav: 'wav' };
+  const extMap: Record<string, string> = { mp4: 'mp4', webm: 'webm', gif: 'gif', pdf: 'pdf', png: 'png', svg: 'svg', wav: 'wav', jpg: 'jpg', webp: 'webp' };
   return extMap[format] || format;
 }
 

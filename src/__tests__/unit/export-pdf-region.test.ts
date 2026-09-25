@@ -43,3 +43,41 @@ describe('region export', () => {
     expect(AgentExportInputSchema.safeParse({ format: 'mp4', region: { x: 0, y: 0, width: 10, height: 10 } }).success).toBe(false);
   });
 });
+
+describe('jpg / webp stills (1.35)', () => {
+  function studio() {
+    const ops: unknown[] = [];
+    class Img { naturalWidth = 20; naturalHeight = 10; onload: (() => void) | null = null; onerror: (() => void) | null = null;
+      set src(_v: string) { queueMicrotask(() => this.onload?.()); } }
+    const document = { createElement: () => ({ width: 0, height: 0,
+      getContext: () => ({ set fillStyle(v: string) { ops.push(['fill', v]); }, fillRect: () => ops.push('fillRect'), drawImage: () => ops.push('draw') }),
+      toDataURL: (mime: string, q: number) => { ops.push(['encode', mime, q]); return `data:${mime};base64,AAAA`; } }) };
+    const app = { canvasSize: { width: 20, height: 10 }, exportEngine: {
+      exportPNG: async () => ({ dataUrl: 'data:image/png;base64,iVBO', width: 20, height: 10 }),
+      exportFidelity: () => ({ warnings: [] }) } };
+    return { ops, globals: { app, document, Image: Img } };
+  }
+  const run = (input: Record<string, unknown>, g: Record<string, unknown>) =>
+    new Function(...Object.keys(g), body(codeGenerator.generateAgentExport(input as never)))(...Object.values(g));
+
+  it('jpg: flattened onto white, encoded at the tier compression', async () => {
+    const s = studio();
+    const r = await run({ format: 'jpg', quality: 'draft' }, s.globals);
+    expect(r).toMatchObject({ success: true, format: 'jpg', mimeType: 'image/jpeg', encodeQuality: 0.6 });
+    expect(s.ops).toContainEqual(['fill', '#ffffff']);
+    expect(s.ops).toContainEqual(['encode', 'image/jpeg', 0.6]);
+  });
+
+  it('webp keeps alpha (no white fill)', async () => {
+    const s = studio();
+    const r = await run({ format: 'webp' }, s.globals);
+    expect(r).toMatchObject({ success: true, mimeType: 'image/webp' });
+    expect(s.ops).not.toContainEqual(['fill', '#ffffff']);
+  });
+
+  it('region works for jpg too, and the canvas cap is 8192', async () => {
+    expect(AgentExportInputSchema.safeParse({ format: 'jpg', region: { x: 0, y: 0, width: 10, height: 10 } }).success).toBe(true);
+    const { SetCanvasSizeInputSchema } = await import('../../types/schemas.js') as Record<string, { safeParse(v: unknown): { success: boolean } }>;
+    if (SetCanvasSizeInputSchema) expect(SetCanvasSizeInputSchema.safeParse({ width: 5400, height: 1350 }).success).toBe(true);
+  });
+});
