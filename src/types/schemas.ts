@@ -2258,6 +2258,10 @@ export const AgentExportFormatSchema = z.enum([
   // ANIMATION WITH FULL ALPHA (8.12): stepped PNG frames. webm cannot carry
   // alpha with the studio's muxer, and gif's transparency is 1-bit.
   'apng',
+  // ADS (8.21 / 8.24): the studio's standalone widget page, wrapped for a
+  // display network (a zip with ad.size + clickTag, and a backup image) or as
+  // an MRAID playable (one HTML file, CTA through mraid.open).
+  'html5-ad', 'playable',
   // CAPTIONS: text items staged with bornAt / ttl, as a subtitle file.
   'srt', 'vtt',
   // AUDIO-ONLY. The soundtrack on its own, with no frames rendered — so
@@ -2573,6 +2577,11 @@ export const AgentExportInputSchema = z.object({
       z.array(z.union([z.string(), z.object({ sceneId: z.string(), width: z.number().positive(), height: z.number().positive() })])).min(1),
     ]).optional().describe("Multi-page: 'scenes' = one page per saved scene in timeline order, or a list of scene ids — or {sceneId, width, height} to give a page its canvas size (scenes do not record one)."),
   }).optional().describe('pdf only: print options.'),
+  ad: z.object({
+    clickUrl: z.string().url().optional().describe('html5-ad: the clickTag value for testing (networks replace it at serve time). playable: the store / landing URL the CTA opens — required.'),
+    ctaItemId: z.string().min(1).optional().describe('The item whose bounds are the click target. html5-ad: optional (default: the whole ad). playable: required — a playable is interactive, so only the CTA clicks through. The hotspot is where the item is at export time; it does not follow an animated CTA.'),
+    maxBytes: z.number().int().positive().optional().describe('Size budget for the upload (the zip for html5-ad, the HTML for playable). html5-ad defaults to 150000: Google Ads display HTML5 is 150 KB; some uploads allow 600 KB — set it to your network\'s figure. Over budget is a fidelity warning, not a refusal.'),
+  }).optional().describe('html5-ad / playable options.'),
   transparent: z.boolean().optional().describe('apng only: keep the alpha channel (the default). false fills the background colour.'),
   loop: z.union([z.boolean(), z.number().int().min(0).max(1000)]).optional().describe('gif / apng: true = loop forever, false / 0 / 1 = play once, n = play n times.'),
   maxBytes: z.number().int().positive().optional().describe('gif only: a size budget in bytes (email wants <= 1 MB). Over it, the GIF is re-encoded smaller — frame size scaled from the overshoot — at most twice; the result reports each attempt and whether the budget was met.'),
@@ -2607,6 +2616,12 @@ export const AgentExportInputSchema = z.object({
     }
     if (val.bitrate !== undefined && val.minBitrate !== undefined && val.minBitrate > val.bitrate) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['minBitrate'], message: 'minBitrate is above bitrate; the floor would override the target. Drop one, or lower minBitrate.' });
+    }
+    if (val.ad !== undefined && val.format !== 'html5-ad' && val.format !== 'playable') {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['ad'], message: 'ad options apply to format "html5-ad" or "playable".' });
+    }
+    if (val.format === 'playable' && (!val.ad?.ctaItemId || !val.ad?.clickUrl)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['ad'], message: 'a playable needs ad.ctaItemId (the install button — only it clicks through, so the rest stays playable) and ad.clickUrl (the store URL it opens).' });
     }
     if (val.transparent !== undefined && val.format !== 'apng') {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['transparent'], message: 'transparent is an apng setting here: png keeps alpha already, and mp4 / webm / gif cannot carry it. For animation with alpha, export format "apng".' });

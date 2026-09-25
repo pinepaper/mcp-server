@@ -80,6 +80,7 @@ export const REQUIRED_ENGINE_METHODS: readonly string[] = [
   'exportEngine._loadPDFLibraries',
   'exportEngine.exportFidelity',
   'exportEngine.exportToStore',
+  'exportEngine.exportWidgetHTML',
   'exportEngine.listExports',
   'exportEngine.readExport',
   'exportEngine.releaseExport',

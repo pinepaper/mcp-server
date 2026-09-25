@@ -8073,8 +8073,8 @@ VERIFY MOTION BEFORE YOU RENDER. An export takes seconds to minutes and shows yo
         },
         format: {
           type: 'string',
-          enum: ['svg', 'png', 'gif', 'apng', 'mp4', 'webm', 'pdf', 'jpg', 'webp', 'srt', 'vtt', 'wav'],
-          description: "Override format (auto-detected if not specified). 'apng' is animation with FULL alpha (stepped PNG frames, saved as .png; transparent unless transparent: false) — the answer for an animated overlay or sticker, since webm here cannot carry alpha and gif's transparency is 1-bit. 'jpg' / 'webp' are stills for a byte budget (ad specs): the png render re-encoded at the quality tier's compression — draft 0.6, standard 0.85, high 0.95 — so lower quality means a smaller file; 'srt' / 'vtt' write a caption file from every text item that has a lifetime (bornAt / ttl) — one cue each, in start order; duration closes a caption with no ttl. jpg has no transparency: it is flattened onto the scene's background colour, or white when none is set. 'wav' exports the SOUNDTRACK ON ITS OWN, with no frames rendered — no platform preset resolves to it, so it must be asked for by name, and platform dimensions, framing and quality do not apply.",
+          enum: ['svg', 'png', 'gif', 'apng', 'mp4', 'webm', 'pdf', 'jpg', 'webp', 'srt', 'vtt', 'wav', 'html5-ad', 'playable'],
+          description: "Override format (auto-detected if not specified). 'html5-ad' is a display-network HTML5 ad (Google Ads, DV360 / CM360, most DSPs): a zip with index.html carrying the ad.size meta and a clickTag click target (the whole ad, or ad.ctaItemId's box), plus a backup PNG saved beside it; the result checks the zip against ad.maxBytes (default 150000) and lists any external requests. 'playable' is an MRAID playable: one HTML file loading mraid.js, whose CTA (ad.ctaItemId, required) opens ad.clickUrl (required) through mraid.open. Both are built from the standalone widget page at the canvas size. 'apng' is animation with FULL alpha (stepped PNG frames, saved as .png; transparent unless transparent: false) — the answer for an animated overlay or sticker, since webm here cannot carry alpha and gif's transparency is 1-bit. 'jpg' / 'webp' are stills for a byte budget (ad specs): the png render re-encoded at the quality tier's compression — draft 0.6, standard 0.85, high 0.95 — so lower quality means a smaller file; 'srt' / 'vtt' write a caption file from every text item that has a lifetime (bornAt / ttl) — one cue each, in start order; duration closes a caption with no ttl. jpg has no transparency: it is flattened onto the scene's background colour, or white when none is set. 'wav' exports the SOUNDTRACK ON ITS OWN, with no frames rendered — no platform preset resolves to it, so it must be asked for by name, and platform dimensions, framing and quality do not apply.",
         },
         sampleRate: {
           type: 'number',
@@ -8084,6 +8084,15 @@ VERIFY MOTION BEFORE YOU RENDER. An export takes seconds to minutes and shows yo
           type: 'number',
           enum: [16, 32],
           description: 'wav only: 16 (default) or 32-bit float. Rejected for any other format.',
+        },
+        ad: {
+          type: 'object',
+          description: 'html5-ad / playable options.',
+          properties: {
+            clickUrl: { type: 'string', description: 'html5-ad: the clickTag value for testing (networks replace it at serve time). playable: the store / landing URL the CTA opens (required).' },
+            ctaItemId: { type: 'string', description: 'The item whose bounds are the click target. Optional for html5-ad (default: whole ad); required for playable. Static: where the item is at export time.' },
+            maxBytes: { type: 'integer', minimum: 1, description: 'Upload size budget (zip for html5-ad, HTML for playable). html5-ad default 150000 (Google Ads display); set your network figure.' },
+          },
         },
         transparent: { type: 'boolean', description: 'apng only: keep the alpha channel (the default); false fills the background colour.' },
         loop: { anyOf: [{ type: 'boolean' }, { type: 'integer', minimum: 0, maximum: 1000 }], description: 'gif / apng: true = loop forever, false / 0 / 1 = play once, n = play n times (email clients often want a few plays, not forever). Refused on video formats — see SEAMLESS LOOPS.' },

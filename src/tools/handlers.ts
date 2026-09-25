@@ -169,6 +169,8 @@ import { ontologyHandlers } from './handlers/ontology.js';
 import * as designSystems from '../design/design-systems.js';
 import { exportHandlers } from './handlers/export.js';
 import { planCharacter, generateCharacterCode } from './handlers/character.js';
+import { buildZip } from '../utils/zip.js';
+import { buildHtml5Ad, buildPlayable, externalRequests, type CtaBox } from '../utils/ad-package.js';
 
 /**
  * Registry of per-domain handler maps. Tools listed here short-circuit the
@@ -224,7 +226,7 @@ function getExportDir(): string {
 // wav joins them: a minute of 48kHz 16-bit is ~5.8 MB of base64 and the ten
 // minutes the schema allows is ~77 MB. Deliverable across the bridge, useless
 // pasted into a response.
-export const ALWAYS_SAVE_FORMATS = new Set(['mp4', 'webm', 'gif', 'apng', 'pdf', 'wav', 'srt', 'vtt']);
+export const ALWAYS_SAVE_FORMATS = new Set(['mp4', 'webm', 'gif', 'apng', 'pdf', 'wav', 'srt', 'vtt', 'html5-ad', 'playable']);
 // 500_000 was chosen against the bridge's limits, not the CALLER's. A pilot
 // session hit a 263K-character end_job result — comfortably under this, so it
 // was returned inline, and over the tool-result limit of the client reading
@@ -453,8 +455,75 @@ export async function resolveMediaSource(input: string): Promise<{ src: string }
 }
 
 export function getFileExtension(format: string): string {
-  const extMap: Record<string, string> = { mp4: 'mp4', webm: 'webm', gif: 'gif', apng: 'png', pdf: 'pdf', png: 'png', svg: 'svg', wav: 'wav', jpg: 'jpg', webp: 'webp', srt: 'srt', vtt: 'vtt' };
+  const extMap: Record<string, string> = { mp4: 'mp4', webm: 'webm', gif: 'gif', apng: 'png', 'html5-ad': 'zip', playable: 'html', pdf: 'pdf', png: 'png', svg: 'svg', wav: 'wav', jpg: 'jpg', webp: 'webp', srt: 'srt', vtt: 'vtt' };
   return extMap[format] || format;
+}
+
+interface AdExportResult {
+  format: 'html5-ad' | 'playable';
+  adPage: string;
+  adSize: { width: number; height: number };
+  cta: CtaBox | null;
+  backupImage: string | null;
+  fidelity?: { warnings?: Array<{ code: string; message: string }>; note?: string };
+  [k: string]: unknown;
+}
+
+/**
+ * Wrap the widget page for its network, write it, and say what a trafficker
+ * checks: the upload's size against the budget, and anything the page fetches
+ * from outside (networks block or must allow-list external requests).
+ */
+async function saveAdExport(r: AdExportResult, input: { ad?: { clickUrl?: string; maxBytes?: number } }, platform: string) {
+  const exportDir = getExportDir();
+  await mkdir(exportDir, { recursive: true });
+  const stamp = `pinepaper_${platform}_${Date.now()}`;
+  const opts = { width: r.adSize.width, height: r.adSize.height, clickUrl: input.ad?.clickUrl, cta: r.cta };
+  const warnings = [...(r.fidelity?.warnings ?? [])];
+  const files: Record<string, string> = {};
+  let uploadBytes: number;
+
+  if (r.format === 'html5-ad') {
+    const html = buildHtml5Ad(r.adPage, opts);
+    const zip = buildZip([{ name: 'index.html', data: html }]);
+    files.zip = join(exportDir, `${stamp}.zip`);
+    await writeFile(files.zip, zip);
+    uploadBytes = zip.length;
+    // The backup image is uploaded BESIDE the zip, not inside it.
+    if (r.backupImage && r.backupImage.startsWith('data:')) {
+      files.backupImage = join(exportDir, `${stamp}_backup.png`);
+      await writeFile(files.backupImage, Buffer.from(r.backupImage.split(',')[1], 'base64'));
+    } else {
+      warnings.push({ code: 'no_backup_image', message: 'no backup image was made (the studio could not capture a frame); display networks require one — export format "png" at the same size.' });
+    }
+  } else {
+    const html = buildPlayable(r.adPage, opts);
+    files.html = join(exportDir, `${stamp}.html`);
+    await writeFile(files.html, html, 'utf-8');
+    uploadBytes = Buffer.byteLength(html, 'utf-8');
+  }
+
+  // 150 KB is Google Ads' display HTML5 figure; some uploads allow 600 KB, and
+  // playable networks set their own — so it is a default, not a rule.
+  const budget = input.ad?.maxBytes ?? (r.format === 'html5-ad' ? 150_000 : undefined);
+  if (budget !== undefined && uploadBytes > budget) {
+    warnings.push({ code: 'over_size_budget', message: `the ${r.format === 'html5-ad' ? 'zip' : 'HTML'} is ${uploadBytes} bytes, over the ${budget}-byte budget. Simplify the scene (fewer items, no embedded images), or set ad.maxBytes to your network's figure if it allows more.` });
+  }
+  const external = externalRequests(r.adPage);
+  if (external.length) {
+    warnings.push({ code: 'external_requests', message: `the page fetches ${external.length} external URL(s): ${external.slice(0, 5).join(', ')}${external.length > 5 ? ', …' : ''}. Display and playable networks often block external requests or require them allow-listed; a scene using only system fonts avoids web-font requests.` });
+  }
+  const { adPage: _page, backupImage: _img, ...rest } = r;
+  void _page; void _img;
+  const cleanResult = { ...rest, files, uploadBytes, ...(budget !== undefined ? { sizeBudget: budget } : {}), externalRequests: external,
+    fidelity: { ...(r.fidelity ?? {}), warnings } };
+  if (warnings.length && cleanResult.fidelity.note) delete cleanResult.fidelity.note;
+  return {
+    content: [{
+      type: 'text' as const,
+      text: `Ad saved:\n\n${Object.entries(files).map(([k, v]) => `${k}: ${v}`).join('\n')}\nFormat: ${r.format}\nSize: ${r.adSize.width}x${r.adSize.height}, upload ${(uploadBytes / 1024).toFixed(1)} KB\n\nResult: ${JSON.stringify(cleanResult, null, 2)}`,
+    }],
+  };
 }
 
 async function saveExportToFile(
@@ -3496,6 +3565,12 @@ You can now start creating new items on a clean canvas.`,
               { toolName: 'pinepaper_agent_export', canvasState: canvasState || undefined }
             );
           }
+        }
+
+        // AN AD (8.21 / 8.24): the studio sent its widget page; the network
+        // wrapper, the zip and the size check are done here.
+        if ((format === 'html5-ad' || format === 'playable') && typeof exportResult?.adPage === 'string') {
+          return saveAdExport(exportResult as AdExportResult, input, input.platform || 'auto');
         }
 
         const shouldSaveToFile = data && typeof data === 'string' && (

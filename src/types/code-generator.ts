@@ -4552,7 +4552,7 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
 
   generateAgentExport(input: AgentExportInput): string {
     const validated = AgentExportInputSchema.parse(input);
-    const { platform, format, quality, framing, duration, estimateOnly, scale, fps, pdf: pdfOpts, region, time: stillTime, maxBytes, loop: gifLoop, broadcast, broadcastHeadroom, bitrate, minBitrate, bitrateMode, transparent } = validated;
+    const { platform, format, quality, framing, duration, estimateOnly, scale, fps, pdf: pdfOpts, region, time: stillTime, maxBytes, loop: gifLoop, broadcast, broadcastHeadroom, bitrate, minBitrate, bitrateMode, transparent, ad: adOpts } = validated;
   // Encoder options (FxTool 16719759); the schema keeps them to mp4 / webm.
   const videoEncodeOpts: Record<string, unknown> = {};
   if (broadcast) videoEncodeOpts.broadcast = true;
@@ -5145,6 +5145,43 @@ ${stillTime !== undefined ? `
           }
         }
         break;
+
+      case 'html5-ad':
+      case 'playable': {
+        // AN AD FROM THE WIDGET PAGE (8.21 / 8.24). The page is the studio's
+        // standalone widget; the server adds the network's wrapper and builds
+        // the zip (src/utils/ad-package.ts). Here: the page, its size, the CTA
+        // box in percent of the canvas, and a backup image for html5-ad.
+        if (!app.exportEngine || typeof app.exportEngine.exportWidgetHTML !== 'function') {
+          result = { success: false, platform, format, error: 'this studio cannot export its standalone widget page (no exportWidgetHTML), which an ad is built from.' };
+          break;
+        }
+        // The artboard, never the canvas element: its backing store is scaled
+        // by the renderer, and an ad's size is what was asked for.
+        const __as = (typeof app.getCanvasSize === 'function' && app.getCanvasSize()) || app.canvasSize || { width: 0, height: 0 };
+        const __cw = __as.width, __ch = __as.height;
+        let __cta = null;
+        ${adOpts?.ctaItemId ? `{
+          const __ce = app.itemRegistry && app.itemRegistry.get(${JSON.stringify(adOpts.ctaItemId)});
+          const __cb = __ce && __ce.item && __ce.item.bounds;
+          if (!__cb || !(__cb.width > 0) || !(__cw > 0)) {
+            result = { success: false, platform, format, error: ${JSON.stringify(`ad.ctaItemId "${adOpts.ctaItemId}" is not an item on the canvas with a size — nothing was exported. List items with pinepaper_get_items.`)} };
+            break;
+          }
+          __cta = { left: __cb.x / __cw * 100, top: __cb.y / __ch * 100, width: __cb.width / __cw * 100, height: __cb.height / __ch * 100 };
+        }` : ''}
+        const __w = await app.exportEngine.exportWidgetHTML({ download: false });
+        if (!__w || typeof __w.html !== 'string' || !__w.html) {
+          result = { success: false, platform, format, error: 'the studio returned no widget page to build the ad from.' };
+          break;
+        }
+        let __backup = null;
+        if (format === 'html5-ad' && typeof app.captureFrameDataURL === 'function') {
+          try { __backup = app.captureFrameDataURL(1); } catch (_) { __backup = null; }
+        }
+        result = { success: true, platform, format, adPage: __w.html, adSize: { width: __cw, height: __ch }, cta: __cta, backupImage: __backup };
+        break;
+      }
 
       case 'gif':
       case 'apng':
