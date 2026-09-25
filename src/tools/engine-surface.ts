@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main fca09aba5bedd567901db87ce25780a77a3dd5b8
- * sha256:    80df73f9098706e5be93cd6ba788c26b1fc1fbfa3d8a1e5f5673437798d266c7   (of PinePaper.js as committed)
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 253a01a04c886713f610e619ac6205e59751dbb4
+ * sha256:    112558d246c6b1115dc8b20d93e0e0061ba1822988e3a10c852ebff9a0201b06   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on `window.app`, with how it gets there. The parity
@@ -16,11 +16,12 @@
 /** How a name lands on `app`. */
 export type EngineMemberKind = 'method' | 'accessor' | 'property' | 'lazy' | 'lazyHeavy' | 'bootstrap';
 
-/** 1152 names, from FxTool/js/PinePaper.js. */
+/** 1157 names, from FxTool/js/PinePaper.js. */
 export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object.freeze({
   _activeByGroup: 'property',
   _activeDrawingGroup: 'method',
   _addAuthoredMesh: 'method',
+  _addImageFromUrl: 'method',
   _adoptRegistryId: 'method',
   _animateCamera: 'method',
   _animationIntervalId: 'property',
@@ -162,6 +163,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _lastUpdateJsMs: 'property',
   _lastUpdateTimestamp: 'property',
   _lines: 'property',
+  _loadedMediaFile: 'method',
   _loadSceneBasic: 'method',
   _loadSceneFontsSoon: 'method',
   _loggedFallbackActivation: 'property',
@@ -329,6 +331,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   addText: 'method',
   addToPrecomp: 'method',
   addToSelection: 'method',
+  addTransition: 'method',
   addWorldActor: 'method',
   addWorldLight: 'method',
   addWorldMaterial: 'method',
@@ -502,6 +505,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   currentSelectionBounds: 'property',
   currentTool: 'property',
   cursiveFont: 'lazy',
+  cutNear: 'method',
   cutoutStyles: 'lazy',
   decorateLoadedImage: 'method',
   decorativeClock: 'method',
@@ -1078,6 +1082,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   solveODE: 'method',
   speedAtTime: 'method',
   speedRamp: 'method',
+  splitMedia: 'method',
   spriteSystem: 'lazyHeavy',
   staggerDelays: 'method',
   staggerItems: 'method',
