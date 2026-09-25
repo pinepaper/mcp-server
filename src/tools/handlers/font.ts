@@ -78,9 +78,15 @@ async function dispatchFontAction(args: Record<string, unknown>, options: Handle
     case 'fallbacks': {
       // Which text items are SILENTLY drawing in something other than what
       // they asked for — the failure nobody notices until the export.
-      const code = `(function() {
+      // A face still downloading measures as a fallback, so this listed fonts
+      // that were merely LOADING (round 8 DD, 1.69). Wait for the fonts in
+      // flight first — bounded, so a stalled download cannot hang the call.
+      const code = `(async function() {
   if (typeof app.fontFallbacks !== 'function') {
     return { success: false, error: 'app.fontFallbacks unavailable — update the studio.' };
+  }
+  if (typeof document !== 'undefined' && document.fonts && document.fonts.ready) {
+    await Promise.race([document.fonts.ready, new Promise(function(r) { setTimeout(r, 5000); })]);
   }
   const items = app.fontFallbacks();
   return { success: true, fallingBack: items, count: Array.isArray(items) ? items.length : 0 };
