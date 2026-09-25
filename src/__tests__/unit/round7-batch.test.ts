@@ -800,3 +800,45 @@ describe('tabular figures (FxTool 3354d51c)', () => {
     expect(r.ignoredProperties).toBeUndefined();
   });
 });
+
+describe('text stroke outside the glyph (FxTool 3e22c0df)', () => {
+  const studio = (records: boolean) => {
+    const item: Record<string, any> = { className: 'PointText', strokeColor: '#000', strokeWidth: 12, data: { registryId: 'item_1' }, bringToFront() {} };
+    const seen: Array<Record<string, unknown>> = [];
+    const take = (p: Record<string, unknown>) => { seen.push(p); if (records && p.strokePosition === 'outside') item.data.strokePosition = 'outside'; };
+    const app = { create: (_t: string, p: Record<string, unknown>) => { take(p); return item; },
+      modifyItem: (_id: string, ch: Record<string, unknown>) => { take(ch); return true; },
+      getItemById: () => item, itemRegistry: { get: () => ({ item }) }, historyManager: { saveState() {} } };
+    return { app, seen };
+  };
+  const create = (app: object, properties: Record<string, unknown>) => {
+    const code = codeGenerator.generateCreateItem({ itemType: 'text', position: { x: 0, y: 0 }, properties } as never);
+    return new Function('app', code.replace(/\(\{ itemId[\s\S]*\}\);\s*$/, (m) => `return ${m.slice(0, -1)}`))(app);
+  };
+  const modify = (app: object, properties: Record<string, unknown>) =>
+    new Function('app', 'window', `return ${codeGenerator.generateModifyItem({ itemId: 'item_1', properties })}`)(app, {});
+
+  it("'outside' reaches the engine, is not ignored, and is confirmed", () => {
+    const s = studio(true);
+    const r = create(s.app, { content: 'I', strokeColor: '#000', strokeWidth: 12, strokePosition: 'Outside' });
+    expect(s.seen[0]).toMatchObject({ strokePosition: 'outside' });
+    expect(r.strokePosition).toEqual({ applied: true, value: 'outside' });
+    expect(r.ignoredProperties).toBeUndefined();
+  });
+
+  it('an older studio says the stroke stayed centred; a bad value is refused, not sent', () => {
+    expect(create(studio(false).app, { content: 'I', strokePosition: 'outside' }).strokePosition).toMatchObject({ applied: false });
+    const s = studio(true);
+    const r = create(s.app, { content: 'I', strokePosition: 'inside' });
+    expect(s.seen[0]).not.toHaveProperty('strokePosition');
+    expect(r.strokePosition).toMatchObject({ applied: false, error: expect.stringContaining("'outside' or 'center'") });
+  });
+
+  it('modify: null turns it back to centre', () => {
+    const s = studio(true);
+    const r = modify(s.app, { strokePosition: null });
+    expect(s.seen[0]).toEqual({ strokePosition: 'center' });
+    expect(r.strokePosition).toEqual({ applied: true, value: 'center' });
+    expect(r.ignoredProperties).toBeUndefined();
+  });
+});

@@ -156,6 +156,34 @@ describe('multi-page pdf from scenes (8.16)', () => {
   const run = (s: ReturnType<typeof sceneStudio>, pages: unknown) =>
     new Function('app', 'FileReader', 'document', 'Image', body(codeGenerator.generateAgentExport({ format: 'pdf', pdf: { pages } } as never)))(s.app, FR, doc, Img);
 
+  it('each page gets the text layer of its own scene, summed into result.pdf (FxTool 3e22c0df)', async () => {
+    const s = sceneStudio();
+    const seen: unknown[] = [];
+    s.app.exportEngine.addTextLayer = (_doc: unknown, box: unknown) => { seen.push([s.app.sceneManager.currentSceneId, box]); return s.app.sceneManager.currentSceneId === 's2' ? { ok: true, linesWritten: 3, linesSkipped: 1 } : { ok: true, linesWritten: 5, linesSkipped: 0 }; };
+    const r = await run(s, 'scenes');
+    expect(seen.map((x) => (x as unknown[])[0])).toEqual(['s1', 's2']);
+    expect((seen[0] as unknown[])[1]).toMatchObject({ x: 0, y: 0 });
+    expect(r.pdf).toEqual({ searchableText: true, linesWritten: 8, linesSkipped: 1 });
+    expect(r.fidelity.warnings.map((w: { code: string }) => w.code)).toContain('pdf_text_lines_skipped');
+  });
+
+  it('a page refused, a studio without the helper, and off on request are each told apart', async () => {
+    const part = sceneStudio();
+    part.app.exportEngine.addTextLayer = () => (part.app.sceneManager.currentSceneId === 's1' ? { ok: false, reason: 'unbounded canvas' } : { ok: true, linesWritten: 2, linesSkipped: 0 });
+    const r1 = await run(part, 'scenes');
+    expect(r1.pdf).toMatchObject({ searchableText: true, linesWritten: 2, pagesWithoutLayer: ['s1: unbounded canvas'] });
+    expect(r1.fidelity.warnings.map((w: { code: string }) => w.code)).toContain('pdf_no_text_layer');
+    const old = await run(sceneStudio(), 'scenes');
+    expect(old.pdf).toMatchObject({ searchableText: false, reason: expect.stringContaining('multi-page') });
+    expect(old.fidelity.warnings.map((w: { code: string }) => w.code)).toContain('pdf_no_text_layer');
+    const offS = sceneStudio();
+    let called = false;
+    offS.app.exportEngine.addTextLayer = () => { called = true; return { ok: true }; };
+    const off = await new Function('app', 'FileReader', 'document', 'Image', body(codeGenerator.generateAgentExport({ format: 'pdf', pdf: { pages: 'scenes', searchableText: false } } as never)))(offS.app, FR, doc, Img);
+    expect(called).toBe(false);
+    expect(off.pdf).toEqual({ searchableText: false, reason: 'off' });
+  });
+
   it("'scenes' makes one page per scene, puts the user's scene back, and warns that sizes are the current canvas", async () => {
     const s = sceneStudio();
     s.app.sceneManager.loadScene = async (id: string) => { s.log.push(['load', id]); }; // like prod: no resize

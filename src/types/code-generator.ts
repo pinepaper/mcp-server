@@ -379,6 +379,7 @@ function generateCreateItemCode(
     textDirection.resolved = baseDirection(createProps.content);
   }
   const textTabular = itemType === 'text' && wantsTabular(createProps) === true;
+  const textStrokePos = itemType === 'text' ? takeStrokePosition(createProps, false) : null;
   const params: Record<string, unknown> = {
     ...(omitXY ? {} : { x: position.x, y: position.y }),
     ...withRadiusAxes(createProps),
@@ -491,7 +492,7 @@ if (item && item.data) { item.data.renderAs = ${JSON.stringify(itemType)}; item.
   // refused: the item is still what the caller asked for in every other way,
   // and a refusal would cost a re-issue over one typo.
   const ignored = Object.keys(properties).filter((k) => !CREATE_KNOWN_KEYS.has(k)
-    && !(itemType === 'text' && ((TEXT_STYLE_KEYS as readonly string[]).includes(k) || k === 'fit' || (DIRECTION_KEYS as readonly string[]).includes(k) || (TABULAR_KEYS as readonly string[]).includes(k))));
+    && !(itemType === 'text' && ((TEXT_STYLE_KEYS as readonly string[]).includes(k) || k === 'fit' || (DIRECTION_KEYS as readonly string[]).includes(k) || (TABULAR_KEYS as readonly string[]).includes(k) || k === 'strokePosition')));
 
   // Build the code
   let code = `
@@ -550,6 +551,7 @@ const item = app.create('${itemType}', ${JSON.stringify(params, null, 2)});`;
   // anchored headline's top edge drifted on every refit.
   if (textDirection) code += emitDirectionCheck('item', textDirection);
   if (textTabular) code += emitTabularCheck('item');
+  if (textStrokePos) code += emitStrokePositionCheck('item', textStrokePos);
   if (textFit) code += `\nlet __textFit = null;${emitTextFit('item', textFit, JSON.stringify(anchorHold(properties.anchor ?? properties.origin) ?? null))}`;
 
   // After opacity, so the "on" level of the lifetime is the item's own.
@@ -582,7 +584,7 @@ const itemId = item.data.registryId;
 app.historyManager.saveState();
 
 // Return item info
-({ itemId, type: '${itemType}'${textFit ? ', textFit: __textFit' : ''}${textDirection ? ', direction: __direction' : ''}${textTabular ? ', tabularFigures: __tabular' : ''}, position: ${omitXY ? `(item.position ? { x: item.position.x, y: item.position.y } : null)` : `{ x: ${position.x}, y: ${position.y} }`}${hasLifetime ? ', lifetime: __lifetime' : ''}${loadsFont ? ', ...(__font ? { font: __font } : {})' : ''}${ignored.length > 0
+({ itemId, type: '${itemType}'${textFit ? ', textFit: __textFit' : ''}${textDirection ? ', direction: __direction' : ''}${textTabular ? ', tabularFigures: __tabular' : ''}${textStrokePos ? ', strokePosition: __strokePos' : ''}, position: ${omitXY ? `(item.position ? { x: item.position.x, y: item.position.y } : null)` : `{ x: ${position.x}, y: ${position.y} }`}${hasLifetime ? ', lifetime: __lifetime' : ''}${loadsFont ? ', ...(__font ? { font: __font } : {})' : ''}${ignored.length > 0
     ? `, ignoredProperties: ${JSON.stringify(ignored)}, warning: ${JSON.stringify(
       `${ignored.join(', ')} ${ignored.length > 1 ? 'are' : 'is'} not read when creating an item, so ${ignored.length > 1 ? 'they had' : 'it had'} no effect. `
       + 'Check the spelling against this item type\'s documented properties.',
@@ -611,7 +613,7 @@ const MODIFY_KNOWN_KEYS: ReadonlySet<string> = new Set([
   ...NORMALIZE_PARAM_READS,
   'contentType', 'contentFormat', 'countdownTarget', 'countdownEndText',
   'audioGain', 'volume', 'gain', 'bornAt', 'ttl', 'smoothing',
-  'fontStyle', 'leading', 'lineHeight', 'skewX', 'skewY', 'matrix', 'fit', 'direction', 'textDirection', 'dir', 'tabularFigures', 'fontVariantNumeric', 'fontFeatures',
+  'fontStyle', 'leading', 'lineHeight', 'skewX', 'skewY', 'matrix', 'fit', 'direction', 'textDirection', 'dir', 'tabularFigures', 'fontVariantNumeric', 'fontFeatures', 'strokePosition',
 ]);
 
 /** Spellings callers reach for, and the key the engine actually reads. */
@@ -774,6 +776,35 @@ const __tabular = (function(it) {
   return it.data && it.data.tabularFigures === true
     ? { applied: true }
     : { applied: false, note: 'this studio does not lay out tabular figures (it needs an engine with them): digits keep their proportional widths. A monospaced font is the fallback.' };
+})(${itemExpr});`;
+}
+
+/**
+ * Text stroke OUTSIDE the glyph (FxTool 3e22c0df): the stroke is drawn under
+ * the fill at twice the width, so a thick outline (captions, memes) no longer
+ * eats the letterform. 'center' is the ordinary stroke. A bad value is
+ * refused here — the engine only console.warns it — and 'outside' is
+ * confirmed from what the engine records, since an older one ignores it.
+ */
+type StrokePositionRequest = { value: 'outside' | 'center' } | { error: string };
+function takeStrokePosition(props: Record<string, unknown>, allowNull: boolean): StrokePositionRequest | null {
+  if (!('strokePosition' in props)) return null;
+  const raw = props.strokePosition;
+  if (raw === null && allowNull) { props.strokePosition = 'center'; return { value: 'center' }; }
+  const v = String(raw ?? '').trim().toLowerCase();
+  if (v === 'outside') { props.strokePosition = 'outside'; return { value: 'outside' }; }
+  if (v === 'center' || v === 'centre') { props.strokePosition = 'center'; return { value: 'center' }; }
+  delete props.strokePosition;
+  return { error: `strokePosition ${JSON.stringify(raw)} is not 'outside' or 'center' — the stroke is unchanged.` };
+}
+function emitStrokePositionCheck(itemExpr: string, req: StrokePositionRequest): string {
+  if ('error' in req) return `\nconst __strokePos = ${JSON.stringify({ applied: false, error: req.error })};`;
+  if (req.value === 'center') return `\nconst __strokePos = { applied: true, value: 'center' };`;
+  return `
+const __strokePos = (function(it) {
+  if (!it || it.className !== 'PointText') return { applied: false, note: 'strokePosition applies to text items only.' };
+  if (!(it.data && it.data.strokePosition === 'outside')) return { applied: false, note: 'this studio does not draw text strokes outside the glyph (it needs an engine with strokePosition): the stroke is centred on the outline, so a thick stroke thins the letters.' };
+  return (it.strokeColor && it.strokeWidth > 0) ? { applied: true, value: 'outside' } : { applied: true, value: 'outside', note: 'the text has no stroke yet: set strokeColor and strokeWidth to see it.' };
 })(${itemExpr});`;
 }
 
@@ -989,6 +1020,7 @@ function generateModifyItemCode(
   if (restProperties.fit && typeof restProperties.fit === 'object') delete restProperties.fit;
   const modDirection = takeDirection(restProperties);
   const modTabular = wantsTabular(restProperties) === true;
+  const modStrokePos = takeStrokePosition(restProperties, true);
 
   // modifyItem(id, changes), NOT select() + modify().
   //
@@ -1130,8 +1162,8 @@ if (_flagged && _flagged.item && _flagged.item.data) Object.assign(_flagged.item
   )}`;
   code += `
 app.historyManager.saveState();
-${modDirection ? emitDirectionCheck(`app.getItemById('${itemId}')`, modDirection) : ''}${modTabular ? emitTabularCheck(`app.getItemById('${itemId}')`) : ''}
-return { success: true, itemId: '${itemId}'${modFit ? ', textFit: __textFit' : ''}${modDirection ? ', direction: __direction' : ''}${modTabular ? ', tabularFigures: __tabular' : ''}${affine ? `, affine: ${JSON.stringify({ skewX, skewY, matrix, note: 'applied to the current shape: calling again compounds it. To undo, apply the inverse (negative skew, or the inverse matrix).' })}` : ''}${modLifetime ? ', lifetime: __lifetime' : ''}${modFont ? ', ...(__font ? { font: __font } : {})' : ''}${modWarning} };`;
+${modDirection ? emitDirectionCheck(`app.getItemById('${itemId}')`, modDirection) : ''}${modTabular ? emitTabularCheck(`app.getItemById('${itemId}')`) : ''}${modStrokePos ? emitStrokePositionCheck(`app.getItemById('${itemId}')`, modStrokePos) : ''}
+return { success: true, itemId: '${itemId}'${modFit ? ', textFit: __textFit' : ''}${modDirection ? ', direction: __direction' : ''}${modTabular ? ', tabularFigures: __tabular' : ''}${modStrokePos ? ', strokePosition: __strokePos' : ''}${affine ? `, affine: ${JSON.stringify({ skewX, skewY, matrix, note: 'applied to the current shape: calling again compounds it. To undo, apply the inverse (negative skew, or the inverse matrix).' })}` : ''}${modLifetime ? ', lifetime: __lifetime' : ''}${modFont ? ', ...(__font ? { font: __font } : {})' : ''}${modWarning} };`;
 
   // Wrapped, because the body now RETURNS early on a miss rather than falling
   // through to an unconditional success. Async only when a font must load
@@ -5344,6 +5376,12 @@ ${stillTime !== undefined ? `
           };
           let doc = null;
           const pagesOut = [];
+          // A SEARCHABLE TEXT LAYER PER PAGE (8.10, FxTool 3e22c0df): the
+          // engine lays the loaded scene's text invisibly over the page box;
+          // the per-page reports are summed into result.pdf.
+          const __wantLayer = ${pdfOpts.searchableText !== false};
+          const __layer = __wantLayer && typeof app.exportEngine.addTextLayer === 'function';
+          const __tl = { written: 0, skipped: 0, reasons: [] };
           try {
             for (const spec of pageSpecs) {
               const id = spec.id;
@@ -5358,6 +5396,13 @@ ${stillTime !== undefined ? `
               if (!doc) doc = new lib.jsPDF({ orientation: orient, unit: 'mm', format: [wMM, hMM] });
               else doc.addPage([wMM, hMM], orient);
               if (jpg) doc.addImage(jpg, 'JPEG', 0, 0, wMM, hMM); else doc.addImage(png, 'PNG', 0, 0, wMM, hMM);
+              if (__layer) {
+                try {
+                  const tr = await app.exportEngine.addTextLayer(doc, { x: 0, y: 0, width: wMM, height: hMM });
+                  if (tr && tr.ok !== false) { __tl.written += tr.linesWritten || 0; __tl.skipped += tr.linesSkipped || 0; }
+                  else __tl.reasons.push(id + ': ' + ((tr && tr.reason) || 'refused'));
+                } catch (e) { __tl.reasons.push(id + ': ' + e.message); }
+              }
               pagesOut.push({ sceneId: id, widthMM: Math.round(wMM * 10) / 10, heightMM: Math.round(hMM * 10) / 10 });
             }
           } finally {
@@ -5366,7 +5411,12 @@ ${stillTime !== undefined ? `
           }
           const blob = doc.output('blob');
           const dataUrl = await blobToDataUrl(blob);
-          result = { success: true, platform, format: 'pdf', data: dataUrl, mimeType: 'application/pdf', size: blob.size, pages: pagesOut.length, pageList: pagesOut };
+          result = { success: true, platform, format: 'pdf', data: dataUrl, mimeType: 'application/pdf', size: blob.size, pages: pagesOut.length, pageList: pagesOut,
+            pdf: !__wantLayer ? { searchableText: false, reason: 'off' }
+              : !__layer ? { searchableText: false, reason: 'this studio adds no text layer to multi-page PDFs' }
+              : Object.assign({ searchableText: __tl.written > 0 || __tl.reasons.length < pagesOut.length, linesWritten: __tl.written, linesSkipped: __tl.skipped },
+                  __tl.reasons.length ? { pagesWithoutLayer: __tl.reasons } : {},
+                  __tl.written === 0 && __tl.reasons.length === pagesOut.length ? { reason: __tl.reasons.join('; ') } : {}) };
           if (!sized) result.warning = 'every page used the current canvas size: saved scenes do not record theirs. To give a page its own size, pass pages as [{sceneId, width, height}, …].';
         }
         break;` : ''}
@@ -5472,11 +5522,12 @@ ${stillTime !== undefined ? `
   // font is WinAnsi only, so Arabic / Hebrew / CJK lines are left out of the
   // layer (drawn, but not selectable) — counted by the engine, said here.
   const __ee = app.exportEngine;
-  const __pr = format === 'pdf' && __ee && __ee.lastPdfReport;
+  const __pr = format === 'pdf' && ((result && result.pdf) || (__ee && __ee.lastPdfReport));
   if (result && result.success && __pr && typeof __pr === 'object') {
     result.pdf = __pr;
     const __pw = [];
     if (__pr.searchableText && __pr.linesSkipped > 0) __pw.push({ code: 'pdf_text_lines_skipped', message: __pr.linesSkipped + ' text line(s) are not in the searchable layer: the built-in PDF font covers Latin (WinAnsi) only, so lines in Arabic, Hebrew, CJK and other non-Latin scripts are drawn but cannot be selected, searched or read by a screen reader.' });
+    if (__pr.searchableText && __pr.pagesWithoutLayer) __pw.push({ code: 'pdf_no_text_layer', message: 'some pages have no searchable text layer — ' + __pr.pagesWithoutLayer.join('; ') });
     if (!__pr.searchableText && __pr.reason && __pr.reason !== 'off') __pw.push({ code: 'pdf_no_text_layer', message: 'no searchable text layer was written (' + __pr.reason + '): the text is drawn but cannot be selected, searched or read by a screen reader.' });
     if (__pw.length) {
       result.fidelity = result.fidelity || { warnings: [] };
