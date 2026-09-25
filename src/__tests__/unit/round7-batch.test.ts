@@ -285,3 +285,12 @@ describe('generator param aliases (5.56)', () => {
     expect(code).not.toContain('"direction"');
   });
 });
+
+describe('landscape print presets (8.18)', () => {
+  it('map to the engine landscape presets and export at landscape print size', async () => {
+    const { canvasPresetFor } = await import('../../types/code-generator.js');
+    expect(canvasPresetFor('print-a4-landscape')).toBe('a4-landscape');
+    expect(canvasPresetFor('print-letter-landscape')).toBe('letter-landscape');
+    expect(codeGenerator.generateAgentExport({ platform: 'print-a4-landscape', format: 'pdf' } as never)).toContain('{"width":3508,"height":2480}');
+  });
+});

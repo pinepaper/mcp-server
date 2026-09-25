@@ -2207,6 +2207,11 @@ export const AgentPlatformSchema = z.enum([
   'web',
   'print-a4',
   'print-letter',
+  // Landscape print (round 8 DD, 8.18): the engine has a4-landscape and
+  // letter-landscape at 300 dpi, but no platform reached them, so a
+  // landscape print job had no preset carrying the print DPI.
+  'print-a4-landscape',
+  'print-letter-landscape',
 ]).describe('Target platform for export');
 
 export type AgentPlatform = z.infer<typeof AgentPlatformSchema>;

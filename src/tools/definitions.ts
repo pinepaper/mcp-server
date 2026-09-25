@@ -7613,7 +7613,7 @@ WORKFLOW: start_job → batch_execute (everything in ONE call) → end_job (scre
 
 RETURNS: canvasSize {width, height} — use this to position items within bounds. Also returns ontology: a pp: triples + item summary snapshot of the (typically empty) canvas. Reuse this baseline across the same agent turn instead of calling pinepaper_get_canvas_ontology unless you've mutated the canvas. When clearCanvas is false, the ontology captures whatever's already on the canvas.
 
-CANVAS PRESETS: instagram (1080x1080), instagram-story (1080x1920), tiktok (1080x1920), youtube (1920x1080), youtube-thumbnail (1280x720), twitter (1200x675), linkedin (1200x627), web, print-a4, print-letter`,
+CANVAS PRESETS: instagram (1080x1080), instagram-story (1080x1920), tiktok (1080x1920), youtube (1920x1080), youtube-thumbnail (1280x720), twitter (1200x675), linkedin (1200x627), web, print-a4, print-letter, print-a4-landscape, print-letter-landscape (print presets carry 300 dpi, so a PDF comes out at paper size)`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -7632,7 +7632,7 @@ CANVAS PRESETS: instagram (1080x1080), instagram-story (1080x1920), tiktok (1080
         },
         canvasPreset: {
           type: 'string',
-          enum: ['instagram', 'instagram-story', 'tiktok', 'youtube', 'youtube-thumbnail', 'twitter', 'linkedin', 'web', 'print-a4', 'print-letter'],
+          enum: ['instagram', 'instagram-story', 'tiktok', 'youtube', 'youtube-thumbnail', 'twitter', 'linkedin', 'web', 'print-a4', 'print-letter', 'print-a4-landscape', 'print-letter-landscape'],
           description: 'Set canvas size to platform preset',
         },
         clearCanvas: {
@@ -7741,7 +7741,7 @@ EXAMPLES:
       properties: {
         canvasPreset: {
           type: 'string',
-          enum: ['instagram', 'instagram-story', 'tiktok', 'youtube', 'youtube-thumbnail', 'twitter', 'linkedin', 'web', 'print-a4', 'print-letter'],
+          enum: ['instagram', 'instagram-story', 'tiktok', 'youtube', 'youtube-thumbnail', 'twitter', 'linkedin', 'web', 'print-a4', 'print-letter', 'print-a4-landscape', 'print-letter-landscape'],
           description: 'Set canvas size to platform preset after reset',
         },
         backgroundColor: {
@@ -8054,7 +8054,7 @@ VERIFY MOTION BEFORE YOU RENDER. An export takes seconds to minutes and shows yo
       properties: {
         platform: {
           type: 'string',
-          enum: ['auto', 'instagram', 'instagram-story', 'tiktok', 'youtube', 'youtube-thumbnail', 'twitter', 'linkedin', 'web', 'print-a4', 'print-letter'],
+          enum: ['auto', 'instagram', 'instagram-story', 'tiktok', 'youtube', 'youtube-thumbnail', 'twitter', 'linkedin', 'web', 'print-a4', 'print-letter', 'print-a4-landscape', 'print-letter-landscape'],
           description: "Target platform, which sets the output DIMENSIONS. 'auto' (the default) renders the canvas at its own size — use it when the canvas is already the size you want, otherwise a preset REPLACES your dimensions. Every other value forces that platform's frame regardless of the canvas.",
         },
         format: {
@@ -8074,7 +8074,7 @@ VERIFY MOTION BEFORE YOU RENDER. An export takes seconds to minutes and shows yo
         time: { type: 'number', minimum: 0, description: 'Stills only (png / jpg / webp / svg / pdf): render at this time in seconds; the playhead is put back afterwards. Without it a still is whatever frame the playhead is on, so repeated runs can differ.' },
         pdf: {
           type: 'object',
-          description: "pdf only: print options. paperFormat 'a4' | 'a3' | 'letter' | … | 'custom' (canvas size, default); orientation; bleed in mm (> 0 includes the bleed area); trimMarks adds crop marks; dpi 72–600. Bleed and trim marks take effect with paperFormat 'custom' (the page is the canvas plus bleed) — on a named size the page stays that size and they are dropped, which the result's warnings say. The canvas's physical size comes from its preset's DPI: start the job with canvasPreset 'print-a4' / 'print-letter' (300 dpi) for print; a hand-sized canvas is read at 96 dpi.",
+          description: "pdf only: print options. paperFormat 'a4' | 'a3' | 'letter' | … | 'custom' (canvas size, default); orientation; bleed in mm (> 0 includes the bleed area); trimMarks adds crop marks; dpi 72–600. Bleed and trim marks take effect with paperFormat 'custom' (the page is the canvas plus bleed) — on a named size the page stays that size and they are dropped, which the result's warnings say. The canvas's physical size comes from its preset's DPI: start the job with canvasPreset 'print-a4' / 'print-letter' / 'print-a4-landscape' / 'print-letter-landscape' (300 dpi) for print; a hand-sized canvas is read at 96 dpi.",
           properties: {
             paperFormat: { type: 'string' },
             orientation: { type: 'string', enum: ['portrait', 'landscape'] },

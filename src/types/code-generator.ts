@@ -2031,6 +2031,8 @@ const PLATFORM_TO_CANVAS_PRESET: Record<string, string> = {
   web: 'hd-720p',                    // 1280x720
   'print-a4': 'a4-portrait',
   'print-letter': 'letter-portrait',
+  'print-a4-landscape': 'a4-landscape',
+  'print-letter-landscape': 'letter-landscape',
 };
 
 /** The engine key for a platform, falling back to the value itself. */
@@ -4191,6 +4193,8 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
       'web': { width: 800, height: 600, staticFormat: 'svg', animatedFormat: 'svg' },
       'print-a4': { width: 2480, height: 3508, staticFormat: 'pdf', animatedFormat: 'pdf' },
       'print-letter': { width: 2550, height: 3300, staticFormat: 'pdf', animatedFormat: 'pdf' },
+      'print-a4-landscape': { width: 3508, height: 2480, staticFormat: 'pdf', animatedFormat: 'pdf' },
+      'print-letter-landscape': { width: 3300, height: 2550, staticFormat: 'pdf', animatedFormat: 'pdf' },
     };
 
     const preset = platformPresets[platform] || platformPresets['web'];
@@ -4867,7 +4871,7 @@ ${stillTime !== undefined ? `
             // Bleed and trim marks on a NAMED paper size: the studio keeps the
             // page at that size and centres the art, so neither appears (prod
             // retest: MediaBox = TrimBox = A4, no marks). Said, not silent.
-            warnings: [${JSON.stringify(`bleed / trimMarks were passed with paperFormat '${pdfOpts.paperFormat}', and this studio applies them only to paperFormat 'custom' (page = canvas + bleed): the page stayed ${pdfOpts.paperFormat} with no bleed and no marks. For print with bleed, size the canvas with a PRINT preset (agent_start_job canvasPreset 'print-a4' / 'print-letter', which carry 300 dpi — a plain 2480x3508 canvas is read at 96 dpi and comes out ~656 mm wide) and pass paperFormat 'custom'.`)}],` : ''}
+            warnings: [${JSON.stringify(`bleed / trimMarks were passed with paperFormat '${pdfOpts.paperFormat}', and this studio applies them only to paperFormat 'custom' (page = canvas + bleed): the page stayed ${pdfOpts.paperFormat} with no bleed and no marks. For print with bleed, size the canvas with a PRINT preset (agent_start_job canvasPreset 'print-a4' / 'print-letter' / 'print-a4-landscape' / 'print-letter-landscape', which carry 300 dpi — a plain 2480x3508 canvas is read at 96 dpi and comes out ~656 mm wide) and pass paperFormat 'custom'.`)}],` : ''}
           };
         } else {
           result = { success: false, error: 'PDF export failed' };
