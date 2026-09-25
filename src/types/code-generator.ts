@@ -5446,14 +5446,29 @@ ${stillTime !== undefined ? `
               const orient = wMM > hMM ? 'landscape' : 'portrait';
               const png = app.captureFrameDataURL(Math.max(1, targetDpi / dpi));
               const jpg = await toJpeg(png);
-              if (!doc) {
-                doc = new lib.jsPDF({ orientation: orient, unit: 'mm', format: [wMM, hMM] });
-                // The scene's fonts, fetched once per document (FxTool
-                // dbe8441d): every page's text layer then writes in them.
-                if (__layer && typeof app.exportEngine.embedTextFonts === 'function') {
-                  try { __tl.fonts = await app.exportEngine.embedTextFonts(doc); } catch (e) { __tl.fonts = { embedded: 0, reason: e && e.message }; }
-                }
-              } else doc.addPage([wMM, hMM], orient);
+              const __first = !doc;
+              if (!doc) doc = new lib.jsPDF({ orientation: orient, unit: 'mm', format: [wMM, hMM] });
+              else doc.addPage([wMM, hMM], orient);
+              // The scene's fonts (FxTool dbe8441d). Once per document on an
+              // engine whose repeat call re-registers over page 1's face; per
+              // page (this page's scene) where the engine caches faces on the
+              // document — it leaves doc.__ppFontCache after the first call
+              // (3b9499f2), which is the evidence, not a version guess.
+              if (__layer && typeof app.exportEngine.embedTextFonts === 'function' && (__first || doc.__ppFontCache)) {
+                try {
+                  const fr = await app.exportEngine.embedTextFonts(doc);
+                  if (!__tl.fonts) __tl.fonts = fr;
+                  else if (fr) {
+                    const seen = {};
+                    __tl.fonts.families = (__tl.fonts.families || []).concat(fr.families || []).filter(function(f) {
+                      const k = f && (f.family + '|' + f.weight + '|' + f.italic);
+                      if (!k || seen[k]) return false; seen[k] = true; return true;
+                    });
+                    if (typeof fr.embedded === 'number') __tl.fonts.embedded = fr.embedded; // cumulative for the document
+                    if (typeof fr.hiddenTextItems === 'number') __tl.fonts.hiddenTextItems = (__tl.fonts.hiddenTextItems || 0) + fr.hiddenTextItems;
+                  }
+                } catch (e) { if (!__tl.fonts) __tl.fonts = { embedded: 0, reason: e && e.message }; }
+              }
               if (jpg) doc.addImage(jpg, 'JPEG', 0, 0, wMM, hMM); else doc.addImage(png, 'PNG', 0, 0, wMM, hMM);
               if (__layer) {
                 try {
@@ -5592,6 +5607,10 @@ ${stillTime !== undefined ? `
     const __ff = (__pr.fonts && Array.isArray(__pr.fonts.families)) ? __pr.fonts.families.filter(function(f) { return f && f.reason; }) : [];
     const __fnames = __ff.slice(0, 4).map(function(f) { return f.family + ' (' + f.reason + ')'; }).join('; ');
     if (__pr.searchableText && __pr.linesSkipped > 0) __pw.push({ code: 'pdf_text_lines_skipped', message: __pr.linesSkipped + ' text line(s) are not in the searchable layer — no font in the PDF covers their characters — so they are drawn but cannot be selected, searched or read by a screen reader.' + (__fnames ? ' Fonts that could not be embedded: ' + __fnames + '.' : '') });
+    // Text hidden at the render moment (a lifetime window, visible: false,
+    // opacity 0) is in neither the picture nor the layer (FxTool 3b9499f2).
+    const __hid = __pr.fonts && typeof __pr.fonts.hiddenTextItems === 'number' ? __pr.fonts.hiddenTextItems : 0;
+    if (__hid > 0) __pw.push({ code: 'pdf_text_hidden', message: __hid + ' text item(s) were hidden when the PDF was rendered (outside their bornAt / ttl window, visible: false, or opacity 0), so they are not in it. Export at a time they show (time), or change their lifetime.' });
     if (__ff.length && !(__pr.linesSkipped > 0)) __pw.push({ code: 'pdf_font_not_embedded', message: 'these fonts could not be embedded, so their text uses a fallback font in the searchable layer: ' + __fnames + '.' });
     if (__pr.searchableText && __pr.pagesWithoutLayer) __pw.push({ code: 'pdf_no_text_layer', message: 'some pages have no searchable text layer — ' + __pr.pagesWithoutLayer.join('; ') });
     if (!__pr.searchableText && __pr.reason && __pr.reason !== 'off') __pw.push({ code: 'pdf_no_text_layer', message: 'no searchable text layer was written (' + __pr.reason + '): the text is drawn but cannot be selected, searched or read by a screen reader.' });

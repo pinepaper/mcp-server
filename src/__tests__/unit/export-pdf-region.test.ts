@@ -170,6 +170,24 @@ describe('multi-page pdf from scenes (8.16)', () => {
     expect(r.fidelity.warnings.map((w: { code: string }) => w.code)).toContain('pdf_text_lines_skipped');
   });
 
+  it('an engine that caches faces on the document gets a font pass per page, combined (FxTool 3b9499f2)', async () => {
+    const s = sceneStudio();
+    s.app.exportEngine.addTextLayer = () => ({ ok: true, linesWritten: 1, linesSkipped: 0 });
+    const calls: string[] = [];
+    s.app.exportEngine.embedTextFonts = async (doc: Record<string, unknown>) => {
+      doc.__ppFontCache = doc.__ppFontCache || { n: 0 };
+      const scene = s.app.sceneManager.currentSceneId;
+      calls.push(scene);
+      return scene === 's1'
+        ? { embedded: 1, families: [{ family: 'Inter', weight: 400, italic: false }], hiddenTextItems: 0 }
+        : { embedded: 2, families: [{ family: 'Anton', weight: 400, italic: false }, { family: 'Inter', weight: 400, italic: false }], hiddenTextItems: 2 };
+    };
+    const r = await run(s, 'scenes');
+    expect(calls).toEqual(['s1', 's2']);
+    expect(r.pdf.fonts).toEqual({ embedded: 2, families: [{ family: 'Inter', weight: 400, italic: false }, { family: 'Anton', weight: 400, italic: false }], hiddenTextItems: 2 });
+    expect(r.fidelity.warnings.map((w: { code: string }) => w.code)).toContain('pdf_text_hidden');
+  });
+
   it('a page refused, a studio without the helper, and off on request are each told apart', async () => {
     const part = sceneStudio();
     part.app.exportEngine.addTextLayer = () => (part.app.sceneManager.currentSceneId === 's1' ? { ok: false, reason: 'unbounded canvas' } : { ok: true, linesWritten: 2, linesSkipped: 0 });
@@ -603,6 +621,11 @@ describe('pdf searchable text layer (8.10, FxTool 9917cfa5)', () => {
     const w = codes.find((c) => c.code === 'pdf_text_lines_skipped')!;
     expect(w.message).toContain('3 text line(s)');
     expect(w.message).toContain('no font in the PDF covers');
+  });
+
+  it('text hidden at the render moment is named (FxTool 3b9499f2)', async () => {
+    const r = await run(undefined, { searchableText: true, linesWritten: 2, linesSkipped: 0, fonts: { embedded: 0, families: [], hiddenTextItems: 3 } });
+    expect(r.codes.find((c) => c.code === 'pdf_text_hidden')!.message).toContain('3 text item(s)');
   });
 
   it('fonts the studio could not embed are named, with its reason (FxTool dbe8441d)', async () => {
