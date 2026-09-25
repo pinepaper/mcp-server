@@ -8501,6 +8501,12 @@ ${loads}
     // Anything else (asset id, data:, URL) passes through untouched.
     // @engine-methods analyzeAudio animateToBeat
     const resolveSource = `  let __src = ${JSON.stringify(input.source || '')};
+  // A large source was staged beside the code (see the handler); read it back.
+  if (__src.indexOf('__ppStage:') === 0) {
+    const __staged = window.__ppStage && window.__ppStage[__src.slice('__ppStage:'.length)];
+    if (!__staged) return { success: false, error: 'the staged audio did not reach the page — try again, or upload it with pinepaper_media upload_audio and pass the returned id.' };
+    __src = __staged;
+  }
   const __A = (typeof window !== 'undefined') && window.PinePaperAgent;
   const __m = (__src && __A && typeof __A.listMedia === 'function')
     ? __A.listMedia().find(function(x) { return x.id === __src || x.registryId === __src; })
@@ -8523,6 +8529,11 @@ ${resolveSource}
   const r = await app.${method}(${args});
   if (r && typeof r === 'object' && 'ok' in r) {
     return { success: r.ok !== false, ...r };
+  }
+  // Nothing back is not a result: it was reported as success with an empty
+  // body (gap 5.5), which reads as "analysed, no beats".
+  if (r === undefined || r === null) {
+    return { success: false, error: '${method} returned nothing, so there is no result to report. If the source is large, upload it with pinepaper_media upload_audio and pass the returned id.' };
   }
   return { success: true, result: r };
 })();`.trim();

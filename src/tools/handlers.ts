@@ -1972,8 +1972,27 @@ async function handleToolCallInner(
 
       case 'pinepaper_audio_beats': {
         const input = AudioBeatsInputSchema.parse(args);
-        const code = codeGenerator.generateAudioBeats(input);
-        return executeOrGenerate(code, `Audio: ${input.action}`, options, 'pinepaper_audio_beats');
+        // A LARGE SOURCE GOES BESIDE THE CODE (gap 5.5). A data: URL over
+        // ~350 KB inlined into the generated code made the governor's
+        // transform bail and the analysis answered success with no result.
+        // Same route as pinepaper_media: URLs, file:// and local paths are
+        // read HERE (a path used to fail "Unable to decode audio data"), and
+        // anything large is staged. Upload / asset ids pass through.
+        let source = input.source;
+        const looksLikeFile = typeof source === 'string'
+          && (/^(data:|https?:|file:)/i.test(source.trim()) || /\.(wav|mp3|ogg|oga|m4a|aac|flac|webm|mp4|mov)$/i.test(source.trim()));
+        if (looksLikeFile) {
+          const resolved = await resolveMediaSource(source!);
+          if ('error' in resolved) {
+            return errorResult(ErrorCodes.INVALID_PARAMS, resolved.error, { source }, { toolName: 'pinepaper_audio_beats' });
+          }
+          source = resolved.src;
+        }
+        const staged = typeof source === 'string' && source.startsWith('data:') && source.length > 64_000;
+        const stageKey = staged ? `audio_${Date.now().toString(36)}` : undefined;
+        const code = codeGenerator.generateAudioBeats({ ...input, source: staged ? `__ppStage:${stageKey}` : source });
+        return executeOrGenerate(code, `Audio: ${input.action}`, options, 'pinepaper_audio_beats',
+          staged ? { [stageKey!]: source as string } : undefined);
       }
 
       case 'pinepaper_accessibility_check': {
