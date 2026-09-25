@@ -3181,7 +3181,12 @@ You can now start creating new items on a clean canvas.`,
             input.scale
           );
 
-          const description = `Imported asset: ${metadata.title} (${metadata.license.name})`;
+          // A URL import has no catalogue metadata (no title, no licence): this
+          // line read metadata.license.name on it, so every URL import that
+          // FETCHED fine then threw "Cannot read properties of undefined".
+          const description = metadata?.source === 'url'
+            ? `Imported SVG from ${metadata.url}`
+            : `Imported asset: ${metadata?.title ?? input.assetId}${metadata?.license?.name ? ` (${metadata.license.name})` : ''}`;
 
           return executeOrGenerate(code, description, options, 'pinepaper_import_asset');
         } catch (error) {
@@ -3876,7 +3881,10 @@ You can now start creating new items on a clean canvas.`,
             try { await soundController.connect(); }
             catch { return executeOrGenerate(code, soundDescription, options, 'pinepaper_sound'); }
           }
-          const wavResult = await soundController.executeCode(code, false);
+          // A soundtrack render is an export: it gets the export budget, not the
+          // governor's 10 s default, which cut off any soundtrack that took
+          // longer to render (the patch downstream kept re-applying).
+          const wavResult = await soundController.executeCode(code, false, { governorTimeoutMs: exportGovernorTimeoutMs() });
           if (!wavResult.success) {
             const canvasState = await captureCanvasState(soundController);
             return errorResult(

@@ -4578,7 +4578,7 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
 
   generateAgentExport(input: AgentExportInput): string {
     const validated = AgentExportInputSchema.parse(input);
-    const { platform, format, quality, framing, duration, estimateOnly, scale, fps, pdf: pdfOpts, region, time: stillTime, maxBytes, loop: gifLoop, broadcast, broadcastHeadroom, bitrate, minBitrate, bitrateMode, transparent, alphaQuantizer, ad: adOpts } = validated;
+    const { platform, format, quality, framing, duration, estimateOnly, scale, fps, pdf: pdfOpts, region, time: stillTime, maxBytes, loop: gifLoop, broadcast, broadcastHeadroom, bitrate, minBitrate, bitrateMode, transparent, alphaQuantizer, deterministic, ad: adOpts } = validated;
   // Encoder options (FxTool 16719759); the schema keeps them to mp4 / webm.
   const videoEncodeOpts: Record<string, unknown> = {};
   if (broadcast) videoEncodeOpts.broadcast = true;
@@ -4591,6 +4591,9 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
   if (bitrate !== undefined) videoEncodeOpts.bitrate = bitrate;
   if (minBitrate !== undefined) videoEncodeOpts.minBitrate = minBitrate;
   if (bitrateMode !== undefined) videoEncodeOpts.bitrateMode = bitrateMode;
+  // Byte-identical repeats (FxTool 3b335567): the container timestamps are
+  // the only bytes that varied, and this pins them.
+  if (deterministic) videoEncodeOpts.deterministic = true;
   // A transparent WebM (FxTool 1833b397) rides the store route too.
   const webmAlpha = format === 'webm' && transparent === true;
   if (webmAlpha) { videoEncodeOpts.transparent = true; if (alphaQuantizer !== undefined) videoEncodeOpts.alphaQuantizer = alphaQuantizer; }
