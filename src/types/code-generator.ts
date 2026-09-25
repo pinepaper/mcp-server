@@ -7388,9 +7388,45 @@ ${resolveSource}
     if (input.action === 'get') {
       return this._facadeCall('getTemplateParams', JSON.stringify(input.templateId), 'Template params: get');
     }
-    return this._facadeCall('applyTemplateWithParams',
-      `${JSON.stringify(input.templateId)}, ${JSON.stringify(input.params || {})}`,
-      'Template params: apply');
+    // AN UNDECLARED PARAM CHANGED NOTHING, AND THE CALL SAID SUCCESS.
+    // apply {templateId:'sale-announcement', params:{headline, date}} loaded
+    // the template, left its text untouched, and answered success:true — and 0
+    // of 195 templates declare any params (round 7 Z, 1.52). The template's own
+    // declaration is read first and anything outside it is named in the result;
+    // the template still loads, because the caller did ask for it.
+    // @engine-methods getTemplateParams applyTemplateWithParams
+    const params = input.params || {};
+    return `
+// Template params: apply, naming params the template does not declare
+(async function() {
+  if (typeof app.applyTemplateWithParams !== 'function') {
+    return { success: false, error: 'app.applyTemplateWithParams() unavailable — update PinePaper Studio to a build that has it.' };
+  }
+  const given = ${JSON.stringify(Object.keys(params))};
+  let declared = null;
+  if (typeof app.getTemplateParams === 'function') {
+    try {
+      const d = await app.getTemplateParams(${JSON.stringify(input.templateId)});
+      if (d && Array.isArray(d.params)) declared = d.params.map(function(p) { return p && (p.name || p.key || p.id); }).filter(Boolean);
+    } catch (_) { /* reported as unknown below */ }
+  }
+  const r = await app.applyTemplateWithParams(${JSON.stringify(input.templateId)}, ${JSON.stringify(params)});
+  const out = (r && typeof r === 'object' && 'ok' in r) ? Object.assign({ success: r.ok !== false }, r)
+    : { success: r !== false, templateId: ${JSON.stringify(input.templateId)} };
+  if (given.length && declared) {
+    const ignored = given.filter(function(k) { return declared.indexOf(k) === -1; });
+    if (ignored.length) {
+      out.ignoredParams = ignored;
+      out.declaredParams = declared;
+      out.warning = declared.length === 0
+        ? 'this template declares no parameters, so ' + ignored.join(', ') + ' changed nothing — the template loaded as designed. Edit its text items with pinepaper_modify_item instead.'
+        : ignored.join(', ') + ' ' + (ignored.length > 1 ? 'are' : 'is') + ' not declared by this template and changed nothing. It declares: ' + declared.join(', ') + '.';
+    }
+  } else if (given.length && !declared) {
+    out.warning = 'could not read which parameters this template declares, so whether ' + given.join(', ') + ' applied is unverified.';
+  }
+  return out;
+})();`.trim();
   }
 
   generateSceneDiff(input: SceneDiffInput): string {
