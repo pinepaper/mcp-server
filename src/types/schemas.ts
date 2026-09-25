@@ -3784,6 +3784,22 @@ export const AudioBeatsInputSchema = z.object({
 });
 export type AudioBeatsInput = z.infer<typeof AudioBeatsInputSchema>;
 
+// RENDER BATCH (data-driven creative): one scene, many rows, one export per
+// row. The handler runs each row through modify_item / template_params and
+// then agent_export, so every per-tool check applies to every row.
+export const RenderBatchRowSchema = z.object({
+  id: z.string().min(1).max(64).optional().describe('A name for this row, echoed in its result.'),
+  changes: z.record(z.string(), z.record(z.unknown())).optional().describe('itemId → properties, applied with modify_item (content, fillColor, fit, …).'),
+  template: z.object({ templateId: z.string().min(1), params: z.record(z.unknown()) }).optional().describe('Apply a template\'s params (template_params apply).'),
+}).refine((r) => r.changes !== undefined || r.template !== undefined, { message: 'a row needs changes and / or template.' });
+
+export const RenderBatchInputSchema = z.object({
+  rows: z.array(RenderBatchRowSchema).min(1).max(100).describe('One entry per creative (max 100).'),
+  export: z.record(z.unknown()).describe('agent_export options used for every row (format, platform, quality, duration, ad, …).'),
+  estimateOnly: z.boolean().optional().describe('Validate the rows and return the plan without rendering.'),
+});
+export type RenderBatchInput = z.infer<typeof RenderBatchInputSchema>;
+
 export const TemplateParamsInputSchema = z.object({
   action: z.enum(['get', 'apply']),
   templateId: z.string(),

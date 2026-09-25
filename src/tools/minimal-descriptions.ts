@@ -55,6 +55,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_event: "Event channel for scene chains (S11). action:'create' {name}→eventId, or 'pulse' {eventId}. Wire beats with on_event_fire_after/add_relation/set_color relations (event as sourceId).",
   pinepaper_construction_sequence: 'Reveal a figure step by step on the timeline (build/play/clear/list). {action, steps?, stepDuration?}',
   pinepaper_group: 'Group a composite object\'s parts into ONE entity, ungroup, or break_apart an imported SVG into movable parts. {action: group|ungroup|break_apart, itemIds?, itemId?, groupName?, groupId?}',
+  pinepaper_render_batch: 'One creative per data row: apply each row (item changes / template params), then export. Rows do not reset. {rows:[{id?, changes?:{itemId:{…}}, template?}], export:{…agent_export}, estimateOnly?}',
   pinepaper_camera_director: 'Cinematic camera walkthrough from a shot list (auto: one shot per item, or explicit shots). Compiles to one camera_animates track. {action: auto|shots, shots?, order?, establishing?, loop?}',
   pinepaper_detect_objects: 'On-device image detection: DETR 80-class, or queries:[…] open-vocabulary (OWL-ViT). asNodes:true → image-anchored design nodes. {itemId?, threshold?, asNodes?, queries?}',
   pinepaper_extract_object: 'Detect + crop the best-matching object out of an imported image into a new item. {label?, itemId?, x?, y?, threshold?}',

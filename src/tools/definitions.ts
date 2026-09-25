@@ -1769,6 +1769,50 @@ EXAMPLES:
   },
 
   {
+    name: 'pinepaper_render_batch',
+    annotations: {
+      title: 'Render Batch',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Render one creative per row of data from the current scene: for each row, apply its changes (modify_item per item, and / or a template's params), then export with the shared export options. For variants, translations and dynamic creative (DCO).
+
+Each row runs through the same tools you would call yourself, so every check applies per row: unread properties, text fit, export fidelity. A row that fails is reported by index and the batch continues.
+
+ROWS DO NOT RESET: row 2 starts from the scene row 1 left. Give every row every field that varies (all headlines, all prices), not only what differs from the row before. Pair with text fit so longer copy still fits its box, and read each row's fidelity for text_overflow.
+
+Needs a live studio (it renders); in code-only mode it is refused. Max 100 rows; estimateOnly checks the rows first.
+
+EXAMPLE:
+{ rows: [
+    { id: "en", changes: { headline: { content: "Summer Sale" }, price: { content: "$19" } } },
+    { id: "de", changes: { headline: { content: "Sommerschlussverkauf" }, price: { content: "19 €" } } } ],
+  export: { format: "png", platform: "instagram" } }`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        rows: {
+          type: 'array', minItems: 1, maxItems: 100,
+          description: 'One entry per creative.',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string', description: 'A name for the row, echoed in its result.' },
+              changes: { type: 'object', additionalProperties: { type: 'object' }, description: 'itemId → properties (as modify_item takes them).' },
+              template: { type: 'object', properties: { templateId: { type: 'string' }, params: { type: 'object' } }, required: ['templateId', 'params'], description: 'template_params apply for this row.' },
+            },
+          },
+        },
+        export: { type: 'object', description: 'pinepaper_agent_export options for every row (format, platform, quality, duration, ad, …).' },
+        estimateOnly: { type: 'boolean', description: 'Validate and return the plan without rendering.' },
+      },
+      required: ['rows', 'export'],
+    },
+  },
+
+  {
     name: 'pinepaper_camera_director',
     annotations: {
       title: 'Camera Director',

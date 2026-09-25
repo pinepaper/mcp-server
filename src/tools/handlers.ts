@@ -57,6 +57,7 @@ import {
   SceneDiffInputSchema,
   AudioBeatsInputSchema,
   TemplateParamsInputSchema,
+  RenderBatchInputSchema,
   ComposeInputSchema,
   CropImageInputSchema,
   PathOpInputSchema,
@@ -458,6 +459,11 @@ export async function resolveMediaSource(input: string): Promise<{ src: string }
 export function getFileExtension(format: string): string {
   const extMap: Record<string, string> = { mp4: 'mp4', webm: 'webm', gif: 'gif', apng: 'png', 'html5-ad': 'zip', playable: 'html', pdf: 'pdf', png: 'png', svg: 'svg', wav: 'wav', jpg: 'jpg', webp: 'webp', srt: 'srt', vtt: 'vtt', scc: 'scc' };
   return extMap[format] || format;
+}
+
+/** The text of a tool result, joined. */
+function toolText(r: CallToolResult): string {
+  return (r.content ?? []).map((c) => (c.type === 'text' ? c.text : '')).join('\n');
 }
 
 interface AdExportResult {
@@ -1957,6 +1963,72 @@ async function handleToolCallInner(
         const input = AudioBeatsInputSchema.parse(args);
         const code = codeGenerator.generateAudioBeats(input);
         return executeOrGenerate(code, `Audio: ${input.action}`, options, 'pinepaper_audio_beats');
+      }
+
+      case 'pinepaper_render_batch': {
+        const input = RenderBatchInputSchema.parse(args);
+        const exportCheck = AgentExportInputSchema.safeParse(input.export);
+        if (!exportCheck.success) {
+          return errorResult(ErrorCodes.VALIDATION_ERROR, `export options are not valid agent_export options: ${exportCheck.error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`).join('; ')}`);
+        }
+        const itemIds = [...new Set(input.rows.flatMap((r) => Object.keys(r.changes ?? {})))];
+        if (input.estimateOnly) {
+          return dataResult({ rows: input.rows.length, itemsChanged: itemIds, export: exportCheck.data, note: 'nothing rendered. Each row runs modify_item per item, template_params when given, then agent_export.' });
+        }
+        if (options.executionMode === 'code' || !options.executeInBrowser) {
+          return errorResult(ErrorCodes.VALIDATION_ERROR, 'render_batch renders each row, so it needs a live studio (browser execution). In code-only mode, call modify_item and agent_export per row yourself.');
+        }
+        const rowResults: Array<Record<string, unknown>> = [];
+        for (let i = 0; i < input.rows.length; i++) {
+          const row = input.rows[i];
+          const out: Record<string, unknown> = { index: i, ...(row.id ? { id: row.id } : {}) };
+          const fail = (stage: string, r: CallToolResult) => {
+            out.success = false;
+            out.stage = stage;
+            out.error = toolText(r).slice(0, 600);
+          };
+          let failed = false;
+          for (const [itemId, properties] of Object.entries(row.changes ?? {})) {
+            const r = await handleToolCall('pinepaper_modify_item', { itemId, properties }, options);
+            if (r.isError || /"success":\s*false/.test(toolText(r))) { fail(`modify ${itemId}`, r); failed = true; break; }
+            const ignored = /"ignoredProperties":\s*(\[[^\]]*\])/.exec(toolText(r));
+            if (ignored) {
+              const bag = (out.ignored ?? {}) as Record<string, unknown>;
+              bag[itemId] = JSON.parse(ignored[1]);
+              out.ignored = bag;
+            }
+          }
+          if (!failed && row.template) {
+            const r = await handleToolCall('pinepaper_template_params', { action: 'apply', templateId: row.template.templateId, params: row.template.params }, options);
+            if (r.isError || /"success":\s*false/.test(toolText(r))) { fail('template', r); failed = true; }
+          }
+          if (!failed) {
+            const r = await handleToolCall('pinepaper_agent_export', input.export, options);
+            const text = toolText(r);
+            if (r.isError) { fail('export', r); }
+            else {
+              out.success = true;
+              const files = [...text.matchAll(/^(?:File|zip|html|backupImage): (\S+)$/gm)].map((m) => m[1]);
+              if (files.length) out.files = files;
+              const json = text.indexOf('Result: ') >= 0 ? text.slice(text.indexOf('Result: ') + 8) : null;
+              try {
+                const parsed = json ? JSON.parse(json) : null;
+                const warnings = parsed?.fidelity?.warnings;
+                if (Array.isArray(warnings) && warnings.length) out.warnings = warnings.map((w: { code?: string; message?: string }) => ({ code: w.code, message: w.message }));
+                if (!files.length && parsed?.data) out.inline = true;
+              } catch { /* the file list stands on its own */ }
+            }
+          }
+          rowResults.push(out);
+        }
+        const ok = rowResults.filter((r) => r.success).length;
+        return dataResult({
+          success: ok === rowResults.length,
+          rendered: ok,
+          failed: rowResults.length - ok,
+          rows: rowResults,
+          ...(rowResults.some((r) => r.warnings) ? { note: 'rows with warnings rendered, but read them — text_overflow means copy past its box.' } : {}),
+        });
       }
 
       case 'pinepaper_template_params': {

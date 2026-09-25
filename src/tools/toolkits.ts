@@ -208,6 +208,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
   template: [
     'pinepaper_apply_template',
     'pinepaper_template_params',
+    'pinepaper_render_batch',
   ],
 
   // --- Query & export ---
