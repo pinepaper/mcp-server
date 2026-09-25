@@ -1272,6 +1272,18 @@ function generateKeyframeAnimateCode(
   // never applies — a Ken Burns eased only there rendered linear. Said in the
   // result rather than silently moved: moving it would change what the other
   // keys the caller wrote mean.
+  // A KEY THAT LEAVES A PROPERTY OUT (round 9 HH, engine 2.30): the engine
+  // treats the gap as a break in that property's track rather than holding or
+  // interpolating across it, silently. Named here — which keys lack which
+  // properties — with the fix a caller can make now: give every key the full set.
+  const propSets = keyframes.map((k) => Object.keys((k as { properties?: object }).properties ?? {}));
+  const allProps = [...new Set(propSets.flat())];
+  const gaps = keyframes
+    .map((k, i) => ({ time: k.time, missing: allProps.filter((p) => !propSets[i].includes(p)) }))
+    .filter((g) => g.missing.length);
+  const gapNote = gaps.length && keyframes.length > 1
+    ? `, propertyGaps: ${JSON.stringify(gaps.slice(0, 10))}, gapWarning: ${JSON.stringify(`${gaps.length} keyframe(s) leave out a property other keys animate (${[...new Set(gaps.flatMap((g) => g.missing))].join(', ')}). The engine can break that property's track at such a key; repeat the value on every key — hold it by repeating the previous value.`)}`
+    : '';
   const first = [...keyframes].sort((a, b) => a.time - b.time)[0] as { easing?: string } | undefined;
   // loop:true repeats in the editor; an export of the measured build played
   // the keyframes ONCE and held (round 7, 2.24). Said where it is set, with
@@ -1288,7 +1300,7 @@ function generateKeyframeAnimateCode(
 (function() {
   ${requireItem(itemId, 'the animation')}${audioLevelGuard}
   app.addAnimation('${itemId}', ${keyframesJson}, ${JSON.stringify(opts)});
-  return { success: true, itemId: '${itemId}', duration: ${calculatedDuration}, loop: ${loop}${timeOffset !== undefined ? `, timeOffset: ${timeOffset}` : ''}${clipInPoint !== undefined ? `, clipInPoint: ${clipInPoint}` : ''}${clipOutPoint !== undefined ? `, clipOutPoint: ${clipOutPoint}` : ''}${easingNote}${loopNote} };
+  return { success: true, itemId: '${itemId}', duration: ${calculatedDuration}, loop: ${loop}${timeOffset !== undefined ? `, timeOffset: ${timeOffset}` : ''}${clipInPoint !== undefined ? `, clipInPoint: ${clipInPoint}` : ''}${clipOutPoint !== undefined ? `, clipOutPoint: ${clipOutPoint}` : ''}${easingNote}${loopNote}${gapNote} };
 })();
 `.trim();
 }

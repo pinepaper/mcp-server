@@ -492,3 +492,16 @@ describe('a pathData path keeps its coordinates without a position (1.81)', () =
     expect(code).toContain('"x": 400');
   });
 });
+
+describe('keyframe property gaps are named (2.30)', () => {
+  it('lists which keys lack which properties', () => {
+    const code = codeGenerator.generateKeyframeAnimate({ itemId: 'item_4', keyframes: [
+      { time: 0, properties: { x: 0, opacity: 0 } }, { time: 1, properties: { x: 100 } }, { time: 2, properties: { x: 200, opacity: 1 } },
+    ] } as never);
+    expect(code).toContain('propertyGaps: [{"time":1,"missing":["opacity"]}]');
+    const full = codeGenerator.generateKeyframeAnimate({ itemId: 'item_4', keyframes: [
+      { time: 0, properties: { x: 0 } }, { time: 1, properties: { x: 1 } },
+    ] } as never);
+    expect(full).not.toContain('propertyGaps');
+  });
+});
