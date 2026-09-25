@@ -7,8 +7,9 @@ import { ignoredArgumentsNote } from '../../tools/handlers.js';
 
 describe('ignoredArgumentsNote', () => {
   it('names loop / seamless on agent_export, with the recipe that works', () => {
-    const note = ignoredArgumentsNote('pinepaper_agent_export', { format: 'mp4', loop: true, seamless: true });
-    expect(note).toContain('loop, seamless are not a parameter');
+    // loop became a real (gif) parameter; seamless is still not one.
+    const note = ignoredArgumentsNote('pinepaper_agent_export', { format: 'mp4', seamless: true });
+    expect(note).toContain('seamless is not a parameter');
     expect(note).toContain('SAME state at t = 0 and at t = duration');
   });
 

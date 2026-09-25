@@ -8021,7 +8021,7 @@ WHAT quality ACTUALLY SETS, because it bundles three things and only one of them
 DOES THIS SURVIVE EXPORT? It is a PATH fact, not a per-feature one, so the rule is short and does not go stale as capabilities land: IF IT TICKS INSIDE THE ENGINE'S UPDATE LOOP, IT EXPORTS. Loop presets (pinepaper_animate), relations, keyframes, generators and camera moves all do - measured frame-by-frame, not assumed. What does NOT survive is anything driven by the wall clock outside that loop, or anything on the realtime recorder path.
 ONE MEASURED EXCEPTION TO CHECK: keyframe_animate's loop:true has been measured playing ONCE in an export and then holding the last keyframe. Before exporting past one cycle, sample a frame in the second cycle; if it holds, write the keyframes out for each cycle, or use a loop preset.
 
-SEAMLESS LOOPS: there is no loop switch on export. Key the animation to the SAME state at t = 0 and at t = duration, and export exactly that duration — the export renders t = 0 up to one frame before duration, so no frame is doubled at the wrap. GIFs loop forever by themselves.
+SEAMLESS LOOPS: there is no loop switch on export. Key the animation to the SAME state at t = 0 and at t = duration, and export exactly that duration — the export renders t = 0 up to one frame before duration, so no frame is doubled at the wrap. A GIF's play count is the loop parameter.
 
 If exported frames look frozen, check the SAMPLING before believing it: a loop animation at animationSpeed 1 has a one-second period, so two frames a whole second apart are identical by design. Compare frames that are not a whole number of periods apart.
 
@@ -8076,7 +8076,8 @@ VERIFY MOTION BEFORE YOU RENDER. An export takes seconds to minutes and shows yo
           enum: [16, 32],
           description: 'wav only: 16 (default) or 32-bit float. Rejected for any other format.',
         },
-        maxBytes: { type: 'integer', minimum: 1, description: 'gif only: size budget in bytes (email: 1000000). Over it, the GIF is re-encoded at a smaller frame size, at most twice; result.budget reports each attempt. GIFs loop forever by themselves — there is no loop switch.' },
+        loop: { anyOf: [{ type: 'boolean' }, { type: 'integer', minimum: 0, maximum: 1000 }], description: 'gif only: true = loop forever, false / 0 / 1 = play once, n = play n times (email clients often want a few plays, not forever). Refused on video formats — see SEAMLESS LOOPS.' },
+        maxBytes: { type: 'integer', minimum: 1, description: 'gif only: size budget in bytes (email: 1000000). Over it, the GIF is re-encoded at a smaller frame size, at most twice; result.budget reports each attempt.' },
         time: { type: 'number', minimum: 0, description: 'Stills only (png / jpg / webp / svg / pdf): render at this time in seconds; the playhead is put back afterwards. Without it a still is whatever frame the playhead is on, so repeated runs can differ.' },
         pdf: {
           type: 'object',

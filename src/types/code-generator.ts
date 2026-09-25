@@ -4368,7 +4368,7 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
 
   generateAgentExport(input: AgentExportInput): string {
     const validated = AgentExportInputSchema.parse(input);
-    const { platform, format, quality, framing, duration, estimateOnly, scale, fps, pdf: pdfOpts, region, time: stillTime, maxBytes } = validated;
+    const { platform, format, quality, framing, duration, estimateOnly, scale, fps, pdf: pdfOpts, region, time: stillTime, maxBytes, loop: gifLoop } = validated;
     const qualityLevel = quality || 'standard';
     const videoDuration = duration ?? 5;
 
@@ -5016,7 +5016,12 @@ ${stillTime !== undefined ? `
         } else if (app.exportEngine && app.exportEngine._quickExportVideo) {
           // GIF path (working): _quickExportVideo forwards gifQuality to
           // gif.js. Also serves as the fallback if videoExporter is absent.
-          const videoResult = await app.exportEngine._quickExportVideo(format, baseVideoSettings, false);
+          ${gifLoop !== undefined ? `// A LOOP COUNT (8.30): _quickExportVideo rebuilds its settings without
+          // it, so a GIF with loop set goes straight to videoExporter.export.
+          // true = forever, false / 0 / 1 = once, n = n plays (engine 952d6d35).
+          const videoResult = (format === 'gif' && app.exportEngine.videoExporter && typeof app.exportEngine.videoExporter.export === 'function')
+            ? { blob: await app.exportEngine.videoExporter.export(Object.assign({}, baseVideoSettings, { format: 'gif', loop: ${JSON.stringify(gifLoop)} })) }
+            : await app.exportEngine._quickExportVideo(format, baseVideoSettings, false);` : `const videoResult = await app.exportEngine._quickExportVideo(format, baseVideoSettings, false);`}
           if (videoResult && videoResult.blob) {
             result = await deliver(videoResult.blob);
           } else {
@@ -5036,7 +5041,7 @@ ${stillTime !== undefined ? `
               // its settings without width / height, so a "smaller" retry
               // through it came out the same size.
               if (!app.exportEngine.videoExporter || typeof app.exportEngine.videoExporter.export !== 'function') break;
-              const again = await app.exportEngine.videoExporter.export(Object.assign({}, baseVideoSettings, { format: 'gif', width: w, height: h }));
+              const again = await app.exportEngine.videoExporter.export(Object.assign({}, baseVideoSettings, { format: 'gif', width: w, height: h }${gifLoop !== undefined ? `, { loop: ${JSON.stringify(gifLoop)} }` : ''}));
               if (!again) break;
               result = await deliver(again);
               attempts.push({ width: w, height: h, bytes: result.size });

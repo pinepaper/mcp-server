@@ -1305,7 +1305,7 @@ const IGNORED_ARGUMENT_HINTS: Readonly<Record<string, Readonly<Record<string, st
     .map((k) => [k, 'Changes go INSIDE properties: {…}; only itemId, properties and data are top-level.'])),
   pinepaper_agent_export: {
     loop: 'There is no loop switch on export: a loop is seamless when the animation is keyed to the SAME state at t = 0 and at t = duration (the export stops one frame before duration, so no frame is doubled at the wrap). GIF exports already loop forever.',
-    seamless: 'Same as loop: key t = 0 and t = duration to the same state and export exactly that duration.',
+    seamless: 'A seamless loop is keyed, not a switch: key the animation to the SAME state at t = 0 and at t = duration and export exactly that duration (the export stops one frame before duration, so nothing is doubled at the wrap). A GIF\'s play count is the loop parameter.',
   },
 };
 

@@ -292,3 +292,17 @@ describe('region export names items crossing its edge (1.78)', () => {
     expect(r.warning).toContain('overflowing its card');
   });
 });
+
+describe('gif loop count reaches the encoder (8.30)', () => {
+  it('goes straight to videoExporter.export with loop, and is refused on video', async () => {
+    const calls: Array<Record<string, unknown>> = [];
+    const app = { canvasSize: { width: 100, height: 100 },
+      exportEngine: { exportFidelity: () => ({ warnings: [] }), _quickExportVideo: async () => { throw new Error('should not be used'); },
+        videoExporter: { export: async (o: Record<string, unknown>) => { calls.push(o); return { size: 10, slice() { return this; } }; } } } };
+    class FR { result = 'data:image/gif;base64,R0lG'; onloadend: (() => void) | null = null; readAsDataURL() { this.onloadend?.(); } }
+    const r = await new Function('app', 'FileReader', 'document', body(codeGenerator.generateAgentExport({ format: 'gif', loop: 3 } as never)))(app, FR, {});
+    expect(r.success).toBe(true);
+    expect(calls[0]).toMatchObject({ format: 'gif', loop: 3 });
+    expect(AgentExportInputSchema.safeParse({ format: 'mp4', loop: true }).success).toBe(false);
+  });
+});
