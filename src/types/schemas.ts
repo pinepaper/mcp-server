@@ -2573,6 +2573,7 @@ export const AgentExportInputSchema = z.object({
   loop: z.union([z.boolean(), z.number().int().min(0).max(1000)]).optional().describe('gif / apng: true = loop forever, false / 0 / 1 = play once, n = play n times.'),
   maxBytes: z.number().int().positive().optional().describe('gif only: a size budget in bytes (email wants <= 1 MB). Over it, the GIF is re-encoded smaller — frame size scaled from the overshoot — at most twice; the result reports each attempt and whether the budget was met.'),
   broadcast: z.boolean().optional().describe('mp4 only: broadcast-safe — BT.709, limited range (samples 16-235), tagged bt709, constant bitrate with an 8 Mbps floor at 720p and up (4 below). result.video reports what the encoder did.'),
+  broadcastHeadroom: z.number().int().min(0).max(40).optional().describe('mp4 with broadcast only: luma codes kept clear at both ends of 16-235, so encoder ringing stays legal. 4 cuts out-of-range samples ~100x, 12 ~1000x; never to zero, so a legaliser pass is still required (result fidelity names it).'),
   bitrate: z.number().int().min(100_000).max(200_000_000).optional().describe('mp4 / webm: target bits per second, replacing the quality-derived one. The browser encoder treats it as a CEILING: simple content comes out lower, and result.video.achievedBitrate says what it was.'),
   minBitrate: z.number().int().min(100_000).max(200_000_000).optional().describe('mp4 / webm: a floor under the target. If the achieved bitrate misses it, fidelity warns and names the re-encode a delivery spec needs.'),
   bitrateMode: z.enum(['constant', 'variable']).optional().describe("mp4 / webm: 'constant' (the default with broadcast) or 'variable'."),
@@ -2591,6 +2592,9 @@ export const AgentExportInputSchema = z.object({
     }
     if (val.broadcast && val.format !== 'mp4') {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['broadcast'], message: 'broadcast is an mp4 setting (BT.709 H.264). Export format: "mp4".' });
+    }
+    if (val.broadcastHeadroom !== undefined && !val.broadcast) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['broadcastHeadroom'], message: 'broadcastHeadroom applies only with broadcast: true (mp4).' });
     }
     for (const k of ['bitrate', 'minBitrate', 'bitrateMode'] as const) {
       if (val[k] !== undefined && val.format !== 'mp4' && val.format !== 'webm') {

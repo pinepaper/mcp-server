@@ -4520,10 +4520,11 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
 
   generateAgentExport(input: AgentExportInput): string {
     const validated = AgentExportInputSchema.parse(input);
-    const { platform, format, quality, framing, duration, estimateOnly, scale, fps, pdf: pdfOpts, region, time: stillTime, maxBytes, loop: gifLoop, broadcast, bitrate, minBitrate, bitrateMode, transparent } = validated;
+    const { platform, format, quality, framing, duration, estimateOnly, scale, fps, pdf: pdfOpts, region, time: stillTime, maxBytes, loop: gifLoop, broadcast, broadcastHeadroom, bitrate, minBitrate, bitrateMode, transparent } = validated;
   // Encoder options (FxTool 16719759); the schema keeps them to mp4 / webm.
   const videoEncodeOpts: Record<string, unknown> = {};
   if (broadcast) videoEncodeOpts.broadcast = true;
+  if (broadcastHeadroom !== undefined) videoEncodeOpts.broadcastHeadroom = broadcastHeadroom;
   if (bitrate !== undefined) videoEncodeOpts.bitrate = bitrate;
   if (minBitrate !== undefined) videoEncodeOpts.minBitrate = minBitrate;
   if (bitrateMode !== undefined) videoEncodeOpts.bitrateMode = bitrateMode;
@@ -4800,12 +4801,14 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
   // generator or pattern backdrop never trips it.
   function alphaLoss(fmt) {
     try {
-      if (['mp4', 'webm', 'jpg'].indexOf(fmt) === -1) return [];
+      if (['mp4', 'webm', 'jpg'${format === 'apng' && transparent === false ? ", 'apng'" : ''}].indexOf(fmt) === -1) return [];
       const bg = app.canvasEl && app.canvasEl.style && app.canvasEl.style.backgroundColor;
       const hasColor = !!bg && !/^(transparent|rgba\\([^)]*,\\s*0\\))$/i.test(bg);
       const hasBgItems = !!(app.patternGroup && app.patternGroup.children && app.patternGroup.children.length);
       if (hasColor || hasBgItems) return [];
-      return [{ code: 'alpha_dropped', message: fmt === 'jpg'
+      return [{ code: 'alpha_dropped', message: fmt === 'apng'
+        ? 'apng with transparent: false and no background colour: the frames are filled BLACK. Set a background colour, or drop transparent: false to keep the alpha.'
+        : fmt === 'jpg'
         ? 'jpg has no transparency and this scene has no background, so transparent areas are filled white. Use png or webp to keep them.'
         : fmt + ' is exported without transparency and this scene has no background, so transparent areas come out BLACK. Set a background colour, or export apng (animated, full alpha) or png to keep it.' }];
     } catch (e) { return []; }
@@ -5456,10 +5459,23 @@ ${stillTime !== undefined ? `
   // that rebuilt its settings without them) is named, not assumed.
   const __vr = __vx && __vx.lastVideoReport;
   if (result && result.success && __vr && typeof __vr === 'object') result.video = __vr;
+  // LUMA OUTSIDE 16-235 (8.35, FxTool 4f1ec3ae). The broadcast encode is
+  // decoded back and measured: H.264 ringing at hard edges puts a fraction of
+  // a percent of samples out of range, which QC rejects. broadcastHeadroom
+  // cuts it but never to zero, so a legaliser pass is the requirement.
+  if (result && result.success && __vr && __vr.luma && __vr.luma.outOfRange > 0 && result.fidelity) {
+    result.fidelity.warnings = (result.fidelity.warnings || []).concat([{ code: 'luma_out_of_range',
+      message: 'broadcast QC will reject this as delivered: ' + ((__vr.luma.outOfRangeFraction || 0) * 100).toFixed(3) + '% of decoded luma is outside 16-235 (min ' + __vr.luma.min + ', max ' + __vr.luma.max + '). A legaliser pass is REQUIRED before delivery: ffmpeg -i in.mp4 -vf "lutyuv=y=clip(val\\\\,16\\\\,235):u=clip(val\\\\,16\\\\,240):v=clip(val\\\\,16\\\\,240)" -c:a copy out.mp4. broadcastHeadroom (e.g. 4-12) reduces the excursions 100-1000x but does not remove them.' }]);
+    if (result.fidelity.note) delete result.fidelity.note;
+  }
 ${Object.keys(videoEncodeOpts).length ? `  if (result && result.success) {
     const __asked = ${JSON.stringify(videoEncodeOpts)};
     const __vw = [];
-    if (__vr && __vr.warning) __vw.push({ code: 'bitrate_below_floor', message: String(__vr.warning) });
+    // The engine joins its warnings into one string (bitrate floor, then
+    // luma), so each is raised from its own numbers, not from that text.
+    if (__vr && typeof __vr.achievedBitrate === 'number' && typeof __vr.bitrateFloor === 'number' && __vr.achievedBitrate < __vr.bitrateFloor * 0.95) {
+      __vw.push({ code: 'bitrate_below_floor', message: 'achieved ' + (__vr.achievedBitrate / 1e6).toFixed(2) + ' Mbps against a ' + (__vr.bitrateFloor / 1e6).toFixed(1) + ' Mbps floor: the browser encoder treats the bitrate as a ceiling and does not pad simple content. Re-encode for delivery (e.g. ffmpeg -b:v with -minrate / -bufsize) if the spec requires the floor.' });
+    }
     if (!__vr || typeof __vr !== 'object') {
       __vw.push({ code: 'encode_options_not_applied', message: 'this studio did not report its encode, so ' + Object.keys(__asked).join(', ') + ' cannot be confirmed — it likely has no broadcast / bitrate support, and the file is an ordinary web encode.' });
     } else {

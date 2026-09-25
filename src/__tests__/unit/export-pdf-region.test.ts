@@ -447,7 +447,7 @@ describe('apng: animation with full alpha (8.12, FxTool 76312a55)', () => {
     const storeCalls: unknown[] = [];
     class VX { static getCapabilities() { return { gif: true, apng: supports }; }
       async export(o: Record<string, unknown>) { calls.push(o); return { size: 10, type: 'image/apng', slice() { return this; } }; } }
-    const app = { canvasSize: { width: 400, height: 400 }, exportEngine: { exportFidelity: () => ({ warnings: [] }), videoExporter: new VX(),
+    const app = { canvasSize: { width: 400, height: 400 }, canvasEl: { style: { backgroundColor: '#123' } }, exportEngine: { exportFidelity: () => ({ warnings: [] }), videoExporter: new VX(),
       exportToStore: async (o: unknown) => { storeCalls.push(o); return { ok: false, reason: 'stub' }; }, readExport: async () => null } };
     const r = await new Function('app', 'FileReader', 'document', body(codeGenerator.generateAgentExport({ format: 'apng', duration: 2, ...args } as never)))(app, FR, {});
     return { r, calls, storeCalls };
@@ -481,5 +481,54 @@ describe('apng: animation with full alpha (8.12, FxTool 76312a55)', () => {
     expect(ALWAYS_SAVE_FORMATS.has('apng')).toBe(true);
     const out = JSON.stringify(await handleToolCall('pinepaper_agent_export', { format: 'apng', transparent: false, loop: 2 }, { executionMode: 'code' } as never));
     expect(out).toContain('transparent: false');
+  });
+});
+
+describe('broadcast luma is measured, and a legaliser named (8.35, FxTool 4f1ec3ae)', () => {
+  class FR { result = 'data:video/mp4;base64,AA'; onloadend: (() => void) | null = null; readAsDataURL() { this.onloadend?.(); } }
+  const run = async (args: Record<string, unknown>, report: Record<string, unknown>) => {
+    const calls: Array<Record<string, unknown>> = [];
+    const vx: Record<string, unknown> = { lastVideoReport: null,
+      export: async (o: Record<string, unknown>) => { calls.push(o); vx.lastVideoReport = report; return { size: 10, slice() { return this; } }; } };
+    const app = { canvasSize: { width: 1920, height: 1080 }, canvasEl: { style: { backgroundColor: '#fff' } }, exportEngine: { exportFidelity: () => ({ warnings: [] }), videoExporter: vx } };
+    const r = await new Function('app', 'FileReader', 'document', body(codeGenerator.generateAgentExport({ format: 'mp4', duration: 2, ...args } as never)))(app, FR, {});
+    return { r, calls, w: (r.fidelity?.warnings ?? []) as Array<{ code: string; message: string }> };
+  };
+  const luma = { min: 10, max: 250, outOfRange: 900, samples: 430000, frames: 60, outOfRangeFraction: 0.0021 };
+
+  it('headroom reaches the encoder; out-of-range luma is a warning with a working ffmpeg filter', async () => {
+    const { calls, w } = await run({ broadcast: true, broadcastHeadroom: 4 }, { broadcast: true, bitrate: 8e6, achievedBitrate: 8e6, luma, warning: 'encoder ringing …' });
+    expect(calls[0]).toMatchObject({ broadcast: true, broadcastHeadroom: 4 });
+    const l = w.find((x) => x.code === 'luma_out_of_range')!;
+    expect(l.message).toContain('REQUIRED');
+    // ffmpeg needs the escaped commas inside clip(): \, — not bare commas.
+    expect(l.message).toContain('lutyuv=y=clip(val\\,16\\,235)');
+    // The engine's joined warning string is not misfiled as a bitrate miss.
+    expect(w.map((x) => x.code)).not.toContain('bitrate_below_floor');
+  });
+
+  it('clean luma raises nothing; a missed floor is still its own warning', async () => {
+    const { w } = await run({ broadcast: true }, { broadcast: true, bitrate: 8e6, achievedBitrate: 1.84e6, bitrateFloor: 8e6, luma: { ...luma, outOfRange: 0, outOfRangeFraction: 0 } });
+    expect(w.map((x) => x.code)).toEqual(['bitrate_below_floor']);
+  });
+
+  it('headroom without broadcast is refused', () => {
+    expect(AgentExportInputSchema.safeParse({ format: 'mp4', broadcastHeadroom: 4 }).success).toBe(false);
+    expect(AgentExportInputSchema.safeParse({ format: 'mp4', broadcast: true, broadcastHeadroom: 41 }).success).toBe(false);
+  });
+});
+
+describe('opaque apng on a page with no colour is filled black — said so (FxTool 4f1ec3ae)', () => {
+  class FR { result = 'data:image/apng;base64,AA'; onloadend: (() => void) | null = null; readAsDataURL() { this.onloadend?.(); } }
+  const run = async (args: Record<string, unknown>, bg: string) => {
+    class VX { static getCapabilities() { return { apng: true }; } async export() { return { size: 10, slice() { return this; } }; } }
+    const app = { canvasSize: { width: 100, height: 100 }, canvasEl: { style: { backgroundColor: bg } }, exportEngine: { exportFidelity: () => ({ warnings: [] }), videoExporter: new VX() } };
+    const r = await new Function('app', 'FileReader', 'document', body(codeGenerator.generateAgentExport({ format: 'apng', duration: 1, ...args } as never)))(app, FR, {});
+    return (r.fidelity?.warnings ?? []).map((x: { code: string; message: string }) => x);
+  };
+  it('transparent: false with no background warns; with a background, or transparent, it does not', async () => {
+    expect((await run({ transparent: false }, '')).find((x: { code: string }) => x.code === 'alpha_dropped')?.message).toContain('BLACK');
+    expect((await run({ transparent: false }, '#ff0')).map((x: { code: string }) => x.code)).not.toContain('alpha_dropped');
+    expect((await run({}, '')).map((x: { code: string }) => x.code)).not.toContain('alpha_dropped');
   });
 });
