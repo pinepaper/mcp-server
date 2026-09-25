@@ -2526,6 +2526,7 @@ export const AgentExportInputSchema = z.object({
       z.array(z.union([z.string(), z.object({ sceneId: z.string(), width: z.number().positive(), height: z.number().positive() })])).min(1),
     ]).optional().describe("Multi-page: 'scenes' = one page per saved scene in timeline order, or a list of scene ids — or {sceneId, width, height} to give a page its canvas size (scenes do not record one)."),
   }).optional().describe('pdf only: print options.'),
+  maxBytes: z.number().int().positive().optional().describe('gif only: a size budget in bytes (email wants <= 1 MB). Over it, the GIF is re-encoded smaller — frame size scaled from the overshoot — at most twice; the result reports each attempt and whether the budget was met.'),
   time: z.number().min(0).optional().describe('Stills only (png / jpg / webp / svg / pdf): render the scene at this time in seconds. Without it a still is taken at wherever the playhead happens to be, so two identical runs can differ.'),
   region: z.object({
     x: z.number(), y: z.number(),
@@ -2537,6 +2538,9 @@ export const AgentExportInputSchema = z.object({
   .superRefine((val, ctx) => {
     if (val.time !== undefined && ['mp4', 'webm', 'gif', 'wav', 'srt', 'vtt'].includes(String(val.format))) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['time'], message: "time picks the moment a STILL is taken; a video or audio export runs from 0 for its duration. Drop time, or export png / jpg / webp / svg / pdf." });
+    }
+    if (val.maxBytes !== undefined && val.format !== 'gif') {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['maxBytes'], message: "maxBytes is a gif budget. For mp4 / webm use scale and quality; for stills use jpg / webp with a lower quality." });
     }
     if (val.pdf !== undefined && val.format !== 'pdf') {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['pdf'], message: "pdf options apply only to format: 'pdf'." });

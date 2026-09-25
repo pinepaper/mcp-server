@@ -83,6 +83,7 @@ export const REQUIRED_ENGINE_METHODS: readonly string[] = [
   'exportEngine.readExport',
   'exportEngine.releaseExport',
   'exportEngine.sceneHasAudio',
+  'exportEngine.videoExporter.export',
   'exportGLB',
   'exportLottie',
   'exportPNGSequence',

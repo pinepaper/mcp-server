@@ -4201,7 +4201,7 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
 
   generateAgentExport(input: AgentExportInput): string {
     const validated = AgentExportInputSchema.parse(input);
-    const { platform, format, quality, framing, duration, estimateOnly, scale, fps, pdf: pdfOpts, region, time: stillTime } = validated;
+    const { platform, format, quality, framing, duration, estimateOnly, scale, fps, pdf: pdfOpts, region, time: stillTime, maxBytes } = validated;
     const qualityLevel = quality || 'standard';
     const videoDuration = duration ?? 5;
 
@@ -4832,6 +4832,32 @@ ${stillTime !== undefined ? `
           } else {
             result = { success: false, error: format.toUpperCase() + ' export returned no data' };
           }
+          ${maxBytes !== undefined ? `// A BYTE BUDGET (round 9 GG, 8.31 — email wants <= 1 MB). gif.js has no
+          // colour-count knob, so size is the lever: GIF bytes scale roughly with
+          // pixel count, so the frame is shrunk by sqrt(budget / size) with a
+          // margin and re-encoded, at most twice. Every attempt is reported.
+          if (format === 'gif' && result && result.success && result.size > ${maxBytes}) {
+            const attempts = [{ width: dimensions.width, height: dimensions.height, bytes: result.size }];
+            let w = dimensions.width, h = dimensions.height;
+            for (let k = 0; k < 2 && result.success && result.size > ${maxBytes}; k++) {
+              const f = Math.sqrt(${maxBytes} / result.size) * 0.9;
+              w = Math.max(16, Math.round(w * f / 2) * 2); h = Math.max(16, Math.round(h * f / 2) * 2);
+              // videoExporter.export, not _quickExportVideo: the latter rebuilds
+              // its settings without width / height, so a "smaller" retry
+              // through it came out the same size.
+              if (!app.exportEngine.videoExporter || typeof app.exportEngine.videoExporter.export !== 'function') break;
+              const again = await app.exportEngine.videoExporter.export(Object.assign({}, baseVideoSettings, { format: 'gif', width: w, height: h }));
+              if (!again) break;
+              result = await deliver(again);
+              attempts.push({ width: w, height: h, bytes: result.size });
+            }
+            result.budget = { maxBytes: ${maxBytes}, met: !!(result.success && result.size <= ${maxBytes}), attempts: attempts };
+            if (result.success && result.size > ${maxBytes}) {
+              result.warning = 'still ' + result.size + ' bytes after shrinking to ' + w + 'x' + h + ' — over the ' + ${maxBytes} + '-byte budget. Lower fps, shorten duration, or use quality "draft".';
+            } else if (result.success) {
+              result.dimensions = { width: w, height: h };
+            }
+          }` : ''}
         } else if (app.exportEngine && app.exportEngine.videoExporter) {
           const blob = await app.exportEngine.videoExporter.export(baseVideoSettings);
           result = await deliver(blob);

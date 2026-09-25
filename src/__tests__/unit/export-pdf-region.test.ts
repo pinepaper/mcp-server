@@ -229,3 +229,27 @@ describe('caption export (8.19)', () => {
     expect(r.error).toContain('bornAt / ttl');
   });
 });
+
+describe('gif byte budget (8.31)', () => {
+  it('re-encodes smaller through videoExporter until it fits, and reports the attempts', async () => {
+    const calls: Array<Record<string, unknown>> = [];
+    const blobOf = (n: number) => ({ size: n, slice() { return this; } });
+    const app = { canvasSize: { width: 800, height: 800 },
+      exportEngine: {
+        exportFidelity: () => ({ warnings: [] }),
+        _quickExportVideo: async () => ({ blob: blobOf(4_000_000) }),
+        videoExporter: { export: async (o: Record<string, unknown>) => { calls.push(o); return blobOf(Math.round((o.width as number) * (o.height as number) * 1.2)); } },
+      } };
+    class FR { result = 'data:image/gif;base64,R0lG'; onloadend: (() => void) | null = null; readAsDataURL() { this.onloadend?.(); } }
+    const code = codeGenerator.generateAgentExport({ format: 'gif', maxBytes: 1_000_000, duration: 3 } as never);
+    const r = await new Function('app', 'FileReader', 'document', body(code))(app, FR, {});
+    expect(calls[0]).toMatchObject({ format: 'gif' });
+    expect(calls[0].width).toBeLessThan(800);
+    expect(r.budget.met).toBe(true);
+    expect(r.budget.attempts.length).toBeGreaterThan(1);
+  });
+
+  it('maxBytes is refused on a non-gif format', () => {
+    expect(AgentExportInputSchema.safeParse({ format: 'mp4', maxBytes: 1000 }).success).toBe(false);
+  });
+});

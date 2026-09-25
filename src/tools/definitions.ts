@@ -8074,6 +8074,7 @@ VERIFY MOTION BEFORE YOU RENDER. An export takes seconds to minutes and shows yo
           enum: [16, 32],
           description: 'wav only: 16 (default) or 32-bit float. Rejected for any other format.',
         },
+        maxBytes: { type: 'integer', minimum: 1, description: 'gif only: size budget in bytes (email: 1000000). Over it, the GIF is re-encoded at a smaller frame size, at most twice; result.budget reports each attempt. GIFs loop forever by themselves — there is no loop switch.' },
         time: { type: 'number', minimum: 0, description: 'Stills only (png / jpg / webp / svg / pdf): render at this time in seconds; the playhead is put back afterwards. Without it a still is whatever frame the playhead is on, so repeated runs can differ.' },
         pdf: {
           type: 'object',
