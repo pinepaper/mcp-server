@@ -25,7 +25,7 @@
 
 PinePaper MCP Server enables AI assistants to create and animate graphics in [PinePaper Studio](https://pinepaper.studio) via the Model Context Protocol (MCP). Works with any AI that supports MCP tool calling (Claude, GPT, Gemini, local models, etc.).
 
-The server exposes **153 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
+The server exposes **154 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
 
 - Create geometric shapes, text collages, diagrams, and data charts
 - Apply 37+ character-level text effects and 28+ vertex deformation presets
@@ -36,7 +36,7 @@ The server exposes **153 tools** across drawing, animation, diagrams, maps, typo
 
 ## Running it: local or hosted
 
-**Local is free and complete.** Every one of the 153 tools works when you run
+**Local is free and complete.** Every one of the 154 tools works when you run
 this server yourself. There is no reduced tier and nothing held back.
 
 What it needs:
@@ -1090,7 +1090,7 @@ Fourteen new tools (121 → 135) and new actions across the surface — the rele
 
 ## Toolkits & Token Budget
 
-153 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
+154 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
 
 **Toolkit profiles** (`PINEPAPER_TOOLKIT`):
 
@@ -1295,7 +1295,7 @@ Generate instruction/code pairs for LLM fine-tuning:
 
 ## Tools Reference
 
-All 153 tools, grouped by the tag used for toolkit filtering.
+All 154 tools, grouped by the tag used for toolkit filtering.
 
 ### Canvas (`canvas`)
 | Tool | Description |
@@ -1514,6 +1514,7 @@ All 153 tools, grouped by the tag used for toolkit filtering.
 | `pinepaper_analyze_design` | Analyze design quality |
 | `pinepaper_validate_design` | Validate against design rules |
 | `pinepaper_validate` | General validation |
+| `pinepaper_accessibility_check` | Text contrast and flashing (WCAG), as a heuristic screen |
 | `pinepaper_validate_scene` | Validate scene integrity |
 | `pinepaper_instantiate_ontology` | Compile a pp: design graph into a scene |
 | `pinepaper_lint_scene` | Relational-density audit + structural-relation suggestions |

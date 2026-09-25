@@ -1769,6 +1769,33 @@ EXAMPLES:
   },
 
   {
+    name: 'pinepaper_accessibility_check',
+    annotations: {
+      title: 'Accessibility Check',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Check the live scene for two accessibility failures that stop ads and broadcast spots: low text contrast and flashing.
+
+- contrast: WCAG 1.4.3 AA — 4.5:1, or 3:1 for large text (24 px, or 18.66 px bold). Each text's fill against the solid fill of the topmost item under it, or the page background. Text over a photo or gradient is skipped and listed.
+- flash: WCAG 2.3.1 general flash — samples the timeline (duration, fps) and fails any region of the frame with more than 3 flashes in a second. It seeks deterministically, so playback is not disturbed.
+
+Both are heuristic screens and say so: not a certified photosensitive-epilepsy (PSE) test, and red flashes are not checked. Needs a live studio for verdicts; in code-only mode it returns the measuring code.
+
+EXAMPLE: { checks: ["contrast", "flash"], duration: 6, fps: 20 }`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        checks: { type: 'array', items: { type: 'string', enum: ['contrast', 'flash'] }, description: 'Which checks (default both).' },
+        duration: { type: 'number', exclusiveMinimum: 0, maximum: 120, description: 'flash: seconds of the timeline to sample (default 5).' },
+        fps: { type: 'integer', minimum: 10, maximum: 60, description: 'flash: samples per second (default 20).' },
+      },
+    },
+  },
+
+  {
     name: 'pinepaper_render_batch',
     annotations: {
       title: 'Render Batch',

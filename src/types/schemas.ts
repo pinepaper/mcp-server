@@ -3784,6 +3784,14 @@ export const AudioBeatsInputSchema = z.object({
 });
 export type AudioBeatsInput = z.infer<typeof AudioBeatsInputSchema>;
 
+// ACCESSIBILITY CHECK: text contrast (WCAG 1.4.3) and flashing (2.3.1).
+export const AccessibilityCheckInputSchema = z.object({
+  checks: z.array(z.enum(['contrast', 'flash'])).min(1).optional().describe("Which checks (default both)."),
+  duration: z.number().positive().max(120).optional().describe('flash: seconds of the timeline to sample (default 5).'),
+  fps: z.number().int().min(10).max(60).optional().describe('flash: samples per second (default 20; a flash rate is only seen below half of it).'),
+});
+export type AccessibilityCheckInput = z.infer<typeof AccessibilityCheckInputSchema>;
+
 // RENDER BATCH (data-driven creative): one scene, many rows, one export per
 // row. The handler runs each row through modify_item / template_params and
 // then agent_export, so every per-tool check applies to every row.

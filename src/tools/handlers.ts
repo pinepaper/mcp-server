@@ -58,6 +58,7 @@ import {
   AudioBeatsInputSchema,
   TemplateParamsInputSchema,
   RenderBatchInputSchema,
+  AccessibilityCheckInputSchema,
   ComposeInputSchema,
   CropImageInputSchema,
   PathOpInputSchema,
@@ -172,6 +173,7 @@ import { exportHandlers } from './handlers/export.js';
 import { planCharacter, generateCharacterCode } from './handlers/character.js';
 import { buildZip } from '../utils/zip.js';
 import { buildScc, type SccCue } from '../utils/scc.js';
+import { checkContrast, checkFlashes, parseCssColor, type TextSample } from '../utils/a11y.js';
 import { buildHtml5Ad, buildPlayable, externalRequests, type CtaBox } from '../utils/ad-package.js';
 
 /**
@@ -1965,6 +1967,36 @@ async function handleToolCallInner(
         return executeOrGenerate(code, `Audio: ${input.action}`, options, 'pinepaper_audio_beats');
       }
 
+      case 'pinepaper_accessibility_check': {
+        const input = AccessibilityCheckInputSchema.parse(args);
+        const code = codeGenerator.generateAccessibilityCheck(input);
+        const mode = options.executionMode ?? getExecutionMode();
+        if (mode === 'code' || !options.executeInBrowser) {
+          return executeOrGenerate(code, 'Accessibility measurements (verdicts need the server: run with a live studio)', options, 'pinepaper_accessibility_check');
+        }
+        const controller = options.browserController || getBrowserController();
+        if (!controller.connected) await controller.connect();
+        const run = await controller.executeCode(code, false);
+        const m = run.result as { texts?: TextSample[]; page?: string | null; series?: number[][]; fps: number; flashUnavailable?: string } | undefined;
+        if (!run.success || !m) return errorResult(ErrorCodes.EXECUTION_ERROR, run.error || 'the studio returned no measurements');
+        const report: Record<string, unknown> = {};
+        const page = parseCssColor(m.page);
+        if (m.texts) {
+          const c = checkContrast(m.texts, page);
+          report.contrast = { pass: c.failing.length === 0, checked: c.checked, failing: c.failing, skipped: c.skipped,
+            method: 'WCAG 1.4.3 AA (4.5:1, 3:1 for large text) between each text fill and the solid fill of the topmost item under its centre, or the page background' + (c.pageAssumed ? ' (none set, so white was assumed)' : '') + '. Approximate: text over a photo or gradient is not judged.' };
+        }
+        if (m.flashUnavailable) report.flash = { checked: false, reason: m.flashUnavailable };
+        else if (m.series) {
+          const f = checkFlashes(m.series, m.fps);
+          report.flash = { pass: f.failing.length === 0, maxFlashesPerSecond: f.maxFlashesPerSecond, failing: f.failing.map((x) => ({ ...x, region: ['top-left', 'top', 'top-right', 'left', 'centre', 'right', 'bottom-left', 'bottom', 'bottom-right'][x.region] })),
+            frames: m.series.length, fps: m.fps,
+            method: 'WCAG 2.3.1 general flash: opposing luminance changes of >= 10% with the darker state below 0.8, over a 3 x 3 grid; more than 3 flashes in any second fails. A heuristic screen, not a certified PSE test (red flashes are not checked).' };
+        }
+        const pass = Object.values(report).every((r) => (r as { pass?: boolean }).pass !== false);
+        return dataResult({ success: true, pass, ...report });
+      }
+
       case 'pinepaper_render_batch': {
         const input = RenderBatchInputSchema.parse(args);
         const exportCheck = AgentExportInputSchema.safeParse(input.export);
@@ -1975,7 +2007,7 @@ async function handleToolCallInner(
         if (input.estimateOnly) {
           return dataResult({ rows: input.rows.length, itemsChanged: itemIds, export: exportCheck.data, note: 'nothing rendered. Each row runs modify_item per item, template_params when given, then agent_export.' });
         }
-        if (options.executionMode === 'code' || !options.executeInBrowser) {
+        if ((options.executionMode ?? getExecutionMode()) === 'code' || !options.executeInBrowser) {
           return errorResult(ErrorCodes.VALIDATION_ERROR, 'render_batch renders each row, so it needs a live studio (browser execution). In code-only mode, call modify_item and agent_export per row yourself.');
         }
         const rowResults: Array<Record<string, unknown>> = [];

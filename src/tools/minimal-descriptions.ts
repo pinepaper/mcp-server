@@ -192,6 +192,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_get_canvas_ontology: 'Capture live canvas as compact pp: triples + item summary. Prefer over get_items for composition reasoning. maxItems, maxChildren, includeViewport.',
   pinepaper_analyze_design: 'Analyze template definition → typed graph, patterns, math functions, semantics, fingerprint, JSON-LD.',
   pinepaper_validate_design: 'Validate + score template definition. 5-dimension quality scoring: completeness, animation, semantics, composition, structure.',
+  pinepaper_accessibility_check: 'Text contrast (WCAG 1.4.3 AA) and flashing (2.3.1, >3/sec) check of the live scene; heuristic. {checks?: [contrast, flash], duration?, fps?}',
   pinepaper_validate: "Semantic validation of the live scene/op → structured diagnostics {code, severity, message, fix}. mode:'scene'|'op'. Catches missing targets (+did-you-mean), bad params, cycles.",
   pinepaper_query_ontology: 'Query design knowledge graph. query: list_types|list_edges|list_generators|list_effects|type_hierarchy|type_properties|animatable_properties|is_subtype|node_type|edge_type.',
 

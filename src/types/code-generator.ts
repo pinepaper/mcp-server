@@ -186,6 +186,7 @@ import {
   ConstructionSequenceInput,
   ValidateSceneInput,
   CaptureFramesInput,
+  AccessibilityCheckInput,
   InstantiateOntologyInput,
   LintSceneInput,
   MediaInput, TextStyleInput, TextEffectInput, DesignMediumInput, ShatterImageInput, ImportLayeredCharacterInput, GameInput, World3DInput,
@@ -10091,6 +10092,69 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
    * sceneAt(t). Returns a cheap per-frame hash by default (token-light) so an agent can
    * verify determinism (re-run → identical hashes) and whether frames actually change.
    */
+  /**
+   * Measurements for pinepaper_accessibility_check; the verdicts are made on
+   * the server (src/utils/a11y.ts). Text: fill, size, weight, and the solid
+   * fill of the topmost item under its centre. Flash: mean relative luminance
+   * of a 3 x 3 grid per sampled frame, through captureFramesAt (deterministic
+   * seek). Pixel work is native reduce / Array.from, not generated loops, so
+   * the loop budget does not count it.
+   */
+  generateAccessibilityCheck(input: AccessibilityCheckInput): string {
+    const checks = input.checks ?? ['contrast', 'flash'];
+    const fps = input.fps ?? 20;
+    const duration = input.duration ?? 5;
+    const n = Math.min(1200, Math.max(3, Math.round(duration * fps)));
+    return `
+// Accessibility measurements (${checks.join(', ')})
+(function() {
+  const out = { success: true, fps: ${fps}, duration: ${duration} };
+  const rgba = function(c) {
+    if (!c || c.gradient || typeof c.red !== 'number') return null;
+    return { r: Math.round(c.red * 255), g: Math.round(c.green * 255), b: Math.round(c.blue * 255), a: typeof c.alpha === 'number' ? c.alpha : 1 };
+  };
+  out.page = (app.canvasEl && app.canvasEl.style && app.canvasEl.style.backgroundColor) || null;
+${checks.includes('contrast') ? `  const all = (app.itemRegistry && typeof app.itemRegistry.getAll === 'function') ? app.itemRegistry.getAll() : [];
+  const texts = all.filter(function(e) { return e && e.item && e.item.className === 'PointText' && e.item.visible !== false && String(e.item.content || '').trim() !== ''; });
+  const solids = all.filter(function(e) { return e && e.item && e.item.className !== 'PointText' && e.item.visible !== false && rgba(e.item.fillColor) && e.item.bounds; });
+  out.texts = texts.map(function(e) {
+    const it = e.item, c = it.bounds.center;
+    const under = solids.filter(function(s) { return s.item.bounds.contains(c) && typeof s.item.isBelow === 'function' && s.item.isBelow(it); });
+    const top = under.reduce(function(best, s) { return (!best || (typeof s.item.isAbove === 'function' && s.item.isAbove(best.item))) ? s : best; }, null);
+    const w = String(it.fontWeight || '');
+    return { id: e.itemId, content: String(it.content), fill: rgba(it.fillColor), fontSize: it.fontSize || 0,
+      bold: w === 'bold' || Number(w) >= 700, behind: top ? rgba(top.item.fillColor) : null, behindId: top ? top.itemId : undefined };
+  });
+` : ''}${checks.includes('flash') ? `  if (typeof app.captureFramesAt !== 'function') {
+    out.flashUnavailable = 'this studio has no deterministic frame capture (app.captureFramesAt), so flashing was not checked.';
+  } else {
+    const W = 48, H = 27;
+    const small = document.createElement('canvas');
+    small.width = W; small.height = H;
+    const ctx = small.getContext('2d', { willReadFrequently: true });
+    const lut = Array.from({ length: 256 }, function(_, v) { const x = v / 255; return x <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); });
+    const times = Array.from({ length: ${n} }, function(_, i) { return i / ${fps}; });
+    out.series = app.captureFramesAt(times, { capture: function(c) {
+      // Transparent canvas shows the page's CSS background, so composite on it.
+      ctx.fillStyle = out.page || '#ffffff';
+      ctx.fillRect(0, 0, W, H);
+      ctx.drawImage(c, 0, 0, W, H);
+      const px = ctx.getImageData(0, 0, W, H).data;
+      const acc = Array.prototype.reduce.call(px, function(a, v, k) {
+        if (k % 4 !== 3) return a;
+        const p = (k - 3) / 4, x = p % W, y = (p - x) / W;
+        const cell = Math.min(2, Math.floor(y * 3 / H)) * 3 + Math.min(2, Math.floor(x * 3 / W));
+        a.sum[cell] += 0.2126 * lut[px[k - 3]] + 0.7152 * lut[px[k - 2]] + 0.0722 * lut[px[k - 1]];
+        a.n[cell] += 1;
+        return a;
+      }, { sum: [0, 0, 0, 0, 0, 0, 0, 0, 0], n: [0, 0, 0, 0, 0, 0, 0, 0, 0] });
+      return acc.sum.map(function(s, i) { return acc.n[i] ? s / acc.n[i] : 0; });
+    } });
+  }
+` : ''}  return out;
+})();`.trim();
+  }
+
   generateCaptureFrames(input: CaptureFramesInput): string {
     const timesJson = JSON.stringify(input.times);
     const seed = input.seed !== undefined ? input.seed : 0;
