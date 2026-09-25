@@ -4788,6 +4788,11 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
   });
 
   let result = { success: false, platform, format, quality, framing };
+  // The engine's report on the audio track of THIS export (FxTool b41860aa:
+  // encoder delay compensated, padding past the picture dropped). Cleared
+  // first so a report left by an earlier export is never read as this one's.
+  const __vx = app.exportEngine && app.exportEngine.videoExporter;
+  if (__vx && 'lastAudioReport' in __vx) __vx.lastAudioReport = null;
 ${stillTime !== undefined ? `
   // A STILL AT A CHOSEN MOMENT (round 7 X, 1.57). Without this a png is
   // whatever frame the playhead is on — two identical builds gave PNGs that
@@ -5221,6 +5226,24 @@ ${stillTime !== undefined ? `
 
   if (result && result.success) Object.assign(result, fidelity(format));
   if (result && result.success && __fit) result.platformFit = __fit;
+  // AUDIO TIMING, WHERE THE STUDIO REPORTS IT (6.27). An MP4's AAC track used
+  // to start ~44 ms late and run past the picture — a 6.000 s bumper with sound
+  // then failed its cap. The engine now reports the track; it is surfaced as
+  // result.audio, and its warning (sound in the trimmed lead-in) and any audio
+  // longer than the picture go into fidelity.warnings, where a caller looks.
+  const __ar = __vx && __vx.lastAudioReport;
+  if (result && result.success && __ar && typeof __ar === 'object') {
+    result.audio = __ar;
+    const __aw = [];
+    if (__ar.warning) __aw.push({ code: 'audio_lead_trimmed', message: String(__ar.warning) });
+    if (typeof __ar.audioDurationS === 'number' && typeof __ar.videoDurationS === 'number' && __ar.audioDurationS > __ar.videoDurationS + 0.0105) {
+      __aw.push({ code: 'audio_longer_than_video', message: 'the audio track is ' + __ar.audioDurationS.toFixed(4) + ' s against ' + __ar.videoDurationS.toFixed(4) + ' s of picture — a platform with a hard length cap may read the longer one.' });
+    }
+    if (__aw.length && result.fidelity) {
+      result.fidelity.warnings = (result.fidelity.warnings || []).concat(__aw);
+      if (result.fidelity.note) delete result.fidelity.note;
+    }
+  }
 ${(() => {
     // A DURATION THAT OVERRUNS AT AN NTSC RATE (round 9 FF, 1.76): 6 s at
     // 29.97 is round(6 x 30000/1001) = 180 frames = 6.006 s, over a 6.000 s

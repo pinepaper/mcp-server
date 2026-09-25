@@ -306,3 +306,25 @@ describe('gif loop count reaches the encoder (8.30)', () => {
     expect(AgentExportInputSchema.safeParse({ format: 'mp4', loop: true }).success).toBe(false);
   });
 });
+
+describe('the audio track report is surfaced (6.27)', () => {
+  const run = async (report: Record<string, unknown> | undefined) => {
+    const vx: Record<string, unknown> = { lastAudioReport: { stale: true },
+      export: async () => { if (report) vx.lastAudioReport = report; return { size: 10, slice() { return this; } }; } };
+    const app = { canvasSize: { width: 100, height: 100 }, exportEngine: { exportFidelity: () => ({ warnings: [] }), videoExporter: vx } };
+    class FR { result = 'data:video/mp4;base64,AA'; onloadend: (() => void) | null = null; readAsDataURL() { this.onloadend?.(); } }
+    return new Function('app', 'FileReader', 'document', body(codeGenerator.generateAgentExport({ format: 'mp4', duration: 2 } as never)))(app, FR, {});
+  };
+
+  it('carries the report and turns its warning and an overlong track into fidelity warnings', async () => {
+    const r = await run({ codec: 'aac', encoderDelaySamples: 2112, leadHadSound: true, audioDurationS: 2.05, videoDurationS: 2.0, warning: 'the first 44 ms of scene audio had sound' });
+    expect(r.audio.codec).toBe('aac');
+    // (The stub scene has no background, so alpha_dropped is also present.)
+    expect(r.fidelity.warnings.map((w: { code: string }) => w.code).filter((c: string) => c.startsWith('audio_'))).toEqual(['audio_lead_trimmed', 'audio_longer_than_video']);
+  });
+
+  it('a stale report from an earlier export is never read as this one', async () => {
+    const r = await run(undefined);
+    expect(r.audio).toBeUndefined();
+  });
+});
