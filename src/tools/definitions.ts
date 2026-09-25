@@ -3030,7 +3030,7 @@ PARAMS: { eps? (bounds-match tolerance px, default 4), cap? (max suggestions, de
 
 MOVES_ALONG_PATH — ride a path (a hand tracing a stroke, a car on a road):
 - sourceId: the item that moves. The path comes from ONE of: targetId (or params.pathId) naming a PATH ITEM, sampled into points for you; params.path as points [[x, y], …]; or params.equation.
-- params.duration: seconds for one traversal (converted to the engine's speed; or pass speed directly, 1 ≈ 150 px/s). params.delay: seconds before it starts. closed (loop back to the start; default from the path item), phase (0–1 start point), easing (linear | easeIn | easeOut | easeInOut | sine | bounce | pingpong), signal (deterministic, frame-rate-invariant — prefer it for export).
+- params.duration: seconds for one traversal (or pass speed directly, 1 ≈ 150 px/s). params.delay: seconds on the timeline before it starts; until then the item waits at the path start. params.offset: [dx, dy] added to the point on the path — set it to (centre - pen tip) so a hand image's TIP, not its centre, rides the stroke. closed (loop back to the start; default from the path item), phase (0–1 start point), easing (linear | easeIn | easeOut | easeInOut | sine | bounce | pingpong), signal (deterministic, frame-rate-invariant — prefer it for export).
 - With no path from any of those it is refused, not accepted as a still item.
 
 USE WHEN:

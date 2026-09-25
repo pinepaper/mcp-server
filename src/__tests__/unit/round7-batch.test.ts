@@ -196,3 +196,38 @@ describe('top-level anchor on create_item (1.63)', () => {
     expect(code).toContain('"anchor": "top-left"');
   });
 });
+
+describe('moves_along_path: native route, offset, start position (1.60 / 1.61)', () => {
+  const line = { className: 'Path', length: 300, closed: false, getPointAt: (o: number) => ({ x: o, y: 0 }) };
+  function studio(native: boolean) {
+    const added: unknown[] = [];
+    const hand = { position: { x: 999, y: 999 } };
+    const app = {
+      relationRegistry: { getRule: () => (native ? { params: { duration: {}, delay: {}, offset: {} } } : { params: { speed: {} } }) },
+      itemRegistry: { get: (id: string) => (id === 'path_1' ? { item: line } : id === 'hand' ? { item: hand } : null) },
+      addRelation: (...a: unknown[]) => { added.push(a); return true; },
+      historyManager: { saveState() {} },
+    };
+    return { app, added, hand };
+  }
+  const input = { sourceId: 'hand', targetId: 'path_1', relationType: 'moves_along_path', params: { duration: 4, delay: 1, offset: [20, -10] } };
+
+  it('on a build that rides paths natively, passes through with the path as target', () => {
+    const s = studio(true);
+    const r = runIIFE(codeGenerator.generateAddRelation(input as never), { app: s.app });
+    expect(r.route).toBe('live-path');
+    const [src, tgt, , params] = s.added[0] as [string, string, string, Record<string, unknown>];
+    expect([src, tgt]).toEqual(['hand', 'path_1']);
+    expect(params).toMatchObject({ duration: 4, delay: 1, offset: [20, -10] });
+    expect(params.path).toBeUndefined();
+  });
+
+  it('otherwise samples, applies offset the engine way, and parks the item at the start', () => {
+    const s = studio(false);
+    const r = runIIFE(codeGenerator.generateAddRelation(input as never), { app: s.app });
+    expect(r.route).toBe('sampled-points');
+    const params = (s.added[0] as any[])[3];
+    expect(params.path[0]).toEqual([20, -10]);
+    expect(s.hand.position).toEqual({ x: 20, y: -10 });
+  });
+});

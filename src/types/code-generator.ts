@@ -962,13 +962,33 @@ app.historyManager.saveState();
  *   - with neither points, a path item nor an equation, it is refused by name.
  */
 function generateMovesAlongPathCode(sourceId: string, targetId: string | undefined, raw: Record<string, unknown>): string {
-  const { pathId, duration, delay, ...params } = raw;
+  const { pathId, duration, delay, offset, ...params } = raw;
   const ref = (typeof pathId === 'string' && pathId) || (targetId && targetId !== sourceId ? targetId : null);
+  const off = Array.isArray(offset) && offset.length >= 2 ? [Number(offset[0]) || 0, Number(offset[1]) || 0] : null;
+  const hasDuration = typeof duration === 'number' && duration > 0;
+  const hasDelay = typeof delay === 'number' && delay > 0;
   return `
 // moves_along_path: ${sourceId}${ref ? ` along ${ref}` : ''}
 (function() {
   const params = ${JSON.stringify(params)};
   const hasPoints = Array.isArray(params.path) && params.path.length >= 2;
+  // A STUDIO THAT RIDES THE PATH ITSELF. From FxTool c16c9dd3 the rule
+  // declares duration / delay / offset and, with a path item as its target and
+  // no points, follows that path's LIVE geometry on the playhead. Sampling it
+  // into static points here would shadow that, so on such a build everything
+  // is passed straight through and the target is the route.
+  const rule = app.relationRegistry && typeof app.relationRegistry.getRule === 'function'
+    ? app.relationRegistry.getRule('moves_along_path') : null;
+  const native = !!(rule && rule.params && rule.params.duration);
+  if (native && !hasPoints && !params.equation ${ref ? '' : '&& false'}) {
+    ${hasDuration ? `params.duration = ${duration};` : ''}
+    ${hasDelay ? `params.delay = ${delay};` : ''}
+    ${off ? `params.offset = ${JSON.stringify(off)};` : ''}
+    const okN = app.addRelation(${JSON.stringify(sourceId)}, ${JSON.stringify(ref ?? sourceId)}, 'moves_along_path', params);
+    if (!okN) return { success: false, error: 'the studio refused the moves_along_path relation.' };
+    app.historyManager.saveState();
+    return { success: true, sourceId: ${JSON.stringify(sourceId)}, relationType: 'moves_along_path', route: 'live-path', target: ${JSON.stringify(ref)}, params: params };
+  }
   if (!hasPoints && !params.equation) {
     ${ref ? `const e = app.itemRegistry && app.itemRegistry.get(${JSON.stringify(ref)});
     let p = e && e.item;
@@ -982,17 +1002,32 @@ function generateMovesAlongPathCode(sourceId: string, targetId: string | undefin
     params.path = Array.from({ length: N + 1 }, function(_, i) { const q = p.getPointAt(Math.min(p.length, p.length * i / N)); return [q.x, q.y]; });
     if (params.closed === undefined) params.closed = !!p.closed;` : `return { success: false, error: 'moves_along_path needs a path: pass targetId (or params.pathId) naming a path item, or params.path as points [[x, y], …], or params.equation. With none, the item would not move.' };`}
   }
-  ${typeof duration === 'number' && duration > 0 ? `if (params.speed === undefined && Array.isArray(params.path)) {
+  ${off ? `// offset, with the ENGINE's meaning (c16c9dd3): [dx, dy] is added to the
+  // point on the path to place the item — so a hand whose pen tip sits
+  // (-dx, -dy) from its centre keeps the tip on the stroke. The same value
+  // therefore behaves the same on a build that reads offset natively.
+  if (Array.isArray(params.path)) params.path = params.path.map(function(q) {
+    const x = Array.isArray(q) ? q[0] : q.x, y = Array.isArray(q) ? q[1] : q.y;
+    return [x + ${off[0]}, y + ${off[1]}];
+  });` : ''}
+  ${hasDuration ? `if (params.speed === undefined && Array.isArray(params.path)) {
     const pts = params.path.map(function(q) { return Array.isArray(q) ? { x: q[0], y: q[1] } : q; });
     const len = pts.slice(1).reduce(function(acc, q, i) { return acc + Math.hypot(q.x - pts[i].x, q.y - pts[i].y); }, 0);
     if (len > 0) params.speed = len / (150 * ${duration});
     if (params.closed === undefined) params.closed = false;
   }` : ''}
-  ${typeof delay === 'number' && delay > 0 ? `if (!params.window) params.window = { start: ${delay} };` : ''}
+  ${hasDelay ? `if (!params.window) params.window = { start: ${delay} };` : ''}
+  // Before its window opens the relation does not run, so the item stays where
+  // it was left — the retest saw it parked at the path END. Put it at the start.
+  if (Array.isArray(params.path) && params.path.length) {
+    const src = app.itemRegistry && app.itemRegistry.get(${JSON.stringify(sourceId)});
+    const q0 = params.path[0];
+    if (src && src.item && src.item.position) { src.item.position.x = Array.isArray(q0) ? q0[0] : q0.x; src.item.position.y = Array.isArray(q0) ? q0[1] : q0.y; }
+  }
   const ok = app.addRelation(${JSON.stringify(sourceId)}, ${JSON.stringify(sourceId)}, 'moves_along_path', params);
   if (!ok) return { success: false, error: 'the studio refused the moves_along_path relation.' };
   app.historyManager.saveState();
-  return { success: true, sourceId: ${JSON.stringify(sourceId)}, relationType: 'moves_along_path',
+  return { success: true, sourceId: ${JSON.stringify(sourceId)}, relationType: 'moves_along_path', route: 'sampled-points',
     points: Array.isArray(params.path) ? params.path.length : 0, speed: params.speed, closed: params.closed,
     ${ref ? `pathFrom: ${JSON.stringify(ref)},` : ''} window: params.window };
 })();`.trim();

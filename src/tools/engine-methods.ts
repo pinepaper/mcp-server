@@ -256,6 +256,7 @@ export const OPTIONAL_ENGINE_METHODS: readonly string[] = [
   'mapSystem.getMapSourceInfo',
   'registerItem',
   'relationRegistry.exportForSave',
+  'relationRegistry.getRule',
   'relationRegistry.getStats',
   'sceneAt',
   'sceneManager.setLoop',
