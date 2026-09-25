@@ -439,3 +439,47 @@ describe('a sheet cell renders only what belongs to it (1.78, FxTool 78ec5916)',
     expect(r.excludedItems).toBeUndefined();
   });
 });
+
+describe('apng: animation with full alpha (8.12, FxTool 76312a55)', () => {
+  class FR { result = 'data:image/apng;base64,AA'; onloadend: (() => void) | null = null; readAsDataURL() { this.onloadend?.(); } }
+  const run = async (args: Record<string, unknown>, supports = true) => {
+    const calls: Array<Record<string, unknown>> = [];
+    const storeCalls: unknown[] = [];
+    class VX { static getCapabilities() { return { gif: true, apng: supports }; }
+      async export(o: Record<string, unknown>) { calls.push(o); return { size: 10, type: 'image/apng', slice() { return this; } }; } }
+    const app = { canvasSize: { width: 400, height: 400 }, exportEngine: { exportFidelity: () => ({ warnings: [] }), videoExporter: new VX(),
+      exportToStore: async (o: unknown) => { storeCalls.push(o); return { ok: false, reason: 'stub' }; }, readExport: async () => null } };
+    const r = await new Function('app', 'FileReader', 'document', body(codeGenerator.generateAgentExport({ format: 'apng', duration: 2, ...args } as never)))(app, FR, {});
+    return { r, calls, storeCalls };
+  };
+
+  it('goes to the exporter directly (never the store), with loop and transparency', async () => {
+    const { r, calls, storeCalls } = await run({ loop: 3, transparent: false });
+    expect(storeCalls).toEqual([]);
+    expect(calls[0]).toMatchObject({ format: 'apng', loop: 3, transparent: false, duration: 2 });
+    expect(r).toMatchObject({ success: true, format: 'apng', mimeType: 'image/apng', transparent: false });
+    expect((r.fidelity?.warnings ?? []).map((w: { code: string }) => w.code)).not.toContain('alpha_dropped');
+  });
+
+  it('is transparent by default', async () => {
+    const { r, calls } = await run({});
+    expect(calls[0].transparent).toBeUndefined(); // the engine's default: transparent
+    expect(r.transparent).toBe(true);
+  });
+
+  it('a studio without apng refuses by name, and points at the png sequence', async () => {
+    const { r, calls } = await run({}, false);
+    expect(calls).toEqual([]);
+    expect(r.success).toBe(false);
+    expect(r.error).toContain('export_png_sequence');
+  });
+
+  it('schema: transparent is apng-only, loop allowed; the handler saves it as .png', async () => {
+    expect(AgentExportInputSchema.safeParse({ format: 'apng', loop: true, transparent: true }).success).toBe(true);
+    expect(AgentExportInputSchema.safeParse({ format: 'webm', transparent: true }).success).toBe(false);
+    const { ALWAYS_SAVE_FORMATS, handleToolCall } = await import('../../tools/handlers.js');
+    expect(ALWAYS_SAVE_FORMATS.has('apng')).toBe(true);
+    const out = JSON.stringify(await handleToolCall('pinepaper_agent_export', { format: 'apng', transparent: false, loop: 2 }, { executionMode: 'code' } as never));
+    expect(out).toContain('transparent: false');
+  });
+});

@@ -4474,7 +4474,7 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
 
   generateAgentExport(input: AgentExportInput): string {
     const validated = AgentExportInputSchema.parse(input);
-    const { platform, format, quality, framing, duration, estimateOnly, scale, fps, pdf: pdfOpts, region, time: stillTime, maxBytes, loop: gifLoop, broadcast, bitrate, minBitrate, bitrateMode } = validated;
+    const { platform, format, quality, framing, duration, estimateOnly, scale, fps, pdf: pdfOpts, region, time: stillTime, maxBytes, loop: gifLoop, broadcast, bitrate, minBitrate, bitrateMode, transparent } = validated;
   // Encoder options (FxTool 16719759); the schema keeps them to mp4 / webm.
   const videoEncodeOpts: Record<string, unknown> = {};
   if (broadcast) videoEncodeOpts.broadcast = true;
@@ -4761,7 +4761,7 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
       if (hasColor || hasBgItems) return [];
       return [{ code: 'alpha_dropped', message: fmt === 'jpg'
         ? 'jpg has no transparency and this scene has no background, so transparent areas are filled white. Use png or webp to keep them.'
-        : fmt + ' is exported without transparency and this scene has no background, so transparent areas come out BLACK. Set a background colour, or export png (or a png sequence) to keep the alpha.' }];
+        : fmt + ' is exported without transparency and this scene has no background, so transparent areas come out BLACK. Set a background colour, or export apng (animated, full alpha) or png to keep it.' }];
     } catch (e) { return []; }
   }
   // TEXT THAT DOES NOT FIT (FxTool 661224ef: textOverflowReport) — text past
@@ -4838,8 +4838,8 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
   // drives motion during export — framing only fixes the output frame.
   let cameraDims = null;
   if (framing === 'camera') {
-    if (!['gif', 'mp4', 'webm'].includes(format)) {
-      return { success: false, platform, format, framing, error: 'framing: "camera" is only supported for video formats (gif, mp4, webm). Use format: "mp4" / "gif" / "webm" or omit framing.' };
+    if (!['gif', 'apng', 'mp4', 'webm'].includes(format)) {
+      return { success: false, platform, format, framing, error: 'framing: "camera" is only supported for animated formats (gif, apng, mp4, webm). Use format: "mp4" / "gif" / "webm" or omit framing.' };
     }
     const rr = app.relationRegistry;
     const hasWalkthrough = rr && typeof rr.hasCameraAnimation === 'function' && rr.hasCameraAnimation();
@@ -5061,9 +5061,10 @@ ${stillTime !== undefined ? `
         break;
 
       case 'gif':
+      case 'apng':
       case 'mp4':
       case 'webm': {
-        const videoMimeType = { mp4: 'video/mp4', webm: 'video/webm', gif: 'image/gif' }[format];
+        const videoMimeType = { mp4: 'video/mp4', webm: 'video/webm', gif: 'image/gif', apng: 'image/apng' }[format];
         // FxTool VideoExporter._calculateBitrate multiplies a per-resolution
         // base by settings.quality (0.5-1.0). Our existing per-tier compression
         // values (0.6 / 0.85 / 0.95) map directly to that scale. Without this,
@@ -5076,7 +5077,7 @@ ${stillTime !== undefined ? `
         // loop rides in the BASE settings for a gif, so every route carries it:
         // the direct one below, and also camera framing and a studio without
         // _quickExportVideo, which build from these and used to drop it.
-        const baseVideoSettings = { format, fps: settings.fps, quality: settings.compression, duration: ${videoDuration}${scale !== undefined && scale !== 1 ? ', width: dimensions.width, height: dimensions.height' : ''}${gifLoop !== undefined ? `, ...(format === 'gif' ? { loop: ${JSON.stringify(gifLoop)} } : {})` : ''}${encodeOptsJs} };
+        const baseVideoSettings = { format, fps: settings.fps, quality: settings.compression, duration: ${videoDuration}${scale !== undefined && scale !== 1 ? ', width: dimensions.width, height: dimensions.height' : ''}${gifLoop !== undefined ? `, ...(format === 'gif' || format === 'apng' ? { loop: ${JSON.stringify(gifLoop)} } : {})` : ''}${encodeOptsJs}${transparent !== undefined ? `, transparent: ${transparent}` : ''} };
 
         // THE EXPORT STORE. A long export cannot come back as one base64
         // string: base64 of a gigabyte is larger than the gigabyte, and it
@@ -5094,7 +5095,7 @@ ${stillTime !== undefined ? `
           && typeof app.exportEngine.readExport === 'function')
           ? app.exportEngine : null;
 
-        if (store && format !== 'gif') {
+        if (store && format !== 'gif' && format !== 'apng') {
           const stored = await store.exportToStore({
             format,
             duration: baseVideoSettings.duration,
@@ -5167,7 +5168,20 @@ ${stillTime !== undefined ? `
 
         // Camera framing requires going direct to videoExporter so width/height
         // pass through — _quickExportVideo strips dim fields.
-        if (cameraDims && app.exportEngine && app.exportEngine.videoExporter) {
+        // ANIMATED PNG (8.12, FxTool 76312a55): stepped PNG frames with full
+        // alpha, transparent unless transparent: false. Asked of the exporter
+        // directly; a studio that lacks it says so in its capability table, and
+        // is refused by name rather than handed a format it would reject.
+        const __apngVx = format === 'apng' ? (app.exportEngine && app.exportEngine.videoExporter) : null;
+        if (format === 'apng' && !(__apngVx && typeof __apngVx.export === 'function' && __apngVx.constructor
+            && typeof __apngVx.constructor.getCapabilities === 'function' && __apngVx.constructor.getCapabilities().apng)) {
+          result = { success: false, platform, format, error: 'this studio cannot export APNG (it needs an engine with animated PNG). For animation with alpha, export a png sequence (pinepaper_interchange export_png_sequence with options.transparent: true); gif keeps only 1-bit transparency.' };
+        } else if (format === 'apng') {
+          const blob = await __apngVx.export(cameraDims ? { ...baseVideoSettings, width: cameraDims.width, height: cameraDims.height } : baseVideoSettings);
+          result = await deliver(blob);
+          if (result.success) result.transparent = ${transparent !== false};
+          if (result.success && cameraDims) result.dimensions = cameraDims;
+        } else if (cameraDims && app.exportEngine && app.exportEngine.videoExporter) {
           const blob = await app.exportEngine.videoExporter.export({ ...baseVideoSettings, width: cameraDims.width, height: cameraDims.height });
           result = await deliver(blob);
           if (result.success) result.dimensions = cameraDims;
@@ -5433,7 +5447,7 @@ ${(() => {
     const actual = frames / fps;
     if (actual <= videoDuration + 1e-9) return '';
     const fit = Math.floor(videoDuration * fps) / fps;
-    return `  if (result && result.success && ['mp4', 'webm', 'gif'].indexOf(format) !== -1) result.timing = ${JSON.stringify({
+    return `  if (result && result.success && ['mp4', 'webm', 'gif', 'apng'].indexOf(format) !== -1) result.timing = ${JSON.stringify({
       frames, seconds: Math.round(actual * 1e6) / 1e6, requested: videoDuration,
       warning: `${frames} frames at ${Math.round(fps * 1000) / 1000} fps is ${actual.toFixed(3)} s — ${((actual - videoDuration) * 1000).toFixed(1)} ms over the ${videoDuration} s asked for. For a hard cap (e.g. a 6 s bumper) use duration ${fit.toFixed(4)} (${Math.floor(videoDuration * fps)} frames).`,
     })};\n`;

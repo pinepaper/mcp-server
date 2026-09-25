@@ -224,7 +224,7 @@ function getExportDir(): string {
 // wav joins them: a minute of 48kHz 16-bit is ~5.8 MB of base64 and the ten
 // minutes the schema allows is ~77 MB. Deliverable across the bridge, useless
 // pasted into a response.
-export const ALWAYS_SAVE_FORMATS = new Set(['mp4', 'webm', 'gif', 'pdf', 'wav', 'srt', 'vtt']);
+export const ALWAYS_SAVE_FORMATS = new Set(['mp4', 'webm', 'gif', 'apng', 'pdf', 'wav', 'srt', 'vtt']);
 // 500_000 was chosen against the bridge's limits, not the CALLER's. A pilot
 // session hit a 263K-character end_job result — comfortably under this, so it
 // was returned inline, and over the tool-result limit of the client reading
@@ -453,7 +453,7 @@ export async function resolveMediaSource(input: string): Promise<{ src: string }
 }
 
 export function getFileExtension(format: string): string {
-  const extMap: Record<string, string> = { mp4: 'mp4', webm: 'webm', gif: 'gif', pdf: 'pdf', png: 'png', svg: 'svg', wav: 'wav', jpg: 'jpg', webp: 'webp', srt: 'srt', vtt: 'vtt' };
+  const extMap: Record<string, string> = { mp4: 'mp4', webm: 'webm', gif: 'gif', apng: 'png', pdf: 'pdf', png: 'png', svg: 'svg', wav: 'wav', jpg: 'jpg', webp: 'webp', srt: 'srt', vtt: 'vtt' };
   return extMap[format] || format;
 }
 

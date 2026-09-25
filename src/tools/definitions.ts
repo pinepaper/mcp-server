@@ -2571,7 +2571,7 @@ Three of these refuse quietly in the engine: exportGLB with no perspective objec
       type: 'object',
       properties: {
         action: { type: 'string', enum: ['export_lottie', 'export_dotlottie', 'import_lottie', 'export_glb', 'export_bvh', 'export_png_sequence'], description: 'Which interchange operation.' },
-        options: { type: 'object', description: "Format options passed through to the exporter. export_png_sequence: { duration (seconds), fps, width, height } — PASS duration and fps: the studio does not size the sequence to the scene, and without them it writes its own default length, which does not follow the scene (runs have measured 45 and 90 frames). The result's defaultsUsed says when that happened." },
+        options: { type: 'object', description: "Format options passed through to the exporter. export_png_sequence: { duration (seconds), fps, width, height, transparent (keep alpha; default false fills the background) } — PASS duration and fps: the studio does not size the sequence to the scene, and without them it writes its own default length, which does not follow the scene (runs have measured 45 and 90 frames). The result's defaultsUsed says when that happened." },
         data: { anyOf: [{ type: 'string' }, { type: 'object' }], description: 'import_lottie: the Lottie JSON — object, JSON string, or URL.' },
         skeletonId: { type: 'string', description: "export_bvh: which skeleton to write. A BVH is one skeleton's motion." },
       },
@@ -8067,8 +8067,8 @@ VERIFY MOTION BEFORE YOU RENDER. An export takes seconds to minutes and shows yo
         },
         format: {
           type: 'string',
-          enum: ['svg', 'png', 'gif', 'mp4', 'webm', 'pdf', 'jpg', 'webp', 'srt', 'vtt', 'wav'],
-          description: "Override format (auto-detected if not specified). 'jpg' / 'webp' are stills for a byte budget (ad specs): the png render re-encoded at the quality tier's compression — draft 0.6, standard 0.85, high 0.95 — so lower quality means a smaller file; 'srt' / 'vtt' write a caption file from every text item that has a lifetime (bornAt / ttl) — one cue each, in start order; duration closes a caption with no ttl. jpg has no transparency: it is flattened onto the scene's background colour, or white when none is set. 'wav' exports the SOUNDTRACK ON ITS OWN, with no frames rendered — no platform preset resolves to it, so it must be asked for by name, and platform dimensions, framing and quality do not apply.",
+          enum: ['svg', 'png', 'gif', 'apng', 'mp4', 'webm', 'pdf', 'jpg', 'webp', 'srt', 'vtt', 'wav'],
+          description: "Override format (auto-detected if not specified). 'apng' is animation with FULL alpha (stepped PNG frames, saved as .png; transparent unless transparent: false) — the answer for an animated overlay or sticker, since webm here cannot carry alpha and gif's transparency is 1-bit. 'jpg' / 'webp' are stills for a byte budget (ad specs): the png render re-encoded at the quality tier's compression — draft 0.6, standard 0.85, high 0.95 — so lower quality means a smaller file; 'srt' / 'vtt' write a caption file from every text item that has a lifetime (bornAt / ttl) — one cue each, in start order; duration closes a caption with no ttl. jpg has no transparency: it is flattened onto the scene's background colour, or white when none is set. 'wav' exports the SOUNDTRACK ON ITS OWN, with no frames rendered — no platform preset resolves to it, so it must be asked for by name, and platform dimensions, framing and quality do not apply.",
         },
         sampleRate: {
           type: 'number',
@@ -8079,7 +8079,8 @@ VERIFY MOTION BEFORE YOU RENDER. An export takes seconds to minutes and shows yo
           enum: [16, 32],
           description: 'wav only: 16 (default) or 32-bit float. Rejected for any other format.',
         },
-        loop: { anyOf: [{ type: 'boolean' }, { type: 'integer', minimum: 0, maximum: 1000 }], description: 'gif only: true = loop forever, false / 0 / 1 = play once, n = play n times (email clients often want a few plays, not forever). Refused on video formats — see SEAMLESS LOOPS.' },
+        transparent: { type: 'boolean', description: 'apng only: keep the alpha channel (the default); false fills the background colour.' },
+        loop: { anyOf: [{ type: 'boolean' }, { type: 'integer', minimum: 0, maximum: 1000 }], description: 'gif / apng: true = loop forever, false / 0 / 1 = play once, n = play n times (email clients often want a few plays, not forever). Refused on video formats — see SEAMLESS LOOPS.' },
         broadcast: { type: 'boolean', description: 'mp4 only: broadcast-safe — BT.709, limited range (16-235), tagged bt709, constant bitrate with an 8 Mbps floor at 720p+ (4 below). result.video reports what the encoder did.' },
         bitrate: { type: 'integer', minimum: 100000, maximum: 200000000, description: 'mp4 / webm: target bits/s, replacing the quality-derived one. The browser encoder treats it as a CEILING; result.video.achievedBitrate is what it produced.' },
         minBitrate: { type: 'integer', minimum: 100000, maximum: 200000000, description: 'mp4 / webm: a floor; a miss is a fidelity warning naming the re-encode a delivery spec needs.' },

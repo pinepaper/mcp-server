@@ -2227,6 +2227,9 @@ export const AgentExportFormatSchema = z.enum([
   // not get there. Rendered as the png path (region included) and re-encoded in
   // the page at the quality tier's compression. jpg has no alpha — see the tool text.
   'jpg', 'webp',
+  // ANIMATION WITH FULL ALPHA (8.12): stepped PNG frames. webm cannot carry
+  // alpha with the studio's muxer, and gif's transparency is 1-bit.
+  'apng',
   // CAPTIONS: text items staged with bornAt / ttl, as a subtitle file.
   'srt', 'vtt',
   // AUDIO-ONLY. The soundtrack on its own, with no frames rendered — so
@@ -2541,7 +2544,8 @@ export const AgentExportInputSchema = z.object({
       z.array(z.union([z.string(), z.object({ sceneId: z.string(), width: z.number().positive(), height: z.number().positive() })])).min(1),
     ]).optional().describe("Multi-page: 'scenes' = one page per saved scene in timeline order, or a list of scene ids — or {sceneId, width, height} to give a page its canvas size (scenes do not record one)."),
   }).optional().describe('pdf only: print options.'),
-  loop: z.union([z.boolean(), z.number().int().min(0).max(1000)]).optional().describe('gif only: true = loop forever, false / 0 / 1 = play once, n = play n times.'),
+  transparent: z.boolean().optional().describe('apng only: keep the alpha channel (the default). false fills the background colour.'),
+  loop: z.union([z.boolean(), z.number().int().min(0).max(1000)]).optional().describe('gif / apng: true = loop forever, false / 0 / 1 = play once, n = play n times.'),
   maxBytes: z.number().int().positive().optional().describe('gif only: a size budget in bytes (email wants <= 1 MB). Over it, the GIF is re-encoded smaller — frame size scaled from the overshoot — at most twice; the result reports each attempt and whether the budget was met.'),
   broadcast: z.boolean().optional().describe('mp4 only: broadcast-safe — BT.709, limited range (samples 16-235), tagged bt709, constant bitrate with an 8 Mbps floor at 720p and up (4 below). result.video reports what the encoder did.'),
   bitrate: z.number().int().min(100_000).max(200_000_000).optional().describe('mp4 / webm: target bits per second, replacing the quality-derived one. The browser encoder treats it as a CEILING: simple content comes out lower, and result.video.achievedBitrate says what it was.'),
@@ -2557,7 +2561,7 @@ export const AgentExportInputSchema = z.object({
   }).optional().describe('png / jpg / webp only: export just this canvas region (canvas coordinates, top-left x/y) — carousel slices, crops. Output is the region\'s size unless outputWidth/outputHeight say otherwise; a different aspect is covered, not stretched.'),
 }).describe('Smart export options')
   .superRefine((val, ctx) => {
-    if (val.time !== undefined && ['mp4', 'webm', 'gif', 'wav', 'srt', 'vtt'].includes(String(val.format))) {
+    if (val.time !== undefined && ['mp4', 'webm', 'gif', 'apng', 'wav', 'srt', 'vtt'].includes(String(val.format))) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['time'], message: "time picks the moment a STILL is taken; a video or audio export runs from 0 for its duration. Drop time, or export png / jpg / webp / svg / pdf." });
     }
     if (val.broadcast && val.format !== 'mp4') {
@@ -2571,8 +2575,11 @@ export const AgentExportInputSchema = z.object({
     if (val.bitrate !== undefined && val.minBitrate !== undefined && val.minBitrate > val.bitrate) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['minBitrate'], message: 'minBitrate is above bitrate; the floor would override the target. Drop one, or lower minBitrate.' });
     }
-    if (val.loop !== undefined && val.format !== 'gif') {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['loop'], message: "loop is a gif setting. A video cannot carry a loop flag — for a seamless loop, key t = 0 and t = duration to the same state and export exactly that duration." });
+    if (val.transparent !== undefined && val.format !== 'apng') {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['transparent'], message: 'transparent is an apng setting here: png keeps alpha already, and mp4 / webm / gif cannot carry it. For animation with alpha, export format "apng".' });
+    }
+    if (val.loop !== undefined && val.format !== 'gif' && val.format !== 'apng') {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['loop'], message: "loop is a gif / apng setting. A video cannot carry a loop flag — for a seamless loop, key t = 0 and t = duration to the same state and export exactly that duration." });
     }
     if (val.maxBytes !== undefined && val.format !== 'gif') {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['maxBytes'], message: "maxBytes is a gif budget. For mp4 / webm use scale and quality; for stills use jpg / webp with a lower quality." });

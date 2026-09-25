@@ -721,7 +721,7 @@ describe('PinePaperCodeGenerator', () => {
         format: 'png',
         framing: 'camera',
       });
-      expect(code).toContain('framing: "camera" is only supported for video formats');
+      expect(code).toContain('framing: "camera" is only supported for animated formats');
     });
 
     it('errors out when framing="camera" but no walkthrough exists', () => {
