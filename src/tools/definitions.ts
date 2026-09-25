@@ -1997,7 +1997,7 @@ EXAMPLE: { times: [0, 0.5, 1, 1.5, 2], seed: 42 }`,
 
 ACTIONS:
 - upload_video: { url (required), position?, scale?, timeOffset? (timeline start, s), clipInPoint?, clipOutPoint? (trim, s) } → { id, duration, width, height, name }
-- upload_audio: { url (required), volume? (0–1, default 1), loop? (default true), muted?, timeOffset? } → { id, duration, name }
+- upload_audio: { url (required), volume? (0–1, default 1), loop?, muted?, timeOffset? } → { id, registryId, duration, name }. Pass loop EXPLICITLY — loop:true for a music bed, loop:false for a voice-over or sting; when omitted, the studio's own default applies and differs between builds.
 - list: → all media [{ id, kind, duration, … }]
 - remove: { id } → removed boolean
 - set_playback_rate: { id, rate (0.25–4) } → applies to video or audio
@@ -2046,7 +2046,7 @@ EXAMPLE: { action: 'upload_video', url: 'https://…/clip.mp4', scale: 0.5, time
         clipInPoint: { type: 'number', description: 'Trim in-point (s) — upload_video.' },
         clipOutPoint: { type: 'number', description: 'Trim out-point (s) — upload_video.' },
         volume: { type: 'number', description: 'Volume 0–1 (default 1) — upload_audio.' },
-        loop: { type: 'boolean', description: 'Loop (default true) — upload_audio.' },
+        loop: { type: 'boolean', description: 'upload_audio: true = loop (music beds), false = play once (voice-over, stings). Pass it explicitly; the default when omitted is the studio\'s and differs between builds.' },
         muted: { type: 'boolean', description: 'Start muted — upload_audio.' },
       },
       required: ['action'],

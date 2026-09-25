@@ -1674,8 +1674,20 @@ async function handleToolCallInner(
 
       case 'pinepaper_media': {
         const input = MediaInputSchema.parse(args);
-        const code = codeGenerator.generateMedia(input);
-        return executeOrGenerate(code, `Media: ${input.action}`, options, 'pinepaper_media');
+        // A LARGE data: URL GOES BESIDE THE CODE — the 1.9 fix, for uploads.
+        // A ~288 KB clip returned an id; a ~2 MB one answered success with no
+        // result, because the bytes were inlined into the generated code and
+        // the governor's transform bails at that size, taking the return value
+        // with it. Same threshold and route as import_image.
+        const url = (input as { url?: unknown }).url;
+        const staged = (input.action === 'upload_audio' || input.action === 'upload_video')
+          && typeof url === 'string' && url.startsWith('data:') && url.length > 64_000;
+        const stageKey = staged ? `media_${Date.now().toString(36)}` : undefined;
+        const code = codeGenerator.generateMedia(staged ? { ...input, url: `__ppStage:${stageKey}` } as typeof input : input);
+        return executeOrGenerate(
+          code, `Media: ${input.action}`, options, 'pinepaper_media',
+          staged ? { [stageKey!]: url as string } : undefined,
+        );
       }
 
       case 'pinepaper_text_style': {

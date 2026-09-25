@@ -8861,6 +8861,15 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
   generateMedia(input: MediaInput): string {
     const guard = `  const A = (typeof window !== 'undefined') && window.PinePaperAgent;
   if (!A || typeof A.uploadVideo !== 'function') { return { success: false, error: 'window.PinePaperAgent media API unavailable — update FxTool to a media-capable build' }; }`;
+    // The URL to upload from: the staged bytes when the handler put a large
+    // data: URL on window.__ppStage (see pinepaper_media in handlers.ts).
+    const srcExpr = (url: string | undefined) => `(function(u) {
+    if (u.indexOf('__ppStage:') !== 0) return u;
+    const k = u.slice('__ppStage:'.length);
+    const v = window.__ppStage && window.__ppStage[k];
+    if (!v) throw new Error('the media bytes were staged as ' + k + ' and are not on the page — a bug in the MCP server, not your call.');
+    return v;
+  })(${JSON.stringify(url ?? '')})`;
     // TWO ID SPACES, AND THE CALLER HOLDS THE WRONG ONE.
     //
     // upload answers {id, registryId}; every other tool on this surface speaks
@@ -8888,7 +8897,7 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
 // Upload video from URL
 (async function() {
 ${guard}
-  const info = await A.uploadVideo(${JSON.stringify(input.url)}, ${opts});
+  const info = await A.uploadVideo(${srcExpr(input.url)}, ${opts});
   return { success: true, action: 'upload_video', media: info };
 })();`.trim();
       }
@@ -8903,7 +8912,7 @@ ${guard}
 // Upload audio from URL
 (async function() {
 ${guard}
-  const info = await A.uploadAudio(${JSON.stringify(input.url)}, ${opts});${input.volume !== undefined ? `
+  const info = await A.uploadAudio(${srcExpr(input.url)}, ${opts});${input.volume !== undefined ? `
   // THE LEVEL IS STORED UNDER ONE KEY AND EXPORTED FROM ANOTHER. The upload
   // records volume as \`gain\` on the registry entry; the video exporter's mix
   // reads \`audioGain\`. So a bed uploaded at 0.25 exported at unity (measured:

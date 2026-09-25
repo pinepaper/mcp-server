@@ -144,3 +144,25 @@ describe('keyframe easing on the first key is called out (1.37)', () => {
     expect(on1).not.toContain('first keyframe');
   });
 });
+
+describe('large data: uploads travel staged, not inline (1.43)', () => {
+  it('upload_audio reads a staged key from window.__ppStage', async () => {
+    const s = studio();
+    let got: unknown;
+    (s.A as Record<string, unknown>).uploadAudio = async (src: unknown) => { got = src; return { id: 'araster_1', registryId: 'item_3' }; };
+    const big = 'data:audio/wav;base64,' + 'A'.repeat(10);
+    const w = { PinePaperAgent: s.A, __ppStage: { media_k: big } };
+    const r = await run(codeGenerator.generateMedia({ action: 'upload_audio', url: '__ppStage:media_k' } as never), { window: w, app: s.app });
+    expect(r.success).toBe(true);
+    expect(got).toBe(big);
+  });
+
+  it('the handler stages a >64KB data: URL instead of inlining it', async () => {
+    const { handleToolCall } = await import('../../tools/handlers.js');
+    const big = 'data:audio/wav;base64,' + 'A'.repeat(70_000);
+    const res = await handleToolCall('pinepaper_media', { action: 'upload_audio', url: big }, { executionMode: 'code' } as never);
+    const text = JSON.stringify(res);
+    expect(text).toContain('__ppStage:media_');
+    expect(text.length).toBeLessThan(40_000);
+  });
+});

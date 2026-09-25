@@ -36,7 +36,7 @@ describe('generateMedia codegen', () => {
 
   it('upload_video → awaited A.uploadVideo with placement opts', () => {
     const code = codeGenerator.generateMedia({ action: 'upload_video', url: 'https://x/y.mp4', scale: 0.5, timeOffset: 1 });
-    expect(code).toContain('await A.uploadVideo("https://x/y.mp4"');
+    expect(code).toContain('await A.uploadVideo('); expect(code).toContain('})("https://x/y.mp4")');
     expect(code).toContain('"scale":0.5');
     expect(code).toContain('"timeOffset":1');
     expect(code).toContain('async function');
@@ -45,7 +45,7 @@ describe('generateMedia codegen', () => {
 
   it('upload_audio → awaited A.uploadAudio with audio opts', () => {
     const code = codeGenerator.generateMedia({ action: 'upload_audio', url: 'https://x/a.mp3', volume: 0.3, loop: false });
-    expect(code).toContain('await A.uploadAudio("https://x/a.mp3"');
+    expect(code).toContain('await A.uploadAudio('); expect(code).toContain('})("https://x/a.mp3")');
     expect(code).toContain('"volume":0.3');
     expect(code).toContain('"loop":false');
     guarded(code); trailingExpr(code);
