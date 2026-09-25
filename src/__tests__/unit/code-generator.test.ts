@@ -494,7 +494,9 @@ describe('PinePaperCodeGenerator', () => {
       expect(code).toContain("'item_1'");
       // The batch op addresses the item too — select+modify edited whatever
       // happened to be selected when the id did not resolve.
-      expect(code).toContain('app.modifyItem(targetId');
+      // modify_item's own emitter, with the runtime id put in (see the batch
+      // modify case): app.modifyItem on the resolved id, never select().
+      expect(code).toContain('app.modifyItem(__mid');
       expect(code).not.toContain('app.select(targetId)');
       expect(code).toContain('#00ff00');
     });

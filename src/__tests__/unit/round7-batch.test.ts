@@ -255,3 +255,24 @@ describe('batch create is create_item (1.67)', () => {
     expect(r.itemIds).toEqual(['item_5']);
   });
 });
+
+describe('batch modify is modify_item (1.67)', () => {
+  it('resolves $N at run time and applies modify_item-only fixes (no-fill)', async () => {
+    const item: Record<string, any> = { fillColor: '#3b82f6', data: { registryId: 'item_7' }, bringToFront() {} };
+    const app = {
+      create: () => item,
+      modifyItem: (id: string) => { item.lastModifiedId = id; return true; },
+      itemRegistry: { get: (id: string) => (id === 'item_7' ? { item } : null) },
+      getItemById: () => item,
+      historyManager: { saveState() {} },
+    };
+    const code = codeGenerator.generateAgentBatchExecute({ operations: [
+      { type: 'create', itemType: 'rectangle', properties: { width: 10, height: 10 } },
+      { type: 'modify', itemId: '$0', properties: { fillColor: 'transparent', strokeColor: '#000' } },
+    ] } as never);
+    const r = await new Function('app', 'paper', 'window', 'document', code.replace('(async function()', 'return (async function()'))(app, {}, {}, {});
+    expect(r.success).toBe(true);
+    expect(item.lastModifiedId).toBe('item_7');
+    expect(item.fillColor).toBeNull();
+  });
+});

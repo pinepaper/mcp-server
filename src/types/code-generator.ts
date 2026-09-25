@@ -3870,21 +3870,27 @@ return __created;
         return createCode;
       }
 
-      case 'modify':
+      case 'modify': {
         const itemRef = op.itemId?.startsWith('$')
           ? `itemIds[${op.itemId.substring(1)}]`
           : `'${op.itemId}'`;
-        const modifyProps = JSON.stringify(op.properties || {});
+        // modify_item's own emitter, as create is create_item's (see above):
+        // the batch's modifyItem call missed text styles, font loading, audio
+        // level, no-fill, lifetimes, smoothing and the unread-property report.
+        // The emitter embeds the id as a literal; a batch ref ($N) is only known
+        // at run time, so it is generated with a placeholder and the runtime
+        // variable put in its place.
+        const single = generateModifyItemCode('__MID__', (op.properties || {}) as Record<string, unknown>).trim()
+          .replace(/'__MID__'/g, '__mid')
+          .replace(/__MID__/g, "' + __mid + '")
+          .replace(/;\s*$/, '');
         return `
-const targetId = ${itemRef};
-// modifyItem(id, changes), not select() + modify(). modify() edits the
-// SELECTION, so an id that does not resolve left the PREVIOUS selection to be
-// edited instead — and this then reported modified:true either way.
-if (app.modifyItem(targetId, ${modifyProps}) === false) {
-  return { success: false, itemId: targetId, error: 'no item ' + targetId + ' — nothing was modified' };
-}
-return { itemId: targetId, modified: true };
+const __mid = ${itemRef};
+const __r = await ${single};
+if (__r && __r.success !== false) __r.modified = true;
+return __r;
 `;
+      }
 
       case 'animate':
         const animItemRef = op.itemId?.startsWith('$')
