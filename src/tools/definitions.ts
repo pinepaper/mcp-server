@@ -8104,10 +8104,8 @@ VERIFY MOTION BEFORE YOU RENDER. An export takes seconds to minutes and shows yo
           description: 'Compression level (default: standard). It ALSO carries a default frame rate — draft 15, standard 30, high 60 — so "high" doubles the frame count and the render time against "standard" unless you set fps yourself. Set fps and scale to control those halves directly and leave quality meaning compression.',
         },
         fps: {
-          type: 'integer',
-          minimum: 1,
-          maximum: 120,
-          description: 'Video only: frames per second, overriding whatever `quality` implies. File size is bitrate x duration and does not move with fps, but the picture gets fewer bits per frame at a higher one.',
+          anyOf: [{ type: 'number', minimum: 1, maximum: 120 }, { type: 'string', pattern: '^[0-9]+/[0-9]+$' }],
+          description: 'Video only: frames per second, overriding whatever `quality` implies. Integers, NTSC rates (23.976, 29.97, 59.94 — snapped to the exact 24000/1001, 30000/1001, 60000/1001, which CTV / OTT specs require) or a rational string "30000/1001". At an NTSC rate a duration of N seconds is round(N x fps) frames, so 6 s at 29.97 is 180 frames = 6.006 s — the result says when that overruns the duration you asked for. File size is bitrate x duration and does not move with fps.',
         },
         scale: {
           type: 'number',

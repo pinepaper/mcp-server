@@ -5026,6 +5026,20 @@ ${stillTime !== undefined ? `
 
   if (result && result.success) Object.assign(result, fidelity(format));
   if (result && result.success && __fit) result.platformFit = __fit;
+${(() => {
+    // A DURATION THAT OVERRUNS AT AN NTSC RATE (round 9 FF, 1.76): 6 s at
+    // 29.97 is round(6 x 30000/1001) = 180 frames = 6.006 s, over a 6.000 s
+    // bumper cap, silently. Said, with the longest duration that fits.
+    if (fps === undefined || Number.isInteger(fps)) return '';
+    const frames = Math.round(videoDuration * fps);
+    const actual = frames / fps;
+    if (actual <= videoDuration + 1e-9) return '';
+    const fit = Math.floor(videoDuration * fps) / fps;
+    return `  if (result && result.success && ['mp4', 'webm', 'gif'].indexOf(format) !== -1) result.timing = ${JSON.stringify({
+      frames, seconds: Math.round(actual * 1e6) / 1e6, requested: videoDuration,
+      warning: `${frames} frames at ${Math.round(fps * 1000) / 1000} fps is ${actual.toFixed(3)} s — ${((actual - videoDuration) * 1000).toFixed(1)} ms over the ${videoDuration} s asked for. For a hard cap (e.g. a 6 s bumper) use duration ${fit.toFixed(4)} (${Math.floor(videoDuration * fps)} frames).`,
+    })};\n`;
+  })()}
 ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) { /* the still is already rendered */ }
   if (result && result.success) result.time = ${stillTime};` : ''}
 

@@ -2511,7 +2511,22 @@ export const AgentExportInputSchema = z.object({
   framing: z.enum(['canvas', 'camera']).optional().default('canvas').describe('Output framing: "canvas" (full canvas, default) or "camera" (camera_animates first-keyframe viewport — fails if no walkthrough exists). Camera animation still drives motion within the fixed output frame.'),
   duration: z.number().min(0.5).max(VIDEO_MAX_DURATION_S).optional().default(5).describe(`Video duration in seconds for animated formats (mp4/webm/gif). Default 5. Max ${VIDEO_MAX_DURATION_S} for mp4/webm, max ${GIF_MAX_DURATION_S} for gif (GIF is not codec-bounded, so file size scales with frames × dimensions, and it cannot stream to the export store). Static formats (png/svg/pdf) ignore this. Past roughly a minute the export is held in the studio's export store and paged back to a file rather than returned inline; a studio without that store refuses by name and says so.`),
   estimateOnly: z.boolean().optional().default(false).describe('Preflight only: return the estimated file size AND what this scene would lose to this format, rendering nothing. Use before a long or high-quality export to check the size first. Modeled for mp4/webm/gif; png/pdf/svg return confidence "none" because no dimension-based model exists for them; wav is reported as "exact", because uncompressed PCM size is arithmetic rather than a guess.'),
-  fps: z.number().int().min(1).max(120).optional().describe('Video only: frames per second, overriding whatever `quality` implies. The tiers set it — draft 15, standard 30, high 60 — so asking for higher quality DOUBLES the frame count and the render time unless you say otherwise. File size is bitrate x duration and does not move with fps, but the picture gets fewer bits per frame at a higher one.'),
+  // NTSC rates (round 9 FF, 1.75): CTV / OTT spots require 29.97 and it was
+  // refused as "Expected integer", though the engine exports true 30000/1001.
+  // A rational string ('30000/1001') or the NTSC decimals snap to the exact
+  // rational — 29.97 is 30000/1001, not the float 29.97, whose drift over a
+  // spot is a dropped frame.
+  fps: z.preprocess((v) => {
+    if (typeof v === 'string') {
+      const m = /^(\d+)\/(\d+)$/.exec(v.trim());
+      if (m && Number(m[2]) > 0) return Number(m[1]) / Number(m[2]);
+      const n = Number(v); return Number.isFinite(n) ? v === '' ? v : n : v;
+    }
+    return v;
+  }, z.number().min(1).max(120).transform((n) => {
+    const ntsc: Record<string, number> = { '23.976': 24000 / 1001, '29.97': 30000 / 1001, '59.94': 60000 / 1001, '119.88': 120000 / 1001 };
+    return ntsc[(Math.round(n * 1000) / 1000).toString()] ?? ntsc[(Math.round(n * 100) / 100).toString()] ?? n;
+  })).optional().describe('Video only: frames per second — an integer, an NTSC rate (23.976, 29.97, 59.94; snapped to the exact 24000/1001 …), or a rational string like "30000/1001". Overrides whatever `quality` implies. The tiers set it — draft 15, standard 30, high 60 — so asking for higher quality DOUBLES the frame count and the render time unless you say otherwise. File size is bitrate x duration and does not move with fps, but the picture gets fewer bits per frame at a higher one.'),
   scale: z.number().min(0.1).max(1).optional().describe('Video only: render at this fraction of the platform preset\'s dimensions (0.1-1). The engine derives its encode target from RESOLUTION, so this is the size control — there is no bitrate to set, and halving the frame roughly quarters the pixels and the file. It is also the preview knob: scale 0.5 with quality "draft" is the fast look-check before committing to a full render. Rounded to even dimensions, which H.264 requires.'),
   sampleRate: z.number().int().positive().optional().describe('wav only: samples per second (default 48000). Ignored by every other format.'),
   bitDepth: z.union([z.literal(16), z.literal(32)]).optional().describe('wav only: 16 (default) or 32-bit float. Ignored by every other format.'),

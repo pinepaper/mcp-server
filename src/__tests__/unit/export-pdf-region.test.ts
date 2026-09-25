@@ -253,3 +253,24 @@ describe('gif byte budget (8.31)', () => {
     expect(AgentExportInputSchema.safeParse({ format: 'mp4', maxBytes: 1000 }).success).toBe(false);
   });
 });
+
+describe('NTSC frame rates (1.75)', () => {
+  it('29.97, "30000/1001" and 23.976 parse to exact rationals; integers pass', () => {
+    const fps = (v: unknown) => (AgentExportInputSchema.parse({ format: 'mp4', fps: v }) as { fps: number }).fps;
+    expect(fps(29.97)).toBe(30000 / 1001);
+    expect(fps('30000/1001')).toBe(30000 / 1001);
+    expect(fps(23.976)).toBe(24000 / 1001);
+    expect(fps(59.94)).toBe(60000 / 1001);
+    expect(fps(30)).toBe(30);
+    expect(AgentExportInputSchema.safeParse({ format: 'mp4', fps: 'fast' }).success).toBe(false);
+  });
+});
+
+describe('NTSC duration overrun is reported (1.76)', () => {
+  it('6 s at 29.97 is 180 frames = 6.006 s, and the fitting duration is named', () => {
+    const code = codeGenerator.generateAgentExport({ format: 'mp4', fps: 29.97, duration: 6 } as never);
+    expect(code).toContain('180 frames');
+    expect(code).toContain('use duration 5.9726 (179 frames)');
+    expect(codeGenerator.generateAgentExport({ format: 'mp4', fps: 30, duration: 6 } as never)).not.toContain('result.timing');
+  });
+});
