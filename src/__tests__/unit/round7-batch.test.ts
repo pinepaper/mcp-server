@@ -540,3 +540,24 @@ describe('modify_item skew / matrix (round 9 HH)', () => {
     expect(r.ignoredProperties).toBeUndefined();
   });
 });
+
+describe('gradient specs are checked (1.82)', () => {
+  const make = (color: unknown) => codeGenerator.generateCreateItem({ itemType: 'rectangle', properties: { width: 10, height: 10, color } } as never);
+
+  it('an unreadable hex is refused by name', () => {
+    const code = make({ gradient: true, stops: ['#a', '#b'] });
+    expect(code).toContain('success: false');
+    expect(code).toContain('is not a colour');
+  });
+
+  it('bare string stops and a missing type are normalised to a linear gradient', () => {
+    const code = make({ stops: ['#ff0000', '#0000ff'] });
+    expect(code).not.toContain('success: false');
+    expect(code).toContain("stops: [['#ff0000', 0], ['#0000ff', 1]]");
+    expect(code).toContain('radial: false');
+  });
+
+  it('a single stop is refused', () => {
+    expect(make({ type: 'radial', stops: [{ color: '#fff', offset: 0 }] })).toContain('at least 2 stops');
+  });
+});

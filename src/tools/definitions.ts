@@ -1013,6 +1013,8 @@ USE WHEN:
 - Adding logos or vector graphics
 - User mentions SVG files or vector graphics
 
+CHECK LINE-ART IMPORTS: fill="none" and stroke-dasharray have been measured to be lost on import — outline icons come in filled, dashed strokes come in solid. For line art, check the result with a screenshot; to fix it, set fillColor: null (and dashArray) on the imported paths with pinepaper_modify_item.
+
 ⚠️ RECOMMENDED FOR COMPLEX CHARACTERS:
 Instead of drawing "a witch" or "a cat" with many path operations, use SVG import:
 1. Describe what you need and use a simple placeholder SVG

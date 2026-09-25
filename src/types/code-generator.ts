@@ -219,6 +219,36 @@ function isGradient(color: unknown): color is Gradient {
 }
 
 /**
+ * A colour OBJECT is a gradient spec, checked before it reaches the engine.
+ *
+ * {gradient: true, stops: ['#a', '#b']} — no type, bare-string stops, invalid
+ * hex — went to the engine as a plain colour and drew NOTHING, with success
+ * (round 9 ads, 1.82). The shape the tools document is {type: 'linear' |
+ * 'radial', stops: [{color, offset}], origin?, destination?}. Near-misses are
+ * normalised (a missing type is linear; bare stops get even offsets); what
+ * cannot be read is refused by name, with the shape.
+ */
+function normalizeGradientSpec(v: unknown, key: string): { gradient: Gradient } | { error: string } {
+  const o = v as Record<string, unknown>;
+  const rawStops = Array.isArray(o.stops) ? o.stops : null;
+  const shape = `${key} as a gradient is {type: 'linear' | 'radial', stops: [{color: '#rrggbb', offset: 0..1}, …], origin?: [x, y], destination?: [x, y]}.`;
+  if (!rawStops || rawStops.length < 2) return { error: `${key} is an object but not a gradient with at least 2 stops, so nothing would be drawn. ${shape}` };
+  const hexOk = (c: string) => !c.startsWith('#') || /^#([0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(c);
+  const n = rawStops.length;
+  const stops: Array<{ color: string; offset: number }> = [];
+  for (let i = 0; i < n; i++) {
+    const st = rawStops[i] as unknown;
+    const color = typeof st === 'string' ? st : (st && typeof (st as { color?: unknown }).color === 'string' ? (st as { color: string }).color : null);
+    const offset = typeof st === 'string' ? i / (n - 1) : Number((st as { offset?: unknown }).offset ?? i / (n - 1));
+    if (!color || !hexOk(color.trim())) return { error: `${key} stop ${i} has colour ${JSON.stringify(color)}, which is not a colour (a hex needs 3, 4, 6 or 8 digits). ${shape}` };
+    if (!(offset >= 0 && offset <= 1)) return { error: `${key} stop ${i} has offset ${JSON.stringify((st as { offset?: unknown }).offset)}; offsets run 0 to 1. ${shape}` };
+    stops.push({ color: color.trim(), offset });
+  }
+  const type = o.type === 'radial' ? 'radial' : 'linear';
+  return { gradient: { ...(o as object), type, stops } as unknown as Gradient };
+}
+
+/**
  * Generate Paper.js gradient code for a fill color
  */
 function generateGradientCode(
@@ -291,6 +321,20 @@ function generateCreateItemCode(
   dataFlags?: Record<string, unknown>,
   positionGiven = true,
 ): string {
+  // Colour objects are gradient specs: normalised, or refused by name.
+  for (const key of ['color', 'fillColor', 'strokeColor']) {
+    const v = properties[key];
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      const g = normalizeGradientSpec(v, key);
+      if ('error' in g) {
+        return `
+// Create ${itemType} — refused: an unreadable gradient would draw nothing
+({ success: false, error: ${JSON.stringify(g.error)} });`.trim();
+      }
+      properties = { ...properties, [key]: g.gradient };
+    }
+  }
+
   // Extract special properties that need separate handling
   const {
     color,
