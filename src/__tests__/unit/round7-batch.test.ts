@@ -35,10 +35,16 @@ describe('lasso cut (1.55)', () => {
     const clicks: Array<{ x: number; y: number }> = [];
     let drawn = false; let target: Record<string, any> | null = null;
     const original: Record<string, any> = { data: { registryId: 'item_1', id: 'item_1' }, clone() { return { data: { ...this.data }, parent: {}, remove() { this.parent = null; } }; } };
-    const L = {
+    // Like prod: the lasso remembers 'freehand', where clicks add no vertex.
+    const L: Record<string, any> = {
+      _forcedMode: 'freehand',
+      setMode(m: string) { this._forcedMode = m; },
       activate: (t: Record<string, any>) => { target = t; },
       startStroke: () => {},
-      endStroke: (p: { x: number; y: number }) => { if (clicks.length >= 3 && p.getDistance(clicks[0]) < 12) drawn = true; else clicks.push(p); },
+      endStroke(p: { x: number; y: number }) {
+        if (this._forcedMode !== 'polygon') return;
+        if (clicks.length >= 3 && p.getDistance(clicks[0]) < 12) drawn = true; else clicks.push(p);
+      },
       isDrawn: () => drawn,
       cancel: () => {},
       applyLasso: async () => {
@@ -57,6 +63,7 @@ describe('lasso cut (1.55)', () => {
     const r = await runIIFE(codeGenerator.generateLasso({ action: 'cut', itemId: 'item_1', points: pts } as never), { app: s.app, paper: s.paper });
     expect(r).toMatchObject({ success: true, cutoutId: 'item_9', originalKept: true, vertices: 4 });
     expect(s.deleted).toEqual([]); // the clone had its ids stripped
+    expect(s.app.lassoTool._forcedMode).toBe('freehand'); // the user's mode is back
   });
 
   it('keepOriginal:false consumes the source, and says so', async () => {

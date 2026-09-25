@@ -4705,35 +4705,65 @@ ${stillTime !== undefined ? `
           }
           const all = SM.listScenes();
           const wanted = ${JSON.stringify(pdfOpts.pages)};
-          const ids = wanted === 'scenes' ? all.map(function(sc) { return sc.id; }) : wanted;
+          // A page is { id, size? }. Scenes do not record their canvas size —
+          // their "dimensions" is the browser viewport and loadScene does not
+          // resize the canvas — so without a size every page is the current
+          // canvas (the retest: three pages, all square).
+          const pageSpecs = wanted === 'scenes'
+            ? all.map(function(sc) { return { id: sc.id }; })
+            : wanted.map(function(w) { return typeof w === 'string' ? { id: w } : { id: w.sceneId, size: { width: w.width, height: w.height } }; });
+          const ids = pageSpecs.map(function(p) { return p.id; });
+          const sized = pageSpecs.some(function(p) { return p.size; });
           const missing = ids.filter(function(id) { return !all.some(function(sc) { return sc.id === id; }); });
           if (!ids.length || missing.length) {
             result = { success: false, platform, format: 'pdf', error: ids.length ? 'no saved scene ' + missing.join(', ') + '. Saved: ' + all.map(function(sc) { return sc.id; }).join(', ') : 'there are no saved scenes — save each page with pinepaper_manage_scenes first.' }; break;
           }
           const back = SM.currentSceneId;
+          const backSize = app.canvasSize ? { width: app.canvasSize.width, height: app.canvasSize.height } : null;
           const lib = await app.exportEngine._loadPDFLibraries();
           const targetDpi = ${pdfOpts.dpi ?? 'settings.dpi'};
+          // JPEG pages: a PNG per page made a 3-slide deck 34 MB.
+          const toJpeg = function(url) {
+            return new Promise(function(resolve) {
+              const img = new Image();
+              img.onload = function() {
+                const c = document.createElement('canvas');
+                c.width = img.naturalWidth; c.height = img.naturalHeight;
+                const x = c.getContext('2d');
+                x.fillStyle = '#ffffff'; x.fillRect(0, 0, c.width, c.height);
+                x.drawImage(img, 0, 0);
+                resolve(c.toDataURL('image/jpeg', settings.compression));
+              };
+              img.onerror = function() { resolve(null); };
+              img.src = url;
+            });
+          };
           let doc = null;
           const pagesOut = [];
           try {
-            for (const id of ids) {
+            for (const spec of pageSpecs) {
+              const id = spec.id;
               await SM.loadScene(id);
+              if (spec.size && typeof app.setCanvasSize === 'function') app.setCanvasSize({ width: spec.size.width, height: spec.size.height });
               const cs = app.canvasSize || { width: app.canvasEl.width, height: app.canvasEl.height };
               const dpi = (typeof app.getDPI === 'function' && app.getDPI()) || 96;
               const wMM = cs.width / dpi * 25.4, hMM = cs.height / dpi * 25.4;
               const orient = wMM > hMM ? 'landscape' : 'portrait';
-              const img = app.captureFrameDataURL(Math.max(1, targetDpi / dpi));
+              const png = app.captureFrameDataURL(Math.max(1, targetDpi / dpi));
+              const jpg = await toJpeg(png);
               if (!doc) doc = new lib.jsPDF({ orientation: orient, unit: 'mm', format: [wMM, hMM] });
               else doc.addPage([wMM, hMM], orient);
-              doc.addImage(img, 'PNG', 0, 0, wMM, hMM);
+              if (jpg) doc.addImage(jpg, 'JPEG', 0, 0, wMM, hMM); else doc.addImage(png, 'PNG', 0, 0, wMM, hMM);
               pagesOut.push({ sceneId: id, widthMM: Math.round(wMM * 10) / 10, heightMM: Math.round(hMM * 10) / 10 });
             }
           } finally {
+            if (sized && backSize && typeof app.setCanvasSize === 'function') { try { app.setCanvasSize(backSize); } catch (_) { /* best effort */ } }
             if (back && typeof SM.loadScene === 'function') { try { await SM.loadScene(back); } catch (_) { /* reported by the page count */ } }
           }
           const blob = doc.output('blob');
           const dataUrl = await blobToDataUrl(blob);
           result = { success: true, platform, format: 'pdf', data: dataUrl, mimeType: 'application/pdf', size: blob.size, pages: pagesOut.length, pageList: pagesOut };
+          if (!sized) result.warning = 'every page used the current canvas size: saved scenes do not record theirs. To give a page its own size, pass pages as [{sceneId, width, height}, …].';
         }
         break;` : ''}
         if (app.exportEngine && app.exportEngine.exportPDF) {
@@ -7940,6 +7970,11 @@ case 'analyze_palette':
   const first = pts[0];
   let skipped = 0;
   L.activate(target);
+  // POLYGON MODE, SET — not assumed. On production the lasso's remembered mode
+  // was 'freehand', where a click adds no vertex, so every cut was refused as
+  // "did not close". The user's own mode is put back afterwards.
+  const __prevMode = L._forcedMode;
+  if (typeof L.setMode === 'function') L.setMode('polygon');
   try {
     L.startStroke(first); L.endStroke(first);
     for (let i = 1; i < pts.length; i++) {
@@ -7966,6 +8001,8 @@ case 'analyze_palette':
     try { L.cancel(); } catch (_) { /* already down */ }
     if (${keep} && target && target.parent) target.remove();
     return { success: false, action: 'cut', error: (e && e.message) || String(e) };
+  } finally {
+    if (typeof L.setMode === 'function' && __prevMode) { try { L.setMode(__prevMode); } catch (_) { /* cosmetic */ } }
   }
 })();`.trim();
       }

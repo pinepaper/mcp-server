@@ -151,21 +151,36 @@ describe('multi-page pdf from scenes (8.16)', () => {
     return { app, log };
   }
   class FR { result = 'data:application/pdf;base64,JVBERg=='; onloadend: (() => void) | null = null; readAsDataURL() { this.onloadend?.(); } }
+  class Img { naturalWidth = 4; naturalHeight = 4; onload: (() => void) | null = null; set src(_v: string) { queueMicrotask(() => this.onload?.()); } }
+  const doc = { createElement: () => ({ getContext: () => ({ set fillStyle(_v: string) {}, fillRect() {}, drawImage() {} }), toDataURL: (m: string) => `data:${m};base64,AA` }) };
+  const run = (s: ReturnType<typeof sceneStudio>, pages: unknown) =>
+    new Function('app', 'FileReader', 'document', 'Image', body(codeGenerator.generateAgentExport({ format: 'pdf', pdf: { pages } } as never)))(s.app, FR, doc, Img);
 
-  it("'scenes' makes one page per scene at its own size, and puts the user's scene back", async () => {
+  it("'scenes' makes one page per scene, puts the user's scene back, and warns that sizes are the current canvas", async () => {
     const s = sceneStudio();
-    const code = codeGenerator.generateAgentExport({ format: 'pdf', pdf: { pages: 'scenes' } } as never);
-    const r = await new Function('app', 'FileReader', 'document', body(code))(s.app, FR, {});
+    s.app.sceneManager.loadScene = async (id: string) => { s.log.push(['load', id]); }; // like prod: no resize
+    const r = await run(s, 'scenes');
     expect(r).toMatchObject({ success: true, format: 'pdf', pages: 2 });
     expect(r.pageList[0]).toMatchObject({ sceneId: 's1', widthMM: 508, heightMM: 285.8 });
+    expect(r.warning).toContain('do not record theirs');
     expect(s.log.filter((l) => Array.isArray(l) && l[0] === 'addPage')).toHaveLength(1);
     expect(s.log.at(-1)).toEqual(['load', 's2']); // restored
   });
 
+  it('{sceneId, width, height} sizes each page, then restores the canvas size', async () => {
+    const s = sceneStudio();
+    s.app.sceneManager.loadScene = async (id: string) => { s.log.push(['load', id]); };
+    s.app.canvasSize = { width: 1080, height: 1080 };
+    s.app.setCanvasSize = (sz: { width: number; height: number }) => { s.app.canvasSize = sz; s.log.push(['size', sz.width, sz.height]); };
+    const r = await run(s, [{ sceneId: 's1', width: 1920, height: 1080 }, { sceneId: 's2', width: 1080, height: 1080 }]);
+    expect(r.pageList.map((p: { widthMM: number }) => p.widthMM)).toEqual([508, 285.8]);
+    expect(r.warning).toBeUndefined();
+    expect(s.log).toContainEqual(['size', 1080, 1080]); // restored at the end
+  });
+
   it('an unknown scene id is refused with the saved ids listed', async () => {
     const s = sceneStudio();
-    const code = codeGenerator.generateAgentExport({ format: 'pdf', pdf: { pages: ['s1', 'nope'] } } as never);
-    const r = await new Function('app', 'FileReader', 'document', body(code))(s.app, FR, {});
+    const r = await run(s, ['s1', 'nope']);
     expect(r.success).toBe(false);
     expect(r.error).toContain('no saved scene nope');
   });

@@ -2508,7 +2508,10 @@ export const AgentExportInputSchema = z.object({
     bleed: z.number().min(0).max(20).optional().describe('Bleed in mm; > 0 includes the bleed area.'),
     trimMarks: z.boolean().optional().describe('Add crop / trim marks.'),
     dpi: z.number().int().min(72).max(600).optional().describe('Rasterisation DPI (default: the quality tier\'s).'),
-    pages: z.union([z.literal('scenes'), z.array(z.string()).min(1)]).optional().describe("Multi-page: 'scenes' = one page per saved scene in timeline order, or a list of scene ids in the order you want."),
+    pages: z.union([
+      z.literal('scenes'),
+      z.array(z.union([z.string(), z.object({ sceneId: z.string(), width: z.number().positive(), height: z.number().positive() })])).min(1),
+    ]).optional().describe("Multi-page: 'scenes' = one page per saved scene in timeline order, or a list of scene ids — or {sceneId, width, height} to give a page its canvas size (scenes do not record one)."),
   }).optional().describe('pdf only: print options.'),
   time: z.number().min(0).optional().describe('Stills only (png / jpg / webp / svg / pdf): render the scene at this time in seconds. Without it a still is taken at wherever the playhead happens to be, so two identical runs can differ.'),
   region: z.object({

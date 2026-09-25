@@ -8070,7 +8070,7 @@ VERIFY MOTION BEFORE YOU RENDER. An export takes seconds to minutes and shows yo
             bleed: { type: 'number', minimum: 0, maximum: 20 },
             trimMarks: { type: 'boolean' },
             dpi: { type: 'integer', minimum: 72, maximum: 600 },
-            pages: { anyOf: [{ type: 'string', enum: ['scenes'] }, { type: 'array', items: { type: 'string' }, minItems: 1 }], description: "Multi-page PDF: 'scenes' = one page per saved scene (the scenes tool's save action) in timeline order, or an ordered list of scene ids. Each page is that scene at its own size." },
+            pages: { anyOf: [{ type: 'string', enum: ['scenes'] }, { type: 'array', items: { anyOf: [{ type: 'string' }, { type: 'object', properties: { sceneId: { type: 'string' }, width: { type: 'number' }, height: { type: 'number' } }, required: ['sceneId', 'width', 'height'] }] }, minItems: 1 }], description: "Multi-page PDF: 'scenes' = one page per saved scene (the scenes tool's save action) in timeline order, or an ordered list of scene ids. Saved scenes do NOT record their canvas size, so every page uses the current canvas size unless you give it: {sceneId, width, height} (pixels) per page. Pages are embedded as JPEG at the quality tier's compression." },
           },
         },
         region: {
