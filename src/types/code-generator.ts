@@ -4971,6 +4971,9 @@ ${stillTime !== undefined ? `
           // this render, a top-level item that reaches in but is centred outside —
           // a neighbouring card's overflowing headline. Older studios ignore the
           // fourth argument, and leave lastRegionExcluded unset.
+          // @engine-surface-exempt lastRegionExcluded — a report property, not a
+          // method, so it cannot be typeof-probed; read only through Array.isArray.
+          // Branch-only until 78ec5916 reaches origin/main.
           if ('lastRegionExcluded' in app) app.lastRegionExcluded = null;
           const regionUrl = app.renderRegionToDataURL(new paper.Rectangle(${region.x}, ${region.y}, ${region.width}, ${region.height}), rw, rh${region.excludeForeign === false ? '' : ', { excludeForeign: true }'});
           const __excluded = Array.isArray(app.lastRegionExcluded) ? app.lastRegionExcluded.filter(function(id) { return id; }) : null;
