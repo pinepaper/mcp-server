@@ -76,6 +76,9 @@ export function declaredFields(
 function consumerSource(): string {
   return walk(SRC)
     .filter((f) => !f.endsWith(join('types', 'schemas.ts')) && !f.endsWith(join('tools', 'definitions.ts')))
+    // Generated DATA, not code: the engine vocabulary's description prose
+    // mentions words like "gait", which would read here as a field consumed.
+    .filter((f) => !f.endsWith(join('ontology', 'upstream-vocabulary.ts')))
     .map((f) => readFileSync(f, 'utf8'))
     .join('\n')
     .replace(/\/\*[\s\S]*?\*\//g, '')

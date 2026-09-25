@@ -20,6 +20,7 @@
  * @version 0.4.0
  */
 
+import { UPSTREAM_ITEM_TYPE_MAP, UPSTREAM_TYPES } from './upstream-vocabulary.js';
 import type { PinePaperVocabulary } from './types.js';
 
 // =============================================================================
@@ -542,6 +543,25 @@ export const ITEM_TYPE_MAP: Record<string, string> = {
   'scatterPlot':    'pp:ScatterPlot',
   'areaChart':      'pp:AreaChart',
 };
+
+// THE ENGINE'S VOCABULARY, MERGED OVER THIS PORT. This file was ported from
+// FxTool's Vocabulary.js by hand once and drifted — 41 map entries and 28
+// classes behind, so validate_design called an uploaded "audio" item an
+// unknown type (round 8 EE, 1.72). upstream-vocabulary.ts is regenerated from
+// the engine (bun run sync:ontology-vocabulary; checked before publish). Where
+// the two disagree the engine wins; a class this port lacks is added; entries
+// only this port has are kept.
+Object.assign(ITEM_TYPE_MAP, UPSTREAM_ITEM_TYPE_MAP);
+for (const [k, t] of Object.entries(UPSTREAM_TYPES)) {
+  if (!PP_VOCABULARY.types[k]) {
+    PP_VOCABULARY.types[k] = {
+      description: t.description ?? k,
+      ...(t.parentType ? { parentType: t.parentType } : {}),
+      ...(t.anchor !== undefined ? { anchor: t.anchor } : {}),
+      ...(t.mcpTool ? { mcpTool: t.mcpTool } : {}),
+    };
+  }
+}
 
 /** Maps ShapeLibrary shapeType strings to specific pp: diagram shape types. */
 export const DIAGRAM_SHAPE_MAP: Record<string, string> = {
