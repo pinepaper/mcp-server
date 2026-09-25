@@ -353,7 +353,7 @@ export function getSystem(systemId: string, tokenType?: DTCGTokenType) {
       note: available.includes(tokenType)
         ? `${sys.id} declares no ${tokenType} tokens, though other systems here do.`
         : `no design system here carries ${tokenType} tokens — these were captured for ${available.join(', ')}. `
-          + 'For palettes, use pinepaper_design_styles (styleTokens), which does carry them.',
+          + 'For palettes, use pinepaper_design_system {action: "list_styles"} — every aesthetic style there carries its palette tokens.',
     };
   }
   return { ...sys, tokens };
