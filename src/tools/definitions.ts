@@ -3461,9 +3461,13 @@ ANIMATABLE PROPERTIES:
 - opacity: 0-1
 - fillColor: Color string
 - strokeColor: Color string
+- strokeWidth, width, height, radius, shadowBlur, shadowColor: Numbers / colours
 - fontSize: Number
+- STROKE DRAW-ON (paths): trimStart, trimEnd (0-1 of the path's length), trimOffset (shifts the visible window along it), dashArray. A draw-on is trimEnd 0 -> 1.
+The authoritative list for a given item is pinepaper_get_animatable_properties — ask it rather than guessing.
 
-EASING OPTIONS:
+EASING — IT SHAPES THE SEGMENT ARRIVING AT THE KEYFRAME IT IS ON.
+The move from keyframe A to keyframe B is eased by B's easing, not A's. Easing on the FIRST keyframe does nothing (no segment arrives at it) — a Ken Burns with easing only on its first key plays linear. Put the easing on the key you are moving TO.
 - linear: Constant speed
 - easeIn: Slow start
 - easeOut: Slow end
@@ -3499,6 +3503,7 @@ EXAMPLE — Reveal at 2s, skip first second of keyframe data, end at 4s of keyfr
               easing: {
                 type: 'string',
                 enum: ['linear', 'easeIn', 'easeOut', 'easeInOut', 'bounce', 'elastic'],
+                description: 'Shapes the segment ARRIVING at this keyframe (from the previous one). Ignored on the first keyframe.',
               },
             },
             required: ['time', 'properties'],

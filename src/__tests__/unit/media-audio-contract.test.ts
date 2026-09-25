@@ -131,3 +131,16 @@ describe('audio_beats analyses uploaded media (6.23)', () => {
     expect(s.seen).toEqual(['blob:studio/abc']);
   });
 });
+
+describe('keyframe easing on the first key is called out (1.37)', () => {
+  it('notes it, and says nothing when easing is on a later key', () => {
+    const on0 = codeGenerator.generateKeyframeAnimate({ itemId: 'item_4', keyframes: [
+      { time: 0, properties: { scale: 1 }, easing: 'easeInOut' }, { time: 5, properties: { scale: 1.2 } },
+    ] } as never);
+    expect(on0).toContain("easing 'easeInOut' is on the first keyframe");
+    const on1 = codeGenerator.generateKeyframeAnimate({ itemId: 'item_4', keyframes: [
+      { time: 0, properties: { scale: 1 } }, { time: 5, properties: { scale: 1.2 }, easing: 'easeInOut' },
+    ] } as never);
+    expect(on1).not.toContain('first keyframe');
+  });
+});

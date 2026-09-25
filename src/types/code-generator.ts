@@ -993,12 +993,21 @@ function generateKeyframeAnimateCode(
     )} };
   }`;
 
+  // Easing is read from the DESTINATION keyframe, so easing on the first one
+  // never applies — a Ken Burns eased only there rendered linear. Said in the
+  // result rather than silently moved: moving it would change what the other
+  // keys the caller wrote mean.
+  const first = [...keyframes].sort((a, b) => a.time - b.time)[0] as { easing?: string } | undefined;
+  const easingNote = first?.easing && first.easing !== 'linear'
+    ? `, note: ${JSON.stringify(`easing '${first.easing}' is on the first keyframe, where it has no effect: easing shapes the segment ARRIVING at a keyframe. Put it on the keyframe you are moving to.`)}`
+    : '';
+
   return `
 // Apply keyframe animation to ${itemId}
 (function() {
   ${requireItem(itemId, 'the animation')}${audioLevelGuard}
   app.addAnimation('${itemId}', ${keyframesJson}, ${JSON.stringify(opts)});
-  return { success: true, itemId: '${itemId}', duration: ${calculatedDuration}, loop: ${loop}${timeOffset !== undefined ? `, timeOffset: ${timeOffset}` : ''}${clipInPoint !== undefined ? `, clipInPoint: ${clipInPoint}` : ''}${clipOutPoint !== undefined ? `, clipOutPoint: ${clipOutPoint}` : ''} };
+  return { success: true, itemId: '${itemId}', duration: ${calculatedDuration}, loop: ${loop}${timeOffset !== undefined ? `, timeOffset: ${timeOffset}` : ''}${clipInPoint !== undefined ? `, clipInPoint: ${clipInPoint}` : ''}${clipOutPoint !== undefined ? `, clipOutPoint: ${clipOutPoint}` : ''}${easingNote} };
 })();
 `.trim();
 }
