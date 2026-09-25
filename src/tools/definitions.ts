@@ -710,6 +710,7 @@ MODIFIABLE PROPERTIES:
 - content: Text content
 - opacity: Transparency (0-1)
 - rotation: Rotation in degrees
+- skewX / skewY: shear in degrees about the item's centre; matrix: [a, b, c, d, tx, ty] affine. For mockups (a box face, a screen at an angle). APPLIED to the current shape, so calling again compounds — the result's affine says so.
 - scale: Size multiplier
 - shadowColor: Shadow color
 - shadowBlur: Shadow blur radius

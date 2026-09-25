@@ -525,3 +525,18 @@ describe('extrude / lathe meshes take a colour (5.64)', () => {
     expect(plain).toContain('"diffuse":[0.8,0.8,0.8]');
   });
 });
+
+describe('modify_item skew / matrix (round 9 HH)', () => {
+  it('shears about the centre and applies a matrix, and is not reported ignored', () => {
+    const ops: unknown[] = [];
+    const item = { bounds: { center: 'C' }, shear: (h: number, v: number, c: unknown) => ops.push(['shear', +h.toFixed(4), +v.toFixed(4), c]), transform: (m: unknown) => ops.push(['matrix', m]) };
+    const app = { modifyItem: () => true, itemRegistry: { get: () => ({ item }) }, historyManager: { saveState() {} } };
+    const paper = { Matrix: class { args: number[]; constructor(...a: number[]) { this.args = a; } } };
+    const code = codeGenerator.generateModifyItem({ itemId: 'item_1', properties: { skewX: 45, matrix: [1, 0, 0.2, 1, 0, 0] } });
+    const r = new Function('app', 'paper', 'window', `return ${code}`)(app, paper, {});
+    expect(ops[0]).toEqual(['shear', 1, 0, 'C']);
+    expect((ops[1] as [string, { args: number[] }])[1].args).toEqual([1, 0, 0.2, 1, 0, 0]);
+    expect(r.affine.note).toContain('compounds');
+    expect(r.ignoredProperties).toBeUndefined();
+  });
+});

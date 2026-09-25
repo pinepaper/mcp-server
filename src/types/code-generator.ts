@@ -566,12 +566,12 @@ const MODIFY_KNOWN_KEYS: ReadonlySet<string> = new Set([
   ...NORMALIZE_PARAM_READS,
   'contentType', 'contentFormat', 'countdownTarget', 'countdownEndText',
   'audioGain', 'volume', 'gain', 'bornAt', 'ttl', 'smoothing',
-  'fontStyle', 'leading', 'lineHeight',
+  'fontStyle', 'leading', 'lineHeight', 'skewX', 'skewY', 'matrix',
 ]);
 
 /** Spellings callers reach for, and the key the engine actually reads. */
 const MODIFY_DID_YOU_MEAN: Readonly<Record<string, string>> = {
-  scaling: 'scale', size: 'width / height', rotate: 'rotation', angle: 'rotation',
+  scaling: 'scale', size: 'width / height', rotate: 'rotation', angle: 'rotation', shear: 'skewX / skewY', skew: 'skewX / skewY',
   alpha: 'opacity', text: 'content', stroke_width: 'strokeWidth', lineWidth: 'strokeWidth',
 };
 
@@ -859,6 +859,27 @@ const _nf = app.itemRegistry.get('${itemId}');
 if (_nf && _nf.item) _nf.item.fillColor = null;`;
   }
 
+  // SKEW AND AFFINE, FOR MOCKUPS (round 9 HH). A box face or a phone screen in
+  // perspective-ish mockups is a shear / affine map; modify_item reported
+  // skewX / shear / matrix as ignored and the only route was custom code.
+  // Paper does both: item.shear(tan x, tan y) about the centre, and
+  // item.transform(Matrix). They are APPLIED to the current shape — a second
+  // call compounds — not stored as settable properties; the result says so.
+  const skewX = typeof properties.skewX === 'number' ? properties.skewX : 0;
+  const skewY = typeof properties.skewY === 'number' ? properties.skewY : 0;
+  const matrix = Array.isArray(properties.matrix) && properties.matrix.length === 6 && properties.matrix.every((n) => typeof n === 'number')
+    ? properties.matrix as number[] : null;
+  const affine = skewX !== 0 || skewY !== 0 || matrix !== null;
+  if (affine) {
+    code += `
+const _af = app.itemRegistry.get('${itemId}');
+const _afi = _af && _af.item;
+if (_afi) {
+  ${skewX !== 0 || skewY !== 0 ? `_afi.shear(Math.tan(${skewX} * Math.PI / 180), Math.tan(${skewY} * Math.PI / 180), _afi.bounds.center);` : ''}
+  ${matrix ? `_afi.transform(new paper.Matrix(${matrix.join(', ')}));` : ''}
+}`;
+  }
+
   const textStyle = emitTextStyle('_ts && _ts.item', properties);
   if (textStyle) {
     code += `
@@ -890,7 +911,7 @@ if (_flagged && _flagged.item && _flagged.item.data) Object.assign(_flagged.item
   )}`;
   code += `
 app.historyManager.saveState();
-return { success: true, itemId: '${itemId}'${modLifetime ? ', lifetime: __lifetime' : ''}${modFont ? ', ...(__font ? { font: __font } : {})' : ''}${modWarning} };`;
+return { success: true, itemId: '${itemId}'${affine ? `, affine: ${JSON.stringify({ skewX, skewY, matrix, note: 'applied to the current shape: calling again compounds it. To undo, apply the inverse (negative skew, or the inverse matrix).' })}` : ''}${modLifetime ? ', lifetime: __lifetime' : ''}${modFont ? ', ...(__font ? { font: __font } : {})' : ''}${modWarning} };`;
 
   // Wrapped, because the body now RETURNS early on a miss rather than falling
   // through to an unconditional success. Async only when a font must load
