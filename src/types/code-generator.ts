@@ -1052,6 +1052,12 @@ function generateKeyframeAnimateCode(
   // result rather than silently moved: moving it would change what the other
   // keys the caller wrote mean.
   const first = [...keyframes].sort((a, b) => a.time - b.time)[0] as { easing?: string } | undefined;
+  // loop:true repeats in the editor; an export of the measured build played
+  // the keyframes ONCE and held (round 7, 2.24). Said where it is set, with
+  // the two ways that do export, until the engine's export clock wraps them.
+  const loopNote = loop
+    ? `, loopNote: ${JSON.stringify('loop:true repeats in the editor, but has been measured playing ONCE in an exported video and then holding the last keyframe. For an export longer than one cycle, check a frame in the second cycle — if it holds, write the keyframes out per cycle, or use a loop preset (pinepaper_animate), which does cycle in export.')}`
+    : '';
   const easingNote = first?.easing && first.easing !== 'linear'
     ? `, note: ${JSON.stringify(`easing '${first.easing}' is on the first keyframe, where it has no effect: easing shapes the segment ARRIVING at a keyframe. Put it on the keyframe you are moving to.`)}`
     : '';
@@ -1061,7 +1067,7 @@ function generateKeyframeAnimateCode(
 (function() {
   ${requireItem(itemId, 'the animation')}${audioLevelGuard}
   app.addAnimation('${itemId}', ${keyframesJson}, ${JSON.stringify(opts)});
-  return { success: true, itemId: '${itemId}', duration: ${calculatedDuration}, loop: ${loop}${timeOffset !== undefined ? `, timeOffset: ${timeOffset}` : ''}${clipInPoint !== undefined ? `, clipInPoint: ${clipInPoint}` : ''}${clipOutPoint !== undefined ? `, clipOutPoint: ${clipOutPoint}` : ''}${easingNote} };
+  return { success: true, itemId: '${itemId}', duration: ${calculatedDuration}, loop: ${loop}${timeOffset !== undefined ? `, timeOffset: ${timeOffset}` : ''}${clipInPoint !== undefined ? `, clipInPoint: ${clipInPoint}` : ''}${clipOutPoint !== undefined ? `, clipOutPoint: ${clipOutPoint}` : ''}${easingNote}${loopNote} };
 })();
 `.trim();
 }

@@ -221,3 +221,11 @@ describe('a remap that the clip window cannot carry is warned about (2.17)', () 
     expect(r).toEqual({ success: true, action: 'set_time_remap', points: 2 });
   });
 });
+
+describe('keyframe loop:true carries the export caveat (2.24)', () => {
+  it('notes it only when loop is on', () => {
+    const kf = [{ time: 0, properties: { rotation: 0 } }, { time: 1, properties: { rotation: 90 } }];
+    expect(codeGenerator.generateKeyframeAnimate({ itemId: 'item_4', keyframes: kf, loop: true } as never)).toContain('loopNote');
+    expect(codeGenerator.generateKeyframeAnimate({ itemId: 'item_4', keyframes: kf } as never)).not.toContain('loopNote');
+  });
+});

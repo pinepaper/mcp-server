@@ -60,7 +60,11 @@ describe('every tool a profile points at, that profile lists', () => {
    */
   const DOMAIN_DANGLING: Readonly<Record<string, number>> = {
     diagram: 7,
-    map: 3,
+    // 4 rather than 3: agent_export now says keyframe loop:true has been
+    // measured playing once in export and names pinepaper_animate's loop
+    // presets as the route that does cycle. The map profile does not carry
+    // animate; the pointer is worth more than the reference costs.
+    map: 4,
     // 11 rather than 10 deliberately: pinepaper_text_style's action list now
     // names pinepaper_text_effect, to explain why 'list' is accepted as an
     // alias for 'list_styles'. Someone in the font profile reading that is
