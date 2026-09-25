@@ -599,7 +599,7 @@ const CREATE_KNOWN_KEYS: ReadonlySet<string> = new Set([
  * then ask again. `__font` is set only when the first answer was "missing",
  * so an available font adds nothing to the result. Needs an async context.
  */
-function emitEnsureFont(family: string): string {
+export function emitEnsureFont(family: string): string {
   const primary = family.split(',')[0].trim().replace(/^['"]|['"]$/g, '');
   return `
 let __font = null;
@@ -608,9 +608,27 @@ if (typeof app.checkFont === 'function') {
   if (__v0 && __v0.available === false) {
     if (typeof app.ensureFontsLoaded === 'function') { try { await app.ensureFontsLoaded('all'); } catch (_) { /* reported below */ } }
     try { if (typeof document !== 'undefined' && document.fonts) await document.fonts.load('16px ' + ${JSON.stringify(JSON.stringify(primary))}); } catch (_) { /* reported below */ }
-    const __v1 = app.checkFont(${JSON.stringify(family)});
+    let __v1 = app.checkFont(${JSON.stringify(family)});
+    let __via = 'studio';
+    // Not in the studio's own sheets (Monoton, a common neon face, is not):
+    // the page's CSP allows fonts.googleapis.com stylesheets and
+    // fonts.gstatic.com files, so ask Google Fonts for the family directly.
+    if (!(__v1 && __v1.available === true) && typeof document !== 'undefined' && document.head) {
+      __via = 'google-fonts';
+      await new Promise(function(res) {
+        const id = 'pp-gf-' + ${JSON.stringify(primary)}.replace(/[^a-z0-9]+/gi, '-');
+        if (document.getElementById(id)) return res();
+        const l = document.createElement('link');
+        l.id = id; l.rel = 'stylesheet';
+        l.href = 'https://fonts.googleapis.com/css2?family=' + encodeURIComponent(${JSON.stringify(primary)}).replace(/%20/g, '+') + '&display=swap';
+        l.onload = res; l.onerror = res; setTimeout(res, 5000);
+        document.head.appendChild(l);
+      });
+      try { if (document.fonts) await document.fonts.load('16px ' + ${JSON.stringify(JSON.stringify(primary))}); } catch (_) { /* reported below */ }
+      __v1 = app.checkFont(${JSON.stringify(family)});
+    }
     __font = (__v1 && __v1.available === true)
-      ? { family: ${JSON.stringify(primary)}, available: true, loadedNow: true }
+      ? { family: ${JSON.stringify(primary)}, available: true, loadedNow: true, via: __via }
       : { family: ${JSON.stringify(primary)}, available: false,
           warning: ${JSON.stringify(primary)} + ' could not be loaded, so this text is drawn in a fallback face. '
             + ((__v1 && __v1.reason) || '') + ' font list_available names the families this studio can load.' };

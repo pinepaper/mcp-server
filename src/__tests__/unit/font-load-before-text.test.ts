@@ -73,3 +73,33 @@ describe('brand_kit apply loads the kit fonts first', () => {
     expect(code).not.toContain('ensureFontsLoaded');
   });
 });
+
+describe('fonts outside the studio sheets come from Google Fonts (1.59)', () => {
+  it('injects the family stylesheet when the studio load does not make it available', async () => {
+    const order: string[] = [];
+    let available = false;
+    const head = { appendChild: (l: { href: string; onload: () => void }) => { order.push('link:' + l.href); available = true; l.onload(); } };
+    const document = { head, getElementById: () => null, createElement: () => ({}), fonts: { load: async () => { order.push('fonts.load'); } } };
+    const app = {
+      checkFont: () => ({ available, reason: 'not installed' }),
+      ensureFontsLoaded: async () => { order.push('ensure'); return { ok: true }; },
+      create: () => ({ className: 'PointText', data: { registryId: 'item_1' }, bringToFront() {} }),
+      historyManager: { saveState() {} },
+    };
+    const code = codeGenerator.generateCreateItem({ itemType: 'text', position: { x: 0, y: 0 }, properties: { content: 'NEON', fontFamily: 'Monoton' } });
+    const r = await new Function('app', 'document', 'window', `return ${code}`)(app, document, {});
+    expect(order.some((o) => o.startsWith('link:https://fonts.googleapis.com/css2?family=Monoton'))).toBe(true);
+    expect(r.font).toMatchObject({ family: 'Monoton', available: true, via: 'google-fonts' });
+  });
+});
+
+describe('font check / load (1.51, X#12)', () => {
+  it('check explains "not loaded yet"; load exists and uses the shared loader', async () => {
+    const { handleToolCall } = await import('../../tools/handlers.js');
+    const check = JSON.stringify(await handleToolCall('pinepaper_font', { action: 'check', name: 'Caveat' }, { executionMode: 'code' } as never));
+    expect(check).toContain('not loaded yet');
+    const load = JSON.stringify(await handleToolCall('pinepaper_font', { action: 'load', name: 'Monoton' }, { executionMode: 'code' } as never));
+    expect(load).toContain('ensureFontsLoaded');
+    expect(load).toContain('fonts.googleapis.com');
+  });
+});

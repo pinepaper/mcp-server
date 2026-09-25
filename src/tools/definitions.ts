@@ -6632,7 +6632,8 @@ ACTIONS:
 Most of this tool is glyph authoring — drawing a typeface. If you just want to know what font families are available to set on a text item, that is ONE action:
 
 - list_available       — { category?, loadedOnly? }  every family the studio can render, with whether its file is loaded yet
-- check                — { name, text? }             is this family really there, and can it draw THIS string? Pass the text: a font with four glyphs is installed and will still render most characters in the fallback face, and that second answer is the one that decides the pixels. Do NOT rely on document.fonts.check() — it returns true for a family that does not exist.
+- load                 — { name }                    load a family NOW: the studio's catalogue first, then Google Fonts (e.g. Monoton). Returns available + via. Text tools also load on first use, so this is for checking up front.
+- check                — { name, text? }             is this family really there, and can it draw THIS string? "available: false" means NOT LOADED YET — the result says whether it is loadable; use load. Pass the text: a font with four glyphs is installed and will still render most characters in the fallback face, and that second answer is the one that decides the pixels. Do NOT rely on document.fonts.check() — it returns true for a family that does not exist.
 - fallbacks            — {}                          which text items on the canvas are silently drawing in something other than the family they asked for
 
 ACTIONS (authoring):
@@ -6658,7 +6659,7 @@ ACTIONS (authoring):
         action: {
           type: 'string',
           enum: [
-            'list_available', 'check', 'fallbacks',
+            'list_available', 'check', 'load', 'fallbacks',
             'show_studio', 'set_name', 'get_required_chars', 'get_status',
             'create_glyph', 'create_space', 'remove_glyph', 'set_metrics',
             'export', 'load_into_document', 'export_data', 'import_data',

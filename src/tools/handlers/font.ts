@@ -9,6 +9,7 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { errorResult, executeOrGenerate, type HandlerOptions } from '../handlers.js';
 import { ErrorCodes } from '../../types/schemas.js';
+import { emitEnsureFont } from '../../types/code-generator.js';
 
 export type FontHandler = (
   args: Record<string, unknown>,
@@ -27,14 +28,46 @@ async function dispatchFontAction(args: Record<string, unknown>, options: Handle
       // is the one that decides the pixels. A font with four glyphs is present
       // and will still render most text in the fallback face — which is the
       // shape Font Studio produces, and the shape a naive probe gets wrong.
-      const code = `(function() {
+      const code = `(async function() {
   if (typeof app.checkFont !== 'function') {
     return { success: false, error: 'app.checkFont unavailable — update the studio. document.fonts.check() is not a substitute: it returns true for a family that does not exist.' };
   }
   const r = app.checkFont(${JSON.stringify(name)}${text !== undefined ? `, ${JSON.stringify(text)}` : ''});
+  // "Unavailable" read as "cannot be used" — while create_item then loaded and
+  // drew the same family (Caveat). Unavailable here means NOT LOADED YET; say
+  // whether this studio can load it, and how.
+  if (r && r.available === false) {
+    r.loadable = 'unknown until tried';
+    if (typeof app.listFonts === 'function') {
+      try {
+        const l = await app.listFonts({});
+        const fam = ${JSON.stringify(name.split(',')[0].trim().replace(/^['"]|['"]$/g, ''))}.toLowerCase();
+        const hit = l && Array.isArray(l.families) && l.families.find(function(f) { return String(f.name || f.family || '').toLowerCase() === fam; });
+        if (hit) r.loadable = 'yes — in the studio catalogue';
+      } catch (_) { /* keep unknown */ }
+    }
+    r.hint = 'not loaded yet. create_item / modify_item load a family on first use, or call pinepaper_font {action:"load", name} to load it now (studio catalogue first, then Google Fonts).';
+  }
   return { success: true, ...r };
 })();`;
       return executeOrGenerate(code, `Check font "${name}"${text ? ' against the given text' : ''}`, options, 'pinepaper_font');
+    }
+    case 'load': {
+      // A way to LOAD a family, not just ask about it (round 7 X): the check
+      // said "load it first" and there was no action that could. Same loader
+      // create_item uses — studio catalogue, then Google Fonts.
+      const { name } = args as { name?: string };
+      if (typeof name !== 'string' || !name.trim()) {
+        return errorResult(ErrorCodes.INVALID_INPUT, 'font load requires { name } — the font family to load.');
+      }
+      const code = `(async function() {
+  if (typeof app.checkFont !== 'function') {
+    return { success: false, error: 'app.checkFont unavailable — update the studio.' };
+  }${emitEnsureFont(name)}
+  if (__font && __font.available === false) return { success: false, action: 'load', ...__font, error: __font.warning };
+  return { success: true, action: 'load', family: ${JSON.stringify(name)}, available: true, ...(__font || { alreadyLoaded: true }) };
+})();`;
+      return executeOrGenerate(code, `Load font "${name}"`, options, 'pinepaper_font');
     }
     case 'fallbacks': {
       // Which text items are SILENTLY drawing in something other than what
@@ -199,7 +232,7 @@ async function dispatchFontAction(args: Record<string, unknown>, options: Handle
     default:
       return errorResult(
         ErrorCodes.INVALID_INPUT,
-        `Unknown font action "${action}". Valid: show_studio, set_name, get_required_chars, get_status, create_glyph, create_space, remove_glyph, set_metrics, export, load_into_document, export_data, import_data, clear, remove_overlap, correct_direction, cleanup_path.`,
+        `Unknown font action "${action}". Valid: check, load, fallbacks, list_available, show_studio, set_name, get_required_chars, get_status, create_glyph, create_space, remove_glyph, set_metrics, export, load_into_document, export_data, import_data, clear, remove_overlap, correct_direction, cleanup_path.`,
       );
   }
 }
