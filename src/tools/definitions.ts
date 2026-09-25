@@ -3720,7 +3720,9 @@ USE WHEN:
 - Creating complex reveal sequences
 - Building custom transitions
 
-Requires maskType and keyframes array.`,
+Requires maskType and keyframes array.
+
+COORDINATES: a 'rectangle' mask's x / y are its TOP-LEFT corner (measured: {x:540, y:620, width:800, height:800} reads back as bounds [540, 620, 800, 800]) — unlike items, which are placed by their centre. Convert before masking an item you placed by centre.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -8652,6 +8654,7 @@ DATA FORMAT: Array of objects, e.g. [{category: "A", value: 10}, {category: "B",
 
 OPTIONS (vary by chart type):
 - Common: title, width, height, x, y, colors, animation, axisColor, labelColor, labelFontSize
+  x / y are the chart's CENTRE (measured: x 1000, y 300 at 800x600 reads back as bounds [600, -25, 800, 625]) — pass the centre of the rect you want it in, not its top-left.
 - Bar: barWidth, barGap, xLabel, yLabel
     orient: 'horizontal' flips bars to grow rightward from a left Y-axis — best for long category names
     labelArrangement: 'auto'|'horizontal'|'slanted'|'vertical'|'truncate'|'wrap'
