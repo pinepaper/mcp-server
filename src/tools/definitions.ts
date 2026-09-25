@@ -7983,6 +7983,8 @@ WHAT quality ACTUALLY SETS, because it bundles three things and only one of them
 
 DOES THIS SURVIVE EXPORT? It is a PATH fact, not a per-feature one, so the rule is short and does not go stale as capabilities land: IF IT TICKS INSIDE THE ENGINE'S UPDATE LOOP, IT EXPORTS. Loop animations, relations, keyframes, generators and camera moves all do - measured frame-by-frame, not assumed. What does NOT survive is anything driven by the wall clock outside that loop, or anything on the realtime recorder path.
 
+SEAMLESS LOOPS: there is no loop switch on export. Key the animation to the SAME state at t = 0 and at t = duration, and export exactly that duration — the export renders t = 0 up to one frame before duration, so no frame is doubled at the wrap. GIFs loop forever by themselves.
+
 If exported frames look frozen, check the SAMPLING before believing it: a loop animation at animationSpeed 1 has a one-second period, so two frames a whole second apart are identical by design. Compare frames that are not a whole number of periods apart.
 
 PLATFORMS & OPTIMAL FORMATS:

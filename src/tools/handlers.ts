@@ -145,7 +145,7 @@ import {
   RelationType,
   ItemType,
 } from '../types/schemas.js';
-import { ZodError } from 'zod';
+import { ZodError, z } from 'zod';
 import { writeFile, mkdir, appendFile, unlink, readFile, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, extname } from 'node:path';
@@ -1280,6 +1280,40 @@ function measureResponseBytes(result: CallToolResult): number {
   return bytes;
 }
 
+/**
+ * TOP-LEVEL ARGUMENTS A TOOL DROPPED, SAID OUT LOUD.
+ *
+ * z.object() strips unknown keys, so agent_export {loop: true, seamless: true}
+ * answered success and exported exactly what it would have without them — the
+ * caller believed they had a loop setting. create_item / modify_item report
+ * unread PROPERTIES; this is the same idea one level up, for tools listed
+ * here. Keyed to the zod schema the handler parses with, so a key the handler
+ * accepts is never reported, and extended one tool at a time rather than
+ * guessed for all 150.
+ */
+const IGNORED_ARGUMENT_SCHEMAS: Readonly<Record<string, z.ZodTypeAny>> = {
+  pinepaper_agent_export: AgentExportInputSchema,
+};
+const IGNORED_ARGUMENT_HINTS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  pinepaper_agent_export: {
+    loop: 'There is no loop switch on export: a loop is seamless when the animation is keyed to the SAME state at t = 0 and at t = duration (the export stops one frame before duration, so no frame is doubled at the wrap). GIF exports already loop forever.',
+    seamless: 'Same as loop: key t = 0 and t = duration to the same state and export exactly that duration.',
+  },
+};
+
+export function ignoredArgumentsNote(toolName: string, args: Record<string, unknown>): string | null {
+  let schema = IGNORED_ARGUMENT_SCHEMAS[toolName];
+  if (!schema || !args || typeof args !== 'object') return null;
+  while (schema instanceof z.ZodEffects) schema = schema._def.schema;
+  if (!(schema instanceof z.ZodObject)) return null;
+  const known = new Set(Object.keys(schema.shape));
+  const ignored = Object.keys(args).filter((k) => !known.has(k));
+  if (ignored.length === 0) return null;
+  const hints = ignored.map((k) => IGNORED_ARGUMENT_HINTS[toolName]?.[k]).filter(Boolean);
+  return `IGNORED ARGUMENTS: ${ignored.join(', ')} ${ignored.length > 1 ? 'are' : 'is'} not a parameter of ${toolName}, so ${ignored.length > 1 ? 'they had' : 'it had'} no effect.`
+    + (hints.length ? ` ${[...new Set(hints)].join(' ')}` : '');
+}
+
 export async function handleToolCall(
   toolName: string,
   args: Record<string, unknown>,
@@ -1289,6 +1323,8 @@ export async function handleToolCall(
   const baseTimerId = `${toolName}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
   const result = await handleToolCallInner(toolName, args, options, tracker, baseTimerId);
+  const ignoredNote = ignoredArgumentsNote(toolName, args);
+  if (ignoredNote) result.content = [...(result.content ?? []), { type: 'text' as const, text: ignoredNote }];
 
   // Record response payload size for token estimation
   const responseBytes = measureResponseBytes(result);
