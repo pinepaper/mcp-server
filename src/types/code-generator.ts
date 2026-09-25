@@ -9172,7 +9172,11 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
   // hashes stay comparable with builds that only have the fallback.
   const hashStr = (typeof app.hashFrame === 'function')
     ? function(s) { return app.hashFrame(s); }
-    : function(s) { let h = 5381; for (let i = 0; i < s.length; i++) { h = (((h << 5) + h) ^ s.charCodeAt(i)) >>> 0; } return h.toString(16); };
+    // The fallback must not be a for loop either: the budget is per loop SITE
+    // across the whole run, so 50 frames of ~40 KB data URLs exhausted it on a
+    // plain 9-text scene (round 7 X, #7) on studios without hashFrame. A native
+    // reduce is not a generated loop and is not counted; same djb2-xor.
+    : function(s) { return Array.prototype.reduce.call(s, function(h, c) { return (((h << 5) + h) ^ c.charCodeAt(0)) >>> 0; }, 5381).toString(16); };
   const frames = app.captureFramesAt(${timesJson}, {
     seed: ${seed},
     capture: function(c, t, i) {
