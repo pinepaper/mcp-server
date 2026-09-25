@@ -28,7 +28,7 @@
     }
   },
   "scripts": {
-    "build": "bun run tsc",
+    "build": "bun run tsc && node scripts/write-build-info.mjs",
     "dev": "bun --watch src/index.ts",
     "start": "bun run src/index.ts",
     "start:dist": "bun dist/index.js",

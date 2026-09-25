@@ -44,7 +44,7 @@ import { PROMPTS, getPromptMessages } from './prompts/index.js';
 // SERVER INFO
 // =============================================================================
 
-import { SERVER_VERSION } from './version.js';
+import { SERVER_VERSION_WITH_BUILD } from './version.js';
 
 /**
  * SUBSTITUTION, NOT FORMAT. This string said "NEVER generate HTML or React"
@@ -56,7 +56,8 @@ import { SERVER_VERSION } from './version.js';
  */
 export const SERVER_INFO = {
   name: 'pinepaper-mcp',
-  version: SERVER_VERSION,
+  // version + build (e.g. 1.6.14+7b7cdf8): builds between releases are told apart.
+  version: SERVER_VERSION_WITH_BUILD,
   description: 'PinePaper Studio — canvas animation engine. Build animations, videos and graphics with PinePaper tools rather than hand-writing HTML or React; it exports to both itself (export_widget_html, export_widget).',
 };
 

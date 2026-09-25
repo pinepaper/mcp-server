@@ -63,3 +63,15 @@ describe('SERVER_VERSION — single source of truth', () => {
     }
   });
 });
+
+describe('serverInfo tells builds apart', () => {
+  it('reports <version>+<sha> when the build is known, and stays valid semver', async () => {
+    const { SERVER_VERSION, SERVER_BUILD, SERVER_VERSION_WITH_BUILD } = await import('../../version.js');
+    if (SERVER_BUILD) {
+      expect(SERVER_VERSION_WITH_BUILD).toBe(`${SERVER_VERSION}+${SERVER_BUILD}`);
+      expect(SERVER_VERSION_WITH_BUILD).toMatch(/^\d+\.\d+\.\d+(?:-[\w.]+)?\+[0-9a-f]{7}(?:\.dirty)?$/);
+    } else {
+      expect(SERVER_VERSION_WITH_BUILD).toBe(SERVER_VERSION);
+    }
+  });
+});
