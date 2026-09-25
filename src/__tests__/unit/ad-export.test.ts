@@ -6,7 +6,7 @@ import { describe, it, expect } from 'bun:test';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
 import { buildZip, crc32 } from '../../utils/zip.js';
-import { buildHtml5Ad, buildPlayable, externalRequests } from '../../utils/ad-package.js';
+import { buildHtml5Ad, buildPlayable, externalRequests, pinSceneBackground } from '../../utils/ad-package.js';
 import { codeGenerator } from '../../types/code-generator.js';
 import { AgentExportInputSchema } from '../../types/schemas.js';
 
@@ -70,6 +70,18 @@ describe('ad wrappers', () => {
     expect(buildPlayable(PAGE, { width: 1, height: 1, clickUrl: 'https://x.test', background: '#0f0f1a' })).toContain('background:#0f0f1a !important');
     // Anything that is not a plain colour is not written into a stylesheet.
     expect(buildHtml5Ad(PAGE, { width: 1, height: 1, background: 'red}</style><script>x()</script>' })).not.toContain('x()');
+  });
+
+  it('the scene data\'s own background is set before the renderer loads it (the canvas fill wins over CSS)', () => {
+    const page = '<html><head></head><body><div id="w"></div><script>\nconst SCENE={"background":"#ffffff","items":[]};\nconst r=new WidgetRenderer(document.getElementById(\'w\'),{});\nr.load(SCENE);\n</script></body></html>';
+    const h = buildHtml5Ad(page, { width: 300, height: 250, background: 'rgb(12, 34, 56)' });
+    expect(h).toContain('SCENE.background="rgb(12, 34, 56)";r.load(SCENE);');
+    // Executed, the renderer sees the pinned colour.
+    const script = h.slice(h.lastIndexOf('<script>') + 8, h.lastIndexOf('</script>'));
+    let loaded: { background?: string } = {};
+    new Function('WidgetRenderer', 'document', script)(class { load(s: { background?: string }) { loaded = s; } }, { getElementById: () => ({}) });
+    expect(loaded.background).toBe('rgb(12, 34, 56)');
+    expect(pinSceneBackground(PAGE, '#000').applied).toBe(false); // no load call to hook
   });
 
   it('a click URL cannot close the script tag', () => {

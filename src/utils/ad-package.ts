@@ -28,6 +28,20 @@ export interface AdOptions {
 /** A CSS colour we will write into a stylesheet: rgb()/rgba()/hex/a plain name only. */
 const SAFE_COLOR = /^(#[0-9a-f]{3,8}|rgba?\([\d.,\s%]+\)|[a-z]+)$/i;
 
+/**
+ * The widget renderer FILLS its canvas with SCENE.background, over any page
+ * CSS — so the CSS pin alone left a stale white on the canvas. The resolved
+ * colour is set on SCENE just before the renderer loads it. `applied` says
+ * whether the page had the load call to hook.
+ */
+export function pinSceneBackground(html: string, bg: string | null | undefined): { html: string; applied: boolean } {
+  if (!bg || !SAFE_COLOR.test(bg.trim())) return { html, applied: false };
+  // `r.load(SCENE);` is a statement of its own in the engine's page.
+  const load = /(^|[;{}\n]\s*)([A-Za-z_$][\w$]*\.load\(SCENE\))/;
+  if (!load.test(html)) return { html, applied: false };
+  return { html: html.replace(load, (_m, pre: string, call: string) => `${pre}SCENE.background=${jsString(bg.trim())};${call}`), applied: true };
+}
+
 function backgroundStyle(bg: string | null | undefined): string {
   if (!bg || !SAFE_COLOR.test(bg.trim())) return '';
   return `\n<style>html,body,#w{background:${bg.trim()} !important}</style>`;
@@ -70,6 +84,7 @@ function placeTarget(html: string, make: (position: 'absolute' | 'fixed') => str
 }
 
 export function buildHtml5Ad(html: string, o: AdOptions): string {
+  html = pinSceneBackground(html, o.background).html;
   const head = [
     `<meta name="ad.size" content="width=${Math.round(o.width)},height=${Math.round(o.height)}">`,
     // The network replaces clickTag at serve time; the value here is the
@@ -82,6 +97,7 @@ export function buildHtml5Ad(html: string, o: AdOptions): string {
 }
 
 export function buildPlayable(html: string, o: AdOptions): string {
+  html = pinSceneBackground(html, o.background).html;
   const head = `<script src="mraid.js"></script>` + backgroundStyle(o.background);
   const script = `<script>
 (function () {

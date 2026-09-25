@@ -174,7 +174,7 @@ import { planCharacter, generateCharacterCode } from './handlers/character.js';
 import { buildZip } from '../utils/zip.js';
 import { buildScc, type SccCue } from '../utils/scc.js';
 import { checkContrast, checkFlashes, parseCssColor, type TextSample } from '../utils/a11y.js';
-import { buildHtml5Ad, buildPlayable, externalRequests, type CtaBox } from '../utils/ad-package.js';
+import { buildHtml5Ad, buildPlayable, externalRequests, pinSceneBackground, type CtaBox } from '../utils/ad-package.js';
 
 /**
  * Registry of per-domain handler maps. Tools listed here short-circuit the
@@ -490,6 +490,11 @@ async function saveAdExport(r: AdExportResult, input: { ad?: { clickUrl?: string
   const stamp = `pinepaper_${platform}_${Date.now()}`;
   const opts = { width: r.adSize.width, height: r.adSize.height, clickUrl: input.ad?.clickUrl, cta: r.cta, background: r.background };
   const warnings = [...(r.fidelity?.warnings ?? [])];
+  // The renderer paints SCENE.background over the page CSS, so the scene's own
+  // fill must be pinned too; a page without the hook is named, not assumed.
+  if (r.background && !pinSceneBackground(r.adPage, r.background).applied) {
+    warnings.push({ code: 'background_not_pinned', message: `the page's own scene background could not be replaced with ${r.background}; the ad may show the widget's stored colour instead. Check the backup image against the served ad.` });
+  }
   const files: Record<string, string> = {};
   let uploadBytes: number;
 
@@ -2021,7 +2026,7 @@ async function handleToolCallInner(
             } catch { /* unchecked: said below */ }
           }
           return dataResult({
-            rows: input.rows.length, itemsChanged: itemIds, export: exportCheck.data,
+            rows: input.rows.length, itemsChanged: itemIds, export: input.export,
             ...(missingItems ? { missingItems, ok: missingItems.length === 0 } : { itemsChecked: false }),
             note: 'nothing rendered. Each row runs modify_item per item, template_params when given, then agent_export.'
               + (missingItems && missingItems.length ? ` These items are not on the canvas, so rows naming them would fail: ${missingItems.join(', ')}.` : '')
