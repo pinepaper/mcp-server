@@ -51,3 +51,23 @@ describe('agent_export fidelity names stand-ins', () => {
     expect(standIns({ itemRegistry: { getAll: () => [entries[2]] } })).toEqual([]);
   });
 });
+
+describe('fidelity names alpha a format drops (8.12)', () => {
+  const code = gen.generateAgentExport({ platform: 'youtube', format: 'webm' } as never);
+  const src = /function alphaLoss\(fmt\) \{[\s\S]*?\n  \}\n/.exec(code)?.[0];
+  const alphaLoss = new Function('app', 'fmt', `${src}; return alphaLoss(fmt);`);
+
+  it('warns for webm / mp4 / jpg on a transparent scene', () => {
+    const app = { canvasEl: { style: { backgroundColor: '' } }, patternGroup: { children: [] } };
+    expect(alphaLoss(app, 'webm')[0].code).toBe('alpha_dropped');
+    expect(alphaLoss(app, 'mp4')[0].message).toContain('BLACK');
+    expect(alphaLoss(app, 'jpg')[0].message).toContain('white');
+    expect(alphaLoss(app, 'png')).toEqual([]);
+  });
+
+  it('is silent when there is a background colour or backdrop items', () => {
+    expect(alphaLoss({ canvasEl: { style: { backgroundColor: 'rgb(0, 0, 0)' } } }, 'webm')).toEqual([]);
+    expect(alphaLoss({ canvasEl: { style: {} }, patternGroup: { children: [{}] } }, 'webm')).toEqual([]);
+    expect(alphaLoss({ canvasEl: { style: { backgroundColor: 'rgba(0, 0, 0, 0)' } }, patternGroup: { children: [] } }, 'webm')).toHaveLength(1);
+  });
+});

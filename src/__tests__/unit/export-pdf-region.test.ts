@@ -102,4 +102,15 @@ describe('round 6 retest follow-ups', () => {
     expect(r.success).toBe(true);
     expect(fills).toEqual(['rgb(12, 18, 40)']);
   });
+
+  it('a fully transparent CSS background still flattens onto WHITE (the regex survives the template)', async () => {
+    const fills: string[] = [];
+    class Img { naturalWidth = 4; naturalHeight = 4; onload: (() => void) | null = null; set src(_v: string) { queueMicrotask(() => this.onload?.()); } }
+    const document = { createElement: () => ({ getContext: () => ({ set fillStyle(v: string) { fills.push(v); }, fillRect() {}, drawImage() {} }),
+      toDataURL: (m: string) => `data:${m};base64,AA` }) };
+    const app = { canvasSize: { width: 4, height: 4 }, canvasEl: { style: { backgroundColor: 'rgba(0, 0, 0, 0)' } },
+      exportEngine: { exportPNG: async () => ({ dataUrl: 'data:image/png;base64,AA' }), exportFidelity: () => ({ warnings: [] }) } };
+    await new Function('app', 'document', 'Image', body(codeGenerator.generateAgentExport({ format: 'jpg' } as never)))(app, document, Img);
+    expect(fills).toEqual(['#ffffff']);
+  });
 });

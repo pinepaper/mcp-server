@@ -4163,8 +4163,25 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
       });
     } catch (e) { return []; }
   }
+  // TRANSPARENCY THE FORMAT CANNOT CARRY. A scene with no background exported
+  // to webm came out on BLACK while the engine's check said it lost nothing
+  // (round 7, 8.12). Only said when the scene is evidently transparent — no
+  // solid CSS background colour AND nothing in the background layer — so a
+  // generator or pattern backdrop never trips it.
+  function alphaLoss(fmt) {
+    try {
+      if (['mp4', 'webm', 'jpg'].indexOf(fmt) === -1) return [];
+      const bg = app.canvasEl && app.canvasEl.style && app.canvasEl.style.backgroundColor;
+      const hasColor = !!bg && !/^(transparent|rgba\\([^)]*,\\s*0\\))$/i.test(bg);
+      const hasBgItems = !!(app.patternGroup && app.patternGroup.children && app.patternGroup.children.length);
+      if (hasColor || hasBgItems) return [];
+      return [{ code: 'alpha_dropped', message: fmt === 'jpg'
+        ? 'jpg has no transparency and this scene has no background, so transparent areas are filled white. Use png or webp to keep them.'
+        : fmt + ' is exported without transparency and this scene has no background, so transparent areas come out BLACK. Set a background colour, or export png (or a png sequence) to keep the alpha.' }];
+    } catch (e) { return []; }
+  }
   function fidelity(fmt) {
-    const own = standIns();
+    const own = standIns().concat(alphaLoss(fmt));
     try {
       if (!app.exportEngine || typeof app.exportEngine.exportFidelity !== 'function') {
         return { fidelity: { available: false, reason: 'this studio cannot check export fidelity — update PinePaper Studio.', ...(own.length ? { warnings: own } : {}) } };
@@ -4571,7 +4588,7 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
           // transparent board vanished into a white flatten. White otherwise.
           if (mime === 'image/jpeg') {
             const bg = app.canvasEl && app.canvasEl.style && app.canvasEl.style.backgroundColor;
-            x.fillStyle = (bg && !/^(transparent|rgba\([^)]*,\s*0\))$/i.test(bg)) ? bg : '#ffffff';
+            x.fillStyle = (bg && !/^(transparent|rgba\\([^)]*,\\s*0\\))$/i.test(bg)) ? bg : '#ffffff';
             x.fillRect(0, 0, c.width, c.height);
           }
           x.drawImage(img, 0, 0);
