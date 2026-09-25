@@ -756,6 +756,8 @@ export interface HandlerOptions {
   screenshotMode?: ScreenshotMode;
   /** Execution mode: 'puppeteer' (default) or 'code' (generate only) */
   executionMode?: ExecutionMode;
+  /** agent_export: write the result to a file at any size (render_batch needs a file per row). */
+  saveToFile?: boolean;
 }
 
 // =============================================================================
@@ -2035,19 +2037,20 @@ async function handleToolCallInner(
             if (r.isError || /"success":\s*false/.test(toolText(r))) { fail('template', r); failed = true; }
           }
           if (!failed) {
-            const r = await handleToolCall('pinepaper_agent_export', input.export, options);
+            // saveToFile: a small still would otherwise come back inline, and a
+            // batch row must name a file.
+            const r = await handleToolCall('pinepaper_agent_export', input.export, { ...options, saveToFile: true });
             const text = toolText(r);
             if (r.isError) { fail('export', r); }
             else {
-              out.success = true;
               const files = [...text.matchAll(/^(?:File|zip|html|backupImage): (\S+)$/gm)].map((m) => m[1]);
-              if (files.length) out.files = files;
+              if (files.length) { out.success = true; out.files = files; }
+              else { out.success = false; out.stage = 'export'; out.error = 'the export reported success but wrote no file: ' + text.slice(0, 300); }
               const json = text.indexOf('Result: ') >= 0 ? text.slice(text.indexOf('Result: ') + 8) : null;
               try {
                 const parsed = json ? JSON.parse(json) : null;
                 const warnings = parsed?.fidelity?.warnings;
                 if (Array.isArray(warnings) && warnings.length) out.warnings = warnings.map((w: { code?: string; message?: string }) => ({ code: w.code, message: w.message }));
-                if (!files.length && parsed?.data) out.inline = true;
               } catch { /* the file list stands on its own */ }
             }
           }
@@ -3692,6 +3695,7 @@ You can now start creating new items on a clean canvas.`,
         }
 
         const shouldSaveToFile = data && typeof data === 'string' && (
+          options.saveToFile ||
           ALWAYS_SAVE_FORMATS.has(format) ||
           data.length > SAVE_THRESHOLD_BYTES
         );

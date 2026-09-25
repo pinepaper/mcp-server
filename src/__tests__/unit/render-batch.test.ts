@@ -53,6 +53,21 @@ describe('render_batch', () => {
     expect(s.calls.filter((c) => c === 'export')).toHaveLength(2);
   });
 
+  it('a small png still gets a file per row (it would otherwise come back inline and be lost)', async () => {
+    const controller = {
+      connected: true,
+      connect: async () => undefined,
+      executeCode: async (code: string) => code.includes('app.modifyItem(')
+        ? { success: true, result: { success: true, itemId: 'x' } }
+        : { success: true, result: { success: true, platform: 'auto', format: 'png', data: 'data:image/png;base64,iVBORw0KGgo=', mimeType: 'image/png', size: 8 } },
+    };
+    const r = await handleToolCall('pinepaper_render_batch', { rows: [{ changes: { a: { content: 'x' } } }, { changes: { a: { content: 'y' } } }], export: { format: 'png' } },
+      { executeInBrowser: true, browserController: controller as never, executionMode: 'puppeteer' });
+    const out = json(r);
+    expect(out).toMatchObject({ success: true, rendered: 2 });
+    expect(out.rows.every((row: { files: string[] }) => existsSync(row.files[0]) && row.files[0].endsWith('.png'))).toBe(true);
+  });
+
   it('bad export options are refused before anything renders; estimateOnly renders nothing', async () => {
     const s = fakeStudio();
     const bad = await handleToolCall('pinepaper_render_batch', { rows: [{ changes: { a: { content: 'x' } } }], export: { format: 'bmp' } },

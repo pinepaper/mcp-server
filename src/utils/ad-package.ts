@@ -38,11 +38,25 @@ function injectBodyEnd(html: string, fragment: string): string {
   return `${html}\n${fragment}`;
 }
 
-function clickTarget(id: string, href: string, cta: CtaBox | null | undefined, label: string): string {
+function clickTarget(id: string, href: string, cta: CtaBox | null | undefined, label: string, position: 'absolute' | 'fixed'): string {
   const box = cta
     ? `left:${cta.left.toFixed(3)}%;top:${cta.top.toFixed(3)}%;width:${cta.width.toFixed(3)}%;height:${cta.height.toFixed(3)}%`
     : 'left:0;top:0;width:100%;height:100%';
-  return `<a id="${id}" href="${href}" aria-label="${esc(label)}" style="position:fixed;${box};z-index:2147483647;display:block;cursor:pointer;background:transparent"></a>`;
+  return `<a id="${id}" href="${href}" aria-label="${esc(label)}" style="position:${position};${box};z-index:2147483647;display:block;cursor:pointer;background:transparent"></a>`;
+}
+
+/**
+ * Place the click target in the widget's own box. The page centres div#w at
+ * the scene's aspect ratio (position: relative) and letterboxes it on any
+ * other screen shape, so a CTA box in VIEWPORT percent lands off the button
+ * on a phone that is not the ad's shape. Inside #w, absolute percentages are
+ * of the canvas. (The widget appends its canvas to #w and never clears it.)
+ * A page without #w gets a viewport-fixed target.
+ */
+function placeTarget(html: string, make: (position: 'absolute' | 'fixed') => string): string {
+  const open = /<div id="w"[^>]*>/i;
+  if (open.test(html)) return html.replace(open, (m) => `${m}\n${make('absolute')}`);
+  return injectBodyEnd(html, make('fixed'));
 }
 
 export function buildHtml5Ad(html: string, o: AdOptions): string {
@@ -54,8 +68,7 @@ export function buildHtml5Ad(html: string, o: AdOptions): string {
   ].join('\n');
   // The pattern the display networks document: an anchor that opens
   // window.clickTag in a new window.
-  const target = clickTarget('pp-clicktag', 'javascript:window.open(window.clickTag)', o.cta, 'Open the advertiser page');
-  return injectBodyEnd(injectHead(html, head), target);
+  return placeTarget(injectHead(html, head), (pos) => clickTarget('pp-clicktag', 'javascript:window.open(window.clickTag)', o.cta, 'Open the advertiser page', pos));
 }
 
 export function buildPlayable(html: string, o: AdOptions): string {
@@ -78,8 +91,7 @@ export function buildPlayable(html: string, o: AdOptions): string {
   }
 })();
 </script>`;
-  const target = clickTarget('pp-cta', '#', o.cta, 'Install');
-  return injectBodyEnd(injectHead(html, head), `${target}\n${script}`);
+  return injectBodyEnd(placeTarget(injectHead(html, head), (pos) => clickTarget('pp-cta', '#', o.cta, 'Install', pos)), script);
 }
 
 /** Every absolute URL the page would fetch: src / href attributes and CSS url() / @import. */

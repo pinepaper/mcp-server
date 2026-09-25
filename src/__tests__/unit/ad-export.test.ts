@@ -51,6 +51,19 @@ describe('ad wrappers', () => {
     expect(h.indexOf('pp-clicktag')).toBeLessThan(h.indexOf('</body>'));
   });
 
+  it('the click target sits inside the widget box, so a letterboxed ad keeps it on the CTA', () => {
+    // The engine's page: div#w centred at the scene's aspect ratio, position: relative.
+    const page = '<html><head></head><body><div id="w" role="img" aria-label="x">\n<div class="sr-only" id="w-desc">x</div></div><script>/*w*/</script></body></html>';
+    const cta = { left: 10, top: 80, width: 80, height: 10 };
+    for (const h of [buildHtml5Ad(page, { width: 300, height: 250, cta }), buildPlayable(page, { width: 320, height: 480, clickUrl: 'https://x.test', cta })]) {
+      const inW = h.slice(h.indexOf('<div id="w"'), h.indexOf('id="w-desc"'));
+      expect(inW).toMatch(/<a id="pp-(clicktag|cta)"[^>]*position:absolute;left:10\.000%;top:80\.000%/);
+      expect(h).not.toContain('position:fixed');
+    }
+    // A page without #w falls back to the viewport.
+    expect(buildHtml5Ad(PAGE.replace('<div id="w"></div>', ''), { width: 1, height: 1 })).toContain('position:fixed');
+  });
+
   it('a click URL cannot close the script tag', () => {
     const h = buildHtml5Ad(PAGE, { width: 1, height: 1, clickUrl: 'https://x.test/</script><script>alert(1)</script>' });
     expect(h).not.toContain('</script><script>alert(1)');
