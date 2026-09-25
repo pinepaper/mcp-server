@@ -23,7 +23,8 @@ describe('text operations', () => {
     const code = text({ action: 'cursive', text: 'hello', cursiveOptions: { scale: 2, strokeColor: '#000' } });
     expect(code).toContain('app.createCursiveText("hello"');
     expect(code).toContain('"scale":2');
-    expect(code).toContain('itemId: item.data && item.data.id');
+    // The answer is { items, group }, not an item — see text-style-props.test.ts.
+    expect(code).toContain('const g = r && (r.group');
     // A path, not a glyph — so draw-on animation and outline_stroke apply.
     expect(code).toContain('STROKED handwriting');
   });

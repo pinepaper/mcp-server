@@ -243,6 +243,7 @@ export const OPTIONAL_ENGINE_METHODS: readonly string[] = [
   'hashFrame',
   'instantiateOntology',
   'itemRegistry.getAll',
+  'itemRegistry.register',
   'listFontAxes',
   'listGenerators',
   'listTextPalettes',

@@ -64,3 +64,20 @@ describe('text style properties are applied, not dropped', () => {
     expect(code).toContain('ignoredProperties: ["fontWeight"]');
   });
 });
+
+describe('text_style cursive returns an item id', () => {
+  const run = (answer: unknown, registered = 'item_7') => {
+    const code = codeGenerator.generateTextStyle({ action: 'cursive', text: 'hi' } as never);
+    const app = { createCursiveText: () => answer, itemRegistry: { register: () => registered } };
+    return new Function('app', `return ${code.replace(/^\/\/[^\n]*\n/, '')}`)(app);
+  };
+  it('reads the registered group', () => {
+    expect(run({ items: [{}, {}], group: { data: { id: 'item_3' } }, totalWidth: 90 })).toMatchObject({ success: true, itemId: 'item_3', strokes: 2 });
+  });
+  it('registers an unregistered group', () => {
+    expect(run({ items: [{}], group: { data: {} } }).itemId).toBe('item_7');
+  });
+  it('refuses when nothing was drawn', () => {
+    expect(run({ items: [], group: null }).success).toBe(false);
+  });
+});

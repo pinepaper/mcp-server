@@ -9122,9 +9122,19 @@ ${resolveMedia}
 // Text: write it as STROKED handwriting — a path, not a glyph
 (function() {
   if (typeof app.createCursiveText !== 'function') { return { success: false, error: 'app.createCursiveText unavailable — update FxTool' }; }
-  const item = app.createCursiveText(${S(input.text)}, ${S(input.cursiveOptions ?? {})});
-  if (!item) { return { success: false, error: 'the cursive text produced no path' }; }
-  return { success: true, itemId: item.data && item.data.id };
+  // createCursiveText answers { items, group, totalWidth, bounds } — not an
+  // item — so reading .data.id off the answer returned no id, every time. The
+  // group is registered only on one of its two branches; the other is
+  // registered here so the caller always gets an addressable id.
+  const r = app.createCursiveText(${S(input.text)}, ${S(input.cursiveOptions ?? {})});
+  const g = r && (r.group || (r.data ? r : null));
+  if (!g) { return { success: false, error: 'the cursive text produced no path' }; }
+  let itemId = g.data && (g.data.id || g.data.registryId);
+  if (!itemId && app.itemRegistry && typeof app.itemRegistry.register === 'function') {
+    itemId = app.itemRegistry.register(g, 'cursiveText', { content: ${S(input.text)} }, 'user');
+  }
+  if (!itemId) { return { success: false, error: 'the cursive text was drawn but not registered — no usable item id.' }; }
+  return { success: true, itemId: itemId, strokes: (r.items || []).length, width: r.totalWidth };
 })();`.trim();
 
       case 'wrap':
