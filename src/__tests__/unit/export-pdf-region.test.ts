@@ -114,3 +114,12 @@ describe('round 6 retest follow-ups', () => {
     expect(fills).toEqual(['#ffffff']);
   });
 });
+
+describe('png sequence says when it used the default length (8.15)', () => {
+  it('notes a missing duration / fps, and nothing when both are given', () => {
+    const a = codeGenerator.generateInterchange({ action: 'export_png_sequence' } as never);
+    expect(a).toContain('"defaultsUsed":["duration","fps"]');
+    const b = codeGenerator.generateInterchange({ action: 'export_png_sequence', options: { duration: 1, fps: 30 } } as never);
+    expect(b).not.toContain('defaultsUsed');
+  });
+});

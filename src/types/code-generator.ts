@@ -10364,6 +10364,14 @@ ${guard('exportBVH')}
 // Interchange: one PNG per frame
 (async function() {
 ${guard('exportPNGSequence')}
+  // The studio does not size a sequence to the scene: without duration / fps
+  // it writes its own default (measured 45 frames = 3 s at 15 fps for a 1 s
+  // scene, 29 of them duplicates). Said in the result when that happened.
+  const __pngSeqDefaults = ${JSON.stringify((() => {
+    const o = (input.options ?? {}) as Record<string, unknown>;
+    const missing = ['duration', 'fps'].filter((k) => o[k] === undefined);
+    return missing.length ? { defaultsUsed: missing, note: `${missing.join(' and ')} not given, so the studio's default was used (measured: 3 s at 15 fps = 45 frames, whatever the scene length). Pass options.duration and options.fps to match the scene.` } : {};
+  })())};
   const out = await app.exportPNGSequence(${opts});
   if (!out) { return { success: false, error: 'PNG sequence produced nothing' }; }
   // A BLOB SERIALISES TO {}. exporter.export() answers a Blob, and returning it
@@ -10378,7 +10386,7 @@ ${guard('exportPNGSequence')}
       fr.onerror = function() { rej(new Error('could not read the PNG sequence')); };
       fr.readAsDataURL(out);
     });
-    return { success: true, format: 'png-sequence', data: dataUrl, mimeType: out.type || 'application/zip', size: out.size };
+    return Object.assign({ success: true, format: 'png-sequence', data: dataUrl, mimeType: out.type || 'application/zip', size: out.size }, __pngSeqDefaults);
   }
   if (Array.isArray(out)) {
     return { success: true, format: 'png-sequence', frames: out.length,
