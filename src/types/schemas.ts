@@ -2583,7 +2583,8 @@ export const AgentExportInputSchema = z.object({
     ctaItemId: z.string().min(1).optional().describe('The item whose bounds are the click target. html5-ad: optional (default: the whole ad). playable: required — a playable is interactive, so only the CTA clicks through. The hotspot is where the item is at export time; it does not follow an animated CTA.'),
     maxBytes: z.number().int().positive().optional().describe('Size budget for the upload (the zip for html5-ad, the HTML for playable). html5-ad defaults to 150000: Google Ads display HTML5 is 150 KB; some uploads allow 600 KB — set it to your network\'s figure. Over budget is a fidelity warning, not a refusal.'),
   }).optional().describe('html5-ad / playable options.'),
-  transparent: z.boolean().optional().describe('apng only: keep the alpha channel (the default). false fills the background colour.'),
+  transparent: z.boolean().optional().describe('apng: keep the alpha channel (the default; false fills the background colour). webm: true writes a VP9 alpha channel where the studio supports it (result.video.alpha confirms it).'),
+  alphaQuantizer: z.number().int().min(0).max(63).optional().describe('webm with transparent: quality of the alpha stream, 0 = lossless … 63 (the studio\'s default otherwise).'),
   loop: z.union([z.boolean(), z.number().int().min(0).max(1000)]).optional().describe('gif / apng: true = loop forever, false / 0 / 1 = play once, n = play n times.'),
   maxBytes: z.number().int().positive().optional().describe('gif only: a size budget in bytes (email wants <= 1 MB). Over it, the GIF is re-encoded smaller — frame size scaled from the overshoot — at most twice; the result reports each attempt and whether the budget was met.'),
   broadcast: z.boolean().optional().describe('mp4 only: broadcast-safe — BT.709, limited range (samples 16-235), tagged bt709, constant bitrate with an 8 Mbps floor at 720p and up (4 below). result.video reports what the encoder did.'),
@@ -2624,8 +2625,11 @@ export const AgentExportInputSchema = z.object({
     if (val.format === 'playable' && (!val.ad?.ctaItemId || !val.ad?.clickUrl)) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['ad'], message: 'a playable needs ad.ctaItemId (the install button — only it clicks through, so the rest stays playable) and ad.clickUrl (the store URL it opens).' });
     }
-    if (val.transparent !== undefined && val.format !== 'apng') {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['transparent'], message: 'transparent is an apng setting here: png keeps alpha already, and mp4 / webm / gif cannot carry it. For animation with alpha, export format "apng".' });
+    if (val.transparent !== undefined && val.format !== 'apng' && val.format !== 'webm') {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['transparent'], message: 'transparent applies to apng and webm: png keeps alpha already, and mp4 (H.264) / gif cannot carry it. For animation with alpha, export "webm" or "apng".' });
+    }
+    if (val.alphaQuantizer !== undefined && !(val.format === 'webm' && val.transparent === true)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['alphaQuantizer'], message: 'alphaQuantizer applies to a transparent webm (format "webm", transparent: true).' });
     }
     if (val.loop !== undefined && val.format !== 'gif' && val.format !== 'apng') {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['loop'], message: "loop is a gif / apng setting. A video cannot carry a loop flag — for a seamless loop, key t = 0 and t = duration to the same state and export exactly that duration." });

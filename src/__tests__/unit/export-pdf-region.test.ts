@@ -504,7 +504,8 @@ describe('apng: animation with full alpha (8.12, FxTool 76312a55)', () => {
 
   it('schema: transparent is apng-only, loop allowed; the handler saves it as .png', async () => {
     expect(AgentExportInputSchema.safeParse({ format: 'apng', loop: true, transparent: true }).success).toBe(true);
-    expect(AgentExportInputSchema.safeParse({ format: 'webm', transparent: true }).success).toBe(false);
+    expect(AgentExportInputSchema.safeParse({ format: 'mp4', transparent: true }).success).toBe(false);
+    expect(AgentExportInputSchema.safeParse({ format: 'gif', transparent: true }).success).toBe(false);
     const { ALWAYS_SAVE_FORMATS, handleToolCall } = await import('../../tools/handlers.js');
     expect(ALWAYS_SAVE_FORMATS.has('apng')).toBe(true);
     const out = JSON.stringify(await handleToolCall('pinepaper_agent_export', { format: 'apng', transparent: false, loop: 2 }, { executionMode: 'code' } as never));
@@ -639,5 +640,47 @@ describe('an odd side rounded up for H.264 is said (FxTool e64a5260)', () => {
   it('even sizes raise nothing', async () => {
     const r = await run({ dimensions: { requested: [1920, 1080], output: [1920, 1080] } });
     expect((r.fidelity?.warnings ?? []).map((x: { code: string }) => x.code)).not.toContain('dimensions_rounded');
+  });
+});
+
+describe('transparent webm (FxTool 1833b397)', () => {
+  class FR { result = 'data:video/webm;base64,AA'; onloadend: (() => void) | null = null; readAsDataURL() { this.onloadend?.(); } }
+  const run = async (args: Record<string, unknown>, report: Record<string, unknown> | null) => {
+    const calls: Array<Record<string, unknown>> = [];
+    const vx: Record<string, unknown> = { lastVideoReport: null, export: async (o: Record<string, unknown>) => { calls.push(o); vx.lastVideoReport = report; return { size: 10, slice() { return this; } }; } };
+    // No background colour: an opaque webm here would be alpha_dropped.
+    const app = { canvasSize: { width: 100, height: 100 }, canvasEl: { style: { backgroundColor: '' } }, exportEngine: { exportFidelity: () => ({ warnings: [] }), videoExporter: vx } };
+    const r = await new Function('app', 'FileReader', 'document', body(codeGenerator.generateAgentExport({ format: 'webm', duration: 1, ...args } as never)))(app, FR, {});
+    return { r, calls, codes: ((r.fidelity?.warnings ?? []) as Array<{ code: string }>).map((w) => w.code) };
+  };
+
+  it('reaches the encoder, and an alpha stream with frames confirms it (no alpha_dropped)', async () => {
+    const { r, calls, codes } = await run({ transparent: true, alphaQuantizer: 10 }, { alpha: { requested: true, frames: 30, keyframeMismatches: 0, quantizer: 10 } });
+    expect(calls[0]).toMatchObject({ transparent: true, alphaQuantizer: 10 });
+    expect(r.video.alpha.frames).toBe(30);
+    expect(codes).not.toContain('alpha_dropped');
+    expect(codes).not.toContain('alpha_not_applied');
+  });
+
+  it('a studio that wrote no alpha stream is named, not claimed', async () => {
+    expect((await run({ transparent: true }, { bitrate: 2e6 })).codes).toContain('alpha_not_applied');
+    expect((await run({ transparent: true }, null)).codes).toContain('alpha_not_applied');
+  });
+
+  it('an opaque webm on a page with no background still says alpha is dropped', async () => {
+    expect((await run({}, { bitrate: 2e6 })).codes).toContain('alpha_dropped');
+  });
+
+  it('the store route carries it too', async () => {
+    const storeArgs: Array<Record<string, unknown>> = [];
+    const app = { canvasSize: { width: 100, height: 100 }, exportEngine: { exportFidelity: () => ({ warnings: [] }), videoExporter: {},
+      exportToStore: async (o: Record<string, unknown>) => { storeArgs.push(o); return { ok: false, reason: 'stub' }; }, readExport: async () => null } };
+    await new Function('app', 'FileReader', 'document', body(codeGenerator.generateAgentExport({ format: 'webm', duration: 1, transparent: true } as never)))(app, FR, {});
+    expect(storeArgs[0]).toMatchObject({ transparent: true });
+  });
+
+  it('alphaQuantizer needs a transparent webm', () => {
+    expect(AgentExportInputSchema.safeParse({ format: 'webm', alphaQuantizer: 5 }).success).toBe(false);
+    expect(AgentExportInputSchema.safeParse({ format: 'webm', transparent: true, alphaQuantizer: 64 }).success).toBe(false);
   });
 });

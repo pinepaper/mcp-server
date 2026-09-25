@@ -4561,7 +4561,7 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
 
   generateAgentExport(input: AgentExportInput): string {
     const validated = AgentExportInputSchema.parse(input);
-    const { platform, format, quality, framing, duration, estimateOnly, scale, fps, pdf: pdfOpts, region, time: stillTime, maxBytes, loop: gifLoop, broadcast, broadcastHeadroom, bitrate, minBitrate, bitrateMode, transparent, ad: adOpts } = validated;
+    const { platform, format, quality, framing, duration, estimateOnly, scale, fps, pdf: pdfOpts, region, time: stillTime, maxBytes, loop: gifLoop, broadcast, broadcastHeadroom, bitrate, minBitrate, bitrateMode, transparent, alphaQuantizer, ad: adOpts } = validated;
   // Encoder options (FxTool 16719759); the schema keeps them to mp4 / webm.
   const videoEncodeOpts: Record<string, unknown> = {};
   if (broadcast) videoEncodeOpts.broadcast = true;
@@ -4574,6 +4574,9 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
   if (bitrate !== undefined) videoEncodeOpts.bitrate = bitrate;
   if (minBitrate !== undefined) videoEncodeOpts.minBitrate = minBitrate;
   if (bitrateMode !== undefined) videoEncodeOpts.bitrateMode = bitrateMode;
+  // A transparent WebM (FxTool 1833b397) rides the store route too.
+  const webmAlpha = format === 'webm' && transparent === true;
+  if (webmAlpha) { videoEncodeOpts.transparent = true; if (alphaQuantizer !== undefined) videoEncodeOpts.alphaQuantizer = alphaQuantizer; }
   const encodeOptsJs = Object.keys(videoEncodeOpts).length ? `, ...${JSON.stringify(videoEncodeOpts)}` : '';
     const qualityLevel = quality || 'standard';
     const videoDuration = duration ?? 5;
@@ -4850,7 +4853,7 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
   // generator or pattern backdrop never trips it.
   function alphaLoss(fmt) {
     try {
-      if (['mp4', 'webm', 'jpg'${format === 'apng' && transparent === false ? ", 'apng'" : ''}].indexOf(fmt) === -1) return [];
+      if (['mp4', 'jpg'${format === 'webm' && transparent === true ? '' : ", 'webm'"}${format === 'apng' && transparent === false ? ", 'apng'" : ''}].indexOf(fmt) === -1) return [];
       const bg = app.canvasEl && app.canvasEl.style && app.canvasEl.style.backgroundColor;
       const hasColor = !!bg && !/^(transparent|rgba\\([^)]*,\\s*0\\))$/i.test(bg);
       const hasBgItems = !!(app.patternGroup && app.patternGroup.children && app.patternGroup.children.length);
@@ -5592,7 +5595,21 @@ ${stillTime !== undefined ? `
     }
   }
   const __vr = __vx && __vx.lastVideoReport;
-  if (result && result.success && __vr && typeof __vr === 'object') result.video = __vr;${headroomDefaulted ? `
+  if (result && result.success && __vr && typeof __vr === 'object') result.video = __vr;${webmAlpha ? `
+  // A TRANSPARENT WEBM is confirmed from the encoder's own record: an alpha
+  // stream with frames in it. A studio without WebM alpha writes an opaque
+  // file that looks like it worked.
+  if (result && result.success) {
+    const __al = __vr && __vr.alpha;
+    const __aw = [];
+    if (!(__al && __al.frames > 0)) __aw.push({ code: 'alpha_not_applied', message: 'transparent was asked for, but this studio wrote no alpha stream: the WebM is opaque (transparent areas black). Export apng, or a png sequence, for transparency here.' });
+    else if (__al.keyframeMismatches > 0) __aw.push({ code: 'alpha_keyframe_mismatch', message: __al.keyframeMismatches + ' frame(s) had colour and alpha keyframes out of step; some players may show those frames without transparency.' });
+    if (__aw.length) {
+      result.fidelity = result.fidelity || { warnings: [] };
+      result.fidelity.warnings = (result.fidelity.warnings || []).concat(__aw);
+      if (result.fidelity.note) delete result.fidelity.note;
+    }
+  }` : ''}${headroomDefaulted ? `
   // The applied value is the engine's own report where it gives one
   // (5adfcf1c: lastVideoReport.headroom), so the result and the report agree.
   if (result && result.success) result.broadcastHeadroom = { value: (__vr && typeof __vr.headroom === 'number') ? __vr.headroom : 12, defaulted: true, note: 'broadcast defaults to 12 luma codes of headroom, which keeps encoder ringing legal; pass broadcastHeadroom: 0 for the full range.' };` : ''}
