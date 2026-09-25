@@ -229,3 +229,30 @@ describe('keyframe loop:true carries the export caveat (2.24)', () => {
     expect(codeGenerator.generateKeyframeAnimate({ itemId: 'item_4', keyframes: kf } as never)).not.toContain('loopNote');
   });
 });
+
+describe('keyed audio gain passes on a studio that animates it (fcec0194)', () => {
+  const kf = [{ time: 0, properties: { gain: 1 } }, { time: 1, properties: { gain: 0.25 } }];
+  const app = (listed: string[]) => {
+    const calls: unknown[] = [];
+    return { calls, app: {
+      itemRegistry: { get: () => ({ type: 'audio', item: {} }) },
+      getItemById: () => ({}),
+      listAnimatableProperties: () => ({ properties: listed.map((name) => ({ name, appliesTo: 'audio' })) }),
+      addAnimation: (...a: unknown[]) => calls.push(a),
+    } };
+  };
+
+  it('gain keys go through when the studio lists gain for audio', async () => {
+    const s = app(['gain', 'volume']);
+    const r = await run(codeGenerator.generateKeyframeAnimate({ itemId: 'item_3', keyframes: kf } as never), { window: {}, app: s.app });
+    expect(r.success).toBe(true);
+    expect(s.calls).toHaveLength(1);
+  });
+
+  it('still refused where the studio does not list it (prod)', async () => {
+    const s = app([]);
+    const r = await run(codeGenerator.generateKeyframeAnimate({ itemId: 'item_3', keyframes: kf } as never), { window: {}, app: s.app });
+    expect(r.success).toBe(false);
+    expect(r.error).toContain('gain cannot be keyframed');
+  });
+});

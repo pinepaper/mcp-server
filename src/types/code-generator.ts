@@ -1280,13 +1280,23 @@ function generateKeyframeAnimateCode(
   // audio items — a `volume` key on a shape is some other thing.
   const levelKeys = [...new Set(keyframes.flatMap((k) => Object.keys((k as { properties?: object }).properties ?? {})))]
     .filter((k) => k === 'audioGain' || k === 'volume' || k === 'gain');
+  // UNLESS THE STUDIO ANIMATES IT. From FxTool fcec0194 keyed gain / volume
+  // are real — fades and ducks bake into the export at the measured level —
+  // and listAnimatableProperties lists them with appliesTo 'audio'. That list
+  // is the feature check: a key it names for audio passes through, anything
+  // else on an audio item is still refused (prod, until that build ships).
   const audioLevelGuard = levelKeys.length === 0 ? '' : `
   const __ae = app.itemRegistry && app.itemRegistry.get('${itemId}');
-  if (__ae && __ae.type === 'audio') {
-    return { success: false, itemId: '${itemId}', error: ${JSON.stringify(
-      `${levelKeys.join(', ')} cannot be keyframed on an audio item: this studio mixes each audio clip at one fixed level, so a fade would be accepted and not heard. Nothing was added. `
-      + 'Set a static level with pinepaper_modify_item {audioGain: 0..1}.',
-    )} };
+  let __audioKeyed = [];
+  try {
+    const __l = typeof app.listAnimatableProperties === 'function' ? app.listAnimatableProperties() : null;
+    __audioKeyed = ((__l && __l.properties) || []).filter(function(p) { return p && p.appliesTo === 'audio'; }).map(function(p) { return p.name; });
+  } catch (_) { /* treat as unsupported */ }
+  const __unsupported = ${JSON.stringify(levelKeys)}.filter(function(k) { return __audioKeyed.indexOf(k) === -1; });
+  if (__ae && __ae.type === 'audio' && __unsupported.length) {
+    return { success: false, itemId: '${itemId}', error: __unsupported.join(', ') + ' cannot be keyframed on an audio item in this studio: it mixes each audio clip at one fixed level, so a fade would be accepted and not heard. Nothing was added. '
+      + (__audioKeyed.length ? 'Keyable on audio here: ' + __audioKeyed.join(', ') + '. ' : '')
+      + 'Set a static level with pinepaper_modify_item {audioGain: 0..1}.' };
   }`;
 
   // Easing is read from the DESTINATION keyframe, so easing on the first one
