@@ -18,6 +18,12 @@ export type FontHandler = (
 
 async function dispatchFontAction(args: Record<string, unknown>, options: HandlerOptions): Promise<CallToolResult> {
   const action = args.action as string;
+  // `family` / `fontFamily` are what create_item and CSS call it; `name` is
+  // this tool's word. check and load said "requires { name }" to a caller who
+  // had passed the family under its usual name (round 7 retest, 1.62).
+  if (args.name === undefined && (typeof args.family === 'string' || typeof args.fontFamily === 'string')) {
+    args = { ...args, name: (args.family ?? args.fontFamily) as string };
+  }
   switch (action) {
     case 'check': {
       const { name, text } = args as { name?: string; text?: string };

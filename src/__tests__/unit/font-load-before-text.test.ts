@@ -103,3 +103,14 @@ describe('font check / load (1.51, X#12)', () => {
     expect(load).toContain('fonts.googleapis.com');
   });
 });
+
+describe('font load accepts family (1.62)', () => {
+  it('family and fontFamily stand in for name', async () => {
+    const { handleToolCall } = await import('../../tools/handlers.js');
+    for (const key of ['family', 'fontFamily']) {
+      const out = JSON.stringify(await handleToolCall('pinepaper_font', { action: 'load', [key]: 'Monoton' }, { executionMode: 'code' } as never));
+      expect(out).not.toContain('requires { name }');
+      expect(out).toContain('Monoton');
+    }
+  });
+});
