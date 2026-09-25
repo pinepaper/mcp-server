@@ -219,6 +219,89 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 
 ## What's new in 1.6.14
 
+Many of the features below rely on newer studio capabilities. Where a studio
+lacks one, the result says so — the call never quietly claims what it could
+not do.
+
+### New: text that fits its box
+
+- **`fit`** on text (`create_item`, `modify_item`, batch):
+  `{maxWidth, maxHeight?, minFontSize?, maxFontSize?, wrap?, hold?}` sizes the
+  text to the box, and later content changes refit it — the variant /
+  translation workflow. It holds the anchored edge (`top-*` holds the top);
+  `fit: null` stops fitting. The result's `textFit` gives the size, line count
+  and whether it fits.
+- **Overflow in every export.** `fidelity` lists `text_overflow` for text past
+  its box or off the frame — the check to run before rendering a batch.
+- **`direction`** (`auto` | `ltr` | `rtl`) for Arabic, Hebrew and other RTL
+  paragraphs; `auto` is reported with the way it resolved.
+- **`tabularFigures`** for counters and prices that should not jitter, and
+  **`strokePosition: 'outside'`** for thick caption outlines that keep the
+  letterform.
+- Weight, italic, line spacing, and fonts from the catalogue or Google Fonts
+  (`pinepaper_font` gained a `load` action) now reach the text, loaded before
+  it is drawn.
+
+### New: export formats and controls
+
+- **`apng`** — animation with full transparency, for overlays and stickers.
+- **`jpg` / `webp`** stills for byte-budgeted ad specs; **`srt` / `vtt`**
+  captions from the scene's timed text; **multi-page PDF**, one page per saved
+  scene, with a searchable text layer (Latin script) and print options (paper
+  size, orientation, bleed, trim marks, dpi).
+- **`region`** exports a part of the canvas — carousel slices, sheets of cards.
+  A cell leaves out a neighbour's overflowing items and names the items that
+  cross its edge.
+- **`time`** renders a still at a chosen moment rather than wherever the
+  playhead is.
+- **GIF** `loop` play count and a `maxBytes` budget (re-encoded smaller, with
+  each attempt reported).
+- **Broadcast MP4** — `broadcast: true` (BT.709, limited range, constant
+  bitrate), `bitrate` / `minBitrate`, and `broadcastHeadroom`. The result
+  reports the achieved bitrate and the measured luma; when the file would fail
+  broadcast QC, `fidelity` says so and gives the command that fixes it.
+- **NTSC rates** (29.97, 59.94, …) with a note when a duration overruns at
+  them, and a warning when H.264 rounds an odd side up by a pixel.
+- New platform presets `print-a4-landscape` and `print-letter-landscape`.
+
+### New: tools and parameters
+
+- **`pinepaper_lasso`** gained `cut`: cut a subject out along a polygon, no custom code.
+- **Generator regions** can be shaped (rounded rect, ellipse, circle, polygon,
+  star, or an existing path) and named with `region.id`; the same generator in
+  several boxes gives several instances.
+- **`modify_item`** takes `skewX` / `skewY` and an affine `matrix` (mockups).
+- **Pixel-art rasters** (`smoothing: 'off'`), a **globe `disable`** action,
+  **keyed audio gain**, and **widget HTML** `lang`, `dir` and `alt`.
+- `bornAt` / `ttl` now work as a visibility window in local renders, so shots
+  hand over cleanly on the boundary.
+- `serverInfo.version` names the exact build (`1.6.14+<sha>`).
+
+### Fixed: properties that were silently ignored
+
+`create_item` and `modify_item` now name any property they could not act on,
+with a suggestion for common misspellings. Beyond that, these used to be
+dropped and now work: no-fill (`null` / `'transparent'` / `'none'`), dashes,
+caps and joins on every shape, `color` on closed paths, a top-level `anchor`,
+path coordinates kept when no position is given, mesh colour on 3D shapes,
+`template_params` naming undeclared params, chart data in the documented
+shape, and gradients that cannot be read (now refused, not drawn as nothing).
+
+### Fixed: tools that reported success for the wrong thing
+
+- Batch create / modify / execute now behave exactly like their single-item
+  tools, with one undo step per batch.
+- `moves_along_path` follows the path you name (or refuses); relations to an
+  id not on the canvas are refused.
+- Uploaded media: the id you are given is the one other tools accept, audio
+  levels reach the mix, `data:` and server-side URLs upload in production,
+  and clearing the canvas removes uploaded media too.
+- A platform preset no longer stretches a canvas of another aspect ratio.
+- `camera_animate` no longer claims pitch / yaw as 3D perspective, and its
+  `duration` is optional.
+- Nine tools' published schemas disagreed with what they accepted; a guard
+  now keeps them in step.
+
 ### New: a whole music bed in one call
 
 `pinepaper_sound` gained a `sequence` action taking `[{t, spec|preset, note?,
