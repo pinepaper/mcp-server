@@ -8827,7 +8827,15 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
   let __html = String(result.html || '');
   const __applied = [];
   ${input.lang || input.dir ? `__html = __html.replace(/<html\\b[^>]*>/i, function() { __applied.push('html'); return '<html lang="' + __esc(${JSON.stringify(input.lang ?? 'en')}) + '"' + ${JSON.stringify(input.dir ? ` dir="${input.dir}"` : '')} + '>'; });` : ''}
-  ${input.alt ? `__html = __html.replace(/<canvas\\b/i, function(m) { __applied.push('canvas'); return m + ' role="img" aria-label="' + __esc(${JSON.stringify(input.alt)}) + '"'; });
+  ${input.alt ? `// The engine's widget draws its canvas from script, so there is no <canvas>
+  // tag to label (prod retest): its accessible name is div#w's aria-label,
+  // mirrored in the screen-reader text #w-desc. Both carry the alt; a literal
+  // <canvas> is labelled too when a page has one. RegExp from strings, so no
+  // backslash escapes pass through this template.
+  const __alt = __esc(${JSON.stringify(input.alt)});
+  __html = __html.replace(new RegExp('<div id="w"([^>]*?)aria-label="[^"]*"', 'i'), function(m, mid) { __applied.push('widget-label'); return '<div id="w"' + mid + 'aria-label="' + __alt + '"'; });
+  __html = __html.replace(new RegExp('(<div[^>]*id="w-desc"[^>]*>)[^<]*(</div>)', 'i'), function(m, open, close) { __applied.push('widget-desc'); return open + __alt + close; });
+  __html = __html.replace(new RegExp('<canvas(?=[\\\\s>])', 'i'), function(m) { __applied.push('canvas'); return m + ' role="img" aria-label="' + __alt + '"'; });
   __html = __html.replace(/<head>/i, function(m) { __applied.push('meta'); return m + '<meta name="description" content="' + __esc(${JSON.stringify(input.alt)}) + '">'; });` : ''}
   result.html = __html;
   result.a11y = __applied;` : ''}

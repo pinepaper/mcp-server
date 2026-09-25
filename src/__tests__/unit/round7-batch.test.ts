@@ -369,4 +369,13 @@ describe('widget HTML lang / dir / alt (8.20)', () => {
     expect(r.html).toContain('<canvas role="img" aria-label="A &quot;sale&quot; banner &lt;animated>" id="c">');
     expect(r.a11y).toEqual(['html', 'canvas', 'meta']);
   });
+
+  it("labels the engine's script-drawn widget: div#w aria-label and #w-desc", async () => {
+    const html = '<html lang="en"><head></head><body><div id="w" role="img" aria-label="Auto: 3 shapes">\n  <div class="sr-only" id="w-desc">Auto: 3 shapes</div></div><script>/*canvas made here*/</script></body></html>';
+    const app = { exportEngine: { exportWidgetHTML: async () => ({ html, estimatedSize: 1, analysis: { itemTypes: new Set(), relationTypes: new Set() } }) } };
+    const r = await runIIFE(codeGenerator.generateExportWidgetHtml({ alt: 'Sale: 50% off' } as never), { app });
+    expect(r.html).toContain('<div id="w" role="img" aria-label="Sale: 50% off">');
+    expect(r.html).toContain('<div class="sr-only" id="w-desc">Sale: 50% off</div>');
+    expect(r.a11y).toEqual(['widget-label', 'widget-desc', 'meta']);
+  });
 });
