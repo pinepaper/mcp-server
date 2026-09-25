@@ -633,6 +633,47 @@ function emitTextStyle(itemExpr: string, props: Record<string, unknown>): string
 }
 
 /**
+ * Which data keys a chart plots, when the caller did not say.
+ *
+ * ChartSystem defaults to fields named `x` and `y`. The tool's own documented
+ * example is [{category, value}], so that example drew NO bars — index labels
+ * "0 1 2 3 4" and success:true, dataPoints:5 (round 7 Z, 1.53). Inferred here
+ * from the data instead: x is a label-like key (category/label/name/…, else
+ * the first text key), y is value-like (value/count/…, else the first number
+ * key other than x). stackedBar picks its own series from every numeric key,
+ * so only x is inferred for it. A y that cannot be found is refused by name,
+ * listing the keys that were there, rather than drawn as nothing.
+ */
+function resolveChartFields(
+  chartType: string,
+  data: Array<Record<string, unknown>>,
+  options: Record<string, unknown>,
+): { options: Record<string, unknown>; inferred?: { xField?: string; yField?: string } } | { error: string } {
+  // No rows yet (a chart created empty and filled by update): nothing to infer.
+  if (data.length === 0) return { options };
+  const row = data.find((d) => d && typeof d === 'object') ?? {};
+  const keys = Object.keys(row);
+  const out = { ...options };
+  const inferred: { xField?: string; yField?: string } = {};
+  const has = (k: string) => keys.includes(k);
+  if (out.xField === undefined && !has('x')) {
+    const x = ['category', 'label', 'name', 'date', 'month', 'year', 'key'].find(has)
+      ?? keys.find((k) => typeof row[k] === 'string') ?? keys[0];
+    if (x !== undefined) { out.xField = x; inferred.xField = x; }
+  }
+  const xf = (out.xField as string | undefined) ?? 'x';
+  if (chartType !== 'stackedBar' && out.yField === undefined && !has('y')) {
+    const numeric = keys.filter((k) => k !== xf && typeof row[k] === 'number');
+    const y = ['value', 'count', 'amount', 'total', 'score'].find((k) => numeric.includes(k)) ?? numeric[0];
+    if (y === undefined) {
+      return { error: `no numeric field to plot: the data rows have ${keys.length ? keys.join(', ') : 'no keys'}, and none but ${xf} is a number. Pass options.yField naming the numeric key.` };
+    }
+    out.yField = y; inferred.yField = y;
+  }
+  return Object.keys(inferred).length ? { options: out, inferred } : { options: out };
+}
+
+/**
  * A lifetime (bornAt / ttl, seconds) as hard-cut opacity keyframes.
  *
  * THE ENGINE HAS NO LIFETIME. create() and modifyItem() never read bornAt or
@@ -8318,8 +8359,10 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
       case 'create': {
         if (!input.chartType) return `(function() { return { error: 'chartType is required for create' }; })();`;
         if (!input.data) return `(function() { return { error: 'data is required for create' }; })();`;
+        const fields = resolveChartFields(input.chartType, input.data, input.options || {});
+        if ('error' in fields) return `(function() { return { success: false, error: ${JSON.stringify(fields.error)} }; })();`;
         const dataStr = JSON.stringify(input.data);
-        const optsStr = JSON.stringify(input.options || {});
+        const optsStr = JSON.stringify(fields.options);
         return `
 // Create chart
 (function() {
@@ -8327,7 +8370,7 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
   const group = app.createChart(${JSON.stringify(input.chartType)}, ${dataStr}, ${optsStr});
   if (!group) return { error: 'Failed to create chart' };
   const chartId = app.chartSystem.getLastChartId();
-  return { success: true, action: 'create', chartType: ${JSON.stringify(input.chartType)}, chartId, dataPoints: ${input.data.length} };
+  return { success: true, action: 'create', chartType: ${JSON.stringify(input.chartType)}, chartId, dataPoints: ${input.data.length}${fields.inferred ? `, fields: ${JSON.stringify(fields.inferred)}` : ''} };
 })();`.trim();
       }
       case 'update': {
