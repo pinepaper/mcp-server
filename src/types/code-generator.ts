@@ -8863,12 +8863,30 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
   if (!A || typeof A.uploadVideo !== 'function') { return { success: false, error: 'window.PinePaperAgent media API unavailable — update FxTool to a media-capable build' }; }`;
     // The URL to upload from: the staged bytes when the handler put a large
     // data: URL on window.__ppStage (see pinepaper_media in handlers.ts).
-    const srcExpr = (url: string | undefined) => `(function(u) {
-    if (u.indexOf('__ppStage:') !== 0) return u;
-    const k = u.slice('__ppStage:'.length);
-    const v = window.__ppStage && window.__ppStage[k];
-    if (!v) throw new Error('the media bytes were staged as ' + k + ' and are not on the page — a bug in the MCP server, not your call.');
-    return v;
+    //
+    // A data: URL IS DECODED HERE INTO A File, NOT HANDED OVER AS A URL. The
+    // engine's upload fetch()es a string, and production's CSP refuses fetch()
+    // of data: — so every data: upload failed on prod with "Failed to fetch ()"
+    // at every size (a local engine without the CSP accepted small ones, which
+    // is what made it look like a size limit). uploadAudio/uploadVideo take a
+    // File directly. Uint8Array.from with a map, not a for loop: a generated
+    // loop is budgeted per iteration and a few MB of audio would exhaust it.
+    const srcExpr = (url: string | undefined, kind: 'audio' | 'video') => `(function(u) {
+    if (u.indexOf('__ppStage:') === 0) {
+      const k = u.slice('__ppStage:'.length);
+      const v = window.__ppStage && window.__ppStage[k];
+      if (!v) throw new Error('the media bytes were staged as ' + k + ' and are not on the page — a bug in the MCP server, not your call.');
+      u = v;
+    }
+    if (u.indexOf('data:') !== 0) return u;
+    const comma = u.indexOf(',');
+    const meta = u.slice(5, comma);
+    const mime = meta.split(';')[0] || '${kind === 'audio' ? 'audio/mpeg' : 'video/mp4'}';
+    const body = u.slice(comma + 1);
+    const bin = /;base64/i.test(meta) ? atob(body) : decodeURIComponent(body);
+    const bytes = Uint8Array.from(bin, function(c) { return c.charCodeAt(0); });
+    const ext = (mime.split('/')[1] || '${kind === 'audio' ? 'mp3' : 'mp4'}').replace(/[^a-z0-9]/gi, '');
+    return new File([bytes], '${kind}.' + ext, { type: mime });
   })(${JSON.stringify(url ?? '')})`;
     // TWO ID SPACES, AND THE CALLER HOLDS THE WRONG ONE.
     //
@@ -8897,7 +8915,7 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
 // Upload video from URL
 (async function() {
 ${guard}
-  const info = await A.uploadVideo(${srcExpr(input.url)}, ${opts});
+  const info = await A.uploadVideo(${srcExpr(input.url, 'video')}, ${opts});
   return { success: true, action: 'upload_video', media: info };
 })();`.trim();
       }
@@ -8912,7 +8930,7 @@ ${guard}
 // Upload audio from URL
 (async function() {
 ${guard}
-  const info = await A.uploadAudio(${srcExpr(input.url)}, ${opts});${input.volume !== undefined ? `
+  const info = await A.uploadAudio(${srcExpr(input.url, 'audio')}, ${opts});${input.volume !== undefined ? `
   // THE LEVEL IS STORED UNDER ONE KEY AND EXPORTED FROM ANOTHER. The upload
   // records volume as \`gain\` on the registry entry; the video exporter's mix
   // reads \`audioGain\`. So a bed uploaded at 0.25 exported at unity (measured:

@@ -150,11 +150,34 @@ describe('large data: uploads travel staged, not inline (1.43)', () => {
     const s = studio();
     let got: unknown;
     (s.A as Record<string, unknown>).uploadAudio = async (src: unknown) => { got = src; return { id: 'araster_1', registryId: 'item_3' }; };
-    const big = 'data:audio/wav;base64,' + 'A'.repeat(10);
+    const bytes = new Uint8Array([82, 73, 70, 70, 0, 255, 128]);
+    const big = 'data:audio/wav;base64,' + Buffer.from(bytes).toString('base64');
     const w = { PinePaperAgent: s.A, __ppStage: { media_k: big } };
     const r = await run(codeGenerator.generateMedia({ action: 'upload_audio', url: '__ppStage:media_k' } as never), { window: w, app: s.app });
     expect(r.success).toBe(true);
-    expect(got).toBe(big);
+    // A File, not the data: URL — production's CSP refuses fetch() of data:.
+    expect(got).toBeInstanceOf(File);
+    const f = got as File;
+    expect(f.type).toBe('audio/wav');
+    expect(f.name).toBe('audio.wav');
+    expect([...new Uint8Array(await f.arrayBuffer())]).toEqual([...bytes]);
+  });
+
+  it('a small inline data: URL is decoded too, and an https URL passes through', async () => {
+    const s = studio();
+    const seen: unknown[] = [];
+    (s.A as Record<string, unknown>).uploadAudio = async (src: unknown) => { seen.push(src); return { id: 'a', registryId: 'item_3' }; };
+    const g = { window: { PinePaperAgent: s.A }, app: s.app };
+    await run(codeGenerator.generateMedia({ action: 'upload_audio', url: 'data:audio/mpeg;base64,AAAA' } as never), g);
+    await run(codeGenerator.generateMedia({ action: 'upload_audio', url: 'https://x/bed.mp3' } as never), g);
+    expect(seen[0]).toBeInstanceOf(File);
+    expect(seen[1]).toBe('https://x/bed.mp3');
+  });
+
+  it('the decode uses no for/while loop (the governor budgets those per iteration)', () => {
+    const code = codeGenerator.generateMedia({ action: 'upload_audio', url: 'data:audio/wav;base64,AAAA' } as never);
+    const decode = code.slice(code.indexOf("indexOf('data:')"), code.indexOf('new File'));
+    expect(decode).not.toMatch(/\bfor\s*\(|\bwhile\s*\(/);
   });
 
   it('the handler stages a >64KB data: URL instead of inlining it', async () => {
