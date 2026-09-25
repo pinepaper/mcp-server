@@ -313,6 +313,21 @@ function generateCreateItemCode(
     ...withRadiusAxes(baseProperties),
   };
 
+  // `color` ON A CLOSED PATH IS ITS FILL.
+  //
+  // The engine's path branch paints `color` as the STROKE whenever no fillColor
+  // is given — right for an open line, and the opposite of every shape, where
+  // color is the fill. So a closed blob or hand-drawn badge passed {color} came
+  // out as a hollow outline (round 6 U, 1.41). A closed path (closed:true, or
+  // pathData ending in Z) now takes color as its fill; an open one keeps the
+  // stroke it always had, so existing line drawings are unchanged.
+  const pathData = typeof baseProperties.pathData === 'string' ? baseProperties.pathData.trim() : '';
+  const closedPath = itemType === 'path'
+    && (baseProperties.closed === true || /z$/i.test(pathData));
+  if (closedPath && color && !isGradient(color) && fillColor === undefined && strokeColor === undefined) {
+    params.fillColor = color;
+  }
+
   // Handle simple solid colors in params
   if (color && !isGradient(color)) {
     params.color = color;

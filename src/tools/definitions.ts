@@ -471,6 +471,7 @@ the label to replace the content.
   positioned it. Offset the points yourself, or use sides + radius + position.
 - ellipse: Oval shape (properties: width, height, color) — defaults to 100x60
 - path: Custom path with segments or SVG data (properties: segments, pathData, strokeColor, fillColor, closed, smooth)
+  color on a path: a CLOSED path (closed:true, or pathData ending in Z) is FILLED with it; an OPEN path is STROKED with it. Pass fillColor / strokeColor to say exactly which.
 - line: Line between two points (properties: from, to, strokeColor, strokeWidth)
 - arc: Curved arc through three points (properties: from, through, to, strokeColor)
 - pentagon: Regular 5-sided polygon (properties: radius, color)
