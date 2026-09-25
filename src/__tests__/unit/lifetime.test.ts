@@ -113,3 +113,22 @@ describe('lifetimes are a visibility window', () => {
     expect(r.lifetime.note).toContain('whole local render');
   });
 });
+
+describe('the studio\'s own lifetime is used when it has one (FxTool bf1a656b)', () => {
+  it('passes through to app.setLifetime and registers no callback', () => {
+    const s = studio();
+    const calls: unknown[] = [];
+    s.app.setLifetime = (it: unknown, b: number, t: number | null) => { calls.push([b, t]); return { ok: true, bornAt: b, ttl: t, visible: false }; };
+    const r = create(s.app, { bornAt: 2, ttl: 1 });
+    expect(calls).toEqual([[2, 1]]);
+    expect(r.lifetime).toMatchObject({ applied: true, via: 'engine', persists: true });
+    expect(s.callbacks.size).toBe(0);
+  });
+
+  it('a refusal from the studio is reported, not claimed', () => {
+    const s = studio();
+    s.app.setLifetime = () => ({ ok: false, error: 'ttl must be positive' });
+    const r = create(s.app, { bornAt: 2, ttl: 1 });
+    expect(r.lifetime).toMatchObject({ applied: false, error: 'ttl must be positive' });
+  });
+});

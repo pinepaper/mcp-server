@@ -266,4 +266,5 @@ export const OPTIONAL_ENGINE_METHODS: readonly string[] = [
   'sceneManager.setLoop',
   'setBackgroundColor',
   'setCanvasSize',
+  'setLifetime',
 ];

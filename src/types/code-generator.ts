@@ -804,6 +804,21 @@ function emitLifetime(itemExpr: string, bornAt: unknown, ttl: unknown): string {
   if (Array.isArray(it.data.keyframes) && it.data.keyframes.some(function(k) { return k && k._lifetime; })) {
     it.data.keyframes = it.data.keyframes.filter(function(k) { return !(k && k._lifetime); });
   }
+  // THE STUDIO'S OWN LIFETIME, WHEN IT HAS ONE (FxTool bf1a656b): same window,
+  // same tolerance, applied in the frame loop, on scrub and in export — and it
+  // PERSISTS through save / reload, which the callback below cannot. Passed
+  // straight through; the callback is only the fallback for older studios.
+  if (typeof app.setLifetime === 'function') {
+    const __r = app.setLifetime(it, ${born}, ${span === null ? 'null' : span});
+    if (!__r || __r.ok === false) {
+      __lifetime = { bornAt: ${born}, ttl: ${span}, applied: false, error: (__r && __r.error) || 'the studio refused the lifetime' };
+      return;
+    }
+    const __G = globalThis.__ppMcp;
+    if (__G && __G.lifetimeApp === app && __G.lifetimeIds) __G.lifetimeIds.delete(it.data.registryId || it.data.id);
+    __lifetime = { bornAt: ${born}, ttl: ${span}, applied: true, via: 'engine', persists: true };
+    return;
+  }
   const rid = it.data.registryId || it.data.id;
   // MCP-owned page state lives on globalThis, not on app: it is not an engine
   // member, and the engine-surface guard reads app.X as a claim that it is.
