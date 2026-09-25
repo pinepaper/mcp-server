@@ -9165,7 +9165,10 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
   app.groupManager.addItemsToGroup(items, group);
   if (app.historyManager) app.historyManager.saveState();
   const groupId = (group.data && (group.data.registryId || group.data.groupId)) || null;
-  return { success: true, groupId: groupId, groupName: group.data && group.data.groupName, itemCount: items.length };`;
+  // itemId too (round 8 BB, 1.70): every other create answers itemId, and a
+  // group is an item every other tool addresses by that id. In a batch this
+  // does not claim a $N slot — only create ops do.
+  return { success: true, groupId: groupId, itemId: groupId, groupName: group.data && group.data.groupName, itemCount: items.length };`;
   }
 
   /**
@@ -9185,7 +9188,7 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
   if (!result || !result.parts || !result.parts.length) return { success: false, error: 'Nothing to break apart (no sub-parts found)' };
   const partIds = result.parts.map(function(p) { return p && p.data && (p.data.registryId || p.data.id); }).filter(Boolean);
   const groupId = (result.group && result.group.data && (result.group.data.registryId || result.group.data.groupId)) || null;
-  return { success: true, action: 'break_apart', groupId: groupId, partIds: partIds, partCount: partIds.length };
+  return { success: true, action: 'break_apart', groupId: groupId, itemId: groupId, partIds: partIds, partCount: partIds.length };
 })();`.trim();
     }
     if (input.action === 'ungroup') {
