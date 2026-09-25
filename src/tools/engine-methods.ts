@@ -171,6 +171,7 @@ export const REQUIRED_ENGINE_METHODS: readonly string[] = [
   'removeWorldLight',
   'removeWorldMaterial',
   'removeWorldMesh',
+  'renderRegionToDataURL',
   'renderSoundtrackWav',
   'resolveComment',
   'resolveDesignMedium',

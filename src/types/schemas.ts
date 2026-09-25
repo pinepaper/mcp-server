@@ -2495,8 +2495,27 @@ export const AgentExportInputSchema = z.object({
   scale: z.number().min(0.1).max(1).optional().describe('Video only: render at this fraction of the platform preset\'s dimensions (0.1-1). The engine derives its encode target from RESOLUTION, so this is the size control — there is no bitrate to set, and halving the frame roughly quarters the pixels and the file. It is also the preview knob: scale 0.5 with quality "draft" is the fast look-check before committing to a full render. Rounded to even dimensions, which H.264 requires.'),
   sampleRate: z.number().int().positive().optional().describe('wav only: samples per second (default 48000). Ignored by every other format.'),
   bitDepth: z.union([z.literal(16), z.literal(32)]).optional().describe('wav only: 16 (default) or 32-bit float. Ignored by every other format.'),
+  pdf: z.object({
+    paperFormat: z.string().optional().describe("Paper size: 'a4', 'a3', 'letter', … or 'custom' (the canvas's own size, the default)."),
+    orientation: z.enum(['portrait', 'landscape']).optional().describe('Default: from the canvas aspect.'),
+    bleed: z.number().min(0).max(20).optional().describe('Bleed in mm; > 0 includes the bleed area.'),
+    trimMarks: z.boolean().optional().describe('Add crop / trim marks.'),
+    dpi: z.number().int().min(72).max(600).optional().describe('Rasterisation DPI (default: the quality tier\'s).'),
+  }).optional().describe('pdf only: print options.'),
+  region: z.object({
+    x: z.number(), y: z.number(),
+    width: z.number().positive(), height: z.number().positive(),
+    outputWidth: z.number().int().positive().max(8192).optional(),
+    outputHeight: z.number().int().positive().max(8192).optional(),
+  }).optional().describe('png only: export just this canvas region (canvas coordinates, top-left x/y) — carousel slices, crops. Output is the region\'s size unless outputWidth/outputHeight say otherwise; a different aspect is covered, not stretched.'),
 }).describe('Smart export options')
   .superRefine((val, ctx) => {
+    if (val.pdf !== undefined && val.format !== 'pdf') {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['pdf'], message: "pdf options apply only to format: 'pdf'." });
+    }
+    if (val.region !== undefined && val.format !== 'png') {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['region'], message: "region applies only to format: 'png' — it renders one still of that part of the canvas." });
+    }
     // wav carries no picture, so the visual knobs are not merely ignored — a
     // caller who set them believes something about the output that is not
     // true. Said once, rather than silently dropped.

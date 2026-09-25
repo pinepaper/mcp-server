@@ -8034,6 +8034,27 @@ VERIFY MOTION BEFORE YOU RENDER. An export takes seconds to minutes and shows yo
           enum: [16, 32],
           description: 'wav only: 16 (default) or 32-bit float. Rejected for any other format.',
         },
+        pdf: {
+          type: 'object',
+          description: "pdf only: print options. paperFormat 'a4' | 'a3' | 'letter' | … | 'custom' (canvas size, default); orientation; bleed in mm (> 0 includes the bleed area); trimMarks adds crop marks; dpi 72–600.",
+          properties: {
+            paperFormat: { type: 'string' },
+            orientation: { type: 'string', enum: ['portrait', 'landscape'] },
+            bleed: { type: 'number', minimum: 0, maximum: 20 },
+            trimMarks: { type: 'boolean' },
+            dpi: { type: 'integer', minimum: 72, maximum: 600 },
+          },
+        },
+        region: {
+          type: 'object',
+          description: 'png only: export just this part of the canvas (canvas coordinates, x/y = TOP-LEFT) — carousel slices, crops. Output is the region\'s own size unless outputWidth/outputHeight say otherwise; a different aspect is covered, not stretched.',
+          properties: {
+            x: { type: 'number' }, y: { type: 'number' },
+            width: { type: 'number', exclusiveMinimum: 0 }, height: { type: 'number', exclusiveMinimum: 0 },
+            outputWidth: { type: 'integer', minimum: 1, maximum: 8192 }, outputHeight: { type: 'integer', minimum: 1, maximum: 8192 },
+          },
+          required: ['x', 'y', 'width', 'height'],
+        },
         quality: {
           type: 'string',
           enum: ['draft', 'standard', 'high'],

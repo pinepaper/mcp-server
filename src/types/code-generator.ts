@@ -3942,7 +3942,7 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
 
   generateAgentExport(input: AgentExportInput): string {
     const validated = AgentExportInputSchema.parse(input);
-    const { platform, format, quality, framing, duration, estimateOnly, scale, fps } = validated;
+    const { platform, format, quality, framing, duration, estimateOnly, scale, fps, pdf: pdfOpts, region } = validated;
     const qualityLevel = quality || 'standard';
     const videoDuration = duration ?? 5;
 
@@ -4317,6 +4317,22 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
         break;
 
       case 'png':
+        ${region ? `// A REGION, not the whole board — carousel slices, crops. renderRegionToDataURL
+        // re-renders that world rect offscreen without touching the live view;
+        // it was reachable only from custom code. A differing output aspect is
+        // covered by the engine, not stretched.
+        if (typeof app.renderRegionToDataURL !== 'function') {
+          result = { success: false, platform, format: 'png', error: 'app.renderRegionToDataURL unavailable — update PinePaper Studio to export a region.' };
+          break;
+        }
+        {
+          const rw = ${region.outputWidth ?? Math.round(region.width)}, rh = ${region.outputHeight ?? Math.round(region.height)};
+          const regionUrl = app.renderRegionToDataURL(new paper.Rectangle(${region.x}, ${region.y}, ${region.width}, ${region.height}), rw, rh);
+          result = { success: true, platform, format: 'png', data: regionUrl, mimeType: 'image/png',
+            size: Math.round(String(regionUrl).length * 0.75), dimensions: { width: rw, height: rh },
+            region: ${JSON.stringify({ x: region.x, y: region.y, width: region.width, height: region.height })} };
+        }
+        break;` : ''}
         if (app.exportEngine && app.exportEngine.exportPNG) {
           // PNG IGNORED THE PLATFORM ENTIRELY.
           //
@@ -4494,7 +4510,12 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
 
       case 'pdf':
         if (app.exportEngine && app.exportEngine.exportPDF) {
-          const pdfOut = await app.exportEngine.exportPDF({ dpi: settings.dpi });
+          // Print options reach the engine (they were engine-only before), and
+          // download:false, because the tool delivers the bytes itself.
+          const pdfOut = await app.exportEngine.exportPDF({
+            dpi: ${pdfOpts?.dpi ?? 'settings.dpi'},
+            download: false,${pdfOpts?.paperFormat ? `\n            format: ${JSON.stringify(pdfOpts.paperFormat)},` : ''}${pdfOpts?.orientation ? `\n            orientation: ${JSON.stringify(pdfOpts.orientation)},` : ''}${pdfOpts?.bleed !== undefined ? `\n            includeBleed: ${pdfOpts.bleed > 0}, bleed: ${pdfOpts.bleed},` : ''}${pdfOpts?.trimMarks !== undefined ? `\n            trimMarks: ${pdfOpts.trimMarks},` : ''}
+          });
           const blob = asBlob(pdfOut);
           if (!blob) {
             const got = pdfOut === null ? 'null'
