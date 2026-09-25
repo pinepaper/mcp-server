@@ -173,3 +173,12 @@ describe('stagger shifts keyframe tracks too (2.2)', () => {
     expect(items.c.data.timeOffset).toBeUndefined();
   });
 });
+
+describe('globe disable (2.8)', () => {
+  it('calls disableGlobeMode and says how to get a flat map back', async () => {
+    const { handleToolCall } = await import('../../tools/handlers.js');
+    const out = JSON.stringify(await handleToolCall('pinepaper_globe', { action: 'disable' }, { executionMode: 'code' } as never));
+    expect(out).toContain('disableGlobeMode()');
+    expect(out).toContain('load the map again');
+  });
+});

@@ -241,6 +241,22 @@ async function dispatchGlobe(args: Record<string, unknown>, options: HandlerOpti
       const code = codeGenerator.generateGlobeEnable(input);
       return executeOrGenerate(code, 'Enables globe (orthographic) mode', options, 'pinepaper_globe');
     }
+    case 'disable': {
+      // A WAY OUT OF GLOBE MODE (round 7 X, 2.8). There was enable and no
+      // disable, so a scene that used the globe once kept its drag handler
+      // and spin running. MapSystem.disableGlobeMode stops both; it does not
+      // re-project, so the regions stay as last drawn — said, with the route
+      // back to a flat map.
+      const code = `(function() {
+  if (!app.mapSystem || typeof app.mapSystem.disableGlobeMode !== 'function') {
+    return { success: false, action: 'disable', error: 'disableGlobeMode unavailable on this build (update the canvas)' };
+  }
+  app.mapSystem.disableGlobeMode();
+  return { success: true, action: 'disable',
+    note: 'globe mode is off (spin, drag and rotation stopped). The regions keep the globe projection they were last drawn in; to get a flat map back, load the map again with pinepaper_map {action: "load"}.' };
+})();`;
+      return executeOrGenerate(code, 'Leaves globe mode', options, 'pinepaper_globe');
+    }
     case 'rotate_to': {
       const input = GlobeRotateToInputSchema.parse(args);
       const code = codeGenerator.generateGlobeRotateTo(input);

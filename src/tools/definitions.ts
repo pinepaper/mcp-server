@@ -6583,6 +6583,7 @@ ACTIONS:
 
 ACTIONS:
 - enable      — { rotation?: [lambda,phi,gamma], momentum?, showOcean? }     switch to globe mode
+- disable     — {}                                                           leave globe mode: stops spin, drag and rotation (reload the map for a flat projection)
 - rotate_to   — { lon, lat, duration? }                                       versor-slerp the globe to face a coordinate
 - spin        — { speed?, axis?: "longitude"|"latitude", duration? }          continuous auto-rotation
 - world_tour  — { regions?: string[] | coords?: [lon,lat][], dwell?, travel?, tilt?, loop?, easing?, highlightColors?: string[], showLabels?, labelColor? }   the headline: the globe swings to each stop, highlighting it (requires regions OR coords)
@@ -6592,7 +6593,7 @@ ACTIONS:
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['enable', 'rotate_to', 'spin', 'world_tour', 'stop_tour', 'pin_item', 'tour_item'], description: 'Globe action' },
+        action: { type: 'string', enum: ['enable', 'disable', 'rotate_to', 'spin', 'world_tour', 'stop_tour', 'pin_item', 'tour_item'], description: 'Globe action' },
         rotation: { type: 'array', items: { type: 'number' }, description: 'Initial rotation [lambda, phi, gamma] (enable)' },
         momentum: { type: 'boolean', description: 'Drag-spin inertia (enable)' },
         showOcean: { type: 'boolean', description: 'Render ocean sphere (enable)' },
