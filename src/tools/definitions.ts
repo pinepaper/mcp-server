@@ -627,6 +627,11 @@ thousands of authored items.
 - Example — a rolling swell: xExpr "(i % 120) * 8", yExpr "400 + sin((i % 120) * 0.4 - t * 2) * 12", count 3600`,
           additionalProperties: true,
         },
+        anchor: {
+          type: 'string',
+          enum: ['center', 'top-left', 'top-right', 'bottom-left', 'bottom-right'],
+          description: "Which point of the item `position` names (default center). Same as properties.anchor — for a pixel-exact slot use 'top-left' with whole numbers.",
+        },
         data: {
           type: 'object',
           description: 'Item data flags for selection and behavior control',

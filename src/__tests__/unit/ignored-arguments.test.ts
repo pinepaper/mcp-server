@@ -17,6 +17,13 @@ describe('ignoredArgumentsNote', () => {
   });
 
   it('is silent for tools not in the table', () => {
-    expect(ignoredArgumentsNote('pinepaper_create_item', { anything: 1 })).toBeNull();
+    expect(ignoredArgumentsNote('pinepaper_add_relation', { anything: 1 })).toBeNull();
+  });
+
+  it('create_item names shape properties passed beside properties, and accepts a top-level anchor', () => {
+    const note = ignoredArgumentsNote('pinepaper_create_item', { itemType: 'rectangle', anchor: 'top-left', width: 615, properties: {} });
+    expect(note).toContain('width is not a parameter');
+    expect(note).toContain('INSIDE properties');
+    expect(note).toMatch(/^IGNORED ARGUMENTS: width is not/);
   });
 });

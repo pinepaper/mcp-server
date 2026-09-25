@@ -2127,6 +2127,7 @@ export class PinePaperCodeGenerator {
     if (validated.animationIntensity !== undefined) properties.animationIntensity = validated.animationIntensity;
     if (validated.animationDelay !== undefined) properties.animationDelay = validated.animationDelay;
     if (validated.keyframes !== undefined) properties.keyframes = validated.keyframes;
+    if (validated.anchor !== undefined && properties.anchor === undefined && properties.origin === undefined) properties.anchor = validated.anchor;
     return generateCreateItemCode(
       validated.itemType,
       validated.position,

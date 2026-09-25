@@ -1293,8 +1293,16 @@ function measureResponseBytes(result: CallToolResult): number {
  */
 const IGNORED_ARGUMENT_SCHEMAS: Readonly<Record<string, z.ZodTypeAny>> = {
   pinepaper_agent_export: AgentExportInputSchema,
+  // A shape property passed beside `properties` instead of inside it is the
+  // common slip here (round 7 retest, 1.63).
+  pinepaper_create_item: CreateItemInputSchema,
+  pinepaper_modify_item: ModifyItemInputSchema,
 };
 const IGNORED_ARGUMENT_HINTS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  pinepaper_create_item: Object.fromEntries(['width', 'height', 'radius', 'color', 'fillColor', 'strokeColor', 'strokeWidth', 'content', 'fontSize', 'fontFamily', 'opacity', 'rotation', 'x', 'y']
+    .map((k) => [k, 'Shape properties go INSIDE properties: {…}; only itemType, position, anchor, properties, animation*, keyframes and data are top-level.'])),
+  pinepaper_modify_item: Object.fromEntries(['width', 'height', 'radius', 'color', 'fillColor', 'strokeColor', 'strokeWidth', 'content', 'fontSize', 'fontFamily', 'opacity', 'rotation', 'x', 'y', 'scale']
+    .map((k) => [k, 'Changes go INSIDE properties: {…}; only itemId, properties and data are top-level.'])),
   pinepaper_agent_export: {
     loop: 'There is no loop switch on export: a loop is seamless when the animation is keyed to the SAME state at t = 0 and at t = duration (the export stops one frame before duration, so no frame is doubled at the wrap). GIF exports already loop forever.',
     seamless: 'Same as loop: key t = 0 and t = duration to the same state and export exactly that duration.',

@@ -189,3 +189,10 @@ describe('globe disable (2.8)', () => {
     expect(out).toContain('load the map again');
   });
 });
+
+describe('top-level anchor on create_item (1.63)', () => {
+  it('is carried into properties', () => {
+    const code = codeGenerator.generateCreateItem({ itemType: 'rectangle', position: { x: 10, y: 10 }, anchor: 'top-left', properties: { width: 615, height: 345 } } as never);
+    expect(code).toContain('"anchor": "top-left"');
+  });
+});

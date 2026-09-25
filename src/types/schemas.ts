@@ -1248,6 +1248,10 @@ export const CreateItemInputSchema = z.object({
   animationDelay: z.number().optional().describe('Loop animation start delay in seconds.'),
   keyframes: z.array(KeyframeSchema).optional().describe('Required when animationType is "keyframe". Inline keyframe array attached at creation.'),
   data: ItemDataFlagsSchema.optional(),
+  // Also accepted at the top level: it names which point `position` is, so it
+  // is read beside position as often as inside properties — and at the top
+  // level it was stripped without a word (round 7 retest, 1.63).
+  anchor: z.string().optional().describe("Which point position names: 'center' (default), 'top-left', 'top-right', 'bottom-left', 'bottom-right'. Same as properties.anchor."),
 });
 
 // Light direction for 3D effects
