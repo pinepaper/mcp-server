@@ -2035,7 +2035,7 @@ EXAMPLE: { action: 'upload_video', url: 'https://…/clip.mp4', scale: 0.5, time
         strength: { type: 'number', description: 'apply_track_matte: 0–1.' },
         hideMatte: { type: 'boolean', description: 'apply_track_matte: hide the matte item after applying.' },
         live: { type: 'boolean', description: 'apply_track_matte: keep re-cutting as the matte moves/animates — the kinetic mask reveal. Omitted = bake once, destructively.' },
-        url: { type: 'string', description: 'Media URL — required for upload_video / upload_audio.' },
+        url: { type: 'string', description: "Required for upload_video / upload_audio: an http(s) URL, a data: URL, or a PATH TO A LOCAL FILE. Remote URLs and local files are fetched/read by the server (the page may not fetch third-party hosts), so stock music and SFX links work; the HTTP status or content-type is named if one does not. Up to 48 MB." },
         id: { type: 'string', description: 'Media id — required for remove / set_playback_rate / set_clip.' },
         rate: { type: 'number', description: 'Playback rate 0.25–4 — set_playback_rate.' },
         inPoint: { type: 'number', description: 'Clip in-point (media-time s) — set_clip.' },

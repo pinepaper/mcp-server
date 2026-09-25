@@ -385,6 +385,73 @@ export async function resolveImageSource(input: string): Promise<{ src: string }
   return { src: `data:${IMAGE_MIME[ext] ?? 'application/octet-stream'};base64,${bytes.toString('base64')}` };
 }
 
+/**
+ * Audio / video for pinepaper_media upload, fetched or read BY THE SERVER.
+ *
+ * The page cannot do it on production: its CSP refuses fetch() of a third-party
+ * host, so upload_audio of a working https URL (Wikimedia's Example.ogg, 200
+ * from anywhere else) failed "Failed to fetch (upload.wikimedia.org)" — every
+ * stock music and SFX URL was unusable. Same answer as remote images: the
+ * server fetches, and the page receives bytes (decoded to a File in the page,
+ * never fetch()ed there — see generateMedia).
+ *
+ * A User-Agent is sent because some media hosts (Wikimedia among them) refuse
+ * anonymous clients. The content-type check accepts audio/*, video/*,
+ * application/ogg, and a generic binary type when the extension says media;
+ * an HTML page around the file is refused by name.
+ */
+const MEDIA_MIME: Record<string, string> = {
+  '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.ogg': 'audio/ogg', '.oga': 'audio/ogg', '.m4a': 'audio/mp4',
+  '.aac': 'audio/aac', '.flac': 'audio/flac', '.opus': 'audio/ogg',
+  '.mp4': 'video/mp4', '.m4v': 'video/mp4', '.webm': 'video/webm', '.mov': 'video/quicktime', '.ogv': 'video/ogg',
+};
+const MAX_MEDIA_BYTES = 48 * 1024 * 1024;
+
+export async function resolveMediaSource(input: string): Promise<{ src: string } | { error: string }> {
+  const raw = input.trim();
+  if (/^data:/i.test(raw)) return { src: raw };
+  const tooBig = (what: string, n: number) => ({
+    error: `${what} is ${(n / 1024 / 1024).toFixed(1)} MB, above the ${MAX_MEDIA_BYTES / 1024 / 1024} MB upload cap for this tool. Trim or re-encode it, or upload it in the studio itself.`,
+  });
+
+  if (/^https?:/i.test(raw)) {
+    let res: Response;
+    try {
+      res = await fetch(raw, { redirect: 'follow', headers: { 'User-Agent': 'PinePaper-MCP (+https://pinepaper.studio)' } });
+    } catch (e) {
+      const why = e instanceof Error ? e.message : 'network request failed';
+      return { error: `could not reach ${raw} — ${why}. This fetch runs in the MCP server, not the page, so it is not a CSP problem: check the host resolves and any proxy is reachable.` };
+    }
+    if (!res.ok) return { error: `the server refused ${raw} — HTTP ${res.status} ${res.statusText || ''}`.trim() };
+    let type = (res.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
+    const extType = MEDIA_MIME[extname(new URL(raw).pathname).toLowerCase()];
+    if (!type || type === 'application/octet-stream' || type === 'binary/octet-stream') type = extType ?? type;
+    if (type === 'application/ogg') type = 'audio/ogg';
+    if (!/^(audio|video)\//.test(type)) {
+      return { error: `${raw} served "${type || 'no content-type'}", not audio or video. A URL that returns an HTML page around the file will do this — link the file itself.` };
+    }
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.length > MAX_MEDIA_BYTES) return tooBig(raw, buf.length);
+    return { src: `data:${type};base64,${buf.toString('base64')}` };
+  }
+
+  const path = raw.startsWith('file://') ? fileURLToPath(raw) : raw;
+  const type = MEDIA_MIME[extname(path).toLowerCase()];
+  if (!type) {
+    return { error: `"${input}" is neither an http(s) URL, a data: URL, nor a path to an audio/video file. Recognised extensions: ${Object.keys(MEDIA_MIME).join(', ')}.` };
+  }
+  try {
+    const info = await stat(path);
+    if (!info.isFile()) return { error: `"${path}" is not a file.` };
+    if (info.size > MAX_MEDIA_BYTES) return tooBig(`"${path}"`, info.size);
+    const bytes = await readFile(path);
+    return { src: `data:${type};base64,${bytes.toString('base64')}` };
+  } catch (e) {
+    const why = e instanceof Error ? e.message : 'unknown error';
+    return { error: `could not read "${path}": ${why}. Paths are resolved from the server's working directory, so pass an absolute path if in doubt.` };
+  }
+}
+
 export function getFileExtension(format: string): string {
   const extMap: Record<string, string> = { mp4: 'mp4', webm: 'webm', gif: 'gif', pdf: 'pdf', png: 'png', svg: 'svg', wav: 'wav' };
   return extMap[format] || format;
@@ -1679,11 +1746,21 @@ async function handleToolCallInner(
         // result, because the bytes were inlined into the generated code and
         // the governor's transform bails at that size, taking the return value
         // with it. Same threshold and route as import_image.
-        const url = (input as { url?: unknown }).url;
-        const staged = (input.action === 'upload_audio' || input.action === 'upload_video')
-          && typeof url === 'string' && url.startsWith('data:') && url.length > 64_000;
+        const isUpload = input.action === 'upload_audio' || input.action === 'upload_video';
+        let url = (input as { url?: unknown }).url;
+        // Remote URLs and local paths are fetched/read HERE and arrive in the
+        // page as bytes — see resolveMediaSource.
+        if (isUpload && typeof url === 'string') {
+          const resolved = await resolveMediaSource(url);
+          if ('error' in resolved) {
+            return errorResult(ErrorCodes.INVALID_PARAMS, resolved.error, { url }, { toolName: 'pinepaper_media' });
+          }
+          url = resolved.src;
+        }
+        const staged = isUpload && typeof url === 'string' && url.startsWith('data:') && url.length > 64_000;
         const stageKey = staged ? `media_${Date.now().toString(36)}` : undefined;
-        const code = codeGenerator.generateMedia(staged ? { ...input, url: `__ppStage:${stageKey}` } as typeof input : input);
+        const forCode = isUpload ? { ...input, url: staged ? `__ppStage:${stageKey}` : url } as typeof input : input;
+        const code = codeGenerator.generateMedia(forCode);
         return executeOrGenerate(
           code, `Media: ${input.action}`, options, 'pinepaper_media',
           staged ? { [stageKey!]: url as string } : undefined,
