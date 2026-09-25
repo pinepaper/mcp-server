@@ -1034,6 +1034,28 @@ function generateMovesAlongPathCode(sourceId: string, targetId: string | undefin
 }
 
 /**
+ * Parameter names a generator's docs used that the engine does not read.
+ *
+ * drawWindField was documented with `direction` and `speed`; the engine reads
+ * windDirection and windSpeed, so the documented call drew wind blowing the
+ * default way (round 8 BB, 5.56). The docs are corrected, and the published
+ * spellings are mapped because callers followed them. An explicit engine name
+ * always wins.
+ */
+const GENERATOR_PARAM_ALIASES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  drawWindField: { direction: 'windDirection', speed: 'windSpeed' },
+};
+function aliasGeneratorParams(name: string, params: Record<string, unknown>): Record<string, unknown> {
+  const map = GENERATOR_PARAM_ALIASES[name];
+  if (!map) return params;
+  const out = { ...params };
+  for (const [from, to] of Object.entries(map)) {
+    if (out[from] !== undefined && out[to] === undefined) { out[to] = out[from]; delete out[from]; }
+  }
+  return out;
+}
+
+/**
  * Template for removing relations
  */
 function generateRemoveRelationCode(
@@ -2308,7 +2330,7 @@ export class PinePaperCodeGenerator {
     const validated = ExecuteGeneratorInputSchema.parse(input);
     return generateExecuteGeneratorCode(
       validated.generatorName,
-      validated.params as Record<string, unknown>,
+      aliasGeneratorParams(validated.generatorName, (validated.params ?? {}) as Record<string, unknown>),
       validated.region
     );
   }
@@ -3960,7 +3982,7 @@ return { success: true, backgroundColor: '${bgColor}' };
 
       case 'execute_generator':
         const genName = op.generatorName || 'drawSunburst';
-        const genParams = JSON.stringify(op.generatorParams || {});
+        const genParams = JSON.stringify(aliasGeneratorParams(genName, (op.generatorParams || {}) as Record<string, unknown>));
         const genOptions = JSON.stringify(op.generatorRegion ? { region: op.generatorRegion } : {});
         return `
 await app.executeGenerator('${genName}', ${genParams}, ${genOptions});

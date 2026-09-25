@@ -6952,7 +6952,7 @@ New — Geometric:
 - drawGeometricAbstract: Mixed translucent shapes (colors, shapeCount, blendMode, rotation)
 
 New — Particles:
-- drawWindField: Directional wind particles with noise turbulence (particleCount, colors, direction, turbulence, trailLength, speed)
+- drawWindField: Directional wind particles with noise turbulence (particleCount, colors, windDirection (degrees), windSpeed, turbulence, trailLength, trailWidth, opacity, bgColor; direction / speed are accepted for windDirection / windSpeed)
 
 New — Textures:
 - drawNoiseTexture: Perlin/grain/stipple noise (noiseType: perlin|grain|stipple, colors, scale, density, animated)

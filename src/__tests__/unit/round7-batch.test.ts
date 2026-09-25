@@ -276,3 +276,12 @@ describe('batch modify is modify_item (1.67)', () => {
     expect(item.fillColor).toBeNull();
   });
 });
+
+describe('generator param aliases (5.56)', () => {
+  it('drawWindField direction / speed reach windDirection / windSpeed', () => {
+    const code = codeGenerator.generateExecuteGenerator({ generatorName: 'drawWindField', params: { direction: 135, speed: 2 } } as never);
+    expect(code).toContain('"windDirection": 135');
+    expect(code).toContain('"windSpeed": 2');
+    expect(code).not.toContain('"direction"');
+  });
+});
