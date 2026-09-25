@@ -366,6 +366,7 @@ function generateCreateItemCode(
   const { fit: _fitDropped, ...createProps } = baseProperties;
   void _fitDropped;
   const textDirection = itemType === 'text' ? takeDirection(createProps) : null;
+  const textTabular = itemType === 'text' && wantsTabular(createProps) === true;
   const params: Record<string, unknown> = {
     ...(omitXY ? {} : { x: position.x, y: position.y }),
     ...withRadiusAxes(createProps),
@@ -478,7 +479,7 @@ if (item && item.data) { item.data.renderAs = ${JSON.stringify(itemType)}; item.
   // refused: the item is still what the caller asked for in every other way,
   // and a refusal would cost a re-issue over one typo.
   const ignored = Object.keys(properties).filter((k) => !CREATE_KNOWN_KEYS.has(k)
-    && !(itemType === 'text' && ((TEXT_STYLE_KEYS as readonly string[]).includes(k) || k === 'fit' || (DIRECTION_KEYS as readonly string[]).includes(k))));
+    && !(itemType === 'text' && ((TEXT_STYLE_KEYS as readonly string[]).includes(k) || k === 'fit' || (DIRECTION_KEYS as readonly string[]).includes(k) || (TABULAR_KEYS as readonly string[]).includes(k))));
 
   // Build the code
   let code = `
@@ -536,6 +537,7 @@ const item = app.create('${itemType}', ${JSON.stringify(params, null, 2)});`;
   // derives it (1.90): without it the fit held the centre, and a top-left
   // anchored headline's top edge drifted on every refit.
   if (textDirection) code += emitDirectionCheck('item', textDirection);
+  if (textTabular) code += emitTabularCheck('item');
   if (textFit) code += `\nlet __textFit = null;${emitTextFit('item', textFit, JSON.stringify(anchorHold(properties.anchor ?? properties.origin) ?? null))}`;
 
   // After opacity, so the "on" level of the lifetime is the item's own.
@@ -568,7 +570,7 @@ const itemId = item.data.registryId;
 app.historyManager.saveState();
 
 // Return item info
-({ itemId, type: '${itemType}'${textFit ? ', textFit: __textFit' : ''}${textDirection ? ', direction: __direction' : ''}, position: ${omitXY ? `(item.position ? { x: item.position.x, y: item.position.y } : null)` : `{ x: ${position.x}, y: ${position.y} }`}${hasLifetime ? ', lifetime: __lifetime' : ''}${loadsFont ? ', ...(__font ? { font: __font } : {})' : ''}${ignored.length > 0
+({ itemId, type: '${itemType}'${textFit ? ', textFit: __textFit' : ''}${textDirection ? ', direction: __direction' : ''}${textTabular ? ', tabularFigures: __tabular' : ''}, position: ${omitXY ? `(item.position ? { x: item.position.x, y: item.position.y } : null)` : `{ x: ${position.x}, y: ${position.y} }`}${hasLifetime ? ', lifetime: __lifetime' : ''}${loadsFont ? ', ...(__font ? { font: __font } : {})' : ''}${ignored.length > 0
     ? `, ignoredProperties: ${JSON.stringify(ignored)}, warning: ${JSON.stringify(
       `${ignored.join(', ')} ${ignored.length > 1 ? 'are' : 'is'} not read when creating an item, so ${ignored.length > 1 ? 'they had' : 'it had'} no effect. `
       + 'Check the spelling against this item type\'s documented properties.',
@@ -597,7 +599,7 @@ const MODIFY_KNOWN_KEYS: ReadonlySet<string> = new Set([
   ...NORMALIZE_PARAM_READS,
   'contentType', 'contentFormat', 'countdownTarget', 'countdownEndText',
   'audioGain', 'volume', 'gain', 'bornAt', 'ttl', 'smoothing',
-  'fontStyle', 'leading', 'lineHeight', 'skewX', 'skewY', 'matrix', 'fit', 'direction', 'textDirection', 'dir',
+  'fontStyle', 'leading', 'lineHeight', 'skewX', 'skewY', 'matrix', 'fit', 'direction', 'textDirection', 'dir', 'tabularFigures', 'fontVariantNumeric', 'fontFeatures',
 ]);
 
 /** Spellings callers reach for, and the key the engine actually reads. */
@@ -722,6 +724,32 @@ const __direction = (function(it) {
   return it.data && it.data.direction === ${v}
     ? { applied: true, value: ${v} }
     : { applied: false, note: 'this studio does not set a paragraph direction (it needs an engine with RTL text support): the text is laid out left-to-right.' };
+})(${itemExpr});`;
+}
+
+/**
+ * Tabular (fixed-width) figures (FxTool 3354d51c): a counter or price column
+ * that does not jitter as its digits change. The engine reads all three
+ * spellings on create and modify itself; this only reports whether it took
+ * them, because an engine without them accepts the key and draws
+ * proportional digits.
+ */
+const TABULAR_KEYS = ['tabularFigures', 'fontVariantNumeric', 'fontFeatures'] as const;
+function wantsTabular(p: Record<string, unknown>): boolean | null {
+  if (!TABULAR_KEYS.some((k) => p[k] !== undefined)) return null;
+  if (p.tabularFigures === true) return true;
+  if (typeof p.fontVariantNumeric === 'string' && /tabular-nums/.test(p.fontVariantNumeric)) return true;
+  const f = p.fontFeatures;
+  const list = Array.isArray(f) ? f.map(String) : typeof f === 'string' ? [f] : f && typeof f === 'object' ? Object.keys(f).filter((k) => (f as Record<string, unknown>)[k]) : [];
+  return list.some((x) => /\btnum\b/.test(x));
+}
+function emitTabularCheck(itemExpr: string): string {
+  return `
+const __tabular = (function(it) {
+  if (!it || it.className !== 'PointText') return { applied: false, note: 'tabular figures apply to text items only.' };
+  return it.data && it.data.tabularFigures === true
+    ? { applied: true }
+    : { applied: false, note: 'this studio does not lay out tabular figures (it needs an engine with them): digits keep their proportional widths. A monospaced font is the fallback.' };
 })(${itemExpr});`;
 }
 
@@ -936,6 +964,7 @@ function generateModifyItemCode(
   // engine's "stop fitting".
   if (restProperties.fit && typeof restProperties.fit === 'object') delete restProperties.fit;
   const modDirection = takeDirection(restProperties);
+  const modTabular = wantsTabular(restProperties) === true;
 
   // modifyItem(id, changes), NOT select() + modify().
   //
@@ -1077,8 +1106,8 @@ if (_flagged && _flagged.item && _flagged.item.data) Object.assign(_flagged.item
   )}`;
   code += `
 app.historyManager.saveState();
-${modDirection ? emitDirectionCheck(`app.getItemById('${itemId}')`, modDirection) : ''}
-return { success: true, itemId: '${itemId}'${modFit ? ', textFit: __textFit' : ''}${modDirection ? ', direction: __direction' : ''}${affine ? `, affine: ${JSON.stringify({ skewX, skewY, matrix, note: 'applied to the current shape: calling again compounds it. To undo, apply the inverse (negative skew, or the inverse matrix).' })}` : ''}${modLifetime ? ', lifetime: __lifetime' : ''}${modFont ? ', ...(__font ? { font: __font } : {})' : ''}${modWarning} };`;
+${modDirection ? emitDirectionCheck(`app.getItemById('${itemId}')`, modDirection) : ''}${modTabular ? emitTabularCheck(`app.getItemById('${itemId}')`) : ''}
+return { success: true, itemId: '${itemId}'${modFit ? ', textFit: __textFit' : ''}${modDirection ? ', direction: __direction' : ''}${modTabular ? ', tabularFigures: __tabular' : ''}${affine ? `, affine: ${JSON.stringify({ skewX, skewY, matrix, note: 'applied to the current shape: calling again compounds it. To undo, apply the inverse (negative skew, or the inverse matrix).' })}` : ''}${modLifetime ? ', lifetime: __lifetime' : ''}${modFont ? ', ...(__font ? { font: __font } : {})' : ''}${modWarning} };`;
 
   // Wrapped, because the body now RETURNS early on a miss rather than falling
   // through to an unconditional success. Async only when a font must load

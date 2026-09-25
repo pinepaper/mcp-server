@@ -745,3 +745,46 @@ describe('paragraph direction (FxTool a3b4e7c3, 1.16)', () => {
     expect(out).toContain('"direction\\": \\"rtl\\"');
   });
 });
+
+describe('tabular figures (FxTool 3354d51c)', () => {
+  const studio = (records: boolean) => {
+    const item: Record<string, any> = { className: 'PointText', data: { registryId: 'item_1' }, bringToFront() {} };
+    const seen: Array<Record<string, unknown>> = [];
+    const take = (p: Record<string, unknown>) => { seen.push(p); if (records && (p.tabularFigures === true || /tabular-nums/.test(String(p.fontVariantNumeric)) || JSON.stringify(p.fontFeatures ?? '').includes('tnum'))) item.data.tabularFigures = true; };
+    const app = {
+      create: (_t: string, p: Record<string, unknown>) => { take(p); return item; },
+      modifyItem: (_id: string, ch: Record<string, unknown>) => { take(ch); return true; },
+      getItemById: () => item, itemRegistry: { get: () => ({ item }) }, historyManager: { saveState() {} },
+    };
+    return { app, seen };
+  };
+  const create = (app: object, properties: Record<string, unknown>) => {
+    const code = codeGenerator.generateCreateItem({ itemType: 'text', position: { x: 0, y: 0 }, properties } as never);
+    return new Function('app', code.replace(/\(\{ itemId[\s\S]*\}\);\s*$/, (m) => `return ${m.slice(0, -1)}`))(app);
+  };
+
+  it('every spelling reaches the engine, is not reported ignored, and is confirmed', () => {
+    for (const p of [{ tabularFigures: true }, { fontVariantNumeric: 'tabular-nums' }, { fontFeatures: ['tnum'] }, { fontFeatures: { tnum: 1 } }]) {
+      const s = studio(true);
+      const r = create(s.app, { content: '$1,299', ...p });
+      expect(s.seen[0]).toMatchObject(p);
+      expect(r.ignoredProperties).toBeUndefined();
+      expect(r.tabularFigures).toEqual({ applied: true });
+    }
+  });
+
+  it('a studio without them says so; modify is checked too', () => {
+    expect(create(studio(false).app, { content: '1', tabularFigures: true }).tabularFigures).toMatchObject({ applied: false });
+    const s = studio(true);
+    const r = new Function('app', 'window', `return ${codeGenerator.generateModifyItem({ itemId: 'item_1', properties: { fontVariantNumeric: 'tabular-nums' } })}`)(s.app, {});
+    expect(s.seen[0]).toEqual({ fontVariantNumeric: 'tabular-nums' });
+    expect(r.tabularFigures).toEqual({ applied: true });
+    expect(r.ignoredProperties).toBeUndefined();
+  });
+
+  it('turning them off is passed on, with no check', () => {
+    const r = create(studio(true).app, { content: '1', tabularFigures: false });
+    expect(r.tabularFigures).toBeUndefined();
+    expect(r.ignoredProperties).toBeUndefined();
+  });
+});
