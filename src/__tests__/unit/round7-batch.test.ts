@@ -301,6 +301,7 @@ describe('small canvas refusal names the region recipe (1.48)', () => {
     const r = SetCanvasSizeInputSchema.safeParse({ width: 728, height: 90 });
     expect(r.success).toBe(false);
     expect(JSON.stringify(r.error)).toContain('outputWidth:728');
+    expect(JSON.stringify(r.error)).toContain('scale: 0.5');
   });
 });
 
