@@ -288,7 +288,8 @@ function generateCreateItemCode(
   itemType: ItemType,
   position: { x: number; y: number },
   properties: Record<string, unknown>,
-  dataFlags?: Record<string, unknown>
+  dataFlags?: Record<string, unknown>,
+  positionGiven = true,
 ): string {
   // Extract special properties that need separate handling
   const {
@@ -307,9 +308,16 @@ function generateCreateItemCode(
     ...baseProperties
   } = properties;
 
+  // A PATH KEEPS ITS OWN COORDINATES WHEN NO POSITION WAS ASKED FOR (round 9
+  // HH, 1.81). The schema defaults position to (400, 300), and the engine
+  // places pathData AT x / y (so origin-centred data can be positioned) — so a
+  // pathData path authored in canvas coordinates was moved to the default,
+  // off by (+99.5, -170). The segments form was untouched only by accident of
+  // the engine's branch. With no position from the caller, a coordinate-built
+  // item (path from pathData / segments, line, arc) gets no x / y at all.
+  const omitXY = !positionGiven && isCoordinateBuilt(itemType, properties);
   const params: Record<string, unknown> = {
-    x: position.x,
-    y: position.y,
+    ...(omitXY ? {} : { x: position.x, y: position.y }),
     ...withRadiusAxes(baseProperties),
   };
 
@@ -529,7 +537,7 @@ const itemId = item.data.registryId;
 app.historyManager.saveState();
 
 // Return item info
-({ itemId, type: '${itemType}', position: { x: ${position.x}, y: ${position.y} }${hasLifetime ? ', lifetime: __lifetime' : ''}${loadsFont ? ', ...(__font ? { font: __font } : {})' : ''}${ignored.length > 0
+({ itemId, type: '${itemType}', position: ${omitXY ? `(item.position ? { x: item.position.x, y: item.position.y } : null)` : `{ x: ${position.x}, y: ${position.y} }`}${hasLifetime ? ', lifetime: __lifetime' : ''}${loadsFont ? ', ...(__font ? { font: __font } : {})' : ''}${ignored.length > 0
     ? `, ignoredProperties: ${JSON.stringify(ignored)}, warning: ${JSON.stringify(
       `${ignored.join(', ')} ${ignored.length > 1 ? 'are' : 'is'} not read when creating an item, so ${ignored.length > 1 ? 'they had' : 'it had'} no effect. `
       + 'Check the spelling against this item type\'s documented properties.',
@@ -1966,7 +1974,8 @@ function generateBatchCreateCode(items: BatchCreateItem[]): string {
     const p = Array.isArray(position) ? { x: Number(position[0]), y: Number(position[1]) }
       : (position && typeof position === 'object') ? { x: Number((position as { x: unknown }).x), y: Number((position as { y: unknown }).y) }
         : { x: typeof x === 'number' ? x : 400, y: typeof y === 'number' ? y : 300 };
-    const body = asReturningBody(generateCreateItemCode(it.type as ItemType, p, props))
+    const given = position !== undefined || typeof x === 'number' || typeof y === 'number';
+    const body = asReturningBody(generateCreateItemCode(it.type as ItemType, p, props, undefined, given))
       .replace(/app\.historyManager\.saveState\(\);/g, '');
     return `
   try {
@@ -2244,6 +2253,7 @@ export class PinePaperCodeGenerator {
    */
   generateCreateItem(input: z.infer<typeof CreateItemInputSchema>): string {
     const validated = CreateItemInputSchema.parse(input);
+    const positionGiven = (input as { position?: unknown }).position !== undefined;
     const properties = { ...(validated.properties as Record<string, unknown>) };
     if (validated.animationType !== undefined) properties.animationType = validated.animationType;
     if (validated.animationSpeed !== undefined) properties.animationSpeed = validated.animationSpeed;
@@ -2255,7 +2265,8 @@ export class PinePaperCodeGenerator {
       validated.itemType,
       validated.position,
       properties,
-      validated.data
+      validated.data,
+      positionGiven,
     );
   }
 
@@ -3923,7 +3934,7 @@ throw new Error('Unknown diagram mode action: ${action}');
         // inside this op's function.
         const pos = op.position || { x: 400, y: 300 };
         const createProps = withRadiusAxes((op.properties || {}) as Record<string, unknown>);
-        const returning = asReturningBody(generateCreateItemCode(op.itemType as ItemType, pos, { ...(op.properties || {}) } as Record<string, unknown>));
+        const returning = asReturningBody(generateCreateItemCode(op.itemType as ItemType, pos, { ...(op.properties || {}) } as Record<string, unknown>, undefined, op.position !== undefined));
         let createCode = `
 const __created = await (async function() {
 ${returning}

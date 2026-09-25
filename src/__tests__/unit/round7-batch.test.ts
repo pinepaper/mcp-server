@@ -472,3 +472,23 @@ describe('component instantiate returns its id and the keys overrides use (1.80)
     expect(r.warning).toContain('ck_9');
   });
 });
+
+describe('a pathData path keeps its coordinates without a position (1.81)', () => {
+  const params = (input: Record<string, unknown>) =>
+    JSON.parse(/app\.create\('path', ([\s\S]*?)\);\n/.exec(codeGenerator.generateCreateItem(input as never))![1]!);
+
+  it('no position → no x / y sent', () => {
+    const p = params({ itemType: 'path', properties: { pathData: 'M500 130 L700 130 L600 300 Z' } });
+    expect(p.x).toBeUndefined();
+    expect(p.y).toBeUndefined();
+  });
+
+  it('an explicit position is still honoured', () => {
+    expect(params({ itemType: 'path', position: { x: 50, y: 60 }, properties: { pathData: 'M0 0 L10 10' } })).toMatchObject({ x: 50, y: 60 });
+  });
+
+  it('a shape without its own coordinates still gets the default', () => {
+    const code = codeGenerator.generateCreateItem({ itemType: 'circle', properties: { radius: 5 } } as never);
+    expect(code).toContain('"x": 400');
+  });
+});
