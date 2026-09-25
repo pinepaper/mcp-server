@@ -203,6 +203,7 @@ import {
   DetectObjectsInput,
   ExtractObjectInput,
   ArrangeInput,
+  GeneratorRegion,
 } from './schemas.js';
 import { OntologyCompiler } from '../ontology/ontology-compiler.js';
 import { z } from 'zod';
@@ -1574,18 +1575,43 @@ function generateImportMotionCaptureCode(
 function generateExecuteGeneratorCode(
   generatorName: GeneratorName,
   params: Record<string, unknown>,
-  region?: { x: number; y: number; width: number; height: number }
+  region?: GeneratorRegion
 ): string {
-  // FxTool signature: app.executeGenerator(name, params, options).
-  // region lives in options (added in FxTool c81781c).
-  const options = region ? { region } : {};
+  const where = !region ? '' : region.width !== undefined
+    ? ` in region ${region.width}×${region.height} @ (${region.x},${region.y})`
+    : ` in the shape of ${(region.shape as { itemId: string }).itemId}`;
   return `
-// Execute ${generatorName} generator${region ? ` in region ${region.width}×${region.height} @ (${region.x},${region.y})` : ''}
-(async function() {
-  await app.executeGenerator('${generatorName}', ${JSON.stringify(params, null, 2)}, ${JSON.stringify(options)});
-  return { success: true, generator: '${generatorName}'${region ? ', region: ' + JSON.stringify(region) : ''} };
+// Execute ${generatorName} generator${where}
+(async function() {${emitGeneratorRun(generatorName, JSON.stringify(params, null, 2), region)}
 })();
 `.trim();
+}
+
+/**
+ * Run a generator, optionally into a region, and return its result. Shared by
+ * execute_generator and the batch op. FxTool signature:
+ * app.executeGenerator(name, params, options), region in options (c81781c).
+ *
+ * A SHAPED REGION (c68524a2) falls back to a plain rectangle with only a
+ * console.warn — for a missing item, or one that is not a path — and an older
+ * engine drops the shape without a word (and, given only {itemId}, has no box
+ * at all and draws full-canvas). So the item is checked first and refused by
+ * name, and the result says whether this studio clips to shapes.
+ */
+function emitGeneratorRun(generatorName: string, paramsJson: string, region?: GeneratorRegion): string {
+  const options = JSON.stringify(region ? { region } : {});
+  const itemId = region && typeof region.shape === 'object' ? region.shape.itemId : null;
+  const shaped = !!region && region.shape !== undefined && region.shape !== 'rect';
+  return `${itemId ? `
+  {
+    const __se = app.itemRegistry && app.itemRegistry.get(${JSON.stringify(itemId)});
+    const __si = __se && __se.item;
+    if (!__si) return { success: false, error: ${JSON.stringify(`region.shape names no item "${itemId}" — nothing was drawn. List items with pinepaper_get_items.`)} };
+    if (__si.className !== 'Path' && __si.className !== 'CompoundPath') return { success: false, error: ${JSON.stringify(`region.shape item "${itemId}" is a `)} + __si.className + ', and a clip needs a path (a shape, not text, a group or an image) — nothing was drawn.' };
+  }` : ''}
+  await app.executeGenerator('${generatorName}', ${paramsJson}, ${options});${shaped ? `
+  const __shapes = !!(app.generatorRegistry && typeof app.generatorRegistry._regionClipPath === 'function');` : ''}
+  return { success: true, generator: '${generatorName}'${region ? `, region: ${JSON.stringify(region)}` : ''}${shaped ? `, ...(__shapes ? {} : { regionShapeApplied: false, warning: ${JSON.stringify(`this studio does not clip generator regions to a shape, so ${typeof region!.shape === 'object' ? 'the region had no box and the generator drew across the whole canvas' : `the ${region!.shape} was drawn as a rectangle`}. It needs an engine with region shapes.`)} })` : ''} };`;
 }
 
 /**
@@ -4289,10 +4315,7 @@ return { success: true, backgroundColor: '${bgColor}' };
       case 'execute_generator':
         const genName = op.generatorName || 'drawSunburst';
         const genParams = JSON.stringify(aliasGeneratorParams(genName, (op.generatorParams || {}) as Record<string, unknown>));
-        const genOptions = JSON.stringify(op.generatorRegion ? { region: op.generatorRegion } : {});
-        return `
-await app.executeGenerator('${genName}', ${genParams}, ${genOptions});
-return { success: true, generator: '${genName}'${op.generatorRegion ? ', region: ' + JSON.stringify(op.generatorRegion) : ''} };
+        return `${emitGeneratorRun(genName, genParams, op.generatorRegion as GeneratorRegion | undefined)}
 `;
 
       case 'set_canvas_size': {

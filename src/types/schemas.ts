@@ -1433,12 +1433,37 @@ export const ImportMotionCaptureInputSchema = z.object({
 // preserve (won't wipe the canvas) and re-running the same generator replaces
 // its prior region. Different generators' regions coexist. Invalid/zero-size
 // regions fall back to full-canvas FxTool-side.
+//
+// Shape (FxTool c68524a2): the clip may be a rounded rect, ellipse, circle,
+// polygon, star, or an existing path's own geometry ({itemId}, whose bounds
+// are the box when none is given).
+export const GENERATOR_REGION_SHAPES = ['rect', 'roundedRect', 'ellipse', 'circle', 'polygon', 'star'] as const;
 export const GeneratorRegionSchema = z.object({
-  x: z.number().describe('Region top-left X in canvas coords'),
-  y: z.number().describe('Region top-left Y in canvas coords'),
-  width: z.number().positive().describe('Region width in pixels'),
-  height: z.number().positive().describe('Region height in pixels'),
-}).describe('Optional sub-region {x, y, width, height} the generator draws into.');
+  x: z.number().optional().describe('Region top-left X in canvas coords'),
+  y: z.number().optional().describe('Region top-left Y in canvas coords'),
+  width: z.number().positive().optional().describe('Region width in pixels'),
+  height: z.number().positive().optional().describe('Region height in pixels'),
+  shape: z.union([z.enum(GENERATOR_REGION_SHAPES), z.object({ itemId: z.string().min(1) })]).optional()
+    .describe("Clip shape: 'rect' (default), 'roundedRect' (+radius), 'ellipse', 'circle', 'polygon' (+sides), 'star' (+points, innerRatio), or {itemId} — clip to that path's geometry (the box defaults to its bounds)."),
+  radius: z.number().min(0).optional().describe("roundedRect corner radius (default 20% of the shorter side)."),
+  sides: z.number().int().min(3).max(64).optional().describe('polygon sides (default 6).'),
+  points: z.number().int().min(3).max(64).optional().describe('star points (default 5).'),
+  innerRatio: z.number().min(0.05).max(0.95).optional().describe('star inner radius as a fraction of the outer (default 0.5).'),
+}).superRefine((r, ctx) => {
+  const box = [r.x, r.y, r.width, r.height].filter((v) => v !== undefined).length;
+  const fromItem = typeof r.shape === 'object';
+  if (box !== 4 && !(fromItem && box === 0)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: fromItem
+      ? 'give all of x, y, width, height, or none of them (the region is then the item\'s bounds).'
+      : 'a region needs x, y, width and height — unless shape is {itemId}, which takes the item\'s bounds.' });
+  }
+  const own: Record<string, string> = { radius: 'roundedRect', sides: 'polygon', points: 'star', innerRatio: 'star' };
+  for (const [k, shape] of Object.entries(own)) {
+    if ((r as Record<string, unknown>)[k] !== undefined && r.shape !== shape) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: [k], message: `${k} applies to shape '${shape}' only.` });
+    }
+  }
+}).describe('Optional sub-region the generator draws into, clipped to a shape.');
 
 export type GeneratorRegion = z.infer<typeof GeneratorRegionSchema>;
 

@@ -247,6 +247,7 @@ export const OPTIONAL_ENGINE_METHODS: readonly string[] = [
   'clearCanvas',
   'ensureFontsLoaded',
   'fitText',
+  'generatorRegistry._regionClipPath',
   'getCanvasSize',
   'getCutoutStylePresets',
   'getDPI',
