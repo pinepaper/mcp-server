@@ -366,7 +366,18 @@ function generateCreateItemCode(
   const textFit = itemType === 'text' && baseProperties.fit && typeof baseProperties.fit === 'object' ? baseProperties.fit as Record<string, unknown> : null;
   const { fit: _fitDropped, ...createProps } = baseProperties;
   void _fitDropped;
-  const textDirection = itemType === 'text' ? takeDirection(createProps) : null;
+  let textDirection = itemType === 'text' ? takeDirection(createProps) : null;
+  // RIGHT-TO-LEFT TEXT WITH NO DIRECTION GIVEN. The engine's default is auto,
+  // but it records nothing, so nothing could confirm it. For content with any
+  // RTL script, auto is sent explicitly — recorded, so checkable — and the
+  // result says which way it resolved.
+  if (itemType === 'text' && !textDirection && typeof createProps.content === 'string' && RTL_SCRIPT.test(createProps.content)) {
+    createProps.direction = 'auto';
+    textDirection = { value: 'auto' };
+  }
+  if (textDirection && 'value' in textDirection && textDirection.value === 'auto' && typeof createProps.content === 'string') {
+    textDirection.resolved = baseDirection(createProps.content);
+  }
   const textTabular = itemType === 'text' && wantsTabular(createProps) === true;
   const params: Record<string, unknown> = {
     ...(omitXY ? {} : { x: position.x, y: position.y }),
@@ -696,7 +707,19 @@ if (typeof app.checkFont === 'function') {
  * it, which production strips.
  */
 const DIRECTION_KEYS = ['direction', 'textDirection', 'dir'] as const;
-type DirectionRequest = { value: 'auto' | 'ltr' | 'rtl' } | { error: string };
+type DirectionRequest = { value: 'auto' | 'ltr' | 'rtl'; resolved?: 'ltr' | 'rtl' } | { error: string };
+
+// The engine's rule (FxTool js/core/TextDirection.js, UAX #9 P2/P3): the
+// first STRONG character decides. Mirrored so a result can say which way
+// 'auto' went.
+const RTL_SCRIPT = /[\p{Script=Hebrew}\p{Script=Arabic}\p{Script=Syriac}\p{Script=Thaana}\p{Script=Nko}\p{Script=Samaritan}\p{Script=Mandaic}\p{Script=Adlam}\p{Script=Hanifi_Rohingya}]/u;
+function baseDirection(text: string): 'ltr' | 'rtl' {
+  for (const ch of text) {
+    if (RTL_SCRIPT.test(ch)) return 'rtl';
+    if (/\p{L}/u.test(ch)) return 'ltr';
+  }
+  return 'ltr';
+}
 function takeDirection(props: Record<string, unknown>): DirectionRequest | null {
   const key = DIRECTION_KEYS.find((k) => props[k] !== undefined && props[k] !== null && props[k] !== '');
   const raw = key ? props[key] : undefined;
@@ -723,7 +746,7 @@ const __direction = ${JSON.stringify({ applied: false, error: req.error })};`;
 const __direction = (function(it) {
   if (!it || it.className !== 'PointText') return { applied: false, note: 'direction applies to text items only.' };
   return it.data && it.data.direction === ${v}
-    ? { applied: true, value: ${v} }
+    ? { applied: true, value: ${v}${req.resolved ? `, resolved: ${JSON.stringify(req.resolved)}` : ''} }
     : { applied: false, note: 'this studio does not set a paragraph direction (it needs an engine with RTL text support): the text is laid out left-to-right.' };
 })(${itemExpr});`;
 }

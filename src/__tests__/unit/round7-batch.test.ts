@@ -739,6 +739,18 @@ describe('paragraph direction (FxTool a3b4e7c3, 1.16)', () => {
     expect(r.direction).toMatchObject({ applied: false, error: expect.stringContaining('auto, ltr, rtl') });
   });
 
+  it('right-to-left content with no direction reports auto and which way it went', () => {
+    const s = studio(true);
+    expect(create(s.app, { content: 'مرحبا بالعالم.' }).direction).toEqual({ applied: true, value: 'auto', resolved: 'rtl' });
+    expect(s.seen[0]).toMatchObject({ direction: 'auto' });
+    // First strong character decides: Latin first is ltr, even with Hebrew after.
+    expect(create(studio(true).app, { content: 'Sale — מבצע' }).direction).toMatchObject({ resolved: 'ltr' });
+    // Plain left-to-right text: no block, and nothing extra sent.
+    const plain = studio(true);
+    expect(create(plain.app, { content: 'Summer Sale' }).direction).toBeUndefined();
+    expect(plain.seen[0]).not.toHaveProperty('direction');
+  });
+
   it('survives the handler schema', async () => {
     const { handleToolCall } = await import('../../tools/handlers.js');
     const out = JSON.stringify(await handleToolCall('pinepaper_create_item', { itemType: 'text', properties: { content: 'x', dir: 'rtl' } }, { executionMode: 'code' } as never));
