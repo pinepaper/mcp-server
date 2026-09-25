@@ -54,3 +54,16 @@ describe('resolveMediaSource', () => {
     expect(await resolveMediaSource('data:audio/wav;base64,AA==')).toEqual({ src: 'data:audio/wav;base64,AA==' });
   });
 });
+
+describe('detect_objects names a blocked model download (1.36)', () => {
+  it('translates "Failed to fetch (huggingface.co)" and leaves other errors alone', async () => {
+    const { codeGenerator } = await import('../../types/code-generator.js');
+    const code = codeGenerator.generateDetectObjects({ itemId: 'item_1' } as never);
+    const run = (err: string) => new Function('app', `return ${code.replace(/^\/\/[^\n]*\n/, '')}`)(
+      { detectObjects: async () => { throw new Error(err); } });
+    const blocked = await run('Failed to fetch (huggingface.co)');
+    expect(blocked.error).toContain('content-security policy');
+    expect(blocked.error).toContain('retrying will not help');
+    expect((await run('Item is not a raster')).error).toBe('Item is not a raster');
+  });
+});

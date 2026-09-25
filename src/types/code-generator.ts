@@ -8544,6 +8544,24 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
    * with asNodes promotes each detection to a typed, image-anchored design node
    * (pp:Detected*) instead of a labeled box. Async (runs an on-device ML model).
    */
+  // THE MODEL CANNOT BE DOWNLOADED, AND THE ERROR SAID ONLY "Failed to fetch".
+  //
+  // Detection runs transformers.js in the page, which pulls the model weights
+  // from huggingface.co. pinepaper.studio's connect-src lists neither that host
+  // nor its CDN (checked against the served header), so the download is refused
+  // for every page on production — an agent read "Failed to fetch
+  // (huggingface.co)" and could not tell whether to retry, pass another image,
+  // or give up. It is a deployment fix (allow the host, or serve the weights
+  // from the studio's own origin), and the error now says so.
+  private static readonly MODEL_FETCH_HINT = `function(msg) {
+    if (/fail(ed)? to fetch|networkerror|load failed/i.test(msg) && /huggingface|hf\\.co/i.test(msg)) {
+      return 'the detection model could not be downloaded: the page could not fetch its weights from huggingface.co. '
+        + 'The studio has to allow that host in its content-security policy, or serve the weights itself — no argument to this call works around it, and retrying will not help. '
+        + 'Other image tools are unaffected. (' + msg + ')';
+    }
+    return msg;
+  }`;
+
   generateDetectObjects(input: DetectObjectsInput): string {
     const args = JSON.stringify({
       ...(input.itemId !== undefined ? { itemId: input.itemId } : {}),
@@ -8559,8 +8577,10 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
   }
   try {
     const res = await app.detectObjects(${args});
-    return Object.assign({ success: !!(res && res.ok) }, res || {});
-  } catch (e) { return { success: false, error: String((e && e.message) || e) }; }
+    const out = Object.assign({ success: !!(res && res.ok) }, res || {});
+    if (!out.success && typeof out.error === 'string') out.error = (${PinePaperCodeGenerator.MODEL_FETCH_HINT})(out.error);
+    return out;
+  } catch (e) { return { success: false, error: (${PinePaperCodeGenerator.MODEL_FETCH_HINT})(String((e && e.message) || e)) }; }
 })();`.trim();
   }
 
@@ -8584,8 +8604,10 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
   }
   try {
     const res = await app.extractObject(${args});
-    return Object.assign({ success: !!(res && res.ok) }, res || {});
-  } catch (e) { return { success: false, error: String((e && e.message) || e) }; }
+    const out = Object.assign({ success: !!(res && res.ok) }, res || {});
+    if (!out.success && typeof out.error === 'string') out.error = (${PinePaperCodeGenerator.MODEL_FETCH_HINT})(out.error);
+    return out;
+  } catch (e) { return { success: false, error: (${PinePaperCodeGenerator.MODEL_FETCH_HINT})(String((e && e.message) || e)) }; }
 })();`.trim();
   }
 
