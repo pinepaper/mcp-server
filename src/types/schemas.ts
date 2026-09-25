@@ -4428,6 +4428,13 @@ export const World3DInputSchema = z.object({
     segments: z.number().optional().describe('extrude_path: segments along the sweep · lathe_path: segments around the revolution.'),
     arc: z.number().optional().describe('lathe_path: how far round to revolve, in degrees. 360 is a full solid of revolution; less leaves it open.'),
     flatness: z.number().optional().describe('Curve flattening tolerance when the path is sampled into rings — smaller is finer and heavier.'),
+    // 5.64: these were read by the generator (65a1a21) but not declared here,
+    // so z.object() stripped them before it ran — every mesh came out the
+    // default grey. Declared, and tested through the handler this time.
+    color: z.union([z.string(), z.array(z.number())]).optional().describe('Mesh colour: hex or [r,g,b] (0..255 or 0..1). Default light grey.'),
+    metalness: z.number().min(0).max(1).optional(),
+    roughness: z.number().min(0).max(1).optional(),
+    uniforms: z.record(z.string(), z.unknown()).optional().describe('Raw shader uniforms (diffuse, metalness, roughness …) — win over color / metalness / roughness.'),
     x: z.number().optional().describe('Placement in world space.'),
     y: z.number().optional().describe('Placement in world space (omit to let it sit where the terrain puts it).'),
     z: z.number().optional().describe('Placement in world space.'),

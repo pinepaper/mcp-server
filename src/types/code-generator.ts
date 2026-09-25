@@ -4937,7 +4937,10 @@ ${stillTime !== undefined ? `
         // width/height ride along ONLY when a scale was asked for. The buffered
         // fallback paths otherwise export at canvas size, and quietly changing
         // that for every existing caller is not what a new optional knob does.
-        const baseVideoSettings = { format, fps: settings.fps, quality: settings.compression, duration: ${videoDuration}${scale !== undefined && scale !== 1 ? ', width: dimensions.width, height: dimensions.height' : ''} };
+        // loop rides in the BASE settings for a gif, so every route carries it:
+        // the direct one below, and also camera framing and a studio without
+        // _quickExportVideo, which build from these and used to drop it.
+        const baseVideoSettings = { format, fps: settings.fps, quality: settings.compression, duration: ${videoDuration}${scale !== undefined && scale !== 1 ? ', width: dimensions.width, height: dimensions.height' : ''}${gifLoop !== undefined ? `, ...(format === 'gif' ? { loop: ${JSON.stringify(gifLoop)} } : {})` : ''} };
 
         // THE EXPORT STORE. A long export cannot come back as one base64
         // string: base64 of a gigabyte is larger than the gigabyte, and it

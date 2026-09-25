@@ -596,3 +596,18 @@ describe('camera_animate duration is optional (retest)', () => {
     expect(out).toContain('over 7.5s');
   });
 });
+
+describe('through the HANDLER: mesh colour and gif loop survive the schema', () => {
+  it('world3d extrude_path mesh.color reaches the diffuse uniform (5.64)', async () => {
+    const { handleToolCall } = await import('../../tools/handlers.js');
+    const out = JSON.stringify(await handleToolCall('pinepaper_world3d', { action: 'extrude_path', pathId: 'item_1', mesh: { depth: 10, color: '#f97316' } }, { executionMode: 'code' } as never));
+    expect(out).toContain('\\"diffuse\\":[0.9764705882352941,0.45098039215686275,0.08627450980392157]');
+  });
+
+  it('agent_export gif loop is in the base settings every route builds from (8.30)', async () => {
+    const { handleToolCall } = await import('../../tools/handlers.js');
+    const out = JSON.stringify(await handleToolCall('pinepaper_agent_export', { format: 'gif', loop: 1, duration: 2 }, { executionMode: 'code' } as never));
+    // out is JSON-stringified: a line break is the two characters \n, so stop at a backslash.
+    expect(out).toMatch(/const baseVideoSettings = \{[^\\]*loop: 1/);
+  });
+});
