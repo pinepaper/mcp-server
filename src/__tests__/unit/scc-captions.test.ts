@@ -54,6 +54,19 @@ describe('buildScc', () => {
     expect(r.delayed).toEqual([]);
   });
 
+  it('a cue clears ON its stop when a gap follows, even while the next one loads (retest 01542e7)', () => {
+    // Cue 1 ends at 2.0 s (frame 60); cue 2 starts at 2.5 s (frame 75).
+    // Cue 2 is two full rows: ~40 words to load, so its load overlaps cue 1's stop.
+    const r = buildScc([{ start: 1, stop: 2, text: 'First caption here' }, { start: 2.5, stop: 4, text: 'A second caption that is long enough to need both rows' }]);
+    const lines = r.text.trim().split('\n\n').slice(1);
+    const clear1 = lines.find((l) => l.endsWith('942c 942c'))!;
+    expect(clear1.split('\t')[0]).toBe('00:00:02;00');
+    // Cue 2 still loads before its start and shows on time.
+    expect(r.delayed).toEqual([]);
+    const eoc2 = lines.filter((l) => l.endsWith('942f 942f'))[1];
+    expect(eoc2.split('\t')[0]).toBe('00:00:02;15'); // frame round(2.5 * 29.97) = 75
+  });
+
   it('back-to-back cues swap without a clear, and never load over a caption not yet shown', () => {
     const r = buildScc([{ start: 1, stop: 2, text: 'A' }, { start: 2, stop: 3, text: 'B' }]);
     const words = r.text.split('\n\n').slice(1).map((l) => l.split('\t')[1]);

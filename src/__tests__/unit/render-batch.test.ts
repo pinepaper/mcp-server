@@ -22,6 +22,7 @@ function fakeStudio() {
         return { success: true, result: { success: true, platform: 'auto', format: 'pdf', data: 'data:application/pdf;base64,JVBERi0xLjQK', mimeType: 'application/pdf', size: 9,
           fidelity: { warnings: calls.filter((c) => c === 'export').length === 2 ? [{ code: 'text_overflow', message: 'headline overflows' }] : [] } } };
       }
+      if (code.includes('ids.filter')) { calls.push('check'); return { success: true, result: ['b'] }; }
       calls.push('other');
       return { success: true, result: { success: true } };
     },
@@ -76,8 +77,10 @@ describe('render_batch', () => {
     expect(text(bad)).toContain('format');
     const est = await handleToolCall('pinepaper_render_batch', { rows: [{ changes: { a: { content: 'x' } } }, { changes: { b: { content: 'y' } } }], export: { format: 'png' }, estimateOnly: true },
       { executeInBrowser: true, browserController: s.controller as never, executionMode: 'puppeteer' });
-    expect(json(est)).toMatchObject({ rows: 2, itemsChanged: ['a', 'b'] });
-    expect(s.calls).toEqual([]);
+    // Item ids are checked against the live scene: 'b' is not on the canvas.
+    expect(json(est)).toMatchObject({ rows: 2, itemsChanged: ['a', 'b'], missingItems: ['b'], ok: false });
+    expect(json(est).note).toContain('b');
+    expect(s.calls).toEqual(['check']); // checked, nothing rendered
   });
 
   it('code-only mode is refused, and an empty row is invalid', async () => {

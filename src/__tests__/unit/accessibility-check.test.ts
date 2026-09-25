@@ -52,6 +52,15 @@ describe('flash', () => {
     expect(checkFlashes(series((i) => 0.4 + (i % 2) * 0.05, 60), 20).maxFlashesPerSecond).toBe(0);
   });
 
+  it('a strobe held across several samples still counts (plateaus, retest 01542e7)', () => {
+    // 5 Hz black / white at 30 fps: each state held 3 samples. Must fail.
+    expect(checkFlashes(series((i) => (Math.floor(i / 3) % 2 ? 1 : 0), 60), 30).maxFlashesPerSecond).toBeGreaterThan(3);
+    // 10 Hz sampled at 30 fps (states of 1-2 samples). Must fail.
+    expect(checkFlashes(series((i) => (Math.floor(i / 1.5) % 2 ? 1 : 0), 60), 30).maxFlashesPerSecond).toBeGreaterThan(3);
+    // 1 Hz held for 15 samples at 30 fps: passes.
+    expect(checkFlashes(series((i) => (Math.floor(i / 15) % 2 ? 1 : 0), 90), 30).failing).toEqual([]);
+  });
+
   it('changes that stay bright (darker state >= 0.8) are not flashes', () => {
     expect(checkFlashes(series((i) => (i % 2 ? 1 : 0.85), 40), 20).maxFlashesPerSecond).toBe(0);
   });

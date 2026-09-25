@@ -143,9 +143,27 @@ export function buildScc(cues: SccCue[]): SccResult {
     // The previous cue's clear and this cue's load, in time order. Loading
     // goes to off-screen memory, so it may run while the previous cue shows;
     // both come before this cue's swap.
+    // The clear lands ON the stop frame: the next load goes before it when it
+    // fits (loading is off screen, so it may run while this cue shows), and
+    // otherwise after it — never over it, which held cues on screen until the
+    // next load finished (half a second late).
+    // When the clear falls inside the load, the load is split around it: EDM
+    // erases only the DISPLAYED caption, so it is valid mid-load.
     if (pendingClear !== null && pendingClear < startF) {
-      if (pendingClear <= loadWant) { emit(pendingClear, [CTRL.EDM, CTRL.EDM]); emit(loadWant, words); }
-      else { emit(loadWant, words); emit(pendingClear, [CTRL.EDM, CTRL.EDM]); }
+      const EDM2 = [CTRL.EDM, CTRL.EDM];
+      if (Math.max(cursor, 0) + words.length <= pendingClear) {
+        emit(Math.max(cursor, pendingClear - words.length), words);
+        emit(pendingClear, EDM2);
+      } else {
+        const s0 = Math.max(cursor, startF - words.length - EDM2.length, 0);
+        if (s0 >= pendingClear) { emit(pendingClear, EDM2); emit(loadWant, words); }
+        else {
+          const k = pendingClear - s0;
+          emit(s0, words.slice(0, k));
+          emit(pendingClear, EDM2);
+          emit(cursor, words.slice(k));
+        }
+      }
     } else {
       emit(loadWant, words);
     }

@@ -21,6 +21,16 @@ export interface AdOptions {
   height: number;
   clickUrl?: string;
   cta?: CtaBox | null;
+  /** The scene's background colour, pinned over the page's own (which can be stale). */
+  background?: string | null;
+}
+
+/** A CSS colour we will write into a stylesheet: rgb()/rgba()/hex/a plain name only. */
+const SAFE_COLOR = /^(#[0-9a-f]{3,8}|rgba?\([\d.,\s%]+\)|[a-z]+)$/i;
+
+function backgroundStyle(bg: string | null | undefined): string {
+  if (!bg || !SAFE_COLOR.test(bg.trim())) return '';
+  return `\n<style>html,body,#w{background:${bg.trim()} !important}</style>`;
 }
 
 const esc = (v: string) => v.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -65,14 +75,14 @@ export function buildHtml5Ad(html: string, o: AdOptions): string {
     // The network replaces clickTag at serve time; the value here is the
     // landing page for a test, or empty.
     `<script>var clickTag = ${jsString(o.clickUrl ?? '')};</script>`,
-  ].join('\n');
+  ].join('\n') + backgroundStyle(o.background);
   // The pattern the display networks document: an anchor that opens
   // window.clickTag in a new window.
   return placeTarget(injectHead(html, head), (pos) => clickTarget('pp-clicktag', 'javascript:window.open(window.clickTag)', o.cta, 'Open the advertiser page', pos));
 }
 
 export function buildPlayable(html: string, o: AdOptions): string {
-  const head = `<script src="mraid.js"></script>`;
+  const head = `<script src="mraid.js"></script>` + backgroundStyle(o.background);
   const script = `<script>
 (function () {
   var url = ${jsString(o.clickUrl ?? '')};

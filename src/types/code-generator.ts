@@ -5183,7 +5183,11 @@ ${stillTime !== undefined ? `
         if (format === 'html5-ad' && typeof app.captureFrameDataURL === 'function') {
           try { __backup = app.captureFrameDataURL(1); } catch (_) { __backup = null; }
         }
-        result = { success: true, platform, format, adPage: __w.html, adSize: { width: __cw, height: __ch }, cta: __cta, backupImage: __backup };
+        // The background the PNG export uses (the canvas element's). The widget
+        // page prefers another record that can be stale, which served a white
+        // page under white text (8.9 again); the server pins this one.
+        const __bgc = (app.canvasEl && app.canvasEl.style && app.canvasEl.style.backgroundColor) || null;
+        result = { success: true, platform, format, adPage: __w.html, adSize: { width: __cw, height: __ch }, cta: __cta, backupImage: __backup, background: __bgc };
         break;
       }
 

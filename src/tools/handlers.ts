@@ -474,6 +474,7 @@ interface AdExportResult {
   adSize: { width: number; height: number };
   cta: CtaBox | null;
   backupImage: string | null;
+  background?: string | null;
   fidelity?: { warnings?: Array<{ code: string; message: string }>; note?: string };
   [k: string]: unknown;
 }
@@ -487,7 +488,7 @@ async function saveAdExport(r: AdExportResult, input: { ad?: { clickUrl?: string
   const exportDir = getExportDir();
   await mkdir(exportDir, { recursive: true });
   const stamp = `pinepaper_${platform}_${Date.now()}`;
-  const opts = { width: r.adSize.width, height: r.adSize.height, clickUrl: input.ad?.clickUrl, cta: r.cta };
+  const opts = { width: r.adSize.width, height: r.adSize.height, clickUrl: input.ad?.clickUrl, cta: r.cta, background: r.background };
   const warnings = [...(r.fidelity?.warnings ?? [])];
   const files: Record<string, string> = {};
   let uploadBytes: number;
@@ -524,7 +525,8 @@ async function saveAdExport(r: AdExportResult, input: { ad?: { clickUrl?: string
   }
   const { adPage: _page, backupImage: _img, ...rest } = r;
   void _page; void _img;
-  const cleanResult = { ...rest, files, uploadBytes, ...(budget !== undefined ? { sizeBudget: budget } : {}), externalRequests: external,
+  const cleanResult = { ...rest, files, uploadBytes,
+    ...(files.backupImage ? { backupNote: 'the backup image is a separate file beside the zip, not inside it: display ad servers take it as its own upload.' } : {}), ...(budget !== undefined ? { sizeBudget: budget } : {}), externalRequests: external,
     fidelity: { ...(r.fidelity ?? {}), warnings } };
   if (warnings.length && cleanResult.fidelity.note) delete cleanResult.fidelity.note;
   return {
@@ -2007,7 +2009,24 @@ async function handleToolCallInner(
         }
         const itemIds = [...new Set(input.rows.flatMap((r) => Object.keys(r.changes ?? {})))];
         if (input.estimateOnly) {
-          return dataResult({ rows: input.rows.length, itemsChanged: itemIds, export: exportCheck.data, note: 'nothing rendered. Each row runs modify_item per item, template_params when given, then agent_export.' });
+          // Item ids are checked against the live scene when there is one, so
+          // a typo shows up in the plan rather than as a failed row.
+          let missingItems: string[] | undefined;
+          if ((options.executionMode ?? getExecutionMode()) !== 'code' && options.executeInBrowser && itemIds.length) {
+            try {
+              const controller = options.browserController || getBrowserController();
+              if (!controller.connected) await controller.connect();
+              const r = await controller.executeCode(`(function() { const ids = ${JSON.stringify(itemIds)}; return ids.filter(function(id) { const e = app.itemRegistry && app.itemRegistry.get(id); return !(e && e.item); }); })();`, false);
+              if (r.success && Array.isArray(r.result)) missingItems = r.result as string[];
+            } catch { /* unchecked: said below */ }
+          }
+          return dataResult({
+            rows: input.rows.length, itemsChanged: itemIds, export: exportCheck.data,
+            ...(missingItems ? { missingItems, ok: missingItems.length === 0 } : { itemsChecked: false }),
+            note: 'nothing rendered. Each row runs modify_item per item, template_params when given, then agent_export.'
+              + (missingItems && missingItems.length ? ` These items are not on the canvas, so rows naming them would fail: ${missingItems.join(', ')}.` : '')
+              + (missingItems ? '' : ' Item ids were not checked (no live studio).'),
+          });
         }
         if ((options.executionMode ?? getExecutionMode()) === 'code' || !options.executeInBrowser) {
           return errorResult(ErrorCodes.VALIDATION_ERROR, 'render_batch renders each row, so it needs a live studio (browser execution). In code-only mode, call modify_item and agent_export per row yourself.');

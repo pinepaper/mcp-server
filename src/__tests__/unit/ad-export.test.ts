@@ -64,6 +64,14 @@ describe('ad wrappers', () => {
     expect(buildHtml5Ad(PAGE.replace('<div id="w"></div>', ''), { width: 1, height: 1 })).toContain('position:fixed');
   });
 
+  it('the scene background is pinned over the page\'s own (8.9, retest 01542e7)', () => {
+    const h = buildHtml5Ad(PAGE, { width: 300, height: 250, background: 'rgb(12, 34, 56)' });
+    expect(h).toContain('<style>html,body,#w{background:rgb(12, 34, 56) !important}</style>');
+    expect(buildPlayable(PAGE, { width: 1, height: 1, clickUrl: 'https://x.test', background: '#0f0f1a' })).toContain('background:#0f0f1a !important');
+    // Anything that is not a plain colour is not written into a stylesheet.
+    expect(buildHtml5Ad(PAGE, { width: 1, height: 1, background: 'red}</style><script>x()</script>' })).not.toContain('x()');
+  });
+
   it('a click URL cannot close the script tag', () => {
     const h = buildHtml5Ad(PAGE, { width: 1, height: 1, clickUrl: 'https://x.test/</script><script>alert(1)</script>' });
     expect(h).not.toContain('</script><script>alert(1)');

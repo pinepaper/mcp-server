@@ -96,12 +96,16 @@ export function checkFlashes(series: number[][], fps: number): { maxFlashesPerSe
   const win = Math.max(1, Math.round(fps));
   for (let c = 0; c < cells; c++) {
     // Turning points of this cell's luminance, then the qualifying changes between them.
-    const l = series.map((f) => f[c]);
-    const turns: Array<{ i: number; v: number }> = [{ i: 0, v: l[0] }];
-    for (let i = 1; i < l.length - 1; i++) {
-      if ((l[i] - l[i - 1]) * (l[i + 1] - l[i]) < 0) turns.push({ i, v: l[i] });
+    // Runs of equal samples collapse to one point first: a flash held for
+    // several samples is a plateau, and comparing neighbours alone found no
+    // turn at a plateau's edge — a 10 Hz strobe sampled at 30 fps counted 0.
+    const all = series.map((f, i) => ({ i, v: f[c] }));
+    const pts = all.filter((p, k) => k === 0 || Math.abs(p.v - all[k - 1].v) > 1e-9);
+    const turns: Array<{ i: number; v: number }> = [pts[0]];
+    for (let k = 1; k < pts.length - 1; k++) {
+      if ((pts[k].v - pts[k - 1].v) * (pts[k + 1].v - pts[k].v) < 0) turns.push(pts[k]);
     }
-    turns.push({ i: l.length - 1, v: l[l.length - 1] });
+    if (pts.length > 1) turns.push(pts[pts.length - 1]);
     const changes: number[] = []; // frame index at which each qualifying change ends
     for (let k = 1; k < turns.length; k++) {
       const a = turns[k - 1].v, b = turns[k].v;
