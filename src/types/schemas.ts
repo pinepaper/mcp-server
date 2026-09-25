@@ -3879,6 +3879,11 @@ export type ExportWidgetInput = z.infer<typeof ExportWidgetInputSchema>;
 export const ExportWidgetHtmlInputSchema = z.object({
   title: z.string().optional(),
   download: z.boolean().optional(),
+  // Accessibility / localisation (round 8 EE, 8.20): the engine writes
+  // <html lang="en"> with no dir and no text alternative for the canvas.
+  lang: z.string().regex(/^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$/).optional().describe('BCP 47 language tag for the page, e.g. "ar", "hi", "zh-Hans".'),
+  dir: z.enum(['ltr', 'rtl', 'auto']).optional().describe('Text direction for the page.'),
+  alt: z.string().max(500).optional().describe('Text alternative for the animation: the canvas gets role="img" and this as its aria-label, and the page a meta description.'),
 });
 export type ExportWidgetHtmlInput = z.infer<typeof ExportWidgetHtmlInputSchema>;
 

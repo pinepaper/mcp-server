@@ -358,3 +358,15 @@ describe('import_image with a mask returns the group that is drawn (4.10)', () =
     expect(r.error).toContain('no size');
   });
 });
+
+describe('widget HTML lang / dir / alt (8.20)', () => {
+  it('rewrites the html tag and labels the canvas', async () => {
+    const html = '<!DOCTYPE html><html lang="en"><head><title>x</title></head><body><canvas id="c"></canvas></body></html>';
+    const app = { exportEngine: { exportWidgetHTML: async () => ({ html, estimatedSize: 1, analysis: { itemTypes: new Set(), relationTypes: new Set() } }) } };
+    const code = codeGenerator.generateExportWidgetHtml({ lang: 'ar', dir: 'rtl', alt: 'A "sale" banner <animated>' } as never);
+    const r = await runIIFE(code, { app });
+    expect(r.html).toContain('<html lang="ar" dir="rtl">');
+    expect(r.html).toContain('<canvas role="img" aria-label="A &quot;sale&quot; banner &lt;animated>" id="c">');
+    expect(r.a11y).toEqual(['html', 'canvas', 'meta']);
+  });
+});

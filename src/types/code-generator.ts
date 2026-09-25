@@ -8820,7 +8820,18 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
 (async function() {
   if (!app.exportEngine || !app.exportEngine.exportWidgetHTML) return { error: 'Widget HTML export not available' };
   const result = await app.exportEngine.exportWidgetHTML(${JSON.stringify(opts)});
-  return { success: true, html: result.html, estimatedSize: result.estimatedSize, analysis: { itemTypes: [...result.analysis.itemTypes], relationTypes: [...result.analysis.relationTypes], hasSimpleAnimations: result.analysis.hasSimpleAnimations, hasKeyframeAnimations: result.analysis.hasKeyframeAnimations, hasMasks: result.analysis.hasMasks } };
+  ${input.lang || input.dir || input.alt ? `// lang / dir / alt on the engine's page (it writes <html lang="en"> and no
+  // text alternative). Applied as string edits on the one <html> tag and the
+  // first <canvas>; the result says which landed.
+  const __esc = function(v) { return String(v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); };
+  let __html = String(result.html || '');
+  const __applied = [];
+  ${input.lang || input.dir ? `__html = __html.replace(/<html\\b[^>]*>/i, function() { __applied.push('html'); return '<html lang="' + __esc(${JSON.stringify(input.lang ?? 'en')}) + '"' + ${JSON.stringify(input.dir ? ` dir="${input.dir}"` : '')} + '>'; });` : ''}
+  ${input.alt ? `__html = __html.replace(/<canvas\\b/i, function(m) { __applied.push('canvas'); return m + ' role="img" aria-label="' + __esc(${JSON.stringify(input.alt)}) + '"'; });
+  __html = __html.replace(/<head>/i, function(m) { __applied.push('meta'); return m + '<meta name="description" content="' + __esc(${JSON.stringify(input.alt)}) + '">'; });` : ''}
+  result.html = __html;
+  result.a11y = __applied;` : ''}
+  return { success: true, html: result.html,${input.lang || input.dir || input.alt ? ' a11y: result.a11y,' : ''} estimatedSize: result.estimatedSize, analysis: { itemTypes: [...result.analysis.itemTypes], relationTypes: [...result.analysis.relationTypes], hasSimpleAnimations: result.analysis.hasSimpleAnimations, hasKeyframeAnimations: result.analysis.hasKeyframeAnimations, hasMasks: result.analysis.hasMasks } };
 })();`.trim();
   }
   // ===========================================================================
