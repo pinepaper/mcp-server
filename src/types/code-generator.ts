@@ -8847,7 +8847,28 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
 (async function() {
   if (!app.exportEngine || !app.exportEngine.exportWidget) return { error: 'Widget export not available' };
   const result = await app.exportEngine.exportWidget(${JSON.stringify(opts)});
-  return { success: true, json: result.json, filename: result.filename, embedCode: result.embedCode, metadata: result.data?.metadata };
+  // THE EMBED BOX WAS ALWAYS 16:9, AND IT IS NOT SELF-CONTAINED (round 9 GG,
+  // 8.32). The engine writes aspect-ratio: 16/9 and max-width: 800px whatever
+  // the scene, so a 300x250 ad sat letterboxed in a wide box. The box is sized
+  // from the canvas here. The embed also loads PineWidget.js from
+  // pinepaper.studio and fetches the scene JSON at runtime — said, with the
+  // zero-dependency alternative.
+  const cs = (typeof app.getCanvasSize === 'function' && app.getCanvasSize()) || app.canvasSize || null;
+  let embedCode = String(result.embedCode || '');
+  if (cs && cs.width > 0 && cs.height > 0) {
+    // RegExp from strings with no backslashes — a template literal eats them.
+    embedCode = embedCode
+      .replace(new RegExp('aspect-ratio:[ ]*[0-9.]+[ ]*/[ ]*[0-9.]+'), 'aspect-ratio: ' + cs.width + '/' + cs.height)
+      .replace(new RegExp('max-width:[ ]*[0-9.]+px'), 'max-width: ' + cs.width + 'px');
+  }
+  const deps = [];
+  const scriptSrc = /<script[^>]+src="([^"]+)"/.exec(embedCode);
+  if (scriptSrc) deps.push({ kind: 'script', url: scriptSrc[1] });
+  if (result.filename) deps.push({ kind: 'scene-json', url: result.filename, note: 'fetched at runtime — host it beside the page' });
+  return { success: true, json: result.json, filename: result.filename, embedCode: embedCode, metadata: result.data?.metadata,
+    size: cs ? { width: cs.width, height: cs.height } : null,
+    dependencies: deps,
+    note: 'this embed needs the files in dependencies at runtime. For a single self-contained file with no network calls (ads, email-safe hosting), use pinepaper_export_widget_html.' };
 })();`.trim();
   }
 

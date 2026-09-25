@@ -399,3 +399,16 @@ describe('add_relation refuses unknown endpoints (1.74)', () => {
     expect(runIIFE(code('#item_2'), { app: app(['item_1', 'item_2']) }).success).toBe(true);
   });
 });
+
+describe('export_widget embed fits the scene and names its dependencies (8.32)', () => {
+  it('a 300x250 scene gets a 300/250 box and the runtime files are listed', async () => {
+    const embed = '<div id="my-widget" style="width: 100%; max-width: 800px; aspect-ratio: 16/9;"></div>\n<script src="https://pinepaper.studio/js/PineWidget.js"></script>';
+    const app = { getCanvasSize: () => ({ width: 300, height: 250 }),
+      exportEngine: { exportWidget: async () => ({ json: '{}', filename: 'ad.json', embedCode: embed, data: {} }) } };
+    const r = await runIIFE(codeGenerator.generateExportWidget({} as never), { app });
+    expect(r.embedCode).toContain('aspect-ratio: 300/250');
+    expect(r.embedCode).toContain('max-width: 300px');
+    expect(r.dependencies.map((d: { kind: string }) => d.kind)).toEqual(['script', 'scene-json']);
+    expect(r.note).toContain('export_widget_html');
+  });
+});
