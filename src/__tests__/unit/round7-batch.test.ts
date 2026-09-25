@@ -100,3 +100,14 @@ describe('no fill at create and modify (1.50)', () => {
     expect(item.fillColor).toBeNull();
   });
 });
+
+describe('dashArray / strokeCap / strokeJoin on every shape (1.54)', () => {
+  it('a dashed circle keeps its dashes', () => {
+    const item: Record<string, any> = { data: { registryId: 'item_1' }, bringToFront() {} };
+    const app = { create: () => item, historyManager: { saveState() {} } };
+    new Function('app', codeGenerator.generateCreateItem({ itemType: 'circle', position: { x: 0, y: 0 },
+      properties: { radius: 40, strokeColor: '#0ff', strokeWidth: 3, dashArray: [8, 6], strokeCap: 'round' } }))(app);
+    expect(item.dashArray).toEqual([8, 6]);
+    expect(item.strokeCap).toBe('round');
+  });
+});

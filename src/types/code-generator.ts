@@ -480,6 +480,18 @@ const item = app.create('${itemType}', ${JSON.stringify(params, null, 2)});`;
 
   if (clearFill) code += `\nitem.fillColor = null;`;
 
+  // DASHES, CAPS AND JOINS FOR EVERY SHAPE (round 7 Z, 1.54). create() applies
+  // them only in its path / line / pattern branches; the shared tail sets a
+  // stroke's colour and width for every type but not these, so a dashed circle
+  // rendered solid and nothing said so (the key is on create()'s read list, so
+  // the unread-property report could not catch it). Re-applied here for every
+  // type; on a path it repeats the engine's own value.
+  const strokeStyle: string[] = [];
+  if (Array.isArray(properties.dashArray)) strokeStyle.push(`item.dashArray = ${JSON.stringify(properties.dashArray)};`);
+  if (typeof properties.strokeCap === 'string') strokeStyle.push(`item.strokeCap = ${JSON.stringify(properties.strokeCap)};`);
+  if (typeof properties.strokeJoin === 'string') strokeStyle.push(`item.strokeJoin = ${JSON.stringify(properties.strokeJoin)};`);
+  if (strokeStyle.length) code += `\n${strokeStyle.join('\n')}`;
+
   // Add opacity support
   if (opacity !== undefined) {
     code += `\nitem.opacity = ${opacity};`;
