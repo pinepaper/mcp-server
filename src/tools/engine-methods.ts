@@ -246,6 +246,7 @@ export const OPTIONAL_ENGINE_METHODS: readonly string[] = [
   'checkFont',
   'clearCanvas',
   'ensureFontsLoaded',
+  'fitText',
   'getCanvasSize',
   'getCutoutStylePresets',
   'getDPI',
@@ -267,4 +268,5 @@ export const OPTIONAL_ENGINE_METHODS: readonly string[] = [
   'setBackgroundColor',
   'setCanvasSize',
   'setLifetime',
+  'textOverflowReport',
 ];

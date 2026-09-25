@@ -611,3 +611,35 @@ describe('through the HANDLER: mesh colour and gif loop survive the schema', () 
     expect(out).toMatch(/const baseVideoSettings = \{[^\\]*loop: 1/);
   });
 });
+
+describe('text auto-fit and overflow report (FxTool 661224ef)', () => {
+  it('create_item fit calls app.fitText after creation and reports it', () => {
+    const calls: unknown[] = [];
+    const item = { className: 'PointText', data: { registryId: 'item_1' }, bringToFront() {} };
+    let createParams: Record<string, unknown> = {};
+    const app = { create: (_t: string, p: Record<string, unknown>) => { createParams = p; return item; }, historyManager: { saveState() {} },
+      fitText: (_i: unknown, box: unknown) => { calls.push(box); return { ok: true, fontSize: 79, lines: 2, fits: true }; } };
+    const code = codeGenerator.generateCreateItem({ itemType: 'text', position: { x: 0, y: 0 }, properties: { content: 'Sommerschlussverkauf', fontSize: 120, fit: { maxWidth: 880, maxHeight: 300 } } } as never);
+    const r = new Function('app', code.replace(/\(\{ itemId[\s\S]*\}\);\s*$/, (m) => `return ${m.slice(0, -1)}`))(app);
+    expect(calls).toEqual([{ maxWidth: 880, maxHeight: 300 }]);
+    expect(createParams.fit).toBeUndefined();
+    expect(r.textFit).toMatchObject({ applied: true, fontSize: 79, lines: 2, fits: true });
+    expect(r.ignoredProperties).toBeUndefined();
+  });
+
+  it('says so on a studio without fitText', () => {
+    const app = { create: () => ({ className: 'PointText', data: { registryId: 'item_1' }, bringToFront() {} }), historyManager: { saveState() {} } };
+    const code = codeGenerator.generateCreateItem({ itemType: 'text', position: { x: 0, y: 0 }, properties: { content: 'x', fit: { maxWidth: 100 } } } as never);
+    const r = new Function('app', code.replace(/\(\{ itemId[\s\S]*\}\);\s*$/, (m) => `return ${m.slice(0, -1)}`))(app);
+    expect(r.textFit).toMatchObject({ applied: false });
+  });
+
+  it('export fidelity lists text overflow', async () => {
+    const app = { canvasSize: { width: 10, height: 10 }, canvasEl: { style: { backgroundColor: '#000' } },
+      textOverflowReport: () => [{ id: 'item_4', content: 'A very long name', reason: 'overflows its fit box at the minimum size' }],
+      exportEngine: { exportPNG: async () => ({ dataUrl: 'data:image/png;base64,AA' }), exportFidelity: () => ({ warnings: [] }) } };
+    const code = codeGenerator.generateAgentExport({ format: 'png' } as never);
+    const r = await new Function('app', 'document', code.replace('(async function()', 'return (async function()'))(app, {});
+    expect(r.fidelity.warnings).toContainEqual(expect.objectContaining({ code: 'text_overflow', items: ['item_4'] }));
+  });
+});

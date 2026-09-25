@@ -360,9 +360,14 @@ function generateCreateItemCode(
   // the engine's branch. With no position from the caller, a coordinate-built
   // item (path from pathData / segments, line, arc) gets no x / y at all.
   const omitXY = !positionGiven && isCoordinateBuilt(itemType, properties);
+  // `fit` is applied through app.fitText after creation (below), not sent to
+  // create(), so a studio without it cannot half-read it.
+  const textFit = itemType === 'text' && baseProperties.fit && typeof baseProperties.fit === 'object' ? baseProperties.fit as Record<string, unknown> : null;
+  const { fit: _fitDropped, ...createProps } = baseProperties;
+  void _fitDropped;
   const params: Record<string, unknown> = {
     ...(omitXY ? {} : { x: position.x, y: position.y }),
-    ...withRadiusAxes(baseProperties),
+    ...withRadiusAxes(createProps),
   };
 
   // "NO FILL" HAS THREE SPELLINGS, AND NONE OF THEM WORKED (round 7 AA, 1.50).
@@ -496,7 +501,7 @@ if (item && item.data) { item.data.renderAs = ${JSON.stringify(itemType)}; item.
   // refused: the item is still what the caller asked for in every other way,
   // and a refusal would cost a re-issue over one typo.
   const ignored = Object.keys(properties).filter((k) => !CREATE_KNOWN_KEYS.has(k)
-    && !(itemType === 'text' && (TEXT_STYLE_KEYS as readonly string[]).includes(k)));
+    && !(itemType === 'text' && ((TEXT_STYLE_KEYS as readonly string[]).includes(k) || k === 'fit')));
 
   // Build the code
   let code = `
@@ -550,6 +555,7 @@ const item = app.create('${itemType}', ${JSON.stringify(params, null, 2)});`;
   }
 
   if (itemType === 'text') code += emitTextStyle('item', properties);
+  if (textFit) code += `\nlet __textFit = null;${emitTextFit('item', textFit)}`;
 
   // After opacity, so the "on" level of the lifetime is the item's own.
   const hasLifetime = properties.bornAt !== undefined || properties.ttl !== undefined;
@@ -581,7 +587,7 @@ const itemId = item.data.registryId;
 app.historyManager.saveState();
 
 // Return item info
-({ itemId, type: '${itemType}', position: ${omitXY ? `(item.position ? { x: item.position.x, y: item.position.y } : null)` : `{ x: ${position.x}, y: ${position.y} }`}${hasLifetime ? ', lifetime: __lifetime' : ''}${loadsFont ? ', ...(__font ? { font: __font } : {})' : ''}${ignored.length > 0
+({ itemId, type: '${itemType}'${textFit ? ', textFit: __textFit' : ''}, position: ${omitXY ? `(item.position ? { x: item.position.x, y: item.position.y } : null)` : `{ x: ${position.x}, y: ${position.y} }`}${hasLifetime ? ', lifetime: __lifetime' : ''}${loadsFont ? ', ...(__font ? { font: __font } : {})' : ''}${ignored.length > 0
     ? `, ignoredProperties: ${JSON.stringify(ignored)}, warning: ${JSON.stringify(
       `${ignored.join(', ')} ${ignored.length > 1 ? 'are' : 'is'} not read when creating an item, so ${ignored.length > 1 ? 'they had' : 'it had'} no effect. `
       + 'Check the spelling against this item type\'s documented properties.',
@@ -610,7 +616,7 @@ const MODIFY_KNOWN_KEYS: ReadonlySet<string> = new Set([
   ...NORMALIZE_PARAM_READS,
   'contentType', 'contentFormat', 'countdownTarget', 'countdownEndText',
   'audioGain', 'volume', 'gain', 'bornAt', 'ttl', 'smoothing',
-  'fontStyle', 'leading', 'lineHeight', 'skewX', 'skewY', 'matrix',
+  'fontStyle', 'leading', 'lineHeight', 'skewX', 'skewY', 'matrix', 'fit',
 ]);
 
 /** Spellings callers reach for, and the key the engine actually reads. */
@@ -685,6 +691,26 @@ if (typeof app.checkFont === 'function') {
           warning: ${JSON.stringify(primary)} + ' could not be loaded, so this text is drawn in a fallback face. '
             + ((__v1 && __v1.reason) || '') + ' font list_available names the families this studio can load.' };
   }
+}`;
+}
+
+/**
+ * Auto-fit a text item to a box (FxTool 661224ef: app.fitText). Text that
+ * overran its slot — a German translation, a long name on a certificate, a
+ * feed value in a variant matrix — was the #1 blocker in rounds 6–9. The box
+ * is remembered by the engine, so later content changes refit. On a studio
+ * without fitText the result says so rather than leaving the text as it was
+ * in silence. `__textFit` must be declared by the caller.
+ */
+function emitTextFit(itemExpr: string, box: Record<string, unknown>): string {
+  return `
+if (typeof app.fitText === 'function') {
+  const __fr = app.fitText(${itemExpr}, ${JSON.stringify(box)});
+  __textFit = __fr && __fr.ok !== false
+    ? Object.assign({ applied: true }, __fr, __fr.fits === false ? { warning: 'the text does not fit its box even at the minimum font size — shorten it or widen the box.' } : {})
+    : { applied: false, error: (__fr && __fr.error) || 'the studio refused the fit box' };
+} else {
+  __textFit = { applied: false, note: 'this studio cannot auto-fit text (no app.fitText): the text keeps its font size and may overrun the box.' };
 }`;
 }
 
@@ -976,6 +1002,13 @@ if (_afi) {
 }`;
   }
 
+  const modFit = properties.fit && typeof properties.fit === 'object' ? properties.fit as Record<string, unknown> : null;
+  if (modFit) {
+    code += `
+let __textFit = null;
+const _tf = app.itemRegistry.get('${itemId}');${emitTextFit('_tf && _tf.item', modFit)}`;
+  }
+
   const textStyle = emitTextStyle('_ts && _ts.item', properties);
   if (textStyle) {
     code += `
@@ -1007,7 +1040,7 @@ if (_flagged && _flagged.item && _flagged.item.data) Object.assign(_flagged.item
   )}`;
   code += `
 app.historyManager.saveState();
-return { success: true, itemId: '${itemId}'${affine ? `, affine: ${JSON.stringify({ skewX, skewY, matrix, note: 'applied to the current shape: calling again compounds it. To undo, apply the inverse (negative skew, or the inverse matrix).' })}` : ''}${modLifetime ? ', lifetime: __lifetime' : ''}${modFont ? ', ...(__font ? { font: __font } : {})' : ''}${modWarning} };`;
+return { success: true, itemId: '${itemId}'${modFit ? ', textFit: __textFit' : ''}${affine ? `, affine: ${JSON.stringify({ skewX, skewY, matrix, note: 'applied to the current shape: calling again compounds it. To undo, apply the inverse (negative skew, or the inverse matrix).' })}` : ''}${modLifetime ? ', lifetime: __lifetime' : ''}${modFont ? ', ...(__font ? { font: __font } : {})' : ''}${modWarning} };`;
 
   // Wrapped, because the body now RETURNS early on a miss rather than falling
   // through to an unconditional success. Async only when a font must load
@@ -4657,8 +4690,19 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
         : fmt + ' is exported without transparency and this scene has no background, so transparent areas come out BLACK. Set a background colour, or export png (or a png sequence) to keep the alpha.' }];
     } catch (e) { return []; }
   }
+  // TEXT THAT DOES NOT FIT (FxTool 661224ef: textOverflowReport) — text past
+  // its fit box at the minimum size, or off the frame. The pre-batch check for
+  // certificates, speaker cards and localised variants, on every export.
+  function textOverflow() {
+    try {
+      const rep = (typeof app.textOverflowReport === 'function' && app.textOverflowReport()) || [];
+      return rep.slice(0, 10).map(function(o) {
+        return { code: 'text_overflow', message: (o.id || 'a text item') + ' (' + JSON.stringify(String(o.content || '').slice(0, 40)) + '): ' + (o.reason || 'overflows'), items: [o.id] };
+      });
+    } catch (e) { return []; }
+  }
   function fidelity(fmt) {
-    const own = standIns().concat(alphaLoss(fmt));
+    const own = standIns().concat(alphaLoss(fmt), textOverflow());
     try {
       if (!app.exportEngine || typeof app.exportEngine.exportFidelity !== 'function') {
         return { fidelity: { available: false, reason: 'this studio cannot check export fidelity — update PinePaper Studio.', ...(own.length ? { warnings: own } : {}) } };
