@@ -151,3 +151,25 @@ describe('moves_along_path from a path item (2.25)', () => {
     expect((s.added[0] as any[])[3]).toEqual({ path: [[0, 0], [10, 0]], speed: 2 });
   });
 });
+
+describe('stagger shifts keyframe tracks too (2.2)', () => {
+  it('offsets keyframed items by their delay, and re-applying replaces the shift', () => {
+    const items: Record<string, any> = {
+      a: { data: { keyframes: [{ time: 0 }], timeOffset: 0.5 } },
+      b: { data: { keyframes: [{ time: 0 }] } },
+      c: { data: {} },
+    };
+    const app = {
+      itemRegistry: { get: (id: string) => (items[id] ? { item: items[id] } : null) },
+      staggerItems: (ids: string[]) => ({ ok: true, delays: ids.map((_, i) => i * 0.2), applied: ids.length, span: 0.4 }),
+    };
+    const code = codeGenerator.generateStagger({ action: 'apply', itemIds: ['a', 'b', 'c'], opts: {} } as never);
+    const r1 = runIIFE(code, { app });
+    expect(r1.shiftedKeyframeTracks).toBe(2);
+    expect(items.a.data.timeOffset).toBeCloseTo(0.5);
+    expect(items.b.data.timeOffset).toBeCloseTo(0.2);
+    runIIFE(code, { app });
+    expect(items.b.data.timeOffset).toBeCloseTo(0.2); // replaced, not stacked
+    expect(items.c.data.timeOffset).toBeUndefined();
+  });
+});

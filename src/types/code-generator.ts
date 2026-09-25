@@ -7143,9 +7143,27 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}${smoothing ?
     return { success: false, error: 'apply needs itemIds, in the order the stagger should follow (row-major for a grid)' };
   }
   const r = app.staggerItems(ids, ${S(validated.opts || {})});
+  // KEYFRAME TRACKS DO NOT READ animationDelay (round 7 X, 2.2). staggerItems
+  // writes the delay to data.animationDelay, which the loop presets honour;
+  // a tile that already had a keyframe fly-in ignored it, and all 64 tiles of
+  // a shatter mosaic arrived on the same frames. A keyframed item's clock is
+  // its clip offset, data.timeOffset, so the delay goes there too — on top of
+  // the offset it had before the first stagger (remembered), so re-staggering
+  // replaces rather than stacks.
+  let shiftedTracks = 0;
+  if (r && r.ok && Array.isArray(r.delays)) {
+    const items = ids.map(function(id) { const e = app.itemRegistry && app.itemRegistry.get(id); return e && e.item; }).filter(Boolean);
+    items.forEach(function(item, i) {
+      if (!item.data || !Array.isArray(item.data.keyframes) || !item.data.keyframes.length) return;
+      if (item.data._staggerBaseOffset === undefined) item.data._staggerBaseOffset = Number(item.data.timeOffset) || 0;
+      item.data.timeOffset = item.data._staggerBaseOffset + (Number(r.delays[i]) || 0);
+      shiftedTracks++;
+    });
+  }
   return {
     success: r && r.ok === true,
     action: 'apply',
+    shiftedKeyframeTracks: shiftedTracks,
     // 'applied' can be lower than the ids given — an id that resolves to
     // nothing is skipped, and a stagger that silently covered fewer items than
     // asked for is the failure worth seeing.

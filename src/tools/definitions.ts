@@ -4416,7 +4416,7 @@ EXAMPLE:
     },
     description: `Shape a delay across many items. What makes a stagger read as designed rather than as a queue is where it STARTS and how it SPREADS — a grid lighting up outward from the centre, a row converging from both edges.
 
-Delays are written to the channel the engine and the SMIL exporter already read, so a staggered scene scrubs, exports and restores. Nothing here is playback-only.
+Delays go where each kind of animation reads them: loop presets take animationDelay, and an item that already has a KEYFRAME track has that track's start offset (timeOffset) shifted by its delay — so apply the stagger after the keyframes, and re-applying replaces the shift rather than adding to it. The result's shiftedKeyframeTracks says how many tracks moved.
 
 ACTIONS:
 - apply: write the delays onto real items, in the order you list them (row-major for a grid).
