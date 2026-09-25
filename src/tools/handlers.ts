@@ -1385,7 +1385,13 @@ async function handleToolCallInner(
 
         // Track code generation phase
         tracker.startTimer(`${baseTimerId}_code_generation`);
-        const code = codeGenerator.generateCreateItem(input);
+        // Whether the CALLER gave a position is only knowable from the raw args:
+        // the schema defaults position to (400, 300), so after the parse above
+        // every call looks like it asked for one — and a pathData path was
+        // moved to the default (1.81, retest: 26241cf's fix was bypassed here).
+        const code = codeGenerator.generateCreateItem(
+          (args as { position?: unknown }).position === undefined ? { ...input, position: undefined as never } : input,
+        );
         const codeGenDuration = tracker.endTimer(`${baseTimerId}_code_generation`);
         tracker.recordMetric({
           toolName,

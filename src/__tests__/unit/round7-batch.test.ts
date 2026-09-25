@@ -561,3 +561,17 @@ describe('gradient specs are checked (1.82)', () => {
     expect(make({ type: 'radial', stops: [{ color: '#fff', offset: 0 }] })).toContain('at least 2 stops');
   });
 });
+
+describe('1.81 through the HANDLER, not just the generator', () => {
+  it('a pathData path with no position gets no x / y via pinepaper_create_item', async () => {
+    const { handleToolCall } = await import('../../tools/handlers.js');
+    const out = JSON.stringify(await handleToolCall('pinepaper_create_item',
+      { itemType: 'path', properties: { pathData: 'M100 300 L400 300 L250 500 Z' } }, { executionMode: 'code' } as never));
+    // out is JSON-stringified, so the emitted code's quotes appear escaped.
+    expect(out).toContain('app.create(\'path\'');
+    expect(out).not.toContain('\\"x\\": 400');
+    const withPos = JSON.stringify(await handleToolCall('pinepaper_create_item',
+      { itemType: 'path', position: { x: 50, y: 60 }, properties: { pathData: 'M0 0 L10 10' } }, { executionMode: 'code' } as never));
+    expect(withPos).toContain('\\"x\\": 50');
+  });
+});
