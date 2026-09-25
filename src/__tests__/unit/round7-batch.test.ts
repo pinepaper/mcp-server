@@ -506,13 +506,26 @@ describe('keyframe property gaps are named (2.30)', () => {
   });
 });
 
-describe('camera pitch / yaw carry a no-effect note (3.6)', () => {
-  it('notes a non-zero yaw, and says nothing without one', async () => {
+describe('camera pitch / yaw note depends on the studio (3.6 / f116b6ad)', () => {
+  const run = async (tilt: boolean, keyframes: unknown[]) => {
     const { handleToolCall } = await import('../../tools/handlers.js');
-    const withYaw = JSON.stringify(await handleToolCall('pinepaper_camera_animate', { keyframes: [{ time: 0, zoom: 1 }, { time: 2, zoom: 1, yaw: 25 }], duration: 2 }, { executionMode: 'code' } as never));
-    expect(withYaw).toContain('NO visible effect');
-    const plain = JSON.stringify(await handleToolCall('pinepaper_camera_animate', { keyframes: [{ time: 0, zoom: 1 }, { time: 2, zoom: 2 }], duration: 2 }, { executionMode: 'code' } as never));
-    expect(plain).not.toContain('NO visible effect');
+    const out = await handleToolCall('pinepaper_camera_animate', { keyframes, duration: 2 }, { executionMode: 'code' } as never);
+    const code = JSON.parse(JSON.stringify(out)).content.map((c: { text: string }) => c.text).join('\n');
+    const src = /\(function\(\) \{[\s\S]*\}\)\(\);/.exec(code)![0];
+    const app = { addRelation: () => true, ...(tilt ? { relationRegistry: { cameraTilt: () => 0 } } : {}) };
+    return new Function('app', `return ${src}`)(app);
+  };
+  const yawKeys = [{ time: 0, zoom: 1 }, { time: 2, zoom: 1, yaw: 25 }];
+
+  it('notes a tilt only where the studio cannot render it', async () => {
+    expect((await run(false, yawKeys)).note).toContain('NO visible effect');
+    const ok = await run(true, yawKeys);
+    expect(ok.note).toBeUndefined();
+    expect(ok.tiltRenders).toBe(true);
+  });
+
+  it('says nothing without a tilt', async () => {
+    expect((await run(false, [{ time: 0, zoom: 1 }, { time: 2, zoom: 2 }])).note).toBeUndefined();
   });
 });
 

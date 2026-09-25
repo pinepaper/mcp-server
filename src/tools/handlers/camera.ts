@@ -122,19 +122,19 @@ export const cameraHandlers: Record<string, CameraHandler> = {
     const keyframesStr = JSON.stringify(keyframes);
     const relParams: Record<string, unknown> = { keyframes: JSON.parse(keyframesStr), duration, loop, delay, fov };
     const relParamsStr = JSON.stringify(relParams);
-    const code = `app.camera && app.camera.animate ? app.camera.animate(${keyframesStr}, ${duration}, ${loop}, ${delay}, { fov: ${fov} }) : app.addRelation('camera', 'camera', 'camera_animates', ${relParamsStr});`;
-    const result = await executeOrGenerate(code, `Animates camera with ${keyframes.length} keyframes over ${duration}s`, options, 'pinepaper_camera_animate');
-    // pitch / yaw ARE ACCEPTED AND MEASURED TO DO NOTHING (round 9 HH, 3.6):
-    // a yaw of 0 -> +-25 degrees gave identical frames on production (bezel
-    // width 0.995 throughout, one unique hash). The engine interpolates them
-    // but nothing it draws reads them yet. Said whenever a key sets one, so a
-    // "3D tilt" is not believed to be on screen.
+    // pitch / yaw: FxTool f116b6ad renders them (a per-frame projection, into
+    // MP4 / WebM / GIF and capture_frames) and exposes
+    // relationRegistry.cameraTilt; production b3591f71 accepts them and draws
+    // nothing (3.6). The note is decided IN THE STUDIO, from that feature
+    // check, so it appears only where tilt would really be invisible.
     const tilted = (keyframes || []).some((k) => (typeof k.pitch === 'number' && k.pitch !== 0) || (typeof k.yaw === 'number' && k.yaw !== 0));
-    if (tilted) {
-      result.content = [...(result.content ?? []), { type: 'text' as const, text:
-        'NOTE: pitch / yaw have been measured to have NO visible effect (identical frames through a +-25 degree yaw). zoom and focus work. For a tilted device or box face, use a world3d scene instead.' }];
-    }
-    return result;
+    const code = `(function() {
+  const tiltRenders = !!(app.relationRegistry && typeof app.relationRegistry.cameraTilt === 'function');
+  const r = app.camera && app.camera.animate ? app.camera.animate(${keyframesStr}, ${duration}, ${loop}, ${delay}, { fov: ${fov} }) : app.addRelation('camera', 'camera', 'camera_animates', ${relParamsStr});
+  return Object.assign({ success: r !== false, keyframes: ${keyframes.length}, tiltRenders: tiltRenders },
+    ${tilted} && !tiltRenders ? { note: 'pitch / yaw have NO visible effect on this studio (measured: identical frames through a +-25 degree yaw). zoom and focus work. For a tilted object use a world3d scene, or a studio build that renders camera tilt.' } : {});
+})();`;
+    return executeOrGenerate(code, `Animates camera with ${keyframes.length} keyframes over ${duration}s`, options, 'pinepaper_camera_animate');
   },
 
   pinepaper_camera: dispatchCameraAction,

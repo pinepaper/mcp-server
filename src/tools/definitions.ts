@@ -3903,7 +3903,7 @@ KEYFRAME PROPERTIES:
     'item-id'                      itemRegistry lookup → item bounds center (tracks the item as it moves)
     { item: 'id', offset: [dx, dy] } item center + offset
 - center: [x, y] — legacy alias, honored only when focus is absent
-- pitch / yaw: accepted, but measured to have NO visible effect (identical frames through a ±25° yaw). Do not rely on them for perspective; use a world3d scene for a tilted object.
+- pitch / yaw: 3D tilt in degrees. Rendered by studio builds that support camera tilt; on others they are accepted with NO visible effect — the result's tiltRenders says which this studio is, and a note appears when a tilt would be invisible.
 - easing: Timing function (linear, easeIn, easeOut, easeInOut, bounce, elastic)
 
 CURVED INTER-KEYFRAME PATHS (optional; default is linear):
@@ -3955,8 +3955,8 @@ EXAMPLE (curved arc between waypoints):
                 items: { type: 'number' },
                 description: 'Legacy view center [x, y] — honored only when focus is absent',
               },
-              pitch: { type: 'number', description: 'Accepted; measured to have no visible effect — see the note above.' },
-              yaw: { type: 'number', description: 'Accepted; measured to have no visible effect — see the note above.' },
+              pitch: { type: 'number', description: '3D tilt in degrees — rendered where the studio supports camera tilt (result.tiltRenders).' },
+              yaw: { type: 'number', description: '3D rotation in degrees — rendered where the studio supports camera tilt (result.tiltRenders).' },
               easing: {
                 type: 'string',
                 enum: ['linear', 'easeIn', 'easeOut', 'easeInOut', 'bounce', 'elastic'],
