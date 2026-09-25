@@ -274,3 +274,21 @@ describe('NTSC duration overrun is reported (1.76)', () => {
     expect(codeGenerator.generateAgentExport({ format: 'mp4', fps: 30, duration: 6 } as never)).not.toContain('result.timing');
   });
 });
+
+describe('region export names items crossing its edge (1.78)', () => {
+  it('flags overflow, ignores inside items and full-bleed backdrops', async () => {
+    const entries = [
+      { itemId: 'inside', item: { bounds: { x: 10, y: 10, width: 100, height: 50 } } },
+      { itemId: 'spills', item: { bounds: { x: 1000, y: 100, width: 200, height: 40 } } },
+      { itemId: 'backdrop', item: { bounds: { x: -10, y: -10, width: 5000, height: 5000 } } },
+      { itemId: 'far', item: { bounds: { x: 3000, y: 3000, width: 10, height: 10 } } },
+    ];
+    const app = { canvasSize: { width: 2160, height: 1080 }, itemRegistry: { getAll: () => entries },
+      renderRegionToDataURL: () => 'data:image/png;base64,AA', exportEngine: { exportFidelity: () => ({ warnings: [] }) } };
+    const paper = { Rectangle: class { constructor(public x: number, public y: number, public width: number, public height: number) {} } };
+    const code = codeGenerator.generateAgentExport({ format: 'png', region: { x: 0, y: 0, width: 1080, height: 1080 } } as never);
+    const r = await new Function('app', 'paper', 'document', body(code))(app, paper, {});
+    expect(r.crossingItems).toEqual(['spills']);
+    expect(r.warning).toContain('overflowing its card');
+  });
+});

@@ -4684,9 +4684,32 @@ ${stillTime !== undefined ? `
         {
           const rw = ${region.outputWidth ?? Math.round(region.width)}, rh = ${region.outputHeight ?? Math.round(region.height)};
           const regionUrl = app.renderRegionToDataURL(new paper.Rectangle(${region.x}, ${region.y}, ${region.width}, ${region.height}), rw, rh);
+          // ITEMS THAT CROSS THE REGION'S EDGE (round 9 II, 1.78). In the sheet
+          // recipe — one big canvas, one region per card — text that overflows
+          // its cell spills into the next card's export (up to 5,826 foreign px),
+          // silently. A region cannot know which card an item belongs to, so it
+          // cannot clip per card; it can name every item that is only partly
+          // inside it, which is exactly the overflow in either direction.
+          const __rx = ${region.x}, __ry = ${region.y}, __rr = ${region.x + region.width}, __rb = ${region.y + region.height};
+          const crossing = [];
+          if (app.itemRegistry && typeof app.itemRegistry.getAll === 'function') {
+            app.itemRegistry.getAll().forEach(function(e) {
+              const b = e && e.item && e.item.visible !== false && e.item.bounds;
+              if (!b || !(b.width > 0)) return;
+              const r = b.x + b.width, bt = b.y + b.height;
+              const intersects = b.x < __rr && r > __rx && b.y < __rb && bt > __ry;
+              const inside = b.x >= __rx - 0.5 && r <= __rr + 0.5 && b.y >= __ry - 0.5 && bt <= __rb + 0.5;
+              const covers = b.x <= __rx && r >= __rr && b.y <= __ry && bt >= __rb; // a full-bleed backdrop is not overflow
+              if (intersects && !inside && !covers && crossing.length < 20) crossing.push(e.itemId);
+            });
+          }
           result = { success: true, platform, format: 'png', data: regionUrl, mimeType: 'image/png',
             size: Math.round(String(regionUrl).length * 0.75), dimensions: { width: rw, height: rh },
             region: ${JSON.stringify({ x: region.x, y: region.y, width: region.width, height: region.height })} };
+          if (crossing.length) {
+            result.crossingItems = crossing;
+            result.warning = crossing.length + ' item(s) are only partly inside this region, so part of them is cut off here or spills into a neighbouring region: ' + crossing.join(', ') + '. In a sheet of cards this is text overflowing its card — shorten it, shrink it, or wrap it.';
+          }
         }
         break;` : ''}
         if (app.exportEngine && app.exportEngine.exportPNG) {
