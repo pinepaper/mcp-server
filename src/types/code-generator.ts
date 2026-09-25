@@ -4679,6 +4679,52 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
       }
 
       case 'pdf':
+        ${pdfOpts?.pages ? `// ONE PAGE PER SCENE (round 7 Z, 8.16). exportPDF renders the current
+        // canvas only, so a deck of 8 saved scenes exported 1 page. Built here
+        // the way exportPDF builds its one page — the engine's jsPDF, a frame
+        // from captureFrameDataURL, the scene's own size at the canvas DPI —
+        // one scene at a time, and the scene the user was on is put back.
+        {
+          const SM = app.sceneManager;
+          if (!SM || typeof SM.listScenes !== 'function' || typeof SM.loadScene !== 'function') {
+            result = { success: false, platform, format: 'pdf', error: 'scenes are unavailable on this studio (app.sceneManager) — a multi-page PDF needs saved scenes.' }; break;
+          }
+          if (!app.exportEngine || typeof app.exportEngine._loadPDFLibraries !== 'function' || typeof app.captureFrameDataURL !== 'function') {
+            result = { success: false, platform, format: 'pdf', error: 'this studio cannot build a multi-page PDF (no PDF library loader or frame capture) — update PinePaper Studio.' }; break;
+          }
+          const all = SM.listScenes();
+          const wanted = ${JSON.stringify(pdfOpts.pages)};
+          const ids = wanted === 'scenes' ? all.map(function(sc) { return sc.id; }) : wanted;
+          const missing = ids.filter(function(id) { return !all.some(function(sc) { return sc.id === id; }); });
+          if (!ids.length || missing.length) {
+            result = { success: false, platform, format: 'pdf', error: ids.length ? 'no saved scene ' + missing.join(', ') + '. Saved: ' + all.map(function(sc) { return sc.id; }).join(', ') : 'there are no saved scenes — save each page with pinepaper_manage_scenes first.' }; break;
+          }
+          const back = SM.currentSceneId;
+          const lib = await app.exportEngine._loadPDFLibraries();
+          const targetDpi = ${pdfOpts.dpi ?? 'settings.dpi'};
+          let doc = null;
+          const pagesOut = [];
+          try {
+            for (const id of ids) {
+              await SM.loadScene(id);
+              const cs = app.canvasSize || { width: app.canvasEl.width, height: app.canvasEl.height };
+              const dpi = (typeof app.getDPI === 'function' && app.getDPI()) || 96;
+              const wMM = cs.width / dpi * 25.4, hMM = cs.height / dpi * 25.4;
+              const orient = wMM > hMM ? 'landscape' : 'portrait';
+              const img = app.captureFrameDataURL(Math.max(1, targetDpi / dpi));
+              if (!doc) doc = new lib.jsPDF({ orientation: orient, unit: 'mm', format: [wMM, hMM] });
+              else doc.addPage([wMM, hMM], orient);
+              doc.addImage(img, 'PNG', 0, 0, wMM, hMM);
+              pagesOut.push({ sceneId: id, widthMM: Math.round(wMM * 10) / 10, heightMM: Math.round(hMM * 10) / 10 });
+            }
+          } finally {
+            if (back && typeof SM.loadScene === 'function') { try { await SM.loadScene(back); } catch (_) { /* reported by the page count */ } }
+          }
+          const blob = doc.output('blob');
+          const dataUrl = await blobToDataUrl(blob);
+          result = { success: true, platform, format: 'pdf', data: dataUrl, mimeType: 'application/pdf', size: blob.size, pages: pagesOut.length, pageList: pagesOut };
+        }
+        break;` : ''}
         if (app.exportEngine && app.exportEngine.exportPDF) {
           // Print options reach the engine (they were engine-only before), and
           // download:false, because the tool delivers the bytes itself.

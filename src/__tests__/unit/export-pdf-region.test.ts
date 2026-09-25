@@ -123,3 +123,50 @@ describe('png sequence says when it used the default length (8.15)', () => {
     expect(b).not.toContain('defaultsUsed');
   });
 });
+
+describe('multi-page pdf from scenes (8.16)', () => {
+  function sceneStudio() {
+    const log: unknown[] = [];
+    const sizes: Record<string, { width: number; height: number }> = { s1: { width: 1920, height: 1080 }, s2: { width: 1080, height: 1920 } };
+    const app: Record<string, any> = {
+      canvasSize: sizes.s1,
+      getDPI: () => 96,
+      captureFrameDataURL: (scale: number) => { log.push(['capture', scale]); return 'data:image/png;base64,AA'; },
+      sceneManager: {
+        currentSceneId: 's2',
+        listScenes: () => [{ id: 's1' }, { id: 's2' }],
+        loadScene: async (id: string) => { log.push(['load', id]); app.canvasSize = sizes[id]; app.sceneManager.currentSceneId = id; },
+      },
+      exportEngine: {
+        exportFidelity: () => ({ warnings: [] }),
+        _loadPDFLibraries: async () => ({ jsPDF: class {
+          pages = 1;
+          constructor(o: Record<string, unknown>) { log.push(['new', o.orientation, o.format]); }
+          addPage(f: unknown, o: string) { this.pages++; log.push(['addPage', o, f]); }
+          addImage() { log.push('img'); }
+          output() { return new Blob(['%PDF'], { type: 'application/pdf' }); }
+        } }),
+      },
+    };
+    return { app, log };
+  }
+  class FR { result = 'data:application/pdf;base64,JVBERg=='; onloadend: (() => void) | null = null; readAsDataURL() { this.onloadend?.(); } }
+
+  it("'scenes' makes one page per scene at its own size, and puts the user's scene back", async () => {
+    const s = sceneStudio();
+    const code = codeGenerator.generateAgentExport({ format: 'pdf', pdf: { pages: 'scenes' } } as never);
+    const r = await new Function('app', 'FileReader', 'document', body(code))(s.app, FR, {});
+    expect(r).toMatchObject({ success: true, format: 'pdf', pages: 2 });
+    expect(r.pageList[0]).toMatchObject({ sceneId: 's1', widthMM: 508, heightMM: 285.8 });
+    expect(s.log.filter((l) => Array.isArray(l) && l[0] === 'addPage')).toHaveLength(1);
+    expect(s.log.at(-1)).toEqual(['load', 's2']); // restored
+  });
+
+  it('an unknown scene id is refused with the saved ids listed', async () => {
+    const s = sceneStudio();
+    const code = codeGenerator.generateAgentExport({ format: 'pdf', pdf: { pages: ['s1', 'nope'] } } as never);
+    const r = await new Function('app', 'FileReader', 'document', body(code))(s.app, FR, {});
+    expect(r.success).toBe(false);
+    expect(r.error).toContain('no saved scene nope');
+  });
+});

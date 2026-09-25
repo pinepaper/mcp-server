@@ -8067,6 +8067,7 @@ VERIFY MOTION BEFORE YOU RENDER. An export takes seconds to minutes and shows yo
             bleed: { type: 'number', minimum: 0, maximum: 20 },
             trimMarks: { type: 'boolean' },
             dpi: { type: 'integer', minimum: 72, maximum: 600 },
+            pages: { anyOf: [{ type: 'string', enum: ['scenes'] }, { type: 'array', items: { type: 'string' }, minItems: 1 }], description: "Multi-page PDF: 'scenes' = one page per saved scene (the scenes tool's save action) in timeline order, or an ordered list of scene ids. Each page is that scene at its own size." },
           },
         },
         region: {

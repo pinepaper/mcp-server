@@ -2508,6 +2508,7 @@ export const AgentExportInputSchema = z.object({
     bleed: z.number().min(0).max(20).optional().describe('Bleed in mm; > 0 includes the bleed area.'),
     trimMarks: z.boolean().optional().describe('Add crop / trim marks.'),
     dpi: z.number().int().min(72).max(600).optional().describe('Rasterisation DPI (default: the quality tier\'s).'),
+    pages: z.union([z.literal('scenes'), z.array(z.string()).min(1)]).optional().describe("Multi-page: 'scenes' = one page per saved scene in timeline order, or a list of scene ids in the order you want."),
   }).optional().describe('pdf only: print options.'),
   region: z.object({
     x: z.number(), y: z.number(),
