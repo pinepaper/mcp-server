@@ -294,3 +294,12 @@ describe('landscape print presets (8.18)', () => {
     expect(codeGenerator.generateAgentExport({ platform: 'print-a4-landscape', format: 'pdf' } as never)).toContain('{"width":3508,"height":2480}');
   });
 });
+
+describe('small canvas refusal names the region recipe (1.48)', () => {
+  it('says how to make a 728x90 banner', async () => {
+    const { SetCanvasSizeInputSchema } = await import('../../types/schemas.js');
+    const r = SetCanvasSizeInputSchema.safeParse({ width: 728, height: 90 });
+    expect(r.success).toBe(false);
+    expect(JSON.stringify(r.error)).toContain('outputWidth:728');
+  });
+});

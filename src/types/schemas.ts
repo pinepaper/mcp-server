@@ -1508,8 +1508,10 @@ export const SetCanvasSizeInputSchema = z.object({
   // 8192, not 4096: the artboard tool takes any size and a 5400x1350 carousel
   // panorama exported exactly, while this refused it. 8192 stays well inside
   // the browser's per-side canvas limit.
-  width: z.number().min(100).max(8192).describe('Canvas width (100-8192)'),
-  height: z.number().min(100).max(8192).describe('Canvas height (100-8192)'),
+  // The refusal NAMES the route: a 728x90 banner refused with a bare "too
+  // small" left a caller to export the preset instead (round 8 BB, 1.48).
+  width: z.number().min(100, "a canvas side under 100 px is not supported. For small assets (a 728x90 or 320x50 banner, a 28 px emote) design at 2-4x — e.g. 1456x180 — and export with agent_export region {x:0, y:0, width, height, outputWidth:728, outputHeight:90}.").max(8192).describe('Canvas width (100-8192)'),
+  height: z.number().min(100, "a canvas side under 100 px is not supported. For small assets (a 728x90 or 320x50 banner, a 28 px emote) design at 2-4x — e.g. 1456x180 — and export with agent_export region {x:0, y:0, width, height, outputWidth:728, outputHeight:90}.").max(8192).describe('Canvas height (100-8192)'),
   preset: z.string().optional().describe('Optional preset name'),
 });
 
