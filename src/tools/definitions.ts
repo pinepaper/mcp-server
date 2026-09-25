@@ -8052,7 +8052,7 @@ VERIFY MOTION BEFORE YOU RENDER. An export takes seconds to minutes and shows yo
         },
         region: {
           type: 'object',
-          description: 'png / jpg / webp only: export just this part of the canvas (canvas coordinates, x/y = TOP-LEFT) — carousel slices, crops. Output is the region\'s own size unless outputWidth/outputHeight say otherwise; a different aspect is covered, not stretched.',
+          description: 'png / jpg / webp only: export just this part of the canvas (canvas coordinates, x/y = TOP-LEFT) — carousel slices, crops. Output is the region\'s own size unless outputWidth/outputHeight say otherwise; a different aspect is covered, not stretched. SMALL ASSETS (emotes, badges, favicons): design at 2-4x on a canvas of at least 100 px, then export the whole board as a region with the small outputWidth/outputHeight — e.g. a 112x112 canvas, region {x:0, y:0, width:112, height:112, outputWidth:28, outputHeight:28}.',
           properties: {
             x: { type: 'number' }, y: { type: 'number' },
             width: { type: 'number', exclusiveMinimum: 0 }, height: { type: 'number', exclusiveMinimum: 0 },
