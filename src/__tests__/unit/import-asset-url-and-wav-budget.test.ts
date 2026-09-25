@@ -47,3 +47,24 @@ describe('deterministic exports (B31)', () => {
     expect(AgentExportInputSchema.safeParse({ format: 'png', deterministic: true }).success).toBe(false);
   });
 });
+
+describe('deterministic: pixels pinned only on the software encoder (FxTool e34ae03d)', () => {
+  const body = (code: string) => code.replace('(async function()', 'return (async function()');
+  class FR { result = 'data:video/mp4;base64,AA'; onloadend: (() => void) | null = null; readAsDataURL() { this.onloadend?.(); } }
+  const run = async (report: Record<string, unknown> | null) => {
+    const { codeGenerator } = await import('../../types/code-generator.js');
+    const vx: Record<string, unknown> = { lastVideoReport: null, export: async () => { vx.lastVideoReport = report; return { size: 10, slice() { return this; } }; } };
+    const app = { canvasSize: { width: 100, height: 100 }, canvasEl: { style: { backgroundColor: '#fff' } }, exportEngine: { exportFidelity: () => ({ warnings: [] }), videoExporter: vx } };
+    const r = await new Function('app', 'FileReader', 'document', body(codeGenerator.generateAgentExport({ format: 'mp4', duration: 1, deterministic: true } as never)))(app, FR, {});
+    return { r, codes: ((r.fidelity?.warnings ?? []) as Array<{ code: string }>).map((w) => w.code) };
+  };
+  it('software encoder: no warning, and the backend is in result.video', async () => {
+    const { r, codes } = await run({ bitrate: 2e6, hardwareAcceleration: 'prefer-software' });
+    expect(r.video.hardwareAcceleration).toBe('prefer-software');
+    expect(codes).not.toContain('determinism_not_pinned');
+  });
+  it('hardware, or an engine that does not say: the pixels are not promised', async () => {
+    expect((await run({ bitrate: 2e6, hardwareAcceleration: 'prefer-hardware' })).codes).toContain('determinism_not_pinned');
+    expect((await run({ bitrate: 2e6 })).codes).toContain('determinism_not_pinned');
+  });
+});

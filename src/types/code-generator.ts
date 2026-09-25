@@ -5671,7 +5671,23 @@ ${stillTime !== undefined ? `
       message: 'the file is ' + __vd.output[0] + 'x' + __vd.output[1] + ', not the requested ' + __vd.requested[0] + 'x' + __vd.requested[1] + ': H.264 needs even dimensions, so an odd side was rounded up by 1 px (the extra row / column is background). For an exact-pixel spec, use an even canvas size, or crop the extra line when re-encoding (ffmpeg -vf crop=' + __vd.requested[0] + ':' + __vd.requested[1] + ':0:0).' }]);
     if (result.fidelity.note) delete result.fidelity.note;
   }
-  // LUMA OUTSIDE 16-235 (8.35, FxTool 4f1ec3ae). The broadcast encode is
+${deterministic ? `  // DETERMINISTIC: the container timestamps are pinned either way; the PIXELS
+  // are only identical run to run on the software encoder, because the
+  // browser may pick a different hardware backend each time (FxTool
+  // e34ae03d: 92/255 between backends, 2/255 run to run on hardware). The
+  // engine requests software and reports what it got.
+  if (result && result.success) {
+    const __hw = __vr && __vr.hardwareAcceleration;
+    if (__hw !== 'prefer-software') {
+      result.fidelity = result.fidelity || { warnings: [] };
+      result.fidelity.warnings = (result.fidelity.warnings || []).concat([{ code: 'determinism_not_pinned',
+        message: __hw
+          ? 'deterministic was asked for, but the encoder ran with hardwareAcceleration ' + JSON.stringify(__hw) + ': the container is pinned, the pixels may still differ slightly between runs (hardware encoders vary). Do not cache this file by hash.'
+          : 'deterministic pinned the container timestamps, but this studio does not report which encoder backend ran, so the pixels may differ slightly between runs if the browser switches between hardware and software encoding. Do not rely on byte-identical files from this studio.' }]);
+      if (result.fidelity.note) delete result.fidelity.note;
+    }
+  }
+` : ''}  // LUMA OUTSIDE 16-235 (8.35, FxTool 4f1ec3ae). The broadcast encode is
   // decoded back and measured: H.264 ringing at hard edges puts a fraction of
   // a percent of samples out of range, which QC rejects. broadcastHeadroom
   // cuts it but never to zero, so a legaliser pass is the requirement.
