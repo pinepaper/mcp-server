@@ -10457,7 +10457,7 @@ ${checks.includes('contrast') ? `  const all = (app.itemRegistry && typeof app.i
 // Upload video from URL
 (async function() {
 ${guard}
-  const info = await A.uploadVideo(${srcExpr(input.url, 'video')}, ${opts});
+  const info = await A.uploadVideo(${srcExpr(input.url, 'video')}, ${input.atPlayhead ? `Object.assign(${opts}, { timeOffset: Number(app.playbackTime) || 0 })` : opts});
   return { success: true, action: 'upload_video', media: info };
 })();`.trim();
       }
@@ -10472,7 +10472,7 @@ ${guard}
 // Upload audio from URL
 (async function() {
 ${guard}
-  const info = await A.uploadAudio(${srcExpr(input.url, 'audio')}, ${opts});${input.volume !== undefined ? `
+  const info = await A.uploadAudio(${srcExpr(input.url, 'audio')}, ${input.atPlayhead ? `Object.assign(${opts}, { timeOffset: Number(app.playbackTime) || 0 })` : opts});${input.volume !== undefined ? `
   // THE LEVEL IS STORED UNDER ONE KEY AND EXPORTED FROM ANOTHER. The upload
   // records volume as \`gain\` on the registry entry; the video exporter's mix
   // reads \`audioGain\`. So a bed uploaded at 0.25 exported at unity (measured:
@@ -10521,10 +10521,39 @@ ${guard}
   if (typeof A.setMediaClip !== 'function') { return { success: false, error: 'setMediaClip unavailable — update FxTool' }; }
 ${resolveMedia}
   if (!__m) return __miss;
-  const ok = A.setMediaClip(__mid, ${input.inPoint}, ${input.outPoint});
+${input.timeOffset !== undefined ? `  // Moving the clip is the 4th argument, which older studios' setMediaClip
+  // does not take (it dropped it silently): its declared arity is the tell.
+  if (A.setMediaClip.length < 4) {
+    return { success: false, action: 'set_clip', id: __mid, error: 'this studio can re-trim a clip but not move it (setMediaClip takes no start time here) — nothing was changed. Update the studio, or remove and re-upload the clip with timeOffset.' };
+  }
+` : ''}  const ok = A.setMediaClip(__mid, ${input.inPoint}, ${input.outPoint}${input.timeOffset !== undefined ? `, ${input.timeOffset}` : ''});
   return ok
-    ? { success: true, action: 'set_clip', id: __mid, registryId: __m.registryId, inPoint: ${input.inPoint}, outPoint: ${input.outPoint} }
+    ? { success: true, action: 'set_clip', id: __mid, registryId: __m.registryId, inPoint: ${input.inPoint}, outPoint: ${input.outPoint}${input.timeOffset !== undefined ? `, timeOffset: ${input.timeOffset}` : ''} }
     : { success: false, action: 'set_clip', id: __mid, error: 'the studio refused the clip window ${input.inPoint}–${input.outPoint} for ' + __mid + '.' };
+})();`.trim();
+
+      // Split and transitions (FxTool, verified on main): the engine's own
+      // refusals come back as {ok:false, reason} and are errors here.
+      case 'split':
+        return `
+// Split a media clip at canvas time ${input.at}
+(async function() {
+${guard}
+  if (typeof A.splitMedia !== 'function') { return { success: false, action: 'split', error: 'this studio is too old to split a clip (no splitMedia) — nothing was changed.' }; }
+  const r = await A.splitMedia(${JSON.stringify(input.id)}, ${input.at});
+  if (!r || r.ok === false) return { success: false, action: 'split', error: (r && r.reason) || 'the studio refused the split' };
+  return Object.assign({ success: true, action: 'split' }, r);
+})();`.trim();
+
+      case 'add_transition':
+        return `
+// ${input.transition?.type ?? 'crossfade'} between ${input.fromItemId} and ${input.toItemId}
+(function() {
+${guard}
+  if (typeof A.addTransition !== 'function') { return { success: false, action: 'add_transition', error: 'this studio is too old for clip transitions (no addTransition) — nothing was changed.' }; }
+  const r = A.addTransition(${JSON.stringify(input.fromItemId)}, ${JSON.stringify(input.toItemId)}, ${JSON.stringify(input.transition ?? {})});
+  if (!r || r.ok === false) return { success: false, action: 'add_transition', error: (r && r.reason) || 'the studio refused the transition' };
+  return Object.assign({ success: true, action: 'add_transition' }, r);
 })();`.trim();
 
       // ── Video-editing actions (v1.6.4) — these live on `app` (PinePaper

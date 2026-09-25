@@ -2090,15 +2090,18 @@ EXAMPLE: { times: [0, 0.5, 1, 1.5, 2], seed: 42 }`,
     description: `Bring VIDEO and AUDIO onto the canvas from a URL, and control playback. Uploaded video is a first-class canvas item (drag, scale, animate, export like any shape); audio rides the timeline.
 
 ACTIONS:
-- upload_video: { url (required), position?, scale?, timeOffset? (timeline start, s), clipInPoint?, clipOutPoint? (trim, s) } → { id, duration, width, height, name }
-- upload_audio: { url (required), volume? (0–1, default 1), loop?, muted?, timeOffset? } → { id, registryId, duration, name }. Pass loop EXPLICITLY — loop:true for a music bed, loop:false for a voice-over or sting; when omitted, the studio's own default applies and differs between builds.
+- upload_video: { url (required), position?, scale?, timeOffset? (timeline start, s) or atPlayhead?: true (start at the current playback time), clipInPoint?, clipOutPoint? (trim, s) } → { id, duration, width, height, name }
+- upload_audio: { url (required), volume? (0–1, default 1), loop?, muted?, timeOffset? or atPlayhead? } → { id, registryId, duration, name }. Pass loop EXPLICITLY — loop:true for a music bed, loop:false for a voice-over or sting; when omitted, the studio's own default applies and differs between builds.
 - list: → all media [{ id, kind, duration, … }]
 - remove: { id } → removed boolean
 - set_playback_rate: { id, rate (0.25–4) } → applies to video or audio
-- set_clip: { id, inPoint, outPoint (media-time s, outPoint > inPoint) } → re-trim an ALREADY-uploaded clip (video or audio)
+- set_clip: { id, inPoint, outPoint (media-time s, outPoint > inPoint), timeOffset? (canvas s: also MOVE the clip to start there) } → re-trim an ALREADY-uploaded clip (video or audio). A studio that cannot move clips refuses timeOffset rather than ignoring it.
+- split: { id, at (canvas s) } → cut a clip in two: { leftId, rightId, leftMediaId, rightMediaId, at }. The first half keeps its id. Refused (not claimed) where the studio cannot split or the time is outside the clip.
+- add_transition: { fromItemId (ends at the cut), toItemId (starts at it), transition?: { type: 'crossfade'|'dip', seconds, color } } → the same in preview and export. Split a clip, then transition between its halves, or join two clips that meet.
+- For an IMAGE on the timeline, use pinepaper_import_image with bornAt / ttl (seconds on screen).
 
 NOTES:
-- URL-based: the URL is fetched in the browser, so it must be reachable + CORS-permitted.
+- The server fetches the URL (or reads a local path / data: URL) and hands the page the bytes, so it does not need to be CORS-permitted.
 - Use the returned id with set_playback_rate / set_clip / remove, and (for video) modify/animate it like any item.
 
 VIDEO EDITING:
@@ -2112,14 +2115,16 @@ EXAMPLE: { action: 'upload_video', url: 'https://…/clip.mp4', scale: 0.5, time
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['upload_video', 'upload_audio', 'list', 'remove', 'set_playback_rate', 'set_clip', 'set_time_remap', 'speed_ramp', 'match_cut', 'apply_track_matte', 'stop_live_matte'], description: "Media action" },
+        action: { type: 'string', enum: ['upload_video', 'upload_audio', 'list', 'remove', 'set_playback_rate', 'set_clip', 'split', 'add_transition', 'set_time_remap', 'speed_ramp', 'match_cut', 'apply_track_matte', 'stop_live_matte'], description: "Media action" },
+        transition: { type: 'object', properties: { type: { type: 'string', enum: ['crossfade', 'dip'] }, seconds: { type: 'number', exclusiveMinimum: 0, maximum: 10 }, color: { type: 'string' } }, description: "add_transition: { type ('crossfade' default | 'dip'), seconds, color (dip) }." },
+        atPlayhead: { type: 'boolean', description: 'upload_video / upload_audio: start at the current playback time (instead of timeOffset).' },
         remapTrack: { type: 'array', items: { type: 'object', properties: { time: { type: 'number' }, value: { type: 'number' }, easing: { type: 'string' } }, required: ['time', 'value'] }, description: 'set_time_remap: canvas-seconds → source-seconds curve (≥2 points). null clears the remap.' },
         segments: { type: 'array', items: { type: 'object', properties: { duration: { type: 'number' }, speed: { type: 'number' } }, required: ['duration', 'speed'] }, description: 'speed_ramp: consecutive {duration, speed} segments. speed 0 = freeze frame, negative = reverse.' },
         fromItemId: { type: 'string', description: 'match_cut: outgoing shot item id.' },
         toItemId: { type: 'string', description: 'match_cut: incoming shot item id.' },
         subject: { type: 'string', enum: ['detect', 'bounds'], description: "match_cut: subject source — 'detect' (on-device DETR, needs consent on first use) or 'bounds'." },
         label: { type: 'string', description: 'match_cut: narrow detection to one class ("person") when the biggest object is not the subject.' },
-        at: { type: 'number', description: 'match_cut: cut time in seconds (default 0).' },
+        at: { type: 'number', description: 'match_cut: cut time in seconds (default 0). split: the canvas time to cut at (required).' },
         settle: { type: 'number', description: 'match_cut: seconds to relax to natural framing (default 0.8).' },
         fade: { type: 'number', description: 'match_cut: crossfade seconds; 0 = hard cut (default 0.12).' },
         consent: { type: 'boolean', description: 'match_cut: allow the detection model download (a first run without it returns needsConsent instead of downloading silently).' },
@@ -2136,7 +2141,7 @@ EXAMPLE: { action: 'upload_video', url: 'https://…/clip.mp4', scale: 0.5, time
         outPoint: { type: 'number', description: 'Clip out-point (media-time s, > inPoint) — set_clip.' },
         position: { type: 'object', properties: { x: { type: 'number' }, y: { type: 'number' } }, description: 'Canvas position — upload_video.' },
         scale: { type: 'number', description: 'Scale factor — upload_video.' },
-        timeOffset: { type: 'number', description: 'Timeline start offset (s) — upload_video / upload_audio.' },
+        timeOffset: { type: 'number', description: 'Timeline start offset (s) — upload_video / upload_audio; set_clip: move the clip to start here.' },
         clipInPoint: { type: 'number', description: 'Trim in-point (s) — upload_video.' },
         clipOutPoint: { type: 'number', description: 'Trim out-point (s) — upload_video.' },
         volume: { type: 'number', description: 'Volume 0–1 (default 1) — upload_audio.' },
