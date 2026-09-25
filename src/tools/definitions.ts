@@ -5154,6 +5154,7 @@ Available filters (GPU raster set):
 - SECOND-INPUT (params.map = another item's id, resolved to its pixels): displace (amount, dispersion, map, mapChannel — the map's brightness pushes pixels), refract (displace with per-channel dispersion — glass), trackMatte (channel, invert, strength — prefer pinepaper_media apply_track_matte for the live version), datamosh (amount, block, map? — self-moshes without a map)
 
 RECIPE — grunge poster: chain [grain, scanlines, vignette]. Glass header: refract with map = a gradient item.
+HARD-EDGED LOOKS NEED SMOOTHING OFF: posterize, dither, halftone and pixel looks are exact at 1:1, but a raster that is then scaled, skewed or rotated is RESAMPLED with smoothing, which blends the flat levels back into a gradient (measured: posterize then skew → 256 tones again). Set smoothing 'off' on the image (pinepaper_import_image, or pinepaper_modify_item {smoothing: 'off'}) to keep the levels.
 CHAIN ORDER MATTERS: each filter runs on the previous one's output. duotone then halftoneDots comes out grey (the ink colour is lost); halftoneDots then duotone keeps it. If a chain loses its colour, move the colour-mapping filter (duotone, paletteMap, colorTint) to the end.
 (Scene-wide filters — sharpen/emboss/noise/vintage etc. — are a different surface: use pinepaper_add_filter.)`,
     inputSchema: {
