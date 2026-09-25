@@ -547,3 +547,40 @@ describe('opaque apng on a page with no colour is filled black — said so (FxTo
     expect((await run({}, '')).map((x: { code: string }) => x.code)).not.toContain('alpha_dropped');
   });
 });
+
+describe('pdf searchable text layer (8.10, FxTool 9917cfa5)', () => {
+  class FR { result = 'data:application/pdf;base64,JVBERg=='; onloadend: (() => void) | null = null; readAsDataURL() { this.onloadend?.(); } }
+  const run = async (pdf: Record<string, unknown> | undefined, report: Record<string, unknown> | undefined) => {
+    const calls: Array<Record<string, unknown>> = [];
+    const ee: Record<string, unknown> = { lastPdfReport: { stale: true }, exportFidelity: () => ({ warnings: [] }),
+      exportPDF: async (o: Record<string, unknown>) => { calls.push(o); if (report) ee.lastPdfReport = report; return { blob: { size: 4, type: 'application/pdf', slice() { return this; } } }; } };
+    const app = { canvasSize: { width: 800, height: 600 }, canvasEl: { style: { backgroundColor: '#fff' } }, exportEngine: ee };
+    const r = await new Function('app', 'FileReader', 'document', 'Blob', body(codeGenerator.generateAgentExport({ format: 'pdf', ...(pdf ? { pdf } : {}) } as never)))(app, FR, {}, Object);
+    return { r, calls, codes: ((r.fidelity?.warnings ?? []) as Array<{ code: string; message: string }>) };
+  };
+
+  it('on by default (nothing sent), and the report comes back as result.pdf', async () => {
+    const { r, calls, codes } = await run(undefined, { searchableText: true, linesWritten: 12, linesSkipped: 0 });
+    expect(calls[0]).not.toHaveProperty('searchableText');
+    expect(r.pdf).toEqual({ searchableText: true, linesWritten: 12, linesSkipped: 0 });
+    expect(codes.map((c) => c.code).filter((c) => c.startsWith('pdf_'))).toEqual([]);
+  });
+
+  it('skipped non-Latin lines are named', async () => {
+    const { codes } = await run(undefined, { searchableText: true, linesWritten: 10, linesSkipped: 3 });
+    const w = codes.find((c) => c.code === 'pdf_text_lines_skipped')!;
+    expect(w.message).toContain('3 text line(s)');
+    expect(w.message).toContain('Arabic');
+  });
+
+  it('a layer not written for a reason is said; turned off on request is not', async () => {
+    expect((await run(undefined, { searchableText: false, reason: 'unbounded canvas' })).codes.map((c) => c.code)).toContain('pdf_no_text_layer');
+    const off = await run({ searchableText: false }, { searchableText: false, reason: 'off' });
+    expect(off.calls[0].searchableText).toBe(false);
+    expect(off.codes.map((c) => c.code)).not.toContain('pdf_no_text_layer');
+  });
+
+  it('a stale report from an earlier export is never read as this one', async () => {
+    expect((await run(undefined, undefined)).r.pdf).toBeUndefined();
+  });
+});

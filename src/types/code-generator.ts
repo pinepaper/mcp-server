@@ -5373,9 +5373,14 @@ ${stillTime !== undefined ? `
         if (app.exportEngine && app.exportEngine.exportPDF) {
           // Print options reach the engine (they were engine-only before), and
           // download:false, because the tool delivers the bytes itself.
+          // lastPdfReport is a report PROPERTY (9917cfa5), read through the
+          // engine object like the exporter's audio / video reports, and only
+          // when present.
+          const __pee = app.exportEngine;
+          if ('lastPdfReport' in __pee) __pee.lastPdfReport = null;
           const pdfOut = await app.exportEngine.exportPDF({
             dpi: ${pdfOpts?.dpi ?? 'settings.dpi'},
-            download: false,${pdfOpts?.paperFormat ? `\n            format: ${JSON.stringify(pdfOpts.paperFormat)},` : ''}${pdfOpts?.orientation ? `\n            orientation: ${JSON.stringify(pdfOpts.orientation)},` : ''}${pdfOpts?.bleed !== undefined ? `\n            includeBleed: ${pdfOpts.bleed > 0}, bleed: ${pdfOpts.bleed},` : ''}${pdfOpts?.trimMarks !== undefined ? `\n            trimMarks: ${pdfOpts.trimMarks},` : ''}
+            download: false,${pdfOpts?.searchableText === false ? '\n            searchableText: false,' : ''}${pdfOpts?.paperFormat ? `\n            format: ${JSON.stringify(pdfOpts.paperFormat)},` : ''}${pdfOpts?.orientation ? `\n            orientation: ${JSON.stringify(pdfOpts.orientation)},` : ''}${pdfOpts?.bleed !== undefined ? `\n            includeBleed: ${pdfOpts.bleed > 0}, bleed: ${pdfOpts.bleed},` : ''}${pdfOpts?.trimMarks !== undefined ? `\n            trimMarks: ${pdfOpts.trimMarks},` : ''}
           });
           const blob = asBlob(pdfOut);
           if (!blob) {
@@ -5462,6 +5467,23 @@ ${stillTime !== undefined ? `
   // request can come out at 1.8 — the engine measures it and warns. A request
   // the report does not reflect (an engine without the options, or a route
   // that rebuilt its settings without them) is named, not assumed.
+  // A PDF'S TEXT LAYER (8.10, FxTool 9917cfa5): invisible text at each line's
+  // drawn position, so the PDF is searchable and screen-readable. The built-in
+  // font is WinAnsi only, so Arabic / Hebrew / CJK lines are left out of the
+  // layer (drawn, but not selectable) — counted by the engine, said here.
+  const __ee = app.exportEngine;
+  const __pr = format === 'pdf' && __ee && __ee.lastPdfReport;
+  if (result && result.success && __pr && typeof __pr === 'object') {
+    result.pdf = __pr;
+    const __pw = [];
+    if (__pr.searchableText && __pr.linesSkipped > 0) __pw.push({ code: 'pdf_text_lines_skipped', message: __pr.linesSkipped + ' text line(s) are not in the searchable layer: the built-in PDF font covers Latin (WinAnsi) only, so lines in Arabic, Hebrew, CJK and other non-Latin scripts are drawn but cannot be selected, searched or read by a screen reader.' });
+    if (!__pr.searchableText && __pr.reason && __pr.reason !== 'off') __pw.push({ code: 'pdf_no_text_layer', message: 'no searchable text layer was written (' + __pr.reason + '): the text is drawn but cannot be selected, searched or read by a screen reader.' });
+    if (__pw.length) {
+      result.fidelity = result.fidelity || { warnings: [] };
+      result.fidelity.warnings = (result.fidelity.warnings || []).concat(__pw);
+      if (result.fidelity.note) delete result.fidelity.note;
+    }
+  }
   const __vr = __vx && __vx.lastVideoReport;
   if (result && result.success && __vr && typeof __vr === 'object') result.video = __vr;${headroomDefaulted ? `
   // The applied value is the engine's own report where it gives one

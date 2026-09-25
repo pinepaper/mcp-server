@@ -2566,6 +2566,7 @@ export const AgentExportInputSchema = z.object({
     orientation: z.enum(['portrait', 'landscape']).optional().describe('Default: from the canvas aspect.'),
     bleed: z.number().min(0).max(20).optional().describe('Bleed in mm; > 0 includes the bleed area.'),
     trimMarks: z.boolean().optional().describe('Add crop / trim marks.'),
+    searchableText: z.boolean().optional().describe('An invisible text layer over the artwork, so the PDF is selectable, searchable and screen-readable (default true where the studio supports it; Latin script only). false omits it.'),
     dpi: z.number().int().min(72).max(600).optional().describe('Rasterisation DPI (default: the quality tier\'s).'),
     pages: z.union([
       z.literal('scenes'),
