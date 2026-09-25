@@ -1674,6 +1674,22 @@ const size = app.getCanvasSize();
 }
 
 /**
+ * Uploaded audio / video, removed through the media pipeline.
+ *
+ * clearCanvas empties the item groups and registries, but an uploaded clip
+ * also lives in the audio / video layers — so a video from the previous job
+ * survived agent_start_job {clearCanvas:true} and played in the next scene
+ * (round 8 retest, 1.66). removeMedia is the full removal (registry entry,
+ * stored blob, layer). Run before clearCanvas; forEach, not a generated loop.
+ */
+const MEDIA_PURGE = `
+  let __mediaRemoved = 0;
+  const __PA = (typeof window !== 'undefined') && window.PinePaperAgent;
+  if (__PA && typeof __PA.listMedia === 'function' && typeof __PA.removeMedia === 'function') {
+    __PA.listMedia().forEach(function(m) { try { if (__PA.removeMedia(m.id)) __mediaRemoved++; } catch (_) { /* keep clearing */ } });
+  }`;
+
+/**
  * Template for clearing all items from canvas
  */
 function generateClearCanvasCode(): string {
@@ -1685,6 +1701,7 @@ function generateClearCanvasCode(): string {
 // entries don't expose those — getItemById wants the registry id), so it
 // removed 0 items, and it called the non-existent app.clearAllRelations.
 const before = app.itemRegistry ? app.itemRegistry.getAll().length : 0;
+${MEDIA_PURGE}
 
 if (typeof app.clearCanvas === 'function') {
   app.clearCanvas();
@@ -1700,7 +1717,7 @@ if (app.historyManager) app.historyManager.saveState();
 
 const remaining = app.itemRegistry ? app.itemRegistry.getAll().length : 0;
 
-({ success: true, removedCount: Math.max(0, before - remaining), remainingItems: remaining });
+({ success: true, removedCount: Math.max(0, before - remaining), remainingItems: remaining, mediaRemoved: __mediaRemoved });
 `.trim();
 }
 
@@ -3462,7 +3479,7 @@ throw new Error('Unknown diagram mode action: ${action}');
 
     if (shouldClear) {
       code += `
-  // Clear canvas
+  // Clear canvas — uploaded media first (it lives outside the item groups)${MEDIA_PURGE}
   if (app.clearCanvas) {
     app.clearCanvas();
   } else {

@@ -303,3 +303,19 @@ describe('small canvas refusal names the region recipe (1.48)', () => {
     expect(JSON.stringify(r.error)).toContain('outputWidth:728');
   });
 });
+
+describe('clearing the canvas removes uploaded media (1.66)', () => {
+  it('clear_canvas removes every uploaded clip through the media pipeline', () => {
+    const removed: string[] = [];
+    const window = { PinePaperAgent: { listMedia: () => [{ id: 'vraster_1' }, { id: 'araster_2' }], removeMedia: (id: string) => { removed.push(id); return true; } } };
+    const app = { itemRegistry: { getAll: () => [] }, clearCanvas() {}, historyManager: { saveState() {} } };
+    const code = codeGenerator.generateClearCanvas();
+    const r = new Function('app', 'window', code.replace(/\(\{ success: true[\s\S]*\}\);\s*$/, (m) => `return ${m.slice(0, -1)}`))(app, window);
+    expect(removed).toEqual(['vraster_1', 'araster_2']);
+    expect(r.mediaRemoved).toBe(2);
+  });
+
+  it('agent_start_job clearCanvas does the same', () => {
+    expect(codeGenerator.generateAgentStartJob({} as never)).toContain('__PA.removeMedia(m.id)');
+  });
+});
