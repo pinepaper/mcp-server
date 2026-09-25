@@ -515,3 +515,13 @@ describe('camera pitch / yaw carry a no-effect note (3.6)', () => {
     expect(plain).not.toContain('NO visible effect');
   });
 });
+
+describe('extrude / lathe meshes take a colour (5.64)', () => {
+  it('color becomes the diffuse uniform; no colour is light grey, not black', () => {
+    const coloured = codeGenerator.generateWorld3D({ action: 'extrude_path', pathId: 'item_1', mesh: { depth: 20, color: '#ff0000', metalness: 0.2 } } as never);
+    expect(coloured).toContain('"uniforms":{"diffuse":[1,0,0],"metalness":0.2,"roughness":0.6}');
+    expect(coloured).not.toContain('"color"');
+    const plain = codeGenerator.generateWorld3D({ action: 'lathe_path', pathId: 'item_1', mesh: {} } as never);
+    expect(plain).toContain('"diffuse":[0.8,0.8,0.8]');
+  });
+});

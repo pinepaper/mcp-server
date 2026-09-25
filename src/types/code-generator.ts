@@ -10548,6 +10548,20 @@ ${needWorld}
           if (mesh.rotY === undefined) mesh.rotY = (mesh.rotYDegrees as number) * Math.PI / 180;
           delete mesh.rotYDegrees;
         }
+        // A COLOUR, NOT A BLACK MESH (round 9 HH, 5.64). The default mesh
+        // shader reads `uniform vec3 diffuse` (0..1) plus metalness / roughness,
+        // and extrude / lathe passed no uniforms — so every authored mesh
+        // rendered black and there was no parameter to change it. color (hex,
+        // [r,g,b] 0..255 or 0..1) becomes diffuse; with none given it is a
+        // neutral light grey, which lights readably. Explicit uniforms win.
+        {
+          const uniforms = { ...((mesh.uniforms as Record<string, unknown>) ?? {}) };
+          if (uniforms.diffuse === undefined) uniforms.diffuse = mesh.color !== undefined ? world3dColor(mesh.color) : [0.8, 0.8, 0.8];
+          if (uniforms.metalness === undefined && typeof mesh.metalness === 'number') uniforms.metalness = mesh.metalness;
+          if (uniforms.roughness === undefined) uniforms.roughness = typeof mesh.roughness === 'number' ? mesh.roughness : 0.6;
+          delete mesh.color; delete mesh.metalness; delete mesh.roughness;
+          mesh.uniforms = uniforms;
+        }
         return `
 // World3D: ${input.action} — a canvas path becomes real geometry
 (async function() {
