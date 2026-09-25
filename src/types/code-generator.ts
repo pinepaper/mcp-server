@@ -555,7 +555,10 @@ const item = app.create('${itemType}', ${JSON.stringify(params, null, 2)});`;
   }
 
   if (itemType === 'text') code += emitTextStyle('item', properties);
-  if (textFit) code += `\nlet __textFit = null;${emitTextFit('item', textFit)}`;
+  // The vertical hold follows the anchor, as the engine's own create step
+  // derives it (1.90): without it the fit held the centre, and a top-left
+  // anchored headline's top edge drifted on every refit.
+  if (textFit) code += `\nlet __textFit = null;${emitTextFit('item', textFit, JSON.stringify(anchorHold(properties.anchor ?? properties.origin) ?? null))}`;
 
   // After opacity, so the "on" level of the lifetime is the item's own.
   const hasLifetime = properties.bornAt !== undefined || properties.ttl !== undefined;
@@ -702,10 +705,18 @@ if (typeof app.checkFont === 'function') {
  * without fitText the result says so rather than leaving the text as it was
  * in silence. `__textFit` must be declared by the caller.
  */
-function emitTextFit(itemExpr: string, box: Record<string, unknown>): string {
+/** 'top' / 'bottom' from a top-* / bottom-* anchor, as the engine derives it. */
+function anchorHold(anchor: unknown): 'top' | 'bottom' | undefined {
+  const a = String(anchor ?? '').toLowerCase();
+  return /^top/.test(a) ? 'top' : /^bottom/.test(a) ? 'bottom' : undefined;
+}
+
+function emitTextFit(itemExpr: string, box: Record<string, unknown>, holdFallback = 'undefined'): string {
   return `
 if (typeof app.fitText === 'function') {
-  const __fr = app.fitText(${itemExpr}, ${JSON.stringify(box)});
+  const __fbox = ${JSON.stringify(box)};
+  if (__fbox.hold === undefined) { const __h = ${holdFallback}; if (__h) __fbox.hold = __h; }
+  const __fr = app.fitText(${itemExpr}, __fbox);
   __textFit = __fr && __fr.ok !== false
     ? Object.assign({ applied: true }, __fr, __fr.fits === false ? { warning: 'the text does not fit its box even at the minimum font size — shorten it or widen the box.' } : {})
     : { applied: false, error: (__fr && __fr.error) || 'the studio refused the fit box' };
@@ -1006,7 +1017,7 @@ if (_afi) {
   if (modFit) {
     code += `
 let __textFit = null;
-const _tf = app.itemRegistry.get('${itemId}');${emitTextFit('_tf && _tf.item', modFit)}`;
+const _tf = app.itemRegistry.get('${itemId}');${emitTextFit('_tf && _tf.item', modFit, JSON.stringify(anchorHold(properties.anchor ?? properties.origin) ?? null) + " || (_tf && _tf.item && _tf.item.data && _tf.item.data.fitBox && _tf.item.data.fitBox.hold)")}`;
   }
 
   const textStyle = emitTextStyle('_ts && _ts.item', properties);
