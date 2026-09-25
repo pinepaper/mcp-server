@@ -70,3 +70,33 @@ describe('lasso cut (1.55)', () => {
     expect(codeGenerator.generateLasso({ action: 'cut', itemId: 'item_1', points: [[0, 0], [5, 5]] } as never)).toContain('at least 3 points');
   });
 });
+
+describe('no fill at create and modify (1.50)', () => {
+  const create = (properties: Record<string, unknown>) => {
+    const item: Record<string, any> = { fillColor: '#3b82f6', data: { registryId: 'item_1' }, bringToFront() {} };
+    let params: Record<string, unknown> = {};
+    const app = { create: (_t: string, p: Record<string, unknown>) => { params = p; return item; }, historyManager: { saveState() {} } };
+    const code = codeGenerator.generateCreateItem({ itemType: 'rectangle', position: { x: 0, y: 0 }, properties });
+    new Function('app', code)(app);
+    return { item, params };
+  };
+
+  for (const v of [null, 'transparent', 'none']) {
+    it(`fillColor ${JSON.stringify(v)} gives no fill, and is never sent as a colour`, () => {
+      const { item, params } = create({ width: 100, height: 50, fillColor: v, strokeColor: '#000', strokeWidth: 2 });
+      expect(item.fillColor).toBeNull();
+      expect(params.fillColor).toBeUndefined();
+    });
+  }
+
+  it('a real colour is untouched', () => {
+    expect(create({ fillColor: '#ff0000' }).params.fillColor).toBe('#ff0000');
+  });
+
+  it('modify_item {fillColor:"transparent"} clears the fill after modifyItem', () => {
+    const item: Record<string, any> = { fillColor: '#3b82f6' };
+    const app = { modifyItem: () => { item.fillColor = '#000000'; return true; }, itemRegistry: { get: () => ({ item }) }, historyManager: { saveState() {} } };
+    new Function('app', 'window', `return ${codeGenerator.generateModifyItem({ itemId: 'item_1', properties: { fillColor: 'transparent' } })}`)(app, {});
+    expect(item.fillColor).toBeNull();
+  });
+});

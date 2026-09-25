@@ -522,6 +522,7 @@ Use itemType: "path" with either:
 
 ADVANCED STYLING (NEW):
 All shapes support these additional properties:
+- No fill (stroke-only outlines, line art): fillColor: null, 'transparent' or 'none', with a strokeColor and strokeWidth.
 - Gradients: color can be an object: {type: "linear"|"radial", stops: [{color: "#fff", offset: 0}, {color: "#000", offset: 1}], origin: [x,y], destination: [x,y]}
 - Shadows: shadowColor, shadowBlur (pixels), shadowOffset: [x, y]
 - Blend modes: blendMode: "multiply"|"screen"|"overlay"|"darken"|"lighten"|etc.

@@ -313,6 +313,14 @@ function generateCreateItemCode(
     ...withRadiusAxes(baseProperties),
   };
 
+  // "NO FILL" HAS THREE SPELLINGS, AND NONE OF THEM WORKED (round 7 AA, 1.50).
+  // fillColor:null was dropped by a truthiness check, so the engine's default
+  // blue applied; 'transparent' reached Paper, which read it as black. A
+  // stroke-only rectangle — whiteboard line art — could not be made at create.
+  // All three now mean no fill, applied after the item exists.
+  const noFill = (v: unknown) => v === null || (typeof v === 'string' && /^(transparent|none)$/i.test(v.trim()));
+  const clearFill = (fillColor !== undefined && noFill(fillColor)) || (fillColor === undefined && color !== undefined && noFill(color));
+
   // `color` ON A CLOSED PATH IS ITS FILL.
   //
   // The engine's path branch paints `color` as the STROKE whenever no fillColor
@@ -329,10 +337,10 @@ function generateCreateItemCode(
   }
 
   // Handle simple solid colors in params
-  if (color && !isGradient(color)) {
+  if (color && !isGradient(color) && !noFill(color)) {
     params.color = color;
   }
-  if (fillColor && !isGradient(fillColor)) {
+  if (fillColor && !isGradient(fillColor) && !noFill(fillColor)) {
     params.fillColor = fillColor;
   }
   if (strokeColor && !isGradient(strokeColor)) {
@@ -469,6 +477,8 @@ const item = app.create('${itemType}', ${JSON.stringify(params, null, 2)});`;
   if (blendMode) {
     code += '\n' + generateBlendModeCode('item', blendMode as string);
   }
+
+  if (clearFill) code += `\nitem.fillColor = null;`;
 
   // Add opacity support
   if (opacity !== undefined) {
@@ -800,6 +810,15 @@ const _sm = app.itemRegistry.get('${itemId}');
 const _smR = _sm && _sm.item && (_sm.item.className === 'Raster' ? _sm.item
   : (typeof _sm.item.getItem === 'function' ? _sm.item.getItem({ className: 'Raster' }) : null));
 if (_smR) _smR.smoothing = ${JSON.stringify(properties.smoothing)};`;
+  }
+
+  // No fill on modify too: null / 'transparent' / 'none' clear it outright,
+  // after modifyItem, which would otherwise read 'transparent' as black.
+  const fillNone = (v: unknown) => v === null || (typeof v === 'string' && /^(transparent|none)$/i.test(v.trim()));
+  if (fillNone(properties.fillColor) || (properties.fillColor === undefined && properties.color !== undefined && fillNone(properties.color))) {
+    code += `
+const _nf = app.itemRegistry.get('${itemId}');
+if (_nf && _nf.item) _nf.item.fillColor = null;`;
   }
 
   const textStyle = emitTextStyle('_ts && _ts.item', properties);
