@@ -6855,9 +6855,9 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
     const entry = await app.imageTools.uploadFromURL(src);
     const opts = ${optsLiteral};
     const raster = await app.imageTools.placeImage(entry.id, Object.keys(opts).length > 0 ? opts : undefined);
-${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}${smoothing ? `    // Pixel art wants 'off': Paper's Raster draws with smoothing 'low' by
+${smoothing ? `    // Pixel art wants 'off': Paper's Raster draws with smoothing 'low' by
     // default, which blurs every scaled-up pixel edge. Read at every draw,
-    // export frames included.
+    // export frames included. Set before a mask, which clones the raster.
     if (raster && 'smoothing' in raster) raster.smoothing = ${JSON.stringify(smoothing)};\n` : ''}    // The REGISTRY id is \`data.id\`. \`data.itemId\` has never existed, so this
     // fell through to \`raster.id\` — a Paper.js NUMBER — and the handle the tool
     // returned could not be used as a relation endpoint or with modify/animate.
@@ -6870,11 +6870,28 @@ ${mask ? `    app.imageTools.applyMask(raster, '${mask}');\n` : ''}${smoothing ?
     if (!itemId) {
       return { error: 'Image placed but not registered — no usable item id. This is a bug; report the scene.' };
     }
+    let placed = raster;
+${mask ? `    // A MASK REPLACES THE RASTER (round 8 DD, 4.10). applyMask builds a
+    // clipping group from a CLONE and removes the original, so the id and bounds
+    // read off \`raster\` afterwards described an item no longer on the canvas.
+    // The group is what is drawn: the registry id is rebound to it (the
+    // registry's own method for exactly this), and a mask that did not apply is
+    // refused instead of answered with the raster's bounds.
+    const masked = app.imageTools.applyMask(raster, ${JSON.stringify(mask)});
+    if (!masked) {
+      return { success: false, itemId: itemId, error: 'the ${mask} mask was not applied — the image may not be a raster yet. The unmasked image is on the canvas as ' + itemId + '.' };
+    }
+    if (app.itemRegistry && typeof app.itemRegistry.rebind === 'function') app.itemRegistry.rebind(itemId, masked);
+    placed = masked;
+` : ''}    const b = placed.bounds;
+    if (!b || !(b.width > 0) || !(b.height > 0)) {
+      return { success: false, itemId: itemId, error: 'the image was placed with no size (' + (b ? b.width + 'x' + b.height : 'no bounds') + ') — it may not have loaded. Nothing visible was drawn.' };
+    }
     return {
       success: true,
       itemId: itemId,
       message: 'Image imported and placed on canvas.',
-      bounds: { x: raster.bounds.x, y: raster.bounds.y, width: raster.bounds.width, height: raster.bounds.height }${mask ? `,\n      mask: '${mask}'` : ''}
+      bounds: { x: b.x, y: b.y, width: b.width, height: b.height }${mask ? `,\n      mask: '${mask}'` : ''}
     };
   } catch (e) {
     return { error: 'Failed to import image: ' + e.message };

@@ -319,3 +319,42 @@ describe('clearing the canvas removes uploaded media (1.66)', () => {
     expect(codeGenerator.generateAgentStartJob({} as never)).toContain('__PA.removeMedia(m.id)');
   });
 });
+
+describe('import_image with a mask returns the group that is drawn (4.10)', () => {
+  function importStudio(maskResult: 'group' | 'null', rasterSize = 200) {
+    const rebinds: unknown[] = [];
+    const raster = { data: { id: 'item_3' }, bounds: { x: 0, y: 0, width: rasterSize, height: rasterSize } };
+    const group = { data: { id: 'item_3', masked: true }, bounds: { x: 10, y: 10, width: 180, height: 180 } };
+    const app = {
+      imageTools: {
+        uploadFromURL: async () => ({ id: 'img_1' }),
+        uploadFromDataURL: async () => ({ id: 'img_1' }),
+        placeImage: async () => raster,
+        applyMask: () => (maskResult === 'group' ? group : null),
+      },
+      itemRegistry: { rebind: (id: string, it: unknown) => { rebinds.push([id, it]); return true; } },
+    };
+    return { app, rebinds, group };
+  }
+  const code = (mask?: string) => codeGenerator.generateImportImage({ url: 'data:image/png;base64,AA', ...(mask ? { mask } : {}) } as never);
+  const run = (c: string, app: unknown) => new Function('app', 'window', 'fetch', c.replace('(async function()', 'return (async function()'))(app, {}, async () => ({}));
+
+  it('rebinds the id to the clipping group and reports its bounds', async () => {
+    const s = importStudio('group');
+    const r = await run(code('circle'), s.app);
+    expect(r).toMatchObject({ success: true, itemId: 'item_3', mask: 'circle', bounds: { width: 180 } });
+    expect(s.rebinds).toEqual([['item_3', s.group]]);
+  });
+
+  it('a mask that does not apply is refused, not reported as success', async () => {
+    const r = await run(code('circle'), importStudio('null').app);
+    expect(r.success).toBe(false);
+    expect(r.error).toContain('mask was not applied');
+  });
+
+  it('an image with no size is refused', async () => {
+    const r = await run(code(), importStudio('group', 0).app);
+    expect(r.success).toBe(false);
+    expect(r.error).toContain('no size');
+  });
+});
