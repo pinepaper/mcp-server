@@ -76,7 +76,9 @@ describe('every tool a profile points at, that profile lists', () => {
     // does not carry it. Kept because the advice is worth more than the
     // reference costs — minimal also renders trimmed descriptions, and anyone
     // who wants the tool can widen with set_toolkit.
-    minimal: 7,
+    // 8: the same pinepaper_animate pointer as map (keyframe loop:true
+    // measured playing once in export; the loop presets do cycle).
+    minimal: 8,
   };
 
   it('the domain profiles dangle only as much as they are known to', () => {
