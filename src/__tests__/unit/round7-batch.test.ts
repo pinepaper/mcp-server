@@ -458,3 +458,17 @@ describe('batch_modify is modify_item for each item', () => {
     expect(saves).toBe(1);
   });
 });
+
+describe('component instantiate returns its id and the keys overrides use (1.80)', () => {
+  it('parts list key, type and text; orphaned overrides are named', () => {
+    const inst = { data: { id: 'item_12' }, children: [
+      { className: 'PointText', content: 'HEADLINE', data: { componentKey: 'ck_1' } },
+      { className: 'Path', data: { componentKey: 'ck_2' } },
+    ] };
+    const app = { instantiateComponent: () => ({ ok: true, item: inst, id: 'item_12', orphaned: [{ key: 'ck_9', props: ['content'] }] }) };
+    const r = runIIFE(codeGenerator.generateComponent({ action: 'instantiate', componentId: 'comp_1', overrides: { ck_9: { content: 'x' } } } as never), { app });
+    expect(r).toMatchObject({ success: true, instanceId: 'item_12', itemId: 'item_12' });
+    expect(r.parts).toEqual([{ key: 'ck_1', type: 'PointText', content: 'HEADLINE' }, { key: 'ck_2', type: 'Path' }]);
+    expect(r.warning).toContain('ck_9');
+  });
+});

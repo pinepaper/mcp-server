@@ -4894,7 +4894,7 @@ Both actions return a WCAG contrast audit, so you can see failing pairs before s
 ACTIONS:
 - define: Turn items into a component master. Params: itemIds[], name
 - list: All defined components
-- instantiate: Place an instance. Params: componentId, position, overrides
+- instantiate: Place an instance. Params: componentId, position, overrides → { instanceId, parts: [{key, type, content?}], orphaned }. overrides is { <componentKey>: { <prop>: value } }, e.g. { "ck_1": { "content": "50% OFF" }, "ck_2": { "fillColor": "#e11d48" } } — keys come from list (each component's parts) or from a previous instantiate.
 - set_override: Change ONE part of ONE instance without detaching it. Params: instanceId, componentKey, prop, value
 - sync: Push the master's current state to every instance (overrides are preserved). Params: componentId
 - update_from_instance: Promote an instance's edits back into the master. Params: instanceId
@@ -4922,7 +4922,7 @@ Overrides are the point: an instance can differ from its master and still receiv
           anyOf: [{ type: 'string' }, { type: 'number' }, { type: 'boolean' }, { type: 'object' }, { type: 'array' }],
           description: 'Override value',
         },
-        overrides: { type: 'object', description: 'Overrides applied at instantiate time' },
+        overrides: { type: 'object', description: 'instantiate: { <componentKey>: { <prop>: value } } — keys are listed in parts by list and instantiate. A key the component does not have is reported in orphaned, not applied silently.' },
       },
       required: ['action'],
     },

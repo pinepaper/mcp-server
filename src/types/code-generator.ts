@@ -7670,14 +7670,55 @@ ${loads}
   const r = app.defineComponent(items, ${JSON.stringify({ name: input.name })});
   return { success: r.ok !== false, ...r };
 })();`.trim();
+      // A COMPONENT'S PARTS, BY THE KEY AN OVERRIDE NEEDS (round 9 II, 1.80).
+      // Overrides are {componentKey: {prop: value}}, and the keys are generated
+      // names (ck_12) — list gave only a count and instantiate returned a raw
+      // Paper item with no id, so the component route to batch creative was
+      // unusable. Both now return parts: each key with its part's type, name and
+      // text, which is how a caller finds the headline's key.
       case 'list':
-        return this._facadeCall('listComponents', '', 'Component: list');
+        return `
+// Component: list, with each definition's parts
+(function() {
+  if (typeof app.listComponents !== 'function') return { success: false, error: 'app.listComponents() unavailable — update PinePaper Studio.' };
+  const partsOf = function(root) {
+    const out = [];
+    const walk = function(n) { if (!n) return; if (n.data && n.data.componentKey) out.push(Object.assign({ key: n.data.componentKey, type: n.className }, typeof n.content === 'string' ? { content: n.content } : {}, n.name ? { name: n.name } : {})); (n.children || []).forEach(walk); };
+    (root && root.children || []).forEach(walk);
+    return out;
+  };
+  const defs = app._components;
+  const components = app.listComponents().map(function(c) {
+    let parts = null;
+    try {
+      const d = defs && typeof defs.get === 'function' ? defs.get(c.id) : null;
+      if (d && d.json && typeof paper !== 'undefined') {
+        const g = new paper.Group({ insert: false });
+        g.importJSON(d.json);
+        parts = partsOf(g.children.length === 1 && g.children[0].children ? g.children[0] : g);
+        g.remove();
+      }
+    } catch (_) { /* parts unknown on this build */ }
+    return Object.assign({}, c, parts ? { parts: parts } : {});
+  });
+  return { success: true, components: components, count: components.length };
+})();`.trim();
       case 'instantiate':
-        return this._facadeCall('instantiateComponent',
-          `${JSON.stringify(input.componentId || '')}, ${JSON.stringify({
-            ...(input.position ? { position: input.position } : {}),
-            ...(input.overrides ? { overrides: input.overrides } : {}),
-          })}`, 'Component: instantiate');
+        return `
+// Component: instantiate — the instance id, and the keys its overrides use
+(function() {
+  if (typeof app.instantiateComponent !== 'function') return { success: false, error: 'app.instantiateComponent() unavailable — update PinePaper Studio.' };
+  const r = app.instantiateComponent(${JSON.stringify(input.componentId || '')}, ${JSON.stringify({
+    ...(input.position ? { position: input.position } : {}),
+    ...(input.overrides ? { overrides: input.overrides } : {}),
+  })});
+  if (!r || r.ok === false) return { success: false, error: (r && r.error) || 'the component was not placed' };
+  const parts = [];
+  const walk = function(n) { if (!n) return; if (n.data && n.data.componentKey) parts.push(Object.assign({ key: n.data.componentKey, type: n.className }, typeof n.content === 'string' ? { content: n.content } : {}, n.name ? { name: n.name } : {})); (n.children || []).forEach(walk); };
+  walk(r.item);
+  return { success: true, instanceId: r.id, itemId: r.id, parts: parts, orphaned: r.orphaned || [],
+    ...(r.orphaned && r.orphaned.length ? { warning: 'overrides for ' + r.orphaned.map(function(o) { return o.key; }).join(', ') + ' matched no part of this component and were not applied. parts lists the keys it has.' } : {}) };
+})();`.trim();
       case 'set_override':
         return this._facadeCall('setComponentOverride',
           `${JSON.stringify(input.instanceId || '')}, ${JSON.stringify(input.componentKey || '')}, ${JSON.stringify(input.prop || '')}, ${JSON.stringify(input.value ?? null)}`,
