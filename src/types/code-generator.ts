@@ -6,7 +6,7 @@
  */
 
 import { REQUIRED_ENGINE_METHODS, OPTIONAL_ENGINE_METHODS } from '../tools/engine-methods.js';
-import { ACCEPTED_CREATE_PARAMS, NORMALIZE_PARAM_READS } from '../tools/shape-params.js';
+import { ACCEPTED_CREATE_PARAMS, NORMALIZE_PARAM_READS, MODIFY_CHANGE_READS } from '../tools/shape-params.js';
 import { generateP5DrawCode } from '../tools/p5-compat/p5-helpers.js';
 import {
   ItemType,
@@ -526,6 +526,26 @@ app.historyManager.saveState();
 }
 
 /**
+ * Every `properties` key modify_item can act on: what the engine's modify path
+ * and normalizeParams() read (generated), plus what generateModifyItemCode
+ * applies itself (dynamic content, audio level, lifetime, raster smoothing,
+ * the text properties modifyItem does not pass on).
+ */
+const MODIFY_KNOWN_KEYS: ReadonlySet<string> = new Set([
+  ...MODIFY_CHANGE_READS,
+  ...NORMALIZE_PARAM_READS,
+  'contentType', 'contentFormat', 'countdownTarget', 'countdownEndText',
+  'audioGain', 'volume', 'gain', 'bornAt', 'ttl', 'smoothing',
+  'fontStyle', 'leading', 'lineHeight',
+]);
+
+/** Spellings callers reach for, and the key the engine actually reads. */
+const MODIFY_DID_YOU_MEAN: Readonly<Record<string, string>> = {
+  scaling: 'scale', size: 'width / height', rotate: 'rotation', angle: 'rotation',
+  alpha: 'opacity', text: 'content', stroke_width: 'strokeWidth', lineWidth: 'strokeWidth',
+};
+
+/**
  * Every `properties` key create_item can act on: what the engine's create()
  * and normalizeParams() read (generated — see shape-params.ts), plus the keys
  * generateCreateItemCode consumes itself before the engine sees them.
@@ -761,9 +781,18 @@ if (_flagged && _flagged.item && _flagged.item.data) Object.assign(_flagged.item
   }
 
   const modFont = typeof properties.fontFamily === 'string' && properties.fontFamily.trim() !== '';
+
+  // AN UNREAD KEY HAD NO EFFECT, AND THE CALL SAID SUCCESS. {scaling: 8} on a
+  // raster answered success and left it 16 px; the engine reads `scale`. Same
+  // report create_item gives, against the engine's modify path (generated).
+  const modIgnored = Object.keys(properties).filter((k) => !MODIFY_KNOWN_KEYS.has(k));
+  const modWarning = modIgnored.length === 0 ? '' : `, ignoredProperties: ${JSON.stringify(modIgnored)}, warning: ${JSON.stringify(
+    `${modIgnored.join(', ')} ${modIgnored.length > 1 ? 'are' : 'is'} not read when modifying an item, so ${modIgnored.length > 1 ? 'they had' : 'it had'} no effect.`
+    + modIgnored.filter((k) => MODIFY_DID_YOU_MEAN[k]).map((k) => ` Did you mean ${MODIFY_DID_YOU_MEAN[k]} (not ${k})?`).join(''),
+  )}`;
   code += `
 app.historyManager.saveState();
-return { success: true, itemId: '${itemId}'${modLifetime ? ', lifetime: __lifetime' : ''}${modFont ? ', ...(__font ? { font: __font } : {})' : ''} };`;
+return { success: true, itemId: '${itemId}'${modLifetime ? ', lifetime: __lifetime' : ''}${modFont ? ', ...(__font ? { font: __font } : {})' : ''}${modWarning} };`;
 
   // Wrapped, because the body now RETURNS early on a miss rather than falling
   // through to an unconditional success. Async only when a font must load

@@ -118,6 +118,59 @@ export const NORMALIZE_PARAM_READS: readonly string[] = Object.freeze([
 ]);
 
 /**
+ * Every `changes.*` that modifyItem() / _applyChangesToItem() read. With
+ * NORMALIZE_PARAM_READS (modify normalises too), the keys modify_item can act on.
+ */
+export const MODIFY_CHANGE_READS: readonly string[] = Object.freeze([
+  'animationIntensity',
+  'animationSpeed',
+  'animationType',
+  'bgColor',
+  'blendMode',
+  'closed',
+  'collageStyle',
+  'color',
+  'content',
+  'crossOrigin',
+  'fillColor',
+  'fit',
+  'fontFamily',
+  'fontSize',
+  'fontSlant',
+  'fontStretch',
+  'fontWeight',
+  'height',
+  'justification',
+  'keyframes',
+  'label',
+  'opacity',
+  'palette',
+  'pathData',
+  'relationBehavior',
+  'rotation',
+  'scale',
+  'scaleX',
+  'scaleY',
+  'segments',
+  'shadowBlur',
+  'shadowColor',
+  'shadowOffset',
+  'src',
+  'staggerDelay',
+  'strokeColor',
+  'strokeWidth',
+  'textColor',
+  'timeOffset',
+  'trimEnd',
+  'trimOffset',
+  'trimStart',
+  'visible',
+  'width',
+  'x',
+  'y',
+]);
+
+/**
  * config key → the `params.*` names that feed it. Several names for one key
  * are ALTERNATIVES: a star's outer size arrives as radius1, radius, width or
  * height, and documenting any one of them makes the key reachable.

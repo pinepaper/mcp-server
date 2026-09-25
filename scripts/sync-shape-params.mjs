@@ -192,6 +192,22 @@ function normalizeParamReads(engineRaw) {
 }
 
 /**
+ * Every `changes.*` the modify path reads: modifyItem(itemId, changes) and the
+ * _applyChangesToItem(item, changes) it hands off to. modify_item reports any
+ * other key as having had no effect, the way create_item does against create().
+ */
+function modifyChangeReads(engineRaw) {
+  const engine = stripComments(engineRaw);
+  const out = new Set();
+  for (const sig of [/^\s{2}modifyItem\(itemId, changes\) \{/m, /^\s{2}_applyChangesToItem\(item, changes\) \{/m]) {
+    const m = sig.exec(engine);
+    if (!m) throw new Error(`sync-shape-params: ${sig} not found in PinePaper.js`);
+    for (const n of names(/\bchanges\.([A-Za-z_]\w*)/g, blockAfter(engine, m.index + m[0].length - 1))) out.add(n);
+  }
+  return [...out].sort();
+}
+
+/**
  * Per registered shape id, the `config.*` keys its `create` reads.
  *
  * A registration whose definition is a shared identifier (`regularPolygon(4, …)`,
@@ -231,6 +247,7 @@ function generate() {
   const toParams = configToParams(engine);
   const accepted = acceptedParams(engine);
   const normalized = normalizeParamReads(engine);
+  const modifyReads = modifyChangeReads(engine);
   const reads = shapeConfigReads(sources);
 
   const digest = createHash('sha256')
@@ -270,6 +287,14 @@ ${accepted.map((n) => `  '${n}',`).join('\n')}
  */
 export const NORMALIZE_PARAM_READS: readonly string[] = Object.freeze([
 ${normalized.map((n) => `  '${n}',`).join('\n')}
+]);
+
+/**
+ * Every \`changes.*\` that modifyItem() / _applyChangesToItem() read. With
+ * NORMALIZE_PARAM_READS (modify normalises too), the keys modify_item can act on.
+ */
+export const MODIFY_CHANGE_READS: readonly string[] = Object.freeze([
+${modifyReads.map((n) => `  '${n}',`).join('\n')}
 ]);
 
 /**
