@@ -223,6 +223,23 @@ Many of the features below rely on newer studio capabilities. Where a studio
 lacks one, the result says so — the call never quietly claims what it could
 not do.
 
+### New: ads, variants and broadcast deliverables
+
+- **`html5-ad`** export: a display-network zip (`index.html` with the
+  `ad.size` meta and a `clickTag` click target — the whole ad or a CTA's box)
+  plus a backup PNG beside it. The result checks the zip against a size budget
+  (`ad.maxBytes`, default 150 KB) and lists any external requests.
+- **`playable`** export: a single-file MRAID playable whose CTA
+  (`ad.ctaItemId`) opens the store link through `mraid.open`, leaving the rest
+  of the ad interactive.
+- **`pinepaper_render_batch`**: one creative per row of data — each row's item
+  changes or template params, then an export — with per-row files, warnings and
+  failures.
+- **`scc`** captions: CEA-608 (broadcast) from the same timed text as SRT / VTT,
+  with notes on anything cut, dropped or timed late.
+- **`pinepaper_accessibility_check`**: text contrast (WCAG AA) and flashing
+  (more than three flashes a second) as a quick screen before delivery.
+
 ### New: text that fits its box
 
 - **`fit`** on text (`create_item`, `modify_item`, batch):
