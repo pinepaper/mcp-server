@@ -189,3 +189,35 @@ describe('large data: uploads travel staged, not inline (1.43)', () => {
     expect(text.length).toBeLessThan(40_000);
   });
 });
+
+describe('a remap that the clip window cannot carry is warned about (2.17)', () => {
+  function remapStudio(props: Record<string, unknown>) {
+    const entry = { type: 'video', properties: { ...props } as Record<string, unknown> };
+    const app = {
+      _resolveId: (id: string) => id,
+      itemRegistry: { get: () => entry },
+      setTimeRemap: (_id: string, track: Array<{ time: number; value: number }>) => { entry.properties.timeRemap = track; return { ok: true, points: track.length }; },
+      speedRamp: () => { entry.properties.timeRemap = [{ time: 0, value: 0 }, { time: 3.5, value: 4.3 }]; return { ok: true, points: 2 }; },
+    };
+    return { window: {}, app };
+  }
+
+  it('past the clip end: hidden, not extended', async () => {
+    const g = remapStudio({ clipStartTime: 0, inPoint: 0, outPoint: 5, duration: 5 });
+    const r = await run(codeGenerator.generateMedia({ action: 'set_time_remap', id: 'item_2', remapTrack: [{ time: 0, value: 0 }, { time: 6.5, value: 5 }] } as never), g);
+    expect(r.success).toBe(true);
+    expect(r.warnings.join(' ')).toContain('hidden, not extended');
+  });
+
+  it('source beyond the out point plays as a hold', async () => {
+    const g = remapStudio({ clipStartTime: 0, inPoint: 0, outPoint: 4, duration: 10 });
+    const r = await run(codeGenerator.generateMedia({ action: 'speed_ramp', id: 'item_2', segments: [{ duration: 3.5, speed: 1.2 }] } as never), g);
+    expect(r.warnings.join(' ')).toContain('plays as a hold');
+  });
+
+  it('a remap inside the window says nothing extra', async () => {
+    const g = remapStudio({ clipStartTime: 0, inPoint: 0, outPoint: 5, duration: 5 });
+    const r = await run(codeGenerator.generateMedia({ action: 'set_time_remap', id: 'item_2', remapTrack: [{ time: 0, value: 0 }, { time: 4, value: 2 }] } as never), g);
+    expect(r).toEqual({ success: true, action: 'set_time_remap', points: 2 });
+  });
+});

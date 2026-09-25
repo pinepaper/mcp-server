@@ -9069,7 +9069,33 @@ ${resolveMedia}
 (function() {
   if (typeof app.setTimeRemap !== 'function') { return { success: false, error: 'app.setTimeRemap unavailable — update FxTool to a time-remap-capable build' }; }
   const r = app.setTimeRemap(${S(input.id)}, ${S(input.remapTrack ?? null)});
-  return r && r.ok ? { success: true, action: 'set_time_remap', points: r.points } : { success: false, error: (r && r.error) || 'remap failed' };
+  if (!(r && r.ok)) return { success: false, error: (r && r.error) || 'remap failed' };
+  // WHAT THE REMAP CANNOT DO, READ BACK FROM WHAT WAS STORED. The clip is on
+  // the timeline only for its trimmed window, and past that it is HIDDEN
+  // whatever the curve says — a remap to 6.5 s on a 5 s clip cut to black at
+  // 5.0 s. Source values outside [inPoint, outPoint] are clamped, so that part
+  // of the curve is a hold. Both answered success before.
+  const __rid = typeof app._resolveId === 'function' ? app._resolveId(${S(input.id)}) : ${S(input.id)};
+  const __e = __rid && app.itemRegistry && app.itemRegistry.get(__rid);
+  const __p = (__e && __e.properties) || {};
+  const __tr = Array.isArray(__p.timeRemap) ? __p.timeRemap : [];
+  const __warnings = [];
+  const __out = typeof __p.outPoint === 'number' ? __p.outPoint : __p.duration;
+  if (__tr.length > 1 && Number.isFinite(__out)) {
+    const __in = typeof __p.inPoint === 'number' ? __p.inPoint : 0;
+    const __start = typeof __p.clipStartTime === 'number' ? __p.clipStartTime : 0;
+    const __end = __start + Math.max(0.001, __out - __in);
+    const __last = __tr[__tr.length - 1].time;
+    if (__last > __end + 0.001) {
+      __warnings.push('the remap runs to ' + __last + ' s but the clip is on the timeline only until ' + __end.toFixed(3) + ' s (start + trimmed length); after that it is hidden, not extended. Lengthen the clip window first.');
+    }
+    const __vals = __tr.map(function(k) { return k.value; });
+    const __hi = Math.max.apply(null, __vals), __lo = Math.min.apply(null, __vals);
+    if (__hi > __out + 0.001 || __lo < __in - 0.001) {
+      __warnings.push('remap source times run ' + __lo.toFixed(3) + '–' + __hi.toFixed(3) + ' s but the clip only has ' + __in.toFixed(3) + '–' + __out.toFixed(3) + ' s; the part outside is clamped, which plays as a hold.');
+    }
+  }
+  return Object.assign({ success: true, action: 'set_time_remap', points: r.points }, __warnings.length ? { warnings: __warnings } : {});
 })();`.trim();
       }
       case 'speed_ramp': {
@@ -9079,7 +9105,33 @@ ${resolveMedia}
 (function() {
   if (typeof app.speedRamp !== 'function') { return { success: false, error: 'app.speedRamp unavailable — update FxTool to a time-remap-capable build' }; }
   const r = app.speedRamp(${S(input.id)}, ${S(input.segments)});
-  return r && r.ok ? { success: true, action: 'speed_ramp', points: r.points } : { success: false, error: (r && r.error) || 'speed ramp failed' };
+  if (!(r && r.ok)) return { success: false, error: (r && r.error) || 'speed ramp failed' };
+  // WHAT THE REMAP CANNOT DO, READ BACK FROM WHAT WAS STORED. The clip is on
+  // the timeline only for its trimmed window, and past that it is HIDDEN
+  // whatever the curve says — a remap to 6.5 s on a 5 s clip cut to black at
+  // 5.0 s. Source values outside [inPoint, outPoint] are clamped, so that part
+  // of the curve is a hold. Both answered success before.
+  const __rid = typeof app._resolveId === 'function' ? app._resolveId(${S(input.id)}) : ${S(input.id)};
+  const __e = __rid && app.itemRegistry && app.itemRegistry.get(__rid);
+  const __p = (__e && __e.properties) || {};
+  const __tr = Array.isArray(__p.timeRemap) ? __p.timeRemap : [];
+  const __warnings = [];
+  const __out = typeof __p.outPoint === 'number' ? __p.outPoint : __p.duration;
+  if (__tr.length > 1 && Number.isFinite(__out)) {
+    const __in = typeof __p.inPoint === 'number' ? __p.inPoint : 0;
+    const __start = typeof __p.clipStartTime === 'number' ? __p.clipStartTime : 0;
+    const __end = __start + Math.max(0.001, __out - __in);
+    const __last = __tr[__tr.length - 1].time;
+    if (__last > __end + 0.001) {
+      __warnings.push('the remap runs to ' + __last + ' s but the clip is on the timeline only until ' + __end.toFixed(3) + ' s (start + trimmed length); after that it is hidden, not extended. Lengthen the clip window first.');
+    }
+    const __vals = __tr.map(function(k) { return k.value; });
+    const __hi = Math.max.apply(null, __vals), __lo = Math.min.apply(null, __vals);
+    if (__hi > __out + 0.001 || __lo < __in - 0.001) {
+      __warnings.push('remap source times run ' + __lo.toFixed(3) + '–' + __hi.toFixed(3) + ' s but the clip only has ' + __in.toFixed(3) + '–' + __out.toFixed(3) + ' s; the part outside is clamped, which plays as a hold.');
+    }
+  }
+  return Object.assign({ success: true, action: 'speed_ramp', points: r.points }, __warnings.length ? { warnings: __warnings } : {});
 })();`.trim();
       }
       case 'match_cut': {
