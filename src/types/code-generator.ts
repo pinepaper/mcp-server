@@ -5540,6 +5540,18 @@ ${stillTime !== undefined ? `
   // The applied value is the engine's own report where it gives one
   // (5adfcf1c: lastVideoReport.headroom), so the result and the report agree.
   if (result && result.success) result.broadcastHeadroom = { value: (__vr && typeof __vr.headroom === 'number') ? __vr.headroom : 12, defaulted: true, note: 'broadcast defaults to 12 luma codes of headroom, which keeps encoder ringing legal; pass broadcastHeadroom: 0 for the full range.' };` : ''}
+  // AN ODD SIDE ROUNDED UP (FxTool e64a5260). H.264 needs even dimensions, so
+  // 1200x675 came out 1200x676 — and platform specs are exact-pixel. The
+  // result's dimensions become what the file IS, and fidelity says why.
+  const __vd = __vr && __vr.dimensions;
+  if (result && result.success && __vd && Array.isArray(__vd.requested) && Array.isArray(__vd.output)
+      && (__vd.requested[0] !== __vd.output[0] || __vd.requested[1] !== __vd.output[1])) {
+    result.dimensions = { width: __vd.output[0], height: __vd.output[1] };
+    result.fidelity = result.fidelity || { warnings: [] };
+    result.fidelity.warnings = (result.fidelity.warnings || []).concat([{ code: 'dimensions_rounded',
+      message: 'the file is ' + __vd.output[0] + 'x' + __vd.output[1] + ', not the requested ' + __vd.requested[0] + 'x' + __vd.requested[1] + ': H.264 needs even dimensions, so an odd side was rounded up by 1 px (the extra row / column is background). For an exact-pixel spec, use an even canvas size, or crop the extra line when re-encoding (ffmpeg -vf crop=' + __vd.requested[0] + ':' + __vd.requested[1] + ':0:0).' }]);
+    if (result.fidelity.note) delete result.fidelity.note;
+  }
   // LUMA OUTSIDE 16-235 (8.35, FxTool 4f1ec3ae). The broadcast encode is
   // decoded back and measured: H.264 ringing at hard edges puts a fraction of
   // a percent of samples out of range, which QC rejects. broadcastHeadroom

@@ -612,3 +612,23 @@ describe('pdf searchable text layer (8.10, FxTool 9917cfa5)', () => {
     expect((await run(undefined, undefined)).r.pdf).toBeUndefined();
   });
 });
+
+describe('an odd side rounded up for H.264 is said (FxTool e64a5260)', () => {
+  class FR { result = 'data:video/mp4;base64,AA'; onloadend: (() => void) | null = null; readAsDataURL() { this.onloadend?.(); } }
+  const run = async (report: Record<string, unknown>) => {
+    const vx: Record<string, unknown> = { lastVideoReport: null, export: async () => { vx.lastVideoReport = report; return { size: 10, slice() { return this; } }; } };
+    const app = { canvasSize: { width: 1200, height: 675 }, canvasEl: { style: { backgroundColor: '#fff' } }, exportEngine: { exportFidelity: () => ({ warnings: [] }), videoExporter: vx } };
+    return new Function('app', 'FileReader', 'document', body(codeGenerator.generateAgentExport({ format: 'mp4', duration: 1 } as never)))(app, FR, {});
+  };
+  it('warns, names the crop, and reports the real size', async () => {
+    const r = await run({ dimensions: { requested: [1200, 675], output: [1200, 676] } });
+    expect(r.dimensions).toEqual({ width: 1200, height: 676 });
+    const w = r.fidelity.warnings.find((x: { code: string }) => x.code === 'dimensions_rounded');
+    expect(w.message).toContain('1200x676');
+    expect(w.message).toContain('crop=1200:675:0:0');
+  });
+  it('even sizes raise nothing', async () => {
+    const r = await run({ dimensions: { requested: [1920, 1080], output: [1920, 1080] } });
+    expect((r.fidelity?.warnings ?? []).map((x: { code: string }) => x.code)).not.toContain('dimensions_rounded');
+  });
+});
