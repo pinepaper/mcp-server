@@ -4967,7 +4967,13 @@ ${stillTime !== undefined ? `
         }
         {
           const rw = ${region.outputWidth ?? Math.round(region.width)}, rh = ${region.outputHeight ?? Math.round(region.height)};
-          const regionUrl = app.renderRegionToDataURL(new paper.Rectangle(${region.x}, ${region.y}, ${region.width}, ${region.height}), rw, rh);
+          // OWNERSHIP BY CENTRE (1.78, FxTool 78ec5916): excludeForeign hides, for
+          // this render, a top-level item that reaches in but is centred outside —
+          // a neighbouring card's overflowing headline. Older studios ignore the
+          // fourth argument, and leave lastRegionExcluded unset.
+          if ('lastRegionExcluded' in app) app.lastRegionExcluded = null;
+          const regionUrl = app.renderRegionToDataURL(new paper.Rectangle(${region.x}, ${region.y}, ${region.width}, ${region.height}), rw, rh${region.excludeForeign === false ? '' : ', { excludeForeign: true }'});
+          const __excluded = Array.isArray(app.lastRegionExcluded) ? app.lastRegionExcluded.filter(function(id) { return id; }) : null;
           // ITEMS THAT CROSS THE REGION'S EDGE (round 9 II, 1.78). In the sheet
           // recipe — one big canvas, one region per card — text that overflows
           // its cell spills into the next card's export (up to 5,826 foreign px),
@@ -4975,7 +4981,7 @@ ${stillTime !== undefined ? `
           // cannot clip per card; it can name every item that is only partly
           // inside it, which is exactly the overflow in either direction.
           const __rx = ${region.x}, __ry = ${region.y}, __rr = ${region.x + region.width}, __rb = ${region.y + region.height};
-          const crossing = [];
+          const crossing = [], coveringExcluded = [];
           if (app.itemRegistry && typeof app.itemRegistry.getAll === 'function') {
             app.itemRegistry.getAll().forEach(function(e) {
               const b = e && e.item && e.item.visible !== false && e.item.bounds;
@@ -4985,14 +4991,22 @@ ${stillTime !== undefined ? `
               const inside = b.x >= __rx - 0.5 && r <= __rr + 0.5 && b.y >= __ry - 0.5 && bt <= __rb + 0.5;
               const covers = b.x <= __rx && r >= __rr && b.y <= __ry && bt >= __rb; // a full-bleed backdrop is not overflow
               if (intersects && !inside && !covers && crossing.length < 20) crossing.push(e.itemId);
+              if (covers && __excluded && (__excluded.indexOf(e.itemId) >= 0 || (e.item.data && __excluded.indexOf(e.item.data.id) >= 0))) coveringExcluded.push(e.itemId);
             });
           }
           result = { success: true, platform, format: 'png', data: regionUrl, mimeType: 'image/png',
             size: Math.round(String(regionUrl).length * 0.75), dimensions: { width: rw, height: rh },
             region: ${JSON.stringify({ x: region.x, y: region.y, width: region.width, height: region.height })} };
+          if (__excluded && __excluded.length) {
+            result.excludedItems = __excluded;
+            result.excludedNote = 'centred outside this region, so treated as belonging to a neighbouring region and left out of this image.';
+          }
+          if (coveringExcluded.length) {
+            result.warning = 'backdrop item(s) ' + coveringExcluded.join(', ') + ' cover this whole region but are centred outside it, so they were left out as foreign — this image has no background from them. Re-export with region.excludeForeign: false, or give each card its own backdrop.';
+          }
           if (crossing.length) {
             result.crossingItems = crossing;
-            result.warning = crossing.length + ' item(s) are only partly inside this region, so part of them is cut off here or spills into a neighbouring region: ' + crossing.join(', ') + '. In a sheet of cards this is text overflowing its card — shorten it, shrink it, or wrap it.';
+            result.warning = (result.warning ? result.warning + ' ' : '') + crossing.length + ' item(s) are only partly inside this region, so part of them is cut off here or spills into a neighbouring region: ' + crossing.join(', ') + '. In a sheet of cards this is text overflowing its card — shorten it, shrink it, or wrap it.';
           }
         }
         break;` : ''}

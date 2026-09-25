@@ -8105,6 +8105,7 @@ VERIFY MOTION BEFORE YOU RENDER. An export takes seconds to minutes and shows yo
             x: { type: 'number' }, y: { type: 'number' },
             width: { type: 'number', exclusiveMinimum: 0 }, height: { type: 'number', exclusiveMinimum: 0 },
             outputWidth: { type: 'integer', minimum: 1, maximum: 8192 }, outputHeight: { type: 'integer', minimum: 1, maximum: 8192 },
+            excludeForeign: { type: 'boolean', description: 'Default true: an item reaching into the region but centred outside it (a neighbouring card overflow) is left out of this image; result.excludedItems names them. false renders everything that touches the region.' },
           },
           required: ['x', 'y', 'width', 'height'],
         },

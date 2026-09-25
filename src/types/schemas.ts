@@ -2553,6 +2553,7 @@ export const AgentExportInputSchema = z.object({
     width: z.number().positive(), height: z.number().positive(),
     outputWidth: z.number().int().positive().max(8192).optional(),
     outputHeight: z.number().int().positive().max(8192).optional(),
+    excludeForeign: z.boolean().optional().describe('Default true: an item that reaches into the region but is centred outside it (a neighbouring card\'s overflow) is left out of this image; result.excludedItems names them. false renders everything that touches the region.'),
   }).optional().describe('png / jpg / webp only: export just this canvas region (canvas coordinates, top-left x/y) — carousel slices, crops. Output is the region\'s size unless outputWidth/outputHeight say otherwise; a different aspect is covered, not stretched.'),
 }).describe('Smart export options')
   .superRefine((val, ctx) => {

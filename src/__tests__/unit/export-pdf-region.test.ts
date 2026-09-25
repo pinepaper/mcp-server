@@ -397,3 +397,45 @@ describe('broadcast-safe mp4 and a bitrate (FxTool 16719759, 8.34-8.36)', () => 
     expect(out).toContain('8000000');
   });
 });
+
+describe('a sheet cell renders only what belongs to it (1.78, FxTool 78ec5916)', () => {
+  const paper = { Rectangle: class { constructor(public x: number, public y: number, public width: number, public height: number) {} } };
+  const entries = [
+    { itemId: 'mine', item: { bounds: { x: 1100, y: 100, width: 200, height: 40 } } },
+    { itemId: 'neighbour', item: { bounds: { x: 600, y: 100, width: 600, height: 40 } } },   // centred in cell A, spills into B
+    { itemId: 'sheetBg', item: { bounds: { x: 0, y: 0, width: 2000, height: 1000 } } },       // centre (1000, 500): on A's edge, outside B
+  ];
+  // renderRegionToDataURL as the engine's: with excludeForeign it records what it hid.
+  const run = async (region: Record<string, unknown>, excludes: string[] | null) => {
+    const calls: unknown[][] = [];
+    const app: Record<string, unknown> = { canvasSize: { width: 2000, height: 1000 }, itemRegistry: { getAll: () => entries }, exportEngine: { exportFidelity: () => ({ warnings: [] }) },
+      ...(excludes ? { lastRegionExcluded: ['stale'] } : {}),
+      renderRegionToDataURL: (...a: unknown[]) => { calls.push(a); if (excludes && (a[3] as { excludeForeign?: boolean } | undefined)?.excludeForeign) app.lastRegionExcluded = excludes; else if (excludes) app.lastRegionExcluded = []; return 'data:image/png;base64,AA'; } };
+    const r = await new Function('app', 'paper', 'document', body(codeGenerator.generateAgentExport({ format: 'png', region: { x: 1000, y: 0, width: 1000, height: 1000, ...region } } as never)))(app, paper, {});
+    return { r, calls };
+  };
+
+  it('asks for foreign items to be left out, and names them', async () => {
+    const { r, calls } = await run({}, ['neighbour']);
+    expect(calls[0][3]).toEqual({ excludeForeign: true });
+    expect(r.excludedItems).toEqual(['neighbour']);
+    expect(r.crossingItems).toEqual(['neighbour']);
+  });
+
+  it('a sheet-wide backdrop left out as foreign is a warning, with the way back', async () => {
+    const { r } = await run({}, ['neighbour', 'sheetBg']);
+    expect(r.warning).toContain('sheetBg');
+    expect(r.warning).toContain('excludeForeign: false');
+  });
+
+  it('excludeForeign: false renders everything that touches, as before', async () => {
+    const { r, calls } = await run({ excludeForeign: false }, ['neighbour']);
+    expect(calls[0]).toHaveLength(3);
+    expect(r.excludedItems).toBeUndefined();
+  });
+
+  it('an older studio reports no exclusions rather than a stale list', async () => {
+    const { r } = await run({}, null);
+    expect(r.excludedItems).toBeUndefined();
+  });
+});
