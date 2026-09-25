@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 253a01a04c886713f610e619ac6205e59751dbb4
- * sha256:    112558d246c6b1115dc8b20d93e0e0061ba1822988e3a10c852ebff9a0201b06   (of PinePaper.js as committed)
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 8210794c5e30551ec4dd6598982b7e53b7ff7deb
+ * sha256:    6efba53536675be8e06af3997380b2c1e1830c0e553719915483d797ecfeafd6   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on `window.app`, with how it gets there. The parity
