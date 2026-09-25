@@ -502,7 +502,8 @@ describe('broadcast luma is measured, and a legaliser named (8.35, FxTool 4f1ec3
     const l = w.find((x) => x.code === 'luma_out_of_range')!;
     expect(l.message).toContain('REQUIRED');
     // ffmpeg needs the escaped commas inside clip(): \, — not bare commas.
-    expect(l.message).toContain('lutyuv=y=clip(val\\,16\\,235)');
+    expect(l.message).toContain('lutyuv=y=clip(val\\,28\\,223)');
+    expect(l.message).toContain('Verify');
     // The engine's joined warning string is not misfiled as a bitrate miss.
     expect(w.map((x) => x.code)).not.toContain('bitrate_below_floor');
   });
@@ -510,6 +511,17 @@ describe('broadcast luma is measured, and a legaliser named (8.35, FxTool 4f1ec3
   it('clean luma raises nothing; a missed floor is still its own warning', async () => {
     const { w } = await run({ broadcast: true }, { broadcast: true, bitrate: 8e6, achievedBitrate: 1.84e6, bitrateFloor: 8e6, luma: { ...luma, outOfRange: 0, outOfRangeFraction: 0 } });
     expect(w.map((x) => x.code)).toEqual(['bitrate_below_floor']);
+  });
+
+  it('broadcast with no headroom asks for 12 and says it defaulted; an explicit 0 is kept', async () => {
+    const d = await run({ broadcast: true }, { broadcast: true, bitrate: 8e6, achievedBitrate: 8e6 });
+    expect(d.calls[0].broadcastHeadroom).toBe(12);
+    expect(d.r.broadcastHeadroom).toMatchObject({ value: 12, defaulted: true });
+    const z = await run({ broadcast: true, broadcastHeadroom: 0 }, { broadcast: true, bitrate: 8e6, achievedBitrate: 8e6 });
+    expect(z.calls[0].broadcastHeadroom).toBe(0);
+    expect(z.r.broadcastHeadroom).toBeUndefined();
+    const plain = await run({}, { broadcast: false, bitrate: 2e6 });
+    expect(plain.calls[0].broadcastHeadroom).toBeUndefined();
   });
 
   it('headroom without broadcast is refused', () => {
