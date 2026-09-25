@@ -201,3 +201,31 @@ describe('a still at a chosen time (1.57)', () => {
     expect(AgentExportInputSchema.safeParse({ format: 'mp4', time: 1 }).success).toBe(false);
   });
 });
+
+describe('caption export (8.19)', () => {
+  const entries = [
+    { item: { className: 'PointText', content: 'Second', data: { bornAt: 2.5, ttl: 1.25 } } },
+    { item: { className: 'PointText', content: 'First', data: { bornAt: 0, ttl: 2 } } },
+    { item: { className: 'PointText', content: 'Title (always on)', data: {} } },
+    { item: { className: 'Path', data: { bornAt: 1 } } },
+  ];
+  const app = { itemRegistry: { getAll: () => entries } };
+  const iife = (c: string) => c.replace('(function()', 'return (function()');
+  const run = (format: string) => new Function('app', iife(codeGenerator.generateAgentExport({ format, duration: 5 } as never)))(app);
+
+  it('srt: one numbered cue per timed text item, in start order', () => {
+    const r = run('srt');
+    expect(r).toMatchObject({ success: true, format: 'srt', cues: 2, untimedText: 1 });
+    expect(r.data).toBe('1\n00:00:00,000 --> 00:00:02,000\nFirst\n\n2\n00:00:02,500 --> 00:00:03,750\nSecond\n');
+  });
+
+  it('vtt: WEBVTT header and dot milliseconds', () => {
+    expect(run('vtt').data.startsWith('WEBVTT\n\n00:00:00.000 --> 00:00:02.000\nFirst')).toBe(true);
+  });
+
+  it('no timed text is refused with the recipe', () => {
+    const r = new Function('app', iife(codeGenerator.generateAgentExport({ format: 'srt' } as never)))({ itemRegistry: { getAll: () => [entries[2]] } });
+    expect(r.success).toBe(false);
+    expect(r.error).toContain('bornAt / ttl');
+  });
+});

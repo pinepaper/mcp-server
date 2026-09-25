@@ -8059,8 +8059,8 @@ VERIFY MOTION BEFORE YOU RENDER. An export takes seconds to minutes and shows yo
         },
         format: {
           type: 'string',
-          enum: ['svg', 'png', 'gif', 'mp4', 'webm', 'pdf', 'jpg', 'webp', 'wav'],
-          description: "Override format (auto-detected if not specified). 'jpg' / 'webp' are stills for a byte budget (ad specs): the png render re-encoded at the quality tier's compression — draft 0.6, standard 0.85, high 0.95 — so lower quality means a smaller file; jpg has no transparency: it is flattened onto the scene's background colour, or white when none is set. 'wav' exports the SOUNDTRACK ON ITS OWN, with no frames rendered — no platform preset resolves to it, so it must be asked for by name, and platform dimensions, framing and quality do not apply.",
+          enum: ['svg', 'png', 'gif', 'mp4', 'webm', 'pdf', 'jpg', 'webp', 'srt', 'vtt', 'wav'],
+          description: "Override format (auto-detected if not specified). 'jpg' / 'webp' are stills for a byte budget (ad specs): the png render re-encoded at the quality tier's compression — draft 0.6, standard 0.85, high 0.95 — so lower quality means a smaller file; 'srt' / 'vtt' write a caption file from every text item that has a lifetime (bornAt / ttl) — one cue each, in start order; duration closes a caption with no ttl. jpg has no transparency: it is flattened onto the scene's background colour, or white when none is set. 'wav' exports the SOUNDTRACK ON ITS OWN, with no frames rendered — no platform preset resolves to it, so it must be asked for by name, and platform dimensions, framing and quality do not apply.",
         },
         sampleRate: {
           type: 'number',

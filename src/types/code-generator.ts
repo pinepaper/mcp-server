@@ -4261,6 +4261,49 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
     // for by name. Dimensions, framing, fps and bitrate are all absent rather
     // than passed and ignored.
     // @engine-methods renderSoundtrackWav exportEngine.sceneHasAudio ensureHeavyModules
+    // CAPTIONS AS A FILE (round 8 EE, 8.19). format 'srt' was "Invalid input",
+    // yet caption text staged with bornAt / ttl already carries frame-exact
+    // times on item.data — the cues are in the scene. Every text item with a
+    // lifetime becomes one cue, in start order; a text item without one is
+    // on screen for the whole piece and is not a caption, so it is left out
+    // and counted.
+    if (exportFormat === 'srt' || exportFormat === 'vtt') {
+      const fmt = exportFormat;
+      return `
+// Export: captions (${fmt}) from text items with a lifetime
+(function() {
+  if (!app.itemRegistry || typeof app.itemRegistry.getAll !== 'function') {
+    return { success: false, format: '${fmt}', error: 'this studio cannot list items (app.itemRegistry.getAll) — update PinePaper Studio.' };
+  }
+  const texts = app.itemRegistry.getAll().filter(function(e) {
+    const it = e && e.item;
+    return it && it.className === 'PointText' && typeof it.content === 'string' && it.content.trim() !== '';
+  });
+  const timed = texts.filter(function(e) { return e.item.data && typeof e.item.data.bornAt === 'number'; });
+  if (!timed.length) {
+    return { success: false, format: '${fmt}', error: 'no captions to export: no text item has a lifetime. Stage each caption with properties.bornAt / ttl (seconds) on create_item or modify_item, then export ${fmt}.', untimedText: texts.length };
+  }
+  const end = ${videoDuration};
+  const ts = function(t, sep) {
+    const ms = Math.max(0, Math.round(t * 1000));
+    const h = Math.floor(ms / 3600000), m = Math.floor(ms / 60000) % 60, s = Math.floor(ms / 1000) % 60, r = ms % 1000;
+    const p = function(n, w) { return String(n).padStart(w, '0'); };
+    return p(h, 2) + ':' + p(m, 2) + ':' + p(s, 2) + sep + p(r, 3);
+  };
+  const cues = timed.map(function(e) {
+    const d = e.item.data;
+    const start = d.bornAt;
+    const stop = typeof d.ttl === 'number' ? start + d.ttl : end;
+    return { start: start, stop: Math.max(start, stop), text: e.item.content.trim() };
+  }).sort(function(a, b) { return a.start - b.start; });
+  const body = cues.map(function(c, i) {
+    return ${fmt === 'srt' ? `(i + 1) + '\\n' + ts(c.start, ',') + ' --> ' + ts(c.stop, ',')` : `ts(c.start, '.') + ' --> ' + ts(c.stop, '.')`} + '\\n' + c.text;
+  }).join('\\n\\n') + '\\n';
+  const text = ${fmt === 'vtt' ? `'WEBVTT\\n\\n' + body` : 'body'};
+  return { success: true, format: '${fmt}', data: text, mimeType: '${fmt === 'srt' ? 'application/x-subrip' : 'text/vtt'}', size: text.length, cues: cues.length, untimedText: texts.length - timed.length };
+})();`.trim();
+    }
+
     if (exportFormat === 'wav') {
       const sr = (validated as { sampleRate?: number }).sampleRate ?? 48000;
       const bd = (validated as { bitDepth?: number }).bitDepth ?? 16;

@@ -2227,6 +2227,8 @@ export const AgentExportFormatSchema = z.enum([
   // not get there. Rendered as the png path (region included) and re-encoded in
   // the page at the quality tier's compression. jpg has no alpha — see the tool text.
   'jpg', 'webp',
+  // CAPTIONS: text items staged with bornAt / ttl, as a subtitle file.
+  'srt', 'vtt',
   // AUDIO-ONLY. The soundtrack on its own, with no frames rendered — so
   // platform dimensions, framing and quality do not apply to it, and no
   // platform preset resolves to it. It has to be asked for by name.
@@ -2533,7 +2535,7 @@ export const AgentExportInputSchema = z.object({
   }).optional().describe('png / jpg / webp only: export just this canvas region (canvas coordinates, top-left x/y) — carousel slices, crops. Output is the region\'s size unless outputWidth/outputHeight say otherwise; a different aspect is covered, not stretched.'),
 }).describe('Smart export options')
   .superRefine((val, ctx) => {
-    if (val.time !== undefined && ['mp4', 'webm', 'gif', 'wav'].includes(String(val.format))) {
+    if (val.time !== undefined && ['mp4', 'webm', 'gif', 'wav', 'srt', 'vtt'].includes(String(val.format))) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['time'], message: "time picks the moment a STILL is taken; a video or audio export runs from 0 for its duration. Drop time, or export png / jpg / webp / svg / pdf." });
     }
     if (val.pdf !== undefined && val.format !== 'pdf') {
