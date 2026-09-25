@@ -17,6 +17,7 @@ import { GeneratorNameSchema, ItemTypeSchema } from '../types/schemas.js';
 import {
   EffectTypeSchema,
   SimpleAnimationTypeSchema,
+  EasingSchema,
   GEOMETRY_OPERATIONS,
   THREAD_STITCHES,
 } from '../types/schemas.js';
@@ -30,6 +31,10 @@ import {
  */
 const EFFECT_TYPES_LIST = EffectTypeSchema.options.join(', ');
 const SIMPLE_ANIMATION_TYPES_LIST = SimpleAnimationTypeSchema.options.join(', ');
+// The easings a keyframe accepts. The batch description once listed
+// easeInCubic / easeOutCubic / easeOutBounce, which keyframe_animate rejects
+// (round 8 DD, 1.68) — derived now, so it cannot say what the schema refuses.
+const KEYFRAME_EASINGS_LIST = EasingSchema.options.join(', ');
 
 // =============================================================================
 // AI AGENT GUIDE (exported for pinepaper_tool_guide)
@@ -7802,8 +7807,8 @@ ANIMATION:
   animate — Loop animation: {itemId, animationType, animationOptions}
     animationType: ${SIMPLE_ANIMATION_TYPES_LIST}
   keyframe_animate — Timed animation: {itemId, keyframes: [{time, properties, easing}], duration, loop}
-    Animatable properties: opacity, scale, scaleX, scaleY, x, y, rotation, fillColor, strokeColor, fontSize
-    Easing: easeInOut, easeIn, easeOut, easeInCubic, easeOutCubic, easeOutBounce, linear
+    Animatable properties: opacity, scale, scaleX, scaleY, x, y, rotation, fillColor, strokeColor, strokeWidth, width, height, radius, fontSize, trimStart/trimEnd/trimOffset (path draw-on)
+    Easing (on the keyframe being moved TO): ${KEYFRAME_EASINGS_LIST}
   relation — Behavioral link: {sourceId, targetId, relationType, relationOptions}
     relationType: orbits, follows, attached_to, points_at, mirrors, parallax, wave_through, morphs_to, group_morphs_to, moves_along_path (+ 9 more in schema)
 
