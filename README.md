@@ -246,6 +246,41 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - Puppeteer mode launches Chrome with `--no-sandbox` and `--disable-setuid-sandbox`. That is routine for headless automation and it does weaken Chrome's own process sandbox. If that matters where you are running it, use `code` mode or put the server in a container.
 - Puppeteer itself is an **optional** peer dependency, kept out of the default tree precisely because a headless browser plus an install script is what scanners flag hardest. Install it only if you want the executing mode.
 
+## What's new in 1.6.15
+
+### New: the PinePaper mark
+
+The "origami pine" is the new PinePaper mark. The package now ships it as its
+icon (`icon.svg`, `icon.png`), and MCP bundle hosts that read `manifest.json`
+show it.
+
+### New: transparent WebM
+
+`pinepaper_agent_export` with `format: "webm"` takes `transparent: true` (and
+`alphaQuantizer`, 0–63) for a video with a real alpha channel, where the studio
+supports it. The result confirms the alpha stream; if none was written, the
+result says so instead of handing back an opaque file.
+
+### New: fonts in multi-page PDFs
+
+A PDF deck (`pdf.pages`) embeds the scene's fonts for its searchable text layer
+and reports them in `result.pdf.fonts`. On studios that support it, each page
+gets its own scene's fonts. Text hidden at the moment of rendering (outside its
+`bornAt` / `ttl` window, or invisible) is named in the result, since it is in
+neither the picture nor the text layer.
+
+### Fixed: `npx` setups could never execute in a browser
+
+Puppeteer is an optional install, and under `npx` a separate `npm i puppeteer`
+is not visible to the server. The README's new **Quick start** gives the `npx`
+configuration that includes it; the error message leads with the same
+advice.
+
+### Fixed: text-only properties on shapes
+
+`fontWeight`, `strokePosition` and other text-only properties passed to a
+non-text item are reported as not applied again.
+
 ## What's new in 1.6.14
 
 Many of the features below rely on newer studio capabilities. Where a studio

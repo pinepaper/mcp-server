@@ -1,7 +1,7 @@
 {
   "manifest_version": "0.3",
   "name": "pinepaper-mcp",
-  "version": "1.6.14",
+  "version": "1.6.15",
   "display_name": "PinePaper Studio",
   "icon": "icon.png",
   "description": "Create animated graphics with AI using PinePaper Studio",
