@@ -3,9 +3,9 @@
  *
  * What each registry-backed shape reads, and how a caller reaches it.
  *
- * Source: FxTool origin/main b3591f71c1399c57011a7b385f80841b03f3c72d
+ * Source: FxTool origin/main fca09aba5bedd567901db87ce25780a77a3dd5b8
  *   js/PinePaper.js + 5 shape modules
- * sha256: 6cc5700e8bcca93e
+ * sha256: aef65398d39a0033
  *
  * A shape's `create` receives a `config`, never the caller's `params`.
  * PinePaper.js's registryConfig literal is the only bridge between the two, so
@@ -29,6 +29,7 @@ export const ACCEPTED_CREATE_PARAMS: readonly string[] = Object.freeze([
   'animationType',
   'area',
   'blendMode',
+  'bornAt',
   'closed',
   'color',
   'content',
@@ -36,9 +37,14 @@ export const ACCEPTED_CREATE_PARAMS: readonly string[] = Object.freeze([
   'crossOrigin',
   'dashArray',
   'dataURL',
+  'dir',
+  'direction',
   'fillColor',
+  'fit',
   'fontFamily',
   'fontSize',
+  'fontStyle',
+  'fontWeight',
   'from',
   'height',
   'id',
@@ -77,13 +83,16 @@ export const ACCEPTED_CREATE_PARAMS: readonly string[] = Object.freeze([
   'strokeCap',
   'strokeColor',
   'strokeJoin',
+  'strokePosition',
   'strokeWidth',
   'tailDirection',
   'tailSize',
   'tension',
+  'textDirection',
   'through',
   'timeOffset',
   'to',
+  'ttl',
   'visible',
   'width',
   'x',
@@ -127,17 +136,22 @@ export const MODIFY_CHANGE_READS: readonly string[] = Object.freeze([
   'animationType',
   'bgColor',
   'blendMode',
+  'bornAt',
   'closed',
   'collageStyle',
   'color',
   'content',
   'crossOrigin',
+  'dashArray',
+  'dashOffset',
+  'direction',
   'fillColor',
   'fit',
   'fontFamily',
   'fontSize',
   'fontSlant',
   'fontStretch',
+  'fontStyle',
   'fontWeight',
   'height',
   'justification',
@@ -158,12 +172,15 @@ export const MODIFY_CHANGE_READS: readonly string[] = Object.freeze([
   'src',
   'staggerDelay',
   'strokeColor',
+  'strokePosition',
   'strokeWidth',
   'textColor',
+  'textDirection',
   'timeOffset',
   'trimEnd',
   'trimOffset',
   'trimStart',
+  'ttl',
   'visible',
   'width',
   'x',
@@ -177,7 +194,7 @@ export const MODIFY_CHANGE_READS: readonly string[] = Object.freeze([
  */
 export const CONFIG_KEY_SOURCES: Readonly<Record<string, readonly string[]>> = Object.freeze({
   "angles": Object.freeze(['angles']),
-  "cornerRadius": Object.freeze(['cornerRadius']),
+  "cornerRadius": Object.freeze(['cornerRadius', 'height', 'radius', 'width']),
   "height": Object.freeze(['height', 'radius', 'radius1']),
   "innerRadiusRatio": Object.freeze(['innerRadiusRatio', 'radius1', 'radius2']),
   "kind": Object.freeze(['kind']),

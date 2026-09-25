@@ -492,8 +492,16 @@ if (item && item.data) { item.data.renderAs = ${JSON.stringify(itemType)}; item.
   // the handful this emitter consumes itself are added. Reported back, not
   // refused: the item is still what the caller asked for in every other way,
   // and a refusal would cost a re-issue over one typo.
-  const ignored = Object.keys(properties).filter((k) => !CREATE_KNOWN_KEYS.has(k)
-    && !(itemType === 'text' && ((TEXT_STYLE_KEYS as readonly string[]).includes(k) || k === 'fit' || (DIRECTION_KEYS as readonly string[]).includes(k) || (TABULAR_KEYS as readonly string[]).includes(k) || k === 'strokePosition')));
+  //
+  // The generated allowlist says what create() READS, for any type; the text
+  // keys it reads apply only to text (the engine gates them on PointText). So
+  // on another type they are reported whatever the list says. `direction` is
+  // not among them: an arc reads it as its sweep.
+  const textOnly = (k: string) => (TEXT_STYLE_KEYS as readonly string[]).includes(k) || k === 'fit' || k === 'textDirection' || k === 'dir'
+    || (TABULAR_KEYS as readonly string[]).includes(k) || k === 'strokePosition';
+  const ignored = Object.keys(properties).filter((k) => itemType === 'text'
+    ? !CREATE_KNOWN_KEYS.has(k) && !textOnly(k) && !(DIRECTION_KEYS as readonly string[]).includes(k)
+    : !CREATE_KNOWN_KEYS.has(k) || textOnly(k));
 
   // Build the code
   let code = `
@@ -5061,9 +5069,6 @@ ${stillTime !== undefined ? `
           // this render, a top-level item that reaches in but is centred outside —
           // a neighbouring card's overflowing headline. Older studios ignore the
           // fourth argument, and leave lastRegionExcluded unset.
-          // @engine-surface-exempt lastRegionExcluded — a report property, not a
-          // method, so it cannot be typeof-probed; read only through Array.isArray.
-          // Branch-only until 78ec5916 reaches origin/main.
           if ('lastRegionExcluded' in app) app.lastRegionExcluded = null;
           const regionUrl = app.renderRegionToDataURL(new paper.Rectangle(${region.x}, ${region.y}, ${region.width}, ${region.height}), rw, rh${region.excludeForeign === false ? '' : ', { excludeForeign: true }'});
           const __excluded = Array.isArray(app.lastRegionExcluded) ? app.lastRegionExcluded.filter(function(id) { return id; }) : null;

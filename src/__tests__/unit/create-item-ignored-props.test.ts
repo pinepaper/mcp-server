@@ -39,13 +39,19 @@ describe('create_item reports unread properties', () => {
   });
 
   it('never flags a key the engine reads (generated allowlist is wired in)', () => {
-    const properties: Record<string, unknown> = {};
-    for (const k of [...ACCEPTED_CREATE_PARAMS, ...NORMALIZE_PARAM_READS]) {
-      if (['anchor', 'origin', 'position'].includes(k)) continue; // validated / consumed separately
-      properties[k] = 1;
-    }
-    const code = gen.generateCreateItem({ itemType: 'circle', position: { x: 0, y: 0 }, properties });
-    expect(code).not.toContain('ignoredProperties');
+    // Text-only keys the engine reads (it gates them on PointText) are the one
+    // exception on other types; they are checked on a text item instead.
+    const TEXT_ONLY = ['fontWeight', 'fontStyle', 'leading', 'lineHeight', 'fit', 'textDirection', 'dir', 'tabularFigures', 'fontVariantNumeric', 'fontFeatures', 'strokePosition'];
+    const all = [...ACCEPTED_CREATE_PARAMS, ...NORMALIZE_PARAM_READS].filter((k) => !['anchor', 'origin', 'position'].includes(k)); // validated / consumed separately
+    const circleProps = Object.fromEntries(all.filter((k) => !TEXT_ONLY.includes(k)).map((k) => [k, 1]));
+    expect(gen.generateCreateItem({ itemType: 'circle', position: { x: 0, y: 0 }, properties: circleProps })).not.toContain('ignoredProperties');
+    const textProps = Object.fromEntries(all.map((k) => [k, 1]));
+    expect(gen.generateCreateItem({ itemType: 'text', position: { x: 0, y: 0 }, properties: textProps })).not.toContain('ignoredProperties');
+  });
+
+  it('text-only keys on another type are reported, whatever the engine reads', () => {
+    const code = gen.generateCreateItem({ itemType: 'circle', position: { x: 0, y: 0 }, properties: { fontWeight: 700, strokePosition: 'outside', direction: 'ccw' } });
+    expect(code).toContain('ignoredProperties: ["fontWeight","strokePosition"]'); // direction is an arc / sweep key, not text-only
   });
 
   it('does not apply to shader / field, whose params travel to the renderer', () => {
