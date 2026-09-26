@@ -5716,9 +5716,20 @@ ${deterministic ? `  // DETERMINISTIC: the container timestamps are pinned eithe
   // browser may pick a different hardware backend each time (FxTool
   // e34ae03d: 92/255 between backends, 2/255 run to run on hardware). The
   // engine requests software and reports what it got.
+  // Where the studio says outright whether the file repeats (bitExact, FxTool
+  // PR #31: it test-encodes and keeps whichever encoder does — often the
+  // HARDWARE one on a Mac, since Chrome's software H.264 is not repeatable at
+  // some sizes), that answer decides; the encoder name is only the fallback
+  // for studios that do not report it.
   if (result && result.success) {
     const __hw = __vr && __vr.hardwareAcceleration;
-    if (__hw !== 'prefer-software') {
+    const __exact = __vr && typeof __vr.bitExact === 'boolean' ? __vr.bitExact : null;
+    if (__exact === false) {
+      result.fidelity = result.fidelity || { warnings: [] };
+      result.fidelity.warnings = (result.fidelity.warnings || []).concat([{ code: 'determinism_not_pinned',
+        message: 'deterministic was asked for, but no encoder on this machine repeats byte for byte at this size (the studio test-encoded and checked): the pixels may differ slightly between runs. Do not cache this file by hash; a different frame size may repeat.' }]);
+      if (result.fidelity.note) delete result.fidelity.note;
+    } else if (__exact === null && __hw !== 'prefer-software') {
       result.fidelity = result.fidelity || { warnings: [] };
       result.fidelity.warnings = (result.fidelity.warnings || []).concat([{ code: 'determinism_not_pinned',
         message: __hw

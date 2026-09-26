@@ -63,6 +63,13 @@ describe('deterministic: pixels pinned only on the software encoder (FxTool e34a
     expect(r.video.hardwareAcceleration).toBe('prefer-software');
     expect(codes).not.toContain('determinism_not_pinned');
   });
+  it('bitExact decides where the studio reports it (FxTool PR #31)', async () => {
+    // The hardware encoder that repeats: pinned, no warning.
+    expect((await run({ bitrate: 2e6, hardwareAcceleration: 'prefer-hardware', bitExact: true })).codes).not.toContain('determinism_not_pinned');
+    // Software that does NOT repeat at this size: warned.
+    expect((await run({ bitrate: 2e6, hardwareAcceleration: 'prefer-software', bitExact: false })).codes).toContain('determinism_not_pinned');
+  });
+
   it('hardware, or an engine that does not say: the pixels are not promised', async () => {
     expect((await run({ bitrate: 2e6, hardwareAcceleration: 'prefer-hardware' })).codes).toContain('determinism_not_pinned');
     expect((await run({ bitrate: 2e6 })).codes).toContain('determinism_not_pinned');
