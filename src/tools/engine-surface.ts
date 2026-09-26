@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 5b52dba3b3da34dd83d126d8dc2e8ad024642f82
- * sha256:    5d68aa668d31f26ad7a97d08d6aa4e9bd398bfc20d200a5efb9fd271910f86db   (of PinePaper.js as committed)
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main e616629dc53898a87a04bfc21ca8a17fe8af09e6
+ * sha256:    9c631184814e0e7324de2f2b735a5c49a8580d1641260bd9badcf6a044ec0dc0   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on `window.app`, with how it gets there. The parity
@@ -16,7 +16,7 @@
 /** How a name lands on `app`. */
 export type EngineMemberKind = 'method' | 'accessor' | 'property' | 'lazy' | 'lazyHeavy' | 'bootstrap';
 
-/** 1168 names, from FxTool/js/PinePaper.js. */
+/** 1170 names, from FxTool/js/PinePaper.js. */
 export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object.freeze({
   _activeByGroup: 'property',
   _activeDrawingGroup: 'method',
@@ -407,6 +407,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   autoIdle: 'method',
   autoJump: 'method',
   autoWalk: 'method',
+  awaitMediaAt: 'method',
   awaitSceneFonts: 'method',
   backgroundLayer: 'property',
   bakeScene: 'method',
@@ -440,6 +441,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   capabilityDetector: 'bootstrap',
   captureFrameDataURL: 'method',
   captureFramesAt: 'method',
+  captureFramesAtAsync: 'method',
   captureProjectDocument: 'method',
   castAbility: 'method',
   characterBuilder: 'lazy',
