@@ -78,6 +78,31 @@ describe('the studio\'s own video report', () => {
   });
 });
 
+describe('round-12 engine report, final shape', () => {
+  class FR { result = 'data:x;base64,AA'; onloadend: (() => void) | null = null; readAsDataURL() { this.onloadend?.(); } }
+  const run = async (report: Record<string, unknown>, size = 400_000, args: Record<string, unknown> = {}) => {
+    const vx: Record<string, unknown> = { lastVideoReport: null, export: async () => { vx.lastVideoReport = report; return { size, type: 'video/mp4', slice() { return this; } }; } };
+    const app = { canvasSize: { width: 3552, height: 1080 }, canvasEl: { style: { backgroundColor: '#000' } },
+      exportEngine: { exportFidelity: () => ({ warnings: [], checked: { animated: true, audio: false, keyframeItems: 1 } }), videoExporter: vx } };
+    const r = await new Function('app', 'FileReader', 'document', body(codeGenerator.generateAgentExport({ format: 'mp4', duration: 20, fps: 30, ...args } as never)))(app, FR, {});
+    return (r.fidelity?.warnings ?? []) as Array<{ code: string; message: string }>;
+  };
+  it('the studio\'s output_frozen replaces the size guess', async () => {
+    const w = await run({ warnings: [{ code: 'output_frozen', message: 'decoded frame 4 matches frame 3 while the input moved' }] });
+    expect(w.map((x) => x.code)).toContain('output_frozen');
+    expect(w.map((x) => x.code)).not.toContain('possibly_frozen');
+  });
+  it('one distinct input frame in an animated scene says the animation did not play', async () => {
+    const w = await run({ frames: { fed: 600, distinct: 1, sampled: true } }, 30_000_000);
+    expect(w.find((x) => x.code === 'possibly_frozen')!.message).toContain('animation did not play');
+  });
+  it('the studio\'s bitrate_not_honoured replaces bitrate_below_floor', async () => {
+    const w = await run({ broadcast: true, bitrate: 8e6, achievedBitrate: 1e6, bitrateFloor: 8e6, warnings: [{ code: 'bitrate_not_honoured', message: 'constant 8 Mbps gave 1.0 Mbps' }] }, 30_000_000, { broadcast: true });
+    expect(w.map((x) => x.code)).toContain('bitrate_not_honoured');
+    expect(w.map((x) => x.code)).not.toContain('bitrate_below_floor');
+  });
+});
+
 describe('12.12 ProRes / HAP', () => {
   it('named, with the png-sequence route, not a generic enum error', async () => {
     for (const format of ['prores', 'HAP', 'prores4444']) {

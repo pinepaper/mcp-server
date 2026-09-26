@@ -5722,9 +5722,14 @@ ${stillTime !== undefined ? `
     // a flat field is also a tiny file).
     const __vf = __vr && __vr.frames;
     const __distinct = __vf && typeof __vf.distinct === 'number' ? __vf.distinct : null;
-    if (__distinct !== null ? __distinct <= 1 : __bpp < 0.002) {
+    // The studio's decoded-output test (output_frozen) is the real answer for
+    // an encoder freeze; the size guess stays out when it has spoken.
+    const __engineFrozen = !!(__vr && Array.isArray(__vr.warnings) && __vr.warnings.some(function(w) { return w && w.code === 'output_frozen'; }));
+    if (!__engineFrozen && (__distinct !== null ? __distinct <= 1 : __bpp < 0.002)) {
       result.fidelity.warnings = (result.fidelity.warnings || []).concat([{ code: 'possibly_frozen',
-        message: (__distinct !== null ? 'the scene animates, but the studio fed the encoder ' + __distinct + ' distinct frame(s). ' : '') + 'the video carries ' + __bpp.toFixed(5) + ' bits per pixel per frame (' + result.size + ' bytes for ' + __frames + ' frames at ' + __d.width + 'x' + __d.height + ') — the encoder has most likely repeated one frame. Check two frames (ffprobe, or pinepaper_capture_frames against the scene); a smaller size, bitrateMode variable, or format webm usually avoids it.' }]);
+        message: __distinct !== null
+          ? 'the scene animates, but the studio rendered ' + __distinct + ' distinct frame(s) for the encoder — the animation did not play during the export (not an encoder fault). Check that the animation runs on the timeline over the exported range.'
+          : 'the video carries ' + __bpp.toFixed(5) + ' bits per pixel per frame (' + result.size + ' bytes for ' + __frames + ' frames at ' + __d.width + 'x' + __d.height + ') — the encoder has most likely repeated one frame. Check two frames (ffprobe, or pinepaper_capture_frames against the scene); a smaller size, bitrateMode variable, or format webm usually avoids it.' }]);
       if (result.fidelity.note) delete result.fidelity.note;
     }
   }
@@ -5806,7 +5811,10 @@ ${Object.keys(videoEncodeOpts).length ? `  if (result && result.success) {
     const __vw = [];
     // The engine joins its warnings into one string (bitrate floor, then
     // luma), so each is raised from its own numbers, not from that text.
-    if (__vr && typeof __vr.achievedBitrate === 'number' && typeof __vr.bitrateFloor === 'number' && __vr.achievedBitrate < __vr.bitrateFloor * 0.95) {
+    // The studio's own measured bitrate_not_honoured, where it sends one,
+    // replaces this estimate.
+    const __engineBitrate = !!(__vr && Array.isArray(__vr.warnings) && __vr.warnings.some(function(w) { return w && w.code === 'bitrate_not_honoured'; }));
+    if (!__engineBitrate && __vr && typeof __vr.achievedBitrate === 'number' && typeof __vr.bitrateFloor === 'number' && __vr.achievedBitrate < __vr.bitrateFloor * 0.95) {
       __vw.push({ code: 'bitrate_below_floor', message: 'achieved ' + (__vr.achievedBitrate / 1e6).toFixed(2) + ' Mbps against a ' + (__vr.bitrateFloor / 1e6).toFixed(1) + ' Mbps floor: the browser encoder treats the bitrate as a ceiling and does not pad simple content. Re-encode for delivery (e.g. ffmpeg -b:v with -minrate / -bufsize) if the spec requires the floor.' });
     }
     if (!__vr || typeof __vr !== 'object') {
