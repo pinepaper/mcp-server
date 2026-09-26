@@ -246,6 +246,37 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - Puppeteer mode launches Chrome with `--no-sandbox` and `--disable-setuid-sandbox`. That is routine for headless automation and it does weaken Chrome's own process sandbox. If that matters where you are running it, use `code` mode or put the server in a container.
 - Puppeteer itself is an **optional** peer dependency, kept out of the default tree precisely because a headless browser plus an install script is what scanners flag hardest. Install it only if you want the executing mode.
 
+## What's new in 1.6.16
+
+### New: video editing on the timeline
+
+`pinepaper_media` gains `split` (cut a clip in two at a time),
+`add_transition` (a crossfade or a dip between two clips that meet), and
+`set_clip` with `timeOffset` to move a clip, not only trim it. Uploads take
+`atPlayhead: true` to start at the current playback time. A studio that cannot
+do one of these says so rather than reporting success.
+
+### New: add to an animation instead of replacing it
+
+`pinepaper_keyframe_animate` takes `append: true` to add keys to an item's
+existing animation — a button press after an entrance. Without it, a second
+call replaces the animation, and the result now says when that happened.
+
+### New: byte-identical exports
+
+`pinepaper_agent_export` takes `deterministic: true` for MP4 and WebM: the same
+scene gives the same file, so exports can be checksummed or cached by hash. If
+a run could not be pinned, the result says not to rely on the hash.
+
+### Fixed
+
+- `pinepaper_import_asset` with a `url` failed on every call after fetching the
+  file successfully.
+- `pinepaper_sound` `render_soundtrack` timed out on longer soundtracks; it now
+  has the same time budget as other exports.
+- `pinepaper_audio_beats` answered success with no result for larger audio, and
+  could not read a local file path. Both work now.
+
 ## What's new in 1.6.15
 
 ### New: the PinePaper mark
