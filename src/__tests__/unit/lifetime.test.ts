@@ -186,6 +186,18 @@ describe('keyframe_animate append (FxTool 2475333b)', () => {
     expect(r.track).toEqual({ appended: true, previousKeys: 2, keys: 3 });
   });
 
+  it('append checks the MERGED track for property gaps (retest f05dcd5)', () => {
+    const s = withEngine(true);
+    kf(s.app, [{ time: 0, properties: { opacity: 0 } }, { time: 1, properties: { opacity: 1 } }]);
+    const r = kf(s.app, [{ time: 2, properties: { scale: 2 } }], true);
+    expect(r.propertyGaps.map((g: { time: number }) => g.time)).toEqual([0, 1, 2]);
+    expect(r.gapWarning).toContain('merged track');
+    // Full sets on every merged key: no warning.
+    const t = withEngine(true);
+    kf(t.app, [{ time: 0, properties: { opacity: 0, scale: 1 } }]);
+    expect(kf(t.app, [{ time: 2, properties: { opacity: 1, scale: 2 } }], true).gapWarning).toBeUndefined();
+  });
+
   it('a studio without merge replaced the track: the result says so', () => {
     const s = withEngine(false);
     kf(s.app, [{ time: 0, properties: { x: 0 } }, { time: 1, properties: { x: 100 } }]);

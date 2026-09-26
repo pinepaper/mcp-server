@@ -1577,7 +1577,10 @@ function generateKeyframeAnimateCode(
   const gaps = keyframes
     .map((k, i) => ({ time: k.time, missing: allProps.filter((p) => !propSets[i].includes(p)) }))
     .filter((g) => g.missing.length);
-  const gapNote = gaps.length && keyframes.length > 1
+  // With append the gaps that matter are the MERGED track's (an earlier key
+  // with no scale beside a new key with one), so that check runs in the page
+  // on the result instead (below).
+  const gapNote = !append && gaps.length && keyframes.length > 1
     ? `, propertyGaps: ${JSON.stringify(gaps.slice(0, 10))}, gapWarning: ${JSON.stringify(`${gaps.length} keyframe(s) leave out a property other keys animate (${[...new Set(gaps.flatMap((g) => g.missing))].join(', ')}). The engine can break that property's track at such a key; repeat the value on every key — hold it by repeating the previous value.`)}`
     : '';
   const first = [...keyframes].sort((a, b) => a.time - b.time)[0] as { easing?: string } | undefined;
@@ -1602,13 +1605,18 @@ function generateKeyframeAnimateCode(
   const __prev = (__ki && __ki.data && Array.isArray(__ki.data.keyframes)) ? __ki.data.keyframes.map(function(k) { return k && k.time; }) : [];
   app.addAnimation('${itemId}', ${keyframesJson}, ${JSON.stringify(opts)});
   const __now = (__ki && __ki.data && Array.isArray(__ki.data.keyframes)) ? __ki.data.keyframes.map(function(k) { return k && k.time; }) : [];
-  const __kept = __prev.every(function(t) { return __now.indexOf(t) >= 0; });
+  const __kept = __prev.every(function(t) { return __now.indexOf(t) >= 0; });${append ? `
+  // Property gaps across the merged track (the same check a single call makes
+  // on its own keys at generation time).
+  const __all = (__ki && __ki.data && Array.isArray(__ki.data.keyframes)) ? __ki.data.keyframes : [];
+  const __props = __all.reduce(function(acc, k) { Object.keys((k && k.properties) || {}).forEach(function(p) { if (acc.indexOf(p) < 0) acc.push(p); }); return acc; }, []);
+  const __gaps = __all.length > 1 ? __all.map(function(k) { const have = Object.keys((k && k.properties) || {}); return { time: k && k.time, missing: __props.filter(function(p) { return have.indexOf(p) < 0; }) }; }).filter(function(g) { return g.missing.length; }) : [];` : ''}
   const __track = !__prev.length ? null
     : ${append ? `(__kept
       ? { appended: true, previousKeys: __prev.length, keys: __now.length }
       : { appended: false, replaced: true, previousKeys: __prev.length, warning: 'append was asked for, but this studio replaced the existing track (' + __prev.length + ' key(s)) instead of adding to it: it has no merge mode. Put every key in one keyframe_animate call.' })`
     : `{ replaced: true, previousKeys: __prev.length, note: 'the item already had a keyframe track (' + __prev.length + ' key(s)); this call replaced it. To add keys to it instead, pass append: true.' }`};
-  return { success: true, itemId: '${itemId}', duration: ${calculatedDuration}, loop: ${loop}${append ? ', append: true' : ''}, ...(__track ? { track: __track } : {})${timeOffset !== undefined ? `, timeOffset: ${timeOffset}` : ''}${clipInPoint !== undefined ? `, clipInPoint: ${clipInPoint}` : ''}${clipOutPoint !== undefined ? `, clipOutPoint: ${clipOutPoint}` : ''}${easingNote}${loopNote}${gapNote} };
+  return { success: true, itemId: '${itemId}', duration: ${calculatedDuration}, loop: ${loop}${append ? ', append: true' : ''}, ...(__track ? { track: __track } : {})${append ? `, ...(__gaps.length ? { propertyGaps: __gaps.slice(0, 10), gapWarning: __gaps.length + ' key(s) of the merged track leave out a property other keys animate (' + __gaps.reduce(function(a, g) { g.missing.forEach(function(p) { if (a.indexOf(p) < 0) a.push(p); }); return a; }, []).join(', ') + '). The engine can break that property at such a key; give each key the full set — hold a value by repeating it.' } : {})` : ''}${timeOffset !== undefined ? `, timeOffset: ${timeOffset}` : ''}${clipInPoint !== undefined ? `, clipInPoint: ${clipInPoint}` : ''}${clipOutPoint !== undefined ? `, clipOutPoint: ${clipOutPoint}` : ''}${easingNote}${loopNote}${gapNote} };
 })();
 `.trim();
 }
