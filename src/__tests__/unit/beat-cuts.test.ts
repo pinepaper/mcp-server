@@ -103,3 +103,20 @@ describe('retest of 65f01d4', () => {
     expect(o.split.skipped[0].reason).not.toContain('[object Object]');
   });
 });
+
+describe('tempo prior (retest of b2d25d5, real Lyria track)', () => {
+  it('the real scores rank 120 above its double', async () => {
+    const { rankCandidates, tempoPrior } = await import('../../utils/beats.js');
+    // grid.candidates from the run on the real track (fit scores).
+    const real = [{ bpm: 240.1, confidence: 0.24, phase: 0.186 }, { bpm: 120, confidence: 0.18, phase: 0.435 }, { bpm: 157.4, confidence: 0.14, phase: 0 }, { bpm: 108.3, confidence: 0.1, phase: 0.372 }];
+    const ranked = rankCandidates(real);
+    expect(ranked[0].bpm).toBe(120);
+    expect(ranked[0].confidence).toBe(0.18);             // the reported confidence stays the fit
+    expect(tempoPrior(120)).toBe(1);
+    expect(tempoPrior(240)).toBeCloseTo(Math.exp(-0.5), 5);
+  });
+  it('a clear fit still wins over the prior', async () => {
+    const { rankCandidates } = await import('../../utils/beats.js');
+    expect(rankCandidates([{ bpm: 174, confidence: 0.9, phase: 0 }, { bpm: 87, confidence: 0.3, phase: 0 }])[0].bpm).toBe(174);
+  });
+});

@@ -21,6 +21,7 @@ export const BeatCutsArgsSchema = z.object({
   beatsPerBar: z.number().int().min(1).max(16).optional(),
   range: z.tuple([z.number().min(0), z.number().min(0)]).optional(),
   clipId: z.string().min(1).optional(),
+  includeOnsets: z.boolean().optional(),
 }).refine((v) => !!(v.source || v.beats), { message: 'give source (music to analyse) or beats (times you already have)' });
 
 const firstJson = (r: CallToolResult): any => {
@@ -55,7 +56,7 @@ export const beatHandlers: Record<string, (args: Record<string, unknown>, option
       beats = g.beats; bpm = g.bpm;
       const conf = candidates.find((c) => c.bpm === Math.round(chosen * 10) / 10)?.confidence ?? null;
       grid = { bpm: g.bpm, phase: g.phase, period: Math.round(g.period * 1000) / 1000, confidence: conf, detected: { bpm: r.bpm, confidence: r.confidence }, duration: r.duration,
-        candidates: candidates.slice(0, 4), ...(a.bpm ? { bpmFrom: 'caller' } : a.bpmHint ? { bpmFrom: 'bpmHint' } : { bpmFrom: 'best candidate' }) };
+        candidates: candidates.slice(0, 4), ...(a.includeOnsets ? { onsets: r.onsets } : {}), ...(a.bpm ? { bpmFrom: 'caller' } : a.bpmHint ? { bpmFrom: 'bpmHint' } : { bpmFrom: 'best candidate' }) };
       if (!a.bpm && (conf === null || conf < 0.4)) {
         grid.lowConfidence = true;
         grid.warning = `the tempo is uncertain (confidence ${conf ?? 'unknown'} at ${g.bpm} bpm; the studio detected ${r.bpm} at ${r.confidence}). If you know it, pass bpm (or bpmHint: [min, max]); the candidates above are the likely alternatives.`;

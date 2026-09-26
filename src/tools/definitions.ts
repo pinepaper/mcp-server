@@ -1788,6 +1788,7 @@ Returns cuts (seconds), the grid (bpm, phase, period, confidence) and, with clip
         beats: { type: 'array', items: { type: 'number' } },
         bpm: { type: 'number' },
         bpmHint: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: '[min, max] bpm to choose within.' },
+        includeOnsets: { type: 'boolean', description: 'Also return the detected onsets (for diagnosing a tempo pick).' },
         every: { anyOf: [{ type: 'string', enum: ['beat', 'bar'] }, { type: 'integer', minimum: 1, maximum: 64 }] },
         beatsPerBar: { type: 'integer', minimum: 1, maximum: 16 },
         range: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2 },

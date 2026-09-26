@@ -38,7 +38,24 @@ export function cutPoints(beats: number[], every: 'beat' | 'bar' | number, beats
   return beats.filter((t, i) => i % step === 0 && (!range || (t >= range[0] - 1e-9 && t <= range[1] + 1e-9)));
 }
 
-export interface TempoCandidate { bpm: number; confidence: number; phase: number }
+export interface TempoCandidate { bpm: number; confidence: number; phase: number; weighted?: number }
+
+/**
+ * A tempo prior (Ellis-style): log-Gaussian around 120 bpm, one octave wide.
+ * The fit score cannot choose between a tempo and its double — a real 120
+ * track scored 0.24 at 240 and 0.18 at 120 — and people tap near 120, so the
+ * ranking weights the score by this; 240 then ranks 0.15, 120 0.18.
+ */
+export function tempoPrior(bpm: number, centre = 120, octaves = 1): number {
+  const x = Math.log2(bpm / centre) / octaves;
+  return Math.exp(-0.5 * x * x);
+}
+
+/** Candidates ranked by fit x prior; the reported confidence stays the fit. */
+export function rankCandidates(cs: TempoCandidate[]): TempoCandidate[] {
+  return cs.map((c) => ({ ...c, weighted: Math.round(c.confidence * tempoPrior(c.bpm) * 100) / 100 }))
+    .sort((a, b) => (b.weighted! - a.weighted!) || Math.abs(a.bpm - 120) - Math.abs(b.bpm - 120));
+}
 
 /**
  * How well a tempo explains the onsets, 0-1: precision x recall — the share of
@@ -92,7 +109,5 @@ export function tempoCandidates(onsets: number[], detected: number, duration: nu
     return best;
   };
   const seen = new Set<number>();
-  return pool.map(refine)
-    .filter((c) => (seen.has(c.bpm) ? false : (seen.add(c.bpm), true)))
-    .sort((a, b) => b.confidence - a.confidence || Math.abs(a.bpm - 120) - Math.abs(b.bpm - 120));
+  return rankCandidates(pool.map(refine).filter((c) => (seen.has(c.bpm) ? false : (seen.add(c.bpm), true))));
 }
