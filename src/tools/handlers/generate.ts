@@ -23,7 +23,14 @@ const GenerateInputSchema = z.object({
   n: z.number().int().min(1).max(4).optional(),
   seed: z.number().int().optional(),
   negativePrompt: z.string().optional(),
-  imageUrls: z.array(z.string().url()).max(14).optional(),
+  // The cloud's own rule: https, or one of the org's own images as
+  // /scene-assets/<32 hex> — how a generated still becomes a video's start
+  // frame or a character reference without leaving the cloud.
+  imageUrls: z.array(z.string().refine((u) => /^https:\/\//.test(u) || /^\/scene-assets\/[0-9a-f]{32}$/.test(u), {
+    message: 'an https URL, or your own image as /scene-assets/<id> (the ref a generation returns)',
+  })).max(14).optional(),
+  // Video: clip length in seconds; each model allows its own set.
+  seconds: z.number().positive().max(60).optional(),
   // WORDS ARE VECTOR: the plate comes back text-free and these come back as
   // textLayers, to be added as real text. allowText (words drawn BY the model)
   // is refused except on eval-tier models.

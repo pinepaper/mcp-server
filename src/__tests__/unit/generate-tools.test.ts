@@ -222,3 +222,20 @@ describe('polling survives one transient 5xx', () => {
     expect(out(r)).toContain('pinepaper_generate_status');
   });
 });
+
+describe('imageUrls take a scene-asset ref (chaining a still into video)', () => {
+  it('accepts https and /scene-assets/<32 hex>, refuses anything else', async () => {
+    const { GenerateArgsSchema } = await import('../../tools/handlers/generate.js');
+    const ok = (imageUrls: string[]) => GenerateArgsSchema.safeParse({ model: 'm', input: { prompt: 'p', imageUrls } }).success;
+    expect(ok(['https://x.test/a.png'])).toBe(true);
+    expect(ok(['/scene-assets/0123456789abcdef0123456789abcdef'])).toBe(true);
+    expect(ok(['http://x.test/a.png'])).toBe(false);
+    expect(ok(['/scene-assets/../secret'])).toBe(false);
+    expect(ok(['/scene-assets/abc'])).toBe(false);
+  });
+  it('the ref and seconds reach the cloud as given', async () => {
+    cloud({ 'POST /v1/generate:estimate': () => ({ status: 200, json: { ok: true, estimate: { priceUsd: 1 } } }) });
+    await handleToolCall('pinepaper_generate_estimate', { model: 'veo', input: { prompt: 'p', imageUrls: ['/scene-assets/0123456789abcdef0123456789abcdef'], seconds: 8 } }, {});
+    expect(calls[0].body.input).toMatchObject({ imageUrls: ['/scene-assets/0123456789abcdef0123456789abcdef'], seconds: 8 });
+  });
+});
