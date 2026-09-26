@@ -98,31 +98,53 @@ const jobBody = (a: z.infer<typeof GenerateArgsSchema> | z.infer<typeof Generate
   ...(a.model ? { model: a.model } : {}), ...(a.useCase ? { useCase: a.useCase } : {}), input: a.input,
 });
 
-/** Bring the first asset into the studio as an image, fitted to the canvas. */
-async function placeAsset(cfg: { base: string; key: string }, asset: { assetId: string; width: number; height: number }, mode: 'cover' | 'contain', options: HandlerOptions): Promise<Record<string, unknown>> {
+type GenAsset = { assetId: string; ref?: string; width: number; height: number; durationSeconds?: number; fps?: number };
+
+/**
+ * Bring the first asset into the studio, fitted to the canvas: an image as an
+ * image item, a video (it has a duration) as a video layer. The fit is
+ * computed in the page from the placed item's own bounds, never from the
+ * requested aspect: models deliver their own sizes (2752x1536 is 1.79, not
+ * 16:9), and those are what fill the frame.
+ */
+async function placeAsset(cfg: { base: string; key: string }, asset: GenAsset, mode: 'cover' | 'contain', options: HandlerOptions): Promise<Record<string, unknown>> {
   let res: Response;
   try {
     res = await generateDeps.fetch(`${cfg.base}/v1/assets/${encodeURIComponent(asset.assetId)}`, { headers: { Authorization: `Bearer ${cfg.key}` } });
   } catch (e) {
-    return { placed: false, error: `could not download the image: ${e instanceof Error ? e.message : String(e)}` };
+    return { placed: false, error: `could not download the asset: ${e instanceof Error ? e.message : String(e)}` };
   }
-  if (!res.ok) return { placed: false, error: `the cloud refused the image download (HTTP ${res.status})` };
-  const type = (res.headers.get('content-type') || 'image/png').split(';')[0].trim();
-  const dataUrl = `data:${type};base64,${Buffer.from(await res.arrayBuffer()).toString('base64')}`;
-  const imported = await handleToolCall('pinepaper_import_image', { url: dataUrl }, options);
-  const importedText = (imported.content ?? []).map((c) => ('text' in c ? c.text : '')).join('\n');
-  const itemId = /"itemId":\s*"([^"]+)"/.exec(importedText)?.[1];
-  if (imported.isError || !itemId) return { placed: false, error: `the image was generated but could not be placed: ${importedText.slice(0, 300)}` };
-  // Fit in the page: cover fills the canvas (the overflow is outside the frame),
-  // contain fits inside it. Centred either way.
+  if (!res.ok) return { placed: false, error: `the cloud refused the asset download (HTTP ${res.status})` };
+  const type = (res.headers.get('content-type') || '').split(';')[0].trim();
+  const isVideo = typeof asset.durationSeconds === 'number' || type.startsWith('video/');
+  const dataUrl = `data:${type || (isVideo ? 'video/mp4' : 'image/png')};base64,${Buffer.from(await res.arrayBuffer()).toString('base64')}`;
+  const placedRes = isVideo
+    ? await handleToolCall('pinepaper_media', { action: 'upload_video', url: dataUrl }, options)
+    : await handleToolCall('pinepaper_import_image', { url: dataUrl }, options);
+  const placedText = (placedRes.content ?? []).map((c) => ('text' in c ? c.text : '')).join('\n');
+  const ref = isVideo
+    ? (/"registryId":\s*"([^"]+)"/.exec(placedText)?.[1] ?? /"id":\s*"([^"]+)"/.exec(placedText)?.[1])
+    : /"itemId":\s*"([^"]+)"/.exec(placedText)?.[1];
+  if (placedRes.isError || !ref) return { placed: false, kind: isVideo ? 'video' : 'image', error: `generated, but could not be placed: ${placedText.slice(0, 300)}` };
+  // Cover fills the canvas (the overflow is outside the frame); contain fits
+  // inside it. Centred either way. A video's media id resolves to its item.
   const fit = await handleToolCall('pinepaper_execute_custom_code', {
-    code: `const it = app.getItemById(${JSON.stringify(itemId)}); const cs = app.getCanvasSize(); const b = it && it.bounds;
+    code: `let it = app.getItemById(${JSON.stringify(ref)});
+if (!it && window.PinePaperAgent && typeof window.PinePaperAgent.listMedia === 'function') {
+  const m = window.PinePaperAgent.listMedia().find(function(x) { return x.id === ${JSON.stringify(ref)} || x.registryId === ${JSON.stringify(ref)}; });
+  if (m) it = app.getItemById(m.registryId);
+}
+const cs = app.getCanvasSize(); const b = it && it.bounds;
 if (!it || !b || !(b.width > 0)) return { fitted: false };
 const s = ${mode === 'cover' ? 'Math.max' : 'Math.min'}(cs.width / b.width, cs.height / b.height);
 it.scale(s); it.position = new paper.Point(cs.width / 2, cs.height / 2);
 return { fitted: true, width: Math.round(it.bounds.width), height: Math.round(it.bounds.height) };`,
   }, options);
-  return { placed: true, itemId, fit: mode, ...(fit.isError ? { fitNote: 'placed at its own size; fitting it to the canvas failed' } : {}) };
+  return {
+    placed: true, kind: isVideo ? 'video' : 'image', itemId: ref, fit: mode,
+    ...(isVideo ? { durationSeconds: asset.durationSeconds, ...(asset.fps ? { fps: asset.fps } : {}) } : {}),
+    ...(fit.isError ? { fitNote: 'placed at its own size; fitting it to the canvas failed' } : {}),
+  };
 }
 
 export const generateHandlers: Record<string, (args: Record<string, unknown>, options: HandlerOptions) => Promise<CallToolResult>> = {
@@ -178,7 +200,7 @@ export const generateHandlers: Record<string, (args: Record<string, unknown>, op
         String(job.error || (job.status === 'refused' ? "the model's safety filter refused this. Nothing was charged." : 'the generation failed. Nothing was charged.')),
         { jobId, status: job.status });
     }
-    const assets = (job.assets ?? []) as Array<{ assetId: string; ref: string; width: number; height: number }>;
+    const assets = (job.assets ?? []) as GenAsset[];
     const result: Record<string, unknown> = {
       success: true, jobId, model: job.model, assets, chargedUsd: job.chargedUsd,
       ...(job.filtered ? { filtered: job.filtered, filteredNote: `${job.filtered} output(s) were removed by the safety filter and not charged.` } : {}),

@@ -1805,7 +1805,7 @@ Needs a service-account key in PINEPAPER_API_KEY (pp_sa_…, render:create scope
 - model or useCase: a model id from pinepaper_generate_estimate {listModels: true}, or a use case and the cloud picks its default (hero stills, plates, text in the image, character-consistent edits).
 - input: { prompt, aspect ('16:9' | '9:16' | '1:1' | '4:5'), n (1-4), seed?, negativePrompt?, imageUrls? (https references for edit models) }.
 - brief / designRef: always passed on; the cloud records each generation against the design.
-- place: 'cover' (fill the canvas, centred; default when true) or 'contain' — imports the first image as an image item.
+- place: 'cover' (fill the canvas, centred; default when true) or 'contain' — places the first asset: an image as an image item, a video as a video layer (with its durationSeconds). The fit uses the asset's delivered size, not the requested aspect.
 - timeoutSec: how long to wait (default 180). A job that outlives it keeps running and is only charged if it delivers; collect it with pinepaper_generate_status.
 
 The result: assets [{assetId, ref, width, height}] — the sizes the files HAVE (a model may pick its own size for an aspect), chargedUsd, and any model notes (e.g. a SynthID watermark) to pass on.`,

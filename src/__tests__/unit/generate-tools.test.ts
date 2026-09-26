@@ -126,3 +126,27 @@ describe('place', () => {
     expect(ran.some((c) => c.includes('Math.max(cs.width / b.width'))).toBe(true);
   });
 });
+
+describe('place a video asset', () => {
+  it('goes in as a video layer, fitted from its own bounds, with its duration', async () => {
+    cloud({
+      'POST /v1/generate': () => ({ status: 202, json: { ok: true, job: { id: 'v1', status: 'queued' }, estimate: {} } }),
+      'GET /v1/generate/v1': () => ({ status: 200, json: { ok: true, job: { id: 'v1', status: 'done', assets: [{ assetId: 'av', ref: '/scene-assets/av', width: 1280, height: 720, durationSeconds: 8, fps: 24 }], chargedUsd: 1.2 } } }),
+    });
+    const base = generateDeps.fetch;
+    generateDeps.fetch = (async (url: string, init?: RequestInit) => url.endsWith('/v1/assets/av')
+      ? new Response(new Uint8Array([0, 0, 0, 24]), { headers: { 'content-type': 'video/mp4' } })
+      : base(url, init)) as typeof generateDeps.fetch;
+    const ran: string[] = [];
+    const controller = { connected: true, connect: async () => undefined,
+      executeCode: async (code: string) => { ran.push(code); return { success: true, result: code.includes('it.scale(') ? { fitted: true } : { success: true, action: 'upload_video', media: { id: 'vraster_1', registryId: 'item_9' } } }; } };
+    const o = JSON.parse(out(await handleToolCall('pinepaper_generate', { ...req, place: 'contain' }, { executeInBrowser: true, browserController: controller as never, executionMode: 'puppeteer' })));
+    expect(ran.some((c) => c.includes('uploadVideo'))).toBe(true);
+    expect(ran.some((c) => c.includes('uploadImage') || c.includes('importImage'))).toBe(false);
+    expect(o.placement).toMatchObject({ placed: true, kind: 'video', itemId: 'item_9', fit: 'contain', durationSeconds: 8, fps: 24 });
+    // The fit reads the placed item's bounds — never the requested aspect.
+    const fitCode = ran.find((c) => c.includes('it.scale('))!;
+    expect(fitCode).toContain('Math.min(cs.width / b.width, cs.height / b.height)');
+    expect(fitCode).not.toContain('16:9');
+  });
+});
