@@ -10,12 +10,13 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { errorResult, getExecutionMode, handleToolCall, type HandlerOptions } from '../handlers.js';
 import { ErrorCodes } from '../../types/schemas.js';
-import { beatGrid, cutPoints } from '../../utils/beats.js';
+import { beatGrid, cutPoints, tempoCandidates } from '../../utils/beats.js';
 
 export const BeatCutsArgsSchema = z.object({
   source: z.string().min(1).optional(),
   beats: z.array(z.number().min(0)).optional(),
   bpm: z.number().positive().max(400).optional(),
+  bpmHint: z.tuple([z.number().positive(), z.number().positive()]).optional(),
   every: z.union([z.enum(['beat', 'bar']), z.number().int().min(1).max(64)]).optional(),
   beatsPerBar: z.number().int().min(1).max(16).optional(),
   range: z.tuple([z.number().min(0), z.number().min(0)]).optional(),
@@ -44,9 +45,21 @@ export const beatHandlers: Record<string, (args: Record<string, unknown>, option
       if (analysed.isError || !r || r.success === false || !Array.isArray(r.onsets) || !(r.bpm > 0)) {
         return errorResult(ErrorCodes.EXECUTION_ERROR, `the music could not be analysed: ${(r && r.error) || JSON.stringify(body).slice(0, 300)}`);
       }
-      const g = beatGrid(r.onsets, a.bpm ?? r.bpm, Number(r.duration) || Math.max(...r.onsets, 0));
+      const duration = Number(r.duration) || Math.max(...r.onsets, 0);
+      // The studio's tempo can lock onto a related one (a 120 track read as
+      // 162 = 4:3). Its usual confusions are scored against the onsets and
+      // the best is used — or the caller's bpm, or the best inside bpmHint.
+      const candidates = tempoCandidates(r.onsets, r.bpm, duration, a.bpmHint as [number, number] | undefined);
+      const chosen = a.bpm ?? candidates[0]?.bpm ?? r.bpm;
+      const g = beatGrid(r.onsets, chosen, duration);
       beats = g.beats; bpm = g.bpm;
-      grid = { bpm: g.bpm, phase: g.phase, period: Math.round(g.period * 1000) / 1000, confidence: r.confidence, duration: r.duration };
+      const conf = candidates.find((c) => c.bpm === Math.round(chosen * 10) / 10)?.confidence ?? null;
+      grid = { bpm: g.bpm, phase: g.phase, period: Math.round(g.period * 1000) / 1000, confidence: conf, detected: { bpm: r.bpm, confidence: r.confidence }, duration: r.duration,
+        candidates: candidates.slice(0, 4), ...(a.bpm ? { bpmFrom: 'caller' } : a.bpmHint ? { bpmFrom: 'bpmHint' } : { bpmFrom: 'best candidate' }) };
+      if (!a.bpm && (conf === null || conf < 0.4)) {
+        grid.lowConfidence = true;
+        grid.warning = `the tempo is uncertain (confidence ${conf ?? 'unknown'} at ${g.bpm} bpm; the studio detected ${r.bpm} at ${r.confidence}). If you know it, pass bpm (or bpmHint: [min, max]); the candidates above are the likely alternatives.`;
+      }
     }
 
     const cuts = cutPoints(beats, a.every ?? 'beat', a.beatsPerBar ?? 4, a.range as [number, number] | undefined);
@@ -62,7 +75,11 @@ export const beatHandlers: Record<string, (args: Record<string, unknown>, option
         const r = await handleToolCall('pinepaper_media', { action: 'split', id: current, at }, options);
         const body = firstJson(r);
         const res = body?.result ?? body;
-        if (r.isError || !res || res.success === false) { refused.push({ at, reason: String(res?.error ?? 'refused') }); continue; }
+        if (r.isError || !res || res.success === false) {
+          const e = res?.error;
+          refused.push({ at, reason: typeof e === 'string' ? e : (e?.message ?? JSON.stringify(e ?? 'refused')) });
+          continue;
+        }
         current = res.rightId ?? current;
         pieces.push(current);
       }

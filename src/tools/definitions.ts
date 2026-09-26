@@ -1777,7 +1777,7 @@ EXAMPLES:
 
 - source: the music — an upload id, URL, data: URL or local file path. Or beats: [seconds] to skip the analysis.
 - every: 'beat' (default) | 'bar' | N beats. beatsPerBar (default 4). range: [from, to] seconds.
-- bpm: override the detected tempo (the grid's phase is still fitted to the music).
+- bpm: the tempo, if you know it (the grid's phase is still fitted to the music). Otherwise the studio's detection and its usual confusions (double, half, 3:4, 4:3 …) are scored against the music and the best is used; bpmHint: [min, max] keeps the choice in a range. The result lists the candidates, and says lowConfidence with a warning when the tempo is uncertain — pass bpm then.
 - clipId: split this clip at each cut, in order; cuts outside the clip are skipped and listed.
 
 Returns cuts (seconds), the grid (bpm, phase, period, confidence) and, with clipId, the pieces' ids.`,
@@ -1787,6 +1787,7 @@ Returns cuts (seconds), the grid (bpm, phase, period, confidence) and, with clip
         source: { type: 'string' },
         beats: { type: 'array', items: { type: 'number' } },
         bpm: { type: 'number' },
+        bpmHint: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: '[min, max] bpm to choose within.' },
         every: { anyOf: [{ type: 'string', enum: ['beat', 'bar'] }, { type: 'integer', minimum: 1, maximum: 64 }] },
         beatsPerBar: { type: 'integer', minimum: 1, maximum: 16 },
         range: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2 },

@@ -56,7 +56,7 @@ describe('the tool', () => {
   it('analyses the music, fits the grid, and splits a clip at each cut in turn', async () => {
     const f = fake([0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5]);
     const o = json(await handleToolCall('pinepaper_beat_cuts', { source: 'media_abc', every: 'bar', clipId: 'item_2' }, opts(f.controller)));
-    expect(o.grid).toMatchObject({ bpm: 120, confidence: 0.9 });
+    expect(o.grid).toMatchObject({ bpm: 120, detected: { bpm: 120, confidence: 0.9 } });
     expect(o.cuts).toEqual([0, 2, 4]);
     // Each split is made on the right-hand piece of the previous one; a cut past the clip is skipped.
     expect(f.splits.map((s) => s.id)).toEqual(['item_2', 'item_11', 'item_12']);
@@ -67,5 +67,39 @@ describe('the tool', () => {
   it('with no studio and no beats, it says what it needs', async () => {
     const r = await handleToolCall('pinepaper_beat_cuts', { source: 'song.mp3' }, { executionMode: 'code' });
     expect(r.isError).toBe(true);
+  });
+});
+
+describe('retest of 65f01d4', () => {
+  it('range keeps the whole-track bar grid', () => {
+    const beats = [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6];
+    expect(cutPoints(beats, 'bar', 4, [1, 6])).toEqual([2, 4, 6]);
+  });
+
+  it('a 120 bpm track mis-detected at 162 is recovered from the onsets', async () => {
+    const { tempoCandidates } = await import('../../utils/beats.js');
+    // 20 s at 120 bpm, with an off-beat hat on some beats and a little jitter.
+    const onsets: number[] = [];
+    for (let i = 0; i < 40; i++) { onsets.push(i * 0.5 + ((i * 7) % 5 - 2) * 0.004); if (i % 3 === 0) onsets.push(i * 0.5 + 0.25); }
+    const c = tempoCandidates(onsets, 162.2, 20);
+    expect(Math.abs(c[0].bpm - 120)).toBeLessThan(1.5);
+    expect(c.length).toBeGreaterThan(2);
+    // Constrained by a hint, the best in range wins.
+    expect(Math.abs(tempoCandidates(onsets, 162.2, 20, [80, 140])[0].bpm - 120)).toBeLessThan(1.5);
+  });
+
+  it('the tool warns when unsure, lists candidates, and a split refusal reads as text', async () => {
+    const onsets = [0.3, 1.1, 1.7, 2.9, 3.2];      // no clear tempo
+    const controller = { connected: true, connect: async () => undefined,
+      executeCode: async (code: string) => code.includes('analyzeAudio')
+        ? { success: true, result: { success: true, ok: true, onsets, bpm: 162.2, confidence: 0.14, duration: 4 } }
+        : { success: true, result: { success: false, action: 'split', error: 'at 0 is outside the clip' } } };
+    const r = await handleToolCall('pinepaper_beat_cuts', { source: 'song', every: 'bar', clipId: 'item_2' }, { executeInBrowser: true, browserController: controller as never, executionMode: 'puppeteer' });
+    const o = JSON.parse((r.content![0] as { text: string }).text);
+    expect(o.grid.lowConfidence).toBe(true);
+    expect(o.grid.warning).toContain('pass bpm');
+    expect(o.grid.candidates.length).toBeGreaterThan(1);
+    expect(o.split.skipped[0].reason).toContain('at 0 is outside the clip');
+    expect(o.split.skipped[0].reason).not.toContain('[object Object]');
   });
 });
