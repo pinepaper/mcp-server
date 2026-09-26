@@ -264,6 +264,11 @@ request and lists the models, free. It is charged per image, needs a service
 account key (`PINEPAPER_API_KEY`), and is enabled per organisation during the
 beta — without it the tools say so, and nothing is charged.
 
+Words are never drawn by the model: pass them as `input.text` (headline,
+subhead, caption, call to action, label) and they are added as real, editable
+PinePaper text over the image, laid out inside the title-safe area and given a
+dark backing only where the image behind them is too bright to read.
+
 ### New: add to an animation instead of replacing it
 
 `pinepaper_keyframe_animate` takes `append: true` to add keys to an item's

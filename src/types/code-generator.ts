@@ -12923,13 +12923,25 @@ const make = function(l, spec, x, y, anchor) {
 };
 const contrast = function(it, spec) {
   if (!plate || typeof plate.getAverageColor !== 'function') return { checked: false, note: 'the plate is not an image the studio can sample (a video plate): contrast was not checked.' };
-  const c = plate.getAverageColor(it.bounds);
-  if (!c) return { checked: false };
-  const L = 0.2126 * lin(c.red) + 0.7152 * lin(c.green) + 0.0722 * lin(c.blue);
+  // The BRIGHT end of what is under the text, not its mean: a caption across
+  // bright reflections on a dark road averaged to 15:1 and was unreadable in
+  // the bright part. An 8 x 3 grid of cells, each averaged, judged at the
+  // 90th percentile of luminance.
+  const b0 = it.bounds, lums = [];
+  for (let gy = 0; gy < 3; gy++) {
+    for (let gx = 0; gx < 8; gx++) {
+      const cw = b0.width / 8, ch = b0.height / 3;
+      const cc = plate.getAverageColor(new paper.Rectangle(b0.left + gx * cw, b0.top + gy * ch, cw, ch));
+      if (cc) lums.push(0.2126 * lin(cc.red) + 0.7152 * lin(cc.green) + 0.0722 * lin(cc.blue));
+    }
+  }
+  if (!lums.length) return { checked: false };
+  lums.sort(function(x, y) { return x - y; });
+  const L = lums[Math.floor(0.9 * (lums.length - 1))];
   const ratio = 1.05 / (L + 0.05);
   const large = it.fontSize >= 24 || (spec.bold && it.fontSize >= 18.66);
   const required = large ? 3 : 4.5;
-  const out = { checked: true, ratio: Math.round(ratio * 100) / 100, required: required, approximate: 'against the average colour of the plate behind the text' };
+  const out = { checked: true, ratio: Math.round(ratio * 100) / 100, required: required, approximate: 'against the bright end (90th percentile of 24 sampled cells) of the plate behind the text' };
   if (ratio >= required) return out;
   // The lightest black scrim that reaches the requirement: under it the
   // background luminance is L * (1 - a).

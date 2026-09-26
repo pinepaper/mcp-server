@@ -200,8 +200,15 @@ export const generateHandlers: Record<string, (args: Record<string, unknown>, op
       }
       await generateDeps.sleep(wait);
       wait = Math.min(10_000, Math.round(wait * 1.5));
-      const polled = await call(cfg, 'GET', `/v1/generate/${encodeURIComponent(jobId)}`);
-      if (!polled.ok) return fail(polled);
+      // Polling is a GET, safe to repeat: one retry on a 5xx or an unreachable
+      // cloud before it is reported (a transient 500 mid-job failed a run
+      // that the rerun passed).
+      let polled = await call(cfg, 'GET', `/v1/generate/${encodeURIComponent(jobId)}`);
+      if (!polled.ok && (polled.status === undefined || polled.status >= 500)) {
+        await generateDeps.sleep(3000);
+        polled = await call(cfg, 'GET', `/v1/generate/${encodeURIComponent(jobId)}`);
+      }
+      if (!polled.ok) return fail({ ...polled, message: `${polled.message} The job ${jobId} may still finish: collect it with pinepaper_generate_status.` });
       job = polled.body.job ?? job;
     }
 

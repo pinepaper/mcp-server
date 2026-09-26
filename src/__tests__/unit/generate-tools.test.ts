@@ -179,18 +179,46 @@ describe('text layer layout in the page', () => {
       made.push(it);
       return it;
     };
-    // The plate: dark at the top, bright at the bottom.
-    const plate = { getAverageColor: (b: { top: number }) => (b.top > H / 2 ? { red: 0.95, green: 0.95, blue: 0.9 } : { red: 0.05, green: 0.05, blue: 0.1 }) };
+    // The plate: dark at the top, bright at the bottom — except a bright
+    // streak across the headline's right end (reflections), 3 of 24 cells.
+    const plate = { getAverageColor: (b: { top: number; left: number }) => (b.top > H / 2 || (b.top < H / 2 && b.left > 380) ? { red: 0.95, green: 0.95, blue: 0.9 } : { red: 0.05, green: 0.05, blue: 0.1 }) };
     const app = { getItemById: (id: string) => (id === 'plate_1' ? plate : null), getCanvasSize: () => ({ width: W, height: H }), create: (_t: string, p: Record<string, any>) => mk(p) };
     const code = emitTextLayersPlacement([{ content: 'SUMMER SALE', role: 'headline' }, { content: 'Ends Sunday', role: 'caption' }], 'plate_1');
-    const r = await new Function('app', 'window', 'document', `return (async function() {${code}})()`)(app, {}, undefined);
+    const paper = { Rectangle: class { constructor(public left: number, public top: number, public width: number, public height: number) {} } };
+    const r = await new Function('app', 'window', 'document', 'paper', `return (async function() {${code}})()`)(app, {}, undefined, paper);
     const [cap, head] = [r.textItems.find((t: any) => t.role === 'caption'), r.textItems.find((t: any) => t.role === 'headline')];
     const headItem = made.find((m) => m.content === 'SUMMER SALE')!, capItem = made.find((m) => m.content === 'Ends Sunday')!;
     expect(headItem).toMatchObject({ x: 54, y: 68, anchor: 'top-left', fontFamily: 'Anton', color: '#ffffff' });   // 5% of 1080 / 1350
     expect(capItem).toMatchObject({ x: 54, y: H - 68, anchor: 'bottom-left', fontFamily: 'Inter' });
     expect(head.contrast).toMatchObject({ checked: true });
-    expect(head.contrast.scrim).toBeUndefined();                    // white on dark: passes
+    // Mostly dark behind the headline, but its bright end decides: a mean
+    // would have passed it; the 90th percentile gives it a scrim.
+    expect(head.contrast.scrim).toBeDefined();
     expect(cap.contrast.scrim.opacity).toBeGreaterThan(0.2);          // white on bright: scrim
     expect(cap.contrast.ratioAfter).toBeGreaterThanOrEqual(cap.contrast.required);
+  });
+});
+
+describe('polling survives one transient 5xx', () => {
+  it('retries a failed poll once, then carries on', async () => {
+    cloud({
+      'POST /v1/generate': () => ({ status: 202, json: { ok: true, job: { id: 'r1', status: 'queued' }, estimate: {} } }),
+      'GET /v1/generate/r1': () => [
+        { status: 500, json: { error: 'internal' } },
+        { status: 200, json: { ok: true, job: { id: 'r1', status: 'done', assets: [{ assetId: 'a', ref: '/x', width: 1, height: 1 }], chargedUsd: 0.12 } } },
+      ],
+    });
+    const o = JSON.parse(out(await handleToolCall('pinepaper_generate', req, {})));
+    expect(o).toMatchObject({ success: true, jobId: 'r1', chargedUsd: 0.12 });
+    expect(calls.filter((c) => c.url === '/v1/generate/r1')).toHaveLength(2);
+  });
+  it('a second 5xx is reported, pointing at generate_status', async () => {
+    cloud({
+      'POST /v1/generate': () => ({ status: 202, json: { ok: true, job: { id: 'r2', status: 'queued' }, estimate: {} } }),
+      'GET /v1/generate/r2': () => ({ status: 502, json: { error: 'bad gateway' } }),
+    });
+    const r = await handleToolCall('pinepaper_generate', req, {});
+    expect(r.isError).toBe(true);
+    expect(out(r)).toContain('pinepaper_generate_status');
   });
 });
