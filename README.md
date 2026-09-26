@@ -276,6 +276,8 @@ a run could not be pinned, the result says not to rely on the hash.
   has the same time budget as other exports.
 - `pinepaper_audio_beats` answered success with no result for larger audio, and
   could not read a local file path. Both work now.
+- `pinepaper_camera_animate` without keyframes failed with a raw JSON error; it
+  now says what `keyframes` needs.
 
 ## What's new in 1.6.15
 
