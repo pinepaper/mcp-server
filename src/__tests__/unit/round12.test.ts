@@ -91,14 +91,14 @@ describe('12.12 ProRes / HAP', () => {
 });
 
 describe('12.9 contrast is sampled over time, and nothing visible is not a pass', () => {
-  it('a caption shown only from 2 s is found and judged', () => {
+  it('a caption shown only from 2 s is found and judged', async () => {
     const cap: Record<string, any> = { className: 'PointText', content: 'Late caption', fontSize: 14, visible: false, opacity: 1,
       fillColor: { red: 0.8, green: 0.8, blue: 0.8 }, bounds: { center: {} }, data: { bornAt: 2, ttl: 2 } };
     const app: Record<string, any> = { playbackTime: 0, canvasEl: { style: { backgroundColor: 'rgb(255, 255, 255)' } },
       itemRegistry: { getAll: () => [{ itemId: 'item_1', item: cap }] },
       setPlaybackTime(t: number) { this.playbackTime = t; cap.visible = t >= 2 && t < 4; } };
     const code = codeGenerator.generateAccessibilityCheck({ checks: ['contrast'], duration: 5 });
-    const r = new Function('app', 'document', 'paper', 'globalThis', `return ${code.replace(/^\/\/[^\n]*\n/, '')}`)(app, {}, undefined, {});
+    const r = await new Function('app', 'document', 'paper', 'globalThis', `return ${code.replace(/^\/\/[^\n]*\n/, '')}`)(app, {}, undefined, {});
     expect(r.texts.some((t: { id: string }) => t.id === 'item_1')).toBe(true);
     expect(r.texts.find((t: { id: string; t: number }) => t.id === 'item_1').t).toBeGreaterThanOrEqual(2);
     expect(app.playbackTime).toBe(0);                     // the playhead is put back
@@ -137,5 +137,29 @@ describe('12.13 import_image maxEdge / nativeSize', () => {
     expect(calls[1][2]).toMatchObject({ nativeSize: true });
     expect(r.native).toEqual({ width: 5504, height: 3096 });
     expect(r.note).toContain('maxEdge');
+  });
+});
+
+describe('12.5 / 12.6 video in stills and captures waits for the seek', () => {
+  it('capture_frames prefers captureFramesAtAsync and says so', async () => {
+    const code = codeGenerator.generateCaptureFrames({ times: [6, 10.5] } as never);
+    let asyncUsed = false;
+    const app = { captureFramesAt: () => [], captureFramesAtAsync: async (ts: number[], o: { capture: (c: unknown, t: number, i: number) => unknown }) => { asyncUsed = true; return ts.map((t, i) => o.capture({ toDataURL: () => 'data:' + t }, t, i)); } };
+    const r = await new Function('app', `return ${code.replace(/^\/\/[^\n]*\n/, '')}`)(app);
+    expect(asyncUsed).toBe(true);
+    expect(r.videoSynced).toBe(true);
+    // An older studio: the sync capture, videoSynced false.
+    const old = { captureFramesAt: (ts: number[], o: { capture: (c: unknown, t: number, i: number) => unknown }) => ts.map((t, i) => o.capture({ toDataURL: () => 'x' + t }, t, i)) };
+    expect((await new Function('app', `return ${code.replace(/^\/\/[^\n]*\n/, '')}`)(old)).videoSynced).toBe(false);
+  });
+
+  it('a region export waits for video at its time before rendering', async () => {
+    const order: string[] = [];
+    const app = { canvasSize: { width: 100, height: 100 }, playbackTime: 3, itemRegistry: { getAll: () => [] }, exportEngine: { exportFidelity: () => ({ warnings: [] }) },
+      awaitMediaAt: async (t: number) => { order.push('await ' + t); },
+      renderRegionToDataURL: () => { order.push('render'); return 'data:image/png;base64,AA'; } };
+    const paper = { Rectangle: class { constructor(public x: number, public y: number, public width: number, public height: number) {} } };
+    await new Function('app', 'paper', 'document', body(codeGenerator.generateAgentExport({ format: 'png', region: { x: 0, y: 0, width: 10, height: 10 } } as never)))(app, paper, {});
+    expect(order).toEqual(['await 3', 'render']);
   });
 });

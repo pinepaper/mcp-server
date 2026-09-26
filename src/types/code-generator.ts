@@ -5122,6 +5122,9 @@ ${stillTime !== undefined ? `
           // a neighbouring card's overflowing headline. Older studios ignore the
           // fourth argument, and leave lastRegionExcluded unset.
           if ('lastRegionExcluded' in app) app.lastRegionExcluded = null;
+          // A video in the region is waited for at this time (round 12, 12.5):
+          // the render drew before the clip's seek landed.
+          if (typeof app.awaitMediaAt === 'function') await app.awaitMediaAt(${stillTime !== undefined ? stillTime : "typeof app.playbackTime === 'number' ? app.playbackTime : 0"});
           const regionUrl = app.renderRegionToDataURL(new paper.Rectangle(${region.x}, ${region.y}, ${region.width}, ${region.height}), rw, rh${region.excludeForeign === false ? '' : ', { excludeForeign: true }'});
           const __excluded = Array.isArray(app.lastRegionExcluded) ? app.lastRegionExcluded.filter(function(id) { return id; }) : null;
           // ITEMS THAT CROSS THE REGION'S EDGE (round 9 II, 1.78). In the sheet
@@ -10337,7 +10340,7 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
     const n = Math.min(1200, Math.max(3, Math.round(duration * fps)));
     return `
 // Accessibility measurements (${checks.join(', ')})
-(function() {
+(async function() {
   const out = { success: true, fps: ${fps}, duration: ${duration} };
   const rgba = function(c) {
     if (!c || c.gradient || typeof c.red !== 'number') return null;
@@ -10395,7 +10398,9 @@ ${checks.includes('contrast') ? `  // SAMPLED OVER TIME (round 12, 12.9): text i
     const ctx = small.getContext('2d', { willReadFrequently: true });
     const lut = Array.from({ length: 256 }, function(_, v) { const x = v / 255; return x <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); });
     const times = Array.from({ length: ${n} }, function(_, i) { return i / ${fps}; });
-    out.series = app.captureFramesAt(times, { capture: function(c) {
+    // Waits for video per frame where the studio can (12.6).
+    const __cap = typeof app.captureFramesAtAsync === 'function' ? app.captureFramesAtAsync.bind(app) : app.captureFramesAt.bind(app);
+    out.series = await __cap(times, { capture: function(c) {
       // Transparent canvas shows the page's CSS background, so composite on it.
       ctx.fillStyle = out.page || '#ffffff';
       ctx.fillRect(0, 0, W, H);
@@ -10422,7 +10427,7 @@ ${checks.includes('contrast') ? `  // SAMPLED OVER TIME (round 12, 12.9): text i
     const includeDataUrls = !!input.includeDataUrls;
     return `
 // Deterministic frame capture
-(function() {
+(async function() {
   if (typeof app.captureFramesAt !== 'function') {
     return { success: false, error: 'app.captureFramesAt unavailable — update FxTool to a build with the deterministic capture entrypoint' };
   }
@@ -10439,7 +10444,13 @@ ${checks.includes('contrast') ? `  // SAMPLED OVER TIME (round 12, 12.9): text i
     // plain 9-text scene (round 7 X, #7) on studios without hashFrame. A native
     // reduce is not a generated loop and is not counted; same djb2-xor.
     : function(s) { return Array.prototype.reduce.call(s, function(h, c) { return (((h << 5) + h) ^ c.charCodeAt(0)) >>> 0; }, 5381).toString(16); };
-  const frames = app.captureFramesAt(${timesJson}, {
+  // A VIDEO ON SCREEN IS WAITED FOR (round 12, 12.6): the sync capture drew
+  // before a clip's seek landed, so a frame showed the previous time's
+  // picture. captureFramesAtAsync waits per frame; older studios keep the
+  // sync one (and say video-not-synced themselves).
+  const __videoSynced = typeof app.captureFramesAtAsync === 'function';
+  const __cap = __videoSynced ? app.captureFramesAtAsync.bind(app) : app.captureFramesAt.bind(app);
+  const frames = await __cap(${timesJson}, {
     seed: ${seed},
     capture: function(c, t, i) {
       // Prefer app.captureFrameDataURL(): it renders only the used region, so an
@@ -10454,7 +10465,7 @@ ${checks.includes('contrast') ? `  // SAMPLED OVER TIME (round 12, 12.9): text i
     }
   });
   const uniqueHashes = new Set(frames.map(function(f) { return f.hash; })).size;
-  return { success: true, seed: ${seed}, frameCount: frames.length, uniqueHashes: uniqueHashes, allIdentical: uniqueHashes <= 1, frames: frames };
+  return { success: true, seed: ${seed}, frameCount: frames.length, uniqueHashes: uniqueHashes, allIdentical: uniqueHashes <= 1, videoSynced: __videoSynced, frames: frames };
 })();`.trim();
   }
 

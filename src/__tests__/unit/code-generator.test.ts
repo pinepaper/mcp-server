@@ -1147,7 +1147,8 @@ describe('PinePaperCodeGenerator', () => {
 
     it('capture_frames seeds, hashes frames, and guards missing entrypoint', () => {
       const code = codeGenerator.generateCaptureFrames({ times: [0, 1, 2], seed: 42 });
-      expect(code).toContain('app.captureFramesAt([0,1,2]');
+      expect(code).toContain('await __cap([0,1,2]');
+      expect(code).toContain('app.captureFramesAtAsync');
       expect(code).toContain('seed: 42');
       expect(code).toContain('allIdentical');
       expect(code).toContain('captureFramesAt unavailable');

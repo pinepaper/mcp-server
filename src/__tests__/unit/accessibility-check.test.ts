@@ -84,14 +84,14 @@ describe('the tool', () => {
     expect(out.flash.failing[0].region).toBe('top-left');
   });
 
-  it('the page code runs: grid luminance per frame through captureFramesAt', () => {
+  it('the page code runs: grid luminance per frame through captureFramesAt', async () => {
     const code = codeGenerator.generateAccessibilityCheck({ checks: ['flash'], duration: 0.2, fps: 10 });
     let frame = 0;
     const ctx = { fillStyle: '', fillRect() {}, clearRect() {}, drawImage() {},
       getImageData: (_x: number, _y: number, w: number, h: number) => ({ data: new Uint8ClampedArray(w * h * 4).fill(frame++ % 2 ? 255 : 0) }) };
     const document = { createElement: () => ({ getContext: () => ctx }) };
     const app = { canvasEl: { style: { backgroundColor: '' } }, captureFramesAt: (times: number[], o: { capture: (c: unknown, t: number, i: number) => unknown }) => times.map((t, i) => o.capture({}, t, i)) };
-    const r = new Function('app', 'document', `return ${code.replace(/^\/\/[^\n]*\n/, '')}`)(app, document);
+    const r = await new Function('app', 'document', `return ${code.replace(/^\/\/[^\n]*\n/, '')}`)(app, document);
     expect(r.series).toHaveLength(3);
     expect(r.series[0]).toHaveLength(9);
     expect(r.series[0][0]).toBe(0);
