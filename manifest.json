@@ -193,6 +193,10 @@
       "description": "Group a composite object's parts into ONE entity, ungroup, or break_apart an imported SVG into movable parts. {action: group|ungroup|break_apart, itemIds?, itemId?, groupName?, groupId?}"
     },
     {
+      "name": "pinepaper_query_mutations",
+      "description": "A property's keyframe series over time (t, frame, value, easing). {itemId, property?, range?: [from, to]}"
+    },
+    {
       "name": "pinepaper_accessibility_check",
       "description": "Text contrast (WCAG 1.4.3 AA) and flashing (2.3.1, >3/sec) check of the live scene; heuristic. {checks?: [contrast, flash], duration?, fps?}"
     },

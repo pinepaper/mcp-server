@@ -754,6 +754,8 @@ Use the collage group's id for palette/collageStyle; use a child letter's id for
             isDecorative: { type: 'boolean', description: 'Mark as decorative/non-interactive' },
           },
         },
+        atTime: { type: 'number', minimum: 0, description: 'AUTO-KEY: instead of a static edit, write these properties as keyframes at this time (seconds) — the same as a user dragging with auto-key on. Eased from the previous value; other keys and other properties\' curves are kept. "At 4 s make it orange" is { properties: { fillColor: "orange" }, atTime: 4 }.' },
+        easing: { type: 'string', description: 'atTime: easing of the segment arriving at the new key (default linear).' },
       },
       required: ['itemId', 'properties'],
     },
@@ -1765,6 +1767,22 @@ EXAMPLES:
         groupId: { type: 'string', description: 'For ungroup: registry ID of the group to dissolve.' },
       },
       required: ['action'],
+    },
+  },
+
+  {
+    name: 'pinepaper_query_mutations',
+    annotations: { title: 'Query Property Keyframes', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    description: `A property's values over time: the item's keyframe series ({t, frame, value, easing} per key), for one property or all, optionally within [from, to] seconds. The read side of modify_item { atTime } (auto-key): "what changed at 4 s?", "show the colour over time". It reads the item's keyframe track; it does not yet say WHO made each change or the value before it — that needs the studio's mutation log.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        itemId: { type: 'string' },
+        property: { type: 'string', description: 'One property; all animated properties when omitted.' },
+        range: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: '[from, to] seconds.' },
+        fps: { type: 'number', description: 'For the frame numbers (default 30).' },
+      },
+      required: ['itemId'],
     },
   },
 

@@ -1299,6 +1299,8 @@ export const ModifyItemInputSchema = z.object({
   itemId: z.string().describe('Registry ID of the item'),
   properties: z.record(z.unknown()).describe('Properties to update'),
   data: ItemDataFlagsSchema.optional(),
+  atTime: z.number().min(0).optional().describe('AUTO-KEY: write these properties as keyframes at this time (seconds) instead of a static edit — eased from the previous value, other keys kept.'),
+  easing: z.string().optional().describe('atTime: easing of the segment arriving at the new key (default linear).'),
 });
 
 // Delete Item
@@ -3801,6 +3803,14 @@ export const AccessibilityCheckInputSchema = z.object({
   fps: z.number().int().min(10).max(60).optional().describe('flash: samples per second (default 20; a flash rate is only seen below half of it).'),
 });
 export type AccessibilityCheckInput = z.infer<typeof AccessibilityCheckInputSchema>;
+
+// QUERY MUTATIONS (plan C5a): a property's keyframe series.
+export const QueryMutationsInputSchema = z.object({
+  itemId: z.string().min(1),
+  property: z.string().min(1).optional().describe('One property; all animated properties when omitted.'),
+  range: z.tuple([z.number().min(0), z.number().min(0)]).optional().describe('[from, to] seconds.'),
+  fps: z.number().positive().max(240).optional().describe('For the frame numbers (default 30).'),
+});
 
 // RENDER BATCH (data-driven creative): one scene, many rows, one export per
 // row. The handler runs each row through modify_item / template_params and

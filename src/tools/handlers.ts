@@ -7,7 +7,7 @@
  */
 
 import { CallToolResult, TextContent, ImageContent } from '@modelcontextprotocol/sdk/types.js';
-import { codeGenerator } from '../types/code-generator.js';
+import { codeGenerator, generateQueryMutationsCode } from '../types/code-generator.js';
 import {
   CreateItemInputSchema,
   ModifyItemInputSchema,
@@ -59,6 +59,7 @@ import {
   TemplateParamsInputSchema,
   RenderBatchInputSchema,
   AccessibilityCheckInputSchema,
+  QueryMutationsInputSchema,
   ComposeInputSchema,
   CropImageInputSchema,
   PathOpInputSchema,
@@ -1995,6 +1996,12 @@ async function handleToolCallInner(
         const code = codeGenerator.generateAudioBeats({ ...input, source: staged ? `__ppStage:${stageKey}` : source });
         return executeOrGenerate(code, `Audio: ${input.action}`, options, 'pinepaper_audio_beats',
           staged ? { [stageKey!]: source as string } : undefined);
+      }
+
+      case 'pinepaper_query_mutations': {
+        const input = QueryMutationsInputSchema.parse(args);
+        const code = generateQueryMutationsCode(input.itemId, input.property, input.range as [number, number] | undefined, input.fps);
+        return executeOrGenerate(code, `Keyframe series: ${input.itemId}`, options, 'pinepaper_query_mutations');
       }
 
       case 'pinepaper_accessibility_check': {

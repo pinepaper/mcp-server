@@ -2635,6 +2635,9 @@ export class PinePaperCodeGenerator {
    */
   generateModifyItem(input: z.infer<typeof ModifyItemInputSchema>): string {
     const validated = ModifyItemInputSchema.parse(input);
+    if (validated.atTime !== undefined) {
+      return generateAutoKeyCode(validated.itemId, validated.properties as Record<string, unknown>, validated.atTime, validated.easing);
+    }
     return generateModifyItemCode(
       validated.itemId,
       validated.properties as Record<string, unknown>,
@@ -12997,4 +13000,100 @@ return {
   }),
   fonts: fonts,
 };`;
+}
+
+/**
+ * AUTO-KEY FROM AN AGENT (plan C5a): "at t, make it orange" writes a key at t,
+ * the way a user's drag does with auto-key on — not a static edit.
+ *
+ * The key is MERGED into the item's track (addAnimation mode 'merge'): other
+ * keys stay. So the track stays whole:
+ * - the new key also carries every OTHER animated property's value at t
+ *   (getInterpolatedState), because a key missing a property the others
+ *   animate can break that property's curve;
+ * - a property the track did not animate yet is added to every existing key
+ *   (its old value before t, the new one from t), and a first key at 0 holds
+ *   the old value, so the change eases in from what it was instead of
+ *   jumping.
+ * No duration is passed: addAnimation starts timeline playback when given one.
+ * The result names each property's previous value and what was written.
+ */
+export function generateAutoKeyCode(itemId: string, props: Record<string, unknown>, atTime: number, easing?: string): string {
+  return `
+// Auto-key ${itemId} at ${atTime}s
+(function() {
+  const item = app.getItemById(${JSON.stringify(itemId)});
+  if (!item) return { success: false, error: ${JSON.stringify(`no item "${itemId}" on the canvas — check the id with pinepaper_get_items.`)} };
+  if (typeof app.addAnimation !== 'function') return { success: false, error: 'this studio cannot write keyframes (no addAnimation).' };
+  const AT = ${atTime};
+  const NEW = ${JSON.stringify(props)};
+  const track = (item.data && Array.isArray(item.data.keyframes)) ? item.data.keyframes : [];
+  const animated = track.reduce(function(a, k) { Object.keys((k && k.properties) || {}).forEach(function(p) { if (a.indexOf(p) < 0) a.push(p); }); return a; }, []);
+  // The static value of a property the track does not animate yet.
+  const read = function(p) {
+    const c = function(v) { return v && typeof v.toCSS === 'function' ? v.toCSS(true) : v; };
+    if (p === 'x') return item.position && item.position.x;
+    if (p === 'y') return item.position && item.position.y;
+    if (p === 'scale') return item.scaling ? item.scaling.x : 1;
+    if (p === 'scaleX') return item.scaling ? item.scaling.x : 1;
+    if (p === 'scaleY') return item.scaling ? item.scaling.y : 1;
+    if (p === 'color' || p === 'fillColor') return c(item.fillColor);
+    if (p === 'strokeColor') return c(item.strokeColor);
+    if (p === 'width') return item.bounds && item.bounds.width;
+    if (p === 'height') return item.bounds && item.bounds.height;
+    const v = item[p];
+    return (v === undefined || typeof v === 'function') ? undefined : c(v);
+  };
+  const state = (track.length && typeof app.getInterpolatedState === 'function') ? (app.getInterpolatedState(item, AT) || {}) : {};
+  const byTime = {};
+  const put = function(t, p, v, e) { const k = byTime[t] || (byTime[t] = { time: t, properties: {} }); k.properties[p] = v; if (e) k.easing = e; };
+  const changes = [];
+  Object.keys(NEW).forEach(function(p) {
+    const wasAnimated = animated.indexOf(p) >= 0;
+    const before = wasAnimated ? state[p] : read(p);
+    if (!wasAnimated && before !== undefined) {
+      track.forEach(function(k) { put(k.time, p, k.time < AT ? before : NEW[p]); });
+      if (!track.length && AT > 0) put(0, p, before);
+    }
+    changes.push({ property: p, before: before === undefined ? null : before, after: NEW[p], easedFrom: before === undefined ? 'unknown — keyed at t only' : (wasAnimated ? 'the track' : 'its value before t') });
+  });
+  // The key at t: the new values, plus every other animated property as it is at t.
+  animated.forEach(function(p) { if (!(p in NEW) && state[p] !== undefined) put(AT, p, state[p]); });
+  Object.keys(NEW).forEach(function(p) { put(AT, p, NEW[p], ${JSON.stringify(easing ?? null)}); });
+  const keys = Object.keys(byTime).map(function(t) { return byTime[t]; }).sort(function(a, b) { return a.time - b.time; });
+  const beforeTimes = track.map(function(k) { return k.time; });
+  app.addAnimation(${JSON.stringify(itemId)}, keys, { mode: 'merge' });
+  const after = (item.data && Array.isArray(item.data.keyframes)) ? item.data.keyframes : [];
+  const kept = beforeTimes.every(function(t) { return after.some(function(k) { return k.time === t; }); });
+  if (!kept) return { success: false, error: 'this studio replaced the track instead of merging into it (no merge mode): the earlier keys are gone. Put every key in one keyframe_animate call.', atTime: AT };
+  if (app.historyManager) app.historyManager.saveState();
+  return { success: true, itemId: ${JSON.stringify(itemId)}, atTime: AT, autoKeyed: true, changes: changes, keys: after.length,
+    note: 'written as keyframes (a temporal edit), not a static change; pinepaper_query_mutations shows the series.' };
+})();`.trim();
+}
+
+/**
+ * A property's time series (plan C5a): the item's own keyframe track, read
+ * back. Until the engine keeps a mutation log (C3) this is the keys, not the
+ * history of who changed what — the result says so.
+ */
+export function generateQueryMutationsCode(itemId: string, property?: string, range?: [number, number], fps = 30): string {
+  return `
+// Keyframe series for ${itemId}${property ? '.' + property : ''}
+(function() {
+  const item = app.getItemById(${JSON.stringify(itemId)});
+  if (!item) return { success: false, error: ${JSON.stringify(`no item "${itemId}" on the canvas.`)} };
+  const P = ${JSON.stringify(property ?? null)}, R = ${JSON.stringify(range ?? null)}, FPS = ${fps};
+  const track = (item.data && Array.isArray(item.data.keyframes)) ? item.data.keyframes : [];
+  const series = {};
+  track.forEach(function(k) {
+    if (R && (k.time < R[0] || k.time > R[1])) return;
+    Object.keys((k && k.properties) || {}).forEach(function(p) {
+      if (P && p !== P) return;
+      (series[p] = series[p] || []).push({ t: k.time, frame: Math.round(k.time * FPS), value: k.properties[p], easing: k.easing || null });
+    });
+  });
+  return { success: true, itemId: ${JSON.stringify(itemId)}, source: 'keyframes', series: series, keys: track.length,
+    note: 'the item\\'s keyframe track, read back. Who changed what and the before value per edit need the studio\\'s mutation log, which this studio does not expose yet.' };
+})();`.trim();
 }

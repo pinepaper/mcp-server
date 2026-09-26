@@ -17,6 +17,7 @@
  * it one call at a time.
  */
 export const REQUIRED_ENGINE_METHODS: readonly string[] = [
+  'addAnimation',
   'addComment',
   'addOnFrameCallback',
   'addPhysicsBody3D',
@@ -254,6 +255,7 @@ export const OPTIONAL_ENGINE_METHODS: readonly string[] = [
   'getCanvasSize',
   'getCutoutStylePresets',
   'getDPI',
+  'getInterpolatedState',
   'hashFrame',
   'instantiateOntology',
   'itemRegistry.rebind',
