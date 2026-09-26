@@ -1536,13 +1536,16 @@ export const SetBackgroundColorInputSchema = z.object({
 });
 
 export const SetCanvasSizeInputSchema = z.object({
-  // 8192, not 4096: the artboard tool takes any size and a 5400x1350 carousel
-  // panorama exported exactly, while this refused it. 8192 stays well inside
-  // the browser's per-side canvas limit.
+  // 16384: the engine's own safe dimension for Chrome / Firefox
+  // (ExportEngine.CANVAS_LIMITS; its hard limit is 32767 per side and 2^28
+  // pixels), and what DOOH / projection canvases need (round 12: 8220 and
+  // 12000 px wide rendered fine while this refused them at 8192, which is
+  // Safari's safe size). Above 8192 the result warns that Safari / iOS may
+  // not manage it.
   // The refusal NAMES the route: a 728x90 banner refused with a bare "too
   // small" left a caller to export the preset instead (round 8 BB, 1.48).
-  width: z.number().min(100, "a canvas side under 100 px is not supported. For small assets (a 728x90 or 320x50 banner, a 28 px emote) design at 2-4x — e.g. 1456x180 — and export with agent_export region {x:0, y:0, width, height, outputWidth:728, outputHeight:90}. For VIDEO at a small size, design at 2x and export with agent_export scale: 0.5.").max(8192).describe('Canvas width (100-8192)'),
-  height: z.number().min(100, "a canvas side under 100 px is not supported. For small assets (a 728x90 or 320x50 banner, a 28 px emote) design at 2-4x — e.g. 1456x180 — and export with agent_export region {x:0, y:0, width, height, outputWidth:728, outputHeight:90}. For VIDEO at a small size, design at 2x and export with agent_export scale: 0.5.").max(8192).describe('Canvas height (100-8192)'),
+  width: z.number().min(100, "a canvas side under 100 px is not supported. For small assets (a 728x90 or 320x50 banner, a 28 px emote) design at 2-4x — e.g. 1456x180 — and export with agent_export region {x:0, y:0, width, height, outputWidth:728, outputHeight:90}. For VIDEO at a small size, design at 2x and export with agent_export scale: 0.5.").max(16384).describe('Canvas width (100-16384; above 8192 Safari / iOS may fail)'),
+  height: z.number().min(100, "a canvas side under 100 px is not supported. For small assets (a 728x90 or 320x50 banner, a 28 px emote) design at 2-4x — e.g. 1456x180 — and export with agent_export region {x:0, y:0, width, height, outputWidth:728, outputHeight:90}. For VIDEO at a small size, design at 2x and export with agent_export scale: 0.5.").max(16384).describe('Canvas height (100-16384; above 8192 Safari / iOS may fail)'),
   preset: z.string().optional().describe('Optional preset name'),
 });
 
@@ -2378,8 +2381,8 @@ export const AgentBatchOperationSchema = z.object({
   generatorParams: z.record(z.unknown()).optional().describe('Generator parameters'),
   generatorRegion: GeneratorRegionSchema.optional().describe('Optional sub-region {x, y, width, height} for execute_generator'),
   // Set canvas size fields
-  width: z.number().min(100).max(8192).optional().describe('Canvas width for set_canvas_size (100-8192)'),
-  height: z.number().min(100).max(8192).optional().describe('Canvas height for set_canvas_size (100-8192)'),
+  width: z.number().min(100).max(16384).optional().describe('Canvas width for set_canvas_size (100-16384)'),
+  height: z.number().min(100).max(16384).optional().describe('Canvas height for set_canvas_size (100-16384)'),
   preset: z.string().optional().describe('Canvas preset for set_canvas_size (e.g. instagram, youtube)'),
   // Keyframe animate fields
   keyframes: z.array(z.object({
@@ -2601,8 +2604,8 @@ export const AgentExportInputSchema = z.object({
   region: z.object({
     x: z.number(), y: z.number(),
     width: z.number().positive(), height: z.number().positive(),
-    outputWidth: z.number().int().positive().max(8192).optional(),
-    outputHeight: z.number().int().positive().max(8192).optional(),
+    outputWidth: z.number().int().positive().max(16384).optional(),
+    outputHeight: z.number().int().positive().max(16384).optional(),
     excludeForeign: z.boolean().optional().describe('Default true: an item that reaches into the region but is centred outside it (a neighbouring card\'s overflow) is left out of this image; result.excludedItems names them. false renders everything that touches the region.'),
   }).optional().describe('png / jpg / webp only: export just this canvas region (canvas coordinates, top-left x/y) — carousel slices, crops. Output is the region\'s size unless outputWidth/outputHeight say otherwise; a different aspect is covered, not stretched.'),
 }).describe('Smart export options')

@@ -2039,7 +2039,8 @@ function generateSetCanvasSizeCode(
   // echoing the request back.
   return { success: true, width: (r && r.width) || ${width}, height: (r && r.height) || ${height},
     ...(r && r.preset ? { preset: r.preset } : {}),
-    ...(r && r.unbounded !== undefined ? { unbounded: r.unbounded } : {}) };
+    ...(r && r.unbounded !== undefined ? { unbounded: r.unbounded } : {})${!preset && (width > 8192 || height > 8192) ? `,
+    note: 'above 8192 px per side: Chrome and Firefox render it (the studio allows up to 16384 safely), but Safari and iOS may produce a blank or corrupt canvas — export from Chrome.'` : ''} };
 })();
 `.trim();
 }
@@ -5350,7 +5351,12 @@ ${stillTime !== undefined ? `
                 + ' MB inline ceiling, and this studio has no app.exportEngine.exportToStore to page it out of — update FxTool, or lower duration/quality',
             };
           }
-          return { success: true, platform, format, framing, data: await blobToDataUrl(blob), mimeType: videoMimeType, size: blob.size };
+          // The container the file IS: an encoder that cannot do H.264 at this
+          // size writes VP9 WebM (round 12: mp4 at 12000 px came back WebM),
+          // and naming it .mp4 breaks players. Said below in fidelity.
+          const __mime = (blob.type && String(blob.type).split(';')[0]) || videoMimeType;
+          const __fmt = __mime === 'video/webm' ? 'webm' : __mime === 'video/mp4' ? 'mp4' : format;
+          return { success: true, platform, format: __fmt, framing, data: await blobToDataUrl(blob), mimeType: __mime, size: blob.size };
         };
 
         // Camera framing requires going direct to videoExporter so width/height
@@ -5699,6 +5705,34 @@ ${stillTime !== undefined ? `
   // The applied value is the engine's own report where it gives one
   // (5adfcf1c: lastVideoReport.headroom), so the result and the report agree.
   if (result && result.success) result.broadcastHeadroom = { value: (__vr && typeof __vr.headroom === 'number') ? __vr.headroom : 12, defaulted: true, note: 'broadcast defaults to 12 luma codes of headroom, which keeps encoder ringing legal; pass broadcastHeadroom: 0 for the full range.' };` : ''}
+  // FROZEN OUTPUT (round 12, 12.3): constant bitrate at 3552x1080 answered
+  // success with 600 identical frames. The file cannot be decoded here on the
+  // store route, so this is a size check: an animated scene whose video
+  // carries under 0.002 bits per pixel per frame is almost certainly one
+  // frame repeated. Labelled as a suspicion, with how to confirm it.
+  if (result && result.success && (result.format === 'mp4' || result.format === 'webm') && result.fidelity && result.fidelity.checked && result.fidelity.checked.animated && typeof result.size === 'number') {
+    const __d = result.dimensions || dimensions;
+    const __frames = Math.max(1, Math.round(${videoDuration} * (settings.fps || 30)));
+    const __bpp = (result.size * 8) / Math.max(1, __d.width * __d.height * __frames);
+    // The studio's own count of distinct frames it fed the encoder, where it
+    // reports one, decides; the size is only the fallback (a small dot moving on
+    // a flat field is also a tiny file).
+    const __vf = __vr && __vr.frames;
+    const __distinct = __vf && typeof __vf.distinct === 'number' ? __vf.distinct : null;
+    if (__distinct !== null ? __distinct <= 1 : __bpp < 0.002) {
+      result.fidelity.warnings = (result.fidelity.warnings || []).concat([{ code: 'possibly_frozen',
+        message: (__distinct !== null ? 'the scene animates, but the studio fed the encoder ' + __distinct + ' distinct frame(s). ' : '') + 'the video carries ' + __bpp.toFixed(5) + ' bits per pixel per frame (' + result.size + ' bytes for ' + __frames + ' frames at ' + __d.width + 'x' + __d.height + ') — the encoder has most likely repeated one frame. Check two frames (ffprobe, or pinepaper_capture_frames against the scene); a smaller size, bitrateMode variable, or format webm usually avoids it.' }]);
+      if (result.fidelity.note) delete result.fidelity.note;
+    }
+  }
+  // A DIFFERENT CONTAINER THAN ASKED (round 12, 12.7): the file is named by
+  // what it is, and the substitution is said, not left to a player to find.
+  if (result && result.success && (result.format === 'mp4' || result.format === 'webm') && result.format !== format && (format === 'mp4' || format === 'webm')) {
+    result.fidelity = result.fidelity || { warnings: [] };
+    result.fidelity.warnings = (result.fidelity.warnings || []).concat([{ code: 'format_substituted',
+      message: format + ' was asked for, but the browser encoder could not make ' + format + ' at ' + ((result.dimensions && result.dimensions.width) || '') + 'x' + ((result.dimensions && result.dimensions.height) || '') + ', so the file is ' + result.format + ' (saved with that extension). For ' + format + ' at this size, export smaller (scale) and upscale, or re-encode the ' + result.format + '.' }]);
+    if (result.fidelity.note) delete result.fidelity.note;
+  }
   // AN ODD SIDE ROUNDED UP (FxTool e64a5260). H.264 needs even dimensions, so
   // 1200x675 came out 1200x676 — and platform specs are exact-pixel. The
   // result's dimensions become what the file IS, and fidelity says why.

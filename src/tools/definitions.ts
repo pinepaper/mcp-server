@@ -278,12 +278,12 @@ COMMON PRESETS:
 - hd-landscape: 1920x1080
 - hd-portrait: 1080x1920
 
-Max canvas size: 8192x8192 (a 5400x1350 carousel panorama fits). For wedding invitations, event cards, or detailed designs, use at least 1080x1080 or larger.`,
+Max canvas size: 16384 per side (a 12000 px DOOH or projection canvas fits); above 8192 Safari / iOS may not render it, Chrome and Firefox do. For wedding invitations, event cards, or detailed designs, use at least 1080x1080 or larger.`,
     inputSchema: {
       type: 'object',
       properties: {
-        width: { type: 'number', description: 'Canvas width in pixels (100-8192)' },
-        height: { type: 'number', description: 'Canvas height in pixels (100-8192)' },
+        width: { type: 'number', description: 'Canvas width in pixels (100-16384)' },
+        height: { type: 'number', description: 'Canvas height in pixels (100-16384)' },
         preset: {
           type: 'string',
           description: 'Optional preset name',
@@ -8000,7 +8000,7 @@ NOTE: For diagrams (flowcharts, UML), use pinepaper_create_diagram_shape + pinep
 
 ⚠️ EVERY operation executes LIVE on the canvas. Calling this twice DOUBLES all items. Call ONCE per pipeline.
 
-⚠️ SIZING: All positions/sizes MUST fit within the canvas. start_job returns canvasSize. Keep items within 5%-95% of canvas width/height. Max canvas: 8192x8192.
+⚠️ SIZING: All positions/sizes MUST fit within the canvas. start_job returns canvasSize. Keep items within 5%-95% of canvas width/height. Max canvas: 16384 per side (above 8192, Safari / iOS may fail).
 
 ONTOLOGY PREFLIGHT: Before code generation, this tool validates itemType, relationType, effectType, and generatorName against the canonical PinePaper vocabulary. A typo (e.g. "circel") returns a structured VALIDATION_ERROR with the operation index, the offending field, the canonical valid list, and a suggested fix — fix and retry rather than guessing. Pass skipValidation: true to bypass when intentionally using experimental vocabulary.
 
@@ -8087,8 +8087,8 @@ EXAMPLE — Animated sky scene with timed reveals:
                 description: 'Operation type',
               },
               // Canvas setup
-              width: { type: 'number', description: 'Canvas width for set_canvas_size (100-8192)' },
-              height: { type: 'number', description: 'Canvas height for set_canvas_size (100-8192)' },
+              width: { type: 'number', description: 'Canvas width for set_canvas_size (100-16384)' },
+              height: { type: 'number', description: 'Canvas height for set_canvas_size (100-16384)' },
               preset: { type: 'string', description: 'Canvas preset for set_canvas_size' },
               backgroundColor: { type: 'string', description: 'For set_background: hex color' },
               generatorName: {
@@ -8340,7 +8340,7 @@ VERIFY MOTION BEFORE YOU RENDER. An export takes seconds to minutes and shows yo
           properties: {
             x: { type: 'number' }, y: { type: 'number' },
             width: { type: 'number', exclusiveMinimum: 0 }, height: { type: 'number', exclusiveMinimum: 0 },
-            outputWidth: { type: 'integer', minimum: 1, maximum: 8192 }, outputHeight: { type: 'integer', minimum: 1, maximum: 8192 },
+            outputWidth: { type: 'integer', minimum: 1, maximum: 16384 }, outputHeight: { type: 'integer', minimum: 1, maximum: 16384 },
             excludeForeign: { type: 'boolean', description: 'Default true: an item reaching into the region but centred outside it (a neighbouring card overflow) is left out of this image; result.excludedItems names them. false renders everything that touches the region.' },
           },
           required: ['x', 'y', 'width', 'height'],

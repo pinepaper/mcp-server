@@ -3608,6 +3608,17 @@ You can now start creating new items on a clean canvas.`,
       }
 
       case 'pinepaper_agent_export': {
+        // Formats a DOOH / projection deliverable asks for that no browser
+        // encoder can make (round 12, 12.12): named, with the route that works,
+        // not a generic enum error.
+        const askedFormat = String((args as { format?: unknown }).format ?? '').toLowerCase();
+        if (/^(prores|prores4444|prores422|hap|hapq|hap-alpha|dnxhd|dnxhr|cineform)$/.test(askedFormat)) {
+          return errorResult(ErrorCodes.INVALID_PARAMS,
+            `${askedFormat} is not supported: the studio encodes in the browser, which has no ${askedFormat.startsWith('hap') ? 'HAP' : askedFormat.startsWith('prores') ? 'ProRes' : askedFormat.toUpperCase()} encoder. `
+            + 'Export a lossless png sequence (pinepaper_interchange export_png_sequence, transparent if you need alpha) and convert it, e.g. '
+            + (askedFormat.startsWith('hap') ? 'ffmpeg -i frame_%05d.png -c:v hap -format hap_q out.mov' : 'ffmpeg -i frame_%05d.png -c:v prores_ks -profile:v 4444 out.mov')
+            + ' — or webm / apng for alpha in the browser.');
+        }
         const input = AgentExportInputSchema.parse(args);
         const code = codeGenerator.generateAgentExport(input);
         const description = `Smart export for ${input.platform} as ${input.format || 'auto'}`;
