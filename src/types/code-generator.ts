@@ -5730,7 +5730,9 @@ ${stillTime !== undefined ? `
   // tool does not already raise from the numbers. Plain-string warnings are
   // the bitrate / luma texts, raised above from their numbers instead.
   if (result && result.success && __vr && Array.isArray(__vr.warnings)) {
-    const __mine = ['bitrate_below_floor', 'luma_out_of_range', 'determinism_not_pinned', 'dimensions_rounded', 'format_substituted', 'possibly_frozen', 'alpha_not_applied', 'alpha_keyframe_mismatch'];
+    // format_substituted is NOT here: the studio's own (agreed with FxTool)
+    // is the better-informed one, so it passes and this tool's is skipped.
+    const __mine = ['bitrate_below_floor', 'luma_out_of_range', 'determinism_not_pinned', 'dimensions_rounded', 'possibly_frozen', 'alpha_not_applied', 'alpha_keyframe_mismatch'];
     const __extra = __vr.warnings.filter(function(w) { return w && typeof w === 'object' && typeof w.code === 'string' && __mine.indexOf(w.code) < 0; })
       .map(function(w) { return { code: w.code, message: String(w.message || w.code) }; });
     if (__extra.length) {
@@ -5741,7 +5743,8 @@ ${stillTime !== undefined ? `
   }
   // A DIFFERENT CONTAINER THAN ASKED (round 12, 12.7): the file is named by
   // what it is, and the substitution is said, not left to a player to find.
-  if (result && result.success && (result.format === 'mp4' || result.format === 'webm') && result.format !== format && (format === 'mp4' || format === 'webm')) {
+  const __studioSaidFormat = !!(__vr && Array.isArray(__vr.warnings) && __vr.warnings.some(function(w) { return w && w.code === 'format_substituted'; }));
+  if (!__studioSaidFormat && result && result.success && (result.format === 'mp4' || result.format === 'webm') && result.format !== format && (format === 'mp4' || format === 'webm')) {
     result.fidelity = result.fidelity || { warnings: [] };
     result.fidelity.warnings = (result.fidelity.warnings || []).concat([{ code: 'format_substituted',
       message: format + ' was asked for, but the browser encoder could not make ' + format + ' at ' + ((result.dimensions && result.dimensions.width) || '') + 'x' + ((result.dimensions && result.dimensions.height) || '') + ((__vr && __vr.codecFallback && __vr.codecFallback.reason) ? ' (' + __vr.codecFallback.reason + ')' : '') + ', so the file is ' + result.format + ' (saved with that extension). For ' + format + ' at this size, export smaller (scale) and upscale, or re-encode the ' + result.format + '.' }]);

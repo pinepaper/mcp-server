@@ -63,6 +63,13 @@ describe('the studio\'s own video report', () => {
     const w = await run('video/webm', { codecFallback: { asked: 'avc1', used: 'vp09', reason: 'H.264 level 6.2 caps width at 8192' } });
     expect(w.find((x) => x.code === 'format_substituted')!.message).toContain('H.264 level 6.2 caps width at 8192');
   });
+  it('the studio\'s own format_substituted replaces this tool\'s (one warning, not two)', async () => {
+    const w = await run('video/webm', { warnings: [{ code: 'format_substituted', message: 'studio: H.264 refused 12000x1080 (level 6.2), wrote VP9' }] });
+    const subs = w.filter((x) => x.code === 'format_substituted');
+    expect(subs).toHaveLength(1);
+    expect(subs[0].message).toContain('studio:');
+  });
+
   it('coded engine warnings pass through; plain strings and ones it raises itself do not', async () => {
     const w = await run('video/mp4', { warnings: ['achieved 1.8 Mbps against an 8.0 Mbps floor', { code: 'output_frozen', message: 'the encoder repeated frame 12 for 588 frames' }, { code: 'luma_out_of_range', message: 'dup' }] });
     expect(w.map((x) => x.code)).toContain('output_frozen');
