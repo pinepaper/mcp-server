@@ -1771,6 +1771,31 @@ EXAMPLES:
   },
 
   {
+    name: 'pinepaper_beat_cuts',
+    annotations: { title: 'Beat-Snapped Cuts', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    description: `Cut on the music: analyse a track's beats (or take beat times you already have), fit a beat grid, and return cut points on every beat, every bar, or every N beats — optionally splitting a video or audio clip at each one.
+
+- source: the music — an upload id, URL, data: URL or local file path. Or beats: [seconds] to skip the analysis.
+- every: 'beat' (default) | 'bar' | N beats. beatsPerBar (default 4). range: [from, to] seconds.
+- bpm: override the detected tempo (the grid's phase is still fitted to the music).
+- clipId: split this clip at each cut, in order; cuts outside the clip are skipped and listed.
+
+Returns cuts (seconds), the grid (bpm, phase, period, confidence) and, with clipId, the pieces' ids.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        source: { type: 'string' },
+        beats: { type: 'array', items: { type: 'number' } },
+        bpm: { type: 'number' },
+        every: { anyOf: [{ type: 'string', enum: ['beat', 'bar'] }, { type: 'integer', minimum: 1, maximum: 64 }] },
+        beatsPerBar: { type: 'integer', minimum: 1, maximum: 16 },
+        range: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2 },
+        clipId: { type: 'string' },
+      },
+    },
+  },
+
+  {
     name: 'pinepaper_query_mutations',
     annotations: { title: 'Query Property Keyframes', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     description: `A property's values over time: the item's keyframe series ({t, frame, value, easing} per key), for one property or all, optionally within [from, to] seconds. The read side of modify_item { atTime } (auto-key): "what changed at 4 s?", "show the colour over time". It reads the item's keyframe track; it does not yet say WHO made each change or the value before it — that needs the studio's mutation log.`,

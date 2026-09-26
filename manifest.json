@@ -193,6 +193,10 @@
       "description": "Group a composite object's parts into ONE entity, ungroup, or break_apart an imported SVG into movable parts. {action: group|ungroup|break_apart, itemIds?, itemId?, groupName?, groupId?}"
     },
     {
+      "name": "pinepaper_beat_cuts",
+      "description": "Cut points on the music: beats / bars from audio analysis, optionally splitting a clip at each. {source|beats, every?: beat|bar|N, range?, clipId?}"
+    },
+    {
       "name": "pinepaper_query_mutations",
       "description": "A property's keyframe series over time (t, frame, value, easing). {itemId, property?, range?: [from, to]}"
     },
