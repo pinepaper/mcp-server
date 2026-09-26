@@ -119,3 +119,15 @@ describe('frames: an exact frame count (showcase film, 11.1)', () => {
     expect(AgentExportInputSchema.safeParse({ format: 'mp4', frames: 190, fps: 24 }).success).toBe(true);
   });
 });
+
+describe('governor warnings reach the caller (FxTool PR #30 keyframe_track_replaced)', () => {
+  it('execute_custom_code carries report.warnings as governor.warnings, whatever their shape', async () => {
+    const { handleToolCall } = await import('../../tools/handlers.js');
+    const warning = { code: 'keyframe_track_replaced', message: 'item_1: addAnimation replaced a track; dropped content', droppedProperties: ['content'] };
+    const controller = { connected: true, connect: async () => undefined,
+      executeCode: async () => ({ success: true, result: { ok: true }, report: { warnings: [warning], items: { created: 0 } } }) };
+    const r = await handleToolCall('pinepaper_execute_custom_code', { code: 'app.addAnimation("item_1", []);' }, { executeInBrowser: true, browserController: controller as never, executionMode: 'puppeteer' });
+    const body = JSON.parse((r.content![0] as { text: string }).text);
+    expect(body.governor.warnings).toEqual([warning]);
+  });
+});
