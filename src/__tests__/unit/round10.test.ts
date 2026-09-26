@@ -94,3 +94,28 @@ describe('precomp add / remove pass the item, not its id', () => {
     expect(called).toBe(false);
   });
 });
+
+describe('frames: an exact frame count (showcase film, 11.1)', () => {
+  const dur = (args: Record<string, unknown>) => {
+    const code = codeGenerator.generateAgentExport({ format: 'mp4', ...args } as never);
+    return Number(/duration: ([0-9.e-]+)/.exec(code)![1]);
+  };
+  it('the duration sent makes exactly N frames on the engine\'s round-up paths', () => {
+    for (const [frames, fps] of [[190, 24], [180, 30], [1, 60], [7, 3], [36000, 60]]) {
+      const d = dur({ frames, fps });
+      expect(Math.ceil(d * fps)).toBe(frames);
+    }
+  });
+  it('apng rounds down in the engine, so its nudge goes the other way', () => {
+    const code = codeGenerator.generateAgentExport({ format: 'apng', frames: 190, fps: 24 } as never);
+    const d = Number(/duration: ([0-9.e-]+)/.exec(code)![1]);
+    expect(Math.floor(d * 24)).toBe(190);
+  });
+  it('without fps, the quality tier\'s fps is used; static formats refuse frames', async () => {
+    const d = dur({ frames: 150, quality: 'standard' });
+    expect(Math.ceil(d * 30)).toBe(150);
+    const { AgentExportInputSchema } = await import('../../types/schemas.js');
+    expect(AgentExportInputSchema.safeParse({ format: 'png', frames: 10 }).success).toBe(false);
+    expect(AgentExportInputSchema.safeParse({ format: 'mp4', frames: 190, fps: 24 }).success).toBe(true);
+  });
+});

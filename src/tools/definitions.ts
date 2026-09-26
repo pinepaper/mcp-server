@@ -8268,6 +8268,7 @@ VERIFY MOTION BEFORE YOU RENDER. An export takes seconds to minutes and shows yo
         alphaQuantizer: { type: 'integer', minimum: 0, maximum: 63, description: 'webm with transparent: alpha-stream quality, 0 = lossless … 63.' },
         loop: { anyOf: [{ type: 'boolean' }, { type: 'integer', minimum: 0, maximum: 1000 }], description: 'gif / apng: true = loop forever, false / 0 / 1 = play once, n = play n times (email clients often want a few plays, not forever). Refused on video formats — see SEAMLESS LOOPS.' },
         broadcast: { type: 'boolean', description: 'mp4 only: broadcast-safe — BT.709, limited range (16-235), tagged bt709, constant bitrate with an 8 Mbps floor at 720p+ (4 below). result.video reports what the encoder did.' },
+        frames: { type: 'integer', minimum: 1, maximum: 36000, description: 'Animated formats: exactly this many frames instead of duration. A duration makes ceil(duration x fps) frames (7.91667 s at 24 fps is 191, not 190), so use frames for frame-exact segments.' },
         deterministic: { type: 'boolean', description: 'mp4 / webm: byte-identical files for the same scene (pins the container timestamps), so exports can be checksummed or cached by hash.' },
         broadcastHeadroom: { type: 'integer', minimum: 0, maximum: 40, description: 'mp4 with broadcast only, default 12: luma codes kept clear at both ends, so encoder ringing stays legal (12 measured clean on hard edges; 4 = ~100x fewer out-of-range samples, 12 = ~1000x; never zero). Fidelity raises luma_out_of_range with the legaliser command when any remain.' },
         bitrate: { type: 'integer', minimum: 100000, maximum: 200000000, description: 'mp4 / webm: target bits/s, replacing the quality-derived one. The browser encoder treats it as a CEILING; result.video.achievedBitrate is what it produced.' },
@@ -8326,8 +8327,8 @@ VERIFY MOTION BEFORE YOU RENDER. An export takes seconds to minutes and shows yo
         duration: {
           type: 'number',
           minimum: 0.5,
-          maximum: 60,
-          description: 'Video duration in seconds for mp4/webm/gif (default 5). Max 60 for mp4/webm; GIF is capped at 15 because it has no bitrate target, so size scales with frames × dimensions — use mp4/webm for longer clips. Static formats ignore this. If you set play_timeline to N seconds, pass the same N here.',
+          maximum: 600,
+          description: 'Video duration in seconds for mp4/webm/gif (default 5). Max 600 for mp4/webm (past about a minute the file is paged back from the studio\'s export store); GIF is capped at 15 because it has no bitrate target, so size scales with frames × dimensions — use mp4/webm for longer clips. The file has ceil(duration × fps) frames — for an exact count use frames instead. Static formats ignore this. If you set play_timeline to N seconds, pass the same N here.',
         },
       },
       // Nothing is required: platform defaults to 'auto', which is the canvas's

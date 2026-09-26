@@ -4593,7 +4593,7 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
 
   generateAgentExport(input: AgentExportInput): string {
     const validated = AgentExportInputSchema.parse(input);
-    const { platform, format, quality, framing, duration, estimateOnly, scale, fps, pdf: pdfOpts, region, time: stillTime, maxBytes, loop: gifLoop, broadcast, broadcastHeadroom, bitrate, minBitrate, bitrateMode, transparent, alphaQuantizer, deterministic, ad: adOpts } = validated;
+    const { platform, format, quality, framing, duration, estimateOnly, scale, fps, pdf: pdfOpts, region, time: stillTime, maxBytes, loop: gifLoop, broadcast, broadcastHeadroom, bitrate, minBitrate, bitrateMode, transparent, alphaQuantizer, deterministic, ad: adOpts, frames } = validated;
   // Encoder options (FxTool 16719759); the schema keeps them to mp4 / webm.
   const videoEncodeOpts: Record<string, unknown> = {};
   if (broadcast) videoEncodeOpts.broadcast = true;
@@ -4614,7 +4614,7 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
   if (webmAlpha) { videoEncodeOpts.transparent = true; if (alphaQuantizer !== undefined) videoEncodeOpts.alphaQuantizer = alphaQuantizer; }
   const encodeOptsJs = Object.keys(videoEncodeOpts).length ? `, ...${JSON.stringify(videoEncodeOpts)}` : '';
     const qualityLevel = quality || 'standard';
-    const videoDuration = duration ?? 5;
+    let videoDuration = duration ?? 5;
 
     // Quality settings (bitrate in bps for VideoEncoder)
     const qualitySettings = {
@@ -4622,6 +4622,16 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
       standard: { compression: 0.85, fps: 30, dpi: 150, bitrate: 5_000_000 },
       high: { compression: 0.95, fps: 60, dpi: 300, bitrate: 8_000_000 },
     }[qualityLevel];
+
+    // FRAMES, EXACTLY (showcase film, 11.1). The engine makes ceil(duration x
+    // fps) frames for mp4 / webm / gif and floor(...) for apng, so 7.91667 s
+    // at 24 fps was 191 frames, not 190 — and N / fps itself can land a hair
+    // above N in floating point (190 / 24 * 24 > 190). The duration is nudged
+    // a microsecond toward the side that rounds to N.
+    if (frames !== undefined) {
+      const fpsEff = fps ?? qualitySettings.fps;
+      videoDuration = frames / fpsEff + (format === 'apng' ? 1e-6 : -1e-6);
+    }
 
     // Platform presets
     const platformPresets: Record<string, { width: number; height: number; staticFormat: string; animatedFormat: string }> = {
