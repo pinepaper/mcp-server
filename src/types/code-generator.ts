@@ -10337,17 +10337,48 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
     return { r: Math.round(c.red * 255), g: Math.round(c.green * 255), b: Math.round(c.blue * 255), a: typeof c.alpha === 'number' ? c.alpha : 1 };
   };
   out.page = (app.canvasEl && app.canvasEl.style && app.canvasEl.style.backgroundColor) || null;
-${checks.includes('contrast') ? `  const all = (app.itemRegistry && typeof app.itemRegistry.getAll === 'function') ? app.itemRegistry.getAll() : [];
-  const texts = all.filter(function(e) { return e && e.item && e.item.className === 'PointText' && e.item.visible !== false && String(e.item.content || '').trim() !== ''; });
-  const solids = all.filter(function(e) { return e && e.item && e.item.className !== 'PointText' && e.item.visible !== false && rgba(e.item.fillColor) && e.item.bounds; });
-  out.texts = texts.map(function(e) {
-    const it = e.item, c = it.bounds.center;
-    const under = solids.filter(function(s) { return s.item.bounds.contains(c) && typeof s.item.isBelow === 'function' && s.item.isBelow(it); });
-    const top = under.reduce(function(best, s) { return (!best || (typeof s.item.isAbove === 'function' && s.item.isAbove(best.item))) ? s : best; }, null);
-    const w = String(it.fontWeight || '');
-    return { id: e.itemId, content: String(it.content), fill: rgba(it.fillColor), fontSize: it.fontSize || 0,
-      bold: w === 'bold' || Number(w) >= 700, behind: top ? rgba(top.item.fillColor) : null, behindId: top ? top.itemId : undefined };
+${checks.includes('contrast') ? `  // SAMPLED OVER TIME (round 12, 12.9): text is judged where it is on screen.
+  // Reading only the current playhead found no visible text in a scene of
+  // timed captions and passed with nothing checked. The times: 0, inside each
+  // text's lifetime, every keyframe time, and every second of the duration —
+  // the playhead is moved, lifetimes applied, and put back.
+  const all = (app.itemRegistry && typeof app.itemRegistry.getAll === 'function') ? app.itemRegistry.getAll() : [];
+  const snap = function(t) {
+    const texts = all.filter(function(e) { return e && e.item && e.item.className === 'PointText' && e.item.visible !== false && e.item.opacity !== 0 && String(e.item.content || '').trim() !== ''; });
+    const solids = all.filter(function(e) { return e && e.item && e.item.className !== 'PointText' && e.item.visible !== false && rgba(e.item.fillColor) && e.item.bounds; });
+    return texts.map(function(e) {
+      const it = e.item, c = it.bounds.center;
+      const under = solids.filter(function(s) { return s.item.bounds.contains(c) && typeof s.item.isBelow === 'function' && s.item.isBelow(it); });
+      const top = under.reduce(function(best, s) { return (!best || (typeof s.item.isAbove === 'function' && s.item.isAbove(best.item))) ? s : best; }, null);
+      const w = String(it.fontWeight || '');
+      return { id: e.itemId, t: t, content: String(it.content), fill: rgba(it.fillColor), fontSize: it.fontSize || 0,
+        bold: w === 'bold' || Number(w) >= 700, behind: top ? rgba(top.item.fillColor) : null, behindId: top ? top.itemId : undefined };
+    });
+  };
+  const times = [0];
+  all.forEach(function(e) {
+    const d = (e && e.item && e.item.data) || {};
+    if (typeof d.bornAt === 'number') times.push(d.bornAt + Math.min(0.1, (typeof d.ttl === 'number' ? d.ttl : 1) / 2));
+    if (Array.isArray(d.keyframes)) d.keyframes.forEach(function(k) { if (k && typeof k.time === 'number') times.push(k.time); });
   });
+  Array.from({ length: Math.floor(${duration}) + 1 }, function(_, i) { times.push(i); });
+  const uniq = times.filter(function(t, i) { return t >= 0 && t <= ${duration} + 1e-6 && times.indexOf(t) === i; }).sort(function(a, b) { return a - b; }).slice(0, 60);
+  const L = globalThis.__ppMcp;
+  const at = function(t) {
+    if (typeof app.setPlaybackTime === 'function') app.setPlaybackTime(t);
+    if (L && L.lifetimeApp === app && typeof L.applyLifetimes === 'function') { try { L.applyLifetimes(t); } catch (_) { /* sampled as is */ } }
+    if (typeof paper !== 'undefined' && paper.view && typeof paper.view.update === 'function') paper.view.update();
+  };
+  const prevT = typeof app.playbackTime === 'number' ? app.playbackTime : 0;
+  out.texts = [];
+  if (typeof app.setPlaybackTime === 'function') {
+    uniq.forEach(function(t) { at(t); out.texts = out.texts.concat(snap(t)); });
+    at(prevT);
+    out.sampledTimes = uniq.length;
+  } else {
+    out.texts = snap(prevT);
+    out.sampledTimes = 1;
+  }
 ` : ''}${checks.includes('flash') ? `  if (typeof app.captureFramesAt !== 'function') {
     out.flashUnavailable = 'this studio has no deterministic frame capture (app.captureFramesAt), so flashing was not checked.';
   } else {
@@ -10567,6 +10598,7 @@ ${checks.includes('contrast') ? `  const all = (app.itemRegistry && typeof app.i
         const opts = JSON.stringify({
           ...(input.position ? { position: input.position } : {}),
           ...(input.scale !== undefined ? { scale: input.scale } : {}),
+          ...(input.fit !== undefined ? { fit: input.fit } : {}),
           ...(input.timeOffset !== undefined ? { timeOffset: input.timeOffset } : {}),
           ...(input.clipInPoint !== undefined ? { clipInPoint: input.clipInPoint } : {}),
           ...(input.clipOutPoint !== undefined ? { clipOutPoint: input.clipOutPoint } : {}),

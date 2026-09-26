@@ -89,3 +89,37 @@ describe('12.12 ProRes / HAP', () => {
     }
   });
 });
+
+describe('12.9 contrast is sampled over time, and nothing visible is not a pass', () => {
+  it('a caption shown only from 2 s is found and judged', () => {
+    const cap: Record<string, any> = { className: 'PointText', content: 'Late caption', fontSize: 14, visible: false, opacity: 1,
+      fillColor: { red: 0.8, green: 0.8, blue: 0.8 }, bounds: { center: {} }, data: { bornAt: 2, ttl: 2 } };
+    const app: Record<string, any> = { playbackTime: 0, canvasEl: { style: { backgroundColor: 'rgb(255, 255, 255)' } },
+      itemRegistry: { getAll: () => [{ itemId: 'item_1', item: cap }] },
+      setPlaybackTime(t: number) { this.playbackTime = t; cap.visible = t >= 2 && t < 4; } };
+    const code = codeGenerator.generateAccessibilityCheck({ checks: ['contrast'], duration: 5 });
+    const r = new Function('app', 'document', 'paper', 'globalThis', `return ${code.replace(/^\/\/[^\n]*\n/, '')}`)(app, {}, undefined, {});
+    expect(r.texts.some((t: { id: string }) => t.id === 'item_1')).toBe(true);
+    expect(r.texts.find((t: { id: string; t: number }) => t.id === 'item_1').t).toBeGreaterThanOrEqual(2);
+    expect(app.playbackTime).toBe(0);                     // the playhead is put back
+  });
+
+  it('the handler reports pass: null, not true, when no text was visible at any time', async () => {
+    const controller = { connected: true, connect: async () => undefined,
+      executeCode: async () => ({ success: true, result: { success: true, fps: 20, duration: 5, page: null, texts: [], sampledTimes: 6 } }) };
+    const r = await handleToolCall('pinepaper_accessibility_check', { checks: ['contrast'] }, { executeInBrowser: true, browserController: controller as never, executionMode: 'puppeteer' });
+    const o = JSON.parse((r.content![0] as { text: string }).text);
+    expect(o.contrast).toMatchObject({ pass: null, checked: 0 });
+    expect(o.contrast.note).toContain('no text was visible');
+    expect(o.pass).toBeNull();
+  });
+});
+
+describe('12.13 upload_video fit', () => {
+  it('reaches the engine', async () => {
+    const { MediaInputSchema } = await import('../../types/schemas.js');
+    const code = codeGenerator.generateMedia(MediaInputSchema.parse({ action: 'upload_video', url: 'https://x.test/a.mp4', fit: 'none', scale: 0.5 }));
+    expect(code).toContain('"fit":"none"');
+    expect(code).toContain('"scale":0.5');
+  });
+});

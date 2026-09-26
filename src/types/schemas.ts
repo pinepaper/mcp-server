@@ -4216,7 +4216,8 @@ export const MediaInputSchema = z.object({
   outPoint: z.number().min(0).optional().describe('Clip out-point in media-time seconds — required for set_clip.'),
   // upload_video placement
   position: PositionSchema.optional().describe('Canvas position — upload_video.'),
-  scale: z.number().positive().optional().describe('Scale factor — upload_video.'),
+  scale: z.number().positive().optional().describe("upload_video: a multiplier on the FIT the studio applies (fit: 'contain' by default), not on the video's own pixels — 0.7 of a contain-fit 1920 clip on a 1080 canvas is not 0.7 x 1920. Pass fit: 'none' for scale to be of the source pixels."),
+  fit: z.enum(['contain', 'cover', 'none']).optional().describe("upload_video: how the clip is sized before scale — 'contain' (default; whole clip inside the canvas), 'cover' (fills it, cropped), 'none' (source pixels). The result gives the scale and bounds that landed."),
   timeOffset: z.number().optional().describe('Start offset on the timeline in seconds — upload_video / upload_audio; set_clip: move the clip to start here (canvas seconds).'),
   clipInPoint: z.number().optional().describe('Trim in-point in seconds — upload_video.'),
   clipOutPoint: z.number().optional().describe('Trim out-point in seconds — upload_video.'),

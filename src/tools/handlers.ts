@@ -2016,14 +2016,27 @@ async function handleToolCallInner(
         const controller = options.browserController || getBrowserController();
         if (!controller.connected) await controller.connect();
         const run = await controller.executeCode(code, false);
-        const m = run.result as { texts?: TextSample[]; page?: string | null; series?: number[][]; fps: number; flashUnavailable?: string } | undefined;
+        const m = run.result as { texts?: TextSample[]; sampledTimes?: number; page?: string | null; series?: number[][]; fps: number; flashUnavailable?: string } | undefined;
         if (!run.success || !m) return errorResult(ErrorCodes.EXECUTION_ERROR, run.error || 'the studio returned no measurements');
         const report: Record<string, unknown> = {};
         const page = parseCssColor(m.page);
         if (m.texts) {
+          // Samples over time: each text judged at every moment it showed,
+          // reported at its worst. Nothing visible at any sampled time is not
+          // a pass — it was a vacuous one (round 12, 12.9).
           const c = checkContrast(m.texts, page);
-          report.contrast = { pass: c.failing.length === 0, checked: c.checked, failing: c.failing, skipped: c.skipped,
-            method: 'WCAG 1.4.3 AA (4.5:1, 3:1 for large text) between each text fill and the solid fill of the topmost item under its centre, or the page background' + (c.pageAssumed ? ' (none set, so white was assumed)' : '') + '. Approximate: text over a photo or gradient is not judged.' };
+          const worst = new Map<string, (typeof c.failing)[number]>();
+          for (const f of c.failing) {
+            const prev = worst.get(f.id);
+            if (!prev || f.ratio < prev.ratio) worst.set(f.id, f);
+          }
+          const ids = new Set(m.texts.filter((t) => t.fill).map((t) => t.id));
+          const skippedIds = [...new Map(c.skipped.map((x) => [x.id, x])).values()];
+          report.contrast = ids.size === 0
+            ? { pass: null, checked: 0, sampledTimes: m.sampledTimes, skipped: skippedIds,
+                note: 'no text was visible at any sampled time (0 s, each text\'s lifetime, keyframe times, every second of duration), so contrast was not checked — pass the scene duration, or check a frame where the text shows.' }
+            : { pass: worst.size === 0, checked: ids.size, sampledTimes: m.sampledTimes, failing: [...worst.values()], skipped: skippedIds,
+                method: 'WCAG 1.4.3 AA (4.5:1, 3:1 for large text) between each text fill and the solid fill of the topmost item under its centre, or the page background' + (c.pageAssumed ? ' (none set, so white was assumed)' : '') + ', at every sampled time the text showed; the worst is reported. Approximate: text over a photo or gradient is not judged.' };
         }
         if (m.flashUnavailable) report.flash = { checked: false, reason: m.flashUnavailable };
         else if (m.series) {
@@ -2032,7 +2045,9 @@ async function handleToolCallInner(
             frames: m.series.length, fps: m.fps,
             method: 'WCAG 2.3.1 general flash: opposing luminance changes of >= 10% with the darker state below 0.8, over a 3 x 3 grid; more than 3 flashes in any second fails. A heuristic screen, not a certified PSE test (red flashes are not checked).' };
         }
-        const pass = Object.values(report).every((r) => (r as { pass?: boolean }).pass !== false);
+        // A check that could not run (pass: null) is not a pass.
+        const verdicts = Object.values(report).map((r) => (r as { pass?: boolean | null }).pass);
+        const pass = verdicts.some((v) => v === false) ? false : verdicts.some((v) => v === null) ? null : true;
         return dataResult({ success: true, pass, ...report });
       }
 

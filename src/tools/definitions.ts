@@ -1834,7 +1834,7 @@ EXAMPLE: { checks: ["contrast", "flash"], duration: 6, fps: 20 }`,
       type: 'object',
       properties: {
         checks: { type: 'array', items: { type: 'string', enum: ['contrast', 'flash'] }, description: 'Which checks (default both).' },
-        duration: { type: 'number', exclusiveMinimum: 0, maximum: 120, description: 'flash: seconds of the timeline to sample (default 5).' },
+        duration: { type: 'number', exclusiveMinimum: 0, maximum: 120, description: 'Seconds of the timeline to sample (default 5): flash samples it at fps; contrast at 0 s, inside each text lifetime, at keyframe times and every second.' },
         fps: { type: 'integer', minimum: 10, maximum: 60, description: 'flash: samples per second (default 20).' },
       },
     },
@@ -2223,7 +2223,7 @@ EXAMPLE: { times: [0, 0.5, 1, 1.5, 2], seed: 42 }`,
     description: `Bring VIDEO and AUDIO onto the canvas from a URL, and control playback. Uploaded video is a first-class canvas item (drag, scale, animate, export like any shape); audio rides the timeline.
 
 ACTIONS:
-- upload_video: { url (required), position?, scale?, timeOffset? (timeline start, s) or atPlayhead?: true (start at the current playback time), clipInPoint?, clipOutPoint? (trim, s) } → { id, duration, width, height, name }
+- upload_video: { url (required), position?, fit? ('contain' default | 'cover' | 'none' = source pixels), scale? (a multiplier on that fit — with fit 'none', on the source pixels), timeOffset? (timeline start, s) or atPlayhead?: true (start at the current playback time), clipInPoint?, clipOutPoint? (trim, s) } → { id, duration, width, height, name }
 - upload_audio: { url (required), volume? (0–1, default 1), loop?, muted?, timeOffset? or atPlayhead? } → { id, registryId, duration, name }. Pass loop EXPLICITLY — loop:true for a music bed, loop:false for a voice-over or sting; when omitted, the studio's own default applies and differs between builds.
 - list: → all media [{ id, kind, duration, … }]
 - remove: { id } → removed boolean
@@ -2273,7 +2273,8 @@ EXAMPLE: { action: 'upload_video', url: 'https://…/clip.mp4', scale: 0.5, time
         inPoint: { type: 'number', description: 'Clip in-point (media-time s) — set_clip.' },
         outPoint: { type: 'number', description: 'Clip out-point (media-time s, > inPoint) — set_clip.' },
         position: { type: 'object', properties: { x: { type: 'number' }, y: { type: 'number' } }, description: 'Canvas position — upload_video.' },
-        scale: { type: 'number', description: 'Scale factor — upload_video.' },
+        scale: { type: 'number', description: "upload_video: a multiplier on the fit (contain by default), not on the source pixels; with fit: 'none', of the source pixels." },
+        fit: { type: 'string', enum: ['contain', 'cover', 'none'], description: "upload_video: size before scale — 'contain' (default), 'cover', or 'none' (source pixels)." },
         timeOffset: { type: 'number', description: 'Timeline start offset (s) — upload_video / upload_audio; set_clip: move the clip to start here.' },
         clipInPoint: { type: 'number', description: 'Trim in-point (s) — upload_video.' },
         clipOutPoint: { type: 'number', description: 'Trim out-point (s) — upload_video.' },

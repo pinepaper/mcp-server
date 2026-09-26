@@ -55,9 +55,10 @@ export interface TextSample {
   bold: boolean;
   behind: Rgba | null;         // solid fill of the topmost item under the text's centre
   behindId?: string;
+  t?: number;                  // the sampled time, when sampled over the timeline
 }
 
-export interface ContrastFinding { id: string; content: string; ratio: number; required: number; large: boolean; against: string }
+export interface ContrastFinding { id: string; content: string; ratio: number; required: number; large: boolean; against: string; atSeconds?: number }
 
 /**
  * WCAG AA: 4.5:1, or 3:1 for large text (>= 18 pt = 24 px, or >= 14 pt = 18.66 px bold).
@@ -75,7 +76,7 @@ export function checkContrast(texts: TextSample[], page: Rgba | null): { failing
     const required = large ? 3 : 4.5;
     checked++;
     if (ratio < required) {
-      failing.push({ id: t.id, content: t.content.slice(0, 40), ratio: Math.round(ratio * 100) / 100, required, large, against: t.behindId ? `item ${t.behindId}` : 'the page background' });
+      failing.push({ id: t.id, content: t.content.slice(0, 40), ratio: Math.round(ratio * 100) / 100, required, large, against: t.behindId ? `item ${t.behindId}` : 'the page background', ...(t.t !== undefined ? { atSeconds: t.t } : {}) });
     }
   }
   return { failing, checked, skipped, pageAssumed: !page || (page.a ?? 1) === 0 };
