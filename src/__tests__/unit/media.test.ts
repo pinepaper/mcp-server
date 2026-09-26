@@ -85,7 +85,7 @@ describe('video-editing actions (v1.6.4)', () => {
     // JSON.stringify(undefined ?? null) — an emitter that dropped the null would
     // silently turn "clear my remap" into "invalid remap".
     const c = codeGenerator.generateMedia(MediaInputSchema.parse({ action: 'set_time_remap', id: 'v1', remapTrack: null }));
-    expect(c).toContain('app.setTimeRemap("v1", null)');
+    expect(c).toContain('app.setTimeRemap(__reg("v1"), null)');
   });
 
   it('set_time_remap forwards the track with easing intact', () => {
@@ -102,7 +102,7 @@ describe('video-editing actions (v1.6.4)', () => {
     const c = codeGenerator.generateMedia(MediaInputSchema.parse({
       action: 'speed_ramp', id: 'v1', segments: [{ duration: 1, speed: 1 }, { duration: 0.5, speed: 0 }],
     }));
-    expect(c).toContain('app.speedRamp("v1"');
+    expect(c).toContain('app.speedRamp(__reg("v1")');
     expect(c).toContain('"speed":0'); // freeze frames are a legal segment
   });
 
@@ -111,7 +111,7 @@ describe('video-editing actions (v1.6.4)', () => {
     const c = codeGenerator.generateMedia(MediaInputSchema.parse({
       action: 'match_cut', fromItemId: 'a', toItemId: 'b', label: 'person', consent: true, fade: 0,
     }));
-    expect(c).toContain('await app.matchCut("a", "b"');
+    expect(c).toContain('await app.matchCut(__reg("a"), __reg("b")');
     expect(c).toContain('"consent":true');
     expect(c).toContain('"fade":0'); // 0 is a hard cut, not a missing value
   });
@@ -132,7 +132,7 @@ describe('video-editing actions (v1.6.4)', () => {
     const c = codeGenerator.generateMedia(MediaInputSchema.parse({
       action: 'apply_track_matte', id: 'v1', matteItemId: 'title', channel: 'alpha', live: true,
     }));
-    expect(c).toContain('await app.applyTrackMatte("v1", "title"');
+    expect(c).toContain('await app.applyTrackMatte(__reg("v1"), __reg("title")');
     expect(c).toContain('"channel":"alpha"');
     expect(c).toContain('"live":true');
     expect(c).toContain('catch');
@@ -140,7 +140,7 @@ describe('video-editing actions (v1.6.4)', () => {
 
   it('stop_live_matte emits the stop facade', () => {
     const c = codeGenerator.generateMedia(MediaInputSchema.parse({ action: 'stop_live_matte', id: 'v1' }));
-    expect(c).toContain('app.stopLiveMatte("v1")');
+    expect(c).toContain('app.stopLiveMatte(__reg("v1"))');
   });
 
   it('none of the five double-snapshot history — the facades save state themselves', () => {

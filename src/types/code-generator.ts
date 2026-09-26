@@ -1171,8 +1171,15 @@ if (_flagged && _flagged.item && _flagged.item.data) Object.assign(_flagged.item
   )}`;
   code += `
 app.historyManager.saveState();
+${properties.content !== undefined ? `
+// CONTENT UNDER A CONTENT TRACK (round 10, 10.13): the keyframes set the text
+// on every frame, so a direct edit is overwritten at once — it answered
+// success and changed nothing visible.
+const __ctItem = app.getItemById('${itemId}');
+const __ctKeys = (__ctItem && __ctItem.data && Array.isArray(__ctItem.data.keyframes))
+  ? __ctItem.data.keyframes.filter(function(k) { return k && k.properties && Object.prototype.hasOwnProperty.call(k.properties, 'content'); }).length : 0;` : ''}
 ${modDirection ? emitDirectionCheck(`app.getItemById('${itemId}')`, modDirection) : ''}${modTabular ? emitTabularCheck(`app.getItemById('${itemId}')`) : ''}${modStrokePos ? emitStrokePositionCheck(`app.getItemById('${itemId}')`, modStrokePos) : ''}
-return { success: true, itemId: '${itemId}'${modFit ? ', textFit: __textFit' : ''}${modDirection ? ', direction: __direction' : ''}${modTabular ? ', tabularFigures: __tabular' : ''}${modStrokePos ? ', strokePosition: __strokePos' : ''}${affine ? `, affine: ${JSON.stringify({ skewX, skewY, matrix, note: 'applied to the current shape: calling again compounds it. To undo, apply the inverse (negative skew, or the inverse matrix).' })}` : ''}${modLifetime ? ', lifetime: __lifetime' : ''}${modFont ? ', ...(__font ? { font: __font } : {})' : ''}${modWarning} };`;
+return { success: true, itemId: '${itemId}'${properties.content !== undefined ? `, ...(__ctKeys ? { contentTrackWarning: 'this text\\'s content is keyframed (' + __ctKeys + ' key(s)), so the track sets it on every frame and this edit does not show. Change the content keys with pinepaper_keyframe_animate (append: true replaces same-time keys), or animate another property.' } : {})` : ''}${modFit ? ', textFit: __textFit' : ''}${modDirection ? ', direction: __direction' : ''}${modTabular ? ', tabularFigures: __tabular' : ''}${modStrokePos ? ', strokePosition: __strokePos' : ''}${affine ? `, affine: ${JSON.stringify({ skewX, skewY, matrix, note: 'applied to the current shape: calling again compounds it. To undo, apply the inverse (negative skew, or the inverse matrix).' })}` : ''}${modLifetime ? ', lifetime: __lifetime' : ''}${modFont ? ', ...(__font ? { font: __font } : {})' : ''}${modWarning} };`;
 
   // Wrapped, because the body now RETURNS early on a miss rather than falling
   // through to an unconditional success. Async only when a font must load
@@ -5610,6 +5617,18 @@ ${stillTime !== undefined ? `
 
   if (result && result.success) Object.assign(result, fidelity(format));
   if (result && result.success && __fit) result.platformFit = __fit;
+  // A LANDSCAPE CANVAS FOR A PORTRAIT PLATFORM (or the reverse) is not an
+  // aspect nuance but the wrong deliverable: tiktok on a 16:9 canvas came out
+  // 1920x1080 with only a note (round 10, 10.7). Said where a caller looks.
+  if (result && result.success && __fit) {
+    const __pw = __fit.preset.split('x').map(Number), __uw = __fit.used.split('x').map(Number);
+    if ((__pw[0] > __pw[1]) !== (__uw[0] > __uw[1]) && __pw[0] !== __pw[1]) {
+      result.fidelity = result.fidelity || { warnings: [] };
+      result.fidelity.warnings = (result.fidelity.warnings || []).concat([{ code: 'platform_orientation_mismatch',
+        message: platform + ' is ' + (__pw[0] > __pw[1] ? 'landscape' : 'portrait') + ' (' + __fit.preset + '), but the canvas is ' + (__uw[0] > __uw[1] ? 'landscape' : 'portrait') + ', so the file is ' + __fit.used + '. For a ' + platform + ' deliverable, resize the canvas to ' + __fit.preset + ' (pinepaper_set_canvas_size) and re-lay the scene for it; the export does not reframe a scene.' }]);
+      if (result.fidelity.note) delete result.fidelity.note;
+    }
+  }
   // AUDIO TIMING, WHERE THE STUDIO REPORTS IT (6.27). An MP4's AAC track used
   // to start ~44 ms late and run past the picture — a 6.000 s bumper with sound
   // then failed its cap. The engine now reports the track; it is surfaced as
@@ -9076,7 +9095,12 @@ case 'analyze_palette':
   // engine mints a NUMBER. Returning the number meant the id could not be
   // round-tripped: pass it back to add/remove and zod rejects it before the
   // call is made.
-  const _pid = precomp && precomp.id !== undefined ? precomp.id : precomp;
+  // THE REGISTRY ID, not Paper's. createPrecomp returns the group, whose
+  // .id is Paper's numeric id ("49"), which no tool accepts back ("precomp:
+  // no such item(s): 49", round 10, 10.11). The registry id — what
+  // listPrecomps and every other tool use — is on the group's data.
+  const _d = (precomp && precomp.data) || {};
+  const _pid = _d.registryId || _d.id || (precomp && precomp.id !== undefined ? precomp.id : precomp);
   return { success: true, action: 'create', precompId: String(_pid), itemCount: items.length, name: ${JSON.stringify(input.name || '')} };
 })();`.trim();
       }
@@ -10572,15 +10596,18 @@ ${guard}
         return `
 // Remap a clip's time — speed ramps, freeze frames, reverse (null clears)
 (function() {
+  // A media id (vraster_ / araster_, what upload returns) is resolved to the
+  // registry id these app facades take (round 10, 10.12).
+  const __reg = function(r) { const __A = window.PinePaperAgent; const __m = (__A && typeof __A.listMedia === 'function') ? __A.listMedia().find(function(x) { return x.id === r; }) : null; return (__m && __m.registryId) || r; };
   if (typeof app.setTimeRemap !== 'function') { return { success: false, error: 'app.setTimeRemap unavailable — update FxTool to a time-remap-capable build' }; }
-  const r = app.setTimeRemap(${S(input.id)}, ${S(input.remapTrack ?? null)});
+  const r = app.setTimeRemap(__reg(${S(input.id)}), ${S(input.remapTrack ?? null)});
   if (!(r && r.ok)) return { success: false, error: (r && r.error) || 'remap failed' };
   // WHAT THE REMAP CANNOT DO, READ BACK FROM WHAT WAS STORED. The clip is on
   // the timeline only for its trimmed window, and past that it is HIDDEN
   // whatever the curve says — a remap to 6.5 s on a 5 s clip cut to black at
   // 5.0 s. Source values outside [inPoint, outPoint] are clamped, so that part
   // of the curve is a hold. Both answered success before.
-  const __rid = typeof app._resolveId === 'function' ? app._resolveId(${S(input.id)}) : ${S(input.id)};
+  const __rid = typeof app._resolveId === 'function' ? app._resolveId(__reg(${S(input.id)})) : ${S(input.id)};
   const __e = __rid && app.itemRegistry && app.itemRegistry.get(__rid);
   const __p = (__e && __e.properties) || {};
   const __tr = Array.isArray(__p.timeRemap) ? __p.timeRemap : [];
@@ -10608,15 +10635,18 @@ ${guard}
         return `
 // Speed ramp: consecutive {duration, speed} segments compiled to a remap curve
 (function() {
+  // A media id (vraster_ / araster_, what upload returns) is resolved to the
+  // registry id these app facades take (round 10, 10.12).
+  const __reg = function(r) { const __A = window.PinePaperAgent; const __m = (__A && typeof __A.listMedia === 'function') ? __A.listMedia().find(function(x) { return x.id === r; }) : null; return (__m && __m.registryId) || r; };
   if (typeof app.speedRamp !== 'function') { return { success: false, error: 'app.speedRamp unavailable — update FxTool to a time-remap-capable build' }; }
-  const r = app.speedRamp(${S(input.id)}, ${S(input.segments)});
+  const r = app.speedRamp(__reg(${S(input.id)}), ${S(input.segments)});
   if (!(r && r.ok)) return { success: false, error: (r && r.error) || 'speed ramp failed' };
   // WHAT THE REMAP CANNOT DO, READ BACK FROM WHAT WAS STORED. The clip is on
   // the timeline only for its trimmed window, and past that it is HIDDEN
   // whatever the curve says — a remap to 6.5 s on a 5 s clip cut to black at
   // 5.0 s. Source values outside [inPoint, outPoint] are clamped, so that part
   // of the curve is a hold. Both answered success before.
-  const __rid = typeof app._resolveId === 'function' ? app._resolveId(${S(input.id)}) : ${S(input.id)};
+  const __rid = typeof app._resolveId === 'function' ? app._resolveId(__reg(${S(input.id)})) : ${S(input.id)};
   const __e = __rid && app.itemRegistry && app.itemRegistry.get(__rid);
   const __p = (__e && __e.properties) || {};
   const __tr = Array.isArray(__p.timeRemap) ? __p.timeRemap : [];
@@ -10652,8 +10682,11 @@ ${guard}
         return `
 // Match cut: align the SUBJECT across the cut (on-device detection)
 (async function() {
+  // A media id (vraster_ / araster_, what upload returns) is resolved to the
+  // registry id these app facades take (round 10, 10.12).
+  const __reg = function(r) { const __A = window.PinePaperAgent; const __m = (__A && typeof __A.listMedia === 'function') ? __A.listMedia().find(function(x) { return x.id === r; }) : null; return (__m && __m.registryId) || r; };
   if (typeof app.matchCut !== 'function') { return { success: false, error: 'app.matchCut unavailable — update FxTool to a match-cut-capable build' }; }
-  const r = await app.matchCut(${S(input.fromItemId)}, ${S(input.toItemId)}, ${opts});
+  const r = await app.matchCut(__reg(${S(input.fromItemId)}), __reg(${S(input.toItemId)}), ${opts});
   if (r && r.needsConsent) { return { success: false, needsConsent: true, cost: r.cost, error: 'Detection model download needs consent — re-call with consent: true' }; }
   if (!r || !r.ok) { return { success: false, error: (r && r.error) || 'match cut failed' }; }
   return { success: true, action: 'match_cut', aspectMismatch: r.aspectMismatch || false };
@@ -10671,9 +10704,12 @@ ${guard}
         return `
 // Track matte: the matte item's ${input.channel || 'luma'} drives the target's alpha${input.live ? ' (LIVE — re-cuts as the matte animates)' : ''}
 (async function() {
+  // A media id (vraster_ / araster_, what upload returns) is resolved to the
+  // registry id these app facades take (round 10, 10.12).
+  const __reg = function(r) { const __A = window.PinePaperAgent; const __m = (__A && typeof __A.listMedia === 'function') ? __A.listMedia().find(function(x) { return x.id === r; }) : null; return (__m && __m.registryId) || r; };
   if (typeof app.applyTrackMatte !== 'function') { return { success: false, error: 'app.applyTrackMatte unavailable — update FxTool to a track-matte-capable build' }; }
   try {
-    await app.applyTrackMatte(${S(input.id)}, ${S(input.matteItemId)}, ${opts});
+    await app.applyTrackMatte(__reg(${S(input.id)}), __reg(${S(input.matteItemId)}), ${opts});
     return { success: true, action: 'apply_track_matte', id: ${S(input.id)}, matte: ${S(input.matteItemId)}, live: ${S(!!input.live)} };
   } catch (e) {
     // The facade throws on a missing raster/matte rather than returning {ok:false}.
@@ -10686,8 +10722,11 @@ ${guard}
         return `
 // Stop a live matte, leaving the last cut in place
 (function() {
+  // A media id (vraster_ / araster_, what upload returns) is resolved to the
+  // registry id these app facades take (round 10, 10.12).
+  const __reg = function(r) { const __A = window.PinePaperAgent; const __m = (__A && typeof __A.listMedia === 'function') ? __A.listMedia().find(function(x) { return x.id === r; }) : null; return (__m && __m.registryId) || r; };
   if (typeof app.stopLiveMatte !== 'function') { return { success: false, error: 'app.stopLiveMatte unavailable — update FxTool' }; }
-  const r = app.stopLiveMatte(${S(input.id)});
+  const r = app.stopLiveMatte(__reg(${S(input.id)}));
   return r && r.ok ? { success: true, action: 'stop_live_matte' } : { success: false, error: (r && r.error) || 'no live matte on that item' };
 })();`.trim();
       }

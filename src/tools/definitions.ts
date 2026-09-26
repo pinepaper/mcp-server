@@ -4986,7 +4986,9 @@ ACTIONS:
 - update_from_instance: Promote an instance's edits back into the master. Params: instanceId
 - detach: Make an instance an ordinary independent item. Params: instanceId
 
-Overrides are the point: an instance can differ from its master and still receive master updates.`,
+Overrides are the point: an instance can differ from its master and still receive master updates.
+
+Instances carry the master's LOOK (geometry, style, text), not its animation: instantiate and sync copy what the master is, not its keyframes or animations. To animate instances, animate each one (keyframe_animate on its instanceId, or stagger across them).`,
     inputSchema: {
       type: 'object',
       properties: {
