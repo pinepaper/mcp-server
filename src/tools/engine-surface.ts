@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 331981e809dfdf109e001f8dcc08a412bd6a43ff
- * sha256:    b69dfe75951445c56482a1d8c784d8bc9a1ebee0ca80cf3081eecf7ff06a8795   (of PinePaper.js as committed)
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 5b52dba3b3da34dd83d126d8dc2e8ad024642f82
+ * sha256:    5d68aa668d31f26ad7a97d08d6aa4e9bd398bfc20d200a5efb9fd271910f86db   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on `window.app`, with how it gets there. The parity
@@ -16,12 +16,13 @@
 /** How a name lands on `app`. */
 export type EngineMemberKind = 'method' | 'accessor' | 'property' | 'lazy' | 'lazyHeavy' | 'bootstrap';
 
-/** 1159 names, from FxTool/js/PinePaper.js. */
+/** 1168 names, from FxTool/js/PinePaper.js. */
 export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object.freeze({
   _activeByGroup: 'property',
   _activeDrawingGroup: 'method',
   _addAuthoredMesh: 'method',
   _addImageFromUrl: 'method',
+  _addToAnimationSets: 'method',
   _adoptRegistryId: 'method',
   _animateCamera: 'method',
   _animationIntervalId: 'property',
@@ -50,6 +51,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _boundaryZoom: 'property',
   _brandKitTargets: 'method',
   _buildCharacterPart: 'method',
+  _buildComponentCopy: 'method',
   _buildEyePiece: 'method',
   _buildStaticCacheIfEnabled: 'method',
   _cachedCanvasCenter: 'property',
@@ -69,6 +71,8 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _collectKeyListenerCleanups: 'method',
   _collectPointerTriggerIds: 'method',
   _comments: 'property',
+  _componentAnchor: 'method',
+  _componentPlacementDelta: 'method',
   _components: 'property',
   _contentModeBeforeDraw: 'property',
   _contrastPassOverImages: 'method',
@@ -170,6 +174,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _luminanceUnder: 'method',
   _mapTargetBounds: 'property',
   _maxCallbacks: 'property',
+  _migrateClonedSubtree: 'method',
   _normalizeSegment: 'method',
   _nudgeSaveTimer: 'bootstrap',
   _onFrameCallbacks: 'property',
@@ -261,6 +266,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _setCursor: 'method',
   _setExactSize: 'method',
   _setImageMaxKB: 'method',
+  _settleComponentPartsToRest: 'method',
   _showWorldCompass: 'method',
   _showWorldControlHint: 'method',
   _silhouettePolygon: 'method',
@@ -285,10 +291,12 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _textEffectCollageRoot: 'method',
   _textEffectMembers: 'method',
   _tickSimpleAnimationItem: 'method',
+  _translateComponentCopy: 'method',
   _uiSuspended: 'property',
   _uiSuspendedAt: 'property',
   _unbakeRotation: 'method',
   _unregisterWorldNode: 'method',
+  _unwireComponentParts: 'method',
   _updateBoundaryVisibility: 'method',
   _updateDynamicContent: 'method',
   _updateErrorLogged: 'property',
@@ -297,6 +305,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _updateSelectionVisualsFast: 'method',
   _viewportBounds: 'property',
   _warnedNoMaterial: 'property',
+  _wireComponentParts: 'method',
   _withExportEngine: 'method',
   _world3d: 'property',
   _world3dPrevTime: 'property',
@@ -1239,7 +1248,7 @@ export const ENGINE_FACADES: Readonly<Record<string, readonly string[]>> = Objec
   itemRegistry: Object.freeze(['_registerBuiltinTypes', 'addAssociation', 'app', 'clear', 'count', 'get', 'getAll', 'getAllTypes', 'getAssociations', 'getByName', 'getBySource', 'getByType', 'getItem', 'getStats', 'getTypesByCategory', 'has', 'itemTypes', 'items', 'nextId', 'query', 'rebind', 'rebuildFromCanvas', 'register', 'registerType', 'removeAssociation', 'setName', 'unregister', 'unregisterType', 'updateProperties']),
   magicSystem: Object.freeze(['COLOR_SCHEME_PALETTES', 'ENERGY_CYCLE', 'GENERATOR_PARAMS', 'MOOD_ANIMATIONS', 'MOOD_BLEND_PRESETS', 'MOOD_COLLAGE_STYLES', 'MOOD_CUTOUT_STYLES', 'MOOD_DEFORMS', 'MOOD_EFFECTS', 'MOOD_FILTERS', 'MOOD_GENERATORS', 'MOOD_KEYFRAMES', 'MOOD_MAP', 'MOOD_MASKS', 'ONTOLOGY_ANIMATIONS', 'STYLE_THEMES', '_applyBackgroundDNA', '_applyContextTreatments', '_applyFullTemplate', '_applyItemTreatment', '_applyKGRemix', '_applyKeyframeAnimation', '_applyPermutation', '_applyRelations', '_applyTemplateRelations', '_buildNodeTypeCounts', '_buildRelationTargetSet', '_claimProps', '_claimable', '_cleanPreviousMagic', '_createTemplateItem', '_energyIndex', '_extractAnimationPatterns', '_extractCanvasKeywords', '_extractColorPalette', '_extractDesignDNA', '_extractSelfRelations', '_fallbackBackground', '_findRasterChild', '_getItemType', '_getMoodEffectColor', '_graphRAGScore', '_hasSourceRelation', '_isMagicOwned', '_kgIndex', '_kgInvertedIndex', '_kgSimilarity', '_kgTemplateMap', '_lastBackgroundGenerator', '_lastEnergy', '_liveItem', '_loadKGIndex', '_magicBlendedItems', '_magicChangedBackground', '_magicCollageIds', '_magicConnectors', '_magicCreatedGenerator', '_magicCreatedItems', '_magicDeformedItems', '_magicEffectedItems', '_magicFilteredRasters', '_magicMaskedItems', '_magicRelations', '_permIndex', '_pickRandom', '_pickRandomExcept', '_pickWeighted', '_queryKG', '_recent', '_remember', '_remixExpressive', '_remixIndex', '_resolveMood', '_restyleCollages', '_rolePalette', '_setBackgroundColor', '_snapshotItem', '_splitTextForCollage', '_treatMedia', '_treatMultiText', '_treatShape', '_treatText', '_userOwns', 'analyzeCanvas', 'app', 'autoAnimate', 'currentEnergy', 'generateMagicBackground', 'nextEnergy', 'remixStyle', 'suggestAnimations']),
   mapSystem: Object.freeze(['_addOceanBackground', '_addRegionInteractivity', '_animatePathSimple', '_applyRotationIfChanged', '_buildRegionMappings', '_cacheDB', '_centerMapOnCanvas', '_cleanupGlobeDrag', '_cleanupMapNavigation', '_cleanupPath', '_cleanupViewLevelHitTesting', '_createInlineMarker', '_createInlineMarkerLoose', '_createLegend', '_createProjection', '_createRevealKeyframes', '_currentStyle', '_easeOut', '_emitEvent', '_ensureGeoPinnedRule', '_ensureGeoToursRule', '_findColumnKey', '_findFeatureAtCanvasPoint', '_findRegionByName', '_getCanvasDimensions', '_getCorrectedPointFromDOM', '_getEventPos', '_getFromCache', '_globeAnimFrame', '_globeArcPoints', '_globeDragActive', '_globeDragEnd', '_globeDragMove', '_globeDragStart', '_globeExtent', '_globeHandlers', '_globeItems', '_globeLastPoint', '_globeMode', '_globeMomentum', '_globeRotation', '_globeVelocity', '_graticuleGeo', '_hideTooltip', '_hoveredPath', '_hoveredRegionId', '_interpolateColor', '_isInsideGlobe', '_loadWorldBasemap', '_loadWorldBasemapItems', '_lodCache', '_lodFeature', '_lodToleranceDeg', '_mapClickHandler', '_mapCtx', '_mapMouseLeaveHandler', '_mapMouseMoveHandler', '_mapOffscreen', '_mapRaster', '_mapRenderParams', '_motionLOD', '_navHandlers', '_openCacheDB', '_origCanvasDims', '_parseCSVLine', '_pathToGeoJSON', '_previousMapGroups', '_processMapData', '_putInCache', '_reRenderGlobe', '_reRenderMapRaster', '_regionAnimCallbackId', '_regionAnimationConfig', '_regionAnimations', '_regionColorAt', '_regionColorOverrides', '_regionFeature', '_renderWorldBasemapToCanvas', '_repaintScheduled', '_resolveRegionFeature', '_resolveRegionStyle', '_resolveTourStops', '_scheduleRasterRepaint', '_segmentsToCoordinates', '_selectedRegions', '_setPathFillColor', '_setRegionOverride', '_settleGlobeRender', '_setupGlobeDrag', '_setupGlobeDragLegacy', '_setupViewLevelHitTesting', '_showTooltip', '_startRegionAnimationLoop', '_stopRegionAnimationLoop', '_suppressClickUntil', '_tourSeq', '_updateGlobePaths', '_updateTooltipPosition', '_worldTours', 'addCities', 'addGraticule', 'addMarker', 'addRegionLabel', 'animateGlobeRotation', 'animateRegions', 'animateRegionsWave', 'animateReveal', 'app', 'applyCustomLabels', 'applyDataColors', 'bundledMaps', 'canvasToGeo', 'clearMap', 'clearSelection', 'connectMarkerToRegion', 'connectRegions', 'currentMap', 'debugCompareRegions', 'debugRegionPositions', 'defaultStyles', 'deselectRegions', 'disableGlobeMode', 'disableMapNavigation', 'downloadGeoJSON', 'downloadOriginalGeoJSON', 'downloadRegionDataCSV', 'downloadSVG', 'enableGlobeMode', 'enableMapNavigation', 'exportGeoJSON', 'exportRegionDataCSV', 'exportSVG', 'extractRegion', 'geoToCanvas', 'getAnimatedRegions', 'getAvailableMaps', 'getAvailableProjections', 'getAvailableRegionCodes', 'getHighlightedRegions', 'getMapSourceInfo', 'getOriginalGeoJSON', 'getQualityOptions', 'getRecommendedSources', 'getRegionInfo', 'getRegionOverride', 'getRegionOverrideCount', 'getSelectedRegions', 'getStylePresets', 'highResMaps', 'highlightRegions', 'importCustomMap', 'importRegionDataCSV', 'isOnNearHemisphere', 'loadChoroplethFromCSV', 'loadLabelsFromCSV', 'loadMap', 'loadMapData', 'mapDataCache', 'mapGroup', 'paper', 'parseCSV', 'pinItemToGlobe', 'projections', 'qualityPresets', 'rebuildRegionPaths', 'regionFilters', 'regionNameMappings', 'regionPaths', 'resetView', 'rotateGlobeTo', 'selectRegions', 'setMapStyle', 'setRegionEditable', 'stopRegionAnimations', 'stopWorldTour', 'stylePresets', 'tooltip', 'tourItemAlongCoords', 'tourRegions', 'ungroupMap', 'unhighlightRegions', 'unpinItemFromGlobe', 'worldTour', 'zoomToRegion']),
-  maskingSystem: Object.freeze(['_adoptRegistryIdentity', '_applyEasing', '_applyEasingFn', '_applyMaskState', '_applyPathMaskFrame', '_buildPathFromDescriptor', '_createCircleMask', '_createCustomMask', '_createEllipseMask', '_createHeartMask', '_createHexagonMask', '_createRectangleMask', '_createRoundedMask', '_createStarMask', '_createTriangleMask', '_getHistoryManager', '_initItemData', '_interpolateMaskState', '_interpolatePathSegments', '_itemRegistry', '_lerpSegments', '_normaliseMaskKeyframes', '_presetCharacterRevealLeft', '_presetCharacterRevealRight', '_presetCinematic', '_presetCurtainHorizontal', '_presetCurtainVertical', '_presetDiagonalWipe', '_presetIris', '_presetIrisOut', '_presetRevealDown', '_presetRevealUp', '_presetWipeDown', '_presetWipeLeft', '_presetWipeRight', '_presetWipeUp', '_setupItemHoverCursor', '_stateMachine', '_transformSegments', '_updateCinematicMask', '_updateCircleMask', '_updateRectangleMask', 'addMask', 'animatedMaskPresets', 'applyAnimatedMask', 'applyCharacterMasks', 'applyCustomMask', 'applyMask', 'applyPathMask', 'clear', 'get', 'getAnimatableProperties', 'getAvailableAnimationPresets', 'getAvailableEasings', 'getAvailableMaskTypes', 'getMaskData', 'isMasked', 'listMaskTypes', 'maskGenerators', 'maskedItems', 'rebuildTracking', 'refitMaskToContent', 'removeMask', 'removeMaskLayer', 'serialize', 'shapeForPreset', 'updateAnimatedMasks', 'updateMask']),
+  maskingSystem: Object.freeze(['_adoptRegistryIdentity', '_applyEasing', '_applyEasingFn', '_applyMaskState', '_applyPathMaskFrame', '_buildPathFromDescriptor', '_createCircleMask', '_createCustomMask', '_createEllipseMask', '_createHeartMask', '_createHexagonMask', '_createRectangleMask', '_createRoundedMask', '_createStarMask', '_createTriangleMask', '_getHistoryManager', '_initItemData', '_interpolateMaskState', '_interpolatePathSegments', '_itemRegistry', '_lerpSegments', '_normaliseMaskKeyframes', '_notifyContentReplaced', '_onContentReplaced', '_presetCharacterRevealLeft', '_presetCharacterRevealRight', '_presetCinematic', '_presetCurtainHorizontal', '_presetCurtainVertical', '_presetDiagonalWipe', '_presetIris', '_presetIrisOut', '_presetRevealDown', '_presetRevealUp', '_presetWipeDown', '_presetWipeLeft', '_presetWipeRight', '_presetWipeUp', '_setupItemHoverCursor', '_stateMachine', '_transformSegments', '_updateCinematicMask', '_updateCircleMask', '_updateRectangleMask', 'addMask', 'animatedMaskPresets', 'applyAnimatedMask', 'applyCharacterMasks', 'applyCustomMask', 'applyMask', 'applyPathMask', 'clear', 'get', 'getAnimatableProperties', 'getAvailableAnimationPresets', 'getAvailableEasings', 'getAvailableMaskTypes', 'getMaskData', 'isMasked', 'listMaskTypes', 'maskGenerators', 'maskedItems', 'rebuildTracking', 'refitMaskToContent', 'removeMask', 'removeMaskLayer', 'serialize', 'shapeForPreset', 'updateAnimatedMasks', 'updateMask']),
   physicsWorld: Object.freeze(['MAX_CATCH_UP_STEPS', '_accumulator', '_active', '_addOnFrameCallback', '_bodies', '_fixedDt', '_frameCallbackId', '_gravity', '_isCircular', '_itemRegistry', '_noteWarning', '_onCollision', '_positionIterations', '_removeOnFrameCallback', '_step', '_stepToSceneTime', '_syncDynamicBodies', '_syncKinematicBodies', '_velocityIterations', '_world', '_worldTime', 'addBody', 'applyForce', 'applyImpulse', 'createGround', 'createJoint', 'destroy', 'getBodyState', 'init', 'isActive', 'removeBody', 'resetWorld', 'setBodyType', 'setVelocity']),
   relationRegistry: Object.freeze(['_addCameraAnimation', '_addEdgeToDependencyGraph', '_animatesAsSignal', '_applyComputed', '_applyParamEasing', '_boundsToAsSignal', '_buildDependencyGraph', '_buildPositionSignal', '_cacheFramePosition', '_cacheFrameProperty', '_calculateDuration', '_cameraAnimation', '_cameraTilt', '_checkIRParity', '_clearFrameCache', '_computeDependencyLevels', '_computeOnMainThread', '_computeRelation', '_containedInPlaceAsSignal', '_debugFrame', '_debug_defaultFontPath', '_debug_fontCacheKeys', '_debug_fontCacheSize', '_dependencyGraph', '_dependentsGraph', '_drivenByAsSignal', '_ensureProcessingOrder', '_evaluateExpression', '_followAsSignal', '_framePositions', '_frameProperties', '_geoAdjacentToAsSignal', '_geoTravelsToAsSignal', '_geometricAsSignal', '_getEffectivePosition', '_getFrameProperty', '_getWorld3D', '_graphDirty', '_interpolateRelationParams', '_invalidateGraph', '_invalidateTopology', '_irModule', '_maintainsDistanceAsSignal', '_movesAlongPathAsSignal', '_normalizeWindow', '_pointsAtAsSignal', '_processingOrder', '_propertyCache', '_registerBuiltInRelations', '_registerGeometricConstraints', '_registerStructuralRelations', '_removeEdgeFromDependencyGraph', '_repelsAsSignal', '_resolveRelativeUnits', '_splitOffload', '_tempFromBounds', '_tempFromPos', '_tempToBounds', '_timeExpressionAsSignal', '_topologicalSort', '_topologyDirty', '_updateCameraAnimation', '_warn', '_warnedOnce', '_waveThroughAsSignal', '_wiggleAsSignal', '_windowLocalTime', 'activeRelations', 'addAssociation', 'addCameraKeyframe', 'addKeyframeAnimation', 'applyFrame', 'cameraTilt', 'chainAnimations', 'clear', 'clearAll', 'computeFrame', 'computedCache', 'cursorPeerId', 'exportForSave', 'exportTrainingData', 'getAllRules', 'getAnimatedItems', 'getAnimationParams', 'getAssociations', 'getCameraAnimationParams', 'getCameraStateAtTime', 'getCursorInteractions', 'getDependencyInfo', 'getIncomingRelations', 'getRule', 'getStats', 'hasCameraAnimation', 'hasRelation', 'importFromSave', 'isCursorTarget', 'itemRegistry', 'migrateItemId', 'modifyRelationParams', 'moveCameraKeyframe', 'query', 'queryActive', 'queryByTarget', 'queryChain', 'queryCompound', 'queryIsolated', 'queryNot', 'rebuildActiveRelations', 'registerDeformRelations', 'registerEffectRelations', 'registerRule', 'relationsActiveAt', 'removeAnimation', 'removeAssociation', 'removeCameraAnimation', 'removeCameraKeyframe', 'rules', 'setMorphSourceColor', 'setPropertyCache', 'setWarningSink', 'setWorld3DGetter', 'syncAnimations', 'timelineOf', 'update', 'updateKeyframes', 'updateSync', 'whatAnimates', 'workerPool']),
   sceneManager: Object.freeze(['_addTemplateRefScene', '_animateCrossfade', '_applyTransition', '_autoSave', '_chainTimeout', '_chainToken', '_clearCanvas', '_crossfadeToScene', '_defaultDimensions', '_delay', '_easeInOutCubic', '_hasAnimations', '_hexToRgb', '_interpolateColor', '_isContinuousTemplate', '_isPaused', '_loadSceneContent', '_playNextInChain', '_playTransitionFrames', '_prefetchNextTemplate', '_prefetchTimeout', '_registerBuiltinTransitions', '_rekeyRestoredItem', '_resolveTemplate', '_resolveTemplateAsync', '_restoreDecorative', '_restoreGroups', '_restoreItems', '_restoreRelations', '_restoreTimeline', '_serializeDecorative', '_serializeGroups', '_serializeItems', '_serializeItemsFallback', '_serializeRelations', '_serializeTimeline', '_serializeTypeSpecific', '_simpleFadeTransition', '_targetCanvasDimensions', '_templateCache', '_templatePrefetchLeadMs', '_templateResolver', '_validateDimensions', 'addTemplateAsScene', 'app', 'autoSaveEnabled', 'autoSaveKey', 'chainIndex', 'chainLoop', 'count', 'createChain', 'createScene', 'currentSceneId', 'defineTransition', 'deleteScene', 'duplicateScene', 'exportScenes', 'getCurrentScene', 'getDimensionValidation', 'getScene', 'importScenes', 'isPlayingChain', 'jumpToChainIndex', 'listScenes', 'loadFromStorage', 'loadScene', 'nextId', 'pauseChain', 'playChain', 'renameScene', 'reorderScenes', 'resumeChain', 'saveCurrentAsScene', 'saveToStorage', 'sceneChain', 'scenes', 'setSceneDuration', 'setTemplatePrefetchLead', 'setTemplateResolver', 'stopChain', 'transitions']),
