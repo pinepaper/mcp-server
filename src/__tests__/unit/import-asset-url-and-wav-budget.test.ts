@@ -68,3 +68,15 @@ describe('deterministic: pixels pinned only on the software encoder (FxTool e34a
     expect((await run({ bitrate: 2e6 })).codes).toContain('determinism_not_pinned');
   });
 });
+
+describe('camera_animate without keyframes is INVALID_INPUT, not a raw SyntaxError (external review, 1.6.15)', () => {
+  it('missing, empty, or a key without a time', async () => {
+    for (const args of [{}, { duration: 2 }, { keyframes: [] }, { keyframes: [{ zoom: 2 }] }]) {
+      const r = await handleToolCall('pinepaper_camera_animate', args, { executionMode: 'code' });
+      const text = (r.content ?? []).map((c) => ('text' in c ? c.text : '')).join('');
+      expect(r.isError).toBe(true);
+      expect(text).toContain('INVALID_INPUT');
+      expect(text).not.toContain('SyntaxError');
+    }
+  });
+});

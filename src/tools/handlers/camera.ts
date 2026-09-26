@@ -114,6 +114,23 @@ export const cameraHandlers: Record<string, CameraHandler> = {
       yaw?: number;
       easing?: string;
     }>;
+    // The handler takes its args unparsed, so a missing keyframes array
+    // reached JSON.parse(JSON.stringify(undefined)) and came back as a raw
+    // SyntaxError (external review, 1.6.15). Checked here and named.
+    if (!Array.isArray(keyframes) || keyframes.length === 0) {
+      return errorResult(
+        ErrorCodes.INVALID_INPUT,
+        'keyframes is required: a non-empty array of { time (seconds), zoom?, center?: [x, y], pitch?, yaw?, easing? }. '
+        + 'For a single move without keyframes use pinepaper_camera (zoom / pan / move_to), or pinepaper_camera_director for a shot list.',
+      );
+    }
+    const badKey = keyframes.findIndex((k) => !k || typeof k !== 'object' || typeof k.time !== 'number' || !Number.isFinite(k.time) || k.time < 0);
+    if (badKey >= 0) {
+      return errorResult(
+        ErrorCodes.INVALID_INPUT,
+        `keyframes[${badKey}] needs a numeric time (seconds, >= 0); got ${JSON.stringify(keyframes[badKey])}.`,
+      );
+    }
     // Optional (retest): omitted, the camera runs to its last keyframe. The
     // last key's time is passed rather than nothing, so every studio does the
     // same — a newer engine infers it, an older one clamped at 2 s.
