@@ -278,8 +278,9 @@ a run could not be pinned, the result says not to rely on the hash.
   could not read a local file path. Both work now.
 - `pinepaper_camera_animate` without keyframes failed with a raw JSON error; it
   now says what `keyframes` needs.
-- `pinepaper_precomp` `create` returned an internal id that no tool accepted; it
-  returns the precomp's item id.
+- `pinepaper_precomp`: `create` returned an internal id that no tool accepted,
+  and `add` / `remove` could not work at all. All three now round-trip the
+  precomp's item id, and a failed `remove` is reported.
 - `pinepaper_media` `set_time_remap`, `speed_ramp`, `match_cut` and the track
   matte actions accept the media id that upload returns, as documented.
 - `modify_item` `content` on text whose content is keyframed now warns that the

@@ -68,3 +68,29 @@ describe('10.7 a landscape canvas for a portrait platform is a fidelity warning'
     expect((await run({ width: 1080, height: 1350 }, 'instagram')).map((x: { code: string }) => x.code)).not.toContain('platform_orientation_mismatch');
   });
 });
+
+describe('precomp add / remove pass the item, not its id', () => {
+  const run = (action: string, engine: Record<string, unknown>, present = true) => {
+    const item = { name: 'dot' };
+    const app = { getItemById: (id: string) => (present && id === 'item_5' ? item : null), ...engine };
+    return { item, r: new Function('app', `return ${strip(codeGenerator.generatePrecomp({ action, precompId: 'item_3', itemId: 'item_5' } as never))}`)(app) };
+  };
+  it('add hands the engine the item', () => {
+    let got: unknown = null;
+    const { item, r } = run('add', { addToPrecomp: (_p: string, it: unknown) => { got = it; return true; } });
+    expect(got).toBe(item);
+    expect(r.success).toBe(true);
+  });
+  it('remove hands the engine the item, and a null answer is a failure', () => {
+    let got: unknown = null;
+    const ok = run('remove', { removeFromPrecomp: (_p: string, it: unknown) => { got = it; return {}; } });
+    expect(got).toBe(ok.item);
+    expect(ok.r.success).toBe(true);
+    expect(run('remove', { removeFromPrecomp: () => null }).r).toMatchObject({ success: false });
+  });
+  it('an unknown item is named, not sent', () => {
+    let called = false;
+    expect(run('add', { addToPrecomp: () => { called = true; return true; } }, false).r.error).toContain('"item_5"');
+    expect(called).toBe(false);
+  });
+});

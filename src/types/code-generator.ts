@@ -9111,7 +9111,11 @@ case 'analyze_palette':
   // addToPrecomp answers falsy when the precomp or the item is not found, and
   // this reported success regardless — the same silent-success shape as an
   // unknown itemId elsewhere.
-  const _ok = app.addToPrecomp(${JSON.stringify(input.precompId || '')}, ${JSON.stringify(input.itemId || '')});
+  // The engine takes the ITEM, not its id (it clones it); an id string made
+  // add throw and could never have worked. Resolved here, and a miss named.
+  const _item = app.getItemById(${JSON.stringify(input.itemId || '')});
+  if (!_item) return { success: false, action: 'add', error: 'no item ' + ${JSON.stringify(JSON.stringify(input.itemId || ''))} + ' on the canvas — check the id with pinepaper_get_items.' };
+  const _ok = app.addToPrecomp(${JSON.stringify(input.precompId || '')}, _item);
   if (_ok === false || _ok === null || _ok === undefined) {
     return { success: false, action: 'add', error: 'nothing was added — check the precompId (create returns it as a string) and the itemId with pinepaper_get_items.' };
   }
@@ -9121,7 +9125,14 @@ case 'analyze_palette':
         return `
 // Remove item from precomp
 (function() {
-  app.removeFromPrecomp(${JSON.stringify(input.precompId || '')}, ${JSON.stringify(input.itemId || '')});
+  // The item, not its id (the engine checks item.parent); and its answer is
+  // read — null meant nothing was removed, and this said success regardless.
+  const _item = app.getItemById(${JSON.stringify(input.itemId || '')});
+  if (!_item) return { success: false, action: 'remove', error: 'no item ' + ${JSON.stringify(JSON.stringify(input.itemId || ''))} + ' on the canvas — check the id with pinepaper_get_items.' };
+  const _r = app.removeFromPrecomp(${JSON.stringify(input.precompId || '')}, _item);
+  if (_r === null || _r === undefined || _r === false) {
+    return { success: false, action: 'remove', error: 'nothing was removed — the item is not in that precomp, or the precompId is not a precomp (create returns it; list shows them).' };
+  }
   return { success: true, action: 'remove', precompId: ${JSON.stringify(input.precompId || '')}, itemId: ${JSON.stringify(input.itemId || '')} };
 })();`.trim();
       default:
