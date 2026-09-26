@@ -12872,3 +12872,107 @@ ${guard('unlockAllItems')}${pass('app.unlockAllItems()')}
 
 // Export singleton instance
 export const codeGenerator = new PinePaperCodeGenerator();
+
+/**
+ * WORDS ARE VECTOR (cloud: every generated plate is text-free; the words come
+ * back as textLayers). Lays them out as real PinePaper text over a placed
+ * plate, by role, inside title-safe (5%), sized from the canvas height:
+ * headline top-left (Anton by default, fitted to the safe width), subhead
+ * under it, caption / cta stacked up from the bottom-left, label top-right.
+ * Each text is checked against the plate's average colour under it (WCAG:
+ * 4.5:1, 3:1 for large text) and gets the lightest dark scrim that passes
+ * when it falls short. A body for pinepaper_execute_custom_code (async).
+ */
+export function emitTextLayersPlacement(layers: Array<{ content: string; role?: string; font?: string }>, plateRef: string): string {
+  const ROLE_FONT: Record<string, string> = { headline: 'Anton' };
+  const families = [...new Set(layers.map((l) => l.font || ROLE_FONT[l.role ?? ''] || 'Inter'))];
+  const fontBlocks = families.map((f) => `{${emitEnsureFont(f)}
+  if (__font) fonts.push(__font);
+}`).join('\n');
+  return `
+const fonts = [];
+${fontBlocks}
+const plate = (function(r) {
+  let it = app.getItemById(r);
+  if (!it && window.PinePaperAgent && typeof window.PinePaperAgent.listMedia === 'function') {
+    const m = window.PinePaperAgent.listMedia().find(function(x) { return x.id === r || x.registryId === r; });
+    if (m) it = app.getItemById(m.registryId);
+  }
+  return it;
+})(${JSON.stringify(plateRef)});
+const cs = app.getCanvasSize();
+const W = cs.width, H = cs.height, mx = Math.round(W * 0.05), my = Math.round(H * 0.05);
+const LAYERS = ${JSON.stringify(layers)};
+const SPEC = {
+  headline: { size: 0.075, font: 'Anton', where: 'top' },
+  subhead: { size: 0.036, font: 'Inter', where: 'top' },
+  caption: { size: 0.028, font: 'Inter', where: 'bottom' },
+  cta: { size: 0.032, font: 'Inter', where: 'bottom', bold: true },
+  label: { size: 0.022, font: 'Inter', where: 'topright' },
+};
+const lin = function(v) { return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+const make = function(l, spec, x, y, anchor) {
+  const size = Math.max(8, Math.round(H * spec.size));
+  const it = app.create('text', { content: l.content, x: x, y: y, fontSize: size, fontFamily: l.font || spec.font, color: '#ffffff', anchor: anchor });
+  if (!it) return null;
+  if (spec.bold) it.fontWeight = 'bold';
+  if (typeof app.fitText === 'function') {
+    try { app.fitText(it, { maxWidth: W - 2 * mx, maxFontSize: size, minFontSize: Math.max(8, Math.round(size * 0.4)), hold: anchor.indexOf('bottom') === 0 ? 'bottom' : 'top' }); } catch (_) { /* keeps its size */ }
+  }
+  return it;
+};
+const contrast = function(it, spec) {
+  if (!plate || typeof plate.getAverageColor !== 'function') return { checked: false, note: 'the plate is not an image the studio can sample (a video plate): contrast was not checked.' };
+  const c = plate.getAverageColor(it.bounds);
+  if (!c) return { checked: false };
+  const L = 0.2126 * lin(c.red) + 0.7152 * lin(c.green) + 0.0722 * lin(c.blue);
+  const ratio = 1.05 / (L + 0.05);
+  const large = it.fontSize >= 24 || (spec.bold && it.fontSize >= 18.66);
+  const required = large ? 3 : 4.5;
+  const out = { checked: true, ratio: Math.round(ratio * 100) / 100, required: required, approximate: 'against the average colour of the plate behind the text' };
+  if (ratio >= required) return out;
+  // The lightest black scrim that reaches the requirement: under it the
+  // background luminance is L * (1 - a).
+  const a = Math.min(0.85, Math.max(0.2, 1 - (1.05 / required - 0.05) / L));
+  const pad = Math.round(it.fontSize * 0.35);
+  const b = it.bounds;
+  const s = app.create('rectangle', { x: b.left - pad, y: b.top - pad, width: b.width + 2 * pad, height: b.height + 2 * pad, color: '#000000', anchor: 'top-left' });
+  if (s) { s.opacity = a; if (typeof s.insertBelow === 'function') s.insertBelow(it); }
+  out.scrim = { itemId: s && s.data && s.data.registryId, opacity: Math.round(a * 100) / 100 };
+  out.ratioAfter = Math.round(1.05 / (L * (1 - a) + 0.05) * 100) / 100;
+  return out;
+};
+const role = function(l) { return SPEC[l.role] ? l.role : 'caption'; };
+const placed = [];
+let top = my;
+LAYERS.filter(function(l) { return SPEC[role(l)].where === 'top'; }).forEach(function(l) {
+  const spec = SPEC[role(l)];
+  const it = make(l, spec, mx, top, 'top-left');
+  if (!it) return;
+  top = it.bounds.bottom + Math.round(H * 0.015);
+  placed.push({ it: it, l: l, spec: spec });
+});
+let bottom = H - my;
+LAYERS.filter(function(l) { return SPEC[role(l)].where === 'bottom'; }).slice().reverse().forEach(function(l) {
+  const spec = SPEC[role(l)];
+  const it = make(l, spec, mx, bottom, 'bottom-left');
+  if (!it) return;
+  bottom = it.bounds.top - Math.round(H * 0.012);
+  placed.unshift({ it: it, l: l, spec: spec });
+});
+let rtop = my;
+LAYERS.filter(function(l) { return SPEC[role(l)].where === 'topright'; }).forEach(function(l) {
+  const spec = SPEC[role(l)];
+  const it = make(l, spec, W - mx, rtop, 'top-right');
+  if (!it) return;
+  rtop = it.bounds.bottom + Math.round(H * 0.01);
+  placed.push({ it: it, l: l, spec: spec });
+});
+if (app.historyManager) app.historyManager.saveState();
+return {
+  textItems: placed.map(function(p) {
+    return { itemId: p.it.data && p.it.data.registryId, role: role(p.l), content: p.l.content, fontFamily: p.it.fontFamily, fontSize: Math.round(p.it.fontSize), contrast: contrast(p.it, p.spec) };
+  }),
+  fonts: fonts,
+};`;
+}

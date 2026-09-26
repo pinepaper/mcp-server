@@ -150,3 +150,47 @@ describe('place a video asset', () => {
     expect(fitCode).not.toContain('16:9');
   });
 });
+
+describe('words are vector (cloud fef660ae)', () => {
+  it('input.text reaches the cloud, and textLayers + hint come back', async () => {
+    cloud({
+      'POST /v1/generate': () => ({ status: 202, json: { ok: true, job: { id: 't1', status: 'queued' }, estimate: {} } }),
+      'GET /v1/generate/t1': () => ({ status: 200, json: { ok: true, job: { id: 't1', status: 'done', assets: [{ assetId: 'p', ref: '/scene-assets/p', width: 1856, height: 2304 }], chargedUsd: 0.18,
+        textLayers: [{ content: 'SUMMER SALE', role: 'headline' }, { content: 'Ends Sunday', role: 'caption' }], hint: 'The plate is text-free: add these words as PinePaper text layers.' } } }),
+    });
+    const o = JSON.parse(out(await handleToolCall('pinepaper_generate', { useCase: 'posters', input: { prompt: 'beach poster', aspect: '4:5', text: [{ content: 'SUMMER SALE', role: 'headline' }, { content: 'Ends Sunday', role: 'caption' }] } }, {})));
+    expect(calls[0].body.input.text).toEqual([{ content: 'SUMMER SALE', role: 'headline' }, { content: 'Ends Sunday', role: 'caption' }]);
+    expect(o.textLayers).toHaveLength(2);
+    expect(o.hint).toContain('text-free');
+  });
+});
+
+describe('text layer layout in the page', () => {
+  it('title-safe, role-placed, and a scrim only where the plate is too bright', async () => {
+    const { emitTextLayersPlacement } = await import('../../types/code-generator.js');
+    const W = 1080, H = 1350;
+    let n = 0;
+    const made: Array<Record<string, any>> = [];
+    const mk = (p: Record<string, any>) => {
+      const w = p.fontSize ? Math.min(p.content.length * p.fontSize * 0.5, W) : p.width, h = p.fontSize ? p.fontSize * 1.2 : p.height;
+      const a = String(p.anchor || 'top-left');
+      const left = a.endsWith('right') ? p.x - w : p.x, top = a.startsWith('bottom') ? p.y - h : p.y;
+      const it: Record<string, any> = { ...p, data: { registryId: 'item_' + (++n) }, bounds: { left, top, width: w, height: h, bottom: top + h, right: left + w, center: { x: left + w / 2, y: top + h / 2 } }, insertBelow() { this.below = true; } };
+      made.push(it);
+      return it;
+    };
+    // The plate: dark at the top, bright at the bottom.
+    const plate = { getAverageColor: (b: { top: number }) => (b.top > H / 2 ? { red: 0.95, green: 0.95, blue: 0.9 } : { red: 0.05, green: 0.05, blue: 0.1 }) };
+    const app = { getItemById: (id: string) => (id === 'plate_1' ? plate : null), getCanvasSize: () => ({ width: W, height: H }), create: (_t: string, p: Record<string, any>) => mk(p) };
+    const code = emitTextLayersPlacement([{ content: 'SUMMER SALE', role: 'headline' }, { content: 'Ends Sunday', role: 'caption' }], 'plate_1');
+    const r = await new Function('app', 'window', 'document', `return (async function() {${code}})()`)(app, {}, undefined);
+    const [cap, head] = [r.textItems.find((t: any) => t.role === 'caption'), r.textItems.find((t: any) => t.role === 'headline')];
+    const headItem = made.find((m) => m.content === 'SUMMER SALE')!, capItem = made.find((m) => m.content === 'Ends Sunday')!;
+    expect(headItem).toMatchObject({ x: 54, y: 68, anchor: 'top-left', fontFamily: 'Anton', color: '#ffffff' });   // 5% of 1080 / 1350
+    expect(capItem).toMatchObject({ x: 54, y: H - 68, anchor: 'bottom-left', fontFamily: 'Inter' });
+    expect(head.contrast).toMatchObject({ checked: true });
+    expect(head.contrast.scrim).toBeUndefined();                    // white on dark: passes
+    expect(cap.contrast.scrim.opacity).toBeGreaterThan(0.2);          // white on bright: scrim
+    expect(cap.contrast.ratioAfter).toBeGreaterThanOrEqual(cap.contrast.required);
+  });
+});

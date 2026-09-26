@@ -15,6 +15,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { errorResult, handleToolCall, type HandlerOptions } from '../handlers.js';
 import { ErrorCodes } from '../../types/schemas.js';
+import { emitTextLayersPlacement } from '../../types/code-generator.js';
 
 const GenerateInputSchema = z.object({
   prompt: z.string().min(1),
@@ -23,6 +24,15 @@ const GenerateInputSchema = z.object({
   seed: z.number().int().optional(),
   negativePrompt: z.string().optional(),
   imageUrls: z.array(z.string().url()).max(14).optional(),
+  // WORDS ARE VECTOR: the plate comes back text-free and these come back as
+  // textLayers, to be added as real text. allowText (words drawn BY the model)
+  // is refused except on eval-tier models.
+  text: z.array(z.object({
+    content: z.string().min(1).max(500),
+    role: z.enum(['headline', 'subhead', 'caption', 'cta', 'label']).optional(),
+    font: z.string().max(80).optional(),
+  })).max(12).optional(),
+  allowText: z.boolean().optional(),
 });
 
 export const GenerateEstimateArgsSchema = z.object({
@@ -207,9 +217,24 @@ export const generateHandlers: Record<string, (args: Record<string, unknown>, op
       // A model may choose its own size for an aspect (nano-banana-pro: 928x1152
       // for 4:5); the sizes above are the files', not the request's.
       ...(est?.notes ? { notes: est.notes } : {}),
+      ...(Array.isArray(job.textLayers) && job.textLayers.length ? { textLayers: job.textLayers, hint: job.hint } : {}),
     };
     if (a.place && assets.length) {
-      result.placement = await placeAsset(cfg, assets[0], a.place === 'contain' ? 'contain' : 'cover', options);
+      const placement = await placeAsset(cfg, assets[0], a.place === 'contain' ? 'contain' : 'cover', options);
+      // The words, as real text over the plate (role layout, title-safe,
+      // contrast-checked against the plate). Their ids come back to restyle.
+      if (placement.placed && Array.isArray(job.textLayers) && job.textLayers.length) {
+        const laid = await handleToolCall('pinepaper_execute_custom_code', { code: emitTextLayersPlacement(job.textLayers, String(placement.itemId)) }, options);
+        // The first text block is the executed result as JSON: {success, result}.
+        const first = laid.content?.[0];
+        let body: { result?: { textItems?: unknown[]; fonts?: unknown[] } } | null = null;
+        try { body = first && 'text' in first ? JSON.parse(first.text) : null; } catch { body = null; }
+        const items = body?.result?.textItems;
+        placement.text = laid.isError || !Array.isArray(items)
+          ? { placed: false, error: (first && 'text' in first ? first.text : '').slice(0, 300) }
+          : { placed: true, items, ...(body?.result?.fonts?.length ? { fonts: body.result.fonts } : {}) };
+      }
+      result.placement = placement;
     }
     return text(result);
   },

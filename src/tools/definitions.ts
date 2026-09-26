@@ -1808,6 +1808,8 @@ Needs a service-account key in PINEPAPER_API_KEY (pp_sa_…, render:create scope
 - place: 'cover' (fill the canvas, centred; default when true) or 'contain' — places the first asset: an image as an image item, a video as a video layer (with its durationSeconds). The fit uses the asset's delivered size, not the requested aspect.
 - timeoutSec: how long to wait (default 180). A job that outlives it keeps running and is only charged if it delivers; collect it with pinepaper_generate_status.
 
+WORDS ARE VECTOR: give words as input.text [{content, role?: headline|subhead|caption|cta|label, font?}]. The model makes a text-free plate; the words come back as textLayers (plus a hint), and with place they are added as real, editable text over it: headline top-left (Anton by default), subhead below, caption / cta bottom-left, label top-right, inside title-safe, each contrast-checked against the plate (a dark scrim is added only where it falls short of WCAG 4.5:1, or 3:1 for large text). Their item ids are in placement.text.
+
 The result: assets [{assetId, ref, width, height}] — the sizes the files HAVE (a model may pick its own size for an aspect), chargedUsd, and any model notes (e.g. a SynthID watermark) to pass on.`,
     inputSchema: {
       type: 'object',
@@ -1823,6 +1825,8 @@ The result: assets [{assetId, ref, width, height}] — the sizes the files HAVE 
               seed: { type: 'integer' },
               negativePrompt: { type: 'string' },
               imageUrls: { type: 'array', items: { type: 'string' }, maxItems: 14, description: 'https reference images (edit / character-consistent models).' },
+              text: { type: 'array', maxItems: 12, items: { type: 'object', properties: { content: { type: 'string' }, role: { type: 'string', enum: ['headline', 'subhead', 'caption', 'cta', 'label'] }, font: { type: 'string' } }, required: ['content'] }, description: 'Words for the design. The model never draws them: the plate comes back text-free and these return as textLayers — with place, laid out as real PinePaper text.' },
+              allowText: { type: 'boolean', description: 'Let the MODEL draw text — eval-tier models only (e.g. ideogram-v3); refused (422) elsewhere. Prefer text.' },
             },
             required: ['prompt'],
           },
@@ -1853,6 +1857,8 @@ The result: assets [{assetId, ref, width, height}] — the sizes the files HAVE 
               seed: { type: 'integer' },
               negativePrompt: { type: 'string' },
               imageUrls: { type: 'array', items: { type: 'string' }, maxItems: 14, description: 'https reference images (edit / character-consistent models).' },
+              text: { type: 'array', maxItems: 12, items: { type: 'object', properties: { content: { type: 'string' }, role: { type: 'string', enum: ['headline', 'subhead', 'caption', 'cta', 'label'] }, font: { type: 'string' } }, required: ['content'] }, description: 'Words for the design. The model never draws them: the plate comes back text-free and these return as textLayers — with place, laid out as real PinePaper text.' },
+              allowText: { type: 'boolean', description: 'Let the MODEL draw text — eval-tier models only (e.g. ideogram-v3); refused (422) elsewhere. Prefer text.' },
             },
             required: ['prompt'],
           },
