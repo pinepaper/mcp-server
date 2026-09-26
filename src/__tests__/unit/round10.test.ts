@@ -94,3 +94,18 @@ describe('precomp add / remove pass the item, not its id', () => {
     expect(called).toBe(false);
   });
 });
+describe('governor warnings reach the caller (FxTool PR #30 keyframe_track_replaced)', () => {
+  it('the engine\'s structured warnings arrive whole as governor.engineWarnings; the sentences stay in warnings', async () => {
+    const { handleToolCall } = await import('../../tools/handlers.js');
+    // The runner's REAL shape (GeneratedCodeRunner.js): objects in
+    // engineWarnings, and only their messages pushed onto warnings.
+    const obj = { message: 'item_1: addAnimation replaced a track; dropped content', code: 'keyframe_track_replaced', droppedProperties: ['content'], itemId: 'item_1' };
+    const controller = { connected: true, connect: async () => undefined,
+      executeCode: async () => ({ success: true, result: { ok: true }, report: { warnings: [obj.message], engineWarnings: [obj], items: { created: 0 } } }) };
+    const r = await handleToolCall('pinepaper_execute_custom_code', { code: 'app.addAnimation("item_1", []);' }, { executeInBrowser: true, browserController: controller as never, executionMode: 'puppeteer' });
+    const body = JSON.parse((r.content![0] as { text: string }).text);
+    expect(body.governor.engineWarnings).toEqual([obj]);
+    expect(body.governor.engineWarnings[0].droppedProperties).toContain('content');
+    expect(body.governor.warnings).toEqual([obj.message]);
+  });
+});
