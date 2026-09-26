@@ -256,6 +256,14 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 `atPlayhead: true` to start at the current playback time. A studio that cannot
 do one of these says so rather than reporting success.
 
+### New: AI image generation (beta)
+
+`pinepaper_generate` creates images with AI models in the PinePaper cloud and
+can place the first one on the canvas; `pinepaper_generate_estimate` prices a
+request and lists the models, free. It is charged per image, needs a service
+account key (`PINEPAPER_API_KEY`), and is enabled per organisation during the
+beta — without it the tools say so, and nothing is charged.
+
 ### New: add to an animation instead of replacing it
 
 `pinepaper_keyframe_animate` takes `append: true` to add keys to an item's
