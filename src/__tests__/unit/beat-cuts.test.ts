@@ -120,3 +120,17 @@ describe('tempo prior (retest of b2d25d5, real Lyria track)', () => {
     expect(rankCandidates([{ bpm: 174, confidence: 0.9, phase: 0 }, { bpm: 87, confidence: 0.3, phase: 0 }])[0].bpm).toBe(174);
   });
 });
+
+describe('real music: the Lyria edit the studio read as 162.2', () => {
+  it('the whole pipeline picks 120 from its real onsets, and flags the uncertainty', async () => {
+    const { tempoCandidates, beatGrid, cutPoints } = await import('../../utils/beats.js');
+    const { readFileSync } = await import('node:fs');
+    const f = JSON.parse(readFileSync(new URL('../fixtures/lyria-onsets.json', import.meta.url), 'utf8'));
+    const c = tempoCandidates(f.onsets, f.detectedBpm, f.duration);
+    expect(Math.abs(c[0].bpm - 120)).toBeLessThan(0.6);
+    expect(c[0].confidence).toBeLessThan(0.4);            // honest: it is a hard track
+    const cuts = cutPoints(beatGrid(f.onsets, c[0].bpm, f.duration).beats, 'bar');
+    const gaps = cuts.slice(1).map((t: number, i: number) => t - cuts[i]);
+    expect(gaps.every((g: number) => Math.abs(g - 2) < 0.02)).toBe(true);
+  });
+});
