@@ -51,6 +51,26 @@ describe('video delivery checks', () => {
   });
 });
 
+describe('the studio\'s own video report', () => {
+  class FR { result = 'data:x;base64,AA'; onloadend: (() => void) | null = null; readAsDataURL() { this.onloadend?.(); } }
+  const run = async (blobType: string, report: Record<string, unknown>) => {
+    const vx: Record<string, unknown> = { lastVideoReport: null, export: async () => { vx.lastVideoReport = report; return { size: 30_000_000, type: blobType, slice() { return this; } }; } };
+    const app = { canvasSize: { width: 12000, height: 1080 }, canvasEl: { style: { backgroundColor: '#000' } }, exportEngine: { exportFidelity: () => ({ warnings: [] }), videoExporter: vx } };
+    const r = await new Function('app', 'FileReader', 'document', body(codeGenerator.generateAgentExport({ format: 'mp4', duration: 2 } as never)))(app, FR, {});
+    return (r.fidelity?.warnings ?? []) as Array<{ code: string; message: string }>;
+  };
+  it('codecFallback.reason goes into the substitution warning', async () => {
+    const w = await run('video/webm', { codecFallback: { asked: 'avc1', used: 'vp09', reason: 'H.264 level 6.2 caps width at 8192' } });
+    expect(w.find((x) => x.code === 'format_substituted')!.message).toContain('H.264 level 6.2 caps width at 8192');
+  });
+  it('coded engine warnings pass through; plain strings and ones it raises itself do not', async () => {
+    const w = await run('video/mp4', { warnings: ['achieved 1.8 Mbps against an 8.0 Mbps floor', { code: 'output_frozen', message: 'the encoder repeated frame 12 for 588 frames' }, { code: 'luma_out_of_range', message: 'dup' }] });
+    expect(w.map((x) => x.code)).toContain('output_frozen');
+    expect(w.filter((x) => x.code === 'luma_out_of_range')).toHaveLength(0);
+    expect(w.some((x) => x.message.includes('Mbps floor'))).toBe(false);
+  });
+});
+
 describe('12.12 ProRes / HAP', () => {
   it('named, with the png-sequence route, not a generic enum error', async () => {
     for (const format of ['prores', 'HAP', 'prores4444']) {
