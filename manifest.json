@@ -197,6 +197,18 @@
       "description": "Text contrast (WCAG 1.4.3 AA) and flashing (2.3.1, >3/sec) check of the live scene; heuristic. {checks?: [contrast, flash], duration?, fps?}"
     },
     {
+      "name": "pinepaper_generate",
+      "description": "AI image generation in the PinePaper cloud (charged; beta, per org; needs PINEPAPER_API_KEY). {model|useCase, input:{prompt, aspect, n, seed?, imageUrls?}, brief?, designRef?, place?: cover|contain, timeoutSec?} → assets + chargedUsd"
+    },
+    {
+      "name": "pinepaper_generate_estimate",
+      "description": "Free: price a generation, or listModels: true for models, prices and defaults. {model|useCase, input} | {listModels: true}"
+    },
+    {
+      "name": "pinepaper_generate_status",
+      "description": "Collect a generation that outlived its timeout. {jobId, place?}"
+    },
+    {
       "name": "pinepaper_render_batch",
       "description": "One creative per data row: apply each row (item changes / template params), then export. Rows do not reset. {rows:[{id?, changes?:{itemId:{…}}, template?}], export:{…agent_export}, estimateOnly?}"
     },

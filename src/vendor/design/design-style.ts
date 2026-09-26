@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
  * Source:    mcp-cloud/src/services/content-recipes.ts (DesignStyle union only)
- * sha256:    d89278c17ff672daedeae6a1e1f2bf2d652154f553a7a3972c4679a65de3da5e
+ * sha256:    325b0a9d87717f8747cbad1b97b825b394ed7338207b0e1a6d9bafe369d429ae
  * Generator: scripts/sync-design-systems.mjs
  *
  * Edit the TypeScript upstream and re-run the generator. A hand edit here is

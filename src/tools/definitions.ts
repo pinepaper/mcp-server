@@ -1796,6 +1796,86 @@ EXAMPLE: { checks: ["contrast", "flash"], duration: 6, fps: 20 }`,
   },
 
   {
+    name: 'pinepaper_generate',
+    annotations: { title: 'Generate Image (cloud)', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    description: `Generate images with an AI model in the PinePaper cloud, and optionally place the first one on the canvas. CHARGED per output — price it first with pinepaper_generate_estimate (free).
+
+Needs a service-account key in PINEPAPER_API_KEY (pp_sa_…, render:create scope). It is an internal beta enabled per organisation: without it the result says "not enabled for your organisation", and nothing is charged. Every refusal says whether anything was charged.
+
+- model or useCase: a model id from pinepaper_generate_estimate {listModels: true}, or a use case and the cloud picks its default (hero stills, plates, text in the image, character-consistent edits).
+- input: { prompt, aspect ('16:9' | '9:16' | '1:1' | '4:5'), n (1-4), seed?, negativePrompt?, imageUrls? (https references for edit models) }.
+- brief / designRef: always passed on; the cloud records each generation against the design.
+- place: 'cover' (fill the canvas, centred; default when true) or 'contain' — imports the first image as an image item.
+- timeoutSec: how long to wait (default 180). A job that outlives it keeps running and is only charged if it delivers; collect it with pinepaper_generate_status.
+
+The result: assets [{assetId, ref, width, height}] — the sizes the files HAVE (a model may pick its own size for an aspect), chargedUsd, and any model notes (e.g. a SynthID watermark) to pass on.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        model: { type: 'string' },
+        useCase: { type: 'string' },
+        input: {
+            type: 'object',
+            properties: {
+              prompt: { type: 'string' },
+              aspect: { type: 'string', enum: ['16:9', '9:16', '1:1', '4:5'] },
+              n: { type: 'integer', minimum: 1, maximum: 4 },
+              seed: { type: 'integer' },
+              negativePrompt: { type: 'string' },
+              imageUrls: { type: 'array', items: { type: 'string' }, maxItems: 14, description: 'https reference images (edit / character-consistent models).' },
+            },
+            required: ['prompt'],
+          },
+        brief: { type: 'string' },
+        designRef: { type: 'object', properties: { kind: { type: 'string' }, id: { type: 'string' } }, required: ['kind', 'id'] },
+        place: { anyOf: [{ type: 'boolean' }, { type: 'string', enum: ['cover', 'contain'] }] },
+        timeoutSec: { type: 'integer', minimum: 10, maximum: 1800 },
+      },
+      required: ['input'],
+    },
+  },
+
+  {
+    name: 'pinepaper_generate_estimate',
+    annotations: { title: 'Estimate Generation (free)', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    description: `Free: price a pinepaper_generate call before making it, or list the models. { listModels: true } returns every model you may use with its price per output, use cases, licence notes and the defaults per use case; { model | useCase, input } returns the estimate for that request. Needs PINEPAPER_API_KEY, like pinepaper_generate.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        model: { type: 'string' },
+        useCase: { type: 'string' },
+        input: {
+            type: 'object',
+            properties: {
+              prompt: { type: 'string' },
+              aspect: { type: 'string', enum: ['16:9', '9:16', '1:1', '4:5'] },
+              n: { type: 'integer', minimum: 1, maximum: 4 },
+              seed: { type: 'integer' },
+              negativePrompt: { type: 'string' },
+              imageUrls: { type: 'array', items: { type: 'string' }, maxItems: 14, description: 'https reference images (edit / character-consistent models).' },
+            },
+            required: ['prompt'],
+          },
+        listModels: { type: 'boolean' },
+      },
+    },
+  },
+
+  {
+    name: 'pinepaper_generate_status',
+    annotations: { title: 'Generation Status', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    description: `Collect a pinepaper_generate job that outlived its timeoutSec: its status, and when done its assets and chargedUsd. place: 'cover' | 'contain' places the first image, as pinepaper_generate does.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        jobId: { type: 'string' },
+        place: { anyOf: [{ type: 'boolean' }, { type: 'string', enum: ['cover', 'contain'] }] },
+      },
+      required: ['jobId'],
+    },
+  },
+
+  {
     name: 'pinepaper_render_batch',
     annotations: {
       title: 'Render Batch',

@@ -125,6 +125,9 @@ export const TOOL_TAGS: Record<string, string[]> = {
   generators: [
     'pinepaper_execute_generator',
     'pinepaper_list_generators',
+    'pinepaper_generate',
+    'pinepaper_generate_estimate',
+    'pinepaper_generate_status',
   ],
   effects: [
     'pinepaper_apply_effect',

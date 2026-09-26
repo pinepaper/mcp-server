@@ -170,6 +170,7 @@ import { mapHandlers } from './handlers/maps.js';
 import { ontologyHandlers } from './handlers/ontology.js';
 import * as designSystems from '../design/design-systems.js';
 import { exportHandlers } from './handlers/export.js';
+import { generateHandlers } from './handlers/generate.js';
 import { planCharacter, generateCharacterCode } from './handlers/character.js';
 import { buildZip } from '../utils/zip.js';
 import { buildScc, type SccCue } from '../utils/scc.js';
@@ -189,6 +190,7 @@ function getDomainHandlers(): Array<Record<string, (args: Record<string, unknown
     mapHandlers,
     ontologyHandlers,
     exportHandlers,
+    generateHandlers,
   ];
 }
 

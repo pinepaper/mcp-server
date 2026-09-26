@@ -30,7 +30,7 @@
 
 PinePaper MCP Server enables AI assistants to create and animate graphics in [PinePaper Studio](https://pinepaper.studio) via the Model Context Protocol (MCP). Works with any AI that supports MCP tool calling (Claude, GPT, Gemini, local models, etc.).
 
-The server exposes **154 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
+The server exposes **157 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
 
 - Create geometric shapes, text collages, diagrams, and data charts
 - Apply 37+ character-level text effects and 28+ vertex deformation presets
@@ -41,7 +41,7 @@ The server exposes **154 tools** across drawing, animation, diagrams, maps, typo
 
 ## Running it: local or hosted
 
-**Local is free and complete.** Every one of the 154 tools works when you run
+**Local is free and complete.** Every one of the 157 tools works when you run
 this server yourself. There is no reduced tier and nothing held back.
 
 What it needs:
@@ -1213,7 +1213,7 @@ Fourteen new tools (121 → 135) and new actions across the surface — the rele
 
 ## Toolkits & Token Budget
 
-154 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
+157 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
 
 **Toolkit profiles** (`PINEPAPER_TOOLKIT`):
 
@@ -1418,7 +1418,7 @@ Generate instruction/code pairs for LLM fine-tuning:
 
 ## Tools Reference
 
-All 154 tools, grouped by the tag used for toolkit filtering.
+All 157 tools, grouped by the tag used for toolkit filtering.
 
 ### Canvas (`canvas`)
 | Tool | Description |
@@ -1519,6 +1519,9 @@ All 154 tools, grouped by the tag used for toolkit filtering.
 |------|-------------|
 | `pinepaper_execute_generator` | Run a background generator |
 | `pinepaper_list_generators` | List available generators |
+| `pinepaper_generate` | AI image generation in the PinePaper cloud (charged; beta, per organisation) |
+| `pinepaper_generate_estimate` | Free price check, and the model list |
+| `pinepaper_generate_status` | Collect a generation that outlived its timeout |
 | `pinepaper_apply_effect` | Apply sparkle, blast, and other effects |
 | `pinepaper_text_effect` | 37 character-level text animations; replaces the text with one keyframed item per character |
 | `pinepaper_add_filter` | Add an image filter |
@@ -1913,6 +1916,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 |----------|-------------|---------|
 | `PINEPAPER_STUDIO_URL` | PinePaper Studio URL to connect to (`/editor` is appended automatically) | `https://pinepaper.studio` |
 | `PINEPAPER_HEADLESS` | Run the browser headless (set `false` to watch it work) | `true` |
+| `PINEPAPER_API_KEY` | Service-account key (`pp_sa_…`) for the cloud-backed tools (`pinepaper_generate`) | — |
+| `PINEPAPER_CLOUD_URL` | The PinePaper cloud those tools call | `https://cloud.pinepaper.studio` |
 | `PINEPAPER_EXECUTION_MODE` | `puppeteer` (execute in a real browser) or `code` (return generated code only) | `puppeteer` |
 | `PINEPAPER_EXPORT_DIR` | Directory for exported files | `<tmpdir>/pinepaper-exports` |
 | `PINEPAPER_LOCALE` | Language locale code | `en` |
