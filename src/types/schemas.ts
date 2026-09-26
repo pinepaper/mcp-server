@@ -3280,6 +3280,8 @@ export const ImportImageInputSchema = z.object({
   position: PositionSchema.optional().describe('Position on canvas (defaults to center)'),
   maxWidth: z.number().optional().describe('Maximum width constraint in pixels'),
   maxHeight: z.number().optional().describe('Maximum height constraint in pixels'),
+  maxEdge: z.union([z.number().int().positive(), z.literal('native')]).optional().describe("The longest edge the studio STORES the image at, in px; 'native' keeps every pixel. Default: the studio's cap (it follows the canvas on desktop)."),
+  nativeSize: z.boolean().optional().describe('Place the image at its source footprint even if it was stored smaller.'),
   mask: ImageMaskSchema.optional().describe('Optional mask shape to apply to the image'),
   smoothing: z.enum(['off', 'low', 'medium', 'high']).optional().describe("Resampling when the image is scaled. 'off' = nearest-neighbour, hard pixel edges (pixel art). Default 'low'."),
 }).describe('Import image input');

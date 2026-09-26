@@ -123,3 +123,19 @@ describe('12.13 upload_video fit', () => {
     expect(code).toContain('"scale":0.5');
   });
 });
+
+describe('12.13 import_image maxEdge / nativeSize', () => {
+  it('reach uploadFromURL and placeImage; a downscaled store is said', async () => {
+    const calls: unknown[][] = [];
+    const raster = { data: { id: 'item_3' }, bounds: { x: 0, y: 0, width: 1920, height: 1080 } };
+    const app = { imageTools: {
+      uploadFromURL: async (...a: unknown[]) => { calls.push(['upload', ...a]); return { id: 'img1', width: 2560, height: 1440, nativeWidth: 5504, nativeHeight: 3096 }; },
+      placeImage: async (...a: unknown[]) => { calls.push(['place', ...a]); return raster; } } };
+    const code = codeGenerator.generateImportImage({ url: 'data:image/png;base64,AA', maxEdge: 'native', nativeSize: true } as never);
+    const r = await new Function('app', 'fetch', 'FileReader', `return ${code.replace(/^\/\/[^\n]*\n/, '')}`)(app, undefined, undefined);
+    expect(calls[0][2]).toEqual({ maxEdge: Infinity });
+    expect(calls[1][2]).toMatchObject({ nativeSize: true });
+    expect(r.native).toEqual({ width: 5504, height: 3096 });
+    expect(r.note).toContain('maxEdge');
+  });
+});

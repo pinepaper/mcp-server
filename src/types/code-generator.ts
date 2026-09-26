@@ -7685,7 +7685,7 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
   }
 
   generateImportImage(input: ImportImageInput): string {
-    const { url, position, maxWidth, maxHeight, mask, smoothing } = input;
+    const { url, position, maxWidth, maxHeight, mask, smoothing, maxEdge, nativeSize } = input;
 
     // Each fragment used to be written with a LEADING comma, as if it followed
     // an entry that no longer exists — so the first one opened the object with
@@ -7697,6 +7697,7 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
       position ? `position: { x: ${position.x}, y: ${position.y} }` : '',
       maxWidth !== undefined ? `maxWidth: ${maxWidth}` : '',
       maxHeight !== undefined ? `maxHeight: ${maxHeight}` : '',
+      nativeSize ? 'nativeSize: true' : '',
     ].filter(Boolean);
     const optsLiteral = optParts.length ? `{ ${optParts.join(', ')} }` : '{}';
 
@@ -7753,7 +7754,7 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
         fr.readAsDataURL(blob);
       });
     }
-    const entry = await app.imageTools.uploadFromURL(src);
+    const entry = await app.imageTools.uploadFromURL(src${maxEdge !== undefined ? `, { maxEdge: ${maxEdge === 'native' ? 'Infinity' : maxEdge} }` : ''});
     const opts = ${optsLiteral};
     const raster = await app.imageTools.placeImage(entry.id, Object.keys(opts).length > 0 ? opts : undefined);
 ${smoothing ? `    // Pixel art wants 'off': Paper's Raster draws with smoothing 'low' by
@@ -7792,7 +7793,13 @@ ${mask ? `    // A MASK REPLACES THE RASTER (round 8 DD, 4.10). applyMask builds
       success: true,
       itemId: itemId,
       message: 'Image imported and placed on canvas.',
-      bounds: { x: b.x, y: b.y, width: b.width, height: b.height }${mask ? `,\n      mask: '${mask}'` : ''}
+      bounds: { x: b.x, y: b.y, width: b.width, height: b.height }${mask ? `,\n      mask: '${mask}'` : ''},
+      // Stored smaller than its source (the studio's cap): said, with the
+      // way to keep every pixel. The studio reports native size where it can.
+      ...((entry && entry.nativeWidth && entry.width && entry.nativeWidth > entry.width)
+        ? { stored: { width: entry.width, height: entry.height }, native: { width: entry.nativeWidth, height: entry.nativeHeight },
+            note: 'the studio stored this image at ' + entry.width + 'x' + entry.height + ' (its source is ' + entry.nativeWidth + 'x' + entry.nativeHeight + '). Pass maxEdge: "native" to keep every pixel.' }
+        : {})
     };
   } catch (e) {
     return { error: 'Failed to import image: ' + e.message };

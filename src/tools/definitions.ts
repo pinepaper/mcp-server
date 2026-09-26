@@ -1182,6 +1182,8 @@ EXAMPLES:
           type: 'number',
           description: 'Maximum height constraint in pixels',
         },
+        maxEdge: { anyOf: [{ type: 'integer', minimum: 1 }, { type: 'string', enum: ['native'] }], description: "The longest edge the studio STORES the image at (px); 'native' keeps every pixel. Default: the studio's cap, which follows the canvas on desktop. The result says when the image was stored smaller than its source." },
+        nativeSize: { type: 'boolean', description: 'Place the image at its source footprint even if it was stored smaller.' },
         mask: {
           type: 'string',
           enum: ['circle', 'rounded', 'hexagon', 'star'],
