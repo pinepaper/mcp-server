@@ -824,6 +824,12 @@ function executedResult(
     const items = report.items as { created?: number } | undefined;
     const governor: Record<string, unknown> = {};
     if (warnings.length) governor.warnings = warnings;
+    // The engine's STRUCTURED warnings (GeneratedCodeRunner: report.warnings
+    // holds only their sentences; report.engineWarnings holds the objects —
+    // {message, code, droppedProperties, itemId, …}). Forwarded whole, so an
+    // agent can act on keyframe_track_replaced without parsing prose.
+    const engineWarnings = Array.isArray(report.engineWarnings) ? report.engineWarnings.filter((w) => w && typeof w === 'object') : [];
+    if (engineWarnings.length) governor.engineWarnings = engineWarnings;
     if (items && typeof items.created === 'number') governor.itemsCreated = items.created;
     if ((report.guard as { tripped?: boolean } | undefined)?.tripped) governor.loopGuardTripped = true;
     if (Object.keys(governor).length) resultObj.governor = governor;

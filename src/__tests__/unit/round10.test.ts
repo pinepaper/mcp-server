@@ -121,13 +121,17 @@ describe('frames: an exact frame count (showcase film, 11.1)', () => {
 });
 
 describe('governor warnings reach the caller (FxTool PR #30 keyframe_track_replaced)', () => {
-  it('execute_custom_code carries report.warnings as governor.warnings, whatever their shape', async () => {
+  it('the engine\'s structured warnings arrive whole as governor.engineWarnings; the sentences stay in warnings', async () => {
     const { handleToolCall } = await import('../../tools/handlers.js');
-    const warning = { code: 'keyframe_track_replaced', message: 'item_1: addAnimation replaced a track; dropped content', droppedProperties: ['content'] };
+    // The runner's REAL shape (GeneratedCodeRunner.js): objects in
+    // engineWarnings, and only their messages pushed onto warnings.
+    const obj = { message: 'item_1: addAnimation replaced a track; dropped content', code: 'keyframe_track_replaced', droppedProperties: ['content'], itemId: 'item_1' };
     const controller = { connected: true, connect: async () => undefined,
-      executeCode: async () => ({ success: true, result: { ok: true }, report: { warnings: [warning], items: { created: 0 } } }) };
+      executeCode: async () => ({ success: true, result: { ok: true }, report: { warnings: [obj.message], engineWarnings: [obj], items: { created: 0 } } }) };
     const r = await handleToolCall('pinepaper_execute_custom_code', { code: 'app.addAnimation("item_1", []);' }, { executeInBrowser: true, browserController: controller as never, executionMode: 'puppeteer' });
     const body = JSON.parse((r.content![0] as { text: string }).text);
-    expect(body.governor.warnings).toEqual([warning]);
+    expect(body.governor.engineWarnings).toEqual([obj]);
+    expect(body.governor.engineWarnings[0].droppedProperties).toContain('content');
+    expect(body.governor.warnings).toEqual([obj.message]);
   });
 });
