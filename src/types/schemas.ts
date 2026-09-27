@@ -4842,6 +4842,7 @@ export const SoundInputSchema = z.object({
     from: z.number().positive().describe('Starting frequency in Hz.'),
     tau: z.number().positive().max(5).describe('Glide time constant in seconds (max 5).'),
   }).optional().describe("define_percussion / define_sfx: the pitch glide, which is what makes a kick a kick — the engine's own note is that the glide IS the drum. Omit it and a defined kick comes out a beep."),
+  duration: z.number().positive().optional().describe('render_soundtrack: seconds to render (same as options.duration; this wins if both are given).'),
   sampleRate: z.number().int().positive().optional().describe('render_soundtrack: samples per second (default 48000).'),
   bitDepth: z.union([z.literal(16), z.literal(32)]).optional().describe('render_soundtrack: 16 (default) or 32-bit float.'),
   text: z.string().optional().describe("from_text / play_from_text: a plain-language description, e.g. 'a soft warm bell on A4'. 'from_text' resolves it to a spec WITHOUT playing, so a caller can inspect or edit before committing."),
@@ -4886,7 +4887,7 @@ export const SoundInputSchema = z.object({
     || (v.partials?.length ?? 0) > 0 || (v.noise ?? 0) > 0,
     { message: 'this action needs a partial table or noise > 0 — with neither the sound is silent', path: ['noise'] })
   // Bound by the scene, like every other timed export.
-  .refine((v) => v.action !== 'render_soundtrack' || (v.options?.duration as number | undefined ?? 1) <= VIDEO_MAX_DURATION_S,
+  .refine((v) => v.action !== 'render_soundtrack' || (v.duration ?? (v.options?.duration as number | undefined) ?? 1) <= VIDEO_MAX_DURATION_S,
     { message: `render_soundtrack duration is capped at ${VIDEO_MAX_DURATION_S}s, the same ceiling as video`, path: ['options'] });
 export type SoundInput = z.infer<typeof SoundInputSchema>;
 

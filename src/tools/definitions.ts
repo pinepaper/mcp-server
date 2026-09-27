@@ -2826,6 +2826,7 @@ render_soundtrack mixes every placed sound to a WAV and writes it to a file. It 
         noiseFreq: { type: 'number', description: 'define_percussion / define_sfx: noise band centre in Hz.' },
         hz: { type: 'number', description: 'define_percussion / define_sfx: base frequency in Hz.' },
         pitch: { type: 'object', description: 'define_percussion / define_sfx: { from, tau } pitch glide. The glide IS the drum — omit it and a kick comes out a beep.' },
+        duration: { type: 'number', description: 'render_soundtrack: seconds to render (options.duration also works; this wins if both are given). Without either, the studio uses the timeline length (3 s when there is none).' },
         sampleRate: { type: 'number', description: 'render_soundtrack: samples per second (default 48000).' },
         bitDepth: { type: 'number', enum: [16, 32], description: 'render_soundtrack: 16 (default) or 32-bit float.' },
         note: { type: 'string', description: "play_tone: scientific pitch, e.g. 'A4'." },

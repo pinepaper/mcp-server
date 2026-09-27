@@ -1395,6 +1395,8 @@ const IGNORED_ARGUMENT_SCHEMAS: Readonly<Record<string, z.ZodTypeAny>> = {
   // common slip here (round 7 retest, 1.63).
   pinepaper_create_item: CreateItemInputSchema,
   pinepaper_modify_item: ModifyItemInputSchema,
+  // Its options live in `options` / `spec`; a key beside them was dropped.
+  pinepaper_sound: SoundInputSchema,
 };
 const IGNORED_ARGUMENT_HINTS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   pinepaper_create_item: Object.fromEntries(['width', 'height', 'radius', 'color', 'fillColor', 'strokeColor', 'strokeWidth', 'content', 'fontSize', 'fontFamily', 'opacity', 'rotation', 'x', 'y']

@@ -5,6 +5,7 @@
  * This code is designed to run in the browser context where window.PinePaper is available.
  */
 
+import { normalizeSvgSize } from '../utils/svg-size.js';
 import { REQUIRED_ENGINE_METHODS, OPTIONAL_ENGINE_METHODS } from '../tools/engine-methods.js';
 import { ACCEPTED_CREATE_PARAMS, NORMALIZE_PARAM_READS, MODIFY_CHANGE_READS } from '../tools/shape-params.js';
 import { generateP5DrawCode } from '../tools/p5-compat/p5-helpers.js';
@@ -2941,13 +2942,22 @@ ${INLINE_REMOTE_IMAGES}
   imported.scale(${scale});
   const itemId = app.registerItem(imported, 'svg-import', { source: 'mcp' });
   app.historyManager.saveState();
+  const _b = imported.bounds;
+  const _tiny = _b && _b.width < 16 && _b.height < 16;
   return { success: true, itemId, changes: _r.changes, position: { x: ${position.x}, y: ${position.y} },
+    size: _b ? { width: Math.round(_b.width * 10) / 10, height: Math.round(_b.height * 10) / 10 } : null,
+    ...(_tiny ? { warning: 'the SVG came in at ' + _b.width.toFixed(1) + 'x' + _b.height.toFixed(1) + ' px — too small to see (a root sized in em or % reads as 1 px). Pass scale, or give the SVG a width / height in px.' } : {}),
     ...(_inl.notes.length ? { imageWarnings: _inl.notes } : {}) };
 })();
 `.trim();
     }
 
     if (svgString) {
+      // A root sized in em / % (icon sets) renders ~5 px: sized from the
+      // viewBox instead, and the result says so (see utils/svg-size.ts).
+      const sized = normalizeSvgSize(svgString);
+      svgString = sized.svg;
+      const sizeFix = sized.fix;
       // Escape the SVG string for embedding in code
       const escapedSvg = svgString.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
       return `
@@ -2966,7 +2976,14 @@ imported.position = new paper.Point(${position.x}, ${position.y});
 imported.scale(${scale});
 const itemId = app.registerItem(imported, 'svg-import', { source: 'mcp' });
 app.historyManager.saveState();
+// A SPECK IS NOT A SUCCESS WORTH REPORTING QUIETLY: under 16 px both ways,
+// the import is said to be tiny, with the fix.
+const _b = imported.bounds;
+const _tiny = _b && _b.width < 16 && _b.height < 16;
 return { success: true, itemId, changes: _r.changes, position: { x: ${position.x}, y: ${position.y} },
+  size: _b ? { width: Math.round(_b.width * 10) / 10, height: Math.round(_b.height * 10) / 10 } : null,
+  ${sizeFix ? `sizeFix: ${JSON.stringify(sizeFix)},` : ''}
+  ...(_tiny ? { warning: 'the SVG came in at ' + _b.width.toFixed(1) + 'x' + _b.height.toFixed(1) + ' px — too small to see. Pass scale, or give the SVG a width / height in px.' } : {}),
   ...(_inl.notes.length ? { imageWarnings: _inl.notes } : {}) };
 })();
 `.trim();
@@ -12187,7 +12204,10 @@ ${guard(fn)}
 
       case 'render_soundtrack': {
         const opts = {
-          ...(typeof input.options?.duration === 'number' ? { duration: input.options.duration } : {}),
+          // A top-level duration was stripped by the schema and the render
+          // used its default length, silently; both spellings are read now.
+          ...(typeof input.duration === 'number' ? { duration: input.duration }
+            : typeof input.options?.duration === 'number' ? { duration: input.options.duration } : {}),
           ...(input.sampleRate !== undefined ? { sampleRate: input.sampleRate } : {}),
           ...(input.bitDepth !== undefined ? { bitDepth: input.bitDepth } : {}),
         };
