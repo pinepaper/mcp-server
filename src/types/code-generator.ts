@@ -10456,8 +10456,19 @@ ${checks.includes('contrast') ? `  // SAMPLED OVER TIME (round 12, 12.9): text i
   // before a clip's seek landed, so a frame showed the previous time's
   // picture. captureFramesAtAsync waits per frame; older studios keep the
   // sync one (and say video-not-synced themselves).
-  const __videoSynced = typeof app.captureFramesAtAsync === 'function';
-  const __cap = __videoSynced ? app.captureFramesAtAsync.bind(app) : app.captureFramesAt.bind(app);
+  //
+  // What is REPORTED is what happened, not what exists (retest of 009f00e: a
+  // "videoSynced: true" capture right after an upload showed the video black).
+  // videoWait says whether the studio waited per frame; firstSeek is the
+  // studio's own answer for the first time (seeked / timedOut / skipped).
+  // A seek that times out later is an engine warning (video-seek-timeout),
+  // forwarded in governor.engineWarnings.
+  const __waits = typeof app.captureFramesAtAsync === 'function';
+  let __firstSeek = null;
+  if (typeof app.awaitMediaAt === 'function' && ${timesJson}.length) {
+    try { __firstSeek = await app.awaitMediaAt(${timesJson}[0]); } catch (e) { __firstSeek = { error: String(e && e.message || e) }; }
+  }
+  const __cap = __waits ? app.captureFramesAtAsync.bind(app) : app.captureFramesAt.bind(app);
   const frames = await __cap(${timesJson}, {
     seed: ${seed},
     capture: function(c, t, i) {
@@ -10473,7 +10484,11 @@ ${checks.includes('contrast') ? `  // SAMPLED OVER TIME (round 12, 12.9): text i
     }
   });
   const uniqueHashes = new Set(frames.map(function(f) { return f.hash; })).size;
-  return { success: true, seed: ${seed}, frameCount: frames.length, uniqueHashes: uniqueHashes, allIdentical: uniqueHashes <= 1, videoSynced: __videoSynced, frames: frames };
+  return { success: true, seed: ${seed}, frameCount: frames.length, uniqueHashes: uniqueHashes, allIdentical: uniqueHashes <= 1,
+    videoWait: __waits ? 'awaited per frame' : 'not supported by this studio (frames may show a video before its seek lands)',
+    ...(__firstSeek ? { firstSeek: __firstSeek } : {}),
+    ...(__firstSeek && __firstSeek.timedOut > 0 ? { videoWarning: 'the video seek for the first frame timed out: its video may show an earlier picture. Retry after the clip has loaded.' } : {}),
+    frames: frames };
 })();`.trim();
   }
 

@@ -172,10 +172,20 @@ describe('12.5 / 12.6 video in stills and captures waits for the seek', () => {
     const app = { captureFramesAt: () => [], captureFramesAtAsync: async (ts: number[], o: { capture: (c: unknown, t: number, i: number) => unknown }) => { asyncUsed = true; return ts.map((t, i) => o.capture({ toDataURL: () => 'data:' + t }, t, i)); } };
     const r = await new Function('app', `return ${code.replace(/^\/\/[^\n]*\n/, '')}`)(app);
     expect(asyncUsed).toBe(true);
-    expect(r.videoSynced).toBe(true);
-    // An older studio: the sync capture, videoSynced false.
+    expect(r.videoWait).toBe('awaited per frame');
+    expect(r.videoSynced).toBeUndefined();             // no longer claimed from a function existing
+    // An older studio: the sync capture, said so.
     const old = { captureFramesAt: (ts: number[], o: { capture: (c: unknown, t: number, i: number) => unknown }) => ts.map((t, i) => o.capture({ toDataURL: () => 'x' + t }, t, i)) };
-    expect((await new Function('app', `return ${code.replace(/^\/\/[^\n]*\n/, '')}`)(old)).videoSynced).toBe(false);
+    expect((await new Function('app', `return ${code.replace(/^\/\/[^\n]*\n/, '')}`)(old)).videoWait).toContain('not supported');
+  });
+
+  it('the first seek is the studio\'s own answer, and a timeout is said', async () => {
+    const code = codeGenerator.generateCaptureFrames({ times: [6] } as never);
+    const app = { awaitMediaAt: async () => ({ seeked: 0, timedOut: 1 }),
+      captureFramesAtAsync: async (ts: number[], o: { capture: (c: unknown, t: number, i: number) => unknown }) => ts.map((t, i) => o.capture({ toDataURL: () => 'd' }, t, i)), captureFramesAt: () => [] };
+    const r = await new Function('app', `return ${code.replace(/^\/\/[^\n]*\n/, '')}`)(app);
+    expect(r.firstSeek).toEqual({ seeked: 0, timedOut: 1 });
+    expect(r.videoWarning).toContain('timed out');
   });
 
   it('a region export waits for video at its time before rendering', async () => {
