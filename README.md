@@ -246,6 +246,50 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - Puppeteer mode launches Chrome with `--no-sandbox` and `--disable-setuid-sandbox`. That is routine for headless automation and it does weaken Chrome's own process sandbox. If that matters where you are running it, use `code` mode or put the server in a container.
 - Puppeteer itself is an **optional** peer dependency, kept out of the default tree precisely because a headless browser plus an install script is what scanners flag hardest. Install it only if you want the executing mode.
 
+## What's new in 1.6.17
+
+### New: tell an agent "at 4 s, make it orange"
+
+`pinepaper_modify_item` takes `atTime`: the change is written as a keyframe at
+that moment, the same as dragging with auto-key on, eased from the previous
+value and without disturbing the rest of the animation.
+`pinepaper_query_mutations` shows a property's values over time.
+
+### New: cuts on the beat
+
+`pinepaper_beat_cuts` analyses a music track, fits a beat grid and returns cut
+points on every beat, every bar or every N beats — and can split a clip at each.
+When the tempo is uncertain it says so and lists the likely alternatives;
+`bpm` or `bpmHint` settles it.
+
+### New: exact frame counts, and larger canvases
+
+- `pinepaper_agent_export` takes `frames` for an exact frame count (a duration
+  rounds up), for segments that must line up.
+- Canvases up to 16384 px per side, for digital out-of-home and projection;
+  above 8192 the result notes that Safari and iOS may not manage it.
+- `pinepaper_import_image` takes `maxEdge` (or `'native'`) and `nativeSize`, and
+  says when the studio stored an image smaller than its source.
+- `pinepaper_media` `upload_video` takes `fit` (`contain`, `cover`, `none`), and
+  `scale` is documented as relative to it.
+
+### Changed: exports say more about what they produced
+
+- When an MP4 cannot be made at the requested size, the file is named by what it
+  is (WebM) and a warning says why.
+- A video whose animation did not play, or whose encoder froze, is flagged.
+- Asking for ProRes or HAP explains the route that works (a PNG sequence).
+- Frame captures, region stills and flash checks wait for video on screen, and
+  report whether they could.
+- The engine's structured warnings reach the caller whole.
+
+### Fixed
+
+- `pinepaper_accessibility_check` judged text only at the current playhead, so
+  timed captions could pass unchecked; it now samples the timeline, and says
+  when no text was visible rather than passing.
+- `pinepaper_agent_export` accepts `fps` and `scale` for APNG.
+
 ## What's new in 1.6.16
 
 ### New: video editing on the timeline
