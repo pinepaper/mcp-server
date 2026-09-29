@@ -160,4 +160,22 @@ describe('OntologyValidator', () => {
       expect(r.diagnostics.some((x) => x.code === 'STRUCTURAL_CONFLICT')).toBe(false);
     });
   });
+
+  // Mirrors FxTool PR #40: keyframe easing is checked against the engine table.
+  it('keyframe easing uses the engine table: springs, back and Bézier arrays are valid', () => {
+    const def = { data: { items: [{ id: 'a', type: 'circle' }], relations: [] } };
+    const v = new OntologyValidator(buildDefinitionValidatorContext(def));
+    const ok = v.validateOp({ kind: 'modify', id: 'a', changes: {
+      keyframes: [{ time: 0 }, { time: 1, easing: 'springPlayful' }, { time: 2, easing: 'easeOutBack' },
+        { time: 3, easing: 'easeInOutCubic' }, { time: 4, easing: [0.2, 0.8, 0.2, 1.2] }],
+    } });
+    expect(ok.diagnostics.filter((d) => d.code === 'KEYFRAME_EASING')).toEqual([]);
+    // A typo is still caught, and the suggestion can now be a spring.
+    const typo = v.validateOp({ kind: 'modify', id: 'a', changes: {
+      keyframes: [{ time: 0 }, { time: 1, easing: 'sprng' }],
+    } });
+    const d: any = typo.diagnostics.find((x) => x.code === 'KEYFRAME_EASING');
+    expect(d).toBeTruthy();
+    expect(d.fix.apply.easing).toBe('spring');
+  });
 });

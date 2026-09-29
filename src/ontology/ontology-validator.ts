@@ -12,6 +12,7 @@
  */
 
 import { ITEM_TYPE_MAP, RELATION_TYPE_MAP, PP_VOCABULARY } from './vocabulary.js';
+import { KEYFRAME_EASINGS } from '../types/schemas.js';
 
 export const SEVERITY = { ERROR: 'error', WARNING: 'warning', HINT: 'hint' } as const;
 const SEVERITY_RANK: Record<string, number> = { error: 0, warning: 1, hint: 2 };
@@ -34,10 +35,14 @@ const RELATION_REQUIRED_PARAMS: Record<string, string[]> = {
   aligned_with: ['axis'],
 };
 
-// Easing names the engine understands (mirrors EASING_TO_MATH in the ontology).
-const KNOWN_EASINGS = new Set([
-  'linear', 'easeIn', 'easeOut', 'easeInOut', 'easeInCubic', 'easeOutCubic', 'bounce', 'elastic', 'customCubicBezier',
-]);
+// The engine's own easing table, not a copy of it (FxTool PR #40): the copy had
+// 9 names, so it flagged springs, easeOutBack, easeInOutCubic… as unknown and
+// "fixed" them to the nearest old name. 'customCubicBezier' is a validator-level
+// alias. KEYFRAME_EASINGS is fixture-pinned to the engine (easing-parity test).
+const KNOWN_EASINGS = new Set<string>([...KEYFRAME_EASINGS, 'customCubicBezier']);
+/** An [x1, y1, x2, y2] cubic Bézier, which the interpolator also accepts. */
+const isBezierArray = (e: unknown): boolean =>
+  Array.isArray(e) && e.length === 4 && e.every((n) => typeof n === 'number' && Number.isFinite(n));
 
 // Properties modify()/_applyChangesToItem actually applies. A change key outside this
 // set is a silent no-op at the engine — the costliest agent failure (burns a render).
@@ -426,7 +431,7 @@ export class OntologyValidator {
         if (t < prev) ordered = false;
         prev = t;
       }
-      if (kf.easing != null && !KNOWN_EASINGS.has(kf.easing)) {
+      if (kf.easing != null && !isBezierArray(kf.easing) && !KNOWN_EASINGS.has(kf.easing)) {
         const near = this._nearest(String(kf.easing), [...KNOWN_EASINGS]);
         out.push(this._diag('KEYFRAME_EASING', SEVERITY.WARNING, `Unknown easing "${kf.easing}".`,
           { target, context: { easing: kf.easing }, fix: near ? { kind: 'replace', suggestion: `Use "${near}"`, apply: { easing: near } } : undefined }));
