@@ -20,6 +20,7 @@ import {
   EasingSchema,
   KEYFRAME_EASINGS,
   EASING_DESCRIPTIONS,
+  KEYFRAME_EASING_JSON_SCHEMA,
   GEOMETRY_OPERATIONS,
   THREAD_STITCHES,
 } from '../types/schemas.js';
@@ -3719,6 +3720,7 @@ The authoritative list for a given item is pinepaper_get_animatable_properties �
 EASING — IT SHAPES THE SEGMENT ARRIVING AT THE KEYFRAME IT IS ON.
 The move from keyframe A to keyframe B is eased by B's easing, not A's. Easing on the FIRST keyframe does nothing (no segment arrives at it) — a Ken Burns with easing only on its first key plays linear. Put the easing on the key you are moving TO.
 ${EASING_LINES}
+- or a custom cubic-bezier [x1, y1, x2, y2] — x in 0..1, y may exceed 0..1 for overshoot. keyframe_animate and camera_animate only.
 Springs render exactly in video, GIF, APNG and SMIL. Lottie and CSS get the closest single Bézier, so springPlayful loses its wobble there.
 
 CLIP WINDOW (optional — Premiere/Canva-style clip behavior):
@@ -3747,9 +3749,8 @@ EXAMPLE — Reveal at 2s, skip first second of keyframe data, end at 4s of keyfr
                 additionalProperties: true,
               },
               easing: {
-                type: 'string',
-                enum: [...KEYFRAME_EASINGS],
-                description: 'Shapes the segment ARRIVING at this keyframe (from the previous one). Ignored on the first keyframe.',
+                ...KEYFRAME_EASING_JSON_SCHEMA,
+                description: 'Shapes the segment ARRIVING at this keyframe (from the previous one). Ignored on the first keyframe. A name, or a custom cubic-bezier [x1, y1, x2, y2] — x in 0..1, y may exceed 0..1 for overshoot.',
               },
             },
             required: ['time', 'properties'],
@@ -4178,8 +4179,8 @@ EXAMPLE (curved arc between waypoints):
               pitch: { type: 'number', description: '3D tilt in degrees — rendered where the studio supports camera tilt (result.tiltRenders).' },
               yaw: { type: 'number', description: '3D rotation in degrees — rendered where the studio supports camera tilt (result.tiltRenders).' },
               easing: {
-                type: 'string',
-                enum: [...KEYFRAME_EASINGS],
+                ...KEYFRAME_EASING_JSON_SCHEMA,
+                description: 'A name, or a custom cubic-bezier [x1, y1, x2, y2] — x in 0..1, y may exceed 0..1 for overshoot.',
               },
               pathOut: {
                 type: 'array',

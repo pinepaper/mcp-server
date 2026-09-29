@@ -23,7 +23,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PINEPAPER_TOOLS } from '../../tools/definitions.js';
 import {
-  KEYFRAME_EASINGS, EASING_DESCRIPTIONS, EasingSchema, MaskEasingSchema,
+  KEYFRAME_EASINGS, EASING_DESCRIPTIONS, EasingSchema, MaskEasingSchema, KeyframeSchema,
 } from '../../types/schemas.js';
 import { PinePaperCodeGenerator } from '../../types/code-generator.js';
 
@@ -46,8 +46,11 @@ function easingEnums(): Array<{ tool: string; values: string[] }> {
     if (!node || typeof node !== 'object') return;
     const n = node as Record<string, unknown>;
     if (Array.isArray(n.enum) && key === 'easing') out.push({ tool, values: n.enum as string[] });
+    // oneOf/anyOf branches (and their array indices) belong to the parent key:
+    // a keyframe easing is oneOf [name enum, Bézier array].
+    const passThrough = (k: string) => k === 'properties' || k === 'items' || k === 'oneOf' || k === 'anyOf' || /^\d+$/.test(k);
     for (const [k, v] of Object.entries(n)) {
-      walk(tool, v, k === 'properties' || k === 'items' ? key : k);
+      walk(tool, v, passThrough(k) ? key : k);
     }
   };
   for (const t of PINEPAPER_TOOLS as { name: string; inputSchema: unknown }[]) {
@@ -89,5 +92,33 @@ describe('easings ↔ the engine easing table', () => {
     const code = new PinePaperCodeGenerator().generateGetAvailableEasings();
     expect(code).toContain('app.listAnimatableProperties');
     for (const e of OURS) expect(code).toContain(`"${e}"`);
+  });
+
+  it('keyframe easing takes a custom cubic-bezier; x must be in 0..1, y may overshoot', () => {
+    const kf = (easing: unknown) => KeyframeSchema.safeParse({ time: 1, properties: {}, easing });
+    expect(kf('springSnappy').success).toBe(true);
+    expect(kf([0.2, 1.6, 0.3, -0.4]).success).toBe(true);
+    expect(kf([1.2, 0, 0.3, 1]).success).toBe(false);
+    expect(kf([0.2, 0.8, 0.2]).success).toBe(false);
+    expect(kf('sprng').success).toBe(false);
+  });
+
+  it('keyframe_animate and camera_animate offer the Bézier form; masks do not', () => {
+    const easingNodes = (name: string) => {
+      const found: any[] = [];
+      const walk = (node: any, key: string) => {
+        if (!node || typeof node !== 'object') return;
+        if (key === 'easing' && !Array.isArray(node)) found.push(node);
+        for (const [k, v] of Object.entries(node)) walk(v, k);
+      };
+      walk((PINEPAPER_TOOLS as any[]).find((t) => t.name === name).inputSchema, '');
+      return found;
+    };
+    for (const name of ['pinepaper_keyframe_animate', 'pinepaper_camera_animate']) {
+      const nodes = easingNodes(name);
+      expect(nodes.length).toBeGreaterThan(0);
+      for (const n of nodes) expect(n.oneOf?.[1]).toMatchObject({ type: 'array', minItems: 4, maxItems: 4 });
+    }
+    for (const n of easingNodes('pinepaper_apply_animated_mask')) expect(n.oneOf).toBeUndefined();
   });
 });

@@ -133,6 +133,31 @@ export const EASING_DESCRIPTIONS: Record<(typeof KEYFRAME_EASINGS)[number], stri
 
 export const EasingSchema = z.enum(KEYFRAME_EASINGS).describe('Easing function for animation');
 
+/**
+ * A keyframe's easing: a name from the table, or a custom cubic Bézier
+ * [x1, y1, x2, y2]. The interpolator runs the array natively, the validator
+ * accepts it, and every export path handles it (SMIL clamps y into keySplines;
+ * CSS and Lottie take the raw curve). Keyframe tracks only — keyframe_animate,
+ * camera_animate and inline keyframes — not masks or relations (fxtool-d7).
+ */
+export const BezierEasingSchema = z.tuple([z.number(), z.number(), z.number(), z.number()])
+  .refine(([x1, , x2]) => x1 >= 0 && x1 <= 1 && x2 >= 0 && x2 <= 1, {
+    message: 'cubic-bezier x1 and x2 must be within 0..1 (y1 and y2 may exceed it for overshoot)',
+  })
+  .describe('Custom cubic-bezier [x1, y1, x2, y2]');
+export const KeyframeEasingSchema = z.union([EasingSchema, BezierEasingSchema]);
+
+/** JSON-Schema form of KeyframeEasingSchema, for tool definitions. */
+export const KEYFRAME_EASING_JSON_SCHEMA = {
+  oneOf: [
+    { type: 'string', enum: [...KEYFRAME_EASINGS] },
+    {
+      type: 'array', items: { type: 'number' }, minItems: 4, maxItems: 4,
+      description: 'or a custom cubic-bezier [x1, y1, x2, y2] — x in 0..1, y may exceed 0..1 for overshoot',
+    },
+  ],
+};
+
 // =============================================================================
 // ITEM TYPES
 // =============================================================================
@@ -324,7 +349,7 @@ export type SimpleAnimationType = z.infer<typeof SimpleAnimationTypeSchema>;
 export const KeyframeSchema = z.object({
   time: z.number().describe('Time in seconds for this keyframe'),
   properties: z.record(z.unknown()).describe('Property values at this keyframe'),
-  easing: EasingSchema.optional().default('linear'),
+  easing: KeyframeEasingSchema.optional().default('linear'),
 });
 
 export type Keyframe = z.infer<typeof KeyframeSchema>;
