@@ -18,6 +18,8 @@ import {
   EffectTypeSchema,
   SimpleAnimationTypeSchema,
   EasingSchema,
+  KEYFRAME_EASINGS,
+  EASING_DESCRIPTIONS,
   GEOMETRY_OPERATIONS,
   THREAD_STITCHES,
 } from '../types/schemas.js';
@@ -35,6 +37,7 @@ const SIMPLE_ANIMATION_TYPES_LIST = SimpleAnimationTypeSchema.options.join(', ')
 // easeInCubic / easeOutCubic / easeOutBounce, which keyframe_animate rejects
 // (round 8 DD, 1.68) — derived now, so it cannot say what the schema refuses.
 const KEYFRAME_EASINGS_LIST = EasingSchema.options.join(', ');
+const EASING_LINES = KEYFRAME_EASINGS.map((e) => `- ${e}: ${EASING_DESCRIPTIONS[e]}`).join('\n');
 
 // =============================================================================
 // AI AGENT GUIDE (exported for pinepaper_tool_guide)
@@ -3715,12 +3718,8 @@ The authoritative list for a given item is pinepaper_get_animatable_properties �
 
 EASING — IT SHAPES THE SEGMENT ARRIVING AT THE KEYFRAME IT IS ON.
 The move from keyframe A to keyframe B is eased by B's easing, not A's. Easing on the FIRST keyframe does nothing (no segment arrives at it) — a Ken Burns with easing only on its first key plays linear. Put the easing on the key you are moving TO.
-- linear: Constant speed
-- easeIn: Slow start
-- easeOut: Slow end
-- easeInOut: Slow start and end
-- bounce: Bounce effect
-- elastic: Elastic overshoot
+${EASING_LINES}
+Springs render exactly in video, GIF, APNG and SMIL. Lottie and CSS get the closest single Bézier, so springPlayful loses its wobble there.
 
 CLIP WINDOW (optional — Premiere/Canva-style clip behavior):
 - timeOffset: Shift the whole clip in canvas time (seconds). The animation only runs while canvas time is in [timeOffset, timeOffset + (clipOutPoint - clipInPoint)].
@@ -3749,7 +3748,7 @@ EXAMPLE — Reveal at 2s, skip first second of keyframe data, end at 4s of keyfr
               },
               easing: {
                 type: 'string',
-                enum: ['linear', 'easeIn', 'easeOut', 'easeInOut', 'bounce', 'elastic'],
+                enum: [...KEYFRAME_EASINGS],
                 description: 'Shapes the segment ARRIVING at this keyframe (from the previous one). Ignored on the first keyframe.',
               },
             },
@@ -3920,7 +3919,7 @@ MASK TYPES: rectangle, circle, ellipse, star, triangle, hexagon, heart, rounded`
             properties: {
               time: { type: 'number', description: 'Normalized time (0-1)' },
               properties: { type: 'object', description: 'Mask properties (x, y, width, height, radius, scale, rotation, opacity)' },
-              easing: { type: 'string', enum: ['linear', 'easeIn', 'easeOut', 'easeInOut', 'bounce', 'elastic'] },
+              easing: { type: 'string', enum: [...KEYFRAME_EASINGS] },
             },
             required: ['time', 'properties'],
           },
@@ -3931,7 +3930,7 @@ MASK TYPES: rectangle, circle, ellipse, star, triangle, hexagon, heart, rounded`
           properties: {
             startTime: { type: 'number', description: 'Start time in seconds', default: 0 },
             duration: { type: 'number', description: 'Duration in seconds', default: 0.8 },
-            easing: { type: 'string', enum: ['linear', 'easeIn', 'easeOut', 'easeInOut', 'bounce'], default: 'easeOut' },
+            easing: { type: 'string', enum: [...KEYFRAME_EASINGS], default: 'easeOut' },
             reversed: { type: 'boolean', description: 'Reverse animation (hide instead of reveal)', default: false },
             loop: { type: 'boolean', description: 'Loop the animation', default: false },
           },
@@ -4052,7 +4051,7 @@ Needs a studio that publishes the item-side table; without one, the tool says so
       idempotentHint: true,
       openWorldHint: false,
     },
-    description: `[Utility] Get list of available easing functions for mask animations.`,
+    description: `[Utility] List the easing names the studio accepts: one table serves keyframes, masks, relations and the camera. Reads the live engine's list when it reports one.`,
     inputSchema: {
       type: 'object',
       properties: {},
@@ -4180,7 +4179,7 @@ EXAMPLE (curved arc between waypoints):
               yaw: { type: 'number', description: '3D rotation in degrees — rendered where the studio supports camera tilt (result.tiltRenders).' },
               easing: {
                 type: 'string',
-                enum: ['linear', 'easeIn', 'easeOut', 'easeInOut', 'bounce', 'elastic'],
+                enum: [...KEYFRAME_EASINGS],
               },
               pathOut: {
                 type: 'array',

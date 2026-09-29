@@ -206,6 +206,8 @@ import {
   ExtractObjectInput,
   ArrangeInput,
   GeneratorRegion,
+  KEYFRAME_EASINGS,
+  EASING_DESCRIPTIONS,
 } from './schemas.js';
 import { OntologyCompiler } from '../ontology/ontology-compiler.js';
 import { z } from 'zod';
@@ -7571,19 +7573,25 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
   }
 
   generateGetAvailableEasings(): string {
+    // The engine's own list wins: listAnimatableProperties().easings is its
+    // EASING_NAMES, read from the easing table itself. The static list is the
+    // fallback for studios that predate it (fixture-pinned, easing-parity test).
     return `
 // Get available easing functions
 (function() {
+  const fallback = ${JSON.stringify(KEYFRAME_EASINGS)};
+  const descriptions = ${JSON.stringify(EASING_DESCRIPTIONS)};
+  let live = null;
+  try {
+    const r = typeof app !== 'undefined' && app && typeof app.listAnimatableProperties === 'function'
+      ? app.listAnimatableProperties() : null;
+    if (r && Array.isArray(r.easings) && r.easings.length) live = r.easings;
+  } catch (e) { live = null; }
   return {
-    easings: ['linear', 'easeIn', 'easeOut', 'easeInOut', 'bounce', 'elastic'],
-    descriptions: {
-      linear: 'Constant speed',
-      easeIn: 'Slow start, fast end',
-      easeOut: 'Fast start, slow end',
-      easeInOut: 'Slow start and end',
-      bounce: 'Bouncing effect at end',
-      elastic: 'Spring-like overshoot'
-    }
+    easings: live || fallback,
+    source: live ? 'engine' : 'mcp-server fallback list',
+    descriptions,
+    exportNote: 'Springs render exactly in video, GIF, APNG and SMIL; Lottie and CSS get the closest single Bezier, so springPlayful loses its wobble there.'
   };
 })();
 `.trim();

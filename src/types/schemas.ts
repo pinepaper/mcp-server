@@ -92,14 +92,46 @@ export const BlendModeSchema = z.enum([
 
 export type BlendMode = z.infer<typeof BlendModeSchema>;
 
-export const EasingSchema = z.enum([
-  'linear',
-  'easeIn',
-  'easeOut',
-  'easeInOut',
-  'bounce',
-  'elastic',
-]).describe('Easing function for animation');
+/**
+ * Every easing name the engine's table accepts (FxTool `EASING_NAMES`, from
+ * core/KeyframeInterpolator.js). Keyframes, masks, relations and the camera all
+ * resolve a name through that one table, so every easing enum here is this list.
+ * Pinned by src/__tests__/unit/easing-parity.test.ts against
+ * fixtures/engine-easings.txt; refresh the fixture when the engine adds one.
+ */
+export const KEYFRAME_EASINGS = [
+  'linear', 'easeIn', 'easeOut', 'easeInOut',
+  'easeInCubic', 'easeOutCubic', 'easeInOutCubic',
+  'bounce', 'easeOutBounce', 'easeInBounce',
+  'elastic', 'easeOutElastic', 'easeInElastic',
+  'easeOutBack', 'easeInBack', 'easeInOutBack',
+  'spring', 'springSnappy', 'springPlayful',
+] as const;
+
+/** One line per easing, for tool descriptions and pinepaper_get_available_easings. */
+export const EASING_DESCRIPTIONS: Record<(typeof KEYFRAME_EASINGS)[number], string> = {
+  linear: 'Constant speed',
+  easeIn: 'Slow start, fast end',
+  easeOut: 'Fast start, slow end',
+  easeInOut: 'Slow start and end',
+  easeInCubic: 'Slow start, stronger than easeIn',
+  easeOutCubic: 'Slow end, stronger than easeOut',
+  easeInOutCubic: 'Slow start and end, stronger than easeInOut',
+  bounce: 'Bounces to rest at the end (same as easeOutBounce)',
+  easeOutBounce: 'Bounces to rest at the end',
+  easeInBounce: 'Bounces at the start, then moves',
+  elastic: 'Overshoots and oscillates at the end (same as easeOutElastic)',
+  easeOutElastic: 'Overshoots and oscillates at the end',
+  easeInElastic: 'Oscillates at the start, then moves',
+  easeOutBack: 'Overshoots the target slightly, then settles',
+  easeInBack: 'Pulls back first, then moves',
+  easeInOutBack: 'Pulls back first and overshoots at the end',
+  spring: 'Damped spring, ζ≈1: settles with no overshoot',
+  springSnappy: 'Damped spring, ζ≈0.69: quick, one ~5% overshoot',
+  springPlayful: 'Damped spring, ζ≈0.45: ~21% overshoot, visible wobbles',
+};
+
+export const EasingSchema = z.enum(KEYFRAME_EASINGS).describe('Easing function for animation');
 
 // =============================================================================
 // ITEM TYPES
@@ -2159,9 +2191,7 @@ export const MaskTypeSchema = z.enum([
 
 export type MaskType = z.infer<typeof MaskTypeSchema>;
 
-export const MaskEasingSchema = z.enum([
-  'linear', 'easeIn', 'easeOut', 'easeInOut', 'bounce', 'elastic',
-]).describe('Mask animation easing function');
+export const MaskEasingSchema = z.enum(KEYFRAME_EASINGS).describe('Mask animation easing function');
 
 export type MaskEasing = z.infer<typeof MaskEasingSchema>;
 

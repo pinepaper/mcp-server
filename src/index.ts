@@ -683,7 +683,7 @@ Smoothly transform source shape into target shape over time.
 - \`duration\`: Morph duration in seconds (default: 1)
 - \`hideTarget\`: Hide target item since it's just a shape reference (default: true)
 - \`removeTargetOnComplete\`: Delete target after morph completes (default: false)
-- \`easing\`: Timing function ('linear', 'easeIn', 'easeOut', 'easeInOut')
+- \`easing\`: Timing function: any name from pinepaper_get_available_easings (e.g. 'easeInOut', 'spring')
 
 **Usage patterns:**
 \`\`\`
