@@ -301,6 +301,10 @@ generated song as the backbone of the edit, used whole.
   sky, fog, light and ground colours, and material and light colours. A
   refused `configure` now says why, naming the key. `ground_height` takes
   `{x, z}`. `create` lists the configurable parameters by name.
+- `pinepaper_world3d` `extrude_path` takes `upright` (stand a drawing up, like
+  a sign) and `placement` (`centered`, the default, stands the mesh on the
+  ground at the point you give). JPG and WebP stills of a 3D world scene show
+  the world rather than a white frame.
 
 ## What's new in 1.6.17
 
