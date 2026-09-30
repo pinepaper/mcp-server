@@ -4619,7 +4619,7 @@ export const World3DInputSchema = z.object({
     .describe("'create' (a preset world) · 'describe' (every parameter with type/range — CALL THIS before configure) · 'configure' (live deep-merge patch, schema-validated) · actor ops · 'set_camera' (follow|fixed|orbit) · object ops · 'remove_world' · MESH AUTHORING: 'extrude_path' / 'lathe_path' turn a canvas path into real geometry, 'list_meshes', 'remove_mesh' · 'add_light' / 'set_light' / 'remove_light' / 'list_lights' (at most 8 point lights) · 'add_material' / 'set_material' / 'remove_material' / 'list_materials'"),
   spec: z.union([z.string(), z.record(z.string(), z.unknown())]).optional().describe("create: a preset id ('forest', 'snowMountain', …) or a full world spec object."),
   character: z.union([z.boolean(), z.record(z.string(), z.unknown())]).optional().describe('create: include the walkable character (true/config).'),
-  patch: z.record(z.string(), z.unknown()).optional().describe('configure: partial world spec, deep-merged and validated — a wrong key errors naming the right one.'),
+  patch: z.record(z.string(), z.unknown()).optional().describe('configure: partial world spec, deep-merged and validated — a wrong key errors naming the right one. Colours (env.zenith, env.horizon, env.fogColor, env.sunColor, env.ambient, env.lowColor … env.propColorB) take hex ("#03050c") or [r, g, b] in 0..1.'),
   actorId: z.string().optional().describe('Actor id — add_actor (optional, generated if omitted) / remove_actor / set_actor_pose / set_camera target.'),
   x: z.number().optional().describe('World-space x — add_actor / add_object.'),
   z: z.number().optional().describe('World-space z — add_actor / add_object.'),
@@ -4664,7 +4664,7 @@ export const World3DInputSchema = z.object({
     x: z.number().optional().describe('World-space x (default 0).'),
     y: z.number().optional().describe('World-space y (default 3 — above the ground, not on it).'),
     z: z.number().optional().describe('World-space z (default 0).'),
-    color: z.array(z.number()).length(3).optional().describe('Linear RGB, each component ≥ 0 (default [1, 0.86, 0.62], a warm lamp).'),
+    color: z.union([z.string(), z.array(z.number()).length(3)]).optional().describe('Hex ("#ffdca0") or linear RGB [r, g, b], each component ≥ 0 and may exceed 1 for a brighter light (default [1, 0.86, 0.62], a warm lamp).'),
     intensity: z.number().optional().describe('Brightness (default 6).'),
     range: z.number().optional().describe('How far the light reaches, in world units (default 20).'),
   }).optional().describe('add_light / set_light: the light spec. At most 8 point lights exist at once — the shader array is fixed-size, so a ninth is refused by name rather than ignored.'),
@@ -4673,14 +4673,14 @@ export const World3DInputSchema = z.object({
   // --- Materials ------------------------------------------------------------
   material: z.object({
     id: z.string().optional().describe('Material id (generated if omitted).'),
-    color: z.array(z.number()).length(3).optional().describe('Base colour, linear RGB (default [0.8, 0.8, 0.82]).'),
-    emissive: z.array(z.number()).length(3).optional().describe('Light the surface emits regardless of the scene (default [0, 0, 0]).'),
+    color: z.union([z.string(), z.array(z.number()).length(3)]).optional().describe('Base colour: hex ("#e9e4d8") or linear RGB [r, g, b] in 0..1 (default [0.8, 0.8, 0.82]).'),
+    emissive: z.union([z.string(), z.array(z.number()).length(3)]).optional().describe('Light the surface emits regardless of the scene: hex or [r, g, b] in 0..1 (default [0, 0, 0]).'),
     metalness: z.number().min(0).max(1).optional().describe('0 dielectric → 1 metal.'),
     roughness: z.number().min(0).max(1).optional().describe('0 mirror → 1 fully diffuse. Floored at 0.045: a true zero is a numerically unstable mirror.'),
     emissiveIntensity: z.number().min(0).optional().describe('Scales `emissive` before the frame is built, so it reaches every path that draws emissive.'),
     clearcoat: z.number().min(0).max(1).optional().describe('A lacquer layer over the base — car paint, varnished wood.'),
     clearcoatRoughness: z.number().min(0).max(1).optional().describe("The coat's own roughness. NOT floored like the base, so a mirror-smooth lacquer stays expressible."),
-    sheenColor: z.array(z.number()).length(3).optional().describe('Retroreflective sheen colour — cloth, velvet.'),
+    sheenColor: z.union([z.string(), z.array(z.number()).length(3)]).optional().describe('Retroreflective sheen colour — cloth, velvet: hex or [r, g, b] in 0..1.'),
     sheenRoughness: z.number().min(0).max(1).optional().describe('How broad the sheen lobe is.'),
   }).optional().describe("add_material / set_material: a NAMED, SHARED surface referenced by many objects, so one edit restyles all of them. metalness and roughness reach the shader on the MESH path only. There are no aoMapIntensity / normalScale / envMapIntensity knobs: each scales a map that does not exist, and a knob that scales nothing is worse than a missing one."),
   materialId: z.string().optional().describe('set_material / remove_material: the material id.'),
@@ -4693,8 +4693,8 @@ export const World3DInputSchema = z.object({
 
   // --- Navigation, picking and the camera ----------------------------------
   navTarget: z.enum(['2d', '3d']).optional().describe("set_nav_target: which layer the pointer drives — '2d' the Paper canvas, '3d' the world."),
-  point: z.object({ x: z.number(), y: z.number(), z: z.number().optional() }).optional()
-    .describe('ground_height / canvas_to_ground / world_to_canvas: the point to convert. ground_height and canvas_to_ground read x and y (canvas) or x and z (world); world_to_canvas takes a world point.'),
+  point: z.object({ x: z.number(), y: z.number().optional(), z: z.number().optional() }).optional()
+    .describe('The point to convert. ground_height: {x, z} in WORLD coordinates (the terrain height there; y is read as z if z is absent). canvas_to_ground: {x, y} in CANVAS pixels. world_to_canvas: {x, y, z?} in world coordinates.'),
   origin: z.array(z.number()).length(3).optional().describe('raycast: ray origin in world space, [x, y, z].'),
   direction: z.array(z.number()).length(3).optional().describe('raycast: ray direction in world space, [x, y, z]. Need not be normalised.'),
   multiplier: z.number().optional().describe('dolly_camera: greater than 1 moves away, less than 1 moves closer.'),
@@ -4713,6 +4713,10 @@ export const World3DInputSchema = z.object({
     .describe('set_mesh_instances: one entry per copy, six numbers each — x, y, z, scale, rotY (RADIANS), and a free variant a shader may read for per-instance colour or phase.'),
 })
   .refine((v) => v.action !== 'configure' || !!v.patch, { message: 'configure requires patch', path: ['patch'] })
+  // ground_height reads a WORLD (x, z); y is accepted in z's place for older callers.
+  .refine((v) => v.action !== 'ground_height' || (!!v.point && (v.point.z !== undefined || v.point.y !== undefined)), { message: 'ground_height requires point {x, z} (world coordinates)', path: ['point'] })
+  .refine((v) => v.action !== 'canvas_to_ground' || (!!v.point && v.point.y !== undefined), { message: 'canvas_to_ground requires point {x, y} (canvas coordinates)', path: ['point'] })
+  .refine((v) => v.action !== 'world_to_canvas' || (!!v.point && v.point.y !== undefined), { message: 'world_to_canvas requires point {x, y, z?} (world coordinates)', path: ['point'] })
   .refine((v) => !['remove_actor', 'set_actor_pose'].includes(v.action) || !!v.actorId, { message: 'this action requires actorId', path: ['actorId'] })
   .refine((v) => v.action !== 'set_actor_pose' || !!v.pose, { message: 'set_actor_pose requires pose', path: ['pose'] })
   .refine((v) => v.action !== 'set_camera' || !!v.camera, { message: 'set_camera requires camera', path: ['camera'] })

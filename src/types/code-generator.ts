@@ -2600,6 +2600,45 @@ function world3dColor(value: unknown): unknown {
   return [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16) / 255);
 }
 
+/**
+ * The world spec's colour fields: FxTool WORLD_SCHEMA entries of kind 'color'
+ * (js/world3d/worlds.js), pinned by world3d-colors.test.ts against
+ * fixtures/engine-world3d-color-paths.txt. None of them is named `color`, so
+ * world3dColors never touched them and a hex `env.zenith` reached the engine
+ * as a string, where the validator refused it.
+ */
+export const WORLD3D_COLOR_PATHS = [
+  'env.zenith', 'env.horizon', 'env.fogColor', 'env.sunColor', 'env.ambient',
+  'env.lowColor', 'env.midColor', 'env.highColor', 'env.rockColor',
+  'env.propColorA', 'env.propColorB',
+] as const;
+
+/** A hex colour to [r, g, b] 0..1; anything else unchanged (arrays too: light colours may exceed 1). */
+export function world3dHex(value: unknown): unknown {
+  return typeof value === 'string' ? world3dColor(value) : value;
+}
+
+/** Convert hex strings at the world spec's colour paths (configure / create). */
+export function world3dSpecColors<T>(spec: T): T {
+  if (!spec || typeof spec !== 'object' || Array.isArray(spec)) return spec;
+  const out = JSON.parse(JSON.stringify(spec)) as Record<string, unknown>;
+  for (const path of WORLD3D_COLOR_PATHS) {
+    const [group, key] = path.split('.');
+    const g = out[group] as Record<string, unknown> | undefined;
+    if (g && typeof g === 'object' && key in g) g[key] = world3dHex(g[key]);
+  }
+  return out as T;
+}
+
+/** A light or material spec with hex colours (color, emissive, sheenColor) converted; an array is left exactly as given. */
+function world3dHexColor(spec: Record<string, unknown> | undefined): Record<string, unknown> {
+  const out = { ...(spec ?? {}) };
+  for (const key of ['color', 'emissive', 'sheenColor']) {
+    if (typeof out[key] === 'string') out[key] = world3dColor(out[key]);
+  }
+  return out;
+}
+
 /** Recursively convert every `color` field in a world3d payload. */
 function world3dColors<T>(value: T): T {
   if (Array.isArray(value)) return value.map((v) => world3dColors(v)) as unknown as T;
@@ -11404,12 +11443,15 @@ ${guard}
 // World3D: create — terrain, sky, shadows, walkable character, under the Paper canvas
 (async function() {
   if (typeof app.createWorld3D !== 'function') { return { success: false, error: 'app.createWorld3D unavailable — update FxTool to a world3d-capable build' }; }
-  await app.createWorld3D(${S(world3dColors(input.spec ?? 'forest'))}, ${opts});
+  await app.createWorld3D(${S(world3dSpecColors(world3dColors(input.spec ?? 'forest')))}, ${opts});
   // describe() is the world's own parameter schema — return the preset list +
   // top-level keys so the agent knows what configure can touch, without the
   // full multi-KB schema on every create.
   const d = typeof app.describeWorld3D === 'function' ? await app.describeWorld3D() : null;
-  return { success: true, action: 'create', spec: ${S(input.spec ?? 'forest')}, configurableKeys: d ? Object.keys(d.params || d) : [] };
+  // params is WORLD_SCHEMA: an ARRAY of {path, kind, doc}. Object.keys on it
+  // returned "0", "1", "2"… — the indexes, not a single usable key.
+  const keys = !d ? [] : Array.isArray(d.params) ? d.params.map(function (e) { return e && e.path; }).filter(Boolean) : Object.keys(d.params || d);
+  return { success: true, action: 'create', spec: ${S(input.spec ?? 'forest')}, configurableKeys: keys };
 })();`.trim();
       }
       case 'describe':
@@ -11425,9 +11467,9 @@ ${guard}
 (function() {
   if (typeof app.configureWorld3D !== 'function') { return { success: false, error: 'app.configureWorld3D unavailable — update FxTool' }; }
 ${needWorld}
-  const r = app.configureWorld3D(${S(world3dColors(input.patch))});
+  const r = app.configureWorld3D(${S(world3dSpecColors(world3dColors(input.patch)))});
   // The validator names the right key on a wrong one — forward it verbatim.
-  return r && r.ok ? { success: true, action: 'configure' } : { success: false, error: (r && r.error) || 'configure failed' };
+  return r && r.ok ? { success: true, action: 'configure' } : { success: false, error: (r && (r.error || (Array.isArray(r.errors) && r.errors.length ? r.errors.join('; ') : '') || r.reason)) || 'configure failed' };
 })();`.trim();
       case 'add_actor': {
         const actor = S({
@@ -11565,8 +11607,8 @@ ${needWorld}
 (function() {
   if (typeof app.addWorldLight !== 'function') { return { success: false, error: 'app.addWorldLight unavailable — update FxTool' }; }
 ${needWorld}
-  const r = app.addWorldLight(${S(input.light ?? {})});
-  if (!r || r.ok === false) { return { success: false, error: (r && r.error) || 'the world refused the light' }; }
+  const r = app.addWorldLight(${S(world3dHexColor(input.light))});
+  if (!r || r.ok === false) { return { success: false, error: (r && (r.error || (Array.isArray(r.errors) && r.errors.length ? r.errors.join('; ') : '') || r.reason)) || 'the world refused the light' }; }
   return { success: true, lightId: r.id, light: r.light };
 })();`.trim();
 
@@ -11575,7 +11617,7 @@ ${needWorld}
 // World3D: edit a light in place
 (function() {
   if (typeof app.setWorldLight !== 'function') { return { success: false, error: 'app.setWorldLight unavailable — update FxTool' }; }
-  return { success: !!app.setWorldLight(${S(input.lightId)}, ${S(input.light ?? {})}) };
+  return { success: !!app.setWorldLight(${S(input.lightId)}, ${S(world3dHexColor(input.light))}) };
 })();`.trim();
 
       case 'remove_light':
@@ -11601,8 +11643,8 @@ ${needWorld}
 (function() {
   if (typeof app.addWorldMaterial !== 'function') { return { success: false, error: 'app.addWorldMaterial unavailable — update FxTool' }; }
 ${needWorld}
-  const r = app.addWorldMaterial(${S(input.material ?? {})});
-  if (!r || r.ok === false) { return { success: false, error: (r && r.error) || 'the world refused the material' }; }
+  const r = app.addWorldMaterial(${S(world3dHexColor(input.material))});
+  if (!r || r.ok === false) { return { success: false, error: (r && (r.error || (Array.isArray(r.errors) && r.errors.length ? r.errors.join('; ') : '') || r.reason)) || 'the world refused the material' }; }
   return { success: true, materialId: r.id, material: r.material };
 })();`.trim();
 
@@ -11611,7 +11653,7 @@ ${needWorld}
 // World3D: patch a material — every object referencing it changes next frame
 (function() {
   if (typeof app.setWorldMaterial !== 'function') { return { success: false, error: 'app.setWorldMaterial unavailable — update FxTool' }; }
-  return { success: !!app.setWorldMaterial(${S(input.materialId)}, ${S(input.material ?? {})}) };
+  return { success: !!app.setWorldMaterial(${S(input.materialId)}, ${S(world3dHexColor(input.material))}) };
 })();`.trim();
 
       case 'remove_material':
@@ -11676,7 +11718,7 @@ ${needWorld}
 (function() {
   if (typeof app.setWorldNavTarget !== 'function') { return { success: false, error: 'app.setWorldNavTarget unavailable — update FxTool' }; }
   const r = app.setWorldNavTarget(${S(input.navTarget)});
-  if (!r || r.ok === false) { return { success: false, error: (r && r.error) || 'the nav target was refused' }; }
+  if (!r || r.ok === false) { return { success: false, error: (r && (r.error || (Array.isArray(r.errors) && r.errors.length ? r.errors.join('; ') : '') || r.reason)) || 'the nav target was refused' }; }
   return { success: true, navTarget: ${S(input.navTarget)} };
 })();`.trim();
 

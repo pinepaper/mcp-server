@@ -81,7 +81,10 @@ describe('generateWorld3D codegen', () => {
 
   it('configure forwards the validator error verbatim — it names the right key', () => {
     const c = codeGenerator.generateWorld3D(World3DInputSchema.parse({ action: 'configure', patch: { terain: {} } }));
-    expect(c).toContain('(r && r.error)');
+    // The engine answers { ok: false, errors: string[] } (World3D.configure →
+    // validateWorldPatch). This used to assert `(r && r.error)`, which pinned
+    // the bug: the reason was dropped and every refusal read "configure failed".
+    expect(c).toContain("r.errors.join('; ')");
   });
 });
 

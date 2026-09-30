@@ -1,0 +1,11 @@
+env.zenith
+env.horizon
+env.fogColor
+env.sunColor
+env.ambient
+env.lowColor
+env.midColor
+env.highColor
+env.rockColor
+env.propColorA
+env.propColorB
