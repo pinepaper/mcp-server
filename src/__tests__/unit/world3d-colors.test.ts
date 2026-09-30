@@ -60,6 +60,7 @@ describe('world3d refusals say why', () => {
       emit({ action: 'configure', patch: { env: {} } }),
       emit({ action: 'add_light', light: {} }),
       emit({ action: 'add_material', material: {} }),
+      emit({ action: 'extrude_path', pathId: 'p1' }),
     ]) {
       expect(code).toContain("r.errors.join('; ')");
       expect(code).not.toMatch(/error: \(r && r\.error\) \|\|/);

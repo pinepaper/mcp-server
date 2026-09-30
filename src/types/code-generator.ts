@@ -11695,7 +11695,7 @@ ${needWorld}
   // @engine-methods extrudeToMesh latheToMesh importOBJToWorld importGLTFToWorld
   if (typeof app.${fn} !== 'function') { return { success: false, error: 'app.${fn} unavailable — update FxTool to a world3d-capable build' }; }
   const r = await app.${fn}(${S(input.pathId)}, ${S(mesh)});
-  if (!r || r.ok === false) { return { success: false, error: (r && r.reason) || 'the world refused the mesh' }; }
+  if (!r || r.ok === false) { return { success: false, error: (r && (r.error || (Array.isArray(r.errors) && r.errors.length ? r.errors.join('; ') : '') || r.reason)) || 'the world refused the mesh' }; }
   return { success: true, meshId: r.id, op: ${S(input.action === 'extrude_path' ? 'extrude' : 'lathe')}, sourceId: ${S(input.pathId)} };
 })();`.trim();
       }
