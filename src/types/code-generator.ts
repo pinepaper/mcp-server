@@ -187,6 +187,7 @@ import {
   ConstructionSequenceInput,
   ValidateSceneInput,
   CaptureFramesInput,
+  CaptureSheet,
   AccessibilityCheckInput,
   InstantiateOntologyInput,
   LintSceneInput,
@@ -2649,6 +2650,59 @@ function world3dColors<T>(value: T): T {
   }
   return out as unknown as T;
 }
+
+/** At most this many tiles in one contact sheet: past it, the tiles are too small to judge. */
+export const SHEET_MAX_TILES = 48;
+
+/**
+ * The times a contact sheet captures, and a label for each. Pure, so the
+ * modes are testable without a browser. Explicit `times` win; otherwise
+ * every / strip / loopSeam. Rounded to the millisecond, clamped at 0.
+ */
+export function sheetTimes(times: number[] | undefined, sheet: CaptureSheet): { times: number[]; labels: string[] } {
+  const r = (t: number) => Math.max(0, Math.round(t * 1000) / 1000);
+  const fmt = (t: number) => `${t.toFixed(2)}s`;
+  let out: number[] = [];
+  let labels: string[] | null = null;
+  if (times && times.length) {
+    out = times.map(r);
+  } else if (sheet.strip) {
+    const { at, count, step } = sheet.strip;
+    const first = at - Math.floor(count / 2) * step;
+    out = Array.from({ length: count }, (_, i) => r(first + i * step));
+  } else if (sheet.loopSeam && sheet.duration) {
+    // The frame BEFORE the loop wraps, then the first: a jump between them is the stutter.
+    out = [r(sheet.duration - 1 / 30), 0];
+    labels = [`end ${fmt(out[0])}`, 'start 0.00s'];
+  } else if (sheet.every && sheet.duration) {
+    for (let t = 0; t < sheet.duration - 1e-9 && out.length < SHEET_MAX_TILES; t += sheet.every) out.push(r(t));
+  }
+  out = out.slice(0, SHEET_MAX_TILES);
+  return { times: out, labels: labels ?? out.map(fmt) };
+}
+
+/**
+ * The critique an agent applies to a contact sheet. One scale, the same every
+ * time, so two passes over one film can be compared.
+ */
+export const SHEET_RUBRIC = {
+  scale: 'Score each 1-10. Under 7 on any line is a fix before export.',
+  criteria: [
+    'hook: does something worth watching happen in the first 2 s?',
+    'phone readability: at 360 px wide, can every word be read?',
+    'motion quality: do moves ease in and out, with nothing jumping or sliding at constant speed?',
+    'variety: does something change every 2-4 s, with no stretch that looks the same?',
+    'composition: is there a clear subject, with nothing crammed against an edge?',
+    'brand accuracy: are the colours, fonts and logo the brand\'s own?',
+    'sound sync: do cuts and hits land on the beat (check against pinepaper_beat_cuts)?',
+  ],
+  checklist: [
+    'text overlapping text or a subject',
+    'dead beats: adjacent tiles that are the same picture',
+    'labels or logos cut off in a corner',
+    'a jump between the last and first frame of a loop (loopSeam)',
+  ],
+};
 
 export class PinePaperCodeGenerator {
   /**
@@ -10494,7 +10548,7 @@ ${checks.includes('contrast') ? `  // SAMPLED OVER TIME (round 12, 12.9): text i
   }
 
   generateCaptureFrames(input: CaptureFramesInput): string {
-    const timesJson = JSON.stringify(input.times);
+    const timesJson = JSON.stringify(input.times ?? []);
     const seed = input.seed !== undefined ? input.seed : 0;
     const includeDataUrls = !!input.includeDataUrls;
     return `
@@ -10553,6 +10607,70 @@ ${checks.includes('contrast') ? `  // SAMPLED OVER TIME (round 12, 12.9): text i
     ...(__firstSeek ? { firstSeek: __firstSeek } : {}),
     ...(__firstSeek && __firstSeek.timedOut > 0 ? { videoWarning: 'the video seek for the first frame timed out: its video may show an earlier picture. Retry after the clip has loaded.' } : {}),
     frames: frames };
+})();`.trim();
+  }
+
+  /**
+   * A contact sheet (G3): capture at the planned times and tile them into one
+   * image in the page. On a studio with sized capture (FxTool #42:
+   * captureFramesAt(times, { width, format })) the engine renders each frame
+   * small; on an older one the full frame is scaled while tiling.
+   */
+  generateCaptureSheet(input: CaptureFramesInput): string {
+    const sheet = input.sheet!;
+    const { times, labels } = sheetTimes(input.times, sheet);
+    const n = times.length;
+    const columns = sheet.columns ?? Math.min(6, Math.max(1, Math.ceil(Math.sqrt(n))));
+    const mime = sheet.format === 'png' ? 'image/png' : 'image/jpeg';
+    const S = (v: unknown) => JSON.stringify(v);
+    return `
+// Contact sheet of ${n} frame(s)
+(async function() {
+  if (typeof app.captureFramesAt !== 'function') {
+    return { success: false, error: 'app.captureFramesAt unavailable — update FxTool to a build with the deterministic capture entrypoint' };
+  }
+  const times = ${S(times)};
+  const labels = ${S(labels)};
+  const tileW = ${sheet.tileWidth};
+  const columns = ${columns};
+  const sized = typeof app._frameCapture === 'function';
+  const cap = typeof app.captureFramesAtAsync === 'function' ? app.captureFramesAtAsync.bind(app) : app.captureFramesAt.bind(app);
+  const urls = sized
+    ? await cap(times, { seed: ${input.seed ?? 0}, width: tileW, format: 'png' })
+    : await cap(times, { seed: ${input.seed ?? 0}, capture: function(c) {
+        return typeof app.captureFrameDataURL === 'function' ? app.captureFrameDataURL() : (c && c.toDataURL ? c.toDataURL() : '');
+      } });
+  const imgs = await Promise.all(urls.map(function(u) {
+    return new Promise(function(res) { const im = new Image(); im.onload = function() { res(im); }; im.onerror = function() { res(null); }; im.src = u; });
+  }));
+  const first = imgs.find(function(im) { return im && im.naturalWidth; });
+  if (!first) return { success: false, error: 'no frame could be captured' };
+  const tileH = Math.max(1, Math.round(tileW * first.naturalHeight / first.naturalWidth));
+  const rows = Math.ceil(imgs.length / columns);
+  const gap = 4;
+  const cv = document.createElement('canvas');
+  cv.width = columns * tileW + (columns + 1) * gap;
+  cv.height = rows * tileH + (rows + 1) * gap;
+  const g = cv.getContext('2d');
+  g.fillStyle = '#202020'; g.fillRect(0, 0, cv.width, cv.height);
+  imgs.forEach(function(im, i) {
+    const x = gap + (i % columns) * (tileW + gap);
+    const y = gap + Math.floor(i / columns) * (tileH + gap);
+    if (im) g.drawImage(im, x, y, tileW, tileH);
+    else { g.fillStyle = '#802020'; g.fillRect(x, y, tileW, tileH); }
+    if (${sheet.labels ? 'true' : 'false'}) {
+      const text = labels[i];
+      g.font = '600 13px system-ui, sans-serif';
+      const w = g.measureText(text).width + 10;
+      g.fillStyle = 'rgba(0,0,0,0.65)'; g.fillRect(x + 4, y + 4, w, 20);
+      g.fillStyle = '#fff'; g.fillText(text, x + 9, y + 19);
+    }
+  });
+  const dataUrl = cv.toDataURL(${S(mime)}${sheet.format === 'png' ? '' : ', 0.82'});
+  return { success: true, dataUrl: dataUrl, tiles: imgs.length, columns: columns, rows: rows,
+    width: cv.width, height: cv.height, tileWidth: tileW, times: times,
+    missing: imgs.filter(function(im) { return !im; }).length,
+    sizedCapture: sized };
 })();`.trim();
   }
 

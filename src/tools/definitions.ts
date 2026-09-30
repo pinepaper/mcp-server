@@ -2198,6 +2198,13 @@ By default returns a cheap per-frame hash + byte size (token-light), plus unique
 
 Set includeDataUrls: true to also get each frame as a PNG data URL (large — only for a few frames).
 
+LOOK AT YOUR OWN FILM — sheet: one tiled image of many frames, saved to a file (filePath), plus a review rubric to score it against. Structure checks cannot see what a frame looks like; this can. Pick the frames with times (e.g. the music's beat times), or:
+- sheet.every + sheet.duration: one frame every N seconds.
+- sheet.strip {at, count?, step?}: consecutive frames around a moment (a transition, a stutter).
+- sheet.loopSeam + sheet.duration: the last frame beside the first.
+tileWidth defaults to 360 px, phone width: if a word cannot be read in its tile, it cannot be read on a phone. Then open the file, score review.criteria 1-10, and go through review.checklist.
+EXAMPLE: { sheet: { every: 1, duration: 15 } } → one ~15-tile JPEG.
+
 USE WHEN:
 - Verifying an animation is deterministic / reproducible
 - Checking whether a scene actually animates across a time range
@@ -2220,8 +2227,26 @@ EXAMPLE: { times: [0, 0.5, 1, 1.5, 2], seed: 42 }`,
           type: 'boolean',
           description: 'Include each frame as a PNG data URL (large). Default false → hashes only.',
         },
+        sheet: {
+          type: 'object',
+          description: 'Return ONE tiled image saved to a file, plus a critique rubric, instead of per-frame hashes. times is then optional.',
+          properties: {
+            every: { type: 'number', description: 'One frame every N seconds from 0 to duration.' },
+            duration: { type: 'number', description: 'Scene length in seconds (for every and loopSeam).' },
+            strip: {
+              type: 'object',
+              properties: { at: { type: 'number' }, count: { type: 'integer', minimum: 2, maximum: 24 }, step: { type: 'number' } },
+              required: ['at'],
+              description: 'Consecutive frames around a moment: count (default 8), step seconds apart (default 1/30).',
+            },
+            loopSeam: { type: 'boolean', description: 'The last frame beside the first.' },
+            tileWidth: { type: 'integer', minimum: 120, maximum: 1080, description: 'Tile width in px (default 360, phone width).' },
+            columns: { type: 'integer', minimum: 1, maximum: 12 },
+            format: { type: 'string', enum: ['jpeg', 'png'], description: 'Default jpeg (small).' },
+            labels: { type: 'boolean', description: 'Stamp each tile with its time (default true).' },
+          },
+        },
       },
-      required: ['times'],
     },
   },
 

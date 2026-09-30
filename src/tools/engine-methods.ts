@@ -238,6 +238,7 @@ export const REQUIRED_ENGINE_METHODS: readonly string[] = [
  * does not read as an unusable one.
  */
 export const OPTIONAL_ENGINE_METHODS: readonly string[] = [
+  '_frameCapture',
   '_isKnownRelationEndpoint',
   '_resolveId',
   '_resolveRaster',

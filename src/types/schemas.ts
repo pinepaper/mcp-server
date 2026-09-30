@@ -4247,11 +4247,38 @@ export type ValidateSceneInput = z.infer<typeof ValidateSceneInputSchema>;
 
 // Deterministic headless frame capture (S3) — evaluate the scene at each time via
 // sceneAt(t) with Math.random seeded once around the whole sequence, then snapshot.
+/**
+ * A contact sheet: many frames tiled into ONE small image, saved to a file,
+ * so an agent can look at its own film (G3 critique loop). Built on the same
+ * deterministic capture; the times come from `times`, or from one of the
+ * modes below.
+ */
+export const CaptureSheetSchema = z.object({
+  every: z.number().positive().optional().describe('One frame every N seconds from 0 to duration (needs duration).'),
+  duration: z.number().positive().optional().describe('Scene length in seconds, for every and loopSeam.'),
+  strip: z.object({
+    at: z.number().min(0).describe('Centre time in seconds.'),
+    count: z.number().int().min(2).max(24).default(8),
+    step: z.number().positive().default(1 / 30).describe('Seconds between frames (default one frame at 30 fps).'),
+  }).optional().describe('Consecutive frames around a moment: to check a transition or a stutter.'),
+  loopSeam: z.boolean().optional().describe('The last frame next to the first (needs duration): does the loop join without a jump?'),
+  tileWidth: z.number().int().min(120).max(1080).default(360).describe('Width of each tile in px. 360 is phone width: read every word at this size.'),
+  columns: z.number().int().min(1).max(12).optional().describe('Tiles per row (default: as square as the count allows, at most 6).'),
+  format: z.enum(['jpeg', 'png']).default('jpeg'),
+  labels: z.boolean().default(true).describe('Stamp each tile with its time.'),
+});
+export type CaptureSheet = z.infer<typeof CaptureSheetSchema>;
+
 export const CaptureFramesInputSchema = z.object({
-  times: z.array(z.number()).min(1).describe('Capture times in seconds, rendered in order.'),
+  times: z.array(z.number()).min(1).optional().describe('Capture times in seconds, rendered in order. Required unless sheet gives every, strip or loopSeam.'),
   seed: z.number().optional().describe('Seed Math.random once around the whole sequence so random generators/particles are reproducible (default 0).'),
   includeDataUrls: z.boolean().optional().describe('Include each frame as a PNG data URL (large — token-heavy). Default false → returns a cheap per-frame hash + byte size only.'),
-});
+  sheet: CaptureSheetSchema.optional().describe('Return ONE tiled image (saved to a file) instead of per-frame hashes, plus a critique rubric.'),
+})
+  .refine((v) => !!v.times || !!(v.sheet && (v.sheet.every || v.sheet.strip || v.sheet.loopSeam)),
+    { message: 'give times, or sheet with every, strip or loopSeam', path: ['times'] })
+  .refine((v) => !v.sheet || !(v.sheet.every || v.sheet.loopSeam) || !!v.sheet.duration || !!v.times,
+    { message: 'sheet.every and sheet.loopSeam need sheet.duration (the scene length in seconds)', path: ['sheet', 'duration'] });
 export type CaptureFramesInput = z.infer<typeof CaptureFramesInputSchema>;
 
 // Ontology→scene compiler (S12-E3). Compiles a pp:-namespaced JSON-LD design graph

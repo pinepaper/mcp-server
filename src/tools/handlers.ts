@@ -7,7 +7,7 @@
  */
 
 import { CallToolResult, TextContent, ImageContent } from '@modelcontextprotocol/sdk/types.js';
-import { codeGenerator, generateQueryMutationsCode } from '../types/code-generator.js';
+import { codeGenerator, generateQueryMutationsCode, SHEET_RUBRIC } from '../types/code-generator.js';
 import {
   CreateItemInputSchema,
   ModifyItemInputSchema,
@@ -1077,6 +1077,45 @@ export async function customCodeRollback(
   return { rolledBack, note: scene + how };
 }
 
+
+/**
+ * pinepaper_capture_frames with `sheet`: one tiled image of the film, saved
+ * to a file (an image is never useful inline, see ALWAYS_SAVE_FORMATS), with
+ * the rubric the agent scores it against. Code mode returns the code as usual.
+ */
+async function captureSheet(input: z.infer<typeof CaptureFramesInputSchema>, options: HandlerOptions): Promise<CallToolResult> {
+  const code = codeGenerator.generateCaptureSheet(input);
+  const description = 'Contact sheet';
+  const effectiveExecMode = options.executionMode ?? getExecutionMode();
+  if (effectiveExecMode === 'code' || !options.executeInBrowser) {
+    return executeOrGenerate(code, description, options, 'pinepaper_capture_frames');
+  }
+  const controller = options.browserController || getBrowserController();
+  if (!controller.connected) {
+    try { await controller.connect(); } catch { return executeOrGenerate(code, description, options, 'pinepaper_capture_frames'); }
+  }
+  // Frames wait for video seeks one at a time, so 48 of them can outlast the
+  // governor's 10 s default.
+  const run = await controller.executeCode(code, false, { governorTimeoutMs: 120_000 });
+  const value = (run.result ?? {}) as { success?: boolean; error?: string; dataUrl?: string } & Record<string, unknown>;
+  if (!run.success || value.success === false || typeof value.dataUrl !== 'string') {
+    return errorResult(ErrorCodes.EXECUTION_ERROR, run.error || value.error || 'the contact sheet could not be made', { code, governorReport: run.report }, { toolName: 'pinepaper_capture_frames' });
+  }
+  const format = input.sheet?.format === 'png' ? 'png' : 'jpg';
+  const { filePath, fileSize } = await saveExportToFile(value.dataUrl, format, 'sheet');
+  const { dataUrl: _d, success: _s, ...facts } = value;
+  void _d; void _s;
+  const result = { success: true, filePath, fileSize, format, ...facts, review: SHEET_RUBRIC };
+  return {
+    content: [{
+      type: 'text' as const,
+      text: `Contact sheet saved: ${filePath} (${(fileSize / 1024).toFixed(1)} KB, ${String(facts.tiles)} tiles).\n`
+        + 'Open the image and score it against review.criteria (1-10 each), then check review.checklist.\n\n'
+        + JSON.stringify(result, null, 2),
+    }],
+  };
+}
+
 export async function executeOrGenerate(
   code: string,
   description: string,
@@ -1977,8 +2016,9 @@ async function handleToolCallInner(
 
       case 'pinepaper_capture_frames': {
         const input = CaptureFramesInputSchema.parse(args);
+        if (input.sheet) return captureSheet(input, options);
         const code = codeGenerator.generateCaptureFrames(input);
-        const description = `Deterministic capture of ${input.times.length} frame(s)`;
+        const description = `Deterministic capture of ${(input.times ?? []).length} frame(s)`;
         return executeOrGenerate(code, description, options, 'pinepaper_capture_frames');
       }
 
