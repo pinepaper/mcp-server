@@ -1781,6 +1781,8 @@ EXAMPLES:
     annotations: { title: 'Beat-Snapped Cuts', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     description: `Cut on the music: analyse a track's beats (or take beat times you already have), fit a beat grid, and return cut points on every beat, every bar, or every N beats — optionally splitting a video or audio clip at each one.
 
+The song is the backbone of the edit: when the music is generated, cut the picture to its beats and bars and use the whole song. Do not trim the song to fit shots that were planned first.
+
 - source: the music — an upload id, URL, data: URL or local file path. Or beats: [seconds] to skip the analysis.
 - every: 'beat' (default) | 'bar' | N beats. beatsPerBar (default 4). range: [from, to] seconds.
 - bpm: the tempo, if you know it (the grid's phase is still fitted to the music). Otherwise the studio's detection and its usual confusions (double, half, 3:4, 4:3 …) are scored against the music and the best is used; bpmHint: [min, max] keeps the choice in a range. The result lists the candidates, and says lowConfidence with a warning when the tempo is uncertain — pass bpm then.
@@ -1851,6 +1853,12 @@ EXAMPLE: { checks: ["contrast", "flash"], duration: 6, fps: 20 }`,
     annotations: { title: 'Generate Image (cloud)', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     description: `Generate images with an AI model in the PinePaper cloud, and optionally place the first one on the canvas. CHARGED per output — price it first with pinepaper_generate_estimate (free).
 
+PLAN FIRST; GENERATE ONLY WHAT THE EDIT USES. Every output is paid in full whether or not it is used, so generate-then-trim is waste:
+- Plan the whole timeline (shots, lengths, roles) before the first paid call, and price the whole plan with pinepaper_generate_estimate.
+- Reuse before generating: an image you already generated is referenced by its ref "/scene-assets/<id>".
+- Video: choose each shot's length from the lengths the model allows (listModels; Veo takes 4, 6 or 8 s) and re-time the edit to them. Do not generate long and crop.
+- Music: the song is the backbone. Its length only loosely follows the request, so cut the picture to its beats and bars with pinepaper_beat_cuts and use the whole song, rather than trimming it to fit the picture.
+
 Needs a service-account key in PINEPAPER_API_KEY (pp_sa_…, render:create scope). It is an internal beta enabled per organisation: without it the result says "not enabled for your organisation", and nothing is charged. Every refusal says whether anything was charged.
 
 - model or useCase: a model id from pinepaper_generate_estimate {listModels: true}, or a use case and the cloud picks its default (hero stills, plates, text in the image, character-consistent edits).
@@ -1894,7 +1902,7 @@ The result: assets [{assetId, ref, width, height}] — the sizes the files HAVE 
   {
     name: 'pinepaper_generate_estimate',
     annotations: { title: 'Estimate Generation (free)', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
-    description: `Free: price a pinepaper_generate call before making it, or list the models. { listModels: true } returns every model you may use with its price per output, use cases, licence notes and the defaults per use case; { model | useCase, input } returns the estimate for that request. Needs PINEPAPER_API_KEY, like pinepaper_generate.`,
+    description: `Free: price a pinepaper_generate call before making it, or list the models. Estimate the WHOLE plan (every asset the edit needs, at the lengths it will use) before generating any of it, not call by call. { listModels: true } returns every model you may use with its price per output, use cases, licence notes and the defaults per use case; { model | useCase, input } returns the estimate for that request. Needs PINEPAPER_API_KEY, like pinepaper_generate.`,
     inputSchema: {
       type: 'object',
       properties: {
