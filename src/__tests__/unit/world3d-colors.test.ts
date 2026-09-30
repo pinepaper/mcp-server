@@ -10,8 +10,8 @@
  * W2 `add_material {color:"#e9e4d8"}` was refused by OUR schema.
  * W3 `ground_height {x, z}` was refused for a missing y it never reads.
  *
- * The colour paths are FxTool WORLD_SCHEMA's kind:'color' entries
- * (js/world3d/worlds.js on origin/main); refresh the fixture when it changes.
+ * The colour paths are GENERATED from FxTool WORLD_SCHEMA's kind:'color'
+ * entries (scripts/sync-engine-lists.mjs); check:engine-lists guards drift.
  */
 
 import { describe, it, expect } from 'bun:test';
@@ -20,15 +20,16 @@ import { join } from 'node:path';
 import { PinePaperCodeGenerator, WORLD3D_COLOR_PATHS, world3dSpecColors } from '../../types/code-generator.js';
 import { World3DInputSchema } from '../../types/schemas.js';
 
-const ENGINE = readFileSync(join(import.meta.dir, '..', 'fixtures', 'engine-world3d-color-paths.txt'), 'utf-8')
-  .split('\n').map((l) => l.trim()).filter(Boolean);
+const GENERATED = readFileSync(join(import.meta.dir, '..', '..', 'tools', 'engine-lists.ts'), 'utf-8');
 
 const gen = new PinePaperCodeGenerator();
 const emit = (input: Record<string, unknown>) => gen.generateWorld3D(World3DInputSchema.parse(input) as never);
 
 describe('world3d colour fields', () => {
-  it('the colour paths are exactly the engine schema\'s', () => {
-    expect([...WORLD3D_COLOR_PATHS].sort()).toEqual([...ENGINE].sort());
+  it('the colour paths are the generated ones, stamped with their engine source', () => {
+    expect(GENERATED).toMatch(/world3d\/worlds\.js\s+sha256: [0-9a-f]{16}/);
+    expect(WORLD3D_COLOR_PATHS.length).toBeGreaterThan(0);
+    expect(WORLD3D_COLOR_PATHS.every((p) => p.startsWith('env.'))).toBe(true);
   });
 
   it('configure converts a hex env colour to [r, g, b] in 0..1', () => {

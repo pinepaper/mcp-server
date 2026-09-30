@@ -1,0 +1,154 @@
+#!/usr/bin/env node
+/**
+ * Generate src/tools/engine-lists.ts — name lists the engine owns, which the
+ * tool surface must offer exactly.
+ *
+ * WHY GENERATED. Both lists were hand-copied first, and both copies were
+ * wrong in the way every hand-copied engine list in this repo has been wrong:
+ * silently.
+ *
+ * - EASING_NAMES. Six hand-maintained six-name enums rejected every easing
+ *   the engine added (the springs, FxTool #39) and hid ten it always had, and
+ *   FxTool's own validator carried a stale nine-name copy of the same table
+ *   (#40). The names are the keys of `EASINGS` in core/KeyframeInterpolator.js,
+ *   several of them arriving through spreads (`..._springs`, `..._standard`),
+ *   so a text scrape misses them: the module is EVALUATED instead. It has no
+ *   imports and runs standalone; if that ever stops being true, this fails
+ *   loudly rather than guessing.
+ * - WORLD3D_COLOR_PATHS. The world spec's colour fields, WORLD_SCHEMA entries
+ *   of kind 'color' in world3d/worlds.js. None of them is named `color`, so a
+ *   converter keyed on that name let a hex `env.zenith` through to a validator
+ *   that refused it, and the refusal's reason was dropped too (W1).
+ *
+ * Descriptions are NOT generated: they are prose, written here. The type of
+ * EASING_DESCRIPTIONS is keyed on the generated union, so a new engine easing
+ * fails the TYPECHECK until someone writes its line.
+ *
+ *   node scripts/sync-engine-lists.mjs [--check]
+ *
+ * Reads FxTool's COMMITTED origin/main (the tree is shared with other
+ * sessions, so its working copy is not evidence). `--check` regenerates into
+ * memory and exits non-zero on any difference. With no FxTool checkout it
+ * exits 0 and says so: an absent sibling is not drift.
+ */
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const REPO = resolve(HERE, '..');
+const OUT = join(REPO, 'src', 'tools', 'engine-lists.ts');
+
+const FXTOOL = process.env.PP_FXTOOL_DIR ? process.env.PP_FXTOOL_DIR : resolve(REPO, '..', 'FxTool');
+const ENGINE_REF = process.env.PP_FXTOOL_REF || 'origin/main';
+const EASING_REL = 'js/core/KeyframeInterpolator.js';
+const WORLD_REL = 'js/world3d/worlds.js';
+
+function resolveRef() {
+  for (const ref of [ENGINE_REF, 'HEAD']) {
+    try {
+      return { ref, sha: execFileSync('git', ['-C', FXTOOL, 'rev-parse', ref], { encoding: 'utf8' }).trim() };
+    } catch { /* try the next */ }
+  }
+  return null;
+}
+
+function readCommitted(rel) {
+  const resolved = resolveRef();
+  if (resolved) {
+    try {
+      return execFileSync('git', ['-C', FXTOOL, 'show', `${resolved.ref}:${rel}`], {
+        encoding: 'utf8', maxBuffer: 64 * 1024 * 1024,
+      });
+    } catch { /* absent at that ref */ }
+  }
+  const abs = join(FXTOOL, rel);
+  return existsSync(abs) ? readFileSync(abs, 'utf8') : null;
+}
+
+function engineRevision() {
+  const resolved = resolveRef();
+  return resolved ? `${resolved.ref} ${resolved.sha}` : 'unknown (not a git checkout)';
+}
+
+const digest = (s) => createHash('sha256').update(s).digest('hex').slice(0, 16);
+
+async function easingNames(src) {
+  if (/^\s*import\s/m.test(src)) {
+    throw new Error(`sync-engine-lists: ${EASING_REL} now has imports, so it cannot be evaluated standalone. Teach this script to resolve them.`);
+  }
+  const mod = await import(`data:text/javascript;base64,${Buffer.from(src).toString('base64')}`);
+  const names = mod.EASING_NAMES;
+  if (!Array.isArray(names) || names.length === 0 || !names.every((n) => typeof n === 'string')) {
+    throw new Error(`sync-engine-lists: ${EASING_REL} did not export a non-empty EASING_NAMES string array`);
+  }
+  return names;
+}
+
+function worldColorPaths(src) {
+  const start = src.indexOf('WORLD_SCHEMA');
+  if (start === -1) throw new Error(`sync-engine-lists: WORLD_SCHEMA not found in ${WORLD_REL}`);
+  const paths = [...src.slice(start).matchAll(/path:\s*'([^']+)',\s*kind:\s*'color'/g)].map((m) => m[1]);
+  if (paths.length === 0) throw new Error(`sync-engine-lists: no kind:'color' entries in WORLD_SCHEMA (${WORLD_REL})`);
+  return paths;
+}
+
+const list = (names) => names.map((n) => `  '${n}',`).join('\n');
+
+async function generate() {
+  const easingSrc = readCommitted(EASING_REL);
+  const worldSrc = readCommitted(WORLD_REL);
+  if (!easingSrc) throw new Error(`sync-engine-lists: cannot read ${EASING_REL}`);
+  if (!worldSrc) throw new Error(`sync-engine-lists: cannot read ${WORLD_REL}`);
+  const easings = await easingNames(easingSrc);
+  const colors = worldColorPaths(worldSrc);
+
+  return `/**
+ * GENERATED — DO NOT EDIT. Run \`bun run sync:engine-lists\`.
+ *
+ * Name lists the engine owns and the tool surface must offer exactly. See
+ * scripts/sync-engine-lists.mjs for why each is generated.
+ *
+ * Source: FxTool ${engineRevision()}
+ *   ${EASING_REL}  sha256: ${digest(easingSrc)}
+ *   ${WORLD_REL}  sha256: ${digest(worldSrc)}
+ */
+
+/** ${easings.length} names: EASING_NAMES, the keys of the engine's easing table. Keyframes, masks, relations and the camera all resolve through it. */
+export const ENGINE_EASING_NAMES = [
+${list(easings)}
+] as const;
+
+/** ${colors.length} paths: WORLD_SCHEMA entries of kind 'color' — the world spec's colour fields. */
+export const WORLD3D_COLOR_PATHS = [
+${list(colors)}
+] as const;
+`;
+}
+
+async function main() {
+  const check = process.argv.includes('--check');
+  if (!existsSync(FXTOOL)) {
+    console.error(`sync-engine-lists: no FxTool checkout at ${FXTOOL}`);
+    console.error('Set PP_FXTOOL_DIR, or check out FxTool beside this repo.');
+    process.exit(0);
+  }
+  const wanted = await generate();
+  const current = existsSync(OUT) ? readFileSync(OUT, 'utf8') : null;
+  const count = (wanted.match(/^  '/gm) || []).length;
+  if (current === wanted) {
+    console.log(`✅ engine lists in sync (${count} names)`);
+    process.exit(0);
+  }
+  if (check) {
+    console.error('DRIFT: src/tools/engine-lists.ts differs from FxTool.');
+    console.error('Run: bun run fix:engine-lists');
+    process.exit(1);
+  }
+  writeFileSync(OUT, wanted);
+  console.log(`✅ wrote engine lists (${count} names)`);
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) main().catch((e) => { console.error(e.message); process.exit(1); });

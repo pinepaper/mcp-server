@@ -9,6 +9,7 @@
  */
 
 import { z } from 'zod';
+import { ENGINE_EASING_NAMES } from '../tools/engine-lists.js';
 
 // =============================================================================
 // COMMON SCHEMAS
@@ -93,26 +94,12 @@ export const BlendModeSchema = z.enum([
 export type BlendMode = z.infer<typeof BlendModeSchema>;
 
 /**
- * Every easing name the engine's table accepts (FxTool `EASING_NAMES`, from
- * core/KeyframeInterpolator.js). Keyframes, masks, relations and the camera all
- * resolve a name through that one table, so every easing enum here is this list.
- * Pinned by src/__tests__/unit/easing-parity.test.ts against
- * fixtures/engine-easings.txt; refresh the fixture when the engine adds one.
+ * Every easing name the engine's table accepts: GENERATED from FxTool's
+ * EASING_NAMES (scripts/sync-engine-lists.mjs, checked in prepublishOnly).
+ * Keyframes, masks, relations and the camera all resolve a name through that
+ * one table, so every easing enum here is this list.
  */
-export const KEYFRAME_EASINGS = [
-  'linear', 'easeIn', 'easeOut', 'easeInOut',
-  'easeInCubic', 'easeOutCubic', 'easeInOutCubic',
-  'bounce', 'easeOutBounce', 'easeInBounce',
-  'elastic', 'easeOutElastic', 'easeInElastic',
-  'easeOutBack', 'easeInBack', 'easeInOutBack',
-  'spring', 'springSnappy', 'springPlayful',
-  'easeInQuad', 'easeOutQuad', 'easeInOutQuad',
-  'easeInSine', 'easeOutSine', 'easeInOutSine',
-  'easeInQuart', 'easeOutQuart', 'easeInOutQuart',
-  'easeInQuint', 'easeOutQuint', 'easeInOutQuint',
-  'easeInExpo', 'easeOutExpo', 'easeInOutExpo',
-  'easeInCirc', 'easeOutCirc', 'easeInOutCirc',
-] as const;
+export const KEYFRAME_EASINGS = ENGINE_EASING_NAMES;
 
 /** One line per easing, for tool descriptions and pinepaper_get_available_easings. */
 export const EASING_DESCRIPTIONS: Record<(typeof KEYFRAME_EASINGS)[number], string> = {

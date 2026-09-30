@@ -38,7 +38,7 @@
     "typecheck": "tsc --noEmit",
     "check:manifest": "bun scripts/check-manifest-tools.mjs",
     "fix:manifest": "bun scripts/check-manifest-tools.mjs --fix",
-    "prepublishOnly": "bun run check:manifest && bun run check:design && bun run check:character && bun run check:engine-methods && bun run check:engine-surface && bun run check:shape-params && bun run check:stick-vocabulary && bun run check:ontology-vocabulary && bun run build",
+    "prepublishOnly": "bun run check:manifest && bun run check:design && bun run check:character && bun run check:engine-methods && bun run check:engine-surface && bun run check:shape-params && bun run check:stick-vocabulary && bun run check:ontology-vocabulary && bun run check:engine-lists && bun run build",
     "lint:errors": "eslint src --quiet",
     "sync:design": "node scripts/sync-design-systems.mjs",
     "check:design": "node scripts/sync-design-systems.mjs --check",
@@ -57,7 +57,10 @@
     "sync:character": "node scripts/sync-character-modules.mjs",
     "check:character": "node scripts/sync-character-modules.mjs --check",
     "sync:ontology-vocabulary": "node scripts/sync-ontology-vocabulary.mjs",
-    "check:ontology-vocabulary": "node scripts/sync-ontology-vocabulary.mjs --check"
+    "check:ontology-vocabulary": "node scripts/sync-ontology-vocabulary.mjs --check",
+    "sync:engine-lists": "node scripts/sync-engine-lists.mjs",
+    "fix:engine-lists": "node scripts/sync-engine-lists.mjs",
+    "check:engine-lists": "node scripts/sync-engine-lists.mjs --check"
   },
   "keywords": [
     "mcp",

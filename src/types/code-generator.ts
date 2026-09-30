@@ -6,6 +6,7 @@
  */
 
 import { normalizeSvgSize } from '../utils/svg-size.js';
+import { WORLD3D_COLOR_PATHS } from '../tools/engine-lists.js';
 import { REQUIRED_ENGINE_METHODS, OPTIONAL_ENGINE_METHODS } from '../tools/engine-methods.js';
 import { ACCEPTED_CREATE_PARAMS, NORMALIZE_PARAM_READS, MODIFY_CHANGE_READS } from '../tools/shape-params.js';
 import { generateP5DrawCode } from '../tools/p5-compat/p5-helpers.js';
@@ -2602,17 +2603,12 @@ function world3dColor(value: unknown): unknown {
 }
 
 /**
- * The world spec's colour fields: FxTool WORLD_SCHEMA entries of kind 'color'
- * (js/world3d/worlds.js), pinned by world3d-colors.test.ts against
- * fixtures/engine-world3d-color-paths.txt. None of them is named `color`, so
- * world3dColors never touched them and a hex `env.zenith` reached the engine
- * as a string, where the validator refused it.
+ * The world spec's colour fields: GENERATED from FxTool WORLD_SCHEMA's kind
+ * 'color' entries (scripts/sync-engine-lists.mjs). None of them is named
+ * `color`, so world3dColors never touched them and a hex `env.zenith` reached
+ * the engine as a string, where the validator refused it.
  */
-export const WORLD3D_COLOR_PATHS = [
-  'env.zenith', 'env.horizon', 'env.fogColor', 'env.sunColor', 'env.ambient',
-  'env.lowColor', 'env.midColor', 'env.highColor', 'env.rockColor',
-  'env.propColorA', 'env.propColorB',
-] as const;
+export { WORLD3D_COLOR_PATHS };
 
 /** A hex colour to [r, g, b] 0..1; anything else unchanged (arrays too: light colours may exceed 1). */
 export function world3dHex(value: unknown): unknown {

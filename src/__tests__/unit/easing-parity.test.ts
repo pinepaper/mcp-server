@@ -9,9 +9,10 @@
  * code ran. The same lists had hidden ten names the engine always had
  * (easeInOutCubic, easeOutBack…).
  *
- * The fixture is `EASING_NAMES` from FxTool origin/main. When the engine adds
- * an easing, "hides nothing" fails here: refresh the fixture and add the name
- * (with a description line) to KEYFRAME_EASINGS in src/types/schemas.ts.
+ * The list is GENERATED from FxTool's EASING_NAMES (scripts/sync-engine-lists.mjs
+ * → src/tools/engine-lists.ts); `bun run check:engine-lists` in prepublishOnly
+ * fails the publish when the engine has moved. A new engine easing then fails
+ * the typecheck until EASING_DESCRIPTIONS has its line.
  *
  * Out of scope on purpose: pinepaper_stagger / pinepaper_flip `ease` and
  * `distributeEase` feed the engine's Stagger distribution, and path-follow
@@ -26,10 +27,9 @@ import {
   KEYFRAME_EASINGS, EASING_DESCRIPTIONS, EasingSchema, MaskEasingSchema, KeyframeSchema,
 } from '../../types/schemas.js';
 import { PinePaperCodeGenerator } from '../../types/code-generator.js';
+import { ENGINE_EASING_NAMES } from '../../tools/engine-lists.js';
 
-const ENGINE = readFileSync(
-  join(import.meta.dir, '..', 'fixtures', 'engine-easings.txt'), 'utf-8',
-).split('\n').map((l) => l.trim()).filter(Boolean);
+const GENERATED = readFileSync(join(import.meta.dir, '..', '..', 'tools', 'engine-lists.ts'), 'utf-8');
 
 const OURS = [...KEYFRAME_EASINGS] as string[];
 
@@ -60,12 +60,11 @@ function easingEnums(): Array<{ tool: string; values: string[] }> {
 }
 
 describe('easings ↔ the engine easing table', () => {
-  it('offers nothing the engine cannot ease with', () => {
-    expect(OURS.filter((e) => !ENGINE.includes(e))).toEqual([]);
-  });
-
-  it('hides nothing the engine can ease with', () => {
-    expect(ENGINE.filter((e) => !OURS.includes(e))).toEqual([]);
+  it('the list is the generated one, stamped with its engine source', () => {
+    expect(GENERATED).toContain('GENERATED — DO NOT EDIT');
+    expect(GENERATED).toMatch(/Source: FxTool \S+ [0-9a-f]{40}/);
+    expect(GENERATED).toMatch(/KeyframeInterpolator\.js\s+sha256: [0-9a-f]{16}/);
+    expect(OURS).toEqual([...ENGINE_EASING_NAMES]);
   });
 
   it('includes the three springs', () => {
