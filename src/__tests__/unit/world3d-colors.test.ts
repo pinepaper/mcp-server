@@ -83,4 +83,16 @@ describe('world3d points', () => {
     const code = emit({ action: 'create', spec: 'forest' });
     expect(code).toContain('d.params.map(function (e) { return e && e.path; })');
   });
+
+  it('extrude_path passes upright and placement through (FxTool #49), not stripped by the schema', () => {
+    const code = emit({ action: 'extrude_path', pathId: 'p1', mesh: { depth: 0.4, upright: true, placement: 'canvas' } });
+    expect(code).toContain('"upright":true');
+    expect(code).toContain('"placement":"canvas"');
+    expect(World3DInputSchema.safeParse({ action: 'extrude_path', pathId: 'p1', mesh: { placement: 'floating' } }).success).toBe(false);
+  });
+
+  it('a 3D world counts as the background for alpha_dropped (FxTool #50 composites it into stills)', () => {
+    const code = gen.generateAgentExport({ format: 'jpg', platform: 'web' } as never);
+    expect(code).toContain('const hasWorld = !!app._world3d;');
+  });
 });

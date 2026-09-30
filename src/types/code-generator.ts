@@ -5018,7 +5018,10 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
       const bg = app.canvasEl && app.canvasEl.style && app.canvasEl.style.backgroundColor;
       const hasColor = !!bg && !/^(transparent|rgba\\([^)]*,\\s*0\\))$/i.test(bg);
       const hasBgItems = !!(app.patternGroup && app.patternGroup.children && app.patternGroup.children.length);
-      if (hasColor || hasBgItems) return [];
+      // A 3D world under the canvas IS the background: since FxTool #50
+      // (747315e3) jpg/webp stills composite it, so nothing turns white/black.
+      const hasWorld = !!app._world3d;
+      if (hasColor || hasBgItems || hasWorld) return [];
       return [{ code: 'alpha_dropped', message: fmt === 'apng'
         ? 'apng with transparent: false and no background colour: the frames are filled BLACK. Set a background colour, or drop transparent: false to keep the alpha.'
         : fmt === 'jpg'

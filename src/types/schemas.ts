@@ -4662,8 +4662,12 @@ export const World3DInputSchema = z.object({
   pathId: z.string().optional().describe("extrude_path / lathe_path: the canvas path to turn into geometry. Extrude sweeps it along depth; lathe revolves its profile around the Y axis. The path is unchanged — the mesh is new."),
   mesh: z.object({
     id: z.string().optional().describe('Mesh id (generated if omitted).'),
-    depth: z.number().optional().describe('extrude_path: how far to sweep, in world units.'),
-    unitsPerPixel: z.number().optional().describe('Canvas pixels → world units. The whole scale relationship between the drawing and the world.'),
+    depth: z.number().optional().describe('extrude_path: how far to sweep, in WORLD units (default 1). Not pixels: the outline is canvas px × unitsPerPixel.'),
+    unitsPerPixel: z.number().optional().describe('Canvas pixels → world units (default 0.01, so a 200 px outline is 2 world units). The whole scale relationship between the drawing and the world.'),
+    // FxTool #49 (7c50c838). Declared here, or z.object() strips them before
+    // the emitter's spread can pass them on (the 5.64 colour bug, again).
+    upright: z.boolean().optional().describe('extrude_path: stand the drawing up (canvas up = world up, extruded along Z) — a sign, a letter, a cut-out. Default false: flat, a floor plan in XZ extruded along Y.'),
+    placement: z.enum(['centered', 'canvas']).optional().describe("extrude_path: 'centered' (default) centres the mesh on x/z with its BASE at y, so it stands on the ground at the point you give. 'canvas' keeps the outline's canvas position (× unitsPerPixel), the older behaviour."),
     caps: z.boolean().optional().describe('extrude_path: close the two ends. A capped extrude is a solid; an uncapped one is a ribbon.'),
     segments: z.number().optional().describe('extrude_path: segments along the sweep · lathe_path: segments around the revolution.'),
     arc: z.number().optional().describe('lathe_path: how far round to revolve, in degrees. 360 is a full solid of revolution; less leaves it open.'),
