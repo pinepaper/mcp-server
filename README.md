@@ -267,6 +267,14 @@ Every easing renders exactly in video, GIF and APNG. Lottie and CSS get the
 closest single curve, so `springPlayful` loses its wobble there and the in-out
 quart, quint, expo and circ curves are within a few percent.
 
+### Changed: plan generations before paying for them
+
+`pinepaper_generate` and `pinepaper_generate_estimate` now tell agents to plan
+the whole timeline and price the whole plan before the first paid call, to
+reuse images already generated, and to pick video lengths the model supports
+rather than generating long and cropping. `pinepaper_beat_cuts` treats a
+generated song as the backbone of the edit, used whole.
+
 ### Fixed
 
 - The scene validator no longer flags valid easings as unknown.
