@@ -267,6 +267,15 @@ Every easing renders exactly in video, GIF and APNG. Lottie and CSS get the
 closest single curve, so `springPlayful` loses its wobble there and the in-out
 quart, quint, expo and circ curves are within a few percent.
 
+### New: look at your own animation
+
+`pinepaper_capture_frames` takes `sheet`: many frames tiled into one small
+image, saved to a file, with a rubric to score it against (hook, phone
+readability, motion, variety, composition, brand, sound sync). Choose the
+frames by time, every N seconds, a strip around a moment, or the loop's last
+frame beside its first. Tiles are 360 px wide by default, the width of a
+phone.
+
 ### Changed: plan generations before paying for them
 
 `pinepaper_generate` and `pinepaper_generate_estimate` now tell agents to plan
@@ -288,6 +297,10 @@ generated song as the backbone of the edit, used whole.
   calls.
 - `pinepaper_design_medium` `apply_thread`: the spine points format is
   documented (`{x, y}` or `[x, y]`).
+- `pinepaper_world3d`: colours take hex (`"#03050c"`) everywhere: the world's
+  sky, fog, light and ground colours, and material and light colours. A
+  refused `configure` now says why, naming the key. `ground_height` takes
+  `{x, z}`. `create` lists the configurable parameters by name.
 
 ## What's new in 1.6.17
 
