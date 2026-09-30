@@ -4440,7 +4440,9 @@ export const DesignMediumInputSchema = z.object({
     kind: z.enum(['radial', 'spine', 'constant']),
     cx: z.number().optional(), cy: z.number().optional(),
     angle: z.number().optional(),
-    spine: z.array(PositionSchema).optional(),
+    // [x, y] is converted to {x, y} here: the engine's own spine reader only
+    // takes {x, y} and crashed on an array pair when called directly.
+    spine: z.array(PositionSchema).optional().describe('Points along the midrib, each {x, y} or [x, y]'),
     across: z.boolean().optional(),
   }).optional().describe("apply_thread: the direction field — the thing that makes it needlepainting rather than hatching. Default radial from the shape centre. 'spine' runs stitches along a midrib or feather shaft; 'constant' is flat hatch."),
   stitchLen: z.number().positive().optional().describe('apply_thread: nominal stitch length px (default 18).'),

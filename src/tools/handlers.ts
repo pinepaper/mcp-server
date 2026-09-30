@@ -235,7 +235,13 @@ function getExportDir(): string {
 // wav joins them: a minute of 48kHz 16-bit is ~5.8 MB of base64 and the ten
 // minutes the schema allows is ~77 MB. Deliverable across the bridge, useless
 // pasted into a response.
-export const ALWAYS_SAVE_FORMATS = new Set(['mp4', 'webm', 'gif', 'apng', 'pdf', 'wav', 'srt', 'vtt', 'scc', 'html5-ad', 'playable']);
+// Stills join them too. The threshold below is in CHARACTERS of base64, and a
+// 59 KB 1920x1080 PNG is ~79k of them: under the threshold, so it came back
+// inline, and over the token limit of the client reading it (a Halloween
+// look-frame session, 2026-09-29), while bigger PNGs saved to a file. Same
+// format, two shapes, decided by file size. An image is never useful as
+// base64 in a text result, so png/jpg/webp always save and name the path.
+export const ALWAYS_SAVE_FORMATS = new Set(['mp4', 'webm', 'gif', 'apng', 'pdf', 'wav', 'srt', 'vtt', 'scc', 'html5-ad', 'playable', 'png', 'jpg', 'webp']);
 // 500_000 was chosen against the bridge's limits, not the CALLER's. A pilot
 // session hit a 263K-character end_job result — comfortably under this, so it
 // was returned inline, and over the tool-result limit of the client reading
@@ -982,6 +988,95 @@ function handleValidationError(error: ZodError, i18n?: I18nManager): CallToolRes
  *
  * Default is 'on_request' for optimal performance per best practices.
  */
+/** Page code: remember the id of every item on the canvas. */
+const MARK_ITEMS_BEFORE_RUN = `(function () {
+  if (typeof paper === 'undefined' || !paper.project) return { ok: false };
+  const ids = new Set();
+  paper.project.getItems({}).forEach(function (i) { ids.add(i.id); });
+  window.__ppPreRunIds = ids;
+  return { ok: true };
+})();`;
+
+/** Page code: remove every item that was not there at the mark, outermost first. */
+const REMOVE_ITEMS_CREATED_SINCE_MARK = `(function () {
+  const pre = window.__ppPreRunIds;
+  window.__ppPreRunIds = null;
+  if (!pre || typeof paper === 'undefined' || !paper.project) return { ok: false };
+  const fresh = paper.project.getItems({}).filter(function (i) { return !pre.has(i.id); });
+  const freshIds = new Set(fresh.map(function (i) { return i.id; }));
+  const tops = fresh.filter(function (i) { return !(i.parent && freshIds.has(i.parent.id)); });
+  let removed = 0;
+  tops.forEach(function (it) {
+    try { if (typeof app !== 'undefined' && typeof app.deleteItem === 'function' && app.deleteItem(it)) { removed++; return; } } catch (e) {}
+    try { if (it.parent) { it.remove(); removed++; } } catch (e) {}
+  });
+  const left = paper.project.getItems({}).filter(function (i) { return !pre.has(i.id); }).length;
+  try { if (paper.view) paper.view.update(); } catch (e) {}
+  return { ok: left === 0, removed: removed, left: left };
+})();`;
+
+type RollbackController = {
+  executeCode: (code: string, screenshot?: boolean, opts?: { bypassGovernor?: boolean }) => Promise<{ success: boolean; result?: unknown }>;
+};
+
+/**
+ * Record which canvas items exist before agent-written code runs, so a failed
+ * run's leftovers can be told apart from the scene it started with. Returns
+ * false when the page could not be marked (the rollback is then skipped and
+ * the failure note says nothing about the scene it cannot vouch for).
+ */
+async function markItemsBeforeRun(controller: RollbackController): Promise<boolean> {
+  try {
+    const r = await controller.executeCode(
+      MARK_ITEMS_BEFORE_RUN,
+      false,
+      { bypassGovernor: true },
+    );
+    return !!(r.success && (r.result as { ok?: boolean } | undefined)?.ok);
+  } catch { return false; }
+}
+
+/**
+ * Remove what agent-written code created before it failed, and say so.
+ *
+ * A run stopped by the loop deadline after drawing 42 strokes left them on
+ * the canvas: a half-painted scene. Undo cannot fix that. The governor's one
+ * history entry only covers mutations that announce themselves, and raw
+ * `new paper.Path(...)` does not (measured: report.mutated false, 30 paths
+ * left behind). So the rollback is by identity instead: every item that was
+ * not on the canvas before the call goes, through app.deleteItem where the
+ * engine knows the item (registry, trackers) and item.remove() otherwise.
+ * Edits to items that already existed are NOT reverted; the note says so.
+ */
+export async function customCodeRollback(
+  controller: RollbackController,
+  error: string | undefined,
+): Promise<{ rolledBack: boolean; note: string }> {
+  let rolledBack = false;
+  let removed = 0;
+  let left = -1;
+  try {
+    const r = await controller.executeCode(
+      REMOVE_ITEMS_CREATED_SINCE_MARK,
+      false,
+      { bypassGovernor: true },
+    );
+    const v = (r.result || {}) as { ok?: boolean; removed?: number; left?: number };
+    rolledBack = !!(r.success && v.ok);
+    removed = v.removed ?? 0;
+    left = typeof v.left === 'number' ? v.left : -1;
+  } catch { rolledBack = false; }
+  const scene = rolledBack
+    ? (removed > 0
+      ? `The ${removed} item(s) this call created before it stopped were removed. Changes it made to items that already existed are not reverted.`
+      : 'This call created no items before it stopped. Changes it made to items that already existed are not reverted.')
+    : `Items this call created could not all be removed${left > 0 ? ` (${left} remain)` : ''}: check the canvas before continuing.`;
+  const how = /Synchronous execution exceeded|Loop budget exceeded/i.test(error || '')
+    ? ' This is execute_custom_code\'s per-call guard, not a limit on the scene: its loops may run about 4 s (and 2,000,000 iterations per loop) so the studio tab stays responsive. Split the work across several calls, each of which gets a fresh budget. For example, paint 10 strokes per call instead of 40 in one.'
+    : '';
+  return { rolledBack, note: scene + how };
+}
+
 export async function executeOrGenerate(
   code: string,
   description: string,
@@ -1138,6 +1233,10 @@ ${code}
     tracker.startTimer(`${timerId}_screenshot`);
   }
 
+  // Agent-written code is rolled back when it fails part-way; a tool's own
+  // emitter is not (its verdict already describes what it left behind).
+  const rollbackOnFailure = toolName === 'pinepaper_execute_custom_code'
+    && await markItemsBeforeRun(controller);
   const result = await controller.executeCode(code, shouldTakeScreenshot, stage ? { stage } : {});
 
   const browserDuration = tracker.endTimer(`${timerId}_browser_execution`);
@@ -1181,7 +1280,10 @@ ${code}
       result.error || 'Failed to execute code in browser',
       // errorCode surfaces the governor's structured code (PP_ITEM_BUDGET,
       // PP_LOOP_BUDGET, PP_TIMEOUT) so the model can correct on the next turn.
-      { code, errorCode: result.errorCode, governorReport: result.report },
+      {
+        code, errorCode: result.errorCode, governorReport: result.report,
+        ...(rollbackOnFailure ? await customCodeRollback(controller, result.error) : {}),
+      },
       {
         toolName,
         canvasState: canvasState || undefined,
@@ -1207,7 +1309,10 @@ ${code}
     return errorResult(
       ErrorCodes.EXECUTION_ERROR,
       inner,
-      { code, result: result.result, governorReport: result.report },
+      {
+        code, result: result.result, governorReport: result.report,
+        ...(rollbackOnFailure ? await customCodeRollback(controller, inner) : {}),
+      },
       { toolName, canvasState: canvasState || undefined }
     );
   }

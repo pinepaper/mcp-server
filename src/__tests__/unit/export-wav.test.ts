@@ -182,7 +182,9 @@ describe('wav reaches the file, not the response body', () => {
     expect(ALWAYS_SAVE_FORMATS.has('wav')).toBe(true);
     // The formats that are never small, together — a removal from any of them
     // is the same bug.
-    for (const f of ['mp4', 'webm', 'gif', 'pdf', 'wav']) {
+    // png/jpg/webp: a 59 KB PNG is ~79k characters of base64, under the size
+    // threshold and over a client's token limit, so size cannot decide it.
+    for (const f of ['mp4', 'webm', 'gif', 'pdf', 'wav', 'png', 'jpg', 'webp']) {
       expect(ALWAYS_SAVE_FORMATS.has(f), `${f} would be returned inline`).toBe(true);
     }
     // And svg stays out: it is text, and small enough to read in place.

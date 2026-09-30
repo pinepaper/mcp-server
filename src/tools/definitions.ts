@@ -2403,7 +2403,7 @@ EXAMPLE — a stitched leaf:
         medium: { type: 'string', description: 'resolve: vector | thread | ink | watercolor | hatch | cutPaper | charcoal | oil | encaustic. Six are native (vector, thread, ink, watercolor, hatch, cutPaper), two stylised, one absent — call list_media for the live table rather than trusting this line.' },
         itemId: { type: 'string', description: 'apply_thread / apply_hatch: a closed path, compound path, or a group of them.' },
         stitch: { type: 'string', enum: [...THREAD_STITCHES], description: "apply_thread: default longAndShort. These six are the stitches the engine publishes; call 'list_stitches' for each one's description and its own parameters. An unknown name is refused rather than quietly stitched as a default fill." },
-        field: { type: 'object', description: "apply_thread: { kind: 'radial'|'spine'|'constant', cx, cy, angle, spine[], across } — default radial from the shape centre." },
+        field: { type: 'object', description: "apply_thread: { kind: 'radial'|'spine'|'constant', cx, cy, angle, spine[], across } — default radial from the shape centre. spine is a list of points, each {x, y} or [x, y], e.g. [{x:400,y:200},{x:400,y:520}]; this tool normalises [x, y] to {x, y} before the engine sees it." },
         stitchLen: { type: 'number', description: 'apply_thread: nominal stitch length px (default 18).' },
         rowGap: { type: 'number', description: 'apply_thread: row spacing px; defaults from thread width so rows abut.' },
         variance: { type: 'number', description: 'apply_thread: length jitter 0..1 (default 0.35) — the long-and-short shading.' },
