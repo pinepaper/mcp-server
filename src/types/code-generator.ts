@@ -7591,7 +7591,7 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
     easings: live || fallback,
     source: live ? 'engine' : 'mcp-server fallback list',
     descriptions,
-    exportNote: 'Springs render exactly in video, GIF, APNG and SMIL; Lottie and CSS get the closest single Bezier, so springPlayful loses its wobble there.'
+    exportNote: 'Every easing renders exactly in video, GIF and APNG. Lottie and CSS get the closest single Bezier: springPlayful loses its wobble, and the in-out quart/quint/expo/circ curves are within 2-4%. SMIL is exact for springs and those four.'
   };
 })();
 `.trim();

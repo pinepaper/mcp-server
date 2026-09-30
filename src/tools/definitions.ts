@@ -3721,7 +3721,7 @@ EASING — IT SHAPES THE SEGMENT ARRIVING AT THE KEYFRAME IT IS ON.
 The move from keyframe A to keyframe B is eased by B's easing, not A's. Easing on the FIRST keyframe does nothing (no segment arrives at it) — a Ken Burns with easing only on its first key plays linear. Put the easing on the key you are moving TO.
 ${EASING_LINES}
 - or a custom cubic-bezier [x1, y1, x2, y2] — x in 0..1, y may exceed 0..1 for overshoot. keyframe_animate and camera_animate only.
-Springs render exactly in video, GIF, APNG and SMIL. Lottie and CSS get the closest single Bézier, so springPlayful loses its wobble there.
+Every easing renders exactly in video, GIF and APNG. Lottie and CSS get the closest single Bézier: springPlayful loses its wobble, and the in-out quart/quint/expo/circ curves are within 2–4 %. SMIL is exact for springs and those four.
 
 CLIP WINDOW (optional — Premiere/Canva-style clip behavior):
 - timeOffset: Shift the whole clip in canvas time (seconds). The animation only runs while canvas time is in [timeOffset, timeOffset + (clipOutPoint - clipInPoint)].

@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 2c358eb7ca71de60906ba3488626ba32688a9e8f
- * sha256:    ecfd5bd3eae0f15808fd1800970579e20554c8c840779e3d48719232ef8fc544   (of PinePaper.js as committed)
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 017acb435d7783c9a56085722eae32c64e1d4084
+ * sha256:    e22073635ad058d213a9b72c7136122e2ae553171a05367edb65f4c582f7d90c   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on `window.app`, with how it gets there. The parity
@@ -16,7 +16,7 @@
 /** How a name lands on `app`. */
 export type EngineMemberKind = 'method' | 'accessor' | 'property' | 'lazy' | 'lazyHeavy' | 'bootstrap';
 
-/** 1178 names, from FxTool/js/PinePaper.js. */
+/** 1179 names, from FxTool/js/PinePaper.js. */
 export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object.freeze({
   _activeByGroup: 'property',
   _activeDrawingGroup: 'method',
@@ -129,6 +129,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _flipSnapshot: 'method',
   _formatElapsed: 'method',
   _formatTime: 'method',
+  _frameCapture: 'method',
   _frameCounter: 'property',
   _frameMetrics: 'property',
   _frameSkipConfig: 'property',

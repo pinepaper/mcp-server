@@ -106,6 +106,12 @@ export const KEYFRAME_EASINGS = [
   'elastic', 'easeOutElastic', 'easeInElastic',
   'easeOutBack', 'easeInBack', 'easeInOutBack',
   'spring', 'springSnappy', 'springPlayful',
+  'easeInQuad', 'easeOutQuad', 'easeInOutQuad',
+  'easeInSine', 'easeOutSine', 'easeInOutSine',
+  'easeInQuart', 'easeOutQuart', 'easeInOutQuart',
+  'easeInQuint', 'easeOutQuint', 'easeInOutQuint',
+  'easeInExpo', 'easeOutExpo', 'easeInOutExpo',
+  'easeInCirc', 'easeOutCirc', 'easeInOutCirc',
 ] as const;
 
 /** One line per easing, for tool descriptions and pinepaper_get_available_easings. */
@@ -129,6 +135,24 @@ export const EASING_DESCRIPTIONS: Record<(typeof KEYFRAME_EASINGS)[number], stri
   spring: 'Damped spring, ζ≈1: settles with no overshoot',
   springSnappy: 'Damped spring, ζ≈0.69: quick, one ~5% overshoot',
   springPlayful: 'Damped spring, ζ≈0.45: ~21% overshoot, visible wobbles',
+  easeInQuad: 'Quadratic slow start (same as easeIn)',
+  easeOutQuad: 'Quadratic slow end (same as easeOut)',
+  easeInOutQuad: 'Quadratic slow start and end (same as easeInOut)',
+  easeInSine: 'Gentle slow start (sine)',
+  easeOutSine: 'Gentle slow end (sine)',
+  easeInOutSine: 'Gentle slow start and end (sine)',
+  easeInQuart: 'Slow start, stronger than cubic (t⁴)',
+  easeOutQuart: 'Slow end, stronger than cubic',
+  easeInOutQuart: 'Slow start and end, stronger than cubic',
+  easeInQuint: 'Very slow start (t⁵)',
+  easeOutQuint: 'Very slow end',
+  easeInOutQuint: 'Very slow start and end',
+  easeInExpo: 'Near-still start, then fast (the standard expo curve)',
+  easeOutExpo: 'Fast, then a long near-still end (the standard expo curve)',
+  easeInOutExpo: 'Near-still at both ends, fast in the middle',
+  easeInCirc: 'Slow start, sharp finish (circular)',
+  easeOutCirc: 'Sharp start, slow finish (circular)',
+  easeInOutCirc: 'Circular slow start and end',
 };
 
 export const EasingSchema = z.enum(KEYFRAME_EASINGS).describe('Easing function for animation');

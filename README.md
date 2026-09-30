@@ -248,20 +248,30 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 
 ## What's new in 1.6.18
 
-### New: spring easings and custom curves
+### New: spring easings, the standard easing set, and custom curves
 
 Keyframes take three spring easings: `spring` (settles with no overshoot),
 `springSnappy` (quick, one small overshoot) and `springPlayful` (bouncy, a few
-visible wobbles). Every other easing the studio supports can now be named too,
-such as `easeInOutCubic` and `easeOutBack`. `pinepaper_get_available_easings`
-lists them all.
+visible wobbles).
+
+The standard easings are here too: sine, quad, cubic, quart, quint, expo,
+circ and back as `easeIn…`, `easeOut…` and `easeInOut…` (for example
+`easeOutExpo`, `easeInOutQuart`), plus in and out bounce and elastic.
+`pinepaper_get_available_easings` lists every name.
 
 `pinepaper_keyframe_animate` and `pinepaper_camera_animate` also take a custom
 cubic-bezier `[x1, y1, x2, y2]`: x within 0..1, y may go outside it for
 overshoot.
 
-Springs render exactly in video, GIF, APNG and animated SVG. Lottie and CSS
-get the closest single curve, so `springPlayful` loses its wobble there.
+Every easing renders exactly in video, GIF and APNG. Lottie and CSS get the
+closest single curve, so `springPlayful` loses its wobble there and the in-out
+quart, quint, expo and circ curves are within a few percent.
+
+### Fixed
+
+- The scene validator no longer flags valid easings as unknown.
+
+## What's new in 1.6.17
 
 ### New: tell an agent "at 4 s, make it orange"
 
@@ -297,10 +307,6 @@ When the tempo is uncertain it says so and lists the likely alternatives;
 - Frame captures, region stills and flash checks wait for video on screen, and
   report whether they could.
 - The engine's structured warnings reach the caller whole.
-- `deterministic: true` repeats byte for byte only where the machine has an
-  encoder that does. WebM does everywhere; MP4 depends on the machine's H.264
-  encoder. When a run could not be pinned, a `determinism_not_pinned` warning
-  says not to cache the file by hash.
 
 ### Fixed
 
@@ -308,9 +314,6 @@ When the tempo is uncertain it says so and lists the likely alternatives;
   timed captions could pass unchecked; it now samples the timeline, and says
   when no text was visible rather than passing.
 - `pinepaper_agent_export` accepts `fps` and `scale` for APNG.
-- `pinepaper_import_svg`: an SVG sized in `em` imported as a speck.
-- `pinepaper_sound` `render_soundtrack` returns its duration at the top level.
-- The scene validator no longer flags valid easings as unknown.
 
 ## What's new in 1.6.16
 
