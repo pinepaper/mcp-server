@@ -270,6 +270,16 @@ quart, quint, expo and circ curves are within a few percent.
 ### Fixed
 
 - The scene validator no longer flags valid easings as unknown.
+- `pinepaper_agent_export` always saves PNG, JPG and WebP to a file and
+  returns its path. Small images used to come back inline as base64, which
+  could exceed a client's response limit.
+- `pinepaper_execute_custom_code`: when the code fails part-way, the items it
+  created are removed, so the scene is not left half-built. The error says
+  what was removed. Edits to items that already existed are not reverted. The
+  4-second loop limit is this tool's, per call: split long work across several
+  calls.
+- `pinepaper_design_medium` `apply_thread`: the spine points format is
+  documented (`{x, y}` or `[x, y]`).
 
 ## What's new in 1.6.17
 
