@@ -265,6 +265,13 @@ of the screen kept in front, and a little glare and light spill. It finds the
 screen itself, or takes its four corners. The result becomes part of the photo,
 so zooms and camera moves carry it.
 
+### Changed: for services that run the steps later
+
+A host that records each canvas step and runs it at render time can pass
+`deferred: true`: the agent is then told the step was recorded, rather than
+handed a script to paste. Generated code always travels in
+`_meta["pinepaper.studio/code"]` for the host to record.
+
 ### Changed: tool results report where their time went
 
 Every result carries `_meta["pinepaper.studio/timing"]`: the whole call, and

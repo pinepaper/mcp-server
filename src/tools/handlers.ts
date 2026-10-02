@@ -777,13 +777,39 @@ export interface HandlerOptions {
   executionMode?: ExecutionMode;
   /** agent_export: write the result to a file at any size (render_batch needs a file per row). */
   saveToFile?: boolean;
+  /**
+   * The HOST runs the generated code later (the hosted service records each
+   * call and replays it when the scene renders). The agent is then told the
+   * step was recorded, not handed a script and told to paste it into a
+   * console it does not have (D36: through the cloud connector most canvas
+   * tools read as "returned code instead of executing"). The code still
+   * travels, in _meta (CODE_META_KEY), for the host to record.
+   */
+  deferred?: boolean;
 }
+
+/** Where a generated script travels for a host to record, beside the agent-visible text. */
+export const CODE_META_KEY = 'pinepaper.studio/code';
 
 // =============================================================================
 // RESULT HELPERS
 // =============================================================================
 
-function successResult(code: string, description?: string): CallToolResult {
+function successResult(code: string, description?: string, deferred = false): CallToolResult {
+  if (deferred) {
+    return {
+      content: [{
+        type: 'text',
+        text: JSON.stringify({
+          success: true,
+          status: 'recorded',
+          step: description || 'canvas step',
+          note: 'Recorded on the scene. It runs in the studio when the scene renders or exports, not now; keep building, then render.',
+        }, null, 2),
+      }],
+      _meta: { [CODE_META_KEY]: code },
+    };
+  }
   const content: TextContent[] = [
     {
       type: 'text',
@@ -798,7 +824,7 @@ function successResult(code: string, description?: string): CallToolResult {
     });
   }
 
-  return { content };
+  return { content, _meta: { [CODE_META_KEY]: code } };
 }
 
 /**
@@ -1268,7 +1294,7 @@ The code is ready to use. Each subsequent tool call will also generate code you 
       timestamp: Date.now(),
       success: true,
     });
-    return successResult(code, description);
+    return successResult(code, description, options.deferred === true);
   }
 
   const controller = browserController || getBrowserController();
