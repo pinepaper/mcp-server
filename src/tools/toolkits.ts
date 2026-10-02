@@ -227,6 +227,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
     'pinepaper_export_svg',
     'pinepaper_export_training_data',
     'pinepaper_export_scene',
+    'pinepaper_import_scene',
     'pinepaper_export_widget',
     'pinepaper_export_widget_html',
     'pinepaper_capture_frames',

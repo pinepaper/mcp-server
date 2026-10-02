@@ -2700,6 +2700,21 @@ export const SHEET_RUBRIC = {
   ],
 };
 
+/**
+ * Page code: what a project holds, counted the same way before a save and
+ * after a load, so a round trip can be checked (keyframes in = keyframes out).
+ */
+const SCENE_COUNTS_JS = `function __ppSceneCounts() {
+  const all = (app.itemRegistry && typeof app.itemRegistry.getAll === 'function') ? app.itemRegistry.getAll() : [];
+  let animated = 0, keyframes = 0;
+  all.forEach(function (e) {
+    const k = e && e.item && e.item.data && e.item.data.keyframes;
+    if (Array.isArray(k) && k.length) { animated++; keyframes += k.length; }
+  });
+  const rel = (app.relationRegistry && typeof app.relationRegistry.exportForSave === 'function') ? app.relationRegistry.exportForSave().length : null;
+  return { items: all.length, animatedItems: animated, keyframes: keyframes, relations: rel };
+}`;
+
 export class PinePaperCodeGenerator {
   /**
    * Generate code for creating an item
@@ -7157,6 +7172,39 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
   /**
    * Generate code to export the complete scene state
    */
+  /**
+   * A RESTORABLE project document (D28): app.captureProjectDocument, the
+   * engine's own durable format (core/ProjectDocument.js), which carries
+   * relations, rigging, connectors, scene chains and animation config.
+   * NOT exportProjectJSON: the engine documents that one as a bare Paper tree
+   * that drops roughly half of a non-trivial scene.
+   */
+  generateCaptureProject(name?: string): string {
+    return `
+// Capture a restorable project document
+(function() {
+  if (typeof app.captureProjectDocument !== 'function') { return { success: false, error: 'app.captureProjectDocument unavailable — update FxTool' }; }
+  ${SCENE_COUNTS_JS}
+  const doc = app.captureProjectDocument(${JSON.stringify(name ? { name } : {})});
+  return { success: true, json: JSON.stringify(doc), counts: __ppSceneCounts() };
+})();`.trim();
+  }
+
+  /** Load a staged project document (window.__ppStage.projectDoc), replacing the scene. */
+  generateLoadProject(strict: boolean): string {
+    return `
+// Load a project document, replacing the current scene
+(function() {
+  if (typeof app.loadProjectDocument !== 'function') { return { success: false, error: 'app.loadProjectDocument unavailable — update FxTool' }; }
+  ${SCENE_COUNTS_JS}
+  const text = window.__ppStage && window.__ppStage.projectDoc;
+  if (typeof text !== 'string' || !text) { return { success: false, error: 'no project document was staged' }; }
+  const r = app.loadProjectDocument(text, { strict: ${strict ? 'true' : 'false'} });
+  if (!r || r.ok === false) { return { success: false, error: 'the document was refused: ' + ((r && r.errors && r.errors.join('; ')) || 'invalid project document'), warnings: (r && r.warnings) || [] }; }
+  return { success: true, counts: __ppSceneCounts(), warnings: r.warnings || [], meta: r.meta || null };
+})();`.trim();
+  }
+
   generateExportScene(): string {
     return `
 // Export complete scene state
@@ -7268,7 +7316,11 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
       backgroundColor: backgroundColor,
       canvasSize: canvasSize,
       itemCount: items.length,
-      relationCount: relations.length
+      relationCount: relations.length,
+      // NOT A BACKUP (D28). This summary carries positions and bounds, not
+      // keyframe tracks, rigging or scene chains: a scene saved this way and
+      // rebuilt from it has no motion. Said in the result, not only in docs.
+      note: 'summary for inspection: animation tracks, rigging and scene chains are not included and this cannot be restored. To save a restorable scene: pinepaper_export_scene with full: true, then pinepaper_import_scene.'
     };
   } catch (error) {
     return { success: false, error: error.message };

@@ -629,6 +629,10 @@
       "description": "Export scene definition as JSON."
     },
     {
+      "name": "pinepaper_import_scene",
+      "description": "Restore a scene from a full export file (replaces the scene); returns counts to compare. {path, strict?}"
+    },
+    {
       "name": "pinepaper_browser_connect",
       "description": "Connect to PinePaper Studio in browser"
     },

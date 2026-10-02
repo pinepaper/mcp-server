@@ -4238,6 +4238,21 @@ export type ValidateSceneInput = z.infer<typeof ValidateSceneInputSchema>;
  * deterministic capture; the times come from `times`, or from one of the
  * modes below.
  */
+/**
+ * pinepaper_export_scene / pinepaper_import_scene (D28): a restorable save.
+ * The default export is a summary for inspection; `full` writes the engine's
+ * project document (captureProjectDocument) to a file.
+ */
+export const ExportSceneInputSchema = z.object({
+  full: z.boolean().optional().describe('Save a RESTORABLE project document to a file (keyframes, relations, rigging, scene chains), not the summary. Restore it with pinepaper_import_scene.'),
+  name: z.string().optional().describe('full: a name recorded in the document.'),
+});
+
+export const ImportSceneInputSchema = z.object({
+  path: z.string().min(1).describe('The project document a full pinepaper_export_scene saved (absolute path, or relative to the server working directory).'),
+  strict: z.boolean().optional().describe('Refuse a document with validation problems (default true). false loads anyway and returns the problems as warnings.'),
+});
+
 export const CaptureSheetSchema = z.object({
   every: z.number().positive().optional().describe('One frame every N seconds from 0 to duration (needs duration).'),
   duration: z.number().positive().optional().describe('Scene length in seconds, for every and loopSeam.'),

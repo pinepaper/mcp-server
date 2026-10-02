@@ -30,7 +30,7 @@
 
 PinePaper MCP Server enables AI assistants to create and animate graphics in [PinePaper Studio](https://pinepaper.studio) via the Model Context Protocol (MCP). Works with any AI that supports MCP tool calling (Claude, GPT, Gemini, local models, etc.).
 
-The server exposes **159 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
+The server exposes **160 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
 
 - Create geometric shapes, text collages, diagrams, and data charts
 - Apply 37+ character-level text effects and 28+ vertex deformation presets
@@ -41,7 +41,7 @@ The server exposes **159 tools** across drawing, animation, diagrams, maps, typo
 
 ## Running it: local or hosted
 
-**Local is free and complete.** Every one of the 159 tools works when you run
+**Local is free and complete.** Every one of the 160 tools works when you run
 this server yourself. There is no reduced tier and nothing held back.
 
 What it needs:
@@ -245,6 +245,23 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - Code an agent writes runs with whatever that browser page has. Give this server the same trust you would give anything else you let write and run code on your machine — which is the trust you already extend to an MCP client with tool access.
 - Puppeteer mode launches Chrome with `--no-sandbox` and `--disable-setuid-sandbox`. That is routine for headless automation and it does weaken Chrome's own process sandbox. If that matters where you are running it, use `code` mode or put the server in a container.
 - Puppeteer itself is an **optional** peer dependency, kept out of the default tree precisely because a headless browser plus an install script is what scanners flag hardest. Install it only if you want the executing mode.
+
+## What's new in 1.6.19
+
+### New: save a scene and restore it
+
+`pinepaper_export_scene` takes `full: true`: it saves a restorable project
+file (animation, relations, rigging, scene chains) and returns its path.
+`pinepaper_import_scene` restores it. Both report counts of items, animated
+items, keyframes and relations, so you can check nothing was lost. Without
+`full`, `pinepaper_export_scene` returns a summary for inspection, and now
+says that it cannot be restored.
+
+### Fixed
+
+- `pinepaper_add_filter` offers every filter the studio has, including dither,
+  CMYK and dot halftones, edge detection, HSL and colour tint, each with its
+  parameter ranges.
 
 ## What's new in 1.6.18
 
@@ -1362,7 +1379,7 @@ Fourteen new tools (121 → 135) and new actions across the surface — the rele
 
 ## Toolkits & Token Budget
 
-159 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
+160 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
 
 **Toolkit profiles** (`PINEPAPER_TOOLKIT`):
 
@@ -1567,7 +1584,7 @@ Generate instruction/code pairs for LLM fine-tuning:
 
 ## Tools Reference
 
-All 159 tools, grouped by the tag used for toolkit filtering.
+All 160 tools, grouped by the tag used for toolkit filtering.
 
 ### Canvas (`canvas`)
 | Tool | Description |
@@ -1800,7 +1817,8 @@ All 159 tools, grouped by the tag used for toolkit filtering.
 | Tool | Description |
 |------|-------------|
 | `pinepaper_export_svg` | Export animated SVG |
-| `pinepaper_export_scene` | Export the scene |
+| `pinepaper_export_scene` | Export the scene: a summary, or a restorable project file (`full: true`) |
+| `pinepaper_import_scene` | Restore a scene from a full export file |
 | `pinepaper_export_training_data` | Export LLM training pairs |
 | `pinepaper_export_widget` | Export an embeddable widget |
 | `pinepaper_export_widget_html` | Export widget HTML |

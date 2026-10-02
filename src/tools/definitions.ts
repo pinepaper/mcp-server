@@ -7648,29 +7648,53 @@ OUTPUT FORMAT:
       idempotentHint: true,
       openWorldHint: false,
     },
-    description: `Export the complete scene state including all items, relations, and settings.
+    description: `Export the scene: a SUMMARY for inspection by default, or with full: true a RESTORABLE project document saved to a file.
+
+SUMMARY (default) — for reading the scene, not for saving it:
+- items (id, type, position, bounds, active window), relations, decorative items, backgroundColor, canvasSize
+- It does NOT carry keyframe tracks, rigging or scene chains, so a scene rebuilt from it has no motion. The result says so (note).
+
+FULL (full: true) — to save work and restore it later:
+- The engine's own project document (relations, keyframes, rigging, connectors, scene chains, animation config), written to a file because it can be megabytes.
+- Returns filePath, bytes and counts (items, animated items, keyframes, relations). Restore with pinepaper_import_scene { path } and compare the counts.
 
 USE WHEN:
-- Saving a complete scene for later restoration
-- Creating scene backups
-- Debugging scene composition
-- Generating scene snapshots for version control
-
-RETURNS:
-- items: Array of all canvas items with properties
-- relations: Array of active relations
-- decorative: Array of decorative (non-interactive) items
-- backgroundColor: Current background color
-- canvasSize: Canvas dimensions`,
+- full: true — saving a scene to come back to, a backup, a hand-off to another session
+- summary — debugging composition, checking what is on the canvas`,
     inputSchema: {
       type: 'object',
-      properties: {},
+      properties: {
+        full: { type: 'boolean', description: 'Save a restorable project document to a file instead of returning the summary.' },
+        name: { type: 'string', description: 'full: a name recorded in the document.' },
+      },
     },
   },
 
-  // ---------------------------------------------------------------------------
-  // INFRASTRUCTURE: BROWSER CONTROL TOOLS
-  // ---------------------------------------------------------------------------
+  {
+    name: 'pinepaper_import_scene',
+    annotations: {
+      title: 'Import Scene',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Restore a scene from a project document saved by pinepaper_export_scene { full: true }. REPLACES the current scene.
+
+The engine validates the document before applying it: a truncated file, a foreign JSON blob or a document from a newer major version is refused, not half-applied. Returns counts (items, animated items, keyframes, relations): compare them with the export's to confirm nothing was lost.
+
+- path: the file the export wrote (absolute, or relative to the server's working directory).
+- strict: false loads a document with validation problems anyway and returns them as warnings (default true: refuse).`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'The project document file.' },
+        strict: { type: 'boolean', description: 'Refuse a document with validation problems (default true).' },
+      },
+      required: ['path'],
+    },
+  },
+
   {
     name: 'pinepaper_browser_connect',
     annotations: {

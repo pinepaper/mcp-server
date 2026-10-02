@@ -166,7 +166,8 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   // --- Export ---
   pinepaper_export_svg: 'Export canvas as animated SVG.',
   pinepaper_export_training_data: 'Export instruction/code pairs for LLM training.',
-  pinepaper_export_scene: 'Export scene definition as JSON.',
+  pinepaper_export_scene: 'Scene summary for inspection; full: true saves a restorable project document to a file. {full?, name?}',
+  pinepaper_import_scene: 'Restore a scene from a full export file (replaces the scene); returns counts to compare. {path, strict?}',
 
   // --- Browser ---
   pinepaper_browser_connect: 'Connect to PinePaper Studio browser instance.',
