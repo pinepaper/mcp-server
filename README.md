@@ -1405,8 +1405,8 @@ Fourteen new tools (121 → 135) and new actions across the surface — the rele
 
 | Profile | Contents |
 |---------|----------|
-| `full` | Every tool, no filtering (default) |
-| `agent` | Broad authoring surface, minus niche/low-level groups |
+| `full` | Every tool, no filtering |
+| `agent` | Every tool except the diagnostics (`pinepaper_get_performance_metrics`, `pinepaper_diagnostic_report`) and `pinepaper_register_item`. The default for a client not listed below |
 | `diagram` | Canvas + diagram + query/export |
 | `map` | Canvas + map + query/export |
 | `font` | Canvas + font + letter collage + export |
