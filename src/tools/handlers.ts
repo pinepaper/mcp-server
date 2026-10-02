@@ -813,6 +813,20 @@ function dataResult(value: unknown): CallToolResult {
 }
 
 
+
+/**
+ * Where a call's time went (O1, per-request trace). In the result's _meta, the
+ * spec's slot for metadata, under one namespaced key, so it adds nothing to
+ * the text a model reads. browserMs includes the screenshot when one was taken.
+ * index.ts adds toolMs, the whole call, for every tool.
+ */
+export const TIMING_META_KEY = 'pinepaper.studio/timing';
+export function withTiming(out: CallToolResult, t: Record<string, number>): CallToolResult {
+  const meta = (out._meta ?? {}) as Record<string, unknown>;
+  const prev = (meta[TIMING_META_KEY] ?? {}) as Record<string, number>;
+  return { ...out, _meta: { ...meta, [TIMING_META_KEY]: { ...prev, ...t } } };
+}
+
 /**
  * A call that only succeeded after the browser session was recovered says so,
  * in the result: the controller has reported `recovered` / `canvasReset` for
@@ -1356,8 +1370,10 @@ ${code}
     error: result.error,
   });
 
+  let screenshotMs: number | undefined;
   if (shouldTakeScreenshot) {
     const screenshotDuration = tracker.endTimer(`${timerId}_screenshot`);
+    screenshotMs = screenshotDuration;
     tracker.recordMetric({
       toolName,
       phase: 'screenshot',
@@ -1378,11 +1394,13 @@ ${code}
     error: result.error,
   });
 
+  const timing = { browserMs: Math.round(browserDuration), ...(screenshotMs !== undefined ? { screenshotMs: Math.round(screenshotMs) } : {}) };
+
   if (!result.success) {
     // Capture canvas state for error context
     const canvasState = await captureCanvasState(controller);
 
-    return errorResult(
+    return withTiming(errorResult(
       ErrorCodes.EXECUTION_ERROR,
       result.error || 'Failed to execute code in browser',
       // errorCode surfaces the governor's structured code (PP_ITEM_BUDGET,
@@ -1395,7 +1413,7 @@ ${code}
         toolName,
         canvasState: canvasState || undefined,
       }
-    );
+    ), timing);
   }
 
   // TWO VERDICTS. `result.success` says the CODE RAN. The emitted code has its
@@ -1413,7 +1431,7 @@ ${code}
   const inner = innerFailure(result.result);
   if (inner) {
     const canvasState = await captureCanvasState(controller);
-    return errorResult(
+    return withTiming(errorResult(
       ErrorCodes.EXECUTION_ERROR,
       inner,
       {
@@ -1421,10 +1439,10 @@ ${code}
         ...(rollbackOnFailure ? await customCodeRollback(controller, inner) : {}),
       },
       { toolName, canvasState: canvasState || undefined }
-    );
+    ), timing);
   }
 
-  return withSessionNote(executedResult(code, result.result, result.screenshot, description, result.report), result);
+  return withTiming(withSessionNote(executedResult(code, result.result, result.screenshot, description, result.report), result), timing);
 }
 
 /**

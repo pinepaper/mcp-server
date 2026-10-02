@@ -34,7 +34,7 @@ import {
   getClientProfile,
 } from './tools/toolkits.js';
 import type { ToolkitProfile } from './tools/toolkits.js';
-import { handleToolCall, ExecutionMode, getExecutionMode } from './tools/handlers.js';
+import { handleToolCall, ExecutionMode, getExecutionMode, withTiming } from './tools/handlers.js';
 import { getBrowserController } from './browser/puppeteer-controller.js';
 import { setLogServer } from './utils/mcp-log.js';
 import { startProgress } from './utils/progress.js';
@@ -5979,6 +5979,7 @@ The tools generate Paper.js/JavaScript code that executes on the PinePaper canva
     const onAbort = () => { if (controller) void controller.cancelExport(); };
     extra?.signal?.addEventListener('abort', onAbort, { once: true });
 
+    const callStarted = Date.now();
     let result;
     try {
       result = await handleToolCall(name, args as Record<string, unknown>, {
@@ -5993,6 +5994,9 @@ The tools generate Paper.js/JavaScript code that executes on the PinePaper canva
     if (extra?.signal?.aborted) {
       throw new McpError(ErrorCode.RequestTimeout, 'Request cancelled');
     }
+    // The whole call's time, for every tool (the browser/screenshot breakdown
+    // rides in from executeOrGenerate when the call ran in the studio).
+    if (result) result = withTiming(result, { toolMs: Date.now() - callStarted });
 
     // STRUCTURED CONTENT, BOUNDED. A result whose text is a JSON object also
     // carries it as structuredContent, so a client can read fields without

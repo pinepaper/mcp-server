@@ -112,4 +112,14 @@ describe('MCP Spec Gaps (MCPA Domains)', () => {
       expect(err.message).toContain('cancelled');
     }
   });
+
+  it('every result carries where its time went, in _meta, not in the text (O1)', async () => {
+    const server = await createServer({ browserMode: false, executionMode: 'code' });
+    const callHandler = (server as any)._requestHandlers.get('tools/call');
+    const result = await callHandler({ method: 'tools/call', params: { name: 'pinepaper_design_system', arguments: { action: 'list_styles' } } }, {});
+    const t = result._meta?.['pinepaper.studio/timing'];
+    expect(typeof t?.toolMs).toBe('number');
+    expect(t.toolMs).toBeGreaterThanOrEqual(0);
+    expect(JSON.stringify(result.content)).not.toContain('pinepaper.studio/timing');
+  });
 });
