@@ -301,6 +301,9 @@ generated song as the backbone of the edit, used whole.
   sky, fog, light and ground colours, and material and light colours. A
   refused `configure` now says why, naming the key. `ground_height` takes
   `{x, z}`. `create` lists the configurable parameters by name.
+- A browser session lost while idle recovers by itself: `pinepaper_refresh_page`
+  and every other tool relaunch the browser when no page answers, restore the
+  canvas size, and say in the result that the canvas was reset.
 - `pinepaper_world3d` `extrude_path` takes `upright` (stand a drawing up, like
   a sign) and `placement` (`centered`, the default, stands the mesh on the
   ground at the point you give). JPG and WebP stills of a 3D world scene show
