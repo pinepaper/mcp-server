@@ -276,6 +276,14 @@ frames by time, every N seconds, a strip around a moment, or the loop's last
 frame beside its first. Tiles are 360 px wide by default, the width of a
 phone.
 
+### New: make one like this
+
+`pinepaper_media` takes `analyze_reference`: give it an uploaded reference
+video and it measures the format: where it cuts, how long each shot runs,
+each shot's colours, how fast it opens, and its beat. `remake_from_reference`
+then builds a new piece on that structure in your own words. Nothing of the
+reference's footage, words or sound is copied.
+
 ### Changed: plan generations before paying for them
 
 `pinepaper_generate` and `pinepaper_generate_estimate` now tell agents to plan
