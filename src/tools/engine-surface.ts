@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 45db18488648141bdbba8859e0f37f1d0b492c6a
- * sha256:    b97071fbc3f7fec5871536b28cbc8b3fb2758c295dca5b3de18b5a4bebab472d   (of PinePaper.js as committed)
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 126f8fb087680d212cfd98e5a1994d4eb7e05191
+ * sha256:    f5566ff163264876614836cded80093b6f612c6d8be4009275f4d416d7297607   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on `window.app`, with how it gets there. The parity
@@ -16,7 +16,7 @@
 /** How a name lands on `app`. */
 export type EngineMemberKind = 'method' | 'accessor' | 'property' | 'lazy' | 'lazyHeavy' | 'bootstrap';
 
-/** 1184 names, from FxTool/js/PinePaper.js. */
+/** 1194 names, from FxTool/js/PinePaper.js. */
 export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object.freeze({
   _activeByGroup: 'property',
   _activeDrawingGroup: 'method',
@@ -32,6 +32,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _applyClippedPose: 'method',
   _applyingRemote: 'property',
   _applyLifetimesAt: 'method',
+  _applyMediumToParts: 'method',
   _applyRestoresFrom: 'method',
   _applyRigPresetUnrecorded: 'method',
   _applySMILAnimations: 'method',
@@ -123,6 +124,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _exportPassDepth: 'property',
   _exportResetTime: 'property',
   _eyeGeom: 'property',
+  _fillHex: 'method',
   _findExclusiveGroupMembers: 'method',
   _findMaskedAncestor: 'method',
   _findParentPrecomp: 'method',
@@ -170,6 +172,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _itemNamedLikePointer: 'method',
   _lastDynamicUpdate: 'property',
   _lastElapsedTime: 'property',
+  _lastMediumError: 'property',
   _lastSelectionUpdateTime: 'property',
   _lastUpdateJsMs: 'property',
   _lastUpdateTimestamp: 'property',
@@ -181,6 +184,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _luminanceUnder: 'method',
   _mapTargetBounds: 'property',
   _maxCallbacks: 'property',
+  _mediumTargets: 'method',
   _migrateClonedSubtree: 'method',
   _normalizeSegment: 'method',
   _nudgeSaveTimer: 'bootstrap',
@@ -198,6 +202,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _pausedForTextEdit: 'bootstrap',
   _pendingTimedPulses: 'property',
   _pinnedExportFrame: 'property',
+  _placeMediumGroup: 'method',
   _prefersReducedMotion: 'property',
   _prePanCursor: 'bootstrap',
   _prepareKeyframeTransformState: 'method',
@@ -277,6 +282,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _setExactSize: 'method',
   _setImageMaxKB: 'method',
   _settleComponentPartsToRest: 'method',
+  _shiftHex: 'method',
   _showWorldCompass: 'method',
   _showWorldControlHint: 'method',
   _silhouettePolygon: 'method',
@@ -381,6 +387,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   applyChromaKey: 'method',
   applyCustomMask: 'method',
   applyCutoutStyle: 'method',
+  applyCutPaper: 'method',
   applyDeform: 'method',
   applyDirectorShots: 'method',
   applyEasing: 'method',
@@ -393,6 +400,8 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   applyKeyframeState: 'method',
   applyMask: 'method',
   applyMaskDefinition: 'method',
+  applyMedium: 'method',
+  applyOilWash: 'method',
   applyPalette: 'method',
   applyPhysicsImpulse3D: 'method',
   applyRelationPreset: 'method',
@@ -407,6 +416,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   applyTextStyle: 'method',
   applyThreadPainting: 'method',
   applyTrackMatte: 'method',
+  applyWatercolorWash: 'method',
   arrowSystem: 'lazy',
   attachToBone: 'method',
   audioGraph: 'lazy',
