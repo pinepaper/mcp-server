@@ -11057,6 +11057,47 @@ ${guard}
   }
 })();`.trim();
       }
+      case 'analyze_reference': {
+        const S = (v: unknown) => JSON.stringify(v);
+        return `
+// Measure a reference video's FORMAT: cuts, shot lengths, colours, pacing, beat
+(async function() {
+  if (typeof app.analyzeReferenceVideo !== 'function') { return { success: false, error: 'app.analyzeReferenceVideo unavailable — update FxTool' }; }
+  const r = await app.analyzeReferenceVideo(${S(input.id)}, { thumbnails: ${input.thumbnails ? 'true' : 'false'} });
+  if (!r || !r.ok) { return { success: false, error: (r && r.error) || 'the reference could not be analysed' }; }
+  // Kept in the page for remake_from_reference, so the analysis does not have
+  // to travel back through the agent.
+  window.__ppLastReference = { analysis: r, id: ${S(input.id)} };
+  const shots = Array.isArray(r.shots) ? r.shots : [];
+  return { success: true, referenceId: ${S(input.id)}, duration: r.duration, aspect: r.aspect, width: r.width, height: r.height,
+    cuts: r.cuts, shots: shots, pacing: r.pacing, audio: r.audio, card: r.card,
+    ...(r.truncated ? { truncated: true } : {}),
+    next: 'remake_from_reference with texts: your own words, ' + shots.length + ' (one per shot). Nothing of the footage, its words or its sound is copied.' };
+})();`.trim();
+      }
+
+      case 'remake_from_reference': {
+        const S = (v: unknown) => JSON.stringify(v);
+        const opts = {
+          texts: input.texts ?? [],
+          ...(input.duration !== undefined ? { duration: input.duration } : {}),
+          ...(input.clear !== undefined ? { clear: input.clear } : {}),
+        };
+        return `
+// Build a new piece on the analysed reference's structure, in your own words
+(async function() {
+  if (typeof app.remakeFromReference !== 'function') { return { success: false, error: 'app.remakeFromReference unavailable — update FxTool' }; }
+  const last = window.__ppLastReference;
+  if (!last || !last.analysis) { return { success: false, error: 'no analysed reference in this session: call pinepaper_media analyze_reference first' }; }
+  // reference: the analysed clip stays in the project MUTED; without it the
+  // reference's own sound is exported under the new cards.
+  const r = await app.remakeFromReference(last.analysis, Object.assign(${S(opts)}, { reference: last.id }));
+  return r && r.ok
+    ? { success: true, action: 'remake_from_reference', duration: r.duration, shots: r.shots, items: r.items, referenceMuted: last.id }
+    : { success: false, error: (r && r.error) || 'the remake could not be built' };
+})();`.trim();
+      }
+
       case 'stop_live_matte': {
         const S = (v: unknown) => JSON.stringify(v);
         return `

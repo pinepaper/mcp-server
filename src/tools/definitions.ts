@@ -2283,11 +2283,15 @@ VIDEO EDITING:
 - apply_track_matte: { id, matteItemId, channel? (luma|alpha|red), invert?, strength?, hideMatte?, live? } — the matte item's pixels drive the target's alpha. The classic: a headline filled with footage. live: true keeps the cut tracking an ANIMATING matte (kinetic mask reveal); otherwise it bakes once, destructively (recorded in data.filterChain for round-trip).
 - stop_live_matte: { id } — stop a live matte, keep the last cut.
 
+MAKE ONE LIKE THIS — a reference video's FORMAT, never its content:
+- analyze_reference: { id, thumbnails? } — the uploaded reference clip (upload_video it first) → cuts (to the frame), shots (length, colours), pacing, beat, and card: the same facts as plain text. Read the card before planning.
+- remake_from_reference: { texts, duration?, clear? } — builds a new piece on the last analysed reference: one card per shot, cut at its cut times, in each shot's colours, the headline popping on its beats. texts are YOUR words, one per shot. Nothing of the footage, its words or its sound is copied; the reference clip stays in the project muted. One undo step.
+
 EXAMPLE: { action: 'upload_video', url: 'https://…/clip.mp4', scale: 0.5, timeOffset: 1 }`,
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['upload_video', 'upload_audio', 'list', 'remove', 'set_playback_rate', 'set_clip', 'split', 'add_transition', 'set_time_remap', 'speed_ramp', 'match_cut', 'apply_track_matte', 'stop_live_matte'], description: "Media action" },
+        action: { type: 'string', enum: ['upload_video', 'upload_audio', 'list', 'remove', 'set_playback_rate', 'set_clip', 'split', 'add_transition', 'set_time_remap', 'speed_ramp', 'match_cut', 'apply_track_matte', 'stop_live_matte', 'analyze_reference', 'remake_from_reference'], description: "Media action" },
         transition: { type: 'object', properties: { type: { type: 'string', enum: ['crossfade', 'dip'] }, seconds: { type: 'number', exclusiveMinimum: 0, maximum: 10 }, color: { type: 'string' } }, description: "add_transition: { type ('crossfade' default | 'dip'), seconds, color (dip) }." },
         atPlayhead: { type: 'boolean', description: 'upload_video / upload_audio: start at the current playback time (instead of timeOffset).' },
         remapTrack: { type: 'array', items: { type: 'object', properties: { time: { type: 'number' }, value: { type: 'number' }, easing: { type: 'string' } }, required: ['time', 'value'] }, description: 'set_time_remap: canvas-seconds → source-seconds curve (≥2 points). null clears the remap.' },
@@ -2307,7 +2311,11 @@ EXAMPLE: { action: 'upload_video', url: 'https://…/clip.mp4', scale: 0.5, time
         hideMatte: { type: 'boolean', description: 'apply_track_matte: hide the matte item after applying.' },
         live: { type: 'boolean', description: 'apply_track_matte: keep re-cutting as the matte moves/animates — the kinetic mask reveal. Omitted = bake once, destructively.' },
         url: { type: 'string', description: "Required for upload_video / upload_audio: an http(s) URL, a data: URL, or a PATH TO A LOCAL FILE. Remote URLs and local files are fetched/read by the server (the page may not fetch third-party hosts), so stock music and SFX links work; the HTTP status or content-type is named if one does not. Up to 48 MB." },
-        id: { type: 'string', description: 'Media id — required for remove / set_playback_rate / set_clip.' },
+        id: { type: 'string', description: 'Media id — required for remove / set_playback_rate / set_clip / analyze_reference.' },
+        texts: { type: 'array', items: { type: 'string' }, description: 'remake_from_reference: your words, one per shot of the reference.' },
+        duration: { type: 'number', description: 'remake_from_reference: total seconds (default the reference\'s own).' },
+        clear: { type: 'boolean', description: 'remake_from_reference: empty the canvas first (media survives).' },
+        thumbnails: { type: 'boolean', description: 'analyze_reference: include a small image per shot (default false; token-heavy).' },
         rate: { type: 'number', description: 'Playback rate 0.25–4 — set_playback_rate.' },
         inPoint: { type: 'number', description: 'Clip in-point (media-time s) — set_clip.' },
         outPoint: { type: 'number', description: 'Clip out-point (media-time s, > inPoint) — set_clip.' },

@@ -4298,14 +4298,20 @@ export type LintSceneInput = z.infer<typeof LintSceneInputSchema>;
 // Media (video/audio) via window.PinePaperAgent. Agent-facing surface is URL-based
 // (the agent can't hand over a File). Uploaded media are first-class canvas items.
 export const MediaInputSchema = z.object({
-  action: z.enum(['upload_video', 'upload_audio', 'list', 'remove', 'set_playback_rate', 'set_clip', 'split', 'add_transition', 'set_time_remap', 'speed_ramp', 'match_cut', 'apply_track_matte', 'stop_live_matte'])
+  action: z.enum(['upload_video', 'upload_audio', 'list', 'remove', 'set_playback_rate', 'set_clip', 'split', 'add_transition', 'set_time_remap', 'speed_ramp', 'match_cut', 'apply_track_matte', 'stop_live_matte', 'analyze_reference', 'remake_from_reference'])
     .describe("'upload_video' / 'upload_audio' (from a URL) · 'list' media · 'remove' by id · 'set_playback_rate' · 'set_clip' (re-trim; with timeOffset also moves the clip) · 'split' (cut a clip in two at canvas time `at`; the first half keeps its id) · 'add_transition' (crossfade or dip between fromItemId, which ends at the cut, and toItemId, which starts there) · 'set_time_remap' (canvas-time→source-time curve: ramps, freezes, reverse) · 'speed_ramp' ({duration, speed} segments — the human way to say a remap) · 'match_cut' (cut between two shots aligning the SUBJECT via on-device detection) · 'apply_track_matte' (an item's alpha driven by another item's luma/alpha — type-filled-with-footage; live:true keeps it tracking as the matte animates) · 'stop_live_matte'"),
   // Not .url(): a bare absolute path is not a URL, and 48f3a2a made the server
   // read local files — so `/Users/…/broll1.mp4` was advertised and then rejected
   // by the schema before anything could read it. resolveMediaSource validates
   // what it is given and names the problem.
   url: z.string().min(1).optional().describe('Required for upload_video / upload_audio: an http(s) URL, a data: URL, or a local file path (absolute, relative to the server, or file://).'),
-  id: z.string().optional().describe('Media id — required for remove / set_playback_rate / set_clip / split.'),
+  id: z.string().optional().describe('Media id — required for remove / set_playback_rate / set_clip / split / analyze_reference.'),
+  // G4 reference intake (FxTool #52): measure a reference video's FORMAT and
+  // build on it. Nothing of its footage, words or sound is copied.
+  texts: z.array(z.string()).optional().describe('remake_from_reference: your words, one per shot of the reference (a short list is reused across shots).'),
+  duration: z.number().positive().optional().describe('remake_from_reference: total length in seconds (default the reference\'s own).'),
+  clear: z.boolean().optional().describe('remake_from_reference: empty the canvas first (media survives).'),
+  thumbnails: z.boolean().optional().describe('analyze_reference: include a small image per shot (default false: they are inline images and token-heavy).'),
   rate: z.number().min(0.25).max(4).optional().describe('Playback rate 0.25–4 — required for set_playback_rate.'),
   inPoint: z.number().min(0).optional().describe('Clip in-point in media-time seconds — required for set_clip.'),
   outPoint: z.number().min(0).optional().describe('Clip out-point in media-time seconds — required for set_clip.'),
@@ -4355,6 +4361,8 @@ export const MediaInputSchema = z.object({
   atPlayhead: z.boolean().optional().describe('upload_video / upload_audio: start the clip at the current playback time (instead of timeOffset).'),
 })
   .refine((v) => !(v.action === 'upload_video' || v.action === 'upload_audio') || !!v.url, { message: 'upload requires url', path: ['url'] })
+  .refine((v) => v.action !== 'analyze_reference' || !!v.id, { message: 'analyze_reference requires id: the uploaded reference clip (upload_video it first)', path: ['id'] })
+  .refine((v) => v.action !== 'remake_from_reference' || (!!v.texts && v.texts.length > 0), { message: 'remake_from_reference requires texts: your own words, one per shot', path: ['texts'] })
   .refine((v) => !(v.action === 'remove' || v.action === 'set_playback_rate' || v.action === 'set_clip' || v.action === 'split') || !!v.id, { message: 'this action requires id', path: ['id'] })
   .refine((v) => v.action !== 'split' || (v.at !== undefined && v.at >= 0), { message: 'split requires at (canvas seconds) — where to cut', path: ['at'] })
   .refine((v) => v.action !== 'add_transition' || (!!v.fromItemId && !!v.toItemId), { message: 'add_transition requires fromItemId (the clip ending at the cut) and toItemId (the clip starting at it)', path: ['fromItemId'] })
