@@ -144,6 +144,7 @@ import {
   MagicInputSchema,
   PhysicsInputSchema,
   MeasurementInputSchema,
+  PlaceOnSurfaceInputSchema,
   ErrorCodes,
   RelationType,
   ItemType,
@@ -2172,6 +2173,12 @@ async function handleToolCallInner(
       }
 
       // ─── 1.6.4: agent surface for the Tier-2 engine features ───
+      case 'pinepaper_place_on_surface': {
+        const input = PlaceOnSurfaceInputSchema.parse(args);
+        const code = codeGenerator.generatePlaceOnSurface(input);
+        return executeOrGenerate(code, 'Place a UI onto a screen in a photo', options, 'pinepaper_place_on_surface');
+      }
+
       case 'pinepaper_brand_kit': {
         const input = BrandKitInputSchema.parse(args);
         if (input.action === 'from_url') return brandFromUrl(input.url!, input.screenshots ?? 3, options);

@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main b2ddccfeabe97f6a2b42e6ad6b35f2451ece3620
- * sha256:    f5566ff163264876614836cded80093b6f612c6d8be4009275f4d416d7297607   (of PinePaper.js as committed)
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 7001c9c8681ad1971a3cb2136a75df4c42064bfe
+ * sha256:    b529f064ad0d596920ef514a63b17eef7550e5852fe3aa468b00ae81b1773802   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on `window.app`, with how it gets there. The parity
@@ -16,7 +16,7 @@
 /** How a name lands on `app`. */
 export type EngineMemberKind = 'method' | 'accessor' | 'property' | 'lazy' | 'lazyHeavy' | 'bootstrap';
 
-/** 1194 names, from FxTool/js/PinePaper.js. */
+/** 1202 names, from FxTool/js/PinePaper.js. */
 export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object.freeze({
   _activeByGroup: 'property',
   _activeDrawingGroup: 'method',
@@ -154,6 +154,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _imageDataFromURL: 'method',
   _importBVHUnrecorded: 'method',
   _importSpineUnrecorded: 'method',
+  _inFrameCallbacks: 'property',
   _initCameraAPI: 'method',
   _initCharacterBuilder: 'method',
   _initialized: 'property',
@@ -170,6 +171,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _isKnownRelationEndpoint: 'method',
   _isTouchDrawing: 'property',
   _itemNamedLikePointer: 'method',
+  _killedFrameCallbacks: 'property',
   _lastDynamicUpdate: 'property',
   _lastElapsedTime: 'property',
   _lastMediumError: 'property',
@@ -215,6 +217,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _rebaseRestBounds: 'method',
   _rebuildGradientToBounds: 'method',
   _recordingExportState: 'property',
+  _recordKilledCallback: 'method',
   _recordRigging: 'method',
   _reflowContentForResize: 'method',
   _refreshTransformBaseline: 'method',
@@ -300,6 +303,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _strokePressurePts: 'property',
   _subjectBox: 'method',
   _subsystemReadyHooks: 'property',
+  _surfaceState: 'property',
   _syncBlendBgToView: 'method',
   _teardownStaticCache: 'method',
   _templateImageSource: 'method',
@@ -354,6 +358,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   addParts: 'method',
   addPhysicsBody3D: 'method',
   addRelation: 'method',
+  addRenderHook: 'method',
   addSceneAction: 'method',
   addText: 'method',
   addToPrecomp: 'method',
@@ -796,6 +801,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   keyframeStartTime: 'property',
   keyframeStore: 'bootstrap',
   keyframeTimeAt: 'method',
+  killedFrameCallbacks: 'method',
   lassoTool: 'lazy',
   lastBatchModifySkipped: 'property',
   lastRegionExcluded: 'property',
@@ -911,6 +917,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   physicsWorld: 'lazyHeavy',
   pickWorldAt: 'method',
   pineMath: 'lazy',
+  placeOnSurface: 'method',
   placeSequence: 'method',
   placeSymbol: 'method',
   planBook: 'method',
@@ -984,6 +991,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   removeOnFrameCallback: 'method',
   removePhysicsBody3D: 'method',
   removeRelation: 'method',
+  removeRenderHook: 'method',
   removeSelectedItems: 'method',
   removeSound: 'method',
   removeTextEffect: 'method',

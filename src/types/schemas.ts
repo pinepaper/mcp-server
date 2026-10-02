@@ -4243,6 +4243,29 @@ export type ValidateSceneInput = z.infer<typeof ValidateSceneInputSchema>;
  * The default export is a summary for inspection; `full` writes the engine's
  * project document (captureProjectDocument) to a file.
  */
+/**
+ * pinepaper_place_on_surface (D22, FxTool #56): a UI onto a screen in a photo,
+ * corner-pinned, matted and lit, baked into the photo's pixels.
+ */
+const PointPair = z.tuple([z.number(), z.number()]);
+export const PlaceOnSurfaceInputSchema = z.object({
+  photoId: z.string().describe('The photo: an image item (or a group holding one).'),
+  sourceId: z.string().describe('The UI to place: any canvas item or group, or an image item.'),
+  quad: z.tuple([PointPair, PointPair, PointPair, PointPair]).optional().describe('The screen\'s four corners TL, TR, BR, BL. Omit to detect it (the largest bright, neutral region).'),
+  quadSpace: z.enum(['image', 'canvas']).optional().describe("quad's coordinates: 'image' (default) photo pixels, or 'canvas'."),
+  occlusion: z.enum(['luma', 'none']).optional().describe("'luma' (default) keeps a thumb or hand in front of the screen; 'none' covers it."),
+  key: z.number().optional().describe('Brightness above which the photo counts as screen (default: found from the photo).'),
+  erode: z.number().min(0).optional().describe('Pull the matte in from the bezel, px (default 2).'),
+  matteBlur: z.number().min(0).optional().describe('Soften the matte edge (default 0.8).'),
+  soften: z.number().min(0).optional().describe('Soften the UI to the photo\'s focus (default 0.5).'),
+  glare: z.number().min(0).max(1).optional().describe('Glass glare kept over the UI (default 0.10).'),
+  spill: z.number().min(0).max(1).optional().describe('Screen light spilling onto the surroundings (default 0.35).'),
+  spillRadius: z.number().min(0).optional().describe('Spill reach, px (default 40).'),
+  tint: z.tuple([z.number(), z.number(), z.number()]).optional().describe('Multiply the UI by [r, g, b], 0..1, to match the photo\'s white balance.'),
+  slot: z.string().optional().describe("Name for this screen (default 'screen'). Placing again in the same slot REPLACES it; several screens in one photo use different slots."),
+  hideSource: z.boolean().optional().describe('Hide the UI item after placing it (default true).'),
+});
+
 export const ExportSceneInputSchema = z.object({
   full: z.boolean().optional().describe('Save a RESTORABLE project document to a file (keyframes, relations, rigging, scene chains), not the summary. Restore it with pinepaper_import_scene.'),
   name: z.string().optional().describe('full: a name recorded in the document.'),

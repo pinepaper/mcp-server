@@ -30,7 +30,7 @@
 
 PinePaper MCP Server enables AI assistants to create and animate graphics in [PinePaper Studio](https://pinepaper.studio) via the Model Context Protocol (MCP). Works with any AI that supports MCP tool calling (Claude, GPT, Gemini, local models, etc.).
 
-The server exposes **160 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
+The server exposes **161 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
 
 - Create geometric shapes, text collages, diagrams, and data charts
 - Apply 37+ character-level text effects and 28+ vertex deformation presets
@@ -41,7 +41,7 @@ The server exposes **160 tools** across drawing, animation, diagrams, maps, typo
 
 ## Running it: local or hosted
 
-**Local is free and complete.** Every one of the 160 tools works when you run
+**Local is free and complete.** Every one of the 161 tools works when you run
 this server yourself. There is no reduced tier and nothing held back.
 
 What it needs:
@@ -256,6 +256,19 @@ file (animation, relations, rigging, scene chains) and returns its path.
 items, keyframes and relations, so you can check nothing was lost. Without
 `full`, `pinepaper_export_scene` returns a summary for inspection, and now
 says that it cannot be restored.
+
+### New: put your UI on a screen in a photo
+
+`pinepaper_place_on_surface` places a design onto a phone, monitor or
+billboard in a photo: fitted to the screen's perspective, with a hand in front
+of the screen kept in front, and a little glare and light spill. It finds the
+screen itself, or takes its four corners. The result becomes part of the photo,
+so zooms and camera moves carry it.
+
+### Changed: tool results report where their time went
+
+Every result carries `_meta["pinepaper.studio/timing"]`: the whole call, and
+the studio's share of it, for tracing slow requests.
 
 ### Fixed
 
@@ -1379,7 +1392,7 @@ Fourteen new tools (121 → 135) and new actions across the surface — the rele
 
 ## Toolkits & Token Budget
 
-160 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
+161 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
 
 **Toolkit profiles** (`PINEPAPER_TOOLKIT`):
 
@@ -1584,7 +1597,7 @@ Generate instruction/code pairs for LLM fine-tuning:
 
 ## Tools Reference
 
-All 160 tools, grouped by the tag used for toolkit filtering.
+All 161 tools, grouped by the tag used for toolkit filtering.
 
 ### Canvas (`canvas`)
 | Tool | Description |
@@ -1819,6 +1832,7 @@ All 160 tools, grouped by the tag used for toolkit filtering.
 | `pinepaper_export_svg` | Export animated SVG |
 | `pinepaper_export_scene` | Export the scene: a summary, or a restorable project file (`full: true`) |
 | `pinepaper_import_scene` | Restore a scene from a full export file |
+| `pinepaper_place_on_surface` | Put a UI onto a screen in a photo |
 | `pinepaper_export_training_data` | Export LLM training pairs |
 | `pinepaper_export_widget` | Export an embeddable widget |
 | `pinepaper_export_widget_html` | Export widget HTML |

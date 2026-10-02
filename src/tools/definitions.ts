@@ -7671,6 +7671,44 @@ USE WHEN:
   },
 
   {
+    name: 'pinepaper_place_on_surface',
+    annotations: {
+      title: 'Place on Surface',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Put a UI ONTO A SCREEN inside a photo: a phone, a monitor, a billboard. It is corner-pinned into the screen's perspective, matted by the photo's own brightness so a thumb or hand stays IN FRONT, softened to the photo, and keeps a little glass glare and light spill. A card laid over a phone photo reads as a sticker; this reads as the screen.
+
+- photoId: the photo (an image item). sourceId: the UI, any canvas item or group (rendered at about twice the screen's size), or an image.
+- quad: the screen's corners TL, TR, BR, BL in the photo's pixels (quadSpace 'canvas' for canvas coordinates). Omit it to DETECT the screen (the largest bright, neutral region); the result's quad and detected say what was found. If nothing is found it refuses: pass quad.
+- The result is BAKED INTO THE PHOTO'S PIXELS, so a zoom or camera move on the photo carries it. Placing again in the same slot replaces it; use different slots for several screens. Undo restores the photo.
+- Tuning: occlusion ('luma' | 'none'), key, erode, matteBlur, soften, glare, spill, spillRadius, tint [r, g, b]. hideSource (default true) hides the UI item once placed.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        photoId: { type: 'string', description: 'The photo (an image item).' },
+        sourceId: { type: 'string', description: 'The UI to place (any item or group, or an image).' },
+        quad: { type: 'array', items: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2 }, minItems: 4, maxItems: 4, description: 'Corners TL, TR, BR, BL as [x, y]; omit to detect.' },
+        quadSpace: { type: 'string', enum: ['image', 'canvas'], description: "quad's coordinates (default 'image', the photo's pixels)." },
+        occlusion: { type: 'string', enum: ['luma', 'none'], description: "'luma' (default) keeps a hand in front of the screen." },
+        key: { type: 'number', description: 'Brightness that counts as screen (default: found from the photo).' },
+        erode: { type: 'number', description: 'Pull the matte in from the bezel, px (default 2).' },
+        matteBlur: { type: 'number', description: 'Matte edge softness (default 0.8).' },
+        soften: { type: 'number', description: 'Soften the UI to the photo (default 0.5).' },
+        glare: { type: 'number', description: 'Glass glare 0..1 (default 0.10).' },
+        spill: { type: 'number', description: 'Light spill 0..1 (default 0.35).' },
+        spillRadius: { type: 'number', description: 'Spill reach, px (default 40).' },
+        tint: { type: 'array', items: { type: 'number' }, minItems: 3, maxItems: 3, description: 'Multiply the UI by [r, g, b] 0..1 to match white balance.' },
+        slot: { type: 'string', description: "Screen name (default 'screen'); the same slot replaces." },
+        hideSource: { type: 'boolean', description: 'Hide the UI item after placing (default true).' },
+      },
+      required: ['photoId', 'sourceId'],
+    },
+  },
+
+  {
     name: 'pinepaper_import_scene',
     annotations: {
       title: 'Import Scene',

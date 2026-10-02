@@ -189,6 +189,7 @@ import {
   ValidateSceneInput,
   CaptureFramesInput,
   CaptureSheet,
+  PlaceOnSurfaceInputSchema,
   AccessibilityCheckInput,
   InstantiateOntologyInput,
   LintSceneInput,
@@ -7172,6 +7173,40 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
   /**
    * Generate code to export the complete scene state
    */
+  /**
+   * pinepaper_place_on_surface (FxTool #56): app.placeOnSurface corner-pins
+   * the UI into the photo's screen, mattes it so a hand stays in front, and
+   * BAKES it into the photo's pixels. Async. Only plain fields come back.
+   */
+  generatePlaceOnSurface(input: z.infer<typeof PlaceOnSurfaceInputSchema>): string {
+    // Named, not spread: a spread makes every field look consumed, which is
+    // how an accepted-and-ignored option hides (the guard test reads these).
+    const opts: Record<string, unknown> = {};
+    if (input.quad !== undefined) opts.quad = input.quad;
+    if (input.quadSpace !== undefined) opts.quadSpace = input.quadSpace;
+    if (input.occlusion !== undefined) opts.occlusion = input.occlusion;
+    if (input.key !== undefined) opts.key = input.key;
+    if (input.erode !== undefined) opts.erode = input.erode;
+    if (input.matteBlur !== undefined) opts.matteBlur = input.matteBlur;
+    if (input.soften !== undefined) opts.soften = input.soften;
+    if (input.glare !== undefined) opts.glare = input.glare;
+    if (input.spill !== undefined) opts.spill = input.spill;
+    if (input.spillRadius !== undefined) opts.spillRadius = input.spillRadius;
+    if (input.tint !== undefined) opts.tint = input.tint;
+    if (input.slot !== undefined) opts.slot = input.slot;
+    if (input.hideSource !== undefined) opts.hideSource = input.hideSource;
+    const { photoId, sourceId } = input;
+    return `
+// Place a UI onto a screen in a photo
+(async function() {
+  if (typeof app.placeOnSurface !== 'function') { return { success: false, error: 'app.placeOnSurface unavailable — update FxTool' }; }
+  const r = await app.placeOnSurface(${JSON.stringify(photoId)}, ${JSON.stringify(sourceId)}, ${JSON.stringify(opts)});
+  if (!r || r.ok === false) { return { success: false, error: (r && r.error) || 'the UI could not be placed' }; }
+  return { success: true, photoId: r.id, slot: r.slot, quad: r.quad, detected: r.detected || null,
+    key: r.key, matteCoverage: r.matteCoverage, ...(r.lostSlots && r.lostSlots.length ? { lostSlots: r.lostSlots } : {}) };
+})();`.trim();
+  }
+
   /**
    * A RESTORABLE project document (D28): app.captureProjectDocument, the
    * engine's own durable format (core/ProjectDocument.js), which carries

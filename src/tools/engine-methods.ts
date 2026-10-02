@@ -160,6 +160,7 @@ export const REQUIRED_ENGINE_METHODS: readonly string[] = [
   'outlineStroke',
   'panWorldCamera',
   'patternFrom',
+  'placeOnSurface',
   'placeSequence',
   'planBook',
   'playChord',

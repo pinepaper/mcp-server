@@ -629,6 +629,10 @@
       "description": "Export scene definition as JSON."
     },
     {
+      "name": "pinepaper_place_on_surface",
+      "description": "Put a UI onto a screen in a photo (corner-pinned, hand stays in front), baked into the photo. {photoId, sourceId, quad?, slot?}"
+    },
+    {
       "name": "pinepaper_import_scene",
       "description": "Restore a scene from a full export file (replaces the scene); returns counts to compare. {path, strict?}"
     },
