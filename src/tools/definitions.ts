@@ -5096,7 +5096,7 @@ flags as a badly-composed scene, and they do not survive an artboard change.`,
     name: 'pinepaper_brand_kit',
     annotations: {
       title: 'Brand Kit', readOnlyHint: false, destructiveHint: false,
-      idempotentHint: true, openWorldHint: false,
+      idempotentHint: true, openWorldHint: true,
     },
     description: `Apply a brand kit — colours, fonts and roles — across the scene.
 
@@ -5104,6 +5104,7 @@ ACTIONS:
 - plan: Report what WOULD change (count, per-role breakdown, WCAG contrast audit) WITHOUT touching
   the canvas. Call this first on an unfamiliar scene; a whole-scene recolour is hard to eyeball afterwards.
 - apply: Commit it. A history snapshot is taken FIRST, so one undo puts everything back.
+- from_url: { url, screenshots? } — read the product's REAL brand from its own site before animating anything: screenshots down the page, the logo (header image or SVG, else the site icon), and a proposed kit from the colours and fonts the site's CSS computes (buttons and links weigh most). Saved to files; the result lists them. Read in an isolated browser context: the studio is not touched. Review the kit against the screenshots, then plan / apply it. Use the brand you are given, never an invented one.
 
 KIT SHAPE — only name and colors.primary are required:
   { "name": "Acme", "colors": { "primary": "#e11d48", "secondary": "#0ea5e9",
@@ -5118,7 +5119,9 @@ Both actions return a WCAG contrast audit, so you can see failing pairs before s
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['plan', 'apply'], description: 'plan (dry run) or apply' },
+        action: { type: 'string', enum: ['plan', 'apply', 'from_url'], description: 'plan (dry run), apply, or from_url (read a site into a proposed kit)' },
+        url: { type: 'string', description: "from_url: the product's site, http(s)." },
+        screenshots: { type: 'integer', minimum: 1, maximum: 6, description: 'from_url: screenshots down the page (default 3).' },
         kit: {
           type: 'object',
           description: 'Brand kit. Requires name and colors.primary; other roles are inferred.',
@@ -5144,7 +5147,7 @@ Both actions return a WCAG contrast audit, so you can see failing pairs before s
         },
         selectionOnly: { type: 'boolean', description: 'Restrict to current selection' },
       },
-      required: ['action', 'kit'],
+      required: ['action'],
     },
   },
   {

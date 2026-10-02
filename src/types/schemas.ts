@@ -3692,8 +3692,10 @@ export type TransformInput = z.infer<typeof TransformInputSchema>;
 // `pinepaper_media` / `pinepaper_transform` set the precedent.
 
 export const BrandKitInputSchema = z.object({
-  /** 'plan' reports what WOULD change without touching the scene. */
-  action: z.enum(['plan', 'apply']),
+  /** 'plan' reports what WOULD change without touching the scene. 'from_url' reads a site into a proposed kit. */
+  action: z.enum(['plan', 'apply', 'from_url']),
+  url: z.string().url().optional().describe("from_url: the product's site (http/https). Read in an isolated browser context: the studio is not navigated."),
+  screenshots: z.number().int().min(1).max(6).optional().describe('from_url: screenshots taken down the page (default 3).'),
   // Spelled out rather than a loose record. A first version typed this as
   // `z.record(...)` described as a "role → colour map", which is NOT the shape
   // the engine takes — every call was rejected with "name is required;
@@ -3714,9 +3716,11 @@ export const BrandKitInputSchema = z.object({
       heading: z.string().optional(),
       body: z.string().optional(),
     }).optional(),
-  }),
+  }).optional(),
   selectionOnly: z.boolean().optional(),
-});
+})
+  .refine((v) => v.action === 'from_url' || !!v.kit, { message: 'plan and apply require kit (from_url proposes one)', path: ['kit'] })
+  .refine((v) => v.action !== 'from_url' || (!!v.url && /^https?:\/\//i.test(v.url)), { message: 'from_url requires an http(s) url', path: ['url'] });
 export type BrandKitInput = z.infer<typeof BrandKitInputSchema>;
 
 export const ComponentInputSchema = z.object({

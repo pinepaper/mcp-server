@@ -317,6 +317,23 @@ export class PinePaperBrowserController {
   }
 
   /**
+   * Run `fn` on a page in a fresh, ISOLATED browser context (its own cookies
+   * and storage), closed afterwards. For reading a site that is not the
+   * studio (brand intake): the studio tab, and the canvas in it, is never
+   * navigated away, and the site's cookies never mix with the studio's.
+   */
+  async withIsolatedPage<T>(fn: (page: Page) => Promise<T>): Promise<T> {
+    if (!this.browser) throw new Error('Not connected to browser');
+    const context = await this.browser.createBrowserContext();
+    try {
+      const page = await context.newPage();
+      return await fn(page);
+    } finally {
+      await context.close().catch(() => {});
+    }
+  }
+
+  /**
    * Get current studio URL (always includes agent parameters for MCP server)
    */
   get studioUrl(): string {

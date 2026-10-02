@@ -228,7 +228,7 @@ export function getScreenshotMode(): ScreenshotMode {
 // EXPORT FILE SAVE HELPERS
 // =============================================================================
 
-function getExportDir(): string {
+export function getExportDir(): string {
   return process.env.PINEPAPER_EXPORT_DIR || join(tmpdir(), 'pinepaper-exports');
 }
 
@@ -1107,6 +1107,44 @@ export async function customCodeRollback(
   return { rolledBack, note: scene + how };
 }
 
+
+
+/**
+ * pinepaper_brand_kit from_url: the product's real brand, read from its own
+ * site (see handlers/brand-intake.ts). Runs in the MCP server's browser, in an
+ * isolated context, so code mode cannot do it and says so.
+ */
+async function brandFromUrl(url: string, shots: number, options: HandlerOptions): Promise<CallToolResult> {
+  const effectiveExecMode = options.executionMode ?? getExecutionMode();
+  if (effectiveExecMode === 'code' || !options.executeInBrowser) {
+    return errorResult(ErrorCodes.EXECUTION_ERROR, 'brand_kit from_url reads the site in the MCP server\'s browser, so it needs browser mode; it cannot run as generated code.', {}, { toolName: 'pinepaper_brand_kit' });
+  }
+  const controller = options.browserController || getBrowserController();
+  if (!controller.connected) {
+    try { await controller.connect(); } catch (e) {
+      return errorResult(ErrorCodes.BROWSER_NOT_CONNECTED, `could not start the browser: ${e instanceof Error ? e.message : String(e)}`, {}, { toolName: 'pinepaper_brand_kit' });
+    }
+  }
+  const host = (() => { try { return new URL(url).hostname.replace(/[^a-z0-9.-]/gi, '_'); } catch { return 'site'; } })();
+  const outDir = join(getExportDir(), `brand-${host}-${Date.now()}`);
+  try {
+    const { intakeBrand } = await import('./handlers/brand-intake.js');
+    const r = await (controller as unknown as { withIsolatedPage: <T>(fn: (p: import('puppeteer').Page) => Promise<T>) => Promise<T> })
+      .withIsolatedPage((page) => intakeBrand(page, url, outDir, shots));
+    const text = [
+      `Brand read from ${url}. Files in ${outDir}:`,
+      ...r.screenshots.map((f) => `- screenshot: ${f}`),
+      r.logo ? `- logo: ${r.logo.file} (from ${r.logo.source})` : '- logo: none found in the header, icons or og:image',
+      '',
+      'Review the proposed kit against the screenshots, then apply it with pinepaper_brand_kit { action: "apply", kit } (or "plan" first). Import the logo or a screenshot with pinepaper_import_image { url: <file> }.',
+      '',
+      JSON.stringify({ success: true, ...r }, null, 2),
+    ].join('\n');
+    return { content: [{ type: 'text' as const, text }] };
+  } catch (e) {
+    return errorResult(ErrorCodes.EXECUTION_ERROR, `could not read ${url}: ${e instanceof Error ? e.message : String(e)}`, {}, { toolName: 'pinepaper_brand_kit' });
+  }
+}
 
 /**
  * pinepaper_capture_frames with `sheet`: one tiled image of the film, saved
@@ -2118,6 +2156,7 @@ async function handleToolCallInner(
       // ─── 1.6.4: agent surface for the Tier-2 engine features ───
       case 'pinepaper_brand_kit': {
         const input = BrandKitInputSchema.parse(args);
+        if (input.action === 'from_url') return brandFromUrl(input.url!, input.screenshots ?? 3, options);
         const code = codeGenerator.generateBrandKit(input);
         return executeOrGenerate(code, `Brand kit: ${input.action}`, options, 'pinepaper_brand_kit');
       }
