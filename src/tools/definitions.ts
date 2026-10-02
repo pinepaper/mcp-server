@@ -14,7 +14,7 @@ import { COMPACT_DESCRIPTIONS } from './compact-descriptions.js';
 import { MINIMAL_DESCRIPTIONS } from './minimal-descriptions.js';
 import { STICK_GAITS, STICK_POSES, STICK_SEQUENCES, STICK_EXPRESSIONS, STICK_PROPS } from './stick-vocabulary.js';
 import { GeneratorNameSchema, ItemTypeSchema } from '../types/schemas.js';
-import { DESIGN_MEDIA, DESIGN_MEDIA_APPLY } from './engine-lists.js';
+import { DESIGN_MEDIA, DESIGN_MEDIA_APPLY, FILTER_TYPES, FILTER_DOCS } from './engine-lists.js';
 import {
   EffectTypeSchema,
   SimpleAnimationTypeSchema,
@@ -7255,7 +7255,7 @@ USE WHEN:
 - "grid background", "geometric abstract", "noise texture"
 - Creating dynamic procedural backgrounds
 
-GENERATORS (15 total):
+GENERATORS (highlights; all ${GeneratorNameSchema.options.length} are in the generatorName enum):
 
 Classic:
 - drawSunburst: Radial rays from center (rayCount, colors, bgColor, opacity, rayGap, gradientRays)
@@ -7401,7 +7401,7 @@ glow's own default is 1.5. Pass a pixel count here and you will be wrong by
 about two orders of magnitude. A recent studio warns about it
 (kind: 'glow-size-unit'); an older one does not.
 
-EFFECTS (15 particle + 7 shader auras):
+EFFECTS (${EffectTypeSchema.options.length}: particles, then the shader auras from heatmap on):
 - sparkle: Glitter/sparkle particles (color, speed, size)
 - blast: Explosion burst effect (color, radius, count)
 - smoke: Rising smoke plumes (color, speed, size, drift, height, growthRate)
@@ -7472,27 +7472,17 @@ USE WHEN:
 - Post-processing the entire scene
 - User says "make it look vintage", "add blur", "black and white"
 
-AVAILABLE FILTERS:
-- grayscale: Convert to black and white (params: intensity 0-1)
-- sepia: Warm vintage brownish tone (params: intensity 0-1)
-- blur: Gaussian blur effect (params: radius 0-20)
-- brightness: Adjust brightness (params: value -100 to 100)
-- contrast: Adjust contrast (params: value -100 to 100)
-- saturation: Adjust color saturation (params: value -100 to 100). 'saturate' is accepted as the same filter.
-- invert: Invert colors (params: intensity 0-1)
-- noise: Add film grain (params: intensity 0-100, monochrome: true/false)
-- vignette: Darken edges (params: intensity 0-1, radius 0-1)
-- vintage: Preset combining sepia, vignette, noise
-- colorOverlay: Add color tint (params: color, intensity, blendMode)
-- sharpen: Increase sharpness (params: intensity 0-100)
-- emboss: 3D emboss (params: intensity 0-1)
-- posterize: Reduce color levels (params: levels 2-32)
+AVAILABLE FILTERS (the engine's own list, with each one's parameters):
+${FILTER_TYPES.map((f) => `- ${f}: ${FILTER_DOCS[f]}`).join('\n')}
+'saturate' is accepted as saturation.
 
 EXAMPLES:
 - "Make it black and white" → filterType: "grayscale"
 - "Add vintage look" → filterType: "vintage", params: {intensity: 0.8}
 - "Blur the background" → filterType: "blur", params: {radius: 5}
 - "Increase contrast" → filterType: "contrast", params: {value: 30}
+- "Print it like a comic" → filterType: "halftoneCMYK", params: {size: 6}
+- "8-bit / retro screen" → filterType: "dither", params: {levels: 4}
 
 Filters can be stacked - call multiple times to combine effects.`,
     inputSchema: {
@@ -7500,7 +7490,7 @@ Filters can be stacked - call multiple times to combine effects.`,
       properties: {
         filterType: {
           type: 'string',
-          enum: ['grayscale', 'sepia', 'blur', 'brightness', 'contrast', 'saturation', 'invert', 'noise', 'vignette', 'vintage', 'colorOverlay', 'sharpen', 'emboss', 'posterize', 'saturate'],
+          enum: [...FILTER_TYPES],
           description: 'Type of filter to apply',
         },
         params: {

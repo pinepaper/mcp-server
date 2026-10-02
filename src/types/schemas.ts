@@ -9,7 +9,7 @@
  */
 
 import { z } from 'zod';
-import { ENGINE_EASING_NAMES, DESIGN_MEDIA, DESIGN_MEDIA_APPLY } from '../tools/engine-lists.js';
+import { ENGINE_EASING_NAMES, DESIGN_MEDIA, DESIGN_MEDIA_APPLY, FILTER_TYPES } from '../tools/engine-lists.js';
 
 // =============================================================================
 // COMMON SCHEMAS
@@ -1238,22 +1238,10 @@ export const BlastParamsSchema = z.object({
 // 'saturate' is what the published JSON schema offered for releases, while
 // the engine registers 'saturation' and this enum rejected 'saturate' — a
 // caller who followed the docs got a validation error. Accepted and mapped.
-export const FilterTypeSchema = z.preprocess((v) => (v === 'saturate' ? 'saturation' : v), z.enum([
-  'grayscale',
-  'sepia',
-  'blur',
-  'brightness',
-  'contrast',
-  'saturation',
-  'invert',
-  'noise',
-  'vignette',
-  'vintage',
-  'colorOverlay',
-  'sharpen',
-  'emboss',
-  'posterize',
-])).describe('Type of visual filter to apply');
+// GENERATED list (FilterSystem.js registerFilter, scripts/sync-engine-lists.mjs).
+// The hand copy here hid six of twenty: dither, halftoneCMYK, halftoneDots,
+// edgeDetect, hsl and colorTint. 'saturate' stays accepted as 'saturation'.
+export const FilterTypeSchema = z.preprocess((v) => (v === 'saturate' ? 'saturation' : v), z.enum(FILTER_TYPES)).describe('Type of visual filter to apply');
 
 export type FilterType = z.infer<typeof FilterTypeSchema>;
 

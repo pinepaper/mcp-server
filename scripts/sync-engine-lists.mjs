@@ -26,6 +26,12 @@
  *   names the rest so their refusal reaches the agent. MEDIA imports another
  *   module, so it is parsed (top-level keys, depth-tracked), not evaluated.
  *
+ * - FILTER_TYPES / FILTER_DOCS. The filters FilterSystem.js registers
+ *   (registerFilter('name', {description, params})), with each one's own
+ *   description and parameter ranges. add_filter's hand-copied enum hid six
+ *   of twenty (dither, halftoneCMYK, halftoneDots, edgeDetect, hsl,
+ *   colorTint), and the marketing session asked for dither by name.
+ *
  * Descriptions are NOT generated: they are prose, written here. The type of
  * EASING_DESCRIPTIONS is keyed on the generated union, so a new engine easing
  * fails the TYPECHECK until someone writes its line.
@@ -52,6 +58,7 @@ const ENGINE_REF = process.env.PP_FXTOOL_REF || 'origin/main';
 const EASING_REL = 'js/core/KeyframeInterpolator.js';
 const WORLD_REL = 'js/world3d/worlds.js';
 const MEDIA_REL = 'js/core/DesignMedia.js';
+const FILTER_REL = 'js/FilterSystem.js';
 
 function resolveRef() {
   for (const ref of [ENGINE_REF, 'HEAD']) {
@@ -129,6 +136,30 @@ function designMedia(src) {
   return entries;
 }
 
+/**
+ * Every registerFilter('name', { description, params: { p: { type, min, max,
+ * default, options } } }). Bounded per block (to the next registerFilter), so
+ * one filter's params are never read as another's.
+ */
+function filters(src) {
+  const starts = [...src.matchAll(/registerFilter\('([A-Za-z]\w*)'\s*,/g)];
+  if (starts.length === 0) throw new Error(`sync-engine-lists: no registerFilter calls in ${FILTER_REL}`);
+  return starts.map((m, i) => {
+    const block = src.slice(m.index, i + 1 < starts.length ? starts[i + 1].index : m.index + 4000);
+    const desc = /description:\s*'((?:[^'\\]|\\.)*)'/.exec(block)?.[1] ?? '';
+    const params = [...block.matchAll(/^\s*([A-Za-z]\w*):\s*\{\s*type:\s*'(\w+)'([^}]*)\}/gm)].map((p) => {
+      const rest = p[3];
+      const num = (k) => { const v = new RegExp(`${k}:\\s*(-?[\\d.]+)`).exec(rest); return v ? v[1] : null; };
+      const def = /default:\s*('([^']*)'|-?[\d.]+|true|false)/.exec(rest);
+      const opts = /options:\s*\[([^\]]*)\]/.exec(rest)?.[1]?.replace(/'/g, '').replace(/\s+/g, '');
+      const range = num('min') !== null && num('max') !== null ? ` ${num('min')}..${num('max')}` : opts ? ` ${opts.split(',').join('|')}` : ` (${p[2]})`;
+      const d = def ? `, default ${def[2] ?? def[1]}` : '';
+      return `${p[1]}${range}${d}`;
+    });
+    return { name: m[1], doc: `${desc}${params.length ? ` — ${params.join('; ')}` : ''}` };
+  });
+}
+
 const list = (names) => names.map((n) => `  '${n}',`).join('\n');
 
 async function generate() {
@@ -141,6 +172,9 @@ async function generate() {
   const easings = await easingNames(easingSrc);
   const colors = worldColorPaths(worldSrc);
   const media = designMedia(mediaSrc);
+  const filterSrc = readCommitted(FILTER_REL);
+  if (!filterSrc) throw new Error(`sync-engine-lists: cannot read ${FILTER_REL}`);
+  const filterList = filters(filterSrc);
 
   return `/**
  * GENERATED — DO NOT EDIT. Run \`bun run sync:engine-lists\`.
@@ -152,6 +186,7 @@ async function generate() {
  *   ${EASING_REL}  sha256: ${digest(easingSrc)}
  *   ${WORLD_REL}  sha256: ${digest(worldSrc)}
  *   ${MEDIA_REL}  sha256: ${digest(mediaSrc)}
+ *   ${FILTER_REL}  sha256: ${digest(filterSrc)}
  */
 
 /** ${easings.length} names: EASING_NAMES, the keys of the engine's easing table. Keyframes, masks, relations and the camera all resolve through it. */
@@ -172,6 +207,16 @@ ${list(media.map((e) => e.key))}
 /** The engine method that applies each medium that has one (MEDIA[key].apply). The others are refused by the engine, by name. */
 export const DESIGN_MEDIA_APPLY: Readonly<Record<string, string>> = Object.freeze({
 ${media.filter((e) => e.apply).map((e) => `  ${e.key}: '${e.apply}',`).join('\n')}
+});
+
+/** ${filterList.length} filters: everything FilterSystem.js registers. */
+export const FILTER_TYPES = [
+${list(filterList.map((f) => f.name))}
+] as const;
+
+/** One line per filter: the engine's own description and parameter ranges. */
+export const FILTER_DOCS: Readonly<Record<string, string>> = Object.freeze({
+${filterList.map((f) => `  ${f.name}: ${JSON.stringify(f.doc)},`).join('\n')}
 });
 `;
 }
