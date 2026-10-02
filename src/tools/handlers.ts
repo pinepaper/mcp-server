@@ -1388,13 +1388,18 @@ ${code}
   const result = await controller.executeCode(code, shouldTakeScreenshot, stage ? { stage } : {});
 
   const browserDuration = tracker.endTimer(`${timerId}_browser_execution`);
+  // THE METRIC RECORDS THE CALL'S VERDICT, NOT THE TRANSPORT'S (gate H2,
+  // 1.6.19). result.success only says the code RAN; an emitter that ran and
+  // returned { success: false } is a failed call, and get_performance_metrics
+  // reported "Success Rate: 100.0%" over exactly such a failure.
+  const innerVerdict = result.success ? innerFailure(result.result) : null;
   tracker.recordMetric({
     toolName,
     phase: 'browser_execution',
     duration: browserDuration,
     timestamp: Date.now(),
-    success: result.success,
-    error: result.error,
+    success: result.success && !innerVerdict,
+    error: result.error || innerVerdict || undefined,
   });
 
   let screenshotMs: number | undefined;
@@ -1417,8 +1422,8 @@ ${code}
     phase: 'total',
     duration: totalDuration,
     timestamp: Date.now(),
-    success: result.success,
-    error: result.error,
+    success: result.success && !innerVerdict,
+    error: result.error || innerVerdict || undefined,
   });
 
   const timing = { browserMs: Math.round(browserDuration), ...(screenshotMs !== undefined ? { screenshotMs: Math.round(screenshotMs) } : {}) };
@@ -1455,7 +1460,7 @@ ${code}
   // outer success and the agent kept building on a rig that did not exist.
   // pinepaper_agent_export got this check in 1.6.9; it belongs HERE, where
   // every tool inherits it.
-  const inner = innerFailure(result.result);
+  const inner = innerVerdict;
   if (inner) {
     const canvasState = await captureCanvasState(controller);
     return withTiming(errorResult(
@@ -1467,6 +1472,13 @@ ${code}
       },
       { toolName, canvasState: canvasState || undefined }
     ), timing);
+  }
+
+  // Session item counts come from the governor's own count of what this call
+  // created (gate H3: the session stats read 0 with items on the canvas).
+  const created = (result.report as { items?: { created?: number } } | undefined)?.items?.created;
+  if (typeof created === 'number' && created > 0) {
+    try { getSessionManager().noteItemsCreated(created); } catch { /* no session */ }
   }
 
   return withTiming(withSessionNote(executedResult(code, result.result, result.screenshot, description, result.report), result), timing);
@@ -3101,7 +3113,14 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
             const perfTracker = getPerformanceTracker();
             const recentMetrics = perfTracker.exportMetrics('json' as MetricsExportFormat, { limit: metricsLimit });
             const stats = perfTracker.getStats();
-            metricsSection = { entries: recentMetrics, stats };
+            // exportMetrics('json') returns a JSON STRING; embedded as-is it reached
+            // the report as one escaped string, not an array (gate H3).
+            let entries: unknown = recentMetrics;
+            if (typeof recentMetrics === 'string') { try { entries = JSON.parse(recentMetrics); } catch { /* keep the string */ } }
+            if (entries && typeof entries === 'object' && !Array.isArray(entries) && Array.isArray((entries as { metrics?: unknown }).metrics)) {
+              entries = (entries as { metrics: unknown[] }).metrics;
+            }
+            metricsSection = { entries, stats };
           } catch { /* metrics not available */ }
         }
 
@@ -3166,17 +3185,24 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
             recommendations: [] as string[],
           };
 
-          // Add actionable recommendations
+          // RECOMMEND ONLY WHAT SAVES (gate H4, 1.6.19). This said "switch to
+          // agent" on full, which saves under 1% (agent omits three small
+          // tools). Each alternative is measured against the active set and
+          // offered only when it saves at least 10%, with the saving stated.
           const recs = toolDefsSection.recommendations as string[];
-          if (toolkit === 'full') {
-            recs.push(`Switch to PINEPAPER_TOOLKIT=agent to reduce to ~${agentCompactTokens.toLocaleString()} tokens/turn (agent+compact)`);
+          const alternatives: Array<{ label: string; how: string; tokens: number }> = [];
+          for (const v of ['compact', 'minimal'] as const) {
+            for (const k of ['full', 'agent', 'minimal'] as const) {
+              if (k === toolkit && v === verbosity) continue;
+              const t = Math.ceil(Buffer.byteLength(JSON.stringify(getToolsForToolkit(getToolsForVerbosity(v), k)), 'utf-8') / 4);
+              alternatives.push({ label: `${k}+${v}`, how: `PINEPAPER_TOOLKIT=${k} PINEPAPER_VERBOSITY=${v}`, tokens: t });
+            }
           }
-          if (verbosity === 'verbose') {
-            recs.push(`Set PINEPAPER_VERBOSITY=compact to reduce tool definitions overhead`);
-          }
-          if (verbosity !== 'minimal') {
-            recs.push(`Set PINEPAPER_VERBOSITY=minimal for maximum savings (~${agentMinimalTokens.toLocaleString()} tokens with agent toolkit) — use pinepaper_tool_guide for on-demand docs`);
-          }
+          alternatives
+            .filter((alt) => alt.tokens <= activeTokens * 0.9)
+            .sort((x, y) => x.tokens - y.tokens)
+            .slice(0, 3)
+            .forEach((alt) => recs.push(`${alt.how}: ~${alt.tokens.toLocaleString()} tokens/turn (${Math.round((1 - alt.tokens / activeTokens) * 100)}% less)${alt.label.startsWith('minimal+') ? ' — a small core set; switch profiles at runtime with pinepaper_set_toolkit' : ''}`));
           if (activeTokens > 20000) {
             recs.push(`Tool definitions alone consume ~${activeTokens.toLocaleString()} tokens per API turn — this is a major context budget item`);
           }

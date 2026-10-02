@@ -60,6 +60,7 @@ export class AgentSessionManager {
    * Start a new agent job
    */
   startJob(options: JobOptions = {}): JobContext {
+    this.createdInJobCount = 0;
     // End any existing job first
     if (this.currentJob) {
       console.warn('[AgentSession] Ending previous job before starting new one');
@@ -201,6 +202,19 @@ ${queue.map((code: string, i: number) => `
   }
 
   /**
+   * Items created by calls the server ran, counted from the governor's own
+   * report (report.items.created). registerItem() below was never called by
+   * anything, so these stats read 0 with items on the canvas (gate H3).
+   */
+  private createdOutsideIds = 0;
+  private createdInJobCount = 0;
+  noteItemsCreated(count: number): void {
+    if (!(count > 0)) return;
+    this.createdOutsideIds += count;
+    if (this.currentJob) this.createdInJobCount += count;
+  }
+
+  /**
    * Register an item created during the job
    */
   registerItem(itemId: string): void {
@@ -335,10 +349,10 @@ if (app.historyManager) {
       activeJob: this.hasActiveJob(),
       currentJobId: this.currentJob?.jobId ?? null,
       currentJobDuration: this.currentJob ? Date.now() - this.currentJob.startTime : null,
-      itemsInCurrentJob: this.currentJob?.itemsCreated.length ?? 0,
+      itemsInCurrentJob: Math.max(this.currentJob?.itemsCreated.length ?? 0, this.currentJob ? this.createdInJobCount : 0),
       codeQueueSize: this.getQueueSize(),
       completedJobs,
-      totalItemsCreated: totalItemsCreated + (this.currentJob?.itemsCreated.length ?? 0),
+      totalItemsCreated: Math.max(totalItemsCreated + (this.currentJob?.itemsCreated.length ?? 0), this.createdOutsideIds),
     };
   }
 }

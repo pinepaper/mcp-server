@@ -1789,7 +1789,9 @@ function generateGetItemsCode(filter?: {
   if (filter?.type) conditions.push(`entry.type === '${filter.type}'`);
   if (filter?.source) conditions.push(`entry.source === '${filter.source}'`);
   if (filter?.hasAnimation !== undefined) {
-    conditions.push(`!!entry.item.data?.animationType === ${filter.hasAnimation}`);
+    // 'none' is what the engine stores on a still item, and !!'none' is true
+    // (gate H5): animated means a real loop animation OR keyframes.
+    conditions.push(`!!((entry.item.data?.animationType && entry.item.data.animationType !== 'none') || (Array.isArray(entry.item.data?.keyframes) && entry.item.data.keyframes.length > 0)) === ${filter.hasAnimation}`);
   }
   if (filter?.hasRelation !== undefined) {
     conditions.push(`(app.getRelations(entry.id || entry.itemId).length > 0) === ${filter.hasRelation}`);
@@ -1803,7 +1805,7 @@ const items = entries.map(entry => ({
   id: entry.id || entry.itemId,
   type: entry.type,
   position: entry.item.position ? { x: entry.item.position.x, y: entry.item.position.y } : null,
-  hasAnimation: !!entry.item.data?.animationType,
+  hasAnimation: !!((entry.item.data?.animationType && entry.item.data.animationType !== 'none') || (Array.isArray(entry.item.data?.keyframes) && entry.item.data.keyframes.length > 0)),
   relations: app.getRelations(entry.id || entry.itemId).map(r => r.relation || r.type)
 }));
 
@@ -1819,7 +1821,7 @@ const items = filtered.map(entry => ({
   id: entry.id || entry.itemId,
   type: entry.type,
   position: entry.item.position ? { x: entry.item.position.x, y: entry.item.position.y } : null,
-  hasAnimation: !!entry.item.data?.animationType,
+  hasAnimation: !!((entry.item.data?.animationType && entry.item.data.animationType !== 'none') || (Array.isArray(entry.item.data?.keyframes) && entry.item.data.keyframes.length > 0)),
   relations: app.getRelations(entry.id || entry.itemId).map(r => r.relation || r.type)
 }));
 
@@ -7476,29 +7478,32 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
   try {
     // Import the Paper.js item from JSON
     const item = paper.project.importJSON(${itemJsonStr});
-    if (!item) {
-      return { success: false, error: 'Failed to import item from JSON' };
+    // importJSON accepts anything: { bogus: true } came back as an object with
+    // no bounds and was registered as an item (found by the 1.6.19 gate). Only
+    // a real Paper item with geometry may be registered.
+    if (!item || !(item instanceof paper.Item) || !item.bounds) {
+      try { if (item && typeof item.remove === 'function') item.remove(); } catch (e) {}
+      return { success: false, error: 'itemJson is not a Paper.js item (pass the output of item.exportJSON())' };
     }
 
-    // Register in item registry
-    const itemId = app.itemRegistry ? 'item_' + (app.itemRegistry.size + 1) : 'item_1';
-    item.data = item.data || {};
-    item.data.registryId = itemId;
-    item.data.type = ${JSON.stringify(input.itemType)};
-
-    // Merge custom properties
+    // REGISTER THROUGH THE ENGINE (gate H1, 1.6.19). This used to call
+    // app.itemRegistry.set(), which does not exist ("not a function", nothing
+    // registered), with an id invented from .size (undefined, so 'item_NaN',
+    // or a collision), and it moved every item into the TEXT group. The
+    // registry's own register() mints the id, never steals a live one, treats
+    // re-registration as an update, and returns the id it assigned.
+    // importJSON already put the item in the active layer.
+    if (!app.itemRegistry || typeof app.itemRegistry.register !== 'function') {
+      try { item.remove(); } catch (e) {}
+      return { success: false, error: 'app.itemRegistry.register unavailable — update FxTool' };
+    }
     const customProps = ${propertiesStr};
-    Object.assign(item.data, customProps);
-
-    // Add to registry
-    if (app.itemRegistry) {
-      app.itemRegistry.set(itemId, item);
+    const itemId = app.itemRegistry.register(item, ${JSON.stringify(input.itemType)}, customProps, 'import');
+    if (!itemId) {
+      try { item.remove(); } catch (e) {}
+      return { success: false, error: 'the registry refused the item' };
     }
-
-    // Add to appropriate group
-    if (app.textItemGroup) {
-      app.textItemGroup.addChild(item);
-    }
+    try { if (paper.view) paper.view.update(); } catch (e) {}
 
     return {
       success: true,

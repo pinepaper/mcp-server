@@ -69,57 +69,33 @@ export async function captureCanvasState(
 
   try {
     // Query canvas state in a single browser execution
+    // THE ENGINE'S OWN API (gate H3, 1.6.19). This read window.pinepaper.getItems()
+    // and window.pinepaper.canvas; there is no lowercase window.pinepaper, so it
+    // threw every time and returned null. diagnostic_report showed canvas: null
+    // with items on screen, and every execution error went out without the
+    // canvas context this function exists to attach.
     const stateCode = `
       (function() {
-        const items = window.pinepaper.getItems();
-        const canvas = window.pinepaper.canvas;
-
-        // Count by type
+        const app = window.app || window.PinePaper;
+        if (!app || !app.itemRegistry || typeof app.itemRegistry.getAll !== 'function') return null;
+        const entries = app.itemRegistry.getAll();
         const itemTypes = {};
-        items.forEach(item => {
-          const type = item.type || 'unknown';
+        entries.forEach(function (e) {
+          const type = (e && e.type) || 'unknown';
           itemTypes[type] = (itemTypes[type] || 0) + 1;
         });
-
-        // Get relation stats
-        const relations = [];
-        items.forEach(item => {
-          if (item.relations) {
-            Object.keys(item.relations).forEach(targetId => {
-              const relationTypes = item.relations[targetId];
-              relationTypes.forEach(rel => {
-                relations.push({ type: rel.type });
-              });
-            });
-          }
-        });
-
+        const rels = (app.relationRegistry && typeof app.relationRegistry.exportForSave === 'function')
+          ? app.relationRegistry.exportForSave() : [];
         const relationsByType = {};
-        relations.forEach(rel => {
-          relationsByType[rel.type] = (relationsByType[rel.type] || 0) + 1;
-        });
-
-        // Get recent items (last 5)
-        const recentItems = items
-          .slice(-5)
-          .map(item => ({
-            id: item.id,
-            type: item.type || 'unknown'
-          }));
-
+        rels.forEach(function (r) { const t = (r && r.relation) || 'unknown'; relationsByType[t] = (relationsByType[t] || 0) + 1; });
+        const size = typeof app.getCanvasSize === 'function' ? app.getCanvasSize() : null;
         return {
-          itemCount: items.length,
+          itemCount: entries.length,
           itemTypes: itemTypes,
-          canvasSize: {
-            width: canvas.width,
-            height: canvas.height
-          },
-          relations: {
-            total: relations.length,
-            byType: relationsByType
-          },
-          recentItems: recentItems,
-          isEmpty: items.length === 0
+          canvasSize: { width: size ? size.width : null, height: size ? size.height : null },
+          relations: { total: rels.length, byType: relationsByType },
+          recentItems: entries.slice(-5).map(function (e) { return { id: e.itemId, type: (e && e.type) || 'unknown' }; }),
+          isEmpty: entries.length === 0
         };
       })();
     `;
