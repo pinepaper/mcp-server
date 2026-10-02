@@ -70,6 +70,33 @@ export const MODULES = ['design-systems-dtcg'];
  */
 const UPSTREAM_REPO = resolve(UPSTREAM_DIR, '..', '..');
 
+/**
+ * The upstream REF read from: origin/main, what mcp-cloud has published.
+ * Tracked was not enough. A commit made in that checkout and not yet pushed
+ * (c80c5db0, 2026-10-02) is tracked, so it was vendored, and check:design
+ * then failed every publish here until someone else pushed. Falls back to
+ * the working tree only when the checkout has no such ref.
+ */
+const UPSTREAM_REF = process.env.PP_MCP_CLOUD_REF || 'origin/main';
+
+function refExists() {
+  try {
+    execFileSync('git', ['-C', UPSTREAM_REPO, 'rev-parse', '--verify', '--quiet', UPSTREAM_REF], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** A file under src/services as published upstream. */
+export function readUpstream(name) {
+  if (refExists()) {
+    return execFileSync('git', ['-C', UPSTREAM_REPO, 'show', `${UPSTREAM_REF}:src/services/${name}`],
+      { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  }
+  return readFileSync(join(UPSTREAM_DIR, name), 'utf8');
+}
+
 /** Is this path committed upstream? An untracked file is not ready to vendor. */
 export function isTracked(relPath) {
   try {
@@ -86,6 +113,14 @@ export function isTracked(relPath) {
  *  Untracked files are skipped: unpublished work is not a style this ships. */
 export function discoverGenerators() {
   if (!existsSync(UPSTREAM_DIR)) return [];
+  if (refExists()) {
+    const listed = execFileSync('git', ['-C', UPSTREAM_REPO, 'ls-tree', '--name-only', `${UPSTREAM_REF}:src/services`], { encoding: 'utf8' })
+      .split('\n').filter(Boolean);
+    return listed
+      .filter((f) => f.endsWith('-generator.ts') && !f.startsWith('typesafe-'))
+      .map((f) => basename(f, '.ts'))
+      .sort();
+  }
   return readdirSync(UPSTREAM_DIR)
     .filter((f) => f.endsWith('-generator.ts') && !f.startsWith('typesafe-'))
     .filter((f) => isTracked(join('src', 'services', f)))
@@ -123,7 +158,7 @@ function header(sourceName, sha) {
 const sha256 = (s) => createHash('sha256').update(s).digest('hex');
 
 export function generate(name) {
-  const src = readFileSync(join(UPSTREAM_DIR, name + '.ts'), 'utf8');
+  const src = readUpstream(name + '.ts');
   return header(name + '.ts', sha256(src)) + repointStyleImport(src);
 }
 
@@ -136,8 +171,7 @@ export function generate(name) {
  * loudly instead of emitting a stale union.
  */
 export function generateStyleUnion() {
-  const path = join(UPSTREAM_DIR, 'content-recipes.ts');
-  const src = readFileSync(path, 'utf8');
+  const src = readUpstream('content-recipes.ts');
   const m = /export type DesignStyle =[\s\S]*?;\n/.exec(src);
   if (!m) {
     throw new Error(
