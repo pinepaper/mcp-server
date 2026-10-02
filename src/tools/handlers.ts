@@ -812,6 +812,36 @@ function dataResult(value: unknown): CallToolResult {
   return { content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] };
 }
 
+
+/**
+ * A call that only succeeded after the browser session was recovered says so,
+ * in the result: the controller has reported `recovered` / `canvasReset` for
+ * a while, but nothing read them, so an agent kept using item ids from a
+ * scene that was gone (M6).
+ */
+function withSessionNote(
+  out: CallToolResult,
+  r: { recovered?: boolean; canvasReset?: boolean; relaunched?: boolean; canvasSizeRestored?: { width: number; height: number } },
+): CallToolResult {
+  if (!r.recovered) return out;
+  const note = r.relaunched
+    ? `The browser session had been lost; the browser was relaunched and this call ran on an EMPTY canvas${r.canvasSizeRestored ? ` (size restored to ${r.canvasSizeRestored.width}x${r.canvasSizeRestored.height})` : ' at the default size'}. Item ids from before are gone: rebuild the scene.`
+    : r.canvasReset
+      ? 'The page had reloaded and the canvas came back EMPTY. Item ids from before are gone: rebuild the scene.'
+      : 'The page connection was re-established; the scene survived.';
+  const first = out.content[0];
+  if (first && first.type === 'text') {
+    try {
+      const obj = JSON.parse(first.text);
+      obj.session = { recovered: true, ...(r.relaunched ? { relaunched: true } : {}), ...(r.canvasReset !== undefined ? { canvasReset: r.canvasReset } : {}), note };
+      return { ...out, content: [{ type: 'text', text: JSON.stringify(obj, null, 2) }, ...out.content.slice(1)] };
+    } catch {
+      return { ...out, content: [{ type: 'text', text: `${note}\n\n${first.text}` }, ...out.content.slice(1)] };
+    }
+  }
+  return out;
+}
+
 function executedResult(
   code: string,
   result: unknown,
@@ -1356,7 +1386,7 @@ ${code}
     );
   }
 
-  return executedResult(code, result.result, result.screenshot, description, result.report);
+  return withSessionNote(executedResult(code, result.result, result.screenshot, description, result.report), result);
 }
 
 /**
@@ -2614,8 +2644,13 @@ async function handleToolCallInner(
         }
 
         try {
-          // Refresh the page
-          await controller.refreshPage();
+          // Refresh the page (recovers a dead session first; M6)
+          const refreshed = await controller.refreshPage();
+          const sizeNote = refreshed.relaunched
+            ? (refreshed.canvasSizeRestored
+              ? `\n\nThe browser session had been lost, so the browser was relaunched. The canvas size was restored to ${refreshed.canvasSizeRestored.width}x${refreshed.canvasSizeRestored.height}.`
+              : '\n\nThe browser session had been lost, so the browser was relaunched at the default canvas size: set the size again if you need another.')
+            : '';
 
           // Wait a moment for the page to stabilize
           await new Promise(resolve => setTimeout(resolve, 2000));
@@ -2630,7 +2665,7 @@ async function handleToolCallInner(
 
 The canvas is now completely empty. The welcome template will not appear (it only shows for first-time visitors).
 
-You can now start creating new items on a clean canvas.`,
+You can now start creating new items on a clean canvas.${sizeNote}`,
             },
           ];
 

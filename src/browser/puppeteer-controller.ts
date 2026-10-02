@@ -137,6 +137,13 @@ export interface ExecuteResult {
    * keep referencing item ids from before the reload. undefined = unknown.
    */
   canvasReset?: boolean;
+  /**
+   * Set alongside `recovered` when no live tab could be re-bound and the
+   * browser was RELAUNCHED: the scene is gone for certain (canvasReset true).
+   */
+  relaunched?: boolean;
+  /** The canvas size put back after a relaunch, when one was known. */
+  canvasSizeRestored?: { width: number; height: number };
 }
 
 /**
@@ -513,6 +520,58 @@ export class PinePaperBrowserController {
     }
   }
 
+  /**
+   * The last canvas size seen on a healthy page. A relaunched browser comes
+   * up at the studio's default (800x600), so without this a session that
+   * died idle came back at the wrong size, silently (M6, 2026-10-02).
+   */
+  private lastCanvasSize: { width: number; height: number } | null = null;
+
+  private async rememberCanvasSize(): Promise<void> {
+    if (!this.page) return;
+    try {
+      const size = await this.page.evaluate(() => {
+        const app = (window as any).app || (window as any).PinePaper;
+        const s = app && typeof app.getCanvasSize === 'function' ? app.getCanvasSize() : null;
+        return s && s.width > 0 && s.height > 0 ? { width: s.width, height: s.height } : null;
+      });
+      if (size) this.lastCanvasSize = size;
+    } catch { /* keep the last known size */ }
+  }
+
+  /**
+   * Get a working page back after a stale-frame error. First re-bind a live
+   * tab (the scene may survive); if none answers, as after days idle when
+   * every frame is detached, relaunch ONCE and put the canvas size back.
+   * 'relaunched' means the scene is gone. false means even that failed.
+   */
+  private async recoverSession(): Promise<false | { kind: 'reacquired' } | { kind: 'relaunched'; canvasSizeRestored?: { width: number; height: number } }> {
+    if (await this.reacquirePage()) return { kind: 'reacquired' };
+    const size = this.lastCanvasSize;
+    try {
+      await this.disconnect();
+      await this.connect();
+    } catch (e) {
+      console.error('[PinePaper] Relaunch after a lost session failed:', e instanceof Error ? e.message : e);
+      return false;
+    }
+    if (!this.page || !this.isConnected) return false;
+    let restored: { width: number; height: number } | undefined;
+    if (size) {
+      try {
+        const ok = await this.page.evaluate((w: number, h: number) => {
+          const app = (window as any).app || (window as any).PinePaper;
+          if (!app || typeof app.setCanvasSize !== 'function') return false;
+          app.setCanvasSize(w, h);
+          return true;
+        }, size.width, size.height);
+        if (ok) { restored = size; this.lastCanvasSize = size; }
+      } catch { /* reported as not restored */ }
+    }
+    console.error('[PinePaper] Session lost; browser relaunched' + (restored ? ` at ${restored.width}x${restored.height}` : ''));
+    return { kind: 'relaunched', ...(restored ? { canvasSizeRestored: restored } : {}) };
+  }
+
   /** Number of registry items currently on the canvas, or null if unknown. */
   private async canvasItemCount(): Promise<number | null> {
     if (!this.page) return null;
@@ -702,6 +761,7 @@ export class PinePaperBrowserController {
       if (takeScreenshot && result.success) {
         screenshot = await this.takeScreenshot();
       }
+      if (result.success) await this.rememberCanvasSize();
 
       return {
         ...result,
@@ -712,7 +772,8 @@ export class PinePaperBrowserController {
       // so every later call hit the same error until the caller manually
       // disconnected — and disconnect+connect relaunches the browser, losing
       // the canvas. Re-bind to the live page and retry ONCE instead.
-      if (PinePaperBrowserController.isStaleFrameError(error) && await this.reacquirePage()) {
+      const recovery = PinePaperBrowserController.isStaleFrameError(error) ? await this.recoverSession() : false;
+      if (recovery) {
         try {
           // Forward `options`: a recovered export that silently reverted to the
           // 10s governor budget would die at the same place the retry exists to
@@ -721,6 +782,15 @@ export class PinePaperBrowserController {
           // The page reloaded under us, so the scene may be gone even though
           // execution now succeeds. Say so explicitly — silently continuing
           // against vanished item ids is how this bug wasted a whole rebuild.
+          if (recovery.kind === 'relaunched') {
+            return {
+              ...retry,
+              recovered: true,
+              relaunched: true,
+              canvasReset: true,
+              ...(recovery.canvasSizeRestored ? { canvasSizeRestored: recovery.canvasSizeRestored } : {}),
+            };
+          }
           const items = await this.canvasItemCount();
           return {
             ...retry,
@@ -735,9 +805,12 @@ export class PinePaperBrowserController {
           };
         }
       }
+      const message = error instanceof Error ? error.message : 'Unknown execution error';
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown execution error',
+        error: PinePaperBrowserController.isStaleFrameError(error)
+          ? `${message}. The browser session was lost and could not be recovered automatically: call pinepaper_browser_disconnect, then pinepaper_browser_connect.`
+          : message,
       };
     }
   }
@@ -811,21 +884,40 @@ export class PinePaperBrowserController {
    * Refresh the page and wait for PinePaper to be ready again.
    * This is the most reliable way to get a clean canvas.
    */
-  async refreshPage(): Promise<void> {
+  /**
+   * Reload the studio. The tool whose job is recovery could not recover: on a
+   * detached frame, page.reload() threw the same "detached Frame" error as
+   * every other call (M6, after ~2 days idle). A stale page is now recovered
+   * first: re-bound and reloaded, or the browser relaunched at the remembered
+   * canvas size. The return says which, so the caller knows the scene is gone.
+   */
+  async refreshPage(): Promise<{ relaunched?: boolean; canvasSizeRestored?: { width: number; height: number } }> {
     if (!this.page) {
       throw new Error('Not connected to browser');
     }
 
     console.error('[PinePaper] Refreshing page...');
-    await this.page.reload({
-      waitUntil: this.config.waitUntil,
-      timeout: this.config.timeout,
-    });
+    try {
+      await this.page.reload({ waitUntil: this.config.waitUntil, timeout: this.config.timeout });
+    } catch (error) {
+      if (!PinePaperBrowserController.isStaleFrameError(error)) throw error;
+      const recovery = await this.recoverSession();
+      if (!recovery) {
+        throw new Error('The browser session was lost and could not be recovered: call pinepaper_browser_disconnect, then pinepaper_browser_connect.');
+      }
+      if (recovery.kind === 'relaunched') {
+        console.error('[PinePaper] Page refreshed by relaunching the browser');
+        return { relaunched: true, ...(recovery.canvasSizeRestored ? { canvasSizeRestored: recovery.canvasSizeRestored } : {}) };
+      }
+      await this.page!.reload({ waitUntil: this.config.waitUntil, timeout: this.config.timeout });
+    }
 
     // Wait for PinePaper to be ready again
     await this.waitForPinePaper();
+    await this.rememberCanvasSize();
 
     console.error('[PinePaper] Page refreshed and ready');
+    return {};
   }
 
   /**

@@ -16,6 +16,10 @@ import { PinePaperBrowserController } from '../../browser/puppeteer-controller.j
 type Internals = {
   isStaleFrameError(e: unknown): boolean;
   reacquirePage(): Promise<boolean>;
+  recoverSession(): Promise<false | { kind: string; canvasSizeRestored?: { width: number; height: number } }>;
+  lastCanvasSize: { width: number; height: number } | null;
+  connect(): Promise<void>;
+  disconnect(): Promise<void>;
   browser: unknown;
   page: unknown;
   isConnected: boolean;
@@ -106,6 +110,61 @@ describe('stale-frame recovery', () => {
       const noPages = controller();
       internals(noPages).browser = { pages: async () => [] };
       expect(await internals(noPages).reacquirePage()).toBe(false);
+    });
+  });
+
+  // M6 (2026-10-02): after ~2 days idle EVERY frame was detached, so there was
+  // no live tab to re-bind; every tool, refresh_page included, failed until a
+  // manual disconnect + connect, which then came back at 800x600.
+  describe('recoverSession / refreshPage (M6)', () => {
+    const controller = () => new PinePaperBrowserController({ studioUrl: 'http://localhost:3100' });
+    const deadBrowser = () => ({
+      pages: async () => [{ url: () => 'http://localhost:3100/editor', evaluate: async () => { throw new Error('Attempted to use detached Frame'); } }],
+      close: async () => {},
+    });
+
+    it('relaunches when no tab answers, and puts the last canvas size back', async () => {
+      const c = controller();
+      const calls: unknown[][] = [];
+      const fresh = { url: () => 'http://localhost:3100/editor', evaluate: async (_fn: unknown, ...args: unknown[]) => { calls.push(args); return true; } };
+      internals(c).browser = deadBrowser();
+      internals(c).lastCanvasSize = { width: 1080, height: 1920 };
+      internals(c).connect = async () => { internals(c).page = fresh; internals(c).isConnected = true; };
+      const r = await internals(c).recoverSession();
+      expect(r).toEqual({ kind: 'relaunched', canvasSizeRestored: { width: 1080, height: 1920 } });
+      expect(calls).toContainEqual([1080, 1920]);
+    });
+
+    it('prefers re-binding a live tab, which keeps the scene', async () => {
+      const c = controller();
+      let relaunched = false;
+      internals(c).browser = { pages: async () => [{ url: () => 'http://localhost:3100/editor', evaluate: async () => true }] };
+      internals(c).connect = async () => { relaunched = true; };
+      expect(await internals(c).recoverSession()).toEqual({ kind: 'reacquired' });
+      expect(relaunched).toBe(false);
+    });
+
+    it('refresh_page recovers a detached frame instead of failing with it', async () => {
+      const c = controller();
+      internals(c).page = { reload: async () => { throw new Error('Attempted to use detached Frame 03F56A62'); } };
+      internals(c).isConnected = true;
+      internals(c).browser = deadBrowser();
+      internals(c).lastCanvasSize = { width: 1280, height: 720 };
+      internals(c).connect = async () => {
+        internals(c).page = { url: () => 'x', evaluate: async () => true };
+        internals(c).isConnected = true;
+      };
+      const r = await c.refreshPage();
+      expect(r).toEqual({ relaunched: true, canvasSizeRestored: { width: 1280, height: 720 } });
+    });
+
+    it('when nothing works, says to call browser_connect', async () => {
+      const c = controller();
+      internals(c).page = { reload: async () => { throw new Error('Target closed'); } };
+      internals(c).isConnected = true;
+      internals(c).browser = deadBrowser();
+      internals(c).connect = async () => { throw new Error('launch failed'); };
+      await expect(c.refreshPage()).rejects.toThrow('pinepaper_browser_connect');
     });
   });
 });
