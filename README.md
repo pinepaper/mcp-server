@@ -298,6 +298,13 @@ paint, cut paper, thread or hatching, with that medium's own options. A medium
 the studio cannot make, or one that is a brush rather than a fill, is refused
 with the reason.
 
+### New: motion blur
+
+`pinepaper_agent_export` takes `motionBlur` for MP4 and WebM: each frame is
+rendered several times across the shutter and averaged, so fast movement
+smears the way it does on camera instead of strobing. It multiplies render
+time; `estimateOnly` reports by how much before you commit to it.
+
 ### Changed: plan generations before paying for them
 
 `pinepaper_generate` and `pinepaper_generate_estimate` now tell agents to plan

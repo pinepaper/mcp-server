@@ -2661,6 +2661,12 @@ export const AgentExportInputSchema = z.object({
   maxBytes: z.number().int().positive().optional().describe('gif only: a size budget in bytes (email wants <= 1 MB). Over it, the GIF is re-encoded smaller — frame size scaled from the overshoot — at most twice; the result reports each attempt and whether the budget was met.'),
   broadcast: z.boolean().optional().describe('mp4 only: broadcast-safe — BT.709, limited range (samples 16-235), tagged bt709, constant bitrate with an 8 Mbps floor at 720p and up (4 below). result.video reports what the encoder did.'),
   frames: z.number().int().min(1).max(36_000).optional().describe('Animated formats: export exactly this many frames; it takes the place of duration (duration x fps frames is rounded UP for mp4 / webm / gif). For frame-exact segments to assemble.'),
+  // FxTool #55 (motion-course G2): N sub-frames per frame, averaged across
+  // the shutter, so fast motion smears the way a camera's does.
+  motionBlur: z.object({
+    subframes: z.number().int().min(1).max(32).optional().describe('Renders per frame (default 8; 1 = no blur). Export time scales with it.'),
+    shutter: z.number().min(0).max(1).optional().describe('Fraction of the frame interval the shutter is open (default 0.5, a 180° shutter).'),
+  }).optional().describe('mp4 / webm: real motion blur. Each frame is rendered subframes times across the shutter and averaged, so fast movement smears instead of strobing. Costs subframes× the render time: run estimateOnly first, which reports renders and renderCost.'),
   deterministic: z.boolean().optional().describe('mp4 / webm: byte-identical files for the same scene, so an export can be checksummed or cached by hash. The container\'s creation / modification timestamps are pinned; nothing about the pixels changes.'),
   broadcastHeadroom: z.number().int().min(0).max(40).optional().describe('mp4 with broadcast only (default 12 with broadcast): luma codes kept clear at both ends of 16-235, so encoder ringing stays legal. 12 measured clean on hard edges; 4 cuts out-of-range samples ~100x, 12 ~1000x; never to zero, so a legaliser pass is still required (result fidelity names it).'),
   bitrate: z.number().int().min(100_000).max(200_000_000).optional().describe('mp4 / webm: target bits per second, replacing the quality-derived one. The browser encoder treats it as a CEILING: simple content comes out lower, and result.video.achievedBitrate says what it was.'),
@@ -2688,7 +2694,7 @@ export const AgentExportInputSchema = z.object({
     if (val.frames !== undefined && !['mp4', 'webm', 'gif', 'apng'].includes(String(val.format))) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['frames'], message: 'frames applies to animated formats: mp4, webm, gif, apng.' });
     }
-    for (const k of ['bitrate', 'minBitrate', 'bitrateMode', 'deterministic'] as const) {
+    for (const k of ['bitrate', 'minBitrate', 'bitrateMode', 'deterministic', 'motionBlur'] as const) {
       if (val[k] !== undefined && val.format !== 'mp4' && val.format !== 'webm') {
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: [k], message: `${k} is a video setting: mp4 or webm. A gif's size is set by maxBytes and scale.` });
       }

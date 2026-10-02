@@ -4705,7 +4705,7 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
 
   generateAgentExport(input: AgentExportInput): string {
     const validated = AgentExportInputSchema.parse(input);
-    const { platform, format, quality, framing, duration, estimateOnly, scale, fps, pdf: pdfOpts, region, time: stillTime, maxBytes, loop: gifLoop, broadcast, broadcastHeadroom, bitrate, minBitrate, bitrateMode, transparent, alphaQuantizer, deterministic, ad: adOpts, frames } = validated;
+    const { platform, format, quality, framing, duration, estimateOnly, scale, fps, pdf: pdfOpts, region, time: stillTime, maxBytes, loop: gifLoop, broadcast, broadcastHeadroom, bitrate, minBitrate, bitrateMode, transparent, alphaQuantizer, deterministic, motionBlur, ad: adOpts, frames } = validated;
   // Encoder options (FxTool 16719759); the schema keeps them to mp4 / webm.
   const videoEncodeOpts: Record<string, unknown> = {};
   if (broadcast) videoEncodeOpts.broadcast = true;
@@ -4721,6 +4721,9 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
   // Byte-identical repeats (FxTool 3b335567): the container timestamps are
   // the only bytes that varied, and this pins them.
   if (deterministic) videoEncodeOpts.deterministic = true;
+  // Motion blur (FxTool #55): the engine forwards it on every mp4/webm path
+  // (quickExport, the agent paths, the export store, videoExporter.export).
+  if (motionBlur) videoEncodeOpts.motionBlur = motionBlur;
   // A transparent WebM (FxTool 1833b397) rides the store route too.
   const webmAlpha = format === 'webm' && transparent === true;
   if (webmAlpha) { videoEncodeOpts.transparent = true; if (alphaQuantizer !== undefined) videoEncodeOpts.alphaQuantizer = alphaQuantizer; }
@@ -5074,7 +5077,9 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
       fps: settings.fps,
       quality,
       width: dimensions.width,
-      height: dimensions.height,
+      height: dimensions.height,${motionBlur ? `
+      // The estimate reports renders (frames x subframes) and renderCost.
+      motionBlur: ${JSON.stringify(motionBlur)},` : ''}
     });
     return {
       success: true,
@@ -5937,6 +5942,17 @@ ${Object.keys(videoEncodeOpts).length ? `  if (result && result.success) {
     if (__vw.length && result.fidelity) {
       result.fidelity.warnings = (result.fidelity.warnings || []).concat(__vw);
       if (result.fidelity.note) delete result.fidelity.note;
+    }
+  }
+` : ''}${motionBlur ? `  // What the exporter actually did with motionBlur (FxTool #55 records it as
+  // lastMotionBlur, with renders = frames x subframes). A studio that predates
+  // it ignores the option silently, so that is said by name.
+  if (result && result.success) {
+    const __mb = __vx && __vx.lastMotionBlur;
+    if (__mb) result.motionBlur = __mb;
+    else {
+      result.fidelity = result.fidelity || { warnings: [] };
+      result.fidelity.warnings = (result.fidelity.warnings || []).concat([{ code: 'motion_blur_not_applied', message: 'motionBlur was asked for, but this studio did not report applying it: it predates motion blur (FxTool #55), so the video has none.' }]);
     }
   }
 ` : ''}  const __ar = __vx && __vx.lastAudioReport;

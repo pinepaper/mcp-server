@@ -8417,6 +8417,14 @@ VERIFY MOTION BEFORE YOU RENDER. An export takes seconds to minutes and shows yo
         broadcast: { type: 'boolean', description: 'mp4 only: broadcast-safe — BT.709, limited range (16-235), tagged bt709, constant bitrate with an 8 Mbps floor at 720p+ (4 below). result.video reports what the encoder did.' },
         frames: { type: 'integer', minimum: 1, maximum: 36000, description: 'Animated formats: exactly this many frames instead of duration. A duration makes ceil(duration x fps) frames (7.91667 s at 24 fps is 191, not 190), so use frames for frame-exact segments.' },
         deterministic: { type: 'boolean', description: 'mp4 / webm: byte-identical files for the same scene (pins the container timestamps), so exports can be checksummed or cached by hash.' },
+        motionBlur: {
+          type: 'object',
+          description: 'mp4 / webm: real motion blur. Each frame is rendered `subframes` times across the shutter and averaged, so fast movement smears instead of strobing. Costs subframes× the render time: run estimateOnly first (it reports renders and renderCost). The result carries motionBlur (what the exporter applied).',
+          properties: {
+            subframes: { type: 'integer', minimum: 1, maximum: 32, description: 'Renders per frame (default 8; 1 = no blur).' },
+            shutter: { type: 'number', minimum: 0, maximum: 1, description: 'Fraction of the frame interval the shutter is open (default 0.5).' },
+          },
+        },
         broadcastHeadroom: { type: 'integer', minimum: 0, maximum: 40, description: 'mp4 with broadcast only, default 12: luma codes kept clear at both ends, so encoder ringing stays legal (12 measured clean on hard edges; 4 = ~100x fewer out-of-range samples, 12 = ~1000x; never zero). Fidelity raises luma_out_of_range with the legaliser command when any remain.' },
         bitrate: { type: 'integer', minimum: 100000, maximum: 200000000, description: 'mp4 / webm: target bits/s, replacing the quality-derived one. The browser encoder treats it as a CEILING; result.video.achievedBitrate is what it produced.' },
         minBitrate: { type: 'integer', minimum: 100000, maximum: 200000000, description: 'mp4 / webm: a floor; a miss is a fidelity warning naming the re-encode a delivery spec needs.' },
