@@ -6,6 +6,7 @@
  */
 
 import type { Browser, Page } from 'puppeteer';
+import { mcpLog } from '../utils/mcp-log.js';
 import { LAZY_HEAVY_SUBSYSTEMS, LAZY_HEAVY_CLASSES, ENGINE_SURFACE } from '../tools/engine-surface.js';
 
 // =============================================================================
@@ -317,6 +318,47 @@ export class PinePaperBrowserController {
   }
 
   /**
+   * The studio's video export, if one is running: its 0..100 progress. Read
+   * concurrently with the call that started it (the export awaits between
+   * frames, so a second evaluate gets a turn). null when nothing is exporting
+   * or the page cannot be read.
+   */
+  async exportStatus(): Promise<{ percent: number } | null> {
+    if (!this.page || !this.isConnected) return null;
+    try {
+      return await this.page.evaluate(() => {
+        const app = (window as any).app || (window as any).PinePaper;
+        const ve = app && app.exportEngine && app.exportEngine.videoExporter;
+        if (!ve || !ve.isRecording) return null;
+        const p = Number(ve.progress);
+        return { percent: Number.isFinite(p) ? Math.max(0, Math.min(100, p)) : 0 };
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Stop a running video export (VideoExporter.cancel: closes the encoders and
+   * the muxer). For a cancelled MCP request, so the studio does not keep
+   * rendering minutes of video nobody will receive. True if one was stopped.
+   */
+  async cancelExport(): Promise<boolean> {
+    if (!this.page || !this.isConnected) return false;
+    try {
+      return await this.page.evaluate(async () => {
+        const app = (window as any).app || (window as any).PinePaper;
+        const ve = app && app.exportEngine && app.exportEngine.videoExporter;
+        if (!ve || !ve.isRecording || typeof ve.cancel !== 'function') return false;
+        await ve.cancel();
+        return true;
+      });
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * Run `fn` on a page in a fresh, ISOLATED browser context (its own cookies
    * and storage), closed afterwards. For reading a site that is not the
    * studio (brand intake): the studio tab, and the canvas in it, is never
@@ -570,6 +612,7 @@ export class PinePaperBrowserController {
       await this.connect();
     } catch (e) {
       console.error('[PinePaper] Relaunch after a lost session failed:', e instanceof Error ? e.message : e);
+      mcpLog('error', { event: 'session_lost', message: 'The browser session was lost and could not be relaunched: call pinepaper_browser_disconnect, then pinepaper_browser_connect.' });
       return false;
     }
     if (!this.page || !this.isConnected) return false;
@@ -586,6 +629,7 @@ export class PinePaperBrowserController {
       } catch { /* reported as not restored */ }
     }
     console.error('[PinePaper] Session lost; browser relaunched' + (restored ? ` at ${restored.width}x${restored.height}` : ''));
+    mcpLog('warning', { event: 'session_relaunched', message: 'The browser session was lost; the browser was relaunched and the canvas is empty.', ...(restored ? { canvasSizeRestored: restored } : {}) });
     return { kind: 'relaunched', ...(restored ? { canvasSizeRestored: restored } : {}) };
   }
 

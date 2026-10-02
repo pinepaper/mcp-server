@@ -2698,6 +2698,13 @@ RECIPE — a playable maze: create_tilemap with wall fills → batch_create colo
 
   {
     name: 'pinepaper_design_system',
+    annotations: {
+      title: 'Design System',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
     description: `The design vocabulary, as data you can read — and eighteen styles that can build a scene.
 
 TWO DIFFERENT THINGS, kept apart on purpose:
@@ -2734,6 +2741,13 @@ A partial composition reports as a failure with the elements that did not create
   },
   {
     name: 'pinepaper_stick',
+    annotations: {
+      title: 'Stick Figure Kit',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
     description: `The vendored stick-figure kit — a rigged figure posed, walking, travelling, holding a prop, with a garment and hair, plus the set it stands on and among.
 
 A different construction from pinepaper_character, which places a figure from the DESIGN GRAPH by concept ("pp:Pigeon"). This is the stick kit specifically.
@@ -2800,6 +2814,13 @@ The geometry is vendored from mcp-cloud, which makes this a three-repo artifact:
 
   {
     name: 'pinepaper_story',
+    annotations: {
+      title: 'Story to Scene',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
     description: `A piece of prose becomes a scene.
 
 - distill: reduce an article to its story beats and draw NOTHING. This is the half worth having on its own — a caller can read what the distiller made of the text, edit the beats, and only then assemble. Discovering the reading by looking at a finished scene is the expensive way round.
@@ -2820,6 +2841,13 @@ The geometry is vendored from mcp-cloud, which makes this a three-repo artifact:
   },
   {
     name: 'pinepaper_interchange',
+    annotations: {
+      title: 'Interchange Formats',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
     description: `The formats other tools read and write — Lottie, dotLottie, GLB, BVH, PNG sequence.
 
 pinepaper_agent_export covers the PLATFORM formats: png, svg, mp4, webm, gif, pdf, sized for Instagram or YouTube. These are the interchange ones — a Lottie an app plays, a GLB a 3D tool opens, a BVH a rig imports, a PNG sequence an editor ingests. Import is here too, because a format you can only write is half a bridge.
@@ -2838,6 +2866,13 @@ Three of these refuse quietly in the engine: exportGLB with no perspective objec
   },
   {
     name: 'pinepaper_sound',
+    annotations: {
+      title: 'Sound Synthesis & Soundtrack',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
     description: `Synthesis — and the drawing that is the same object.
 
 The engine carries a full audio graph, and none of it was reachable. pinepaper_audio_beats ANALYSES audio that already exists; this MAKES audio.
@@ -2891,6 +2926,13 @@ render_soundtrack mixes every placed sound to a WAV and writes it to a file. It 
   },
   {
     name: 'pinepaper_motion',
+    annotations: {
+      title: 'Group & Field Motion',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
     description: `The generators' Animation knob, pointed at anything — the same motion engine every generator's own animation runs on, reachable for any group or list of items.
 
 Two kinds, and the second is the one nothing else here can do:
@@ -2922,6 +2964,13 @@ This is not pinepaper_animate: that applies a loop preset to ONE item. This move
   },
   {
     name: 'pinepaper_path',
+    annotations: {
+      title: 'Path Operations',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
     description: `Destructive path operations — the ones that REPLACE or ADD items rather than restyling them.
 
 - boolean: unite | subtract | intersect | exclude | divide. CONSUMES its operands and leaves one result, so the input ids stop existing. The first id is the base; the rest apply to it in order.
@@ -3029,7 +3078,9 @@ RECIPE — a character walking through a forest: create {spec:'forest'} → impo
     annotations: {
       title: 'Character (place and direct a figure from the graph)',
       readOnlyHint: false,
+      destructiveHint: false,
       idempotentHint: false,
+      openWorldHint: false,
     },
     description: `Place a CHARACTER from the design graph and DIRECT it — no geometry, no bones, no poses.
 
@@ -3584,7 +3635,7 @@ applyFunction: \`
     annotations: {
       title: 'Execute Custom Code',
       readOnlyHint: false,
-      destructiveHint: false,
+      destructiveHint: true,
       idempotentHint: false,
       openWorldHint: true,
     },
@@ -7179,7 +7230,7 @@ EXAMPLES:
     annotations: {
       title: 'Execute Generator',
       readOnlyHint: false,
-      destructiveHint: false,
+      destructiveHint: true,
       idempotentHint: false,
       openWorldHint: false,
     },
@@ -8038,7 +8089,7 @@ EXAMPLES:
     annotations: {
       title: 'Build Scene — Items, Animations, Effects in One Call',
       readOnlyHint: false,
-      destructiveHint: false,
+      destructiveHint: true,
       idempotentHint: false,
       openWorldHint: false,
     },

@@ -19,6 +19,8 @@ import {
   ReadResourceRequestSchema,
   ListPromptsRequestSchema,
   GetPromptRequestSchema,
+  McpError,
+  ErrorCode,
 } from '@modelcontextprotocol/sdk/types.js';
 
 import { PINEPAPER_TOOLS, getToolsForVerbosity, AI_AGENT_GUIDE } from './tools/definitions.js';
@@ -33,6 +35,12 @@ import {
 } from './tools/toolkits.js';
 import type { ToolkitProfile } from './tools/toolkits.js';
 import { handleToolCall, ExecutionMode, getExecutionMode } from './tools/handlers.js';
+import { getBrowserController } from './browser/puppeteer-controller.js';
+import { setLogServer } from './utils/mcp-log.js';
+import { startProgress } from './utils/progress.js';
+
+/** The MCP spec's resource-not-found error code (not InvalidParams). */
+const RESOURCE_NOT_FOUND = -32002;
 import {
   initI18n,
   SupportedLocale,
@@ -5822,6 +5830,8 @@ export interface ServerOptions {
   verbosity?: ToolVerbosity;
   /** Toolkit profile: controls which tools are exposed via tools/list */
   toolkit?: ToolkitProfile;
+  /** How often a running tool reports progress to a client that asked for it (ms, default 3000). */
+  progressIntervalMs?: number;
 }
 
 // =============================================================================
@@ -5845,6 +5855,7 @@ export async function createServer(options: ServerOptions = {}): Promise<Server>
       tools: { listChanged: true },
       resources: {},
       prompts: {},
+      logging: {},
     },
     instructions: `You are connected to PinePaper Studio — a canvas animation engine with 120+ tools for creating animations, videos, and graphics.
 
@@ -5893,6 +5904,10 @@ The tools generate Paper.js/JavaScript code that executes on the PinePaper canva
   // ---------------------------------------------------------------------------
 
   // List available tools — dynamic, recomputed each request (sub-ms)
+  // Server events (a relaunched browser session) reach the client as MCP
+  // log messages; see utils/mcp-log.ts.
+  setLogServer(server);
+
   server.setRequestHandler(ListToolsRequestSchema, async () => {
     return {
       tools: getEffectiveTools(),
@@ -5904,8 +5919,13 @@ The tools generate Paper.js/JavaScript code that executes on the PinePaper canva
   // Execution mode: 'puppeteer' (default) or 'code' (generate only)
   const executeInBrowser = options.browserMode ?? true; // Default to browser mode
   const executionMode = options.executionMode ?? getExecutionMode();
-  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
+    if (extra?.signal?.aborted) {
+      throw new McpError(ErrorCode.RequestTimeout, 'Request cancelled');
+    }
+
     const { name, arguments: args } = request.params;
+    const progressToken = request.params._meta?.progressToken;
 
     // Runtime toolkit/verbosity switching — handled here because it needs
     // direct access to mutable effectiveToolkit/effectiveVerbosity state
@@ -5936,11 +5956,62 @@ The tools generate Paper.js/JavaScript code that executes on the PinePaper canva
       };
     }
 
-    return handleToolCall(name, args as Record<string, unknown>, {
-      i18n,
-      executeInBrowser,
-      executionMode,
-    });
+    // PROGRESS, WHILE THE TOOL RUNS (MCP progress notifications). An export
+    // can run for minutes. A client that sent a progressToken gets a
+    // notification every few seconds, which also resets its request timeout
+    // (resetTimeoutOnProgress). `progress` is elapsed seconds, so it always
+    // increases, as the spec requires; the message carries the studio's own
+    // export percentage when a video export is running.
+    const controller = executeInBrowser ? getBrowserController() : null;
+    const stopProgress = progressToken !== undefined
+      ? startProgress({
+        progressToken,
+        send: (n) => extra.sendNotification(n),
+        intervalMs: options.progressIntervalMs ?? 3000,
+        label: name,
+        status: controller ? () => controller.exportStatus() : undefined,
+      })
+      : null;
+
+    // CANCELLATION STOPS THE WORK, not just the wait: a cancelled call that
+    // is exporting stops the studio's encoder, rather than leaving it to
+    // render minutes of video nobody will receive.
+    const onAbort = () => { if (controller) void controller.cancelExport(); };
+    extra?.signal?.addEventListener('abort', onAbort, { once: true });
+
+    let result;
+    try {
+      result = await handleToolCall(name, args as Record<string, unknown>, {
+        i18n,
+        executeInBrowser,
+        executionMode,
+      });
+    } finally {
+      if (stopProgress) stopProgress();
+      extra?.signal?.removeEventListener('abort', onAbort);
+    }
+    if (extra?.signal?.aborted) {
+      throw new McpError(ErrorCode.RequestTimeout, 'Request cancelled');
+    }
+
+    // STRUCTURED CONTENT, BOUNDED. A result whose text is a JSON object also
+    // carries it as structuredContent, so a client can read fields without
+    // parsing text. Capped at 16 KB: the text block stays (for clients that
+    // only read text), so a large payload would be sent twice. Results with a
+    // prose preamble (an export's "saved to file" line) are not pure JSON and
+    // keep text only.
+    const first = result?.content?.[0];
+    if (result && !result.structuredContent && first?.type === 'text' && first.text.length <= 16_384) {
+      const text = first.text.trim();
+      if (text.startsWith('{') && text.endsWith('}')) {
+        try {
+          const parsed = JSON.parse(text);
+          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) result.structuredContent = parsed;
+        } catch { /* not JSON after all: text only */ }
+      }
+    }
+
+    return result;
   });
 
   // ---------------------------------------------------------------------------
@@ -5973,12 +6044,12 @@ The tools generate Paper.js/JavaScript code that executes on the PinePaper canva
         // version.ts relies on).
         content = readFileSync(join(here, '..', file), 'utf8');
       } catch {
-        throw new Error(`README not found for: ${uri}`);
+        throw new McpError(RESOURCE_NOT_FOUND, `README not found for: ${uri}`, { uri });
       }
     }
 
     if (!content) {
-      throw new Error(`Resource not found: ${uri}`);
+      throw new McpError(RESOURCE_NOT_FOUND, `Resource not found: ${uri}`, { uri });
     }
 
     return {
