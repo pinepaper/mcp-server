@@ -284,6 +284,13 @@ each shot's colours, how fast it opens, and its beat. `remake_from_reference`
 then builds a new piece on that structure in your own words. Nothing of the
 reference's footage, words or sound is copied.
 
+### New: start from the real brand
+
+`pinepaper_brand_kit` takes `from_url`: give it a product's site and it saves
+screenshots and the logo, and proposes a brand kit from the colours and fonts
+the site actually uses, ready to review and apply. The site is read in a
+separate browser context; your canvas is not touched.
+
 ### Changed: plan generations before paying for them
 
 `pinepaper_generate` and `pinepaper_generate_estimate` now tell agents to plan
