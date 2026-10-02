@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 557a46dd483e6bc3509397bf48d9e6d4c8528022
- * sha256:    2bd1a8d49a77594525df2cef26086763b6d7567ddd7cfab9978532da53fa23b0   (of PinePaper.js as committed)
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 45db18488648141bdbba8859e0f37f1d0b492c6a
+ * sha256:    b97071fbc3f7fec5871536b28cbc8b3fb2758c295dca5b3de18b5a4bebab472d   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on `window.app`, with how it gets there. The parity
@@ -16,7 +16,7 @@
 /** How a name lands on `app`. */
 export type EngineMemberKind = 'method' | 'accessor' | 'property' | 'lazy' | 'lazyHeavy' | 'bootstrap';
 
-/** 1180 names, from FxTool/js/PinePaper.js. */
+/** 1184 names, from FxTool/js/PinePaper.js. */
 export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object.freeze({
   _activeByGroup: 'property',
   _activeDrawingGroup: 'method',
@@ -42,6 +42,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _atomicLoadDepth: 'property',
   _atomicLoadFailsafe: 'property',
   _basePropertyValue: 'method',
+  _benchReferenceClip: 'method',
   _bendAlongField: 'method',
   _bgBeforeWorld: 'property',
   _bindKeyEventRelation: 'method',
@@ -216,6 +217,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _regenerateForResize: 'method',
   _registerWorldNode: 'method',
   _relationPresetCache: 'property',
+  _remakeFromPlan: 'method',
   _removeAllDeformRelations: 'method',
   _removeTextEffect: 'method',
   _removeWorldCompass: 'method',
@@ -363,6 +365,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   analyzeAudio: 'method',
   analyzeExportComplexity: 'method',
   analyzePalette: 'method',
+  analyzeReferenceVideo: 'method',
   animate: 'method',
   animatedItems: 'property',
   animateItems: 'method',
@@ -959,6 +962,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   registerTool: 'method',
   rehydrateImageFilters: 'method',
   relationRegistry: 'property',
+  remakeFromReference: 'method',
   removeAssociation: 'method',
   removeDeform: 'method',
   removeDynamicContent: 'method',
