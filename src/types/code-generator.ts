@@ -11273,6 +11273,21 @@ ${guard}
     const S = (v: unknown) => JSON.stringify(v);
     const wrap = (comment: string, body: string) => `\n// ${comment}\n(function() {\n${body}\n})();`.trim();
     switch (input.action) {
+      case 'apply':
+        // One engine entry point (FxTool #54): app.applyMedium dispatches to the
+        // medium's own method (DesignMedia MEDIA[key].apply) and refuses an absent
+        // or brush-only medium with the reason. The Paper item it returns is not
+        // passed back (it cannot cross the bridge); its id is.
+        return `
+// Medium: apply ${input.medium}
+(async function() {
+  if (typeof app.applyMedium !== 'function') { return { success: false, error: 'app.applyMedium unavailable — update FxTool' }; }
+  const r = await app.applyMedium(${S(input.itemId)}, ${S(input.medium)}, ${S(input.options ?? {})});
+  if (!r || r.ok === false) {
+    return { success: false, error: (r && (r.error || r.reason)) || 'the medium could not be applied', medium: ${S(input.medium)}, ...(r && r.fidelity ? { fidelity: r.fidelity } : {}) };
+  }
+  return { success: true, action: 'apply', medium: r.medium || ${S(input.medium)}, fidelity: r.fidelity, itemId: r.id, ...(r.note ? { note: r.note } : {}) };
+})();`.trim();
       case 'list_media':
         return wrap('Medium: list',
           `  if (typeof app.listDesignMedia !== 'function') { return { success: false, error: 'medium axis unavailable — update FxTool' }; }

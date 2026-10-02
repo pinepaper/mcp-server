@@ -9,7 +9,7 @@
  */
 
 import { z } from 'zod';
-import { ENGINE_EASING_NAMES } from '../tools/engine-lists.js';
+import { ENGINE_EASING_NAMES, DESIGN_MEDIA, DESIGN_MEDIA_APPLY } from '../tools/engine-lists.js';
 
 // =============================================================================
 // COMMON SCHEMAS
@@ -4456,10 +4456,11 @@ export type TextStyleInput = z.infer<typeof TextStyleInputSchema>;
  * `list_media` before promising a medium in prose.
  */
 export const DesignMediumInputSchema = z.object({
-  action: z.enum(['list_media', 'resolve', 'list_stitches', 'apply_thread', 'apply_hatch', 'list_flow_fields', 'list_hatch_options'])
-    .describe("'list_media' (7 media with fidelity + limitation) · 'resolve' (can this medium be made here, and how honestly) · 'list_stitches' · 'apply_thread' (render an item in thread) · 'apply_hatch' (rule an item with hatching — value through line density) · 'list_flow_fields' · 'list_hatch_options'"),
-  medium: z.string().optional().describe("resolve: medium key — vector, thread, hatch, watercolor, ink, cutPaper, charcoal, oil, encaustic. Call list_media for the live set with each one's fidelity; the catalogue grows."),
-  itemId: z.string().optional().describe('apply_thread / apply_hatch: a closed path, compound path, or a group of them. Its own silhouette is the region and its fill is the ink colour.'),
+  action: z.enum(['list_media', 'resolve', 'list_stitches', 'apply_thread', 'apply_hatch', 'list_flow_fields', 'list_hatch_options', 'apply'])
+    .describe("'apply' (render an item in ANY medium the engine can make: medium + options — watercolor, oil, cutPaper, thread, hatch) · 'list_media' (every medium with fidelity + limitation) · 'resolve' (can this medium be made here, and how honestly) · 'list_stitches' · 'apply_thread' (render an item in thread) · 'apply_hatch' (rule an item with hatching — value through line density) · 'list_flow_fields' · 'list_hatch_options'"),
+  medium: z.string().optional().describe(`resolve / apply: medium key — ${DESIGN_MEDIA.join(', ')}. apply works for ${Object.keys(DESIGN_MEDIA_APPLY).join(', ')}; the others are refused by the engine with the reason (encaustic is absent here; charcoal and ink are brushes, not fills).`),
+  options: z.record(z.string(), z.unknown()).optional().describe('apply: the medium\'s own options. watercolor: color, brush, water 0..1, opacity, edge 0..1 (the dark rim), angle, bleed, seed, keepSource. oil: color, brush, length, density, toneRange, relief, angle, seed, keepSource. cutPaper: color, facet, jitter, shadow, shadowColor, shadowOpacity, shadowOffset [dx, dy], seed, keepSource. thread / hatch: as apply_thread / apply_hatch.'),
+  itemId: z.string().optional().describe('apply / apply_thread / apply_hatch: a closed path, compound path (holes kept), or a group of them (applied per path). The result takes the source\'s place in the stacking order and the source is hidden; applying again replaces it. One undo step.'),
   stitch: z.enum(THREAD_STITCHES).optional()
     .describe("Which stitch, when the medium is thread. Default longAndShort. These six are THE_STITCH_OPS the engine publishes — call 'list_stitches' for each one's description and its own parameters. An unknown name is refused by the engine rather than quietly stitched as a default fill."),
   field: z.object({
@@ -4513,7 +4514,10 @@ export const DesignMediumInputSchema = z.object({
 })
   .refine((v) => v.action !== 'apply_thread' || !!v.itemId, { message: 'apply_thread requires itemId', path: ['itemId'] })
   .refine((v) => v.action !== 'resolve' || !!v.medium, { message: 'resolve requires medium', path: ['medium'] })
-  .refine((v) => v.action !== 'apply_hatch' || !!v.itemId, { message: 'apply_hatch requires itemId', path: ['itemId'] });
+  .refine((v) => v.action !== 'apply_hatch' || !!v.itemId, { message: 'apply_hatch requires itemId', path: ['itemId'] })
+  .refine((v) => v.action !== 'apply' || (!!v.itemId && !!v.medium), { message: 'apply requires itemId and medium', path: ['medium'] })
+  .refine((v) => v.action !== 'apply' || !v.medium || (DESIGN_MEDIA as readonly string[]).includes(v.medium),
+    { message: `unknown medium; the engine knows ${DESIGN_MEDIA.join(', ')}`, path: ['medium'] });
 export type DesignMediumInput = z.infer<typeof DesignMediumInputSchema>;
 
 export const TextEffectInputSchema = z.object({

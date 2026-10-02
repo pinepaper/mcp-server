@@ -7,6 +7,7 @@
  * Source: FxTool origin/main 126f8fb087680d212cfd98e5a1994d4eb7e05191
  *   js/core/KeyframeInterpolator.js  sha256: 4c38752d86cae944
  *   js/world3d/worlds.js  sha256: 0e0973f7587c06e1
+ *   js/core/DesignMedia.js  sha256: 46fae8ceafe54b11
  */
 
 /** 37 names: EASING_NAMES, the keys of the engine's easing table. Keyframes, masks, relations and the camera all resolve through it. */
@@ -64,3 +65,25 @@ export const WORLD3D_COLOR_PATHS = [
   'env.propColorA',
   'env.propColorB',
 ] as const;
+
+/** 9 media: the keys of DesignMedia MEDIA. */
+export const DESIGN_MEDIA = [
+  'vector',
+  'thread',
+  'ink',
+  'watercolor',
+  'hatch',
+  'cutPaper',
+  'charcoal',
+  'oil',
+  'encaustic',
+] as const;
+
+/** The engine method that applies each medium that has one (MEDIA[key].apply). The others are refused by the engine, by name. */
+export const DESIGN_MEDIA_APPLY: Readonly<Record<string, string>> = Object.freeze({
+  thread: 'applyThreadPainting',
+  watercolor: 'applyWatercolorWash',
+  hatch: 'applyHatching',
+  cutPaper: 'applyCutPaper',
+  oil: 'applyOilWash',
+});

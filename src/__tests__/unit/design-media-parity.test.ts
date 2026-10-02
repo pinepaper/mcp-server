@@ -16,21 +16,24 @@
  *
  * This is the fifth enum in this release to drift from the engine, and the
  * fourth to do it silently. Diff against the engine's PUBLISHED table.
+ *
+ * The media list is now GENERATED from DesignMedia MEDIA
+ * (scripts/sync-engine-lists.mjs; check:engine-lists in prepublishOnly), and
+ * the served `medium` field is an enum of it. The hand fixture it replaced
+ * was one more copy to keep in step.
  */
 import { describe, it, expect } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PINEPAPER_TOOLS } from '../../tools/definitions.js';
 import { DesignMediumInputSchema, ComposeInputSchema } from '../../types/schemas.js';
+import { DESIGN_MEDIA, DESIGN_MEDIA_APPLY } from '../../tools/engine-lists.js';
 
 const fixture = (name: string) =>
   readFileSync(join(import.meta.dir, '..', 'fixtures', name), 'utf-8')
     .split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
 
-const MEDIA = fixture('engine-design-media.txt').map((l) => {
-  const [key, fidelity] = l.split(/\s+/);
-  return { key: key!, fidelity: fidelity! };
-});
+const MEDIA = DESIGN_MEDIA.map((key) => ({ key }));
 const COMPOSABLE = fixture('engine-composable-media.txt');
 
 const served = (tool: string, prop: string) => {
@@ -41,42 +44,19 @@ const served = (tool: string, prop: string) => {
 describe('design media parity with the engine', () => {
   it('the fixtures are not empty', () => {
     // An empty derivation satisfies every containment assertion below.
-    expect(MEDIA.length).toBe(9);
+    expect(MEDIA.length).toBeGreaterThan(1);
     expect(COMPOSABLE.length).toBe(2);
-    expect(MEDIA.every((m) => m.key && m.fidelity)).toBe(true);
   });
 
-  /**
-   * The PIPE-SEPARATED LIST, not the whole description.
-   *
-   * My first version asked `desc.includes(key)` for each medium, and it MISSED
-   * the very bug it was written for. The replacement description I had just
-   * written also says "Six are native (vector, thread, ink, watercolor, hatch,
-   * cutPaper)", so every key appeared somewhere in the string no matter what
-   * the enumerated list said — the check could not fail while that parenthetical
-   * stood. A guard agreeing with prose I wrote is not a guard.
-   *
-   * Planting the original bug is what surfaced it: the stale seven-item list
-   * went back in and the test stayed green.
-   */
-  const servedList = (): string[] => {
+  it('the served medium field is exactly the engine\'s media, as an enum', () => {
+    const served_ = served('pinepaper_design_medium', 'medium');
+    expect([...(served_?.enum ?? [])]).toEqual([...DESIGN_MEDIA]);
+  });
+
+  it('apply offers exactly the media the engine has an apply method for', () => {
     const desc = String(served('pinepaper_design_medium', 'medium')?.description ?? '');
-    const m = /resolve:\s*([a-zA-Z|\s]+?)(?:\.|$)/.exec(desc);
-    return (m?.[1] ?? '').split('|').map((x) => x.trim()).filter(Boolean);
-  };
-
-  it('the enumerated list names every medium the engine has', () => {
-    const list = servedList();
-    expect(list.length, 'no `resolve: a | b | c` list found in the description').toBeGreaterThan(1);
-    expect(MEDIA.map((m) => m.key).filter((k) => !list.includes(k)),
-      'media the engine ships that the served list never names').toEqual([]);
-  });
-
-  it('and names no medium the engine does not have', () => {
-    // The other direction: advertising a medium that resolves to "no medium X"
-    // costs a round trip and teaches a model to distrust the list.
-    const known = new Set(MEDIA.map((m) => m.key));
-    expect(servedList().filter((k) => !known.has(k)), 'media advertised that do not exist').toEqual([]);
+    for (const k of Object.keys(DESIGN_MEDIA_APPLY)) expect(desc).toContain(k);
+    expect(Object.keys(DESIGN_MEDIA_APPLY).every((k) => (DESIGN_MEDIA as readonly string[]).includes(k))).toBe(true);
   });
 
   it('the Zod description agrees with the served one', () => {

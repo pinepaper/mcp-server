@@ -34,6 +34,7 @@ export const REQUIRED_ENGINE_METHODS: readonly string[] = [
   'applyDirectorShots',
   'applyHatching',
   'applyImageFilter',
+  'applyMedium',
   'applyPhysicsImpulse3D',
   'applyRelationPreset',
   'applyStorySpec',

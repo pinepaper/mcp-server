@@ -20,6 +20,12 @@
  *   converter keyed on that name let a hex `env.zenith` through to a validator
  *   that refused it, and the refusal's reason was dropped too (W1).
  *
+ * - DESIGN_MEDIA / DESIGN_MEDIA_APPLY. The media core/DesignMedia.js MEDIA
+ *   knows, and the engine method that applies each one (its `apply` field), so
+ *   design_medium's `apply` action offers exactly what the engine can do and
+ *   names the rest so their refusal reaches the agent. MEDIA imports another
+ *   module, so it is parsed (top-level keys, depth-tracked), not evaluated.
+ *
  * Descriptions are NOT generated: they are prose, written here. The type of
  * EASING_DESCRIPTIONS is keyed on the generated union, so a new engine easing
  * fails the TYPECHECK until someone writes its line.
@@ -45,6 +51,7 @@ const FXTOOL = process.env.PP_FXTOOL_DIR ? process.env.PP_FXTOOL_DIR : resolve(R
 const ENGINE_REF = process.env.PP_FXTOOL_REF || 'origin/main';
 const EASING_REL = 'js/core/KeyframeInterpolator.js';
 const WORLD_REL = 'js/world3d/worlds.js';
+const MEDIA_REL = 'js/core/DesignMedia.js';
 
 function resolveRef() {
   for (const ref of [ENGINE_REF, 'HEAD']) {
@@ -95,6 +102,33 @@ function worldColorPaths(src) {
   return paths;
 }
 
+/** MEDIA's top-level keys, and each entry's `apply: '<method>'` when it has one. */
+function designMedia(src) {
+  const m = /export const MEDIA\s*=\s*Object\.freeze\(\{/.exec(src);
+  if (!m) throw new Error(`sync-engine-lists: MEDIA not found in ${MEDIA_REL}`);
+  const start = src.indexOf('{', m.index);
+  const entries = [];
+  let depth = 0;
+  let current = null;
+  for (const raw of src.slice(start + 1).split('\n')) {
+    const line = raw.replace(/\/\/.*$/, '');
+    if (depth === 0) {
+      if (/^\s*\}\);?/.test(line)) break;
+      const k = /^\s*([A-Za-z_]\w*)\s*:\s*\{/.exec(line);
+      if (k) { current = { key: k[1], apply: null }; entries.push(current); }
+    } else if (depth === 1 && current) {
+      const a = /^\s*apply:\s*'([A-Za-z_]\w*)'/.exec(line);
+      if (a) current.apply = a[1];
+    }
+    for (const ch of line.replace(/'[^']*'|"[^"]*"|`[^`]*`/g, '')) {
+      if (ch === '{') depth++;
+      else if (ch === '}') depth--;
+    }
+  }
+  if (entries.length === 0) throw new Error(`sync-engine-lists: MEDIA came out empty (${MEDIA_REL})`);
+  return entries;
+}
+
 const list = (names) => names.map((n) => `  '${n}',`).join('\n');
 
 async function generate() {
@@ -102,8 +136,11 @@ async function generate() {
   const worldSrc = readCommitted(WORLD_REL);
   if (!easingSrc) throw new Error(`sync-engine-lists: cannot read ${EASING_REL}`);
   if (!worldSrc) throw new Error(`sync-engine-lists: cannot read ${WORLD_REL}`);
+  const mediaSrc = readCommitted(MEDIA_REL);
+  if (!mediaSrc) throw new Error(`sync-engine-lists: cannot read ${MEDIA_REL}`);
   const easings = await easingNames(easingSrc);
   const colors = worldColorPaths(worldSrc);
+  const media = designMedia(mediaSrc);
 
   return `/**
  * GENERATED — DO NOT EDIT. Run \`bun run sync:engine-lists\`.
@@ -114,6 +151,7 @@ async function generate() {
  * Source: FxTool ${engineRevision()}
  *   ${EASING_REL}  sha256: ${digest(easingSrc)}
  *   ${WORLD_REL}  sha256: ${digest(worldSrc)}
+ *   ${MEDIA_REL}  sha256: ${digest(mediaSrc)}
  */
 
 /** ${easings.length} names: EASING_NAMES, the keys of the engine's easing table. Keyframes, masks, relations and the camera all resolve through it. */
@@ -125,6 +163,16 @@ ${list(easings)}
 export const WORLD3D_COLOR_PATHS = [
 ${list(colors)}
 ] as const;
+
+/** ${media.length} media: the keys of DesignMedia MEDIA. */
+export const DESIGN_MEDIA = [
+${list(media.map((e) => e.key))}
+] as const;
+
+/** The engine method that applies each medium that has one (MEDIA[key].apply). The others are refused by the engine, by name. */
+export const DESIGN_MEDIA_APPLY: Readonly<Record<string, string>> = Object.freeze({
+${media.filter((e) => e.apply).map((e) => `  ${e.key}: '${e.apply}',`).join('\n')}
+});
 `;
 }
 

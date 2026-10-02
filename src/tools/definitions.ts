@@ -14,6 +14,7 @@ import { COMPACT_DESCRIPTIONS } from './compact-descriptions.js';
 import { MINIMAL_DESCRIPTIONS } from './minimal-descriptions.js';
 import { STICK_GAITS, STICK_POSES, STICK_SEQUENCES, STICK_EXPRESSIONS, STICK_PROPS } from './stick-vocabulary.js';
 import { GeneratorNameSchema, ItemTypeSchema } from '../types/schemas.js';
+import { DESIGN_MEDIA, DESIGN_MEDIA_APPLY } from './engine-lists.js';
 import {
   EffectTypeSchema,
   SimpleAnimationTypeSchema,
@@ -2408,9 +2409,10 @@ READ THIS BEFORE PROMISING A MEDIUM. Naming a medium does not create its marks. 
 Call resolve before telling a user you will render in a medium. "yes, but as an impression" is the true answer for half of them, and a flat approximation misrepresents a medium rather than approximating it.
 
 ACTIONS:
+- apply: { itemId, medium, options? } — render an item in ANY medium the engine can make: ${Object.keys(DESIGN_MEDIA_APPLY).join(', ')}. One engine entry point; a medium it cannot make (encaustic, absent here) or that is a brush rather than a fill (charcoal, ink) is refused with the reason: pass it on. watercolor options: color, brush, water 0..1, opacity, edge 0..1 (the dark rim), angle, bleed, seed. oil (stylised): color, brush, length, density, toneRange, relief, angle, seed. cutPaper (vector: survives SVG/PDF/video): color, facet, jitter, shadow, shadowColor, shadowOpacity, shadowOffset [dx, dy], seed. The result replaces the source in the stacking order and hides it; applying again replaces; one undo step.
 - list_media: every medium with fidelity, definition and limitation. Read it rather than assuming a fixed set — the catalogue grows (hatch and watercolor are recent additions).
 - resolve: { medium } → { ok, fidelity, reason, markMaker }. ok:false with a reason is a real answer — pass it on rather than trying anyway.
-- list_stitches: the 4 thread stitches with their params.
+- list_stitches: the thread stitches with their params.
 - apply_thread: render an item in thread. Its own silhouette is the region and its own fill is the thread colour, so an existing drawing becomes stitched rather than needing to be redrawn. The source is HIDDEN, not destroyed.
 - apply_hatch: rule an item with hatching. Same deal — silhouette is the region, source is hidden, re-hatching replaces.
 - list_flow_fields: the 7 fields that bend a hatch line.
@@ -2440,9 +2442,10 @@ EXAMPLE — a stitched leaf:
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['list_media', 'resolve', 'list_stitches', 'apply_thread', 'apply_hatch', 'list_flow_fields', 'list_hatch_options'], description: 'Medium operation' },
-        medium: { type: 'string', description: 'resolve: vector | thread | ink | watercolor | hatch | cutPaper | charcoal | oil | encaustic. Six are native (vector, thread, ink, watercolor, hatch, cutPaper), two stylised, one absent — call list_media for the live table rather than trusting this line.' },
-        itemId: { type: 'string', description: 'apply_thread / apply_hatch: a closed path, compound path, or a group of them.' },
+        action: { type: 'string', enum: ['list_media', 'resolve', 'list_stitches', 'apply_thread', 'apply_hatch', 'list_flow_fields', 'list_hatch_options', 'apply'], description: 'Medium operation' },
+        medium: { type: 'string', enum: [...DESIGN_MEDIA], description: `resolve / apply: the medium. apply works for ${Object.keys(DESIGN_MEDIA_APPLY).join(', ')}; the rest are refused by the engine with the reason. Call list_media for each one's fidelity and limitation.` },
+        options: { type: 'object', description: 'apply: the medium\'s own options (see the description; color takes hex).' },
+        itemId: { type: 'string', description: 'apply / apply_thread / apply_hatch: a closed path, compound path (holes kept), or a group of them (applied per path).' },
         stitch: { type: 'string', enum: [...THREAD_STITCHES], description: "apply_thread: default longAndShort. These six are the stitches the engine publishes; call 'list_stitches' for each one's description and its own parameters. An unknown name is refused rather than quietly stitched as a default fill." },
         field: { type: 'object', description: "apply_thread: { kind: 'radial'|'spine'|'constant', cx, cy, angle, spine[], across } — default radial from the shape centre. spine is a list of points, each {x, y} or [x, y], e.g. [{x:400,y:200},{x:400,y:520}]; this tool normalises [x, y] to {x, y} before the engine sees it." },
         stitchLen: { type: 'number', description: 'apply_thread: nominal stitch length px (default 18).' },

@@ -291,6 +291,13 @@ screenshots and the logo, and proposes a brand kit from the colours and fonts
 the site actually uses, ready to review and apply. The site is read in a
 separate browser context; your canvas is not touched.
 
+### New: watercolour, oil paint and cut paper
+
+`pinepaper_design_medium` takes `apply`: render any shape in watercolour, oil
+paint, cut paper, thread or hatching, with that medium's own options. A medium
+the studio cannot make, or one that is a brush rather than a fill, is refused
+with the reason.
+
 ### Changed: plan generations before paying for them
 
 `pinepaper_generate` and `pinepaper_generate_estimate` now tell agents to plan
