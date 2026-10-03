@@ -61,10 +61,6 @@ const ROUTED_TO_A_TOOL: Record<string, RegExp | string[]> = {
   'map tools (place containment)': ['contained_in_place'],
   pinepaper_rigging: ['bone_attached', 'bone_skinned', 'ik_target', 'locomotion', 'pose_layer'],
   'blending system': /^blend_/,
-  // Written by the composing tool as its own structure; an agent authoring one
-  // by hand would make a component whose slots disagree with its parts.
-  pinepaper_component: ['composed_as', 'fills_slot'],
-  pinepaper_camera_director: ['has_camera_treatment'],
 };
 
 const isExcluded = (name: string) =>

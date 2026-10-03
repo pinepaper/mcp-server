@@ -15,7 +15,6 @@ camera_animates
 camera_follows
 centered_on
 circumscribes
-composed_as
 concentric_with
 connects_to
 construction_reveal
@@ -61,7 +60,6 @@ effect_trail
 effect_vortex
 exclusive_group
 expresses
-fills_slot
 follows
 geo_adjacent_to
 geo_centers_on
@@ -71,7 +69,6 @@ geo_tours
 geo_travels_to
 group_morphs_to
 grows_from
-has_camera_treatment
 head_points_to
 ik_target
 indicates
