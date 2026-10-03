@@ -46,3 +46,17 @@ it(`agent_batch_execute's quoted op count matches the enum (${level})`, () => {
   const quoted = [...d.matchAll(/OPERATION TYPES \((\d+)\)/g)].map((m) => Number(m[1]));
   expect(quoted.filter((n) => n !== AgentBatchOperationTypeSchema.options.length)).toEqual([]);
 });
+
+// Minimal is one line, so it may abbreviate — but a list that stops short must
+// say so with "…", or it reads as the whole enum (gate D6 follow-up: 14 tools).
+describe('a partial action list is marked (minimal)', () => {
+  for (const tool of getToolsForVerbosity('minimal')) {
+    const actions = (tool.inputSchema?.properties as Record<string, { enum?: string[] }> | undefined)?.action?.enum;
+    if (!actions) continue;
+    it(tool.name, () => {
+      const d = tool.description ?? '';
+      const missing = actions.filter((a) => !new RegExp(`\\b${a}\\b`).test(d));
+      expect(missing.length === 0 || d.includes('…')).toBe(true);
+    });
+  }
+});

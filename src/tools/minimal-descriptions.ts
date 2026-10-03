@@ -68,26 +68,26 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_design_system: `DTCG design systems + ${COMPOSABLE_STYLE_COUNT} composable aesthetic styles. {action: list_systems|get_system|list_easings|list_motion|list_styles|compose, systemId, style, title}`,
   pinepaper_stick: 'Stick-figure kit. {action: figure|set, pose, walk, travel, prop, garment, hair, at, scale}',
   pinepaper_story: 'Prose to scene. {action: distill|from_text|apply_spec|plan_book, text, spec, images}',
-  pinepaper_interchange: 'Lottie / dotLottie / GLB / BVH / PNG-sequence import and export. {action, options, data, skeletonId}',
-  pinepaper_sound: 'Synthesis: tones, chords, percussion, SFX, sound-from-text, and a two-way bridge between a sound and a drawn path. {action, note|root|name|text|itemId}',
+  pinepaper_interchange: 'Lottie / dotLottie / GLB / BVH / PNG-sequence import and export. action: export_lottie|export_dotlottie|import_lottie|export_glb|export_bvh|export_png_sequence. {options, data, skeletonId}',
+  pinepaper_sound: 'Synthesis: tones, chords, percussion, SFX, sound-from-text, and a two-way bridge between a sound and a drawn path. action: list_instruments|play_tone|play_chord|… {note|root|name|text|itemId}',
   pinepaper_motion: 'Generator motion engine for a group. {action: list|apply, itemId|itemIds, motion, speed, intensity, waveform, origin}',
   pinepaper_path: 'Destructive path ops. {action: boolean|simplify|outline_stroke|toggle_closed|pattern|get_geometry|set_locked|unlock_all, itemId|itemIds, op, kind}',
   pinepaper_validate_scene: 'Audit the live canvas (dangling refs, unknown types/props, keyframes, cycles) → structured diagnostics. Optional ops[] to pre-validate proposed mutations.',
   pinepaper_capture_frames: 'Deterministic frames at given times: per-frame hashes, or sheet: one tiled image file + critique rubric. {times?, seed?, sheet?: {every+duration|strip|loopSeam, tileWidth?}}',
   pinepaper_instantiate_ontology: 'Compile a pp: JSON-LD graph (typed nodes + structural edges like on_top_of) into a scene — roots placed, rest positioned by relations. {doc, canvas?, defaultGeometry?} → {itemIds, diagnostics}.',
   pinepaper_lint_scene: 'Read-only relational-density audit of the live scene → {density, suggestions}. Flags coordinate-driven scenes and proposes structural relations for unrelated items already in position. {eps?, cap?}',
-  pinepaper_media: "Video/audio + editing. action: upload_video|upload_audio|list|remove|set_playback_rate|set_clip|set_time_remap|speed_ramp|match_cut|apply_track_matte|stop_live_matte.",
-  pinepaper_world3d: "3D world under the canvas: create (forest|snowMountain|field|jungle)|describe (engine schema)|configure|add_actor (live sprites)|set_actor_pose|set_camera (follow|fixed|orbit)|objects|remove_world.",
+  pinepaper_media: "Video/audio + editing. action: upload_video|upload_audio|list|remove|set_playback_rate|set_clip|set_time_remap|speed_ramp|match_cut|apply_track_matte|stop_live_matte|…",
+  pinepaper_world3d: "3D world under the canvas: create (forest|snowMountain|field|jungle)|describe (engine schema)|configure|add_actor (live sprites)|set_actor_pose|set_camera (follow|fixed|orbit)|objects|remove_world|…",
   pinepaper_game: "Game logic: pathfind (A* world-coords waypoints for moves_along_path)|create_tilemap (board data + grid + merged collision rects). Pure data, draws nothing.",
   pinepaper_shatter_image: "Split a raster into a grid of tiles (inert until animated). Group adopts the original id. {itemId, pieces?|rows?+cols?, keepSource?}",
   pinepaper_import_layered_character: "Import decomposer output (layer manifest + images) as role-bound parts; blink/smile work immediately. CHECK rolesWired>0; skipped names images that did not land. {info, images}",
-  pinepaper_text_style: "Display text styles + variable fonts. action: apply_style (stacked-layer title, adopts the text id)|set_font_axes (weight/width/slant, animatable)|list_styles.",
+  pinepaper_text_style: "Display text styles + variable fonts. action: apply_style (stacked-layer title, adopts the text id)|set_font_axes (weight/width/slant, animatable)|list_styles|list|cursive|wrap|unwrap|to_collage.",
   pinepaper_text_effect: "Character-level text animations (list for the keys). action: list|apply {itemId, effect}. REPLACES the text with one keyframed item per character (source id dies; keepSource:true to keep it).",
   pinepaper_crop_image: 'One-shot crop of an image item to a canvas-coords rect (clamped; keeps the registry id). {itemId, rect: {x,y,width,height}, aspectRatio?}',
   pinepaper_chroma_key: "One-shot green-screen background removal on an image item (keeps the registry id). Omit threshold/smoothing to auto-estimate. {itemId, color?, threshold?, smoothing?}",
   pinepaper_character: "Place a character from the graph and direct it. {concept, at, height, beats:[{at, channel, until?, value?}]}. The concept declares its channels — blink, say, headTurn, bob.",
-  pinepaper_rigging: "Skeletal rigging + animation. action: create_skeleton, add_bone, attach_item, create_ik_chain, save/load/list/interpolate poses, play + stitch_poses, auto_walk|idle|jump, move_root, bake_animation.",
-  pinepaper_design_medium: "What makes the marks. action: list_media|resolve (refuses what it cannot honestly render)|list_stitches|apply_thread|apply_hatch (value via line density)|list_flow_fields|list_hatch_options.",
+  pinepaper_rigging: "Skeletal rigging + animation. action: create_skeleton, add_bone, attach_item, create_ik_chain, save/load/list/interpolate poses, play + stitch_poses, auto_walk|idle|jump, move_root, bake_animation, …",
+  pinepaper_design_medium: "What makes the marks. action: list_media|resolve (refuses what it cannot honestly render)|list_stitches|apply_thread|apply_hatch (value via line density)|list_flow_fields|list_hatch_options|apply.",
 
   // --- Relations ---
   pinepaper_add_relation: `Add relation. sourceId, targetId, type: ${RELATION_TYPES}. params: {speed, ...}.`,
@@ -101,7 +101,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   // --- Animation ---
   pinepaper_animate: 'Animate item. itemId, type: pulse|rotate|bounce|fade|wobble|slideLeftRight|slideUpDown|typewriter. speed, amplitude optional.',
   pinepaper_keyframe_animate: 'Keyframe animate. itemId, keyframes: [{time, properties:{opacity,scale,x,y,rotation,...}, easing}], duration. Clip window: timeOffset, clipInPoint, clipOutPoint.',
-  pinepaper_play_timeline: 'Playback. action: play|pause|stop|seek|set/get_time_scale|get/set_progress|bind_scroll|unbind_scroll|list_scrub_anchors. time, rate (0 freezes, <0 reverses), progress 0..1, scroll.',
+  pinepaper_play_timeline: 'Playback. action: play|pause|stop|seek|set_time_scale|get_time_scale|get_progress|set_progress|bind_scroll|unbind_scroll|list_scrub_anchors. rate 0 freezes, <0 reverses; progress 0..1.',
 
   // --- Masks ---
   pinepaper_apply_animated_mask: 'Apply mask. itemId, preset: wipeLeft|wipeRight|iris|irisOut|star|heart|curtainH|curtainV|cinematic|diagonalWipe|revealUp|revealDown.',
@@ -137,14 +137,14 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_get_diagram_shapes: 'List available diagram shape types.',
   pinepaper_update_connector: 'Update connector style, label, or routing.',
   pinepaper_remove_connector: 'Remove a connector.',
-  pinepaper_diagram_mode: 'Toggle diagram editing mode.',
+  pinepaper_diagram_mode: 'Toggle diagram editing mode. action: activate|deactivate|toggle|setMode.',
 
   // --- Maps ---
   pinepaper_map: 'Map load. action: load|export_config|import_custom (pan/zoom refuse: frame with a camera animation + export framing:camera). mapId: usa|world|worldHighRes|<custom>.',
   pinepaper_map_regions: 'Map region styling/selection. action: highlight|unhighlight|apply_colors|add_marker|add_labels|get_at_point|select|deselect|get_highlighted.',
   pinepaper_map_animation: 'Map region animation. action: animate_regions|animate_wave|stop|get_animated. duration, loop.',
   pinepaper_map_data: 'Map import/export. action: export_csv|import_csv|export_geojson|export_original_geojson|source_info.',
-  pinepaper_globe: 'Globe mode + world tour. action: enable|rotate_to|spin|world_tour|stop_tour|pin_item|tour_item. world_tour needs regions or coords.',
+  pinepaper_globe: 'Globe mode + world tour. action: enable|disable|rotate_to|spin|world_tour|stop_tour|pin_item|tour_item. world_tour needs regions or coords.',
 
   // --- Fonts ---
   pinepaper_font: 'Font Studio. action: show_studio|set_name|create_glyph|create_space|remove_glyph|set_metrics|export|cleanup_path|… (the rest are in the action enum; see pinepaper_tool_guide).',
@@ -214,8 +214,8 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_history: 'Undo/redo. action: undo|redo|get_state.',
   // "Wires relations, not coordinates" earns its place even at this tier: it is
   // what stops a model positioning the images itself and getting a dead layout.
-  pinepaper_compose: 'Named collage layout + camera. action: list_patterns (call first — fixed slot counts) | apply {pattern, itemIds in slot order} | list_treatments | set_treatment. Wires relations, not coordinates.',
-  pinepaper_brand_kit: 'Apply brand colours by role. action: plan (dry run + contrast audit)|apply. kit: {name, colors:{primary,secondary?,accent?,background?,text?}, fonts?}. Only name+colors.primary required.',
+  pinepaper_compose: 'Named collage layout + camera. action: list_patterns (first: fixed slot counts)|apply {pattern, itemIds in slot order}|list_treatments|set_treatment|list_reveals|list_styles. Wires relations.',
+  pinepaper_brand_kit: 'Apply brand colours by role. action: plan (dry run + contrast audit)|apply|from_url. kit: {name, colors:{primary,secondary?,accent?,background?,text?}, fonts?}. Only name+colors.primary required.',
   pinepaper_component: 'Reusable master + instances, per-instance overrides. action: define|list|instantiate|set_override|sync|update_from_instance|detach. {itemIds?, componentId?, instanceId?, componentKey?, prop?, value?}',
   pinepaper_artboard: 'Resize the artboard and control reflow. action: list_presets|set|set_constraints. {preset? | width+height, itemId?, horizontal?, vertical?}',
   pinepaper_comment: 'Notes pinned to an item, a point and/or a time. action: add|list|resolve|delete. add needs text + at least one anchor. {text?, itemId?, x?, y?, time?, id?}',
@@ -225,8 +225,8 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_scene_diff: 'What changed between two scene states. action: history {indexA,indexB}|version {versionId}. Use it to verify a batch produced the scene you intended.',
 
   // --- Image Processing ---
-  pinepaper_image_filter: 'GPU image filters. action: apply|chain. itemId, filterName, params, filters[].',
-  pinepaper_lasso: 'Lasso selection. action: activate|apply. itemId.',
+  pinepaper_image_filter: 'GPU image filters. action: apply|chain|analyze_palette|recolor_palette. itemId, filterName, params, filters[].',
+  pinepaper_lasso: 'Lasso selection. action: activate|apply|cut. itemId.',
   pinepaper_cutout_style: 'Style cutouts. action: apply|list. itemId, preset, options.',
 
   // --- Composition & View ---
@@ -235,7 +235,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
 
   // --- Canvas Query ---
   pinepaper_query: 'Canvas queries. action: get_by_id|hit_test|is_empty. itemId, x, y, tolerance.',
-  pinepaper_query_capabilities: 'Query and recommend capabilities across text styles, text effects, generators, deforms, and relations. action: list|choose|coverage|find. kind, mood, subject, seed, key, warm.',
+  pinepaper_query_capabilities: 'Query and recommend capabilities across text styles, text effects, generators, deforms, and relations. action: list|choose|coverage|find|catalogue|studio. kind, mood, subject, seed, key, warm.',
 
   // --- Deformation, Sprite Sheets, Interaction ---
   pinepaper_deform: 'Vertex deformation. action: apply|trigger|remove. itemId, preset: fold|squeeze|squash|twist|ripple|wave|breathe|wobble..., phase, amplitude.',
