@@ -633,6 +633,10 @@
       "description": "One composition drawn in a built-in style (cut, ink, watercolor, dither, flow, ascii) as one item that redraws every exported frame. {style, duration, id, spec}"
     },
     {
+      "name": "pinepaper_look",
+      "description": "Restyle an item / subtree / the scene as a look (8-bit, blueprint, ink sketch…). action: list|describe (fidelity!)|apply {look, target}|remove|get|grid."
+    },
+    {
       "name": "pinepaper_original_character",
       "description": "Original characters from a base (person|robot|cat|bird|blob) + variant. action: bases|describe (read first)|random {base, seed}|create {base, variant, at}."
     },

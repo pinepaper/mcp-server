@@ -59,6 +59,7 @@ const EASING_LINES = KEYFRAME_EASINGS.map((e) => `- ${e}: ${EASING_DESCRIPTIONS[
 type Door = { when: string; doors: Array<{ tool?: string; text: string }>; always?: boolean };
 const DOORS: Door[] = [
   { when: 'A scene or landscape drawn in an art style (cut paper, ink, watercolour, dither, flow, ASCII)', doors: [{ tool: 'pinepaper_styled_scene', text: 'pinepaper_styled_scene' }] },
+  { when: 'Make THIS — an item, a character, the whole scene — look like a style (8-bit, blueprint, ink sketch, flat modern, print halftone, paper cutout…)', doors: [{ tool: 'pinepaper_look', text: 'pinepaper_look (describe first: it grades each look convincing / moderate / weak)' }] },
   { when: 'A story, several beats, a narrative from prose', doors: [{ tool: 'pinepaper_story', text: 'pinepaper_story (from_text)' }, { tool: 'pinepaper_scene_playback', text: 'then scene chains (pinepaper_scene_playback)' }] },
   { when: 'An ORIGINAL character from a description (a hero with a cape, a round robot, a cat in glasses), or a cast of variants', doors: [{ tool: 'pinepaper_original_character', text: 'pinepaper_original_character (describe first, then create)' }] },
   { when: 'A character that acts (expressions, poses, walks)', doors: [{ tool: 'pinepaper_character', text: 'pinepaper_character' }, { tool: 'pinepaper_stick', text: 'pinepaper_stick' }, { tool: 'pinepaper_rigging', text: 'pinepaper_rigging' }, { tool: 'pinepaper_deform', text: 'squash and stretch via pinepaper_deform' }] },
@@ -5665,6 +5666,7 @@ Available filters (GPU raster set):
 - Stylize: vignette (intensity, radius), edgeDetect, halftoneDots (size, angle), halftoneCMYK (size), dither (levels), grain (amount, seed), scanlines (intensity, period), chromaticAberration (amount), blur (radius)
 - Light (additive): bloom (amount, threshold, radius), glow, halation (warm-fringed bloom; color), lightShafts (amount, threshold, decay, density, x, y, color — volumetric rays from a point)
 - Keying: lumaKey (threshold, softness, invert)
+- Pixel art: pixelate (size or cells across, levels, dither, palette [colours] — e.g. a PICO-8 set), where the studio has it
 - Painted (CPU, STILL images only, where the studio has them): watercolor (strength, seed, radius, edges, bleed, granulation, paper, washes — layered washes, pigment rims, paper grain), painterly (strength, seed, radius, stroke, texture, edges, vivid — brush strokes along the form). About 1 s per 1080p image; the same seed paints the same picture; values are clamped and unknown params are warned about. A video is refused (they cannot run per frame): apply to a still or a captured frame. A studio without them refuses with its list of filters.
 - SECOND-INPUT (params.map = another item's id, resolved to its pixels): displace (amount, dispersion, map, mapChannel — the map's brightness pushes pixels), refract (displace with per-channel dispersion — glass), trackMatte (channel, invert, strength — prefer pinepaper_media apply_track_matte for the live version), datamosh (amount, block, map? — self-moshes without a map)
 
@@ -7895,6 +7897,33 @@ EXAMPLE: { style: 'ink', duration: 6 }`,
         id: { type: 'string', description: 'Scene id (default "styled-scene"); the same id replaces the scene.' },
         spec: { type: 'object', description: "The composition; omitted keys take the 'valley' preset.", additionalProperties: true },
       },
+    },
+  },
+  {
+    name: 'pinepaper_look',
+    annotations: { title: 'Look', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    description: `Restyle what is already drawn — one item, a group and everything in it, or the WHOLE SCENE — as a named look: palette remapped in place (colour keyframes too), strokes, type, image treatment, texture, background and a framing device. Ids, keyframes and relations are kept; it survives a project round trip; remove restores it pixel for pixel. This is "the same subject, in style X".
+
+ACTIONS:
+- list: every look with its FIDELITY — the engine's own grade of how close it gets: convincing, moderate or weak.
+- describe: { look } — the recipe, its fidelity, what it approximates, and the engine call per part. Read it before promising a look.
+- apply: { look, target? ('scene' default | an itemId), scope? ('item' | 'subtree' | 'scene') } → what it restyled, and the fidelity. Below 'convincing' the reply says so — present it as an approximation, not the finished style.
+- remove: { target } — restore what was there.   get: { target } — the look on it now.
+- grid: { looks?, cols?, cellWidth?, t? } — a contact sheet of the scene in several looks (a PNG), to choose from.
+
+look is an id from list, or a look spec. An unknown look is refused with the known ones.
+Looks act on what is THERE: they restyle a drawing, they do not redraw a subject from scratch in another medium.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['list', 'describe', 'apply', 'remove', 'get', 'grid'] },
+        look: { description: 'a look id, or a look spec', oneOf: [{ type: 'string' }, { type: 'object', additionalProperties: true }] },
+        target: { type: 'string', description: "an itemId, or 'scene' (default)" },
+        scope: { type: 'string', enum: ['item', 'subtree', 'scene'] },
+        looks: { type: 'array', items: { type: 'string' } },
+        cols: { type: 'integer' }, cellWidth: { type: 'number' }, t: { type: 'number' },
+      },
+      required: ['action'],
     },
   },
   {

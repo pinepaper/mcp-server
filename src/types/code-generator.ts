@@ -197,7 +197,7 @@ import {
   AccessibilityCheckInput,
   InstantiateOntologyInput,
   LintSceneInput,
-  MediaInput, TextStyleInput, TextEffectInput, DesignMediumInput, RelightInput, ShaderGraphInput, ChoreographInput, EmitterInput, RenderHookInput, MorphSequenceInput, OriginalCharacterInput, ShatterImageInput, ImportLayeredCharacterInput, GameInput, World3DInput,
+  MediaInput, TextStyleInput, TextEffectInput, DesignMediumInput, RelightInput, ShaderGraphInput, ChoreographInput, EmitterInput, RenderHookInput, MorphSequenceInput, OriginalCharacterInput, LookInput, ShatterImageInput, ImportLayeredCharacterInput, GameInput, World3DInput,
   CropImageInput,
   PathOpInput,
   MotionInput,
@@ -12153,6 +12153,64 @@ ${cam ? `  // The camera rides the SAME timing: framing each state as its morph 
   const r = await app.createCharacter(${S(spec)});
   if (!r || r.ok === false) return { success: false, action: 'create', errors: (r && r.errors) || [], error: (r && r.errors && r.errors.join('; ')) || 'the character was refused' };
   return { success: true, action: 'create', itemId: r.id, rigId: r.rigId, parts: r.parts, name: r.name, base: r.base, look: r.look, variant: r.variant };
+})();`.trim();
+      }
+    }
+  }
+
+  /**
+   * pinepaper_look (D64): one look over an item, a subtree or the whole scene
+   * — ids, keys and relations kept, removable pixel for pixel. Every apply
+   * carries the look's own FIDELITY grade, and anything below 'convincing'
+   * says so in the reply, so a weak approximation is never handed over as
+   * the finished style.
+   */
+  generateLook(input: LookInput): string {
+    const S = (v: unknown) => JSON.stringify(v);
+    const guard = `if (typeof app.applyLook !== 'function') { return { success: false, error: 'this studio has no looks (app.applyLook) — it predates FxTool D64.' }; }`;
+    const target = S(input.target ?? 'scene');
+    switch (input.action) {
+      case 'list':
+        return `(function() {\n  ${guard}\n  return { success: true, action: 'list', looks: app.listLooks(), note: 'fidelity says how close each look gets: convincing, moderate or weak. Describe one before promising it.' };\n})();`;
+      case 'describe':
+        return `(function() {\n  ${guard}\n  const r = app.describeLook(${S(input.look)});\n  if (!r || r.ok === false) return { success: false, action: 'describe', error: (r && r.error) || 'unknown look', known: r && r.known };\n  return { success: true, action: 'describe', fidelity: r.look && r.look.fidelity, approximations: (r.look && r.look.approximations) || [], recipe: r.look, enginePaths: r.enginePaths, sceneOnly: r.sceneOnly };\n})();`;
+      case 'get':
+        return `(function() {\n  ${guard}\n  return { success: true, action: 'get', target: ${target}, look: app.getLook(${target}) || null };\n})();`;
+      case 'remove':
+        return `
+// Look: remove (restores what was there)
+(async function() {
+  ${guard}
+  const r = await app.removeLook(${target});
+  if (!r || r.ok === false) return { success: false, action: 'remove', error: (r && r.error) || 'nothing to remove' };
+  return { success: true, action: 'remove', target: ${target}, removed: r.removed, scene: r.scene };
+})();`.trim();
+      case 'grid':
+        return `
+// Look: a contact sheet of looks over the current scene
+(async function() {
+  ${guard}
+  const r = await app.renderLookGrid(${input.looks ? S(input.looks) : 'undefined'}, ${S({ ...(input.cols ? { cols: input.cols } : {}), ...(input.cellWidth ? { cellWidth: input.cellWidth } : {}), ...(input.t !== undefined ? { t: input.t } : {}) })});
+  if (!r || r.ok === false || !r.dataURL) return { success: false, action: 'grid', error: (r && r.error) || 'the grid did not render' };
+  return { success: true, action: 'grid', data: r.dataURL, mimeType: 'image/png', cells: (r.cells || []).map(function (c) { return { id: c.id, name: c.name, fidelity: c.fidelity }; }), cols: r.cols, rows: r.rows };
+})();`.trim();
+      default: {
+        const opts = input.scope ? { scope: input.scope } : {};
+        return `
+// Look: apply
+(async function() {
+  ${guard}
+  const d = app.describeLook(${S(input.look)});
+  const r = await app.applyLook(${target}, ${S(input.look)}, ${S(opts)});
+  if (!r || r.ok === false) return { success: false, action: 'apply', error: (r && r.error) || 'the look was refused', known: r && r.known };
+  const fidelity = (d && d.look && d.look.fidelity) || (r.look && r.look.fidelity) || null;
+  const res = { success: true, action: 'apply', target: ${target}, look: r.look && (r.look.id || r.look.name), fidelity: fidelity,
+    restyled: r.restyled, texts: r.texts, images: r.images, brushed: r.brushed, keyframes: r.keyframes, filters: r.filters, ids: r.ids,
+    approximations: r.approximations || [], warnings: r.warnings || [] };
+  if (fidelity && fidelity !== 'convincing') {
+    res.warning = 'this look is graded ' + fidelity + ' by the engine' + ((res.approximations && res.approximations.length) ? ' — it approximates: ' + res.approximations.join('; ') : '') + '. Present it as an approximation of the style, not the finished style.';
+  }
+  return res;
 })();`.trim();
       }
     }

@@ -169,6 +169,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_export_svg: 'Export canvas as animated SVG.',
   pinepaper_export_training_data: 'Export instruction/code pairs for LLM training.',
   pinepaper_export_scene: 'Scene summary for inspection; full: true saves a restorable project document to a file. {full?, name?}',
+  pinepaper_look: "Restyle an item / subtree / the scene as a look (8-bit, blueprint, ink sketch…). action: list|describe (fidelity!)|apply {look, target}|remove|get|grid.",
   pinepaper_original_character: 'Original characters from a base (person|robot|cat|bird|blob) + variant. action: bases|describe (read first)|random {base, seed}|create {base, variant, at}.',
   pinepaper_morph_sequence: 'One element through N states, no cuts: {itemId, states:[{at, to | shape}], camera?: true (rides the morphs), sound?: true}.',
   pinepaper_emitter: "Particles as a saved, deterministic item (cloud-safe). action: create|set {spec: bursts[{t,x,y,count}] | target+rate (trail), shape, palette, speed, gravity…}.",

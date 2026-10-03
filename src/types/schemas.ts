@@ -4750,6 +4750,18 @@ export const EmitterInputSchema = z.object({
 }).refine((v) => v.action !== 'set' || !!v.itemId, { message: 'set requires itemId', path: ['itemId'] });
 export type EmitterInput = z.infer<typeof EmitterInputSchema>;
 
+/** pinepaper_look (D64): restyle an item, a subtree or the whole scene as a named look. */
+export const LookInputSchema = z.object({
+  action: z.enum(['list', 'describe', 'apply', 'remove', 'get', 'grid']),
+  look: z.union([z.string().min(1), z.record(z.string(), z.unknown())]).optional().describe('describe / apply: a look id from list, or a look spec.'),
+  target: z.string().optional().describe("apply / remove / get: an itemId, or 'scene' (default)."),
+  scope: z.enum(['item', 'subtree', 'scene']).optional().describe('apply: how far the look reaches (default: the item for an id, the scene for scene).'),
+  looks: z.array(z.string()).optional().describe('grid: which looks (default every one).'),
+  cols: z.number().int().positive().optional(), cellWidth: z.number().positive().optional(), t: z.number().min(0).optional(),
+})
+  .refine((v) => !['describe', 'apply'].includes(v.action) || v.look !== undefined, { message: 'describe and apply require look', path: ['look'] });
+export type LookInput = z.infer<typeof LookInputSchema>;
+
 /** pinepaper_original_character (D66): an ORIGINAL character from a base rig and a declarative variant. */
 export const OriginalCharacterInputSchema = z.object({
   action: z.enum(['bases', 'describe', 'random', 'create']),
