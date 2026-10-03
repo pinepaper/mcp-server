@@ -2493,12 +2493,12 @@ EXAMPLE — a stitched leaf:
       idempotentHint: false,
       openWorldHint: false,
     },
-    description: `Animate text CHARACTER BY CHARACTER — 37 effects (terminaltexteffects' vocabulary, reimplemented from source).
+    description: `Animate text CHARACTER BY CHARACTER — the terminaltexteffects vocabulary, reimplemented from source).
 
 ⚠️ THIS REPLACES THE TEXT ITEM. Unlike pinepaper_text_style (which ADOPTS the text's registry id), this EXPLODES the text into one item per character and REMOVES the original. Any relation, keyframe, or handle pointing at the source id DIES with it. Pass keepSource: true to leave the original in place. The returned \`ids\` array is your entire new handle set.
 
 ACTIONS:
-- list: {} — the 37 effects as {key, label, definition}. Call this first; effect keys come from here.
+- list: {} — every effect as {key, label, definition}. Call this first; effect keys come from here.
 - apply: { itemId, effect, duration?, seed?, gradient?, gradientStops?, gradientDirection?, gradientSteps?, keepSource?, options? } — explode and animate.
 
 WHAT YOU GET: ordinary keyframe-animated items. It scrubs on the timeline, survives undo and session restore, and exports through the existing MP4 / SMIL / Lottie paths — this is not a frame-callback effect that renders on screen and vanishes from your export. Every effect ends AT REST, so \`duration\` is the settle time and the text is readable afterwards.

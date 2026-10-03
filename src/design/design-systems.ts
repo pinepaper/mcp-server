@@ -193,6 +193,9 @@ const COMPOSERS: Partial<Record<DesignStyle, (o: ComposeOptions) => unknown>> = 
   vaporwave_retro: (o) => generateVaporwavePoster(o as never),
 };
 
+/** How many styles `compose` can draw — the count the tool descriptions quote. */
+export const COMPOSABLE_STYLE_COUNT = Object.keys(COMPOSERS).length;
+
 /**
  * Every style the union declares, whether or not it can compose.
  *

@@ -11,6 +11,7 @@
 
 import { ItemTypeSchema, RelationTypeSchema, GeneratorNameSchema, AgentExportFormatSchema, AgentBatchOperationTypeSchema, SceneAnimationSchema } from '../types/schemas.js';
 import { DIAGRAM_SHAPE_MAP } from '../ontology/vocabulary.js';
+import { COMPOSABLE_STYLE_COUNT } from '../design/design-systems.js';
 
 const ITEM_TYPES = ItemTypeSchema.options.join(', ');
 const RELATION_TYPES = RelationTypeSchema.options.join(', ');
@@ -142,7 +143,7 @@ SHAPE TYPES: ${DIAGRAM_SHAPES}.`,
   // -------------------------------------------------------------------------
   // design_system
   // -------------------------------------------------------------------------
-  pinepaper_design_system: `Licensed design systems (Material 3, Carbon, Polaris, Fluent 2, USWDS, GOV.UK…) as W3C DTCG tokens, plus 18 aesthetic styles that compose a scene. list_systems | get_system | list_easings (named curves with licence + authored provenance) | list_motion (the curves plus the duration scale) | list_styles | compose (draw:false returns the scene as data; compose sets the canvas to the size it laid out for, and says so).`,
+  pinepaper_design_system: `Licensed design systems (Material 3, Carbon, Polaris, Fluent 2, USWDS, GOV.UK…) as W3C DTCG tokens, plus ${COMPOSABLE_STYLE_COUNT} aesthetic styles that compose a scene. list_systems | get_system | list_easings (named curves with licence + authored provenance) | list_motion (the curves plus the duration scale) | list_styles | compose (draw:false returns the scene as data; compose sets the canvas to the size it laid out for, and says so).`,
 
   // -------------------------------------------------------------------------
   // stick / story

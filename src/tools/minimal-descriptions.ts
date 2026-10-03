@@ -13,6 +13,7 @@
 import { ItemTypeSchema, RelationTypeSchema } from '../types/schemas.js';
 import { DIAGRAM_SHAPE_MAP } from '../ontology/vocabulary.js';
 import { STYLED_SCENE_STYLES } from './engine-lists.js';
+import { COMPOSABLE_STYLE_COUNT } from '../design/design-systems.js';
 
 /** Joins a vocabulary list; truncates to `maxShown` with a pointer to the ontology query tool. */
 function shortList(items: readonly string[], maxShown: number): string {
@@ -64,7 +65,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_detect_objects: 'On-device image detection: DETR 80-class, or queries:[…] open-vocabulary (OWL-ViT). asNodes:true → image-anchored design nodes. {itemId?, threshold?, asNodes?, queries?}',
   pinepaper_extract_object: 'Detect + crop the best-matching object out of an imported image into a new item. {label?, itemId?, x?, y?, threshold?}',
   pinepaper_arrange: 'Change an item\'s z-order (stacking). {itemId, action: front|back|forward|backward}',
-  pinepaper_design_system: 'DTCG design systems + 18 composable aesthetic styles. {action: list_systems|get_system|list_easings|list_styles|compose, systemId, style, title}',
+  pinepaper_design_system: `DTCG design systems + ${COMPOSABLE_STYLE_COUNT} composable aesthetic styles. {action: list_systems|get_system|list_easings|list_motion|list_styles|compose, systemId, style, title}`,
   pinepaper_stick: 'Stick-figure kit. {action: figure|set, pose, walk, travel, prop, garment, hair, at, scale}',
   pinepaper_story: 'Prose to scene. {action: distill|from_text|apply_spec|plan_book, text, spec, images}',
   pinepaper_interchange: 'Lottie / dotLottie / GLB / BVH / PNG-sequence import and export. {action, options, data, skeletonId}',
@@ -81,7 +82,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_shatter_image: "Split a raster into a grid of tiles (inert until animated). Group adopts the original id. {itemId, pieces?|rows?+cols?, keepSource?}",
   pinepaper_import_layered_character: "Import decomposer output (layer manifest + images) as role-bound parts; blink/smile work immediately. CHECK rolesWired>0; skipped names images that did not land. {info, images}",
   pinepaper_text_style: "Display text styles + variable fonts. action: apply_style (stacked-layer title, adopts the text id)|set_font_axes (weight/width/slant, animatable)|list_styles.",
-  pinepaper_text_effect: "37 character-level text animations. action: list|apply {itemId, effect}. REPLACES the text with one keyframed item per character (source id dies; keepSource:true to keep it).",
+  pinepaper_text_effect: "Character-level text animations (list for the keys). action: list|apply {itemId, effect}. REPLACES the text with one keyframed item per character (source id dies; keepSource:true to keep it).",
   pinepaper_crop_image: 'One-shot crop of an image item to a canvas-coords rect (clamped; keeps the registry id). {itemId, rect: {x,y,width,height}, aspectRatio?}',
   pinepaper_chroma_key: "One-shot green-screen background removal on an image item (keeps the registry id). Omit threshold/smoothing to auto-estimate. {itemId, color?, threshold?, smoothing?}",
   pinepaper_character: "Place a character from the graph and direct it. {concept, at, height, beats:[{at, channel, until?, value?}]}. The concept declares its channels — blink, say, headTurn, bob.",
@@ -125,7 +126,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_stagger: 'Delay across items. action: apply|preview|list_origins. itemIds (in order), count, opts:{each|amount, from: start|end|center|edges|random, grid:[r,c], axis, ease, seed}.',
   pinepaper_flip: 'Animate a layout change without describing it. action: record (before the change) | apply (after). itemIds, duration, easing, enter, stagger. Writes keyframes.',
   pinepaper_scene_graph: 'Interactive story/quiz scene graph. action: create|validate. graph: {start, nodes:[{id, prompt?, text?, kind?, answers?, next?, duration?, outcome?}]}, opts: {style?, scoreItemId?, subject?}.',
-  pinepaper_apply_template: 'Apply pre-built template (templateId), or list available (listOnly:true). 13 categories. DESTRUCTIVE: replaces canvas.',
+  pinepaper_apply_template: 'Apply pre-built template (templateId), or list available (listOnly:true). DESTRUCTIVE: replaces canvas.',
 
   // --- Diagrams ---
   pinepaper_create_diagram_shape: `Create diagram shape. shapeType: ${DIAGRAM_SHAPES}. position: {x,y}. text: string.`,
@@ -146,7 +147,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_globe: 'Globe mode + world tour. action: enable|rotate_to|spin|world_tour|stop_tour|pin_item|tour_item. world_tour needs regions or coords.',
 
   // --- Fonts ---
-  pinepaper_font: 'Font Studio. action: show_studio|set_name|create_glyph|create_space|remove_glyph|set_metrics|export|cleanup_path|… (16 actions; see pinepaper_tool_guide).',
+  pinepaper_font: 'Font Studio. action: show_studio|set_name|create_glyph|create_space|remove_glyph|set_metrics|export|cleanup_path|… (the rest are in the action enum; see pinepaper_tool_guide).',
 
   // --- Letter Collage ---
   pinepaper_create_letter_collage: 'Create stylized text with per-letter customization (Wordle, magazine, gradient).',

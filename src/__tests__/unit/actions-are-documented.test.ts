@@ -23,3 +23,18 @@ describe(`every enum action is documented (${level})`, () => {
     });
   }
 });
+
+// A description that QUOTES a count must quote the enum's. Minimal said
+// "16 actions" for a font tool with 20 (gate run 3, D6); a count nobody
+// regenerates is the one that goes stale.
+for (const level of ['verbose', 'compact', 'minimal'] as const)
+describe(`a quoted action count matches the enum (${level})`, () => {
+  for (const tool of getToolsForVerbosity(level)) {
+    const actions = (tool.inputSchema?.properties as Record<string, { enum?: string[] }> | undefined)?.action?.enum;
+    const quoted = [...(tool.description ?? '').matchAll(/\b(\d+) actions\b/g)].map((m) => Number(m[1]));
+    if (!actions || !quoted.length) continue;
+    it(tool.name, () => {
+      expect(quoted.filter((n) => n !== actions.length)).toEqual([]);
+    });
+  }
+});
