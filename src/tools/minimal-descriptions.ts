@@ -169,7 +169,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_export_svg: 'Export canvas as animated SVG.',
   pinepaper_export_training_data: 'Export instruction/code pairs for LLM training.',
   pinepaper_export_scene: 'Scene summary for inspection; full: true saves a restorable project document to a file. {full?, name?}',
-  pinepaper_choreograph: 'Acting for any item: beats [{at, verb: pop|drop|hop|bounce|roll|fly|peek|shake|squash|enter|exit, to?}] → one squash-and-stretch track.',
+  pinepaper_choreograph: 'Acting for any item: beats [{at, verb: pop|drop|hop|bounce|roll|fly|peek|shake|squash|enter|exit, to?}] → squash-and-stretch track; sound:true adds SFX on the action.',
   pinepaper_relight: 'Light the 3D world with point/directional lights (post pass; PNG/PDF/MP4/WebM, ~0.4 s per 1080p frame; not saved). action: set|get|clear|list_lights.',
   pinepaper_shader_graph: "Pixel graphs (normals, relight, depth of field, bloom) over an item or 'scene'. action: node_types|validate|create|get|list|remove|apply.",
   pinepaper_styled_scene: `One composition in a built-in style (${STYLED_SCENE_STYLES.join('|')}) as one item; export for its returned duration. {style, duration, id, spec}`,

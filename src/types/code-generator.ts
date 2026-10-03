@@ -11909,6 +11909,29 @@ ${guard}
   }
   if (__r.final && !__r.final.onScreen) __warnings.push('after the last beat the actor is off screen at [' + __r.final.x + ', ' + __r.final.y + '].');
   const __res = { success: true, itemId: ${id}, beats: ${input.beats.length}, keyframes: __r.keyframes.length, duration: __r.end, final: __r.final };
+${input.sound ? `  // SOUND ON THE ACTION (D68): one placed sound per moment the motion makes —
+  // pop, launch, contact, shake — loud as the moment is strong. A sound that
+  // does not place is reported; it never undoes the motion.
+  const __map = Object.assign({ pop: 'pop', whoosh: 'whoosh', contact: 'tom', shake: 'hat' }, ${S(typeof input.sound === 'object' ? Object.fromEntries(Object.entries(input.sound).filter(([k]) => k !== 'gain')) : {})});
+  const __gain = ${S(typeof input.sound === 'object' && input.sound.gain !== undefined ? input.sound.gain : 0.8)};
+  const __sounds = [];
+  const __silent = [];
+  if (typeof app.createSound !== 'function' || (typeof app.sfxSpec !== 'function' && typeof app.percussionSpec !== 'function')) {
+    __warnings.push('no sound was placed: this studio cannot place synthesized sounds (app.createSound / sfxSpec). The motion is written.');
+  } else {
+    (__r.events || []).forEach(function (e) {
+      const name = __map[e.kind];
+      if (name === false || name === undefined) return;
+      const base = (typeof app.sfxSpec === 'function' && app.sfxSpec(name)) || (typeof app.percussionSpec === 'function' && app.percussionSpec(name));
+      if (!base) { if (__silent.indexOf(name) < 0) __silent.push(name); return; }
+      const spec = Object.assign({}, base, { gain: Math.round(((base.gain || 0.8) * __gain * (0.35 + 0.65 * e.strength)) * 1000) / 1000 });
+      const it = app.createSound(spec, { startTime: e.time, duration: spec.duration || 0.5 });
+      if (it && it.data) __sounds.push({ t: e.time, kind: e.kind, sound: name, itemId: it.data.id });
+    });
+    if (__silent.length) __warnings.push('not in the sound catalogue, so silent: ' + __silent.join(', ') + ' (pinepaper_sound list_sfx / list_percussion for the names).');
+  }
+  __res.sounds = __sounds;
+` : ''}
   if (__warnings.length) __res.warnings = __warnings;
   return __res;
 })();`.trim();

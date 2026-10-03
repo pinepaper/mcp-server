@@ -7884,6 +7884,8 @@ WHAT IT RETURNS: keyframes written, the duration, and where the actor ends (and 
 
 ACTORS: a shape, a group, an imported SVG character, a photo cut-out — anything with one transform. Its own scale and rotation are kept (a beat squashes relative to them). A figure placed by pinepaper_character is several parts with their own tracks and no single transform, so choreograph its parts' group only if you grouped a STATIC figure; otherwise direct it with character beats.
 
+SOUND: sound: true puts a sound on every moment the motion makes — the pop, each launch, every landing (a bounce's landings get quieter as the bounces shrink), a shake — placed on the timeline and baked into the video. sound: { contact: 'kick', whoosh: false, gain: 0.6 } picks or silences them by catalogue name (SFX beep, pop, wind, whoosh, zap; drums kick, snare, tom, hat, clap; or your own from define_sfx). The reply lists the sounds placed.
+
 MIX WITH: pinepaper_character / text expressions on top; pinepaper_apply_effect (confetti, shockwave) at a landing; pinepaper_sound at the same times. Call choreograph BEFORE keyframing the actor's other properties (colour, fill): the beat keys carry position, scale, rotation and opacity only, and the result warns if the actor already animates something else.
 
 EXAMPLE — a ball comes to life and crosses the frame:
@@ -7892,6 +7894,7 @@ EXAMPLE — a ball comes to life and crosses the frame:
       type: 'object',
       properties: {
         itemId: { type: 'string', description: 'The actor (any item with one transform).' },
+        sound: { description: "true, or {pop?, whoosh?, contact?, shake? (catalogue name or false), gain? 0..1}: a sound on every pop, launch, landing and shake.", oneOf: [{ type: 'boolean' }, { type: 'object', additionalProperties: true }] },
         beats: {
           type: 'array',
           description: 'Beats in time order: [{at, verb, to?, duration?, height?, times?, decay?, arc?, edge?, from?, amount?, hold?, intensity?}].',

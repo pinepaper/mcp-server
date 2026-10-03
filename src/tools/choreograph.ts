@@ -31,8 +31,11 @@ export interface ChoreoActor {
   rot: number;                   // base authored rotation, degrees
 }
 export interface ChoreoFrame { x: number; y: number; width: number; height: number }
+export interface ChoreoEvent { time: number; kind: 'pop' | 'whoosh' | 'contact' | 'shake'; strength: number }
 export interface ChoreoResult {
   keyframes?: Array<{ time: number; properties: Record<string, number>; easing: string }>;
+  /** The moments a sound belongs on (D68): pops, launches, contacts with their strength, shakes. */
+  events?: ChoreoEvent[];
   end?: number;
   final?: { x: number; y: number; onScreen: boolean };
   warnings?: string[];
@@ -44,6 +47,8 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
   const h = actor.h, w = actor.w;
   const warnings: string[] = [];
   const keys: Array<{ time: number; properties: Record<string, number>; easing: string }> = [];
+  const events: Array<{ time: number; kind: string; strength: number }> = [];
+  const ev = (time: number, kind: string, strength: number) => { events.push({ time: Math.round(time * 1000) / 1000, kind, strength: Math.round(Math.max(0.05, Math.min(1, strength)) * 100) / 100 }); };
   const r3 = (v: number) => Math.round(v * 1000) / 1000;
   // Live state: centre, scale factors, rotation delta, opacity.
   const s = { x: actor.x, y: actor.y, fx: 1, fy: 1, rot: 0, op: 1 };
@@ -95,6 +100,7 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
       if (verb === 'pop') {
         const d = +b.duration || 0.5;
         squashTo(1); s.fx = 0; s.fy = 0; s.op = 0; key(t, 'linear');
+        ev(t, 'pop', 0.8);
         s.fx = 1.15; s.fy = 1.15; s.op = 1; key(t + d * 0.6, 'easeOut');
         s.fx = 1; s.fy = 1; key(t + d, 'easeInOut');
         t += d;
@@ -109,6 +115,7 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
         if (!airborne) { s.x = land.x; s.y = frame.y - h; }
         squashTo(airborne ? 1 : 1.15); s.op = 1; key(t, 'linear');
         s.x = land.x; s.y = land.y; squashTo(1.15); key(t + d * 0.7, 'easeIn');
+        ev(t + d * 0.72, 'contact', 1);
         squashTo(0.7); key(t + d * 0.78, 'easeOut');
         squashTo(1.08); key(t + d * 0.9, 'easeOut');
         squashTo(1); key(t + d, 'easeInOut');
@@ -120,10 +127,12 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
         const height = b.height !== undefined ? +b.height : h * 1.2;
         squashTo(1); key(t, 'linear');
         squashTo(0.8); key(t + d * 0.15, 'easeOut');                         // anticipation
+        ev(t + d * 0.2, 'whoosh', 0.35);
         s.x = from.x + (dest.x - from.x) * 0.2; s.y = from.y - height * 0.45; squashTo(1.15); key(t + d * 0.3, 'easeOut'); // launch
         s.x = (from.x + dest.x) / 2; s.y = Math.min(from.y, dest.y) - height; squashTo(1); key(t + d * 0.5, 'easeOut');  // apex
         s.x = from.x + (dest.x - from.x) * 0.8; s.y = dest.y - height * 0.45; squashTo(1.12); key(t + d * 0.7, 'easeIn');
         s.x = dest.x; s.y = dest.y; squashTo(0.75); key(t + d * 0.82, 'easeIn');   // contact
+        ev(t + d * 0.82, 'contact', Math.min(1, height / Math.max(1, h * 1.5)));
         squashTo(1.06); key(t + d * 0.92, 'easeOut');
         squashTo(1); key(t + d, 'easeInOut');                                 // settle
         t += d;
@@ -142,6 +151,7 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
           s.x = gx(f0); s.y = gy(f0); squashTo(0.78); key(t + per * 0.08, 'easeOut');
           s.x = gx((f0 + f1) / 2); s.y = gy((f0 + f1) / 2) - height; squashTo(1.08); key(t + per * 0.5, 'easeOut');
           s.x = gx(f1); s.y = gy(f1); squashTo(1.1); key(t + per * 0.95, 'easeIn');
+          ev(t + per * 0.95, 'contact', Math.min(1, height / Math.max(1, h * 1.5)));
           t += per;
           height *= decay;
         }
@@ -168,6 +178,7 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
         const r0 = s.rot;
         squashTo(1); key(t, 'linear');
         squashTo(0.85); key(t + d * 0.08, 'easeOut');
+        ev(t + d * 0.08, 'whoosh', 0.8);
         const N = 6;
         for (let k = 1; k <= N; k++) {
           const u = k / N;
@@ -197,6 +208,7 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
         const amp = b.intensity !== undefined ? +b.intensity : Math.max(2, w * 0.08);
         const x0 = s.x;
         key(t, 'linear');
+        ev(t, 'shake', 0.6);
         for (let k = 1; k <= 6; k++) { s.x = x0 + amp * (k % 2 ? 1 : -1) * (1 - k / 7); key(t + d * k / 7, 'easeInOut'); }
         s.x = x0; key(t + d, 'easeOut');
         t += d;
@@ -205,6 +217,7 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
         const a = b.amount !== undefined ? Math.min(0.8, Math.max(0.05, +b.amount)) : 0.25;
         key(t, 'linear');
         squashTo(1 - a); key(t + d * 0.35, 'easeOut');
+        ev(t + d * 0.3, 'contact', a * 2);
         squashTo(1 + a * 0.3); key(t + d * 0.7, 'easeOut');
         squashTo(1); key(t + d, 'easeInOut');
         t += d;
@@ -213,6 +226,7 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
         const dest = to || { x: s.x, y: s.y };
         const off = offEdge(b.from || 'left', dest);
         s.x = off.x; s.y = off.y; squashTo(1); s.op = 1; key(t, 'linear');
+        ev(t, 'whoosh', 0.6);
         const ox = (dest.x - off.x) * 0.06, oy = (dest.y - off.y) * 0.06;
         s.x = dest.x + ox; s.y = dest.y + oy; key(t + d * 0.75, 'easeOut');    // overshoot
         s.x = dest.x; s.y = dest.y; key(t + d, 'easeInOut');
@@ -223,6 +237,7 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
         const ax = (s.x - off.x) * 0.04, ay = (s.y - off.y) * 0.04;
         key(t, 'linear');
         s.x += ax; s.y += ay; squashTo(0.9); key(t + d * 0.2, 'easeOut');     // anticipation
+        ev(t + d * 0.2, 'whoosh', 0.6);
         s.x = off.x; s.y = off.y; squashTo(1); key(t + d, 'easeIn');
         t += d;
       }
@@ -232,5 +247,5 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
   }
   if (!keys.length) return { error: 'no beats' };
   const onScreen = s.x >= frame.x && s.x <= frame.x + frame.width && s.y >= frame.y && s.y <= frame.y + frame.height;
-  return { keyframes: keys, end: r3(t), final: { x: r3(s.x), y: r3(s.y), onScreen }, warnings };
+  return { keyframes: keys, events: events as ChoreoEvent[], end: r3(t), final: { x: r3(s.x), y: r3(s.y), onScreen }, warnings };
 }

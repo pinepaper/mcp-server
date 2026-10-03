@@ -4733,9 +4733,15 @@ export const ChoreographBeatSchema = z.object({
   if ((b.verb === 'roll' || b.verb === 'fly') && !b.to) ctx.addIssue({ code: z.ZodIssueCode.custom, message: `${b.verb} needs to: [x, y]`, path: ['to'] });
   if (b.verb === 'exit' && b.to !== undefined) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'exit leaves by an edge: pass edge (left | right | top | bottom), not to', path: ['to'] });
 });
+const ChoreoSoundName = z.union([z.string().min(1), z.literal(false)]);
 export const ChoreographInputSchema = z.object({
   itemId: z.string().describe('The actor: any item — a shape, a group, an imported SVG character, a photo cut-out.'),
   beats: z.array(ChoreographBeatSchema).min(1).max(60),
+  sound: z.union([z.boolean(), z.object({
+    pop: ChoreoSoundName.optional(), whoosh: ChoreoSoundName.optional(),
+    contact: ChoreoSoundName.optional(), shake: ChoreoSoundName.optional(),
+    gain: z.number().min(0).max(1).optional(),
+  }).strict()]).optional().describe("true: a sound on every pop, launch, landing and shake, its loudness following the motion (a bounce's contacts get quieter as it decays). An object picks the sound per moment by catalogue name (an SFX — beep, pop, wind, whoosh, zap — or a drum — kick, snare, tom, hat, clap — or one you defined), false to leave one silent, and gain 0..1. Placed on the timeline, baked into video and render_soundtrack."),
 });
 export type ChoreographInput = z.infer<typeof ChoreographInputSchema>;
 

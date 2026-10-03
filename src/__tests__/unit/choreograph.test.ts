@@ -108,4 +108,26 @@ describe('pinepaper_choreograph emitted code', () => {
     expect(run({ itemId: 'item_9', beats: [{ at: 0, verb: 'pop' }] }, fakeApp()).success).toBe(false);
     expect(() => ChoreographInputSchema.parse({ itemId: 'item_1', beats: [{ at: 0, verb: 'roll' }] })).toThrow(/roll needs to/);
   });
+
+  it('sound: true places a sound on every pop and landing, quieter as bounces decay (D68)', () => {
+    const app = fakeApp() as Record<string, any>;
+    const placed: Array<{ spec: Record<string, any>; at: number }> = [];
+    app.sfxSpec = (n: string) => (['pop', 'whoosh'].includes(n) ? { gain: 0.8, duration: 0.3, sfx: n } : null);
+    app.percussionSpec = (n: string) => (['tom', 'hat', 'kick'].includes(n) ? { gain: 0.9, duration: 0.35, drum: n } : null);
+    app.createSound = (spec: Record<string, any>, o: { startTime: number }) => { placed.push({ spec, at: o.startTime }); return { data: { id: 'snd_' + placed.length } }; };
+    const r = run({ itemId: 'item_1', sound: true, beats: [{ at: 0, verb: 'pop' }, { at: 0.6, verb: 'bounce', times: 3, to: [700, 760] }] }, app);
+    expect(r.sounds.map((x: any) => x.sound)).toEqual(['pop', 'tom', 'tom', 'tom']);
+    const toms = placed.filter((p) => p.spec.drum === 'tom').map((p) => p.spec.gain);
+    expect(toms[0]).toBeGreaterThan(toms[1]);
+    expect(toms[1]).toBeGreaterThan(toms[2]);
+  });
+
+  it('an unknown sound name is reported, a false one is silent, and the motion stands', () => {
+    const app = fakeApp() as Record<string, any>;
+    app.sfxSpec = () => null; app.percussionSpec = () => null; app.createSound = () => ({ data: { id: 's' } });
+    const r = run({ itemId: 'item_1', sound: { contact: 'boing', pop: false }, beats: [{ at: 0, verb: 'pop' }, { at: 0.6, verb: 'squash' }] }, app);
+    expect(r.success).toBe(true);
+    expect(r.warnings.join(' ')).toContain('boing');
+    expect(r.sounds).toEqual([]);
+  });
 });
