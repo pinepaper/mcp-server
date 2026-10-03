@@ -5,8 +5,6 @@
  */
 
 import { AssetRepository, AssetResult, AssetMetadata, AssetCacheEntry } from './types.js';
-import { createSVGRepoAdapter } from './repositories/svgrepo.js';
-import { createOpenClipartAdapter } from './repositories/openclipart.js';
 import { createIconifyAdapter } from './repositories/iconify.js';
 import { createFontAwesomeAdapter } from './repositories/fontawesome.js';
 
@@ -37,7 +35,7 @@ export interface AssetManagerConfig {
   maxCacheSizeMB?: number;
 
   /** Repositories to enable (default: all) */
-  repositories?: ('svgrepo' | 'openclipart' | 'iconify' | 'fontawesome')[];
+  repositories?: ('iconify' | 'fontawesome')[];
 }
 
 /**
@@ -45,6 +43,14 @@ export interface AssetManagerConfig {
  *
  * Provides unified interface for searching and downloading assets from multiple repositories.
  */
+/**
+ * Removed in 1.6.19. SVGRepo answered every request 429 (it blocks automated
+ * clients) and OpenClipart's search/json endpoint stopped answering, so both
+ * returned nothing; until 25ece7c they did it silently, as "0 results".
+ */
+export const REMOVED_REPOSITORIES: readonly string[] = ['svgrepo', 'openclipart'];
+export const REMOVED_REPOSITORY_REASON = 'SVGRepo and OpenClipart were removed in 1.6.19 because neither answers automated searches any more.';
+
 export class AssetManager {
   private repositories: Map<string, AssetRepository> = new Map();
   private cache: Map<string, AssetCacheEntry> = new Map();
@@ -55,16 +61,10 @@ export class AssetManager {
       cacheDir: config.cacheDir || '.pinepaper-cache/assets',
       enableCache: config.enableCache ?? true,
       maxCacheSizeMB: config.maxCacheSizeMB || 100,
-      repositories: config.repositories || ['svgrepo', 'openclipart', 'iconify', 'fontawesome'],
+      repositories: config.repositories || ['iconify', 'fontawesome'],
     };
 
     // Register default repositories based on config
-    if (this.config.repositories?.includes('svgrepo')) {
-      this.registerRepository(createSVGRepoAdapter());
-    }
-    if (this.config.repositories?.includes('openclipart')) {
-      this.registerRepository(createOpenClipartAdapter());
-    }
     if (this.config.repositories?.includes('iconify')) {
       this.registerRepository(createIconifyAdapter());
     }
@@ -186,6 +186,9 @@ export class AssetManager {
     const repositoryName = parts[0];
 
     const repository = this.repositories.get(repositoryName);
+    if (!repository && REMOVED_REPOSITORIES.includes(repositoryName)) {
+      throw new Error(`${repositoryName} assets can no longer be imported: ${REMOVED_REPOSITORY_REASON} Search again; results now come from iconify and fontawesome.`);
+    }
     if (!repository) {
       throw new Error(`Repository '${repositoryName}' not found in asset ID: ${assetId}`);
     }

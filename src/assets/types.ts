@@ -28,11 +28,11 @@ export interface AssetLicense {
  * Single asset search result
  */
 export interface AssetResult {
-  /** Unique asset ID (e.g., 'svgrepo_12345', 'openclipart_67890') */
+  /** Unique asset ID (e.g., 'iconify_mdi_rocket', 'fontawesome_solid_heart') */
   id: string;
 
   /** Repository name */
-  repository: 'svgrepo' | 'openclipart' | 'iconify' | 'fontawesome';
+  repository: 'iconify' | 'fontawesome';
 
   /** Asset title/name */
   title: string;

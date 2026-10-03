@@ -1760,7 +1760,7 @@ export type SetToolkitInput = z.infer<typeof SetToolkitInputSchema>;
 
 export const SearchAssetsInputSchema = z.object({
   query: z.string().describe('Search term (e.g., "rocket", "heart", "user icon")'),
-  repository: z.enum(['all', 'svgrepo', 'openclipart', 'iconify', 'fontawesome']).optional().describe('Which repository to search (default: all)'),
+  repository: z.enum(['all', 'iconify', 'fontawesome']).optional().describe('Which repository to search (default: all)'),
   limit: z.number().min(1).max(50).optional().describe('Max results to return (default: 10)'),
   includeSvgContent: z.boolean().optional().describe('Include actual SVG content for each result (default: false). When true, fetches and returns the SVG string for each asset, enabling AI to display or describe the icons.'),
 });
@@ -1768,7 +1768,7 @@ export const SearchAssetsInputSchema = z.object({
 export type SearchAssetsInput = z.infer<typeof SearchAssetsInputSchema>;
 
 export const ImportAssetInputSchema = z.object({
-  assetId: z.string().optional().describe('Asset ID from search results (e.g., "svgrepo_12345")'),
+  assetId: z.string().optional().describe('Asset ID from search results (e.g., "iconify_mdi_rocket")'),
   url: z.string().optional().describe('Direct URL to SVG (alternative to assetId)'),
   position: z.object({
     x: z.number(),

@@ -118,7 +118,7 @@ SHAPE TYPES: ${DIAGRAM_SHAPES}.`,
   // -------------------------------------------------------------------------
   // search_assets
   // -------------------------------------------------------------------------
-  pinepaper_search_assets: `Search for free SVG icons and illustrations from open repositories (SVGRepo, OpenClipart, Iconify, FontAwesome). The result's sources says how each repository answered (ok | timeout | error); one that is down does not hold up the others, and a search that names one repository fails if it is down.`,
+  pinepaper_search_assets: `Search for free SVG icons and illustrations from open repositories (Iconify, Font Awesome). The result's sources says how each repository answered (ok | timeout | error); one that is down does not hold up the others, and a search that names one repository fails if it is down.`,
 
   // -------------------------------------------------------------------------
   // connect

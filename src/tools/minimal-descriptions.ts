@@ -47,7 +47,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_import_svg: "Import SVG markup or a URL. source:'figma' normalises Figma Copy-as-SVG first (root fill=none makes everything invisible; missing viewBox; global ids like clip0 collide across imports).",
   pinepaper_import_mermaid: 'Import a Mermaid diagram (flowchart|graph|stateDiagram|sequenceDiagram|erDiagram|classDiagram). mermaidText, autoLayout, clearExisting.',
   pinepaper_import_image: 'Import a raster image (PNG/JPG/WebP) onto the canvas.',
-  pinepaper_search_assets: 'Search SVG icons (SVGRepo, Iconify, FontAwesome, OpenClipart); sources says which answered.',
+  pinepaper_search_assets: 'Search SVG icons (Iconify, Font Awesome); sources says which answered.',
   pinepaper_import_asset: 'Place a search result asset onto the canvas.',
   pinepaper_batch_create: 'Create multiple items in one call with single history save.',
   pinepaper_batch_modify: 'Modify multiple items in one call with single history save.',

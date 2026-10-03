@@ -3423,6 +3423,16 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
       // ASSET TOOLS
       // -----------------------------------------------------------------------
       case 'pinepaper_search_assets': {
+        // Asked for by name, a removed repository says why rather than failing
+        // the enum check with a bare "invalid option".
+        {
+          const { REMOVED_REPOSITORIES, REMOVED_REPOSITORY_REASON } = await import('../assets/index.js');
+          if (typeof args.repository === 'string' && REMOVED_REPOSITORIES.includes(args.repository)) {
+            return errorResult(ErrorCodes.INVALID_PARAMS,
+              `${REMOVED_REPOSITORY_REASON} Search repository 'all', 'iconify' or 'fontawesome'.`,
+              { repository: args.repository }, { toolName: 'pinepaper_search_assets' });
+          }
+        }
         const input = SearchAssetsInputSchema.parse(args);
         const { getAssetManager } = await import('../assets/index.js');
         const assetManager = getAssetManager();

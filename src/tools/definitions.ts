@@ -1219,7 +1219,7 @@ EXAMPLES:
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: `Search for free SVG assets from open repositories (SVGRepo, OpenClipart, Iconify, FontAwesome). The result's sources says how each repository answered (ok | timeout | error); one that is down does not hold up the others, and a search that names one repository fails if it is down.
+    description: `Search for free SVG assets from open repositories (Iconify, Font Awesome). The result's sources says how each repository answered (ok | timeout | error); one that is down does not hold up the others, and a search that names one repository fails if it is down.
 
 USE WHEN:
 - User wants icons, illustrations, or clipart
@@ -1229,15 +1229,13 @@ USE WHEN:
 - Need graphics that are too complex to draw with paths
 
 REPOSITORIES:
-- SVGRepo: 500,000+ icons, various categories and licenses
-- OpenClipart: 150,000+ public domain clipart
 - Iconify: 200,000+ icon sets (various licenses)
 - Font Awesome: 2,000+ free icons (CC BY 4.0)
 
 WORKFLOW:
 1. Search for assets: pinepaper_search_assets(query: "rocket")
 2. Review results (you'll see assetIds, previews, licenses)
-3. Import chosen asset: pinepaper_import_asset(assetId: "svgrepo_rocket_12345")
+3. Import chosen asset: pinepaper_import_asset(assetId: "iconify_mdi_rocket")
 
 IMPORTANT NOTES:
 - Always respect license terms (check license field in results)
@@ -1274,7 +1272,7 @@ SVG CONTENT RETRIEVAL:
         },
         repository: {
           type: 'string',
-          enum: ['all', 'svgrepo', 'openclipart', 'iconify', 'fontawesome'],
+          enum: ['all', 'iconify', 'fontawesome'],
           description: 'Which repository to search (default: all)',
         },
         limit: {
@@ -1309,12 +1307,12 @@ USE WHEN:
 WORKFLOW:
 1. Search: pinepaper_search_assets(query: "rocket")
 2. Choose: Review results, pick one with desired license
-3. Import: pinepaper_import_asset(assetId: "svgrepo_rocket_12345", position: {x: 400, y: 300})
+3. Import: pinepaper_import_asset(assetId: "iconify_mdi_rocket", position: {x: 400, y: 300})
 4. Modify: Use pinepaper_modify_item to adjust size, color, etc.
 5. Animate: Use pinepaper_animate or pinepaper_add_relation for motion
 
 PARAMETERS:
-- assetId: From search results (e.g., "svgrepo_12345")
+- assetId: From search results (e.g., "iconify_mdi_rocket")
 - url: Alternative to assetId - direct URL to SVG
 - position: Where to place on canvas (default: center)
 - scale: Size multiplier (default: 1.0)
@@ -1333,9 +1331,9 @@ CACHING:
 - No disk storage (memory only)
 
 EXAMPLES:
-- Import from search: {assetId: "svgrepo_rocket_001", position: {x: 400, y: 300}, scale: 2.0}
+- Import from search: {assetId: "iconify_mdi_rocket", position: {x: 400, y: 300}, scale: 2.0}
 - Import from URL: {url: "https://example.com/icon.svg", position: {x: 500, y: 400}}
-- Import with color override: {assetId: "svgrepo_heart_123", position: {x: 400, y: 300}, color: "#ef4444"}
+- Import with color override: {assetId: "iconify_mdi_heart", position: {x: 400, y: 300}, color: "#ef4444"}
 
 RETURNS:
 - itemId: ID of the imported SVG group (use for further modifications)
@@ -1345,7 +1343,7 @@ RETURNS:
       properties: {
         assetId: {
           type: 'string',
-          description: 'Asset ID from search results (e.g., "svgrepo_12345")',
+          description: 'Asset ID from search results (e.g., "iconify_mdi_rocket")',
         },
         url: {
           type: 'string',

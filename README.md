@@ -286,6 +286,12 @@ running it (deferred, or `--mode code`), the code travels in
 Every result carries `_meta["pinepaper.studio/timing"]`: the whole call, and
 the studio's share of it, for tracing slow requests.
 
+### Changed: asset search uses Iconify and Font Awesome
+
+`pinepaper_search_assets` no longer searches SVGRepo or OpenClipart. Neither
+answers automated searches any more, so they returned nothing. Asking for
+either by name, or importing one of their asset ids, says so.
+
 ### Fixed
 
 - `pinepaper_add_filter` offers every filter the studio has, including dither,
@@ -1576,10 +1582,8 @@ Choropleths, region styling, and data-driven map animation via `pinepaper_map`, 
 
 ### 🔍 Asset Search & Import
 
-Search and import free SVG assets from multiple repositories:
+Search and import free SVG icons:
 
-- **SVGRepo**: 500,000+ icons with various licenses
-- **OpenClipart**: 151,000+ public domain clipart (CC0)
 - **Iconify**: 200,000+ icons from multiple icon sets
 - **Font Awesome**: 2,000+ free icons (CC BY 4.0)
 

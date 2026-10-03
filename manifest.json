@@ -154,7 +154,7 @@
     },
     {
       "name": "pinepaper_search_assets",
-      "description": "Search for SVG assets from open repositories (SVGRepo, OpenClipart, Iconify, FontAwesome)"
+      "description": "Search for SVG assets from open repositories (Iconify, Font Awesome)"
     },
     {
       "name": "pinepaper_import_asset",
