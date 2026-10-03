@@ -4519,7 +4519,12 @@ export const TextStyleInputSchema = z.object({
   }).passthrough().optional().describe('set_font_axes: weight/width/slant, or OpenType tags (wght/wdth/slnt). Unknown axes are passed to the engine and come back in `rejected` rather than being dropped here. All three named axes are animatable (addKeyframe with fontWeight interpolates).'),
 })
   .refine((v) => v.action !== 'apply_style' || (!!v.itemId && !!v.styleKey), { message: 'apply_style requires itemId and styleKey', path: ['styleKey'] })
-  .refine((v) => v.action !== 'set_font_axes' || (!!v.itemId && !!v.axes && Object.keys(v.axes).length > 0), { message: 'set_font_axes requires itemId and at least one axis', path: ['axes'] });
+  .refine((v) => v.action !== 'set_font_axes' || (!!v.itemId && !!v.axes && Object.keys(v.axes).length > 0), { message: 'set_font_axes requires itemId and at least one axis', path: ['axes'] })
+  // cursive WRITES new words; with no text it reached the engine and failed as
+  // "Cannot read properties of undefined (reading 'length')" (gate, P2).
+  .refine((v) => v.action !== 'cursive' || (typeof v.text === 'string' && v.text.trim() !== ''), {
+    message: "cursive writes new text from `text`; it does not restyle an existing item. Pass text (the words to write); for a style on an existing text item use apply_style with its itemId.",
+    path: ['text'] });
 export type TextStyleInput = z.infer<typeof TextStyleInputSchema>;
 
 /**

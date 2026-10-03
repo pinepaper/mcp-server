@@ -34,4 +34,10 @@ describe('cursive nib', () => {
     const text = r.content.map((c: any) => c.text ?? '').join('');
     expect(text).toContain('"nib":false');
   });
+  it('refuses cursive without text, by name', async () => {
+    expect(() => TextStyleInputSchema.parse({ action: 'cursive', itemId: 'item_1' })).toThrow(/writes new text from `text`/);
+    const r = await handleToolCall('pinepaper_text_style', { action: 'cursive', itemId: 'item_1' }, { generateOnly: true } as never);
+    expect(r.isError).toBe(true);
+    expect(r.content.map((c: any) => c.text ?? '').join('')).toContain('does not restyle an existing item');
+  });
 });
