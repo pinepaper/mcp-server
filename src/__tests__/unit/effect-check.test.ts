@@ -131,3 +131,11 @@ describe("a refusal carries the engine's own reason (D78)", () => {
     expect(text(r)).toContain("did you mean 'opacity'");
   });
 });
+
+describe('agent_export carries the studio build (D92)', () => {
+  it('the emitted export reads app.buildId into the reply', async () => {
+    const { codeGenerator } = await import('../../types/code-generator.js');
+    const code = codeGenerator.generateAgentExport({ format: 'png', platform: 'auto' } as never);
+    expect(code).toContain('result.studioBuild = app.buildId');
+  });
+});

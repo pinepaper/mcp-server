@@ -6249,6 +6249,10 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
       }
     } catch (_) { /* the export stands */ }
   }
+  // WHICH STUDIO MADE THIS FILE (D92): a service worker can serve a stale
+  // build right after a deploy, and a retest then judges old code. The
+  // engine's own identity, version + build sha, rides on every export reply.
+  try { if (result && typeof result === 'object' && app.buildId) result.studioBuild = app.buildId; } catch (_) { /* older studio */ }
   // RELIGHT (FxTool D5): applied to png / pdf / mp4 / webm, not gif / apng
   // or the vector formats; and it is what makes a video export slow.
   if (result && result.success && typeof app.getRelight === 'function') {
