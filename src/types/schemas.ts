@@ -3102,7 +3102,7 @@ export const HighlightRegionsInputSchema = z.object({
     strokeColor: z.string().optional().describe('Highlight stroke color'),
     stroke: z.string().optional().describe("The engine's own name for the stroke."),
     strokeWidth: z.number().optional().describe('Highlight stroke width'),
-    opacity: z.number().min(0).max(1).optional().describe('Fill opacity 0..1, applied to a hex fill colour.'),
+    opacity: z.number().min(0).max(1).optional().describe('0..1: a TINT over the land. The colour is pre-blended over the region\'s land fill and drawn opaque, so the export shows exactly the fill reported. Hex colours only.'),
     animate: z.boolean().optional().describe('Animate the highlight'),
   }).optional().describe('Highlight options'),
 }).describe('Highlight regions input');

@@ -6524,17 +6524,14 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
     // means the fill.
     const ho = (validated.options ?? {}) as Record<string, unknown>;
     const style: Record<string, unknown> = {};
-    let fill = ho.color ?? ho.fillColor ?? ho.fill;
-    // The engine's override channel carries fill / stroke / strokeWidth and no
-    // opacity, so opacity rides in the fill as rgba (hex fills only).
-    if (typeof fill === 'string' && typeof ho.opacity === 'number') {
-      const h = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(fill);
-      if (h) {
-        const x = h[1].length === 3 ? h[1].split('').map((c) => c + c).join('') : h[1];
-        fill = `rgba(${parseInt(x.slice(0, 2), 16)}, ${parseInt(x.slice(2, 4), 16)}, ${parseInt(x.slice(4, 6), 16)}, ${ho.opacity})`;
-      }
-    }
+    const fill = ho.color ?? ho.fillColor ?? ho.fill;
     if (fill !== undefined) style.fill = fill;
+    // OPACITY IS A TINT OVER THE LAND (gate D59). The override REPLACES a
+    // region's land fill rather than drawing over it, and an rgba fill lost
+    // its alpha on the way to the exported pixels, so the readback reported a
+    // blend the PNG did not draw. The colour is blended over each region's own
+    // land fill in the browser and sent opaque: export and readback agree.
+    const opacity = typeof ho.opacity === 'number' ? ho.opacity : null;
     const stroke = ho.strokeColor ?? ho.stroke;
     if (stroke !== undefined) style.stroke = stroke;
     if (ho.strokeWidth !== undefined) style.strokeWidth = ho.strokeWidth;
@@ -6554,7 +6551,42 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
 
   try {${this.mapRegionReadbackJs()}
     if (!__features().length) return __noMap;
-    app.mapSystem.highlightRegions(${regionIds}, ${optionsStr});
+    const __style = ${optionsStr};
+    const __op = ${JSON.stringify(opacity)};
+    const __expected = {};
+    const __unblended = [];
+    if (__op !== null && typeof __style.fill === 'string') {
+      const __rgb = function (c) {
+        const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(c || ''));
+        if (!m) return null;
+        const x = m[1].length === 3 ? m[1].replace(/./g, function (ch) { return ch + ch; }) : m[1];
+        return [0, 2, 4].map(function (i) { return parseInt(x.slice(i, i + 2), 16); });
+      };
+      const __src = __rgb(__style.fill);
+      const __p = app.mapSystem._mapRenderParams;
+      const __ms = (__p && __p.mergedStyles) || {};
+      const __user = (app.mapSystem.currentMap && app.mapSystem.currentMap.geoData && app.mapSystem.currentMap.geoData.features) || [];
+      ${regionIds}.forEach(function (id) {
+        const f = __resolve(id);
+        if (!f) return;
+        // The land the engine paints under this region: a user feature takes
+        // the map's fill, a basemap country its basemapFill.
+        const __land = __rgb(__user.indexOf(f) !== -1 ? __ms.fill
+          : (__ms.basemapFill || (app.mapSystem.defaultStyles || {}).basemapFill));
+        let __fill = __style.fill;
+        if (__src && __land) {
+          __fill = '#' + [0, 1, 2].map(function (i) {
+            return ('0' + Math.round(__src[i] * __op + __land[i] * (1 - __op)).toString(16)).slice(-2);
+          }).join('');
+        } else {
+          __unblended.push(id);
+        }
+        __expected[id] = __fill;
+        app.mapSystem.highlightRegions([id], Object.assign({}, __style, { fill: __fill }));
+      });
+    } else {
+      app.mapSystem.highlightRegions(${regionIds}, __style);
+    }
     // READ BACK (gate D16, D51): every id is resolved and its colour read.
     const __r = __check(${regionIds});
     if (!__r.done.length) {
@@ -6566,13 +6598,15 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
     // reported #3b82f6 for a #e11d48 request and still said success).
     const __want = ${JSON.stringify(style.fill ?? null)};
     if (__want) {
-      const __off = __r.done.filter(function (d) { return String(d.fill).toLowerCase() !== String(__want).toLowerCase(); });
+      const __exp = function (d) { return __expected[d.asked] || __want; };
+      const __off = __r.done.filter(function (d) { return String(d.fill).toLowerCase() !== String(__exp(d)).toLowerCase(); });
       if (__off.length === __r.done.length) {
-        return { success: false, highlighted: __r.done, error: 'the regions were highlighted in ' + __off[0].fill + ', not the ' + __want + ' asked for.' };
+        return { success: false, highlighted: __r.done, error: 'the regions were highlighted in ' + __off[0].fill + ', not the ' + __exp(__off[0]) + ' asked for.' };
       }
       if (__off.length) __r.wrongFill = __off;
     }
     const __res = { success: true, highlighted: __r.done };
+    if (__unblended.length) { __res.unblended = __unblended; __res.warning = 'opacity needs a hex colour and a hex land fill; drawn at full strength: ' + __unblended.join(', ') + '.'; }
     if (__r.wrongFill) { __res.wrongFill = __r.wrongFill; __res.warning = 'some regions were not drawn in ' + __want + ': ' + __r.wrongFill.map(function (d) { return d.regionId; }).join(', ') + '.'; }
     if (__r.notFound.length) { __res.notFound = __r.notFound; __res.warning = 'not on this map, so not highlighted: ' + __r.notFound.join(', ') + '. Ids on this map include ' + __sampleIds() + '.'; }
     if (__r.notApplied.length) __res.notApplied = __r.notApplied;

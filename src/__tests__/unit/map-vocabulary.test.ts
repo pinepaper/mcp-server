@@ -20,6 +20,14 @@ const argsOf = (code: string, fn: string): unknown[] => {
   return JSON.parse(`[${m[1]}]`) as unknown[];
 };
 
+// highlight builds its style once (const __style = {...}) and calls the engine
+// per region when it pre-blends opacity, so the style is read from there.
+const highlightStyle = (code: string): Record<string, unknown> => {
+  const m = /const __style = (\{[^\n]*\});/.exec(code);
+  if (!m) throw new Error(`no __style in:\n${code}`);
+  return JSON.parse(m[1]) as Record<string, unknown>;
+};
+
 describe('the map tools speak the engine vocabulary', () => {
   it('turns a colour-scale NAME into the two-stop ramp the engine wants', () => {
     const code = codeGenerator.generateApplyDataColors({
@@ -55,7 +63,7 @@ describe('the map tools speak the engine vocabulary', () => {
       const code = codeGenerator.generateHighlightRegions({
         regionIds: ['FR'], options: { [key]: '#ef4444' },
       } as never);
-      const [, style] = argsOf(code, 'highlightRegions') as [unknown, Record<string, unknown>];
+      const style = highlightStyle(code);
       expect(style.fill, `${key} should reach style.fill`).toBe('#ef4444');
       expect(style).not.toHaveProperty('fillColor');
     }
@@ -65,7 +73,7 @@ describe('the map tools speak the engine vocabulary', () => {
     const code = codeGenerator.generateHighlightRegions({
       regionIds: ['FR'], options: { strokeColor: '#000', strokeWidth: 3 },
     } as never);
-    const [, style] = argsOf(code, 'highlightRegions') as [unknown, Record<string, unknown>];
+    const style = highlightStyle(code);
     expect(style).toMatchObject({ stroke: '#000', strokeWidth: 3 });
     expect(style).not.toHaveProperty('strokeColor');
   });

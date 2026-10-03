@@ -6921,7 +6921,7 @@ For region styling/selection use pinepaper_map_regions; for animations use pinep
     description: `Highlight, color, label, and select map regions. Requires a map loaded via pinepaper_map { action: "load" } first.
 
 ACTIONS:
-- highlight        — { regionIds: string[], color?, opacity? }
+- highlight        — { regionIds: string[], color?, opacity? }   opacity 0..1 tints over the land: pre-blended over the region's land fill, drawn opaque
 - unhighlight      — { regionIds?: string[] }              omit to clear all
 - apply_colors     — { data: Record<regionId, value>, options? }   choropleth coloring
 - add_marker       — { lat, lon, label?, color?, size? }

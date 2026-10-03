@@ -127,9 +127,19 @@ describe('map region readback (D51)', () => {
     expect(r.content.map((c: any) => c.text ?? '').join('')).toContain('"fill":"#e11d48"');
   });
 
-  it('opacity rides in the fill as rgba', () => {
-    const r = run(codeGenerator.generateHighlightRegions({ regionIds: ['France'], options: { color: '#ff0000', opacity: 0.5 } } as never));
-    expect(r.highlighted[0].fill).toBe('rgba(255, 0, 0, 0.5)');
+  it('opacity is a tint pre-blended over the land, sent opaque (D59)', () => {
+    const ms = fakeMap() as Record<string, any>;
+    ms._mapRenderParams = { mergedStyles: { basemapFill: '#e5e7eb' } };
+    // #16a34a at 0.5 over #e5e7eb land = (126, 197, 155)
+    const r = run(codeGenerator.generateHighlightRegions({ regionIds: ['France'], options: { color: '#16a34a', opacity: 0.5 } } as never), ms);
+    expect(r.success).toBe(true);
+    expect(r.highlighted[0].fill).toBe('#7ec59b');
+  });
+
+  it('opacity over a land colour it cannot read is drawn full strength, and says so', () => {
+    const r = run(codeGenerator.generateHighlightRegions({ regionIds: ['France'], options: { color: '#16a34a', opacity: 0.5 } } as never));
+    expect(r.highlighted[0].fill).toBe('#16a34a');
+    expect(r.unblended).toEqual(['France']);
   });
 
   it('fails when the engine draws a different colour than asked', () => {
