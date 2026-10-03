@@ -99,6 +99,7 @@ on_event_add_relation
 on_event_fire_after
 on_event_fire_if
 on_event_increment
+on_event_play_sound
 on_event_remove_relation
 on_event_set_active
 on_event_set_color

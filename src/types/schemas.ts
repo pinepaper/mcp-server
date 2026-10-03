@@ -458,6 +458,7 @@ export const RelationTypeSchema = z.enum([
   'on_event_toggle',
   'on_event_store_set',
   'on_event_store_increment',
+  'on_event_play_sound',
   // --- Proximity — the pointer entering or leaving an item ---
   'on_enter_set_color',
   'on_enter_set_property',
@@ -825,6 +826,7 @@ export const EventInputSchema = z.object({
   payloadType: z.string().optional().describe("Payload type label (default 'Pulse') — action 'create'"),
   x:           z.number().optional().describe('Canvas x for the event marker — action create'),
   y:           z.number().optional().describe('Canvas y for the event marker — action create'),
+  at:          z.union([z.number().min(0), z.array(z.number().min(0)).min(1)]).optional().describe('create: fire the event ITSELF at these scene times (seconds) — a timed trigger, so on_event_play_sound and every other reaction runs on the timeline and in video exports.'),
   eventId:     z.string().optional().describe("Event id to fire — required for action 'pulse'"),
   payload:     z.unknown().optional().describe("Optional value forwarded to listeners — action 'pulse'"),
 }).refine((v) => v.action !== 'create' || !!v.name, { message: "action 'create' requires name", path: ['name'] })
@@ -3566,6 +3568,8 @@ export const ScenePlaybackInputSchema = z.object({
   defaultDuration: z.number().optional(),
   defaultTransition: z.enum(['none', 'fade', 'zoom-in', 'zoom-out']).optional(),
   transitionDuration: z.number().optional(),
+  cutSound: z.union([z.string().min(1), z.object({ sound: z.string().min(1), gain: z.number().min(0).optional(), offset: z.number().optional() }).strict()]).optional()
+    .describe("create_chain: a sound at every cut — a catalogue name, or {sound, gain?, offset? (seconds, + later / − earlier)}. The scene_cut event also fires at each cut ({from, to, time, index})."),
   enabled: z.boolean().optional(),
   index: z.number().optional(),
 });

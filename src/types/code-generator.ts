@@ -8598,13 +8598,21 @@ ${mask ? `    // A MASK REPLACES THE RASTER (round 8 DD, 4.10). applyMask builds
         if (input.defaultDuration !== undefined) opts.push(`defaultDuration: ${input.defaultDuration * 1000}`);
         if (input.defaultTransition !== undefined) opts.push(`defaultTransition: ${JSON.stringify(input.defaultTransition)}`);
         if (input.transitionDuration !== undefined) opts.push(`transitionDuration: ${input.transitionDuration * 1000}`);
+        if (input.cutSound !== undefined) opts.push(`cutSound: ${JSON.stringify(input.cutSound)}`);
         const optsStr = opts.length > 0 ? `, { ${opts.join(', ')} }` : '';
         return `
 // Create scene chain for sequential playback
 (function() {
   ${guard}
-  app.sceneManager.createChain(${JSON.stringify(input.sceneIds)}${optsStr});
-  return { success: true, action: 'create_chain', sceneIds: ${JSON.stringify(input.sceneIds)}${input.loop !== undefined ? `, loop: ${input.loop}` : ''}${input.defaultDuration !== undefined ? `, defaultDuration: ${input.defaultDuration}` : ''} };
+  const __cr = app.sceneManager.createChain(${JSON.stringify(input.sceneIds)}${optsStr});
+  // An unknown cut sound comes back {ok:false, reason} (FxTool D85); a
+  // studio without cut sounds ignores the option, which the cuts readback shows.
+  if (__cr && __cr.ok === false) { return { success: false, action: 'create_chain', error: __cr.reason || 'the chain was refused' }; }
+  const __res = { success: true, action: 'create_chain', sceneIds: ${JSON.stringify(input.sceneIds)}${input.loop !== undefined ? `, loop: ${input.loop}` : ''}${input.defaultDuration !== undefined ? `, defaultDuration: ${input.defaultDuration}` : ''} };
+${input.cutSound !== undefined ? `  const __cuts = (__cr && __cr.cuts) || (app.sceneManager.getChainCuts ? app.sceneManager.getChainCuts() : null);
+  if (__cuts) __res.cuts = __cuts;
+  else __res.warning = 'this studio placed no cut sounds: it predates them (FxTool D85). The chain plays without them.';
+` : ''}  return __res;
 })();
 `.trim();
       }
@@ -14384,7 +14392,7 @@ ${guard('unlockAllItems')}${pass('app.unlockAllItems()')}
   generateEvent(input: EventInput): string {
     if (input.action === 'create') {
       const nameJson = JSON.stringify(input.name);
-      const optsJson = JSON.stringify({ payloadType: input.payloadType, x: input.x, y: input.y });
+      const optsJson = JSON.stringify({ payloadType: input.payloadType, x: input.x, y: input.y, ...(input.at !== undefined ? { at: input.at } : {}) });
       return `
 // Create event: ${input.name}
 (function() {
@@ -14394,7 +14402,7 @@ ${guard('unlockAllItems')}${pass('app.unlockAllItems()')}
   const eventId = app.createEvent(${nameJson}, ${optsJson});
   if (!eventId) { return { success: false, error: 'Event creation failed' }; }
   if (app.historyManager) app.historyManager.saveState();
-  return { success: true, action: 'create', eventId };
+  return { success: true, action: 'create', eventId${input.at !== undefined ? `, at: ${JSON.stringify(input.at)}` : ''} };
 })();`.trim();
     }
     // pulse — a runtime fire, not a scene edit (no history save)
