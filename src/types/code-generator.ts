@@ -4113,6 +4113,22 @@ throw new Error('Unknown diagram mode action: ${action}');
   // Allow canvas resize to take effect
   await new Promise(r => setTimeout(r, 50));
 `;
+    } else {
+      code += `
+  // BOUND THE BOARD IT REPORTS (gate D57). An UNBOUNDED canvas still answers
+  // getCanvasSize with its 1920x1080 fallback, which is what this job reports
+  // and what every sizing rule here is relative to; but its stills export the
+  // artwork's bounds plus a margin (432x232 for one rectangle), while video
+  // exports the board. Fixing it at the size reported makes the two agree.
+  let _boundedFrom = null;
+  if (app.canvasSize && app.canvasSize.unbounded && typeof app.setCanvasSize === 'function') {
+    const _u = app.getCanvasSize ? app.getCanvasSize() : app.canvasSize;
+    if (_u && _u.width > 0 && _u.height > 0) {
+      const _r = app.setCanvasSize({ width: _u.width, height: _u.height });
+      if (!(_r && _r.ok === false)) _boundedFrom = 'unbounded';
+    }
+  }
+`;
     }
 
     if (wantOntology) {
@@ -4147,7 +4163,8 @@ throw new Error('Unknown diagram mode action: ${action}');
     screenshotPolicy: '${policyStr}',
     canvasPreset: ${canvasPreset ? `'${canvasPreset}'` : 'null'},
     canvasCleared: ${shouldClear},
-    canvasSize: { width: _cs.width || 800, height: _cs.height || 600 }${wantOntology ? `,
+    canvasSize: { width: _cs.width || 800, height: _cs.height || 600 }${canvasPreset ? '' : `,
+    ...(_boundedFrom ? { note: 'the canvas was unbounded (it exported the artwork, not the board); it is now fixed at ' + (_cs.width || 800) + 'x' + (_cs.height || 600) + ', so stills and video both export that size.' } : {})`}${wantOntology ? `,
     ontology: _ontology,
     ontologyUnavailable: _ontologyUnavailable || undefined` : ''}
   };
@@ -5403,6 +5420,12 @@ ${stillTime !== undefined ? `
               ? { width: png.width, height: png.height }
               : { width: dimensions.width, height: dimensions.height },
           };
+          // An unbounded canvas exports its ARTWORK (bounds plus a margin), not
+          // the board getCanvasSize reports (gate D57). Say so rather than
+          // hand back a size nobody asked for unexplained.
+          if (app.canvasSize && app.canvasSize.unbounded) {
+            result.warning = (result.warning ? result.warning + ' ' : '') + 'this canvas is unbounded, so the still is cropped to the artwork, not the ' + pngBoard.width + 'x' + pngBoard.height + ' board. pinepaper_set_canvas_size {width, height} fixes the board; video exports the board either way.';
+          }
         } else {
           const canvas = document.querySelector('canvas');
           if (canvas) {
