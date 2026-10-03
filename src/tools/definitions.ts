@@ -7890,6 +7890,8 @@ ACTIONS:
 
 GRAPH: { nodes: [{ id, type, params? }], edges: [{ from, to }] } — a LINEAR chain from SourceInput to OutputCompositor. A NormalGen feeds a Relighting node; a DepthMap feeds DepthOfField.
 
+PARAMS come from node_types, which is the studio's own list. SelectiveBloom: threshold 0..1, intensity 0..10, and radius 0..64 px (the glow's reach past the bright pixels; 0 keeps the glow inside them) where the studio has it. A glow can make the new item LARGER than its source, centred on it: read its bounds from the reply rather than reusing the source's.
+
 The graph runs on the CPU. Stored graphs live for the session, not in the project. A studio without the shader graph refuses with the reason.
 
 EXAMPLE: { action: 'apply', target: 'item_4', graph: { nodes: [{ id: 'in', type: 'SourceInput' }, { id: 'bloom', type: 'SelectiveBloom', params: { threshold: 0.6, intensity: 2 } }, { id: 'out', type: 'OutputCompositor' }], edges: [{ from: 'in', to: 'bloom' }, { from: 'bloom', to: 'out' }] } }`,

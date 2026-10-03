@@ -11836,7 +11836,12 @@ ${guard}
   if (!r || !r.ok) return { success: false, action: 'apply', errors: (r && r.errors) || undefined, error: ${fail} };
   if (r.target === 'item') {
     if (!r.id) return { success: false, action: 'apply', error: 'the graph ran but made no item' };
-    return { success: true, action: 'apply', target: 'item', itemId: r.id, sourceId: r.sourceId, sourceHidden: r.sourceHidden, graphId: r.graphId, width: r.width, height: r.height };
+    // The new item's OWN bounds: a bloom with reach (FxTool D60) is larger
+    // than its source, centred on it, so the source's bounds are not these.
+    const __ne = app.itemRegistry && typeof app.itemRegistry.get === 'function' ? app.itemRegistry.get(r.id) : null;
+    const __nb = __ne && __ne.item && __ne.item.bounds;
+    return { success: true, action: 'apply', target: 'item', itemId: r.id, sourceId: r.sourceId, sourceHidden: r.sourceHidden, graphId: r.graphId, width: r.width, height: r.height,
+      ...(__nb ? { bounds: { x: __nb.x, y: __nb.y, width: __nb.width, height: __nb.height } } : {}) };
   }
   const res = { success: true, action: 'apply', target: 'scene', graphId: r.graphId, width: r.width, height: r.height };
   if (r.id) { res.itemId = r.id; } else { res.data = r.dataURL; res.mimeType = 'image/png'; res.note = 'the processed frame; the scene is unchanged. asItem: true adds it as an image item instead.'; }

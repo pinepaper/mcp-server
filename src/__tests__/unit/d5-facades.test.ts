@@ -68,6 +68,13 @@ describe('shader graph', () => {
     const app = { ...sg(), applyShaderGraph: async () => ({ ok: true, target: 'item', id: 'item_12', sourceId: 'item_4', sourceHidden: true, graphId: 'sg_1', width: 10, height: 10 }) };
     expect(await run(graph({ action: 'apply', target: 'item_4', graphId: 'sg_1' }), app)).toMatchObject({ success: true, itemId: 'item_12', sourceId: 'item_4', sourceHidden: true });
   });
+
+  it('apply reports the new item bounds, larger than the source when it glows', async () => {
+    const app = { ...sg(), applyShaderGraph: async () => ({ ok: true, target: 'item', id: 'item_12', sourceId: 'item_4', sourceHidden: true, width: 116, height: 116 }),
+      itemRegistry: { get: (id: string) => (id === 'item_12' ? { item: { bounds: { x: -8, y: -8, width: 116, height: 116 } } } : null) } };
+    const r = await run(graph({ action: 'apply', target: 'item_4', graph: { nodes: [{ id: 'in', type: 'SourceInput' }, { id: 'b', type: 'SelectiveBloom', params: { radius: 8 } }, { id: 'out', type: 'OutputCompositor' }], edges: [{ from: 'in', to: 'b' }, { from: 'b', to: 'out' }] } }), app);
+    expect(r.bounds).toEqual({ x: -8, y: -8, width: 116, height: 116 });
+  });
   it('apply to the scene returns the frame', async () => {
     const app = { ...sg(), applyShaderGraph: async () => ({ ok: true, target: 'scene', dataURL: 'data:image/png;base64,AA', width: 4, height: 4 }) };
     expect(await run(graph({ action: 'apply', target: 'scene', graph: CHAIN }), app)).toMatchObject({ success: true, target: 'scene', data: 'data:image/png;base64,AA' });

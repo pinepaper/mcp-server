@@ -276,6 +276,7 @@ export const OPTIONAL_ENGINE_METHODS: readonly string[] = [
   'getUnitGridEnabled',
   'hashFrame',
   'instantiateOntology',
+  'itemRegistry.get',
   'itemRegistry.rebind',
   'listFontAxes',
   'listGenerators',
