@@ -50,4 +50,16 @@ describe('morph sequence', () => {
     expect(() => MorphSequenceInputSchema.parse({ itemId: 'i', states: [{ at: 0, to: 'a' }, { at: 0.5, to: 'b' }] })).toThrow(/starts before/);
     expect(() => MorphSequenceInputSchema.parse({ itemId: 'i', states: [{ at: 0 }] })).toThrow(/exactly one/);
   });
+  it('with no app.camera.animate (prod), the camera goes through the camera_animates relation and is read back', () => {
+    const s = studio() as any;
+    delete s.app.camera;
+    let params: any = null;
+    const add = s.app.addRelation;
+    s.app.addRelation = (a: string, b: string, t: string, p: any) => { if (t === 'camera_animates') { params = p; return true; } return add(a, b, t, p); };
+    s.app.relationRegistry = { getCameraAnimationParams: () => params };
+    const r = run(INPUT, s.app);
+    expect(params.keyframes.map((k: any) => k.time)).toEqual([0, 1, 1.8, 3, 3.8]);
+    expect(r.camera).toEqual({ keyframes: 5 });
+    expect(r.warning).toBeUndefined();
+  });
 });

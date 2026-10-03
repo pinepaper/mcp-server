@@ -12047,7 +12047,7 @@ ${input.sound ? `  // SOUND ON THE ACTION (D68): one placed sound per moment the
   const n = app.getRelations ? app.getRelations(${S(input.itemId)}, 'morphs_to').length : null;
   if (n !== null && n < done.length) res.warning = 'only ' + n + ' of ' + done.length + ' morphs are on the element.';
 ${cam ? `  // The camera rides the SAME timing: framing each state as its morph lands.
-  if (app.camera && app.camera.animate) {
+  {
     const fr = (typeof app.exportFrameRect === 'function' && app.exportFrameRect()) || (app.getCanvasSize && app.getCanvasSize()) || { width: 1920, height: 1080 };
     const fill = ${S(cam.fill ?? 0.45)};
     const frameOf = function (it) { const b = it.bounds; return { focus: [b.center.x, b.center.y], zoom: Math.max(0.2, Math.min(8, fill * Math.min(fr.width / Math.max(1, b.width), fr.height / Math.max(1, b.height)))) }; };
@@ -12060,9 +12060,21 @@ ${cam ? `  // The camera rides the SAME timing: framing each state as its morph 
       kfs.push({ time: d.at, zoom: prev.zoom, focus: prev.focus });
       kfs.push({ time: d.at + d.duration, zoom: f.zoom, focus: f.focus, easing: ${S((cam as { easing?: string }).easing ?? 'easeInOut')} });
     });
-    app.camera.animate(kfs, res.end, false, 0, {});
-    res.camera = { keyframes: kfs.length };
-  } else { res.warning = (res.warning ? res.warning + ' ' : '') + 'this studio has no camera animation; the morphs run without it.'; }
+    // The SAME door pinepaper_camera_animate uses: app.camera.animate where the
+    // build has it, else the camera_animates relation — prod has only the
+    // relation, and probing app.camera.animate alone reported "no camera" there.
+    const r = app.camera && app.camera.animate
+      ? app.camera.animate(kfs, res.end, false, 0, {})
+      : app.addRelation('camera', 'camera', 'camera_animates', { keyframes: kfs, duration: res.end, loop: false, delay: 0 });
+    // Read the track back where the engine keeps it.
+    const rr = app.relationRegistry;
+    const written = rr && rr.getCameraAnimationParams ? rr.getCameraAnimationParams() : null;
+    if (r === false || (rr && rr.getCameraAnimationParams && !written)) {
+      res.warning = (res.warning ? res.warning + ' ' : '') + 'the camera track was not written; the morphs run without it.';
+    } else {
+      res.camera = { keyframes: kfs.length };
+    }
+  }
 ` : ''}${sound ? `  // A sound on each morph (D68's placement, with its MP4-lead nudge).
   const base = (app.sfxSpec && app.sfxSpec(${S(sound)})) || (app.percussionSpec && app.percussionSpec(${S(sound)}));
   if (base && app.createSound) {
