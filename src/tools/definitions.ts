@@ -59,6 +59,7 @@ export const CHOOSE_THE_DOOR = `CHOOSE THE HIGHEST-LEVEL TOOL FIRST. Primitive s
 - A scene or landscape drawn in an art style (cut paper, ink, watercolour, dither, flow, ASCII) → pinepaper_styled_scene
 - A story, several beats, a narrative from prose → pinepaper_story (from_text), then scene chains (pinepaper_scene_playback)
 - A character that acts (expressions, poses, walks) → pinepaper_character, pinepaper_stick, pinepaper_rigging; squash and stretch via pinepaper_deform
+- A number that counts up (a KPI roll-up, a year counter, a timer) → create_item text with counter: exact on every frame, steady width
 - Any item that moves with intent (pops in, hops, bounces, rolls, flies, peeks, lands) → pinepaper_choreograph: beats, not hand-timed keyframes
 - One element that becomes the next thing, and the next, with no cuts (a pill → a field → a dot → a card) → pinepaper_morph_sequence
 - A title or caption with craft → pinepaper_text_style (display styles; cursive with animate writes itself on), pinepaper_text_effect
@@ -609,6 +610,7 @@ For glossy 3D spheres, use pinepaper_create_glossy_sphere instead. For diagonal 
       type: 'object',
       properties: {
         screenSpace: { type: 'boolean', description: 'HUD: true keeps the item fixed in the FRAME under camera moves; its x/y, keyframes and relations are then frame coordinates. Exports (mp4, webm, gif, png, pdf) honour it; the live preview still tilts it; SVG and Lottie ignore it (agent_export warns). A studio without it refuses.' },
+        counter: { description: "TEXT only: a number that counts on the scene clock, exact on every exported frame. {from, to, start? (s), duration? (s, 1), easing? (engine name or [x1,y1,x2,y2]), decimals?, prefix?, suffix?, locale?, grouping?, padStart?, steps?, tabular? (true: steady width)}; null removes it. A year counter: {from: -30000, to: 2026, …}; a KPI: {from: 1.67, to: 5.58, suffix: '%'}. A studio without counters refuses.", oneOf: [{ type: 'object', additionalProperties: true }, { type: 'null' }] },
         stepTiming: { description: "Animate 'on twos': N or {every: N, baseFps?} (every N frames of a 30 fps base unless baseFps), {fps}, or null to turn off. A stepped group steps its children; follows, spring_follow, auras, rigging and GPU generators are not stepped. A studio without it refuses.", oneOf: [{ type: 'integer', minimum: 1 }, { type: 'object', properties: { every: { type: 'integer', minimum: 1 }, baseFps: { type: 'number' }, fps: { type: 'number' } } }, { type: 'null' }] },
         itemType: {
           type: 'string',
@@ -770,6 +772,7 @@ Use the collage group's id for palette/collageStyle; use a child letter's id for
       type: 'object',
       properties: {
         screenSpace: { type: 'boolean', description: 'HUD: true keeps the item fixed in the FRAME under camera moves; its x/y, keyframes and relations are then frame coordinates. Exports (mp4, webm, gif, png, pdf) honour it; the live preview still tilts it; SVG and Lottie ignore it (agent_export warns). A studio without it refuses.' },
+        counter: { description: "TEXT only: a number that counts on the scene clock, exact on every exported frame. {from, to, start? (s), duration? (s, 1), easing? (engine name or [x1,y1,x2,y2]), decimals?, prefix?, suffix?, locale?, grouping?, padStart?, steps?, tabular? (true: steady width)}; null removes it. A year counter: {from: -30000, to: 2026, …}; a KPI: {from: 1.67, to: 5.58, suffix: '%'}. A studio without counters refuses.", oneOf: [{ type: 'object', additionalProperties: true }, { type: 'null' }] },
         stepTiming: { description: "Animate 'on twos': N or {every: N, baseFps?} (every N frames of a 30 fps base unless baseFps), {fps}, or null to turn off. A stepped group steps its children; follows, spring_follow, auras, rigging and GPU generators are not stepped. A studio without it refuses.", oneOf: [{ type: 'integer', minimum: 1 }, { type: 'object', properties: { every: { type: 'integer', minimum: 1 }, baseFps: { type: 'number' }, fps: { type: 'number' } } }, { type: 'null' }] },
         itemId: {
           type: 'string',
@@ -3948,6 +3951,8 @@ EASING — IT SHAPES THE SEGMENT ARRIVING AT THE KEYFRAME IT IS ON.
 The move from keyframe A to keyframe B is eased by B's easing, not A's. Easing on the FIRST keyframe does nothing (no segment arrives at it) — a Ken Burns with easing only on its first key plays linear. Put the easing on the key you are moving TO.
 ${EASING_LINES}
 - or a custom cubic-bezier [x1, y1, x2, y2] — x in 0..1, y may exceed 0..1 for overshoot. keyframe_animate and camera_animate only.
+COUNTERS: a text item with a counter (create_item / modify_item counter) also animates the numeric property counterValue, drawn through the counter's format — keyframe it to shape a count by hand (hold on a number, then race). Its keys override the counter's own from / to.
+
 HOLD KEYS (where the studio has them): interpolation: 'hold' on a key holds ITS value until the next key, then cuts — no in-between. Easing 'hold' / 'step' on the ARRIVING key does the same. A studio without hold keys refuses rather than interpolate; there, two keys a frame apart make the cut. For a whole layer 'on twos', set stepTiming on the item (create_item / modify_item).
 
 Every easing renders exactly in video, GIF and APNG. Lottie and CSS get the closest single Bézier: springPlayful loses its wobble, and the in-out quart/quint/expo/circ curves are within 2–4 %. SMIL is exact for springs and those four.

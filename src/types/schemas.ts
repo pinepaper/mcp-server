@@ -1322,6 +1322,24 @@ export const StepTimingSchema = z.union([
   z.null(),
 ]).describe("Animate this item 'on twos' (or threes…): N or {every: N, baseFps?} steps every N frames of a 30 fps base unless baseFps is given; {fps} steps at that rate; null turns it off. A stepped group steps its children. Not stepped: follows, spring_follow, auras, rigging and GPU generators.");
 
+/** A text item's counter (FxTool D70): a number that counts on the scene clock. */
+export const CounterSchema = z.union([
+  z.object({
+    from: z.number(), to: z.number(),
+    start: z.number().min(0).optional().describe('Seconds into the timeline (default 0).'),
+    duration: z.number().positive().optional().describe('Seconds to count (default 1).'),
+    easing: z.union([z.string(), z.tuple([z.number(), z.number(), z.number(), z.number()])]).optional().describe("Any engine easing (including 'hold' / 'step') or a cubic Bézier [x1, y1, x2, y2]; default linear."),
+    decimals: z.number().int().min(0).max(10).optional().describe('Default: the precision from / to were written with.'),
+    prefix: z.string().optional(), suffix: z.string().optional(),
+    locale: z.string().optional().describe("Number format locale (default 'en-US')."),
+    grouping: z.boolean().optional().describe('Thousands separators (default true).'),
+    padStart: z.number().int().min(1).max(21).optional().describe('Zero-pad to this many digits.'),
+    steps: z.number().int().positive().optional().describe('Count in N jumps instead of smoothly.'),
+    tabular: z.boolean().optional().describe('Fixed-width digits so the width stays steady (default true).'),
+  }).strict(),
+  z.null(),
+]).describe("A text that COUNTS on the scene clock: {from, to, start?, duration?, easing?, decimals?, prefix?, suffix?, locale?, grouping?, padStart?, steps?, tabular?}; null removes it. Exact on every exported frame. To shape the count by hand, keyframe the numeric property counterValue instead.");
+
 export const CreateItemInputSchema = z.object({
   itemType: ItemTypeSchema,
   position: PositionSchema.optional().default({ x: 400, y: 300 }),
@@ -1338,6 +1356,7 @@ export const CreateItemInputSchema = z.object({
   anchor: z.string().optional().describe("Which point position names: 'center' (default), 'top-left', 'top-right', 'bottom-left', 'bottom-right'. Same as properties.anchor."),
   screenSpace: ScreenSpaceSchema.optional(),
   stepTiming: StepTimingSchema.optional(),
+  counter: CounterSchema.optional(),
 });
 
 // Light direction for 3D effects
@@ -1389,6 +1408,7 @@ export const ModifyItemInputSchema = z.object({
   easing: z.string().optional().describe('atTime: easing of the segment arriving at the new key (default linear).'),
   screenSpace: ScreenSpaceSchema.optional(),
   stepTiming: StepTimingSchema.optional(),
+  counter: CounterSchema.optional(),
 });
 
 // Delete Item
@@ -2472,6 +2492,7 @@ export const AgentBatchOperationSchema = z.object({
   properties: z.record(z.unknown()).optional().describe('Properties for create/modify operations'),
   screenSpace: ScreenSpaceSchema.optional().describe('create: keep the item fixed in the frame under camera moves (HUD).'),
   stepTiming: StepTimingSchema.optional().describe("create: step this item's animation (N, {every, baseFps?} or {fps})."),
+  counter: CounterSchema.optional().describe('create (text): count on the scene clock.'),
   // Modify/Animate/Delete/Keyframe/Mask/Effect target
   itemId: z.string().optional().describe('Target item ID or $N reference'),
   // Group operation fields

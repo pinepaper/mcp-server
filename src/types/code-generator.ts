@@ -19,6 +19,7 @@ import {
   CreateItemInputSchema,
   ScreenSpaceSchema,
   StepTimingSchema,
+  CounterSchema,
   ImportMotionCaptureInputSchema,
   ModifyItemInputSchema,
   AddRelationInputSchema,
@@ -2374,10 +2375,11 @@ if (__bk && __bk.colors && app.modifyItem) {
  * in silence; here a missing setter fails BEFORE anything is changed, and a
  * refusal comes back with the engine's reason.
  */
-type ItemSetters = { screenSpace?: boolean; stepTiming?: unknown };
+type ItemSetters = { screenSpace?: boolean; stepTiming?: unknown; counter?: unknown };
 const ITEM_SETTERS = [
   { key: 'screenSpace', fn: 'setScreenSpace', what: 'screen-space (HUD) items', since: 'D20' },
   { key: 'stepTiming', fn: 'setStepTiming', what: 'step timing', since: 'D11' },
+  { key: 'counter', fn: 'setCounter', what: 'counters', since: 'D70' },
 ] as const;
 
 /** Lift screenSpace / hud / stepTiming out of a properties bag (mutated), explicit fields winning. */
@@ -2389,12 +2391,18 @@ function takeItemSetters(props: Record<string, unknown>, explicit: ItemSetters =
   if (ss !== undefined) out.screenSpace = explicit.screenSpace !== undefined ? ScreenSpaceSchema.parse(ss) : !!ss;
   const st = explicit.stepTiming !== undefined ? explicit.stepTiming : props.stepTiming;
   if (st !== undefined) out.stepTiming = StepTimingSchema.parse(st);
+  // A counter from properties is lifted only when it is a valid spec; anything
+  // else stays where it was, for the engine to read and refuse by name.
+  let liftCounter = explicit.counter !== undefined;
+  if (liftCounter) out.counter = CounterSchema.parse(explicit.counter);
+  else if (props.counter !== undefined && CounterSchema.safeParse(props.counter).success) { out.counter = props.counter; liftCounter = true; }
   delete props.screenSpace; delete props.hud; delete props.stepTiming;
+  if (liftCounter) delete props.counter;
   return out;
 }
 
 function hasItemSetters(s: ItemSetters): boolean {
-  return s.screenSpace !== undefined || s.stepTiming !== undefined;
+  return s.screenSpace !== undefined || s.stepTiming !== undefined || s.counter !== undefined;
 }
 
 /** Statements: refuse, before anything changes, when a requested setter is missing. */
@@ -2413,7 +2421,7 @@ function itemSettersApplyJs(s: ItemSetters, idExpr: string, resVar: string): str
     if (!__sr || __sr.ok === false) {
       return Object.assign({}, ${resVar}, { success: false, error: '${d.key} was not applied to ' + ${idExpr} + ': ' + ((__sr && (__sr.reason || __sr.error)) || 'refused by the studio') });
     }
-    ${resVar}.${d.key} = ${d.key === 'stepTiming' ? `(__sr.stepTiming !== undefined ? __sr.stepTiming : ${arg})` : arg};
+    ${resVar}.${d.key} = ${d.key === 'screenSpace' ? arg : `(__sr.${d.key} !== undefined ? __sr.${d.key} : ${arg})`};${d.key === 'counter' ? `\n    if (__sr.text !== undefined) ${resVar}.counterText = __sr.text;` : ''}
   }`;
   }).join('\n');
 }
@@ -2889,7 +2897,7 @@ export class PinePaperCodeGenerator {
     if (validated.animationDelay !== undefined) properties.animationDelay = validated.animationDelay;
     if (validated.keyframes !== undefined) properties.keyframes = validated.keyframes;
     if (validated.anchor !== undefined && properties.anchor === undefined && properties.origin === undefined) properties.anchor = validated.anchor;
-    const setters = takeItemSetters(properties, { screenSpace: validated.screenSpace, stepTiming: validated.stepTiming });
+    const setters = takeItemSetters(properties, { screenSpace: validated.screenSpace, stepTiming: validated.stepTiming, counter: validated.counter });
     const brandProps = { ...properties };
     delete properties.noBrand;
     return withItemSetters(withBrandDefaults(generateCreateItemCode(
@@ -2907,7 +2915,7 @@ export class PinePaperCodeGenerator {
   generateModifyItem(input: z.infer<typeof ModifyItemInputSchema>): string {
     const validated = ModifyItemInputSchema.parse(input);
     const props = { ...(validated.properties as Record<string, unknown>) };
-    const setters = takeItemSetters(props, { screenSpace: validated.screenSpace, stepTiming: validated.stepTiming });
+    const setters = takeItemSetters(props, { screenSpace: validated.screenSpace, stepTiming: validated.stepTiming, counter: validated.counter });
     const idExpr = JSON.stringify(validated.itemId);
     if (validated.atTime !== undefined) {
       return withItemSetters(generateAutoKeyCode(validated.itemId, props, validated.atTime, validated.easing), setters, idExpr);
@@ -4640,7 +4648,7 @@ throw new Error('Unknown diagram mode action: ${action}');
         // inside this op's function.
         const pos = op.position || { x: 400, y: 300 };
         const opProps = { ...(op.properties || {}) } as Record<string, unknown>;
-        const opSetters = takeItemSetters(opProps, { screenSpace: op.screenSpace, stepTiming: op.stepTiming });
+        const opSetters = takeItemSetters(opProps, { screenSpace: op.screenSpace, stepTiming: op.stepTiming, counter: op.counter });
         const createProps = withRadiusAxes(opProps);
         const opBrand = { ...opProps };
         delete opProps.noBrand;
