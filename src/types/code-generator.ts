@@ -6524,13 +6524,22 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
     // means the fill.
     const ho = (validated.options ?? {}) as Record<string, unknown>;
     const style: Record<string, unknown> = {};
-    const fill = ho.color ?? ho.fillColor ?? ho.fill;
+    let fill = ho.color ?? ho.fillColor ?? ho.fill;
+    // The engine's override channel carries fill / stroke / strokeWidth and no
+    // opacity, so opacity rides in the fill as rgba (hex fills only).
+    if (typeof fill === 'string' && typeof ho.opacity === 'number') {
+      const h = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(fill);
+      if (h) {
+        const x = h[1].length === 3 ? h[1].split('').map((c) => c + c).join('') : h[1];
+        fill = `rgba(${parseInt(x.slice(0, 2), 16)}, ${parseInt(x.slice(2, 4), 16)}, ${parseInt(x.slice(4, 6), 16)}, ${ho.opacity})`;
+      }
+    }
     if (fill !== undefined) style.fill = fill;
     const stroke = ho.strokeColor ?? ho.stroke;
     if (stroke !== undefined) style.stroke = stroke;
     if (ho.strokeWidth !== undefined) style.strokeWidth = ho.strokeWidth;
     for (const [k, v] of Object.entries(ho)) {
-      if (!['color', 'fillColor', 'fill', 'strokeColor', 'stroke', 'strokeWidth'].includes(k) && v !== undefined) {
+      if (!['color', 'fillColor', 'fill', 'strokeColor', 'stroke', 'strokeWidth', 'opacity'].includes(k) && v !== undefined) {
         style[k] = v;
       }
     }
@@ -6553,7 +6562,18 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
         error: 'no region was highlighted.'
           + (__r.notFound.length ? ' Not on this map: ' + __r.notFound.join(', ') + '. Ids on this map include ' + __sampleIds() + '; names work too.' : '') };
     }
+    // The colour asked for must be the colour drawn (gate D59: the readback
+    // reported #3b82f6 for a #e11d48 request and still said success).
+    const __want = ${JSON.stringify(style.fill ?? null)};
+    if (__want) {
+      const __off = __r.done.filter(function (d) { return String(d.fill).toLowerCase() !== String(__want).toLowerCase(); });
+      if (__off.length === __r.done.length) {
+        return { success: false, highlighted: __r.done, error: 'the regions were highlighted in ' + __off[0].fill + ', not the ' + __want + ' asked for.' };
+      }
+      if (__off.length) __r.wrongFill = __off;
+    }
     const __res = { success: true, highlighted: __r.done };
+    if (__r.wrongFill) { __res.wrongFill = __r.wrongFill; __res.warning = 'some regions were not drawn in ' + __want + ': ' + __r.wrongFill.map(function (d) { return d.regionId; }).join(', ') + '.'; }
     if (__r.notFound.length) { __res.notFound = __r.notFound; __res.warning = 'not on this map, so not highlighted: ' + __r.notFound.join(', ') + '. Ids on this map include ' + __sampleIds() + '.'; }
     if (__r.notApplied.length) __res.notApplied = __r.notApplied;
     return __res;

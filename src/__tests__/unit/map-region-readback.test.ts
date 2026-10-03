@@ -120,4 +120,24 @@ describe('map region readback (D51)', () => {
       expect(r.error).toContain('no map is loaded');
     }
   });
+
+  it('a top-level color reaches the engine (D59)', async () => {
+    const { handleToolCall } = await import('../../tools/handlers.js');
+    const r = await handleToolCall('pinepaper_map_regions', { action: 'highlight', regionIds: ['USA'], color: '#e11d48' }, { generateOnly: true } as never);
+    expect(r.content.map((c: any) => c.text ?? '').join('')).toContain('"fill":"#e11d48"');
+  });
+
+  it('opacity rides in the fill as rgba', () => {
+    const r = run(codeGenerator.generateHighlightRegions({ regionIds: ['France'], options: { color: '#ff0000', opacity: 0.5 } } as never));
+    expect(r.highlighted[0].fill).toBe('rgba(255, 0, 0, 0.5)');
+  });
+
+  it('fails when the engine draws a different colour than asked', () => {
+    const ms = fakeMap();
+    const orig = ms.highlightRegions.bind(ms);
+    ms.highlightRegions = (ids: string[]) => orig(ids, {});
+    const r = run(codeGenerator.generateHighlightRegions({ regionIds: ['France'], options: { color: '#e11d48' } } as never), ms);
+    expect(r.success).toBe(false);
+    expect(r.error).toContain('#3b82f6');
+  });
 });

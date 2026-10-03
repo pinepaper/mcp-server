@@ -3102,6 +3102,7 @@ export const HighlightRegionsInputSchema = z.object({
     strokeColor: z.string().optional().describe('Highlight stroke color'),
     stroke: z.string().optional().describe("The engine's own name for the stroke."),
     strokeWidth: z.number().optional().describe('Highlight stroke width'),
+    opacity: z.number().min(0).max(1).optional().describe('Fill opacity 0..1, applied to a hex fill colour.'),
     animate: z.boolean().optional().describe('Animate the highlight'),
   }).optional().describe('Highlight options'),
 }).describe('Highlight regions input');

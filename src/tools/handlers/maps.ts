@@ -100,7 +100,17 @@ async function dispatchMapRegions(args: Record<string, unknown>, options: Handle
   const action = args.action as string;
   switch (action) {
     case 'highlight': {
-      const input = HighlightRegionsInputSchema.parse(args);
+      // The tool docs put color / opacity / strokeColor / strokeWidth at the
+      // TOP level; the schema reads them from options, so they were stripped
+      // and every highlight came out the default blue (gate D59). Folded in
+      // here; a value in options still wins.
+      const top: Record<string, unknown> = {};
+      for (const k of ['color', 'fillColor', 'fill', 'strokeColor', 'stroke', 'strokeWidth', 'opacity']) {
+        if (args[k] !== undefined) top[k] = args[k];
+      }
+      const input = HighlightRegionsInputSchema.parse(Object.keys(top).length
+        ? { ...args, options: { ...top, ...((args.options as Record<string, unknown>) ?? {}) } }
+        : args);
       const code = codeGenerator.generateHighlightRegions(input);
       return executeOrGenerate(code, `Highlights ${input.regionIds.length} region(s) on the map`, options, 'pinepaper_map_regions');
     }
