@@ -138,7 +138,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_diagram_mode: 'Toggle diagram editing mode.',
 
   // --- Maps ---
-  pinepaper_map: 'Map load + viewport. action: load|pan|zoom|export_config|import_custom. mapId: usa|world|worldHighRes|<custom>.',
+  pinepaper_map: 'Map load. action: load|export_config|import_custom (pan/zoom refuse: frame with load center). mapId: usa|world|worldHighRes|<custom>.',
   pinepaper_map_regions: 'Map region styling/selection. action: highlight|unhighlight|apply_colors|add_marker|add_labels|get_at_point|select|deselect|get_highlighted.',
   pinepaper_map_animation: 'Map region animation. action: animate_regions|animate_wave|stop|get_animated. duration, loop.',
   pinepaper_map_data: 'Map import/export. action: export_csv|import_csv|export_geojson|export_original_geojson|source_info.',
@@ -185,7 +185,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_agent_end_job: 'End job and get summary with screenshot.',
   pinepaper_agent_reset: 'Quick canvas reset without page refresh.',
   pinepaper_agent_batch_execute: 'ALL ops in one call. Pattern: set_canvas_size → set_background/execute_generator → create → animate/keyframe_animate EACH item ("$0","$1") → play_timeline (REQUIRED).',
-  pinepaper_agent_export: 'Export. format: svg|png|gif|mp4|webm|pdf|wav. platform: instagram|tiktok|youtube|twitter. framing: canvas|camera. scale 0.1-1=smaller+faster; fps overrides quality 15/30/60. Fail: export_store list.',
+  pinepaper_agent_export: 'Export video, stills, apng, ads, captions or wav (format enum). platform: instagram|tiktok|youtube|twitter. framing: canvas|camera. scale 0.1-1. Fail: export_store list.',
   pinepaper_export_store: 'Recover a held export. action: list|save|release; save/release need exportId. Page bytes to a file instead of re-rendering — re-rendering evicts older held exports.',
   pinepaper_agent_analyze: 'Analyze canvas content for export recommendations.',
 

@@ -166,6 +166,12 @@ async function dispatchMapAnimation(args: Record<string, unknown>, options: Hand
       return executeOrGenerate(code, `Animates ${regionCount} map region(s) over ${input.duration || 5}s`, options, 'pinepaper_map_animation');
     }
     case 'animate_wave': {
+      // The engine's wave always covers EVERY region; a regions list was
+      // dropped and the call succeeded anyway (gate run 2, 1.6.19).
+      if (args.regions !== undefined) {
+        return errorResult(ErrorCodes.INVALID_INPUT,
+          'animate_wave runs across every region and cannot take a regions list. To animate only some regions, use animate_regions with keyframes per region id.');
+      }
       const input = AnimateMapWaveInputSchema.parse(args);
       const code = codeGenerator.generateAnimateMapWave(input);
       return executeOrGenerate(code, `Creates ${input.waveDirection || 'horizontal'} wave animation`, options, 'pinepaper_map_animation');

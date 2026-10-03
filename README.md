@@ -269,7 +269,8 @@ so zooms and camera moves carry it.
 
 A host that records each canvas step and runs it at render time can pass
 `deferred: true`: the agent is then told the step was recorded, rather than
-handed a script to paste. Generated code always travels in
+handed a script to paste. Whenever the server hands back code instead of
+running it (deferred, or `--mode code`), the code travels in
 `_meta["pinepaper.studio/code"]` for the host to record.
 
 ### Changed: tool results report where their time went

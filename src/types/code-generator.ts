@@ -211,6 +211,8 @@ import {
   GeneratorRegion,
   KEYFRAME_EASINGS,
   EASING_DESCRIPTIONS,
+  MaskTypeSchema,
+  MaskPresetSchema,
 } from './schemas.js';
 import { OntologyCompiler } from '../ontology/ontology-compiler.js';
 import { z } from 'zod';
@@ -2022,12 +2024,12 @@ app.setBackgroundColor('${color}');
  * Template for canvas size
  */
 function generateSetCanvasSizeCode(
-  width: number,
-  height: number,
+  width: number | undefined,
+  height: number | undefined,
   preset?: string
 ): string {
   const sizeArg = preset
-    ? `'${preset}'`
+    ? JSON.stringify(preset)
     : `{ width: ${width}, height: ${height} }`;
   return `
 // Set canvas size
@@ -2045,9 +2047,10 @@ function generateSetCanvasSizeCode(
   app.historyManager.saveState();
   // Report what the canvas ACTUALLY took where the engine says so, rather than
   // echoing the request back.
-  return { success: true, width: (r && r.width) || ${width}, height: (r && r.height) || ${height},
+  const __sz = app.getCanvasSize ? app.getCanvasSize() : null;
+  return { success: true, width: (r && r.width) || (__sz && __sz.width) || ${width ?? null}, height: (r && r.height) || (__sz && __sz.height) || ${height ?? null},
     ...(r && r.preset ? { preset: r.preset } : {}),
-    ...(r && r.unbounded !== undefined ? { unbounded: r.unbounded } : {})${!preset && (width > 8192 || height > 8192) ? `,
+    ...(r && r.unbounded !== undefined ? { unbounded: r.unbounded } : {})${!preset && ((width ?? 0) > 8192 || (height ?? 0) > 8192) ? `,
     note: 'above 8192 px per side: Chrome and Firefox render it (the studio allows up to 16384 safely), but Safari and iOS may produce a blank or corrupt canvas — export from Chrome.'` : ''} };
 })();
 `.trim();
@@ -2750,6 +2753,12 @@ const TO_DATA_URL_JS = `async function __ppToDataUrl(out, mime) {
   if (!blob) return null;
   return await new Promise(function (res, rej) { const r = new FileReader(); r.onload = function () { res(r.result); }; r.onerror = rej; r.readAsDataURL(blob); });
 }`;
+
+/** Why map pan / zoom refuse, and what to do instead. */
+const MAP_VIEW_REFUSAL = (action: 'pan' | 'zoom') =>
+  `map ${action} is not supported: the map has no view transform, and moving the camera changes only the studio view, `
+  + 'which a canvas export ignores. To frame part of a map in an export: keyframe the camera with pinepaper_camera_animate '
+  + 'and export with framing:"camera", or load the map with center: [lon, lat] (and options.scale) so the projection itself frames the region.';
 
 export class PinePaperCodeGenerator {
   /**
@@ -3929,68 +3938,50 @@ const shapes = category ? _lib.getByCategory(category) : _lib.getAll();
     const validated = UpdateConnectorInputSchema.parse(input);
     const { connectorId, style, label, labelPosition } = validated;
 
-    const updates: string[] = [];
-
-    if (style) {
-      updates.push(`style: ${JSON.stringify(style)}`);
-    }
-    if (label !== undefined) {
-      updates.push(`label: ${JSON.stringify(label)}`);
-    }
-    if (labelPosition !== undefined) {
-      updates.push(`labelPosition: ${labelPosition}`);
-    }
-
-    const updatesStr = updates.length > 0 ? `{ ${updates.join(', ')} }` : '{}';
-
     return `
 // Update connector: ${connectorId}
-// CONNECTORS LIVE IN THE DIAGRAM SYSTEM, NOT THE ITEM REGISTRY (gate D1,
-// 1.6.19): getItemById never resolves the id connect returned, so every
-// update/remove failed "Connector not found" with that exact id.
-const __cid = ${JSON.stringify(connectorId)};
-const connector = (app.diagramSystem && app.diagramSystem.getConnector(__cid)) || app.getItemById(__cid);
-if (!connector) throw new Error('Connector not found: ' + __cid);
-
-const updates = ${updatesStr};
-
-// THERE IS NO updateConnector. ConnectorManager publishes removeConnector,
-// findConnector and updateSelectedStyle — nothing that edits one connector's
-// properties in place. The old emitter called app.diagramSystem.updateConnector
-// and reported updated:true, so a caller changing a connector's colour got a
-// success and an unchanged connector.
-//
-// Applied directly where the property is a plain Paper.js one, and refused by
-// name where it is not, rather than claiming a change that did not happen.
-// The engine gained getConnector(id) / updateConnector(id, style), which is
-// the call this tool always wanted: addressable by the id a connector is
-// created and serialised with. Guarded, because a studio predating that still
-// has to do something sensible rather than throw.
-if (typeof app.diagramSystem?.updateConnector === 'function') {
-  const res = app.diagramSystem.updateConnector(__cid, updates);
-  if (res && res.ok === false) { return { success: false, error: res.reason || 'the connector could not be updated' }; }
+(function() {
+  // CONNECTORS LIVE IN THE DIAGRAM SYSTEM, NOT THE ITEM REGISTRY (gate D1,
+  // 1.6.19): getItemById never resolves the id connect returned.
+  const __cid = ${JSON.stringify(connectorId)};
+  const ds = app.diagramSystem;
+  const connector = ds && typeof ds.getConnector === 'function' ? ds.getConnector(__cid) : null;
+  if (!connector) return { success: false, error: 'Connector not found: ' + __cid + '. Use the connectorId pinepaper_connect returned.' };
+  // updateConnector(id, style) takes the STYLE BAG ITSELF. This passed
+  // { style: {...}, label } (gate run 2, 1.6.19), so the engine merged a key
+  // named "style" into the connector's style, changed nothing it draws, and
+  // the tool reported updated:true over an unchanged connector.
+  const style = ${JSON.stringify(style ?? {})};
+  const label = ${label === undefined ? 'undefined' : JSON.stringify(label)};
+  const labelPosition = ${labelPosition === undefined ? 'undefined' : labelPosition};
+  const keys = Object.keys(style);
+  if (!keys.length && label === undefined && labelPosition === undefined) {
+    return { success: false, error: 'nothing to update: pass style, label or labelPosition' };
+  }
+  const applied = [];
+  if (keys.length) {
+    if (typeof ds.updateConnector !== 'function') {
+      return { success: false, error: 'this studio has no per-connector update (app.diagramSystem.updateConnector); update the studio' };
+    }
+    const res = ds.updateConnector(__cid, style);
+    if (!res || res.ok === false) return { success: false, error: (res && res.reason) || 'the connector could not be updated' };
+    const unchanged = keys.filter(function (k) { return connector.style[k] !== style[k]; });
+    if (unchanged.length) return { success: false, error: 'the studio did not take ' + unchanged.join(', ') };
+    keys.forEach(function (k) { applied.push('style.' + k); });
+  }
+  if (label !== undefined || labelPosition !== undefined) {
+    connector.setLabel(label !== undefined ? label : connector.label, labelPosition !== undefined ? labelPosition : connector.labelPosition);
+    applied.push(label !== undefined ? 'label' : 'labelPosition');
+  }
   app.historyManager.saveState();
-  return { connectorId: '${connectorId}', updated: true, applied: Object.keys(updates) };
-}
-
-const _applied = [];
-const _unsupported = [];
-for (const [k, v] of Object.entries(updates)) {
-  if (k === 'lineColor' && connector.strokeColor !== undefined) { connector.strokeColor = v; _applied.push(k); }
-  else if (k === 'lineWidth' && connector.strokeWidth !== undefined) { connector.strokeWidth = v; _applied.push(k); }
-  else _unsupported.push(k);
-}
-if (_applied.length) { app.historyManager.saveState(); app._scheduleRepaint?.(); }
-if (_unsupported.length && !_applied.length) {
-  throw new Error(
-    'this build cannot update ' + _unsupported.join(', ') + ' on an existing connector — '
-    + 'this build has no per-connector update — app.diagramSystem.updateConnector arrived later. '
-    + 'Update the studio for it. Removing and recreating the connector works, but mints a NEW id '
-    + 'and orphans anything holding the old one, so it is a last resort rather than the fix.'
-  );
-}
-
-({ connectorId: '${connectorId}', updated: _applied.length > 0, applied: _applied, unsupported: _unsupported });
+  // What it now DRAWS, read off the path, so a caller can check rather than trust.
+  const p = connector.path;
+  return {
+    success: true, connectorId: __cid, updated: true, applied: applied,
+    drawn: p ? { stroke: p.strokeColor ? p.strokeColor.toCSS(true) : null, width: p.strokeWidth, dash: p.dashArray || [] } : null,
+    label: connector.label || null,
+  };
+})();
 `.trim();
   }
 
@@ -4609,7 +4600,7 @@ return { success: true, backgroundColor: '${bgColor}' };
       case 'set_canvas_size': {
         const w = op.width || 1080;
         const h = op.height || 1080;
-        const sizeArg = op.preset ? `'${op.preset}'` : `{ width: ${w}, height: ${h} }`;
+        const sizeArg = op.preset ? JSON.stringify(op.preset) : `{ width: ${w}, height: ${h} }`;
         return `
 // Read the verdict, as the standalone tool now does: an unknown preset or an
 // out-of-range dimension is refused by name, and reporting the size we ASKED
@@ -6410,7 +6401,9 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
     return {
       success: true,
       mapId: result.mapId || '${mapId}',
-      regions: result.regions?.length || 0,
+      // regionPaths is a Map: .length was undefined, so every load reported
+      // regions: 0 (gate D3). size, with the feature count as a fallback.
+      regions: (result.regions && (result.regions.size ?? result.regions.length)) || (result.geoData && result.geoData.features ? result.geoData.features.length : 0),
       bounds: result.bounds,
       center: result.center,${warn}
     };
@@ -6457,7 +6450,16 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
 
   try {
     app.mapSystem.highlightRegions(${regionIds}, ${optionsStr});
-    return { success: true, highlighted: ${regionIds} };
+    // READ BACK (gate run 2, D16): highlight reported success while
+    // get_highlighted came back [] and the export showed no highlight.
+    const __asked = ${regionIds};
+    const __got = (app.mapSystem.getHighlightedRegions() || []).map(function (r) { return r.regionId; });
+    const __names = (app.mapSystem.getHighlightedRegions() || []).map(function (r) { return r.name; });
+    const __missing = __asked.filter(function (id) { return __got.indexOf(id) === -1 && __names.indexOf(id) === -1; });
+    if (__missing.length) {
+      return { success: false, highlighted: __got, error: 'the studio did not highlight ' + __missing.join(', ') + ' (get_highlighted does not list them). Check the ids with pinepaper_map_data, or report it: this map may not support per-region highlighting.' };
+    }
+    return { success: true, highlighted: __got };
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -6627,31 +6629,13 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
     if (validated.animate !== undefined) options.animate = validated.animate;
     if (validated.duration !== undefined) options.duration = validated.duration;
 
-    return `
-// Pan map to coordinates
-(function() {
-  if (!app.mapSystem) {
-    return { success: false, error: 'Map system not available' };
-  }
-
-  try {
-    // A REAL PAN (gate D3, 1.6.19). The map has no lat/lon pan of its own, but
-    // geoToCanvas projects a coordinate to the canvas and the camera pans
-    // there. This used to refuse every call while the docs advertised it.
-    if (typeof app.mapSystem.geoToCanvas !== 'function' || !app.camera || typeof app.camera.panTo !== 'function') {
-      return { success: false, error: 'pan needs mapSystem.geoToCanvas and the camera — update FxTool' };
-    }
-    const __p = app.mapSystem.geoToCanvas([${validated.lon}, ${validated.lat}]);
-    if (!__p) return { success: false, error: 'no map is loaded (load one first), or the coordinate is not on it' };
-    const __x = Array.isArray(__p) ? __p[0] : __p.x, __y = Array.isArray(__p) ? __p[1] : __p.y;
-    if (!isFinite(__x) || !isFinite(__y)) return { success: false, error: 'the coordinate is not on the visible side of this projection' };
-    app.camera.panTo(__x, __y, ${validated.duration ?? 0.5});
-    return { success: true, action: 'pan', lat: ${validated.lat}, lon: ${validated.lon}, canvasPoint: { x: __x, y: __y } };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-})();
-`.trim();
+    // REFUSED, HONESTLY (gate run 2, 1.6.19). Run 1 turned pan into a camera
+    // pan, which moves the studio VIEW but not the map: a canvas-framed export
+    // ignores the camera, so the call reported success and the export was
+    // unchanged. The map itself cannot be moved without breaking geoToCanvas
+    // (it projects against the untransformed map, so markers would land in the
+    // wrong place). Until the engine has a map view transform, say so.
+    return `(function() { return { success: false, error: ${JSON.stringify(MAP_VIEW_REFUSAL('pan'))} }; })();`;
   }
 
   /**
@@ -6663,26 +6647,8 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
     if (validated.animate !== undefined) options.animate = validated.animate;
     if (validated.duration !== undefined) options.duration = validated.duration;
 
-    return `
-// Set map zoom level
-(function() {
-  if (!app.mapSystem) {
-    return { success: false, error: 'Map system not available' };
-  }
-
-  try {
-    // A REAL ZOOM (gate D3, 1.6.19): the camera zooms to an absolute level
-    // (camera.zoomIn(level) animates to { zoom: level }).
-    if (!app.camera || typeof app.camera.zoomIn !== 'function') {
-      return { success: false, error: 'zoom needs the camera — update FxTool' };
-    }
-    app.camera.zoomIn(${validated.level}, ${validated.duration ?? 0.5});
-    return { success: true, action: 'zoom', level: ${validated.level} };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-})();
-`.trim();
+    // Refused for the same reason as pan (see generatePanMap).
+    return `(function() { return { success: false, error: ${JSON.stringify(MAP_VIEW_REFUSAL('zoom'))} }; })();`;
   }
 
   /**
@@ -6730,7 +6696,11 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
 
   try {
     const result = await app.mapSystem.importCustomMap('${validated.url}', ${optionsStr});
-    return { success: true, ...result };
+    // A summary, not the engine's return: that carries the Paper group and
+    // the region Map, which serialised into a raw Paper.js dump (gate N1).
+    const __r = result && result.regions;
+    const __n = (__r && (__r.size ?? __r.length)) || (result && result.geoData && result.geoData.features ? result.geoData.features.length : 0);
+    return { success: !!result, mapId: (result && result.mapId) || null, regions: __n, regionIds: (__r && __r.size ? Array.from(__r.keys()) : ((result && result.geoData && result.geoData.features) || []).map(function (f) { return (f.properties && f.properties.name) || f.id; })).slice(0, 50) };
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -6746,7 +6716,11 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
 
   try {
     const result = await app.mapSystem.importCustomMap(${JSON.stringify(validated.geoJson)}, ${optionsStr});
-    return { success: true, ...result };
+    // A summary, not the engine's return: that carries the Paper group and
+    // the region Map, which serialised into a raw Paper.js dump (gate N1).
+    const __r = result && result.regions;
+    const __n = (__r && (__r.size ?? __r.length)) || (result && result.geoData && result.geoData.features ? result.geoData.features.length : 0);
+    return { success: !!result, mapId: (result && result.mapId) || null, regions: __n, regionIds: (__r && __r.size ? Array.from(__r.keys()) : ((result && result.geoData && result.geoData.features) || []).map(function (f) { return (f.properties && f.properties.name) || f.id; })).slice(0, 50) };
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -7877,7 +7851,9 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
 // Get available mask types
 (function() {
   return {
-    maskTypes: ['rectangle', 'circle', 'ellipse', 'star', 'triangle', 'hexagon', 'heart', 'rounded', 'custom']
+    // From the enum the mask tools validate against: this listed 'custom',
+    // which both refuse (1.6.19 gate).
+    maskTypes: ${JSON.stringify(MaskTypeSchema.options)}
   };
 })();
 `.trim();
@@ -7888,14 +7864,7 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
 // Get available mask animation presets
 (function() {
   return {
-    animations: [
-      'wipeLeft', 'wipeRight', 'wipeUp', 'wipeDown',
-      'iris', 'irisOut',
-      'star', 'heart',
-      'curtainHorizontal', 'curtainVertical', 'cinematic',
-      'diagonalWipe',
-      'revealUp', 'revealDown'
-    ]
+    animations: ${JSON.stringify(MaskPresetSchema.options)}
   };
 })();
 `.trim();
@@ -8881,7 +8850,7 @@ ${loads}
       case 'dependents': return this._facadeCall('getDependents', id, 'Provenance: dependents');
       case 'record':
         return this._facadeCall('recordLineage',
-          `${id}, ${JSON.stringify(input.kind || 'derived')}, ${JSON.stringify(input.sourceRef || '')}, ${JSON.stringify(input.meta || {})}`,
+          `${id}, ${JSON.stringify(input.kind || 'derivedFrom')}, ${JSON.stringify(input.sourceRef || '')}, ${JSON.stringify(input.meta || {})}`,
           'Provenance: record lineage');
     }
   }
@@ -8907,7 +8876,8 @@ ${loads}
         // vector and audio halves of composeCollage were unreachable through
         // MCP, so agents converged on the four static patterns the description
         // happened to name. A capability gap reads as model bias from outside.
-        return this._facadeCall('composeCollage',
+        {
+          const apply = this._facadeCall('composeCollage',
           `${JSON.stringify(input.pattern || '')}, ${JSON.stringify(input.itemIds || [])}, ${JSON.stringify({
             ...(input.treatment ? { treatment: input.treatment } : {}),
             ...(input.applyCamera === false ? { applyCamera: false } : {}),
@@ -8928,7 +8898,23 @@ ${loads}
             ...(input.medium ? { medium: input.medium } : {}),
             ...(input.stitch ? { stitch: input.stitch } : {}),
             ...(input.stitchBudget !== undefined ? { stitchBudget: input.stitchBudget } : {}),
-          })}`, 'Compose: apply pattern');
+          })}`, 'Compose: apply pattern');;
+          if (typeof input.reveal !== 'string' || !input.reveal) return apply;
+          // CHECK THE REVEAL FIRST (gate C3). composeCollage lays the items out
+          // and wires their relations BEFORE it reaches an unknown reveal, so a
+          // typo errored with the grid already applied and nothing reverted.
+          return `
+// Compose: check the reveal, then apply
+(async function() {
+  if (typeof app.listReveals === 'function') {
+    const __keys = (app.listReveals() || []).map(function (r) { return r && r.key; });
+    if (__keys.length && __keys.indexOf(${JSON.stringify(input.reveal)}) === -1) {
+      return { success: false, error: 'unknown reveal ' + ${JSON.stringify(JSON.stringify(input.reveal))} + ' — known: ' + __keys.join(', ') + '. Nothing was changed.' };
+    }
+  }
+  return await ${apply.replace(/^\/\/[^\n]*\n/, '').replace(/;\s*$/, '')};
+})();`.trim();
+        }
     }
   }
 
@@ -10044,8 +10030,18 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
   ${guard}
   const entry = app.itemRegistry.get(${itemIdStr});
   if (!entry || !entry.item) return { error: 'Item not found: ' + ${itemIdStr} };
-  app.interactionSystem.removeContinuousBehavior(entry.item, ${behaviorIdStr});
-  return { success: true, action: 'remove_behavior', itemId: ${itemIdStr}, behaviorId: ${behaviorIdStr} };
+  // The engine's remove returns nothing, and this used to echo its inputs, so
+  // a wrong behaviorId still "succeeded" (gate run 2). Count what went.
+  const __list = function () { const m = app.interactionSystem.continuousBehaviors; const l = m && m.get ? m.get(${itemIdStr}) : null; return (l || []).map(function (b) { return b.id; }); };
+  const __before = __list();
+  const __bid = ${behaviorIdStr};
+  if (__bid && __before.indexOf(__bid) === -1) {
+    return { success: false, error: 'no behavior ' + JSON.stringify(__bid) + ' on ' + ${itemIdStr} + (__before.length ? '; it has: ' + __before.join(', ') : '; it has none') + '. Use the behaviorId add_behavior returned, or omit it to remove all.' };
+  }
+  app.interactionSystem.removeContinuousBehavior(entry.item, __bid || null);
+  const __after = __list();
+  const removed = __before.filter(function (id) { return __after.indexOf(id) === -1; });
+  return { success: removed.length > 0, action: 'remove_behavior', itemId: ${itemIdStr}, removed: removed, remaining: __after, ...(removed.length ? {} : { error: 'nothing was removed: the item has no behaviors' }) };
 })();`.trim();
       }
       case 'trigger_action': {
@@ -10409,8 +10405,10 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
 // Toggle grid
 (function() {
   ${guard}
-  // showGrid()/hideGrid(), not a boolean setter — setGridVisible never existed.
-  app.measurementSystem[${enabled} ? 'showGrid' : 'hideGrid']();
+  // setUnitGridEnabled shows/hides the grid AND records the setting that
+  // set_snap depends on; showGrid() alone left snapping inert (1.6.19 gate).
+  if (typeof app.setUnitGridEnabled === 'function') app.setUnitGridEnabled(${enabled});
+  else app.measurementSystem[${enabled} ? 'showGrid' : 'hideGrid']();
   return { success: true, action: 'set_grid', enabled: ${enabled} };
 })();`.trim();
       }
@@ -10428,17 +10426,18 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
 })();`.trim();
       }
       case 'set_snap': {
-        // `enabled` is deliberately unread: there is no mode to set either way.
+        // The engine has setSnapToUnitEnabled now; this refused, saying it had
+        // never existed (1.6.19 gate). It is an EDITOR setting: it snaps a
+        // drag or resize to the unit grid's ticks, and does nothing while that
+        // grid is off. Tool-placed items are not snapped, and the result says so.
         return `
-// Snap to grid — refused, see below
+// Snap to unit grid (drag / resize in the studio)
 (function() {
-  ${guard}
-  // NO EQUIVALENT. MeasurementSystem publishes snapCoordinate(), which snaps a
-  // coordinate you hand it, and nothing that turns snapping on as a mode —
-  // setSnapToUnitEnabled has never existed, so this reported success over a
-  // setting that was never changed. Refused by name, with the thing that works.
-  return { success: false, action: 'set_snap',
-    error: 'this build has no snap-to-unit MODE to switch: the measurement system snaps a coordinate on request rather than holding a setting. Snap positions yourself before creating or moving items, or set a grid with the grid action and place on its multiples.' };
+  if (typeof app.setSnapToUnitEnabled !== 'function') { return { success: false, action: 'set_snap', error: 'this studio has no snap-to-unit setting; update FxTool' }; }
+  const enabled = app.setSnapToUnitEnabled(${input.enabled !== false});
+  const gridOn = typeof app.getUnitGridEnabled === 'function' ? app.getUnitGridEnabled() : null;
+  return { success: true, action: 'set_snap', enabled: enabled, unitGrid: gridOn,
+    note: 'snaps dragging and resizing in the studio to the unit grid' + (gridOn === false ? ', which is OFF, so nothing snaps until it is on (set_grid)' : '') + '. Items placed by tools are not snapped: give them grid multiples.' };
 })();`.trim();
       }
       default:
@@ -10536,6 +10535,16 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
   }
   try {
     const res = await app.extractObject(${args});
+    // A numeric itemId is Paper's own id: the engine's register fallback did
+    // not take, so the new item was unaddressable and uncounted (gate run 2:
+    // itemId 226, itemsCreated 0). Register it here and hand back that id.
+    if (res && res.ok && typeof res.itemId === 'number' && typeof paper !== 'undefined' && paper.project) {
+      const __n = res.itemId;
+      const __it = paper.project.getItem({ match: function (i) { return i.id === __n; } });
+      const __rid = __it && app.itemRegistry && app.itemRegistry.register ? app.itemRegistry.register(__it, 'image', { source: 'extract' }, 'import') : null;
+      if (typeof __rid === 'string') res.itemId = __rid;
+      else return { success: false, error: 'the object was extracted but could not be registered, so it has no usable id (Paper id ' + __n + ')' };
+    }
     const out = Object.assign({ success: !!(res && res.ok) }, res || {});
     if (!out.success && typeof out.error === 'string') out.error = (${PinePaperCodeGenerator.MODEL_FETCH_HINT})(out.error);
     return out;
@@ -12000,6 +12009,9 @@ ${needWorld}
   // collision and vertex arrays nobody asked for. Arrays longer than 16 numbers
   // become their length; everything else passes as is.
   const __slim = function (v, depth) {
+    // Typed arrays too: collision positions are a Float32Array, which
+    // Array.isArray misses, so a star still came back as 12 KB (gate run 2).
+    if (ArrayBuffer.isView(v)) return v.length > 16 ? { length: v.length } : Array.prototype.slice.call(v);
     if (Array.isArray(v)) return v.length > 16 ? { length: v.length } : v.map(function (x) { return __slim(x, depth + 1); });
     if (v && typeof v === 'object' && depth < 4) { const o = {}; for (const k in v) { if (typeof v[k] !== 'function') o[k] = __slim(v[k], depth + 1); } return o; }
     return v;
@@ -12322,7 +12334,13 @@ ${needWorld}
 (function() {
   if (typeof app.create !== 'function') { return { success: false, error: 'app.create unavailable — update FxTool' }; }
   const size = ${S({ width: scene.width, height: scene.height })};
+  // The layout was computed for this size, so the canvas is set to it — and
+  // the result SAYS so: a 1080x1080 canvas became 1280x720 silently (gate C).
+  const __before = app.getCanvasSize ? app.getCanvasSize() : null;
   if (typeof app.setCanvasSize === 'function') { try { app.setCanvasSize(size.width, size.height); } catch (_) { /* a fixed canvas is not a failure */ } }
+  const __after = app.getCanvasSize ? app.getCanvasSize() : null;
+  const canvasResized = __before && __after && (__before.width !== __after.width || __before.height !== __after.height)
+    ? { from: { width: __before.width, height: __before.height }, to: { width: __after.width, height: __after.height } } : null;
   ${scene.backgroundHex ? `if (typeof app.setBackgroundColor === 'function') { try { app.setBackgroundColor(${S(scene.backgroundHex)}); } catch (_) { /* ditto */ } }` : '// this style paints no background of its own'}
   const ops = ${S(ops)};
   const ids = [];
@@ -12337,7 +12355,8 @@ ${needWorld}
   if (app.historyManager) app.historyManager.saveState();
   // A partial composition is reported as one. Half a poster that claims
   // success is worse than a poster that says which four elements are missing.
-  return { success: failed.length === 0, style: ${S(style)}, itemIds: ids, itemCount: ids.length, failed: failed };
+  return { success: failed.length === 0, style: ${S(style)}, itemIds: ids, itemCount: ids.length, failed: failed,
+    ...(canvasResized ? { canvasResized: canvasResized, note: 'the canvas was resized to the composition; pass width and height to compose at your canvas size' } : {}) };
 })();`.trim();
   }
 
@@ -12505,14 +12524,21 @@ ${guard('importLottie')}
   // stripped console makes that indistinguishable from an empty animation.
   ${REG_ID_JS}
   const r = await app.importLottie(${S(input.data)}, ${opts});
-  if (!r) { return { success: false, error: 'the Lottie did not import — it may be malformed, or this build has no Lottie importer' }; }
-  // The Paper group itself went back as a dump of internals (gate D7); what a
-  // caller can use is the id and the size of what arrived.
-  const __it = r.item || r.group || r;
-  const __id = (r && (r.itemId || r.id) && typeof (r.itemId || r.id) === 'string') ? (r.itemId || r.id) : __ppRegId(__it);
-  return { success: true, itemId: __id, layers: Array.isArray(r.layers) ? r.layers.length : (__it && __it.children ? __it.children.length : undefined),
-    bounds: __it && __it.bounds ? { x: __it.bounds.x, y: __it.bounds.y, width: __it.bounds.width, height: __it.bounds.height } : undefined,
-    ...(r.warnings ? { warnings: r.warnings } : {}) };
+  // importLottie ALWAYS answers { success, items, duration, warnings, errors };
+  // only !r was checked, so a failed import read as a success, and the ids
+  // were looked for on fields it does not have (gate N2: itemId null).
+  if (!r || r.success === false) {
+    const why = r && Array.isArray(r.errors) && r.errors.length ? r.errors.join('; ') : 'the Lottie did not import — it may be malformed';
+    return { success: false, error: why, ...(r && r.warnings && r.warnings.length ? { warnings: r.warnings } : {}) };
+  }
+  const __items = Array.isArray(r.items) ? r.items : [];
+  const itemIds = __items.map(function (it) { return __ppRegId(it); }).filter(Boolean);
+  if (!__items.length) return { success: false, error: 'the Lottie imported no items' };
+  let __b = null;
+  __items.forEach(function (it) { if (it && it.bounds) __b = __b ? __b.unite(it.bounds) : it.bounds; });
+  return { success: true, itemId: itemIds[0] || null, itemIds: itemIds, items: __items.length, duration: r.duration,
+    bounds: __b ? { x: __b.x, y: __b.y, width: __b.width, height: __b.height } : undefined,
+    ...(r.warnings && r.warnings.length ? { warnings: r.warnings } : {}) };
 })();`.trim();
 
       case 'export_glb':
@@ -12593,7 +12619,16 @@ ${guard('exportPNGSequence')}
     const S = (v: unknown) => JSON.stringify(v);
     const guard = (fn: string) =>
       `  if (typeof app.${fn} !== 'function') { return { success: false, error: 'app.${fn} unavailable — update FxTool' }; }`;
-    const simple = (fn: string, args: string, key: string, label: string) => `
+    const simple = (fn: string, args: string, key: string, label: string) => key === 'played' ? `
+// Sound: ${label}
+(function() {
+${guard(fn)}
+  // A play that returns no voice played nothing, and reported success (gate
+  // sweep D, 1.6.19). A headless studio may have no audio output at all.
+  const __v = app.${fn}(${args});
+  if (__v == null) { return { success: false, error: 'nothing played: the studio returned no voice (it may have no audio output). Placed sounds (create, sequence) and render_soundtrack work without one.' }; }
+  return { success: true, played: __v };
+})();`.trim() : `
 // Sound: ${label}
 (function() {
 ${guard(fn)}
@@ -12610,8 +12645,12 @@ ${guard(fn)}
       case 'chord_frequencies': return simple('chordFrequencies', `${S(input.root)}, ${S(input.chord)}, ${S(input.options ?? {})}`, 'frequencies', `the Hz of ${input.chord} on ${input.root}`);
       case 'play_percussion': return simple('playPercussion', `${S(input.name)}, ${S(input.options ?? {})}`, 'played', `percussion ${input.name}`);
       case 'play_sfx': return simple('playSfx', `${S(input.name)}, ${S(input.options ?? {})}`, 'played', `sfx ${input.name}`);
-      case 'play_spec': return simple('playSound', S(input.spec), 'played', 'a raw spec');
-      case 'play_from_text': return simple('playSoundFromText', S(input.text), 'played', `"${input.text}"`);
+      // options are merged into the spec, as play_tone's are; play_spec and
+      // play_from_text dropped them (gate sweep D).
+      case 'play_spec': return simple('playSound', `Object.assign({}, ${S(input.spec)}, ${S(input.options ?? {})})`, 'played', 'a raw spec');
+      case 'play_from_text': return input.options
+        ? simple('playSound', `Object.assign({}, app.buildSoundFromText(${S(input.text)}) || {}, ${S(input.options)})`, 'played', 'a described sound')
+        : simple('playSoundFromText', S(input.text), 'played', 'a described sound');
 
       case 'from_text':
         return `
@@ -12776,7 +12815,9 @@ ${guard('createSound')}
   for (let i = 0; i < cues.length; i++) {
     const c = cues[i];
     try {
-      const spec = c.spec || (c.preset ? { preset: c.preset, note: c.note } : null);
+      // The engine reads spec.instrument and never preset, so a preset cue
+      // played a plain sine (gate sweep D).
+      const spec = c.spec || (c.preset ? { instrument: c.preset, note: c.note } : null);
       if (!spec) { failed.push({ index: i, t: c.t, error: 'neither spec nor preset' }); continue; }
       const item = app.createSound(spec, c.visual || {});
       if (!item) { failed.push({ index: i, t: c.t, error: 'the cue produced no waveform path' }); continue; }
@@ -12870,10 +12911,18 @@ ${guard('timbreFromPath')}
     const S = (v: unknown) => JSON.stringify(v);
     const guard = (fn: string) =>
       `  if (typeof app.${fn} !== 'function') { return { success: false, error: 'app.${fn} unavailable — update FxTool' }; }`;
+    // Paper items in the engine's answer become their registry ids: spread
+    // as-is they serialised to raw Paper dumps (1.6.19 gate: boolean,
+    // outline_stroke and pattern).
     const pass = (expr: string) => `
+  ${REG_ID_JS}
+  const __isItem = function (v) { return v && typeof v === 'object' && typeof v.className === 'string' && 'bounds' in v; };
+  const __clean = function (v) { return __isItem(v) ? (__ppRegId(v) || ('paper:' + v.id)) : (Array.isArray(v) && v.some(__isItem) ? v.map(__clean) : v); };
   const r = ${expr};
   if (!r || r.ok === false) { return { success: false, error: (r && r.reason) || 'the engine refused the operation' }; }
-  return { success: true, ...r };`;
+  const out = { success: true };
+  Object.keys(r).forEach(function (k) { out[k] = __clean(r[k]); });
+  return out;`;
 
     switch (input.action) {
       case 'boolean':

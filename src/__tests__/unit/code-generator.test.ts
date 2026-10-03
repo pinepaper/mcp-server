@@ -571,7 +571,7 @@ describe('PinePaperCodeGenerator', () => {
       const code = codeGenerator.generateAgentBatchExecute({
         operations: [{ type: 'set_canvas_size', preset: 'youtube' }],
       });
-      expect(code).toContain("app.setCanvasSize('youtube')");
+      expect(code).toContain('app.setCanvasSize("youtube")');
     });
 
     it('should generate code for apply_mask operation', () => {

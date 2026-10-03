@@ -882,7 +882,7 @@ function withSessionNote(
   const note = r.relaunched
     ? `The browser session had been lost; the browser was relaunched and this call ran on an EMPTY canvas${r.canvasSizeRestored ? ` (size restored to ${r.canvasSizeRestored.width}x${r.canvasSizeRestored.height})` : ' at the default size'}. Item ids from before are gone: rebuild the scene.`
     : r.canvasReset
-      ? 'The page had reloaded and the canvas came back EMPTY. Item ids from before are gone: rebuild the scene.'
+      ? 'The studio page had reloaded or navigated away, and the canvas came back EMPTY. Item ids from before are gone: rebuild the scene.'
       : 'The page connection was re-established; the scene survived.';
   const first = out.content[0];
   if (first && first.type === 'text') {
@@ -2783,10 +2783,9 @@ async function handleToolCallInner(
       case 'pinepaper_set_canvas_size': {
         const input = SetCanvasSizeInputSchema.parse(args);
         const code = codeGenerator.generateSetCanvasSize(input);
-        const description = getLocalizedSuccessMessage(i18n, 'canvasSizeSet', {
-          width: input.width,
-          height: input.height,
-        });
+        const description = input.preset && input.width === undefined
+          ? `Set canvas size to preset ${input.preset}`
+          : getLocalizedSuccessMessage(i18n, 'canvasSizeSet', { width: input.width ?? '', height: input.height ?? '' });
         return executeOrGenerate(code, description, options, 'pinepaper_set_canvas_size');
       }
 

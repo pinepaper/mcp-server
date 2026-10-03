@@ -32,6 +32,9 @@
  *   of twenty (dither, halftoneCMYK, halftoneDots, edgeDetect, hsl,
  *   colorTint), and the marketing session asked for dither by name.
  *
+ * - LINEAGE_KINDS. The provenance kinds core/Provenance.js accepts. The tool
+ *   defaulted to 'derived', which is not one, so every record without an
+ *   explicit kind was refused, and the valid kinds were documented nowhere.
  * Descriptions are NOT generated: they are prose, written here. The type of
  * EASING_DESCRIPTIONS is keyed on the generated union, so a new engine easing
  * fails the TYPECHECK until someone writes its line.
@@ -59,6 +62,7 @@ const EASING_REL = 'js/core/KeyframeInterpolator.js';
 const WORLD_REL = 'js/world3d/worlds.js';
 const MEDIA_REL = 'js/core/DesignMedia.js';
 const FILTER_REL = 'js/FilterSystem.js';
+const PROVENANCE_REL = 'js/core/Provenance.js';
 
 function resolveRef() {
   for (const ref of [ENGINE_REF, 'HEAD']) {
@@ -107,6 +111,14 @@ function worldColorPaths(src) {
   const paths = [...src.slice(start).matchAll(/path:\s*'([^']+)',\s*kind:\s*'color'/g)].map((m) => m[1]);
   if (paths.length === 0) throw new Error(`sync-engine-lists: no kind:'color' entries in WORLD_SCHEMA (${WORLD_REL})`);
   return paths;
+}
+
+function lineageKinds(src) {
+  const m = /export const LINEAGE_KINDS\s*=\s*Object\.freeze\(\[([^\]]*)\]\)/.exec(src);
+  if (!m) throw new Error(`sync-engine-lists: LINEAGE_KINDS not found in ${PROVENANCE_REL}`);
+  const kinds = [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]);
+  if (kinds.length === 0) throw new Error(`sync-engine-lists: LINEAGE_KINDS is empty in ${PROVENANCE_REL}`);
+  return kinds;
 }
 
 /** MEDIA's top-level keys, and each entry's `apply: '<method>'` when it has one. */
@@ -180,6 +192,9 @@ async function generate() {
   const filterSrc = readCommitted(FILTER_REL);
   if (!filterSrc) throw new Error(`sync-engine-lists: cannot read ${FILTER_REL}`);
   const filterList = filters(filterSrc);
+  const provSrc = readCommitted(PROVENANCE_REL);
+  if (!provSrc) throw new Error(`sync-engine-lists: cannot read ${PROVENANCE_REL}`);
+  const lineage = lineageKinds(provSrc);
 
   return `/**
  * GENERATED — DO NOT EDIT. Run \`bun run sync:engine-lists\`.
@@ -192,6 +207,7 @@ async function generate() {
  *   ${WORLD_REL}  sha256: ${digest(worldSrc)}
  *   ${MEDIA_REL}  sha256: ${digest(mediaSrc)}
  *   ${FILTER_REL}  sha256: ${digest(filterSrc)}
+ *   ${PROVENANCE_REL}  sha256: ${digest(provSrc)}
  */
 
 /** ${easings.length} names: EASING_NAMES, the keys of the engine's easing table. Keyframes, masks, relations and the camera all resolve through it. */
@@ -223,6 +239,11 @@ ${list(filterList.map((f) => f.name))}
 export const FILTER_PARAM_RANGES: Readonly<Record<string, Readonly<Record<string, readonly [number, number]>>>> = Object.freeze({
 ${filterList.map((f) => `  ${f.name}: { ${Object.entries(f.ranges).map(([k, [a, b]]) => `${k}: [${a}, ${b}]`).join(', ')} },`).join('\n')}
 });
+
+/** ${lineage.length} kinds: LINEAGE_KINDS, what provenance record accepts. */
+export const LINEAGE_KINDS = [
+${list(lineage)}
+] as const;
 
 /** One line per filter: the engine's own description and parameter ranges. */
 export const FILTER_DOCS: Readonly<Record<string, string>> = Object.freeze({

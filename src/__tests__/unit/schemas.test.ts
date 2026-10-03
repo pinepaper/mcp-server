@@ -625,11 +625,12 @@ describe('Schema Validation', () => {
       expect(result.success).toBe(true);
     });
 
-    it('should reject missing dimensions', () => {
-      const result = SetCanvasSizeInputSchema.safeParse({
-        preset: 'instagram-square',
-      });
-      expect(result.success).toBe(false);
+    // A preset alone is a size (1.6.19 gate: {preset} was refused); a lone
+    // width is still not.
+    it('accepts a preset alone, and rejects a width without a height', () => {
+      expect(SetCanvasSizeInputSchema.safeParse({ preset: 'instagram-square' }).success).toBe(true);
+      expect(SetCanvasSizeInputSchema.safeParse({ width: 800 }).success).toBe(false);
+      expect(SetCanvasSizeInputSchema.safeParse({}).success).toBe(false);
     });
   });
 

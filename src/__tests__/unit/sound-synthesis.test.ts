@@ -31,7 +31,8 @@ describe('every action reaches its own facade, guarded', () => {
     [{ action: 'chord_frequencies', root: 'C4' }, 'app.chordFrequencies("C4", "major", {})'],
     [{ action: 'play_percussion', name: 'kick' }, 'app.playPercussion("kick", {})'],
     [{ action: 'play_sfx', name: 'whoosh' }, 'app.playSfx("whoosh", {})'],
-    [{ action: 'play_spec', spec: { partials: [] } }, 'app.playSound({"partials":[]})'],
+    // options merge into the spec (1.6.19 gate: play_spec dropped them).
+    [{ action: 'play_spec', spec: { partials: [] } }, 'app.playSound(Object.assign({}, {"partials":[]}, {}))'],
     [{ action: 'play_from_text', text: 'a soft bell' }, 'app.playSoundFromText("a soft bell")'],
     [{ action: 'from_text', text: 'a soft bell' }, 'app.buildSoundFromText("a soft bell")'],
     [{ action: 'create' }, 'app.createSound({}, {})'],

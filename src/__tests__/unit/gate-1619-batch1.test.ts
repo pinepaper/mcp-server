@@ -46,3 +46,13 @@ describe('custom relation names (D2)', () => {
     expect(bad.isError).toBe(true);
   });
 });
+
+describe('update_connector passes the style bag itself (gate run 2)', () => {
+  it('updateConnector(id, style) gets the style, not {style, label}', () => {
+    const code = gen.generateUpdateConnector({ connectorId: 'c1', style: { lineColor: '#ff0000' }, label: 'hi' } as never);
+    expect(code).toContain('const style = {"lineColor":"#ff0000"};');
+    expect(code).toContain('ds.updateConnector(__cid, style)');
+    expect(code).toContain('connector.setLabel(');
+    expect(code).not.toMatch(/updates = \{ style:/);
+  });
+});

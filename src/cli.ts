@@ -22,6 +22,8 @@ async function main(): Promise<void> {
 
   // Handle help flag
   if (args.includes('--help') || args.includes('-h')) {
+    // Counted, not written down: "agent ~50" and "full 120+" both went stale.
+    const countFor = (p: ToolkitProfile) => `${getToolsForToolkit(getToolsForVerbosity('compact'), p).length} tools`;
     console.log(`
 PinePaper MCP Server v${VERSION}
 
@@ -37,8 +39,8 @@ OPTIONS:
                           - puppeteer: Open browser and execute code (default)
                           - code: Generate code only for manual paste
   --toolkit <profile>     Tool visibility profile (default: agent)
-                          - full: All ${TOOLKIT_PROFILES_LIST.length > 0 ? '120+' : ''} tools
-                          - agent: Core creative tools (~50 tools)
+                          - full: Every tool (${countFor('full')})
+                          - agent: Every tool except the diagnostics and register_item (${countFor('agent')})
                           - diagram: Diagram/flowchart tools
                           - map: Map/choropleth tools
                           - font: Font creation tools

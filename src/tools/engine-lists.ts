@@ -4,11 +4,12 @@
  * Name lists the engine owns and the tool surface must offer exactly. See
  * scripts/sync-engine-lists.mjs for why each is generated.
  *
- * Source: FxTool origin/main f5aa5436fd71ce86baf333835916397416f1b79f
+ * Source: FxTool origin/main 057c71c5a3b17274903d1dddc6542f5b4c1fafe6
  *   js/core/KeyframeInterpolator.js  sha256: 4c38752d86cae944
  *   js/world3d/worlds.js  sha256: 0e0973f7587c06e1
  *   js/core/DesignMedia.js  sha256: 46fae8ceafe54b11
  *   js/FilterSystem.js  sha256: f862237e73c93a34
+ *   js/core/Provenance.js  sha256: 27e4d8becfa382c8
  */
 
 /** 37 names: EASING_NAMES, the keys of the engine's easing table. Keyframes, masks, relations and the camera all resolve through it. */
@@ -136,6 +137,15 @@ export const FILTER_PARAM_RANGES: Readonly<Record<string, Readonly<Record<string
   halftoneCMYK: { size: [2, 32] },
   dither: { levels: [2, 16] },
 });
+
+/** 5 kinds: LINEAGE_KINDS, what provenance record accepts. */
+export const LINEAGE_KINDS = [
+  'derivedFrom',
+  'instanceOf',
+  'placedFrom',
+  'importedFrom',
+  'copyOf',
+] as const;
 
 /** One line per filter: the engine's own description and parameter ranges. */
 export const FILTER_DOCS: Readonly<Record<string, string>> = Object.freeze({

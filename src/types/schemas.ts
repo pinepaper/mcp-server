@@ -9,7 +9,7 @@
  */
 
 import { z } from 'zod';
-import { ENGINE_EASING_NAMES, DESIGN_MEDIA, DESIGN_MEDIA_APPLY, FILTER_TYPES } from '../tools/engine-lists.js';
+import { ENGINE_EASING_NAMES, DESIGN_MEDIA, DESIGN_MEDIA_APPLY, FILTER_TYPES, LINEAGE_KINDS } from '../tools/engine-lists.js';
 
 // =============================================================================
 // COMMON SCHEMAS
@@ -1600,9 +1600,12 @@ export const SetCanvasSizeInputSchema = z.object({
   // not manage it.
   // The refusal NAMES the route: a 728x90 banner refused with a bare "too
   // small" left a caller to export the preset instead (round 8 BB, 1.48).
-  width: z.number().min(100, "a canvas side under 100 px is not supported. For small assets (a 728x90 or 320x50 banner, a 28 px emote) design at 2-4x — e.g. 1456x180 — and export with agent_export region {x:0, y:0, width, height, outputWidth:728, outputHeight:90}. For VIDEO at a small size, design at 2x and export with agent_export scale: 0.5.").max(16384).describe('Canvas width (100-16384; above 8192 Safari / iOS may fail)'),
-  height: z.number().min(100, "a canvas side under 100 px is not supported. For small assets (a 728x90 or 320x50 banner, a 28 px emote) design at 2-4x — e.g. 1456x180 — and export with agent_export region {x:0, y:0, width, height, outputWidth:728, outputHeight:90}. For VIDEO at a small size, design at 2x and export with agent_export scale: 0.5.").max(16384).describe('Canvas height (100-16384; above 8192 Safari / iOS may fail)'),
-  preset: z.string().optional().describe('Optional preset name'),
+  width: z.number().min(100, "a canvas side under 100 px is not supported. For small assets (a 728x90 or 320x50 banner, a 28 px emote) design at 2-4x — e.g. 1456x180 — and export with agent_export region {x:0, y:0, width, height, outputWidth:728, outputHeight:90}. For VIDEO at a small size, design at 2x and export with agent_export scale: 0.5.").max(16384).optional().describe('Canvas width (100-16384; above 8192 Safari / iOS may fail)'),
+  height: z.number().min(100, "a canvas side under 100 px is not supported. For small assets (a 728x90 or 320x50 banner, a 28 px emote) design at 2-4x — e.g. 1456x180 — and export with agent_export region {x:0, y:0, width, height, outputWidth:728, outputHeight:90}. For VIDEO at a small size, design at 2x and export with agent_export scale: 0.5.").max(16384).optional().describe('Canvas height (100-16384; above 8192 Safari / iOS may fail)'),
+  preset: z.string().optional().describe('A named size instead of width/height; an unknown name is refused with the known ones listed.'),
+}).refine((v) => !!v.preset || (v.width !== undefined && v.height !== undefined), {
+  // {preset} alone was refused for a missing width (1.6.19 gate).
+  message: 'pass width and height, or a preset', path: ['width'],
 });
 
 // Export
@@ -2410,10 +2413,8 @@ export const AgentBatchOperationSchema = z.object({
   type: AgentBatchOperationTypeSchema,
   // Create operation fields
   itemType: z.string().optional().describe('Item type for create operations'),
-  position: z.object({
-    x: z.number(),
-    y: z.number(),
-  }).optional().describe('Position for create operations'),
+  // PositionSchema, as create_item takes: [x, y] was refused here (1.6.19 gate).
+  position: PositionSchema.optional().describe('Position for create operations: {x, y} or [x, y]'),
   properties: z.record(z.unknown()).optional().describe('Properties for create/modify operations'),
   // Modify/Animate/Delete/Keyframe/Mask/Effect target
   itemId: z.string().optional().describe('Target item ID or $N reference'),
@@ -3161,14 +3162,20 @@ export type GetRegionAtPointInput = z.infer<typeof GetRegionAtPointInputSchema>;
 // Map Animation Schemas
 // The engine reads fillColor OR color, plus easing (MapSystem.animateRegions);
 // requiring fillColor refused keyframes written with color (gate D17, 1.6.19).
-export const MapRegionKeyframeSchema = z.object({
+// A keyframe may nest its values under `properties`, the shape every other
+// keyframe tool takes; it is flattened rather than refused (gate run 2).
+export const MapRegionKeyframeSchema = z.preprocess((k) => {
+  if (!k || typeof k !== 'object' || Array.isArray(k)) return k;
+  const { properties, ...rest } = k as Record<string, unknown>;
+  return properties && typeof properties === 'object' && !Array.isArray(properties) ? { ...(properties as Record<string, unknown>), ...rest } : k;
+}, z.object({
   time: z.number().describe('Time in seconds'),
   fillColor: z.string().optional().describe('Fill color at this keyframe (or color)'),
   color: z.string().optional().describe('Same as fillColor'),
   strokeColor: z.string().optional().describe('Stroke color (optional)'),
   opacity: z.number().optional().describe('Opacity 0-1 (optional)'),
   easing: z.string().optional().describe('Easing into this keyframe'),
-}).refine((k) => !!(k.fillColor || k.color), { message: 'each keyframe needs fillColor (or color)', path: ['fillColor'] })
+}).refine((k) => !!(k.fillColor || k.color), { message: 'each keyframe needs fillColor (or color)', path: ['fillColor'] }))
   .describe('Map region keyframe');
 
 export type MapRegionKeyframe = z.infer<typeof MapRegionKeyframeSchema>;
@@ -3767,7 +3774,9 @@ export type CommentInput = z.infer<typeof CommentInputSchema>;
 export const ProvenanceInputSchema = z.object({
   action: z.enum(['get', 'lineage', 'dependents', 'record']),
   itemId: z.string(),
-  kind: z.string().optional(),
+  // GENERATED (LINEAGE_KINDS): the default was 'derived', which the engine
+  // refuses, and the docs named three kinds that do not exist (1.6.19 gate).
+  kind: z.enum(LINEAGE_KINDS).optional().describe('record: how the item came from sourceRef (default derivedFrom).'),
   sourceRef: z.string().optional(),
   meta: z.record(z.string(), z.unknown()).optional(),
 });
@@ -4878,7 +4887,7 @@ export type DesignSystemInput = z.infer<typeof DesignSystemInputSchema>;
 export const StickInputSchema = z.object({
   action: z.enum(['figure', 'set']).describe("'figure' a posed, walking or travelling stick figure · 'set' the floor, wall and objects it stands on and among."),
   id: z.string().optional().describe('Prefix for the created items.'),
-  kind: z.string().optional().describe("figure: which figure. set: which piece of the scene kit ('floor', 'wall', a named object) — list-free, because the kit is vendored and grows there."),
+  kind: z.string().optional().describe("figure: which figure. set: which piece — room (floor + wall; options groundY, wall, floor), tabletop (object + surfaceY), chair (facing), table, counter, door, shelf (items), window. An unknown kind or tabletop object is refused with the engine's current list."),
   at: z.object({ x: z.number().optional(), y: z.number().optional() }).optional().describe('Where it goes.'),
   scale: z.number().optional().describe('Size multiplier.'),
   facing: z.enum(['left', 'right']).optional().describe("set: which way a CHAIR faces. The figure has no facing — it is ignored on action 'figure', which refuses it by name rather than dropping it."),
@@ -5052,7 +5061,7 @@ export type SoundInput = z.infer<typeof SoundInputSchema>;
  * pinepaper_motion — the generators' Animation knob, pointed at anything.
  *
  * The same engine every generator's own animation runs on, reachable for any
- * group or list of items. Two kinds: a GROUP motion (drift, sway, rotate,
+ * group or list of items. Two kinds: a GROUP motion (driftX/Y, swayX/Y, rotate,
  * pulse, wave, bounce) moves the target as one; a FIELD motion (ripple,
  * breathe, undulate) sweeps a crest through the children from an origin, with
  * a chosen waveform. The field kind is the one nothing else here can do.
@@ -5065,7 +5074,7 @@ export const MotionInputSchema = z.object({
   action: z.enum(['list', 'apply']).describe("'list' every motion, waveform and origin the engine offers · 'apply' one to a target."),
   itemId: z.string().optional().describe('apply: a group or single item to move.'),
   itemIds: z.array(z.string()).optional().describe('apply: several items, wrapped in a new group that becomes the motion host. The members keep their own identity and ids.'),
-  motion: z.string().optional().describe("apply: the motion name — a GROUP motion (drift, sway, rotate, pulse, wave, bounce) moves the target as one; a FIELD motion (ripple, breathe, undulate) sweeps a crest through its children. Call 'list' for the engine's own set rather than guessing."),
+  motion: z.string().optional().describe("apply: the motion name — a GROUP motion (driftX, driftY, swayX, swayY, rotate, pulse, wave, bounce) moves the target as one; a FIELD motion (ripple, breathe, undulate) sweeps a crest through its children. Call 'list' for the engine's own set rather than guessing."),
   speed: z.number().optional().describe('apply: cycles per second, roughly. Higher is faster.'),
   intensity: z.number().optional().describe('apply: amplitude. 0.15 is the usual default elsewhere in this surface.'),
   waveform: z.enum(['sine', 'triangle', 'square', 'sawtooth', 'spike']).optional()

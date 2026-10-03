@@ -14,9 +14,11 @@ import { COMPACT_DESCRIPTIONS } from './compact-descriptions.js';
 import { MINIMAL_DESCRIPTIONS } from './minimal-descriptions.js';
 import { STICK_GAITS, STICK_POSES, STICK_SEQUENCES, STICK_EXPRESSIONS, STICK_PROPS } from './stick-vocabulary.js';
 import { GeneratorNameSchema, ItemTypeSchema } from '../types/schemas.js';
-import { DESIGN_MEDIA, DESIGN_MEDIA_APPLY, FILTER_TYPES, FILTER_DOCS } from './engine-lists.js';
+import { DESIGN_MEDIA, DESIGN_MEDIA_APPLY, FILTER_TYPES, FILTER_DOCS, LINEAGE_KINDS } from './engine-lists.js';
 import {
   EffectTypeSchema,
+  AgentExportFormatSchema,
+  RelationTypeSchema,
   SimpleAnimationTypeSchema,
   EasingSchema,
   KEYFRAME_EASINGS,
@@ -291,10 +293,10 @@ Max canvas size: 16384 per side (a 12000 px DOOH or projection canvas fits); abo
         height: { type: 'number', description: 'Canvas height in pixels (100-16384)' },
         preset: {
           type: 'string',
-          description: 'Optional preset name',
+          description: "A studio preset key instead of width/height, e.g. 'instagram-post', 'instagram-story', 'youtube-thumbnail', 'tiktok', 'full-hd'. An unknown key is refused with the known ones.",
         },
       },
-      required: ['width', 'height'],
+      // width + height, or preset alone (enforced by the Zod schema).
     },
   },
 
@@ -1137,7 +1139,7 @@ NOTE: Import-only — there is no MCP equivalent of FxTool's exportMermaid. Merm
       idempotentHint: false,
       openWorldHint: true,
     },
-    description: `Import a raster image from a URL onto the canvas. Returns an itemId for the imported image.
+    description: `Import a raster image onto the canvas from an http(s) URL, a data: URL, or a LOCAL FILE PATH (the server reads the file). Returns an itemId for the imported image.
 
 USE WHEN:
 - User wants to add a photo, PNG, JPG, or other raster image
@@ -1159,6 +1161,9 @@ Apply a mask shape during import to clip the image:
 
 SIZE CONSTRAINTS:
 Use maxWidth/maxHeight to constrain the image dimensions while preserving aspect ratio.
+- maxEdge: the longest edge the studio STORES the image at (px), or 'native' to keep every pixel. The result says when it was stored smaller.
+- nativeSize: true places the image at its source footprint even if it was stored smaller.
+- smoothing: 'off' (nearest-neighbour, for pixel art) | 'low' (default) | 'medium' | 'high'.
 
 EXAMPLES:
 - Import photo: url: "https://example.com/photo.jpg"
@@ -2271,7 +2276,7 @@ ACTIONS:
 - set_clip: { id, inPoint, outPoint (media-time s, outPoint > inPoint), timeOffset? (canvas s: also MOVE the clip to start there) } → re-trim an ALREADY-uploaded clip (video or audio). A studio that cannot move clips refuses timeOffset rather than ignoring it.
 - split: { id, at (canvas s) } → cut a clip in two: { leftId, rightId, leftMediaId, rightMediaId, at }. The first half keeps its id. Refused (not claimed) where the studio cannot split or the time is outside the clip.
 - add_transition: { fromItemId (ends at the cut), toItemId (starts at it), transition?: { type: 'crossfade'|'dip', seconds, color } } → the same in preview and export. Split a clip, then transition between its halves, or join two clips that meet.
-- For an IMAGE on the timeline, use pinepaper_import_image with bornAt / ttl (seconds on screen).
+- For an IMAGE on the timeline, import it with pinepaper_import_image, then give it bornAt / ttl (seconds on screen) with pinepaper_modify_item.
 
 NOTES:
 - The server fetches the URL (or reads a local path / data: URL) and hands the page the bytes, so it does not need to be CORS-permitted.
@@ -2350,6 +2355,10 @@ ACTIONS:
 - apply_style: { itemId, styleKey, palette?, variant?, content?, fontFamily?, fontSize? } — render a text item as a layered display title (offset copies, outlines, fills). The result GROUP ADOPTS the text's registry id, so existing relations/keyframes/handles keep pointing at it. fontFamily: 'suggested' opts into the face the style was designed around (arcade wants a pixel face — a layer stack can outline any typeface but cannot pixellate one); never automatic.
 - set_font_axes: { itemId, axes: { weight?, width?, slant? } } — STANDARD variable-font axes only (Canvas 2D has no font-variation-settings, so custom foundry axes are unreachable — platform limit, stated, not silent). Returns {applied, rejected}: CHECK rejected — an axis silently ignored is the failure this surface exists to prevent. All three are ordinary animatable properties: keyframe fontWeight and type breathes between weights.
 - list_styles: {} — styles + palettes + axes, for pickers. Call this first; styleKey strings come from here.
+- list: {} — the same as list_styles.
+- cursive: { text, cursiveOptions?: { x?, y?, scale? (1), strokeColor? ('#ffffff'), strokeWidth? (2) } } → { itemId, strokes, width } — writes the words as STROKED handwriting, a path rather than a glyph, so pinepaper_animate's draw-on applies to it.
+- wrap: { itemId, maxWidth } — breaks a text item into lines no wider than maxWidth (canvas units). unwrap: { itemId } — restores the single line; wrap is not destructive.
+- to_collage: { itemId, text?, collageOptions? } — rebuilds a text item as a letter collage (same vocabulary as pinepaper_create_letter_collage); text defaults to the item's content.
 
 OVER PHOTOGRAPHS, PASS A PALETTE — NEVER THE DEFAULT. Measured on a real
 render of captions over photographs: highlighter, sticker, caption and badge
@@ -2733,7 +2742,7 @@ A partial composition reports as a failure with the elements that did not create
         title: { type: 'string', description: 'compose: the headline most styles build around.' },
         subtitle: { type: 'string', description: 'compose: the supporting line.' },
         body: { type: 'string', description: 'compose: body copy, where the style has room for it.' },
-        width: { type: 'number', description: 'compose: canvas width (the style picks its own default otherwise).' },
+        width: { type: 'number', description: 'compose: canvas width. compose SETS the canvas to its size (the style picks a default otherwise, and the result says when the canvas was resized), so pass your canvas size to keep it.' },
         height: { type: 'number', description: 'compose: canvas height.' },
         variant: { type: 'string', description: "compose: a style-specific variant, e.g. art deco's 'emerald'." },
         draw: { type: 'boolean', description: 'compose: draw it (default true). false returns the scene and ops as data and draws nothing.' },
@@ -2757,7 +2766,7 @@ A different construction from pinepaper_character, which places a figure from th
 
 TO MAKE IT ACT, not just stand: gait is how it walks and is never just walking; poses is the body over time, [{at, pose}]; sequence is a named track of those. Pass gait and travel in the SAME call to cross the frame — they share one track and two calls fight over it. A mistyped gait, pose or sequence comes back NAMED in warnings with the valid list, and the figure is still built.
 
-action 'figure' builds the figure. action 'set' builds the floor, the wall and the objects around it, so a figure has somewhere to be.
+action 'figure' builds the figure. action 'set' builds the floor, the wall and the objects around it, so a figure has somewhere to be. set takes kind: 'room' (floor and wall: groundY?, wall?, floor?), 'tabletop' (object, surfaceY), 'chair' (facing), 'table', 'counter', 'door', 'shelf' (items), 'window'; all take at and scale.
 
 The geometry is vendored from mcp-cloud, which makes this a three-repo artifact: a change to the kit lands there first and is re-vendored into the engine.`,
     inputSchema: {
@@ -2765,7 +2774,7 @@ The geometry is vendored from mcp-cloud, which makes this a three-repo artifact:
       properties: {
         action: { type: 'string', enum: ['figure', 'set'], description: "'figure' or 'set'." },
         id: { type: 'string', description: 'Prefix for the created items.' },
-        kind: { type: 'string', description: 'figure: which figure. set: which piece of the kit.' },
+        kind: { type: 'string', description: 'figure: which figure. set: room | tabletop | chair | table | counter | door | shelf | window (an unknown one is refused with the current list).' },
         at: { type: 'object', description: '{ x?, y? } — where it goes.' },
         scale: { type: 'number', description: 'Size multiplier.' },
         facing: { type: 'string', enum: ['left', 'right'], description: "set: which way a CHAIR faces. A figure has none and passing it here is refused — a figure faces the way it travels." },
@@ -2855,7 +2864,19 @@ The geometry is vendored from mcp-cloud, which makes this a three-repo artifact:
 
 pinepaper_agent_export covers the PLATFORM formats: png, svg, mp4, webm, gif, pdf, sized for Instagram or YouTube. These are the interchange ones — a Lottie an app plays, a GLB a 3D tool opens, a BVH a rig imports, a PNG sequence an editor ingests. Import is here too, because a format you can only write is half a bridge.
 
-Three of these refuse quietly in the engine: exportGLB with no perspective objects and exportBVH with no rigging system both warn to the console and return nothing, and the production build strips the console. Over MCP there is no console to read, so the precondition is checked BEFORE the call and named — "no perspective objects to export — create one with createObject3D first" rather than an empty result and a guess.`,
+Three of these refuse quietly in the engine: exportGLB with no perspective objects and exportBVH with no rigging system both warn to the console and return nothing, and the production build strips the console. Over MCP there is no console to read, so the precondition is checked BEFORE the call and named — "no perspective objects to export — create one with createObject3D first" rather than an empty result and a guess.
+
+EXPORTS ARE FILES. Each export is written to a file in the export directory and the result returns { format, filePath, bytes } instead of the data — the bytes are not inlined. An export that produced nothing is refused by name.
+
+EXPORT:
+- export_lottie: { options?: { fps?, duration? (s), includeRelations? } } → a .json Lottie file
+- export_dotlottie: { options?: { fps?, duration? (s), id?, loop?, autoplay? } } → a .lottie file (the zipped Lottie plus manifest)
+- export_glb: { } → a .glb file of the PERSPECTIVE 3D objects (createObject3D). Refused when there are none. It does not export world3d meshes, which are a separate renderer.
+- export_bvh: { skeletonId (required), options?: { fps? } } → a .bvh file of that skeleton's motion. Refused when nothing is rigged.
+- export_png_sequence: { options?: { duration (s), fps, width?, height?, transparent? } } → a .zip of one PNG per frame. PASS duration and fps: the studio does not size the sequence to the scene, and the result's defaultsUsed says when its own default length was used.
+
+IMPORT:
+- import_lottie: { data (the Lottie JSON — an object or a JSON string), options?: { fitToCanvas?, autoPlay?, centerOnCanvas?, scale? } } → { itemId, itemIds, items, duration, bounds }; a failed import fails with the importer's errors. data is parsed as JSON, so a URL or a file path does not work; read the file and pass its contents. There is no .lottie, GLB or BVH import here: a glTF goes into a 3D world with the world3d tool's import_gltf, a BVH onto a rig with the rigging tool's import_bvh / retarget_bvh.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -2894,6 +2915,36 @@ THE CATALOGUE IS A STARTING SET, NOT THE LIMIT. Six instruments, five drums and 
 - A melodic instrument needs a partial table, because one with no partials renders silence. Percussion and SFX may be pure noise instead, because a hat and a whoosh are.
 - For a drum, pass pitch: { from, tau }. The glide is what makes a kick a kick; without it you get a beep.
 - Names are normalised to [a-z][a-z0-9_-]. Register 'Rhodes' and the response returns canonicalName 'rhodes' — play THAT.
+
+ARGUMENTS BY ACTION. A sound spec is { note? ('A4') | hz? | chord? + root?, instrument? (a catalogue name), waveform? ('sine' | 'square' | 'sawtooth' | 'triangle'), partials? ([{ h, amp }]), envelope? ({ attack, decay, sustain, release }), gain? (0..1), pan? (-1..1), duration? (seconds) }.
+
+CATALOGUES:
+- list_instruments / list_percussion / list_sfx: {} → the engine's names, built-in and defined.
+
+PLAY — each returns { played }. When the studio returns no voice (it may have no audio output) the call fails and says so; placed sounds and render_soundtrack need no audio output:
+- play_tone: { note ('A4', required), options? } — options is merged into the spec, so { duration, gain, pan, instrument, envelope, waveform } all work, and options.hz overrides the note. A top-level hz is NOT play_tone's: it belongs to define_percussion / define_sfx, and play_tone without note is refused.
+- play_chord: { root ('C4'), chord? ('major' default; 'minor', 'maj7', 'dim' …), options? }
+- play_percussion / play_sfx: { name (from the catalogue), options? }
+- play_spec: { spec, options? } — options is merged into the spec.
+- play_from_text: { text, options? } — options is merged into the resolved spec.
+
+READ WITHOUT PLAYING:
+- chord_frequencies: { root, chord?, options? } → { frequencies } (Hz)
+- from_text: { text ('a soft warm bell on A4') } → { spec } to inspect or edit, then play_spec or create
+- timbre_from_path: { itemId (a path with length), samples? (256) } → { timbre: { partials } }
+
+ON THE CANVAS — a placed sound is a timeline item:
+- create: { spec?, visual?: { width? (220), height? (64), position? ({ x, y }), color?, startTime? (s), duration? (s) } } → { itemId, placement? } — startTime / duration place it in the same call.
+- sequence: { cues: [{ t (s, required), spec? | preset? (an instrument name) + note?, duration?, visual? }] } → { placed, itemIds, cues, failed? } — a whole bed in ONE call; failures come back by index. preset is shorthand for spec: { instrument: preset, note }.
+- set_placement: { itemId, placement: { startTime?, duration? } } (seconds; no other keys are read) → { placed }
+- remove: { itemId } → { removed } · stop_all: {} → { stopped } — stops everything sounding now; placed sounds stay placed.
+
+DEFINE (name is normalised to [a-z][a-z0-9_-]; play the returned canonicalName):
+- define_instrument: { name, partials (required, ≥1), envelope?, gain? (0.8), aliases? } → { canonicalName, requestedName, normalised, listed }
+- define_percussion / define_sfx: { name, partials? or noise? (0..1; one of the two is required), noiseFreq? (Hz), hz? (base Hz), pitch? ({ from (Hz), tau (s, ≤5) }), envelope?, gain?, aliases? }
+
+RENDER:
+- render_soundtrack: { duration? (s, ≤600), sampleRate? (48000), bitDepth? (16 | 32) } → a WAV FILE; the result names filePath, fileSize, placed and any dropped. Refused by name when no sound is placed.
 
 render_soundtrack mixes every placed sound to a WAV and writes it to a file. It runs offline, with no Web Audio and no playback, so it works in a headless studio. An empty scene is refused by name rather than producing a silent file, and any sound that could not be mixed is reported as dropped — a soundtrack missing a track otherwise looks exactly like a complete one.`,
     inputSchema: {
@@ -2939,7 +2990,7 @@ render_soundtrack mixes every placed sound to a WAV and writes it to a file. It 
     description: `The generators' Animation knob, pointed at anything — the same motion engine every generator's own animation runs on, reachable for any group or list of items.
 
 Two kinds, and the second is the one nothing else here can do:
-- GROUP motions (drift, sway, rotate, pulse, wave, bounce) move the target as one.
+- GROUP motions (driftX, driftY, swayX, swayY, rotate, pulse, wave, bounce) move the target as one.
 - FIELD motions (ripple, breathe, undulate) sweep a crest THROUGH the children from an origin, with a chosen waveform — each element moves at its own moment in the cycle. That is a wave passing through a crowd, not a crowd moving together.
 
 Call action 'list' first. It returns the engine's own catalogue — every motion, waveform and origin it will accept — so the names come from the engine rather than from an enum here that can drift away from it.
@@ -3020,8 +3071,48 @@ ACTIONS:
 - add_actor: { actorId?, x, z, height?, sprite? (a canvas item id), live? } → { actorId }. live: true re-rasterizes the item as it animates — a RIGGED character (walk cycle, expressions) PERFORMS in the world instead of standing there as a photograph of itself.
 - remove_actor / list_actors / set_actor_pose: { actorId, pose: { x?, z?, angle? } } — the setter a timeline, sequencer or agent drives frame by frame.
 - set_camera: { camera: { mode: 'follow' | 'fixed' | 'orbit', target? (actorId), radius?, speed?, eye?, lookAt? } }
-- add_object: { object: { x, z, height?, color?, metalness?, roughness?, emissiveIntensity? } } (y defaults to sitting ON the terrain) / remove_object: { objectId }
+- add_object: { object: { x, z, height?, color? } } (y defaults to sitting ON the terrain) / remove_object: { objectId }
 - remove_world: {} — tears the world down; the Paper canvas was always its own layer and is untouched.
+
+UNITS: positions, sizes, ranges and radii are WORLD units (metres). rotY is RADIANS everywhere on the mesh path (pass mesh.rotYDegrees to write degrees); lathe arc is DEGREES. Colours take hex or [r, g, b] in 0..1. These act on an existing world: call create first.
+
+MESHES — a canvas path becomes real geometry:
+- extrude_path: { pathId, mesh?: { id?, depth? (1), unitsPerPixel? (0.01: canvas px → world units), upright? (stand the drawing up; default flat, a floor plan), placement? ('centered' default: centred on x/z, base at y | 'canvas'), caps?, segments?, flatness?, x?, y?, z?, rotY?, rotYDegrees?, scale?, doubleSided?, color?, metalness?, roughness?, uniforms? } } → { meshId }. The path is unchanged.
+- lathe_path: { pathId, mesh?: same fields, plus arc? (DEGREES, 360 = full solid); segments? = steps round the revolution } → { meshId }
+- list_meshes: {} → { count, meshes } (long vertex arrays summarised to their length)
+- remove_mesh: { meshId }
+- set_mesh_instances: { meshId, instances: [[x, y, z, scale, rotY (RADIANS), variant], …] } — replaces the copies a mesh draws, six numbers each.
+
+LIGHTS — point lights, at most 8 (the ninth is refused by name):
+- add_light: { light: { id?, x? (0), y? (3), z? (0), color? (hex or linear [r, g, b], may exceed 1), intensity? (6), range? (20) } } → { lightId, light }
+- set_light: { lightId, light: any of the add_light fields } — moves or retunes in place.
+- remove_light: { lightId } · list_lights: {} → { lights }
+
+MATERIALS — a NAMED, SHARED surface: one edit restyles every object using it.
+- add_material: { material: { id?, color?, emissive?, emissiveIntensity?, metalness? (0..1), roughness? (0..1), clearcoat?, clearcoatRoughness?, sheenColor?, sheenRoughness? } } → { materialId, material }. metalness / roughness reach pixels on the MESH path only.
+- set_material: { materialId, material: any of the add_material fields } · remove_material: { materialId } · list_materials: {} → { materials }
+
+IMPORT:
+- import_obj: { source (the .obj file TEXT), importOptions?: { id?, x?, y?, z?, rotY? (RADIANS), scale?, doubleSided?, uniforms?, color? ([r, g, b] 0..1; .mtl is never read) } } → { meshIds, warnings }
+- import_gltf: { source (the .gltf JSON TEXT, buffers embedded), importOptions?: { id?, x?, y?, z?, rotY?, scale?, doubleSided?, uniforms?, merge? (default true) } } → { meshIds, warnings }. A URL, a data: URI or a file path is NOT fetched — the string is parsed as glTF JSON. Unsupported features come back named in warnings.
+- list_mesh_clips: { meshId } → { clips } (the animation clips a skinned import carries)
+- set_mesh_clip: { meshId, clip, crossfade? (seconds) }
+
+NAVIGATION, PICKING, CAMERA:
+- set_nav_target: { navTarget: '2d' | '3d' } — which layer the pointer drives · get_nav_target: {} → { navTarget }
+- ground_height: { point: { x, z } (WORLD) } → { height } of the terrain there
+- raycast: { origin: [x, y, z], direction: [x, y, z] (need not be normalised) } → { hit (registry id, point …) | null, missed }
+- line_of_sight: { from: [x, y, z], to: [x, y, z] } → { clear }
+- world_to_canvas: { point: { x, y, z? } (WORLD) } → { point: { x, y } } in canvas px; refused when the point is behind the camera
+- canvas_to_ground: { point: { x, y } (CANVAS px) } → { ground } where that pixel lands on the terrain
+- dolly_camera: { multiplier } (>1 away, <1 closer) → { camera }
+- pan_camera: { dx, dy } (SCREEN px) → { camera }
+
+PHYSICS — narrow by design: spheres and capsules under gravity colliding with terrain, objects, actors and meshes. No stacking, no joints (pinepaper_physics is the 2D world and has those).
+- add_body: { body: { id?, kind? ('sphere' default | 'capsule'), position? ([x, y, z]), velocity? ([x, y, z]), radius? (0.5), height? (1.8, capsule), mass? (1), restitution? (0.3), friction? (0.6), gravityScale? (1), kinematic?, ignoreIds?, ttl? (seconds), data? } } → { bodyId, body }
+- fire_projectile: { body: { id?, position?, direction? ([0, 0, -1]), speed? (40), radius? (0.15), restitution? (0), gravityScale? (0.35), ttl? (6 s), ignoreIds? (e.g. the shooter), data? } } → { id, body } — a SWEPT sphere, so it cannot tunnel through a thin wall.
+- impulse: { bodyId, vector: [x, y, z] } · set_velocity: { bodyId, vector: [x, y, z] }
+- step_physics: { dt (seconds) } → { contacts, removed } · remove_body: { bodyId } · list_bodies: {} → { bodies }
 
 RECIPE — a character walking through a forest: create {spec:'forest'} → import/rig a character on the canvas → add_actor {sprite: itemId, live: true} → set_camera {mode:'follow', target} → drive set_actor_pose over time (or let the built-in character control walk).`,
     inputSchema: {
@@ -3094,7 +3185,7 @@ The knowledge of how a figure is built and how it moves lives in the graph; this
              { at: 1.8, channel: "say", until: 4.2 },
              { at: 5.0, channel: "headTurn", value: -0.8 } ] }
 
-CHANNELS ARE DECLARED BY THE CONCEPT, not by you. Ask pinepaper_ontology for a concept to see the ones it has. Four kinds exist:
+CHANNELS ARE DECLARED BY THE CONCEPT, not by you. Ask pinepaper_query_ontology for a concept to see the ones it has. Four kinds exist:
 - transform: one part deformed with an attack, a hold and a release — a blink is the eyes flattening in scaleY and easing back. This is what gives a gesture a MIDDLE; a swap between two drawings has only two ends and reads as flashing.
 - cycle: a repeating throw that runs for as long as you ask — a pigeon's head bob, a tail flick. Amplitude is a fraction of the part, so it means the same at any size.
 - shift: every part moved together, for a turn a flat drawing cannot rotate into.
@@ -3197,6 +3288,12 @@ ACTIONS:
 - import_bvh: { bvhText, view? (side|front), fps? (15; 0 = every frame), height? (320px), rootPosition?, name? } → { skeletonId, poses, duration, warnings } — build a NEW rig from a BVH mocap clip (CMU / Mixamo), stick figure included. Root translation returns as a separate track rather than baked into poses.
 - retarget_bvh: { bvhText, skeletonId, fps?, name? } → { skeletonId, matched, unmatchedSource, unmatchedTarget, poses, duration } — drive an EXISTING rig with a BVH clip, bones matched by name. CHECK matched/unmatched in the result: a retarget that matched 2 of 15 bones "succeeds" and looks broken.
 - import_spine: { spineJson, rootPosition?, name? } → { skeletonId, bones, placeholders, animations, warnings } — import a Spine editor JSON export (bones, poses, attachment placeholders).
+- list_skeletons: {} → { skeletons: [{ id, name, boneCount, rootBoneId, hasIK, hasPhysics }], count } — needs no skeletonId; the place to find one on a rig you did not build.
+- stop_pose_sequence: { skeletonId } — stops the playing pose sequence; joints go back to their poses / rest. Refused (a no-op, not a fault) when nothing was playing.
+- apply_pose_transition: { skeletonId, transitionName, poseIdMap? ({ transitionPoseName: savedPoseId }) } — plays a named stock transition (walk, run, flap …; list_pose_libraries returns the names). It plays poses BY NAME, so load_pose_library first; poseIdMap is built from list_poses by name when omitted.
+- stop_root_track: { skeletonId } — stops a move_root locomotion track; the figure stays where it is. Refused (a no-op) when no track was running.
+- list_shape_keys: { skeletonId } → { shapeKeys: [{ id, name }], count }
+- load_shape_key: { skeletonId, shapeKeyId, weight? (0..1, default 1) } — blends the attached items toward a shape key saved with save_shape_key.
 
 BREAKDOWN POSES (S12): a breakdown keyframe shapes the ARC + SPACING between key poses (favor biases spacing; boneOffsets lag bones so a tip drags its root — follow-through; movingHold keeps a hold alive). This is the difference between mechanical and lifelike motion.`,
     inputSchema: {
@@ -3898,6 +3995,8 @@ USE WHEN:
 - Starting/stopping/pausing timeline playback
 - Seeking to specific time
 - Controlling animation state
+
+PLAYBACK: play { duration?, loop? } · pause {} (holds the playhead) · stop {} (stops and rewinds) · seek { time (s), deterministic? }
 
 DETERMINISTIC SEEK: pass deterministic: true with action 'seek' to evaluate the WHOLE scene at the exact time via app.sceneAt(t) — keyframes + relations + generators all tick to t, so the same time always yields the same frame (paired with a seed in pinepaper_capture_frames for reproducible output). Plain seek only sets the keyframe playback state. Use deterministic seek before pinepaper_browser_screenshot to capture a reproducible frame.
 
@@ -5136,7 +5235,7 @@ flags as a badly-composed scene, and they do not survive an artboard change.`,
         medium: { type: 'string', enum: ['vector', 'thread'], description: "What makes the marks. 'thread' stitches every closed path AFTER arranging; photographs and text cannot be stitched and return in medium.skipped with the reason. Other media are refused with their own reason rather than faked." },
         stitch: { type: 'string', enum: [...THREAD_STITCHES], description: 'Which stitch when medium is thread (default longAndShort) — the same six pinepaper_design_medium offers.' },
         stitchBudget: { type: 'number', description: 'Total marks across the composition (default 6000); the stitch scales to fit rather than the fill being cut short.' },
-        action: { type: 'string', enum: ['list_patterns', 'list_treatments', 'apply', 'set_treatment'] },
+        action: { type: 'string', enum: ['list_patterns', 'list_treatments', 'list_reveals', 'list_styles', 'apply', 'set_treatment'] },
         pattern: { type: 'string', description: 'Pattern key from list_patterns' },
         itemIds: { type: 'array', items: { type: 'string' }, description: 'Items in slot order' },
         treatment: { type: 'string', description: 'Camera treatment key' },
@@ -5144,6 +5243,15 @@ flags as a badly-composed scene, and they do not survive an artboard change.`,
         applyCamera: { type: 'boolean', description: 'false to arrange without compiling a camera track' },
         loop: { type: 'boolean' },
         craft: { type: 'object', description: 'Override craft ratios (gutter, margin…), as fractions of the short canvas edge' },
+        // These were in the Zod schema and the description but not here, so a
+        // client never saw them (1.6.19 gate C3).
+        reveal: { type: ['string', 'null'], description: 'apply: temporal reveal key from list_reveals — items arriving over time' },
+        revealOptions: { type: 'object', description: 'apply: reveal tuning { duration, beat, fade, beats: number[] }; explicit beats sync cuts to audio' },
+        style: { type: 'string', description: 'apply: visual style bundle from list_styles (treatments + spacing + motion defaults)' },
+        text: { type: 'array', items: { type: 'string' }, description: "apply: content for the pattern's TEXT slots (headline, caption…), in slot order" },
+        assets: { type: 'array', items: { type: 'string' }, description: "apply: SVG markup for the pattern's VECTOR slots (badge, logo mark), in slot order" },
+        audio: { type: 'string', description: 'apply: audio source to beat-sync the reveal to' },
+        grid: { type: 'boolean', description: 'apply with audio: snap to an even tempo grid instead of raw onsets' },
       },
       required: ['action'],
     },
@@ -5330,13 +5438,13 @@ ACTIONS:
 - lineage: Walk back to the roots — the chain of imports/derivations that produced it. Params: itemId
 - dependents: What breaks if you delete it. Params: itemId — check this BEFORE removing something
   other items were built from.
-- record: Note that this item derives from a source. Params: itemId, kind, sourceRef, meta`,
+- record: Note where this item came from. Params: itemId, kind (${LINEAGE_KINDS.join(' | ')}; default derivedFrom), sourceRef (an item id, or asset:… / component:…), meta`,
     inputSchema: {
       type: 'object',
       properties: {
         action: { type: 'string', enum: ['get', 'lineage', 'dependents', 'record'] },
         itemId: { type: 'string' },
-        kind: { type: 'string', description: 'Lineage kind, e.g. traced | imported | derived' },
+        kind: { type: 'string', enum: [...LINEAGE_KINDS], description: 'record: lineage kind (default derivedFrom)' },
         sourceRef: { type: 'string', description: 'What it came from (item id, asset id, URL)' },
         meta: { type: 'object' },
       },
@@ -5725,6 +5833,8 @@ ACTIONS:
 - choose: Mood- and context-weighted recommendation based on subject/prompt words and target feeling.
 - coverage: Report total indexable and describable capabilities across categories.
 - find: Direct lookup of a capability by key to inspect its description and how to apply it (applyWith).
+- catalogue: { catalogue: 'rig_presets' | 'shader_effects' | 'stroke_decorations' | 'precomps' | 'images' | 'segment_edit_kinds' | 'shatter_orders' | 'world_meshes' | 'relation_presets' } — the registries 'list' does not gather.
+- studio: {} — which engine methods THIS studio has, so you learn what will refuse before calling it.
 
 MOOD VOCABULARY FOR CHOOSE:
 - reveal: resolve, reveal, appear, emerge, decode, decrypt, unscramble, form, assemble
@@ -6775,12 +6885,11 @@ EXAMPLES:
       idempotentHint: false,
       openWorldHint: false,
     },
-    description: `Load a map and control its viewport. Call action: "load" first to set up; subsequent calls control pan / zoom / config import-export.
+    description: `Load a map and import/export its config. Call action: "load" first.
 
 ACTIONS:
-- load           — { mapId: "usa"|"world"|"worldHighRes"|<custom>, projection?, options? }
-- pan            — { lat, lon, duration? }
-- zoom           — { level, duration? }
+- load           — { mapId: "usa"|"world"|"worldHighRes"|<custom>, projection?, center?: [lon, lat], options? } — center (and options.scale) frame the map; this is the way to show one region
+- pan, zoom      — REFUSED: the map has no view transform, and a camera move would change only the studio view, which a canvas export ignores. For a moving frame, keyframe a camera animation and export with framing:"camera"
 - export_config  — {}
 - import_custom  — { url? | geoJson? (geojson accepted), options?: { projection?, fillColor? } }
 
@@ -6791,6 +6900,7 @@ For region styling/selection use pinepaper_map_regions; for animations use pinep
         action: { type: 'string', enum: ['load', 'pan', 'zoom', 'export_config', 'import_custom'], description: 'Map action' },
         mapId: { type: 'string', description: 'Map identifier (load)' },
         projection: { type: 'string', description: 'Projection (load / import_custom)' },
+        center: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: 'load: [lon, lat] the projection centres on' },
         options: { type: 'object', description: 'Map options (load)', additionalProperties: true },
         lat: { type: 'number', description: 'Latitude (pan)' },
         lon: { type: 'number', description: 'Longitude (pan)' },
@@ -8172,14 +8282,14 @@ After validation: user reviews screenshot → feedback → modify/recreate as ne
 OPERATION TYPES (13) — use in this order:
 
 CANVAS SETUP:
-  set_canvas_size — {width, height} or {preset: "instagram"|"youtube"|"tiktok"|...}
+  set_canvas_size — {width, height} or {preset: "instagram-post"|"instagram-story"|"youtube-thumbnail"|"tiktok"|"full-hd"|...} (studio preset keys, not platform names; an unknown one is refused with the list)
   set_background — {backgroundColor: "#hex"}
   execute_generator — {generatorName, generatorParams} → fills canvas with procedural art (paints WITHOUT fully registering items — see get_items; custom generator names need skipValidation:true)
     Generators: drawBokeh, drawGradientMesh, drawWaves, drawSunburst, drawSunsetScene, drawGrid, drawCircuit, drawPattern, drawStackedCircles, drawGeometricAbstract, drawWindField, drawFluidFlow, drawOrganicFlow, drawNoiseTexture, drawGlobeWireframe
     PineMath: drawFunctionPlot (y=f(x) plots), drawParametricCurve (x(t),y(t)), drawSimulation (pendulum, Lorenz, spring-mass), drawSpectrumAnalyzer (FFT), draw3DSurface (torus, sphere, Klein bottle)
 
 ITEMS:
-  create — {itemType, position: {x,y}, properties}
+  create — {itemType, position: {x,y} or [x,y], properties}
     itemType: text, circle, rectangle, star, triangle, polygon, ellipse, path, line, arc, pentagon, hexagon, diamond, arrow, heart
     Properties per type:
       text: {content, fontSize, fontFamily, color, fontWeight}
@@ -8265,9 +8375,11 @@ EXAMPLE — Animated sky scene with timed reveals:
                 description: 'For create: item type',
               },
               position: {
-                type: 'object',
-                properties: { x: { type: 'number' }, y: { type: 'number' } },
-                description: 'For create: position {x, y}',
+                oneOf: [
+                  { type: 'object', properties: { x: { type: 'number' }, y: { type: 'number' } } },
+                  { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2 },
+                ],
+                description: 'For create: position {x, y} or [x, y]',
               },
               properties: { type: 'object', description: 'For create/modify: item properties' },
               itemId: { type: 'string', description: 'Target item ID or $N reference' },
@@ -8277,7 +8389,7 @@ EXAMPLE — Animated sky scene with timed reveals:
               // Loop animation
               animationType: {
                 type: 'string',
-                enum: ['bounce', 'breathe', 'fade', 'glow', 'jelly', 'path', 'pulse', 'rotate', 'scrollDown', 'scrollLeft', 'scrollRight', 'scrollUp', 'shake', 'slideLeftRight', 'slideUpDown', 'swing', 'typewriter', 'wobble'],
+                enum: [...SimpleAnimationTypeSchema.options],
                 description: 'For animate: loop animation type',
               },
               animationOptions: { type: 'object', description: 'For animate: {speed, amplitude, direction}' },
@@ -8301,7 +8413,7 @@ EXAMPLE — Animated sky scene with timed reveals:
               targetId: { type: 'string', description: 'For relation: target item ID or $N' },
               relationType: {
                 type: 'string',
-                enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'anchored_in_world', 'spring_follow', 'repels', 'attracts', 'wiggle', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'morphs_to', 'group_morphs_to', 'moves_along_path', 'construction_reveal', 'triggers_animation', 'syncs_with', 'tours', 'synced_to_audio', 'expresses', 'camera_follows', 'camera_animates', 'is_midpoint_of', 'lies_on_line', 'is_centroid_of', 'is_circumcenter_of', 'concentric_with', 'driven_by', 'time_expression', 'on_click_fire', 'on_pointer_enter_fire', 'on_pointer_exit_fire', 'on_key_fire', 'on_event_fire_after', 'on_event_fire_if', 'on_event_add_relation', 'on_event_remove_relation', 'on_event_set_color', 'on_event_set_property', 'on_event_set_property_from_template', 'on_event_set_visibility', 'on_event_set_active', 'on_event_set_data', 'on_event_increment', 'on_event_toggle', 'on_event_store_set', 'on_event_store_increment', 'on_enter_set_color', 'on_enter_set_property', 'on_enter_set_property_from_template', 'on_enter_set_visibility', 'on_enter_set_data', 'on_enter_increment', 'on_enter_toggle', 'on_exit_set_color', 'on_exit_set_property', 'on_exit_set_property_from_template', 'on_exit_set_visibility', 'on_exit_set_data', 'on_exit_increment', 'on_exit_toggle', 'exclusive_group', 'menubar_group', 'restores_from', 'on_top_of', 'below', 'beside', 'inside', 'centered_on', 'aligned_with', 'part_of', 'connects_to', 'attached_to_tail', 'head_points_to'],
+                enum: [...RelationTypeSchema.options],
                 description: 'For relation: type',
               },
               relationOptions: { type: 'object', description: 'For relation: options' },
@@ -8316,7 +8428,7 @@ EXAMPLE — Animated sky scene with timed reveals:
               // Effects
               effectType: {
                 type: 'string',
-                enum: ['sparkle', 'blast', 'smoke', 'fire', 'rain', 'snow', 'confetti', 'ripple', 'glow', 'electric', 'bubbles', 'dust', 'fireflies', 'shockwave', 'trail', 'heatmap', 'liquid_metal', 'gem_smoke', 'electric_arc', 'vortex', 'rain_veil', 'caustics'],
+                enum: [...EffectTypeSchema.options],
                 description: 'For apply_effect: effect type',
               },
               effectParams: { type: 'object', description: 'For apply_effect: parameters' },
@@ -8393,7 +8505,7 @@ Held exports last until released, or until a LATER export needs the space — an
   {
     name: 'pinepaper_agent_export',
     annotations: {
-      title: 'Export as MP4 Video, GIF, PNG, SVG, or PDF',
+      title: 'Export Video, Stills, Animation, Ads, Captions or Audio',
       readOnlyHint: true,
       destructiveHint: false,
       idempotentHint: true,
@@ -8422,7 +8534,7 @@ PLATFORMS & OPTIMAL FORMATS:
 
 A preset's dimensions assume the canvas has the same aspect. When it does not, the canvas aspect is KEPT (never stretched) and its short edge takes the preset's short edge — a 4:5 canvas on instagram exports 1080x1350 — and the result carries platformFit saying so.
 
-FORMATS: svg, png, gif, mp4, webm, pdf.
+FORMATS: ${AgentExportFormatSchema.options.join(', ')}.
 QUALITY: draft, standard, high.
 FRAMING: canvas (default, full canvas) | camera (camera_animates first-keyframe viewport — video formats only, requires a keyframe-mode walkthrough on the canvas; camera animation still drives motion within the fixed output frame).
 
@@ -8445,7 +8557,7 @@ VERIFY MOTION BEFORE YOU RENDER. An export takes seconds to minutes and shows yo
         platform: {
           type: 'string',
           enum: ['auto', 'instagram', 'instagram-story', 'tiktok', 'youtube', 'youtube-thumbnail', 'twitter', 'linkedin', 'web', 'print-a4', 'print-letter', 'print-a4-landscape', 'print-letter-landscape'],
-          description: "Target platform, which sets the output DIMENSIONS. 'auto' (the default) renders the canvas at its own size — use it when the canvas is already the size you want, otherwise a preset REPLACES your dimensions. Every other value forces that platform's frame regardless of the canvas.",
+          description: "Target platform, which sets the output DIMENSIONS. 'auto' (the default) renders the canvas at its own size — use it when the canvas is already the size you want, otherwise a preset sets the output SIZE from the platform's short edge. The canvas aspect is kept, never stretched: on a canvas of a different aspect the output is not the platform's frame (an 800x600 canvas on instagram exports 1440x1080), and the result's platformFit says so. To get the exact frame, set the canvas to the platform's aspect first.",
         },
         format: {
           type: 'string',
@@ -8866,6 +8978,14 @@ Three-phase analysis:
 
 Quality tiers: basic (<0.4), fair (0.4-0.6), good (0.6-0.8), excellent (>=0.8)
 
+DEFINITION SHAPE (a template document; every field optional, the items and relations sit under data):
+{ id?, name?, category?, dimensions?: { width, height }, duration? (s), description?, tags?: [..], semantics?: {..},
+  data: {
+    items: [{ id, type ('circle', 'text' …), x?, y? | position?: [x, y], content?, animationType?, keyframes?: [{ time, properties: {..}, easing? }], mask?: { type } }],
+    relations: [{ type ('orbits' …), source | from, target | to, params? }],
+    backgroundGenerator?, backgroundGeneratorParams?
+  } }
+
 USE WHEN:
 - Checking a template for structural issues before publishing
 - Comparing quality scores between template variants
@@ -9055,12 +9175,12 @@ USE WHEN:
 - You want more/less detail in tool descriptions → switch verbosity
 
 PROFILES:
-- full: All 120+ tools
-- agent: Core creative tools (~50 tools) — default
+- full: Every tool, no filtering
+- agent: Every tool except the diagnostics (get_performance_metrics, diagnostic_report) and register_item — default
 - diagram: Diagram/flowchart tools
 - map: Map/choropleth tools
 - font: Font creation tools
-- minimal: Bare essentials (~15 tools)
+- minimal: Bare essentials
 
 VERBOSITY:
 - verbose: Full descriptions
@@ -9290,7 +9410,7 @@ ACTIONS:
 - set_rulers: Show/hide rulers. Params: enabled (bool)
 - set_grid: Show/hide unit grid. Params: enabled (bool)
 - get_dimensions: Get item bounds. Params: itemId → returns {x, y, width, height, rotation}
-- set_snap: Enable/disable snap-to-grid. Params: enabled (bool)`,
+- set_snap: Enable/disable snapping a DRAG or RESIZE in the studio to the unit grid (only while the grid is on). Params: enabled (bool). Items placed by tools are not snapped.`,
     inputSchema: {
       type: 'object',
       properties: {

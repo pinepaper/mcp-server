@@ -1190,14 +1190,12 @@ describe('Measurement code generation', () => {
     expect(code).toContain('"item_1"');
   });
 
-  it('set_snap REFUSES, because there is no snap mode to set', () => {
-    // MeasurementSystem publishes snapCoordinate() — it snaps a coordinate you
-    // hand it — and nothing that holds snapping on. The old call reported
-    // success over a setting that never changed.
+  it('set_snap sets the engine\'s snap-to-unit setting and says what it governs', () => {
+    // The engine gained setSnapToUnitEnabled; the old refusal said it had never
+    // existed (1.6.19 gate). It snaps drags and resizes, not tool placement.
     const code = codeGenerator.generateMeasurement({ action: 'set_snap', enabled: true });
-    expect(code).not.toContain('.setSnapToUnitEnabled(');
-    expect(code).toContain('success: false');
-    expect(code).toContain('snaps a coordinate on request');
+    expect(code).toContain('app.setSnapToUnitEnabled(true)');
+    expect(code).toContain('Items placed by tools are not snapped');
   });
 
   it('includes measurementSystem guard', () => {

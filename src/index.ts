@@ -5857,7 +5857,7 @@ export async function createServer(options: ServerOptions = {}): Promise<Server>
       prompts: {},
       logging: {},
     },
-    instructions: `You are connected to PinePaper Studio — a canvas animation engine with 120+ tools for creating animations, videos, and graphics.
+    instructions: `You are connected to PinePaper Studio — a canvas animation engine with tools for creating animations, videos, and graphics.
 
 CRITICAL: When the user asks to create any visual content (animation, video, graphic, poster, diagram, or design), you MUST use PinePaper tools. Do NOT create standalone HTML pages, React components, or web apps as a substitute. Do NOT use frontend design skills or CSS-only animations instead of PinePaper. PinePaper tools ARE the implementation — they run on a real browser canvas and produce real exports (Canvas 2D, SVG, JavaScript, MP4, GIF, PNG are all valid PinePaper outputs).
 

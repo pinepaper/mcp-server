@@ -1084,32 +1084,18 @@ describe('handleToolCall', () => {
     });
   });
 
-  describe('pinepaper_pan_map', () => {
-    it('should generate code to pan the map', async () => {
-      const result = await handleToolCall('pinepaper_map', { action: 'pan',
-        lat: 50,
-        lon: 10,
+  // pan / zoom refuse (1.6.19 gate run 2): a camera move changed only the
+  // studio view, which a canvas export ignores, so success was a false one.
+  describe('pinepaper_map pan / zoom', () => {
+    for (const args of [{ action: 'pan', lat: 50, lon: 10 }, { action: 'zoom', level: 2 }]) {
+      it(`${args.action} refuses and says how to frame a map instead`, async () => {
+        const result = await handleToolCall('pinepaper_map', args);
+        const code = String((result._meta as Record<string, unknown>)['pinepaper.studio/code']);
+        expect(code).toContain('success: false');
+        expect(code).toContain('framing:\\"camera\\"');
+        expect(code).not.toContain('app.camera.');
       });
-
-      expect(result.isError).toBeFalsy();
-      const text = (result.content[0] as { type: string; text: string }).text;
-      expect(text).toContain('panTo');
-    });
-  });
-
-  describe('pinepaper_zoom_map', () => {
-    it('should generate code to zoom the map', async () => {
-      const result = await handleToolCall('pinepaper_map', { action: 'zoom',
-        level: 2,
-      });
-
-      expect(result.isError).toBeFalsy();
-      const text = (result.content[0] as { type: string; text: string }).text;
-      // The map has no numeric zoom, but the camera zooms to an absolute level
-      // (camera.zoomIn(level) animates to { zoom: level }), so the documented
-      // call now works instead of refusing (1.6.19 gate D3).
-      expect(text).toContain('app.camera.zoomIn(2, 0.5)');
-    });
+    }
   });
 
   describe('pinepaper_export_map', () => {
