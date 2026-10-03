@@ -2976,12 +2976,20 @@ export class PinePaperCodeGenerator {
       return generateMovesAlongPathCode(validated.sourceId, validated.targetId ?? undefined, (validated.params ?? {}) as Record<string, unknown>);
     }
 
-    return generateAddRelationCode(
+    const code = generateAddRelationCode(
       validated.sourceId,
       validated.targetId || validated.sourceId,
       validated.relationType as RelationType,
       validated.params as Record<string, unknown>
     );
+    // NO TARGET (event reactions like on_event_play_sound, self-relations): the
+    // engine is handed the source as the target, but the reply must not say
+    // "item_2 → item_2" — a model reads that as the event wired to itself.
+    if (validated.targetId) return code;
+    return code
+      .replace(`return { success: true, sourceId: '${validated.sourceId}', targetId: '${validated.sourceId}',`,
+        `return { success: true, sourceId: '${validated.sourceId}', targetId: null,`)
+      .replace(`relation between ${validated.sourceId} and ${validated.sourceId}.`, `relation on ${validated.sourceId} (no target).`);
   }
 
   /**

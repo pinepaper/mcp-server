@@ -28,3 +28,12 @@ describe('event sounds', () => {
     expect(old.warning).toContain('D85');
   });
 });
+
+describe('a target-less relation reports no target', () => {
+  it('targetId is null in the reply, not the source', async () => {
+    const { AddRelationInputSchema } = await import('../../types/schemas.js');
+    const code = codeGenerator.generateAddRelation(AddRelationInputSchema.parse({ sourceId: 'item_2', relationType: 'on_event_play_sound', params: { sound: 'pop' } }) as never);
+    const r = run(code, { addRelation: () => true, _isKnownRelationEndpoint: () => true, historyManager: { saveState() {} } });
+    expect(r).toMatchObject({ success: true, sourceId: 'item_2', targetId: null });
+  });
+});

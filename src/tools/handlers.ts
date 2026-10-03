@@ -2657,7 +2657,7 @@ async function handleToolCallInner(
         const description = getLocalizedSuccessMessage(i18n, 'relationAdded', {
           relationType: input.relationType ?? `preset:${input.presetId}`,
           sourceId: input.sourceId,
-          targetId: input.targetId || 'self',
+          targetId: input.targetId || '(no target)',
         });
         return executeOrGenerate(code, description, options, 'pinepaper_add_relation');
       }
