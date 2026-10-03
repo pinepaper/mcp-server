@@ -16,9 +16,12 @@
  * could do it and nothing could NAME it. For a model those are the same
  * condition.
  *
- * The fixture is the engine's own RELATION_TYPE_MAP, copied from
- * FxTool js/ontology/Vocabulary.js. Refresh it when the engine adds relations;
- * this test then says precisely what the tool surface still has to learn.
+ * The fixtures are FxTool's own exports, kept equal by
+ * scripts/check-relation-names.mjs (in prepublishOnly): engine-relations.txt is
+ * every name the fully booted registry accepts, engine-relations-authorable.txt
+ * the subset a caller may author (the engine marks the rest internal: true —
+ * character_face, part_of_figure, glyph_of, has_text_effect). This test then
+ * says precisely what the tool surface still has to learn.
  */
 
 import { describe, it, expect } from 'bun:test';
@@ -28,10 +31,11 @@ import { PINEPAPER_TOOLS } from '../../tools/definitions.js';
 import { RelationTypeSchema } from '../../types/schemas.js';
 import { RELATION_TYPE_MAP } from '../../ontology/vocabulary.js';
 
-const ENGINE = new Set(
-  readFileSync(join(import.meta.dir, '..', 'fixtures', 'engine-relations.txt'), 'utf-8')
+const readFixture = (name: string) => new Set(
+  readFileSync(join(import.meta.dir, '..', 'fixtures', name), 'utf-8')
     .split('\n').map((l) => l.trim()).filter(Boolean),
 );
+const AUTHORABLE = readFixture('engine-relations-authorable.txt');
 
 /**
  * Relations a DEDICATED TOOL emits.
@@ -43,41 +47,31 @@ const ENGINE = new Set(
  * Written down because the alternative is re-litigating all 95 at every engine
  * diff. If a family moves from tool-emitted to hand-authored, move it here.
  */
-const EMITTED_BY_A_TOOL: Record<string, RegExp | string[]> = {
+/**
+ * AUTHORABLE, BUT ROUTED TO A DEDICATED TOOL — a product decision, not an
+ * engine fact. The engine marks bookkeeping internal itself (those never reach
+ * AUTHORABLE); these it lets a caller author, and the server offers them
+ * through the tool that validates their parameters instead of add_relation,
+ * where they would be a second, unvalidated way to do the same thing.
+ */
+const ROUTED_TO_A_TOOL: Record<string, RegExp | string[]> = {
   pinepaper_deform: /^deform_/,
   pinepaper_apply_effect: /^effect_/,
   'map tools': /^geo_/,
-  // `expresses` is NOT here, though it is registered by the rigging system:
-  // the engine documents it as a hand-authored call —
-  // `app.addRelation(rootId, null, 'expresses', { expression: 'blink' })` — and
-  // pinepaper_import_layered_character promises blink/smile "work immediately",
-  // which is false if an agent cannot name it. Registered-by is not the test;
-  // authored-by is.
+  'map tools (place containment)': ['contained_in_place'],
   pinepaper_rigging: ['bone_attached', 'bone_skinned', 'ik_target', 'locomotion', 'pose_layer'],
   'blending system': /^blend_/,
+  // Written by the composing tool as its own structure; an agent authoring one
+  // by hand would make a component whose slots disagree with its parts.
   pinepaper_component: ['composed_as', 'fills_slot'],
-  'text tools': ['glyph_of', 'has_text_effect'],
-  // `part_of_figure` is the figure twin of `glyph_of` and is excluded for the
-  // same reason: it is BOOKKEEPING the composing tool maintains, not an edge a
-  // caller authors. pinepaper_character writes one per part so the thirteen
-  // shapes of a pigeon are addressable as one figure; an agent adding them
-  // ad-hoc would produce a figure whose membership disagrees with its parts.
-  // (It is deliberately NOT `part_of`, which cascades position — see the note
-  // in FxTool's RelationRegistry.)
-  pinepaper_character: ['part_of_figure'],
-  // `character_face` is the same kind of bookkeeping: createCharacter writes one
-  // per head-region part so looks_at / reacts_to find the face (fxtool: INTERNAL).
-  pinepaper_original_character: ['character_face'],
   pinepaper_camera_director: ['has_camera_treatment'],
-  'map tools (place containment)': ['contained_in_place'],
-  '(not a relation — the escape hatch for an unrecognised edge)': ['unknown'],
 };
 
 const isExcluded = (name: string) =>
-  Object.values(EMITTED_BY_A_TOOL).some((rule) =>
+  Object.values(ROUTED_TO_A_TOOL).some((rule) =>
     rule instanceof RegExp ? rule.test(name) : rule.includes(name));
 
-const EXPOSED = [...ENGINE].filter((r) => !isExcluded(r)).sort();
+const EXPOSED = [...AUTHORABLE].filter((r) => !isExcluded(r)).sort();
 
 /** Every JSON-Schema copy of the enum in the tool definitions. */
 function enumCopies(): Array<{ tool: string; prop: string; values: string[] }> {
@@ -103,7 +97,8 @@ describe('relation vocabulary ↔ engine', () => {
   });
 
   it('nothing is offered that the engine cannot run', () => {
-    const invented = (RelationTypeSchema.options as string[]).filter((r) => !ENGINE.has(r));
+    // Against AUTHORABLE: offering an internal rule is wrong too.
+    const invented = (RelationTypeSchema.options as string[]).filter((r) => !AUTHORABLE.has(r));
     // The mirror-image failure: a name resolves to nothing, so the row is
     // silently dropped downstream and the count quietly disagrees.
     expect(invented).toEqual([]);
@@ -111,8 +106,8 @@ describe('relation vocabulary ↔ engine', () => {
 
   it('the exclusion list covers exactly what is left out, and nothing more', () => {
     const zod = new Set(RelationTypeSchema.options as string[]);
-    const notCallable = [...ENGINE].filter((r) => !zod.has(r)).sort();
-    const excluded = [...ENGINE].filter(isExcluded).sort();
+    const notCallable = [...AUTHORABLE].filter((r) => !zod.has(r)).sort();
+    const excluded = [...AUTHORABLE].filter(isExcluded).sort();
     // The done-condition: what is uncallable IS the written exclusion list.
     // Any drift shows up here as a name nobody decided about.
     expect(notCallable).toEqual(excluded);
@@ -120,9 +115,9 @@ describe('relation vocabulary ↔ engine', () => {
 
   it('every exclusion names a real engine relation', () => {
     // A stale exclusion silently re-hides a relation if the engine renames it.
-    const stale = Object.values(EMITTED_BY_A_TOOL)
+    const stale = Object.values(ROUTED_TO_A_TOOL)
       .flatMap((rule) => (rule instanceof RegExp ? [] : rule))
-      .filter((r) => !ENGINE.has(r));
+      .filter((r) => !AUTHORABLE.has(r));
     expect(stale).toEqual([]);
   });
 });

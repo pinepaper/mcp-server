@@ -14,7 +14,6 @@ bounds_to
 camera_animates
 camera_follows
 centered_on
-character_face
 circumscribes
 composed_as
 concentric_with
@@ -70,11 +69,9 @@ geo_highlights
 geo_pinned
 geo_tours
 geo_travels_to
-glyph_of
 group_morphs_to
 grows_from
 has_camera_treatment
-has_text_effect
 head_points_to
 ik_target
 indicates
@@ -127,7 +124,6 @@ on_top_of
 orbits
 parallax
 part_of
-part_of_figure
 points_at
 pose_layer
 reacts_to

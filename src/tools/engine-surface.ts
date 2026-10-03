@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main c48fec8983a9a1c10b3f65fea72ddce0d4825df7
- * sha256:    d71e066b82fbf689163df97291e29f0cd94c81b1cbcf3b6253b6877ef1666ca2   (of PinePaper.js as committed)
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 285d52153acef6a782a7fab95e3545dc7c64de2e
+ * sha256:    4866a583807ec233813e2e80fdf894e127056fbf9547795d6b79488cc9513399   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on `window.app`, with how it gets there. The parity
@@ -16,7 +16,7 @@
 /** How a name lands on `app`. */
 export type EngineMemberKind = 'method' | 'accessor' | 'property' | 'lazy' | 'lazyHeavy' | 'bootstrap';
 
-/** 1314 names, from FxTool/js/PinePaper.js. */
+/** 1317 names, from FxTool/js/PinePaper.js. */
 export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object.freeze({
   __buildFreshness: 'property',
   _activeByGroup: 'property',
@@ -111,6 +111,8 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _debouncedResize: 'property',
   _decodeAudio: 'method',
   _deferredGeneratorLoads: 'property',
+  _deferredViewFit: 'property',
+  _deferViewFitDuringExport: 'method',
   _defineLazy: 'method',
   _defineLazyHeavy: 'method',
   _deriveStoryStops: 'method',
@@ -158,6 +160,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _fitHoldPoint: 'method',
   _fixZeroSizeBlendItems: 'method',
   _flipSnapshot: 'method',
+  _flushDeferredViewFit: 'method',
   _formatElapsed: 'method',
   _formatTime: 'method',
   _frameCapture: 'method',
@@ -259,7 +262,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _refreshTransformBaseline: 'method',
   _refreshViewConstantOverlays: 'method',
   _regenerateForResize: 'method',
-  _registerCharacterInteractionRules: 'method',
+  _registerBootRelationRules: 'method',
   _registerWorldNode: 'method',
   _relationPresetCache: 'property',
   _remakeFromPlan: 'method',
