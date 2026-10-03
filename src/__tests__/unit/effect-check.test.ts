@@ -108,3 +108,18 @@ describe('the fingerprint is authored state, not the live frame (first live swee
     expect(probe(effectAfterJs([]), s.app, win).changed.sort()).toEqual(['camera', 'filters']);
   });
 });
+
+describe("a refusal carries the engine's own reason (D78)", () => {
+  it('appends governor warnings to a generic refusal', async () => {
+    const c = {
+      connected: true, connect: async () => undefined,
+      executeCode: async (code: string) => (code.includes('__ppEffect')
+        ? { success: true, result: { ok: true, checked: [], changed: [], missing: [] } }
+        : { success: true, result: { success: false, error: 'the studio refused the time_expression relation between item_1 and item_1.' },
+            report: { warnings: ["unknown property 'opacty' — did you mean 'opacity'?"] } }),
+    };
+    const r = await handleToolCall('pinepaper_add_relation', { sourceId: 'item_1', targetId: 'item_1', relationType: 'time_expression', params: { property: 'opacty', expr: 't' } }, opts(c));
+    expect(r.isError).toBe(true);
+    expect(text(r)).toContain("did you mean 'opacity'");
+  });
+});

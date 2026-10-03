@@ -1544,9 +1544,17 @@ ${code}
   const inner = innerVerdict;
   if (inner) {
     const canvasState = await captureCanvasState(controller);
+    // THE ENGINE'S OWN REASON, when it gave one. An emitter's refusal is often
+    // generic ("the studio refused the time_expression relation") while the
+    // engine said exactly why in a warning the governor captured ("unknown
+    // property 'opacty' — did you mean 'opacity'?"; D78). Production strips
+    // console.warn, so this is the only place the model can read it.
+    const said = (Array.isArray(result.report?.warnings) ? (result.report!.warnings as unknown[]) : [])
+      .filter((w): w is string => typeof w === 'string' && w.length > 0 && !inner.includes(w))
+      .slice(0, 3);
     return withTiming(errorResult(
       ErrorCodes.EXECUTION_ERROR,
-      inner,
+      said.length ? `${inner} The studio said: ${said.join(' | ')}` : inner,
       {
         code, result: result.result, governorReport: result.report,
         ...(rollbackOnFailure ? await customCodeRollback(controller, inner) : {}),
