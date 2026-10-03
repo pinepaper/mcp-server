@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 023ad407a3e2c327a972b3ff165dce538e2f3761
- * sha256:    117fe8a2a6c87ef92fd1a21942e7c39a0d75b6bbab405a5ff5980a58f4a6ec72   (of PinePaper.js as committed)
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main c48fec8983a9a1c10b3f65fea72ddce0d4825df7
+ * sha256:    d71e066b82fbf689163df97291e29f0cd94c81b1cbcf3b6253b6877ef1666ca2   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on `window.app`, with how it gets there. The parity
@@ -16,7 +16,7 @@
 /** How a name lands on `app`. */
 export type EngineMemberKind = 'method' | 'accessor' | 'property' | 'lazy' | 'lazyHeavy' | 'bootstrap';
 
-/** 1297 names, from FxTool/js/PinePaper.js. */
+/** 1314 names, from FxTool/js/PinePaper.js. */
 export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object.freeze({
   __buildFreshness: 'property',
   _activeByGroup: 'property',
@@ -32,6 +32,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _announceItemEffect: 'method',
   _applyBrushProfile: 'method',
   _applyChangesToItem: 'method',
+  _applyCharacterLook: 'method',
   _applyClippedPose: 'method',
   _applyCounter: 'method',
   _applyCountersAt: 'method',
@@ -79,6 +80,12 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _callbackWarningThreshold: 'property',
   _canvasColorSpace: 'property',
   _canvasRevealed: 'property',
+  _characterDrag: 'property',
+  _characterDragEnd: 'method',
+  _characterDragMove: 'method',
+  _characterDragStart: 'method',
+  _characterExportFields: 'method',
+  _characterStates: 'property',
   _clearCollageTextEffect: 'method',
   _clearHoverOutline: 'method',
   _clickTriggerTargetAt: 'method',
@@ -165,6 +172,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _gpuLossArmed: 'property',
   _gradientPointsForBounds: 'method',
   _groupNamesForItem: 'method',
+  _hasCharacters: 'property',
   _hasCounterValueKeys: 'method',
   _hasMatrixTrack: 'method',
   _heavy: 'property',
@@ -251,6 +259,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _refreshTransformBaseline: 'method',
   _refreshViewConstantOverlays: 'method',
   _regenerateForResize: 'method',
+  _registerCharacterInteractionRules: 'method',
   _registerWorldNode: 'method',
   _relationPresetCache: 'property',
   _remakeFromPlan: 'method',
@@ -282,6 +291,8 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _resolveShotBounds: 'method',
   _resolveTextEffect: 'method',
   _resolveTrimTarget: 'method',
+  _restoreCharacterFields: 'method',
+  _restoreCharacters: 'method',
   _restoreMotionOntoMask: 'method',
   _restoreSettled: 'property',
   _restoreSoundChips: 'method',
@@ -373,6 +384,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _viewportBounds: 'property',
   _warnedNoMaterial: 'property',
   _warnUnserialized: 'method',
+  _wireCharacterFace: 'method',
   _wireComponentParts: 'method',
   _withExportEngine: 'method',
   _world3d: 'property',
@@ -568,6 +580,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   createBarChart: 'method',
   createCanvasBoundary: 'method',
   createChain: 'method',
+  createCharacter: 'method',
   createCharacterEyes: 'method',
   createChart: 'method',
   createCursiveText: 'method',
@@ -612,6 +625,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   deleteItem: 'method',
   deleteOrphanAssets: 'method',
   deleteSelected: 'method',
+  describeCharacterVariantSchema: 'method',
   describeComposition: 'method',
   describeWorld3D: 'method',
   deselectAll: 'method',
@@ -880,6 +894,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   listBrushStrokes: 'method',
   listBrushStyles: 'method',
   listCameraTreatments: 'method',
+  listCharacterBases: 'method',
   listCharacterEyes: 'method',
   listCollagePatterns: 'method',
   listComments: 'method',
@@ -1029,6 +1044,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   queryRelationChain: 'method',
   queryRelationPredicate: 'method',
   queryRelations: 'method',
+  randomCharacterVariant: 'method',
   raycastWorld: 'method',
   readStore: 'method',
   rebindEventRelations: 'method',
@@ -1053,6 +1069,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   registerStrokePattern: 'method',
   registerTool: 'method',
   rehydrateImageFilters: 'method',
+  rehydrateSynthSounds: 'method',
   relationRegistry: 'property',
   reloadIfStale: 'method',
   remakeFromReference: 'method',
