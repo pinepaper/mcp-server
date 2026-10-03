@@ -11703,6 +11703,24 @@ ${guard}
   if (!r || r.ok === false) {
     return { success: false, error: (r && (r.error || r.reason)) || 'the medium could not be applied', medium: ${S(input.medium)}, ...(r && r.fidelity ? { fidelity: r.fidelity } : {}) };
   }
+  // ink / charcoal restyle IN PLACE (FxTool D32): the same item, marked with
+  // data.brushStyle on its paths and texts. Read the mark back, so an item
+  // the engine passed over is a failure rather than a success (gate D32).
+  if (${S(input.medium)} === 'ink' || ${S(input.medium)} === 'charcoal') {
+    const __e = app.itemRegistry && app.itemRegistry.get(r.id || ${S(input.itemId)});
+    const __it = (__e && __e.item) || r.item;
+    let __styled = 0;
+    const __walk = function (n) {
+      if (!n) return;
+      if (n.data && n.data.brushStyle) __styled++;
+      (n.children || []).forEach(__walk);
+    };
+    __walk(__it);
+    if (!__styled) {
+      return { success: false, action: 'apply', medium: ${S(input.medium)}, error: 'the studio reported ' + ${S(input.medium)} + ' applied, but no path or text in ' + ${S(input.itemId)} + ' carries it. Ink and charcoal restyle paths and text; a primitive shape is skipped.' };
+    }
+    return { success: true, action: 'apply', medium: ${S(input.medium)}, fidelity: r.fidelity, itemId: r.id || ${S(input.itemId)}, inPlace: true, styled: __styled, ...(r.note ? { note: r.note } : {}) };
+  }
   return { success: true, action: 'apply', medium: r.medium || ${S(input.medium)}, fidelity: r.fidelity, itemId: r.id, ...(r.note ? { note: r.note } : {}) };
 })();`.trim();
       case 'list_media':

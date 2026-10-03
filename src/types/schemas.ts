@@ -4557,7 +4557,7 @@ export type TextStyleInput = z.infer<typeof TextStyleInputSchema>;
 export const DesignMediumInputSchema = z.object({
   action: z.enum(['list_media', 'resolve', 'list_stitches', 'apply_thread', 'apply_hatch', 'list_flow_fields', 'list_hatch_options', 'apply'])
     .describe("'apply' (render an item in ANY medium the engine can make: medium + options — watercolor, oil, cutPaper, thread, hatch) · 'list_media' (every medium with fidelity + limitation) · 'resolve' (can this medium be made here, and how honestly) · 'list_stitches' · 'apply_thread' (render an item in thread) · 'apply_hatch' (rule an item with hatching — value through line density) · 'list_flow_fields' · 'list_hatch_options'"),
-  medium: z.string().optional().describe(`resolve / apply: medium key — ${DESIGN_MEDIA.join(', ')}. apply works for ${Object.keys(DESIGN_MEDIA_APPLY).join(', ')}; the others are refused by the engine with the reason (encaustic is absent here; charcoal and ink are brushes, not fills).`),
+  medium: z.string().optional().describe(`resolve / apply: medium key — ${DESIGN_MEDIA.join(', ')}. apply works for ${Object.keys(DESIGN_MEDIA_APPLY).join(', ')}; a medium the studio cannot apply is refused by the engine with the reason. ink and charcoal, where the studio applies them, restyle the item IN PLACE (same id).`),
   options: z.record(z.string(), z.unknown()).optional().describe('apply: the medium\'s own options. watercolor: color, brush, water 0..1, opacity, edge 0..1 (the dark rim), angle, bleed, seed, keepSource. oil: color, brush, length, density, toneRange, relief, angle, seed, keepSource. cutPaper: color, facet, jitter, shadow, shadowColor, shadowOpacity, shadowOffset [dx, dy], seed, keepSource. thread / hatch: as apply_thread / apply_hatch.'),
   itemId: z.string().optional().describe('apply / apply_thread / apply_hatch: a closed path, compound path (holes kept), or a group of them (applied per path). The result takes the source\'s place in the stacking order and the source is hidden; applying again replaces it. One undo step.'),
   stitch: z.enum(THREAD_STITCHES).optional()
@@ -4615,6 +4615,7 @@ export const DesignMediumInputSchema = z.object({
   .refine((v) => v.action !== 'resolve' || !!v.medium, { message: 'resolve requires medium', path: ['medium'] })
   .refine((v) => v.action !== 'apply_hatch' || !!v.itemId, { message: 'apply_hatch requires itemId', path: ['itemId'] })
   .refine((v) => v.action !== 'apply' || (!!v.itemId && !!v.medium), { message: 'apply requires itemId and medium', path: ['medium'] })
+  .refine((v) => v.action !== 'apply' || (!!v.itemId && !!v.medium), { message: 'apply needs itemId and medium', path: ['medium'] })
   .refine((v) => v.action !== 'apply' || !v.medium || (DESIGN_MEDIA as readonly string[]).includes(v.medium),
     { message: `unknown medium; the engine knows ${DESIGN_MEDIA.join(', ')}`, path: ['medium'] });
 export type DesignMediumInput = z.infer<typeof DesignMediumInputSchema>;
