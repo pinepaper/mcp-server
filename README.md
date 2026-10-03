@@ -246,6 +246,55 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - Puppeteer mode launches Chrome with `--no-sandbox` and `--disable-setuid-sandbox`. That is routine for headless automation and it does weaken Chrome's own process sandbox. If that matters where you are running it, use `code` mode or put the server in a container.
 - Puppeteer itself is an **optional** peer dependency, kept out of the default tree precisely because a headless browser plus an install script is what scanners flag hardest. Install it only if you want the executing mode.
 
+## What's new in 1.6.20
+
+### New: make anything act
+
+`pinepaper_choreograph` turns a list of beats into a performance for any
+item: pop, drop, hop, bounce, roll, fly, peek, shake, squash, enter and exit,
+each with anticipation, squash and stretch, and a settle. The item stays on
+its ground line while it squashes. `sound: true` puts a sound on every pop,
+launch and landing, quieter as the bounces shrink.
+
+### New: one element, many states
+
+`pinepaper_morph_sequence` morphs one element through a series of shapes with
+no cuts, and can move the camera and place a sound on the same timing.
+
+### New: a brand every beat inherits
+
+`pinepaper_brand_kit` `set` applies a kit and makes it active: every shape
+and text created afterwards takes its colours and fonts unless the call says
+otherwise.
+
+### New: particles and drawing that survive a save
+
+`pinepaper_emitter` makes confetti bursts and trails as a saved, frame-exact
+item. `pinepaper_render_hook` adds custom per-frame drawing that a saved
+scene carries. A full `pinepaper_export_scene` names anything it cannot save.
+
+### New: overlays, step timing and hold keys
+
+`create_item` and `modify_item` take `screenSpace` (an overlay that stays
+fixed while the camera moves) and `stepTiming` (animate on twos).
+Keyframes take `interpolation: 'hold'` for a cut with no in-between.
+
+### Changed: no silent success
+
+A call that reports success but changes nothing now says so in its result,
+and a call that names an item that is not on the canvas fails. The tool
+descriptions point models to the highest-level tool first instead of a
+background generator with simple shapes.
+
+### Fixed
+
+- `pinepaper_import_mermaid` returns the canvas ids of the shapes it drew, so
+  `pinepaper_auto_layout` can move them.
+- A refusal now carries the studio's own reason, such as a misspelt property
+  and the one it meant.
+- `pinepaper_image_filter` documents the watercolour and painterly filters
+  for photos, and reports a refused filter as a failure.
+
 ## What's new in 1.6.19
 
 ### New: save a scene and restore it
