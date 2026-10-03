@@ -3,7 +3,7 @@
  *
  * What each registry-backed shape reads, and how a caller reaches it.
  *
- * Source: FxTool origin/main a32b3b112a557a4f3a61085eb18c624ff969ee5f
+ * Source: FxTool origin/main d574696f7d1d7d75483e692d4cc99a516fc6544a
  *   js/PinePaper.js + 5 shape modules
  * sha256: 0ec969864be803fc
  *

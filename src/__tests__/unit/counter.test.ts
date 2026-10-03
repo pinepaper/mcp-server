@@ -41,6 +41,7 @@ describe('counter', () => {
   });
   it('the schema takes a year counter and refuses unknown keys', () => {
     expect(CounterSchema.parse({ from: -30000, to: 2026, duration: 90, grouping: false })).toBeTruthy();
+    expect(CounterSchema.parse({ from: -30000, to: 2026, era: true, eraPositive: 'AD' })).toMatchObject({ era: true, eraPositive: 'AD' });
     expect(() => CounterSchema.parse({ from: 0, to: 1, color: 'red' })).toThrow();
   });
 });

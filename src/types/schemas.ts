@@ -1336,6 +1336,9 @@ export const CounterSchema = z.union([
     padStart: z.number().int().min(1).max(21).optional().describe('Zero-pad to this many digits.'),
     steps: z.number().int().positive().optional().describe('Count in N jumps instead of smoothly.'),
     tabular: z.boolean().optional().describe('Fixed-width digits so the width stays steady (default true).'),
+    era: z.boolean().optional().describe("Years with an era: a negative prints as its magnitude + eraNegative ('30,000 BCE'), a positive + eraPositive ('2026 CE'). No year 0: the count crosses 1 BCE → 1 CE. Years group from five digits only ('1274 BCE'); grouping: false turns that off; prefix / suffix still wrap it."),
+    eraNegative: z.string().optional().describe("Era label for negative years (default 'BCE')."),
+    eraPositive: z.string().optional().describe("Era label for positive years (default 'CE'; '' for a bare year; 'AD' works)."),
   }).strict(),
   z.null(),
 ]).describe("A text that COUNTS on the scene clock: {from, to, start?, duration?, easing?, decimals?, prefix?, suffix?, locale?, grouping?, padStart?, steps?, tabular?}; null removes it. Exact on every exported frame. To shape the count by hand, keyframe the numeric property counterValue instead.");
