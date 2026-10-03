@@ -273,6 +273,12 @@ otherwise.
 item. `pinepaper_render_hook` adds custom per-frame drawing that a saved
 scene carries. A full `pinepaper_export_scene` names anything it cannot save.
 
+### New: numbers that count
+
+A text item takes a `counter`: a KPI rolling from 1.67% to 5.58%, a year
+counter from 30,000 BCE to 2026, a timer. It is exact on every exported
+frame, and its width stays steady while it counts.
+
 ### New: overlays, step timing and hold keys
 
 `create_item` and `modify_item` take `screenSpace` (an overlay that stays
