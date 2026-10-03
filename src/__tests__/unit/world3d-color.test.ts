@@ -46,10 +46,12 @@ describe('a world3d colour reaches the uniform as floats', () => {
     expect(Array.isArray(c)).toBe(true);
   });
 
-  it('leaves a value it cannot parse untouched rather than guessing', () => {
-    // 'red' is not a hex triple; converting it to a wrong colour silently
-    // would be worse than passing it on and letting the engine speak.
-    expect(objOf(add({ color: 'red' })).color).toBe('red');
+  it('refuses a value it cannot parse, naming both forms, rather than guessing', () => {
+    // 'red' is not a hex triple. Converting it to a wrong colour would be
+    // worse than refusing; and passed on, the engine said "must be [r,g,b]",
+    // which contradicted the docs saying hex works (1.6.19 gate). So: refused
+    // here, with both accepted forms named.
+    expect(() => add({ color: 'red' })).toThrow(/hex .* or \[r, g, b\]/);
   });
 
   it('reaches nested colours too', () => {

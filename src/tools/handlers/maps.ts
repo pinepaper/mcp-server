@@ -76,7 +76,11 @@ async function dispatchMap(args: Record<string, unknown>, options: HandlerOption
       return executeOrGenerate(code, 'Exports map configuration', options, 'pinepaper_map');
     }
     case 'import_custom': {
-      const input = ImportCustomMapInputSchema.parse(args);
+      // The docs said `geojson`; the schema wanted `geoJson`, so the documented
+      // call failed "Either url or geoJson" (gate D3, 1.6.19). Both work.
+      const input = ImportCustomMapInputSchema.parse(
+        args.geoJson === undefined && args.geojson !== undefined ? { ...args, geoJson: args.geojson } : args,
+      );
       const code = codeGenerator.generateImportCustomMap(input);
       return executeOrGenerate(code, input.url ? 'Imports custom map from URL' : 'Imports custom GeoJSON map', options, 'pinepaper_map');
     }
@@ -196,7 +200,11 @@ async function dispatchMapData(args: Record<string, unknown>, options: HandlerOp
       return executeOrGenerate(code, 'Exports map region data as CSV', options, 'pinepaper_map_data');
     }
     case 'import_csv': {
-      const input = ImportMapRegionCSVInputSchema.parse(args);
+      // The tool text documented `csv`; the schema demanded `csvText`, so the
+      // documented call failed "csvText Required" (gate D4, 1.6.19). Both work.
+      const input = ImportMapRegionCSVInputSchema.parse(
+        args.csvText === undefined && typeof args.csv === 'string' ? { ...args, csvText: args.csv } : args,
+      );
       const code = codeGenerator.generateImportMapRegionCSV(input);
       return executeOrGenerate(code, 'Imports CSV data to update map regions', options, 'pinepaper_map_data');
     }

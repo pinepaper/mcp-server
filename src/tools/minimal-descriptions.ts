@@ -97,7 +97,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_execute_custom_code: 'Execute arbitrary JavaScript in the PinePaper browser context.',
 
   // --- Animation ---
-  pinepaper_animate: 'Animate item. itemId, type: pulse|rotate|bounce|fade|wobble|slide|typewriter. speed, amplitude optional.',
+  pinepaper_animate: 'Animate item. itemId, type: pulse|rotate|bounce|fade|wobble|slideLeftRight|slideUpDown|typewriter. speed, amplitude optional.',
   pinepaper_keyframe_animate: 'Keyframe animate. itemId, keyframes: [{time, properties:{opacity,scale,x,y,rotation,...}, easing}], duration. Clip window: timeOffset, clipInPoint, clipOutPoint.',
   pinepaper_play_timeline: 'Playback. action: play|pause|stop|seek|set/get_time_scale|get/set_progress|bind_scroll|unbind_scroll|list_scrub_anchors. time, rate (0 freezes, <0 reverses), progress 0..1, scroll.',
 

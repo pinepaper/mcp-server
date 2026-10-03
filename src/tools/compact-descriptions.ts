@@ -86,7 +86,7 @@ NOT SUPPORTED: setup()/draw() loop, noise(), text(), loadImage(), transforms, be
 
 Item types: ${ITEM_TYPES}.
 Relations: ${RELATION_TYPES}.
-Animations: pulse, rotate, bounce, fade, wobble, slide, typewriter.`,
+Animations: pulse, rotate, bounce, fade, wobble, slideLeftRight, slideUpDown, typewriter.`,
 
   // -------------------------------------------------------------------------
   // execute_generator

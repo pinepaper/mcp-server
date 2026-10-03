@@ -98,8 +98,8 @@ export class SmartExportManager {
       analysis.hasImages = true;
     }
 
-    // Check for animations
-    if (data.animationType) {
+    // Check for animations ('none' is a still item, gate C5)
+    if (data.animationType && data.animationType !== 'none') {
       analysis.hasAnimations = true;
       animationSet.add(data.animationType);
     }

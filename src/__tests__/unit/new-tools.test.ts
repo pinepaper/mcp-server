@@ -87,14 +87,14 @@ describe('Selection code generation', () => {
   it('select generates deselectAll + select loop', () => {
     const code = codeGenerator.generateSelection({ action: 'select', itemIds: ['item_1'], mode: 'replace' });
     expect(code).toContain('app.deselectAll()');
-    expect(code).toContain('app.select(entry.item)');
+    expect(code).toContain('app.select(entry.item, false)');
     expect(code).toContain('item_1');
   });
 
   it('select with add mode does not deselect', () => {
     const code = codeGenerator.generateSelection({ action: 'select', itemIds: ['item_1'], mode: 'add' });
     expect(code).not.toContain('app.deselectAll()');
-    expect(code).toContain('app.select(entry.item)');
+    expect(code).toContain('app.select(entry.item, false)');
   });
 
   it('select_all generates selectAll call', () => {

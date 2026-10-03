@@ -2170,7 +2170,7 @@ MODES:
 
 This complements pinepaper_validate_design (which validates a definition object, not the live scene).
 
-EXAMPLE (pre-flight): { ops: [ { kind: "create", id: "c1", itemType: "circle" }, { kind: "addRelation", source: "c1", target: "missing", relationType: "orbits" } ] }`,
+EXAMPLE (pre-flight): { ops: [ { kind: "create", id: "c1", itemType: "circle" }, { kind: "addRelation", from: "c1", to: "missing", relation: "orbits" } ] } (source / target / relationType are accepted as the same fields)`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -3478,7 +3478,7 @@ Relations are COMPOSITIONAL - an item can have multiple relations that work toge
         relationType: {
           type: 'string',
           enum: ['orbits', 'follows', 'attached_to', 'maintains_distance', 'points_at', 'mirrors', 'parallax', 'bounds_to', 'anchored_in_world', 'spring_follow', 'repels', 'attracts', 'wiggle', 'animates', 'grows_from', 'staggered_with', 'indicates', 'circumscribes', 'wave_through', 'morphs_to', 'group_morphs_to', 'moves_along_path', 'construction_reveal', 'triggers_animation', 'syncs_with', 'tours', 'synced_to_audio', 'expresses', 'camera_follows', 'camera_animates', 'is_midpoint_of', 'lies_on_line', 'is_centroid_of', 'is_circumcenter_of', 'concentric_with', 'driven_by', 'time_expression', 'on_click_fire', 'on_pointer_enter_fire', 'on_pointer_exit_fire', 'on_key_fire', 'on_event_fire_after', 'on_event_fire_if', 'on_event_add_relation', 'on_event_remove_relation', 'on_event_set_color', 'on_event_set_property', 'on_event_set_property_from_template', 'on_event_set_visibility', 'on_event_set_active', 'on_event_set_data', 'on_event_increment', 'on_event_toggle', 'on_event_store_set', 'on_event_store_increment', 'on_enter_set_color', 'on_enter_set_property', 'on_enter_set_property_from_template', 'on_enter_set_visibility', 'on_enter_set_data', 'on_enter_increment', 'on_enter_toggle', 'on_exit_set_color', 'on_exit_set_property', 'on_exit_set_property_from_template', 'on_exit_set_visibility', 'on_exit_set_data', 'on_exit_increment', 'on_exit_toggle', 'exclusive_group', 'menubar_group', 'restores_from', 'on_top_of', 'below', 'beside', 'inside', 'centered_on', 'aligned_with', 'part_of', 'connects_to', 'attached_to_tail', 'head_points_to'],
-          description: 'Type of relationship',
+          description: 'Type of relationship. A name registered with pinepaper_register_custom_relation in this session is accepted too.',
         },
         params: {
           type: 'object',
@@ -3572,7 +3572,9 @@ USE WHEN:
       idempotentHint: false,
       openWorldHint: false,
     },
-    description: `Register a custom relation type with compute and apply functions.
+    description: `PARAMS ARE DEFINITIONS, not values: { gap: { type: 'number', default: 60, min: 0 } } (type is number | string | boolean | array | object). Once registered, the name is a valid relationType for pinepaper_add_relation in this session.
+
+Register a custom relation type with compute and apply functions.
 
 USE WHEN:
 - Creating physics-based behaviors (attraction, repulsion, collision)
@@ -5923,7 +5925,8 @@ ACTIONS:
 BEHAVIOR TYPES: repel, attract, follow, orbit, slingshot, physics_body, draggable_constrained
 - repel params: strength, maxDistance, minDistance, returnSpeed (0–1, default 0.08 — how fast the item eases back to its home position once the target/cursor leaves; returnSpeed: 0 freezes it scattered instead of reforming).
 
-ACTION TYPES: navigate, show, hide, animate, stopAnimation, setState, incrementScore, playTimeline, pauseTimeline, seekTimeline, showFeedback, complete`,
+ACTION TYPES: navigate, show, hide, animate, stopAnimation, setState, incrementScore, playTimeline, pauseTimeline, seekTimeline, showFeedback, complete
+ACTION PARAMS: show / hide / stopAnimation: { items: [ids] } (itemId is accepted); animate: { items, animation?, speed? }; incrementScore: { points } (default 1; amount is accepted); setState: { key, value }.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -6041,7 +6044,7 @@ TEMPLATE CATEGORIES (13):
 EXAMPLES:
 - List all templates: { "listOnly": true }
 - List by category: { "category": "social-media", "listOnly": true }
-- Load template: { "templateId": "solar-system" }`,
+- Load template: { "templateId": "solar-system-education" }`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -6779,7 +6782,7 @@ ACTIONS:
 - pan            — { lat, lon, duration? }
 - zoom           — { level, duration? }
 - export_config  — {}
-- import_custom  — { url? | geojson?, projection? }
+- import_custom  — { url? | geoJson? (geojson accepted), options?: { projection?, fillColor? } }
 
 For region styling/selection use pinepaper_map_regions; for animations use pinepaper_map_animation; for CSV/GeoJSON/source-info use pinepaper_map_data.`,
     inputSchema: {
@@ -6854,19 +6857,19 @@ ACTIONS:
     description: `Animate map regions with keyframes or wave effects.
 
 ACTIONS:
-- animate_regions  — { regions: Record<regionId, keyframes[]>, duration?, loop? }
-- animate_wave     — { regions?: string[], waveDirection?, speed?, color?, duration?, loop? }
+- animate_regions  — { regions: { [regionId]: [{ time, fillColor (or color), opacity?, easing? }, …at least 2] }, duration?, loop? }
+- animate_wave     — { colors: [at least 2], waveDirection? (horizontal | vertical | radial), waveSpeed?, duration?, loop? } — the wave runs across ALL regions
 - stop             — { regionIds?: string[] }
 - get_animated     — {}`,
     inputSchema: {
       type: 'object',
       properties: {
         action: { type: 'string', enum: ['animate_regions', 'animate_wave', 'stop', 'get_animated'], description: 'Animation action' },
-        regions: { type: 'object', description: 'Keyframes per region (animate_regions) or list (animate_wave)', additionalProperties: true },
-        regionIds: { type: 'array', items: { type: 'string' } },
+        regions: { description: 'animate_regions: an object of keyframes per region id. stop: an array of region ids to stop (omit for all).' },
+        resetColors: { type: 'boolean', description: 'stop: reset regions to their default colours (default true).' },
+        colors: { type: 'array', items: { type: 'string' }, description: 'animate_wave: colours the wave cycles through (at least 2).' },
         waveDirection: { type: 'string', enum: ['horizontal', 'vertical', 'radial'] },
-        speed: { type: 'number' },
-        color: { type: 'string' },
+        waveSpeed: { type: 'number' },
         duration: { type: 'number' },
         loop: { type: 'boolean' },
       },
@@ -6885,8 +6888,8 @@ ACTIONS:
     description: `CSV / GeoJSON import-export and source-info introspection.
 
 ACTIONS:
-- export_csv               — { regionIds?, columns?, download?, filename? }
-- import_csv               — { csv: string, mapping?: { region?, value?, color? } }
+- export_csv               — { includeColors?, includeHighlighted?, includeSelected?, download?, filename? } — one row per region of the loaded map
+- import_csv               — { csv (or csvText): string, applyColors?, applyHighlight?, applySelection? } — the CSV export_csv writes (one row per region id)
 - export_geojson           — { includeStyles?, includeMetadata?, selectedOnly?, download?, filename? }
 - export_original_geojson  — { download?, filename? }   source GeoJSON before styling
 - source_info              — {}                          { source, projection, quality, regionCount, hasOriginalGeoJSON, isCustomImport }`,
@@ -6894,10 +6897,14 @@ ACTIONS:
       type: 'object',
       properties: {
         action: { type: 'string', enum: ['export_csv', 'import_csv', 'export_geojson', 'export_original_geojson', 'source_info'], description: 'Data action' },
-        regionIds: { type: 'array', items: { type: 'string' } },
-        columns: { type: 'array', items: { type: 'string' } },
-        csv: { type: 'string' },
-        mapping: { type: 'object', additionalProperties: true },
+        csv: { type: 'string', description: 'import_csv: the CSV text (csvText is accepted too).' },
+        csvText: { type: 'string' },
+        applyColors: { type: 'boolean' },
+        applyHighlight: { type: 'boolean' },
+        applySelection: { type: 'boolean' },
+        includeColors: { type: 'boolean' },
+        includeHighlighted: { type: 'boolean' },
+        includeSelected: { type: 'boolean' },
         includeStyles: { type: 'boolean' },
         includeMetadata: { type: 'boolean' },
         selectedOnly: { type: 'boolean' },
@@ -8221,7 +8228,7 @@ EXAMPLE — Animated sky scene with timed reveals:
   {type: "create", itemType: "ellipse", position: {x: 900, y: 120}, properties: {radiusX: 120, radiusY: 40, color: "#ffffff", opacity: 0.7}},
   {type: "create", itemType: "text", position: {x: 960, y: 500}, properties: {content: "Dream Big", fontSize: 96, color: "#ffffff", fontWeight: "bold"}},
   {type: "animate", itemId: "$0", animationType: "pulse", animationOptions: {speed: 0.3}},
-  {type: "animate", itemId: "$1", animationType: "slide", animationOptions: {speed: 0.2, direction: "left"}},
+  {type: "animate", itemId: "$1", animationType: "slideLeftRight", animationOptions: {speed: 0.2}},
   {type: "animate", itemId: "$2", animationType: "slide", animationOptions: {speed: 0.15, direction: "left"}},
   {type: "keyframe_animate", itemId: "$3", keyframes: [{time: 0, properties: {opacity: 0, scale: 0.8}}, {time: 2, properties: {opacity: 1, scale: 1}, easing: "easeOutBack"}], duration: 3},
   {type: "apply_mask", itemId: "$3", maskPreset: "wipeLeft"},

@@ -84,6 +84,18 @@ export const exportHandlers: Record<string, ExportHandler> = {
     } catch (e) {
       return errorResult(ErrorCodes.EXECUTION_ERROR, `could not read ${path}: ${e instanceof Error ? e.message : String(e)}`, {}, { toolName: 'pinepaper_import_scene' });
     }
+    // REFUSE A FOREIGN FILE BEFORE THE CANVAS IS TOUCHED (gate A2d, 1.6.19).
+    // loadProjectDocument also accepts legacy shapes (a bare snapshot, raw
+    // Paper JSON), so {"foo":1,"items":[]} passed its validation, loaded as an
+    // empty scene and wiped the canvas with success:true. Only the document a
+    // full export writes (kind "pinepaper.project") is restored here.
+    let doc: { kind?: unknown; formatVersion?: unknown } | null = null;
+    try { doc = JSON.parse(text); } catch {
+      return errorResult(ErrorCodes.VALIDATION_ERROR, `${path} is not a PinePaper scene file (not JSON). Save one with pinepaper_export_scene { full: true }.`, {}, { toolName: 'pinepaper_import_scene' });
+    }
+    if (!doc || typeof doc !== 'object' || doc.kind !== 'pinepaper.project' || typeof doc.formatVersion !== 'string') {
+      return errorResult(ErrorCodes.VALIDATION_ERROR, `${path} is not a PinePaper scene file (no "kind": "pinepaper.project" marker). Nothing was changed. Save one with pinepaper_export_scene { full: true }.`, {}, { toolName: 'pinepaper_import_scene' });
+    }
     // Staged beside the code, never inlined: a megabyte document inside the
     // generated code is what makes the governor's transform bail.
     const code = codeGenerator.generateLoadProject(input.strict !== false);

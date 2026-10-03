@@ -156,7 +156,12 @@ function filters(src) {
       const d = def ? `, default ${def[2] ?? def[1]}` : '';
       return `${p[1]}${range}${d}`;
     });
-    return { name: m[1], doc: `${desc}${params.length ? ` — ${params.join('; ')}` : ''}` };
+    const ranges = {};
+    for (const p of block.matchAll(/^\s*([A-Za-z]\w*):\s*\{\s*type:\s*'number'([^}]*)\}/gm)) {
+      const mn = /min:\s*(-?[\d.]+)/.exec(p[2]); const mx = /max:\s*(-?[\d.]+)/.exec(p[2]);
+      if (mn && mx) ranges[p[1]] = [Number(mn[1]), Number(mx[1])];
+    }
+    return { name: m[1], doc: `${desc}${params.length ? ` — ${params.join('; ')}` : ''}`, ranges };
   });
 }
 
@@ -213,6 +218,11 @@ ${media.filter((e) => e.apply).map((e) => `  ${e.key}: '${e.apply}',`).join('\n'
 export const FILTER_TYPES = [
 ${list(filterList.map((f) => f.name))}
 ] as const;
+
+/** Numeric parameter ranges per filter, [min, max], as the engine registers them. */
+export const FILTER_PARAM_RANGES: Readonly<Record<string, Readonly<Record<string, readonly [number, number]>>>> = Object.freeze({
+${filterList.map((f) => `  ${f.name}: { ${Object.entries(f.ranges).map(([k, [a, b]]) => `${k}: [${a}, ${b}]`).join(', ')} },`).join('\n')}
+});
 
 /** One line per filter: the engine's own description and parameter ranges. */
 export const FILTER_DOCS: Readonly<Record<string, string>> = Object.freeze({

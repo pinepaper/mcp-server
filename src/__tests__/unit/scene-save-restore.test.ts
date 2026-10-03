@@ -28,7 +28,8 @@ describe('scene save / restore', () => {
   it('import loads the staged document through the validating loader', () => {
     const code = gen.generateLoadProject(true);
     expect(code).toContain('window.__ppStage && window.__ppStage.projectDoc');
-    expect(code).toContain('app.loadProjectDocument(text, { strict: true })');
+    expect(code).toContain('app.loadProjectDocument(__doc, { strict: true })');
+    expect(code).toContain("__doc.kind !== 'pinepaper.project'");
     expect(code).not.toContain('importProjectJSON');
   });
 

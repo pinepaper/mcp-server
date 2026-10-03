@@ -215,6 +215,14 @@ const BOOTSTRAP_SUBSYSTEMS: readonly string[] = Object.freeze(
  * 2. Executes JavaScript code directly in the page context
  * 3. Captures screenshots to show results
  */
+/**
+ * Time spent in the studio page, accumulated across every call: executing code
+ * and taking screenshots. index.ts reads the change around each tool call, so
+ * every tool's _meta timing has a browser breakdown, including tools that do
+ * not go through executeOrGenerate (gate A2, 1.6.19).
+ */
+export const BROWSER_TIME = { executeMs: 0, screenshotMs: 0 };
+
 export class PinePaperBrowserController {
   private browser: Browser | null = null;
   private page: Page | null = null;
@@ -367,10 +375,12 @@ export class PinePaperBrowserController {
   async withIsolatedPage<T>(fn: (page: Page) => Promise<T>): Promise<T> {
     if (!this.browser) throw new Error('Not connected to browser');
     const context = await this.browser.createBrowserContext();
+    const started = Date.now();
     try {
       const page = await context.newPage();
       return await fn(page);
     } finally {
+      BROWSER_TIME.executeMs += Date.now() - started;
       await context.close().catch(() => {});
     }
   }
@@ -633,6 +643,56 @@ export class PinePaperBrowserController {
     return { kind: 'relaunched', ...(restored ? { canvasSizeRestored: restored } : {}) };
   }
 
+  /** A token planted in the page; if it is gone, the page reloaded. */
+  private readonly sessionToken = `pp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  private tokenPlanted = false;
+
+  private async plantSessionToken(): Promise<void> {
+    if (!this.page) return;
+    try { await this.page.evaluate((t: string) => { (window as any).__ppSessionToken = t; }, this.sessionToken); this.tokenPlanted = true; } catch { /* next call retries */ }
+  }
+
+  /** The studio URL in agent mode (what connect() navigates to). */
+  private studioTargetUrl(): string {
+    return this.config.studioUrl.includes('agent=') ? this.config.studioUrl : this.getAgentUrl(this.config.studioUrl);
+  }
+
+  /**
+   * 'ok': the studio is there and has not reloaded since the last call.
+   * 'reloaded': it reloaded (the token is gone), so the canvas is empty.
+   * 'restored': there was no studio (about:blank or a foreign page); it was
+   * navigated back, so the canvas is empty. Errors fall through as 'ok' so the
+   * call itself reports them.
+   */
+  private async ensureStudioPage(): Promise<'ok' | 'reloaded' | 'restored'> {
+    if (!this.page) return 'ok';
+    let state: { hasApp: boolean; token: string | null } | null = null;
+    try {
+      state = await this.page.evaluate(() => {
+        const app = (window as any).app || (window as any).PinePaper;
+        return { hasApp: !!(app && typeof app.create === 'function'), token: (window as any).__ppSessionToken || null };
+      });
+    } catch {
+      return 'ok';
+    }
+    const plant = () => this.plantSessionToken();
+    if (!state.hasApp) {
+      try {
+        await this.page.goto(this.studioTargetUrl(), { waitUntil: this.config.waitUntil, timeout: this.config.timeout });
+        await this.waitForPinePaper();
+        await plant();
+        console.error('[PinePaper] No studio in the page (about:blank?); navigated back to it');
+        return 'restored';
+      } catch {
+        return 'ok';
+      }
+    }
+    if (state.token === this.sessionToken) return 'ok';
+    const reloaded = this.tokenPlanted;
+    await plant();
+    return reloaded ? 'reloaded' : 'ok';
+  }
+
   /** Number of registry items currently on the canvas, or null if unknown. */
   private async canvasItemCount(): Promise<number | null> {
     if (!this.page) return null;
@@ -656,6 +716,17 @@ export class PinePaperBrowserController {
         success: false,
         error: 'Not connected to PinePaper Studio. Call connect() first.',
       };
+    }
+
+    // THE PAGE MAY HAVE CHANGED UNDER US WITHOUT A STALE HANDLE (gate A3 / M6b,
+    // 1.6.19): an in-page reload keeps the same live page, so nothing threw
+    // while the canvas came back empty and ids restarted at item_1; and a page
+    // on about:blank has no studio at all, so every tool failed reading
+    // 'create'. Checked before each call, and said in the result.
+    const pageState = await this.ensureStudioPage();
+    if (pageState === 'reloaded' || pageState === 'restored') {
+      const inner = await this.executeCode(code, takeScreenshot, options);
+      return { ...inner, recovered: true, canvasReset: true };
     }
 
     try {
@@ -705,6 +776,7 @@ export class PinePaperBrowserController {
         awaitBoot,
         stage: options.stage ?? null,
       };
+      const __evalStart = Date.now();
       const result = await this.page.evaluate(async (codeToRun: string, opts: { bypass: boolean; timeoutMs?: number; heavyClass: string | null; awaitBoot: boolean; stage: Record<string, string> | null }) => {
         // THE BRIDGE USES STRUCTURED CLONE, AND JSON.stringify DOES NOT PROVE IT.
         //
@@ -816,6 +888,7 @@ export class PinePaperBrowserController {
           };
         }
       }, code, runOptions);
+      BROWSER_TIME.executeMs += Date.now() - __evalStart;
 
       // Take screenshot if requested
       let screenshot: string | undefined;
@@ -880,6 +953,14 @@ export class PinePaperBrowserController {
    * Take a screenshot of the current canvas
    */
   async takeScreenshot(): Promise<string | undefined> {
+    if (!this.page) {
+      return undefined;
+    }
+    const __shotStart = Date.now();
+    try { return await this._takeScreenshot(); } finally { BROWSER_TIME.screenshotMs += Date.now() - __shotStart; }
+  }
+
+  private async _takeScreenshot(): Promise<string | undefined> {
     if (!this.page) {
       return undefined;
     }
@@ -959,7 +1040,15 @@ export class PinePaperBrowserController {
 
     console.error('[PinePaper] Refreshing page...');
     try {
-      await this.page.reload({ waitUntil: this.config.waitUntil, timeout: this.config.timeout });
+      // On about:blank (or any page that is not the studio) a reload reloads
+      // THAT page, and waiting for the studio then timed out after 30 s
+      // (gate A3 / M6b). Navigate to the studio instead.
+      const href = (() => { try { return this.page!.url(); } catch { return ''; } })();
+      // Unknown (no url) counts as the studio: only a page that is clearly
+      // something else is navigated away from.
+      const onStudio = !href || (/^https?:/.test(href) && !href.startsWith('about:'));
+      if (onStudio) await this.page.reload({ waitUntil: this.config.waitUntil, timeout: this.config.timeout });
+      else await this.page.goto(this.studioTargetUrl(), { waitUntil: this.config.waitUntil, timeout: this.config.timeout });
     } catch (error) {
       if (!PinePaperBrowserController.isStaleFrameError(error)) throw error;
       const recovery = await this.recoverSession();
@@ -976,6 +1065,9 @@ export class PinePaperBrowserController {
     // Wait for PinePaper to be ready again
     await this.waitForPinePaper();
     await this.rememberCanvasSize();
+    // An intended reload is not a surprise one: re-plant the token so the
+    // next call does not report a reload.
+    await this.plantSessionToken();
 
     console.error('[PinePaper] Page refreshed and ready');
     return {};

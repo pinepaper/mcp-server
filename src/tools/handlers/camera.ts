@@ -41,7 +41,7 @@ async function dispatchCameraAction(args: Record<string, unknown>, options: Hand
       }
       const level = (args.level as number) ?? (direction === 'in' ? 2 : 0.5);
       const method = direction === 'in' ? 'zoomIn' : 'zoomOut';
-      const code = `app.camera && app.camera.${method} ? app.camera.${method}(${level}, ${duration}) : null;`;
+      const code = `(function() { return app.camera && app.camera.${method} ? app.camera.${method}(${level}, ${duration}) : null; })();`;
       return executeOrGenerate(code, `Camera zoom ${direction} to ${level}x`, options, 'pinepaper_camera');
     }
 
@@ -52,12 +52,12 @@ async function dispatchCameraAction(args: Record<string, unknown>, options: Hand
       const y = args.y as number | undefined;
 
       if (x !== undefined && y !== undefined) {
-        const code = `app.camera && app.camera.panTo ? app.camera.panTo(${x}, ${y}, ${duration}) : null;`;
+        const code = `(function() { return app.camera && app.camera.panTo ? app.camera.panTo(${x}, ${y}, ${duration}) : null; })();`;
         return executeOrGenerate(code, `Camera pan to (${x}, ${y})`, options, 'pinepaper_camera');
       }
       if (direction && direction in PAN_METHOD_MAP) {
         const method = PAN_METHOD_MAP[direction];
-        const code = `app.camera && app.camera.${method} ? app.camera.${method}(${amount}, ${duration}) : null;`;
+        const code = `(function() { return app.camera && app.camera.${method} ? app.camera.${method}(${amount}, ${duration}) : null; })();`;
         return executeOrGenerate(code, `Camera pan ${direction} by ${amount}px`, options, 'pinepaper_camera');
       }
       return errorResult(ErrorCodes.INVALID_INPUT, 'camera pan requires either direction (left|right|up|down) or {x, y} coordinates');
@@ -70,29 +70,29 @@ async function dispatchCameraAction(args: Record<string, unknown>, options: Hand
       if (typeof x !== 'number' || typeof y !== 'number' || typeof zoom !== 'number') {
         return errorResult(ErrorCodes.INVALID_INPUT, 'camera move_to requires {x, y, zoom}');
       }
-      const code = `app.camera && app.camera.moveTo ? app.camera.moveTo(${x}, ${y}, ${zoom}, ${duration}) : null;`;
+      const code = `(function() { return app.camera && app.camera.moveTo ? app.camera.moveTo(${x}, ${y}, ${zoom}, ${duration}) : null; })();`;
       return executeOrGenerate(code, `Camera move to (${x}, ${y}) at ${zoom}x zoom`, options, 'pinepaper_camera');
     }
 
     case 'reset': {
-      const code = `app.camera && app.camera.reset ? app.camera.reset(${duration}) : null;`;
+      const code = `(function() { return app.camera && app.camera.reset ? app.camera.reset(${duration}) : null; })();`;
       return executeOrGenerate(code, 'Reset camera to default state', options, 'pinepaper_camera');
     }
 
     case 'stop': {
-      const code = `app.camera && app.camera.stop ? app.camera.stop() : null;`;
+      const code = `(function() { return app.camera && app.camera.stop ? app.camera.stop() : null; })();`;
       return executeOrGenerate(code, 'Stop camera animation', options, 'pinepaper_camera');
     }
 
     case 'state': {
-      const code = `app.camera && app.camera.getState ? app.camera.getState() : { zoom: 1, center: [400, 300], isAnimating: false };`;
+      const code = `(function() { return app.camera && app.camera.getState ? app.camera.getState() : { zoom: 1, center: [400, 300], isAnimating: false }; })();`;
       return executeOrGenerate(code, 'Get current camera state', options, 'pinepaper_camera');
     }
 
     case 'fit_view': {
       // FxTool exposes app.fitView() as the canonical zoom-to-fit (added in
       // commit f97fc60 so mobile gestures and this tool both work).
-      const code = `app.fitView ? app.fitView() : null;`;
+      const code = `(function() { return app.fitView ? app.fitView() : null; })();`;
       return executeOrGenerate(code, 'Fit content to view', options, 'pinepaper_camera');
     }
 

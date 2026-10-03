@@ -3159,12 +3159,17 @@ export const GetRegionAtPointInputSchema = z.object({
 export type GetRegionAtPointInput = z.infer<typeof GetRegionAtPointInputSchema>;
 
 // Map Animation Schemas
+// The engine reads fillColor OR color, plus easing (MapSystem.animateRegions);
+// requiring fillColor refused keyframes written with color (gate D17, 1.6.19).
 export const MapRegionKeyframeSchema = z.object({
   time: z.number().describe('Time in seconds'),
-  fillColor: z.string().describe('Fill color at this keyframe'),
+  fillColor: z.string().optional().describe('Fill color at this keyframe (or color)'),
+  color: z.string().optional().describe('Same as fillColor'),
   strokeColor: z.string().optional().describe('Stroke color (optional)'),
   opacity: z.number().optional().describe('Opacity 0-1 (optional)'),
-}).describe('Map region keyframe');
+  easing: z.string().optional().describe('Easing into this keyframe'),
+}).refine((k) => !!(k.fillColor || k.color), { message: 'each keyframe needs fillColor (or color)', path: ['fillColor'] })
+  .describe('Map region keyframe');
 
 export type MapRegionKeyframe = z.infer<typeof MapRegionKeyframeSchema>;
 
@@ -3183,9 +3188,10 @@ export type AnimateMapRegionsInput = z.infer<typeof AnimateMapRegionsInputSchema
 export const AnimateMapWaveInputSchema = z.object({
   duration: z.number().optional().default(10).describe('Total wave duration in seconds'),
   loop: z.boolean().optional().default(true).describe('Loop the animation'),
-  colors: z.array(z.string()).optional().describe('Array of colors for the wave'),
+  colors: z.array(z.string()).optional().describe('Colors the wave cycles through (at least 2)'),
   waveDirection: WaveDirectionSchema.optional().default('horizontal').describe('Direction of wave effect'),
-}).describe('Animate map wave input');
+  waveSpeed: z.number().positive().optional().describe('Speed of the wave (default 1)'),
+}).describe('Animate map wave input: the wave runs across ALL regions of the map');
 
 export type AnimateMapWaveInput = z.infer<typeof AnimateMapWaveInputSchema>;
 
@@ -5266,7 +5272,8 @@ export const RiggingInputSchema = z.object({
   duration: z.number().positive().optional().describe('Seconds to traverse the path (default 1) — set_target_path.'),
   loop: z.boolean().optional().describe('Cycle the path — set_target_path.'),
 })
-  .refine((v) => ['create_skeleton', 'import_bvh', 'import_spine'].includes(v.action) || !!v.skeletonId, { message: 'this action requires skeletonId', path: ['skeletonId'] })
+  // Listing ALL skeletons or pose libraries needs no skeleton (gate D6, 1.6.19).
+  .refine((v) => ['create_skeleton', 'import_bvh', 'import_spine', 'list_skeletons', 'list_pose_libraries'].includes(v.action) || !!v.skeletonId, { message: 'this action requires skeletonId', path: ['skeletonId'] })
   .refine((v) => v.action !== 'add_bone' || v.skeletonId != null, { message: 'add_bone requires skeletonId', path: ['skeletonId'] })
   .refine((v) => v.action !== 'attach_item' || (!!v.boneId && !!v.itemId), { message: 'attach_item requires boneId and itemId', path: ['boneId'] })
   .refine((v) => v.action !== 'create_ik_chain' || (!!v.boneIds && v.boneIds.length >= 2), { message: 'create_ik_chain requires boneIds (≥2)', path: ['boneIds'] })

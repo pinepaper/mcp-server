@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 7001c9c8681ad1971a3cb2136a75df4c42064bfe
- * sha256:    b529f064ad0d596920ef514a63b17eef7550e5852fe3aa468b00ae81b1773802   (of PinePaper.js as committed)
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main f5aa5436fd71ce86baf333835916397416f1b79f
+ * sha256:    95fed5388f3cac6d7170d8133b9e970dbf99dfae7a2f172f76127712351a8a13   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on `window.app`, with how it gets there. The parity
@@ -16,7 +16,7 @@
 /** How a name lands on `app`. */
 export type EngineMemberKind = 'method' | 'accessor' | 'property' | 'lazy' | 'lazyHeavy' | 'bootstrap';
 
-/** 1202 names, from FxTool/js/PinePaper.js. */
+/** 1205 names, from FxTool/js/PinePaper.js. */
 export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object.freeze({
   _activeByGroup: 'property',
   _activeDrawingGroup: 'method',
@@ -301,6 +301,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _storageReady: 'bootstrap',
   _storySafeSummary: 'method',
   _strokePressurePts: 'property',
+  _styledRendererCache: 'property',
   _subjectBox: 'method',
   _subsystemReadyHooks: 'property',
   _surfaceState: 'property',
@@ -1005,6 +1006,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   renderRegionToDataURL: 'method',
   renderSoundtrackWav: 'method',
   renderSoundtrackWavAsync: 'method',
+  renderStyled: 'method',
   replaceImage: 'method',
   replaceRelation: 'method',
   resetAnimationState: 'method',
@@ -1156,6 +1158,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   storeStatus: 'method',
   storyFromText: 'method',
   strokeRegistry: 'accessor',
+  styledScene: 'method',
   syncBlendBackground: 'method',
   syncComponent: 'method',
   syncWorldNodes: 'method',

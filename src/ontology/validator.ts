@@ -261,7 +261,7 @@ export class KnowledgeGraphValidator {
     const items = templateDef.data?.items || [];
     if (items.length === 0) return 0;
 
-    const animatedCount = items.filter(i => i.animationType === 'keyframe' || i.animationType).length;
+    const animatedCount = items.filter(i => i.animationType && i.animationType !== 'none').length;
     const animatedRatio = Math.min(animatedCount / items.length, 1);
 
     const allEasings = new Set<string>();

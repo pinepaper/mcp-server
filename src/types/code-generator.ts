@@ -2601,7 +2601,10 @@ function world3dColor(value: unknown): unknown {
   if (typeof value !== 'string') return value;
   const hex = value.trim().replace(/^#/, '');
   const full = hex.length === 3 ? hex.split('').map((c) => c + c).join('') : hex;
-  if (!/^[0-9a-f]{6}$/i.test(full)) return value;
+  // A string that is not hex is refused HERE, naming both forms: passed on,
+  // the engine answered "must be [r,g,b]", which contradicted the docs
+  // saying hex works (gate A, 1.6.19).
+  if (!/^[0-9a-f]{6}$/i.test(full)) throw new Error(`"${value}" is not a colour: use hex ("#03050c" or "#abc") or [r, g, b]`);
   return [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16) / 255);
 }
 
@@ -2718,6 +2721,36 @@ const SCENE_COUNTS_JS = `function __ppSceneCounts() {
   return { items: all.length, animatedItems: animated, keyframes: keyframes, relations: rel };
 }`;
 
+/**
+ * Page code: the REGISTRY id for a Paper item, walking up from a child (a hit
+ * test lands on a group's inner path). Results used to fall back to Paper's
+ * internal numeric id (gate D9/D10, 1.6.19), which no other tool can address.
+ */
+const REG_ID_JS = `function __ppRegId(it) {
+  for (let n = it; n; n = n.parent) {
+    const id = n.data && (n.data.id || n.data.registryId);
+    if (id && app.itemRegistry && app.itemRegistry.get(id)) return id;
+  }
+  const all = (app.itemRegistry && typeof app.itemRegistry.getAll === 'function') ? app.itemRegistry.getAll() : [];
+  for (let n = it; n; n = n.parent) { const e = all.find(function (x) { return x && x.item === n; }); if (e) return e.itemId; }
+  return null;
+}`;
+
+/**
+ * Page code: any binary an engine export returns (Blob, ArrayBuffer, typed
+ * array) as a data URL, so it crosses the bridge as bytes and the handler can
+ * write a file. A Uint8Array crossed as a JSON object of byte indices
+ * ({"0": 80, "1": 75, ...}): export_dotlottie was unusable (gate D7, 1.6.19).
+ */
+const TO_DATA_URL_JS = `async function __ppToDataUrl(out, mime) {
+  if (typeof out === 'string') return out.indexOf('data:') === 0 ? out : null;
+  let blob = null;
+  if (out instanceof Blob) blob = out;
+  else if (out instanceof ArrayBuffer || ArrayBuffer.isView(out)) blob = new Blob([out], { type: mime });
+  if (!blob) return null;
+  return await new Promise(function (res, rej) { const r = new FileReader(); r.onload = function () { res(r.result); }; r.onerror = rej; r.readAsDataURL(blob); });
+}`;
+
 export class PinePaperCodeGenerator {
   /**
    * Generate code for creating an item
@@ -2766,8 +2799,13 @@ export class PinePaperCodeGenerator {
   /**
    * Generate code for adding a relation
    */
-  generateAddRelation(input: z.infer<typeof AddRelationInputSchema>): string {
-    const validated = AddRelationInputSchema.parse(input);
+  generateAddRelation(input: z.infer<typeof AddRelationInputSchema>, customName = false): string {
+    // The handler has already parsed, and a session-registered custom
+    // relation name is not in the enum (gate D2); the handler says so, and the
+    // name is re-parsed with a built-in stand-in and put back.
+    const rt = input.relationType as string | undefined;
+    const validated = AddRelationInputSchema.parse(customName ? { ...input, relationType: 'orbits' } : input);
+    if (customName) (validated as { relationType?: string }).relationType = rt;
 
     // A PRESET decides its own relationType and params, so this is a different
     // call, not a defaulted one. applyRelationPreset refuses with
@@ -3615,10 +3653,13 @@ if (typeof _gen === 'function') {
     codeParts.push(`
 // Save history and return results
 app.historyManager.saveState();
-results;
+return results;
 `);
 
-    return codeParts.join('\n');
+    // ONE (-led FUNCTION (gate C4, 1.6.19). This was a statement list ending
+    // in a bare \`results;\`, and the governor keeps only a (-led snippet's
+    // value, so every created id was collected and then dropped.
+    return `(async function() {\n${codeParts.join('\n')}\n})();`;
   }
 
   // =============================================================================
@@ -3761,12 +3802,26 @@ if (!sourceItem) throw new Error('Source item not found: ${sourceItemId}');
 if (!targetItem) throw new Error('Target item not found: ${targetItemId}');
 
 const config = ${configStr};
-const connector = app.diagramSystem.connectPorts(
-  sourceItem, '${sourcePort}',
-  targetItem, '${targetPort}',
-  config
-);
-const connectorId = connector.data?.registryId || connector.id;
+// connectPorts(sourcePort, targetPort, config) takes PORT OBJECTS (gate C8,
+// 1.6.19). This passed (item, name, item, name, config): five arguments to a
+// three-argument method, so the engine got an item where a port belongs,
+// returned null, and connector.data threw. Ports are resolved by name or
+// position first; an item with none gets the standard diagram ports.
+const __pm = app.diagramSystem.portManager;
+const __port = function (item, name) {
+  let p = __pm.getPort(item, name);
+  if (!p && !(__pm.getPorts(item) || []).length) { app.diagramSystem.addPorts(item); p = __pm.getPort(item, name); }
+  return p;
+};
+const __sp = __port(sourceItem, ${JSON.stringify(sourcePort)});
+const __tp = __port(targetItem, ${JSON.stringify(targetPort)});
+if (!__sp || !__tp) {
+  const __names = function (item) { return (__pm.getPorts(item) || []).map(function (p) { return p.position || p.id; }).join(', '); };
+  return { success: false, error: 'no such port: ' + (!__sp ? ${JSON.stringify(sourcePort)} + ' on ' + ${JSON.stringify(sourceItemId)} + ' (has: ' + __names(sourceItem) + ')' : ${JSON.stringify(targetPort)} + ' on ' + ${JSON.stringify(targetItemId)} + ' (has: ' + __names(targetItem) + ')') };
+}
+const connector = app.diagramSystem.connectPorts(__sp, __tp, config);
+if (!connector) { return { success: false, error: 'the diagram system did not create the connector' }; }
+const connectorId = connector.id || connector.data?.registryId;
 app.historyManager.saveState();
 
 ({ connectorId, sourceItemId: '${sourceItemId}', sourcePort: '${sourcePort}', targetItemId: '${targetItemId}', targetPort: '${targetPort}' });
@@ -3890,8 +3945,12 @@ const shapes = category ? _lib.getByCategory(category) : _lib.getAll();
 
     return `
 // Update connector: ${connectorId}
-const connector = app.getItemById('${connectorId}');
-if (!connector) throw new Error('Connector not found: ${connectorId}');
+// CONNECTORS LIVE IN THE DIAGRAM SYSTEM, NOT THE ITEM REGISTRY (gate D1,
+// 1.6.19): getItemById never resolves the id connect returned, so every
+// update/remove failed "Connector not found" with that exact id.
+const __cid = ${JSON.stringify(connectorId)};
+const connector = (app.diagramSystem && app.diagramSystem.getConnector(__cid)) || app.getItemById(__cid);
+if (!connector) throw new Error('Connector not found: ' + __cid);
 
 const updates = ${updatesStr};
 
@@ -3908,7 +3967,7 @@ const updates = ${updatesStr};
 // created and serialised with. Guarded, because a studio predating that still
 // has to do something sensible rather than throw.
 if (typeof app.diagramSystem?.updateConnector === 'function') {
-  const res = app.diagramSystem.updateConnector('${connectorId}', updates);
+  const res = app.diagramSystem.updateConnector(__cid, updates);
   if (res && res.ok === false) { return { success: false, error: res.reason || 'the connector could not be updated' }; }
   app.historyManager.saveState();
   return { connectorId: '${connectorId}', updated: true, applied: Object.keys(updates) };
@@ -3944,8 +4003,10 @@ if (_unsupported.length && !_applied.length) {
 
     return `
 // Remove connector: ${connectorId}
-const connector = app.getItemById('${connectorId}');
-if (!connector) throw new Error('Connector not found: ${connectorId}');
+// Resolved through the diagram system (gate D1, 1.6.19), as update_connector is.
+const __cid = ${JSON.stringify(connectorId)};
+const connector = (app.diagramSystem && app.diagramSystem.getConnector(__cid)) || app.getItemById(__cid);
+if (!connector) throw new Error('Connector not found: ' + __cid);
 
 app.diagramSystem.connectorManager.removeConnector(connector);
 app.historyManager.saveState();
@@ -4165,12 +4226,13 @@ throw new Error('Unknown diagram mode action: ${action}');
 
     if (entry.type === 'text' || item.className === 'PointText') analysis.hasText = true;
     if (item.className === 'Raster') analysis.hasImages = true;
-    if (data.animationType) {
+    // 'none' is what a still item stores (gate C5, 1.6.19): it is not an animation.
+    if (data.animationType && data.animationType !== 'none') {
       analysis.hasAnimations = true;
       animationSet.add(data.animationType);
     }
     // Detect keyframe animations (added via app.addAnimation with keyframes array)
-    if (data.keyframes || data.animation || data.keyframeAnimation) {
+    if ((Array.isArray(data.keyframes) && data.keyframes.length > 0) || data.animation || data.keyframeAnimation) {
       analysis.hasAnimations = true;
       animationSet.add('keyframe');
     }
@@ -6071,12 +6133,13 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
     if (entry.type === 'text' || item.className === 'PointText') analysis.hasText = true;
     if (item.className === 'Raster') analysis.hasImages = true;
 
-    if (data.animationType) {
+    // 'none' is what a still item stores (gate C5, 1.6.19): it is not an animation.
+    if (data.animationType && data.animationType !== 'none') {
       analysis.hasAnimations = true;
       animationSet.add(data.animationType);
     }
     // Detect keyframe animations (added via app.addAnimation with keyframes array)
-    if (data.keyframes || data.animation || data.keyframeAnimation) {
+    if ((Array.isArray(data.keyframes) && data.keyframes.length > 0) || data.animation || data.keyframeAnimation) {
       analysis.hasAnimations = true;
       animationSet.add('keyframe');
     }
@@ -6572,13 +6635,18 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
   }
 
   try {
-    // panTo() has never existed on any studio, and there is no lat/lon pan for
-    // a flat map to route this to. Refused by NAME with the calls that do work,
-    // rather than letting the caller take an undefined-is-not-a-function.
-    return { success: false, error: 'pan_map is not supported: the engine has no lat/lon pan. '
-      + 'On a globe, rotateGlobeTo brings a coordinate to the front; on a flat map, zoom to a REGION '
-      + '(zoomToRegion) or call resetView for the whole view. This tool accepted coordinates and did '
-      + 'nothing for as long as it existed.' };
+    // A REAL PAN (gate D3, 1.6.19). The map has no lat/lon pan of its own, but
+    // geoToCanvas projects a coordinate to the canvas and the camera pans
+    // there. This used to refuse every call while the docs advertised it.
+    if (typeof app.mapSystem.geoToCanvas !== 'function' || !app.camera || typeof app.camera.panTo !== 'function') {
+      return { success: false, error: 'pan needs mapSystem.geoToCanvas and the camera — update FxTool' };
+    }
+    const __p = app.mapSystem.geoToCanvas([${validated.lon}, ${validated.lat}]);
+    if (!__p) return { success: false, error: 'no map is loaded (load one first), or the coordinate is not on it' };
+    const __x = Array.isArray(__p) ? __p[0] : __p.x, __y = Array.isArray(__p) ? __p[1] : __p.y;
+    if (!isFinite(__x) || !isFinite(__y)) return { success: false, error: 'the coordinate is not on the visible side of this projection' };
+    app.camera.panTo(__x, __y, ${validated.duration ?? 0.5});
+    return { success: true, action: 'pan', lat: ${validated.lat}, lon: ${validated.lon}, canvasPoint: { x: __x, y: __y } };
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -6603,11 +6671,13 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
   }
 
   try {
-    // zoomTo(level) has never existed. The engine zooms to a REGION, not to a
-    // numeric level, so there is nothing to convert a level into.
-    return { success: false, error: 'zoom_map takes a numeric level and the engine has no such call: it zooms to a REGION. '
-      + 'Use zoomToRegion with a region id, or resetView for the full view. A level was accepted here and did '
-      + 'nothing for as long as this tool existed.' };
+    // A REAL ZOOM (gate D3, 1.6.19): the camera zooms to an absolute level
+    // (camera.zoomIn(level) animates to { zoom: level }).
+    if (!app.camera || typeof app.camera.zoomIn !== 'function') {
+      return { success: false, error: 'zoom needs the camera — update FxTool' };
+    }
+    app.camera.zoomIn(${validated.level}, ${validated.duration ?? 0.5});
+    return { success: true, action: 'zoom', level: ${validated.level} };
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -6777,7 +6847,8 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
     const result = app.mapSystem.animateRegionsWave({
       duration: ${validated.duration || 10},
       loop: ${validated.loop !== false},
-      colors: ${colorsStr},
+      colors: ${colorsStr},${validated.waveSpeed !== undefined ? `
+      waveSpeed: ${validated.waveSpeed},` : ''}
       waveDirection: '${validated.waveDirection || 'horizontal'}'
     });
     return { success: true, animatedRegions: result?.animatedRegions || [], totalRegions: result?.totalRegions || 0 };
@@ -7236,7 +7307,11 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
   ${SCENE_COUNTS_JS}
   const text = window.__ppStage && window.__ppStage.projectDoc;
   if (typeof text !== 'string' || !text) { return { success: false, error: 'no project document was staged' }; }
-  const r = app.loadProjectDocument(text, { strict: ${strict ? 'true' : 'false'} });
+  // Second guard, in the page: nothing but a project document reaches the loader.
+  let __doc = null;
+  try { __doc = JSON.parse(text); } catch (e) { return { success: false, error: 'not a PinePaper scene file (not JSON); nothing was changed' }; }
+  if (!__doc || __doc.kind !== 'pinepaper.project') { return { success: false, error: 'not a PinePaper scene file (no kind "pinepaper.project"); nothing was changed' }; }
+  const r = app.loadProjectDocument(__doc, { strict: ${strict ? 'true' : 'false'} });
   if (!r || r.ok === false) { return { success: false, error: 'the document was refused: ' + ((r && r.errors && r.errors.join('; ')) || 'invalid project document'), warnings: (r && r.warnings) || [] }; }
   return { success: true, counts: __ppSceneCounts(), warnings: r.warnings || [], meta: r.meta || null };
 })();`.trim();
@@ -7837,10 +7912,12 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
       const categoryFilter = category ? `'${category}'` : 'null';
       return `
 // List available templates
-(function() {
+(async function() {
   if (!app.templateManager) {
     return { error: 'Template manager not available. Make sure PinePaper Studio is loaded.' };
   }
+  // The built-in catalogue loads lazily; a fresh page listed none (1.6.19 gate).
+  try { if (app.templateManager._ensureTemplateData) await app.templateManager._ensureTemplateData(); } catch (e) {}
   const allTemplates = app.templateManager.getAllTemplates();
   const category = ${categoryFilter};
   const filtered = category
@@ -7866,8 +7943,25 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
   if (!app.templateManager) {
     return { error: 'Template manager not available. Make sure PinePaper Studio is loaded.' };
   }
+  // AN UNKNOWN ID IS AN ERROR, NOT A SUCCESS (gate C1, 1.6.19). loadTemplate
+  // on an id that does not exist changed nothing and this still reported
+  // "Template applied successfully"; the description's own example id
+  // ('solar-system') was one of them. The nearest real ids are offered.
+  const __tid = ${JSON.stringify(templateId)};
+  // The built-in catalogue loads LAZILY: on a fresh page getAllTemplates() is
+  // [] until it does, which made every id look unknown. Load it first, as
+  // loadTemplate itself does, and count the cloud templates it falls back to.
+  try { if (app.templateManager._ensureTemplateData) await app.templateManager._ensureTemplateData(); } catch (e) {}
+  const __cloud = (app.templateManager.cloudSync && app.templateManager.cloudSync.cloudTemplates) || [];
+  const __all = app.templateManager.getAllTemplates().concat(__cloud.filter(Boolean));
+  if (__all.length && !__all.some(function(t) { return t && t.id === __tid; })) {
+    const __lev = function(a, b) { const m = a.length, n = b.length; const d = Array.from({ length: m + 1 }, function(_, i) { return [i]; }); for (let j = 1; j <= n; j++) d[0][j] = j; for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) d[i][j] = Math.min(d[i-1][j] + 1, d[i][j-1] + 1, d[i-1][j-1] + (a[i-1] === b[j-1] ? 0 : 1)); return d[m][n]; };
+    const __near = __all.map(function(t) { const id = String(t.id); return { id: id, d: id.indexOf(__tid) >= 0 || __tid.indexOf(id) >= 0 ? 0 : __lev(__tid, id) }; })
+      .sort(function(a, b) { return a.d - b.d; }).slice(0, 5).map(function(x) { return x.id; });
+    return { success: false, error: 'no template "' + __tid + '". Nearest: ' + __near.join(', ') + '. List them with listOnly: true.' };
+  }
   try {
-    await app.templateManager.loadTemplate('${templateId}', true);
+    await app.templateManager.loadTemplate(__tid, true);
 
     // DID THE CLIPPED CHARACTER PARTS SURVIVE?
     //
@@ -8556,7 +8650,7 @@ ${mask ? `    // A MASK REPLACES THE RASTER (round 8 DD, 4.10). applyMask builds
   for (const id of ids) {
     const entry = app.itemRegistry.get(id);
     if (entry && entry.item) {
-      ${mode === 'remove' ? 'entry.item.selected = false;' : 'app.select(entry.item);'}
+      ${mode === 'remove' ? 'entry.item.selected = false;' : 'app.select(entry.item, false);'}
       selected.push(id);
     }
   }
@@ -8567,8 +8661,9 @@ ${mask ? `    // A MASK REPLACES THE RASTER (round 8 DD, 4.10). applyMask builds
         return `
 // Select all items
 (function() {
+  ${REG_ID_JS}
   app.selectAll();
-  const items = app.getSelectedItems().map(i => i.data?.itemId || i.name || i.id);
+  const items = app.getSelectedItems().map(i => __ppRegId(i)).filter(Boolean);
   return { success: true, action: 'select_all', count: items.length, items };
 })();`.trim();
       case 'deselect_all':
@@ -8582,8 +8677,9 @@ ${mask ? `    // A MASK REPLACES THE RASTER (round 8 DD, 4.10). applyMask builds
         return `
 // Get current selection
 (function() {
+  ${REG_ID_JS}
   const items = app.getSelectedItems().map(i => ({
-    itemId: i.data?.itemId || i.name || i.id,
+    itemId: __ppRegId(i),
     type: i.data?.itemType || i.className,
     bounds: i.bounds ? { x: i.bounds.x, y: i.bounds.y, width: i.bounds.width, height: i.bounds.height } : null
   }));
@@ -8593,8 +8689,9 @@ ${mask ? `    // A MASK REPLACES THE RASTER (round 8 DD, 4.10). applyMask builds
         return `
 // Delete selected items
 (function() {
+  ${REG_ID_JS}
   const selection = app.getSelectedItems();
-  const deleted = selection.map(i => i.data?.itemId || i.name || i.id);
+  const deleted = selection.map(i => __ppRegId(i)).filter(Boolean);
   app.deleteSelected();
   return { success: true, action: 'delete_selected', deleted, count: deleted.length };
 })();`.trim();
@@ -9494,16 +9591,28 @@ case 'analyze_palette':
         return `
 // Clear background
 (function() {
+  // clearBackground() removes generated patterns, drawings and the image, but
+  // not the colour; the tool promises "remove entirely" and left #1e293b
+  // behind (gate C6, 1.6.19). The colour goes too, to transparent.
   app.clearBackground();
-  return { success: true, action: 'clear' };
+  if (typeof app.setBackgroundColor === 'function') app.setBackgroundColor('transparent');
+  return { success: true, action: 'clear', removed: ['pattern', 'drawing', 'image', 'color'] };
 })();`.trim();
       case 'get':
         return `
 // Get background info
 (function() {
-  // FxTool exposes getBackgroundMode() returning the mode string only.
+  // getBackgroundMode() returns only the mode, so 'color' came back with no
+  // colour (gate C6, 1.6.19). The colour is read from the canvas, as hex.
   const mode = app.getBackgroundMode ? app.getBackgroundMode() : null;
-  return { success: true, action: 'get', mode };
+  const css = (app.canvasEl && app.canvasEl.style && app.canvasEl.style.backgroundColor) || '';
+  // No regex: this is a template literal, and \\( or \\s here reach the page
+  // without their backslash (that was the #NaN293b).
+  const open = css.indexOf('('), close = css.indexOf(')');
+  let color = css || null;
+  if (css.indexOf('rgb') === 0 && open > 0 && close > open) { const p = css.slice(open + 1, close).split(',').join(' ').split('/').join(' ').split(' ').filter(Boolean).map(function (x) { return parseFloat(x); }); color = (p.length > 3 && p[3] === 0) ? 'transparent' : '#' + p.slice(0, 3).map(function (v) { return Math.round(v).toString(16).padStart(2, '0'); }).join(''); }
+  const patterns = app.patternGroup && app.patternGroup.children ? app.patternGroup.children.length : 0;
+  return { success: true, action: 'get', mode, color, hasPattern: patterns > 0, hasImage: !!(app.config && app.config.backgroundImage) };
 })();`.trim();
       default:
         return `(function() { return { error: 'Unknown background action: ${(input as any).action}' }; })();`;
@@ -9541,13 +9650,14 @@ case 'analyze_palette':
         return `
 // Hit test at point
 (function() {
+  ${REG_ID_JS}
   const point = new paper.Point(${input.x ?? 0}, ${input.y ?? 0});
   ${all
     ? `const results = app.hitTestAll(point, { tolerance: ${tolerance} });
   const hits = results.map(r => ({
-    itemId: r.item?.data?.itemId || r.item?.name || r.item?.id,
-    type: r.item?.data?.itemType || r.item?.className,
-    point: { x: r.point?.x, y: r.point?.y }
+    itemId: __ppRegId(r.item),
+    type: r.item?.data?.type || r.item?.className,
+    point: r.point ? { x: r.point.x, y: r.point.y } : null
   }));
   return { success: true, action: 'hit_test', x: ${input.x ?? 0}, y: ${input.y ?? 0}, hits, count: hits.length };`
     : `const result = app.hitTest(point, { tolerance: ${tolerance} });
@@ -9555,7 +9665,7 @@ case 'analyze_palette':
   return {
     success: true, action: 'hit_test',
     x: ${input.x ?? 0}, y: ${input.y ?? 0},
-    hit: { itemId: result.item?.data?.itemId || result.item?.name || result.item?.id, type: result.item?.data?.itemType || result.item?.className }
+    hit: { itemId: __ppRegId(result.item), type: result.item?.data?.type || result.item?.className, point: result.point ? { x: result.point.x, y: result.point.y } : null }
   };`}
 })();`.trim();
       }
@@ -9939,7 +10049,18 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
 })();`.trim();
       }
       case 'trigger_action': {
-        const params = JSON.stringify(input.params || {});
+        // The engine's handlers read params.items (ids) for show / hide /
+        // animate / stopAnimation, and params.points for incrementScore. The
+        // tool documented neither, so { itemId } hid nothing and { amount: 5 }
+        // scored 1 (gate D13, 1.6.19). The natural names are accepted too.
+        const raw = { ...((input.params || {}) as Record<string, unknown>) };
+        if (raw.items === undefined) {
+          const one = raw.itemId ?? raw.targetItemId;
+          const many = raw.itemIds;
+          if (Array.isArray(many)) raw.items = many; else if (typeof one === 'string') raw.items = [one];
+        }
+        if (input.actionType === 'incrementScore' && raw.points === undefined && typeof raw.amount === 'number') raw.points = raw.amount;
+        const params = JSON.stringify(raw);
         return `
 // Trigger interaction action
 (function() {
@@ -11766,7 +11887,9 @@ ${needWorld}
 (function() {
   if (typeof app.addWorldActor !== 'function') { return { success: false, error: 'app.addWorldActor unavailable — update FxTool' }; }
 ${needWorld}
-  const id = app.addWorldActor(${actor});
+  const __r = app.addWorldActor(${actor});
+  // The engine may return the actor itself; the id is what later calls take (gate D5).
+  const id = (__r && typeof __r === 'object') ? (__r.id || null) : __r;
   return id ? { success: true, actorId: id } : { success: false, error: 'actor not added — is the sprite id a canvas item?' };
 })();`.trim();
       }
@@ -11804,7 +11927,9 @@ ${needWorld}
 // World3D: place an object (y defaults to sitting on the terrain)
 (function() {
 ${needWorld}
-  const id = app.addWorldObject(${S(world3dColors(input.object))});
+  const __o = app.addWorldObject(${S(world3dColors(input.object))});
+  // addWorldObject returns the OBJECT; its id is what set/remove calls take (gate D5).
+  const id = (__o && typeof __o === 'object') ? (__o.id || null) : __o;
   return id ? { success: true, objectId: id } : { success: false, error: 'object not added' };
 })();`.trim();
       case 'remove_object':
@@ -11819,7 +11944,10 @@ ${needWorld}
 // World3D: tear the world down — Paper's canvas is untouched (it was always its own layer)
 (function() {
   if (typeof app.removeWorld3D !== 'function') { return { success: false, error: 'app.removeWorld3D unavailable — update FxTool' }; }
-  return { success: !!app.removeWorld3D() };
+  // removeWorld3D's return value is not a success flag; whether the world is
+  // gone is (gate D5: it worked and reported failure).
+  app.removeWorld3D();
+  return { success: !app._world3d };
 })();`.trim();
 
       // --- Mesh authoring ---------------------------------------------------
@@ -11868,7 +11996,16 @@ ${needWorld}
 // World3D: every authored mesh on the stage
 (function() {
   if (typeof app.listWorldMeshes !== 'function') { return { success: false, error: 'app.listWorldMeshes unavailable — update FxTool' }; }
-  return { success: true, meshes: app.listWorldMeshes() };
+  // Summarised (gate A, 1.6.19): one star returned over 10 KB, nearly all of it
+  // collision and vertex arrays nobody asked for. Arrays longer than 16 numbers
+  // become their length; everything else passes as is.
+  const __slim = function (v, depth) {
+    if (Array.isArray(v)) return v.length > 16 ? { length: v.length } : v.map(function (x) { return __slim(x, depth + 1); });
+    if (v && typeof v === 'object' && depth < 4) { const o = {}; for (const k in v) { if (typeof v[k] !== 'function') o[k] = __slim(v[k], depth + 1); } return o; }
+    return v;
+  };
+  const __m = app.listWorldMeshes() || [];
+  return { success: true, count: __m.length, meshes: __m.map(function (m) { return __slim(m, 0); }) };
 })();`.trim();
 
       case 'remove_mesh':
@@ -12057,7 +12194,10 @@ ${needWorld}
 (function() {
   if (typeof app.worldToCanvas !== 'function') { return { success: false, error: 'app.worldToCanvas unavailable — update FxTool' }; }
 ${needWorld}
-  return { success: true, point: app.worldToCanvas(${S(input.point)}) };
+  // projectToCanvas destructures [x, y, z]; an {x, y, z} object threw "is not iterable" (gate D5).
+  const __p = ${S(input.point)};
+  const __pt = app.worldToCanvas(Array.isArray(__p) ? __p : [__p.x, __p.y, __p.z ?? 0]);
+  return __pt ? { success: true, point: Array.isArray(__pt) ? { x: __pt[0], y: __pt[1] } : __pt } : { success: false, error: 'the point is not in front of the camera, or there is no world' };
 })();`.trim();
 
       case 'canvas_to_ground':
@@ -12346,9 +12486,13 @@ ${needWorld}
 // Interchange: ${fn}
 (async function() {
 ${guard(fn)}
+  ${TO_DATA_URL_JS}
   const out = await app.${fn}(${opts});
   if (!out) { return { success: false, error: '${fn} produced nothing — the scene may have no animatable content' }; }
-  return { success: true, format: ${S(input.action === 'export_lottie' ? 'lottie' : 'dotlottie')}, data: out };
+  ${input.action === 'export_lottie'
+    ? `return { success: true, format: 'lottie', data: out };`
+    : `const __url = await __ppToDataUrl(out, 'application/zip');
+  return __url ? { success: true, format: 'dotlottie', data: __url } : { success: false, error: 'exportDotLottie returned something that is not binary' };`}
 })();`.trim();
       }
 
@@ -12359,9 +12503,16 @@ ${guard(fn)}
 ${guard('importLottie')}
   // importLottie logs and returns falsy when the importer is absent — a
   // stripped console makes that indistinguishable from an empty animation.
+  ${REG_ID_JS}
   const r = await app.importLottie(${S(input.data)}, ${opts});
   if (!r) { return { success: false, error: 'the Lottie did not import — it may be malformed, or this build has no Lottie importer' }; }
-  return { success: true, imported: r };
+  // The Paper group itself went back as a dump of internals (gate D7); what a
+  // caller can use is the id and the size of what arrived.
+  const __it = r.item || r.group || r;
+  const __id = (r && (r.itemId || r.id) && typeof (r.itemId || r.id) === 'string') ? (r.itemId || r.id) : __ppRegId(__it);
+  return { success: true, itemId: __id, layers: Array.isArray(r.layers) ? r.layers.length : (__it && __it.children ? __it.children.length : undefined),
+    bounds: __it && __it.bounds ? { x: __it.bounds.x, y: __it.bounds.y, width: __it.bounds.width, height: __it.bounds.height } : undefined,
+    ...(r.warnings ? { warnings: r.warnings } : {}) };
 })();`.trim();
 
       case 'export_glb':
@@ -12373,9 +12524,11 @@ ${guard('exportGLB')}
   // stripped in production, so the precondition is checked here instead.
   const has3d = app._initialized && app._initialized.has && app._initialized.has('threeD');
   if (!has3d) { return { success: false, error: 'no perspective objects to export — create one with createObject3D first' }; }
+  ${TO_DATA_URL_JS}
   const out = await app.exportGLB(${opts});
   if (!out) { return { success: false, error: 'GLB export produced nothing' }; }
-  return { success: true, format: 'glb', data: out };
+  const __url = await __ppToDataUrl(out, 'model/gltf-binary');
+  return __url ? { success: true, format: 'glb', data: __url } : { success: true, format: 'glb', data: out };
 })();`.trim();
 
       case 'export_bvh':

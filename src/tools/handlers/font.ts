@@ -124,17 +124,17 @@ async function dispatchFontAction(args: Record<string, unknown>, options: Handle
     case 'set_name': {
       const { name } = args as { name: string };
       if (typeof name !== 'string') return errorResult(ErrorCodes.INVALID_INPUT, 'font set_name requires { name: string }');
-      const code = `app.fontStudio.setFontName(${JSON.stringify(name)});`;
+      const code = `(function() { return app.fontStudio.setFontName(${JSON.stringify(name)}); })();`;
       return executeOrGenerate(code, `Set font name to "${name}"`, options, 'pinepaper_font');
     }
     case 'get_required_chars': {
       const { set } = args as { set?: string };
       const setArg = set ? JSON.stringify(set) : '"minimum"';
-      const code = `app.fontStudio.getRequiredCharacters(${setArg});`;
+      const code = `(function() { return app.fontStudio.getRequiredCharacters(${setArg}); })();`;
       return executeOrGenerate(code, `Get required characters (${set || 'minimum'} set)`, options, 'pinepaper_font');
     }
     case 'get_status': {
-      const code = `app.fontStudio.getCompletionStatus();`;
+      const code = `(function() { return app.fontStudio.getCompletionStatus(); })();`;
       return executeOrGenerate(code, 'Get font completion status', options, 'pinepaper_font');
     }
     case 'create_glyph': {
@@ -165,7 +165,7 @@ async function dispatchFontAction(args: Record<string, unknown>, options: Handle
     case 'remove_glyph': {
       const { character } = args as { character: string };
       if (typeof character !== 'string') return errorResult(ErrorCodes.INVALID_INPUT, 'font remove_glyph requires { character }');
-      const code = `app.fontStudio.removeGlyph(${JSON.stringify(character)});`;
+      const code = `(function() { return app.fontStudio.removeGlyph(${JSON.stringify(character)}); })();`;
       return executeOrGenerate(code, `Remove glyph for "${character}"`, options, 'pinepaper_font');
     }
     case 'set_metrics': {
@@ -174,7 +174,7 @@ async function dispatchFontAction(args: Record<string, unknown>, options: Handle
       for (const k of ['unitsPerEm', 'ascender', 'descender', 'xHeight', 'capHeight']) {
         if (metrics[k] !== undefined) cleanMetrics[k] = metrics[k];
       }
-      const code = `app.fontStudio.setMetrics(${JSON.stringify(cleanMetrics)});`;
+      const code = `(function() { return app.fontStudio.setMetrics(${JSON.stringify(cleanMetrics)}); })();`;
       return executeOrGenerate(code, 'Set font metrics', options, 'pinepaper_font');
     }
     case 'export': {
@@ -189,7 +189,7 @@ async function dispatchFontAction(args: Record<string, unknown>, options: Handle
       return executeOrGenerate(code, 'Export font as OTF', options, 'pinepaper_font');
     }
     case 'load_into_document': {
-      const code = `app.fontStudio.loadIntoDocument();`;
+      const code = `(function() { return app.fontStudio.loadIntoDocument(); })();`;
       return executeOrGenerate(code, 'Load font into document', options, 'pinepaper_font');
     }
     case 'export_data': {
@@ -202,23 +202,23 @@ async function dispatchFontAction(args: Record<string, unknown>, options: Handle
     case 'import_data': {
       const { data } = args as { data: object };
       if (!data || typeof data !== 'object') return errorResult(ErrorCodes.INVALID_INPUT, 'font import_data requires { data: object }');
-      const code = `app.fontStudio.importData(${JSON.stringify(data)});`;
+      const code = `(function() { return app.fontStudio.importData(${JSON.stringify(data)}); })();`;
       return executeOrGenerate(code, 'Import font data from JSON', options, 'pinepaper_font');
     }
     case 'clear': {
-      const code = `app.fontStudio.clear();`;
+      const code = `(function() { return app.fontStudio.clear(); })();`;
       return executeOrGenerate(code, 'Clear all glyphs and reset font', options, 'pinepaper_font');
     }
     case 'remove_overlap': {
       const { pathId } = args as { pathId: string };
       if (typeof pathId !== 'string') return errorResult(ErrorCodes.INVALID_INPUT, 'font remove_overlap requires { pathId }');
-      const code = `app.fontStudio.removeOverlap(${JSON.stringify(pathId)});`;
+      const code = `(function() { return app.fontStudio.removeOverlap(${JSON.stringify(pathId)}); })();`;
       return executeOrGenerate(code, `Remove overlaps from path ${pathId}`, options, 'pinepaper_font');
     }
     case 'correct_direction': {
       const { pathId } = args as { pathId: string };
       if (typeof pathId !== 'string') return errorResult(ErrorCodes.INVALID_INPUT, 'font correct_direction requires { pathId }');
-      const code = `app.fontStudio.correctDirection(${JSON.stringify(pathId)});`;
+      const code = `(function() { return app.fontStudio.correctDirection(${JSON.stringify(pathId)}); })();`;
       return executeOrGenerate(code, `Correct path direction for ${pathId}`, options, 'pinepaper_font');
     }
     case 'cleanup_path': {

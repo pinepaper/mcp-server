@@ -4,7 +4,7 @@
  * Name lists the engine owns and the tool surface must offer exactly. See
  * scripts/sync-engine-lists.mjs for why each is generated.
  *
- * Source: FxTool origin/main 7001c9c8681ad1971a3cb2136a75df4c42064bfe
+ * Source: FxTool origin/main f5aa5436fd71ce86baf333835916397416f1b79f
  *   js/core/KeyframeInterpolator.js  sha256: 4c38752d86cae944
  *   js/world3d/worlds.js  sha256: 0e0973f7587c06e1
  *   js/core/DesignMedia.js  sha256: 46fae8ceafe54b11
@@ -112,6 +112,30 @@ export const FILTER_TYPES = [
   'halftoneCMYK',
   'dither',
 ] as const;
+
+/** Numeric parameter ranges per filter, [min, max], as the engine registers them. */
+export const FILTER_PARAM_RANGES: Readonly<Record<string, Readonly<Record<string, readonly [number, number]>>>> = Object.freeze({
+  grayscale: { intensity: [0, 1] },
+  sepia: { intensity: [0, 1] },
+  brightness: { value: [-100, 100] },
+  contrast: { value: [-100, 100] },
+  saturation: { value: [-100, 100] },
+  invert: { intensity: [0, 1] },
+  blur: { radius: [0, 20] },
+  noise: { intensity: [0, 100] },
+  vignette: { intensity: [0, 1], radius: [0, 1] },
+  vintage: { intensity: [0, 1] },
+  colorOverlay: { intensity: [0, 1] },
+  sharpen: { intensity: [0, 100] },
+  emboss: { intensity: [0, 1] },
+  posterize: { levels: [2, 32] },
+  hsl: { hue: [-180, 180], saturation: [-100, 100], lightness: [-100, 100] },
+  colorTint: { intensity: [0, 1] },
+  edgeDetect: { strength: [0, 4] },
+  halftoneDots: { size: [2, 32], angle: [0, 3.14] },
+  halftoneCMYK: { size: [2, 32] },
+  dither: { levels: [2, 16] },
+});
 
 /** One line per filter: the engine's own description and parameter ranges. */
 export const FILTER_DOCS: Readonly<Record<string, string>> = Object.freeze({

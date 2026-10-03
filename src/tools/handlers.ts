@@ -163,6 +163,7 @@ import {
 import { sameStudioTarget, validateStudioUrl } from '../browser/url-target.js';
 import { getPerformanceTracker, MetricsExportFormat } from '../metrics/index.js';
 import { ErrorContext, formatErrorContext, captureCanvasState } from '../execution/index.js';
+import { FILTER_PARAM_RANGES } from './engine-lists.js';
 import { getSessionManager } from '../agent/session-manager.js';
 import { vocabularyHintForPath, validateBatchVocabulary, detectBatchPropertyTypos } from '../ontology/hints.js';
 import { cameraHandlers } from './handlers/camera.js';
@@ -789,6 +790,19 @@ export interface HandlerOptions {
 }
 
 /** Where a generated script travels for a host to record, beside the agent-visible text. */
+/** Relation types registered with register_custom_relation in this server session (gate D2). */
+export const CUSTOM_RELATION_NAMES = new Set<string>();
+
+/**
+ * Tools whose browser work legitimately outlasts the governor's 10 s default.
+ * The first detection call downloads and initialises a model, which on a cold
+ * page took longer than 10 s and died as a timeout (gate C10, 1.6.19).
+ */
+const LONG_GOVERNOR_BUDGET_MS: Record<string, number> = {
+  pinepaper_detect_objects: 120_000,
+  pinepaper_extract_object: 120_000,
+};
+
 export const CODE_META_KEY = 'pinepaper.studio/code';
 
 // =============================================================================
@@ -1187,6 +1201,32 @@ async function brandFromUrl(url: string, shots: number, options: HandlerOptions)
   }
 }
 
+
+/**
+ * If an executed result carries `data` (a data URL, or JSON/text), write it to
+ * a file in the export dir and replace it with filePath + bytes.
+ */
+async function writeResultDataToFile(out: CallToolResult, ext: string): Promise<CallToolResult> {
+  const first = out.content?.[0];
+  if (out.isError || !first || first.type !== 'text') return out;
+  let obj: { result?: { data?: unknown } & Record<string, unknown> } & Record<string, unknown>;
+  try { obj = JSON.parse(first.text); } catch { return out; }
+  const r = obj.result;
+  if (!r || r.data === undefined || r.data === null) return out;
+  let bytes: Buffer;
+  if (typeof r.data === 'string' && r.data.startsWith('data:')) bytes = Buffer.from(r.data.slice(r.data.indexOf(',') + 1), 'base64');
+  else if (typeof r.data === 'string') bytes = Buffer.from(r.data, 'utf-8');
+  else bytes = Buffer.from(JSON.stringify(r.data), 'utf-8');
+  const dir = getExportDir();
+  await mkdir(dir, { recursive: true });
+  const filePath = join(dir, `pinepaper_${String(r.format ?? 'export').replace(/[^a-z0-9-]/gi, '')}_${Date.now()}.${ext}`);
+  await writeFile(filePath, bytes);
+  const { data: _d, ...rest } = r;
+  void _d;
+  obj.result = { ...rest, filePath, bytes: bytes.length };
+  return { ...out, content: [{ type: 'text', text: JSON.stringify(obj, null, 2) }, ...out.content.slice(1)] };
+}
+
 /**
  * pinepaper_capture_frames with `sheet`: one tiled image of the film, saved
  * to a file (an image is never useful inline, see ALWAYS_SAVE_FORMATS), with
@@ -1385,7 +1425,11 @@ ${code}
   // emitter is not (its verdict already describes what it left behind).
   const rollbackOnFailure = toolName === 'pinepaper_execute_custom_code'
     && await markItemsBeforeRun(controller);
-  const result = await controller.executeCode(code, shouldTakeScreenshot, stage ? { stage } : {});
+  const governorTimeoutMs = LONG_GOVERNOR_BUDGET_MS[toolName];
+  const result = await controller.executeCode(code, shouldTakeScreenshot, {
+    ...(stage ? { stage } : {}),
+    ...(governorTimeoutMs ? { governorTimeoutMs } : {}),
+  });
 
   const browserDuration = tracker.endTimer(`${timerId}_browser_execution`);
   // THE METRIC RECORDS THE CALL'S VERDICT, NOT THE TRANSPORT'S (gate H2,
@@ -2134,6 +2178,19 @@ async function handleToolCallInner(
 
       case 'pinepaper_validate_scene': {
         const input = ValidateSceneInputSchema.parse(args);
+        // The validator reads { from, to, relation } on an addRelation op; the
+        // add_relation tool's own names (source, target, relationType) are what
+        // an agent reaches for, and the tool's example used them, so every
+        // example op failed SOURCE_NOT_FOUND "undefined" (gate D8, 1.6.19).
+        if (Array.isArray(input.ops)) {
+          input.ops = input.ops.map((op) => {
+            const o = { ...(op as Record<string, unknown>) };
+            if (o.from === undefined && o.source !== undefined) { o.from = o.source; delete o.source; }
+            if (o.to === undefined && o.target !== undefined) { o.to = o.target; delete o.target; }
+            if (o.relation === undefined && o.relationType !== undefined) { o.relation = o.relationType; delete o.relationType; }
+            return o;
+          }) as typeof input.ops;
+        }
         const code = codeGenerator.generateValidateScene(input);
         const description = input.ops ? `Pre-validate ${input.ops.length} proposed op(s)` : 'Audit the live scene';
         return executeOrGenerate(code, description, options, 'pinepaper_validate_scene');
@@ -2472,8 +2529,16 @@ async function handleToolCallInner(
       // RELATION TOOLS
       // -----------------------------------------------------------------------
       case 'pinepaper_add_relation': {
-        const input = AddRelationInputSchema.parse(args);
-        const code = codeGenerator.generateAddRelation(input);
+        // A relation registered with register_custom_relation this session is
+        // a valid type here (gate D2, 1.6.19: the enum refused the name just
+        // registered). Only those names; an unknown one is still refused.
+        const rt = (args as { relationType?: unknown }).relationType;
+        // The schema's refinements check presence, not which type, so a custom
+        // name is validated with a built-in stand-in and then put back.
+        const isCustom = typeof rt === 'string' && CUSTOM_RELATION_NAMES.has(rt);
+        const input = AddRelationInputSchema.parse(isCustom ? { ...args, relationType: 'orbits' } : args);
+        if (isCustom) (input as { relationType?: string }).relationType = rt as string;
+        const code = codeGenerator.generateAddRelation(input, isCustom);
         const description = getLocalizedSuccessMessage(i18n, 'relationAdded', {
           relationType: input.relationType ?? `preset:${input.presetId}`,
           sourceId: input.sourceId,
@@ -2513,6 +2578,7 @@ async function handleToolCallInner(
 
       case 'pinepaper_register_custom_relation': {
         const input = RegisterCustomRelationInputSchema.parse(args);
+        CUSTOM_RELATION_NAMES.add(input.name);
         const code = codeGenerator.generateRegisterCustomRelation(input);
         return executeOrGenerate(
           code,
@@ -2856,6 +2922,15 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
       // -----------------------------------------------------------------------
       case 'pinepaper_add_filter': {
         const input = AddFilterInputSchema.parse(args);
+        // Out-of-range parameters are refused with the engine's own range
+        // (gate A, 1.6.19: dither levels 99 was accepted and quietly clamped).
+        const ranges = FILTER_PARAM_RANGES[input.filterType] ?? {};
+        for (const [k, v] of Object.entries((input.params ?? {}) as Record<string, unknown>)) {
+          const r = ranges[k];
+          if (r && typeof v === 'number' && (v < r[0] || v > r[1])) {
+            return errorResult(ErrorCodes.VALIDATION_ERROR, `${input.filterType} ${k} must be ${r[0]}..${r[1]} (got ${v}).`, { filterType: input.filterType, param: k, range: r });
+          }
+        }
         const code = codeGenerator.generateAddFilter(
           input.filterType,
           input.params as Record<string, unknown>
@@ -3522,6 +3597,15 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
             metadata = { source: 'url', url: input.url };
           }
 
+          // `color` was accepted and never applied, so a recoloured icon
+          // rendered black (gate D15, 1.6.19). A monochrome icon draws in
+          // currentColor (stroke sets) or in the default fill (fill sets):
+          // both take the colour.
+          if (input.color) {
+            const c = input.color.replace(/"/g, '');
+            svg = svg!.replace(/currentColor/g, c);
+            svg = svg.replace(/<svg\b([^>]*)>/i, (m, attrs: string) => (/\sfill\s*=/.test(attrs) ? m : `<svg${attrs} fill="${c}">`));
+          }
           // Import the SVG onto canvas using existing import_svg tool
           const code = codeGenerator.generateImportSVG(
             svg!,
@@ -4217,7 +4301,12 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
       case 'pinepaper_interchange': {
         const input = InterchangeInputSchema.parse(args);
         const code = codeGenerator.generateInterchange(input);
-        return executeOrGenerate(code, `Interchange: ${input.action}`, options, 'pinepaper_interchange');
+        const out = await executeOrGenerate(code, `Interchange: ${input.action}`, options, 'pinepaper_interchange');
+        // AN EXPORT IS A FILE (gate D7, 1.6.19): .lottie, GLB and the PNG-sequence
+        // zip came back as byte-index objects or inline data URLs, and a Lottie
+        // JSON can be large. Written out; the result names the path.
+        const ext: Record<string, string> = { export_lottie: 'json', export_dotlottie: 'lottie', export_glb: 'glb', export_png_sequence: 'zip', export_bvh: 'bvh' };
+        return ext[input.action] ? await writeResultDataToFile(out, ext[input.action]) : out;
       }
 
       case 'pinepaper_sound': {

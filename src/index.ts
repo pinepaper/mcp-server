@@ -35,7 +35,7 @@ import {
 } from './tools/toolkits.js';
 import type { ToolkitProfile } from './tools/toolkits.js';
 import { handleToolCall, ExecutionMode, getExecutionMode, withTiming } from './tools/handlers.js';
-import { getBrowserController } from './browser/puppeteer-controller.js';
+import { getBrowserController, BROWSER_TIME } from './browser/puppeteer-controller.js';
 import { setLogServer } from './utils/mcp-log.js';
 import { startProgress } from './utils/progress.js';
 
@@ -257,7 +257,7 @@ Then call \`pinepaper_agent_end_job\` to see the result.
 | create | Add items: text, circle, rectangle, star, triangle, polygon, ellipse, path, line, arc |
 | modify | Change item properties |
 | delete | Remove item |
-| animate | Loop animation: pulse, rotate, bounce, fade, wobble, slide |
+| animate | Loop animation: pulse, rotate, bounce, fade, wobble, slideLeftRight, slideUpDown |
 | keyframe_animate | Timed animation: [{time, properties, easing}] |
 | relation | Behavioral link: orbits, follows, attached_to, points_at, mirrors, parallax |
 | apply_mask | Reveal effects: wipeLeft, iris, curtain, cinematic, etc. |
@@ -1691,8 +1691,8 @@ pinepaper_create_item itemType: "path" position: {x: 400, y: 320}
   properties: {segments: [[-200, 0], [-100, 30], [0, 0], [100, -30], [200, 0]], smooth: true, strokeColor: "#ef4444", strokeWidth: 2}
 → item_2
 
-pinepaper_animate_item itemId: "item_1" animationType: "slide" speed: 0.5
-pinepaper_animate_item itemId: "item_2" animationType: "slide" speed: -0.5
+pinepaper_animate_item itemId: "item_1" animationType: "slideLeftRight" speed: 0.5
+pinepaper_animate_item itemId: "item_2" animationType: "slideLeftRight" speed: -0.5
 \`\`\`
 
 ## Geometric Patterns
@@ -2333,7 +2333,7 @@ pinepaper_add_relation
   }
 
 // Give the ball some motion
-pinepaper_animate_item itemId: "ball" animationType: "slide" speed: 2
+pinepaper_animate_item itemId: "ball" animationType: "slideLeftRight" speed: 2
 \`\`\`
 
 ### Contained Particles
@@ -5980,6 +5980,7 @@ The tools generate Paper.js/JavaScript code that executes on the PinePaper canva
     extra?.signal?.addEventListener('abort', onAbort, { once: true });
 
     const callStarted = Date.now();
+    const browserBefore = { ...BROWSER_TIME };
     let result;
     try {
       result = await handleToolCall(name, args as Record<string, unknown>, {
@@ -5996,7 +5997,15 @@ The tools generate Paper.js/JavaScript code that executes on the PinePaper canva
     }
     // The whole call's time, for every tool (the browser/screenshot breakdown
     // rides in from executeOrGenerate when the call ran in the studio).
-    if (result) result = withTiming(result, { toolMs: Date.now() - callStarted });
+    if (result) {
+      const browserMs = (BROWSER_TIME.executeMs - browserBefore.executeMs) + (BROWSER_TIME.screenshotMs - browserBefore.screenshotMs);
+      const screenshotMs = BROWSER_TIME.screenshotMs - browserBefore.screenshotMs;
+      result = withTiming(result, {
+        toolMs: Date.now() - callStarted,
+        ...(browserMs > 0 ? { browserMs } : {}),
+        ...(screenshotMs > 0 ? { screenshotMs } : {}),
+      });
+    }
 
     // STRUCTURED CONTENT, BOUNDED. A result whose text is a JSON object also
     // carries it as structuredContent, so a client can read fields without

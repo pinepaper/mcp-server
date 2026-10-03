@@ -434,7 +434,7 @@ export class DesignGraph {
         if (node.properties.blendMode) nodeDoc['pp:blendMode'] = node.properties.blendMode;
         if (node.properties.masked) nodeDoc['pp:masked'] = true;
         if (node.properties.maskType) nodeDoc['pp:maskType'] = node.properties.maskType;
-        if (node.properties.animationType && node.properties.animationType !== 'keyframe') {
+        if (node.properties.animationType && node.properties.animationType !== 'keyframe' && node.properties.animationType !== 'none') {
           nodeDoc['pp:animationType'] = node.properties.animationType;
         }
         // Recipes. A consumer that drops any hop of
@@ -858,7 +858,7 @@ export class DesignGraph {
     const hasRigging = nodeTypes.has('pp:Skeleton') || nodeTypes.has('pp:Bone');
     const hasPrecomp = nodeTypes.has('pp:Precomp');
     const hasOnLoad = typeof template.onLoad === 'function';
-    const hasSimpleAnim = items.some(i => i.animationType && i.animationType !== 'keyframe');
+    const hasSimpleAnim = items.some(i => i.animationType && i.animationType !== 'keyframe' && i.animationType !== 'none');
 
     if (hasRigging || hasPrecomp || (hasOnLoad && hasKeyframes && hasRelations)) {
       sem.animationComplexity = 'advanced';

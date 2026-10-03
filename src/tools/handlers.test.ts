@@ -1105,13 +1105,10 @@ describe('handleToolCall', () => {
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
-      // zoomTo(level) has never existed — the engine zooms to a REGION — so
-      // this tool now refuses by name instead of calling into undefined.
-      expect(text).toContain('zoom_map takes a numeric level');
-      // The level is no longer echoed into the code, because nothing consumes
-      // it — asserting it appeared was asserting that the argument survived to
-      // a call that never existed.
-      expect(text).toContain('zoomToRegion');
+      // The map has no numeric zoom, but the camera zooms to an absolute level
+      // (camera.zoomIn(level) animates to { zoom: level }), so the documented
+      // call now works instead of refusing (1.6.19 gate D3).
+      expect(text).toContain('app.camera.zoomIn(2, 0.5)');
     });
   });
 
