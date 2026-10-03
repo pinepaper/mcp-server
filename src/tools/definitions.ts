@@ -6928,10 +6928,12 @@ ACTIONS:
 - apply_colors     — { data: Record<regionId, value>, options? }   choropleth coloring
 - add_marker       — { lat, lon, label?, color?, size? }
 - add_labels       — { regions?: string[], style?, formatter? }
-- get_at_point     — { x, y }                              region at canvas coords
+- get_at_point     — { x, y }                              region id + name at canvas coords, and its (lon, lat)
 - select           — { regionIds: string[] }
 - deselect         — { regionIds?: string[] }              omit to deselect all
-- get_highlighted  — {}`,
+- get_highlighted  — {}                                    every region highlight OR apply_colors coloured (one colour channel)
+
+highlight and apply_colors return the regions they coloured, by id, and name any id not on the map (notFound / unmatched).`,
     inputSchema: {
       type: 'object',
       properties: {

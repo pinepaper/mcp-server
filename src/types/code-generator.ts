@@ -6425,6 +6425,54 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
   }
 
   /**
+   * Emitted helpers for reading a map's region colours back.
+   *
+   * highlightRegions and applyDataColors both write ONE channel — a colour
+   * override keyed on the feature's _mapId — and log a console.warn for an id
+   * they cannot resolve, which production strips. getHighlightedRegions reads
+   * path.data.highlighted over regionPaths, which a rasterised map leaves
+   * empty, so it saw nothing either tool did (gate D51). The override, read
+   * through the public getRegionOverride, is the record the engine leaves.
+   * Ids resolve the way the engine resolves them: exact, then lower-case.
+   */
+  private mapRegionReadbackJs(): string {
+    return `
+  function __resolve(id) {
+    const m = app.mapSystem.regionNameMappings;
+    if (!m || typeof m.get !== 'function') return null;
+    return m.get(id) || m.get(String(id).toLowerCase()) || null;
+  }
+  function __features() {
+    const seen = new Map();
+    app.mapSystem.regionNameMappings.forEach(function (f) { if (f && !seen.has(f._mapId)) seen.set(f._mapId, f); });
+    return Array.from(seen.values());
+  }
+  function __row(f, asked) {
+    const o = app.mapSystem.getRegionOverride(f._mapId);
+    const r = { regionId: f._mapId, name: f._mapName, fill: o ? o.fill : null };
+    if (asked !== undefined) r.asked = asked;
+    return r;
+  }
+  function __overridden() {
+    return __features().filter(function (f) { return !!app.mapSystem.getRegionOverride(f._mapId); })
+      .map(function (f) { return __row(f); });
+  }
+  function __sampleIds() {
+    return __features().slice(0, 8).map(function (f) { return f._mapId + ' (' + f._mapName + ')'; }).join(', ');
+  }
+  function __check(asked) {
+    const done = [], notFound = [], notApplied = [];
+    asked.forEach(function (id) {
+      const f = __resolve(id);
+      if (!f) { notFound.push(id); return; }
+      const r = __row(f, id);
+      (r.fill ? done : notApplied).push(r);
+    });
+    return { done: done, notFound: notFound, notApplied: notApplied };
+  }`;
+  }
+
+  /**
    * Generate code to highlight map regions
    */
   generateHighlightRegions(input: HighlightRegionsInput): string {
@@ -6458,26 +6506,19 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
     return { success: false, error: 'Map system not available' };
   }
 
-  try {
+  try {${this.mapRegionReadbackJs()}
     app.mapSystem.highlightRegions(${regionIds}, ${optionsStr});
-    // READ BACK (gate run 2, D16): highlight reported success while
-    // get_highlighted came back [] and the export showed no highlight.
-    const __asked = ${regionIds};
-    const __got = (app.mapSystem.getHighlightedRegions() || []).map(function (r) { return r.regionId; });
-    const __names = (app.mapSystem.getHighlightedRegions() || []).map(function (r) { return r.name; });
-    const __missing = __asked.filter(function (id) { return __got.indexOf(id) === -1 && __names.indexOf(id) === -1; });
-    if (__missing.length) {
-      // On a RASTERISED map (no region paths) the highlight is drawn, but the
-      // readback cannot see it and the requested colour is not applied (gate
-      // run 3, N5: the PNG showed the default blue). Say exactly that.
-      const __raster = !(app.mapSystem.regionPaths && app.mapSystem.regionPaths.size);
-      if (__raster) {
-        return { success: true, verified: false, highlighted: __asked,
-          warning: 'this map is rasterised: the highlight is drawn, but the studio cannot confirm it and the requested colour is not applied (the default highlight colour is used). get_highlighted will not list these regions.' };
-      }
-      return { success: false, highlighted: __got, error: 'the studio did not highlight ' + __missing.join(', ') + ' (get_highlighted does not list them). Check the region names.' };
+    // READ BACK (gate D16, D51): every id is resolved and its colour read.
+    const __r = __check(${regionIds});
+    if (!__r.done.length) {
+      return { success: false, notFound: __r.notFound, notApplied: __r.notApplied,
+        error: 'no region was highlighted.'
+          + (__r.notFound.length ? ' Not on this map: ' + __r.notFound.join(', ') + '. Ids on this map include ' + __sampleIds() + '; names work too.' : '') };
     }
-    return { success: true, highlighted: __got };
+    const __res = { success: true, highlighted: __r.done };
+    if (__r.notFound.length) { __res.notFound = __r.notFound; __res.warning = 'not on this map, so not highlighted: ' + __r.notFound.join(', ') + '. Ids on this map include ' + __sampleIds() + '.'; }
+    if (__r.notApplied.length) __res.notApplied = __r.notApplied;
+    return __res;
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -6561,9 +6602,19 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
     return { success: false, error: 'Map system not available' };
   }
 
-  try {
-    app.mapSystem.applyDataColors(${dataStr}, ${optionsStr});
-    return { success: true, regionsColored: ${Object.keys(validated.data).length} };
+  try {${this.mapRegionReadbackJs()}
+    const __legend = app.mapSystem.applyDataColors(${dataStr}, ${optionsStr});
+    // READ BACK (gate D51): the engine skips a key it cannot resolve with a
+    // console warning, which production strips, so a misspelt key looked coloured.
+    const __r = __check(${JSON.stringify(Object.keys(validated.data))});
+    if (!__r.done.length) {
+      return { success: false, unmatched: __r.notFound,
+        error: 'no region was coloured: none of the keys is on this map. Ids on this map include ' + __sampleIds() + '; names work too.' };
+    }
+    const __res = { success: true, regionsColored: __r.done.length, colored: __r.done };
+    if (__legend && __legend.id !== undefined) __res.legendId = __legend.id;
+    if (__r.notFound.length) { __res.unmatched = __r.notFound; __res.warning = 'not on this map, so not coloured: ' + __r.notFound.join(', ') + '.'; }
+    return __res;
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -6594,8 +6645,15 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
   }
 
   try {
-    const marker = app.mapSystem.addMarker(${JSON.stringify(options)});
-    return { success: true, markerId: marker?.id || 'marker_added' };
+    // addMarker(longitude, latitude, options). One object went in as the
+    // longitude, projected to NaN, and the engine returned null while this
+    // reported success with the made-up id 'marker_added' (gate D51).
+    const __o = ${JSON.stringify(options)};
+    const marker = app.mapSystem.addMarker(__o.lon, __o.lat, __o);
+    if (!marker) {
+      return { success: false, error: 'no marker was added: [' + __o.lat + ', ' + __o.lon + '] (lat, lon) is outside the visible map, or no map is loaded.' };
+    }
+    return { success: true, markerId: marker.id, position: [marker.position.x, marker.position.y] };
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -6768,20 +6826,14 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
   }
 
   try {
-    // getRegionAtPoint() has never existed; the engine exposes no hit test.
-    // canvasToGeo turns a point into COORDINATES, which is a different answer,
-    // so it is offered rather than quietly substituted.
-    if (typeof app.mapSystem.canvasToGeo === 'function') {
-      const coord = app.mapSystem.canvasToGeo(${validated.x}, ${validated.y});
-      return { success: false, coordinate: coord,
-        error: 'the engine has no region hit test. That point is at ' + JSON.stringify(coord)
-          + ' — find regions by id with get_highlighted_map_regions or getSelectedRegions.' };
-    }
-    const region = null;
-    if (region) {
-      return { success: true, regionId: region.id, regionName: region.name, properties: region.properties };
-    }
-    return { success: true, regionId: null, message: 'No region at this point' };
+    // canvasToGeo takes ONE [x, y] argument; (x, y) handed it a bare number.
+    const coord = typeof app.mapSystem.canvasToGeo === 'function' ? app.mapSystem.canvasToGeo([${validated.x}, ${validated.y}]) : null;
+    // The hit test the studio's own hover uses (getRegionAtPoint never existed).
+    const f = app.mapSystem._findFeatureAtCanvasPoint(${validated.x}, ${validated.y});
+    if (!f) return { success: true, regionId: null, coordinate: coord, message: 'no region at this point (off the map, or ocean)' };
+    const p = f.properties || {};
+    return { success: true, regionId: f._mapId !== undefined ? f._mapId : (p.id || p.ISO_A3 || p.name || null),
+      regionName: f._mapName || p.name || p.NAME || null, coordinate: coord, properties: p };
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -7018,9 +7070,17 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
     return { success: false, error: 'Map system not available' };
   }
 
-  try {
-    const result = app.mapSystem.getHighlightedRegions();
-    return { highlighted: result?.highlighted || [], count: result?.count || 0 };
+  try {${this.mapRegionReadbackJs()}
+    // getHighlightedRegions returns an ARRAY of {regionId, name, path}; this
+    // read result.highlighted off it and always answered [] (gate D51). It also
+    // walks regionPaths, empty on a rasterised map, so the override channel is
+    // read as well.
+    const __byId = new Map();
+    (app.mapSystem.getHighlightedRegions() || []).forEach(function (r) { __byId.set(r.regionId, { regionId: r.regionId, name: r.name }); });
+    __overridden().forEach(function (r) { __byId.set(r.regionId, r); });
+    const __list = Array.from(__byId.values());
+    return { success: true, highlighted: __list, count: __list.length,
+      note: 'highlight and apply_colors share one colour channel, so this lists every region either has coloured.' };
   } catch (error) {
     return { success: false, error: error.message };
   }
