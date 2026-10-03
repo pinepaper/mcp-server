@@ -154,6 +154,9 @@ import {
   ItemType,
 } from '../types/schemas.js';
 import { ZodError, z } from 'zod';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { effectClass } from './effect-class.js';
+import { EFFECT_BEFORE_JS, effectAfterJs, namedItemIds, idMayBeGone, NO_CHANGE_NOTE } from './effect-check.js';
 import { writeFile, mkdir, appendFile, unlink, readFile, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, extname } from 'node:path';
@@ -866,6 +869,18 @@ function dataResult(value: unknown): CallToolResult {
  * index.ts adds toolMs, the whole call, for every tool.
  */
 export const TIMING_META_KEY = 'pinepaper.studio/timing';
+export const EFFECT_META_KEY = 'pinepaper.studio/effect';
+
+/** The tool and action of the call in flight, for executeOrGenerate's effect check. */
+const callContext = new AsyncLocalStorage<{ toolName: string; action?: string }>();
+let READ_ONLY_TOOLS: Set<string> | null = null;
+async function readOnlyTools(): Promise<Set<string>> {
+  if (!READ_ONLY_TOOLS) {
+    const { PINEPAPER_TOOLS } = await import('./definitions.js');
+    READ_ONLY_TOOLS = new Set(PINEPAPER_TOOLS.filter((t) => t.annotations?.readOnlyHint).map((t) => t.name));
+  }
+  return READ_ONLY_TOOLS;
+}
 export function withTiming(out: CallToolResult, t: Record<string, number>): CallToolResult {
   const meta = (out._meta ?? {}) as Record<string, unknown>;
   const prev = (meta[TIMING_META_KEY] ?? {}) as Record<string, number>;
@@ -1430,6 +1445,24 @@ ${code}
   const rollbackOnFailure = toolName === 'pinepaper_execute_custom_code'
     && await markItemsBeforeRun(controller);
   const governorTimeoutMs = LONG_GOVERNOR_BUDGET_MS[toolName];
+
+  // NO SILENT SUCCESS (effect-class.ts / effect-check.ts): fingerprint a
+  // mutating call before and after it runs.
+  const ctx = callContext.getStore();
+  const action = ctx && ctx.toolName === toolName ? ctx.action : undefined;
+  const effect = effectClass(toolName, action, (await readOnlyTools()).has(toolName));
+  const checkEffect = effect === 'mutates' && !rollbackOnFailure;
+  let effectCheckMs = 0;
+  let effectArmed = false;
+  if (checkEffect) {
+    const t0 = Date.now();
+    try {
+      const r = await controller.executeCode(EFFECT_BEFORE_JS, false, { bypassGovernor: true });
+      effectArmed = !!(r.success && (r.result as { ok?: boolean } | undefined)?.ok);
+    } catch { /* unchecked this time */ }
+    effectCheckMs += Date.now() - t0;
+  }
+
   const result = await controller.executeCode(code, shouldTakeScreenshot, {
     ...(stage ? { stage } : {}),
     ...(governorTimeoutMs ? { governorTimeoutMs } : {}),
@@ -1529,7 +1562,36 @@ ${code}
     try { getSessionManager().noteItemsCreated(created); } catch { /* no session */ }
   }
 
-  return withTiming(withSessionNote(executedResult(code, result.result, result.screenshot, description, result.report), result), timing);
+  let noChangeNote: string | null = null;
+  let effectMeta: Record<string, unknown> | null = null;
+  if (checkEffect && effectArmed) {
+    const t0 = Date.now();
+    const ids = idMayBeGone(toolName, action) ? [] : namedItemIds(result.result);
+    type EffectVerdict = { ok?: boolean; checked?: string[]; changed?: string[] | null; missing?: string[] };
+    const verdict: EffectVerdict | null = await controller.executeCode(effectAfterJs(ids), false, { bypassGovernor: true })
+      .then((r) => (r.success ? (r.result as EffectVerdict) : null))
+      .catch(() => null);
+    effectCheckMs += Date.now() - t0;
+    if (verdict && verdict.ok) {
+      // A CONTRADICTION, not idempotence: the call names an item that is not there.
+      if (verdict.missing && verdict.missing.length) {
+        return withTiming(errorResult(
+          ErrorCodes.EXECUTION_ERROR,
+          `the call reported ${verdict.missing.join(', ')}, which ${verdict.missing.length === 1 ? 'is' : 'are'} not on the canvas: it did not make what it said it made.`,
+          { result: result.result },
+          { toolName },
+        ), { ...timing, effectCheckMs });
+      }
+      const changed = verdict.changed ?? [];
+      effectMeta = { class: effect, changed: changed.length > 0, signals: changed, checked: verdict.checked ?? [] };
+      if (!changed.length) noChangeNote = NO_CHANGE_NOTE(verdict.checked ?? []);
+    }
+  }
+
+  let out = withSessionNote(executedResult(code, result.result, result.screenshot, description, result.report), result);
+  if (noChangeNote) out = { ...out, content: [...(out.content ?? []), { type: 'text' as const, text: noChangeNote }] };
+  if (effectMeta) out = { ...out, _meta: { ...((out._meta ?? {}) as Record<string, unknown>), [EFFECT_META_KEY]: effectMeta } };
+  return withTiming(out, checkEffect ? { ...timing, effectCheckMs } : timing);
 }
 
 /**
@@ -1747,7 +1809,10 @@ export async function handleToolCall(
   const tracker = getPerformanceTracker();
   const baseTimerId = `${toolName}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-  const result = await handleToolCallInner(toolName, args, options, tracker, baseTimerId);
+  const result = await callContext.run(
+    { toolName, action: typeof args.action === 'string' ? args.action : undefined },
+    () => handleToolCallInner(toolName, args, options, tracker, baseTimerId),
+  );
   const ignoredNote = ignoredArgumentsNote(toolName, args);
   if (ignoredNote) result.content = [...(result.content ?? []), { type: 'text' as const, text: ignoredNote }];
 
