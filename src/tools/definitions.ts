@@ -1105,7 +1105,7 @@ EXAMPLE (sequenceDiagram):
   "mermaidText": "sequenceDiagram\\n  Alice->>Bob: Hello\\n  Bob-->>Alice: Hi back\\n  Note right of Bob: Thinking..."
 }
 
-Returns { success, nodeCount, edgeCount, nodes, edges, errors }. The created shapes participate in the relation/animation systems just like natively created items — you can grab their ids from \`nodes\` and feed them into pinepaper_add_relation, pinepaper_animate, etc.
+Returns { success, nodeCount, edgeCount, nodeItemIds, nodeIdMap?, edgeIds?, nodes, edges, errors }. nodeItemIds are the CANVAS ids of the shapes (item_N): pass THOSE to pinepaper_auto_layout, pinepaper_animate, pinepaper_add_relation. The mermaid ids (A, B…) in edges[].from/to name nodes in the source text and resolve to nothing on the canvas; nodeIdMap (where the studio returns it) maps one to the other, and edgeIds are the connectors' canvas ids.
 
 NOTE: Import-only — there is no MCP equivalent of FxTool's exportMermaid. Mermaid lacks animation primitives, so a round-trip would silently drop animations.`,
     inputSchema: {
@@ -6606,7 +6606,7 @@ EXAMPLES:
 - Grid of icons: {layoutType: "grid", options: {columns: 4, cellWidth: 120}}
 
 PARTIAL LAYOUT:
-Pass itemIds array to only layout specific items, leaving others in place.`,
+Pass itemIds array to only layout specific items, leaving others in place. They are CANVAS ids (item_N) — after pinepaper_import_mermaid, use its nodeItemIds, not the mermaid ids (A, B…), which lay out nothing.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -6618,7 +6618,7 @@ Pass itemIds array to only layout specific items, leaving others in place.`,
         itemIds: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Specific items to layout (default: all diagram items)',
+          description: 'Canvas item ids (item_N) to layout (default: all diagram items). After import_mermaid, its nodeItemIds.',
         },
         options: {
           type: 'object',

@@ -3214,6 +3214,15 @@ throw new Error('Either svgString or url must be provided');
     success: !!result.success,
     nodeCount: nodes.length,
     edgeCount: edges.length,
+    // CANVAS ids, the ones auto_layout / animate / add_relation take. The
+    // engine's own nodeIds are the MERMAID ids (A, B…), which resolve to
+    // nothing on the canvas (gate D45). Newer engines return nodeItemIds;
+    // otherwise they are read off the registered nodes.
+    nodeItemIds: Array.isArray(result.nodeItemIds) && result.nodeItemIds.length
+      ? result.nodeItemIds
+      : nodes.map((n) => n.id).filter((id) => typeof id === 'string' && /^item_/.test(id)),
+    ...(result.nodeIdMap && typeof result.nodeIdMap === 'object' ? { nodeIdMap: result.nodeIdMap } : {}),
+    ...(Array.isArray(result.edgeIds) && result.edgeIds.length ? { edgeIds: result.edgeIds } : {}),
     nodes,
     edges,
     errors: result.errors || [],
