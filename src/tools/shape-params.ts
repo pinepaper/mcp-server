@@ -3,9 +3,9 @@
  *
  * What each registry-backed shape reads, and how a caller reaches it.
  *
- * Source: FxTool origin/main 057c71c5a3b17274903d1dddc6542f5b4c1fafe6
+ * Source: FxTool origin/main c0a932f12b2350ac3cbaeb3655738630030b4eda
  *   js/PinePaper.js + 5 shape modules
- * sha256: 4a941636f4fcd2f0
+ * sha256: 2b685a5f0689075f
  *
  * A shape's `create` receives a `config`, never the caller's `params`.
  * PinePaper.js's registryConfig literal is the only bridge between the two, so
@@ -30,6 +30,7 @@ export const ACCEPTED_CREATE_PARAMS: readonly string[] = Object.freeze([
   'area',
   'blendMode',
   'bornAt',
+  'calligraphic',
   'closed',
   'color',
   'content',
@@ -55,7 +56,9 @@ export const ACCEPTED_CREATE_PARAMS: readonly string[] = Object.freeze([
   'label',
   'labelPosition',
   'layer',
+  'monoline',
   'name',
+  'nib',
   'opacity',
   'origin',
   'pathData',

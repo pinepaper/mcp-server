@@ -4,11 +4,11 @@
  * Name lists the engine owns and the tool surface must offer exactly. See
  * scripts/sync-engine-lists.mjs for why each is generated.
  *
- * Source: FxTool origin/main 057c71c5a3b17274903d1dddc6542f5b4c1fafe6
+ * Source: FxTool origin/main c0a932f12b2350ac3cbaeb3655738630030b4eda
  *   js/core/KeyframeInterpolator.js  sha256: 4c38752d86cae944
  *   js/world3d/worlds.js  sha256: 0e0973f7587c06e1
- *   js/core/DesignMedia.js  sha256: 46fae8ceafe54b11
- *   js/FilterSystem.js  sha256: f862237e73c93a34
+ *   js/core/DesignMedia.js  sha256: a371877509a5d63a
+ *   js/FilterSystem.js  sha256: 276b29622e467f37
  *   js/core/Provenance.js  sha256: 27e4d8becfa382c8
  *   js/core/StyledScene.js  sha256: ea647c014de59faf
  */
@@ -85,9 +85,11 @@ export const DESIGN_MEDIA = [
 /** The engine method that applies each medium that has one (MEDIA[key].apply). The others are refused by the engine, by name. */
 export const DESIGN_MEDIA_APPLY: Readonly<Record<string, string>> = Object.freeze({
   thread: 'applyThreadPainting',
+  ink: 'applyInkBrush',
   watercolor: 'applyWatercolorWash',
   hatch: 'applyHatching',
   cutPaper: 'applyCutPaper',
+  charcoal: 'applyCharcoalBrush',
   oil: 'applyOilWash',
 });
 
@@ -124,7 +126,7 @@ export const FILTER_PARAM_RANGES: Readonly<Record<string, Readonly<Record<string
   saturation: { value: [-100, 100] },
   invert: { intensity: [0, 1] },
   blur: { radius: [0, 20] },
-  noise: { intensity: [0, 100] },
+  noise: { intensity: [0, 100], grainSize: [1, 4], refresh: [1, 8], seed: [0, 99999] },
   vignette: { intensity: [0, 1], radius: [0, 1] },
   vintage: { intensity: [0, 1] },
   colorOverlay: { intensity: [0, 1] },
@@ -177,7 +179,7 @@ export const FILTER_DOCS: Readonly<Record<string, string>> = Object.freeze({
   saturation: "Adjust color saturation — value -100..100, default 0",
   invert: "Invert colors — intensity 0..1, default 1",
   blur: "Apply gaussian blur — radius 0..20, default 5",
-  noise: "Add film grain effect — intensity 0..100, default 20; monochrome (boolean), default true",
+  noise: "Add film grain effect — intensity 0..100, default 20; monochrome (boolean), default true; grainSize 1..4; refresh 1..8; seed 0..99999, default 0",
   vignette: "Add vignette darkening — intensity 0..1, default 0.5; radius 0..1, default 0.5",
   vintage: "Retro vintage look — intensity 0..1, default 1",
   colorOverlay: "Add color tint — color (color), default #ff0000; intensity 0..1, default 0.3; blendMode multiply|overlay|screen, default overlay",
