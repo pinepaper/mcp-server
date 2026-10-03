@@ -50,6 +50,21 @@ describe('compileChoreography', () => {
     expect(Math.max(...r.keyframes!.map((k) => k.properties.x))).toBeGreaterThan(1920);
   });
 
+  it('drop after fly falls from where the actor is, never up and off screen first', () => {
+    const r = compileChoreography({ ...BALL, x: 300, y: 820, w: 100, h: 100 }, FRAME,
+      [{ at: 3.5, verb: 'fly', to: [1600, 300] }, { at: 4.8, verb: 'drop', to: [1600, 820] }]);
+    const atDrop = r.keyframes!.filter((k) => k.time >= 4.7);
+    const ys = atDrop.map((k) => k.properties.y);
+    // From the fly's end (300) the centre only goes DOWN until the landing squash.
+    expect(Math.min(...ys)).toBeGreaterThanOrEqual(300 - 1);
+    expect(r.keyframes!.at(-1)!.properties.y).toBe(820);
+  });
+
+  it('a drop from the ground still comes in from above the frame', () => {
+    const r = compileChoreography(BALL, FRAME, [{ at: 0, verb: 'drop' }]);
+    expect(r.keyframes![0].properties.y).toBeLessThan(0);
+  });
+
   it('refuses overlapping beats and unknown verbs by name', () => {
     expect(compileChoreography(BALL, FRAME, [{ at: 0, verb: 'hop' }, { at: 0.2, verb: 'pop' }]).error).toContain('starts before the previous beat ends');
     expect(compileChoreography(BALL, FRAME, [{ at: 0, verb: 'moonwalk' }]).error).toContain('unknown verb');

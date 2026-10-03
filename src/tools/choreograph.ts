@@ -101,8 +101,14 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
       } else if (verb === 'drop') {
         const d = +b.duration || 0.7;
         const land = to || { x: s.x, y: s.y };
-        s.x = land.x; s.y = frame.y - h; squashTo(1.15); s.op = 1; key(t, 'linear');
-        s.y = land.y; squashTo(1.15); key(t + d * 0.7, 'easeIn');
+        // ALREADY IN THE AIR (after a fly, say): fall from where it is. Only an
+        // actor at or below its landing line comes in from above the frame —
+        // snapping an airborne actor up and off screen first was a visible jump
+        // (prod retest, fly → drop).
+        const airborne = s.y < land.y - h / 4;
+        if (!airborne) { s.x = land.x; s.y = frame.y - h; }
+        squashTo(airborne ? 1 : 1.15); s.op = 1; key(t, 'linear');
+        s.x = land.x; s.y = land.y; squashTo(1.15); key(t + d * 0.7, 'easeIn');
         squashTo(0.7); key(t + d * 0.78, 'easeOut');
         squashTo(1.08); key(t + d * 0.9, 'easeOut');
         squashTo(1); key(t + d, 'easeInOut');

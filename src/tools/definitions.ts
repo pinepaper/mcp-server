@@ -7870,7 +7870,7 @@ EXAMPLE: { style: 'ink', duration: 6 }`,
 
 BEATS run one after another: [{ at, verb, ...params }]. Positions are the actor's CENTRE in canvas px; a squash keeps its BOTTOM on the ground.
 - pop: scales up from nothing with an overshoot (an entrance in place).
-- drop { to? }: falls in from above the frame, stretched, and lands with a squash.
+- drop { to? }: falls and lands with a squash. Already in the air (after a fly), it falls from where it is; on the ground or below the landing point, it comes in from above the frame.
 - hop { to?, height? }: crouch, launch stretched, arc, land squashed, settle. Without to it hops in place.
 - bounce { times? (3), height?, decay? (0.6), to? }: bounces that lose height; with to it travels while bouncing.
 - roll { to }: rolls without slipping — it turns by the distance over its radius (right = clockwise).
