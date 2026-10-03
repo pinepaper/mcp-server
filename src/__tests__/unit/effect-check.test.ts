@@ -60,3 +60,40 @@ describe('effect check', () => {
     expect(idMayBeGone('pinepaper_map_regions', 'highlight')).toBe(false);
   });
 });
+
+describe('the fingerprint is authored state, not the live frame (first live sweep)', async () => {
+  const { effectAfterJs } = await import('../../tools/effect-check.js');
+  const color = (hex: string) => ({ toCSS: () => hex });
+  function studio() {
+    const ball = { position: { x: 100, y: 100 }, scaling: { x: 1, y: 1 }, rotation: 0, fillColor: color('#ff0000'), opacity: 1,
+      data: { id: 'item_1', keyframes: [{ time: 0, properties: { x: 100 } }, { time: 1, properties: { x: 500 } }], _renderTick: 1 } };
+    const box = { position: { x: 10, y: 10 }, scaling: { x: 1, y: 1 }, rotation: 0, fillColor: color('#00ff00'), opacity: 1, data: { id: 'item_2' } };
+    const app: Record<string, any> = {
+      isPlayingKeyframes: true,
+      view: { zoom: 1, center: { x: 960, y: 540 } },
+      config: { currentBackgroundMode: 'color' },
+      getCanvasSize: () => ({ width: 1920, height: 1080 }),
+      itemRegistry: { getAll: () => [{ id: 'item_1', type: 'circle', item: ball }, { id: 'item_2', type: 'rectangle', item: box }] },
+    };
+    return { app, ball, box };
+  }
+  const probe = (code: string, app: unknown, win: Record<string, unknown>) => new Function('app', 'window', `return ${code}`)(app, win);
+  const tick = (s: ReturnType<typeof studio>) => { s.ball.position.x += 37; s.ball.data._renderTick++; s.app.view.center.x += 5; };
+
+  it('a no-op while the timeline plays reads unchanged', () => {
+    const s = studio(); const win: Record<string, unknown> = {};
+    probe(EFFECT_BEFORE_JS, s.app, win);
+    tick(s);                                   // playback moves the animated ball and the camera
+    s.box.fillColor = color('#00ff00');        // modify to the colour it already had
+    const v = probe(effectAfterJs([]), s.app, win);
+    expect(v.changed).toEqual([]);
+  });
+
+  it('a real change still reads changed during playback', () => {
+    const s = studio(); const win: Record<string, unknown> = {};
+    probe(EFFECT_BEFORE_JS, s.app, win);
+    tick(s);
+    s.box.fillColor = color('#0000ff');
+    expect(probe(effectAfterJs([]), s.app, win).changed).toEqual(['items']);
+  });
+});
