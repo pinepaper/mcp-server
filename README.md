@@ -256,6 +256,12 @@ each with anticipation, squash and stretch, and a settle. The item stays on
 its ground line while it squashes. `sound: true` puts a sound on every pop,
 launch and landing, quieter as the bounces shrink.
 
+### New: sounds on events
+
+A click can play a sound (`on_event_play_sound`), an event can fire at set
+times (`pinepaper_event` `at`), and a scene chain can put a sound on every
+cut (`cutSound`).
+
 ### New: one element, many states
 
 `pinepaper_morph_sequence` morphs one element through a series of shapes with
