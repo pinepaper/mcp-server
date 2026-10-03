@@ -6457,6 +6457,8 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
     return __features().filter(function (f) { return !!app.mapSystem.getRegionOverride(f._mapId); })
       .map(function (f) { return __row(f); });
   }
+  // No map loaded: every id is "not on this map", which blames the ids.
+  const __noMap = { success: false, error: 'no map is loaded. Load one with pinepaper_map {action: "load"} first.' };
   function __sampleIds() {
     return __features().slice(0, 8).map(function (f) { return f._mapId + ' (' + f._mapName + ')'; }).join(', ');
   }
@@ -6507,6 +6509,7 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
   }
 
   try {${this.mapRegionReadbackJs()}
+    if (!__features().length) return __noMap;
     app.mapSystem.highlightRegions(${regionIds}, ${optionsStr});
     // READ BACK (gate D16, D51): every id is resolved and its colour read.
     const __r = __check(${regionIds});
@@ -6603,6 +6606,7 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
   }
 
   try {${this.mapRegionReadbackJs()}
+    if (!__features().length) return __noMap;
     const __legend = app.mapSystem.applyDataColors(${dataStr}, ${optionsStr});
     // READ BACK (gate D51): the engine skips a key it cannot resolve with a
     // console warning, which production strips, so a misspelt key looked coloured.
@@ -6653,7 +6657,11 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
     if (!marker) {
       return { success: false, error: 'no marker was added: [' + __o.lat + ', ' + __o.lon + '] (lat, lon) is outside the visible map, or no map is loaded.' };
     }
-    return { success: true, markerId: marker.id, position: [marker.position.x, marker.position.y] };
+    // A REGISTRY id, so modify / animate / delete can take it. register()
+    // leaves the marker inside the map group; registerItem would move it out,
+    // and it would stop panning and clearing with the map.
+    const markerId = app.itemRegistry.register(marker, 'mapMarker', { lat: __o.lat, lon: __o.lon, label: __o.label || null }, 'user');
+    return { success: true, markerId: markerId, position: [marker.position.x, marker.position.y] };
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -6826,6 +6834,9 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
   }
 
   try {
+    if (!app.mapSystem.currentMap) {
+      return { success: false, error: 'no map is loaded. Load one with pinepaper_map {action: "load"} first.' };
+    }
     // canvasToGeo takes ONE [x, y] argument; (x, y) handed it a bare number.
     const coord = typeof app.mapSystem.canvasToGeo === 'function' ? app.mapSystem.canvasToGeo([${validated.x}, ${validated.y}]) : null;
     // The hit test the studio's own hover uses (getRegionAtPoint never existed).

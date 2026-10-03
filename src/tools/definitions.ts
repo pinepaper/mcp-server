@@ -13,7 +13,7 @@ import { I18nManager } from '../i18n/index.js';
 import { COMPACT_DESCRIPTIONS } from './compact-descriptions.js';
 import { MINIMAL_DESCRIPTIONS } from './minimal-descriptions.js';
 import { STICK_GAITS, STICK_POSES, STICK_SEQUENCES, STICK_EXPRESSIONS, STICK_PROPS } from './stick-vocabulary.js';
-import { GeneratorNameSchema, ItemTypeSchema } from '../types/schemas.js';
+import { AgentBatchOperationTypeSchema, GeneratorNameSchema, ItemTypeSchema } from '../types/schemas.js';
 import { DESIGN_MEDIA, DESIGN_MEDIA_APPLY, FILTER_TYPES, FILTER_DOCS, LINEAGE_KINDS, STYLED_SCENE_STYLES, STYLED_SCENE_STYLE_INFO } from './engine-lists.js';
 import {
   EffectTypeSchema,
@@ -8315,7 +8315,7 @@ WORKFLOW:
 1. pinepaper_agent_start_job → 2. pinepaper_agent_batch_execute (everything) → 3. pinepaper_agent_end_job (screenshot for validation)
 After validation: user reviews screenshot → feedback → modify/recreate as needed.
 
-OPERATION TYPES (13) — use in this order:
+OPERATION TYPES (${AgentBatchOperationTypeSchema.options.length}) — use in this order:
 
 CANVAS SETUP:
   set_canvas_size — {width, height} or {preset: "instagram-post"|"instagram-story"|"youtube-thumbnail"|"tiktok"|"full-hd-1080p"|...} (studio preset keys, not platform names; an unknown one is refused with the list)

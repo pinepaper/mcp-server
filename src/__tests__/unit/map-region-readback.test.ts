@@ -24,6 +24,7 @@ function fakeMap() {
   const resolve = (id: unknown) => regionNameMappings.get(id) || regionNameMappings.get(String(id).toLowerCase());
   return {
     regionNameMappings,
+    currentMap: {},
     regionPaths: new Map(),
     highlightRegions(ids: string[], style: { fill?: string } = {}) {
       for (const id of ids) { const f = resolve(id); if (f) overrides.set(f._mapId, { fill: style.fill || '#3b82f6' }); }
@@ -42,10 +43,11 @@ function fakeMap() {
   };
 }
 
-function run(code: string, mapSystem = fakeMap()) {
+function run(code: string, mapSystem: Record<string, any> = fakeMap()) {
   // Emitted code opens with a // comment line; `return` would stop at it.
   const body = code.replace(/^(\s*\/\/.*\n)+/, '');
-  return new Function('app', `return ${body}`)({ mapSystem }) as Record<string, any>;
+  const itemRegistry = { register: () => 'item_7' };
+  return new Function('app', `return ${body}`)({ mapSystem, itemRegistry }) as Record<string, any>;
 }
 
 describe('map region readback (D51)', () => {
@@ -98,9 +100,24 @@ describe('map region readback (D51)', () => {
 
   it('add_marker passes (lon, lat) and fails when the engine adds nothing', () => {
     const ok = run(codeGenerator.generateAddMarker({ lat: 48.85, lon: 2.35 } as never));
-    expect(ok).toMatchObject({ success: true, markerId: 42 });
+    expect(ok).toMatchObject({ success: true, markerId: 'item_7' });
     const ms = fakeMap();
     ms.addMarker = () => null;
     expect(run(codeGenerator.generateAddMarker({ lat: 0, lon: 0 } as never), ms).success).toBe(false);
+  });
+
+  it('with no map loaded, says so instead of blaming the ids', () => {
+    const ms = fakeMap();
+    ms.regionNameMappings.clear();
+    ms.currentMap = null as never;
+    for (const code of [
+      codeGenerator.generateHighlightRegions({ regionIds: ['France'] } as never),
+      codeGenerator.generateApplyDataColors({ data: { France: 1 } } as never),
+      codeGenerator.generateGetRegionAtPoint({ x: 50, y: 50 } as never),
+    ]) {
+      const r = run(code, ms);
+      expect(r.success).toBe(false);
+      expect(r.error).toContain('no map is loaded');
+    }
   });
 });

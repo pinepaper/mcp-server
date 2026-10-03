@@ -8,6 +8,7 @@
 
 import { describe, it, expect } from 'bun:test';
 import { getToolsForVerbosity } from '../../tools/index.js';
+import { AgentBatchOperationTypeSchema } from '../../types/schemas.js';
 
 // BOTH levels: compact is the DEFAULT, and a compact override is separate
 // prose. Batch 2 fixed the verbose text only, and the default users kept the
@@ -37,4 +38,11 @@ describe(`a quoted action count matches the enum (${level})`, () => {
       expect(quoted.filter((n) => n !== actions.length)).toEqual([]);
     });
   }
+});
+
+for (const level of ['verbose', 'compact', 'minimal'] as const)
+it(`agent_batch_execute's quoted op count matches the enum (${level})`, () => {
+  const d = getToolsForVerbosity(level).find((t) => t.name === 'pinepaper_agent_batch_execute')?.description ?? '';
+  const quoted = [...d.matchAll(/OPERATION TYPES \((\d+)\)/g)].map((m) => Number(m[1]));
+  expect(quoted.filter((n) => n !== AgentBatchOperationTypeSchema.options.length)).toEqual([]);
 });
