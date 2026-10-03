@@ -24,7 +24,7 @@ const FINGERPRINT_JS = `function __ppFingerprint() {
   // (re-applied colour, same canvas size, a repeated highlight). Animated
   // values are left out; what a call can author is kept.
   const o = {};
-  const playing = !!(app.isPlayingKeyframes || (app.timeline && app.timeline.isPlaying));
+  const playing = !!app.isPlayingKeyframes;
   const plain = function (k, v) {
     if (typeof k === 'string' && (k.charAt(0) === '_' || /^(selected|hovered|isHovered|cached|lastRender|renderTick|frame|playbackTime|time)$/.test(k))) return undefined;
     if (typeof v === 'function') return undefined;
