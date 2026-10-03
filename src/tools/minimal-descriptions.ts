@@ -227,7 +227,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_scene_diff: 'What changed between two scene states. action: history {indexA,indexB}|version {versionId}. Use it to verify a batch produced the scene you intended.',
 
   // --- Image Processing ---
-  pinepaper_image_filter: 'GPU image filters. action: apply|chain|analyze_palette|recolor_palette. itemId, filterName, params, filters[].',
+  pinepaper_image_filter: 'Image filters (GPU set + watercolor/painterly for photos). action: apply|chain|analyze_palette|recolor_palette. itemId, filterName, params, filters[].',
   pinepaper_lasso: 'Lasso selection. action: activate|apply|cut. itemId.',
   pinepaper_cutout_style: 'Style cutouts. action: apply|list. itemId, preset, options.',
 

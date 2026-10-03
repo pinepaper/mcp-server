@@ -9447,8 +9447,8 @@ ${resolveSource}
     const resolve = `  const item = (typeof app._resolveRaster === 'function')
     ? app._resolveRaster(${JSON.stringify(input.itemId)})
     : (app.itemRegistry ? app.itemRegistry.getItem(${JSON.stringify(input.itemId)}) : null);
-  if (!item) return { error: 'Item not found or not a raster: ' + ${JSON.stringify(input.itemId)} };
-  if (typeof app.applyImageFilter !== 'function') return { error: 'GPU image filters unavailable — update FxTool' };`;
+  if (!item) return { success: false, error: 'Item not found or not a raster: ' + ${JSON.stringify(input.itemId)} };
+  if (typeof app.applyImageFilter !== 'function') return { success: false, error: 'GPU image filters unavailable — update FxTool' };`;
     switch (input.action) {
       case 'apply':
         return `
@@ -9465,7 +9465,7 @@ ${resolve}
     }
     return { success: true, action: 'apply', itemId: ${JSON.stringify(input.itemId)}, filter: ${JSON.stringify(input.filterName || '')} };
   } catch (e) {
-    return { error: 'Failed to apply filter: ' + e.message };
+    return { success: false, action: 'apply', error: 'Failed to apply filter: ' + e.message };
   }
 })();`.trim();
       case 'chain':
@@ -9478,7 +9478,7 @@ ${resolve}
     await app.applyImageFilterChain(item, filters);
     return { success: true, action: 'chain', itemId: ${JSON.stringify(input.itemId)}, filterCount: filters.length };
   } catch (e) {
-    return { error: 'Failed to apply filter chain: ' + e.message };
+    return { success: false, action: 'chain', error: 'Failed to apply filter chain: ' + e.message };
   }
 })();`.trim();
       default:
@@ -11912,7 +11912,7 @@ ${body}
     }
     return { success: true, action: 'apply', medium: ${S(input.medium)}, fidelity: r.fidelity, itemId: r.id || ${S(input.itemId)}, inPlace: true, styled: __styled, ...(r.note ? { note: r.note } : {}) };
   }
-  return { success: true, action: 'apply', medium: r.medium || ${S(input.medium)}, fidelity: r.fidelity, itemId: r.id, ...(r.note ? { note: r.note } : {}) };
+  return { success: true, action: 'apply', medium: r.medium || ${S(input.medium)}, fidelity: r.fidelity, itemId: r.id, ...(r.filter ? { filter: r.filter } : {}), ...(r.note ? { note: r.note } : {}) };
 })();`.trim();
       case 'sdf_stroke': {
         // FxTool D5: an SDF capsule stroke rendered to a bitmap and created as a

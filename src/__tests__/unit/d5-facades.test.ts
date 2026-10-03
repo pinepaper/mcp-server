@@ -100,3 +100,15 @@ describe('shader graph apply bounds wait for the image to decode', () => {
   });
 });
 });
+
+describe('painted image filters (D38)', () => {
+  it('a refusal (old engine, or a video) is a failure with the engine reason', async () => {
+    const { ImageFilterInputSchema } = await import('../../types/schemas.js');
+    const code = codeGenerator.generateImageFilter(ImageFilterInputSchema.parse({ action: 'apply', itemId: 'item_2', filterName: 'watercolor', params: { seed: 3 } }) as never);
+    const app = { itemRegistry: { getItem: () => ({ className: 'Raster' }) },
+      applyImageFilter: async () => { throw new Error('[GPUFilter] unknown filter "watercolor" — available: grayscale, sepia'); } };
+    const r = await run(code, app);
+    expect(r.success).toBe(false);
+    expect(r.error).toContain('unknown filter "watercolor"');
+  });
+});

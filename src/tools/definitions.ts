@@ -2414,7 +2414,7 @@ READ THIS BEFORE PROMISING A MEDIUM. Naming a medium does not create its marks. 
 Call resolve before telling a user you will render in a medium. "yes, but as an impression" is the true answer for half of them, and a flat approximation misrepresents a medium rather than approximating it.
 
 ACTIONS:
-- apply: { itemId, medium, options? } — render an item in ANY medium the engine can make: ${Object.keys(DESIGN_MEDIA_APPLY).join(', ')}. One engine entry point; a medium this studio cannot apply is refused with the reason: pass it on. ink / charcoal (where the studio applies them) restyle a path, text, or group of them IN PLACE — same itemId, keyframes and relations kept — with a boiling hand-drawn line; raster and video exports boil, SVG/Lottie get the colour and width only. Their options: color, amplitude (px), wavelength (px), fps (boil rate, 12), seed, boil (default true), width (px, paths), keepColor. watercolor options: color, brush, water 0..1, opacity, edge 0..1 (the dark rim), angle, bleed, seed. oil (stylised): color, brush, length, density, toneRange, relief, angle, seed. cutPaper (vector: survives SVG/PDF/video): color, facet, jitter, shadow, shadowColor, shadowOpacity, shadowOffset [dx, dy], seed. The result replaces the source in the stacking order and hides it; applying again replaces; one undo step.
+- apply: { itemId, medium, options? } — on a PHOTO (an image item), watercolor and oil run as the watercolor / painterly image filters and report fidelity 'stylised' (an image filter, not paint simulated over geometry); other media are refused for photos, with the reason. On shapes — render an item in ANY medium the engine can make: ${Object.keys(DESIGN_MEDIA_APPLY).join(', ')}. One engine entry point; a medium this studio cannot apply is refused with the reason: pass it on. ink / charcoal (where the studio applies them) restyle a path, text, or group of them IN PLACE — same itemId, keyframes and relations kept — with a boiling hand-drawn line; raster and video exports boil, SVG/Lottie get the colour and width only. Their options: color, amplitude (px), wavelength (px), fps (boil rate, 12), seed, boil (default true), width (px, paths), keepColor. watercolor options: color, brush, water 0..1, opacity, edge 0..1 (the dark rim), angle, bleed, seed. oil (stylised): color, brush, length, density, toneRange, relief, angle, seed. cutPaper (vector: survives SVG/PDF/video): color, facet, jitter, shadow, shadowColor, shadowOpacity, shadowOffset [dx, dy], seed. The result replaces the source in the stacking order and hides it; applying again replaces; one undo step.
 - list_media: every medium with fidelity, definition and limitation. Read it rather than assuming a fixed set — the catalogue grows (hatch and watercolor are recent additions).
 - resolve: { medium } → { ok, fidelity, reason, markMaker }. ok:false with a reason is a real answer — pass it on rather than trying anyway.
 - list_stitches: the thread stitches with their params.
@@ -5584,7 +5584,7 @@ ACTIONS:
       idempotentHint: false,
       openWorldHint: false,
     },
-    description: `Apply GPU-accelerated image filters to raster items.
+    description: `Apply image filters to raster items: a GPU set, plus painted watercolor / painterly looks for photos.
 
 ACTIONS:
 - apply: Apply a single filter. Params: itemId, filterName, params
@@ -5597,6 +5597,7 @@ Available filters (GPU raster set):
 - Stylize: vignette (intensity, radius), edgeDetect, halftoneDots (size, angle), halftoneCMYK (size), dither (levels), grain (amount, seed), scanlines (intensity, period), chromaticAberration (amount), blur (radius)
 - Light (additive): bloom (amount, threshold, radius), glow, halation (warm-fringed bloom; color), lightShafts (amount, threshold, decay, density, x, y, color — volumetric rays from a point)
 - Keying: lumaKey (threshold, softness, invert)
+- Painted (CPU, STILL images only, where the studio has them): watercolor (strength, seed, radius, edges, bleed, granulation, paper, washes — layered washes, pigment rims, paper grain), painterly (strength, seed, radius, stroke, texture, edges, vivid — brush strokes along the form). About 1 s per 1080p image; the same seed paints the same picture; values are clamped and unknown params are warned about. A video is refused (they cannot run per frame): apply to a still or a captured frame. A studio without them refuses with its list of filters.
 - SECOND-INPUT (params.map = another item's id, resolved to its pixels): displace (amount, dispersion, map, mapChannel — the map's brightness pushes pixels), refract (displace with per-channel dispersion — glass), trackMatte (channel, invert, strength — prefer pinepaper_media apply_track_matte for the live version), datamosh (amount, block, map? — self-moshes without a map)
 
 RECIPE — grunge poster: chain [grain, scanlines, vignette]. Glass header: refract with map = a gradient item.
