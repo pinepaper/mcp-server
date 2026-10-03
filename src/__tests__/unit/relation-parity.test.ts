@@ -65,6 +65,9 @@ const EMITTED_BY_A_TOOL: Record<string, RegExp | string[]> = {
   // (It is deliberately NOT `part_of`, which cascades position — see the note
   // in FxTool's RelationRegistry.)
   pinepaper_character: ['part_of_figure'],
+  // `character_face` is the same kind of bookkeeping: createCharacter writes one
+  // per head-region part so looks_at / reacts_to find the face (fxtool: INTERNAL).
+  pinepaper_original_character: ['character_face'],
   pinepaper_camera_director: ['has_camera_treatment'],
   'map tools (place containment)': ['contained_in_place'],
   '(not a relation — the escape hatch for an unrecognised edge)': ['unknown'],
