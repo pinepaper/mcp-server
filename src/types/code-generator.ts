@@ -12171,7 +12171,7 @@ ${cam ? `  // The camera rides the SAME timing: framing each state as its morph 
     const target = S(input.target ?? 'scene');
     switch (input.action) {
       case 'list':
-        return `(function() {\n  ${guard}\n  return { success: true, action: 'list', looks: app.listLooks(), note: 'fidelity says how close each look gets: convincing, moderate or weak. Describe one before promising it.' };\n})();`;
+        return `(function() {\n  ${guard}\n  return { success: true, action: 'list', looks: app.listLooks(), note: 'fidelity is the engine grade: native (the medium itself), faithful (close, approximations named), impression (an evocation, not the real style). Describe one before promising it.' };\n})();`;
       case 'describe':
         return `(function() {\n  ${guard}\n  const r = app.describeLook(${S(input.look)});\n  if (!r || r.ok === false) return { success: false, action: 'describe', error: (r && r.error) || 'unknown look', known: r && r.known };\n  return { success: true, action: 'describe', fidelity: r.look && r.look.fidelity, approximations: (r.look && r.look.approximations) || [], recipe: r.look, enginePaths: r.enginePaths, sceneOnly: r.sceneOnly };\n})();`;
       case 'get':
@@ -12207,8 +12207,15 @@ ${cam ? `  // The camera rides the SAME timing: framing each state as its morph 
   const res = { success: true, action: 'apply', target: ${target}, look: r.look && (r.look.id || r.look.name), fidelity: fidelity,
     restyled: r.restyled, texts: r.texts, images: r.images, brushed: r.brushed, keyframes: r.keyframes, filters: r.filters, ids: r.ids,
     approximations: r.approximations || [], warnings: r.warnings || [] };
-  if (fidelity && fidelity !== 'convincing') {
-    res.warning = 'this look is graded ' + fidelity + ' by the engine' + ((res.approximations && res.approximations.length) ? ' — it approximates: ' + res.approximations.join('; ') : '') + '. Present it as an approximation of the style, not the finished style.';
+  // The engine's grades: native (the medium itself), faithful (close, with
+  // named approximations), impression (an evocation), custom (an ad-hoc spec).
+  const __approx = (res.approximations && res.approximations.length) ? res.approximations.join('; ') : '';
+  if (fidelity === 'impression') {
+    res.warning = 'this look is an IMPRESSION of the style (the engine\\'s grade)' + (__approx ? ' — it approximates: ' + __approx : '') + '. Present it as an approximation of the style, not the finished style.';
+  } else if (fidelity === 'faithful' && __approx) {
+    res.note = 'a faithful look; what it approximates: ' + __approx + '.';
+  } else if (fidelity === 'custom') {
+    res.note = 'a custom look spec: the engine has no fidelity grade for it.';
   }
   return res;
 })();`.trim();

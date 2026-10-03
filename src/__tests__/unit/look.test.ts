@@ -10,13 +10,18 @@ const studio = (fidelity: string) => ({
 });
 
 describe('pinepaper_look', () => {
-  it('a weak look applies, and says to present it as an approximation', async () => {
-    const r = await run({ action: 'apply', look: 'woodcut' }, studio('weak'));
-    expect(r).toMatchObject({ success: true, fidelity: 'weak', restyled: 12 });
+  it('an impression applies, and says to present it as an approximation', async () => {
+    const r = await run({ action: 'apply', look: 'woodcut' }, studio('impression'));
+    expect(r).toMatchObject({ success: true, fidelity: 'impression', restyled: 12 });
     expect(r.warning).toContain('approximation');
   });
-  it('a convincing look carries no warning', async () => {
-    expect((await run({ action: 'apply', look: '8-bit', target: 'item_2' }, studio('convincing'))).warning).toBeUndefined();
+  it('a faithful look lists its approximations as a note, not a warning; native says nothing', async () => {
+    const f = await run({ action: 'apply', look: '8-bit', target: 'item_2' }, studio('faithful'));
+    expect(f.warning).toBeUndefined();
+    expect(f.note).toContain('no gouge texture');
+    const n = await run({ action: 'apply', look: 'flat' }, studio('native'));
+    expect(n.warning).toBeUndefined();
+    expect(n.note).toBeUndefined();
   });
   it('an unknown look fails with the known ones; an old studio refuses by name', async () => {
     const r = await run({ action: 'apply', look: 'vaporwave2' }, { describeLook: () => ({ ok: false }), applyLook: async () => ({ ok: false, error: 'unknown look "vaporwave2"', known: ['8-bit', 'blueprint'] }) });
