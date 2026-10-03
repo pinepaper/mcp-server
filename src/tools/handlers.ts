@@ -1132,6 +1132,69 @@ type RollbackController = {
  * false when the page could not be marked (the rollback is then skipped and
  * the failure note says nothing about the scene it cannot vouch for).
  */
+/**
+ * The studio's job gate (FxTool D92). PinePaperAgent.startJob is the one place
+ * a stale studio reloads, and only when the job is about to clear the canvas:
+ * it resolves {reloading: true, fromBuild, toBuild} and the PAGE reloads, so
+ * nothing running in it survives — the wait has to happen here. Poll the new
+ * page through waitForReady, open the job again, then let start_job's own
+ * setup (clear, canvas size) run on the fresh page.
+ */
+export async function studioJobGate(
+  input: { name?: string; clearCanvas?: boolean },
+  options: HandlerOptions,
+  wait: (ms: number) => Promise<void> = (ms) => new Promise((r) => setTimeout(r, ms)),
+): Promise<{ note?: string; warning?: string; build?: Record<string, unknown> }> {
+  const mode = options.executionMode ?? getExecutionMode();
+  if (mode === 'code' || !options.executeInBrowser || options.deferred) return {};
+  const controller = options.browserController || getBrowserController();
+  if (!controller.connected) { try { await controller.connect(); } catch { return {}; } }
+  const args = JSON.stringify({ ...(input.name ? { name: input.name } : {}), clearCanvas: input.clearCanvas !== false });
+  const START = `(async function () {
+  const A = typeof window !== 'undefined' ? window.PinePaperAgent : null;
+  if (!A || !A.startJob) return { legacy: true };
+  return await A.startJob(${args});
+})();`;
+  type Job = { legacy?: boolean; reloading?: boolean; jobOpen?: boolean; fromBuild?: string; toBuild?: string; buildId?: string; liveBuildId?: string; stale?: boolean; reason?: string };
+  const call = async (code: string): Promise<Job | null> => {
+    try { const r = await controller.executeCode(code, false, { bypassGovernor: true }); return r.success ? (r.result as Job) : null; } catch { return null; }
+  };
+  const first = await call(START);
+  if (!first || first.legacy || (first.jobOpen === undefined && first.reloading === undefined)) return {};
+  const build = (j: Job) => ({ buildId: j.buildId, liveBuildId: j.liveBuildId, stale: !!j.stale });
+  if (first.reloading) {
+    const READY = `(async function () {
+  const A = typeof window !== 'undefined' ? window.PinePaperAgent : null;
+  if (!A || !A.waitForReady) return { ready: false };
+  await A.waitForReady();
+  return { ready: true };
+})();`;
+    let ready = false;
+    for (let i = 0; i < 60 && !ready; i++) {       // ~30 s: a reload is ~100 ms plus a fresh boot
+      await wait(500);
+      const r = await call(READY) as { ready?: boolean } | null;
+      ready = !!(r && r.ready);
+    }
+    if (!ready) return { warning: `the studio was reloading from build ${first.fromBuild} to ${first.toBuild} and did not come back within 30 s; this job may run on the old page.`, build: build(first) };
+    const second = await call(START);
+    if (!second) return { warning: 'the studio reloaded but did not open the job again.', build: build(first) };
+    return {
+      note: `Studio was on build ${first.fromBuild}, reloaded to ${first.toBuild} before this job.`,
+      ...(second.stale ? { warning: `the studio is still on an old build after reloading (${second.buildId}; live ${second.liveBuildId})${second.reason ? ': ' + second.reason : ''}.` } : {}),
+      build: build(second),
+    };
+  }
+  if (first.stale) {
+    return {
+      warning: input.clearCanvas === false
+        ? `studio is on old build ${first.buildId} (live: ${first.liveBuildId}); finish, then start a new job to update.`
+        : `studio is on old build ${first.buildId} (live: ${first.liveBuildId}) and was not reloaded${first.reason ? ': ' + first.reason : ''}.`,
+      build: build(first),
+    };
+  }
+  return { build: build(first) };
+}
+
 async function markItemsBeforeRun(controller: RollbackController): Promise<boolean> {
   try {
     const r = await controller.executeCode(
@@ -3858,12 +3921,18 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
 
         const code = codeGenerator.generateAgentStartJob(input);
         const descriptionText = `Started agent job${input.name ? ` "${input.name}"` : ''} with ${input.screenshotPolicy || 'on_complete'} screenshot policy`;
+        // A STALE STUDIO IS RELOADED HERE, AND ONLY HERE (D92): the canvas is
+        // about to be cleared anyway. The setup below runs on the new page.
+        const gate = await studioJobGate(input, options);
         const result = await executeOrGenerate(code, descriptionText, options, 'pinepaper_agent_start_job');
 
         // Append a 1-line workflow hint
         if (result.content && result.content.length > 0 && result.content[0].type === 'text') {
           result.content[0].text += `\n\nNEXT: Call batch_execute with all operations, then end_job.`;
+          if (gate.note) result.content[0].text = `${gate.note}\n\n${result.content[0].text}`;
+          if (gate.warning) result.content[0].text = `⚠️ ${gate.warning}\n\n${result.content[0].text}`;
         }
+        if (gate.build) result._meta = { ...((result._meta ?? {}) as Record<string, unknown>), 'pinepaper.studio/build': gate.build };
         return result;
       }
 

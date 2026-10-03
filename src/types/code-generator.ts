@@ -4335,6 +4335,8 @@ throw new Error('Unknown diagram mode action: ${action}');
     let code = `
 // End agent job
 (async function() {
+  // Close the studio's job (D92). It never reloads.
+  try { if (typeof window !== 'undefined' && window.PinePaperAgent && window.PinePaperAgent.endJob) window.PinePaperAgent.endJob(); } catch (_) { /* older studio */ }
   const result = {
     success: true,
     jobEnded: true
@@ -6269,6 +6271,19 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
   // build right after a deploy, and a retest then judges old code. The
   // engine's own identity, version + build sha, rides on every export reply.
   try { if (result && typeof result === 'object' && app.buildId) result.studioBuild = app.buildId; } catch (_) { /* older studio */ }
+  // A STALE STUDIO (D92): the file was made by an old build. Said in the
+  // fidelity warnings the reply shows, not only as a field.
+  try {
+    const __bs = app.buildStatus ? app.buildStatus() : null;
+    if (result && typeof result === 'object' && __bs) {
+      result.liveBuild = __bs.liveBuildId;
+      if (__bs.stale) {
+        result.stale = true;
+        result.fidelity = result.fidelity || { warnings: [] };
+        result.fidelity.warnings = (result.fidelity.warnings || []).concat([{ code: 'stale_build', message: 'this studio is running an old build (' + __bs.buildId + '; the live build is ' + __bs.liveBuildId + '): this file was made by the old code. Start a new job (pinepaper_agent_start_job, which reloads it) and export again.' }]);
+      }
+    }
+  } catch (_) { /* older studio */ }
   // RELIGHT (FxTool D5): applied to png / pdf / mp4 / webm, not gif / apng
   // or the vector formats; and it is what makes a video export slow.
   if (result && result.success && typeof app.getRelight === 'function') {
