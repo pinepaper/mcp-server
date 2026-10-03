@@ -124,8 +124,10 @@ part_of
 points_at
 pose_layer
 reacts_to
+reacts_to_audio
 repels
 restores_from
+says
 spring_follow
 staggered_with
 synced_to_audio

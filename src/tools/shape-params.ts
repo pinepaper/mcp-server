@@ -3,9 +3,9 @@
  *
  * What each registry-backed shape reads, and how a caller reaches it.
  *
- * Source: FxTool origin/main 66689623393b99579f8660a8f69a1273e0e12887
+ * Source: FxTool origin/main 4358c257f8960aaebde31d5c1714c65d6e7127cb
  *   js/PinePaper.js + 5 shape modules
- * sha256: db555096a3d55cbf
+ * sha256: 5e34c9bca9a269c4
  *
  * A shape's `create` receives a `config`, never the caller's `params`.
  * PinePaper.js's registryConfig literal is the only bridge between the two, so
@@ -49,6 +49,8 @@ export const ACCEPTED_CREATE_PARAMS: readonly string[] = Object.freeze([
   'fontStyle',
   'fontWeight',
   'from',
+  'glass',
+  'goo',
   'height',
   'hud',
   'id',
@@ -65,6 +67,7 @@ export const ACCEPTED_CREATE_PARAMS: readonly string[] = Object.freeze([
   'nib',
   'opacity',
   'origin',
+  'paintedMedium',
   'pathData',
   'payloadType',
   'points',
@@ -72,6 +75,7 @@ export const ACCEPTED_CREATE_PARAMS: readonly string[] = Object.freeze([
   'radius1',
   'radius2',
   'relationBehavior',
+  'relight',
   'rgbSplit',
   'rotation',
   'screenSpace',
@@ -164,6 +168,9 @@ export const MODIFY_CHANGE_READS: readonly string[] = Object.freeze([
   'fontStretch',
   'fontStyle',
   'fontWeight',
+  'glass',
+  'goo',
+  'growth',
   'height',
   'hud',
   'justification',
@@ -171,9 +178,11 @@ export const MODIFY_CHANGE_READS: readonly string[] = Object.freeze([
   'label',
   'motionBlur',
   'opacity',
+  'paintedMedium',
   'palette',
   'pathData',
   'relationBehavior',
+  'relight',
   'rgbSplit',
   'rotation',
   'scale',

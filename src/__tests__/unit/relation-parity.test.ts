@@ -61,6 +61,13 @@ const ROUTED_TO_A_TOOL: Record<string, RegExp | string[]> = {
   'map tools (place containment)': ['contained_in_place'],
   pinepaper_rigging: ['bone_attached', 'bone_skinned', 'ik_target', 'locomotion', 'pose_layer'],
   'blending system': /^blend_/,
+  // Engine facades with no MCP tool YET. Each relation is made by a facade that
+  // does more than bind it (addSpeechLine draws the bubble and label;
+  // addAudioReactive decodes the soundtrack), so the eventual tool wraps the
+  // facade, not add_relation. Until it ships, neither path names them: when the
+  // tool lands, rename the key to it.
+  'tool pending: app.addSpeechLine': ['says'],
+  'tool pending: app.addAudioReactive': ['reacts_to_audio'],
 };
 
 const isExcluded = (name: string) =>
