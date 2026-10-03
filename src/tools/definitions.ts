@@ -47,6 +47,26 @@ const EASING_LINES = KEYFRAME_EASINGS.map((e) => `- ${e}: ${EASING_DESCRIPTIONS[
 // AI AGENT GUIDE (exported for pinepaper_tool_guide)
 // =============================================================================
 
+/**
+ * THE DOOR CHOICE (tracker D72). The guide, the server instructions and
+ * start_job all used to say "everything in ONE batch_execute" and "use
+ * generators for rich backgrounds" — which is exactly the stock result (a
+ * procedural backdrop, primitive shapes, a pulse) the quality bar rejects.
+ * Higher-level tools go first; the batch is the glue. One copy, so the places
+ * a model reads it cannot drift apart.
+ */
+export const CHOOSE_THE_DOOR = `CHOOSE THE HIGHEST-LEVEL TOOL FIRST. Primitive shapes over a generator backdrop with a pulse is the stock result users reject; reach for it only when nothing below fits the brief.
+- A scene or landscape drawn in an art style (cut paper, ink, watercolour, dither, flow, ASCII) → pinepaper_styled_scene
+- A story, several beats, a narrative from prose → pinepaper_story (from_text), then scene chains (pinepaper_scene_playback)
+- A character that acts (expressions, poses, walks) → pinepaper_character, pinepaper_stick, pinepaper_rigging; squash and stretch via pinepaper_deform
+- A title or caption with craft → pinepaper_text_style (display styles; cursive with animate writes itself on), pinepaper_text_effect
+- A poster or layout in an aesthetic → pinepaper_design_system (compose); a collage → pinepaper_compose
+- A painted, stitched, hatched, inked or cut-paper look on shapes or photos → pinepaper_design_medium; photos also pinepaper_image_filter (watercolor, painterly)
+- A brand's colours → pinepaper_brand_kit; sound and music → pinepaper_sound, pinepaper_audio_beats, pinepaper_beat_cuts
+- A camera move through the piece → pinepaper_camera_director; 3D → pinepaper_world3d (+ pinepaper_relight)
+pinepaper_agent_batch_execute then does the glue in ONE call: extra items, keyframes, relations, masks, effects, playback.
+If no tool reaches what the brief asks (for example, redrawing a subject in another art style), tell the user what is missing instead of handing over a lesser result as done.`;
+
 export const AI_AGENT_GUIDE = `⚠️ You are connected to PinePaper Studio via MCP tools. ALWAYS use these tools to create visual content.
 NEVER create standalone HTML pages, React components, or web apps as a substitute. Do NOT use frontend design skills or CSS-only animations instead of PinePaper.
 PinePaper tools ARE the implementation — they generate Paper.js/JavaScript code that runs on the canvas and produce Canvas 2D, SVG, MP4, GIF, PNG exports.
@@ -60,11 +80,14 @@ The generated code is shown in tool responses and can be copied into PinePaper's
 
 ⚠️ KNOWN CONFLICT: The "frontend-design" plugin instructs agents to generate HTML/CSS pages for visual content. This conflicts with PinePaper. If you keep generating HTML instead of calling PinePaper tools, the user should disable the frontend-design plugin.
 
+${CHOOSE_THE_DOOR}
+
 WORKFLOW — Create → Validate → Iterate:
 
 1. pinepaper_agent_start_job (clearCanvas: true, canvasPreset)
-2. pinepaper_agent_batch_execute — ONE call with ALL operations:
-     set_canvas_size → set_background / execute_generator → create items → animate / keyframe_animate → relation → apply_mask → apply_effect → play_timeline
+2. The craft tool(s) above that fit the brief, each called once.
+   Then pinepaper_agent_batch_execute — ONE call for the glue:
+     set_canvas_size → set_background → create items → keyframe_animate / animate → relation → apply_mask → apply_effect → play_timeline
 3. pinepaper_agent_end_job — returns screenshot
 4. Show screenshot to user for validation
 5. If user wants changes → modify specific items or start a new job
@@ -76,13 +99,13 @@ If you restart the pipeline or re-call batch_execute, you DOUBLE every item on t
 To fix mistakes: use modify/delete operations, or start a NEW job with clearCanvas: true.
 
 RULES:
-- NEVER restart the pipeline — one start_job, one batch_execute, one end_job
-- ALL operations go in batch_execute — canvas, background, items, animation, masks, effects, playback
+- NEVER restart the pipeline — one start_job, one batch_execute, one end_job; the craft tools go between them
+- Primitive operations go in the ONE batch_execute — canvas, background, items, animation, masks, effects, playback
 - EXCEPTION: Diagrams (flowcharts, UML) use pinepaper_create_diagram_shape + pinepaper_connect, NOT batch_execute
-- Use generators for rich backgrounds — the built-in templates are limited, generators create much better visuals
+- A generator is a BACKDROP: under a composed scene it adds texture; on its own it is the stock look. Prefer a styled scene, a drawn world or a real photo for the ground of a piece
 - Use "$0", "$1" to reference items by creation order within the batch
 
-─── BATCH OPERATIONS (12 types, in order) ───
+─── BATCH OPERATIONS (${AgentBatchOperationTypeSchema.options.length} types, in order) ───
 
 CANVAS:  set_canvas_size (width/height or preset) → set_background (color) → execute_generator (procedural art)
 ITEMS:   create (itemType, position, properties) → modify (itemId, properties) → delete (itemId) → group (itemIds → one entity)
@@ -90,9 +113,9 @@ ANIMATE: animate (loop presets) → keyframe_animate (timed reveals) → relatio
 EFFECTS: apply_mask (reveal animations) → apply_effect (sparkle/blast/bubbles/fireflies/trail...)
 PLAY:    play_timeline (start playback)
 
-─── GENERATORS (prefer these for backgrounds) ───
+─── GENERATORS (procedural backdrops — under a scene, not as one) ───
 
-Generators fill the canvas with procedural art — much richer than solid colors.
+Generators fill the canvas with procedural art: richer than a flat colour as a backdrop, but not a composition by themselves.
 Choose based on mood:
   Dreamy/soft:  drawBokeh, drawGradientMesh, drawOrganicFlow
   Techy/modern: drawCircuit, drawGrid, drawWindField
@@ -8238,7 +8261,7 @@ PRIVACY: No screenshots, no tool call arguments, no user content — only struct
 
 ⚠️ Call ONCE per pipeline. NEVER restart — creates duplicates.
 
-WORKFLOW: start_job → batch_execute (everything in ONE call) → end_job (screenshot) → show user → iterate if needed.
+WORKFLOW: start_job → the craft tool(s) that fit the brief (styled_scene, story, character, text_style, compose, design_medium…) → batch_execute for the primitive glue, in ONE call → end_job (screenshot) → show user → iterate if needed. Primitive shapes over a generator backdrop is the stock look; use it only when no higher-level tool fits.
 
 RETURNS: canvasSize {width, height} — use this to position items within bounds. Without a canvasPreset, an unbounded canvas is fixed at that size, so stills and video both export it (the result says so in note). Also returns ontology: a pp: triples + item summary snapshot of the (typically empty) canvas. Reuse this baseline across the same agent turn instead of calling pinepaper_get_canvas_ontology unless you've mutated the canvas. When clearCanvas is false, the ontology captures whatever's already on the canvas.
 
@@ -8394,7 +8417,7 @@ EXAMPLES:
       idempotentHint: false,
       openWorldHint: false,
     },
-    description: `Execute ALL operations in a single call for building animated scenes — canvas setup, backgrounds, items, animations, masks, effects, and playback.
+    description: `Execute the primitive operations of a scene in a single call — canvas setup, backgrounds, items, animations, masks, effects, and playback. It is the GLUE: a styled scene, a character, a story or a crafted title has its own tool (styled_scene, character, story, text_style), called first.
 
 NOTE: For diagrams (flowcharts, UML), use pinepaper_create_diagram_shape + pinepaper_connect instead.
 
@@ -8405,7 +8428,7 @@ NOTE: For diagrams (flowcharts, UML), use pinepaper_create_diagram_shape + pinep
 ONTOLOGY PREFLIGHT: Before code generation, this tool validates itemType, relationType, effectType, and generatorName against the canonical PinePaper vocabulary. A typo (e.g. "circel") returns a structured VALIDATION_ERROR with the operation index, the offending field, the canonical valid list, and a suggested fix — fix and retry rather than guessing. Pass skipValidation: true to bypass when intentionally using experimental vocabulary.
 
 WORKFLOW:
-1. pinepaper_agent_start_job → 2. pinepaper_agent_batch_execute (everything) → 3. pinepaper_agent_end_job (screenshot for validation)
+1. pinepaper_agent_start_job → 2. the craft tools that fit the brief (styled_scene, story, character, text_style, compose…) → 3. pinepaper_agent_batch_execute (the primitive glue, in one call) → 4. pinepaper_agent_end_job (screenshot for validation)
 After validation: user reviews screenshot → feedback → modify/recreate as needed.
 
 OPERATION TYPES (${AgentBatchOperationTypeSchema.options.length}) — use in this order:

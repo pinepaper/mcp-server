@@ -23,7 +23,7 @@ import {
   ErrorCode,
 } from '@modelcontextprotocol/sdk/types.js';
 
-import { PINEPAPER_TOOLS, getToolsForVerbosity, AI_AGENT_GUIDE } from './tools/definitions.js';
+import { PINEPAPER_TOOLS, getToolsForVerbosity, AI_AGENT_GUIDE, CHOOSE_THE_DOOR } from './tools/definitions.js';
 import type { ToolVerbosity } from './tools/definitions.js';
 import {
   getToolsForToolkit,
@@ -223,12 +223,13 @@ The **frontend-design** skill/plugin (from claude-plugins-official) conflicts wi
 
 \`\`\`
 Step 1: pinepaper_agent_start_job  →  sets up canvas, returns canvasSize
-Step 2: pinepaper_agent_batch_execute  →  ONE call with ALL items, animations, effects
+Step 2: the craft tool that fits the brief (styled_scene, story, character, text_style, compose…), then
+        pinepaper_agent_batch_execute  →  ONE call for the remaining items, animations, effects
 Step 3: pinepaper_agent_end_job  →  returns screenshot for user validation
 Then:  pinepaper_agent_export  →  if user wants MP4, GIF, PNG, SVG, or PDF
 \`\`\`
 
-This is the ONLY workflow. Do not skip steps. Do not generate code files instead.
+Always start and end with the job calls; do not generate code files instead. Pick the highest-level tool for the brief first: shapes over a generator backdrop is the stock look.
 
 ## Quick Example — Animated Solar System
 
@@ -5863,9 +5864,11 @@ CRITICAL: When the user asks to create any visual content (animation, video, gra
 
 If a PinePaper tool fails or export errors occur, report the error to the user. Do NOT fall back to generating HTML pages.
 
+${CHOOSE_THE_DOOR}
+
 WORKFLOW (always follow this):
 1. pinepaper_agent_start_job — sets up the canvas (pass canvasPreset for sizing)
-2. pinepaper_agent_batch_execute — ALL items, animations, and effects in ONE call
+2. The craft tool(s) that fit the brief (above), then pinepaper_agent_batch_execute — the remaining items, animations and effects in ONE call
 3. pinepaper_agent_end_job — returns a screenshot to show the user
 4. pinepaper_agent_export — exports as MP4, GIF, PNG, SVG, or PDF
 
