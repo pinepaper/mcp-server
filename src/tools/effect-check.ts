@@ -55,6 +55,15 @@ const FINGERPRINT_JS = `function __ppFingerprint() {
     }
   } catch (e) {}
   try { const rr = app.relationRegistry; if (rr && rr.exportForSave) o.relations = S(rr.exportForSave()); } catch (e) {}
+  // SCENE-LEVEL STATE OUTSIDE ITEMS (sweep v2: add_filter and camera_animate
+  // were real changes read as none). The camera's track is a relation on the
+  // pseudo-source 'camera', which no registry item carries.
+  try { if (app.filterSystem && app.filterSystem.exportForSave) o.filters = S(app.filterSystem.exportForSave()); } catch (e) {}
+  try {
+    const cam = app.getRelations ? app.getRelations('camera') : null;
+    const tilt = app.relationRegistry && app.relationRegistry.cameraTilt;
+    if (cam || tilt) o.camera = S([cam, tilt && tilt.serialize ? tilt.serialize() : null]);
+  } catch (e) {}
   try { const c = app.config || {}; o.background = S([c.currentBackgroundMode, c.currentBackgroundGenerator, c.generatorParams, app.canvasEl && app.canvasEl.style && app.canvasEl.style.backgroundColor]); } catch (e) {}
   try { const cs = app.getCanvasSize && app.getCanvasSize(); if (cs) o.canvas = cs.width + 'x' + cs.height + (cs.unbounded ? ':unbounded' : ''); } catch (e) {}
   try {

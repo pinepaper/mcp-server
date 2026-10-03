@@ -96,4 +96,15 @@ describe('the fingerprint is authored state, not the live frame (first live swee
     s.box.fillColor = color('#0000ff');
     expect(probe(effectAfterJs([]), s.app, win).changed).toEqual(['items']);
   });
+
+  it('scene filters and the camera track count as changes (sweep v2)', () => {
+    const s = studio(); const win: Record<string, unknown> = {};
+    const filters: unknown[] = []; const cam: unknown[] = [];
+    s.app.filterSystem = { exportForSave: () => filters.slice() };
+    s.app.getRelations = (id: string) => (id === 'camera' ? cam.slice() : []);
+    probe(EFFECT_BEFORE_JS, s.app, win);
+    filters.push({ type: 'grayscale', params: { intensity: 1 } });
+    cam.push({ type: 'camera_animates', params: { keyframes: [{ time: 0, zoom: 1 }, { time: 2, zoom: 2 }] } });
+    expect(probe(effectAfterJs([]), s.app, win).changed.sort()).toEqual(['camera', 'filters']);
+  });
 });
