@@ -9,19 +9,20 @@
  * then makes the schema, every JSON enum copy and RELATION_TYPE_MAP follow the
  * fixture — this closes the step before it.
  *
- * WHY A SUBSET CHECK, NOT A GENERATOR. Whole families are registered
- * dynamically (on_event_*, on_enter_*, deform_*, effect_* built in loops from
- * name tables), so a scrape of `registerRule('name'` sees 63 of ~140. The
- * fixture stays the full list (taken from the live registry); this only proves
- * nothing STATIC is missing from it. A dynamic family growing is not caught —
- * that needs the engine's own relation listing, which is fxtool's to export.
+ * AGAINST THE ENGINE'S OWN LIST. Whole families are registered dynamically
+ * (on_event_*, on_enter_*, deform_*, effect_* built from name tables), so the
+ * first version scraped `registerRule('name'` and saw 61 of 140. FxTool #104
+ * exports the registry's full list, claude-docs/relation-names.json; this
+ * compares both ways. WHICH names the tools expose, and which are deliberately
+ * left to the tool that creates them, is decided in relation-parity.test.ts
+ * (EMITTED_BY_A_TOOL) — not here.
  *
- *   node scripts/check-relation-names.mjs
+ *   node scripts/check-relation-names.mjs [--fix]   (--fix rewrites the fixture)
  *
  * Reads FxTool's committed origin/main. With no FxTool checkout it exits 0 and
  * says so: an absent sibling is not drift.
  */
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -38,21 +39,37 @@ if (!existsSync(FXTOOL)) {
   process.exit(0);
 }
 
-let grep;
-try {
-  grep = execFileSync('git', ['-C', FXTOOL, 'grep', '-hoE', "registerRule\\(\\s*'[a-z_0-9]+'", REF, '--', 'js'], { encoding: 'utf8' });
-} catch (e) {
-  console.error(`could not read FxTool ${REF}: ${e.message}`);
-  process.exit(1);
-}
-const engine = [...new Set(grep.split('\n').map((l) => (/'([a-z_0-9]+)'/.exec(l) || [])[1]).filter(Boolean))]
-  .filter((n) => !n.endsWith('_'));          // a template prefix (deform_${x}), not a name
-const fixture = new Set(readFileSync(FIXTURE, 'utf8').split('\n').map((l) => l.trim()).filter(Boolean));
-const missing = engine.filter((n) => !fixture.has(n)).sort();
+const FIX = process.argv.includes('--fix');
+// Fixture-only entries that are deliberately not engine relations.
+const FIXTURE_ONLY = new Set(['unknown']);   // the escape hatch for an unrecognised edge
 
-if (missing.length) {
-  console.error(`DRIFT: FxTool ${REF} registers relation(s) the fixture does not list: ${missing.join(', ')}`);
-  console.error(`Add them to ${FIXTURE.replace(REPO + '/', '')}; relation-parity.test.ts then names every copy to update.`);
+let raw;
+try {
+  raw = execFileSync('git', ['-C', FXTOOL, 'show', `${REF}:claude-docs/relation-names.json`], { encoding: 'utf8' });
+} catch (e) {
+  console.error(`could not read claude-docs/relation-names.json at FxTool ${REF}: ${e.message}`);
   process.exit(1);
 }
-console.log(`✅ relation names: all ${engine.length} statically registered engine relations are in the fixture`);
+const engine = JSON.parse(raw);
+if (!Array.isArray(engine) || engine.some((n) => typeof n !== 'string')) {
+  console.error('relation-names.json is not a flat list of names — its shape changed; update this script.');
+  process.exit(1);
+}
+const fixtureLines = readFileSync(FIXTURE, 'utf8').split('\n').map((l) => l.trim()).filter(Boolean);
+const fixture = new Set(fixtureLines);
+const missing = engine.filter((n) => !fixture.has(n)).sort();
+const gone = fixtureLines.filter((n) => !engine.includes(n) && !FIXTURE_ONLY.has(n)).sort();
+
+if (FIX) {
+  const next = [...new Set([...engine, ...[...fixture].filter((n) => FIXTURE_ONLY.has(n))])].sort();
+  writeFileSync(FIXTURE, next.join('\n') + '\n');
+  console.log(`✅ wrote ${next.length} relation names to the fixture (${missing.length} added, ${gone.length} removed)`);
+  process.exit(0);
+}
+if (missing.length || gone.length) {
+  if (missing.length) console.error(`DRIFT: FxTool ${REF} registers relation(s) the fixture does not list: ${missing.join(', ')}`);
+  if (gone.length) console.error(`DRIFT: the fixture lists relation(s) FxTool ${REF} no longer registers: ${gone.join(', ')}`);
+  console.error('Run: node scripts/check-relation-names.mjs --fix — then relation-parity.test.ts names every copy to update, or EMITTED_BY_A_TOOL to extend.');
+  process.exit(1);
+}
+console.log(`✅ relation names: the fixture matches all ${engine.length} relations FxTool ${REF} registers`);
