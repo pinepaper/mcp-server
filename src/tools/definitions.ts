@@ -176,7 +176,7 @@ Shapes: circle, rectangle, star, ellipse, triangle, polygon, line, arc, path, pe
 Surfaces (render-time, evaluated per pixel — not shapes): shader, field
   shader: a lit surface — water, liquid_metal, heatmap, gem_smoke. Set behind:true to put it UNDER the art, which is what scenery wants.
   field:  one expression, many marks — xExpr/yExpr/count, re-evaluated every frame against t.
-  Both draw fully in a cloud render; locally they stand in as a flat plate.
+  Both draw in the studio (live, stills, every export) and in a cloud render.
 Text: text (content, fontSize, fontFamily, color, fontWeight)
   Dynamic text: set contentType on text items → clock (live time), timer (elapsed), countdown (from N seconds), stopwatch (pauseable)
 All items: opacity, shadowColor, shadowBlur, blendMode, strokeColor, strokeWidth
@@ -642,7 +642,7 @@ For glossy 3D spheres, use pinepaper_create_glossy_sphere instead. For diagonal 
         itemType: {
           type: 'string',
           enum: ['text', 'circle', 'star', 'rectangle', 'triangle', 'polygon', 'ellipse', 'path', 'line', 'arc', 'pentagon', 'hexagon', 'diamond', 'arrow', 'heart', 'disk', 'circle-outline', 'arrow-right', 'speech-bubble', 'speech-bubble-square', 'speech-bubble-pointed', 'thought-bubble', 'double-bubble', 'quote-bubble', 'comment-box', 'callout-box', 'shader', 'field'],
-          description: "Type of item to create. 'shader' and 'field' are RENDER-TIME SURFACES drawn per pixel by the cloud renderer — locally they stand in as a flat plate. See the shader/field properties below.",
+          description: "Type of item to create. 'shader' and 'field' are RENDER-TIME SURFACES drawn per pixel, in the studio and in a cloud render. See the shader/field properties below.",
         },
         position: {
           oneOf: [

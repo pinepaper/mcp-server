@@ -234,9 +234,8 @@ export const ItemTypeSchema = z.enum([
   // and no tool has ever offered them, so the only way to reach one was to
   // hand-write a scene file.
   //
-  // In the browser they degrade to a flat plate of their own colour (see
-  // generateCreateItemCode) so a composition built with one still reads
-  // locally; the shaded surface appears in a cloud render.
+  // Created as a tagged plate (see generateCreateItemCode) that the studio and
+  // the cloud renderer both draw the surface over.
   'shader',
   'field',
 ]);

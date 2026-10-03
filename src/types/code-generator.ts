@@ -434,18 +434,15 @@ function generateCreateItemCode(
     params.strokeColor = strokeColor;
   }
 
-  // RENDER-TIME SURFACES DEGRADE, THEY DO NOT FAIL.
+  // RENDER-TIME SURFACES ARE A TAGGED PLATE.
   //
-  // `shader` and `field` are drawn per pixel by the cloud rasterizer from the
-  // scene document; the browser engine has no such item type and answers
-  // `create('shader')` with "unknown type — nothing was created". Emitting that
-  // call would hand every local user a silent hole where their backdrop was.
-  //
-  // So locally they become a plate: a rectangle carrying the same id, position,
-  // size and colour, which keeps the composition readable and the item
-  // addressable by every later call. The scene document still says `shader`, so
-  // a cloud render draws the real surface. The divergence is declared here
-  // rather than discovered in a frame.
+  // `shader` and `field` are drawn per pixel from the scene document. What is
+  // created is a rectangle carrying the id, position, size and colour, tagged
+  // data.renderAs + data.renderParams. The studio adopts that plate and draws
+  // the surface over it in the live view, stills and every export (FxTool D19);
+  // the cloud rasterizer draws it from the same tags. A studio too old to adopt
+  // it still shows a readable, addressable plate rather than a hole, which is
+  // why this does not call create('shader').
   if (itemType === 'shader' || itemType === 'field') {
     const plate: Record<string, unknown> = {
       x: position.x,
@@ -457,8 +454,7 @@ function generateCreateItemCode(
     if (params.id) plate.id = params.id;
     if (params.opacity != null) plate.opacity = params.opacity;
     return `
-// ${itemType} — a render-time surface. Drawn per pixel by the cloud renderer;
-// stood in for locally by a flat plate so the layout still reads.
+// ${itemType} — a render-time surface: a plate tagged with what to draw over it.
 const item = app.create('rectangle', ${JSON.stringify(plate, null, 2)});
 if (item && item.data) { item.data.renderAs = ${JSON.stringify(itemType)}; item.data.renderParams = ${JSON.stringify(params)}; }
 // The snippet's value is its last statement's, which was the assignment above:
@@ -467,10 +463,8 @@ if (item && item.data) { item.data.renderAs = ${JSON.stringify(itemType)}; item.
 // \`}\` as a statement end, so a bare ternary of object literals is not wrapped
 // and its value is lost.
 ((item && item.data)
-  ? { itemId: item.data.registryId, type: ${JSON.stringify(itemType)}, position: { x: ${position.x}, y: ${position.y} },
-      localStandIn: true,
-      note: 'drawn here as a flat plate; the ${itemType} itself appears only in a cloud render. A local export shows the plate.' }
-  : { success: false, error: 'the stand-in plate for this ${itemType} was not created.' });`;
+  ? { itemId: item.data.registryId, type: ${JSON.stringify(itemType)}, position: { x: ${position.x}, y: ${position.y} } }
+  : { success: false, error: 'the plate for this ${itemType} was not created.' });`;
   }
 
   // AN UNKNOWN ANCHOR IS INVISIBLE OVER MCP.
@@ -5236,34 +5230,7 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
   // warnings:[] plus a note when it checked and found nothing, and the
   // warnings themselves otherwise. The note carries the caveat that absence
   // was standing in for.
-  //
-  // STAND-INS ARE THIS TOOL'S OWN DOING, SO THIS TOOL REPORTS THEM. create_item
-  // draws 'shader' and 'field' locally as a flat plate tagged data.renderAs; the
-  // engine's check sees an ordinary rectangle and cannot know a surface was
-  // meant. So a local export of a sea came out a flat blue slab with nothing
-  // said. Reported whatever the engine check can or cannot do.
-  function standIns() {
-    try {
-      // Probed with === : a studio without it degrades to "no stand-ins".
-      const canList = app.itemRegistry && typeof app.itemRegistry.getAll === 'function';
-      if (!canList) return [];
-      const found = {};
-      for (const entry of app.itemRegistry.getAll()) {
-        const kind = entry && entry.item && entry.item.data && entry.item.data.renderAs;
-        if (kind === 'shader' || kind === 'field') (found[kind] = found[kind] || []).push(entry.itemId);
-      }
-      return Object.keys(found).map(function(kind) {
-        const ids = found[kind];
-        return {
-          code: 'render_time_surface_stand_in',
-          message: ids.length + ' ' + kind + ' item' + (ids.length > 1 ? 's are' : ' is')
-            + ' exported as the flat plate that stands in for ' + (ids.length > 1 ? 'them' : 'it')
-            + ' on a local canvas. The surface itself is drawn only by a cloud render.',
-          items: ids.slice(0, 6),
-        };
-      });
-    } catch (e) { return []; }
-  }
+
   // TRANSPARENCY THE FORMAT CANNOT CARRY. A scene with no background exported
   // to webm came out on BLACK while the engine's check said it lost nothing
   // (round 7, 8.12). Only said when the scene is evidently transparent — no
@@ -5302,7 +5269,7 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
     } catch (e) { return []; }
   }
   function fidelity(fmt) {
-    const own = standIns().concat(alphaLoss(fmt), textOverflow());
+    const own = alphaLoss(fmt).concat(textOverflow());
     try {
       if (!app.exportEngine || typeof app.exportEngine.exportFidelity !== 'function') {
         return { fidelity: { available: false, reason: 'this studio cannot check export fidelity — update PinePaper Studio.', ...(own.length ? { warnings: own } : {}) } };

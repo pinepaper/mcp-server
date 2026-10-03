@@ -321,6 +321,9 @@ background generator with simple shapes.
   and the one it meant.
 - `pinepaper_image_filter` documents the watercolour and painterly filters
   for photos, and reports a refused filter as a failure.
+- `shader` and `field` items from `pinepaper_create_item` draw in the studio
+  and in every export, not only in a cloud render. The note and export
+  warning that said a local export shows a flat plate are gone.
 
 ## What's new in 1.6.19
 
