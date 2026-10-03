@@ -289,9 +289,11 @@ export const OPTIONAL_ENGINE_METHODS: readonly string[] = [
   'relationRegistry.getStats',
   'sceneAt',
   'sceneManager.setLoop',
+  'screenSpaceItems',
   'setBackgroundColor',
   'setCanvasSize',
   'setLifetime',
+  'setStepTiming',
   'setUnitGridEnabled',
   'textOverflowReport',
 ];

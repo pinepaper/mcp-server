@@ -101,8 +101,19 @@ export type BlendMode = z.infer<typeof BlendModeSchema>;
  */
 export const KEYFRAME_EASINGS = ENGINE_EASING_NAMES;
 
+/**
+ * Lines for easings an engine branch adds before the list is resynced
+ * (FxTool D11: hold / step). Spread in, so they satisfy the record the moment
+ * the sync brings the names, and are unused until then.
+ */
+const UPCOMING_EASING_DESCRIPTIONS = {
+  hold: 'Holds the previous value, then jumps at the next key (a cut, no in-between)',
+  step: 'Same as hold: jumps at the next key',
+};
+
 /** One line per easing, for tool descriptions and pinepaper_get_available_easings. */
 export const EASING_DESCRIPTIONS: Record<(typeof KEYFRAME_EASINGS)[number], string> = {
+  ...UPCOMING_EASING_DESCRIPTIONS,
   linear: 'Constant speed',
   easeIn: 'Slow start, fast end',
   easeOut: 'Fast start, slow end',
@@ -361,6 +372,8 @@ export const KeyframeSchema = z.object({
   time: z.number().describe('Time in seconds for this keyframe'),
   properties: z.record(z.unknown()).describe('Property values at this keyframe'),
   easing: KeyframeEasingSchema.optional().default('linear'),
+  interpolation: z.literal('hold').optional().describe("'hold': this key holds ITS OWN value until the next key, then jumps (FxTool D11). Refused on a studio without hold keys."),
+  hold: z.boolean().optional().describe("Same as interpolation: 'hold'."),
 });
 
 export type Keyframe = z.infer<typeof KeyframeSchema>;
@@ -1294,6 +1307,21 @@ export const ItemDataFlagsSchema = z.object({
   isDecorative: z.boolean().optional(),
 });
 
+/**
+ * Per-item engine setters applied after create / modify (FxTool D20, D11).
+ * Sent through their own engine calls, never as create params: an engine
+ * without them would ignore an unknown param in silence, and the call says so
+ * instead.
+ */
+export const ScreenSpaceSchema = z.boolean()
+  .describe('HUD layer: true keeps the item fixed in the FRAME under camera moves (its x/y, keyframes and relations are then frame coordinates). Exports honour it; the live preview still tilts it; SVG and Lottie ignore it.');
+export const StepTimingSchema = z.union([
+  z.number().int().min(1),
+  z.object({ every: z.number().int().min(1), baseFps: z.number().positive().optional() }).strict(),
+  z.object({ fps: z.number().positive() }).strict(),
+  z.null(),
+]).describe("Animate this item 'on twos' (or threes…): N or {every: N, baseFps?} steps every N frames of a 30 fps base unless baseFps is given; {fps} steps at that rate; null turns it off. A stepped group steps its children. Not stepped: follows, spring_follow, auras, rigging and GPU generators.");
+
 export const CreateItemInputSchema = z.object({
   itemType: ItemTypeSchema,
   position: PositionSchema.optional().default({ x: 400, y: 300 }),
@@ -1308,6 +1336,8 @@ export const CreateItemInputSchema = z.object({
   // is read beside position as often as inside properties — and at the top
   // level it was stripped without a word (round 7 retest, 1.63).
   anchor: z.string().optional().describe("Which point position names: 'center' (default), 'top-left', 'top-right', 'bottom-left', 'bottom-right'. Same as properties.anchor."),
+  screenSpace: ScreenSpaceSchema.optional(),
+  stepTiming: StepTimingSchema.optional(),
 });
 
 // Light direction for 3D effects
@@ -1357,6 +1387,8 @@ export const ModifyItemInputSchema = z.object({
   data: ItemDataFlagsSchema.optional(),
   atTime: z.number().min(0).optional().describe('AUTO-KEY: write these properties as keyframes at this time (seconds) instead of a static edit — eased from the previous value, other keys kept.'),
   easing: z.string().optional().describe('atTime: easing of the segment arriving at the new key (default linear).'),
+  screenSpace: ScreenSpaceSchema.optional(),
+  stepTiming: StepTimingSchema.optional(),
 });
 
 // Delete Item
@@ -2438,6 +2470,8 @@ export const AgentBatchOperationSchema = z.object({
   // PositionSchema, as create_item takes: [x, y] was refused here (1.6.19 gate).
   position: PositionSchema.optional().describe('Position for create operations: {x, y} or [x, y]'),
   properties: z.record(z.unknown()).optional().describe('Properties for create/modify operations'),
+  screenSpace: ScreenSpaceSchema.optional().describe('create: keep the item fixed in the frame under camera moves (HUD).'),
+  stepTiming: StepTimingSchema.optional().describe("create: step this item's animation (N, {every, baseFps?} or {fps})."),
   // Modify/Animate/Delete/Keyframe/Mask/Effect target
   itemId: z.string().optional().describe('Target item ID or $N reference'),
   // Group operation fields

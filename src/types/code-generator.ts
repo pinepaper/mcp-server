@@ -16,6 +16,8 @@ import {
   RelationType,
   GeneratorName,
   CreateItemInputSchema,
+  ScreenSpaceSchema,
+  StepTimingSchema,
   ImportMotionCaptureInputSchema,
   ModifyItemInputSchema,
   AddRelationInputSchema,
@@ -2334,6 +2336,72 @@ export function planKeyframeMerges(
  * Such a snippet's value is its last top-level (-led statement; the
  * font-loading form is an async IIFE, which is awaited instead.
  */
+/**
+ * Per-item engine setters run after create / modify: screen space (FxTool D20)
+ * and step timing (D11). They go through their own engine calls rather than
+ * as create params, because an engine without them ignores an unknown param
+ * in silence; here a missing setter fails BEFORE anything is changed, and a
+ * refusal comes back with the engine's reason.
+ */
+type ItemSetters = { screenSpace?: boolean; stepTiming?: unknown };
+const ITEM_SETTERS = [
+  { key: 'screenSpace', fn: 'setScreenSpace', what: 'screen-space (HUD) items', since: 'D20' },
+  { key: 'stepTiming', fn: 'setStepTiming', what: 'step timing', since: 'D11' },
+] as const;
+
+/** Lift screenSpace / hud / stepTiming out of a properties bag (mutated), explicit fields winning. */
+function takeItemSetters(props: Record<string, unknown>, explicit: ItemSetters = {}): ItemSetters {
+  const out: ItemSetters = {};
+  const ss = explicit.screenSpace ?? props.screenSpace ?? props.hud;
+  if (ss !== undefined) out.screenSpace = ScreenSpaceSchema.parse(ss);
+  const st = explicit.stepTiming !== undefined ? explicit.stepTiming : props.stepTiming;
+  if (st !== undefined) out.stepTiming = StepTimingSchema.parse(st);
+  delete props.screenSpace; delete props.hud; delete props.stepTiming;
+  return out;
+}
+
+function hasItemSetters(s: ItemSetters): boolean {
+  return s.screenSpace !== undefined || s.stepTiming !== undefined;
+}
+
+/** Statements: refuse, before anything changes, when a requested setter is missing. */
+function itemSettersPreflightJs(s: ItemSetters): string {
+  return ITEM_SETTERS.filter((d) => (s as Record<string, unknown>)[d.key] !== undefined).map((d) =>
+    `  if (typeof app.${d.fn} !== 'function') { return { success: false, error: 'this studio has no ${d.what} (app.${d.fn}) — it predates FxTool ${d.since}; nothing was changed.' }; }`,
+  ).join('\n');
+}
+
+/** Statements: apply each setter to idExpr, folding the verdict into resVar. */
+function itemSettersApplyJs(s: ItemSetters, idExpr: string, resVar: string): string {
+  return ITEM_SETTERS.filter((d) => (s as Record<string, unknown>)[d.key] !== undefined).map((d) => {
+    const arg = JSON.stringify((s as Record<string, unknown>)[d.key]);
+    return `  {
+    const __sr = app.${d.fn}(${idExpr}, ${arg});
+    if (!__sr || __sr.ok === false) {
+      return Object.assign({}, ${resVar}, { success: false, error: '${d.key} was not applied to ' + ${idExpr} + ': ' + ((__sr && (__sr.reason || __sr.error)) || 'refused by the studio') });
+    }
+    ${resVar}.${d.key} = ${d.key === 'stepTiming' ? `(__sr.stepTiming !== undefined ? __sr.stepTiming : ${arg})` : arg};
+  }`;
+  }).join('\n');
+}
+
+/** Wrap a create / modify snippet so the setters run after it, on its item. */
+function withItemSetters(code: string, s: ItemSetters, idExpr: string): string {
+  if (!hasItemSetters(s)) return code;
+  return `(async function() {
+${itemSettersPreflightJs(s)}
+  const __res = await (async function() {
+${asReturningBody(code)}
+  })();
+  if (!__res || __res.success === false) return __res;
+  const __sid = ${idExpr};
+  if (!__sid) return __res;
+${itemSettersApplyJs(s, '__sid', '__res')}
+  if (__res.success === undefined) __res.success = true;
+  return __res;
+})();`;
+}
+
 function asReturningBody(snippet: string): string {
   const single = snippet.trim();
   if (single.startsWith('(async function()')) return `return await ${single.replace(/;\s*$/, '')};`;
@@ -2788,13 +2856,14 @@ export class PinePaperCodeGenerator {
     if (validated.animationDelay !== undefined) properties.animationDelay = validated.animationDelay;
     if (validated.keyframes !== undefined) properties.keyframes = validated.keyframes;
     if (validated.anchor !== undefined && properties.anchor === undefined && properties.origin === undefined) properties.anchor = validated.anchor;
-    return generateCreateItemCode(
+    const setters = takeItemSetters(properties, { screenSpace: validated.screenSpace, stepTiming: validated.stepTiming });
+    return withItemSetters(generateCreateItemCode(
       validated.itemType,
       validated.position,
       properties,
       validated.data,
       positionGiven,
-    );
+    ), setters, '__res.itemId');
   }
 
   /**
@@ -2802,14 +2871,21 @@ export class PinePaperCodeGenerator {
    */
   generateModifyItem(input: z.infer<typeof ModifyItemInputSchema>): string {
     const validated = ModifyItemInputSchema.parse(input);
+    const props = { ...(validated.properties as Record<string, unknown>) };
+    const setters = takeItemSetters(props, { screenSpace: validated.screenSpace, stepTiming: validated.stepTiming });
+    const idExpr = JSON.stringify(validated.itemId);
     if (validated.atTime !== undefined) {
-      return generateAutoKeyCode(validated.itemId, validated.properties as Record<string, unknown>, validated.atTime, validated.easing);
+      return withItemSetters(generateAutoKeyCode(validated.itemId, props, validated.atTime, validated.easing), setters, idExpr);
     }
-    return generateModifyItemCode(
+    // Only a setter asked for: no property edit to run.
+    if (hasItemSetters(setters) && Object.keys(props).length === 0 && !validated.data) {
+      return withItemSetters(`({ success: true, itemId: ${idExpr} });`, setters, idExpr);
+    }
+    return withItemSetters(generateModifyItemCode(
       validated.itemId,
-      validated.properties as Record<string, unknown>,
+      props,
       validated.data
-    );
+    ), setters, idExpr);
   }
 
   /**
@@ -2906,7 +2982,11 @@ export class PinePaperCodeGenerator {
    */
   generateKeyframeAnimate(input: z.infer<typeof KeyframeAnimateInputSchema>): string {
     const validated = KeyframeAnimateInputSchema.parse(input);
-    return generateKeyframeAnimateCode(
+    // Hold keys (FxTool D11) on an engine without them would interpolate in
+    // silence; refuse before anything is written. setStepTiming ships in the
+    // same change, so it is the probe.
+    const holds = validated.keyframes.some((k) => k.interpolation === 'hold' || k.hold === true);
+    const code = generateKeyframeAnimateCode(
       validated.itemId,
       validated.keyframes,
       validated.duration,
@@ -2917,6 +2997,13 @@ export class PinePaperCodeGenerator {
       validated.timeUnits,
       validated.append
     );
+    if (!holds) return code;
+    return `(async function() {
+  if (!(typeof app.setStepTiming === 'function')) { return { success: false, error: 'this studio has no hold keys (interpolation: \\'hold\\') — it predates FxTool D11; nothing was written. Use two keys a frame apart for a cut.' }; }
+  return await (async function() {
+${asReturningBody(code)}
+  })();
+})();`;
   }
 
   /**
@@ -4517,12 +4604,17 @@ throw new Error('Unknown diagram mode action: ${action}');
         // the exact emitter create_item uses, adapted to return its result
         // inside this op's function.
         const pos = op.position || { x: 400, y: 300 };
-        const createProps = withRadiusAxes((op.properties || {}) as Record<string, unknown>);
-        const returning = asReturningBody(generateCreateItemCode(op.itemType as ItemType, pos, { ...(op.properties || {}) } as Record<string, unknown>, undefined, op.position !== undefined));
-        let createCode = `
+        const opProps = { ...(op.properties || {}) } as Record<string, unknown>;
+        const opSetters = takeItemSetters(opProps, { screenSpace: op.screenSpace, stepTiming: op.stepTiming });
+        const createProps = withRadiusAxes(opProps);
+        const returning = asReturningBody(generateCreateItemCode(op.itemType as ItemType, pos, { ...opProps }, undefined, op.position !== undefined));
+        let createCode = `${hasItemSetters(opSetters) ? `\n${itemSettersPreflightJs(opSetters)}` : ''}
 const __created = await (async function() {
 ${returning}
-})();`;
+})();${hasItemSetters(opSetters) ? `
+if (__created && __created.success !== false && __created.itemId) {
+${itemSettersApplyJs(opSetters, '__created.itemId', '__created')}
+}` : ''}`;
         // Coordinate-built items (path from segments/pathData, line/arc from
         // from/through/to) derive their geometry from those coordinates and
         // IGNORE params.position — so `create` at a point silently produced an
@@ -6109,6 +6201,17 @@ ${(() => {
   })()}
 ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) { /* the still is already rendered */ }
   if (result && result.success) result.time = ${stillTime};` : ''}
+  // SCREEN-SPACE ITEMS (FxTool D20): SVG and Lottie write geometry, not the
+  // camera's frame map, so a HUD item is placed as if the camera had not moved.
+  if (result && result.success && typeof app.screenSpaceItems === 'function' && ['svg', 'lottie', 'dotlottie'].indexOf(${JSON.stringify(format)}) !== -1) {
+    try {
+      const __hud = app.screenSpaceItems() || [];
+      if (__hud.length) {
+        result.fidelity = result.fidelity || { warnings: [] };
+        result.fidelity.warnings = (result.fidelity.warnings || []).concat([{ code: 'screen_space_ignored', message: __hud.length + ' screen-space (HUD) item(s) are written at their frame coordinates in world space: ${format} has no camera frame, so they do not stay fixed under the camera move. Export mp4, webm, gif or png to keep them fixed.' }]);
+      }
+    } catch (_) { /* the export stands */ }
+  }
   // RELIGHT (FxTool D5): applied to png / pdf / mp4 / webm, not gif / apng
   // or the vector formats; and it is what makes a video export slow.
   if (result && result.success && typeof app.getRelight === 'function') {

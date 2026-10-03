@@ -582,6 +582,8 @@ For glossy 3D spheres, use pinepaper_create_glossy_sphere instead. For diagonal 
     inputSchema: {
       type: 'object',
       properties: {
+        screenSpace: { type: 'boolean', description: 'HUD: true keeps the item fixed in the FRAME under camera moves; its x/y, keyframes and relations are then frame coordinates. Exports (mp4, webm, gif, png, pdf) honour it; the live preview still tilts it; SVG and Lottie ignore it (agent_export warns). A studio without it refuses.' },
+        stepTiming: { description: "Animate 'on twos': N or {every: N, baseFps?} (every N frames of a 30 fps base unless baseFps), {fps}, or null to turn off. A stepped group steps its children; follows, spring_follow, auras, rigging and GPU generators are not stepped. A studio without it refuses.", oneOf: [{ type: 'integer', minimum: 1 }, { type: 'object', properties: { every: { type: 'integer', minimum: 1 }, baseFps: { type: 'number' }, fps: { type: 'number' } } }, { type: 'null' }] },
         itemType: {
           type: 'string',
           enum: ['text', 'circle', 'star', 'rectangle', 'triangle', 'polygon', 'ellipse', 'path', 'line', 'arc', 'pentagon', 'hexagon', 'diamond', 'arrow', 'heart', 'disk', 'circle-outline', 'arrow-right', 'speech-bubble', 'speech-bubble-square', 'speech-bubble-pointed', 'thought-bubble', 'double-bubble', 'quote-bubble', 'comment-box', 'callout-box', 'shader', 'field'],
@@ -741,6 +743,8 @@ Use the collage group's id for palette/collageStyle; use a child letter's id for
     inputSchema: {
       type: 'object',
       properties: {
+        screenSpace: { type: 'boolean', description: 'HUD: true keeps the item fixed in the FRAME under camera moves; its x/y, keyframes and relations are then frame coordinates. Exports (mp4, webm, gif, png, pdf) honour it; the live preview still tilts it; SVG and Lottie ignore it (agent_export warns). A studio without it refuses.' },
+        stepTiming: { description: "Animate 'on twos': N or {every: N, baseFps?} (every N frames of a 30 fps base unless baseFps), {fps}, or null to turn off. A stepped group steps its children; follows, spring_follow, auras, rigging and GPU generators are not stepped. A studio without it refuses.", oneOf: [{ type: 'integer', minimum: 1 }, { type: 'object', properties: { every: { type: 'integer', minimum: 1 }, baseFps: { type: 'number' }, fps: { type: 'number' } } }, { type: 'null' }] },
         itemId: {
           type: 'string',
           description: 'Registry ID of the item (e.g., "item_1")',
@@ -3918,6 +3922,8 @@ EASING — IT SHAPES THE SEGMENT ARRIVING AT THE KEYFRAME IT IS ON.
 The move from keyframe A to keyframe B is eased by B's easing, not A's. Easing on the FIRST keyframe does nothing (no segment arrives at it) — a Ken Burns with easing only on its first key plays linear. Put the easing on the key you are moving TO.
 ${EASING_LINES}
 - or a custom cubic-bezier [x1, y1, x2, y2] — x in 0..1, y may exceed 0..1 for overshoot. keyframe_animate and camera_animate only.
+HOLD KEYS (where the studio has them): interpolation: 'hold' on a key holds ITS value until the next key, then cuts — no in-between. Easing 'hold' / 'step' on the ARRIVING key does the same. A studio without hold keys refuses rather than interpolate; there, two keys a frame apart make the cut. For a whole layer 'on twos', set stepTiming on the item (create_item / modify_item).
+
 Every easing renders exactly in video, GIF and APNG. Lottie and CSS get the closest single Bézier: springPlayful loses its wobble, and the in-out quart/quint/expo/circ curves are within 2–4 %. SMIL is exact for springs and those four.
 
 CLIP WINDOW (optional — Premiere/Canva-style clip behavior):
