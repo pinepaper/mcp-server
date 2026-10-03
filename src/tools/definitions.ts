@@ -63,7 +63,7 @@ export const CHOOSE_THE_DOOR = `CHOOSE THE HIGHEST-LEVEL TOOL FIRST. Primitive s
 - A title or caption with craft → pinepaper_text_style (display styles; cursive with animate writes itself on), pinepaper_text_effect
 - A poster or layout in an aesthetic → pinepaper_design_system (compose); a collage → pinepaper_compose
 - A painted, stitched, hatched, inked or cut-paper look on shapes or photos → pinepaper_design_medium; photos also pinepaper_image_filter (watercolor, painterly)
-- A brand's colours → pinepaper_brand_kit; sound and music → pinepaper_sound, pinepaper_audio_beats, pinepaper_beat_cuts
+- A brand → pinepaper_brand_kit set (first): every item made afterwards inherits it; sound and music → pinepaper_sound, pinepaper_audio_beats, pinepaper_beat_cuts
 - A camera move through the piece → pinepaper_camera_director; 3D → pinepaper_world3d (+ pinepaper_relight)
 pinepaper_agent_batch_execute then does the glue in ONE call: extra items, keyframes, relations, masks, effects, playback.
 If no tool reaches what the brief asks (for example, redrawing a subject in another art style), tell the user what is missing instead of handing over a lesser result as done.`;
@@ -5301,6 +5301,8 @@ ACTIONS:
 - plan: Report what WOULD change (count, per-role breakdown, WCAG contrast audit) WITHOUT touching
   the canvas. Call this first on an unfamiliar scene; a whole-scene recolour is hard to eyeball afterwards.
 - apply: Commit it. A history snapshot is taken FIRST, so one undo puts everything back.
+- set: { kit } — apply it AND make it the ACTIVE brand for the rest of the piece: every shape created afterwards (create_item, batch create, agent_batch_execute) takes colors.primary, and every text colors.text with the heading font from 32 px up (body below), wherever the call names none. Pass noBrand: true in an item's properties to opt it out. Use set at the start of a multi-beat piece so beat 5 matches beat 1. It lives with the studio session: set it again after a reload.
+- get: the active brand (or null).   clear: stop inheriting (what is on the canvas keeps its colours).
 - from_url: { url, screenshots? } — read the product's REAL brand from its own site before animating anything: screenshots down the page, the logo (header image or SVG, else the site icon), and a proposed kit from the colours and fonts the site's CSS computes (buttons and links weigh most). Saved to files; the result lists them. Read in an isolated browser context: the studio is not touched. Review the kit against the screenshots, then plan / apply it. Use the brand you are given, never an invented one.
 
 KIT SHAPE — only name and colors.primary are required:
@@ -5316,7 +5318,7 @@ Both actions return a WCAG contrast audit, so you can see failing pairs before s
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['plan', 'apply', 'from_url'], description: 'plan (dry run), apply, or from_url (read a site into a proposed kit)' },
+        action: { type: 'string', enum: ['plan', 'apply', 'from_url', 'set', 'get', 'clear'], description: 'plan (dry run), apply (once), set (apply + every new item inherits it), get, clear, or from_url (read a site into a proposed kit)' },
         url: { type: 'string', description: "from_url: the product's site, http(s)." },
         screenshots: { type: 'integer', minimum: 1, maximum: 6, description: 'from_url: screenshots down the page (default 3).' },
         kit: {

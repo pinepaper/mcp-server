@@ -218,7 +218,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   // "Wires relations, not coordinates" earns its place even at this tier: it is
   // what stops a model positioning the images itself and getting a dead layout.
   pinepaper_compose: 'Named collage layout + camera. action: list_patterns (first: fixed slot counts)|apply {pattern, itemIds in slot order}|list_treatments|set_treatment|list_reveals|list_styles. Wires relations.',
-  pinepaper_brand_kit: 'Apply brand colours by role. action: plan (dry run + contrast audit)|apply|from_url. kit: {name, colors:{primary,secondary?,accent?,background?,text?}, fonts?}. Only name+colors.primary required.',
+  pinepaper_brand_kit: 'Brand colours + fonts by role. action: plan|apply|set (apply + new items inherit it)|get|clear|from_url. kit: {name, colors:{primary,…,text?}, fonts?}.',
   pinepaper_component: 'Reusable master + instances, per-instance overrides. action: define|list|instantiate|set_override|sync|update_from_instance|detach. {itemIds?, componentId?, instanceId?, componentKey?, prop?, value?}',
   pinepaper_artboard: 'Resize the artboard and control reflow. action: list_presets|set|set_constraints. {preset? | width+height, itemId?, horizontal?, vertical?}',
   pinepaper_comment: 'Notes pinned to an item, a point and/or a time. action: add|list|resolve|delete. add needs text + at least one anchor. {text?, itemId?, x?, y?, time?, id?}',

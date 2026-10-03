@@ -2338,6 +2338,36 @@ export function planKeyframeMerges(
  * font-loading form is an async IIFE, which is awaited instead.
  */
 /**
+ * The active brand's defaults for a new item (D69): only what the caller did
+ * not name. Closed shapes take colors.primary; text takes colors.text (or
+ * primary) and the heading font from 32 px up, else the body font. Applied
+ * through modifyItem after create, so the engine's own bookkeeping runs.
+ */
+const BRAND_FILL_TYPES = new Set(['circle', 'star', 'rectangle', 'triangle', 'polygon', 'ellipse', 'pentagon', 'hexagon', 'diamond', 'arrow', 'heart']);
+function withBrandDefaults(code: string, itemType: string, props: Record<string, unknown>): string {
+  if (props.noBrand === true) return code;
+  const isText = itemType === 'text';
+  if (!isText && !BRAND_FILL_TYPES.has(itemType)) return code;
+  const hasColor = ['color', 'fillColor', 'fill'].some((k) => props[k] !== undefined);
+  const hasFont = props.fontFamily !== undefined;
+  if (hasColor && (!isText || hasFont)) return code;
+  const size = typeof props.fontSize === 'number' ? props.fontSize : 36;
+  const anchor = 'const itemId = item.data.registryId;';
+  if (!code.includes(anchor)) return code;
+  const patch = `
+// Active brand (D69): fill in what this call did not name.
+const __bk = (typeof window !== 'undefined' && window.__ppActiveBrand) || null;
+let __brand = null;
+if (__bk && __bk.colors && app.modifyItem) {
+  const __bm = {};
+  ${hasColor ? '' : `__bm.color = ${isText ? '__bk.colors.text || __bk.colors.primary' : '__bk.colors.primary'};`}
+  ${isText && !hasFont ? `const __f = __bk.fonts && (${size >= 32 ? '__bk.fonts.heading || __bk.fonts.body' : '__bk.fonts.body || __bk.fonts.heading'}); if (__f) __bm.fontFamily = __f;` : ''}
+  if (Object.keys(__bm).length) { app.modifyItem(itemId, __bm); __brand = __bm; }
+}`;
+  return code.replace(anchor, anchor + patch).replace(/\(\{ itemId, type:/, '({ itemId, ...(__brand ? { brand: __brand } : {}), type:');
+}
+
+/**
  * Per-item engine setters run after create / modify: screen space (FxTool D20)
  * and step timing (D11). They go through their own engine calls rather than
  * as create params, because an engine without them ignores an unknown param
@@ -2858,13 +2888,15 @@ export class PinePaperCodeGenerator {
     if (validated.keyframes !== undefined) properties.keyframes = validated.keyframes;
     if (validated.anchor !== undefined && properties.anchor === undefined && properties.origin === undefined) properties.anchor = validated.anchor;
     const setters = takeItemSetters(properties, { screenSpace: validated.screenSpace, stepTiming: validated.stepTiming });
-    return withItemSetters(generateCreateItemCode(
+    const brandProps = { ...properties };
+    delete properties.noBrand;
+    return withItemSetters(withBrandDefaults(generateCreateItemCode(
       validated.itemType,
       validated.position,
       properties,
       validated.data,
       positionGiven,
-    ), setters, '__res.itemId');
+    ), validated.itemType, brandProps), setters, '__res.itemId');
   }
 
   /**
@@ -4608,7 +4640,9 @@ throw new Error('Unknown diagram mode action: ${action}');
         const opProps = { ...(op.properties || {}) } as Record<string, unknown>;
         const opSetters = takeItemSetters(opProps, { screenSpace: op.screenSpace, stepTiming: op.stepTiming });
         const createProps = withRadiusAxes(opProps);
-        const returning = asReturningBody(generateCreateItemCode(op.itemType as ItemType, pos, { ...opProps }, undefined, op.position !== undefined));
+        const opBrand = { ...opProps };
+        delete opProps.noBrand;
+        const returning = asReturningBody(withBrandDefaults(generateCreateItemCode(op.itemType as ItemType, pos, { ...opProps }, undefined, op.position !== undefined), op.itemType as string, opBrand));
         let createCode = `${hasItemSetters(opSetters) ? `\n${itemSettersPreflightJs(opSetters)}` : ''}
 const __created = await (async function() {
 ${returning}
@@ -9003,6 +9037,32 @@ ${mask ? `    // A MASK REPLACES THE RASTER (round 8 DD, 4.10). applyMask builds
   }
 
   generateBrandKit(input: BrandKitInput): string {
+    // THE ACTIVE BRAND (D69). apply recolours what is on the canvas once; a
+    // later beat's new items knew nothing of it. 'set' applies AND makes the
+    // kit the studio's active brand, which every create reads (withBrandDefaults).
+    // It lives in the PAGE, not this process: one cloud server serves many
+    // studios, and a brand must not cross between them.
+    if (input.action === 'get' || input.action === 'clear') {
+      return `
+// Brand kit: ${input.action} the active brand
+(function() {
+  const b = (typeof window !== 'undefined' && window.__ppActiveBrand) || null;
+  ${input.action === 'clear' ? 'if (typeof window !== "undefined") window.__ppActiveBrand = null;' : ''}
+  return { success: true, action: ${JSON.stringify(input.action)}, ${input.action === 'clear' ? 'cleared: !!b' : 'brand: b'} };
+})();`.trim();
+    }
+    if (input.action === 'set') {
+      const applied = this.generateBrandKit({ ...input, action: 'apply' });
+      return `
+// Brand kit: apply, then make it the active brand every new item inherits
+(async function() {
+  const out = await ${applied.replace(/^\/\/[^\n]*\n/, '').replace(/;\s*$/, '')};
+  if (out && (out.success === false || out.ok === false)) return out;
+  if (typeof window !== 'undefined') window.__ppActiveBrand = ${JSON.stringify(input.kit)};
+  return Object.assign({}, out, { success: true, action: 'set', active: true,
+    note: 'new shapes take colors.primary and new text colors.text with the heading (32 px and up) or body font, wherever the call names none; noBrand: true opts an item out. The active brand lives with this studio session: set it again after a reload.' });
+})();`.trim();
+    }
     const opts = JSON.stringify({ ...(input.selectionOnly ? { selectionOnly: true } : {}) });
     const method = input.action === 'plan' ? 'planBrandKit' : 'applyBrandKit';
     const facade = this._facadeCall(method, `${JSON.stringify(input.kit)}, ${opts}`,

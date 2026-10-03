@@ -119,6 +119,7 @@ export const ACTION_CLASS: Readonly<Record<string, EffectClass>> = Object.freeze
   'pinepaper_story:plan_book': 'read-only',
   'pinepaper_brand_kit:plan': 'read-only',
   'pinepaper_brand_kit:from_url': 'read-only',
+  'pinepaper_brand_kit:clear': 'side-effect',     // page state; the canvas keeps its colours
   'pinepaper_audio_beats:analyze': 'read-only',
   'pinepaper_compose:apply': 'mutates',
   'pinepaper_camera:state': 'read-only',

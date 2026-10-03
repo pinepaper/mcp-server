@@ -3772,7 +3772,7 @@ export type TransformInput = z.infer<typeof TransformInputSchema>;
 
 export const BrandKitInputSchema = z.object({
   /** 'plan' reports what WOULD change without touching the scene. 'from_url' reads a site into a proposed kit. */
-  action: z.enum(['plan', 'apply', 'from_url']),
+  action: z.enum(['plan', 'apply', 'from_url', 'set', 'get', 'clear']),
   url: z.string().url().optional().describe("from_url: the product's site (http/https). Read in an isolated browser context: the studio is not navigated."),
   screenshots: z.number().int().min(1).max(6).optional().describe('from_url: screenshots taken down the page (default 3).'),
   // Spelled out rather than a loose record. A first version typed this as
@@ -3798,7 +3798,7 @@ export const BrandKitInputSchema = z.object({
   }).optional(),
   selectionOnly: z.boolean().optional(),
 })
-  .refine((v) => v.action === 'from_url' || !!v.kit, { message: 'plan and apply require kit (from_url proposes one)', path: ['kit'] })
+  .refine((v) => !['plan', 'apply', 'set'].includes(v.action) || !!v.kit, { message: 'plan, apply and set require kit (from_url proposes one)', path: ['kit'] })
   .refine((v) => v.action !== 'from_url' || (!!v.url && /^https?:\/\//i.test(v.url)), { message: 'from_url requires an http(s) url', path: ['url'] });
 export type BrandKitInput = z.infer<typeof BrandKitInputSchema>;
 
