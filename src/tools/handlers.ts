@@ -44,6 +44,8 @@ import {
   TextStyleInputSchema,
   TextEffectInputSchema,
   DesignMediumInputSchema,
+  RelightInputSchema,
+  ShaderGraphInputSchema,
   ShatterImageInputSchema,
   ImportLayeredCharacterInputSchema,
   CharacterInputSchema,
@@ -2269,6 +2271,16 @@ async function handleToolCallInner(
       }
 
       // ─── 1.6.4: agent surface for the Tier-2 engine features ───
+      case 'pinepaper_relight': {
+        const input = RelightInputSchema.parse(args);
+        return executeOrGenerate(codeGenerator.generateRelight(input), `Relight: ${input.action}`, options, 'pinepaper_relight');
+      }
+
+      case 'pinepaper_shader_graph': {
+        const input = ShaderGraphInputSchema.parse(args);
+        return executeOrGenerate(codeGenerator.generateShaderGraph(input), `Shader graph: ${input.action}`, options, 'pinepaper_shader_graph');
+      }
+
       case 'pinepaper_styled_scene': {
         const input = StyledSceneInputSchema.parse(args);
         return executeOrGenerate(codeGenerator.generateStyledScene(input), `Styled scene${input.style ? `: ${input.style}` : ''}`, options, 'pinepaper_styled_scene');

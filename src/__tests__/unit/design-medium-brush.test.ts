@@ -38,6 +38,6 @@ describe('design_medium apply ink / charcoal (D32)', () => {
   });
   it('refuses an unknown medium, and apply without itemId or medium', () => {
     expect(() => DesignMediumInputSchema.parse({ action: 'apply', itemId: 'item_3', medium: 'pastel' })).toThrow(/unknown medium/);
-    expect(() => DesignMediumInputSchema.parse({ action: 'apply', medium: 'ink' })).toThrow(/needs itemId and medium/);
+    expect(() => DesignMediumInputSchema.parse({ action: 'apply', medium: 'ink' })).toThrow(/requires itemId and medium/);
   });
 });

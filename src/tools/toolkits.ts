@@ -139,6 +139,8 @@ export const TOOL_TAGS: Record<string, string[]> = {
   ],
   filters: [
     'pinepaper_add_filter',
+    'pinepaper_relight',
+    'pinepaper_shader_graph',
   ],
 
   // --- Compositions ---

@@ -2422,6 +2422,7 @@ ACTIONS:
 - apply_hatch: rule an item with hatching. Same deal — silhouette is the region, source is hidden, re-hatching replaces.
 - list_flow_fields: the 7 fields that bend a hatch line.
 - list_hatch_options: the hatch defaults.
+- sdf_stroke: { points, width? (8), softness? (0.2), color?, opacity?, resolution? (2), name? } → itemId — a smooth, anti-aliased brush stroke along points ({x, y, pressure?} or [x, y, pressure?], canvas px; pressure 0..1 thins the line there), made as an image item (registered, one undo step). Runs on the CPU; a stroke too large for its bitmap budget is refused with the fix. A studio without the SDF brush refuses with the reason.
 
 THE DIRECTION FIELD IS THE WHOLE THING. Stitches that all lie the same way are hatching; stitches that follow the form are needlepainting. Use { kind: 'radial', cx, cy } for anything that radiates (a flower, an eye), { kind: 'spine', spine: [...] } to run them along a midrib or feather shaft, { kind: 'constant', angle } when you actually want flat hatch.
 
@@ -2447,9 +2448,14 @@ EXAMPLE — a stitched leaf:
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['list_media', 'resolve', 'list_stitches', 'apply_thread', 'apply_hatch', 'list_flow_fields', 'list_hatch_options', 'apply'], description: 'Medium operation' },
+        action: { type: 'string', enum: ['list_media', 'resolve', 'list_stitches', 'apply_thread', 'apply_hatch', 'list_flow_fields', 'list_hatch_options', 'apply', 'sdf_stroke'], description: 'Medium operation' },
         medium: { type: 'string', enum: [...DESIGN_MEDIA], description: `resolve / apply: the medium. apply works for ${Object.keys(DESIGN_MEDIA_APPLY).join(', ')}; the rest are refused by the engine with the reason. Call list_media for each one's fidelity and limitation.` },
         options: { type: 'object', description: 'apply: the medium\'s own options (see the description; color takes hex).' },
+        points: { type: 'array', items: {}, description: 'sdf_stroke: [{x, y, pressure?}] or [[x, y, pressure?]] in canvas px' },
+        softness: { type: 'number', description: 'sdf_stroke: edge softness 0..1 (default 0.2)' },
+        opacity: { type: 'number', description: 'sdf_stroke: 0..1 (default 1)' },
+        resolution: { type: 'number', description: 'sdf_stroke: bitmap px per canvas px (default 2)' },
+        name: { type: 'string', description: 'sdf_stroke: item name' },
         itemId: { type: 'string', description: 'apply / apply_thread / apply_hatch: a closed path, compound path (holes kept), or a group of them (applied per path).' },
         stitch: { type: 'string', enum: [...THREAD_STITCHES], description: "apply_thread: default longAndShort. These six are the stitches the engine publishes; call 'list_stitches' for each one's description and its own parameters. An unknown name is refused rather than quietly stitched as a default fill." },
         field: { type: 'object', description: "apply_thread: { kind: 'radial'|'spine'|'constant', cx, cy, angle, spine[], across } — default radial from the shape centre. spine is a list of points, each {x, y} or [x, y], e.g. [{x:400,y:200},{x:400,y:520}]; this tool normalises [x, y] to {x, y} before the engine sees it." },
@@ -7818,6 +7824,86 @@ EXAMPLE: { style: 'ink', duration: 6 }`,
         id: { type: 'string', description: 'Scene id (default "styled-scene"); the same id replaces the scene.' },
         spec: { type: 'object', description: "The composition; omitted keys take the 'valley' preset.", additionalProperties: true },
       },
+    },
+  },
+  {
+    name: 'pinepaper_relight',
+    annotations: {
+      title: 'Relight the 3D World',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `Light the 3D world layer (pinepaper_world3d) with point and directional lights — a post pass, so the lit side of every surface reads brighter in the preview and the export.
+
+ACTIONS:
+- set: { lights, ambient?, strength?, enabled?, preview? } — install or replace the rig. Up to 8 lights:
+    point:       { type: 'point', x, y, z? (120), radius? (400), color?, intensity? (1), specular? (32) }
+    directional: { type: 'directional', dir: [dx, dy, dz], color?, intensity? }   [0, 0, -1] faces the viewer
+  Coordinates are export-frame px; colours are '#rrggbb' or [r, g, b]. ambient default 0.2, strength (normal-map) default 2.
+  The result reports cost: the pass runs on the CPU, about 0.42 s per 1080p frame, so a 10 s MP4 at 30 fps takes about 2 minutes longer.
+- get: the current rig.
+- clear: remove it.
+- list_lights: the light types.
+
+LIMITS — say them before you promise a look:
+- Applied in the preview and in PNG, PDF, MP4 and WebM exports. GIF and APNG are NOT relit (agent_export says so when it happens).
+- Normals come from the world's brightness, not real depth, so it reads as raking light over the picture rather than true 3D shading.
+- It lights the 3D world layer only, not 2D items drawn over it.
+- The rig is NOT saved with the project: set it again after reloading.
+- A studio without the relight pass refuses with the reason.
+
+EXAMPLE: { action: 'set', lights: [{ type: 'point', x: 1500, y: 200, z: 300, radius: 1200, color: '#ffd9a0', intensity: 1.4 }], ambient: 0.15 }`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['set', 'get', 'clear', 'list_lights'], description: 'Relight operation' },
+        lights: { type: 'array', items: { type: 'object', additionalProperties: true }, description: "set: up to 8 lights, {type:'point', x, y, z?, radius?, color?, intensity?, specular?} or {type:'directional', dir:[dx,dy,dz], color?, intensity?}" },
+        ambient: { type: 'number', description: 'set: ambient light (default 0.2)' },
+        strength: { type: 'number', description: 'set: normal-map strength (default 2)' },
+        enabled: { type: 'boolean', description: 'set: false keeps the rig but turns it off' },
+        preview: { description: 'set: true / false, or {maxSide} for the live preview overlay', oneOf: [{ type: 'boolean' }, { type: 'object', properties: { maxSide: { type: 'number' } } }] },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'pinepaper_shader_graph',
+    annotations: {
+      title: 'Shader Graph',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Build a pixel-processing graph from nodes (normal map, relighting, depth of field, bloom) and run it over an item or the whole scene.
+
+ACTIONS:
+- node_types: the node vocabulary with each node's params. Call this first.
+- validate: { graph } — check it, store nothing. Errors are named (unknown type, duplicate id, dangling edge, cycle, branching).
+- create: { graph } → graphId — validate and store.
+- get / remove: { graphId }.  list: the stored graphs.
+- apply: { target, graph | graphId, keepSource?, asItem? }
+    target = an itemId → the item's pixels become a NEW image item in its place (returned itemId); the source is hidden unless keepSource:true. One undo step.
+    target = 'scene' → the rendered frame is processed and returned as a PNG (data); the scene does not change. asItem:true adds it as an image item instead.
+
+GRAPH: { nodes: [{ id, type, params? }], edges: [{ from, to }] } — a LINEAR chain from SourceInput to OutputCompositor. A NormalGen feeds a Relighting node; a DepthMap feeds DepthOfField.
+
+The graph runs on the CPU. Stored graphs live for the session, not in the project. A studio without the shader graph refuses with the reason.
+
+EXAMPLE: { action: 'apply', target: 'item_4', graph: { nodes: [{ id: 'in', type: 'SourceInput' }, { id: 'bloom', type: 'SelectiveBloom', params: { threshold: 0.6, intensity: 2 } }, { id: 'out', type: 'OutputCompositor' }], edges: [{ from: 'in', to: 'bloom' }, { from: 'bloom', to: 'out' }] } }`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['node_types', 'validate', 'create', 'get', 'list', 'remove', 'apply'], description: 'Shader graph operation' },
+        graph: { type: 'object', description: 'validate / create / apply: {id?, nodes: [{id, type, params?}], edges: [{from, to}]}', additionalProperties: true },
+        graphId: { type: 'string', description: 'get / remove / apply: a stored graph id' },
+        target: { type: 'string', description: "apply: an itemId, or 'scene'" },
+        keepSource: { type: 'boolean', description: 'apply to an item: keep the source visible' },
+        asItem: { type: 'boolean', description: "apply to 'scene': add the result as an image item" },
+      },
+      required: ['action'],
     },
   },
 

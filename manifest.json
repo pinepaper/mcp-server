@@ -633,6 +633,14 @@
       "description": "One composition drawn in a built-in style (cut, ink, watercolor, dither, flow, ascii) as one item that redraws every exported frame. {style, duration, id, spec}"
     },
     {
+      "name": "pinepaper_relight",
+      "description": "Light the 3D world with point/directional lights (post pass; PNG/PDF/MP4/WebM, ~0.4 s per 1080p frame; not saved). action: set|get|clear|list_lights."
+    },
+    {
+      "name": "pinepaper_shader_graph",
+      "description": "Pixel graphs (normals, relight, depth of field, bloom) over an item or 'scene'. action: node_types|validate|create|get|list|remove|apply."
+    },
+    {
       "name": "pinepaper_place_on_surface",
       "description": "Put a UI onto a screen in a photo (corner-pinned, hand stays in front), baked into the photo. {photoId, sourceId, quad?, slot?}"
     },

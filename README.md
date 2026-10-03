@@ -30,7 +30,7 @@
 
 PinePaper MCP Server enables AI assistants to create and animate graphics in [PinePaper Studio](https://pinepaper.studio) via the Model Context Protocol (MCP). Works with any AI that supports MCP tool calling (Claude, GPT, Gemini, local models, etc.).
 
-The server exposes **162 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
+The server exposes **164 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
 
 - Create geometric shapes, text collages, diagrams, and data charts
 - Apply 37+ character-level text effects and 28+ vertex deformation presets
@@ -41,7 +41,7 @@ The server exposes **162 tools** across drawing, animation, diagrams, maps, typo
 
 ## Running it: local or hosted
 
-**Local is free and complete.** Every one of the 162 tools works when you run
+**Local is free and complete.** Every one of the 164 tools works when you run
 this server yourself. There is no reduced tier and nothing held back.
 
 What it needs:
@@ -285,6 +285,15 @@ running it (deferred, or `--mode code`), the code travels in
 
 Every result carries `_meta["pinepaper.studio/timing"]`: the whole call, and
 the studio's share of it, for tracing slow requests.
+
+### New: light the 3D world, brush strokes, shader graphs
+
+`pinepaper_relight` lights the 3D world layer with up to eight point and
+directional lights. The lighting shows in the preview and in PNG, PDF, MP4
+and WebM exports, and the reply says how much time it adds to an export.
+`pinepaper_shader_graph` runs node graphs (relighting, depth of field, bloom)
+over an item or the whole scene. `pinepaper_design_medium` gains
+`sdf_stroke`, a smooth pressure-sensitive brush stroke from a list of points.
 
 ### Changed: asset search uses Iconify and Font Awesome
 
@@ -1414,7 +1423,7 @@ Fourteen new tools (121 → 135) and new actions across the surface — the rele
 
 ## Toolkits & Token Budget
 
-162 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
+164 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
 
 **Toolkit profiles** (`PINEPAPER_TOOLKIT`):
 
@@ -1617,7 +1626,7 @@ Generate instruction/code pairs for LLM fine-tuning:
 
 ## Tools Reference
 
-All 162 tools, grouped by the tag used for toolkit filtering.
+All 164 tools, grouped by the tag used for toolkit filtering.
 
 ### Canvas (`canvas`)
 | Tool | Description |
@@ -1725,6 +1734,8 @@ All 162 tools, grouped by the tag used for toolkit filtering.
 | `pinepaper_apply_effect` | Apply sparkle, blast, and other effects |
 | `pinepaper_text_effect` | 37 character-level text animations; replaces the text with one keyframed item per character |
 | `pinepaper_add_filter` | Add an image filter |
+| `pinepaper_relight` | Light the 3D world with point and directional lights |
+| `pinepaper_shader_graph` | Pixel graphs (relight, depth of field, bloom) over an item or the scene |
 
 ### Editing (`selection`, `transform`, `history`)
 | Tool | Description |

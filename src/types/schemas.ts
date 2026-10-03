@@ -4556,7 +4556,7 @@ export type TextStyleInput = z.infer<typeof TextStyleInputSchema>;
  * `list_media` before promising a medium in prose.
  */
 export const DesignMediumInputSchema = z.object({
-  action: z.enum(['list_media', 'resolve', 'list_stitches', 'apply_thread', 'apply_hatch', 'list_flow_fields', 'list_hatch_options', 'apply'])
+  action: z.enum(['list_media', 'resolve', 'list_stitches', 'apply_thread', 'apply_hatch', 'list_flow_fields', 'list_hatch_options', 'apply', 'sdf_stroke'])
     .describe("'apply' (render an item in ANY medium the engine can make: medium + options — watercolor, oil, cutPaper, thread, hatch) · 'list_media' (every medium with fidelity + limitation) · 'resolve' (can this medium be made here, and how honestly) · 'list_stitches' · 'apply_thread' (render an item in thread) · 'apply_hatch' (rule an item with hatching — value through line density) · 'list_flow_fields' · 'list_hatch_options'"),
   medium: z.string().optional().describe(`resolve / apply: medium key — ${DESIGN_MEDIA.join(', ')}. apply works for ${Object.keys(DESIGN_MEDIA_APPLY).join(', ')}; a medium the studio cannot apply is refused by the engine with the reason. ink and charcoal, where the studio applies them, restyle the item IN PLACE (same id).`),
   options: z.record(z.string(), z.unknown()).optional().describe('apply: the medium\'s own options. watercolor: color, brush, water 0..1, opacity, edge 0..1 (the dark rim), angle, bleed, seed, keepSource. oil: color, brush, length, density, toneRange, relief, angle, seed, keepSource. cutPaper: color, facet, jitter, shadow, shadowColor, shadowOpacity, shadowOffset [dx, dy], seed, keepSource. thread / hatch: as apply_thread / apply_hatch.'),
@@ -4575,9 +4575,9 @@ export const DesignMediumInputSchema = z.object({
   stitchLen: z.number().positive().optional().describe('apply_thread: nominal stitch length px (default 18).'),
   rowGap: z.number().positive().optional().describe('apply_thread: row spacing px. Defaults from the thread width so the rows abut; setting it wider is what makes a fill read as hatching.'),
   variance: z.number().min(0).max(1).optional().describe('apply_thread: length jitter 0..1 (default 0.35) — the variance IS the long-and-short shading.'),
-  width: z.number().positive().optional().describe('apply_thread: thread width px (default 2).'),
+  width: z.number().positive().optional().describe('apply_thread: thread width px (default 2). sdf_stroke: stroke width px (default 8).'),
   sheen: z.boolean().optional().describe('apply_thread: draw the highlight along each stitch (default true) — thread is not matte.'),
-  color: z.string().optional().describe("apply_thread: thread colour, defaulting to the item's own fill."),
+  color: z.string().optional().describe("apply_thread: thread colour, defaulting to the item's own fill. sdf_stroke: stroke colour."),
   seed: z.number().int().optional().describe('apply_thread: PRNG seed (default 1). Same seed stitches the same way.'),
   count: z.number().int().positive().optional().describe('apply_thread: stitch count for seed/satin.'),
   // THE OPTIONS THE ENGINE READS AND NOTHING NAMED. ThreadPainting.paint reads
@@ -4611,15 +4611,86 @@ export const DesignMediumInputSchema = z.object({
   flowField: z.enum(['hand', 'curved', 'zigzag', 'waves', 'seabed', 'spiral', 'columns']).optional()
     .describe('apply_hatch: bend each line along a flow field. The straight scanline is the ruling; the field is what makes it read as drawn rather than printed. See list_flow_fields.'),
   t: z.number().optional().describe('apply_hatch: flow-field time offset — advances the field without changing the seed.'),
+
+  // --- SDF brush stroke (FxTool D5) ---
+  points: z.array(z.union([
+    z.object({ x: z.number(), y: z.number(), pressure: z.number().min(0).max(1).optional() }),
+    z.tuple([z.number(), z.number()]),
+    z.tuple([z.number(), z.number(), z.number()]),
+  ])).min(1).optional().describe('sdf_stroke: the stroke path in canvas px, each {x, y, pressure?} or [x, y, pressure?]. Pressure 0..1 scales the width at that point.'),
+  softness: z.number().min(0).max(1).optional().describe('sdf_stroke: edge softness 0..1 (default 0.2).'),
+  opacity: z.number().min(0).max(1).optional().describe('sdf_stroke: 0..1 (default 1).'),
+  resolution: z.number().positive().optional().describe('sdf_stroke: bitmap pixels per canvas px (default 2).'),
+  name: z.string().optional().describe('sdf_stroke: item name.'),
 })
   .refine((v) => v.action !== 'apply_thread' || !!v.itemId, { message: 'apply_thread requires itemId', path: ['itemId'] })
   .refine((v) => v.action !== 'resolve' || !!v.medium, { message: 'resolve requires medium', path: ['medium'] })
+  .refine((v) => v.action !== 'sdf_stroke' || (Array.isArray(v.points) && v.points.length > 0), { message: 'sdf_stroke requires points', path: ['points'] })
   .refine((v) => v.action !== 'apply_hatch' || !!v.itemId, { message: 'apply_hatch requires itemId', path: ['itemId'] })
   .refine((v) => v.action !== 'apply' || (!!v.itemId && !!v.medium), { message: 'apply requires itemId and medium', path: ['medium'] })
-  .refine((v) => v.action !== 'apply' || (!!v.itemId && !!v.medium), { message: 'apply needs itemId and medium', path: ['medium'] })
   .refine((v) => v.action !== 'apply' || !v.medium || (DESIGN_MEDIA as readonly string[]).includes(v.medium),
     { message: `unknown medium; the engine knows ${DESIGN_MEDIA.join(', ')}`, path: ['medium'] });
 export type DesignMediumInput = z.infer<typeof DesignMediumInputSchema>;
+
+/**
+ * pinepaper_relight — a lighting pass over the 3D world layer (FxTool D5).
+ * CPU-backed; normals from the world's luminance (no depth). Applied in the
+ * preview and in PNG / PDF / MP4 / WebM; not GIF / APNG; not saved with the
+ * project. Lights are validated by the engine, which names every error.
+ */
+const RelightColorSchema = z.union([z.string(), z.tuple([z.number(), z.number(), z.number()])]);
+export const RelightInputSchema = z.object({
+  action: z.enum(['set', 'get', 'clear', 'list_lights'])
+    .describe("'set' (install or replace the rig) · 'get' (the current rig) · 'clear' (remove it) · 'list_lights' (the light types)"),
+  lights: z.array(z.discriminatedUnion('type', [
+    z.object({
+      type: z.literal('point'),
+      x: z.number(), y: z.number(),
+      z: z.number().optional().describe('Height above the picture, px (default 120).'),
+      radius: z.number().positive().optional().describe('Falloff radius, px (default 400).'),
+      color: RelightColorSchema.optional(),
+      intensity: z.number().min(0).optional().describe('Default 1.'),
+      specular: z.number().min(0).optional().describe('Shininess exponent (default 32).'),
+    }),
+    z.object({
+      type: z.literal('directional'),
+      dir: z.tuple([z.number(), z.number(), z.number()]).describe('[dx, dy, dz]; [0, 0, -1] faces the viewer.'),
+      color: RelightColorSchema.optional(),
+      intensity: z.number().min(0).optional(),
+    }),
+  ])).max(8).optional().describe('set: up to 8 lights. Coordinates are export-frame px. Colours are #rrggbb or [r, g, b].'),
+  ambient: z.number().min(0).optional().describe('set: ambient light (default 0.2).'),
+  strength: z.number().positive().optional().describe('set: normal-map strength (default 2).'),
+  enabled: z.boolean().optional().describe('set: false keeps the rig but turns it off.'),
+  preview: z.union([z.boolean(), z.object({ maxSide: z.number().min(64).max(4096) })]).optional()
+    .describe('set: show it in the live preview (capped-resolution overlay); {maxSide} sets the cap.'),
+}).refine((v) => v.action !== 'set' || (Array.isArray(v.lights) && v.lights.length > 0) || v.enabled === false,
+  { message: 'set requires at least one light (or enabled: false)', path: ['lights'] });
+export type RelightInput = z.infer<typeof RelightInputSchema>;
+
+/**
+ * pinepaper_shader_graph — validated JSON pixel graphs (FxTool D5), CPU-backed.
+ * Linear chains only; the engine names every error (unknown type, duplicate,
+ * dangling edge, cycle, branching).
+ */
+const ShaderGraphJsonSchema = z.object({
+  id: z.string().optional(),
+  nodes: z.array(z.object({ id: z.string(), type: z.string(), params: z.record(z.string(), z.unknown()).optional() })).min(1),
+  edges: z.array(z.object({ from: z.string(), to: z.string() })).optional(),
+});
+export const ShaderGraphInputSchema = z.object({
+  action: z.enum(['node_types', 'validate', 'create', 'get', 'list', 'remove', 'apply'])
+    .describe("'node_types' (the node vocabulary + params) · 'validate' (check a graph, store nothing) · 'create' (validate + store) · 'get' / 'remove' (by graphId) · 'list' · 'apply' (run a graph over an item or the scene)"),
+  graph: ShaderGraphJsonSchema.optional().describe('validate / create / apply: {id?, nodes: [{id, type, params?}], edges: [{from, to}]} — a linear chain.'),
+  graphId: z.string().optional().describe('get / remove / apply: a stored graph id.'),
+  target: z.string().optional().describe("apply: an itemId, or 'scene'."),
+  keepSource: z.boolean().optional().describe('apply to an item: keep the source visible (default: hidden).'),
+  asItem: z.boolean().optional().describe("apply to 'scene': add the result as an image item instead of returning it."),
+})
+  .refine((v) => !['validate', 'create'].includes(v.action) || !!v.graph, { message: 'validate / create require graph', path: ['graph'] })
+  .refine((v) => !['get', 'remove'].includes(v.action) || !!v.graphId, { message: 'get / remove require graphId', path: ['graphId'] })
+  .refine((v) => v.action !== 'apply' || (!!v.target && (!!v.graph || !!v.graphId)), { message: "apply requires target (an itemId or 'scene') and graph or graphId", path: ['target'] });
+export type ShaderGraphInput = z.infer<typeof ShaderGraphInputSchema>;
 
 export const TextEffectInputSchema = z.object({
   action: z.enum(['apply', 'list'])

@@ -193,7 +193,7 @@ import {
   AccessibilityCheckInput,
   InstantiateOntologyInput,
   LintSceneInput,
-  MediaInput, TextStyleInput, TextEffectInput, DesignMediumInput, ShatterImageInput, ImportLayeredCharacterInput, GameInput, World3DInput,
+  MediaInput, TextStyleInput, TextEffectInput, DesignMediumInput, RelightInput, ShaderGraphInput, ShatterImageInput, ImportLayeredCharacterInput, GameInput, World3DInput,
   CropImageInput,
   PathOpInput,
   MotionInput,
@@ -6100,6 +6100,21 @@ ${(() => {
   })()}
 ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) { /* the still is already rendered */ }
   if (result && result.success) result.time = ${stillTime};` : ''}
+  // RELIGHT (FxTool D5): applied to png / pdf / mp4 / webm, not gif / apng
+  // or the vector formats; and it is what makes a video export slow.
+  if (result && result.success && typeof app.getRelight === 'function') {
+    try {
+      const __rl = app.getRelight();
+      if (__rl && __rl.enabled) {
+        result.fidelity = result.fidelity || { warnings: [] };
+        if (['png', 'jpg', 'webp', 'pdf', 'mp4', 'webm'].indexOf(${JSON.stringify(format)}) === -1) {
+          result.fidelity.warnings = (result.fidelity.warnings || []).concat([{ code: 'relight_not_applied', message: 'a relight rig is set, but ${format} is not relit. Export png, pdf, mp4 or webm to keep the lighting.' }]);
+        } else {
+          result.relight = { applied: true, lights: (__rl.lights || []).length };
+        }
+      }
+    } catch (_) { /* the export stands */ }
+  }
 
   return result;
 })();
@@ -11736,6 +11751,108 @@ ${guard}
    * caller now has, since the source item is gone.
    */
   /**
+   * pinepaper_relight — FxTool D5's relight post pass over the 3D world layer.
+   * The rig is not saved with the project, GIF / APNG are not relit, and it
+   * costs ~0.42 s per 1080p frame on the CPU, so a set says what an export
+   * will pay.
+   */
+  generateRelight(input: RelightInput): string {
+    const S = (v: unknown) => JSON.stringify(v);
+    const missing = (fn: string) => `if (typeof app.${fn} !== 'function') { return { success: false, action: ${S(input.action)}, error: 'this studio has no relight pass (app.${fn}) — it predates FxTool D5.' }; }`;
+    switch (input.action) {
+      case 'set': {
+        const spec = S({
+          ...(input.lights !== undefined ? { lights: input.lights } : {}),
+          ...(input.ambient !== undefined ? { ambient: input.ambient } : {}),
+          ...(input.strength !== undefined ? { strength: input.strength } : {}),
+          ...(input.enabled !== undefined ? { enabled: input.enabled } : {}),
+          ...(input.preview !== undefined ? { preview: input.preview } : {}),
+        });
+        return `
+// Relight: set the rig
+(function() {
+  ${missing('setRelight')}
+  const r = app.setRelight(${spec});
+  if (!r || r.ok === false) { return { success: false, action: 'set', error: (r && ((r.errors && r.errors.join('; ')) || r.reason)) || 'the relight rig was refused' }; }
+  // What an export will pay: ~418 ms per 1920x1080 frame, scaled by pixels.
+  const __f = (typeof app.exportFrameRect === 'function' && app.exportFrameRect()) || (app.getCanvasSize && app.getCanvasSize()) || { width: 1920, height: 1080 };
+  const __ms = Math.round(418 * (__f.width * __f.height) / (1920 * 1080));
+  const res = { success: true, action: 'set', active: r.active, relight: r.relight,
+    cost: { msPerFrame: __ms, frame: { width: __f.width, height: __f.height },
+      tenSecondsAt30fps: Math.round(__ms * 300 / 1000) + ' s extra' },
+    note: 'applied in the preview and in PNG, PDF, MP4 and WebM exports; GIF and APNG are not relit. The rig is NOT saved with the project — set it again after a reload.' };
+  if (r.reason) res.reason = r.reason;
+  if (r.active === false) res.warning = 'the rig is set but not active' + (r.reason ? ': ' + r.reason : '') + ' — relight needs a 3D world (pinepaper_world3d create).';
+  return res;
+})();`.trim();
+      }
+      case 'get':
+        return `
+// Relight: the current rig
+(function() {
+  ${missing('getRelight')}
+  return Object.assign({ success: true, action: 'get' }, app.getRelight());
+})();`.trim();
+      case 'clear':
+        return `
+// Relight: remove the rig
+(function() {
+  ${missing('clearRelight')}
+  const r = app.clearRelight();
+  return { success: true, action: 'clear', cleared: !!(r && r.cleared) };
+})();`.trim();
+      case 'list_lights':
+        return `
+// Relight: light types
+(function() {
+  ${missing('listRelightLights')}
+  return { success: true, action: 'list_lights', lights: app.listRelightLights() };
+})();`.trim();
+    }
+  }
+
+  /**
+   * pinepaper_shader_graph — FxTool D5's JSON pixel graphs. Applying to an
+   * item makes a NEW image item and hides the source (one undo step);
+   * applying to 'scene' returns the processed frame and changes nothing.
+   */
+  generateShaderGraph(input: ShaderGraphInput): string {
+    const S = (v: unknown) => JSON.stringify(v);
+    const ref = input.graph ?? input.graphId;
+    const head = `  if (!app.shaderGraph || typeof app.shaderGraph.create !== 'function') { return { success: false, action: ${S(input.action)}, error: 'this studio has no shader graph (app.shaderGraph) — it predates FxTool D5.' }; }`;
+    const fail = `(r && ((r.errors && r.errors.join('; ')) || r.reason)) || 'the shader graph call failed'`;
+    const body = (() => {
+      switch (input.action) {
+        case 'node_types': return `  return { success: true, action: 'node_types', nodeTypes: app.shaderGraph.nodeTypes() };`;
+        case 'list': return `  const r = app.shaderGraph.list();\n  return { success: true, action: 'list', graphs: (r && r.graphs) || [] };`;
+        case 'validate': return `  const r = app.shaderGraph.validate(${S(input.graph)});\n  if (!r || !r.ok) return { success: false, action: 'validate', errors: (r && r.errors) || [], error: ${fail} };\n  return { success: true, action: 'validate', order: r.order };`;
+        case 'create': return `  const r = app.shaderGraph.create(${S(input.graph)});\n  if (!r || !r.ok) return { success: false, action: 'create', errors: (r && r.errors) || [], error: ${fail} };\n  return { success: true, action: 'create', graphId: r.id, order: r.order, nodes: r.nodes, replaced: r.replaced };`;
+        case 'get': return `  const r = app.shaderGraph.get(${S(input.graphId)});\n  if (!r || !r.ok) return { success: false, action: 'get', error: ${fail} };\n  return { success: true, action: 'get', graph: r.graph };`;
+        case 'remove': return `  const r = app.shaderGraph.remove(${S(input.graphId)});\n  if (!r || !r.ok) return { success: false, action: 'remove', error: ${fail} };\n  return { success: true, action: 'remove', removed: r.removed };`;
+        case 'apply': {
+          const opts = S({ ...(input.keepSource !== undefined ? { keepSource: input.keepSource } : {}), ...(input.asItem !== undefined ? { asItem: input.asItem } : {}) });
+          return `  if (typeof app.applyShaderGraph !== 'function') { return { success: false, action: 'apply', error: 'this studio has no app.applyShaderGraph — it predates FxTool D5.' }; }
+  const r = await app.applyShaderGraph(${S(input.target)}, ${S(ref)}, ${opts});
+  if (!r || !r.ok) return { success: false, action: 'apply', errors: (r && r.errors) || undefined, error: ${fail} };
+  if (r.target === 'item') {
+    if (!r.id) return { success: false, action: 'apply', error: 'the graph ran but made no item' };
+    return { success: true, action: 'apply', target: 'item', itemId: r.id, sourceId: r.sourceId, sourceHidden: r.sourceHidden, graphId: r.graphId, width: r.width, height: r.height };
+  }
+  const res = { success: true, action: 'apply', target: 'scene', graphId: r.graphId, width: r.width, height: r.height };
+  if (r.id) { res.itemId = r.id; } else { res.data = r.dataURL; res.mimeType = 'image/png'; res.note = 'the processed frame; the scene is unchanged. asItem: true adds it as an image item instead.'; }
+  return res;`;
+        }
+      }
+    })();
+    return `
+// Shader graph: ${input.action}
+(async function() {
+${head}
+${body}
+})();`.trim();
+  }
+
+  /**
    * The medium axis. `list_media` and `resolve` are READS — they exist so an
    * agent can find out what this build can honestly make before it promises a
    * medium in prose, which is the failure the axis was built to prevent.
@@ -11777,6 +11894,24 @@ ${guard}
   }
   return { success: true, action: 'apply', medium: r.medium || ${S(input.medium)}, fidelity: r.fidelity, itemId: r.id, ...(r.note ? { note: r.note } : {}) };
 })();`.trim();
+      case 'sdf_stroke': {
+        // FxTool D5: an SDF capsule stroke rendered to a bitmap and created as a
+        // registered, undoable image item. CPU-backed.
+        const opts = S({
+          ...(input.width !== undefined ? { width: input.width } : {}),
+          ...(input.softness !== undefined ? { softness: input.softness } : {}),
+          ...(input.color !== undefined ? { color: input.color } : {}),
+          ...(input.opacity !== undefined ? { opacity: input.opacity } : {}),
+          ...(input.resolution !== undefined ? { resolution: input.resolution } : {}),
+          ...(input.name !== undefined ? { name: input.name } : {}),
+        });
+        return wrap('Medium: SDF brush stroke',
+          `  if (typeof app.sdfBrushStroke !== 'function') { return { success: false, action: 'sdf_stroke', error: 'this studio has no SDF brush (app.sdfBrushStroke) — it predates FxTool D5.' }; }
+  const r = app.sdfBrushStroke(${S(input.points)}, ${opts});
+  if (!r || r.ok === false) { return { success: false, action: 'sdf_stroke', error: (r && ((r.errors && r.errors.join('; ')) || r.reason)) || 'the stroke was not drawn' }; }
+  if (!r.id) { return { success: false, action: 'sdf_stroke', error: 'the stroke was drawn but returned no item id' }; }
+  return { success: true, action: 'sdf_stroke', itemId: r.id, bounds: r.bounds, pixelSize: r.pixelSize, backend: r.backend };`);
+      }
       case 'list_media':
         return wrap('Medium: list',
           `  if (typeof app.listDesignMedia !== 'function') { return { success: false, error: 'medium axis unavailable — update FxTool' }; }

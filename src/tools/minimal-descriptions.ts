@@ -87,7 +87,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_chroma_key: "One-shot green-screen background removal on an image item (keeps the registry id). Omit threshold/smoothing to auto-estimate. {itemId, color?, threshold?, smoothing?}",
   pinepaper_character: "Place a character from the graph and direct it. {concept, at, height, beats:[{at, channel, until?, value?}]}. The concept declares its channels — blink, say, headTurn, bob.",
   pinepaper_rigging: "Skeletal rigging + animation. action: create_skeleton, add_bone, attach_item, create_ik_chain, save/load/list/interpolate poses, play + stitch_poses, auto_walk|idle|jump, move_root, bake_animation, …",
-  pinepaper_design_medium: "What makes the marks. action: list_media|resolve (refuses what it cannot honestly render)|list_stitches|apply_thread|apply_hatch (value via line density)|list_flow_fields|list_hatch_options|apply.",
+  pinepaper_design_medium: "What makes the marks. action: list_media|resolve (refuses what it cannot render)|list_stitches|apply_thread|apply_hatch|list_flow_fields|list_hatch_options|apply|sdf_stroke (brush stroke).",
 
   // --- Relations ---
   pinepaper_add_relation: `Add relation. sourceId, targetId, type: ${RELATION_TYPES}. params: {speed, ...}.`,
@@ -169,6 +169,8 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_export_svg: 'Export canvas as animated SVG.',
   pinepaper_export_training_data: 'Export instruction/code pairs for LLM training.',
   pinepaper_export_scene: 'Scene summary for inspection; full: true saves a restorable project document to a file. {full?, name?}',
+  pinepaper_relight: 'Light the 3D world with point/directional lights (post pass; PNG/PDF/MP4/WebM, ~0.4 s per 1080p frame; not saved). action: set|get|clear|list_lights.',
+  pinepaper_shader_graph: "Pixel graphs (normals, relight, depth of field, bloom) over an item or 'scene'. action: node_types|validate|create|get|list|remove|apply.",
   pinepaper_styled_scene: `One composition in a built-in style (${STYLED_SCENE_STYLES.join('|')}) as one item; export for its returned duration. {style, duration, id, spec}`,
   pinepaper_place_on_surface: 'Put a UI onto a screen in a photo (corner-pinned, hand stays in front), baked into the photo. {photoId, sourceId, quad?, slot?}',
   pinepaper_import_scene: 'Restore a scene from a full export file (replaces the scene); returns counts to compare. {path, strict?}',
