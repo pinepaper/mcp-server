@@ -4767,7 +4767,7 @@ export const World3DInputSchema = z.object({
   materialId: z.string().optional().describe('set_material / remove_material: the material id.'),
 
   // --- Import ---------------------------------------------------------------
-  source: z.string().optional().describe('import_obj: the OBJ file TEXT. import_gltf: a URL, or a data: URI of the .glb bytes.'),
+  source: z.string().optional().describe('import_obj: the OBJ file TEXT. import_gltf: the .gltf JSON TEXT with its buffers embedded. A URL, data: URI or file path is NOT fetched (the string is parsed as JSON), so a .glb cannot be imported here.'),
   importOptions: z.record(z.string(), z.unknown()).optional().describe('import_obj / import_gltf: placement and scale options, passed through to the engine.'),
   clip: z.string().optional().describe('set_mesh_clip: which imported animation clip a skinned mesh plays.'),
   crossfade: z.number().optional().describe('set_mesh_clip: seconds to blend out of the clip that was playing. The blend happens in LOCAL pose space — a palette cannot be blended after the fact.'),
@@ -4957,7 +4957,7 @@ export const InterchangeInputSchema = z.object({
     .describe("'export_lottie' (JSON) · 'export_dotlottie' (the zipped .lottie) · 'import_lottie' (a Lottie or .lottie back onto the canvas) · 'export_glb' (the perspective 3D objects — needs some to exist) · 'export_bvh' (a skeleton's motion — needs a rig) · 'export_png_sequence' (one file per frame)."),
   options: z.record(z.string(), z.unknown()).optional().describe('Format options, passed through to the exporter: frame range, dimensions, fps, naming.'),
   data: z.union([z.string(), z.record(z.string(), z.unknown())]).optional()
-    .describe('import_lottie: the Lottie JSON — an object, a JSON string, or a URL.'),
+    .describe('import_lottie: the Lottie JSON — an object or a JSON string. A URL or a file path is NOT fetched: read the file and pass its contents.'),
   skeletonId: z.string().optional().describe('export_bvh: which skeleton to write. A BVH is one skeleton\'s motion, so this is not optional in practice.'),
 })
   .refine((v) => v.action !== 'import_lottie' || v.data !== undefined, { message: 'import_lottie requires data', path: ['data'] })

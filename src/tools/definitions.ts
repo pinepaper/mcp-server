@@ -2882,7 +2882,7 @@ IMPORT:
       properties: {
         action: { type: 'string', enum: ['export_lottie', 'export_dotlottie', 'import_lottie', 'export_glb', 'export_bvh', 'export_png_sequence'], description: 'Which interchange operation.' },
         options: { type: 'object', description: "Format options passed through to the exporter. export_png_sequence: { duration (seconds), fps, width, height, transparent (keep alpha; default false fills the background) } — PASS duration and fps: the studio does not size the sequence to the scene, and without them it writes its own default length, which does not follow the scene (runs have measured 45 and 90 frames). The result's defaultsUsed says when that happened." },
-        data: { anyOf: [{ type: 'string' }, { type: 'object' }], description: 'import_lottie: the Lottie JSON — object, JSON string, or URL.' },
+        data: { anyOf: [{ type: 'string' }, { type: 'object' }], description: 'import_lottie: the Lottie JSON — object or JSON string (a URL or path is not fetched).' },
         skeletonId: { type: 'string', description: "export_bvh: which skeleton to write. A BVH is one skeleton's motion." },
       },
       required: ['action'],
@@ -3144,7 +3144,7 @@ RECIPE — a character walking through a forest: create {spec:'forest'} → impo
         lightId: { type: 'string', description: 'set_light / remove_light: the light id.' },
         material: { type: 'object', description: 'add_material / set_material: colours (color, emissive, sheenColor) take hex or [r, g, b] in 0..1. { id?, color?, emissive?, metalness?, roughness?, emissiveIntensity?, clearcoat?, clearcoatRoughness?, sheenColor?, sheenRoughness? }. A shared surface — one edit restyles every object using it. metalness/roughness render on the mesh path only.' },
         materialId: { type: 'string', description: 'set_material / remove_material: the material id.' },
-        source: { type: 'string', description: 'import_obj: the OBJ file TEXT. import_gltf: a URL or a data: URI of the .glb bytes.' },
+        source: { type: 'string', description: 'import_obj: the OBJ file TEXT. import_gltf: the .gltf JSON TEXT, buffers embedded (a URL, data: URI or path is not fetched; .glb is not supported here).' },
         importOptions: { type: 'object', description: 'import_obj / import_gltf: placement and scale options, passed through.' },
         clip: { type: 'string', description: 'set_mesh_clip: which imported animation clip a skinned mesh plays.' },
         crossfade: { type: 'number', description: 'set_mesh_clip: seconds to blend out of the previous clip (blended in LOCAL pose space).' },
