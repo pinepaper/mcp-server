@@ -14,6 +14,7 @@ bounds_to
 camera_animates
 camera_follows
 centered_on
+character_face
 circumscribes
 composed_as
 concentric_with

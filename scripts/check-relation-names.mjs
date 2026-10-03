@@ -46,7 +46,7 @@ const FIXTURE_ONLY = new Set([
   // TEMPORARY: registered lazily by the character system (FxTool #105, D66) and
   // missing from relation-names.json until fxtool's export captures lazy
   // registrations. Remove when it does — the guard then checks them normally.
-  'looks_at', 'reacts_to', 'drag_to_turn',
+  'looks_at', 'reacts_to', 'drag_to_turn', 'character_face',
 ]);
 
 let raw;
