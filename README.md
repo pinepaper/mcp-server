@@ -246,6 +246,14 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - Puppeteer mode launches Chrome with `--no-sandbox` and `--disable-setuid-sandbox`. That is routine for headless automation and it does weaken Chrome's own process sandbox. If that matters where you are running it, use `code` mode or put the server in a container.
 - Puppeteer itself is an **optional** peer dependency, kept out of the default tree precisely because a headless browser plus an install script is what scanners flag hardest. Install it only if you want the executing mode.
 
+## What's new in 1.6.21
+
+### Fixed
+
+- `shader` and `field` items from `pinepaper_create_item` draw in the studio
+  and in every export, not only in a cloud render. The note and export
+  warning that said a local export shows a flat plate are gone.
+
 ## What's new in 1.6.20
 
 ### New: make anything act
@@ -321,9 +329,6 @@ background generator with simple shapes.
   and the one it meant.
 - `pinepaper_image_filter` documents the watercolour and painterly filters
   for photos, and reports a refused filter as a failure.
-- `shader` and `field` items from `pinepaper_create_item` draw in the studio
-  and in every export, not only in a cloud render. The note and export
-  warning that said a local export shows a flat plate are gone.
 
 ## What's new in 1.6.19
 
