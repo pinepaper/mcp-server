@@ -56,3 +56,15 @@ describe('update_connector passes the style bag itself (gate run 2)', () => {
     expect(code).not.toMatch(/updates = \{ style:/);
   });
 });
+
+describe('connector style keys (gate run 3)', () => {
+  it('Paper names map to the connector\'s own; an unknown key is refused by name', async () => {
+    const { UpdateConnectorInputSchema, ConnectInputSchema } = await import('../../types/schemas.js');
+    expect(UpdateConnectorInputSchema.parse({ connectorId: 'c', style: { strokeColor: '#f00', strokeWidth: 5, dashArray: [4, 2] } }).style)
+      .toEqual({ lineColor: '#f00', lineWidth: 5, lineStyle: 'dashed' });
+    const bad = UpdateConnectorInputSchema.safeParse({ connectorId: 'c', style: { opacity: 0.5 } });
+    expect(bad.success).toBe(false);
+    expect(JSON.stringify(bad.error)).toContain('lineColor');
+    expect(ConnectInputSchema.parse({ sourceItemId: 'a', targetItemId: 'b', strokeColor: '#0f0' }).lineColor).toBe('#0f0');
+  });
+});

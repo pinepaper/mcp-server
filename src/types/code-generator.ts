@@ -213,6 +213,8 @@ import {
   EASING_DESCRIPTIONS,
   MaskTypeSchema,
   MaskPresetSchema,
+  StyledSceneInputSchema,
+  StyledSceneInput,
 } from './schemas.js';
 import { OntologyCompiler } from '../ontology/ontology-compiler.js';
 import { z } from 'zod';
@@ -10519,6 +10521,31 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
    * Extract the best-matching detected region from an image as a NEW item (FxTool
    * ImageWorkflow.extractObject). Async (runs detection first).
    */
+  /**
+   * pinepaper_styled_scene (FxTool K2). app.styledScene answers {ok:false,
+   * error} rather than rejecting, so the verdict is read, not assumed. The
+   * result carries the duration to export for: the scene item lives that long,
+   * and an export left at its own default would cut it short or pad it.
+   */
+  generateStyledScene(input: StyledSceneInput): string {
+    const opts = {
+      ...(input.style !== undefined ? { style: input.style } : {}),
+      ...(input.duration !== undefined ? { duration: input.duration } : {}),
+      ...(input.id !== undefined ? { id: input.id } : {}),
+    };
+    return `
+// Styled scene${input.style ? ` (${input.style.replace(/[\r\n]/g, ' ')})` : ''}
+(async function() {
+  if (typeof app.styledScene !== 'function') { return { success: false, error: 'app.styledScene unavailable — update FxTool' }; }
+  const r = await app.styledScene(${JSON.stringify(input.spec ?? {})}, ${JSON.stringify(opts)});
+  if (!r || r.ok === false) { return { success: false, error: (r && r.error) || 'the styled scene was refused' }; }
+  const notes = ['export for ' + r.duration + ' s (agent_export duration: ' + r.duration + '): the scene runs that long'];
+  if (r.style === 'dither' || r.style === 'ascii') notes.push(r.style + ' needs a Chrome renderer (WebKit ignores the canvas filter it uses)');
+  notes.push('the scene redraws every exported frame; after a page reload it is a still until styled_scene is called again');
+  return { success: true, itemId: r.id, style: r.style, width: r.width, height: r.height, duration: r.duration, firstFrameMs: r.firstFrameMs, notes: notes };
+})();`.trim();
+  }
+
   generateExtractObject(input: ExtractObjectInput): string {
     const args = JSON.stringify({
       ...(input.label !== undefined ? { label: input.label } : {}),

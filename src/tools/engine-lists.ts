@@ -10,6 +10,7 @@
  *   js/core/DesignMedia.js  sha256: 46fae8ceafe54b11
  *   js/FilterSystem.js  sha256: f862237e73c93a34
  *   js/core/Provenance.js  sha256: 27e4d8becfa382c8
+ *   js/core/StyledScene.js  sha256: ea647c014de59faf
  */
 
 /** 37 names: EASING_NAMES, the keys of the engine's easing table. Keyframes, masks, relations and the camera all resolve through it. */
@@ -146,6 +147,26 @@ export const LINEAGE_KINDS = [
   'importedFrom',
   'copyOf',
 ] as const;
+
+/** 6 styles: STYLES, the looks a styled scene is drawn in. */
+export const STYLED_SCENE_STYLES = [
+  'cut',
+  'ink',
+  'watercolor',
+  'dither',
+  'flow',
+  'ascii',
+] as const;
+
+/** One line per styled-scene style: the engine's STYLE_INFO. */
+export const STYLED_SCENE_STYLE_INFO: Readonly<Record<string, string>> = Object.freeze({
+  cut: "paper cut-out with soft drop shadows and paper grain",
+  ink: "ink line and hatching, boiling on twos (12 fps)",
+  watercolor: "translucent watercolour glazes on cold-press paper",
+  dither: "1-bit ordered (Bayer) dither in two inks",
+  flow: "contour streamlines on dark ground, animated along their length",
+  ascii: "ASCII broadcast with scanlines and a timecode",
+});
 
 /** One line per filter: the engine's own description and parameter ranges. */
 export const FILTER_DOCS: Readonly<Record<string, string>> = Object.freeze({

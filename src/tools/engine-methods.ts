@@ -224,6 +224,7 @@ export const REQUIRED_ENGINE_METHODS: readonly string[] = [
   'stopLiveMatte',
   'stopSounds',
   'storyFromText',
+  'styledScene',
   'syncComponent',
   'timbreFromPath',
   'togglePathClosed',

@@ -145,6 +145,7 @@ import {
   PhysicsInputSchema,
   MeasurementInputSchema,
   PlaceOnSurfaceInputSchema,
+  StyledSceneInputSchema,
   ErrorCodes,
   RelationType,
   ItemType,
@@ -2268,6 +2269,11 @@ async function handleToolCallInner(
       }
 
       // ─── 1.6.4: agent surface for the Tier-2 engine features ───
+      case 'pinepaper_styled_scene': {
+        const input = StyledSceneInputSchema.parse(args);
+        return executeOrGenerate(codeGenerator.generateStyledScene(input), `Styled scene${input.style ? `: ${input.style}` : ''}`, options, 'pinepaper_styled_scene');
+      }
+
       case 'pinepaper_place_on_surface': {
         const input = PlaceOnSurfaceInputSchema.parse(args);
         const code = codeGenerator.generatePlaceOnSurface(input);

@@ -30,7 +30,7 @@
 
 PinePaper MCP Server enables AI assistants to create and animate graphics in [PinePaper Studio](https://pinepaper.studio) via the Model Context Protocol (MCP). Works with any AI that supports MCP tool calling (Claude, GPT, Gemini, local models, etc.).
 
-The server exposes **161 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
+The server exposes **162 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
 
 - Create geometric shapes, text collages, diagrams, and data charts
 - Apply 37+ character-level text effects and 28+ vertex deformation presets
@@ -41,7 +41,7 @@ The server exposes **161 tools** across drawing, animation, diagrams, maps, typo
 
 ## Running it: local or hosted
 
-**Local is free and complete.** Every one of the 161 tools works when you run
+**Local is free and complete.** Every one of the 162 tools works when you run
 this server yourself. There is no reduced tier and nothing held back.
 
 What it needs:
@@ -264,6 +264,14 @@ billboard in a photo: fitted to the screen's perspective, with a hand in front
 of the screen kept in front, and a little glare and light spill. It finds the
 screen itself, or takes its four corners. The result becomes part of the photo,
 so zooms and camera moves carry it.
+
+### New: one scene, six styles
+
+`pinepaper_styled_scene` draws a whole animated scene in one call: paper
+cut-out, ink, watercolour, 1-bit dither, flowing contours or ASCII broadcast.
+The composition can be changed (sky, hills, river, camera, colours), and
+calling it again with another style redraws the same scene in the new look.
+Export it for the length the result reports.
 
 ### Changed: for services that run the steps later
 
@@ -1400,7 +1408,7 @@ Fourteen new tools (121 → 135) and new actions across the surface — the rele
 
 ## Toolkits & Token Budget
 
-161 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
+162 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
 
 **Toolkit profiles** (`PINEPAPER_TOOLKIT`):
 
@@ -1605,7 +1613,7 @@ Generate instruction/code pairs for LLM fine-tuning:
 
 ## Tools Reference
 
-All 161 tools, grouped by the tag used for toolkit filtering.
+All 162 tools, grouped by the tag used for toolkit filtering.
 
 ### Canvas (`canvas`)
 | Tool | Description |
@@ -1709,6 +1717,7 @@ All 161 tools, grouped by the tag used for toolkit filtering.
 | `pinepaper_generate` | AI image generation in the PinePaper cloud (charged; beta, per organisation) |
 | `pinepaper_generate_estimate` | Free price check, and the model list |
 | `pinepaper_generate_status` | Collect a generation that outlived its timeout |
+| `pinepaper_styled_scene` | One composition drawn in a built-in style |
 | `pinepaper_apply_effect` | Apply sparkle, blast, and other effects |
 | `pinepaper_text_effect` | 37 character-level text animations; replaces the text with one keyframed item per character |
 | `pinepaper_add_filter` | Add an image filter |

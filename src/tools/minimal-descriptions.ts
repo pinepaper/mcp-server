@@ -12,6 +12,7 @@
 
 import { ItemTypeSchema, RelationTypeSchema } from '../types/schemas.js';
 import { DIAGRAM_SHAPE_MAP } from '../ontology/vocabulary.js';
+import { STYLED_SCENE_STYLES } from './engine-lists.js';
 
 /** Joins a vocabulary list; truncates to `maxShown` with a pointer to the ontology query tool. */
 function shortList(items: readonly string[], maxShown: number): string {
@@ -167,6 +168,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_export_svg: 'Export canvas as animated SVG.',
   pinepaper_export_training_data: 'Export instruction/code pairs for LLM training.',
   pinepaper_export_scene: 'Scene summary for inspection; full: true saves a restorable project document to a file. {full?, name?}',
+  pinepaper_styled_scene: `One composition in a built-in style (${STYLED_SCENE_STYLES.join('|')}) as one item; export for its returned duration. {style, duration, id, spec}`,
   pinepaper_place_on_surface: 'Put a UI onto a screen in a photo (corner-pinned, hand stays in front), baked into the photo. {photoId, sourceId, quad?, slot?}',
   pinepaper_import_scene: 'Restore a scene from a full export file (replaces the scene); returns counts to compare. {path, strict?}',
 

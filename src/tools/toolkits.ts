@@ -131,6 +131,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
     'pinepaper_generate',
     'pinepaper_generate_estimate',
     'pinepaper_generate_status',
+    'pinepaper_styled_scene',
   ],
   effects: [
     'pinepaper_apply_effect',

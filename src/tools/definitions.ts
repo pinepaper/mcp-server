@@ -14,7 +14,7 @@ import { COMPACT_DESCRIPTIONS } from './compact-descriptions.js';
 import { MINIMAL_DESCRIPTIONS } from './minimal-descriptions.js';
 import { STICK_GAITS, STICK_POSES, STICK_SEQUENCES, STICK_EXPRESSIONS, STICK_PROPS } from './stick-vocabulary.js';
 import { GeneratorNameSchema, ItemTypeSchema } from '../types/schemas.js';
-import { DESIGN_MEDIA, DESIGN_MEDIA_APPLY, FILTER_TYPES, FILTER_DOCS, LINEAGE_KINDS } from './engine-lists.js';
+import { DESIGN_MEDIA, DESIGN_MEDIA_APPLY, FILTER_TYPES, FILTER_DOCS, LINEAGE_KINDS, STYLED_SCENE_STYLES, STYLED_SCENE_STYLE_INFO } from './engine-lists.js';
 import {
   EffectTypeSchema,
   AgentExportFormatSchema,
@@ -7783,6 +7783,41 @@ USE WHEN:
       properties: {
         full: { type: 'boolean', description: 'Save a restorable project document to a file instead of returning the summary.' },
         name: { type: 'string', description: 'full: a name recorded in the document.' },
+      },
+    },
+  },
+
+  {
+    name: 'pinepaper_styled_scene',
+    annotations: {
+      title: 'Styled Scene',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    description: `One composition, drawn in a built-in STYLE, as one canvas item that redraws itself every exported frame. No drawing code: pick a style, optionally shape the composition, then export.
+
+STYLES: ${STYLED_SCENE_STYLES.map((k) => `${k} (${STYLED_SCENE_STYLE_INFO[k]})`).join('; ')}. Default watercolor; the studio also takes its aliases (watercolour, papercut, 1bit…), and an unknown style is refused with the list.
+
+THE COMPOSITION is data (spec). Every key is optional; omitted keys take the 'valley' preset, a valley going from dream to cost over 8 s: size [W, H], duration, transition {name, start, length}, camera {zoom: [from, to], pan}, palette, sun, clouds, ridges, foreground, river, settlements, structure, pylons, vegetation, effects {steam, ripples, scars}, hud {label}.
+
+THEN EXPORT FOR ITS DURATION: the result carries duration, and the scene runs that long. Pass it as agent_export's duration; a different length cuts the scene short or holds its last frame.
+
+KNOW:
+- Calling again with the same id REPLACES the scene, which is how to change style.
+- dither and ascii need a Chrome renderer (WebKit ignores the canvas filter they use).
+- The scene redraws every frame through a render hook. After a page reload it is a still image until this is called again.
+- It sits below every other item, sized to cover the canvas, so titles and overlays go on top as usual.
+
+EXAMPLE: { style: 'ink', duration: 6 }`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        style: { type: 'string', description: `${STYLED_SCENE_STYLES.join(' | ')} (default watercolor)` },
+        duration: { type: 'number', description: 'Seconds the scene runs (default 8). Export for this long.' },
+        id: { type: 'string', description: 'Scene id (default "styled-scene"); the same id replaces the scene.' },
+        spec: { type: 'object', description: "The composition; omitted keys take the 'valley' preset.", additionalProperties: true },
       },
     },
   },

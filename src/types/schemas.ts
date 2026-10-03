@@ -9,7 +9,7 @@
  */
 
 import { z } from 'zod';
-import { ENGINE_EASING_NAMES, DESIGN_MEDIA, DESIGN_MEDIA_APPLY, FILTER_TYPES, LINEAGE_KINDS } from '../tools/engine-lists.js';
+import { ENGINE_EASING_NAMES, DESIGN_MEDIA, DESIGN_MEDIA_APPLY, FILTER_TYPES, LINEAGE_KINDS, STYLED_SCENE_STYLES } from '../tools/engine-lists.js';
 
 // =============================================================================
 // COMMON SCHEMAS
@@ -2033,7 +2033,15 @@ export type CreateDiagramShapeInput = z.infer<typeof CreateDiagramShapeInputSche
 /**
  * Connect items input
  */
-export const ConnectInputSchema = z.object({
+// strokeColor / strokeWidth are what a model guesses (Paper's names); they
+// were stripped and the connector drew in the default colour (gate run 3).
+export const ConnectInputSchema = z.preprocess((v) => {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return v;
+  const o = { ...(v as Record<string, unknown>) };
+  if (o.lineColor === undefined && o.strokeColor !== undefined) { o.lineColor = o.strokeColor; delete o.strokeColor; }
+  if (o.lineWidth === undefined && o.strokeWidth !== undefined) { o.lineWidth = o.strokeWidth; delete o.strokeWidth; }
+  return o;
+}, z.object({
   id: z.string().optional().describe('Stable connector ID. Assign your own and reuse it as `connectorId` in update/remove — the engine otherwise mints a Date.now()-based ID no caller can predict'),
   sourceItemId: z.string().describe('Registry ID of source item'),
   targetItemId: z.string().describe('Registry ID of target item'),
@@ -2047,7 +2055,7 @@ export const ConnectInputSchema = z.object({
   curvature: z.number().min(0.1).max(1.0).optional().default(0.5).describe('Curve intensity for curved routing'),
   boltEnabled: z.boolean().optional().default(true).describe('Enable animated bolt effect'),
   boltColor: z.string().optional().default('#fbbf24').describe('Bolt animation color'),
-});
+}));
 
 export type ConnectInput = z.infer<typeof ConnectInputSchema>;
 
@@ -2137,16 +2145,30 @@ export type GetDiagramShapesInput = z.infer<typeof GetDiagramShapesInputSchema>;
 /**
  * Update connector input
  */
+// Paper.js's own names are what a model guesses for a connector's style, and
+// an unknown key was STRIPPED, so {strokeColor} changed nothing and reported
+// success (gate run 3). The Paper names are mapped; anything else is refused
+// with the keys that work.
+const CONNECTOR_STYLE_ALIASES: Record<string, string> = { strokeColor: 'lineColor', color: 'lineColor', strokeWidth: 'lineWidth', width: 'lineWidth' };
+const CONNECTOR_STYLE_KEYS = ['lineColor', 'lineWidth', 'headStyle', 'tailStyle', 'routing', 'lineStyle'];
 export const UpdateConnectorInputSchema = z.object({
   connectorId: z.string().describe('Connector ID to update'),
-  style: z.object({
+  style: z.preprocess((v) => {
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return v;
+    const out: Record<string, unknown> = {};
+    for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+      if (k === 'dashArray') { out.lineStyle = Array.isArray(val) && val.length ? 'dashed' : 'solid'; continue; }
+      out[CONNECTOR_STYLE_ALIASES[k] ?? k] = val;
+    }
+    return out;
+  }, z.object({
     lineColor: z.string().optional(),
     lineWidth: z.number().optional(),
     headStyle: ArrowHeadStyleSchema.optional(),
     tailStyle: ArrowHeadStyleSchema.optional(),
     routing: ConnectorRoutingSchema.optional(),
     lineStyle: ConnectorLineStyleSchema.optional(),
-  }).optional(),
+  }).strict(`a connector's style takes ${CONNECTOR_STYLE_KEYS.join(', ')} (strokeColor, strokeWidth and dashArray are accepted for lineColor, lineWidth and lineStyle)`)).optional(),
   label: z.string().optional().describe('Update connector label'),
   labelPosition: z.number().min(0).max(1).optional().describe('Label position along path (0-1)'),
 });
@@ -2562,6 +2584,21 @@ export const GIF_MAX_DURATION_S = 15;
  * out-of-memory — it turns into a message naming the ceiling and what to do.
  */
 export const VIDEO_MAX_DURATION_S = 600;
+
+/**
+ * pinepaper_styled_scene (FxTool K2): one declarative composition drawn in a
+ * built-in style, as ONE canvas item that redraws itself every exported frame.
+ * The styles are GENERATED (STYLED_SCENE_STYLES); the engine also resolves its
+ * own aliases ('watercolour', 'papercut'), so style is a string here and an
+ * unknown one is refused by the engine with the known list.
+ */
+export const StyledSceneInputSchema = z.object({
+  style: z.string().optional().describe(`The look: ${STYLED_SCENE_STYLES.join(' | ')} (default watercolor). The engine also takes its aliases (watercolour, papercut, 1bit…).`),
+  duration: z.number().positive().max(VIDEO_MAX_DURATION_S).optional().describe('Seconds the scene runs (default the composition\'s, 8). Export for this long.'),
+  id: z.string().optional().describe('Scene id (default "styled-scene"). Calling again with the same id REPLACES that scene, e.g. to change style.'),
+  spec: z.record(z.string(), z.unknown()).optional().describe("The composition, every key optional (omitted keys take the 'valley' preset): preset, size [W, H], duration, transition {name, start, length}, camera {zoom: [from, to], pan}, palette, sun, clouds, ridges, foreground, river, settlements, structure, pylons, vegetation, effects {steam, ripples, scars}, hud {label}."),
+});
+export type StyledSceneInput = z.infer<typeof StyledSceneInputSchema>;
 
 /**
  * Smart export input schema

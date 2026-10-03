@@ -35,6 +35,10 @@
  * - LINEAGE_KINDS. The provenance kinds core/Provenance.js accepts. The tool
  *   defaulted to 'derived', which is not one, so every record without an
  *   explicit kind was refused, and the valid kinds were documented nowhere.
+ * - STYLED_SCENE_STYLES. The six looks core/StyledScene.js draws a styled
+ *   scene in (STYLES), with each one's own line (STYLE_INFO). The engine
+ *   resolves aliases ('watercolour', 'papercut') itself; the tool offers the
+ *   canonical names.
  * Descriptions are NOT generated: they are prose, written here. The type of
  * EASING_DESCRIPTIONS is keyed on the generated union, so a new engine easing
  * fails the TYPECHECK until someone writes its line.
@@ -63,6 +67,7 @@ const WORLD_REL = 'js/world3d/worlds.js';
 const MEDIA_REL = 'js/core/DesignMedia.js';
 const FILTER_REL = 'js/FilterSystem.js';
 const PROVENANCE_REL = 'js/core/Provenance.js';
+const STYLED_REL = 'js/core/StyledScene.js';
 
 function resolveRef() {
   for (const ref of [ENGINE_REF, 'HEAD']) {
@@ -119,6 +124,17 @@ function lineageKinds(src) {
   const kinds = [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]);
   if (kinds.length === 0) throw new Error(`sync-engine-lists: LINEAGE_KINDS is empty in ${PROVENANCE_REL}`);
   return kinds;
+}
+
+function styledStyles(src) {
+  const m = /export const STYLES\s*=\s*\[([^\]]*)\]/.exec(src);
+  if (!m) throw new Error(`sync-engine-lists: STYLES not found in ${STYLED_REL}`);
+  const names = [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]);
+  const info = {};
+  const block = /export const STYLE_INFO\s*=\s*\{([\s\S]*?)\n\};/.exec(src);
+  if (block) for (const e of block[1].matchAll(/^\s*(\w+):\s*'([^']*)'/gm)) info[e[1]] = e[2];
+  if (names.length === 0) throw new Error(`sync-engine-lists: STYLES is empty in ${STYLED_REL}`);
+  return names.map((n) => ({ name: n, info: info[n] || '' }));
 }
 
 /** MEDIA's top-level keys, and each entry's `apply: '<method>'` when it has one. */
@@ -195,6 +211,9 @@ async function generate() {
   const provSrc = readCommitted(PROVENANCE_REL);
   if (!provSrc) throw new Error(`sync-engine-lists: cannot read ${PROVENANCE_REL}`);
   const lineage = lineageKinds(provSrc);
+  const styledSrc = readCommitted(STYLED_REL);
+  if (!styledSrc) throw new Error(`sync-engine-lists: cannot read ${STYLED_REL}`);
+  const styled = styledStyles(styledSrc);
 
   return `/**
  * GENERATED — DO NOT EDIT. Run \`bun run sync:engine-lists\`.
@@ -208,6 +227,7 @@ async function generate() {
  *   ${MEDIA_REL}  sha256: ${digest(mediaSrc)}
  *   ${FILTER_REL}  sha256: ${digest(filterSrc)}
  *   ${PROVENANCE_REL}  sha256: ${digest(provSrc)}
+ *   ${STYLED_REL}  sha256: ${digest(styledSrc)}
  */
 
 /** ${easings.length} names: EASING_NAMES, the keys of the engine's easing table. Keyframes, masks, relations and the camera all resolve through it. */
@@ -244,6 +264,16 @@ ${filterList.map((f) => `  ${f.name}: { ${Object.entries(f.ranges).map(([k, [a, 
 export const LINEAGE_KINDS = [
 ${list(lineage)}
 ] as const;
+
+/** ${styled.length} styles: STYLES, the looks a styled scene is drawn in. */
+export const STYLED_SCENE_STYLES = [
+${list(styled.map((x) => x.name))}
+] as const;
+
+/** One line per styled-scene style: the engine's STYLE_INFO. */
+export const STYLED_SCENE_STYLE_INFO: Readonly<Record<string, string>> = Object.freeze({
+${styled.map((x) => `  ${x.name}: ${JSON.stringify(x.info)},`).join('\n')}
+});
 
 /** One line per filter: the engine's own description and parameter ranges. */
 export const FILTER_DOCS: Readonly<Record<string, string>> = Object.freeze({
