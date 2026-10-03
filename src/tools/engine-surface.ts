@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main d574696f7d1d7d75483e692d4cc99a516fc6544a
- * sha256:    981d4ed4afbe64c67920a558ae1c0340c3c9b333e5da6a3fc902fca8af874155   (of PinePaper.js as committed)
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 5c401d5f7b98740575eaa86a9d845ca3c60744b5
+ * sha256:    cbaec2188d99ab54d76a3d409821aaa27bce12115d91545e0c9e45c81f85b033   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on `window.app`, with how it gets there. The parity
@@ -16,7 +16,7 @@
 /** How a name lands on `app`. */
 export type EngineMemberKind = 'method' | 'accessor' | 'property' | 'lazy' | 'lazyHeavy' | 'bootstrap';
 
-/** 1280 names, from FxTool/js/PinePaper.js. */
+/** 1290 names, from FxTool/js/PinePaper.js. */
 export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object.freeze({
   _activeByGroup: 'property',
   _activeDrawingGroup: 'method',
@@ -106,6 +106,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _deriveStoryStops: 'method',
   _detectorCached: 'method',
   _directorSubjectIds: 'method',
+  _dispatchTimedEvents: 'method',
   _dispatchTimedPulses: 'method',
   _downloadMermaidExport: 'method',
   _downloadWidgetHTML: 'method',
@@ -350,6 +351,10 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _textEffectMembers: 'method',
   _tickBrushBoil: 'method',
   _tickSimpleAnimationItem: 'method',
+  _timedEventClock: 'property',
+  _timedEventIds: 'property',
+  _timedEventsCount: 'property',
+  _timedEventsDirty: 'property',
   _translateComponentCopy: 'method',
   _uiSuspended: 'property',
   _uiSuspendedAt: 'property',
@@ -653,6 +658,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   ensureRigging: 'method',
   eraseAt: 'method',
   estimateExportSize: 'method',
+  eventSoundCatalogue: 'method',
   executeChain: 'method',
   executeGenerator: 'method',
   exitDrawTool: 'method',
@@ -677,6 +683,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   exportRelationTrainingData: 'method',
   exportSelectionSVG: 'method',
   exportSimulationCSV: 'method',
+  exportSoundList: 'method',
   exportSourceBundle: 'method',
   exportSpriteSheet: 'method',
   exportStoryVideo: 'method',
@@ -875,6 +882,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   listCutoutStyles: 'method',
   listDesignMedia: 'method',
   listEntrancePresets: 'method',
+  listEventSoundCues: 'method',
   listFlowFields: 'method',
   listFontAxes: 'method',
   listFonts: 'method',
@@ -985,6 +993,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   planBrandKit: 'method',
   playbackTime: 'property',
   playChord: 'method',
+  playEventSound: 'method',
   playKeyframeTimeline: 'method',
   playPercussion: 'method',
   playScene: 'method',
@@ -1273,6 +1282,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   updateKeyframe: 'method',
   updateSelectionVisuals: 'method',
   validateCollageFill: 'method',
+  validateEventSound: 'method',
   validateOp: 'method',
   validateScene: 'method',
   validateSceneDocument: 'method',
@@ -1363,6 +1373,6 @@ export const ENGINE_FACADES: Readonly<Record<string, readonly string[]>> = Objec
   maskingSystem: Object.freeze(['_adoptRegistryIdentity', '_applyEasing', '_applyEasingFn', '_applyMaskState', '_applyPathMaskFrame', '_buildPathFromDescriptor', '_getHistoryManager', '_initItemData', '_interpolateMaskState', '_interpolatePathSegments', '_itemRegistry', '_lerpSegments', '_normaliseMaskKeyframes', '_notifyContentReplaced', '_onContentReplaced', '_presetCharacterRevealLeft', '_presetCharacterRevealRight', '_presetCinematic', '_presetCurtainHorizontal', '_presetCurtainVertical', '_presetDiagonalWipe', '_presetIris', '_presetIrisOut', '_presetRevealDown', '_presetRevealUp', '_presetWipeDown', '_presetWipeLeft', '_presetWipeRight', '_presetWipeUp', '_setupItemHoverCursor', '_stateMachine', '_transformSegments', '_updateCinematicMask', '_updateCircleMask', '_updateRectangleMask', 'addMask', 'animatedMaskPresets', 'applyAnimatedMask', 'applyCharacterMasks', 'applyCustomMask', 'applyMask', 'applyPathMask', 'clear', 'get', 'getAnimatableProperties', 'getAvailableAnimationPresets', 'getAvailableEasings', 'getAvailableMaskTypes', 'getMaskData', 'isMasked', 'listMaskTypes', 'maskGenerators', 'maskedItems', 'rebuildTracking', 'refitMaskToContent', 'removeMask', 'removeMaskLayer', 'serialize', 'shapeForPreset', 'trackMaskedGroup', 'updateAnimatedMasks', 'updateMask']),
   physicsWorld: Object.freeze(['MAX_CATCH_UP_STEPS', '_accumulator', '_active', '_addOnFrameCallback', '_bodies', '_fixedDt', '_frameCallbackId', '_gravity', '_isCircular', '_itemRegistry', '_noteWarning', '_onCollision', '_positionIterations', '_removeOnFrameCallback', '_step', '_stepToSceneTime', '_syncDynamicBodies', '_syncKinematicBodies', '_velocityIterations', '_world', '_worldTime', 'addBody', 'applyForce', 'applyImpulse', 'createGround', 'createJoint', 'destroy', 'getBodyState', 'init', 'isActive', 'removeBody', 'resetWorld', 'setBodyType', 'setVelocity']),
   relationRegistry: Object.freeze(['_addCameraAnimation', '_addEdgeToDependencyGraph', '_animatesAsSignal', '_applyComputed', '_applyParamEasing', '_boundsToAsSignal', '_buildDependencyGraph', '_buildPositionSignal', '_cacheFramePosition', '_cacheFrameProperty', '_calculateDuration', '_cameraAnimation', '_cameraFrame', '_cameraTilt', '_checkIRParity', '_clearFrameCache', '_computeDependencyLevels', '_computeOnMainThread', '_computeRelation', '_containedInPlaceAsSignal', '_debugFrame', '_debug_defaultFontPath', '_debug_fontCacheKeys', '_debug_fontCacheSize', '_dependencyGraph', '_dependentsGraph', '_drivenByAsSignal', '_ensureProcessingOrder', '_evaluateExpression', '_followAsSignal', '_framePositions', '_frameProperties', '_geoAdjacentToAsSignal', '_geoTravelsToAsSignal', '_geometricAsSignal', '_getEffectivePosition', '_getFrameProperty', '_getWorld3D', '_graphDirty', '_interpolateRelationParams', '_invalidateGraph', '_invalidateTopology', '_irModule', '_lazyRuleFamilies', '_maintainsDistanceAsSignal', '_movesAlongPathAsSignal', '_normalizeWindow', '_pointsAtAsSignal', '_processingOrder', '_propertyCache', '_registerBuiltInRelations', '_registerGeometricConstraints', '_registerStructuralRelations', '_removeEdgeFromDependencyGraph', '_repelsAsSignal', '_resolveRelativeUnits', '_resolveRule', '_splitOffload', '_tempFromBounds', '_tempFromPos', '_tempToBounds', '_timeExpressionAsSignal', '_timeExpressionPropertyOk', '_topologicalSort', '_topologyDirty', '_updateCameraAnimation', '_warn', '_warnedOnce', '_waveThroughAsSignal', '_wiggleAsSignal', '_windowLocalTime', 'activeRelations', 'addAssociation', 'addCameraKeyframe', 'addKeyframeAnimation', 'applyFrame', 'cameraFrame', 'cameraTilt', 'chainAnimations', 'checkRelationParams', 'clear', 'clearAll', 'computeFrame', 'computedCache', 'cursorPeerId', 'exportForSave', 'exportTrainingData', 'getAllRules', 'getAnimatedItems', 'getAnimationParams', 'getAssociations', 'getCameraAnimationParams', 'getCameraStateAtTime', 'getCursorInteractions', 'getDependencyInfo', 'getIncomingRelations', 'getRule', 'getStats', 'hasCameraAnimation', 'hasRelation', 'importFromSave', 'isCursorTarget', 'isLazyRuleFamilyWarmed', 'itemRegistry', 'migrateItemId', 'modifyRelationParams', 'moveCameraKeyframe', 'query', 'queryActive', 'queryByTarget', 'queryChain', 'queryCompound', 'queryIsolated', 'queryNot', 'rebuildActiveRelations', 'registerDeformRelations', 'registerEffectRelations', 'registerLazyRuleFamily', 'registerRule', 'relationsActiveAt', 'removeAnimation', 'removeAssociation', 'removeCameraAnimation', 'removeCameraKeyframe', 'rules', 'setMorphSourceColor', 'setPropertyCache', 'setWarningSink', 'setWorld3DGetter', 'syncAnimations', 'timelineOf', 'update', 'updateKeyframes', 'updateSync', 'whatAnimates', 'workerPool']),
-  sceneManager: Object.freeze(['_addTemplateRefScene', '_animateCrossfade', '_applyTransition', '_autoSave', '_chainTimeout', '_chainToken', '_clearCanvas', '_crossfadeToScene', '_defaultDimensions', '_delay', '_easeInOutCubic', '_hasAnimations', '_hexToRgb', '_interpolateColor', '_isContinuousTemplate', '_isPaused', '_loadSceneContent', '_playNextInChain', '_playTransitionFrames', '_prefetchNextTemplate', '_prefetchTimeout', '_registerBuiltinTransitions', '_rekeyRestoredItem', '_resolveTemplate', '_resolveTemplateAsync', '_restoreDecorative', '_restoreGroups', '_restoreItems', '_restoreRelations', '_restoreTimeline', '_serializeDecorative', '_serializeGroups', '_serializeItems', '_serializeItemsFallback', '_serializeRelations', '_serializeTimeline', '_serializeTypeSpecific', '_simpleFadeTransition', '_targetCanvasDimensions', '_templateCache', '_templatePrefetchLeadMs', '_templateResolver', '_validateDimensions', 'addTemplateAsScene', 'app', 'autoSaveEnabled', 'autoSaveKey', 'chainIndex', 'chainLoop', 'count', 'createChain', 'createScene', 'currentSceneId', 'defineTransition', 'deleteScene', 'duplicateScene', 'exportScenes', 'getCurrentScene', 'getDimensionValidation', 'getScene', 'importScenes', 'isPlayingChain', 'jumpToChainIndex', 'listScenes', 'loadFromStorage', 'loadScene', 'nextId', 'pauseChain', 'playChain', 'renameScene', 'reorderScenes', 'resumeChain', 'saveCurrentAsScene', 'saveToStorage', 'sceneChain', 'scenes', 'setSceneDuration', 'setTemplatePrefetchLead', 'setTemplateResolver', 'stopChain', 'transitions']),
+  sceneManager: Object.freeze(['_addTemplateRefScene', '_animateCrossfade', '_announceCut', '_applyTransition', '_autoSave', '_chainElapsed', '_chainPrev', '_chainTimeout', '_chainToken', '_clearCanvas', '_crossfadeToScene', '_defaultDimensions', '_delay', '_easeInOutCubic', '_hasAnimations', '_hexToRgb', '_interpolateColor', '_isContinuousTemplate', '_isPaused', '_loadSceneContent', '_playNextInChain', '_playTransitionFrames', '_prefetchNextTemplate', '_prefetchTimeout', '_registerBuiltinTransitions', '_rekeyRestoredItem', '_resolveTemplate', '_resolveTemplateAsync', '_restoreDecorative', '_restoreGroups', '_restoreItems', '_restoreRelations', '_restoreTimeline', '_serializeDecorative', '_serializeGroups', '_serializeItems', '_serializeItemsFallback', '_serializeRelations', '_serializeTimeline', '_serializeTypeSpecific', '_simpleFadeTransition', '_targetCanvasDimensions', '_templateCache', '_templatePrefetchLeadMs', '_templateResolver', '_validateDimensions', 'addTemplateAsScene', 'app', 'autoSaveEnabled', 'autoSaveKey', 'chainIndex', 'chainLoop', 'count', 'createChain', 'createScene', 'currentSceneId', 'defineTransition', 'deleteScene', 'duplicateScene', 'exportScenes', 'getChainCuts', 'getCurrentScene', 'getDimensionValidation', 'getScene', 'importScenes', 'isPlayingChain', 'jumpToChainIndex', 'listScenes', 'loadFromStorage', 'loadScene', 'nextId', 'pauseChain', 'playChain', 'renameScene', 'reorderScenes', 'resumeChain', 'saveCurrentAsScene', 'saveToStorage', 'sceneChain', 'scenes', 'setCutSound', 'setSceneDuration', 'setTemplatePrefetchLead', 'setTemplateResolver', 'stopChain', 'transitions']),
   templateManager: Object.freeze(['_activeTemplateId', '_activeTemplateName', '_addTemplateToChain', '_authChangeCleanup', '_authoringFrame', '_closeTemplateSheet', '_cloudBaseUrl', '_cloudConnectTimedOut', '_cloudConnectTimer', '_doLoadTemplate', '_ensureCloudIframeLoaded', '_ensureTemplateData', '_getAuthorBadge', '_getLetterCollagesFromCanvas', '_injectTemplateSheetStyles', '_loadBackgroundItems', '_loadCloudTemplateFromURL', '_loadDefaultTemplateFromURL', '_loadedTemplateId', '_migrateAndLoadFromIDB', '_multiSceneCount', '_notifyActiveTemplate', '_offerCloudSignIn', '_pendingTemplateParams', '_persistToLocalStorage', '_refreshCloudGrid', '_refreshGrid', '_renderCloudConnecting', '_renderCloudEmpty', '_renderCloudSignIn', '_renderTemplateCard', '_saveToCloud', '_startCloudConnectTimeout', '_syncLocalToCloud', '_templateDataPromise', '_thumbnailForCloudTemplate', '_updateStarDisplay', '_wireTemplateSheetGestures', 'addTemplateToChain', 'app', 'attachEventListeners', 'attachTemplateCardListeners', 'cloudSync', 'createModal', 'currentCategory', 'defaultTemplates', 'deleteTemplate', 'generateTemplateCode', 'getActiveTemplateParams', 'getAllTemplates', 'getLoadedTemplateId', 'getTemplateParams', 'getUserTemplate', 'importTemplate', 'loadTemplate', 'loadTemplateFromURL', 'loadUserTemplates', 'persistPromise', 'persistUserTemplates', 'populateCodeConsole', 'ratings', 'reNotifyActiveTemplate', 'renderTemplates', 'saveCurrentSceneAsTemplate', 'searchQuery', 'showNotification', 'showSaveDialog', 'showTemplateGallery', 'trackTemplateUsage', 'userTemplates']),
 });
