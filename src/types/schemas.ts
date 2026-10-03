@@ -4485,6 +4485,16 @@ export const TextStyleInputSchema = z.object({
     scale: z.number().optional().describe('Size multiplier (default 1).'),
     strokeColor: z.string().optional().describe("Ink colour (default '#ffffff')."),
     strokeWidth: z.number().optional().describe('Pen width (default 2).'),
+    nib: z.union([
+      z.boolean(),
+      z.enum(['monoline', 'broad']),
+      z.object({
+        angle: z.number().optional().describe('Nib angle in degrees.'),
+        width: z.number().positive().optional().describe('Widest stroke, in px.'),
+        contrast: z.number().min(0).max(1).optional().describe('0..1; the hairline is width × (1 − contrast).'),
+        taper: z.number().min(0).max(0.5).optional().describe('0..0.5; thin entry and exit.'),
+      }).strict(),
+    ]).optional().describe("The pen. 'monoline' (or false): one even line. 'broad' (or true): a broad nib, thick across it and hairline along it; an object tunes the broad nib. Omitted: the studio's default pen."),
   }).optional().describe('cursive: where and how it is written. The result is a STROKED PATH, so pinepaper_animate\'s draw-on and pinepaper_path\'s outline_stroke both apply to it — which is the reason to prefer it over a script font.'),
   collageOptions: z.record(z.string(), z.unknown()).optional().describe('to_collage: style, palette and the rest, same vocabulary as pinepaper_create_letter_collage.'),
   itemId: z.string().optional().describe('Text item id — apply_style / set_font_axes.'),

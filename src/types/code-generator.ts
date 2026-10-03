@@ -734,6 +734,18 @@ type DirectionRequest = { value: 'auto' | 'ltr' | 'rtl'; resolved?: 'ltr' | 'rtl
 // first STRONG character decides. Mirrored so a result can say which way
 // 'auto' went.
 const RTL_SCRIPT = /[\p{Script=Hebrew}\p{Script=Arabic}\p{Script=Syriac}\p{Script=Thaana}\p{Script=Nko}\p{Script=Samaritan}\p{Script=Mandaic}\p{Script=Adlam}\p{Script=Hanifi_Rohingya}]/u;
+/**
+ * cursiveOptions as createCursiveText reads them. The engine takes `nib` as a
+ * boolean or a tuning object; the tool also takes the words 'monoline' and
+ * 'broad', which the engine would read as truthy (= broad) both times.
+ */
+export function cursiveEngineOptions(o: TextStyleInput['cursiveOptions']): Record<string, unknown> {
+  if (!o) return {};
+  const { nib, ...rest } = o;
+  if (nib === undefined) return rest;
+  return { ...rest, nib: nib === 'monoline' ? false : nib === 'broad' ? true : nib };
+}
+
 function baseDirection(text: string): 'ltr' | 'rtl' {
   for (const ch of text) {
     if (RTL_SCRIPT.test(ch)) return 'rtl';
@@ -11580,7 +11592,9 @@ ${guard}
   // item — so reading .data.id off the answer returned no id, every time. The
   // group is registered only on one of its two branches; the other is
   // registered here so the caller always gets an addressable id.
-  const r = app.createCursiveText(${S(input.text)}, ${S(input.cursiveOptions ?? {})});
+  // nib goes to the engine as a boolean or a tuning object. A STRING is
+  // truthy there, so 'monoline' would have selected the broad nib (D31).
+  const r = app.createCursiveText(${S(input.text)}, ${S(cursiveEngineOptions(input.cursiveOptions))});
   const g = r && (r.group || (r.data ? r : null));
   if (!g) { return { success: false, error: 'the cursive text produced no path' }; }
   let itemId = g.data && (g.data.id || g.data.registryId);
