@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 4358c257f8960aaebde31d5c1714c65d6e7127cb
- * sha256:    8be7ffbaa81a634d27ee34bf4574b7bd67a26ef7c4fa7274352107455d8a14ce   (of PinePaper.js as committed)
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 0b5ceae66e5a5aec04dbf5ecc0e808674ef65c35
+ * sha256:    c1111ef06b8dbc8d5979a62e498d2fd17ff0d7467846e54f281bec0e61828abd   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on `window.app`, with how it gets there. The parity
@@ -16,7 +16,7 @@
 /** How a name lands on `app`. */
 export type EngineMemberKind = 'method' | 'accessor' | 'property' | 'lazy' | 'lazyHeavy' | 'bootstrap';
 
-/** 1412 names, from FxTool/js/PinePaper.js. */
+/** 1413 names, from FxTool/js/PinePaper.js. */
 export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object.freeze({
   __buildFreshness: 'property',
   _activeByGroup: 'property',
@@ -286,6 +286,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _recordingExportState: 'property',
   _recordKilledCallback: 'method',
   _recordRigging: 'method',
+  _reducedMotionGatesFrame: 'method',
   _reflowContentForResize: 'method',
   _refreshTransformBaseline: 'method',
   _refreshViewConstantOverlays: 'method',
