@@ -40,4 +40,14 @@ describe('cursive nib', () => {
     expect(r.isError).toBe(true);
     expect(r.content.map((c: any) => c.text ?? '').join('')).toContain('does not restyle an existing item');
   });
+  it('passes the draw-on options to the engine (D41)', async () => {
+    const opts = parse({ animate: true, duration: 2, easing: 'linear', timeOffset: 0.5, singleStroke: true, showGhost: true, tension: 0.4 });
+    expect(cursiveEngineOptions(opts)).toEqual({ animate: true, duration: 2, easing: 'linear', timeOffset: 0.5, singleStroke: true, showGhost: true, tension: 0.4 });
+    const r = await handleToolCall('pinepaper_text_style', { action: 'cursive', text: 'Hi', cursiveOptions: { animate: true, duration: 2 } }, { generateOnly: true } as never);
+    expect(r.content.map((c: any) => c.text ?? '').join('')).toContain('"animate":true,"duration":2');
+  });
+  it('refuses an unknown cursiveOptions key instead of dropping it', () => {
+    expect(() => parse({ animte: true })).toThrow();
+    expect(() => parse({ easing: 'wobbly' })).toThrow();
+  });
 });

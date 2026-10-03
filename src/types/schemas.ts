@@ -4496,7 +4496,16 @@ export const TextStyleInputSchema = z.object({
         taper: z.number().min(0).max(0.5).optional().describe('0..0.5; thin entry and exit.'),
       }).strict(),
     ]).optional().describe("The pen. 'monoline' (or false): one even line. 'broad' (or true): a broad nib, thick across it and hairline along it; an object tunes the broad nib. Omitted: the studio's default pen."),
-  }).optional().describe('cursive: where and how it is written. The result is a STROKED PATH, so pinepaper_animate\'s draw-on and pinepaper_path\'s outline_stroke both apply to it — which is the reason to prefer it over a script font.'),
+    // Draw-on (gate D41): the engine keyframes trimEnd 0→1 itself; these were
+    // stripped, so a handwritten title arrived fully drawn.
+    animate: z.boolean().optional().describe('true writes the words on, stroke by stroke, over `duration` seconds — no keyframe_animate needed (default false: drawn at once).'),
+    duration: z.number().positive().optional().describe('animate: seconds to write the whole line (default 2).'),
+    easing: z.enum(ENGINE_EASING_NAMES).optional().describe("animate: the write-on easing (default 'easeOut')."),
+    timeOffset: z.number().min(0).optional().describe('animate: seconds into the timeline before writing starts (default 0).'),
+    singleStroke: z.boolean().optional().describe('Primary strokes only — drop the secondary strokes (default false).'),
+    showGhost: z.boolean().optional().describe('Show a faint outline of the whole line under the write-on (default false).'),
+    tension: z.number().optional().describe("Curve tension of the pen path (the studio's default when omitted)."),
+  }).strict().optional().describe('cursive: where and how it is written. The result is a STROKED PATH, so pinepaper_animate\'s draw-on and pinepaper_path\'s outline_stroke both apply to it — which is the reason to prefer it over a script font.'),
   collageOptions: z.record(z.string(), z.unknown()).optional().describe('to_collage: style, palette and the rest, same vocabulary as pinepaper_create_letter_collage.'),
   itemId: z.string().optional().describe('Text item id — apply_style / set_font_axes.'),
   styleKey: z.string().optional().describe("apply_style: style name from list_styles (e.g. 'stacked', 'arcade' — the pixel/arcade styles suggest their own face)."),
