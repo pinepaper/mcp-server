@@ -60,6 +60,7 @@ export const CHOOSE_THE_DOOR = `CHOOSE THE HIGHEST-LEVEL TOOL FIRST. Primitive s
 - A story, several beats, a narrative from prose → pinepaper_story (from_text), then scene chains (pinepaper_scene_playback)
 - A character that acts (expressions, poses, walks) → pinepaper_character, pinepaper_stick, pinepaper_rigging; squash and stretch via pinepaper_deform
 - Any item that moves with intent (pops in, hops, bounces, rolls, flies, peeks, lands) → pinepaper_choreograph: beats, not hand-timed keyframes
+- One element that becomes the next thing, and the next, with no cuts (a pill → a field → a dot → a card) → pinepaper_morph_sequence
 - A title or caption with craft → pinepaper_text_style (display styles; cursive with animate writes itself on), pinepaper_text_effect
 - A poster or layout in an aesthetic → pinepaper_design_system (compose); a collage → pinepaper_compose
 - A painted, stitched, hatched, inked or cut-paper look on shapes or photos → pinepaper_design_medium; photos also pinepaper_image_filter (watercolor, painterly)
@@ -7860,6 +7861,37 @@ EXAMPLE: { style: 'ink', duration: 6 }`,
         id: { type: 'string', description: 'Scene id (default "styled-scene"); the same id replaces the scene.' },
         spec: { type: 'object', description: "The composition; omitted keys take the 'valley' preset.", additionalProperties: true },
       },
+    },
+  },
+  {
+    name: 'pinepaper_morph_sequence',
+    annotations: { title: 'Morph Sequence', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    description: `ONE element through many states, with no cuts: each state grows out of the last (a pill becomes an input field becomes a dot becomes a card). The one-take UI-launch idiom, from one call.
+
+{ itemId, states: [{ at, duration? (0.8), to: itemId | shape: { itemType, position, properties? } }], easing?, camera?, sound? }
+- Each state is the shape the element morphs INTO, starting at \`at\` seconds. Name an existing item (to) or describe one (shape); either way the reference is hidden and the element keeps its own id throughout. States run one after another; an overlap is refused.
+- easing: linear | easeIn | easeOut | easeInOut (default easeInOut) — the four the morph supports.
+- camera: true (or { fill, easing }) keys the camera on the SAME timing: it holds while a state rests and moves with each morph, framing the new state to \`fill\` of the frame (default 0.45).
+- sound: true puts a whoosh at each morph start (or name any catalogue sound).
+
+Shapes morph by kind: path → path point by point, circle → circle by radius, text → text by font, across kinds by a particle transition. Colours and size morph too.
+
+RETURNS: states [{ at, duration, targetId }], end (seconds), camera { keyframes }, sounds.
+
+EXAMPLE — pill → field → dot:
+{ itemId: "item_1", camera: true, sound: true, states: [
+  { at: 1, shape: { itemType: "rectangle", position: { x: 960, y: 540 }, properties: { width: 640, height: 88, cornerRadius: 44, color: "#ffffff" } } },
+  { at: 3, shape: { itemType: "circle", position: { x: 960, y: 540 }, properties: { radius: 18, color: "#111111" } } } ] }`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        itemId: { type: 'string' },
+        states: { type: 'array', items: { type: 'object', properties: { at: { type: 'number' }, duration: { type: 'number' }, to: { type: 'string' }, shape: { type: 'object', additionalProperties: true } }, required: ['at'] } },
+        easing: { type: 'string', enum: ['linear', 'easeIn', 'easeOut', 'easeInOut'] },
+        camera: { description: 'true, or {fill, easing}', oneOf: [{ type: 'boolean' }, { type: 'object', additionalProperties: true }] },
+        sound: { description: 'true, or a catalogue sound name', oneOf: [{ type: 'boolean' }, { type: 'string' }] },
+      },
+      required: ['itemId', 'states'],
     },
   },
   {

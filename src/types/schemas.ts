@@ -4719,6 +4719,32 @@ export const EmitterInputSchema = z.object({
 }).refine((v) => v.action !== 'set' || !!v.itemId, { message: 'set requires itemId', path: ['itemId'] });
 export type EmitterInput = z.infer<typeof EmitterInputSchema>;
 
+/** pinepaper_morph_sequence (D73): one element through N states as a morphs_to chain. */
+export const MorphSequenceInputSchema = z.object({
+  itemId: z.string().describe('The element that morphs (it keeps its id through every state).'),
+  states: z.array(z.object({
+    at: z.number().min(0).describe('Seconds: when the morph INTO this state starts.'),
+    duration: z.number().positive().optional().describe('Seconds the morph takes (default 0.8).'),
+    to: z.string().optional().describe('An existing item whose shape this state takes (it is hidden; it is only the shape reference).'),
+    shape: z.object({
+      itemType: z.string(),
+      position: z.object({ x: z.number(), y: z.number() }),
+      properties: z.record(z.string(), z.unknown()).optional(),
+    }).optional().describe('Or describe the state: it is created hidden as the reference.'),
+  }).refine((s) => !!s.to !== !!s.shape, { message: 'each state takes exactly one of to or shape' })).min(1).max(40),
+  easing: z.enum(['linear', 'easeIn', 'easeOut', 'easeInOut']).optional().describe('Morph easing (default easeInOut) — the morph supports these four.'),
+  camera: z.union([z.boolean(), z.object({ fill: z.number().min(0.05).max(1).optional(), easing: z.string().optional() })]).optional()
+    .describe('true: the camera rides every morph on the same timing, framing each state (fill = share of the frame the state fills, default 0.45).'),
+  sound: z.union([z.boolean(), z.string().min(1)]).optional().describe("true: a whoosh at each morph start; or a catalogue sound name."),
+}).superRefine((v, ctx) => {
+  let end = -Infinity;
+  [...v.states].sort((a, b) => a.at - b.at).forEach((s, i) => {
+    if (s.at < end - 1e-6) ctx.addIssue({ code: z.ZodIssueCode.custom, message: `state at ${s.at} s starts before the previous morph ends at ${end} s`, path: ['states', i, 'at'] });
+    end = s.at + (s.duration ?? 0.8);
+  });
+});
+export type MorphSequenceInput = z.infer<typeof MorphSequenceInputSchema>;
+
 /** pinepaper_render_hook — per-frame drawing saved as SOURCE (FxTool D29). */
 export const RenderHookInputSchema = z.object({
   action: z.enum(['register', 'unregister', 'list']),

@@ -80,6 +80,7 @@ export const TOOL_CLASS: Readonly<Record<string, EffectClass>> = Object.freeze({
   pinepaper_add_filter: 'mutates',
   pinepaper_styled_scene: 'mutates',
   pinepaper_choreograph: 'mutates',
+  pinepaper_morph_sequence: 'mutates',
   pinepaper_place_on_surface: 'mutates',
   pinepaper_import_scene: 'mutates',
   pinepaper_browser_connect: 'side-effect',

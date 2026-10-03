@@ -47,6 +47,7 @@ import {
   RelightInputSchema,
   ChoreographInputSchema,
   EmitterInputSchema,
+  MorphSequenceInputSchema,
   RenderHookInputSchema,
   ShaderGraphInputSchema,
   ShatterImageInputSchema,
@@ -2347,6 +2348,11 @@ async function handleToolCallInner(
       }
 
       // ─── 1.6.4: agent surface for the Tier-2 engine features ───
+      case 'pinepaper_morph_sequence': {
+        const input = MorphSequenceInputSchema.parse(args);
+        return executeOrGenerate(codeGenerator.generateMorphSequence(input), `Morph sequence: ${input.states.length} states`, options, 'pinepaper_morph_sequence');
+      }
+
       case 'pinepaper_emitter': {
         const input = EmitterInputSchema.parse(args);
         return executeOrGenerate(codeGenerator.generateEmitter(input), `Emitter: ${input.action}`, options, 'pinepaper_emitter');

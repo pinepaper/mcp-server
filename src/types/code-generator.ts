@@ -196,7 +196,7 @@ import {
   AccessibilityCheckInput,
   InstantiateOntologyInput,
   LintSceneInput,
-  MediaInput, TextStyleInput, TextEffectInput, DesignMediumInput, RelightInput, ShaderGraphInput, ChoreographInput, EmitterInput, RenderHookInput, ShatterImageInput, ImportLayeredCharacterInput, GameInput, World3DInput,
+  MediaInput, TextStyleInput, TextEffectInput, DesignMediumInput, RelightInput, ShaderGraphInput, ChoreographInput, EmitterInput, RenderHookInput, MorphSequenceInput, ShatterImageInput, ImportLayeredCharacterInput, GameInput, World3DInput,
   CropImageInput,
   PathOpInput,
   MotionInput,
@@ -12005,6 +12005,70 @@ ${input.sound ? `  // SOUND ON THE ACTION (D68): one placed sound per moment the
 ` : ''}
   if (__warnings.length) __res.warnings = __warnings;
   return __res;
+})();`.trim();
+  }
+
+  /**
+   * pinepaper_morph_sequence (D73): ONE element through N states — R8's pill →
+   * input → dot → grid → composer → orb. The engine already chains morphs_to
+   * on one shape (per-relation state since gap 2.27); what a model could not
+   * do was time the chain, make the reference shapes, and ride the camera on
+   * the same curve. Compiled here to that chain, a camera track and sounds.
+   */
+  generateMorphSequence(input: MorphSequenceInput): string {
+    const S = (v: unknown) => JSON.stringify(v);
+    const states = [...input.states].sort((a, b) => a.at - b.at).map((st) => ({ at: st.at, duration: st.duration ?? 0.8, to: st.to ?? null, shape: st.shape ?? null }));
+    const cam = input.camera === true ? { fill: 0.45 } : (input.camera || null);
+    const sound = input.sound === true ? 'whoosh' : (input.sound || null);
+    return `
+// Morph sequence: ${states.length} state(s)
+(function() {
+  const src = app.getItemById && app.getItemById(${S(input.itemId)});
+  if (!src) { return { success: false, error: ${S(input.itemId)} + ' is not on the canvas.' }; }
+  if (typeof app.addRelation !== 'function') { return { success: false, error: 'this studio cannot add relations.' }; }
+  const states = ${S(states)};
+  const done = [];
+  for (let i = 0; i < states.length; i++) {
+    const st = states[i];
+    let tid = st.to;
+    if (!tid) {
+      const p = Object.assign({}, st.shape.properties || {}, { x: st.shape.position.x, y: st.shape.position.y });
+      const made = app.create(st.shape.itemType, p);
+      tid = made && made.data && made.data.registryId;
+      if (!tid) { return { success: false, error: 'state ' + i + ': could not make the ' + st.shape.itemType + ' reference shape', states: done }; }
+    } else if (!(app.getItemById && app.getItemById(tid))) {
+      return { success: false, error: 'state ' + i + ': ' + tid + ' is not on the canvas', states: done };
+    }
+    const ok = app.addRelation(${S(input.itemId)}, tid, 'morphs_to', { duration: st.duration, delay: st.at, easing: ${S(input.easing ?? 'easeInOut')}, hideTarget: true });
+    if (ok === false) { return { success: false, error: 'state ' + i + ': the studio refused the morph into ' + tid, states: done }; }
+    done.push({ at: st.at, duration: st.duration, targetId: tid });
+  }
+  const res = { success: true, itemId: ${S(input.itemId)}, states: done, end: done[done.length - 1].at + done[done.length - 1].duration };
+  const n = app.getRelations ? app.getRelations(${S(input.itemId)}, 'morphs_to').length : null;
+  if (n !== null && n < done.length) res.warning = 'only ' + n + ' of ' + done.length + ' morphs are on the element.';
+${cam ? `  // The camera rides the SAME timing: framing each state as its morph lands.
+  if (app.camera && app.camera.animate) {
+    const fr = (typeof app.exportFrameRect === 'function' && app.exportFrameRect()) || (app.getCanvasSize && app.getCanvasSize()) || { width: 1920, height: 1080 };
+    const fill = ${S(cam.fill ?? 0.45)};
+    const frameOf = function (it) { const b = it.bounds; return { focus: [b.center.x, b.center.y], zoom: Math.max(0.2, Math.min(8, fill * Math.min(fr.width / Math.max(1, b.width), fr.height / Math.max(1, b.height)))) }; };
+    const f0 = frameOf(src);
+    const kfs = [{ time: 0, zoom: f0.zoom, focus: f0.focus }];
+    done.forEach(function (d) {
+      const t = app.getItemById(d.targetId);
+      const f = frameOf(t);
+      const prev = kfs[kfs.length - 1];
+      kfs.push({ time: d.at, zoom: prev.zoom, focus: prev.focus });
+      kfs.push({ time: d.at + d.duration, zoom: f.zoom, focus: f.focus, easing: ${S((cam as { easing?: string }).easing ?? 'easeInOut')} });
+    });
+    app.camera.animate(kfs, res.end, false, 0, {});
+    res.camera = { keyframes: kfs.length };
+  } else { res.warning = (res.warning ? res.warning + ' ' : '') + 'this studio has no camera animation; the morphs run without it.'; }
+` : ''}${sound ? `  // A sound on each morph (D68's placement, with its MP4-lead nudge).
+  const base = (app.sfxSpec && app.sfxSpec(${S(sound)})) || (app.percussionSpec && app.percussionSpec(${S(sound)}));
+  if (base && app.createSound) {
+    res.sounds = done.map(function (d) { const at = d.at < 0.06 ? 0.06 : d.at; const it = app.createSound(Object.assign({}, base), { startTime: at, duration: base.duration || 0.5 }); return { t: at, itemId: it && it.data && it.data.id }; });
+  } else { res.warning = (res.warning ? res.warning + ' ' : '') + ${S(`no sound placed: ${sound} is not in the catalogue, or this studio cannot place sounds.`)}; }
+` : ''}  return res;
 })();`.trim();
   }
 

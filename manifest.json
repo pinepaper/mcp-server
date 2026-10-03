@@ -633,6 +633,10 @@
       "description": "One composition drawn in a built-in style (cut, ink, watercolor, dither, flow, ascii) as one item that redraws every exported frame. {style, duration, id, spec}"
     },
     {
+      "name": "pinepaper_morph_sequence",
+      "description": "One element through N states, no cuts: {itemId, states:[{at, to | shape}], camera?: true (rides the morphs), sound?: true}."
+    },
+    {
       "name": "pinepaper_emitter",
       "description": "Particles as a saved, deterministic item (cloud-safe). action: create|set {spec: bursts[{t,x,y,count}] | target+rate (trail), shape, palette, speed, gravity…}."
     },

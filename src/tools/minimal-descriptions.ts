@@ -169,6 +169,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_export_svg: 'Export canvas as animated SVG.',
   pinepaper_export_training_data: 'Export instruction/code pairs for LLM training.',
   pinepaper_export_scene: 'Scene summary for inspection; full: true saves a restorable project document to a file. {full?, name?}',
+  pinepaper_morph_sequence: 'One element through N states, no cuts: {itemId, states:[{at, to | shape}], camera?: true (rides the morphs), sound?: true}.',
   pinepaper_emitter: "Particles as a saved, deterministic item (cloud-safe). action: create|set {spec: bursts[{t,x,y,count}] | target+rate (trail), shape, palette, speed, gravity…}.",
   pinepaper_render_hook: 'Per-frame drawing saved as source (survives save/load). action: register {id, source "(ctx,t,info)=>{}", layer}|unregister|list.',
   pinepaper_choreograph: 'Acting for any item: beats [{at, verb: pop|drop|hop|bounce|roll|fly|peek|shake|squash|enter|exit, to?}] → squash-and-stretch track; sound:true adds SFX on the action.',
