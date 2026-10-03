@@ -59,6 +59,7 @@ export const CHOOSE_THE_DOOR = `CHOOSE THE HIGHEST-LEVEL TOOL FIRST. Primitive s
 - A scene or landscape drawn in an art style (cut paper, ink, watercolour, dither, flow, ASCII) → pinepaper_styled_scene
 - A story, several beats, a narrative from prose → pinepaper_story (from_text), then scene chains (pinepaper_scene_playback)
 - A character that acts (expressions, poses, walks) → pinepaper_character, pinepaper_stick, pinepaper_rigging; squash and stretch via pinepaper_deform
+- Any item that moves with intent (pops in, hops, bounces, rolls, flies, peeks, lands) → pinepaper_choreograph: beats, not hand-timed keyframes
 - A title or caption with craft → pinepaper_text_style (display styles; cursive with animate writes itself on), pinepaper_text_effect
 - A poster or layout in an aesthetic → pinepaper_design_system (compose); a collage → pinepaper_compose
 - A painted, stitched, hatched, inked or cut-paper look on shapes or photos → pinepaper_design_medium; photos also pinepaper_image_filter (watercolor, painterly)
@@ -7854,6 +7855,61 @@ EXAMPLE: { style: 'ink', duration: 6 }`,
         id: { type: 'string', description: 'Scene id (default "styled-scene"); the same id replaces the scene.' },
         spec: { type: 'object', description: "The composition; omitted keys take the 'valley' preset.", additionalProperties: true },
       },
+    },
+  },
+  {
+    name: 'pinepaper_choreograph',
+    annotations: {
+      title: 'Choreograph an Actor',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Make any item ACT: a list of beats compiled to one keyframe track with anticipation, squash and stretch, contact and settle — the timing a hand animator would key, from one call.
+
+BEATS run one after another: [{ at, verb, ...params }]. Positions are the actor's CENTRE in canvas px; a squash keeps its BOTTOM on the ground.
+- pop: scales up from nothing with an overshoot (an entrance in place).
+- drop { to? }: falls in from above the frame, stretched, and lands with a squash.
+- hop { to?, height? }: crouch, launch stretched, arc, land squashed, settle. Without to it hops in place.
+- bounce { times? (3), height?, decay? (0.6), to? }: bounces that lose height; with to it travels while bouncing.
+- roll { to }: rolls without slipping — it turns by the distance over its radius (right = clockwise).
+- fly { to, arc? }: an arc through the air, nose up on the rise and down on the fall.
+- peek { edge (left|right|top|bottom), amount? (0.5), hold? (1) }: slides partly in from a frame edge, waits, ducks back out.
+- shake { intensity? }: a startled shiver.   squash { amount? }: an in-place squash and recover (a reaction, a landing hit).
+- enter { from (edge), to? }: slides in from an edge with an overshoot.   exit { edge }: a small anticipation, then away off that edge.
+Each verb has a default duration; pass duration to change it.
+
+WHAT IT RETURNS: keyframes written, the duration, and where the actor ends (and whether that is on screen). Beats that overlap, an unknown verb, or roll / fly without a destination are refused by name.
+
+ACTORS: a shape, a group, an imported SVG character, a photo cut-out — anything with one transform. Its own scale and rotation are kept (a beat squashes relative to them). A figure placed by pinepaper_character is several parts with their own tracks and no single transform, so choreograph its parts' group only if you grouped a STATIC figure; otherwise direct it with character beats.
+
+MIX WITH: pinepaper_character / text expressions on top; pinepaper_apply_effect (confetti, shockwave) at a landing; pinepaper_sound at the same times. Call choreograph BEFORE keyframing the actor's other properties (colour, fill): the beat keys carry position, scale, rotation and opacity only, and the result warns if the actor already animates something else.
+
+EXAMPLE — a ball comes to life and crosses the frame:
+{ itemId: "item_1", beats: [ { at: 0, verb: "pop" }, { at: 0.6, verb: "bounce", times: 3, to: [700, 820] }, { at: 2.4, verb: "roll", to: [1200, 820] }, { at: 3.5, verb: "fly", to: [1600, 300] } ] }`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        itemId: { type: 'string', description: 'The actor (any item with one transform).' },
+        beats: {
+          type: 'array',
+          description: 'Beats in time order: [{at, verb, to?, duration?, height?, times?, decay?, arc?, edge?, from?, amount?, hold?, intensity?}].',
+          items: {
+            type: 'object',
+            properties: {
+              at: { type: 'number' },
+              verb: { type: 'string', enum: ['pop', 'drop', 'hop', 'bounce', 'roll', 'fly', 'peek', 'shake', 'squash', 'enter', 'exit'] },
+              to: { description: '[x, y] or {x, y}: the actor centre at the end of the beat' },
+              duration: { type: 'number' }, height: { type: 'number' }, times: { type: 'integer' }, decay: { type: 'number' },
+              arc: { type: 'number' }, edge: { type: 'string', enum: ['left', 'right', 'top', 'bottom'] }, from: { type: 'string', enum: ['left', 'right', 'top', 'bottom'] },
+              amount: { type: 'number' }, hold: { type: 'number' }, intensity: { type: 'number' },
+            },
+            required: ['at', 'verb'],
+          },
+        },
+      },
+      required: ['itemId', 'beats'],
     },
   },
   {

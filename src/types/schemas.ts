@@ -4711,6 +4711,34 @@ export const RelightInputSchema = z.object({
   { message: 'set requires at least one light (or enabled: false)', path: ['lights'] });
 export type RelightInput = z.infer<typeof RelightInputSchema>;
 
+/** pinepaper_choreograph — beat verbs compiled to one squash-and-stretch track (D67). */
+const ChoreoPointSchema = z.union([z.tuple([z.number(), z.number()]), z.object({ x: z.number(), y: z.number() })]);
+const ChoreoEdgeSchema = z.enum(['left', 'right', 'top', 'bottom']);
+export const CHOREO_VERBS = ['pop', 'drop', 'hop', 'bounce', 'roll', 'fly', 'peek', 'shake', 'squash', 'enter', 'exit'] as const;
+export const ChoreographBeatSchema = z.object({
+  at: z.number().min(0).describe('Seconds. Beats run one after another; one that starts before the previous ends is refused.'),
+  verb: z.enum(CHOREO_VERBS),
+  to: ChoreoPointSchema.optional().describe('Where the actor ends up (its centre, canvas px): hop / bounce / roll / fly / drop / enter. roll and fly require it.'),
+  duration: z.number().positive().optional().describe('Seconds for this beat (each verb has a sensible default).'),
+  height: z.number().positive().optional().describe('hop / bounce: jump height px (default 1.2× / 1.5× the actor).'),
+  times: z.number().int().min(1).max(12).optional().describe('bounce: number of bounces (default 3).'),
+  decay: z.number().min(0.1).max(0.95).optional().describe('bounce: each bounce is this fraction of the last (default 0.6).'),
+  arc: z.number().optional().describe('fly: how far above the higher end the path rises, px (default 2× the actor).'),
+  edge: ChoreoEdgeSchema.optional().describe('peek: the frame edge it peeks from (default left). exit: the edge it leaves by (default right).'),
+  from: ChoreoEdgeSchema.optional().describe('enter: the frame edge it comes in from (default left).'),
+  amount: z.number().min(0).max(1).optional().describe('peek: how much of it shows, 0..1 (default 0.5). squash: depth (default 0.25).'),
+  hold: z.number().min(0).optional().describe('peek: seconds it stays out (default 1).'),
+  intensity: z.number().positive().optional().describe('shake: px each way (default 8% of its width).'),
+}).strict().superRefine((b, ctx) => {
+  if ((b.verb === 'roll' || b.verb === 'fly') && !b.to) ctx.addIssue({ code: z.ZodIssueCode.custom, message: `${b.verb} needs to: [x, y]`, path: ['to'] });
+  if (b.verb === 'exit' && b.to !== undefined) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'exit leaves by an edge: pass edge (left | right | top | bottom), not to', path: ['to'] });
+});
+export const ChoreographInputSchema = z.object({
+  itemId: z.string().describe('The actor: any item — a shape, a group, an imported SVG character, a photo cut-out.'),
+  beats: z.array(ChoreographBeatSchema).min(1).max(60),
+});
+export type ChoreographInput = z.infer<typeof ChoreographInputSchema>;
+
 /**
  * pinepaper_shader_graph — validated JSON pixel graphs (FxTool D5), CPU-backed.
  * Linear chains only; the engine names every error (unknown type, duplicate,

@@ -5,6 +5,7 @@
  * This code is designed to run in the browser context where window.PinePaper is available.
  */
 
+import { compileChoreography } from '../tools/choreograph.js';
 import { normalizeSvgSize } from '../utils/svg-size.js';
 import { WORLD3D_COLOR_PATHS } from '../tools/engine-lists.js';
 import { REQUIRED_ENGINE_METHODS, OPTIONAL_ENGINE_METHODS } from '../tools/engine-methods.js';
@@ -195,7 +196,7 @@ import {
   AccessibilityCheckInput,
   InstantiateOntologyInput,
   LintSceneInput,
-  MediaInput, TextStyleInput, TextEffectInput, DesignMediumInput, RelightInput, ShaderGraphInput, ShatterImageInput, ImportLayeredCharacterInput, GameInput, World3DInput,
+  MediaInput, TextStyleInput, TextEffectInput, DesignMediumInput, RelightInput, ShaderGraphInput, ChoreographInput, ShatterImageInput, ImportLayeredCharacterInput, GameInput, World3DInput,
   CropImageInput,
   PathOpInput,
   MotionInput,
@@ -11868,6 +11869,51 @@ ${guard}
    * costs ~0.42 s per 1080p frame on the CPU, so a set says what an export
    * will pay.
    */
+  /**
+   * pinepaper_choreograph (D67). The compiler runs IN THE STUDIO, serialised
+   * by toString, because the track depends on the actor's live size, scale,
+   * rotation and the export frame. Merged into the actor's track, read back
+   * the way keyframe_animate reads its own.
+   */
+  generateChoreograph(input: ChoreographInput): string {
+    const S = (v: unknown) => JSON.stringify(v);
+    const id = S(input.itemId);
+    return `
+// Choreograph ${input.beats.length} beat(s) for ${input.itemId}
+(function() {
+  const __it = (app.getItemById && app.getItemById(${id}))
+    || (app.itemRegistry && app.itemRegistry.get && (app.itemRegistry.get(${id}) || {}).item);
+  if (!__it || !__it.bounds) { return { success: false, error: ${id} + ' is not on the canvas — check the id with pinepaper_get_items.' }; }
+  const __sc = __it.scaling || { x: 1, y: 1 };
+  const __b = __it.bounds;
+  const __baked = (__it.data && typeof __it.data._bakedRotation === 'number') ? __it.data._bakedRotation : 0;
+  const __fr = (typeof app.exportFrameRect === 'function' && app.exportFrameRect()) || (app.getCanvasSize && app.getCanvasSize()) || { width: 1920, height: 1080 };
+  const __frame = { x: __fr.x || 0, y: __fr.y || 0, width: __fr.width, height: __fr.height };
+  const __actor = { x: __it.position.x, y: __it.position.y,
+    w: __b.width / (Math.abs(__sc.x) || 1), h: __b.height / (Math.abs(__sc.y) || 1),
+    sx: __sc.x || 1, sy: __sc.y || 1, rot: (__it.rotation || 0) + __baked };
+  const __r = (${compileChoreography.toString()})(__actor, __frame, ${S(input.beats)});
+  if (__r.error) { return { success: false, itemId: ${id}, error: __r.error }; }
+  const __prev = (__it.data && Array.isArray(__it.data.keyframes)) ? __it.data.keyframes : [];
+  const __prevTimes = __prev.map(function (k) { return k && k.time; });
+  const __ours = ['x', 'y', 'scaleX', 'scaleY', 'rotation', 'opacity'];
+  const __other = __prev.reduce(function (acc, k) { Object.keys((k && k.properties) || {}).forEach(function (p) { if (__ours.indexOf(p) < 0 && acc.indexOf(p) < 0) acc.push(p); }); return acc; }, []);
+  app.addAnimation(${id}, __r.keyframes, { duration: Math.max(__r.end, __prev.reduce(function (m, k) { return Math.max(m, (k && k.time) || 0); }, 0)), loop: false, mode: 'merge' });
+  const __now = (__it.data && Array.isArray(__it.data.keyframes)) ? __it.data.keyframes.map(function (k) { return k && k.time; }) : [];
+  const __warnings = (__r.warnings || []).slice();
+  if (__prevTimes.length && !__prevTimes.every(function (t) { return __now.indexOf(t) >= 0; })) {
+    __warnings.push('this studio replaced the existing track of the actor (' + __prevTimes.length + ' key(s)) instead of merging: put the other keys in after choreographing.');
+  }
+  if (__other.length) {
+    __warnings.push('the actor already animates ' + __other.join(', ') + '; the beat keys leave those out, which the engine can break at the beat keys. Re-key ' + __other.join(', ') + ' with every key carrying them, after choreographing.');
+  }
+  if (__r.final && !__r.final.onScreen) __warnings.push('after the last beat the actor is off screen at [' + __r.final.x + ', ' + __r.final.y + '].');
+  const __res = { success: true, itemId: ${id}, beats: ${input.beats.length}, keyframes: __r.keyframes.length, duration: __r.end, final: __r.final };
+  if (__warnings.length) __res.warnings = __warnings;
+  return __res;
+})();`.trim();
+  }
+
   generateRelight(input: RelightInput): string {
     const S = (v: unknown) => JSON.stringify(v);
     const missing = (fn: string) => `if (typeof app.${fn} !== 'function') { return { success: false, action: ${S(input.action)}, error: 'this studio has no relight pass (app.${fn}) — it predates FxTool D5.' }; }`;

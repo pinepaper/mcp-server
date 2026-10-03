@@ -633,6 +633,10 @@
       "description": "One composition drawn in a built-in style (cut, ink, watercolor, dither, flow, ascii) as one item that redraws every exported frame. {style, duration, id, spec}"
     },
     {
+      "name": "pinepaper_choreograph",
+      "description": "Acting for any item: beats [{at, verb: pop|drop|hop|bounce|roll|fly|peek|shake|squash|enter|exit, to?}] → one squash-and-stretch track."
+    },
+    {
       "name": "pinepaper_relight",
       "description": "Light the 3D world with point/directional lights (post pass; PNG/PDF/MP4/WebM, ~0.4 s per 1080p frame; not saved). action: set|get|clear|list_lights."
     },

@@ -45,6 +45,7 @@ import {
   TextEffectInputSchema,
   DesignMediumInputSchema,
   RelightInputSchema,
+  ChoreographInputSchema,
   ShaderGraphInputSchema,
   ShatterImageInputSchema,
   ImportLayeredCharacterInputSchema,
@@ -2271,6 +2272,11 @@ async function handleToolCallInner(
       }
 
       // ─── 1.6.4: agent surface for the Tier-2 engine features ───
+      case 'pinepaper_choreograph': {
+        const input = ChoreographInputSchema.parse(args);
+        return executeOrGenerate(codeGenerator.generateChoreograph(input), `Choreograph: ${input.beats.map((b) => b.verb).join(' → ')}`, options, 'pinepaper_choreograph');
+      }
+
       case 'pinepaper_relight': {
         const input = RelightInputSchema.parse(args);
         return executeOrGenerate(codeGenerator.generateRelight(input), `Relight: ${input.action}`, options, 'pinepaper_relight');

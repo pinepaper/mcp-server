@@ -30,7 +30,7 @@
 
 PinePaper MCP Server enables AI assistants to create and animate graphics in [PinePaper Studio](https://pinepaper.studio) via the Model Context Protocol (MCP). Works with any AI that supports MCP tool calling (Claude, GPT, Gemini, local models, etc.).
 
-The server exposes **164 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
+The server exposes **165 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
 
 - Create geometric shapes, text collages, diagrams, and data charts
 - Apply 37+ character-level text effects and 28+ vertex deformation presets
@@ -41,7 +41,7 @@ The server exposes **164 tools** across drawing, animation, diagrams, maps, typo
 
 ## Running it: local or hosted
 
-**Local is free and complete.** Every one of the 164 tools works when you run
+**Local is free and complete.** Every one of the 165 tools works when you run
 this server yourself. There is no reduced tier and nothing held back.
 
 What it needs:
@@ -1446,7 +1446,7 @@ Fourteen new tools (121 → 135) and new actions across the surface — the rele
 
 ## Toolkits & Token Budget
 
-164 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
+165 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
 
 **Toolkit profiles** (`PINEPAPER_TOOLKIT`):
 
@@ -1649,7 +1649,7 @@ Generate instruction/code pairs for LLM fine-tuning:
 
 ## Tools Reference
 
-All 164 tools, grouped by the tag used for toolkit filtering.
+All 165 tools, grouped by the tag used for toolkit filtering.
 
 ### Canvas (`canvas`)
 | Tool | Description |
@@ -1711,6 +1711,7 @@ All 164 tools, grouped by the tag used for toolkit filtering.
 | `pinepaper_motion` | Generator motion engine: group and field motions |
 | `pinepaper_animate` | Apply a simple loop animation |
 | `pinepaper_keyframe_animate` | Timed keyframe animation |
+| `pinepaper_choreograph` | Acting for any item: hop, bounce, roll, fly, peek with squash and stretch |
 | `pinepaper_play_timeline` | Control playback, rate, progress, scroll-driven scrubbing |
 | `pinepaper_stagger` | Shape a delay across many items |
 | `pinepaper_flip` | Animate a layout change without describing the motion |
