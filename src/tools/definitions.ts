@@ -55,22 +55,47 @@ const EASING_LINES = KEYFRAME_EASINGS.map((e) => `- ${e}: ${EASING_DESCRIPTIONS[
  * Higher-level tools go first; the batch is the glue. One copy, so the places
  * a model reads it cannot drift apart.
  */
-export const CHOOSE_THE_DOOR = `CHOOSE THE HIGHEST-LEVEL TOOL FIRST. Primitive shapes over a generator backdrop with a pulse is the stock result users reject; reach for it only when nothing below fits the brief.
-- A scene or landscape drawn in an art style (cut paper, ink, watercolour, dither, flow, ASCII) → pinepaper_styled_scene
-- A story, several beats, a narrative from prose → pinepaper_story (from_text), then scene chains (pinepaper_scene_playback)
-- An ORIGINAL character from a description (a hero with a cape, a round robot, a cat in glasses), or a cast of variants → pinepaper_original_character (describe first, then create)
-- A character that acts (expressions, poses, walks) → pinepaper_character, pinepaper_stick, pinepaper_rigging; squash and stretch via pinepaper_deform
-- A number that counts up (a KPI roll-up, a year counter, a timer) → create_item text with counter: exact on every frame, steady width; year counters: counter {from: -30000, to: 2026, era: true}
-- Any item that moves with intent (pops in, hops, bounces, rolls, flies, peeks, lands) → pinepaper_choreograph: beats, not hand-timed keyframes
-- One element that becomes the next thing, and the next, with no cuts (a pill → a field → a dot → a card) → pinepaper_morph_sequence
-- A title or caption with craft → pinepaper_text_style (display styles; cursive with animate writes itself on), pinepaper_text_effect
-- A poster or layout in an aesthetic → pinepaper_design_system (compose); a collage → pinepaper_compose
-- A painted, stitched, hatched, inked or cut-paper look on shapes or photos → pinepaper_design_medium; photos also pinepaper_image_filter (watercolor, painterly)
-- A brand → pinepaper_brand_kit set (first): every item made afterwards inherits it; sound and music → pinepaper_sound, pinepaper_audio_beats, pinepaper_beat_cuts
-- Particles that must survive save, export and the cloud (confetti bursts, a trail) → pinepaper_emitter; custom per-frame drawing → pinepaper_render_hook
-- A camera move through the piece → pinepaper_camera_director; 3D → pinepaper_world3d (+ pinepaper_relight)
-pinepaper_agent_batch_execute then does the glue in ONE call: extra items, keyframes, relations, masks, effects, playback.
-If no tool reaches what the brief asks (for example, redrawing a subject in another art style), tell the user what is missing instead of handing over a lesser result as done.`;
+/** One row of the door table: a request type and the tools that answer it, in preference order. */
+type Door = { when: string; doors: Array<{ tool?: string; text: string }>; always?: boolean };
+const DOORS: Door[] = [
+  { when: 'A scene or landscape drawn in an art style (cut paper, ink, watercolour, dither, flow, ASCII)', doors: [{ tool: 'pinepaper_styled_scene', text: 'pinepaper_styled_scene' }] },
+  { when: 'A story, several beats, a narrative from prose', doors: [{ tool: 'pinepaper_story', text: 'pinepaper_story (from_text)' }, { tool: 'pinepaper_scene_playback', text: 'then scene chains (pinepaper_scene_playback)' }] },
+  { when: 'An ORIGINAL character from a description (a hero with a cape, a round robot, a cat in glasses), or a cast of variants', doors: [{ tool: 'pinepaper_original_character', text: 'pinepaper_original_character (describe first, then create)' }] },
+  { when: 'A character that acts (expressions, poses, walks)', doors: [{ tool: 'pinepaper_character', text: 'pinepaper_character' }, { tool: 'pinepaper_stick', text: 'pinepaper_stick' }, { tool: 'pinepaper_rigging', text: 'pinepaper_rigging' }, { tool: 'pinepaper_deform', text: 'squash and stretch via pinepaper_deform' }] },
+  { when: 'A number that counts up (a KPI roll-up, a year counter, a timer)', doors: [{ tool: 'pinepaper_create_item', text: 'create_item text with counter: exact on every frame, steady width; year counters: counter {from: -30000, to: 2026, era: true}' }] },
+  { when: 'Any item that moves with intent (pops in, hops, bounces, rolls, flies, peeks, lands)', doors: [{ tool: 'pinepaper_choreograph', text: 'pinepaper_choreograph: beats, not hand-timed keyframes' }] },
+  { when: 'One element that becomes the next thing, and the next, with no cuts (a pill → a field → a dot → a card)', doors: [{ tool: 'pinepaper_morph_sequence', text: 'pinepaper_morph_sequence' }] },
+  { when: 'A title or caption with craft', doors: [{ tool: 'pinepaper_text_style', text: 'pinepaper_text_style (display styles; cursive with animate writes itself on)' }, { tool: 'pinepaper_text_effect', text: 'pinepaper_text_effect' }] },
+  { when: 'A poster or layout in an aesthetic, or a collage', doors: [{ tool: 'pinepaper_design_system', text: 'pinepaper_design_system (compose)' }, { tool: 'pinepaper_compose', text: 'a collage: pinepaper_compose' }] },
+  { when: 'A painted, stitched, hatched, inked or cut-paper look on shapes or photos', doors: [{ tool: 'pinepaper_design_medium', text: 'pinepaper_design_medium' }, { tool: 'pinepaper_image_filter', text: 'photos also pinepaper_image_filter (watercolor, painterly)' }] },
+  { when: 'A brand', doors: [{ tool: 'pinepaper_brand_kit', text: 'pinepaper_brand_kit set (first): every item made afterwards inherits it' }] },
+  { when: 'Sound and music', doors: [{ tool: 'pinepaper_sound', text: 'pinepaper_sound' }, { tool: 'pinepaper_audio_beats', text: 'pinepaper_audio_beats' }, { tool: 'pinepaper_beat_cuts', text: 'pinepaper_beat_cuts' }] },
+  { when: 'Particles that must survive save, export and the cloud (confetti bursts, a trail), or custom per-frame drawing', doors: [{ tool: 'pinepaper_emitter', text: 'pinepaper_emitter' }, { tool: 'pinepaper_render_hook', text: 'custom drawing: pinepaper_render_hook' }] },
+  { when: 'A camera move through the piece, or 3D', doors: [{ tool: 'pinepaper_camera_director', text: 'pinepaper_camera_director' }, { tool: 'pinepaper_world3d', text: '3D: pinepaper_world3d' }, { tool: 'pinepaper_relight', text: 'pinepaper_relight' }] },
+];
+
+/**
+ * The door block for a host's tool list (D72; cloud request from a3). A host
+ * that offers only some tools passes their names: a row keeps only the doors
+ * that host has, and a row with none is dropped — so the model is never told
+ * to "use pinepaper_X" for a tool it cannot see. With no list, every door.
+ */
+export function buildDoorBlock(available?: Iterable<string>): string {
+  const has = available ? new Set(available) : null;
+  const rows = DOORS.map((d) => {
+    const doors = d.doors.filter((x) => !has || !x.tool || has.has(x.tool));
+    return doors.length ? `- ${d.when} → ${doors.map((x) => x.text).join('; ')}` : null;
+  }).filter(Boolean);
+  return [
+    'CHOOSE THE HIGHEST-LEVEL TOOL FIRST. Primitive shapes over a generator backdrop with a pulse is the stock result users reject; reach for it only when nothing below fits the brief.',
+    ...rows,
+    'pinepaper_agent_batch_execute then does the glue in ONE call: extra items, keyframes, relations, masks, effects, playback.',
+    'If no tool reaches what the brief asks (for example, redrawing a subject in another art style), tell the user what is missing instead of handing over a lesser result as done.',
+  ].join('\n');
+}
+
+/** The full door block (every tool), for the guide and a local server. */
+export const CHOOSE_THE_DOOR = buildDoorBlock();
 
 export const AI_AGENT_GUIDE = `⚠️ You are connected to PinePaper Studio via MCP tools. ALWAYS use these tools to create visual content.
 NEVER create standalone HTML pages, React components, or web apps as a substitute. Do NOT use frontend design skills or CSS-only animations instead of PinePaper.

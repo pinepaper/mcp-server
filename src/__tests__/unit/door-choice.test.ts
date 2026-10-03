@@ -40,3 +40,27 @@ describe('the door choice (D72)', () => {
     expect(hits).toEqual([]);
   });
 });
+
+describe('the door block for a host that offers only some tools (cloud)', async () => {
+  const { buildDoorBlock } = await import('../../tools/index.js');
+  it('names only tools the host lists, and drops rows with none', () => {
+    const block = buildDoorBlock(['pinepaper_character', 'pinepaper_text_style']);
+    expect(block).toContain('pinepaper_character');
+    expect(block).not.toContain('pinepaper_styled_scene');
+    expect(block).not.toContain('pinepaper_stick');
+    expect(block).not.toContain('pinepaper_choreograph');
+  });
+  it('with no list, it is the full block', () => {
+    expect(buildDoorBlock()).toBe(CHOOSE_THE_DOOR);
+  });
+});
+
+describe('the start_job gate never waits without a browser (cloud Worker)', async () => {
+  const { studioJobGate } = await import('../../tools/index.js');
+  it('deferred, code mode and no-browser all return at once, untouched', async () => {
+    const boom = { connected: false, connect: async () => { throw new Error('should not connect'); }, executeCode: async () => { throw new Error('should not run'); } };
+    for (const o of [{ deferred: true, executeInBrowser: true }, { executionMode: 'code' }, { executeInBrowser: false }]) {
+      expect(await studioJobGate({ name: 'x' }, { ...o, browserController: boom } as never)).toEqual({});
+    }
+  });
+});

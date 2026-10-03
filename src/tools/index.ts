@@ -1,6 +1,6 @@
-export { PINEPAPER_TOOLS, AI_AGENT_GUIDE, getToolByName, getToolNames, getToolsForVerbosity } from './definitions.js';
+export { PINEPAPER_TOOLS, AI_AGENT_GUIDE, CHOOSE_THE_DOOR, buildDoorBlock, getToolByName, getToolNames, getToolsForVerbosity } from './definitions.js';
 export type { ToolVerbosity } from './definitions.js';
-export { handleToolCall } from './handlers.js';
+export { handleToolCall, studioJobGate } from './handlers.js';
 export {
   getToolsForToolkit,
   detectToolkitFromEnvironment,
