@@ -60,9 +60,14 @@ const FINGERPRINT_JS = `function __ppFingerprint() {
   // pseudo-source 'camera', which no registry item carries.
   try { if (app.filterSystem && app.filterSystem.exportForSave) o.filters = S(app.filterSystem.exportForSave()); } catch (e) {}
   try {
-    const cam = app.getRelations ? app.getRelations('camera') : null;
-    const tilt = app.relationRegistry && app.relationRegistry.cameraTilt;
-    if (cam || tilt) o.camera = S([cam, tilt && tilt.serialize ? tilt.serialize() : null]);
+    // Camera keyframes live in relationRegistry._cameraAnimation.params (a
+    // virtual item, no registry entry), read through getCameraAnimationParams.
+    // getRelations('camera') looks in the associations and is always empty
+    // for them (sweep v3: camera_animate still read as no change).
+    const rr = app.relationRegistry;
+    const cam = rr && rr.getCameraAnimationParams ? rr.getCameraAnimationParams() : null;
+    const tilt = rr && rr.cameraTilt;
+    o.camera = S([cam, tilt && tilt.serialize ? tilt.serialize() : null]);
   } catch (e) {}
   try { const c = app.config || {}; o.background = S([c.currentBackgroundMode, c.currentBackgroundGenerator, c.generatorParams, app.canvasEl && app.canvasEl.style && app.canvasEl.style.backgroundColor]); } catch (e) {}
   try { const cs = app.getCanvasSize && app.getCanvasSize(); if (cs) o.canvas = cs.width + 'x' + cs.height + (cs.unbounded ? ':unbounded' : ''); } catch (e) {}

@@ -97,11 +97,19 @@ describe('the fingerprint is authored state, not the live frame (first live swee
     expect(probe(effectAfterJs([]), s.app, win).changed).toEqual(['items']);
   });
 
+  it('the same camera keyframes again read unchanged', () => {
+    const s = studio(); const win: Record<string, unknown> = {};
+    const kfs = [{ time: 0, zoom: 1 }, { time: 2, zoom: 1.3 }];
+    s.app.relationRegistry = { getCameraAnimationParams: () => ({ keyframes: kfs.map((k) => ({ ...k })) }) };
+    probe(EFFECT_BEFORE_JS, s.app, win);
+    expect(probe(effectAfterJs([]), s.app, win).changed).toEqual([]);
+  });
+
   it('scene filters and the camera track count as changes (sweep v2)', () => {
     const s = studio(); const win: Record<string, unknown> = {};
     const filters: unknown[] = []; const cam: unknown[] = [];
     s.app.filterSystem = { exportForSave: () => filters.slice() };
-    s.app.getRelations = (id: string) => (id === 'camera' ? cam.slice() : []);
+    s.app.relationRegistry = { getCameraAnimationParams: () => (cam.length ? { keyframes: cam.slice() } : null) };
     probe(EFFECT_BEFORE_JS, s.app, win);
     filters.push({ type: 'grayscale', params: { intensity: 1 } });
     cam.push({ type: 'camera_animates', params: { keyframes: [{ time: 0, zoom: 1 }, { time: 2, zoom: 2 }] } });
