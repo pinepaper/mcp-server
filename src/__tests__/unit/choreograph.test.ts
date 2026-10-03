@@ -117,6 +117,9 @@ describe('pinepaper_choreograph emitted code', () => {
     app.createSound = (spec: Record<string, any>, o: { startTime: number }) => { placed.push({ spec, at: o.startTime }); return { data: { id: 'snd_' + placed.length } }; };
     const r = run({ itemId: 'item_1', sound: true, beats: [{ at: 0, verb: 'pop' }, { at: 0.6, verb: 'bounce', times: 3, to: [700, 760] }] }, app);
     expect(r.sounds.map((x: any) => x.sound)).toEqual(['pop', 'tom', 'tom', 'tom']);
+    // MP4 priming swallows the first ~50 ms: the 0 s pop is placed at 0.06 s.
+    expect(r.sounds[0]).toMatchObject({ t: 0.06, movedFrom: 0 });
+    expect(placed[0].at).toBe(0.06);
     const toms = placed.filter((p) => p.spec.drum === 'tom').map((p) => p.spec.gain);
     expect(toms[0]).toBeGreaterThan(toms[1]);
     expect(toms[1]).toBeGreaterThan(toms[2]);

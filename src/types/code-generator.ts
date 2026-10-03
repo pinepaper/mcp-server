@@ -11925,8 +11925,13 @@ ${input.sound ? `  // SOUND ON THE ACTION (D68): one placed sound per moment the
       const base = (typeof app.sfxSpec === 'function' && app.sfxSpec(name)) || (typeof app.percussionSpec === 'function' && app.percussionSpec(name));
       if (!base) { if (__silent.indexOf(name) < 0) __silent.push(name); return; }
       const spec = Object.assign({}, base, { gain: Math.round(((base.gain || 0.8) * __gain * (0.35 + 0.65 * e.strength)) * 1000) / 1000 });
-      const it = app.createSound(spec, { startTime: e.time, duration: spec.duration || 0.5 });
-      if (it && it.data) __sounds.push({ t: e.time, kind: e.kind, sound: name, itemId: it.data.id });
+      // MP4 (AAC) encoder priming swallows the first ~50 ms of audio, and this
+      // muxer writes no edit list (the engine reports audio_lead_trimmed): a pop
+      // at 0 s exported as silence (prod retest of D68). 60 ms later is in sync
+      // to the eye and audible in every format.
+      const at = e.time < 0.06 ? 0.06 : e.time;
+      const it = app.createSound(spec, { startTime: at, duration: spec.duration || 0.5 });
+      if (it && it.data) __sounds.push(Object.assign({ t: at, kind: e.kind, sound: name, itemId: it.data.id }, at !== e.time ? { movedFrom: e.time } : {}));
     });
     if (__silent.length) __warnings.push('not in the sound catalogue, so silent: ' + __silent.join(', ') + ' (pinepaper_sound list_sfx / list_percussion for the names).');
   }
