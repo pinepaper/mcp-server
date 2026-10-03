@@ -11839,7 +11839,13 @@ ${guard}
     // The new item's OWN bounds: a bloom with reach (FxTool D60) is larger
     // than its source, centred on it, so the source's bounds are not these.
     const __ne = app.itemRegistry && typeof app.itemRegistry.get === 'function' ? app.itemRegistry.get(r.id) : null;
-    const __nb = __ne && __ne.item && __ne.item.bounds;
+    const __ni = __ne && __ne.item;
+    // An image item made from a data URL decodes ASYNCHRONOUSLY and has 0x0
+    // bounds until it does (prod read {width:0, height:0}); wait for it.
+    if (__ni && __ni.className === 'Raster' && !__ni.loaded && typeof __ni.once === 'function') {
+      await new Promise(function (resolve) { const t = setTimeout(resolve, 5000); __ni.once('load', function () { clearTimeout(t); resolve(); }); });
+    }
+    const __nb = __ni && __ni.bounds && __ni.bounds.width > 0 ? __ni.bounds : null;
     return { success: true, action: 'apply', target: 'item', itemId: r.id, sourceId: r.sourceId, sourceHidden: r.sourceHidden, graphId: r.graphId, width: r.width, height: r.height,
       ...(__nb ? { bounds: { x: __nb.x, y: __nb.y, width: __nb.width, height: __nb.height } } : {}) };
   }

@@ -83,4 +83,20 @@ describe('shader graph', () => {
     expect((await run(graph({ action: 'list' }), {})).success).toBe(false);
     expect(() => ShaderGraphInputSchema.parse({ action: 'apply', graphId: 'sg_1' })).toThrow(/requires target/);
   });
+
+describe('shader graph apply bounds wait for the image to decode', () => {
+  it('reads bounds after the load event, not the 0x0 before it', async () => {
+    const item: Record<string, any> = { className: 'Raster', loaded: false, bounds: { x: 960, y: 260, width: 0, height: 0 },
+      once(_ev: string, cb: () => void) { setTimeout(() => { item.loaded = true; item.bounds = { x: 617, y: 144, width: 686, height: 232 }; cb(); }, 5); } };
+    const app = { shaderGraph: { create() {} }, itemRegistry: { get: () => ({ item }) },
+      applyShaderGraph: async () => ({ ok: true, target: 'item', id: 'item_12', sourceId: 'item_4', sourceHidden: true, width: 1372, height: 464 }) };
+    const r = await run(graph({ action: 'apply', target: 'item_4', graphId: 'sg_1' }), app);
+    expect(r.bounds).toEqual({ x: 617, y: 144, width: 686, height: 232 });
+  });
+  it('omits bounds rather than report 0x0', async () => {
+    const app = { shaderGraph: { create() {} }, itemRegistry: { get: () => ({ item: { bounds: { x: 1, y: 1, width: 0, height: 0 } } }) },
+      applyShaderGraph: async () => ({ ok: true, target: 'item', id: 'item_12', width: 4, height: 4 }) };
+    expect((await run(graph({ action: 'apply', target: 'item_4', graphId: 'sg_1' }), app)).bounds).toBeUndefined();
+  });
+});
 });
