@@ -5243,6 +5243,7 @@ export const StoryInputSchema = z.object({
   spec: z.record(z.string(), z.unknown()).optional().describe('apply_spec: the story spec — usually one from `distill`, edited.'),
   images: z.array(z.union([z.string(), z.record(z.string(), z.unknown())])).optional().describe('plan_book: the images to lay out, as ids or specs.'),
   options: z.record(z.string(), z.unknown()).optional().describe('Assembly or layout options, passed through.'),
+  nav: z.enum(['panels', 'scenes']).optional().describe("from_text / apply_spec: 'scenes' is the VIDEO form — one scene per part on a scene chain, cut in time (export it as MP4); 'panels' (default) the WIDGET form — tabs a viewer clicks through (export_widget_html)."),
 })
   .refine((v) => !['distill', 'from_text'].includes(v.action) || !!v.text, { message: 'this action requires text', path: ['text'] })
   .refine((v) => v.action !== 'apply_spec' || !!v.spec, { message: 'apply_spec requires spec', path: ['spec'] })

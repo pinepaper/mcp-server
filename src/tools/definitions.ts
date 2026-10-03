@@ -60,7 +60,7 @@ type Door = { when: string; doors: Array<{ tool?: string; text: string }>; alway
 const DOORS: Door[] = [
   { when: 'A scene or landscape drawn in an art style (cut paper, ink, watercolour, dither, flow, ASCII)', doors: [{ tool: 'pinepaper_styled_scene', text: 'pinepaper_styled_scene' }] },
   { when: 'Make THIS — an item, a character, the whole scene — look like a style (8-bit, blueprint, ink sketch, flat modern, print halftone, paper cutout…)', doors: [{ tool: 'pinepaper_look', text: 'pinepaper_look (describe first: the engine grades each look native / faithful / impression)' }] },
-  { when: 'A story, several beats, a narrative from prose', doors: [{ tool: 'pinepaper_story', text: 'pinepaper_story (from_text)' }, { tool: 'pinepaper_scene_playback', text: 'then scene chains (pinepaper_scene_playback)' }] },
+  { when: 'A story, several beats, a narrative from prose — a video or film in N parts, or a click-through widget', doors: [{ tool: 'pinepaper_story', text: "pinepaper_story (from_text; nav: 'scenes' for a VIDEO — a scene chain that cuts — 'panels' for a widget)" }, { tool: 'pinepaper_scene_playback', text: 'scene chains (pinepaper_scene_playback: cutSound, play)' }] },
   { when: 'An ORIGINAL character from a description (a hero with a cape, a round robot, a cat in glasses), or a cast of variants', doors: [{ tool: 'pinepaper_original_character', text: 'pinepaper_original_character (describe first, then create)' }] },
   { when: 'A character that acts (expressions, poses, walks)', doors: [{ tool: 'pinepaper_character', text: 'pinepaper_character' }, { tool: 'pinepaper_stick', text: 'pinepaper_stick' }, { tool: 'pinepaper_rigging', text: 'pinepaper_rigging' }, { tool: 'pinepaper_deform', text: 'squash and stretch via pinepaper_deform' }] },
   { when: 'A number that counts up (a KPI roll-up, a year counter, a timer)', doors: [{ tool: 'pinepaper_create_item', text: 'create_item text with counter: exact on every frame, steady width; year counters: counter {from: -30000, to: 2026, era: true}' }] },
@@ -2897,7 +2897,9 @@ The geometry is vendored from mcp-cloud, which makes this a three-repo artifact:
       idempotentHint: false,
       openWorldHint: false,
     },
-    description: `A piece of prose becomes a scene.
+    description: `FORM — nav: 'scenes' is the VIDEO story: one scene per part on a scene chain that cuts in time (export as MP4); each part's length follows its role (hook 2.5 s, stat 3 s, section 3.5 s, quote 3 s, exit 3 s; 0.4 s transitions), and the reply carries the cut times. nav: 'panels' (the default) is the WIDGET story: tabs a viewer clicks through (export_widget_html). A video brief needs 'scenes'.
+
+A piece of prose becomes a scene.
 
 - distill: reduce an article to its story beats and draw NOTHING. This is the half worth having on its own — a caller can read what the distiller made of the text, edit the beats, and only then assemble. Discovering the reading by looking at a finished scene is the expensive way round.
 - from_text: distill and assemble in one call, when the reading does not need checking.
@@ -2906,6 +2908,7 @@ The geometry is vendored from mcp-cloud, which makes this a three-repo artifact:
     inputSchema: {
       type: 'object',
       properties: {
+        nav: { type: 'string', enum: ['panels', 'scenes'], description: "'scenes' = the video form (a scene chain that cuts); 'panels' = the widget form (default)" },
         action: { type: 'string', enum: ['distill', 'from_text', 'apply_spec', 'plan_book'], description: 'Which story operation.' },
         text: { type: 'string', description: 'distill / from_text: the prose.' },
         spec: { type: 'object', description: 'apply_spec: the story spec, usually a distilled one you edited.' },

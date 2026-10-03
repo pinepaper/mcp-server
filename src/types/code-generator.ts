@@ -13388,7 +13388,14 @@ ${needWorld}
    */
   generateStory(input: StoryInput): string {
     const S = (v: unknown) => JSON.stringify(v);
-    const opts = S(input.options ?? {});
+    // nav decides the story's FORM (D109): 'scenes' = a scene chain (video),
+    // 'panels' = tabs (widget). storyFromText reads options.nav; a spec carries
+    // its own nav, which a top-level nav fills in when the spec has none.
+    const opts = S({ ...(input.options ?? {}), ...(input.nav ? { nav: input.nav } : {}) });
+    const spec = input.spec && input.nav && (input.spec as Record<string, unknown>).nav === undefined ? { ...input.spec, nav: input.nav } : input.spec;
+    const cuts = input.nav === 'scenes'
+      ? `\n  // The video form's cut times (s), for checking the edit.\n  try { if (app.sceneManager && app.sceneManager.getChainCuts) __out.cuts = app.sceneManager.getChainCuts(); } catch (_) {}`
+      : '';
     switch (input.action) {
       case 'distill':
         return `
@@ -13415,7 +13422,8 @@ ${needWorld}
   // fine in-page. Not a cycle; JSON.stringify succeeded on this the whole time.
   // The groups have to stay for in-page callers, so the wrapper takes what
   // travels: the spec, the ids, the count.
-  return { success: true, spec: r.spec, partIds: r.partIds, partCount: r.partCount, beats: r.beats };
+  const __out = { success: true, nav: (r.spec && r.spec.nav) || ${S(input.nav ?? 'panels')}, spec: r.spec, partIds: r.partIds, partCount: r.partCount, beats: r.beats };${cuts}
+  return __out;
 })();`.trim();
 
       case 'apply_spec':
@@ -13423,9 +13431,10 @@ ${needWorld}
 // Story: assemble a spec you already have
 (async function() {
   if (typeof app.applyStorySpec !== 'function') { return { success: false, error: 'app.applyStorySpec unavailable — update FxTool' }; }
-  const r = await app.applyStorySpec(${S(input.spec)}, ${opts});
+  const r = await app.applyStorySpec(${S(spec)}, ${opts});
   if (!r || r.ok === false) { return { success: false, error: (r && (r.reason || r.error)) || 'the spec did not assemble' }; }
-  return { success: true, ...r };
+  const __out = { success: true, ...r };${cuts}
+  return __out;
 })();`.trim();
 
       case 'plan_book':
