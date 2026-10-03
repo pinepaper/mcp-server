@@ -262,6 +262,13 @@ A click can play a sound (`on_event_play_sound`), an event can fire at set
 times (`pinepaper_event` `at`), and a scene chain can put a sound on every
 cut (`cutSound`).
 
+### New: original characters
+
+`pinepaper_original_character` builds a character from a base (person, robot,
+cat, bird, blob) and a variant: palette, hair, eyes, accessories, proportions
+and a look. It can generate a whole cast from seeds, and the characters can
+look at the cursor, react to events and turn when dragged.
+
 ### New: one element, many states
 
 `pinepaper_morph_sequence` morphs one element through a series of shapes with
