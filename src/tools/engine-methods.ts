@@ -60,6 +60,7 @@ export const REQUIRED_ENGINE_METHODS: readonly string[] = [
   'configureWorld3D',
   'convertTextToCollage',
   'create',
+  'createCharacter',
   'createCursiveText',
   'createEquationPath',
   'createEvent',

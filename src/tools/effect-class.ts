@@ -141,6 +141,8 @@ export const ACTION_CLASS: Readonly<Record<string, EffectClass>> = Object.freeze
   'pinepaper_map_regions:select': 'side-effect',
   'pinepaper_map_regions:deselect': 'side-effect',
   'pinepaper_construction_sequence:clear': 'mutates',
+  'pinepaper_original_character:bases': 'read-only',
+  'pinepaper_original_character:random': 'read-only',   // computes a variant; draws nothing
   'pinepaper_flip:record': 'side-effect',          // snapshots the before-state only
   'pinepaper_path:set_locked': 'unchecked',        // a lock flag the fingerprint does not read
   'pinepaper_path:unlock_all': 'unchecked',

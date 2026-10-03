@@ -41,7 +41,13 @@ if (!existsSync(FXTOOL)) {
 
 const FIX = process.argv.includes('--fix');
 // Fixture-only entries that are deliberately not engine relations.
-const FIXTURE_ONLY = new Set(['unknown']);   // the escape hatch for an unrecognised edge
+const FIXTURE_ONLY = new Set([
+  'unknown',                                   // the escape hatch for an unrecognised edge
+  // TEMPORARY: registered lazily by the character system (FxTool #105, D66) and
+  // missing from relation-names.json until fxtool's export captures lazy
+  // registrations. Remove when it does — the guard then checks them normally.
+  'looks_at', 'reacts_to', 'drag_to_turn',
+]);
 
 let raw;
 try {

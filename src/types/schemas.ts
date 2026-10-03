@@ -459,6 +459,9 @@ export const RelationTypeSchema = z.enum([
   'on_event_store_set',
   'on_event_store_increment',
   'on_event_play_sound',
+  'looks_at',
+  'reacts_to',
+  'drag_to_turn',
   // --- Proximity — the pointer entering or leaving an item ---
   'on_enter_set_color',
   'on_enter_set_property',
@@ -4746,6 +4749,22 @@ export const EmitterInputSchema = z.object({
   spec: z.record(z.string(), z.unknown()).describe('create: the whole spec. set: the keys to change (merged).'),
 }).refine((v) => v.action !== 'set' || !!v.itemId, { message: 'set requires itemId', path: ['itemId'] });
 export type EmitterInput = z.infer<typeof EmitterInputSchema>;
+
+/** pinepaper_original_character (D66): an ORIGINAL character from a base rig and a declarative variant. */
+export const OriginalCharacterInputSchema = z.object({
+  action: z.enum(['bases', 'describe', 'random', 'create']),
+  base: z.string().optional().describe('person | robot | cat | bird | blob (bases lists them).'),
+  variant: z.record(z.string(), z.unknown()).optional().describe('create: {palette, features, look, seed, name} — legal values from describe.'),
+  seed: z.number().int().optional().describe('random: same (base, seed) → the same variant.'),
+  fixed: z.record(z.string(), z.unknown()).optional().describe('random: traits every member shares (a look, proportions), merged over the random choice.'),
+  at: z.object({ x: z.number(), y: z.number() }).optional().describe('create: x, and y = the FEET.'),
+  height: z.number().positive().optional().describe('create: drawn height px (default 320).'),
+  scale: z.number().positive().optional().describe('create: multiplier of the default height.'),
+  rig: z.boolean().optional().describe('create: build the skeleton (default true).'),
+})
+  .refine((v) => !['random', 'create'].includes(v.action) || !!v.base, { message: 'random and create require base', path: ['base'] })
+  .refine((v) => v.action !== 'random' || v.seed !== undefined, { message: 'random requires seed', path: ['seed'] });
+export type OriginalCharacterInput = z.infer<typeof OriginalCharacterInputSchema>;
 
 /** pinepaper_morph_sequence (D73): one element through N states as a morphs_to chain. */
 export const MorphSequenceInputSchema = z.object({

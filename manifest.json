@@ -633,6 +633,10 @@
       "description": "One composition drawn in a built-in style (cut, ink, watercolor, dither, flow, ascii) as one item that redraws every exported frame. {style, duration, id, spec}"
     },
     {
+      "name": "pinepaper_original_character",
+      "description": "Original characters from a base (person|robot|cat|bird|blob) + variant. action: bases|describe (read first)|random {base, seed}|create {base, variant, at}."
+    },
+    {
       "name": "pinepaper_morph_sequence",
       "description": "One element through N states, no cuts: {itemId, states:[{at, to | shape}], camera?: true (rides the morphs), sound?: true}."
     },

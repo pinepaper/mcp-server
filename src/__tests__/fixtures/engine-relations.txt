@@ -34,6 +34,7 @@ deform_squeeze
 deform_twist
 deform_wave
 deform_wobble
+drag_to_turn
 driven_by
 effect_blast
 effect_bubbles
@@ -82,6 +83,7 @@ is_circumcenter_of
 is_midpoint_of
 lies_on_line
 locomotion
+looks_at
 maintains_distance
 menubar_group
 mirrors
@@ -127,6 +129,7 @@ part_of
 part_of_figure
 points_at
 pose_layer
+reacts_to
 repels
 restores_from
 spring_follow

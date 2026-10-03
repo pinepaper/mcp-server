@@ -106,6 +106,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
     'pinepaper_keyframe_animate',
     'pinepaper_choreograph',
     'pinepaper_morph_sequence',
+    'pinepaper_original_character',
     'pinepaper_play_timeline',
     'pinepaper_get_animatable_properties',
     'pinepaper_get_available_easings',

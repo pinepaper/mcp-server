@@ -197,7 +197,7 @@ import {
   AccessibilityCheckInput,
   InstantiateOntologyInput,
   LintSceneInput,
-  MediaInput, TextStyleInput, TextEffectInput, DesignMediumInput, RelightInput, ShaderGraphInput, ChoreographInput, EmitterInput, RenderHookInput, MorphSequenceInput, ShatterImageInput, ImportLayeredCharacterInput, GameInput, World3DInput,
+  MediaInput, TextStyleInput, TextEffectInput, DesignMediumInput, RelightInput, ShaderGraphInput, ChoreographInput, EmitterInput, RenderHookInput, MorphSequenceInput, OriginalCharacterInput, ShatterImageInput, ImportLayeredCharacterInput, GameInput, World3DInput,
   CropImageInput,
   PathOpInput,
   MotionInput,
@@ -12125,6 +12125,37 @@ ${cam ? `  // The camera rides the SAME timing: framing each state as its morph 
   } else { res.warning = (res.warning ? res.warning + ' ' : '') + ${S(`no sound placed: ${sound} is not in the catalogue, or this studio cannot place sounds.`)}; }
 ` : ''}  return res;
 })();`.trim();
+  }
+
+  /**
+   * pinepaper_original_character (D66): app.createCharacter and its schema
+   * helpers. The helpers read the SAME table the validator uses, so a model
+   * reads the legal values (describe) before it guesses; a wrong one is
+   * refused by name and nothing is drawn.
+   */
+  generateOriginalCharacter(input: OriginalCharacterInput): string {
+    const S = (v: unknown) => JSON.stringify(v);
+    const guard = `if (typeof app.createCharacter !== 'function') { return { success: false, error: 'this studio has no original characters (app.createCharacter) — it predates FxTool D66.' }; }`;
+    switch (input.action) {
+      case 'bases':
+        return `(function() {\n  ${guard}\n  return { success: true, action: 'bases', bases: app.listCharacterBases() };\n})();`;
+      case 'describe':
+        return `(function() {\n  ${guard}\n  return { success: true, action: 'describe', schema: app.describeCharacterVariantSchema(${input.base ? S(input.base) : ''}) };\n})();`;
+      case 'random':
+        return `(function() {\n  ${guard}\n  const r = app.randomCharacterVariant(${S(input.base)}, ${S(input.seed)}${input.fixed ? `, { fixed: ${S(input.fixed)} }` : ''});\n  if (!r || r.ok === false) return { success: false, action: 'random', error: (r && r.errors && r.errors.join('; ')) || 'no variant' };\n  return { success: true, action: 'random', base: ${S(input.base)}, seed: ${S(input.seed)}, variant: r.variant };\n})();`;
+      default: {
+        const spec = { base: input.base, ...(input.variant ? { variant: input.variant } : {}), ...(input.at ? { x: input.at.x, y: input.at.y } : {}),
+          ...(input.height !== undefined ? { height: input.height } : {}), ...(input.scale !== undefined ? { scale: input.scale } : {}), ...(input.rig !== undefined ? { rig: input.rig } : {}) };
+        return `
+// Original character: create
+(async function() {
+  ${guard}
+  const r = await app.createCharacter(${S(spec)});
+  if (!r || r.ok === false) return { success: false, action: 'create', errors: (r && r.errors) || [], error: (r && r.errors && r.errors.join('; ')) || 'the character was refused' };
+  return { success: true, action: 'create', itemId: r.id, rigId: r.rigId, parts: r.parts, name: r.name, base: r.base, look: r.look, variant: r.variant };
+})();`.trim();
+      }
+    }
   }
 
   /** pinepaper_emitter (D29): create('emitter', spec) / setEmitter(id, patch). */

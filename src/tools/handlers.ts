@@ -48,6 +48,7 @@ import {
   ChoreographInputSchema,
   EmitterInputSchema,
   MorphSequenceInputSchema,
+  OriginalCharacterInputSchema,
   RenderHookInputSchema,
   ShaderGraphInputSchema,
   ShatterImageInputSchema,
@@ -2411,6 +2412,11 @@ async function handleToolCallInner(
       }
 
       // ─── 1.6.4: agent surface for the Tier-2 engine features ───
+      case 'pinepaper_original_character': {
+        const input = OriginalCharacterInputSchema.parse(args);
+        return executeOrGenerate(codeGenerator.generateOriginalCharacter(input), `Original character: ${input.action}`, options, 'pinepaper_original_character');
+      }
+
       case 'pinepaper_morph_sequence': {
         const input = MorphSequenceInputSchema.parse(args);
         return executeOrGenerate(codeGenerator.generateMorphSequence(input), `Morph sequence: ${input.states.length} states`, options, 'pinepaper_morph_sequence');

@@ -30,7 +30,7 @@
 
 PinePaper MCP Server enables AI assistants to create and animate graphics in [PinePaper Studio](https://pinepaper.studio) via the Model Context Protocol (MCP). Works with any AI that supports MCP tool calling (Claude, GPT, Gemini, local models, etc.).
 
-The server exposes **168 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
+The server exposes **169 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
 
 - Create geometric shapes, text collages, diagrams, and data charts
 - Apply 37+ character-level text effects and 28+ vertex deformation presets
@@ -41,7 +41,7 @@ The server exposes **168 tools** across drawing, animation, diagrams, maps, typo
 
 ## Running it: local or hosted
 
-**Local is free and complete.** Every one of the 168 tools works when you run
+**Local is free and complete.** Every one of the 169 tools works when you run
 this server yourself. There is no reduced tier and nothing held back.
 
 What it needs:
@@ -1507,7 +1507,7 @@ Fourteen new tools (121 → 135) and new actions across the surface — the rele
 
 ## Toolkits & Token Budget
 
-168 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
+169 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
 
 **Toolkit profiles** (`PINEPAPER_TOOLKIT`):
 
@@ -1710,7 +1710,7 @@ Generate instruction/code pairs for LLM fine-tuning:
 
 ## Tools Reference
 
-All 168 tools, grouped by the tag used for toolkit filtering.
+All 169 tools, grouped by the tag used for toolkit filtering.
 
 ### Canvas (`canvas`)
 | Tool | Description |
@@ -1817,6 +1817,7 @@ All 168 tools, grouped by the tag used for toolkit filtering.
 | `pinepaper_generate_status` | Collect a generation that outlived its timeout |
 | `pinepaper_styled_scene` | One composition drawn in a built-in style |
 | `pinepaper_apply_effect` | Apply sparkle, blast, and other effects |
+| `pinepaper_original_character` | Original characters from a base rig and a variant; a cast from seeds |
 | `pinepaper_morph_sequence` | One element through many states, with the camera riding the morphs |
 | `pinepaper_emitter` | Particles as a saved, deterministic item: bursts and trails |
 | `pinepaper_render_hook` | Custom per-frame drawing a saved scene carries |
