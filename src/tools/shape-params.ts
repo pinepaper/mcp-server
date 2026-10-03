@@ -3,9 +3,9 @@
  *
  * What each registry-backed shape reads, and how a caller reaches it.
  *
- * Source: FxTool origin/main 8e4a795a5c06dcd94e21a28acd13ec217aa97449
+ * Source: FxTool origin/main 2e2e6f03f4b85f5bd71bea7bbcfae7d2dacdb06c
  *   js/PinePaper.js + 5 shape modules
- * sha256: 2b685a5f0689075f
+ * sha256: 3ee94407629f7528
  *
  * A shape's `create` receives a `config`, never the caller's `params`.
  * PinePaper.js's registryConfig literal is the only bridge between the two, so
@@ -48,6 +48,7 @@ export const ACCEPTED_CREATE_PARAMS: readonly string[] = Object.freeze([
   'fontWeight',
   'from',
   'height',
+  'hud',
   'id',
   'innerRadiusRatio',
   'justification',
@@ -57,6 +58,7 @@ export const ACCEPTED_CREATE_PARAMS: readonly string[] = Object.freeze([
   'labelPosition',
   'layer',
   'monoline',
+  'motionBlur',
   'name',
   'nib',
   'opacity',
@@ -68,7 +70,9 @@ export const ACCEPTED_CREATE_PARAMS: readonly string[] = Object.freeze([
   'radius1',
   'radius2',
   'relationBehavior',
+  'rgbSplit',
   'rotation',
+  'screenSpace',
   'secondaryColor',
   'segments',
   'shadowBlur',
@@ -83,6 +87,7 @@ export const ACCEPTED_CREATE_PARAMS: readonly string[] = Object.freeze([
   'soundSpec',
   'spacing',
   'src',
+  'stepTiming',
   'strokeCap',
   'strokeColor',
   'strokeJoin',
@@ -157,23 +162,28 @@ export const MODIFY_CHANGE_READS: readonly string[] = Object.freeze([
   'fontStyle',
   'fontWeight',
   'height',
+  'hud',
   'justification',
   'keyframes',
   'label',
+  'motionBlur',
   'opacity',
   'palette',
   'pathData',
   'relationBehavior',
+  'rgbSplit',
   'rotation',
   'scale',
   'scaleX',
   'scaleY',
+  'screenSpace',
   'segments',
   'shadowBlur',
   'shadowColor',
   'shadowOffset',
   'src',
   'staggerDelay',
+  'stepTiming',
   'strokeColor',
   'strokePosition',
   'strokeWidth',

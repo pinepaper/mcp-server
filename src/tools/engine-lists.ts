@@ -4,16 +4,16 @@
  * Name lists the engine owns and the tool surface must offer exactly. See
  * scripts/sync-engine-lists.mjs for why each is generated.
  *
- * Source: FxTool origin/main 8e4a795a5c06dcd94e21a28acd13ec217aa97449
- *   js/core/KeyframeInterpolator.js  sha256: 4c38752d86cae944
+ * Source: FxTool origin/main 2e2e6f03f4b85f5bd71bea7bbcfae7d2dacdb06c
+ *   js/core/KeyframeInterpolator.js  sha256: 1134ba0e2ce5d1f5
  *   js/world3d/worlds.js  sha256: 0e0973f7587c06e1
- *   js/core/DesignMedia.js  sha256: a371877509a5d63a
- *   js/FilterSystem.js  sha256: 276b29622e467f37
+ *   js/core/DesignMedia.js  sha256: ab07f330e4060cb7
+ *   js/FilterSystem.js  sha256: d644cff008a38ced
  *   js/core/Provenance.js  sha256: 27e4d8becfa382c8
  *   js/core/StyledScene.js  sha256: ea647c014de59faf
  */
 
-/** 37 names: EASING_NAMES, the keys of the engine's easing table. Keyframes, masks, relations and the camera all resolve through it. */
+/** 39 names: EASING_NAMES, the keys of the engine's easing table. Keyframes, masks, relations and the camera all resolve through it. */
 export const ENGINE_EASING_NAMES = [
   'linear',
   'easeIn',
@@ -52,6 +52,8 @@ export const ENGINE_EASING_NAMES = [
   'easeInCirc',
   'easeOutCirc',
   'easeInOutCirc',
+  'hold',
+  'step',
 ] as const;
 
 /** 11 paths: WORLD_SCHEMA entries of kind 'color' — the world spec's colour fields. */
@@ -126,8 +128,8 @@ export const FILTER_PARAM_RANGES: Readonly<Record<string, Readonly<Record<string
   saturation: { value: [-100, 100] },
   invert: { intensity: [0, 1] },
   blur: { radius: [0, 20] },
-  noise: { intensity: [0, 100], grainSize: [1, 4], refresh: [1, 8], seed: [0, 99999] },
-  vignette: { intensity: [0, 1], radius: [0, 1] },
+  noise: { intensity: [0, 100], grainSize: [1, 4], refresh: [0, 8], seed: [0, 99999] },
+  vignette: { intensity: [0, 1], radius: [0, 1], falloff: [0.5, 4] },
   vintage: { intensity: [0, 1] },
   colorOverlay: { intensity: [0, 1] },
   sharpen: { intensity: [0, 100] },
@@ -179,8 +181,8 @@ export const FILTER_DOCS: Readonly<Record<string, string>> = Object.freeze({
   saturation: "Adjust color saturation — value -100..100, default 0",
   invert: "Invert colors — intensity 0..1, default 1",
   blur: "Apply gaussian blur — radius 0..20, default 5",
-  noise: "Add film grain effect — intensity 0..100, default 20; monochrome (boolean), default true; grainSize 1..4; refresh 1..8; seed 0..99999, default 0",
-  vignette: "Add vignette darkening — intensity 0..1, default 0.5; radius 0..1, default 0.5",
+  noise: "Add film grain effect — intensity 0..100, default 20; monochrome (boolean), default true; grainSize 1..4; refresh 0..8; seed 0..99999, default 0; blend add|multiply, default add",
+  vignette: "Add vignette darkening — intensity 0..1, default 0.5; radius 0..1, default 0.5; color (color); falloff 0.5..4, default 2",
   vintage: "Retro vintage look — intensity 0..1, default 1",
   colorOverlay: "Add color tint — color (color), default #ff0000; intensity 0..1, default 0.3; blendMode multiply|overlay|screen, default overlay",
   sharpen: "Increase image sharpness — intensity 0..100, default 50",
