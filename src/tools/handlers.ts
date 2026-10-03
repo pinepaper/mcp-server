@@ -46,6 +46,8 @@ import {
   DesignMediumInputSchema,
   RelightInputSchema,
   ChoreographInputSchema,
+  EmitterInputSchema,
+  RenderHookInputSchema,
   ShaderGraphInputSchema,
   ShatterImageInputSchema,
   ImportLayeredCharacterInputSchema,
@@ -2345,6 +2347,16 @@ async function handleToolCallInner(
       }
 
       // ─── 1.6.4: agent surface for the Tier-2 engine features ───
+      case 'pinepaper_emitter': {
+        const input = EmitterInputSchema.parse(args);
+        return executeOrGenerate(codeGenerator.generateEmitter(input), `Emitter: ${input.action}`, options, 'pinepaper_emitter');
+      }
+
+      case 'pinepaper_render_hook': {
+        const input = RenderHookInputSchema.parse(args);
+        return executeOrGenerate(codeGenerator.generateRenderHook(input), `Render hook: ${input.action}`, options, 'pinepaper_render_hook');
+      }
+
       case 'pinepaper_choreograph': {
         const input = ChoreographInputSchema.parse(args);
         return executeOrGenerate(codeGenerator.generateChoreograph(input), `Choreograph: ${input.beats.map((b) => b.verb).join(' → ')}`, options, 'pinepaper_choreograph');

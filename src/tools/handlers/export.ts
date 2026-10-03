@@ -59,7 +59,7 @@ export const exportHandlers: Record<string, ExportHandler> = {
       try { await controller.connect(); } catch { return executeOrGenerate(code, 'Capture a project document', options, 'pinepaper_export_scene'); }
     }
     const run = await controller.executeCode(code, false, { governorTimeoutMs: 120_000 });
-    const v = (run.result ?? {}) as { success?: boolean; error?: string; json?: string; counts?: Record<string, unknown> };
+    const v = (run.result ?? {}) as { success?: boolean; error?: string; json?: string; counts?: Record<string, unknown>; unserialized?: Array<{ kind?: string; id?: string }> };
     if (!run.success || v.success === false || typeof v.json !== 'string') {
       return errorResult(ErrorCodes.EXECUTION_ERROR, run.error || v.error || 'the project document could not be captured', { code }, { toolName: 'pinepaper_export_scene' });
     }
@@ -67,7 +67,14 @@ export const exportHandlers: Record<string, ExportHandler> = {
     await mkdir(dir, { recursive: true });
     const filePath = join(dir, `pinepaper_project_${Date.now()}.json`);
     await writeFile(filePath, v.json, 'utf-8');
-    const result = { success: true, filePath, bytes: Buffer.byteLength(v.json), counts: v.counts, restore: `pinepaper_import_scene { path: "${filePath}" }` };
+    const lost = Array.isArray(v.unserialized) ? v.unserialized : [];
+    const result = {
+      success: true, filePath, bytes: Buffer.byteLength(v.json), counts: v.counts, restore: `pinepaper_import_scene { path: "${filePath}" }`,
+      ...(lost.length ? {
+        unserialized: lost,
+        warning: `${lost.length} piece(s) of per-frame drawing will NOT be in the file: ${lost.map((u) => `${u.kind ?? 'callback'} ${u.id ?? ''}`.trim()).join(', ')}. They are JavaScript functions, which a document cannot carry. Re-create them as pinepaper_render_hook (saved as source) or pinepaper_emitter (saved as data) to keep them.`,
+      } : {}),
+    };
     return { content: [{ type: 'text' as const, text: `Project saved: ${filePath}\n\n${JSON.stringify(result, null, 2)}` }] };
   },
 

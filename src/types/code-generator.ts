@@ -196,7 +196,7 @@ import {
   AccessibilityCheckInput,
   InstantiateOntologyInput,
   LintSceneInput,
-  MediaInput, TextStyleInput, TextEffectInput, DesignMediumInput, RelightInput, ShaderGraphInput, ChoreographInput, ShatterImageInput, ImportLayeredCharacterInput, GameInput, World3DInput,
+  MediaInput, TextStyleInput, TextEffectInput, DesignMediumInput, RelightInput, ShaderGraphInput, ChoreographInput, EmitterInput, RenderHookInput, ShatterImageInput, ImportLayeredCharacterInput, GameInput, World3DInput,
   CropImageInput,
   PathOpInput,
   MotionInput,
@@ -2383,8 +2383,10 @@ const ITEM_SETTERS = [
 /** Lift screenSpace / hud / stepTiming out of a properties bag (mutated), explicit fields winning. */
 function takeItemSetters(props: Record<string, unknown>, explicit: ItemSetters = {}): ItemSetters {
   const out: ItemSetters = {};
-  const ss = explicit.screenSpace ?? props.screenSpace ?? props.hud;
-  if (ss !== undefined) out.screenSpace = ScreenSpaceSchema.parse(ss);
+  // From properties a caller may write hud: 1; it means on. The top-level
+  // field is still a strict boolean.
+  const ss = explicit.screenSpace ?? (props.screenSpace ?? props.hud);
+  if (ss !== undefined) out.screenSpace = explicit.screenSpace !== undefined ? ScreenSpaceSchema.parse(ss) : !!ss;
   const st = explicit.stepTiming !== undefined ? explicit.stepTiming : props.stepTiming;
   if (st !== undefined) out.stepTiming = StepTimingSchema.parse(st);
   delete props.screenSpace; delete props.hud; delete props.stepTiming;
@@ -7608,7 +7610,11 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
   if (typeof app.captureProjectDocument !== 'function') { return { success: false, error: 'app.captureProjectDocument unavailable — update FxTool' }; }
   ${SCENE_COUNTS_JS}
   const doc = app.captureProjectDocument(${JSON.stringify(name ? { name } : {})});
-  return { success: true, json: JSON.stringify(doc), counts: __ppSceneCounts() };
+  // What the document CANNOT carry (D29): render hooks added as raw functions
+  // and frame callbacks from generated code. Named, never dropped in silence.
+  const __un = (doc && Array.isArray(doc.unserialized)) ? doc.unserialized
+    : (app.listUnserializedCallbacks ? app.listUnserializedCallbacks() : []);
+  return { success: true, json: JSON.stringify(doc), counts: __ppSceneCounts(), unserialized: __un };
 })();`.trim();
   }
 
@@ -11999,6 +12005,54 @@ ${input.sound ? `  // SOUND ON THE ACTION (D68): one placed sound per moment the
 ` : ''}
   if (__warnings.length) __res.warnings = __warnings;
   return __res;
+})();`.trim();
+  }
+
+  /** pinepaper_emitter (D29): create('emitter', spec) / setEmitter(id, patch). */
+  generateEmitter(input: EmitterInput): string {
+    const S = (v: unknown) => JSON.stringify(v);
+    if (input.action === 'set') {
+      return `
+// Emitter: change a spec
+(function() {
+  if (typeof app.setEmitter !== 'function') { return { success: false, error: 'this studio has no emitter item (app.setEmitter) — it predates FxTool D29.' }; }
+  const r = app.setEmitter(${S(input.itemId)}, ${S(input.spec)});
+  if (!r || r.ok === false) { return { success: false, error: (r && r.error) || 'the emitter change was refused' }; }
+  return { success: true, action: 'set', itemId: ${S(input.itemId)}, spec: r.spec };
+})();`.trim();
+    }
+    return `
+// Emitter: create
+(function() {
+  if (typeof app.setEmitter !== 'function') { return { success: false, error: 'this studio has no emitter item (app.setEmitter) — it predates FxTool D29.' }; }
+  const it = app.create('emitter', ${S(input.spec)});
+  // A bad spec comes back null with an emitter-invalid warning; the reason
+  // reaches this reply through the governor's warnings.
+  if (!it) { return { success: false, error: 'the emitter spec was refused' }; }
+  const id = it.data && (it.data.registryId || it.data.id);
+  if (!id) { return { success: false, error: 'the emitter was made but not registered — no usable id' }; }
+  return { success: true, action: 'create', itemId: id };
+})();`.trim();
+  }
+
+  /** pinepaper_render_hook (D29): drawing saved as source, re-installed on load. */
+  generateRenderHook(input: RenderHookInput): string {
+    const S = (v: unknown) => JSON.stringify(v);
+    const guard = `if (typeof app.registerRenderHook !== 'function') { return { success: false, error: 'this studio has no saved render hooks (app.registerRenderHook) — it predates FxTool D29.' }; }`;
+    if (input.action === 'list') {
+      return `(function() {\n  ${guard}\n  return { success: true, action: 'list', hooks: app.listRenderHooks() };\n})();`;
+    }
+    if (input.action === 'unregister') {
+      return `(function() {\n  ${guard}\n  const had = app.unregisterRenderHook(${S(input.id)});\n  if (!had) return { success: false, error: 'no render hook ' + ${S(input.id)} };\n  return { success: true, action: 'unregister', id: ${S(input.id)} };\n})();`;
+    }
+    const spec = { id: input.id, source: input.source, ...(input.layer ? { layer: input.layer } : {}), ...(input.deterministic !== undefined ? { deterministic: input.deterministic } : {}), ...(input.seed !== undefined ? { seed: input.seed } : {}) };
+    return `
+// Render hook: register (saved as source)
+(function() {
+  ${guard}
+  const r = app.registerRenderHook(${S(spec)});
+  if (!r || r.ok === false) { return { success: false, error: (r && r.error) || 'the render hook was refused' }; }
+  return { success: true, action: 'register', id: r.id, layer: r.layer, deterministic: r.deterministic, seed: r.seed };
 })();`.trim();
   }
 

@@ -4711,6 +4711,26 @@ export const RelightInputSchema = z.object({
   { message: 'set requires at least one light (or enabled: false)', path: ['lights'] });
 export type RelightInput = z.infer<typeof RelightInputSchema>;
 
+/** pinepaper_emitter — the data-driven particle item (FxTool D29). The engine validates the spec and refuses by name. */
+export const EmitterInputSchema = z.object({
+  action: z.enum(['create', 'set']),
+  itemId: z.string().optional().describe('set: the emitter to change.'),
+  spec: z.record(z.string(), z.unknown()).describe('create: the whole spec. set: the keys to change (merged).'),
+}).refine((v) => v.action !== 'set' || !!v.itemId, { message: 'set requires itemId', path: ['itemId'] });
+export type EmitterInput = z.infer<typeof EmitterInputSchema>;
+
+/** pinepaper_render_hook — per-frame drawing saved as SOURCE (FxTool D29). */
+export const RenderHookInputSchema = z.object({
+  action: z.enum(['register', 'unregister', 'list']),
+  id: z.string().min(1).optional(),
+  source: z.string().min(1).optional().describe('register: JS that evaluates to (ctx, t, info) => {}.'),
+  layer: z.enum(['above', 'below']).optional(),
+  deterministic: z.boolean().optional(),
+  seed: z.number().int().optional(),
+}).refine((v) => v.action === 'list' || !!v.id, { message: 'register / unregister require id', path: ['id'] })
+  .refine((v) => v.action !== 'register' || !!v.source, { message: 'register requires source', path: ['source'] });
+export type RenderHookInput = z.infer<typeof RenderHookInputSchema>;
+
 /** pinepaper_choreograph — beat verbs compiled to one squash-and-stretch track (D67). */
 const ChoreoPointSchema = z.union([z.tuple([z.number(), z.number()]), z.object({ x: z.number(), y: z.number() })]);
 const ChoreoEdgeSchema = z.enum(['left', 'right', 'top', 'bottom']);

@@ -633,6 +633,14 @@
       "description": "One composition drawn in a built-in style (cut, ink, watercolor, dither, flow, ascii) as one item that redraws every exported frame. {style, duration, id, spec}"
     },
     {
+      "name": "pinepaper_emitter",
+      "description": "Particles as a saved, deterministic item (cloud-safe). action: create|set {spec: bursts[{t,x,y,count}] | target+rate (trail), shape, palette, speed, gravity…}."
+    },
+    {
+      "name": "pinepaper_render_hook",
+      "description": "Per-frame drawing saved as source (survives save/load). action: register {id, source \"(ctx,t,info)=>{}\", layer}|unregister|list."
+    },
+    {
       "name": "pinepaper_choreograph",
       "description": "Acting for any item: beats [{at, verb: pop|drop|hop|bounce|roll|fly|peek|shake|squash|enter|exit, to?}] → one squash-and-stretch track."
     },

@@ -64,6 +64,7 @@ export const CHOOSE_THE_DOOR = `CHOOSE THE HIGHEST-LEVEL TOOL FIRST. Primitive s
 - A poster or layout in an aesthetic → pinepaper_design_system (compose); a collage → pinepaper_compose
 - A painted, stitched, hatched, inked or cut-paper look on shapes or photos → pinepaper_design_medium; photos also pinepaper_image_filter (watercolor, painterly)
 - A brand → pinepaper_brand_kit set (first): every item made afterwards inherits it; sound and music → pinepaper_sound, pinepaper_audio_beats, pinepaper_beat_cuts
+- Particles that must survive save, export and the cloud (confetti bursts, a trail) → pinepaper_emitter; custom per-frame drawing → pinepaper_render_hook
 - A camera move through the piece → pinepaper_camera_director; 3D → pinepaper_world3d (+ pinepaper_relight)
 pinepaper_agent_batch_execute then does the glue in ONE call: extra items, keyframes, relations, masks, effects, playback.
 If no tool reaches what the brief asks (for example, redrawing a subject in another art style), tell the user what is missing instead of handing over a lesser result as done.`;
@@ -7540,6 +7541,8 @@ USE WHEN:
     },
     description: `Apply a visual effect to an item.
 
+EFFECT OR EMITTER: apply_effect is a live look on an item. For particles a saved scene, a template, the cloud render and every export must reproduce frame for frame — confetti at 2 s, a trail behind a moving item — use pinepaper_emitter: its particles are a pure function of its spec and the scene time.
+
 USE WHEN:
 - Adding sparkle/glitter effects
 - Creating burst/explosion, fire, smoke effects
@@ -7857,6 +7860,56 @@ EXAMPLE: { style: 'ink', duration: 6 }`,
         id: { type: 'string', description: 'Scene id (default "styled-scene"); the same id replaces the scene.' },
         spec: { type: 'object', description: "The composition; omitted keys take the 'valley' preset.", additionalProperties: true },
       },
+    },
+  },
+  {
+    name: 'pinepaper_emitter',
+    annotations: { title: 'Particle Emitter', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    description: `Particles as an ITEM whose every frame is a pure function of its spec and the scene time — so the preview, capture_frames, every export, a saved project, a template and the cloud render all draw the same particles, scrubbing backwards included. The serialisable, cloud-safe choice; pinepaper_apply_effect is a live look on an item.
+
+ACTIONS:
+- create: { spec } → itemId
+- set: { itemId, spec } — merge a partial spec onto the emitter's.
+
+SPEC:
+- mode: 'burst' (default) — bursts: [{ t, x, y, count, …per-burst overrides }]: a pop of particles at scene time t.
+- mode: 'trail' (or give target) — target (an item id), rate (per second), emitWindows [[t0, t1], …], window, offset: particles shed from a moving item.
+- look and physics (per emitter or per burst): shape ('circle' | 'rect' | 'dash' | 'star' | 'confetti', or an array), palette [colours], size / sizes / sizeEnd, speed + angle ranges or velocities, gravity (px/s², +down), drag, friction, lifetime, fadeIn / fadeOut, spin, opacity, jitter, seed.
+An unknown shape, mode or bad range is refused with the engine's reason — never defaulted.
+
+EXAMPLE — confetti at 2 s:
+{ action: 'create', spec: { bursts: [{ t: 2, x: 960, y: 400, count: 80 }], shape: 'confetti', palette: ['#f43f5e', '#facc15', '#22d3ee'], speed: [300, 700], angle: [-150, -30], gravity: 900, lifetime: 2.5, seed: 7 } }`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['create', 'set'] },
+        itemId: { type: 'string', description: 'set: the emitter' },
+        spec: { type: 'object', additionalProperties: true, description: 'create: the whole spec; set: the keys to change' },
+      },
+      required: ['action', 'spec'],
+    },
+  },
+  {
+    name: 'pinepaper_render_hook',
+    annotations: { title: 'Render Hook', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    description: `Custom per-frame drawing that a saved scene CARRIES: SOURCE TEXT, compiled and run under the governor's loop guards with seeded Math, saved in the project document, the template and undo, and re-installed on load. (A raw function added with code is not saved — pinepaper_export_scene { full: true } names any such as unserialized.)
+
+ACTIONS:
+- register: { id, source, layer? ('above' | 'below'), deterministic? (true), seed? } — source evaluates to (ctx, t, info) => {}: ctx in canvas coordinates, t the scene time in seconds, info { width, height, frame, seed }. 'above' draws over every item, 'below' under them. deterministic reseeds Math.random from (seed, frame) each call, so a frame always draws the same.
+- unregister: { id }   list: the saved hooks.
+
+Reach for it when no tool draws the look (a scanline overlay, a custom texture pass). For particles, pinepaper_emitter is data rather than code.
+
+EXAMPLE: { action: 'register', id: 'scanlines', layer: 'above', source: "(ctx, t, info) => { ctx.globalAlpha = 0.08; for (let y = (t * 40) % 4; y < info.height; y += 4) ctx.fillRect(0, y, info.width, 1); }" }`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['register', 'unregister', 'list'] },
+        id: { type: 'string' }, source: { type: 'string' },
+        layer: { type: 'string', enum: ['above', 'below'] },
+        deterministic: { type: 'boolean' }, seed: { type: 'integer' },
+      },
+      required: ['action'],
     },
   },
   {
