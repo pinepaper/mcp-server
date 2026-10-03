@@ -295,6 +295,19 @@ and WebM exports, and the reply says how much time it adds to an export.
 over an item or the whole scene. `pinepaper_design_medium` gains
 `sdf_stroke`, a smooth pressure-sensitive brush stroke from a list of points.
 
+### New: handwriting that writes itself on
+
+`pinepaper_text_style` cursive takes `animate: true` and writes the words on
+over `duration` seconds, with no keyframes to add. A `nib` chooses the pen:
+`'broad'` for calligraphic thick and thin strokes, `'monoline'` for one even
+line. Unknown cursive options are now refused rather than ignored.
+
+### New: ink and charcoal on what you already drew
+
+`pinepaper_design_medium` `apply` with `medium: 'ink'` or `'charcoal'`
+restyles an existing stroke, title or group in place, with a hand-drawn line
+that boils. The item keeps its id, animation and relations.
+
 ### Changed: asset search uses Iconify and Font Awesome
 
 `pinepaper_search_assets` no longer searches SVGRepo or OpenClipart. Neither
@@ -306,6 +319,16 @@ either by name, or importing one of their asset ids, says so.
 - `pinepaper_add_filter` offers every filter the studio has, including dither,
   CMYK and dot halftones, edge detection, HSL and colour tint, each with its
   parameter ranges.
+- Maps: a highlight takes the colour you give it, and `opacity` tints the
+  land. Highlight, colouring and `get_highlighted` report the regions that
+  were actually coloured and name any that are not on the map;
+  `get_at_point` returns the region under a point; `add_marker` adds the
+  marker it reports.
+- `pinepaper_agent_start_job` fixes an unbounded canvas at the size it
+  reports, so a PNG export is the full canvas rather than a crop of the
+  artwork.
+- Tool descriptions at every level quote counts and action lists that match
+  the tools.
 
 ## What's new in 1.6.18
 
