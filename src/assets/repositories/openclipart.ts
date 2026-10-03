@@ -87,7 +87,7 @@ export class OpenClipartAdapter implements AssetRepository {
       }));
     } catch (error) {
       console.error('[OpenClipartAdapter] Search error:', error);
-      return [];
+      throw error;
     }
   }
 

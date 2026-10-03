@@ -105,7 +105,10 @@ describe('generateInstantiateOntology codegen', () => {
     expect(code).toContain("typeof app.instantiateOntology === 'function'");
     // awaitImages: the studio decorates rasters on their 'load' event; the call
     // returns once the last one has landed, so the screenshot after it is whole.
-    expect(code).toContain('await app.instantiateOntology(doc, {"canvas":{"width":800,"height":600},"awaitImages":true})');
+    expect(code).toContain('const __opts = {"canvas":{"width":800,"height":600},"awaitImages":true};');
+    expect(code).toContain('await app.instantiateOntology(doc, __opts)');
+    // Registry ids, not the document's (gate run 3).
+    expect(code).toContain('itemIds: __new');
     expect(code).toContain('"pp:fillColor":"#ff0000"');
     expect(code).toContain('"pp:radius":40');
     // the fallback still exists for older studios and says what it lost

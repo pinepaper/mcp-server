@@ -2042,7 +2042,7 @@ export const ConnectInputSchema = z.preprocess((v) => {
   if (o.lineWidth === undefined && o.strokeWidth !== undefined) { o.lineWidth = o.strokeWidth; delete o.strokeWidth; }
   return o;
 }, z.object({
-  id: z.string().optional().describe('Stable connector ID. Assign your own and reuse it as `connectorId` in update/remove — the engine otherwise mints a Date.now()-based ID no caller can predict'),
+  id: z.string().optional().describe('Requested connector id. The studio may not honour it (the result says idHonoured): always use the connectorId the result returns for update/remove.'),
   sourceItemId: z.string().describe('Registry ID of source item'),
   targetItemId: z.string().describe('Registry ID of target item'),
   routing: ConnectorRoutingSchema.optional().default('orthogonal'),
@@ -2063,7 +2063,7 @@ export type ConnectInput = z.infer<typeof ConnectInputSchema>;
  * Connect specific ports input
  */
 export const ConnectPortsInputSchema = z.object({
-  id: z.string().optional().describe('Stable connector ID. Assign your own and reuse it as `connectorId` in update/remove — the engine otherwise mints a Date.now()-based ID no caller can predict'),
+  id: z.string().optional().describe('Requested connector id. The studio may not honour it (the result says idHonoured): always use the connectorId the result returns for update/remove.'),
   sourceItemId: z.string().describe('Registry ID of source item'),
   sourcePort: PortPositionSchema.describe('Port position on source'),
   targetItemId: z.string().describe('Registry ID of target item'),
@@ -4366,7 +4366,7 @@ export const InstantiateOntologyInputSchema = z.object({
   canvas: z.object({
     width: z.number().positive(),
     height: z.number().positive(),
-  }).optional().describe('Canvas size used to tile component roots (default 1080×1080).'),
+  }).optional().describe('Canvas size to lay out for (default: the live canvas).'),
   defaultGeometry: z.record(z.string(), z.object({
     width: z.number(),
     height: z.number(),

@@ -9,8 +9,12 @@
 import { describe, it, expect } from 'bun:test';
 import { getToolsForVerbosity } from '../../tools/index.js';
 
-describe('every enum action is documented', () => {
-  for (const tool of getToolsForVerbosity('verbose')) {
+// BOTH levels: compact is the DEFAULT, and a compact override is separate
+// prose. Batch 2 fixed the verbose text only, and the default users kept the
+// stale one (gate run 3).
+for (const level of ['verbose', 'compact'] as const)
+describe(`every enum action is documented (${level})`, () => {
+  for (const tool of getToolsForVerbosity(level)) {
     const actions = (tool.inputSchema?.properties as Record<string, { enum?: string[] }> | undefined)?.action?.enum;
     if (!actions) continue;
     it(tool.name, () => {

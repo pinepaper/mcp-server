@@ -128,7 +128,7 @@ Text: text (content, fontSize, fontFamily, color, fontWeight)
 All items: opacity, shadowColor, shadowBlur, blendMode, strokeColor, strokeWidth
 
 SVG imports for recognizable objects (planes, cars, animals, buildings):
-  pinepaper_search_assets → pinepaper_import_asset (850k+ SVG icons)
+  pinepaper_search_assets → pinepaper_import_asset (open SVG icon repositories)
   An imported SVG is ONE opaque item. To move/recolor its parts (a wheel, a window), pinepaper_group action:"break_apart" splits it into individually movable, re-grouped sub-parts.
 
 Photos / raster images (on-device, no upload):
@@ -214,7 +214,7 @@ Measurement: pinepaper_measurement — rulers, grid, snap-to-grid, get item dime
 
 ─── CANVAS & EXPORT ───
 
-Presets: instagram (1080x1080), youtube (1920x1080), tiktok (1080x1920), twitter (1200x675)
+Canvas presets (pinepaper_set_canvas_size preset): instagram-post (1080x1080), instagram-story (1080x1920), tiktok (1080x1920), youtube-thumbnail (1280x720), full-hd-1080p (1920x1080), twitter-post (1200x675). Platform names (instagram, youtube) are agent_export's, not canvas presets.
 Export: pinepaper_agent_export (SVG/PNG/GIF/MP4/WebM/PDF, plus WAV for the soundtrack alone), pinepaper_export_svg
 Widget: pinepaper_export_widget (pp:PinePaper ontology JSON), pinepaper_export_widget_html (self-contained HTML with tree-shaken runtime)`;
 
@@ -277,13 +277,11 @@ USE WHEN:
 - Custom canvas size requirements
 - Design elements extend beyond current canvas bounds
 
-COMMON PRESETS:
-- instagram-square: 1080x1080
-- instagram-story: 1080x1920
-- youtube-thumbnail: 1280x720
-- twitter-post: 1200x675
-- hd-landscape: 1920x1080
-- hd-portrait: 1080x1920
+COMMON PRESETS (studio keys; an unknown key is refused with the full list):
+- instagram-post: 1080x1080 · instagram-portrait · instagram-story: 1080x1920
+- youtube-thumbnail: 1280x720 · youtube-short · tiktok: 1080x1920
+- twitter-post: 1200x675 · facebook-post · linkedin-post · pinterest-pin
+- full-hd-1080p: 1920x1080 · hd-720p: 1280x720 · a4-portrait / a4-landscape and other print sizes
 
 Max canvas size: 16384 per side (a 12000 px DOOH or projection canvas fits); above 8192 Safari / iOS may not render it, Chrome and Firefox do. For wedding invitations, event cards, or detailed designs, use at least 1080x1080 or larger.`,
     inputSchema: {
@@ -293,7 +291,7 @@ Max canvas size: 16384 per side (a 12000 px DOOH or projection canvas fits); abo
         height: { type: 'number', description: 'Canvas height in pixels (100-16384)' },
         preset: {
           type: 'string',
-          description: "A studio preset key instead of width/height, e.g. 'instagram-post', 'instagram-story', 'youtube-thumbnail', 'tiktok', 'full-hd'. An unknown key is refused with the known ones.",
+          description: "A studio preset key instead of width/height, e.g. 'instagram-post', 'instagram-story', 'youtube-thumbnail', 'tiktok', 'full-hd-1080p'. An unknown key is refused with the known ones.",
         },
       },
       // width + height, or preset alone (enforced by the Zod schema).
@@ -1221,7 +1219,7 @@ EXAMPLES:
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: `Search for free SVG assets from open repositories (SVGRepo, OpenClipart, Iconify, FontAwesome).
+    description: `Search for free SVG assets from open repositories (SVGRepo, OpenClipart, Iconify, FontAwesome). The result's sources says how each repository answered (ok | timeout | error); one that is down does not hold up the others, and a search that names one repository fails if it is down.
 
 USE WHEN:
 - User wants icons, illustrations, or clipart
@@ -2652,9 +2650,10 @@ RECIPE — assemble-from-pieces: shatter with keepSource, keyframe each tile fro
 
 Input is the output of a single-image layer decomposer (See-through — one flat anime drawing in, ~20 occlusion-inpainted layers out — or any PSD-style layer dump with the same manifest shape). The decomposition model does NOT run here: it needs a GPU and minutes per image; run it where it fits and import the folder.
 
-Layer tags map onto the exact role tokens the expresses presets read (eye_left, pupil_right, mouth…), so blink / smile / talk work on the imported character immediately — through an 'expresses' RELATION (pinepaper_add_relation relationType expresses), which is the only thing that drives them. pinepaper_animate applies ambient motion (bounce, pulse, wobble) and cannot blink: asking it to is a silent no-op.
+Layer tags resolve to the role tokens the expresses presets read: decomposer tags (eyel / eyer, iridesl / iridesr, eyebrowl / eyebrowr, hairf, mouth, face…) and the role tokens themselves (eye_left, pupil_right…) both work, in any case and with _ or - separators, so blink / smile / talk work on the imported character immediately — through an 'expresses' RELATION (pinepaper_add_relation relationType expresses), which is the only thing that drives them. pinepaper_animate applies ambient motion (bounce, pulse, wobble) and cannot blink: asking it to is a silent no-op.
 
-Params: { info — the decomposer manifest, whose parts live under info.parts (or info.tag2pinfo) as an OBJECT KEYED BY TAG, not a layers[] array: { eye_left: { xyxy: [x0,y0,x1,y1], depth_median: <draw order> }, … } plus frame_size [h,w]. An array here imports nothing and reports no parts. images ({tag: PNG data URL or CORS-reachable https URL} — data URLs are the reliable path; ~20 layers of base64 is a big call, use URLs when you can), position?, scale?, name? }
+Params: { info — the decomposer manifest, whose parts live under info.parts (or info.tag2pinfo) as an OBJECT KEYED BY TAG, not a layers[] array: { eyel: { xyxy: [x0,y0,x1,y1], depth_median: <draw order> }, … } plus frame_size [h,w]. An array here imports nothing and reports no parts. images ({tag: PNG data URL or CORS-reachable https URL} — data URLs are the reliable path; ~20 layers of base64 is a big call, use URLs when you can), position?, scale?, name? }
+A supplied image that does not land (no manifest entry, no usable xyxy) FAILS the call by name, with skipped: [...] and the groupId of what did land; layers that imported without a role are listed in unroled.
 Returns: { groupId, parts, roles, rolesWired, warnings }
 
 CHECK rolesWired: a character importing with 0 roles renders perfectly and silently refuses to animate — that number is the difference between a picture and a puppet.`,
@@ -2742,7 +2741,7 @@ A partial composition reports as a failure with the elements that did not create
         title: { type: 'string', description: 'compose: the headline most styles build around.' },
         subtitle: { type: 'string', description: 'compose: the supporting line.' },
         body: { type: 'string', description: 'compose: body copy, where the style has room for it.' },
-        width: { type: 'number', description: 'compose: canvas width. compose SETS the canvas to its size (the style picks a default otherwise, and the result says when the canvas was resized), so pass your canvas size to keep it.' },
+        width: { type: 'number', description: 'compose: canvas width. compose SETS the canvas to the size it laid out for. Most styles honour width/height; a few lay out at their own fixed size, and the result warns when the requested size was not used. canvasResized says when the canvas changed.' },
         height: { type: 'number', description: 'compose: canvas height.' },
         variant: { type: 'string', description: "compose: a style-specific variant, e.g. art deco's 'emerald'." },
         draw: { type: 'boolean', description: 'compose: draw it (default true). false returns the scene and ops as data and draws nothing.' },
@@ -3273,7 +3272,7 @@ POSE MOTION — build a performance out of saved poses:
   · plan: true returns the seams without touching the skeleton, so you can check the joins first.
 - move_root: a deterministic locomotion track, keyed in SCENE SECONDS on the same clock as the pose sequence. Without it a walk cycle is a march on the spot; with a last keyframe shorter than the performance, the figure arrives early and stands there.
 - auto_walk / auto_breath / auto_idle / auto_jump: one-call procedural layers. breath and idle find their bones BY NAME (spine/chest/body, head/hip/spine) and refuse with that list if the rig uses other names.
-- bake_animation: freeze the whole rig into plain item keyframes for export. Needs items ATTACHED to bones — a bare skeleton has no output.
+- bake_animation: { skeletonId, options?: { duration? (2), fps? (30), detach? (true), write? (true) } } → { written, keyframes, detached, wrote } — freeze the whole rig into plain item keyframes for export. Needs items ATTACHED to bones. It DETACHES the items (the bones stop driving them, so the keyframes are what plays); pass options.detach:false to keep the rig driving.
 - add_secondary_motion: spring chains for tails, hair, cloth. skin_path: per-vertex deformation of a curved path.
 
 ACTIONS:
@@ -3395,7 +3394,7 @@ EXAMPLE doc: { "nodes": [ {"id":"bar","type":"pp:Rectangle","width":300,"height"
             width: { type: 'number' },
             height: { type: 'number' },
           },
-          description: 'Canvas size used to tile component roots (default 1080×1080).',
+          description: 'Canvas size to lay out for (default: the live canvas). The result returns registry itemIds, the document ids as docIds, and idMap pairing them.',
         },
         defaultGeometry: {
           type: 'object',
@@ -6337,7 +6336,7 @@ RETURNS:
       properties: {
         id: {
           type: 'string',
-          description: 'Stable ID for the connector. Assign your own and reuse it as `connectorId` in pinepaper_update_connector / pinepaper_remove_connector — creation does not return an ID you can rely on. Without one the engine mints a timestamp-based ID that no caller can predict.',
+          description: 'Requested connector id. The studio may not honour it (the result says idHonoured): always use the connectorId the result returns in pinepaper_update_connector / pinepaper_remove_connector.',
         },
         sourceItemId: {
           type: 'string',
@@ -6435,7 +6434,7 @@ Same as pinepaper_connect: routing, lineColor, lineWidth, lineStyle, headStyle, 
       properties: {
         id: {
           type: 'string',
-          description: 'Stable ID for the connector. Assign your own and reuse it as `connectorId` in pinepaper_update_connector / pinepaper_remove_connector — creation does not return an ID you can rely on. Without one the engine mints a timestamp-based ID that no caller can predict.',
+          description: 'Requested connector id. The studio may not honour it (the result says idHonoured): always use the connectorId the result returns in pinepaper_update_connector / pinepaper_remove_connector.',
         },
         sourceItemId: {
           type: 'string',
@@ -6888,7 +6887,7 @@ EXAMPLES:
     description: `Load a map and import/export its config. Call action: "load" first.
 
 ACTIONS:
-- load           — { mapId: "usa"|"world"|"worldHighRes"|<custom>, projection?, center?: [lon, lat], options? } — center (and options.scale) frame the map; this is the way to show one region
+- load           — { mapId: "usa"|"world"|"worldHighRes"|<custom>, projection?, center?: [lon, lat], options? } — center is the projection's centre; options.scale is the d3 projection scale, UNIT-LESS (hundreds: about 600 fills India on a 1080-tall canvas). center alone does not zoom
 - pan, zoom      — REFUSED: the map has no view transform, and a camera move would change only the studio view, which a canvas export ignores. For a moving frame, keyframe a camera animation and export with framing:"camera"
 - export_config  — {}
 - import_custom  — { url? | geoJson? (geojson accepted), options?: { projection?, fillColor? } }
@@ -8317,7 +8316,7 @@ After validation: user reviews screenshot → feedback → modify/recreate as ne
 OPERATION TYPES (13) — use in this order:
 
 CANVAS SETUP:
-  set_canvas_size — {width, height} or {preset: "instagram-post"|"instagram-story"|"youtube-thumbnail"|"tiktok"|"full-hd"|...} (studio preset keys, not platform names; an unknown one is refused with the list)
+  set_canvas_size — {width, height} or {preset: "instagram-post"|"instagram-story"|"youtube-thumbnail"|"tiktok"|"full-hd-1080p"|...} (studio preset keys, not platform names; an unknown one is refused with the list)
   set_background — {backgroundColor: "#hex"}
   execute_generator — {generatorName, generatorParams} → fills canvas with procedural art (paints WITHOUT fully registering items — see get_items; custom generator names need skipValidation:true)
     Generators: drawBokeh, drawGradientMesh, drawWaves, drawSunburst, drawSunsetScene, drawGrid, drawCircuit, drawPattern, drawStackedCircles, drawGeometricAbstract, drawWindField, drawFluidFlow, drawOrganicFlow, drawNoiseTexture, drawGlobeWireframe
@@ -8366,7 +8365,7 @@ ANIMATION NOTES:
 
 EXAMPLE — Animated sky scene with timed reveals:
 {operations: [
-  {type: "set_canvas_size", preset: "youtube"},
+  {type: "set_canvas_size", preset: "full-hd-1080p"},
   {type: "execute_generator", generatorName: "drawGradientMesh", generatorParams: {colors: ["#1e3a5f", "#87CEEB", "#fbbf24"], bgColor: "#0c1445", blobCount: 4}},
   {type: "create", itemType: "circle", position: {x: 1600, y: 150}, properties: {radius: 80, color: "#fbbf24", shadowColor: "#fbbf24", shadowBlur: 40}},
   {type: "create", itemType: "ellipse", position: {x: 400, y: 180}, properties: {radiusX: 100, radiusY: 35, color: "#ffffff", opacity: 0.8}},
@@ -9013,8 +9012,8 @@ Three-phase analysis:
 
 Quality tiers: basic (<0.4), fair (0.4-0.6), good (0.6-0.8), excellent (>=0.8)
 
-DEFINITION SHAPE (a template document; every field optional, the items and relations sit under data):
-{ id?, name?, category?, dimensions?: { width, height }, duration? (s), description?, tags?: [..], semantics?: {..},
+DEFINITION SHAPE (a template document; id, name, category and data are REQUIRED, the rest optional; items and relations sit under data):
+{ id, name, category, dimensions?: { width, height }, duration? (s), description?, tags?: [..], semantics?: {..},
   data: {
     items: [{ id, type ('circle', 'text' …), x?, y? | position?: [x, y], content?, animationType?, keyframes?: [{ time, properties: {..}, easing? }], mask?: { type } }],
     relations: [{ type ('orbits' …), source | from, target | to, params? }],

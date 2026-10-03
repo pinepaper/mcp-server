@@ -68,3 +68,10 @@ describe('connector style keys (gate run 3)', () => {
     expect(ConnectInputSchema.parse({ sourceItemId: 'a', targetItemId: 'b', strokeColor: '#0f0' }).lineColor).toBe('#0f0');
   });
 });
+
+describe('camera framing honours scale (gate C7)', () => {
+  it('scale 0.5 halves the camera frame', () => {
+    const code = gen.generateAgentExport({ format: 'mp4', framing: 'camera', scale: 0.5 } as never);
+    expect(code).toContain('const __cs = 0.5;');
+  });
+});

@@ -47,7 +47,7 @@ describe('an export is sized by the request, not by the renderer', () => {
 
   it('camera framing asks for the artboard, not the backing store', () => {
     const code = png({ format: 'mp4', framing: 'camera' });
-    expect(code).toContain('cameraDims = { width: camBase.width');
+    expect(code).toContain('cameraDims = { width: __ev(camBase.width), height: __ev(camBase.height) }');
     expect(code).not.toContain('canvasEl ? canvasEl.width');
   });
 

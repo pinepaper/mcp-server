@@ -54,14 +54,48 @@ describe('pinepaper_import_layered_character', () => {
     // bundle.images must answer .get() — passing the plain object through would
     // throw 'bundle.images must be a Map' on every single call.
     const c = codeGenerator.generateImportLayeredCharacter(ImportLayeredCharacterInputSchema.parse({ info: INFO, images: IMAGES }));
-    expect(c).toContain('new Map(Object.entries(');
+    expect(c).toContain('const images = new Map();');
     expect(c).toContain('await app.importLayeredCharacter(bundle');
   });
 
   it('surfaces rolesWired — 0 roles is a picture pretending to be a puppet', () => {
     const c = codeGenerator.generateImportLayeredCharacter(ImportLayeredCharacterInputSchema.parse({ info: INFO, images: IMAGES }));
     expect(c).toContain('rolesWired: Object.keys(r.roles || {}).length');
-    expect(c).toContain('warnings: r.warnings');
+    expect(c).toContain('...(r.warnings || [])');
+  });
+
+  // Gate 1.6.19: eye_left / eye_right were skipped as "no image found" while the
+  // call reported success with rolesWired 2. Run the EMITTED code against a fake
+  // importer that applies the engine's lookup rule (images.has(normalizePartTag))
+  // and its taxonomy's suffix rule (role tokens are not tags: eyel is).
+  it('keys reach the engine normalised + role tokens aliased; a dropped layer fails by name', async () => {
+    const engineNorm = (t: string) => t.trim().toLowerCase().replace(/[_\-\s]+/g, ' ').trim();
+    const seen: { images: string[]; parts: string[] } = { images: [], parts: [] };
+    const fakeApp = {
+      importLayeredCharacter: async (b: { info: { parts: Record<string, unknown> }; images: Map<string, string> }) => {
+        seen.images = [...b.images.keys()];
+        seen.parts = Object.keys(b.info.parts);
+        const tags = seen.parts.filter((t) => b.images.has(engineNorm(t)));
+        return { groupId: 'g1', parts: tags.map((tag) => ({ id: tag, role: tag, tag })), roles: Object.fromEntries(tags.map((t) => [t, t])), warnings: [] };
+      },
+    };
+    const run = (info: unknown, images: Record<string, string>) => {
+      const c = codeGenerator.generateImportLayeredCharacter(ImportLayeredCharacterInputSchema.parse({ info, images }));
+      return new Function('app', 'return ' + c.replace(/^\/\/.*\n/, ''))(fakeApp);
+    };
+    const r = [0, 0, 10, 10];
+    const ok = await run({ frame_size: [100, 100], parts: { eye_left: { xyxy: r }, pupil_right: { xyxy: r }, front_hair: { xyxy: r } } },
+      { eye_left: 'data:,', pupil_right: 'data:,', 'front-hair': 'data:,' });
+    expect(seen.images).toEqual(['eyel', 'iridesr', 'front hair']);
+    expect(seen.parts).toEqual(['eyel', 'iridesr', 'front hair']);
+    expect(ok.success).toBe(true);
+    expect(ok.skipped).toEqual([]);
+
+    const bad = await run({ frame_size: [100, 100], parts: { mouth: { xyxy: r } } }, { mouth: 'data:,', eye_left: 'data:,' });
+    expect(bad.success).toBe(false);
+    expect(bad.skipped).toEqual(['eye_left']);
+    expect(bad.error).toContain('eye_left');
+    expect(bad.groupId).toBe('g1');
   });
 
   it('forwards placement options and parses', () => {

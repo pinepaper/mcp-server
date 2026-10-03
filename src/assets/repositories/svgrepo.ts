@@ -68,8 +68,8 @@ export class SVGRepoAdapter implements AssetRepository {
       }));
     } catch (error) {
       console.error('[SVGRepoAdapter] Search error:', error);
-      // Return empty results on error rather than throwing
-      return [];
+      // Rethrow: the AssetManager reports this source as 'error' by name
+      throw error;
     }
   }
 

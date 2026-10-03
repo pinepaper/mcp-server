@@ -9,7 +9,7 @@
  * lists below never drift from what the server actually validates.
  */
 
-import { ItemTypeSchema, RelationTypeSchema, GeneratorNameSchema, AgentExportFormatSchema } from '../types/schemas.js';
+import { ItemTypeSchema, RelationTypeSchema, GeneratorNameSchema, AgentExportFormatSchema, AgentBatchOperationTypeSchema, SceneAnimationSchema } from '../types/schemas.js';
 import { DIAGRAM_SHAPE_MAP } from '../ontology/vocabulary.js';
 
 const ITEM_TYPES = ItemTypeSchema.options.join(', ');
@@ -24,7 +24,7 @@ export const COMPACT_DESCRIPTIONS: Record<string, string> = {
   // -------------------------------------------------------------------------
   pinepaper_set_background_color: `Set the canvas background color. Pass a hex color string (e.g. "#0f172a").`,
 
-  pinepaper_set_canvas_size: `Set canvas dimensions. Use width+height or a preset: instagram (1080x1080), youtube (1920x1080), tiktok (1080x1920), twitter (1200x675).`,
+  pinepaper_set_canvas_size: `Set canvas dimensions: width+height, or a studio preset key alone — instagram-post (1080x1080), instagram-story / tiktok (1080x1920), youtube-thumbnail (1280x720), full-hd-1080p (1920x1080), twitter-post (1200x675). Platform names (instagram, youtube) are not preset keys; an unknown key is refused with the list.`,
 
   pinepaper_get_canvas_size: `Get current canvas width and height.`,
 
@@ -59,7 +59,7 @@ Pass description for creative direction and canvasPreset for platform sizing. WO
   // -------------------------------------------------------------------------
   pinepaper_agent_batch_execute: `Execute multiple operations in a single call — canvas setup, items, animations, effects, playback. Call ONCE per pipeline — calling twice doubles all items.
 
-OPERATION TYPES (12): set_canvas_size, set_background, execute_generator, create, modify, delete, animate, keyframe_animate, relation, apply_mask, apply_effect, play_timeline.
+OPERATION TYPES (${AgentBatchOperationTypeSchema.options.length}): ${AgentBatchOperationTypeSchema.options.join(', ')}. create takes position {x, y} or [x, y].
 
 VARIABLE REFERENCES: "$0", "$1" etc. reference items by creation order within the batch.`,
 
@@ -86,7 +86,7 @@ NOT SUPPORTED: setup()/draw() loop, noise(), text(), loadImage(), transforms, be
 
 Item types: ${ITEM_TYPES}.
 Relations: ${RELATION_TYPES}.
-Animations: pulse, rotate, bounce, fade, wobble, slideLeftRight, slideUpDown, typewriter.`,
+Animations: ${SceneAnimationSchema.shape.type.options.join(', ')}.`,
 
   // -------------------------------------------------------------------------
   // execute_generator
@@ -105,7 +105,7 @@ GENERATORS (${GeneratorNameSchema.options.length}): ${GENERATORS}.`,
   // -------------------------------------------------------------------------
   pinepaper_add_relation: `Add a behavior relation between two items (orbits, follows, attached_to, etc.). Relations are compositional — an item can have multiple.
 
-RELATION TYPES: ${RELATION_TYPES}.`,
+RELATION TYPES: ${RELATION_TYPES}. A name registered with pinepaper_register_custom_relation this session is accepted too.`,
 
   // -------------------------------------------------------------------------
   // create_diagram_shape
@@ -117,12 +117,12 @@ SHAPE TYPES: ${DIAGRAM_SHAPES}.`,
   // -------------------------------------------------------------------------
   // search_assets
   // -------------------------------------------------------------------------
-  pinepaper_search_assets: `Search for free SVG icons and illustrations from open repositories (SVGRepo, OpenClipart, Iconify, FontAwesome).`,
+  pinepaper_search_assets: `Search for free SVG icons and illustrations from open repositories (SVGRepo, OpenClipart, Iconify, FontAwesome). The result's sources says how each repository answered (ok | timeout | error); one that is down does not hold up the others, and a search that names one repository fails if it is down.`,
 
   // -------------------------------------------------------------------------
   // connect
   // -------------------------------------------------------------------------
-  pinepaper_connect: `Draw a connector/arrow between two diagram shapes. Routing: orthogonal, direct, curved. Supports labels and animated bolt effect.`,
+  pinepaper_connect: `Draw a connector/arrow between two diagram shapes. Routing: orthogonal, direct, curved. Supports labels and animated bolt effect. Use the connectorId the result returns (a requested id may not be honoured). Style: lineColor, lineWidth, lineStyle (strokeColor / strokeWidth accepted).`,
 
   // -------------------------------------------------------------------------
   // auto_layout
@@ -142,23 +142,23 @@ SHAPE TYPES: ${DIAGRAM_SHAPES}.`,
   // -------------------------------------------------------------------------
   // design_system
   // -------------------------------------------------------------------------
-  pinepaper_design_system: `Licensed design systems (Material 3, Carbon, Polaris, Fluent 2, USWDS, GOV.UK…) as W3C DTCG tokens, plus 18 aesthetic styles that compose a scene. list_systems | get_system | list_easings (named curves with licence + authored provenance) | list_styles | compose (draw:false returns the scene as data).`,
+  pinepaper_design_system: `Licensed design systems (Material 3, Carbon, Polaris, Fluent 2, USWDS, GOV.UK…) as W3C DTCG tokens, plus 18 aesthetic styles that compose a scene. list_systems | get_system | list_easings (named curves with licence + authored provenance) | list_motion (the curves plus the duration scale) | list_styles | compose (draw:false returns the scene as data; compose sets the canvas to the size it laid out for, and says so).`,
 
   // -------------------------------------------------------------------------
   // stick / story
   // -------------------------------------------------------------------------
-  pinepaper_stick: `The vendored stick-figure kit. figure: pose, walk, travel, prop, garment, hair, expressions over time. set: floor, wall and objects. Distinct from pinepaper_character, which places a figure from the design graph by concept.`,
+  pinepaper_stick: `The vendored stick-figure kit. figure: pose, walk, travel, prop, garment, hair, expressions over time. set: kind room (floor + wall) | tabletop (object, surfaceY) | chair (facing) | table | counter | door | shelf (items) | window. Distinct from pinepaper_character, which places a figure from the design graph by concept.`,
   pinepaper_story: `Prose becomes a scene. distill (beats only, draws nothing), from_text (distill + assemble), apply_spec, plan_book.`,
 
   // -------------------------------------------------------------------------
   // interchange
   // -------------------------------------------------------------------------
-  pinepaper_interchange: `Interchange formats the platform exporter does not cover: export_lottie, export_dotlottie, import_lottie, export_glb (needs perspective objects), export_bvh (needs a rig), export_png_sequence.`,
+  pinepaper_interchange: `Interchange formats the platform exporter does not cover: export_lottie, export_dotlottie, import_lottie, export_glb (needs perspective objects), export_bvh (needs a rig, skeletonId), export_png_sequence (pass duration and fps). Exports are written to a FILE; the result gives filePath. import_lottie takes the Lottie JSON itself (object or string), not a URL or path, and returns itemId.`,
 
   // -------------------------------------------------------------------------
   // sound
   // -------------------------------------------------------------------------
-  pinepaper_sound: `Synthesis. Catalogues: list_instruments|list_percussion|list_sfx. Play: play_tone|play_chord|play_percussion|play_sfx|play_spec|play_from_text. Read: chord_frequencies|from_text|timbre_from_path. Canvas: create draws a sound AS an editable waveform path; timbre_from_path reads any drawn path back as harmonic content.`,
+  pinepaper_sound: `Synthesis. Catalogues: list_instruments|list_percussion|list_sfx. Play: play_tone|play_chord|play_percussion|play_sfx|play_spec|play_from_text. Read: chord_frequencies|from_text|timbre_from_path. Canvas: create draws a sound AS an editable waveform path; sequence {cues: [{t, spec | preset + note}]} places a whole bed in one call; set_placement {itemId, placement: {startTime, duration}}; remove {itemId}; stop_all. timbre_from_path reads any drawn path back as harmonic content. Define: define_instrument {name, partials} | define_percussion / define_sfx {name, partials or noise}. render_soundtrack writes every placed sound to a WAV file. play_tone takes note ('A4'), not hz; a play with no voice fails.`,
 
   // -------------------------------------------------------------------------
   // motion
@@ -168,6 +168,6 @@ SHAPE TYPES: ${DIAGRAM_SHAPES}.`,
   // -------------------------------------------------------------------------
   // path
   // -------------------------------------------------------------------------
-  pinepaper_path: `Destructive path ops: boolean (unite|subtract|intersect|exclude|divide — CONSUMES its operands), simplify, outline_stroke (a stroked line becomes a filled shape), toggle_closed, pattern (concentric|radial|grid|extrude), get_geometry, set_locked, unlock_all.`,
+  pinepaper_path: `Destructive path ops: boolean (unite|subtract|intersect|exclude|divide — CONSUMES its operands), simplify, outline_stroke (a stroked line becomes a filled shape), toggle_closed, pattern (concentric|radial|grid|extrude), get_geometry, set_locked, unlock_all. Results name the item as itemId.`,
 
 };

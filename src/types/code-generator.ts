@@ -2760,7 +2760,7 @@ const TO_DATA_URL_JS = `async function __ppToDataUrl(out, mime) {
 const MAP_VIEW_REFUSAL = (action: 'pan' | 'zoom') =>
   `map ${action} is not supported: the map has no view transform, and moving the camera changes only the studio view, `
   + 'which a canvas export ignores. To frame part of a map in an export: keyframe the camera with pinepaper_camera_animate '
-  + 'and export with framing:"camera", or load the map with center: [lon, lat] (and options.scale) so the projection itself frames the region.';
+  + 'and export with framing:"camera".';
 
 export class PinePaperCodeGenerator {
   /**
@@ -5093,7 +5093,11 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
       // A 3D world under the canvas IS the background: since FxTool #50
       // (747315e3) jpg/webp stills composite it, so nothing turns white/black.
       const hasWorld = !!app._world3d;
-      if (hasColor || hasBgItems || hasWorld) return [];
+      // So does a styled scene: one raster sized to COVER the frame (gate run 3:
+      // every export after styled_scene warned of black areas it does not have).
+      const hasStyledScene = !!(app.textItemGroup && app.textItemGroup.children
+        && app.textItemGroup.children.some(function (it) { return it && it.data && it.data.styledScene && it.visible !== false; }));
+      if (hasColor || hasBgItems || hasWorld || hasStyledScene) return [];
       return [{ code: 'alpha_dropped', message: fmt === 'apng'
         ? 'apng with transparent: false and no background colour: the frames are filled BLACK. Set a background colour, or drop transparent: false to keep the alpha.'
         : fmt === 'jpg'
@@ -5220,7 +5224,11 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
       camBase = { width: app.canvasSize.width, height: app.canvasSize.height };
     }
     if (!camBase) camBase = { width: dimensions.width, height: dimensions.height };
-    cameraDims = { width: camBase.width, height: camBase.height };
+    // scale applies here too: it was dropped, so scale 0.5 rendered full
+    // size and nothing said so (gate C7).
+    const __cs = ${scale !== undefined ? scale : 1};
+    const __ev = (n) => Math.max(2, Math.round((n * __cs) / 2) * 2);
+    cameraDims = { width: __ev(camBase.width), height: __ev(camBase.height) };
   }
 
   // AN EXPORTER ANSWERS A BLOB OR A RECORD AROUND ONE.
@@ -6459,7 +6467,15 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
     const __names = (app.mapSystem.getHighlightedRegions() || []).map(function (r) { return r.name; });
     const __missing = __asked.filter(function (id) { return __got.indexOf(id) === -1 && __names.indexOf(id) === -1; });
     if (__missing.length) {
-      return { success: false, highlighted: __got, error: 'the studio did not highlight ' + __missing.join(', ') + ' (get_highlighted does not list them). Check the ids with pinepaper_map_data, or report it: this map may not support per-region highlighting.' };
+      // On a RASTERISED map (no region paths) the highlight is drawn, but the
+      // readback cannot see it and the requested colour is not applied (gate
+      // run 3, N5: the PNG showed the default blue). Say exactly that.
+      const __raster = !(app.mapSystem.regionPaths && app.mapSystem.regionPaths.size);
+      if (__raster) {
+        return { success: true, verified: false, highlighted: __asked,
+          warning: 'this map is rasterised: the highlight is drawn, but the studio cannot confirm it and the requested colour is not applied (the default highlight colour is used). get_highlighted will not list these regions.' };
+      }
+      return { success: false, highlighted: __got, error: 'the studio did not highlight ' + __missing.join(', ') + ' (get_highlighted does not list them). Check the region names.' };
     }
     return { success: true, highlighted: __got };
   } catch (error) {
@@ -10040,10 +10056,20 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
   if (__bid && __before.indexOf(__bid) === -1) {
     return { success: false, error: 'no behavior ' + JSON.stringify(__bid) + ' on ' + ${itemIdStr} + (__before.length ? '; it has: ' + __before.join(', ') : '; it has none') + '. Use the behaviorId add_behavior returned, or omit it to remove all.' };
   }
-  app.interactionSystem.removeContinuousBehavior(entry.item, __bid || null);
+  if (__bid) app.interactionSystem.removeContinuousBehavior(entry.item, __bid);
+  else {
+    // "Remove all" means the behaviors a caller ADDED. The engine's own
+    // selectable / draggable go too with a bare remove, which left the item
+    // impossible to select or drag (gate run 3, N4).
+    const __sys = ['selectable', 'draggable'];
+    const __m = app.interactionSystem.continuousBehaviors;
+    ((__m && __m.get ? __m.get(${itemIdStr}) : null) || []).slice()
+      .filter(function (b) { return __sys.indexOf(b.type) === -1; })
+      .forEach(function (b) { app.interactionSystem.removeContinuousBehavior(entry.item, b.id); });
+  }
   const __after = __list();
   const removed = __before.filter(function (id) { return __after.indexOf(id) === -1; });
-  return { success: removed.length > 0, action: 'remove_behavior', itemId: ${itemIdStr}, removed: removed, remaining: __after, ...(removed.length ? {} : { error: 'nothing was removed: the item has no behaviors' }) };
+  return { success: removed.length > 0, action: 'remove_behavior', itemId: ${itemIdStr}, removed: removed, remaining: __after, ...(removed.length ? {} : { error: 'nothing was removed: the item has no behaviors added to it (the built-in selectable / draggable are kept)' }) };
 })();`.trim();
       }
       case 'trigger_action': {
@@ -10967,12 +10993,26 @@ ${checks.includes('contrast') ? `  // SAMPLED OVER TIME (round 12, 12.9): text i
   // which get the box loop below and a note saying so.
   const doc = ${docJson};
   if (typeof app.instantiateOntology === 'function') {
-    const r = await app.instantiateOntology(doc, ${engineOptsJson});
+    // THE LIVE CANVAS, unless one was given: the engine lays out for 1080x1080
+    // otherwise, which put items at (540,540) on a 640x360 canvas (gate run 3).
+    const __opts = ${engineOptsJson};
+    if (!__opts.canvas && app.getCanvasSize) { const __c = app.getCanvasSize(); if (__c && __c.width > 0) __opts.canvas = { width: __c.width, height: __c.height }; }
+    // REGISTRY IDS. The engine returns the DOCUMENT's ids ("bar"), which no
+    // other tool resolves; the new registry entries are found by diffing.
+    const __all = function () { return (app.itemRegistry && app.itemRegistry.getAll) ? app.itemRegistry.getAll() : []; };
+    const __before = new Set(__all().map(function (e) { return e.itemId; }));
+    const r = await app.instantiateOntology(doc, __opts);
     const diags = r.diagnostics || [];
+    const __new = __all().filter(function (e) { return !__before.has(e.itemId) && e.item && e.item.data && e.item.data._origin === 'ontology'; }).map(function (e) { return e.itemId; });
+    const docIds = r.itemIds || [];
+    const idMap = {};
+    if (__new.length === docIds.length) docIds.forEach(function (d, i) { idMap[d] = __new[i]; });
     return {
       success: !diags.some(function(d) { return d && d.level === 'error'; }) && !r.imagesFailed,
       engine: 'studio',
-      itemIds: r.itemIds, itemCount: r.itemIds.length,
+      itemIds: __new, itemCount: __new.length, docIds: docIds,
+      ...(Object.keys(idMap).length ? { idMap: idMap } : { note: 'document ids could not be paired with registry ids one to one; use itemIds' }),
+      canvas: __opts.canvas || null,
       // Every count the engine returns, not a chosen three. imagesFailed is the
       // one that matters most: a raster that never decoded leaves a scene that
       // looks built and is not, and dropping the count is how that becomes
@@ -11513,7 +11553,11 @@ ${guard}
   // would otherwise read as "the conversion did nothing to your text".
   const r = app.convertTextToCollage(item, ${S(input.text ?? null)} || item.content, ${S(input.collageOptions ?? {})});
   if (!r) { return { success: false, error: 'the collage system is unavailable in this build, so the text was left as it was' }; }
-  return { success: true, collage: r };
+  // A summary, not the collage's Paper group (that was a raw dump, gate run 3).
+  ${REG_ID_JS}
+  const __g = (r && (r.group || r.item)) || (r && typeof r.className === 'string' ? r : null);
+  return { success: true, itemId: __g ? __ppRegId(__g) : null, letters: __g && __g.children ? __g.children.length : undefined,
+    bounds: __g && __g.bounds ? { x: __g.bounds.x, y: __g.bounds.y, width: __g.bounds.width, height: __g.bounds.height } : undefined };
 })();`.trim();
     }
   }
@@ -11811,14 +11855,60 @@ ${guard}
 // Import a layered character (decomposer output → role-bound parts; blink works out of the box)
 (async function() {
   if (typeof app.importLayeredCharacter !== 'function') { return { success: false, error: 'app.importLayeredCharacter unavailable — update FxTool to a layered-character build' }; }
-  // The importer's contract is a Map (it calls images.get) — the wire format is
-  // a plain object, so rebuild the Map here.
-  const bundle = { info: ${S(input.info)}, images: new Map(Object.entries(${S(input.images)})) };
+  // The engine looks layers up by NORMALISED tag (lowercase, no dir/extension,
+  // '_'/'-' collapsed to a space): parseSeeThroughManifest asks
+  // images.has(normalizePartTag(tag)), then images.get(layer.tag). Its own
+  // folder reader keys the Map that way; a wire object keyed 'eye_left' is never
+  // found and every multi-word layer is skipped as "no image found".
+  // Mirrors FxTool js/ontology/CharacterPartTaxonomy.js normalizePartTag.
+  const norm = (t) => String(t).trim().toLowerCase().replace(/^.*[\\\\/]/, '').replace(/\\.(png|webp|tga|psd)$/i, '').replace(/[_\\-\\s]+/g, ' ').trim();
+  // The taxonomy resolves DECOMPOSER tags (eyel, iridesr, eyebrowl, hairf) — not
+  // the role tokens it emits. A layer tagged with a role token (eye_left,
+  // pupil_right, hair_front) resolves to no role, so alias role tokens to the
+  // decomposer tag that produces them.
+  const SIDED = { eye: 'eye', pupil: 'irides', brow: 'eyebrow', eyelash: 'eyelash', ear: 'ears', hand: 'handwear' };
+  const FLAT = { 'hair front': 'hairf', 'hair back': 'hairb', torso: 'topwear', hips: 'bottomwear', legs: 'legwear', feet: 'footwear', prop: 'objects' };
+  const canon = (t) => {
+    const k = norm(t);
+    let m = /^(.+) (left|right|l|r)$/.exec(k);
+    if (m && SIDED[m[1]] !== undefined) return SIDED[m[1]] + m[2][0];
+    m = /^(left|right) (.+)$/.exec(k);
+    if (m && SIDED[m[2]] !== undefined) return SIDED[m[2]] + m[1][0];
+    return FLAT[k] || k;
+  };
+  const rawInfo = ${S(input.info)};
+  const rawImages = ${S(input.images)};
+  const partsKey = rawInfo.parts ? 'parts' : (rawInfo.tag2pinfo ? 'tag2pinfo' : null);
+  const info = { ...rawInfo };
+  const notes = [];
+  if (partsKey && rawInfo[partsKey] && typeof rawInfo[partsKey] === 'object' && !Array.isArray(rawInfo[partsKey])) {
+    info[partsKey] = {};
+    for (const [t, v] of Object.entries(rawInfo[partsKey])) {
+      const c = canon(t);
+      if (info[partsKey][c]) { notes.push('layer "' + t + '" collides with another layer as "' + c + '" — kept the first'); continue; }
+      info[partsKey][c] = v;
+    }
+  }
+  const images = new Map();
+  const suppliedBy = {}; // canonical tag → the caller's own key, for naming
+  for (const [t, v] of Object.entries(rawImages)) {
+    const c = canon(t);
+    if (images.has(c)) { notes.push('image "' + t + '" collides with "' + suppliedBy[c] + '" — kept the first'); continue; }
+    images.set(c, v); suppliedBy[c] = t;
+  }
+  const bundle = { info, images };
   const r = await app.importLayeredCharacter(bundle, ${opts});
   if (!r || !r.groupId) { return { success: false, error: (r && r.error) || 'layered character import failed' }; }
   // roles maps part roles → item ids; zero roles wired means the character
   // renders but will NOT animate — surface the count so that cannot hide.
-  return { success: true, groupId: r.groupId, parts: (r.parts || []).length, roles: r.roles || {}, rolesWired: Object.keys(r.roles || {}).length, warnings: r.warnings || [] };
+  const imported = new Set((r.parts || []).map((p) => p.tag));
+  const skipped = Object.keys(suppliedBy).filter((c) => !imported.has(c)).map((c) => suppliedBy[c]);
+  const unroled = (r.parts || []).filter((p) => !p.role).map((p) => suppliedBy[p.tag] || p.tag);
+  const result = { groupId: r.groupId, parts: (r.parts || []).length, roles: r.roles || {}, rolesWired: Object.keys(r.roles || {}).length, skipped, unroled, warnings: [...notes, ...(r.warnings || [])] };
+  // A supplied image that did not land is the caller's input dropped — not a
+  // success. The group IS on the canvas, so hand back its id to fix or delete.
+  if (skipped.length) { return { success: false, ...result, error: 'supplied layer(s) not imported: ' + skipped.join(', ') + ' — each needs a matching key under info.parts with a usable xyxy (see warnings)' }; }
+  return { success: true, ...result };
 })();`.trim();
   }
 
@@ -12354,7 +12444,7 @@ ${needWorld}
    * already decided by a pure function, so nothing is left for the page to
    * work out.
    */
-  generateDesignCompose(scene: { width: number; height: number; backgroundHex?: string }, ops: Array<Record<string, unknown>>, style: string): string {
+  generateDesignCompose(scene: { width: number; height: number; backgroundHex?: string }, ops: Array<Record<string, unknown>>, style: string, sizeWarning?: string): string {
     const S = (v: unknown) => JSON.stringify(v);
     return `
 // Design: compose a ${style} scene — ${ops.length} items, laid out server-side
@@ -12364,7 +12454,7 @@ ${needWorld}
   // The layout was computed for this size, so the canvas is set to it — and
   // the result SAYS so: a 1080x1080 canvas became 1280x720 silently (gate C).
   const __before = app.getCanvasSize ? app.getCanvasSize() : null;
-  if (typeof app.setCanvasSize === 'function') { try { app.setCanvasSize(size.width, size.height); } catch (_) { /* a fixed canvas is not a failure */ } }
+  if (typeof app.setCanvasSize === 'function') { try { app.setCanvasSize({ width: size.width, height: size.height }); } catch (_) { /* a fixed canvas is not a failure */ } }
   const __after = app.getCanvasSize ? app.getCanvasSize() : null;
   const canvasResized = __before && __after && (__before.width !== __after.width || __before.height !== __after.height)
     ? { from: { width: __before.width, height: __before.height }, to: { width: __after.width, height: __after.height } } : null;
@@ -12383,7 +12473,8 @@ ${needWorld}
   // A partial composition is reported as one. Half a poster that claims
   // success is worse than a poster that says which four elements are missing.
   return { success: failed.length === 0, style: ${S(style)}, itemIds: ids, itemCount: ids.length, failed: failed,
-    ...(canvasResized ? { canvasResized: canvasResized, note: 'the canvas was resized to the composition; pass width and height to compose at your canvas size' } : {}) };
+    ...(canvasResized ? { canvasResized: canvasResized, note: 'the canvas was resized to the composition' + (${S(sizeWarning ?? '')} ? '' : '; pass width and height to compose at your canvas size') } : {}),
+    ...(${S(sizeWarning ?? '')} ? { warning: ${S(sizeWarning ?? '')} } : {}) };
 })();`.trim();
   }
 
@@ -12949,6 +13040,8 @@ ${guard('timbreFromPath')}
   if (!r || r.ok === false) { return { success: false, error: (r && r.reason) || 'the engine refused the operation' }; }
   const out = { success: true };
   Object.keys(r).forEach(function (k) { out[k] = __clean(r[k]); });
+  // itemId, as every other tool names it; the engine says id (gate run 3).
+  if (out.itemId === undefined && typeof out.id === 'string') out.itemId = out.id;
   return out;`;
 
     switch (input.action) {
@@ -13328,7 +13421,14 @@ ${guard('unlockAllItems')}${pass('app.unlockAllItems()')}
           `  const res = R.bakeAnimation(${S(input.skeletonId)}, ${S(input.options ?? {})});
   if (res && app.historyManager) app.historyManager.saveState();
   if (!res) { return { success: false, action: 'bake_animation', error: "nothing to bake — no such skeleton, or no items are ATTACHED to its bones. Baking writes keyframes onto the attached items, so a bare skeleton has no output." }; }
-  return { success: true, action: 'bake_animation', result: res };`);
+  // bakeAnimation returns a MAP (itemId -> keyframes), which serialised to {},
+  // and its report is a non-enumerable bakeReport (gate run 3). Read both.
+  const rep = res.bakeReport || {};
+  const detached = rep.detached || 0;
+  return { success: (rep.written || 0) > 0 || ${input.options && (input.options as Record<string, unknown>).write === false ? 'true' : 'false'}, action: 'bake_animation',
+    items: res.size, written: rep.written || 0, keyframes: rep.keyframes || 0, cleared: rep.cleared || 0, detached: detached,
+    wrote: rep.wrote || [], ...(rep.skipped && rep.skipped.length ? { skipped: rep.skipped } : {}),
+    ...(detached ? { note: detached + ' item(s) were DETACHED from the rig: their motion is now keyframes, and the bones no longer drive them. Pass options.detach:false to keep the rig driving.' } : {}) };`);
       case 'list_shape_keys':
         return wrap('Rigging: list shape keys',
           `  const keys = R.listShapeKeys(${S(input.skeletonId)});

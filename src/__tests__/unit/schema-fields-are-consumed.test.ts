@@ -96,7 +96,7 @@ function consumerSource(): string {
  *
  * Every entry below was checked against FxTool origin/main and IS read:
  *   stick     opts.poseAt (2 sites), opts.trouser, opts.withHair,
- *             opts.groundY, opts.surfaceY, and the vocabulary added when
+ *             opts.groundY, and the vocabulary added when
  *             export/long-form-streaming landed: opts.gait (checked against
  *             GAIT_NAMES), opts.gaitSeconds, opts.gaitFrom, opts.sequenceFrom
  *             and opts.sequenceSeconds, all read in stickFigure's gait and
@@ -115,7 +115,7 @@ function consumerSource(): string {
  * stick-contract.test.ts, and prefer a behavioural pin to an entry here.
  */
 const SPREAD_THROUGH_VERIFIED: Readonly<Record<string, readonly string[]>> = Object.freeze({
-  StickInputSchema: ['poseAt', 'trouser', 'withHair', 'groundY', 'surfaceY', 'gait', 'gaitSeconds', 'gaitFrom', 'sequenceFrom', 'sequenceSeconds'],
+  StickInputSchema: ['poseAt', 'trouser', 'withHair', 'groundY', 'gait', 'gaitSeconds', 'gaitFrom', 'sequenceFrom', 'sequenceSeconds'],
   WorldTourInputSchema: ['dwell', 'highlightColors', 'showLabels', 'labelColor'],
   GlobeEnableInputSchema: ['momentum', 'showOcean'],
   TourItemInputSchema: ['dwell'],

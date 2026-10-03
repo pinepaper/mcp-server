@@ -11,6 +11,19 @@ import { createIconifyAdapter } from './repositories/iconify.js';
 import { createFontAwesomeAdapter } from './repositories/fontawesome.js';
 
 /**
+ * How one repository's search ended. 'timeout' and 'error' sources are
+ * reported by name rather than silently contributing zero results.
+ */
+export type AssetSourceStatus = 'ok' | 'timeout' | 'error';
+
+/**
+ * Upper bound on one repository's search. The adapters' fetch() calls carry no
+ * timeout of their own, so one stalled connection used to hold the whole
+ * aggregated search open for tens of seconds.
+ */
+const SOURCE_TIMEOUT_MS = 4000;
+
+/**
  * Asset Manager configuration
  */
 export interface AssetManagerConfig {
@@ -79,33 +92,76 @@ export class AssetManager {
     repository: string = 'all',
     limit: number = 10
   ): Promise<AssetResult[]> {
-    const results: AssetResult[] = [];
+    return (await this.searchWithStatus(query, repository, limit)).results;
+  }
 
+  /**
+   * Search, and say how each queried repository ended.
+   *
+   * Repositories are queried in parallel, each bounded by SOURCE_TIMEOUT_MS;
+   * the results of the ones that answered in time are returned. A single
+   * named repository that times out or fails throws, as before.
+   */
+  async searchWithStatus(
+    query: string,
+    repository: string = 'all',
+    limit: number = 10
+  ): Promise<{ results: AssetResult[]; sources: Record<string, AssetSourceStatus> }> {
+    let repos: AssetRepository[];
     if (repository === 'all') {
-      // Search all repositories
-      for (const [_, repo] of this.repositories) {
-        try {
-          const repoResults = await repo.search(query, limit);
-          results.push(...repoResults);
-        } catch (error) {
-          console.error(`[AssetManager] Error searching ${repo.name}:`, error);
-          // Continue with other repositories
-        }
-      }
+      repos = Array.from(this.repositories.values());
     } else {
-      // Search specific repository
       const repo = this.repositories.get(repository);
       if (!repo) {
         throw new Error(`Repository '${repository}' not found`);
       }
+      repos = [repo];
+    }
 
-      const repoResults = await repo.search(query, limit);
-      results.push(...repoResults);
+    const outcomes = await Promise.all(repos.map((repo) => this.searchOne(repo, query, limit)));
+
+    const results: AssetResult[] = [];
+    const sources: Record<string, AssetSourceStatus> = {};
+    for (const outcome of outcomes) {
+      sources[outcome.name] = outcome.status;
+      results.push(...outcome.results);
+    }
+
+    if (repository !== 'all' && sources[repository] !== 'ok') {
+      throw new Error(`Repository '${repository}' search ${sources[repository] === 'timeout' ? `timed out after ${SOURCE_TIMEOUT_MS}ms` : 'failed'}`);
     }
 
     // Sort by relevance (for now, just return as-is)
     // In production, implement relevance scoring
-    return results.slice(0, limit);
+    return { results: results.slice(0, limit), sources };
+  }
+
+  /**
+   * One repository's search, bounded by SOURCE_TIMEOUT_MS. Never throws.
+   */
+  private async searchOne(
+    repo: AssetRepository,
+    query: string,
+    limit: number
+  ): Promise<{ name: string; status: AssetSourceStatus; results: AssetResult[] }> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<'timeout'>((resolve) => {
+      timer = setTimeout(() => resolve('timeout'), SOURCE_TIMEOUT_MS);
+    });
+
+    try {
+      const outcome = await Promise.race([repo.search(query, limit), timeout]);
+      if (outcome === 'timeout') {
+        console.error(`[AssetManager] ${repo.name} did not answer within ${SOURCE_TIMEOUT_MS}ms`);
+        return { name: repo.name, status: 'timeout', results: [] };
+      }
+      return { name: repo.name, status: 'ok', results: outcome };
+    } catch (error) {
+      console.error(`[AssetManager] Error searching ${repo.name}:`, error);
+      return { name: repo.name, status: 'error', results: [] };
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   /**

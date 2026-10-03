@@ -3428,7 +3428,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
         const assetManager = getAssetManager();
 
         try {
-          const results = await assetManager.search(
+          const { results, sources } = await assetManager.searchWithStatus(
             input.query,
             input.repository || 'all',
             input.limit || 10
@@ -3521,6 +3521,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
                     query: input.query,
                     repository: input.repository || 'all',
                     count: resultsWithContent.length,
+                    sources,
                     includeSvgContent: input.includeSvgContent || false,
                     attributionRequired: requiresAttribution.length > 0,
                     attributionNotice,
@@ -4282,10 +4283,18 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
               );
             }
             const ops = designSystems.sceneToOps(scene);
+            // Some vendored styles lay out at their OWN fixed size and ignore
+            // width/height (swiss_typographic is always 1280x720), so a caller
+            // asking for 1080x1080 got a resized canvas (gate run 3). Say so.
+            const sizeIgnored = (input.width !== undefined && input.width !== scene.width)
+              || (input.height !== undefined && input.height !== scene.height);
+            const sizeWarning = sizeIgnored
+              ? `"${scene.style}" lays out at its own size, ${scene.width}x${scene.height}; the requested ${input.width ?? '?'}x${input.height ?? '?'} was not used`
+              : undefined;
             if (input.draw === false) {
-              return dataResult({ scene, ops, drawn: false });
+              return dataResult({ scene, ops, drawn: false, ...(sizeWarning ? { warning: sizeWarning } : {}) });
             }
-            const code = codeGenerator.generateDesignCompose(scene, ops, scene.style);
+            const code = codeGenerator.generateDesignCompose(scene, ops, scene.style, sizeWarning);
             return executeOrGenerate(code, `Composed a ${scene.style} scene (${ops.length} items)`, options, 'pinepaper_design_system');
           }
         }

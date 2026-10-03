@@ -46,7 +46,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_import_svg: "Import SVG markup or a URL. source:'figma' normalises Figma Copy-as-SVG first (root fill=none makes everything invisible; missing viewBox; global ids like clip0 collide across imports).",
   pinepaper_import_mermaid: 'Import a Mermaid diagram (flowchart|graph|stateDiagram|sequenceDiagram|erDiagram|classDiagram). mermaidText, autoLayout, clearExisting.',
   pinepaper_import_image: 'Import a raster image (PNG/JPG/WebP) onto the canvas.',
-  pinepaper_search_assets: 'Search 850k+ SVG icons from SVGRepo, Iconify, FontAwesome, OpenClipart.',
+  pinepaper_search_assets: 'Search SVG icons (SVGRepo, Iconify, FontAwesome, OpenClipart); sources says which answered.',
   pinepaper_import_asset: 'Place a search result asset onto the canvas.',
   pinepaper_batch_create: 'Create multiple items in one call with single history save.',
   pinepaper_batch_modify: 'Modify multiple items in one call with single history save.',
@@ -79,7 +79,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_world3d: "3D world under the canvas: create (forest|snowMountain|field|jungle)|describe (engine schema)|configure|add_actor (live sprites)|set_actor_pose|set_camera (follow|fixed|orbit)|objects|remove_world.",
   pinepaper_game: "Game logic: pathfind (A* world-coords waypoints for moves_along_path)|create_tilemap (board data + grid + merged collision rects). Pure data, draws nothing.",
   pinepaper_shatter_image: "Split a raster into a grid of tiles (inert until animated). Group adopts the original id. {itemId, pieces?|rows?+cols?, keepSource?}",
-  pinepaper_import_layered_character: "Import decomposer output (layer manifest + images) as role-bound parts; blink/smile work immediately. CHECK rolesWired>0. {info, images}",
+  pinepaper_import_layered_character: "Import decomposer output (layer manifest + images) as role-bound parts; blink/smile work immediately. CHECK rolesWired>0; skipped names images that did not land. {info, images}",
   pinepaper_text_style: "Display text styles + variable fonts. action: apply_style (stacked-layer title, adopts the text id)|set_font_axes (weight/width/slant, animatable)|list_styles.",
   pinepaper_text_effect: "37 character-level text animations. action: list|apply {itemId, effect}. REPLACES the text with one keyframed item per character (source id dies; keepSource:true to keep it).",
   pinepaper_crop_image: 'One-shot crop of an image item to a canvas-coords rect (clamped; keeps the registry id). {itemId, rect: {x,y,width,height}, aspectRatio?}',
@@ -139,7 +139,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_diagram_mode: 'Toggle diagram editing mode.',
 
   // --- Maps ---
-  pinepaper_map: 'Map load. action: load|export_config|import_custom (pan/zoom refuse: frame with load center). mapId: usa|world|worldHighRes|<custom>.',
+  pinepaper_map: 'Map load. action: load|export_config|import_custom (pan/zoom refuse: frame with a camera animation + export framing:camera). mapId: usa|world|worldHighRes|<custom>.',
   pinepaper_map_regions: 'Map region styling/selection. action: highlight|unhighlight|apply_colors|add_marker|add_labels|get_at_point|select|deselect|get_highlighted.',
   pinepaper_map_animation: 'Map region animation. action: animate_regions|animate_wave|stop|get_animated. duration, loop.',
   pinepaper_map_data: 'Map import/export. action: export_csv|import_csv|export_geojson|export_original_geojson|source_info.',

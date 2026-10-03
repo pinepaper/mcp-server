@@ -100,7 +100,7 @@ export class IconifyAdapter implements AssetRepository {
       return results;
     } catch (error) {
       console.error('[IconifyAdapter] Search error:', error);
-      return [];
+      throw error;
     }
   }
 
