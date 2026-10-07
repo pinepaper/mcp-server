@@ -275,9 +275,11 @@ function generateGradientCode(
 ): string {
   const { type, stops, origin, destination } = gradient;
 
-  // Calculate default origin/destination based on item position
-  const defaultOrigin = origin || [position.x - 50, position.y - 50];
-  const defaultDestination = destination || [position.x + 50, position.y + 50];
+  // Calculate default origin/destination based on item position.
+  // For radial gradients, origin defaults to the item center (position.x, position.y),
+  // not an offset (-50, -50), and destination to the radius edge (B88).
+  const defaultOrigin = origin || (type === 'radial' ? [position.x, position.y] : [position.x - 50, position.y - 50]);
+  const defaultDestination = destination || (type === 'radial' ? [position.x + 50, position.y] : [position.x + 50, position.y + 50]);
 
   const stopsCode = stops.map(s => `['${s.color}', ${s.offset}]`).join(', ');
 
@@ -348,6 +350,18 @@ function generateCreateItemCode(
 ({ success: false, error: ${JSON.stringify(g.error)} });`.trim();
       }
       properties = { ...properties, [key]: g.gradient };
+    }
+  }
+
+  // Aliases for text items: text -> content (B66), textAlign / align -> justification (B89)
+  if (properties.content === undefined && properties.text !== undefined) {
+    properties = { ...properties, content: properties.text };
+  }
+  if (properties.justification === undefined) {
+    if (properties.textAlign !== undefined) {
+      properties = { ...properties, justification: properties.textAlign };
+    } else if (properties.align !== undefined) {
+      properties = { ...properties, justification: properties.align };
     }
   }
 
@@ -870,7 +884,7 @@ if (typeof app.fitText === 'function') {
  *
  * lineHeight is the CSS habit: <= 4 is a multiple of fontSize, above that px.
  */
-const TEXT_STYLE_KEYS = ['fontWeight', 'fontStyle', 'leading', 'lineHeight'] as const;
+const TEXT_STYLE_KEYS = ['fontWeight', 'fontStyle', 'leading', 'lineHeight', 'textAlign', 'align', 'text'] as const;
 function emitTextStyle(itemExpr: string, props: Record<string, unknown>): string {
   const weight = props.fontWeight;
   const italic = props.fontStyle === 'italic' || props.fontStyle === 'oblique';
@@ -1042,6 +1056,20 @@ function generateModifyItemCode(
   dataFlags?: Record<string, unknown>
 ): string {
   const { contentType, contentFormat, countdownTarget, countdownEndText, ...restProperties } = properties;
+  // Aliases for text items: text -> content (B66), textAlign / align -> justification (B89)
+  if (restProperties.justification === undefined) {
+    if (restProperties.textAlign !== undefined) {
+      restProperties.justification = restProperties.textAlign;
+      delete restProperties.textAlign;
+    } else if (restProperties.align !== undefined) {
+      restProperties.justification = restProperties.align;
+      delete restProperties.align;
+    }
+  }
+  if (restProperties.content === undefined && restProperties.text !== undefined) {
+    restProperties.content = restProperties.text;
+    delete restProperties.text;
+  }
   // A new fit box is applied here (emitTextFit, with the hold carried over),
   // not by modifyItem: the engine's modify fits it with no hold, overwriting
   // the one this reads back. fit: null still goes through — that is the
@@ -4650,13 +4678,40 @@ throw new Error('Unknown diagram mode action: ${action}');
         // for a 12 s MP4 (round 8 DD, 1.67). It now runs generateCreateItemCode,
         // the exact emitter create_item uses, adapted to return its result
         // inside this op's function.
-        const pos = op.position || { x: 400, y: 300 };
+        const anyOp = op as Record<string, unknown>;
+        let pos = op.position;
+        if (!pos && (typeof anyOp.x === 'number' || typeof anyOp.y === 'number')) {
+          pos = { x: (anyOp.x as number) ?? 400, y: (anyOp.y as number) ?? 300 };
+        }
+        if (!pos) {
+          pos = { x: 400, y: 300 };
+        }
         const opProps = { ...(op.properties || {}) } as Record<string, unknown>;
+        const batchKeys = new Set([
+          'type', 'itemType', 'position', 'properties', 'screenSpace', 'stepTiming', 'counter',
+          'itemId', 'itemIds', 'groupName', 'animationType', 'animationOptions',
+          'sourceId', 'targetId', 'relationType', 'relationOptions',
+          'backgroundColor', 'generatorName', 'generatorParams', 'generatorRegion',
+          'width', 'height', 'preset', 'keyframes', 'duration', 'loop',
+          'maskPreset', 'maskType', 'maskOptions', 'effectType', 'effectParams',
+          'action', 'time'
+        ]);
+        for (const [k, v] of Object.entries(anyOp)) {
+          if (!batchKeys.has(k) && v !== undefined && opProps[k] === undefined) {
+            opProps[k] = v;
+          }
+        }
+        if (opProps.content === undefined && opProps.text !== undefined) {
+          opProps.content = opProps.text;
+        }
+        if (opProps.fillColor === undefined && opProps.color !== undefined) {
+          opProps.fillColor = opProps.color;
+        }
         const opSetters = takeItemSetters(opProps, { screenSpace: op.screenSpace, stepTiming: op.stepTiming, counter: op.counter });
         const createProps = withRadiusAxes(opProps);
         const opBrand = { ...opProps };
         delete opProps.noBrand;
-        const returning = asReturningBody(withBrandDefaults(generateCreateItemCode(op.itemType as ItemType, pos, { ...opProps }, undefined, op.position !== undefined), op.itemType as string, opBrand));
+        const returning = asReturningBody(withBrandDefaults(generateCreateItemCode(op.itemType as ItemType, pos, { ...opProps }, undefined, op.position !== undefined || typeof anyOp.x === 'number' || typeof anyOp.y === 'number'), op.itemType as string, opBrand));
         let createCode = `${hasItemSetters(opSetters) ? `\n${itemSettersPreflightJs(opSetters)}` : ''}
 const __created = await (async function() {
 ${returning}
@@ -4671,7 +4726,7 @@ ${itemSettersApplyJs(opSetters, '__created.itemId', '__created')}
         // caller explicitly asked for a position. Guarded on an explicit
         // op.position so absolute-coordinate geometry (the common case, which
         // passes no position) is never snapped to the injected default.
-        if (op.position && isCoordinateBuilt(op.itemType, createProps)) {
+        if ((op.position || typeof anyOp.x === 'number' || typeof anyOp.y === 'number') && isCoordinateBuilt(op.itemType, createProps)) {
           createCode += `
 // create() builds this item type from its own coordinates and ignores
 // params.position — apply the caller's explicit position after the fact.
@@ -4766,7 +4821,7 @@ return (function() {${this.groupCodeBody(idsArrayExpr, nameExpr)}
       }
 
       case 'set_background':
-        const bgColor = op.backgroundColor || (op.properties as any)?.color || '#000000';
+        const bgColor = op.backgroundColor || (op as any).color || (op.properties as any)?.backgroundColor || (op.properties as any)?.color || '#000000';
         return `
 app.setBackgroundColor('${bgColor}');
 return { success: true, backgroundColor: '${bgColor}' };
@@ -4818,8 +4873,13 @@ return { itemId: ${op.itemId?.startsWith('$') ? `itemIds[${op.itemId.substring(1
         const kfLoop = mergedPayload ? mergedPayload.loop : (op.loop ?? false);
         return `
 const targetId = ${kfItemRef};
-app.addAnimation(targetId, ${kfJson}, { duration: ${kfDuration}, loop: ${kfLoop} });
-return { itemId: targetId, duration: ${kfDuration}, loop: ${kfLoop} };
+const _target = (app.getItemById && app.getItemById(targetId))
+  || (app.itemRegistry && app.itemRegistry.get && app.itemRegistry.get(targetId));
+if (!_target) {
+  return { success: false, itemId: targetId, error: 'Item not found: ' + targetId };
+}
+app.addAnimation(targetId, ${kfJson}, { duration: ${kfDuration}, loop: ${kfLoop}, mode: 'merge' });
+return { success: true, itemId: targetId, duration: ${kfDuration}, loop: ${kfLoop} };
 `;
       }
 

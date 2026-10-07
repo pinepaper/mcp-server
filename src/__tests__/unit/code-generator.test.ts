@@ -1387,6 +1387,101 @@ describe('PinePaperCodeGenerator', () => {
         expect(calls.length).toBe(1);
       });
     });
+
+    describe('beta feedback v1.6.20 regressions (B65, B66, B88, B89, B93)', () => {
+      it('B65: set_background resolves op-level color alias and does not default to black', () => {
+        const code = codeGenerator.generateAgentBatchExecute({
+          operations: [
+            { type: 'set_background', color: '#1a1a2e' } as never,
+          ],
+        });
+        expect(code).toContain("app.setBackgroundColor('#1a1a2e')");
+        expect(code).toContain("backgroundColor: '#1a1a2e'");
+      });
+
+      it('B66: batch create honours op-level text, x, y, and fillColor', () => {
+        const code = codeGenerator.generateAgentBatchExecute({
+          operations: [
+            {
+              type: 'create',
+              itemType: 'text',
+              text: 'Headline Title',
+              x: 250,
+              y: 180,
+              fillColor: '#facc15',
+            } as never,
+          ],
+        });
+        expect(code).toContain("app.create('text'");
+        expect(code).toContain('Headline Title');
+        expect(code).toContain('250');
+        expect(code).toContain('180');
+        expect(code).toContain('#facc15');
+      });
+
+      it('B66: create_item aliases properties.text to content', () => {
+        const code = codeGenerator.generateCreateItem({
+          itemType: 'text',
+          position: { x: 100, y: 200 },
+          properties: { text: 'Aliased Text' },
+        });
+        expect(code).toContain("content\": \"Aliased Text\"");
+      });
+
+      it('B89: create_item aliases textAlign to justification and does not report it ignored', () => {
+        const code = codeGenerator.generateCreateItem({
+          itemType: 'text',
+          position: { x: 100, y: 200 },
+          properties: { content: 'Centered', textAlign: 'center' },
+        });
+        expect(code).toContain("justification\": \"center\"");
+        expect(code).not.toContain("ignoredProperties: [\"textAlign\"]");
+      });
+
+      it('B89: modify_item aliases textAlign to justification', () => {
+        const code = codeGenerator.generateModifyItem({
+          itemId: 'item_1',
+          properties: { textAlign: 'right' },
+        });
+        expect(code).toContain("justification\": \"right\"");
+      });
+
+      it('B88: radial gradient defaults origin to item center instead of up-left offset', () => {
+        const code = codeGenerator.generateCreateItem({
+          itemType: 'circle',
+          position: { x: 500, y: 400 },
+          properties: {
+            radius: 50,
+            fillColor: {
+              type: 'radial',
+              stops: [
+                { color: '#ffffff', offset: 0 },
+                { color: '#000000', offset: 1 },
+              ],
+            },
+          },
+        });
+        expect(code).toContain("origin: [500, 400]");
+        expect(code).toContain("destination: [550, 400]");
+        expect(code).not.toContain("origin: [450, 350]");
+      });
+
+      it('B93: batch keyframe_animate checks target existence and uses merge mode', () => {
+        const code = codeGenerator.generateAgentBatchExecute({
+          operations: [
+            {
+              type: 'keyframe_animate',
+              itemId: 'ghost_id',
+              keyframes: [{ time: 0, properties: { opacity: 0 } }, { time: 1, properties: { opacity: 1 } }],
+            },
+          ],
+        });
+        expect(code).toContain("app.getItemById(targetId)");
+        expect(code).toContain("if (!_target)");
+        expect(code).toContain("error: 'Item not found: ' + targetId");
+        expect(code).toContain("mode: 'merge'");
+      });
+    });
   });
 });
 

@@ -2515,6 +2515,7 @@ export const AgentBatchOperationSchema = z.object({
   relationOptions: z.record(z.unknown()).optional().describe('Relation options'),
   // Set background fields
   backgroundColor: z.string().optional().describe('Background color for set_background'),
+  color: z.string().optional().describe('Alias for backgroundColor in set_background, or color property'),
   // Execute generator fields
   generatorName: z.string().optional().describe('Generator name for execute_generator'),
   generatorParams: z.record(z.unknown()).optional().describe('Generator parameters'),
@@ -2541,7 +2542,7 @@ export const AgentBatchOperationSchema = z.object({
   // Play timeline fields
   action: z.string().optional().describe('Timeline action for play_timeline (play, stop, seek)'),
   time: z.number().optional().describe('Seek time for play_timeline'),
-}).describe('Single batch operation');
+}).passthrough().describe('Single batch operation');
 
 export type AgentBatchOperation = z.infer<typeof AgentBatchOperationSchema>;
 
