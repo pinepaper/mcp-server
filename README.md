@@ -253,6 +253,18 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - `shader` and `field` items from `pinepaper_create_item` draw in the studio
   and in every export, not only in a cloud render. The note and export
   warning that said a local export shows a flat plate are gone.
+- Text accepts `text` for `content` and `textAlign` (or `align`) for
+  `justification`, in `pinepaper_create_item`, `pinepaper_modify_item` and
+  batch creates.
+- `pinepaper_agent_batch_execute` reads `color`, `text`, `x` and `y` written
+  directly on an operation. Its `keyframe_animate` refuses an item that is not
+  on the canvas, and takes `append` with the same meaning as
+  `pinepaper_keyframe_animate`.
+- A radial gradient is centred on its item.
+- `pinepaper_choreograph` holds the actor still until its first beat, and no
+  longer calls a move off screen because the canvas is unbounded.
+- `pinepaper_morph_sequence` hides the shapes it makes as references, and
+  `pinepaper_physics` `add_body` looks its item up the way the other tools do.
 
 ## What's new in 1.6.20
 
