@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
  * Source:    mcp-cloud/src/services/content-recipes.ts (DesignStyle union only)
- * sha256:    5f36f68c0278045a212382ac43db12ef892556fe99df30728e1bdbbfe446f397
+ * sha256:    4987265fc982ad8d7191733208ccf9c5fad8aa6149c457e23742f66223a1a677
  * Generator: scripts/sync-design-systems.mjs
  *
  * Edit the TypeScript upstream and re-run the generator. A hand edit here is
@@ -43,10 +43,16 @@ export type DesignStyle =
   | "print_early_learner"
   | "print_stem_technical"
   | "embroidery_tapestry"
-  | "woven_textile";
+  | "woven_textile"
+  // #60: the design graph's looks that had no fast-path counterpart.
+  | "explainer_ink"
+  | "synthwave_outrun"
+  | "sumi_e_ink"
+  | "flat_design"
+  | "blueprint_schematic";
 
 
-/** The same 33 styles as DATA, so a runtime list cannot drift from the type. */
+/** The same 38 styles as DATA, so a runtime list cannot drift from the type. */
 export const DESIGN_STYLES: readonly DesignStyle[] = Object.freeze([
   'minimal',
   'editorial',
@@ -81,4 +87,9 @@ export const DESIGN_STYLES: readonly DesignStyle[] = Object.freeze([
   'print_stem_technical',
   'embroidery_tapestry',
   'woven_textile',
+  'explainer_ink',
+  'synthwave_outrun',
+  'sumi_e_ink',
+  'flat_design',
+  'blueprint_schematic',
 ]);

@@ -4,9 +4,9 @@
  * FxTool's ITEM_TYPE_MAP and type classes (anchor, description, parentType,
  * mcpTool, mcpAction), read from the loaded module.
  *
- * Source: FxTool origin/main c2d922787576249eeb37b1fa8c4cb0cfec943204
+ * Source: FxTool origin/main beceb86f998acb9f071cf7860bfa40a121270417
  *   js/ontology/Vocabulary.js
- * sha256: 43ad8955640e34e2
+ * sha256: 4fb7cb8f45a8ae86
  *
  * vocabulary.ts merges these over its hand-written port: the engine's map
  * wins where the two disagree, and a class the port lacks is added.
@@ -824,7 +824,7 @@ export const UPSTREAM_TYPES: Readonly<Record<string, UpstreamTypeDef>> = Object.
   },
   "pp:ShaderMesh": {
     "anchor": "wd:Q1154597",
-    "description": "Geometry in a 3D world drawn by an author-supplied vertex and fragment program. Unlike pp:WorldObject, which is a box with a colour, its SHAPE and its SHADING are both the author's: vertices and triangles supplied as data, transformed by a vertex program that may displace them per frame. A registry citizen under its own id, so relations can target it — anchor a label to a procedural surface, or drive its uniforms from an event.",
+    "description": "Geometry in a 3D world drawn by an author-supplied vertex and fragment program. Unlike pp:WorldObject, which is a box with a colour, its SHAPE and its SHADING are both the author's: vertices and triangles supplied as data, transformed by a vertex program that may displace them per frame. A registry citizen under its own id, so relations can target it — anchor a label to a procedural surface, or drive its uniforms from an event. INSTANCED when created with `instances`: one mesh drawn N times in one draw call, each copy six floats [x, y, z, scale, rotY, variant] (scale > 0 — the default program reads 0 as unbound and draws it full size). app.setWorldMeshInstances rewrites the copies; app.setWorldMeshInstanceDriver moves them on the SCENE clock — per-channel expressions in t, i, n, col, row, cols, rows, u, v, d and the base values, or keyframes [{t, instances}] — inside renderAt, so it scrubs and exports frame-exact; app.addWorldBoxField lays a cols × rows field of boxes (BoxGeometry) as one instanced mesh (a pin-art board: motion y = A*sin(d*k - t*w)). The on-device assistant reaches all three through its pinepaper_world3d tool (cube_field, set_mesh_instances, animate_mesh_instances); the server MCP tool does not expose them yet. Neither the geometry nor a driver is persisted.",
     "parentType": "pp:WorldObject"
   },
   "pp:ShaderNode": {
