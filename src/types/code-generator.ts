@@ -10736,8 +10736,9 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
 // Add physics body
 (function() {
   ${guard}
-  const entry = app.itemRegistry.get(${itemIdStr});
-  if (!entry || !entry.item) return { error: 'Item not found: ' + ${itemIdStr} };
+  const entry = (app.getItemById && app.getItemById(${itemIdStr})) || (app.itemRegistry && (app.itemRegistry.getItem ? app.itemRegistry.getItem(${itemIdStr}) : app.itemRegistry.get(${itemIdStr})));
+  const it = entry && (entry.item || entry);
+  if (!it) return { error: 'Item not found: ' + ${itemIdStr} };
   const ok = app.physicsWorld.addBody(${itemIdStr}, ${JSON.stringify(config)});
   return { success: ok, action: 'add_body', itemId: ${itemIdStr}, bodyType: ${JSON.stringify(input.bodyType || 'dynamic')} };
 })();`.trim();
@@ -12104,6 +12105,7 @@ ${input.sound ? `  // SOUND ON THE ACTION (D68): one placed sound per moment the
     if (!tid) {
       const p = Object.assign({}, st.shape.properties || {}, { x: st.shape.position.x, y: st.shape.position.y });
       const made = app.create(st.shape.itemType, p);
+      if (made) { made.visible = false; }
       tid = made && made.data && made.data.registryId;
       if (!tid) { return { success: false, error: 'state ' + i + ': could not make the ' + st.shape.itemType + ' reference shape', states: done }; }
     } else if (!(app.getItemById && app.getItemById(tid))) {

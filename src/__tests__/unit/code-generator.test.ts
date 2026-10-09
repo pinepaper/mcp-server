@@ -1481,6 +1481,27 @@ describe('PinePaperCodeGenerator', () => {
         expect(code).toContain("error: 'Item not found: ' + targetId");
         expect(code).toContain("mode: 'merge'");
       });
+
+      it('generateMorphSequence hides inline reference shapes immediately upon creation (B73)', () => {
+        const code = codeGenerator.generateMorphSequence({
+          itemId: 'hero_1',
+          states: [
+            { at: 1.0, shape: { itemType: 'circle', position: { x: 200, y: 200 } } },
+          ],
+        } as never);
+        expect(code).toContain('const made = app.create(st.shape.itemType, p);');
+        expect(code).toContain('if (made) { made.visible = false; }');
+      });
+
+      it('generatePhysics add_body uses flexible item lookup with app.getItemById fallback (B84)', () => {
+        const code = codeGenerator.generatePhysics({
+          action: 'add_body',
+          itemId: 'ball_1',
+          bodyType: 'dynamic',
+        } as never);
+        expect(code).toContain('app.getItemById && app.getItemById("ball_1")');
+        expect(code).toContain('app.physicsWorld.addBody("ball_1"');
+      });
     });
   });
 });
