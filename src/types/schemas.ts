@@ -2532,6 +2532,7 @@ export const AgentBatchOperationSchema = z.object({
   })).optional().describe('Keyframes for keyframe_animate [{time, properties, easing}]'),
   duration: z.number().optional().describe('Duration in seconds for keyframe_animate or play_timeline'),
   loop: z.boolean().optional().describe('Loop for keyframe_animate or play_timeline'),
+  append: z.boolean().optional().describe("For keyframe_animate: add these keys to the item's existing track instead of replacing it (a key at the same time merges, the new values win). Without it the op replaces the track; the op's result says which happened."),
   // Apply mask fields
   maskPreset: z.string().optional().describe('Mask preset for apply_mask (wipeLeft, wipeRight, wipeUp, wipeDown, iris, irisOut, star, heart, curtainHorizontal, curtainVertical, cinematic, diagonalWipe, revealUp, revealDown)'),
   maskType: z.string().optional().describe('Mask shape for apply_mask (rectangle, circle, ellipse, star, triangle, hexagon, heart, rounded)'),

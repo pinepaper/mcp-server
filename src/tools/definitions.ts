@@ -8703,7 +8703,7 @@ ITEMS:
 ANIMATION:
   animate — Loop animation: {itemId, animationType, animationOptions}
     animationType: ${SIMPLE_ANIMATION_TYPES_LIST}
-  keyframe_animate — Timed animation: {itemId, keyframes: [{time, properties, easing}], duration, loop}
+  keyframe_animate — Timed animation: {itemId, keyframes: [{time, properties, easing}], duration, loop, append}. Replaces the item's track unless append: true; two ops on one item in a batch are merged into one.
     Animatable properties: opacity, scale, scaleX, scaleY, x, y, rotation, fillColor, strokeColor, strokeWidth, width, height, radius, fontSize, trimStart/trimEnd/trimOffset (path draw-on)
     Easing (on the keyframe being moved TO): ${KEYFRAME_EASINGS_LIST}
   relation — Behavioral link: {sourceId, targetId, relationType, relationOptions}
@@ -8759,6 +8759,7 @@ EXAMPLE — Animated sky scene with timed reveals:
               height: { type: 'number', description: 'Canvas height for set_canvas_size (100-16384)' },
               preset: { type: 'string', description: 'Canvas preset for set_canvas_size' },
               backgroundColor: { type: 'string', description: 'For set_background: hex color' },
+              color: { type: 'string', description: 'For set_background: same as backgroundColor. For create: same as fillColor.' },
               generatorName: {
                 type: 'string',
                 enum: [...GeneratorNameSchema.options],
@@ -8805,6 +8806,7 @@ EXAMPLE — Animated sky scene with timed reveals:
               },
               duration: { type: 'number', description: 'Duration in seconds for keyframe_animate or play_timeline' },
               loop: { type: 'boolean', description: 'Loop for keyframe_animate or play_timeline' },
+              append: { type: 'boolean', description: "For keyframe_animate: add these keys to the item's existing track instead of replacing it (a key at the same time merges, the new values win). Without it the op replaces the track; the op's result says which happened." },
               // Relations
               sourceId: { type: 'string', description: 'For relation: source item ID or $N' },
               targetId: { type: 'string', description: 'For relation: target item ID or $N' },

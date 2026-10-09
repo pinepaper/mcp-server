@@ -1446,6 +1446,15 @@ describe('PinePaperCodeGenerator', () => {
         expect(code).toContain("justification\": \"right\"");
       });
 
+      it('B89: modify_item does not report an aliased key as having no effect', () => {
+        const code = codeGenerator.generateModifyItem({
+          itemId: 'item_1',
+          properties: { textAlign: 'right', text: 'Hi', bogusKey: 1 },
+        });
+        expect(code).toContain('ignoredProperties: ["bogusKey"]');
+        expect(code).not.toMatch(/ignoredProperties: \[[^\]]*"(textAlign|text)"/);
+      });
+
       it('B88: radial gradient defaults origin to item center instead of up-left offset', () => {
         const code = codeGenerator.generateCreateItem({
           itemType: 'circle',
@@ -1466,7 +1475,7 @@ describe('PinePaperCodeGenerator', () => {
         expect(code).not.toContain("origin: [450, 350]");
       });
 
-      it('B93: batch keyframe_animate checks target existence and uses merge mode', () => {
+      it('B93: batch keyframe_animate checks target existence; replaces unless append, like the standalone tool', () => {
         const code = codeGenerator.generateAgentBatchExecute({
           operations: [
             {
@@ -1479,7 +1488,14 @@ describe('PinePaperCodeGenerator', () => {
         expect(code).toContain("app.getItemById(targetId)");
         expect(code).toContain("if (!_target)");
         expect(code).toContain("error: 'Item not found: ' + targetId");
-        expect(code).toContain("mode: 'merge'");
+        expect(code).not.toContain("mode: 'merge'");
+        expect(code).toContain('replaced: true');
+        const appended = codeGenerator.generateAgentBatchExecute({
+          operations: [{ type: 'keyframe_animate', itemId: 'item_1', append: true,
+            keyframes: [{ time: 0, properties: { opacity: 0 } }, { time: 1, properties: { opacity: 1 } }] } as never],
+        });
+        expect(appended).toContain("mode: 'merge'");
+        expect(appended).toContain('append: true');
       });
 
       it('generateMorphSequence hides inline reference shapes immediately upon creation (B73)', () => {

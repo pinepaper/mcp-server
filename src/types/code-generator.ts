@@ -884,6 +884,25 @@ if (typeof app.fitText === 'function') {
  *
  * lineHeight is the CSS habit: <= 4 is a multiple of fontSize, above that px.
  */
+/**
+ * THE FRAME A MOTION IS AUTHORED AGAINST.
+ *
+ * app.exportFrameRect() is the export frame. On a bounded canvas that is the
+ * artboard. On an UNBOUNDED canvas (prod's default) it is the region the items
+ * currently occupy, padded: with one actor on the canvas it is the actor
+ * itself, so choreograph called every move "off screen" and the morph camera
+ * framed against the hero alone. An unbounded canvas has no fixed frame, so
+ * motion is checked against its nominal artboard instead, flagged unbounded so
+ * the caller can say so.
+ */
+function authoringFrameJs(name: string): string {
+  return `const ${name} = (function() {
+    const cs = app.getCanvasSize && app.getCanvasSize();
+    if (cs && cs.unbounded && cs.width > 0 && cs.height > 0) return { x: 0, y: 0, width: cs.width, height: cs.height, unbounded: true };
+    return (typeof app.exportFrameRect === 'function' && app.exportFrameRect()) || cs || { width: 1920, height: 1080 };
+  })();`;
+}
+
 const TEXT_STYLE_KEYS = ['fontWeight', 'fontStyle', 'leading', 'lineHeight', 'textAlign', 'align', 'text'] as const;
 function emitTextStyle(itemExpr: string, props: Record<string, unknown>): string {
   const weight = props.fontWeight;
@@ -1056,19 +1075,25 @@ function generateModifyItemCode(
   dataFlags?: Record<string, unknown>
 ): string {
   const { contentType, contentFormat, countdownTarget, countdownEndText, ...restProperties } = properties;
-  // Aliases for text items: text -> content (B66), textAlign / align -> justification (B89)
+  // Aliases for text items: text -> content (B66), textAlign / align -> justification (B89).
+  // A key consumed here was applied, so the unread-key report below must not
+  // call it "no effect".
+  const aliased = new Set<string>();
   if (restProperties.justification === undefined) {
     if (restProperties.textAlign !== undefined) {
       restProperties.justification = restProperties.textAlign;
       delete restProperties.textAlign;
+      aliased.add('textAlign');
     } else if (restProperties.align !== undefined) {
       restProperties.justification = restProperties.align;
       delete restProperties.align;
+      aliased.add('align');
     }
   }
   if (restProperties.content === undefined && restProperties.text !== undefined) {
     restProperties.content = restProperties.text;
     delete restProperties.text;
+    aliased.add('text');
   }
   // A new fit box is applied here (emitTextFit, with the hold carried over),
   // not by modifyItem: the engine's modify fits it with no hold, overwriting
@@ -1212,7 +1237,7 @@ if (_flagged && _flagged.item && _flagged.item.data) Object.assign(_flagged.item
   // AN UNREAD KEY HAD NO EFFECT, AND THE CALL SAID SUCCESS. {scaling: 8} on a
   // raster answered success and left it 16 px; the engine reads `scale`. Same
   // report create_item gives, against the engine's modify path (generated).
-  const modIgnored = Object.keys(properties).filter((k) => !MODIFY_KNOWN_KEYS.has(k));
+  const modIgnored = Object.keys(properties).filter((k) => !MODIFY_KNOWN_KEYS.has(k) && !aliased.has(k));
   const modWarning = modIgnored.length === 0 ? '' : `, ignoredProperties: ${JSON.stringify(modIgnored)}, warning: ${JSON.stringify(
     `${modIgnored.join(', ')} ${modIgnored.length > 1 ? 'are' : 'is'} not read when modifying an item, so ${modIgnored.length > 1 ? 'they had' : 'it had'} no effect.`
     + modIgnored.filter((k) => MODIFY_DID_YOU_MEAN[k]).map((k) => ` Did you mean ${MODIFY_DID_YOU_MEAN[k]} (not ${k})?`).join(''),
@@ -4694,7 +4719,7 @@ throw new Error('Unknown diagram mode action: ${action}');
           'backgroundColor', 'generatorName', 'generatorParams', 'generatorRegion',
           'width', 'height', 'preset', 'keyframes', 'duration', 'loop',
           'maskPreset', 'maskType', 'maskOptions', 'effectType', 'effectParams',
-          'action', 'time'
+          'action', 'time', 'append'
         ]);
         for (const [k, v] of Object.entries(anyOp)) {
           if (!batchKeys.has(k) && v !== undefined && opProps[k] === undefined) {
@@ -4871,6 +4896,8 @@ return { itemId: ${op.itemId?.startsWith('$') ? `itemIds[${op.itemId.substring(1
           ? mergedPayload.duration
           : (op.duration || (op.keyframes?.length ? Math.max(...op.keyframes.map(k => k.time)) : 5));
         const kfLoop = mergedPayload ? mergedPayload.loop : (op.loop ?? false);
+        // Same contract as pinepaper_keyframe_animate: replace unless append.
+        const kfAppend = (op as { append?: boolean }).append === true;
         return `
 const targetId = ${kfItemRef};
 const _target = (app.getItemById && app.getItemById(targetId))
@@ -4878,8 +4905,10 @@ const _target = (app.getItemById && app.getItemById(targetId))
 if (!_target) {
   return { success: false, itemId: targetId, error: 'Item not found: ' + targetId };
 }
-app.addAnimation(targetId, ${kfJson}, { duration: ${kfDuration}, loop: ${kfLoop}, mode: 'merge' });
-return { success: true, itemId: targetId, duration: ${kfDuration}, loop: ${kfLoop} };
+const _kfItem = _target.item || _target;
+const _prevKeys = (_kfItem.data && Array.isArray(_kfItem.data.keyframes)) ? _kfItem.data.keyframes.length : 0;
+app.addAnimation(targetId, ${kfJson}, { duration: ${kfDuration}, loop: ${kfLoop}${kfAppend ? ", mode: 'merge'" : ''} });
+return { success: true, itemId: targetId, duration: ${kfDuration}, loop: ${kfLoop}${kfAppend ? ', append: true' : ''}${kfAppend ? '' : `, ...(_prevKeys ? { track: { replaced: true, previousKeys: _prevKeys, note: 'the item already had a keyframe track; this op replaced it. To add keys to it instead, pass append: true.' } } : {})`} };
 `;
       }
 
@@ -12024,7 +12053,7 @@ ${guard}
   const __sc = __it.scaling || { x: 1, y: 1 };
   const __b = __it.bounds;
   const __baked = (__it.data && typeof __it.data._bakedRotation === 'number') ? __it.data._bakedRotation : 0;
-  const __fr = (typeof app.exportFrameRect === 'function' && app.exportFrameRect()) || (app.getCanvasSize && app.getCanvasSize()) || { width: 1920, height: 1080 };
+  ${authoringFrameJs('__fr')}
   const __frame = { x: __fr.x || 0, y: __fr.y || 0, width: __fr.width, height: __fr.height };
   const __actor = { x: __it.position.x, y: __it.position.y,
     w: __b.width / (Math.abs(__sc.x) || 1), h: __b.height / (Math.abs(__sc.y) || 1),
@@ -12045,6 +12074,7 @@ ${guard}
     __warnings.push('the actor already animates ' + __other.join(', ') + '; the beat keys leave those out, which the engine can break at the beat keys. Re-key ' + __other.join(', ') + ' with every key carrying them, after choreographing.');
   }
   if (__r.final && !__r.final.onScreen) __warnings.push('after the last beat the actor is off screen at [' + __r.final.x + ', ' + __r.final.y + '].');
+  if (__fr.unbounded && __warnings.some(function (w) { return /off screen/.test(w); })) __warnings.push('the canvas is unbounded, so it has no fixed frame: on-screen was checked against its nominal ' + __fr.width + 'x' + __fr.height + ' artboard. Set a canvas size or preset to fix the frame.');
   const __res = { success: true, itemId: ${id}, beats: ${input.beats.length}, keyframes: __r.keyframes.length, duration: __r.end, final: __r.final };
 ${input.sound ? `  // SOUND ON THE ACTION (D68): one placed sound per moment the motion makes —
   // pop, launch, contact, shake — loud as the moment is strong. A sound that
@@ -12120,7 +12150,7 @@ ${input.sound ? `  // SOUND ON THE ACTION (D68): one placed sound per moment the
   if (n !== null && n < done.length) res.warning = 'only ' + n + ' of ' + done.length + ' morphs are on the element.';
 ${cam ? `  // The camera rides the SAME timing: framing each state as its morph lands.
   {
-    const fr = (typeof app.exportFrameRect === 'function' && app.exportFrameRect()) || (app.getCanvasSize && app.getCanvasSize()) || { width: 1920, height: 1080 };
+    ${authoringFrameJs('fr')}
     const fill = ${S(cam.fill ?? 0.45)};
     const frameOf = function (it) { const b = it.bounds; return { focus: [b.center.x, b.center.y], zoom: Math.max(0.2, Math.min(8, fill * Math.min(fr.width / Math.max(1, b.width), fr.height / Math.max(1, b.height)))) }; };
     const f0 = frameOf(src);
