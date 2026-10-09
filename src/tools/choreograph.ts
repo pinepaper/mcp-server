@@ -85,6 +85,16 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
   const sorted = beats.map((b, i) => ({ b, i })).sort((a, z) => (+a.b.at || 0) - (+z.b.at || 0));
   let t = 0;
   let started = false;
+  if (sorted.length > 0) {
+    const firstAt = +sorted[0].b.at || 0;
+    if (firstAt > 0) {
+      const firstVerb = sorted[0].b.verb;
+      const isEntrance = firstVerb === 'enter' || firstVerb === 'pop' || firstVerb === 'peek';
+      if (!isEntrance) {
+        key(0, 'linear');
+      }
+    }
+  }
   try {
     for (const { b, i } of sorted) {
       const at = +b.at || 0;

@@ -25,9 +25,19 @@ describe('compileChoreography', () => {
     const r = compileChoreography(BALL, FRAME, [{ at: 1, verb: 'hop', to: [600, 760] }]);
     const last = r.keyframes!.at(-1)!;
     expect(last.properties).toMatchObject({ x: 600, y: 760, scaleX: 1, scaleY: 1 });
-    expect(r.keyframes![0].time).toBe(1);
+    expect(r.keyframes![0].time).toBe(0);
+    expect(r.keyframes![1].time).toBe(1);
     expect(r.keyframes!.some((k) => k.properties.scaleY < 0.8)).toBe(true);   // contact squash
     expect(Math.min(...r.keyframes!.map((k) => k.properties.y))).toBeLessThan(760 - 80);  // it left the ground
+  });
+
+  it('B109: actor sits still at rest from t=0 before a beat starting at at > 0', () => {
+    const r = compileChoreography(BALL, FRAME, [{ at: 1.5, verb: 'hop', to: [400, 760] }]);
+    expect(r.keyframes![0].time).toBe(0);
+    expect(r.keyframes![0].properties.opacity).toBe(1);
+    expect(r.keyframes![0].properties.x).toBe(BALL.x);
+    expect(r.keyframes![0].properties.y).toBe(BALL.y);
+    expect(r.keyframes![1].time).toBe(1.5);
   });
 
   it('roll turns by distance over radius, clockwise to the right', () => {
