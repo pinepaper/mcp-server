@@ -514,7 +514,7 @@ describe('PinePaperCodeGenerator', () => {
       const code = codeGenerator.generateAgentBatchExecute({
         operations: [{ type: 'animate', itemId: '$0', animationType: 'pulse', animationOptions: { speed: 0.5 } }],
       });
-      expect(code).toContain('itemIds[0]');
+      expect(code).toContain('__ref(0)');
       expect(code).toContain("animationType: 'pulse'");
       expect(code).toContain('0.5');
     });
@@ -539,8 +539,8 @@ describe('PinePaperCodeGenerator', () => {
       const code = codeGenerator.generateAgentBatchExecute({
         operations: [{ type: 'relation', sourceId: '$1', targetId: '$0', relationType: 'orbits', relationOptions: { radius: 150 } }],
       });
-      expect(code).toContain('itemIds[1]');
-      expect(code).toContain('itemIds[0]');
+      expect(code).toContain('__ref(1)');
+      expect(code).toContain('__ref(0)');
       expect(code).toContain("app.addRelation(source, target, 'orbits'");
       expect(code).toContain('150');
     });
@@ -605,7 +605,7 @@ describe('PinePaperCodeGenerator', () => {
           { type: 'animate', itemId: '$0', animationType: 'pulse' },
         ],
       });
-      expect(code).toContain('itemIds[0]');
+      expect(code).toContain('__ref(0)');
     });
 
     it('should use literal ID when not a $N reference', () => {
@@ -613,7 +613,7 @@ describe('PinePaperCodeGenerator', () => {
         operations: [{ type: 'modify', itemId: 'item_42', properties: { opacity: 0.5 } }],
       });
       expect(code).toContain("'item_42'");
-      expect(code).not.toContain('itemIds[');
+      expect(code).not.toContain('__ref(');
     });
 
     it('should preserve operation order in generated code', () => {
@@ -1044,7 +1044,7 @@ describe('PinePaperCodeGenerator', () => {
           { type: 'group', itemIds: ['$0', '$1'], groupName: 'wheels' },
         ],
       } as any);
-      expect(code).toContain('[itemIds[0], itemIds[1]]');
+      expect(code).toContain('[__ref(0), __ref(1)]');
       expect(code).toContain('createGroup("wheels")');
       // group op returns groupId (no itemId) so it must not shift $N indices
       expect(code).toContain('groupId');
@@ -1231,7 +1231,7 @@ describe('PinePaperCodeGenerator', () => {
 
       // $1 must resolve to the SECOND create (itemIds[1]) — with the old
       // unconditional push, itemIds[1] was the first keyframe op's target.
-      expect(code).toContain('itemIds[1]');
+      expect(code).toContain('__ref(1)');
     });
 
     it('modify/animate/delete results never extend the $N space', () => {
@@ -1530,7 +1530,19 @@ describe('PinePaperCodeGenerator', () => {
           ],
         });
         expect(code).toContain('window.__pinepaper_batch_item_ids');
-        expect(code).toContain('itemIds[0]');
+        expect(code).toContain('__ref(0)');
+      });
+
+      it('B115: $N inside a batch is THIS batch\'s Nth create; a reach past it names the previous id', () => {
+        const code = codeGenerator.generateAgentBatchExecute({
+          operations: [
+            { type: 'create', itemType: 'rectangle', position: { x: 1, y: 1 }, properties: { width: 5, height: 5 } },
+            { type: 'keyframe_animate', itemId: '$0', keyframes: [{ time: 0, properties: { x: 0 } }, { time: 1, properties: { x: 9 } }] },
+          ],
+        });
+        expect(code).toContain('const itemIds = [];');
+        expect(code).not.toMatch(/const itemIds = \(\(typeof window/);
+        expect(code).toContain("In the previous batch $");
       });
 
       it('B116: keyframe_animate and batch keyframe_animate warn on letterSpacing', () => {
@@ -1542,7 +1554,7 @@ describe('PinePaperCodeGenerator', () => {
           ],
         });
         expect(single).toContain('ignoredProperties: ["letterSpacing"]');
-        expect(single).toContain('cannot be keyframed');
+        expect(single).toContain('is not an animatable property');
 
         const batch = codeGenerator.generateAgentBatchExecute({
           operations: [
@@ -1554,7 +1566,7 @@ describe('PinePaperCodeGenerator', () => {
           ],
         });
         expect(batch).toContain('ignoredProperties: ["letterSpacing"]');
-        expect(batch).toContain('cannot be keyframed');
+        expect(batch).toContain('is not an animatable property');
       });
     });
   });

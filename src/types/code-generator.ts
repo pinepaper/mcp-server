@@ -1680,7 +1680,7 @@ function generateKeyframeAnimateCode(
     : '';
   const unsupportedKeys = [...new Set(keyframes.flatMap((k) => Object.keys((k as { properties?: object }).properties ?? {})))]
     .filter((k) => k === 'letterSpacing');
-  const letterSpacingWarning = unsupportedKeys.length === 0 ? '' : `, ignoredProperties: ${JSON.stringify(unsupportedKeys)}, warning: ${JSON.stringify(`${unsupportedKeys.join(', ')} cannot be keyframed (Paper.js text has no letterSpacing), so it had no effect.`)}`;
+  const letterSpacingWarning = unsupportedKeys.length === 0 ? '' : `, ignoredProperties: ${JSON.stringify(unsupportedKeys)}, warning: ${JSON.stringify(`${unsupportedKeys.join(', ')} is not an animatable property in this engine (app.listAnimatableProperties does not list it), so it had no effect. Set a fixed value with pinepaper_modify_item, or animate fontSize or scaleX.`)}`;
 
   const addAnimTarget = itemId.startsWith('$') ? '_targetId' : `'${itemId}'`;
 
@@ -4625,7 +4625,18 @@ throw new Error('Unknown diagram mode action: ${action}');
       || (typeof v.reason === 'string' && v.reason)
       || 'the operation reported failure without naming a reason';
   };
-  const itemIds = ((typeof window !== 'undefined' && window.__pinepaper_batch_item_ids) || []).slice();
+  // $N is the Nth item THIS batch created (the documented contract). The
+  // previous batch's ids are kept only to name the right id when a $N reaches
+  // past what this batch has made: picking it silently shifted every $N in a
+  // batch that also creates (B115 follow-up).
+  const itemIds = [];
+  const __prevBatchIds = ((typeof window !== 'undefined' && window.__pinepaper_batch_item_ids) || []).slice();
+  const __ref = function (n) {
+    if (itemIds[n] !== undefined) return itemIds[n];
+    const prev = __prevBatchIds[n];
+    throw new Error('$' + n + ' is the item number ' + n + ' THIS batch created, and it has created ' + itemIds.length + ' so far.'
+      + (prev ? ' In the previous batch $' + n + ' was ' + prev + ' — pass that id instead.' : ' Put the create ops first, or pass the item id.'));
+  };
   const results = [];
   let success = true;
 
@@ -4684,7 +4695,8 @@ throw new Error('Unknown diagram mode action: ${action}');
     // 60-op batch should not have to scan sixty entries to learn that op 41
     // could not find a preset.
     const _failed = results.filter((r) => !r.success);
-    if (typeof window !== 'undefined') {
+    // A batch that created nothing keeps the previous batch's ids on record.
+    if (typeof window !== 'undefined' && itemIds.length) {
       window.__pinepaper_batch_item_ids = itemIds;
     }
     return { success, itemIds, results, operationCount: ${operations.length},
@@ -4692,7 +4704,8 @@ throw new Error('Unknown diagram mode action: ${action}');
       ...(_failed.length ? { error: _failed.map((r) => 'op ' + r.index + ': ' + r.error).join('; ') } : {}),
       canvasSize: { width: _cs.width || 800, height: _cs.height || 600 } };
   } catch (e) {
-    if (typeof window !== 'undefined') {
+    // A batch that created nothing keeps the previous batch's ids on record.
+    if (typeof window !== 'undefined' && itemIds.length) {
       window.__pinepaper_batch_item_ids = itemIds;
     }
     const _cs = app.getCanvasSize ? app.getCanvasSize() : { width: 800, height: 600 };
@@ -4782,7 +4795,7 @@ return __created;
 
       case 'modify': {
         const itemRef = op.itemId?.startsWith('$')
-          ? `itemIds[${op.itemId.substring(1)}]`
+          ? `__ref(${op.itemId.substring(1)})`
           : `'${op.itemId}'`;
         // modify_item's own emitter, as create is create_item's (see above):
         // the batch's modifyItem call missed text styles, font loading, audio
@@ -4804,7 +4817,7 @@ return __r;
 
       case 'animate':
         const animItemRef = op.itemId?.startsWith('$')
-          ? `itemIds[${op.itemId.substring(1)}]`
+          ? `__ref(${op.itemId.substring(1)})`
           : `'${op.itemId}'`;
         const animOpts = JSON.stringify(op.animationOptions || {});
         return `
@@ -4817,10 +4830,10 @@ return { itemId: targetId, animationType: '${op.animationType}' };
 
       case 'relation':
         const srcRef = op.sourceId?.startsWith('$')
-          ? `itemIds[${op.sourceId.substring(1)}]`
+          ? `__ref(${op.sourceId.substring(1)})`
           : `'${op.sourceId}'`;
         const tgtRef = op.targetId?.startsWith('$')
-          ? `itemIds[${op.targetId.substring(1)}]`
+          ? `__ref(${op.targetId.substring(1)})`
           : `'${op.targetId}'`;
         const relOpts = JSON.stringify(op.relationOptions || {});
         return `
@@ -4836,7 +4849,7 @@ return { relationId, sourceId, targetId, relationType: '${op.relationType}' };
 
       case 'delete':
         const delRef = op.itemId?.startsWith('$')
-          ? `itemIds[${op.itemId.substring(1)}]`
+          ? `__ref(${op.itemId.substring(1)})`
           : `'${op.itemId}'`;
         return `
 const targetId = ${delRef};
@@ -4850,7 +4863,7 @@ return { itemId: targetId, deleted: true };
       case 'group': {
         // Resolve each ref ($N → itemIds[N]; literal → quoted id) into a JS array.
         const refs = (op.itemIds || []).map((ref) =>
-          ref?.startsWith('$') ? `itemIds[${ref.substring(1)}]` : `'${ref}'`,
+          ref?.startsWith('$') ? `__ref(${ref.substring(1)})` : `'${ref}'`,
         );
         const idsArrayExpr = `[${refs.join(', ')}]`;
         const nameExpr = op.groupName !== undefined ? JSON.stringify(op.groupName) : 'undefined';
@@ -4899,12 +4912,12 @@ return { success: true, width: (_cs && _cs.width) || ${w}, height: (_cs && _cs.h
           return `
 // Keyframes merged into operation ${foldTarget} (same target). A keyframe track
 // is replaced wholesale, so emitting both here would silently drop one.
-return { itemId: ${op.itemId?.startsWith('$') ? `itemIds[${op.itemId.substring(1)}]` : `'${op.itemId}'`}, merged: true, mergedInto: ${foldTarget} };
+return { itemId: ${op.itemId?.startsWith('$') ? `__ref(${op.itemId.substring(1)})` : `'${op.itemId}'`}, merged: true, mergedInto: ${foldTarget} };
 `;
         }
         const mergedPayload = mergePlan?.merged.get(index);
         const kfItemRef = op.itemId?.startsWith('$')
-          ? `itemIds[${op.itemId.substring(1)}]`
+          ? `__ref(${op.itemId.substring(1)})`
           : `'${op.itemId}'`;
         const kfSource = mergedPayload ? mergedPayload.keyframes : (op.keyframes || []);
         const kfJson = JSON.stringify(normalizeKeyframePositions(kfSource as never));
@@ -4916,7 +4929,7 @@ return { itemId: ${op.itemId?.startsWith('$') ? `itemIds[${op.itemId.substring(1
         const kfAppend = (op as { append?: boolean }).append === true;
         const kfUnsupported = [...new Set(((kfSource || []) as any[]).flatMap((k) => Object.keys((k as { properties?: object }).properties ?? {})))]
           .filter((k) => k === 'letterSpacing');
-        const kfIgnored = kfUnsupported.length === 0 ? '' : `, ignoredProperties: ${JSON.stringify(kfUnsupported)}, warning: ${JSON.stringify(`${kfUnsupported.join(', ')} cannot be keyframed (Paper.js text has no letterSpacing), so it had no effect.`)}`;
+        const kfIgnored = kfUnsupported.length === 0 ? '' : `, ignoredProperties: ${JSON.stringify(kfUnsupported)}, warning: ${JSON.stringify(`${kfUnsupported.join(', ')} is not an animatable property in this engine (app.listAnimatableProperties does not list it), so it had no effect. Set a fixed value with pinepaper_modify_item, or animate fontSize or scaleX.`)}`;
         return `
 const targetId = ${kfItemRef};
 const _target = (app.getItemById && app.getItemById(targetId))
@@ -4933,7 +4946,7 @@ return { success: true, itemId: targetId, duration: ${kfDuration}, loop: ${kfLoo
 
       case 'apply_mask': {
         const maskItemRef = op.itemId?.startsWith('$')
-          ? `itemIds[${op.itemId.substring(1)}]`
+          ? `__ref(${op.itemId.substring(1)})`
           : `'${op.itemId}'`;
         const maskOpts = JSON.stringify(op.maskOptions || {});
         const preset = op.maskPreset || op.maskType || 'wipeLeft';
@@ -4953,7 +4966,7 @@ return { success: !!maskedGroup, itemId: targetId, preset: '${preset}' };
 
       case 'apply_effect': {
         const effItemRef = op.itemId?.startsWith('$')
-          ? `itemIds[${op.itemId.substring(1)}]`
+          ? `__ref(${op.itemId.substring(1)})`
           : `'${op.itemId}'`;
         const effParams = JSON.stringify(op.effectParams || {});
         return `
