@@ -265,6 +265,11 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   longer calls a move off screen because the canvas is unbounded.
 - `pinepaper_morph_sequence` hides the shapes it makes as references, and
   `pinepaper_physics` `add_body` looks its item up the way the other tools do.
+- A `$N` that reaches past the items a batch has created fails and names the
+  id the previous batch gave it; a standalone `$N` resolves to the last
+  batch's item.
+- Keyframing `letterSpacing` reports that it is not animatable, rather than
+  succeeding with no effect.
 
 ## What's new in 1.6.20
 
