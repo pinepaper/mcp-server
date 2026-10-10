@@ -1518,6 +1518,44 @@ describe('PinePaperCodeGenerator', () => {
         expect(code).toContain('app.getItemById && app.getItemById("ball_1")');
         expect(code).toContain('app.physicsWorld.addBody("ball_1"');
       });
+
+      it('B115: batch seeds itemIds from previous batch and saves on completion', () => {
+        const code = codeGenerator.generateAgentBatchExecute({
+          operations: [
+            {
+              type: 'keyframe_animate',
+              itemId: '$0',
+              keyframes: [{ time: 0, properties: { opacity: 0 } }, { time: 1, properties: { opacity: 1 } }],
+            },
+          ],
+        });
+        expect(code).toContain('window.__pinepaper_batch_item_ids');
+        expect(code).toContain('itemIds[0]');
+      });
+
+      it('B116: keyframe_animate and batch keyframe_animate warn on letterSpacing', () => {
+        const single = codeGenerator.generateKeyframeAnimate({
+          itemId: 'text_1',
+          keyframes: [
+            { time: 0, properties: { letterSpacing: 5 } },
+            { time: 1, properties: { letterSpacing: 10 } },
+          ],
+        });
+        expect(single).toContain('ignoredProperties: ["letterSpacing"]');
+        expect(single).toContain('cannot be keyframed');
+
+        const batch = codeGenerator.generateAgentBatchExecute({
+          operations: [
+            {
+              type: 'keyframe_animate',
+              itemId: 'text_1',
+              keyframes: [{ time: 0, properties: { letterSpacing: 5 } }],
+            },
+          ],
+        });
+        expect(batch).toContain('ignoredProperties: ["letterSpacing"]');
+        expect(batch).toContain('cannot be keyframed');
+      });
     });
   });
 });

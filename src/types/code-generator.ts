@@ -1587,9 +1587,14 @@ function normalizeKeyframePositions<T extends { properties?: Record<string, unkn
  * "item_7 is not on the canvas" is actionable, silence is not.
  */
 function requireItem(itemId: string, what: string): string {
+  const isRef = typeof itemId === 'string' && itemId.startsWith('$');
+  const targetExpr = isRef
+    ? `((typeof window !== 'undefined' && window.__pinepaper_batch_item_ids && window.__pinepaper_batch_item_ids[${itemId.substring(1)}]) || '${itemId}')`
+    : `'${itemId}'`;
   return `
-const _target = (app.getItemById && app.getItemById(${JSON.stringify(itemId)}))
-  || (app.itemRegistry && app.itemRegistry.get && app.itemRegistry.get(${JSON.stringify(itemId)}));
+const _targetId = ${targetExpr};
+const _target = (app.getItemById && app.getItemById(_targetId))
+  || (app.itemRegistry && app.itemRegistry.get && app.itemRegistry.get(_targetId));
 if (!_target) {
   return { success: false, error: ${JSON.stringify(itemId)} + ' is not on the canvas, so ' + ${JSON.stringify(what)} + ' would have done nothing. Check the id with pinepaper_get_items — create returns the registry id, not the Paper id.' };
 }`.trim();
@@ -1631,7 +1636,7 @@ function generateKeyframeAnimateCode(
   // is the feature check: a key it names for audio passes through, anything
   // else on an audio item is still refused (prod, until that build ships).
   const audioLevelGuard = levelKeys.length === 0 ? '' : `
-  const __ae = app.itemRegistry && app.itemRegistry.get('${itemId}');
+  const __ae = app.itemRegistry && app.itemRegistry.get(_targetId);
   let __audioKeyed = [];
   try {
     const __l = typeof app.listAnimatableProperties === 'function' ? app.listAnimatableProperties() : null;
@@ -1639,7 +1644,7 @@ function generateKeyframeAnimateCode(
   } catch (_) { /* treat as unsupported */ }
   const __unsupported = ${JSON.stringify(levelKeys)}.filter(function(k) { return __audioKeyed.indexOf(k) === -1; });
   if (__ae && __ae.type === 'audio' && __unsupported.length) {
-    return { success: false, itemId: '${itemId}', error: __unsupported.join(', ') + ' cannot be keyframed on an audio item in this studio: it mixes each audio clip at one fixed level, so a fade would be accepted and not heard. Nothing was added. '
+    return { success: false, itemId: _targetId, error: __unsupported.join(', ') + ' cannot be keyframed on an audio item in this studio: it mixes each audio clip at one fixed level, so a fade would be accepted and not heard. Nothing was added. '
       + (__audioKeyed.length ? 'Keyable on audio here: ' + __audioKeyed.join(', ') + '. ' : '')
       + 'Set a static level with pinepaper_modify_item {audioGain: 0..1}.' };
   }`;
@@ -1673,6 +1678,11 @@ function generateKeyframeAnimateCode(
   const easingNote = first?.easing && first.easing !== 'linear'
     ? `, note: ${JSON.stringify(`easing '${first.easing}' is on the first keyframe, where it has no effect: easing shapes the segment ARRIVING at a keyframe. Put it on the keyframe you are moving to.`)}`
     : '';
+  const unsupportedKeys = [...new Set(keyframes.flatMap((k) => Object.keys((k as { properties?: object }).properties ?? {})))]
+    .filter((k) => k === 'letterSpacing');
+  const letterSpacingWarning = unsupportedKeys.length === 0 ? '' : `, ignoredProperties: ${JSON.stringify(unsupportedKeys)}, warning: ${JSON.stringify(`${unsupportedKeys.join(', ')} cannot be keyframed (Paper.js text has no letterSpacing), so it had no effect.`)}`;
+
+  const addAnimTarget = itemId.startsWith('$') ? '_targetId' : `'${itemId}'`;
 
   return `
 // Apply keyframe animation to ${itemId}
@@ -1683,7 +1693,7 @@ function generateKeyframeAnimateCode(
   // merge support — an older engine takes the option and replaces anyway.
   const __ki = _target && (_target.item || _target);
   const __prev = (__ki && __ki.data && Array.isArray(__ki.data.keyframes)) ? __ki.data.keyframes.map(function(k) { return k && k.time; }) : [];
-  app.addAnimation('${itemId}', ${keyframesJson}, ${JSON.stringify(opts)});
+  app.addAnimation(${addAnimTarget}, ${keyframesJson}, ${JSON.stringify(opts)});
   const __now = (__ki && __ki.data && Array.isArray(__ki.data.keyframes)) ? __ki.data.keyframes.map(function(k) { return k && k.time; }) : [];
   const __kept = __prev.every(function(t) { return __now.indexOf(t) >= 0; });${append ? `
   // Property gaps across the merged track (the same check a single call makes
@@ -1696,7 +1706,7 @@ function generateKeyframeAnimateCode(
       ? { appended: true, previousKeys: __prev.length, keys: __now.length }
       : { appended: false, replaced: true, previousKeys: __prev.length, warning: 'append was asked for, but this studio replaced the existing track (' + __prev.length + ' key(s)) instead of adding to it: it has no merge mode. Put every key in one keyframe_animate call.' })`
     : `{ replaced: true, previousKeys: __prev.length, note: 'the item already had a keyframe track (' + __prev.length + ' key(s)); this call replaced it. To add keys to it instead, pass append: true.' }`};
-  return { success: true, itemId: '${itemId}', duration: ${calculatedDuration}, loop: ${loop}${append ? ', append: true' : ''}, ...(__track ? { track: __track } : {})${append ? `, ...(__gaps.length ? { propertyGaps: __gaps.slice(0, 10), gapWarning: __gaps.length + ' key(s) of the merged track leave out a property other keys animate (' + __gaps.reduce(function(a, g) { g.missing.forEach(function(p) { if (a.indexOf(p) < 0) a.push(p); }); return a; }, []).join(', ') + '). The engine can break that property at such a key; give each key the full set — hold a value by repeating it.' } : {})` : ''}${timeOffset !== undefined ? `, timeOffset: ${timeOffset}` : ''}${clipInPoint !== undefined ? `, clipInPoint: ${clipInPoint}` : ''}${clipOutPoint !== undefined ? `, clipOutPoint: ${clipOutPoint}` : ''}${easingNote}${loopNote}${gapNote} };
+  return { success: true, itemId: ${addAnimTarget}, duration: ${calculatedDuration}, loop: ${loop}${append ? ', append: true' : ''}, ...(__track ? { track: __track } : {})${append ? `, ...(__gaps.length ? { propertyGaps: __gaps.slice(0, 10), gapWarning: __gaps.length + ' key(s) of the merged track leave out a property other keys animate (' + __gaps.reduce(function(a, g) { g.missing.forEach(function(p) { if (a.indexOf(p) < 0) a.push(p); }); return a; }, []).join(', ') + '). The engine can break that property at such a key; give each key the full set — hold a value by repeating it.' } : {})` : ''}${timeOffset !== undefined ? `, timeOffset: ${timeOffset}` : ''}${clipInPoint !== undefined ? `, clipInPoint: ${clipInPoint}` : ''}${clipOutPoint !== undefined ? `, clipOutPoint: ${clipOutPoint}` : ''}${easingNote}${loopNote}${gapNote}${letterSpacingWarning} };
 })();
 `.trim();
 }
@@ -4615,8 +4625,8 @@ throw new Error('Unknown diagram mode action: ${action}');
       || (typeof v.reason === 'string' && v.reason)
       || 'the operation reported failure without naming a reason';
   };
+  const itemIds = ((typeof window !== 'undefined' && window.__pinepaper_batch_item_ids) || []).slice();
   const results = [];
-  const itemIds = [];
   let success = true;
 
   try {
@@ -4674,11 +4684,17 @@ throw new Error('Unknown diagram mode action: ${action}');
     // 60-op batch should not have to scan sixty entries to learn that op 41
     // could not find a preset.
     const _failed = results.filter((r) => !r.success);
+    if (typeof window !== 'undefined') {
+      window.__pinepaper_batch_item_ids = itemIds;
+    }
     return { success, itemIds, results, operationCount: ${operations.length},
       failedCount: _failed.length,
       ...(_failed.length ? { error: _failed.map((r) => 'op ' + r.index + ': ' + r.error).join('; ') } : {}),
       canvasSize: { width: _cs.width || 800, height: _cs.height || 600 } };
   } catch (e) {
+    if (typeof window !== 'undefined') {
+      window.__pinepaper_batch_item_ids = itemIds;
+    }
     const _cs = app.getCanvasSize ? app.getCanvasSize() : { width: 800, height: 600 };
     return { success: false, error: e.message, itemIds, results, operationCount: ${operations.length}, canvasSize: { width: _cs.width || 800, height: _cs.height || 600 } };
   }
@@ -4898,6 +4914,9 @@ return { itemId: ${op.itemId?.startsWith('$') ? `itemIds[${op.itemId.substring(1
         const kfLoop = mergedPayload ? mergedPayload.loop : (op.loop ?? false);
         // Same contract as pinepaper_keyframe_animate: replace unless append.
         const kfAppend = (op as { append?: boolean }).append === true;
+        const kfUnsupported = [...new Set(((kfSource || []) as any[]).flatMap((k) => Object.keys((k as { properties?: object }).properties ?? {})))]
+          .filter((k) => k === 'letterSpacing');
+        const kfIgnored = kfUnsupported.length === 0 ? '' : `, ignoredProperties: ${JSON.stringify(kfUnsupported)}, warning: ${JSON.stringify(`${kfUnsupported.join(', ')} cannot be keyframed (Paper.js text has no letterSpacing), so it had no effect.`)}`;
         return `
 const targetId = ${kfItemRef};
 const _target = (app.getItemById && app.getItemById(targetId))
@@ -4908,7 +4927,7 @@ if (!_target) {
 const _kfItem = _target.item || _target;
 const _prevKeys = (_kfItem.data && Array.isArray(_kfItem.data.keyframes)) ? _kfItem.data.keyframes.length : 0;
 app.addAnimation(targetId, ${kfJson}, { duration: ${kfDuration}, loop: ${kfLoop}${kfAppend ? ", mode: 'merge'" : ''} });
-return { success: true, itemId: targetId, duration: ${kfDuration}, loop: ${kfLoop}${kfAppend ? ', append: true' : ''}${kfAppend ? '' : `, ...(_prevKeys ? { track: { replaced: true, previousKeys: _prevKeys, note: 'the item already had a keyframe track; this op replaced it. To add keys to it instead, pass append: true.' } } : {})`} };
+return { success: true, itemId: targetId, duration: ${kfDuration}, loop: ${kfLoop}${kfAppend ? ', append: true' : ''}${kfAppend ? '' : `, ...(_prevKeys ? { track: { replaced: true, previousKeys: _prevKeys, note: 'the item already had a keyframe track; this op replaced it. To add keys to it instead, pass append: true.' } } : {})`}${kfIgnored} };
 `;
       }
 
