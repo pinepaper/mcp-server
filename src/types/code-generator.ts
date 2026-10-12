@@ -1560,10 +1560,22 @@ app.animate(item, {
  */
 function normalizeKeyframePositions<T extends { properties?: Record<string, unknown> }>(keyframes: T[]): T[] {
   return (keyframes || []).map((kf) => {
-    const props = (kf as any)?.properties;
-    const p = props?.position;
-    if (p && !Array.isArray(p) && typeof p === 'object' && 'x' in p && 'y' in p) {
-      return { ...kf, properties: { ...props, position: [p.x, p.y] } } as T;
+    const rawProps = (kf as any)?.properties;
+    const props = rawProps && typeof rawProps === 'object' ? rawProps : {};
+    const p = props.position ?? (kf as any)?.position;
+    if (p) {
+      if (Array.isArray(p) && p.length >= 2) {
+        return { ...kf, properties: { ...props, position: [p[0], p[1]] } } as T;
+      }
+      if (typeof p === 'object' && 'x' in p && 'y' in p) {
+        return { ...kf, properties: { ...props, position: [p.x, p.y] } } as T;
+      }
+    }
+    if ((kf as any)?.x !== undefined && (kf as any)?.y !== undefined && props.position === undefined && props.x === undefined && props.y === undefined) {
+      return { ...kf, properties: { ...props, position: [(kf as any).x, (kf as any).y] } } as T;
+    }
+    if (rawProps === undefined && Object.keys(props).length > 0) {
+      return { ...kf, properties: props } as T;
     }
     return kf;
   });
@@ -4916,17 +4928,26 @@ return { itemId: ${op.itemId?.startsWith('$') ? `__ref(${op.itemId.substring(1)}
 `;
         }
         const mergedPayload = mergePlan?.merged.get(index);
-        const kfItemRef = op.itemId?.startsWith('$')
-          ? `__ref(${op.itemId.substring(1)})`
-          : `'${op.itemId}'`;
-        const kfSource = mergedPayload ? mergedPayload.keyframes : (op.keyframes || []);
+        const rawItemId = op.itemId ?? op.id ?? (op.properties as any)?.itemId ?? (op.properties as any)?.id;
+        const kfItemRef = rawItemId?.startsWith('$')
+          ? `__ref(${rawItemId.substring(1)})`
+          : `'${rawItemId}'`;
+        const kfSource = mergedPayload
+          ? mergedPayload.keyframes
+          : (op.keyframes || (op.properties && (op.properties as any).keyframes) || ((op as any).params && (op as any).params.keyframes) || []);
         const kfJson = JSON.stringify(normalizeKeyframePositions(kfSource as never));
         const kfDuration = mergedPayload
           ? mergedPayload.duration
-          : (op.duration || (op.keyframes?.length ? Math.max(...op.keyframes.map(k => k.time)) : 5));
-        const kfLoop = mergedPayload ? mergedPayload.loop : (op.loop ?? false);
+          : (op.duration || (op.properties as any)?.duration || (op.keyframes?.length ? Math.max(...op.keyframes.map(k => k.time)) : 5));
+        const kfLoop = mergedPayload ? mergedPayload.loop : (op.loop ?? (op.properties as any)?.loop ?? false);
         // Same contract as pinepaper_keyframe_animate: replace unless append.
-        const kfAppend = (op as { append?: boolean }).append === true;
+        const kfAppend = (op as { append?: boolean }).append === true || (op.properties as any)?.append === true;
+        const kfExtra: string[] = [];
+        if ((op as any).timeOffset !== undefined) kfExtra.push(`timeOffset: ${(op as any).timeOffset}`);
+        if ((op as any).clipInPoint !== undefined) kfExtra.push(`clipInPoint: ${(op as any).clipInPoint}`);
+        if ((op as any).clipOutPoint !== undefined) kfExtra.push(`clipOutPoint: ${(op as any).clipOutPoint}`);
+        if ((op as any).timeUnits !== undefined) kfExtra.push(`timeUnits: '${(op as any).timeUnits}'`);
+        const kfExtraStr = kfExtra.length > 0 ? `, ${kfExtra.join(', ')}` : '';
         const kfUnsupported = [...new Set(((kfSource || []) as any[]).flatMap((k) => Object.keys((k as { properties?: object }).properties ?? {})))]
           .filter((k) => k === 'letterSpacing');
         const kfIgnored = kfUnsupported.length === 0 ? '' : `, ignoredProperties: ${JSON.stringify(kfUnsupported)}, warning: ${JSON.stringify(`${kfUnsupported.join(', ')} is not an animatable property in this engine (app.listAnimatableProperties does not list it), so it had no effect. Set a fixed value with pinepaper_modify_item, or animate fontSize or scaleX.`)}`;
@@ -4939,7 +4960,7 @@ if (!_target) {
 }
 const _kfItem = _target.item || _target;
 const _prevKeys = (_kfItem.data && Array.isArray(_kfItem.data.keyframes)) ? _kfItem.data.keyframes.length : 0;
-app.addAnimation(targetId, ${kfJson}, { duration: ${kfDuration}, loop: ${kfLoop}${kfAppend ? ", mode: 'merge'" : ''} });
+app.addAnimation(targetId, ${kfJson}, { duration: ${kfDuration}, loop: ${kfLoop}${kfAppend ? ", mode: 'merge'" : ''}${kfExtraStr} });
 return { success: true, itemId: targetId, duration: ${kfDuration}, loop: ${kfLoop}${kfAppend ? ', append: true' : ''}${kfAppend ? '' : `, ...(_prevKeys ? { track: { replaced: true, previousKeys: _prevKeys, note: 'the item already had a keyframe track; this op replaced it. To add keys to it instead, pass append: true.' } } : {})`}${kfIgnored} };
 `;
       }
