@@ -1498,6 +1498,26 @@ describe('PinePaperCodeGenerator', () => {
         expect(appended).toContain('append: true');
       });
 
+      it('B134: batch keyframe_animate takes {x,y} and [x,y] positions, and forwards clip options', () => {
+        const code = codeGenerator.generateAgentBatchExecute({
+          operations: [{ type: 'keyframe_animate', itemId: 'item_1', timeOffset: 2, clipOutPoint: 3, timeUnits: 'seconds',
+            keyframes: [{ time: 0, properties: { position: { x: 10, y: 20 } } }, { time: 4, properties: { position: [30, 40] } }] } as never],
+        });
+        expect(code).toContain('"position":[10,20]');
+        expect(code).toContain('"position":[30,40]');
+        expect(code).toContain("duration: 4, loop: false, timeOffset: 2, clipOutPoint: 3, timeUnits: 'seconds'");
+      });
+
+      it('B134: unvalidated batch clip options never reach the script raw', () => {
+        const code = codeGenerator.generateAgentBatchExecute({
+          operations: [{ type: 'keyframe_animate', itemId: 'item_1', timeOffset: '1); alert(1', timeUnits: "x'); alert(1",
+            keyframes: [{ time: 0, properties: { opacity: 0 } }, { time: 1, properties: { opacity: 1 } }] } as never],
+        });
+        expect(code).not.toContain('alert(1');
+        expect(code).not.toContain('timeOffset:');
+        expect(code).not.toContain('timeUnits: ');
+      });
+
       it('generateMorphSequence hides inline reference shapes immediately upon creation (B73)', () => {
         const code = codeGenerator.generateMorphSequence({
           itemId: 'hero_1',

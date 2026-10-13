@@ -4928,7 +4928,7 @@ return { itemId: ${op.itemId?.startsWith('$') ? `__ref(${op.itemId.substring(1)}
 `;
         }
         const mergedPayload = mergePlan?.merged.get(index);
-        const rawItemId = op.itemId ?? op.id ?? (op.properties as any)?.itemId ?? (op.properties as any)?.id;
+        const rawItemId = String(op.itemId ?? op.id ?? (op.properties as any)?.itemId ?? (op.properties as any)?.id);
         const kfItemRef = rawItemId?.startsWith('$')
           ? `__ref(${rawItemId.substring(1)})`
           : `'${rawItemId}'`;
@@ -4938,15 +4938,18 @@ return { itemId: ${op.itemId?.startsWith('$') ? `__ref(${op.itemId.substring(1)}
         const kfJson = JSON.stringify(normalizeKeyframePositions(kfSource as never));
         const kfDuration = mergedPayload
           ? mergedPayload.duration
-          : (op.duration || (op.properties as any)?.duration || (op.keyframes?.length ? Math.max(...op.keyframes.map(k => k.time)) : 5));
+          : (op.duration || (op.properties as any)?.duration || ((kfSource as any[]).length ? Math.max(...(kfSource as any[]).map((k) => Number(k.time) || 0)) : 5));
         const kfLoop = mergedPayload ? mergedPayload.loop : (op.loop ?? (op.properties as any)?.loop ?? false);
         // Same contract as pinepaper_keyframe_animate: replace unless append.
         const kfAppend = (op as { append?: boolean }).append === true || (op.properties as any)?.append === true;
+        // Batch ops are passthrough, so these arrive unvalidated: numbers only, and timeUnits from its enum.
         const kfExtra: string[] = [];
-        if ((op as any).timeOffset !== undefined) kfExtra.push(`timeOffset: ${(op as any).timeOffset}`);
-        if ((op as any).clipInPoint !== undefined) kfExtra.push(`clipInPoint: ${(op as any).clipInPoint}`);
-        if ((op as any).clipOutPoint !== undefined) kfExtra.push(`clipOutPoint: ${(op as any).clipOutPoint}`);
-        if ((op as any).timeUnits !== undefined) kfExtra.push(`timeUnits: '${(op as any).timeUnits}'`);
+        for (const key of ['timeOffset', 'clipInPoint', 'clipOutPoint'] as const) {
+          const v = Number((op as any)[key]);
+          if ((op as any)[key] !== undefined && Number.isFinite(v)) kfExtra.push(`${key}: ${v}`);
+        }
+        const kfUnits = (op as any).timeUnits;
+        if (kfUnits === 'seconds' || kfUnits === 'ms') kfExtra.push(`timeUnits: '${kfUnits}'`);
         const kfExtraStr = kfExtra.length > 0 ? `, ${kfExtra.join(', ')}` : '';
         const kfUnsupported = [...new Set(((kfSource || []) as any[]).flatMap((k) => Object.keys((k as { properties?: object }).properties ?? {})))]
           .filter((k) => k === 'letterSpacing');

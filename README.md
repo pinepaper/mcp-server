@@ -258,7 +258,8 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   batch creates.
 - `pinepaper_agent_batch_execute` reads `color`, `text`, `x` and `y` written
   directly on an operation. Its `keyframe_animate` refuses an item that is not
-  on the canvas, and takes `append` with the same meaning as
+  on the canvas, and takes `append`, `timeOffset`, `clipInPoint`,
+  `clipOutPoint` and `timeUnits` with the same meaning as
   `pinepaper_keyframe_animate`.
 - A radial gradient is centred on its item.
 - `pinepaper_choreograph` holds the actor still until its first beat, and no
