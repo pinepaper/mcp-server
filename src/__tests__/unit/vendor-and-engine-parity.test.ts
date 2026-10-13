@@ -122,7 +122,8 @@ describe('the vendored character modules have a generator, not a transcription',
 const isDesignUpstreamAccessible = (upstreamPath: string) => {
   try {
     if (!existsSync(upstreamPath)) return false;
-    readFileSync(join(upstreamPath, 'design-system-registry.ts'));
+    // The file sync-design-systems.mjs itself reads to decide the upstream is there.
+    readFileSync(join(upstreamPath, 'content-recipes.ts'));
     return true;
   } catch {
     return false;
