@@ -1521,6 +1521,40 @@ export const CharacterInputSchema = z.object({
     .describe("Ink colour for the stroked copies that make the figure read as drawn rather than filled. The style supplies its own; this overrides it."),
 });
 
+// Character tool aliases (compat with on-device / local model specs)
+export const CreateCharacterInputSchema = z.object({
+  characterId: z.string().optional().describe('Unique character identifier'),
+  name: z.string().optional().describe('Character display name'),
+  x: z.number().optional().describe('X coordinate on canvas (default: 400)'),
+  y: z.number().optional().describe('Y coordinate on canvas (default: 300)'),
+  scale: z.number().optional().describe('Scale multiplier (default: 1)'),
+  preset: z.string().optional().describe('Character preset/concept name (e.g. pp:Pigeon, pp:Character, person, robot)'),
+  concept: z.string().optional().describe('Alias for preset'),
+  base: z.string().optional().describe('Base rig name for original character (person, robot, cat, bird, blob)'),
+  variant: z.record(z.string(), z.unknown()).optional().describe('Variant parameters'),
+  bundle: z.record(z.string(), z.unknown()).optional().describe('Layered character bundle manifest'),
+}).passthrough();
+export type CreateCharacterInput = z.infer<typeof CreateCharacterInputSchema>;
+
+export const CharacterActionInputSchema = z.object({
+  characterId: z.string().optional().describe('Character identifier'),
+  itemId: z.string().optional().describe('Item identifier (alias for characterId)'),
+  action: z.string().default('walk').describe('Locomotion or motion action: walk, run, locomotion, wave, dance, jump, idle'),
+  speed: z.number().optional().describe('Speed in pixels/sec (default: 100)'),
+  direction: z.number().optional().describe('Movement direction (1 or -1)'),
+  duration: z.number().optional().describe('Duration in seconds'),
+}).passthrough();
+export type CharacterActionInput = z.infer<typeof CharacterActionInputSchema>;
+
+export const CharacterPoseInputSchema = z.object({
+  characterId: z.string().optional().describe('Character identifier'),
+  itemId: z.string().optional().describe('Item identifier (alias for characterId)'),
+  expression: z.string().default('smile').describe('Facial expression: blink, frown, smile, surprise, talk, wink'),
+  duration: z.number().nullable().optional().describe('Duration in seconds'),
+  interval: z.number().nullable().optional().describe('Repeat interval in seconds'),
+}).passthrough();
+export type CharacterPoseInput = z.infer<typeof CharacterPoseInputSchema>;
+
 // Motion Capture (BVH)
 //
 // FxTool exposes two distinct operations and the difference is the whole point:
@@ -4134,6 +4168,20 @@ export const DeformInputSchema = z.object({
 });
 export type DeformInput = z.infer<typeof DeformInputSchema>;
 
+// Procedural Hand-Drawn Canvas Animation (Sketchy, Wobble, Stop-Motion, Reveal)
+export const HandDrawnInputSchema = z.object({
+  itemId: z.string().optional().describe('Target item ID (defaults to active selection)'),
+  style: z.enum(['sketchy', 'wobble', 'stop_motion', 'reveal']).optional().default('sketchy').describe('Hand-drawn style preset'),
+  mode: z.enum(['sketchy', 'wobble', 'stop_motion', 'reveal']).optional().describe('Alias for style'),
+  roughness: z.number().optional().default(2).describe('Noise magnitude in pixels (default: 2)'),
+  bowing: z.number().optional().default(1).describe('Line bowing curve handle factor (default: 1)'),
+  fps: z.number().optional().default(12).describe('Target posterized frame rate (8-24, default: 12)'),
+  posterizeFps: z.number().optional().describe('Alias for fps'),
+  seed: z.number().optional().default(1).describe('PRNG seed for deterministic vertex displacement (default: 1)'),
+  duration: z.number().optional().default(2).describe('Duration in seconds for animated reveal or wobble loop (default: 2)'),
+});
+export type HandDrawnInput = z.infer<typeof HandDrawnInputSchema>;
+
 // =============================================================================
 // SPRITE SHEET TOOLS
 // =============================================================================
@@ -5603,3 +5651,100 @@ export const RiggingInputSchema = z.object({
 export type RiggingInput = z.infer<typeof RiggingInputSchema>;
 
 
+
+// =============================================================================
+// CRAFT TOOLS SHARED WITH THE CLOUD (1.6.21): weave, knots, sashiko,
+// subdivision, UI kit. The JSON schemas are mcp-cloud's, vendored by
+// scripts/sync-design-systems.mjs; schema-parity.test.ts holds these to them.
+// The generators write colours into the script inside quotes and numbers bare,
+// so every value is checked here, before it becomes code.
+// =============================================================================
+
+const CRAFT_COLOUR = /^(#[0-9a-f]{3,8}|rgba?\([\d\s.,%]+\)|hsla?\([\d\s.,%deg]+\)|[a-z]{3,20})$/i;
+const CraftColour = z.string().trim().regex(CRAFT_COLOUR, 'a colour: #rrggbb, rgb(…), hsl(…) or a CSS name');
+const CraftNumber = z.number().finite();
+const CraftBounds = z.object({
+  x: CraftNumber.optional(),
+  y: CraftNumber.optional(),
+  width: z.number().finite().positive().optional(),
+  height: z.number().finite().positive().optional(),
+}).describe('Rectangle to fill. Default: the canvas.');
+
+export const DrawWeaveInputSchema = z.object({
+  weave: z.enum(['plain', 'twill', 'basket', 'herringbone']).optional(),
+  warpColor: CraftColour.optional(),
+  weftColor: CraftColour.optional(),
+  threadThickness: z.number().finite().positive().max(64).optional(),
+  density: z.number().finite().min(4).max(400).optional(),
+  floatRatio: z.number().finite().min(1).max(16).optional(),
+  twillVariant: z.enum(['standard', 'herringbone']).optional(),
+  chevronWidth: z.number().finite().positive().max(4000).optional(),
+  bundleSize: z.number().int().min(1).max(16).optional(),
+  bundleGap: z.number().finite().min(0).max(200).optional(),
+  slubJitter: z.number().finite().min(0).max(4).optional(),
+  opacity: z.number().finite().min(0).max(1).optional(),
+  bounds: CraftBounds.optional(),
+});
+export type DrawWeaveInput = z.infer<typeof DrawWeaveInputSchema>;
+
+const KnotPoint = z.object({
+  x: CraftNumber,
+  y: CraftNumber,
+  radius: z.number().finite().positive().max(500).optional(),
+  color: CraftColour.optional(),
+  highlightColor: CraftColour.optional(),
+  shadowColor: CraftColour.optional(),
+  length: z.number().finite().positive().max(2000).optional(),
+  angle: CraftNumber.optional(),
+});
+
+export const DrawKnotsInputSchema = z.object({
+  knotType: z.enum(['french_knot', 'bullion_roll', 'knot_anchor']).optional(),
+  points: z.array(KnotPoint).max(2000).optional(),
+  threadColor: CraftColour.optional(),
+  highlightColor: CraftColour.optional(),
+  shadowColor: CraftColour.optional(),
+  defaultRadius: z.number().finite().positive().max(500).optional(),
+});
+export type DrawKnotsInput = z.infer<typeof DrawKnotsInputSchema>;
+
+export const DrawSashikoInputSchema = z.object({
+  pattern: z.enum(['seigaiha', 'asanoha', 'hishi', 'kaki_no_hana']).optional(),
+  stitchLength: z.number().finite().positive().max(200).optional(),
+  gapLength: z.number().finite().min(0).max(200).optional(),
+  vertexGap: z.number().finite().min(0).max(200).optional(),
+  scale: z.number().finite().min(8).max(1000).optional(),
+  concentricArcs: z.number().int().min(1).max(12).optional(),
+  threadColor: CraftColour.optional(),
+  groundColor: CraftColour.optional(),
+  threadWidth: z.number().finite().positive().max(64).optional(),
+  bounds: CraftBounds.optional(),
+});
+export type DrawSashikoInput = z.infer<typeof DrawSashikoInputSchema>;
+
+export const DrawSubdivisionInputSchema = z.object({
+  preset: z.enum(['mondrian', 'swiss', 'bauhaus', 'minimal', 'custom']).optional(),
+  maxDepth: z.number().int().min(1).max(8).optional(),
+  minDepth: z.number().int().min(0).max(8).optional(),
+  splitBias: z.array(z.number().finite().min(0.05).max(0.95)).length(2).optional(),
+  colorProbability: z.number().finite().min(0).max(1).optional(),
+  nestedProbability: z.number().finite().min(0).max(1).optional(),
+  dividerWidth: z.number().finite().min(0).max(200).optional(),
+  dividerColor: CraftColour.optional(),
+  groundColor: CraftColour.optional(),
+  accentColors: z.array(CraftColour).max(16).optional(),
+  cellInset: z.number().finite().min(0).max(200).optional(),
+  bounds: CraftBounds.optional(),
+  seed: z.number().int().optional(),
+  idPrefix: z.string().regex(/^[A-Za-z][\w-]{0,40}$/, 'letters, digits, _ and -').optional(),
+});
+export type DrawSubdivisionInput = z.infer<typeof DrawSubdivisionInputSchema>;
+
+/**
+ * The UI kit's own lowering (vendor/design/ui-kit-tool-schema.ts) whitelists,
+ * types and JSON-encodes every argument, so only the action is checked here.
+ */
+export const UiKitInputSchema = z.object({
+  action: z.enum(['phone_lock_screen', 'notification', 'prompt_box', 'toggle', 'ad_card', 'calendar_card']),
+}).passthrough();
+export type UiKitInput = z.infer<typeof UiKitInputSchema>;

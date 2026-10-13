@@ -77,7 +77,16 @@ export function generate(ours, theirs) {
 
 function main() {
   const check = process.argv.includes('--check');
-  if (!existsSync(UPSTREAM)) {
+  let upstreamReadable = false;
+  try {
+    if (existsSync(UPSTREAM)) {
+      readFileSync(join(UPSTREAM, PAIRS[0][1]), 'utf8');
+      upstreamReadable = true;
+    }
+  } catch {
+    upstreamReadable = false;
+  }
+  if (!upstreamReadable) {
     console.error(`sync-character-modules: no upstream at ${UPSTREAM}`);
     console.error('Set PP_MCP_CLOUD_DIR, or check out mcp-cloud beside this repo.');
     // Absent sibling is not a failure: this package ships to npm without it.

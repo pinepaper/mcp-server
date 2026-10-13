@@ -26,7 +26,11 @@ import { REQUIRED_ENGINE_METHODS, OPTIONAL_ENGINE_METHODS } from '../../tools/en
 
 const REPO = resolve(import.meta.dir, '..', '..', '..');
 const run = (script: string) =>
-  spawnSync('node', [join(REPO, 'scripts', script), '--check'], { cwd: REPO, encoding: 'utf-8' });
+  spawnSync(process.execPath || 'node', [join(REPO, 'scripts', script), '--check'], {
+    cwd: REPO,
+    encoding: 'utf-8',
+    env: process.env,
+  });
 
 describe('the derived engine-method list stays derived', () => {
   it('matches the guards in the emitters', () => {
@@ -79,11 +83,21 @@ describe('the derived engine-method list stays derived', () => {
 
 });
 
+const isUpstreamAccessible = (upstreamPath: string) => {
+  try {
+    if (!existsSync(upstreamPath)) return false;
+    readFileSync(join(upstreamPath, 'character-perform.ts'));
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 describe('the vendored character modules have a generator, not a transcription', () => {
   const UPSTREAM = process.env.PP_MCP_CLOUD_DIR
     ? join(process.env.PP_MCP_CLOUD_DIR, 'src', 'services')
     : resolve(REPO, '..', 'mcp-cloud', 'src', 'services');
-  const present = existsSync(UPSTREAM);
+  const present = isUpstreamAccessible(UPSTREAM);
 
   it(present ? 'match upstream' : 'skip cleanly with mcp-cloud absent', () => {
     // These two were hand-vendored: a header saying "re-vendor", a parity test
@@ -105,11 +119,21 @@ describe('the vendored character modules have a generator, not a transcription',
   });
 });
 
+const isDesignUpstreamAccessible = (upstreamPath: string) => {
+  try {
+    if (!existsSync(upstreamPath)) return false;
+    readFileSync(join(upstreamPath, 'design-system-registry.ts'));
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 describe('the vendored design data is checked in the suite, not only at publish', () => {
   const UPSTREAM = process.env.PP_MCP_CLOUD_DIR
     ? join(process.env.PP_MCP_CLOUD_DIR, 'src', 'services')
     : resolve(REPO, '..', 'mcp-cloud', 'src', 'services');
-  const present = existsSync(UPSTREAM);
+  const present = isDesignUpstreamAccessible(UPSTREAM);
 
   it(present ? 'matches upstream' : 'skips cleanly with mcp-cloud absent', () => {
     const r = run('sync-design-systems.mjs');

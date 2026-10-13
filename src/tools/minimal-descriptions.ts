@@ -179,6 +179,11 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_shader_graph: "Pixel graphs (normals, relight, depth of field, bloom) over an item or 'scene'. action: node_types|validate|create|get|list|remove|apply.",
   pinepaper_styled_scene: `One composition in a built-in style (${STYLED_SCENE_STYLES.join('|')}) as one item; export for its returned duration. {style, duration, id, spec}`,
   pinepaper_place_on_surface: 'Put a UI onto a screen in a photo (corner-pinned, hand stays in front), baked into the photo. {photoId, sourceId, quad?, slot?}',
+  pinepaper_draw_weave: 'Woven cloth as vector threads over the canvas: plain, twill, basket or herringbone. {weave?, warpColor?, weftColor?, density?, bounds?}',
+  pinepaper_draw_knots: 'Embroidered knots (french_knot, bullion_roll, knot_anchor) with shadow and highlight, where you place them. {points, knotType?, threadColor?}',
+  pinepaper_draw_sashiko: 'Japanese sashiko running-stitch pattern on ground cloth: seigaiha, asanoha, hishi, kaki_no_hana. {pattern?, threadColor?, groundColor?, scale?}',
+  pinepaper_draw_subdivision: 'Recursive rectangle composition: mondrian, swiss, bauhaus, minimal. {preset?, seed?, maxDepth?, accentColors?, bounds?}',
+  pinepaper_ui_kit: 'Product UI mockups on brand. action: phone_lock_screen (notifications + typing prompt) | notification | prompt_box | toggle | ad_card | calendar_card. {action, brand?}',
   pinepaper_import_scene: 'Restore a scene from a full export file (replaces the scene); returns counts to compare. {path, strict?}',
 
   // --- Browser ---
@@ -247,6 +252,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
 
   // --- Deformation, Sprite Sheets, Interaction ---
   pinepaper_deform: 'Vertex deformation. action: apply|trigger|remove. itemId, preset: fold|squeeze|squash|twist|ripple|wave|breathe|wobble..., phase, amplitude.',
+  pinepaper_hand_drawn: 'Procedural hand-drawn strokes, jitter, bowing, and stop-motion frame holding. itemId, style: sketchy|wobble|reveal|stop_motion, roughness, bowing, fps, seed, duration.',
   pinepaper_sprite_sheet: 'Sprite sheets. action: generate|play|export. skeletonId, spriteSheetId, poses, animations, format.',
   pinepaper_interaction: 'Physics behaviors. action: add_behavior|remove_behavior|trigger_action|get_state. behaviorType: repel|attract|follow|orbit|slingshot.',
 

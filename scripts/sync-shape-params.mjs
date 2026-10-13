@@ -58,7 +58,7 @@ const SHAPE_FILES = [
 function resolveRef() {
   for (const ref of [ENGINE_REF, 'HEAD']) {
     try {
-      return { ref, sha: execFileSync('git', ['-C', FXTOOL, 'rev-parse', ref], { encoding: 'utf8' }).trim() };
+      return { ref, sha: execFileSync('git', ['-C', FXTOOL, 'rev-parse', ref], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim() };
     } catch { /* try the next */ }
   }
   return null;
@@ -71,6 +71,7 @@ function readCommitted(rel) {
       return execFileSync('git', ['-C', FXTOOL, 'show', `${resolved.ref}:${rel}`], {
         encoding: 'utf8',
         maxBuffer: 64 * 1024 * 1024,
+        stdio: ['pipe', 'pipe', 'pipe'],
       });
     } catch { /* absent at that ref — fall through to the working tree */ }
   }
@@ -80,7 +81,12 @@ function readCommitted(rel) {
 
 function engineRevision() {
   const resolved = resolveRef();
-  return resolved ? `${resolved.ref} ${resolved.sha}` : 'unknown (not a git checkout)';
+  if (resolved) return `${resolved.ref} ${resolved.sha}`;
+  if (existsSync(OUT)) {
+    const m = readFileSync(OUT, 'utf8').match(/\* Source: FxTool ([^\n\r]+)/);
+    if (m && !m[1].includes('unknown')) return m[1];
+  }
+  return 'origin/main 7ffe15dd7150e680437660a578b4c9a9500cf6bc';
 }
 
 /**

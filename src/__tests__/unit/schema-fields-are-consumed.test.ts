@@ -119,6 +119,12 @@ const SPREAD_THROUGH_VERIFIED: Readonly<Record<string, readonly string[]>> = Obj
   WorldTourInputSchema: ['dwell', 'highlightColors', 'showLabels', 'labelColor'],
   GlobeEnableInputSchema: ['momentum', 'showOcean'],
   TourItemInputSchema: ['dwell'],
+  // The cloud's craft tools: read inside the vendored generators, which this
+  // walk skips. craft-tools.test.ts changes each one and checks the code moves.
+  DrawWeaveInputSchema: ['bundleGap', 'bundleSize', 'chevronWidth', 'floatRatio', 'slubJitter', 'threadThickness', 'twillVariant'],
+  DrawKnotsInputSchema: ['defaultRadius'],
+  DrawSashikoInputSchema: ['concentricArcs', 'gapLength', 'stitchLength', 'threadWidth', 'vertexGap'],
+  DrawSubdivisionInputSchema: ['cellInset', 'colorProbability', 'dividerWidth', 'minDepth', 'nestedProbability', 'splitBias'],
 });
 
 /**

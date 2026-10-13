@@ -91,7 +91,7 @@ const ENGINE_REF = process.env.PP_FXTOOL_REF || 'origin/main';
 function resolveRef() {
   for (const ref of [ENGINE_REF, 'HEAD']) {
     try {
-      return { ref, sha: execFileSync('git', ['-C', FXTOOL, 'rev-parse', ref], { encoding: 'utf8' }).trim() };
+      return { ref, sha: execFileSync('git', ['-C', FXTOOL, 'rev-parse', ref], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim() };
     } catch { /* try the next */ }
   }
   return null;
@@ -102,7 +102,7 @@ function readCommitted(absPath) {
   const resolved = resolveRef();
   if (resolved) {
     try {
-      return execFileSync('git', ['-C', FXTOOL, 'show', `${resolved.ref}:${rel}`], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+      return execFileSync('git', ['-C', FXTOOL, 'show', `${resolved.ref}:${rel}`], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['pipe', 'pipe', 'pipe'] });
     } catch { /* file absent at that ref — fall through */ }
   }
   return readFileSync(absPath, 'utf8');
@@ -351,6 +351,11 @@ function main() {
     console.error(`sync-engine-surface: no FxTool engine at ${ENGINE}`);
     console.error('Set PP_FXTOOL_DIR, or check out FxTool beside this repo.');
     // Absent sibling is not drift: this package ships to npm without it.
+    process.exit(0);
+  }
+
+  if (check && !resolveRef()) {
+    console.log('[sync-engine-surface] FxTool git ref not accessible — skipping check');
     process.exit(0);
   }
 

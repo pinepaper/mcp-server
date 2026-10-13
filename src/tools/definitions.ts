@@ -12,6 +12,7 @@ import { Tool } from '@modelcontextprotocol/sdk/types.js';
 import { I18nManager } from '../i18n/index.js';
 import { COMPACT_DESCRIPTIONS } from './compact-descriptions.js';
 import { MINIMAL_DESCRIPTIONS } from './minimal-descriptions.js';
+import { craftToolDefinitions } from './craft-tools.js';
 import { STICK_GAITS, STICK_POSES, STICK_SEQUENCES, STICK_EXPRESSIONS, STICK_PROPS } from './stick-vocabulary.js';
 import { AgentBatchOperationTypeSchema, GeneratorNameSchema, ItemTypeSchema } from '../types/schemas.js';
 import { DESIGN_MEDIA, DESIGN_MEDIA_APPLY, FILTER_TYPES, FILTER_DOCS, LINEAGE_KINDS, STYLED_SCENE_STYLES, STYLED_SCENE_STYLE_INFO } from './engine-lists.js';
@@ -6035,6 +6036,61 @@ PHASES: sin, blink, linear, pingpong, once, elastic, heartbeat, stepped`,
   },
 
   {
+    name: 'pinepaper_hand_drawn',
+    annotations: {
+      title: 'Hand-Drawn Sketchy Animation',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Apply procedural hand-drawn sketchy strokes, vertex noise jitter, line bowing, and stop-motion frame holding (posterizeFps) to items.
+
+USE WHEN:
+- "give it a hand-drawn / sketchy / wobbly outline"
+- "stop motion hand-drawn animation"
+- "sketchy ink reveal"
+- "apply rough bowing / jitter to strokes"
+
+MODES / STYLES:
+- 'sketchy' (or 'static'): One-time procedural vertex noise jitter & bowing displacement.
+- 'wobble': Continuous stop-motion line wobble across frames with posterized timing (e.g. 8-12 FPS).
+- 'reveal': Hand-drawn progressive stroke/ink reveal animation.
+- 'stop_motion': Quantize motion timing to target posterized FPS.
+
+PARAMETERS:
+- itemId: Target item ID (or active selection if omitted)
+- style / mode: 'sketchy' | 'wobble' | 'reveal' | 'stop_motion' (default: 'sketchy')
+- roughness: Noise magnitude in pixels (default: 2)
+- bowing: Line bowing factor for bezier curve handles (default: 1)
+- fps / posterizeFps: Target posterized FPS for stop-motion timing (default: 12)
+- seed: PRNG seed for deterministic jitter (default: 1)
+- duration: Duration in seconds for reveal or wobble loop (default: 2)`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        itemId: { type: 'string', description: 'Target item registry ID (or current selection if omitted)' },
+        style: {
+          type: 'string',
+          enum: ['sketchy', 'wobble', 'stop_motion', 'reveal'],
+          description: 'Hand-drawn style preset or timing mode (default: sketchy)',
+        },
+        mode: {
+          type: 'string',
+          enum: ['sketchy', 'wobble', 'stop_motion', 'reveal'],
+          description: 'Alias for style',
+        },
+        roughness: { type: 'number', description: 'Noise magnitude in pixels (default: 2)' },
+        bowing: { type: 'number', description: 'Line bowing curve handle factor (default: 1)' },
+        fps: { type: 'number', description: 'Target posterized frame rate (8-24, default: 12)' },
+        posterizeFps: { type: 'number', description: 'Alias for fps' },
+        seed: { type: 'number', description: 'Random seed for deterministic vertex displacement (default: 1)' },
+        duration: { type: 'number', description: 'Duration in seconds for animated reveal or wobble loop (default: 2)' },
+      },
+    },
+  },
+
+  {
     name: 'pinepaper_sprite_sheet',
     annotations: {
       title: 'Sprite Sheet',
@@ -9826,9 +9882,11 @@ ACTIONS:
   },
 
   // ---------------------------------------------------------------------------
-  // STITCHCRAFT PROCEDURAL EMBROIDERY & THREAD
+  // STITCHCRAFT PROCEDURAL EMBROIDERY & THREAD, SUBDIVISION, UI KIT
+  // The cloud's craft tools, shared: schemas vendored from mcp-cloud, local
+  // words and behaviour in craft-tools.ts.
   // ---------------------------------------------------------------------------
-
+  ...craftToolDefinitions(),
 ];
 
 /**

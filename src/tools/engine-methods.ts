@@ -262,6 +262,8 @@ export const OPTIONAL_ENGINE_METHODS: readonly string[] = [
   '_resolveRaster',
   '_resolveRelationEndpoint',
   'activeWindowOf',
+  'animate',
+  'applyHandDrawnJitter',
   'audioLayer.setVolume',
   'authoredRotation',
   'awaitMediaAt',

@@ -30,7 +30,7 @@
 
 PinePaper MCP Server enables AI assistants to create and animate graphics in [PinePaper Studio](https://pinepaper.studio) via the Model Context Protocol (MCP). Works with any AI that supports MCP tool calling (Claude, GPT, Gemini, local models, etc.).
 
-The server exposes **170 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
+The server exposes **176 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
 
 - Create geometric shapes, text collages, diagrams, and data charts
 - Apply 37+ character-level text effects and 28+ vertex deformation presets
@@ -41,7 +41,7 @@ The server exposes **170 tools** across drawing, animation, diagrams, maps, typo
 
 ## Running it: local or hosted
 
-**Local is free and complete.** Every one of the 170 tools works when you run
+**Local is free and complete.** Every one of the 176 tools works when you run
 this server yourself. There is no reduced tier and nothing held back.
 
 What it needs:
@@ -247,6 +247,26 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - Puppeteer itself is an **optional** peer dependency, kept out of the default tree precisely because a headless browser plus an install script is what scanners flag hardest. Install it only if you want the executing mode.
 
 ## What's new in 1.6.21
+
+### New: craft tools from PinePaper Cloud, now local
+
+Five tools that were cloud-only now draw in your local studio, free:
+
+- `pinepaper_draw_weave`: woven cloth as vector threads (plain, twill,
+  basket, herringbone).
+- `pinepaper_draw_knots`: embroidered French knots, bullion rolls and anchor
+  tacks, placed where you say.
+- `pinepaper_draw_sashiko`: Japanese running-stitch patterns (seigaiha,
+  asanoha, hishi, kaki no hana) on ground cloth.
+- `pinepaper_draw_subdivision`: Mondrian, Swiss, Bauhaus and minimal
+  rectangle compositions, repeatable by `seed`.
+- `pinepaper_ui_kit`: a phone lock screen with notifications that stack in
+  and a prompt that types, plus notification, prompt box, toggle, ad and
+  calendar cards. It draws in your active `pinepaper_brand_kit` brand, set in
+  Geist.
+
+Each one fills the canvas you have, and draws ordinary items you can select
+and edit.
 
 ### Fixed
 
@@ -1548,7 +1568,7 @@ Fourteen new tools (121 → 135) and new actions across the surface — the rele
 
 ## Toolkits & Token Budget
 
-170 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
+176 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
 
 **Toolkit profiles** (`PINEPAPER_TOOLKIT`):
 
@@ -1751,7 +1771,7 @@ Generate instruction/code pairs for LLM fine-tuning:
 
 ## Tools Reference
 
-All 170 tools, grouped by the tag used for toolkit filtering.
+All 176 tools, grouped by the tag used for toolkit filtering.
 
 ### Canvas (`canvas`)
 | Tool | Description |
@@ -1820,6 +1840,7 @@ All 170 tools, grouped by the tag used for toolkit filtering.
 | `pinepaper_get_animatable_properties` | List animatable properties |
 | `pinepaper_get_available_easings` | List easing functions |
 | `pinepaper_construction_sequence` | Staged construction animation |
+| `pinepaper_hand_drawn` | Procedural hand-drawn sketchy strokes, vertex jitter, bowing, and stop-motion timing |
 
 ### Masks (`masks`)
 | Tool | Description |
@@ -1857,6 +1878,10 @@ All 170 tools, grouped by the tag used for toolkit filtering.
 | `pinepaper_generate_estimate` | Free price check, and the model list |
 | `pinepaper_generate_status` | Collect a generation that outlived its timeout |
 | `pinepaper_styled_scene` | One composition drawn in a built-in style |
+| `pinepaper_draw_weave` | Woven cloth as vector threads: plain, twill, basket, herringbone |
+| `pinepaper_draw_knots` | Embroidered knots with shadow and highlight, where you place them |
+| `pinepaper_draw_sashiko` | Sashiko running-stitch patterns on ground cloth |
+| `pinepaper_draw_subdivision` | Mondrian, Swiss, Bauhaus and minimal rectangle compositions |
 | `pinepaper_apply_effect` | Apply sparkle, blast, and other effects |
 | `pinepaper_look` | Restyle an item or the whole scene as a named look, graded for fidelity |
 | `pinepaper_original_character` | Original characters from a base rig and a variant; a cast from seeds |
@@ -1877,6 +1902,7 @@ All 170 tools, grouped by the tag used for toolkit filtering.
 | `pinepaper_compose` | Arrange items into a named collage pattern and film it |
 | `pinepaper_design_medium` | What makes the marks — media with honest fidelity, and needlepainting |
 | `pinepaper_brand_kit` | Apply brand colours / fonts by role, with a contrast audit |
+| `pinepaper_ui_kit` | Phone lock screen, notifications, prompt box, toggle, ad and calendar cards, on brand |
 | `pinepaper_component` | Reusable master + instances, with per-instance overrides |
 | `pinepaper_artboard` | Resize the artboard; per-item reflow constraints |
 | `pinepaper_comment` | Notes pinned to an item, a point and/or a moment |

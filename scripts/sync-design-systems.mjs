@@ -55,7 +55,14 @@ export const UPSTREAM_DIR = process.env.PP_MCP_CLOUD_DIR
   : resolve(REPO, '..', 'mcp-cloud', 'src', 'services');
 
 /** Self-contained modules, copied whole. */
-export const MODULES = ['design-systems-dtcg'];
+export const MODULES = [
+  'design-systems-dtcg',
+  // The craft tools' public schemas and the UI kit the tools draw with (1.6.21: shared, not cloud-only).
+  'textile-tool-schema',
+  'subdivision-tool-schema',
+  'ui-kit-runtime',
+  'ui-kit-tool-schema',
+];
 
 /**
  * The upstream repo root, for reading COMMITTED state rather than the tree.
@@ -138,6 +145,10 @@ function repointStyleImport(code) {
   return code.replace(
     /import type \{ DesignStyle \} from ["']\.\/content-recipes["'];?/g,
     'import type { DesignStyle } from "./design-style.js";'
+  ).replace(
+    // Upstream is bundled and imports siblings bare; this package is NodeNext ESM and needs the extension.
+    /(from ["']\.\/[\w-]+)(["'])/g,
+    (m, path, quote) => (path.endsWith('.js') ? m : `${path}.js${quote}`)
   );
 }
 
@@ -199,7 +210,16 @@ export function generateStyleUnion() {
 
 function main() {
   const check = process.argv.includes('--check');
-  if (!existsSync(UPSTREAM_DIR)) {
+  let upstreamReadable = false;
+  try {
+    if (existsSync(UPSTREAM_DIR)) {
+      readFileSync(join(UPSTREAM_DIR, 'content-recipes.ts'), 'utf8');
+      upstreamReadable = true;
+    }
+  } catch {
+    upstreamReadable = false;
+  }
+  if (!upstreamReadable) {
     console.error(`sync-design-systems: no upstream at ${UPSTREAM_DIR}`);
     console.error('Set PP_MCP_CLOUD_DIR, or check out mcp-cloud beside this repo.');
     process.exit(check ? 0 : 1); // --check is a no-op without the sibling, not a failure

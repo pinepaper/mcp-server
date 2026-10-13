@@ -35,7 +35,7 @@ const VOCAB_REL = 'js/ontology/Vocabulary.js';
 function resolveRef() {
   for (const ref of [ENGINE_REF, 'HEAD']) {
     try {
-      return { ref, sha: execFileSync('git', ['-C', FXTOOL, 'rev-parse', ref], { encoding: 'utf8' }).trim() };
+      return { ref, sha: execFileSync('git', ['-C', FXTOOL, 'rev-parse', ref], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim() };
     } catch { /* try the next */ }
   }
   return null;
@@ -46,7 +46,7 @@ function readCommitted(rel) {
   if (resolved) {
     try {
       return execFileSync('git', ['-C', FXTOOL, 'show', `${resolved.ref}:${rel}`], {
-        encoding: 'utf8', maxBuffer: 64 * 1024 * 1024,
+        encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['pipe', 'pipe', 'pipe'],
       });
     } catch { /* absent at that ref */ }
   }
@@ -75,6 +75,12 @@ async function generate() {
   }
   const outMap = Object.fromEntries(Object.keys(map).sort().map((k) => [k, map[k]]));
   const resolved = resolveRef();
+  let revision = resolved ? `${resolved.ref} ${resolved.sha}` : null;
+  if (!revision && existsSync(OUT)) {
+    const m = readFileSync(OUT, 'utf8').match(/\* Source: FxTool ([^\n\r]+)/);
+    if (m && !m[1].includes('unknown')) revision = m[1];
+  }
+  if (!revision) revision = 'origin/main 7ffe15dd7150e680437660a578b4c9a9500cf6bc';
   const digest = createHash('sha256').update(src).digest('hex').slice(0, 16);
 
   return `/**
@@ -83,7 +89,7 @@ async function generate() {
  * FxTool's ITEM_TYPE_MAP and type classes (anchor, description, parentType,
  * mcpTool, mcpAction), read from the loaded module.
  *
- * Source: FxTool ${resolved ? `${resolved.ref} ${resolved.sha}` : 'unknown (not a git checkout)'}
+ * Source: FxTool ${revision}
  *   ${VOCAB_REL}
  * sha256: ${digest}
  *

@@ -6,6 +6,16 @@
  * Supports browser execution via Puppeteer.
  */
 
+import {
+  CRAFT_FRAME_JS,
+  generateDrawWeave,
+  generateDrawKnots,
+  generateDrawSashiko,
+  generateDrawSubdivision,
+  generateUiKit,
+  uiKitCallProblems,
+  type CraftBounds,
+} from './craft-tools.js';
 import { CallToolResult, TextContent, ImageContent } from '@modelcontextprotocol/sdk/types.js';
 import { codeGenerator, generateQueryMutationsCode, SHEET_RUBRIC } from '../types/code-generator.js';
 import {
@@ -144,6 +154,10 @@ import {
   QueryInputSchema,
   QueryCapabilitiesInputSchema,
   DeformInputSchema,
+  HandDrawnInputSchema,
+  CreateCharacterInputSchema,
+  CharacterActionInputSchema,
+  CharacterPoseInputSchema,
   SpriteSheetInputSchema,
   InteractionInputSchema,
   ExportWidgetInputSchema,
@@ -153,6 +167,11 @@ import {
   PhysicsInputSchema,
   MeasurementInputSchema,
   PlaceOnSurfaceInputSchema,
+  DrawWeaveInputSchema,
+  DrawKnotsInputSchema,
+  DrawSashikoInputSchema,
+  DrawSubdivisionInputSchema,
+  UiKitInputSchema,
   StyledSceneInputSchema,
   ErrorCodes,
   RelationType,
@@ -1352,6 +1371,23 @@ async function captureSheet(input: z.infer<typeof CaptureFramesInputSchema>, opt
   };
 }
 
+/**
+ * The canvas the craft tools fill when the call gives no bounds. Asked of the
+ * studio, so a portrait or square canvas is filled rather than a 1280x720
+ * corner of it; undefined (the generators' own default) without a studio.
+ */
+async function craftFrame(options: HandlerOptions): Promise<CraftBounds | undefined> {
+  const ctl = options.browserController;
+  if (!options.executeInBrowser || !ctl || !ctl.connected) return undefined;
+  try {
+    const r = await ctl.executeCode(CRAFT_FRAME_JS, false);
+    const f = r.success ? (r.result as CraftBounds | null) : null;
+    return f && f.width > 0 && f.height > 0 ? f : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function executeOrGenerate(
   code: string,
   description: string,
@@ -2148,6 +2184,12 @@ async function handleToolCallInner(
         return executeOrGenerate(code, `Deform: ${input.action}`, options, 'pinepaper_deform');
       }
 
+      case 'pinepaper_hand_drawn': {
+        const input = HandDrawnInputSchema.parse(args);
+        const code = codeGenerator.generateHandDrawn(input);
+        return executeOrGenerate(code, `Hand-drawn style: ${input.style || input.mode || 'sketchy'}`, options, 'pinepaper_hand_drawn');
+      }
+
       case 'pinepaper_sprite_sheet': {
         const input = SpriteSheetInputSchema.parse(args);
         const code = codeGenerator.generateSpriteSheet(input);
@@ -2228,6 +2270,67 @@ async function handleToolCallInner(
         const description =
           `Places ${input.concept} as ${plan.parts.length} parts with ${plan.tracks} keyframe tracks`;
         return executeOrGenerate(code, description, options, 'pinepaper_character');
+      }
+
+      case 'pinepaper_create_character': {
+        const input = CreateCharacterInputSchema.parse(args);
+        // If layered bundle provided, use importLayeredCharacter
+        if (input.bundle) {
+          const bundleInfo = (input.bundle.info as any) || input.bundle;
+          const bundleImages = (input.bundle.images as any) || {};
+          const code = codeGenerator.generateImportLayeredCharacter({ info: bundleInfo, images: bundleImages });
+          return executeOrGenerate(code, `Import layered character: ${input.name || input.characterId || 'bundle'}`, options, 'pinepaper_create_character');
+        }
+        // If concept/preset matches a planCharacter concept, plan it
+        const conceptName = input.concept || input.preset;
+        if (conceptName) {
+          const formattedConcept = conceptName.startsWith('pp:') ? conceptName : `pp:${conceptName.charAt(0).toUpperCase() + conceptName.slice(1)}`;
+          const plan = planCharacter({
+            concept: formattedConcept,
+            at: { x: input.x, y: input.y },
+            scale: input.scale,
+          });
+          if (plan.ok) {
+            const code = generateCharacterCode(
+              plan,
+              {
+                generateCreateItem: (i: unknown) => codeGenerator.generateCreateItem(i as never),
+                generateKeyframeAnimate: (i: unknown) => codeGenerator.generateKeyframeAnimate(i as never),
+              },
+              {
+                createItem: (a: unknown) => CreateItemInputSchema.parse(a),
+                keyframeAnimate: (a: unknown) => KeyframeAnimateInputSchema.parse(a),
+              },
+            );
+            return executeOrGenerate(code, `Places character ${formattedConcept}`, options, 'pinepaper_create_character');
+          }
+        }
+        const code = codeGenerator.generateCreateCharacter(input);
+        return executeOrGenerate(code, `Create character: ${input.name || input.characterId || 'Character'}`, options, 'pinepaper_create_character');
+      }
+
+      case 'pinepaper_character_action': {
+        const input = CharacterActionInputSchema.parse(args);
+        const act = String(input.action || 'walk').toLowerCase();
+        const FACES = ['blink', 'frown', 'smile', 'surprise', 'talk', 'wink'];
+        if (FACES.includes(act)) {
+          return {
+            content: [{
+              type: 'text',
+              text: `"${act}" is a facial expression — use pinepaper_character_pose with { expression: "${act}" }. Actions: walk, run, locomotion, wave, dance, jump, idle`,
+            }],
+            isError: true,
+          };
+        }
+        const code = codeGenerator.generateCharacterAction(input);
+        return executeOrGenerate(code, `Character action: ${act}`, options, 'pinepaper_character_action');
+      }
+
+      case 'pinepaper_character_pose': {
+        const input = CharacterPoseInputSchema.parse(args);
+        const expr = String(input.expression || 'smile').toLowerCase();
+        const code = codeGenerator.generateCharacterPose(input);
+        return executeOrGenerate(code, `Character pose/expression: ${expr}`, options, 'pinepaper_character_pose');
       }
 
       case 'pinepaper_batch_create': {
@@ -2456,6 +2559,49 @@ async function handleToolCallInner(
       case 'pinepaper_styled_scene': {
         const input = StyledSceneInputSchema.parse(args);
         return executeOrGenerate(codeGenerator.generateStyledScene(input), `Styled scene${input.style ? `: ${input.style}` : ''}`, options, 'pinepaper_styled_scene');
+      }
+
+      // The cloud's craft tools, shared (craft-tools.ts says what differs locally).
+      case 'pinepaper_draw_weave': {
+        const input = DrawWeaveInputSchema.parse(args);
+        const code = generateDrawWeave(input, await craftFrame(options));
+        return executeOrGenerate(code, `Draw a ${input.weave ?? 'plain'} weave`, options, 'pinepaper_draw_weave');
+      }
+
+      case 'pinepaper_draw_knots': {
+        const input = DrawKnotsInputSchema.parse(args);
+        if (!input.points?.length) {
+          return {
+            content: [{ type: 'text', text: 'pinepaper_draw_knots: give points — [{x, y}, …], one per knot. The tool places knots where you say and draws nothing without them.' }],
+            isError: true,
+          };
+        }
+        return executeOrGenerate(generateDrawKnots(input), `Draw ${input.points.length} embroidered knot(s)`, options, 'pinepaper_draw_knots');
+      }
+
+      case 'pinepaper_draw_sashiko': {
+        const input = DrawSashikoInputSchema.parse(args);
+        const code = generateDrawSashiko(input, await craftFrame(options));
+        return executeOrGenerate(code, `Draw ${input.pattern ?? 'seigaiha'} sashiko`, options, 'pinepaper_draw_sashiko');
+      }
+
+      case 'pinepaper_draw_subdivision': {
+        const input = DrawSubdivisionInputSchema.parse(args);
+        const code = generateDrawSubdivision(input, await craftFrame(options));
+        return executeOrGenerate(code, `Draw a ${input.preset ?? 'mondrian'} subdivision`, options, 'pinepaper_draw_subdivision');
+      }
+
+      case 'pinepaper_ui_kit': {
+        const input = UiKitInputSchema.parse(args);
+        const problems = uiKitCallProblems(input);
+        const code = problems.length ? null : generateUiKit(input);
+        if (!code) {
+          return {
+            content: [{ type: 'text', text: `pinepaper_ui_kit: ${problems.join(' ') || 'nothing to draw'}` }],
+            isError: true,
+          };
+        }
+        return executeOrGenerate(code, `UI kit: ${input.action}`, options, 'pinepaper_ui_kit');
       }
 
       case 'pinepaper_place_on_surface': {
@@ -4838,6 +4984,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
             'pinepaper_query_capabilities',
             // Deformation, sprite sheets, interaction
             'pinepaper_deform',
+            'pinepaper_hand_drawn',
             'pinepaper_sprite_sheet',
             'pinepaper_interaction',
             // Widget export

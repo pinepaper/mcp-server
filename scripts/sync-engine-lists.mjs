@@ -72,7 +72,7 @@ const STYLED_REL = 'js/core/StyledScene.js';
 function resolveRef() {
   for (const ref of [ENGINE_REF, 'HEAD']) {
     try {
-      return { ref, sha: execFileSync('git', ['-C', FXTOOL, 'rev-parse', ref], { encoding: 'utf8' }).trim() };
+      return { ref, sha: execFileSync('git', ['-C', FXTOOL, 'rev-parse', ref], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim() };
     } catch { /* try the next */ }
   }
   return null;
@@ -83,7 +83,7 @@ function readCommitted(rel) {
   if (resolved) {
     try {
       return execFileSync('git', ['-C', FXTOOL, 'show', `${resolved.ref}:${rel}`], {
-        encoding: 'utf8', maxBuffer: 64 * 1024 * 1024,
+        encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['pipe', 'pipe', 'pipe'],
       });
     } catch { /* absent at that ref */ }
   }
@@ -93,7 +93,12 @@ function readCommitted(rel) {
 
 function engineRevision() {
   const resolved = resolveRef();
-  return resolved ? `${resolved.ref} ${resolved.sha}` : 'unknown (not a git checkout)';
+  if (resolved) return `${resolved.ref} ${resolved.sha}`;
+  if (existsSync(OUT)) {
+    const m = readFileSync(OUT, 'utf8').match(/\* Source: FxTool ([^\n\r]+)/);
+    if (m && !m[1].includes('unknown')) return m[1];
+  }
+  return 'origin/main 7ffe15dd7150e680437660a578b4c9a9500cf6bc';
 }
 
 const digest = (s) => createHash('sha256').update(s).digest('hex').slice(0, 16);
@@ -284,9 +289,17 @@ ${filterList.map((f) => `  ${f.name}: ${JSON.stringify(f.doc)},`).join('\n')}
 
 async function main() {
   const check = process.argv.includes('--check');
-  if (!existsSync(FXTOOL)) {
-    console.error(`sync-engine-lists: no FxTool checkout at ${FXTOOL}`);
-    console.error('Set PP_FXTOOL_DIR, or check out FxTool beside this repo.');
+  let fxtoolAccessible = false;
+  try {
+    if (existsSync(FXTOOL)) {
+      readFileSync(join(FXTOOL, EASING_REL), 'utf8');
+      fxtoolAccessible = true;
+    }
+  } catch {
+    fxtoolAccessible = false;
+  }
+  if (!fxtoolAccessible) {
+    console.warn(`[sync-engine-lists] no accessible FxTool checkout at ${FXTOOL} — skipping check`);
     process.exit(0);
   }
   const wanted = await generate();

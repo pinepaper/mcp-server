@@ -505,6 +505,10 @@
       "description": "Vertex deformation. action: apply|trigger|remove. itemId, preset: fold|squeeze|squash|twist|ripple|wave|breathe|wobble..., phase, amplitude."
     },
     {
+      "name": "pinepaper_hand_drawn",
+      "description": "Procedural hand-drawn strokes, jitter, bowing, and stop-motion frame holding. itemId, style: sketchy|wobble|reveal|stop_motion, roughness, bowing, fps, seed, duration."
+    },
+    {
       "name": "pinepaper_sprite_sheet",
       "description": "Sprite sheets. action: generate|play|export. skeletonId, spriteSheetId, poses, animations, format."
     },
@@ -775,6 +779,26 @@
     {
       "name": "pinepaper_measurement",
       "description": "Rulers/grid. action: set_rulers|set_grid|get_dimensions|set_snap. enabled, itemId."
+    },
+    {
+      "name": "pinepaper_draw_weave",
+      "description": "Woven cloth as vector threads over the canvas: plain, twill, basket or herringbone. {weave?, warpColor?, weftColor?, density?, bounds?}"
+    },
+    {
+      "name": "pinepaper_draw_knots",
+      "description": "Embroidered knots (french_knot, bullion_roll, knot_anchor) with shadow and highlight, where you place them. {points, knotType?, threadColor?}"
+    },
+    {
+      "name": "pinepaper_draw_sashiko",
+      "description": "Japanese sashiko running-stitch pattern on ground cloth: seigaiha, asanoha, hishi, kaki_no_hana. {pattern?, threadColor?, groundColor?, scale?}"
+    },
+    {
+      "name": "pinepaper_draw_subdivision",
+      "description": "Recursive rectangle composition: mondrian, swiss, bauhaus, minimal. {preset?, seed?, maxDepth?, accentColors?, bounds?}"
+    },
+    {
+      "name": "pinepaper_ui_kit",
+      "description": "Product UI mockups on brand. action: phone_lock_screen (notifications + typing prompt) | notification | prompt_box | toggle | ad_card | calendar_card. {action, brand?}"
     }
   ]
 }

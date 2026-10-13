@@ -223,9 +223,19 @@ describe('vendor parity with mcp-cloud', () => {
     ['src/character/path-bbox.ts', 'src/services/path-bbox.ts'],
   ];
 
+  const canReadCloud = () => {
+    try {
+      if (!existsSync(CLOUD)) return false;
+      readFileSync(join(CLOUD, 'src/services/character-perform.ts'), 'utf-8');
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   it('the vendored modules match their cloud originals', () => {
-    if (!existsSync(CLOUD)) {
-      console.warn('[character] mcp-cloud not checked out — vendor parity not verified');
+    if (!canReadCloud()) {
+      console.warn('[character] mcp-cloud not checked out or accessible — vendor parity not verified');
       return;
     }
     for (const [ours, theirs] of pairs) {
@@ -241,7 +251,7 @@ describe('vendor parity with mcp-cloud', () => {
   });
 
   it('the duration scale still matches the cloud tokens', () => {
-    if (!existsSync(CLOUD)) return;
+    if (!canReadCloud()) return;
     const tokens = JSON.parse(readFileSync(join(CLOUD, 'src/data/motion-design-tokens.json'), 'utf-8'));
     const expected = Object.values(tokens.duration as Record<string, unknown>)
       .flatMap((v) => (v && typeof v === 'object' && 'ms' in v ? [(v as { ms: number }).ms] : []))

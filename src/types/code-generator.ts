@@ -178,6 +178,10 @@ import {
   QueryCapabilitiesInputSchema,
   // New parity tools
   DeformInput,
+  HandDrawnInput,
+  CreateCharacterInput,
+  CharacterActionInput,
+  CharacterPoseInput,
   SpriteSheetInput,
   InteractionInput,
   ExportWidgetInput,
@@ -10474,6 +10478,147 @@ case 'analyze_palette':
   }
 
   // ===========================================================================
+  // HAND-DRAWN SKETCHY ANIMATION & JITTER
+  // ===========================================================================
+
+  generateHandDrawn(input: HandDrawnInput): string {
+    const S = (v: unknown) => JSON.stringify(v);
+    const style = input.style || input.mode || 'sketchy';
+    const roughness = input.roughness ?? 2;
+    const bowing = input.bowing ?? 1;
+    const fps = input.fps ?? input.posterizeFps ?? 12;
+    const seed = input.seed ?? 1;
+    const duration = input.duration ?? 2;
+    const targetId = input.itemId ? S(input.itemId) : 'null';
+
+    return `
+// Hand-drawn sketchy animation & organic stroke jitter
+(function() {
+  const targetId = ${targetId};
+  const item = targetId ? (app.getItemById(targetId) || (app.itemRegistry && app.itemRegistry.get(targetId)?.item)) : (app.selectedItems && app.selectedItems[0]);
+  if (!item) {
+    return { success: false, error: 'Target item not found for hand-drawn styling' };
+  }
+
+  // 1. Try engine HandDrawn / applyHandDrawnStyle if available
+  if (typeof HandDrawn !== 'undefined' && typeof HandDrawn.applyHandDrawnStyle === 'function') {
+    try {
+      HandDrawn.applyHandDrawnStyle(item, ${S(style)}, {
+        roughness: ${roughness},
+        bowing: ${bowing},
+        fps: ${fps},
+        seed: ${seed},
+        duration: ${duration}
+      });
+      if (app._scheduleRepaint) app._scheduleRepaint();
+      return { success: true, itemId: item.id || targetId, style: ${S(style)}, engine: 'HandDrawn' };
+    } catch (e) {
+      console.warn('[HandDrawn] Engine error, falling back to procedural jitter:', e);
+    }
+  }
+
+  if (typeof app.applyHandDrawnJitter === 'function' && ${S(style)} === 'sketchy') {
+    app.applyHandDrawnJitter(item, { roughness: ${roughness}, bowing: ${bowing}, seed: ${seed} });
+    if (app._scheduleRepaint) app._scheduleRepaint();
+    return { success: true, itemId: item.id || targetId, style: ${S(style)}, engine: 'app.applyHandDrawnJitter' };
+  }
+
+  // 2. Procedural mulberry32 PRNG vertex jitter fallback
+  function mulberry32(a) {
+    return function() {
+      var t = a += 0x6D2B79F5;
+      t = Math.imul(t ^ t >>> 15, t | 1);
+      t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+
+  const targets = (item.children && item.children.length) ? item.children : [item];
+  const roughness = ${roughness};
+  const bowing = ${bowing};
+  const baseSeed = ${seed};
+  const fps = Math.max(1, ${fps});
+  const style = ${S(style)};
+
+  targets.forEach((t, itemIdx) => {
+    if (!t.segments || !t.segments.length) return;
+    const rand = mulberry32(baseSeed + itemIdx * 777);
+
+    if (!t.data) t.data = {};
+    if (!t.data._origSegments) {
+      t.data._origSegments = t.segments.map(s => ({
+        x: s.point.x,
+        y: s.point.y,
+        hInX: s.handleIn ? s.handleIn.x : 0,
+        hInY: s.handleIn ? s.handleIn.y : 0,
+        hOutX: s.handleOut ? s.handleOut.x : 0,
+        hOutY: s.handleOut ? s.handleOut.y : 0,
+      }));
+    }
+
+    if (style === 'sketchy') {
+      for (let i = 0; i < t.segments.length; i++) {
+        const seg = t.segments[i];
+        seg.point.x += (rand() - 0.5) * roughness * 2;
+        seg.point.y += (rand() - 0.5) * roughness * 2;
+        if (seg.handleIn && (seg.handleIn.x !== 0 || seg.handleIn.y !== 0)) {
+          seg.handleIn.x += (rand() - 0.5) * bowing * 1.5;
+          seg.handleIn.y += (rand() - 0.5) * bowing * 1.5;
+        }
+        if (seg.handleOut && (seg.handleOut.x !== 0 || seg.handleOut.y !== 0)) {
+          seg.handleOut.x += (rand() - 0.5) * bowing * 1.5;
+          seg.handleOut.y += (rand() - 0.5) * bowing * 1.5;
+        }
+      }
+    } else if (style === 'wobble' || style === 'stop_motion') {
+      // Posterized frame holding animation loop (posterizeFps): quantize to fps
+      const orig = t.data._origSegments;
+      let lastFrame = -1;
+      t.onFrame = function(event) {
+        const currentFrame = Math.floor(event.time * fps);
+        if (currentFrame === lastFrame) return;
+        lastFrame = currentFrame;
+        const frameRand = mulberry32(baseSeed + itemIdx * 777 + currentFrame * 1337);
+        for (let i = 0; i < t.segments.length && i < orig.length; i++) {
+          const seg = t.segments[i];
+          const o = orig[i];
+          seg.point.x = o.x + (frameRand() - 0.5) * roughness * 2;
+          seg.point.y = o.y + (frameRand() - 0.5) * roughness * 2;
+          if (o.hInX !== 0 || o.hInY !== 0) {
+            seg.handleIn.x = o.hInX + (frameRand() - 0.5) * bowing;
+            seg.handleIn.y = o.hInY + (frameRand() - 0.5) * bowing;
+          }
+          if (o.hOutX !== 0 || o.hOutY !== 0) {
+            seg.handleOut.x = o.hOutX + (frameRand() - 0.5) * bowing;
+            seg.handleOut.y = o.hOutY + (frameRand() - 0.5) * bowing;
+          }
+        }
+      };
+    } else if (style === 'reveal') {
+      if (t.dashArray === undefined || !t.dashArray.length) {
+        const len = t.length || 500;
+        t.dashArray = [0, len];
+        let startTime = null;
+        const dur = ${duration};
+        t.onFrame = function(event) {
+          if (startTime === null) startTime = event.time;
+          const progress = Math.min(1, (event.time - startTime) / dur);
+          const jitter = (rand() - 0.5) * (roughness * 0.02);
+          const p = Math.max(0, Math.min(1, progress + jitter));
+          t.dashArray = [p * len, len];
+          if (progress >= 1) t.onFrame = null;
+        };
+      }
+    }
+  });
+
+  if (app._scheduleRepaint) app._scheduleRepaint();
+  if (app.historyManager) app.historyManager.saveState();
+  return { success: true, itemId: item.id || targetId, style: style, roughness: roughness, fps: fps };
+})();`.trim();
+  }
+
+  // ===========================================================================
   // SPRITE SHEETS
   // ===========================================================================
 
@@ -12271,6 +12416,160 @@ ${cam ? `  // The camera rides the SAME timing: framing each state as its morph 
 })();`.trim();
       }
     }
+  }
+
+  /**
+   * Character tool aliases (pinepaper_create_character, pinepaper_character_action, pinepaper_character_pose)
+   * Routing on-device / local model calls cleanly to the engine.
+   */
+  generateCreateCharacter(input: CreateCharacterInput): string {
+    const S = (v: unknown) => JSON.stringify(v);
+    const charId = S(input.characterId || input.name || `char_${Date.now()}`);
+    const posX = typeof input.x === 'number' ? input.x : 400;
+    const posY = typeof input.y === 'number' ? input.y : 300;
+    const scale = typeof input.scale === 'number' ? input.scale : 1;
+    const name = S(input.name || input.characterId || 'Character');
+    const base = input.base ? S(input.base) : 'null';
+    const preset = input.preset || input.concept ? S(input.preset || input.concept) : 'null';
+
+    return `
+// Create Character
+(async function() {
+  const charId = ${charId};
+  const posX = ${posX};
+  const posY = ${posY};
+  const scale = ${scale};
+  const name = ${name};
+  const base = ${base};
+  const preset = ${preset};
+
+  // 1. If original character base is specified and app.createCharacter exists
+  if (base && typeof app.createCharacter === 'function') {
+    const r = await app.createCharacter({ base: base, at: { x: posX, y: posY }, scale: scale });
+    if (r && r.ok !== false) {
+      return { success: true, characterId: charId, itemId: r.id, parts: r.parts };
+    }
+  }
+
+  // 2. Try app.create
+  let groupId = null;
+  if (typeof app.create === 'function') {
+    const group = app.create('circle', { x: posX, y: posY, radius: 35 * scale, color: '#7C3AED' });
+    if (group) {
+      group.data = group.data || {};
+      group.data.ppType = 'pp:Character';
+      group.data.characterId = charId;
+      group.name = name;
+      groupId = group.id || (group.data && group.data.id) || charId;
+    }
+  } else {
+    const p = typeof paper !== 'undefined' ? paper : ((typeof window !== 'undefined' ? window : globalThis).paper);
+    if (p && p.Path) {
+      const body = new p.Path.Circle({ center: [posX, posY], radius: 35 * scale, fillColor: '#7C3AED' });
+      const head = new p.Path.Circle({ center: [posX, posY - 45 * scale], radius: 20 * scale, fillColor: '#EC4899' });
+      const group = new p.Group([body, head]);
+      group.name = name;
+      if (app.textItemGroup) group.parent = app.textItemGroup;
+      group.data = { isUserGroup: true, isLayeredCharacter: true, ppType: 'pp:Character', characterId: charId };
+      const reg = app.itemRegistry;
+      groupId = reg ? reg.register(group, 'group', { source: 'mcp_create_character' }, 'mcp') : charId;
+      group.data.id = groupId;
+    }
+  }
+
+  if (app._scheduleRepaint) app._scheduleRepaint();
+  if (app.historyManager) app.historyManager.saveState();
+  return { success: true, characterId: charId, itemId: groupId };
+})();`.trim();
+  }
+
+  generateCharacterAction(input: CharacterActionInput): string {
+    const S = (v: unknown) => JSON.stringify(v);
+    const targetId = input.characterId || input.itemId;
+    const act = String(input.action || 'walk').toLowerCase();
+    const speed = input.speed || 100;
+
+    return `
+// Character Action
+(function() {
+  const targetId = ${S(targetId)};
+  const act = ${S(act)};
+  const speed = ${speed};
+
+  const charItem = targetId
+    ? (app.getItemById(targetId) || (app.getAllItems && app.getAllItems().find(i => (i.data && i.data.characterId === targetId) || i.name === targetId)))
+    : (app.selectedItems && app.selectedItems[0]);
+
+  if (!charItem) {
+    return { success: false, error: 'Character not found: ' + targetId };
+  }
+
+  const itemId = charItem.id || (charItem.data && charItem.data.id) || targetId;
+  const skelId = (charItem.data && charItem.data.characterId) ? 'character_' + charItem.data.characterId : null;
+
+  if (act === 'walk' || act === 'run' || act === 'locomotion') {
+    if (typeof app.addRelation === 'function') {
+      app.addRelation(itemId, null, 'locomotion', {
+        skeletonId: skelId,
+        speed: speed,
+        cycleDistance: 150,
+      });
+    }
+  } else if (app.riggingSystem) {
+    const rs = app.riggingSystem;
+    if (skelId && rs.skeletons && rs.skeletons.has(skelId)) {
+      if (typeof rs.applyBoneAngles === 'function') {
+        rs.applyBoneAngles(skelId, { spine: 0.1, left_arm: -0.5, right_arm: 0.5 });
+        if (typeof rs.solveFK === 'function') rs.solveFK(skelId);
+      }
+    }
+  }
+
+  if (typeof app.animate === 'function' && (act === 'wave' || act === 'dance' || act === 'jump' || act === 'idle')) {
+    app.animate(charItem, { animationType: act === 'jump' ? 'bounce' : (act === 'idle' ? 'breathe' : 'wobble') });
+  }
+
+  if (app._scheduleRepaint) app._scheduleRepaint();
+  return { success: true, characterId: targetId || itemId, action: act };
+})();`.trim();
+  }
+
+  generateCharacterPose(input: CharacterPoseInput): string {
+    const S = (v: unknown) => JSON.stringify(v);
+    const targetId = input.characterId || input.itemId;
+    const expr = String(input.expression || 'smile').toLowerCase();
+    const duration = input.duration !== undefined ? input.duration : null;
+    const interval = input.interval !== undefined ? input.interval : null;
+
+    return `
+// Character Pose / Expression
+(function() {
+  const targetId = ${S(targetId)};
+  const expr = ${S(expr)};
+
+  const charItem = targetId
+    ? (app.getItemById(targetId) || (app.getAllItems && app.getAllItems().find(i => (i.data && i.data.characterId === targetId) || i.name === targetId)))
+    : (app.selectedItems && app.selectedItems[0]);
+
+  if (!charItem) {
+    return { success: false, error: 'Character not found: ' + targetId };
+  }
+
+  const itemId = charItem.id || (charItem.data && charItem.data.id) || targetId;
+
+  // Touch riggingSystem first to ensure expression rules are initialized
+  const rs = app.riggingSystem;
+  if (typeof app.addRelation === 'function') {
+    app.addRelation(itemId, null, 'expresses', {
+      expression: expr,
+      duration: ${duration === null ? 'null' : duration},
+      interval: ${interval === null ? 'null' : interval},
+    });
+  }
+
+  if (app._scheduleRepaint) app._scheduleRepaint();
+  return { success: true, characterId: targetId || itemId, expression: expr };
+})();`.trim();
   }
 
   /**

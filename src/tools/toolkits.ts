@@ -114,6 +114,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
     'pinepaper_construction_sequence',
     'pinepaper_query_mutations',
     'pinepaper_beat_cuts',
+    'pinepaper_hand_drawn',
   ],
   masks: [
     'pinepaper_apply_animated_mask',
@@ -136,6 +137,11 @@ export const TOOL_TAGS: Record<string, string[]> = {
     'pinepaper_generate_estimate',
     'pinepaper_generate_status',
     'pinepaper_styled_scene',
+    // Craft generators shared from the cloud (craft-tools.ts).
+    'pinepaper_draw_weave',
+    'pinepaper_draw_knots',
+    'pinepaper_draw_sashiko',
+    'pinepaper_draw_subdivision',
   ],
   effects: [
     'pinepaper_apply_effect',
@@ -179,6 +185,8 @@ export const TOOL_TAGS: Record<string, string[]> = {
     // The medium axis belongs with the design system, not with effects: it is
     // a choice about what makes the marks, alongside register and level.
     'pinepaper_design_medium',
+    // Product UI drawn on brand: it reads the active brand kit.
+    'pinepaper_ui_kit',
   ],
   // Review surface (1.6.4): anchored feedback, and where things came from.
   review: [

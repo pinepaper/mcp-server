@@ -5,7 +5,7 @@
  *
  * Source: FxTool origin/main 7ffe15dd7150e680437660a578b4c9a9500cf6bc
  *   js/PinePaper.js + 5 shape modules
- * sha256: a96a4a05e2a02a6c
+ * sha256: 988dd41c24f1e59e
  *
  * A shape's `create` receives a `config`, never the caller's `params`.
  * PinePaper.js's registryConfig literal is the only bridge between the two, so
@@ -61,6 +61,7 @@ export const ACCEPTED_CREATE_PARAMS: readonly string[] = Object.freeze([
   'label',
   'labelPosition',
   'layer',
+  'lifetime',
   'monoline',
   'motionBlur',
   'name',

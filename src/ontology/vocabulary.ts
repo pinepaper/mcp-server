@@ -136,7 +136,7 @@ export const PP_VOCABULARY: PinePaperVocabulary = {
     'pp:FlowField': { anchor: null, description: 'A per-cell direction field that bends a mark along it — walked as a particle, so a line drifts the way a pen does rather than being displaced sideways. hand | curved | zigzag | waves | seabed | spiral | columns. What makes a ruling read as drawn rather than printed.', parentType: 'pp:Concept', mcpTool: 'pinepaper_design_medium' },
     // Stitchcraft & Procedural Hand-Drawn Animation (parity with FxTool)
     'pp:Stitchcraft':     { anchor: 'schema:VisualArtwork', description: "Procedural embroidery: an item rendered in thread, following a direction field, with optional hand wobble. The engine publishes six stitches through applyThreadPainting — longAndShort (the needlepainting fill, where length variance IS the shading), satin, seed, stem, runningSeam and crossStitch — and refuses any other name rather than stitching a default fill in its place.", parentType: 'pp:CanvasElement', createdWith: 'pp:CanvasShape', mcpTool: 'pinepaper_design_medium' },
-    'pp:HandDrawnAnimation': { anchor: 'schema:VisualArtwork', description: 'Procedural hand-drawn canvas animation, sketchy stroke jitter, and stop-motion line reveals.', parentType: 'pp:Concept', mcpTool: 'pinepaper_animate' },
+    'pp:HandDrawnAnimation': { anchor: 'schema:VisualArtwork', description: 'Procedural hand-drawn canvas animation, sketchy stroke jitter, and stop-motion line reveals.', parentType: 'pp:Concept', mcpTool: 'pinepaper_hand_drawn' },
     // Escape hatch — items that don't match any vocabulary type
     'pp:Unclassified':  { anchor: null, description: 'Item type not expressible in current vocabulary.', parentType: 'pp:CanvasElement' },
   },
