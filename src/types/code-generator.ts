@@ -10515,7 +10515,10 @@ case 'analyze_palette':
       if (!input.itemId) {
         return `(function() { return { success: false, style: 'reveal', error: 'reveal needs an itemId: it keyframes that item\\'s stroke. Nothing was changed.' }; })();`;
       }
-      return generateKeyframeAnimateCode(
+      // A trimEnd track on text or an image is kept and draws nothing (measured
+      // on prod: a PointText answered success and never changed), so the item
+      // is checked for a stroke first.
+      const track = generateKeyframeAnimateCode(
         input.itemId,
         [
           { time: 0, properties: { trimEnd: 0 }, easing: 'linear' },
@@ -10525,7 +10528,20 @@ case 'analyze_palette':
         false,
         undefined, undefined, undefined, undefined,
         true
-      );
+      ).replace(/;\s*$/, '');
+      return `
+// Hand-drawn draw-on: a trimEnd track on a stroked path
+(function() {
+  const found = app.getItemById(${S(input.itemId)}) || (app.itemRegistry && app.itemRegistry.get(${S(input.itemId)}));
+  const it = found && found.item ? found.item : found;
+  const isPath = function(p) { return !!(p && p.segments && p.segments.length); };
+  if (it && !isPath(it) && !(it.children && it.children.some(isPath))) {
+    return { success: false, itemId: ${S(input.itemId)}, error: 'reveal draws a stroke on, and this item has no path to draw (' + (it.className || 'not a path') + '). Nothing was changed. For words that write themselves on, use pinepaper_text_style cursive with animate: true.' };
+  }
+  return (
+${track}
+  );
+})();`.trim();
     }
 
     const targetId = input.itemId ? S(input.itemId) : 'null';

@@ -61,7 +61,7 @@ describe('pinepaper_hand_drawn', () => {
   it('reveal and ink_reveal keyframe trimEnd 0 -> 1, merged, over duration', () => {
     for (const style of ['reveal', 'ink_reveal'] as const) {
       const calls: unknown[][] = [];
-      const item = { data: { keyframes: [] } };
+      const item = { segments: [{}], data: { keyframes: [] } };
       const code = codeGenerator.generateHandDrawn({ itemId: 'item_1', style, duration: 1.5 } as never);
       expect(code).not.toContain('onFrame');
       const out = run(code, { getItemById: () => ({ item }), addAnimation: (...a: unknown[]) => calls.push(a) });
@@ -70,6 +70,24 @@ describe('pinepaper_hand_drawn', () => {
       expect(calls[0][1]).toEqual([{ time: 0, properties: { trimEnd: 0 }, easing: 'linear' }, { time: 1.5, properties: { trimEnd: 1 }, easing: 'linear' }]);
       expect(calls[0][2]).toMatchObject({ duration: 1.5, mode: 'merge' });
     }
+  });
+
+  it('reveal on an item with no path (text, image) is refused, nothing keyframed', () => {
+    const calls: unknown[] = [];
+    const code = codeGenerator.generateHandDrawn({ itemId: 'item_1', style: 'reveal' } as never);
+    const out = run(code, { getItemById: () => ({ item: { className: 'PointText', data: {} } }), addAnimation: (...a: unknown[]) => calls.push(a) });
+    expect(out.success).toBe(false);
+    expect(out.error).toContain('PointText');
+    expect(calls.length).toBe(0);
+  });
+
+  it('reveal on a group of paths keyframes it', () => {
+    const calls: unknown[] = [];
+    const item = { children: [{ segments: [{}] }], data: {} };
+    const code = codeGenerator.generateHandDrawn({ itemId: 'item_1', style: 'reveal' } as never);
+    const out = run(code, { getItemById: () => ({ item }), addAnimation: (...a: unknown[]) => calls.push(a) });
+    expect(out.success).toBe(true);
+    expect(calls.length).toBe(1);
   });
 
   it('reveal without an itemId is refused', () => {
