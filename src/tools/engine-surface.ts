@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 7ffe15dd7150e680437660a578b4c9a9500cf6bc
- * sha256:    45d4d99b7a27e95af2fa971e4400300b894b4eae72c74c0915901d144c823b38   (of PinePaper.js as committed)
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 3364f0a558c262b7ac6245e21a063daa5cfd71ca
+ * sha256:    42544732c60f09f6103234effc656efa7a47810dc599ce5451dc81d826c6e6a0   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on `window.app`, with how it gets there. The parity
@@ -16,7 +16,7 @@
 /** How a name lands on `app`. */
 export type EngineMemberKind = 'method' | 'accessor' | 'property' | 'lazy' | 'lazyHeavy' | 'bootstrap';
 
-/** 1425 names, from FxTool/js/PinePaper.js. */
+/** 1440 names, from FxTool/js/PinePaper.js. */
 export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object.freeze({
   __buildFreshness: 'property',
   _activeByGroup: 'property',
@@ -32,6 +32,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _animateCamera: 'method',
   _animationIntervalId: 'property',
   _announceItemEffect: 'method',
+  _applyBackingRatio: 'method',
   _applyBrushProfile: 'method',
   _applyChangesToItem: 'method',
   _applyCharacterLook: 'method',
@@ -55,6 +56,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _audioBakeSeq: 'property',
   _audioFeatureCache: 'property',
   _audioReactivePending: 'property',
+  _backingRatioTarget: 'method',
   _basePropertyValue: 'method',
   _benchReferenceClip: 'method',
   _bendAlongField: 'method',
@@ -181,6 +183,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _frameCounter: 'property',
   _frameMetrics: 'property',
   _frameSkipConfig: 'property',
+  _fullBackingHolds: 'property',
   _getCropHandleCursor: 'method',
   _getItemVisualBounds: 'method',
   _getItemWorldBounds: 'method',
@@ -203,6 +206,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _heavyModuleFailures: 'property',
   _heavyModulesPromise: 'property',
   _hideSoundChips: 'method',
+  _holdFullBacking: 'method',
   _hoverOutline: 'property',
   _hoverOutlineFor: 'property',
   _imageDataFromURL: 'method',
@@ -212,6 +216,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _initCameraAPI: 'method',
   _initCharacterBuilder: 'method',
   _initialized: 'property',
+  _installBackingStore: 'method',
   _installRenderHook: 'method',
   _installWorldNavigation: 'method',
   _instantiateToken: 'property',
@@ -250,6 +255,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _mediumTargets: 'method',
   _migrateClonedSubtree: 'method',
   _motionFxEvaluateAt: 'method',
+  _nativePixelRatio: 'property',
   _normalizeSegment: 'method',
   _noteBrushStyled: 'method',
   _notePainted: 'method',
@@ -269,6 +275,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _panStartCenter: 'property',
   _panStartPoint: 'property',
   _parseColor: 'method',
+  _patternRoot: 'method',
   _pausedForEditing: 'property',
   _pausedForTextEdit: 'bootstrap',
   _pendingTimedPulses: 'property',
@@ -330,15 +337,19 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _resolveShotBounds: 'method',
   _resolveTextEffect: 'method',
   _resolveTrimTarget: 'method',
+  _restBoundsShown: 'method',
   _restGeometry: 'method',
+  _restitchText: 'method',
   _restoreCharacterFields: 'method',
   _restoreCharacters: 'method',
   _restoreMotionOntoMask: 'method',
   _restoreSettled: 'property',
   _restoreSoundChips: 'method',
   _retargetBVHUnrecorded: 'method',
+  _retypeTextOutlines: 'method',
   _revealAfterAtomicLoad: 'method',
   _revealTimer: 'property',
+  _rewriteCursive: 'method',
   _rigCharacter: 'method',
   _rlm: 'method',
   _samplePointsFromItem: 'method',
@@ -397,6 +408,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _subjectBox: 'method',
   _subsystemReadyHooks: 'property',
   _surfaceState: 'property',
+  _syncBackingStore: 'method',
   _syncBlendBgToView: 'method',
   _syncRenderHooks: 'method',
   _teardownStaticCache: 'method',
@@ -585,6 +597,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   camera: 'lazy',
   cameraViewportOverlay: 'lazy',
   cancelDrawingAnimationPath: 'method',
+  canvasBackingInfo: 'method',
   canvasBoundary: 'property',
   canvasEl: 'property',
   canvasId: 'property',
@@ -696,6 +709,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   describeComposition: 'method',
   describeExtrudedText: 'method',
   describeLook: 'method',
+  describeStyledText: 'method',
   describeWorld3D: 'method',
   deselectAll: 'method',
   designGraph: 'lazy',
@@ -727,6 +741,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   drawYeganehMountains: 'method',
   duplicateSelected: 'bootstrap',
   ease: 'property',
+  editStyledText: 'method',
   effectSystem: 'lazy',
   emit: 'method',
   enableGpuCompositor: 'method',
