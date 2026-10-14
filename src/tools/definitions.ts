@@ -6038,54 +6038,51 @@ PHASES: sin, blink, linear, pingpong, once, elastic, heartbeat, stepped`,
   {
     name: 'pinepaper_hand_drawn',
     annotations: {
-      title: 'Hand-Drawn Sketchy Animation',
+      title: 'Hand-Drawn Line',
       readOnlyHint: false,
       destructiveHint: false,
       idempotentHint: false,
       openWorldHint: false,
     },
-    description: `Apply procedural hand-drawn sketchy strokes, vertex noise jitter, line bowing, and stop-motion frame holding (posterizeFps) to items.
+    description: `Give a path a hand-drawn look: a rough, bowed outline (sketchy), or a stroke that draws itself on (reveal).
 
 USE WHEN:
-- "give it a hand-drawn / sketchy / wobbly outline"
-- "stop motion hand-drawn animation"
-- "sketchy ink reveal"
-- "apply rough bowing / jitter to strokes"
+- "give it a hand-drawn / sketchy / rough outline"
+- "draw the line on like ink" (reveal)
 
-MODES / STYLES:
-- 'sketchy' (or 'static'): One-time procedural vertex noise jitter & bowing displacement.
-- 'wobble': Continuous stop-motion line wobble across frames with posterized timing (e.g. 8-12 FPS).
-- 'reveal': Hand-drawn progressive stroke/ink reveal animation.
-- 'stop_motion': Quantize motion timing to target posterized FPS.
+STYLES:
+- 'sketchy' (default): one-time seeded jitter of the path's points and curve handles. Saved with the scene; exports as drawn.
+- 'reveal' (alias 'ink_reveal'): keyframes the item's stroke trimEnd 0 -> 1 over duration seconds, merged with any keyframes it already has. Needs itemId.
+- 'wobble', 'stop_motion': refused, nothing changed. A line that boils frame to frame in exports is pinepaper_design_medium medium 'ink'; the refusal returns that call, with fps as the boil rate.
 
 PARAMETERS:
-- itemId: Target item ID (or active selection if omitted)
-- style / mode: 'sketchy' | 'wobble' | 'reveal' | 'stop_motion' (default: 'sketchy')
-- roughness: Noise magnitude in pixels (default: 2)
-- bowing: Line bowing factor for bezier curve handles (default: 1)
-- fps / posterizeFps: Target posterized FPS for stop-motion timing (default: 12)
-- seed: PRNG seed for deterministic jitter (default: 1)
-- duration: Duration in seconds for reveal or wobble loop (default: 2)`,
+- itemId: target item registry id (sketchy falls back to the selection)
+- style / mode: 'sketchy' | 'reveal' | 'ink_reveal' | 'wobble' | 'stop_motion'
+- roughness: point jitter in px (default 2)
+- bowing: curve handle jitter factor (default 1)
+- seed: same seed, same jitter (default 1)
+- duration: reveal seconds (default 2)
+- fps / posterizeFps: boil rate passed on in the wobble/stop_motion refusal (default 12)`,
     inputSchema: {
       type: 'object',
       properties: {
         itemId: { type: 'string', description: 'Target item registry ID (or current selection if omitted)' },
         style: {
           type: 'string',
-          enum: ['sketchy', 'wobble', 'stop_motion', 'reveal'],
-          description: 'Hand-drawn style preset or timing mode (default: sketchy)',
+          enum: ['sketchy', 'reveal', 'ink_reveal', 'wobble', 'stop_motion'],
+          description: "Hand-drawn style (default: sketchy). wobble and stop_motion are refused with the pinepaper_design_medium call that does it",
         },
         mode: {
           type: 'string',
-          enum: ['sketchy', 'wobble', 'stop_motion', 'reveal'],
+          enum: ['sketchy', 'reveal', 'ink_reveal', 'wobble', 'stop_motion'],
           description: 'Alias for style',
         },
         roughness: { type: 'number', description: 'Noise magnitude in pixels (default: 2)' },
         bowing: { type: 'number', description: 'Line bowing curve handle factor (default: 1)' },
-        fps: { type: 'number', description: 'Target posterized frame rate (8-24, default: 12)' },
+        fps: { type: 'number', description: 'wobble/stop_motion: the boil rate handed to pinepaper_design_medium (default: 12)' },
         posterizeFps: { type: 'number', description: 'Alias for fps' },
         seed: { type: 'number', description: 'Random seed for deterministic vertex displacement (default: 1)' },
-        duration: { type: 'number', description: 'Duration in seconds for animated reveal or wobble loop (default: 2)' },
+        duration: { type: 'number', description: 'reveal: seconds to draw the stroke on (default: 2)' },
       },
     },
   },

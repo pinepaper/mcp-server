@@ -9,16 +9,17 @@ describe('pinepaper_hand_drawn', () => {
     const tool = getToolByName('pinepaper_hand_drawn');
     expect(tool).toBeDefined();
     expect(tool?.name).toBe('pinepaper_hand_drawn');
-    expect(tool?.description).toContain('procedural hand-drawn sketchy strokes');
+    expect(tool?.description).toContain('hand-drawn look');
     expect(tool?.inputSchema?.type).toBe('object');
   });
 
   it('validates schema options correctly', () => {
     const parsedDefault = HandDrawnInputSchema.parse({});
-    expect(parsedDefault.style).toBe('sketchy');
+    // No default on style or fps: with one, the mode / posterizeFps aliases were never read.
+    expect(parsedDefault.style).toBeUndefined();
+    expect(parsedDefault.fps).toBeUndefined();
     expect(parsedDefault.roughness).toBe(2);
     expect(parsedDefault.bowing).toBe(1);
-    expect(parsedDefault.fps).toBe(12);
 
     const parsedCustom = HandDrawnInputSchema.parse({
       itemId: 'item_123',
@@ -38,23 +39,63 @@ describe('pinepaper_hand_drawn', () => {
     expect(parsedCustom.duration).toBe(3);
   });
 
-  it('generateHandDrawn emits parseable JavaScript code for all styles', () => {
-    const sketchyCode = codeGenerator.generateHandDrawn({ itemId: 'item_1', style: 'sketchy' });
-    expect(sketchyCode).toContain('applyHandDrawnStyle');
-    expect(() => new Function(sketchyCode)).not.toThrow();
+  // Run the generated script against a stub app and read its result.
+  const run = (code: string, app: Record<string, unknown>) =>
+    new Function('app', 'HandDrawn', 'window', `return (\n${code.trim().replace(/;$/, '')}\n)`)(app, undefined, {});
 
-    const wobbleCode = codeGenerator.generateHandDrawn({ itemId: 'item_1', style: 'wobble', fps: 10 });
-    expect(wobbleCode).toContain('onFrame');
-    expect(wobbleCode).toContain('posterizeFps');
-    expect(() => new Function(wobbleCode)).not.toThrow();
+  it('sketchy jitters through the engine and returns the registry id, not the Paper id', () => {
+    const calls: unknown[] = [];
+    const item = { id: 42, data: { registryId: 'item_1' }, segments: [] };
+    const code = codeGenerator.generateHandDrawn({ itemId: 'item_1', style: 'sketchy' } as never);
+    expect(code).toContain('applyHandDrawnStyle');
+    const out = run(code, { getItemById: () => ({ item }), applyHandDrawnJitter: (...a: unknown[]) => calls.push(a) });
+    expect(out).toMatchObject({ success: true, itemId: 'item_1', style: 'sketchy' });
+    expect(calls.length).toBe(1);
+  });
 
-    const revealCode = codeGenerator.generateHandDrawn({ itemId: 'item_1', style: 'reveal', duration: 1.5 });
-    expect(revealCode).toContain('reveal');
-    expect(() => new Function(revealCode)).not.toThrow();
+  it('mode is read when style is absent', () => {
+    const code = codeGenerator.generateHandDrawn(HandDrawnInputSchema.parse({ itemId: 'item_1', mode: 'wobble' }));
+    expect(run(code, {}).success).toBe(false);
+  });
 
-    const stopMotionCode = codeGenerator.generateHandDrawn({ itemId: 'item_1', style: 'stop_motion', posterizeFps: 8 });
-    expect(stopMotionCode).toContain('posterizeFps');
-    expect(() => new Function(stopMotionCode)).not.toThrow();
+  it('reveal and ink_reveal keyframe trimEnd 0 -> 1, merged, over duration', () => {
+    for (const style of ['reveal', 'ink_reveal'] as const) {
+      const calls: unknown[][] = [];
+      const item = { data: { keyframes: [] } };
+      const code = codeGenerator.generateHandDrawn({ itemId: 'item_1', style, duration: 1.5 } as never);
+      expect(code).not.toContain('onFrame');
+      const out = run(code, { getItemById: () => ({ item }), addAnimation: (...a: unknown[]) => calls.push(a) });
+      expect(out.success).toBe(true);
+      expect(calls[0][0]).toBe('item_1');
+      expect(calls[0][1]).toEqual([{ time: 0, properties: { trimEnd: 0 }, easing: 'linear' }, { time: 1.5, properties: { trimEnd: 1 }, easing: 'linear' }]);
+      expect(calls[0][2]).toMatchObject({ duration: 1.5, mode: 'merge' });
+    }
+  });
+
+  it('reveal without an itemId is refused', () => {
+    const out = run(codeGenerator.generateHandDrawn({ style: 'reveal' } as never), {});
+    expect(out.success).toBe(false);
+    expect(out.error).toContain('itemId');
+  });
+
+  it('wobble and stop_motion are refused with the design_medium ink call, nothing run', () => {
+    for (const style of ['wobble', 'stop_motion'] as const) {
+      const code = codeGenerator.generateHandDrawn({ itemId: 'item_1', style, posterizeFps: 8, seed: 3, roughness: 4 } as never);
+      expect(code).not.toContain('onFrame');
+      const out = run(code, {});
+      expect(out.success).toBe(false);
+      expect(out.error).toContain('Nothing was changed');
+      expect(out.use).toEqual({
+        tool: 'pinepaper_design_medium',
+        args: { action: 'apply', itemId: 'item_1', medium: 'ink', options: { keepColor: true, fps: 8, seed: 3, amplitude: 4 } },
+      });
+    }
+  });
+
+  it('sketchy on an item with no points is refused, not reported done', () => {
+    const code = codeGenerator.generateHandDrawn({ itemId: 'item_1' } as never);
+    const out = run(code, { getItemById: () => ({ item: { data: {} } }) });
+    expect(out.success).toBe(false);
   });
 
   it('handler executes pinepaper_hand_drawn call', async () => {

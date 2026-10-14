@@ -4171,14 +4171,14 @@ export type DeformInput = z.infer<typeof DeformInputSchema>;
 // Procedural Hand-Drawn Canvas Animation (Sketchy, Wobble, Stop-Motion, Reveal)
 export const HandDrawnInputSchema = z.object({
   itemId: z.string().optional().describe('Target item ID (defaults to active selection)'),
-  style: z.enum(['sketchy', 'wobble', 'stop_motion', 'reveal']).optional().default('sketchy').describe('Hand-drawn style preset'),
-  mode: z.enum(['sketchy', 'wobble', 'stop_motion', 'reveal']).optional().describe('Alias for style'),
+  style: z.enum(['sketchy', 'reveal', 'ink_reveal', 'wobble', 'stop_motion']).optional().describe("Hand-drawn style (default 'sketchy'). wobble and stop_motion are refused with the pinepaper_design_medium call that does it"),
+  mode: z.enum(['sketchy', 'reveal', 'ink_reveal', 'wobble', 'stop_motion']).optional().describe('Alias for style'),
   roughness: z.number().optional().default(2).describe('Noise magnitude in pixels (default: 2)'),
   bowing: z.number().optional().default(1).describe('Line bowing curve handle factor (default: 1)'),
-  fps: z.number().optional().default(12).describe('Target posterized frame rate (8-24, default: 12)'),
+  fps: z.number().optional().describe('wobble/stop_motion: the boil rate handed to pinepaper_design_medium (default: 12)'),
   posterizeFps: z.number().optional().describe('Alias for fps'),
   seed: z.number().optional().default(1).describe('PRNG seed for deterministic vertex displacement (default: 1)'),
-  duration: z.number().optional().default(2).describe('Duration in seconds for animated reveal or wobble loop (default: 2)'),
+  duration: z.number().positive().optional().describe('reveal: seconds to draw the stroke on (default: 2)'),
 });
 export type HandDrawnInput = z.infer<typeof HandDrawnInputSchema>;
 

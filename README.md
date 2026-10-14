@@ -1840,7 +1840,7 @@ All 176 tools, grouped by the tag used for toolkit filtering.
 | `pinepaper_get_animatable_properties` | List animatable properties |
 | `pinepaper_get_available_easings` | List easing functions |
 | `pinepaper_construction_sequence` | Staged construction animation |
-| `pinepaper_hand_drawn` | Procedural hand-drawn sketchy strokes, vertex jitter, bowing, and stop-motion timing |
+| `pinepaper_hand_drawn` | Hand-drawn line: a rough, bowed outline, or a stroke that draws itself on |
 
 ### Masks (`masks`)
 | Tool | Description |

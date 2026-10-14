@@ -10483,44 +10483,81 @@ case 'analyze_palette':
 
   generateHandDrawn(input: HandDrawnInput): string {
     const S = (v: unknown) => JSON.stringify(v);
-    const style = input.style || input.mode || 'sketchy';
+    // style carries no schema default: with one, `mode` (its alias) was never read.
+    const requested = input.style ?? input.mode ?? 'sketchy';
+    const style = requested === 'ink_reveal' ? 'reveal' : requested;
     const roughness = input.roughness ?? 2;
     const bowing = input.bowing ?? 1;
     const fps = input.fps ?? input.posterizeFps ?? 12;
     const seed = input.seed ?? 1;
     const duration = input.duration ?? 2;
-    const targetId = input.itemId ? S(input.itemId) : 'null';
 
+    // WOBBLE AND STOP_MOTION ANSWERED SUCCESS AND EXPORTED NOTHING. The engine's
+    // wobble draws one frame per call (updateHandDrawnWobble(item, frameIndex)),
+    // so a single call is a static jitter; stop_motion is a per-frame timing
+    // helper with no item to apply to, and applyHandDrawnStyle throws for it by
+    // name. The fallback hung an onFrame on the path, which is neither saved
+    // nor exported. The boiling line the studio does save and export is the ink
+    // medium, so the refusal hands over that call with these arguments.
+    if (style === 'wobble' || style === 'stop_motion') {
+      const use = {
+        tool: 'pinepaper_design_medium',
+        args: { action: 'apply', itemId: input.itemId ?? '<itemId>', medium: 'ink', options: { keepColor: true, fps, seed, amplitude: roughness } },
+      };
+      const error = `'${style}' has no animated form this studio saves or exports, so it would have shown in the editor and not in a video. Nothing was changed. For a hand-drawn line that boils frame to frame in exports, call pinepaper_design_medium with the arguments in \`use\` (fps is the boil rate). For a one-off rough line, use style 'sketchy'.`;
+      return `(function() { return { success: false, style: ${S(style)}, error: ${S(error)}, use: ${S(use)} }; })();`;
+    }
+
+    // REVEAL WAS AN onFrame DASH ANIMATION, which no export plays. A draw-on the
+    // studio saves is a trimEnd 0 -> 1 keyframe track, merged so the item's
+    // other keyframes survive.
+    if (style === 'reveal') {
+      if (!input.itemId) {
+        return `(function() { return { success: false, style: 'reveal', error: 'reveal needs an itemId: it keyframes that item\\'s stroke. Nothing was changed.' }; })();`;
+      }
+      return generateKeyframeAnimateCode(
+        input.itemId,
+        [
+          { time: 0, properties: { trimEnd: 0 }, easing: 'linear' },
+          { time: duration, properties: { trimEnd: 1 }, easing: 'linear' },
+        ],
+        duration,
+        false,
+        undefined, undefined, undefined, undefined,
+        true
+      );
+    }
+
+    const targetId = input.itemId ? S(input.itemId) : 'null';
     return `
-// Hand-drawn sketchy animation & organic stroke jitter
+// Hand-drawn sketchy stroke jitter
 (function() {
   const targetId = ${targetId};
-  const item = targetId ? (app.getItemById(targetId) || (app.itemRegistry && app.itemRegistry.get(targetId)?.item)) : (app.selectedItems && app.selectedItems[0]);
+  const found = targetId ? (app.getItemById(targetId) || (app.itemRegistry && app.itemRegistry.get(targetId))) : (app.selectedItems && app.selectedItems[0]);
+  const item = found && found.item ? found.item : found;
   if (!item) {
     return { success: false, error: 'Target item not found for hand-drawn styling' };
   }
+  // The registry id, which every other tool takes — not Paper's numeric item.id.
+  const itemId = targetId || (item.data && (item.data.registryId || item.data.id)) || null;
 
-  // 1. Try engine HandDrawn / applyHandDrawnStyle if available
-  if (typeof HandDrawn !== 'undefined' && typeof HandDrawn.applyHandDrawnStyle === 'function') {
+  // 1. The engine's own sketchy jitter.
+  if (typeof HandDrawn !== 'undefined' && HandDrawn && typeof HandDrawn.applyHandDrawnStyle === 'function') {
     try {
-      HandDrawn.applyHandDrawnStyle(item, ${S(style)}, {
-        roughness: ${roughness},
-        bowing: ${bowing},
-        fps: ${fps},
-        seed: ${seed},
-        duration: ${duration}
-      });
+      HandDrawn.applyHandDrawnStyle(item, 'sketchy', { roughness: ${roughness}, bowing: ${bowing}, seed: ${seed} });
       if (app._scheduleRepaint) app._scheduleRepaint();
-      return { success: true, itemId: item.id || targetId, style: ${S(style)}, engine: 'HandDrawn' };
+      if (app.historyManager) app.historyManager.saveState();
+      return { success: true, itemId: itemId, style: 'sketchy', engine: 'HandDrawn' };
     } catch (e) {
       console.warn('[HandDrawn] Engine error, falling back to procedural jitter:', e);
     }
   }
 
-  if (typeof app.applyHandDrawnJitter === 'function' && ${S(style)} === 'sketchy') {
+  if (typeof app.applyHandDrawnJitter === 'function') {
     app.applyHandDrawnJitter(item, { roughness: ${roughness}, bowing: ${bowing}, seed: ${seed} });
     if (app._scheduleRepaint) app._scheduleRepaint();
-    return { success: true, itemId: item.id || targetId, style: ${S(style)}, engine: 'app.applyHandDrawnJitter' };
+    if (app.historyManager) app.historyManager.saveState();
+    return { success: true, itemId: itemId, style: 'sketchy', engine: 'app.applyHandDrawnJitter' };
   }
 
   // 2. Procedural mulberry32 PRNG vertex jitter fallback
@@ -10534,87 +10571,32 @@ case 'analyze_palette':
   }
 
   const targets = (item.children && item.children.length) ? item.children : [item];
-  const roughness = ${roughness};
-  const bowing = ${bowing};
-  const baseSeed = ${seed};
-  const fps = Math.max(1, ${fps});
-  const style = ${S(style)};
-
+  let moved = 0;
   targets.forEach((t, itemIdx) => {
     if (!t.segments || !t.segments.length) return;
-    const rand = mulberry32(baseSeed + itemIdx * 777);
-
-    if (!t.data) t.data = {};
-    if (!t.data._origSegments) {
-      t.data._origSegments = t.segments.map(s => ({
-        x: s.point.x,
-        y: s.point.y,
-        hInX: s.handleIn ? s.handleIn.x : 0,
-        hInY: s.handleIn ? s.handleIn.y : 0,
-        hOutX: s.handleOut ? s.handleOut.x : 0,
-        hOutY: s.handleOut ? s.handleOut.y : 0,
-      }));
-    }
-
-    if (style === 'sketchy') {
-      for (let i = 0; i < t.segments.length; i++) {
-        const seg = t.segments[i];
-        seg.point.x += (rand() - 0.5) * roughness * 2;
-        seg.point.y += (rand() - 0.5) * roughness * 2;
-        if (seg.handleIn && (seg.handleIn.x !== 0 || seg.handleIn.y !== 0)) {
-          seg.handleIn.x += (rand() - 0.5) * bowing * 1.5;
-          seg.handleIn.y += (rand() - 0.5) * bowing * 1.5;
-        }
-        if (seg.handleOut && (seg.handleOut.x !== 0 || seg.handleOut.y !== 0)) {
-          seg.handleOut.x += (rand() - 0.5) * bowing * 1.5;
-          seg.handleOut.y += (rand() - 0.5) * bowing * 1.5;
-        }
+    const rand = mulberry32(${seed} + itemIdx * 777);
+    for (let i = 0; i < t.segments.length; i++) {
+      const seg = t.segments[i];
+      seg.point.x += (rand() - 0.5) * ${roughness} * 2;
+      seg.point.y += (rand() - 0.5) * ${roughness} * 2;
+      if (seg.handleIn && (seg.handleIn.x !== 0 || seg.handleIn.y !== 0)) {
+        seg.handleIn.x += (rand() - 0.5) * ${bowing} * 1.5;
+        seg.handleIn.y += (rand() - 0.5) * ${bowing} * 1.5;
       }
-    } else if (style === 'wobble' || style === 'stop_motion') {
-      // Posterized frame holding animation loop (posterizeFps): quantize to fps
-      const orig = t.data._origSegments;
-      let lastFrame = -1;
-      t.onFrame = function(event) {
-        const currentFrame = Math.floor(event.time * fps);
-        if (currentFrame === lastFrame) return;
-        lastFrame = currentFrame;
-        const frameRand = mulberry32(baseSeed + itemIdx * 777 + currentFrame * 1337);
-        for (let i = 0; i < t.segments.length && i < orig.length; i++) {
-          const seg = t.segments[i];
-          const o = orig[i];
-          seg.point.x = o.x + (frameRand() - 0.5) * roughness * 2;
-          seg.point.y = o.y + (frameRand() - 0.5) * roughness * 2;
-          if (o.hInX !== 0 || o.hInY !== 0) {
-            seg.handleIn.x = o.hInX + (frameRand() - 0.5) * bowing;
-            seg.handleIn.y = o.hInY + (frameRand() - 0.5) * bowing;
-          }
-          if (o.hOutX !== 0 || o.hOutY !== 0) {
-            seg.handleOut.x = o.hOutX + (frameRand() - 0.5) * bowing;
-            seg.handleOut.y = o.hOutY + (frameRand() - 0.5) * bowing;
-          }
-        }
-      };
-    } else if (style === 'reveal') {
-      if (t.dashArray === undefined || !t.dashArray.length) {
-        const len = t.length || 500;
-        t.dashArray = [0, len];
-        let startTime = null;
-        const dur = ${duration};
-        t.onFrame = function(event) {
-          if (startTime === null) startTime = event.time;
-          const progress = Math.min(1, (event.time - startTime) / dur);
-          const jitter = (rand() - 0.5) * (roughness * 0.02);
-          const p = Math.max(0, Math.min(1, progress + jitter));
-          t.dashArray = [p * len, len];
-          if (progress >= 1) t.onFrame = null;
-        };
+      if (seg.handleOut && (seg.handleOut.x !== 0 || seg.handleOut.y !== 0)) {
+        seg.handleOut.x += (rand() - 0.5) * ${bowing} * 1.5;
+        seg.handleOut.y += (rand() - 0.5) * ${bowing} * 1.5;
       }
+      moved++;
     }
   });
+  if (!moved) {
+    return { success: false, itemId: itemId, error: 'sketchy moves path points, and this item has none (text or an image?). Nothing was changed.' };
+  }
 
   if (app._scheduleRepaint) app._scheduleRepaint();
   if (app.historyManager) app.historyManager.saveState();
-  return { success: true, itemId: item.id || targetId, style: style, roughness: roughness, fps: fps };
+  return { success: true, itemId: itemId, style: 'sketchy', roughness: ${roughness}, points: moved };
 })();`.trim();
   }
 

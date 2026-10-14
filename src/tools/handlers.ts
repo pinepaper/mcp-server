@@ -2187,7 +2187,7 @@ async function handleToolCallInner(
       case 'pinepaper_hand_drawn': {
         const input = HandDrawnInputSchema.parse(args);
         const code = codeGenerator.generateHandDrawn(input);
-        return executeOrGenerate(code, `Hand-drawn style: ${input.style || input.mode || 'sketchy'}`, options, 'pinepaper_hand_drawn');
+        return executeOrGenerate(code, `Hand-drawn style: ${input.style ?? input.mode ?? 'sketchy'}`, options, 'pinepaper_hand_drawn');
       }
 
       case 'pinepaper_sprite_sheet': {
