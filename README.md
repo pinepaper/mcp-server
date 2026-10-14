@@ -268,6 +268,14 @@ Five tools that were cloud-only now draw in your local studio, free:
 Each one fills the canvas you have, and draws ordinary items you can select
 and edit.
 
+### New: hand-drawn lines
+
+`pinepaper_hand_drawn` gives a path a hand-drawn look. `sketchy` roughens and
+bows its outline, repeatable by `seed`. `reveal` draws the stroke on over
+`duration` seconds, alongside any keyframes the item already has. For a line
+that boils from frame to frame, it points you to `pinepaper_design_medium`
+ink.
+
 ### Fixed
 
 - `shader` and `field` items from `pinepaper_create_item` draw in the studio
