@@ -1357,10 +1357,38 @@ describe('PinePaperCodeGenerator', () => {
         const merged = plan.merged.get(0)!;
         // t=0 keeps opacity from op-0, takes rotation from op-1, gains strokeColor
         expect(merged.keyframes[0].properties).toEqual({ rotation: 90, opacity: 1, strokeColor: '#0f0' });
-        // t=4 only existed in op-0 and survives
-        expect(merged.keyframes[1]).toEqual({ time: 4, properties: { rotation: 0 } });
+        // t=4 existed only in op-0, but op-1's one key HOLDS there and, being later, wins (B120)
+        expect(merged.keyframes[1]).toEqual({ time: 4, properties: { rotation: 90, strokeColor: '#0f0' } });
         expect(merged.duration).toBe(9);
         expect(merged.loop).toBe(true);
+      });
+
+      it('B120: samples each track at every key time, so no key drops the other op\'s channel', () => {
+        const plan = planKeyframeMerges([
+          { type: 'keyframe_animate', itemId: 'c', duration: 2,
+            keyframes: [{ time: 0, properties: { x: 100 } }, { time: 2, properties: { x: 300 } }] },
+          { type: 'keyframe_animate', itemId: 'c', duration: 2,
+            keyframes: [{ time: 0, properties: { opacity: 0 } }, { time: 1, properties: { opacity: 1 } }] },
+        ]);
+        const kfs = plan.merged.get(0)!.keyframes;
+        expect(kfs.map((k) => k.time)).toEqual([0, 1, 2]);
+        expect(kfs[0].properties).toEqual({ x: 100, opacity: 0 });
+        expect(kfs[1].properties).toEqual({ x: 200, opacity: 1 });   // x interpolated at the other op's key
+        expect(kfs[2].properties).toEqual({ x: 300, opacity: 1 });   // opacity held past its last key
+      });
+
+      it('B120: interpolates equal-length number arrays and keeps the arriving easing', () => {
+        const plan = planKeyframeMerges([
+          { type: 'keyframe_animate', itemId: 'p',
+            keyframes: [{ time: 0, properties: { position: [0, 0] } }, { time: 4, properties: { position: [400, 200] }, easing: 'easeOut' }] },
+          { type: 'keyframe_animate', itemId: 'p',
+            keyframes: [{ time: 1, properties: { scale: 1 } }, { time: 3, properties: { scale: 2 }, easing: 'bounce' }] },
+        ]);
+        const kfs = plan.merged.get(0)!.keyframes;
+        expect(kfs.map((k) => k.time)).toEqual([0, 1, 3, 4]);
+        expect(kfs[1].properties).toEqual({ position: [100, 50], scale: 1 });
+        expect(kfs[2]).toEqual({ time: 3, properties: { position: [300, 150], scale: 2 }, easing: 'bounce' });
+        expect(kfs[3].easing).toBe('easeOut');
       });
 
       it('plans nothing when every target is unique', () => {

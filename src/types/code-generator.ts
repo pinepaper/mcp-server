@@ -2346,6 +2346,47 @@ export interface KeyframeMergePlan {
   foldedInto: Map<number, number>;
 }
 
+/** A keyframe's properties, with the flat spellings (x, opacity, ...) lifted in beside `properties`. */
+function extractKfPropsMap(kf: KeyframeLike | undefined): Record<string, unknown> {
+  const props: Record<string, unknown> = (kf && kf.properties && typeof kf.properties === 'object') ? { ...kf.properties } : {};
+  if (kf) {
+    const flat = kf as unknown as Record<string, unknown>;
+    for (const key of ['x', 'y', 'opacity', 'scale', 'scaleX', 'scaleY', 'rotation', 'position', 'fill', 'fillColor', 'stroke', 'strokeColor', 'width', 'height', 'radius', 'lineHeight']) {
+      if (flat[key] !== undefined && props[key] === undefined) props[key] = flat[key];
+    }
+  }
+  return props;
+}
+
+/**
+ * One op's track sampled at time t: held before its first key and after its last, linear in between
+ * (numbers and equal-length number arrays; anything else holds until the next key is reached).
+ */
+function sampleOpTrack(kfs: KeyframeLike[], t: number): Record<string, unknown> {
+  if (!kfs.length) return {};
+  if (kfs.length === 1 || t <= kfs[0]!.time) return extractKfPropsMap(kfs[0]);
+  if (t >= kfs[kfs.length - 1]!.time) return extractKfPropsMap(kfs[kfs.length - 1]);
+  let i = 0;
+  for (let j = 0; j < kfs.length - 1; j++) {
+    if (t >= kfs[j]!.time && t <= kfs[j + 1]!.time) { i = j; break; }
+  }
+  const k0 = kfs[i]!, k1 = kfs[i + 1]!;
+  const p0 = extractKfPropsMap(k0), p1 = extractKfPropsMap(k1);
+  const f = Math.max(0, Math.min(1, (t - k0.time) / (k1.time - k0.time || 1)));
+  const out: Record<string, unknown> = {};
+  for (const k of new Set([...Object.keys(p0), ...Object.keys(p1)])) {
+    const v0 = p0[k], v1 = p1[k];
+    if (typeof v0 === 'number' && typeof v1 === 'number') {
+      out[k] = v0 + (v1 - v0) * f;
+    } else if (Array.isArray(v0) && Array.isArray(v1) && v0.length === v1.length && typeof v0[0] === 'number') {
+      out[k] = v0.map((n, idx) => Number(n) + (Number(v1[idx]) - Number(n)) * f);
+    } else {
+      out[k] = (v1 !== undefined && f >= 1) ? v1 : (v0 !== undefined ? v0 : v1);
+    }
+  }
+  return out;
+}
+
 /**
  * app.addAnimation() REPLACES data.keyframes wholesale, so two
  * keyframe_animate ops targeting one item meant the first track was silently
@@ -2376,28 +2417,34 @@ export function planKeyframeMerges(
     if (indices.length < 2) continue;
     const first = indices[0];
 
-    // Union keyframes by time; later ops shallow-merge over earlier ones.
-    const byTime = new Map<number, KeyframeLike>();
     let duration = 0;
     let loop = false;
     for (const i of indices) {
       const op = operations[i];
-      for (const kf of op.keyframes || []) {
-        const prev = byTime.get(kf.time);
-        byTime.set(kf.time, {
-          time: kf.time,
-          properties: { ...(prev?.properties || {}), ...(kf.properties || {}) },
-          ...((kf.easing ?? prev?.easing) !== undefined ? { easing: kf.easing ?? prev?.easing } : {}),
-        });
-      }
       const opMax = op.keyframes?.length ? Math.max(...op.keyframes.map(k => k.time)) : 0;
       duration = Math.max(duration, op.duration || opMax);
       loop = loop || op.loop === true;
       if (i !== first) plan.foldedInto.set(i, first);
     }
 
+    // B120: at every key time of ANY op, each op contributes its own track SAMPLED there (held outside
+    // its keys, interpolated between them), later ops winning. A plain union by timestamp left a key
+    // holding only one op's properties, so the engine broke the other op's channel at that key.
+    const allTimes = [...new Set(indices.flatMap((i) => (operations[i].keyframes || []).map((k) => k.time)))].sort((a, b) => a - b);
+    const mergedKeyframes: KeyframeLike[] = allTimes.map((t) => {
+      let properties: Record<string, unknown> = {};
+      let easing: string | undefined;
+      for (const i of indices) {
+        const kfs = operations[i].keyframes || [];
+        properties = { ...properties, ...sampleOpTrack(kfs, t) };
+        const exact = kfs.find((k) => k.time === t);
+        if (exact && exact.easing !== undefined) easing = exact.easing;
+      }
+      return { time: t, properties, ...(easing !== undefined ? { easing } : {}) };
+    });
+
     plan.merged.set(first, {
-      keyframes: [...byTime.values()].sort((a, b) => a.time - b.time),
+      keyframes: mergedKeyframes,
       duration: duration || 5,
       loop,
     });
