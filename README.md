@@ -309,6 +309,9 @@ the same figure on any canvas size.
   succeeding with no effect.
 - `pinepaper_create_item` reads a numeric `lifetime` as `ttl`, also when
   `bornAt` is given beside it.
+- Several `keyframe_animate` operations on one item in a batch merge into one
+  track that carries every property at every key, so one operation's key no
+  longer breaks another's motion.
 
 ## What's new in 1.6.20
 
