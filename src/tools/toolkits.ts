@@ -115,6 +115,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
     'pinepaper_query_mutations',
     'pinepaper_beat_cuts',
     'pinepaper_hand_drawn',
+    'pinepaper_pen_figure',
   ],
   masks: [
     'pinepaper_apply_animated_mask',

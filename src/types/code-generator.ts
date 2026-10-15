@@ -179,6 +179,7 @@ import {
   // New parity tools
   DeformInput,
   HandDrawnInput,
+  PenFigureInput,
   CreateCharacterInput,
   CharacterActionInput,
   CharacterPoseInput,
@@ -590,9 +591,14 @@ const item = app.create('${itemType}', ${JSON.stringify(params, null, 2)});`;
   if (textFit) code += `\nlet __textFit = null;${emitTextFit('item', textFit, JSON.stringify(anchorHold(properties.anchor ?? properties.origin) ?? null))}`;
 
   // After opacity, so the "on" level of the lifetime is the item's own.
-  const hasLifetime = properties.bornAt !== undefined || properties.ttl !== undefined;
+  // A numeric `lifetime` is the studio's alias of ttl on create (FxTool B125;
+  // emitters, where it means each particle's life, are not made here).
+  // Resolved here too: with bornAt beside it, passing ttl undefined would reset
+  // the item to "until the end" after create() had set the alias.
+  const createTtl = properties.ttl ?? (typeof properties.lifetime === 'number' ? properties.lifetime : undefined);
+  const hasLifetime = properties.bornAt !== undefined || createTtl !== undefined;
   if (hasLifetime) {
-    code += `\nlet __lifetime = null;${emitLifetime('item', properties.bornAt, properties.ttl)}`;
+    code += `\nlet __lifetime = null;${emitLifetime('item', properties.bornAt, createTtl)}`;
   }
 
   // Ensure item is visible above backgrounds/generators
@@ -668,9 +674,8 @@ const CREATE_KNOWN_KEYS: ReadonlySet<string> = new Set([
   // withRadiusAxes, gradients / shadow / blend / opacity emitted here, and
   // setDynamicContent for text.
   'radiusX', 'radiusY', 'contentType', 'contentFormat', 'countdownTarget', 'countdownEndText',
-  // Lifetimes. The editor's create() does not read them, but they are
-  // documented on ANY item and the scene renderer schedules by them — calling
-  // them "no effect" would steer a caller off the only way to cut between shots.
+  // Lifetimes, on ANY item: this generator applies them through app.setLifetime
+  // (emitLifetime), whatever create() itself reads.
   'bornAt', 'ttl',
 ]);
 
@@ -992,10 +997,11 @@ function resolveChartFields(
  * same way for the same reason. A 1-microsecond tolerance makes a hand-off at
  * an exact frame time show exactly one item.
  *
- * Runtime-only: a scene saved and reopened keeps data.bornAt / ttl (the cloud
- * renderer reads those) but not the callback, until the studio reads the
- * fields itself — the result says so. Lifetimes applied the old way are
- * migrated: their tagged opacity keys are removed.
+ * The callback is the FALLBACK, for a studio without app.setLifetime: it is
+ * not saved, so a reopened scene keeps data.bornAt / ttl (the cloud renderer
+ * reads those) but not the hiding. app.setLifetime persists; the result's
+ * lifetime field says which ran. Lifetimes applied the old way are migrated:
+ * their tagged opacity keys are removed.
  */
 function emitLifetime(itemExpr: string, bornAt: unknown, ttl: unknown): string {
   const b = Number(bornAt);
@@ -10660,6 +10666,55 @@ ${track}
   if (app._scheduleRepaint) app._scheduleRepaint();
   if (app.historyManager) app.historyManager.saveState();
   return { success: true, itemId: itemId, style: 'sketchy', roughness: ${roughness}, points: moved };
+})();`.trim();
+  }
+
+  // ===========================================================================
+  // PEN FIGURES
+  // ===========================================================================
+
+  generatePenFigure(input: PenFigureInput): string {
+    const S = (v: unknown) => JSON.stringify(v);
+    const missing = `if (typeof app.listFigures !== 'function' || typeof app.createFigure !== 'function') {
+    return { success: false, error: 'This studio has no pen figures (app.createFigure). Nothing was drawn.' };
+  }`;
+    if (input.action === 'list') {
+      return `
+// The pen figure catalogue
+(function() {
+  ${missing}
+  const figures = app.listFigures();
+  return { success: true, action: 'list', count: figures.length, figures: figures };
+})();`.trim();
+    }
+    if (input.figure === undefined) {
+      return `(function() { return { success: false, error: "figure is required: a catalogue id (action 'list' names them) or an inline figure spec. Nothing was drawn." }; })();`;
+    }
+    const opts: Record<string, unknown> = {};
+    for (const k of ['box', 'margin', 'duration', 'delay', 'loop', 'pen', 'strokeColor', 'penColor', 'strokeWidth'] as const) {
+      if (input[k] !== undefined) opts[k] = input[k];
+    }
+    // createFigure answers null for an unknown id or a bad spec, and says why
+    // only in a console.warn, which production strips. The refusal is built
+    // here instead, naming the catalogue.
+    return `
+// Draw a figure with a pen (draws_figure)
+(function() {
+  ${missing}
+  const figure = ${S(input.figure)};
+  const out = app.createFigure(figure, ${S(opts)});
+  if (!out || !out.ink) {
+    const known = app.listFigures().map(function(f) { return f.id; });
+    return { success: false, error: (typeof figure === 'string' && known.indexOf(figure) < 0
+      ? 'No figure "' + figure + '". Known: ' + known.join(', ') + '.'
+      : 'The figure spec could not be drawn (it produced no strokes or did not parse).') + ' Nothing was drawn.' };
+  }
+  if (app._scheduleRepaint) app._scheduleRepaint();
+  if (app.historyManager) app.historyManager.saveState();
+  return out.pen
+    ? { success: true, inkId: out.ink, penId: out.pen, title: out.title, strokes: out.strokes, duration: ${S(input.duration ?? 6)},
+        note: 'The pen draws the ink over duration seconds (relation draws_figure, pen → ink).' }
+    : { success: true, inkId: out.ink, penId: null, title: out.title, strokes: out.strokes, note: 'pen: false — the ink is fully drawn, with no pen and no animation.' };
 })();`.trim();
   }
 

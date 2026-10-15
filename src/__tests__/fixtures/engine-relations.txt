@@ -36,6 +36,7 @@ deform_twist
 deform_wave
 deform_wobble
 drag_to_turn
+draws_figure
 driven_by
 effect_blast
 effect_bubbles

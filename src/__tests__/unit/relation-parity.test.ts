@@ -59,6 +59,8 @@ const ROUTED_TO_A_TOOL: Record<string, RegExp | string[]> = {
   pinepaper_apply_effect: /^effect_/,
   'map tools': /^geo_/,
   'map tools (place containment)': ['contained_in_place'],
+  // createFigure builds the ink and pen the relation runs on; on any other pair it has nothing to draw.
+  pinepaper_pen_figure: ['draws_figure'],
   pinepaper_rigging: ['bone_attached', 'bone_skinned', 'ik_target', 'locomotion', 'pose_layer'],
   'blending system': /^blend_/,
   // Engine facades with no MCP tool YET. Each relation is made by a facade that

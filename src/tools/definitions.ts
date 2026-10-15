@@ -670,14 +670,15 @@ For glossy 3D spheres, use pinepaper_create_glossy_sphere instead. For diagonal 
 
 LIFETIME — on ANY item, and the only way to build a piece that CUTS between shots:
 - bornAt: seconds. The item does not exist before this instant.
-- ttl: seconds it lives for. Omit for "until the end".
+- ttl: seconds it lives for. Omit for "until the end". A numeric lifetime is
+  read as ttl, except on an emitter, where lifetime is each particle's life.
 Without these every item is on screen for the whole render, which is what makes
 a long piece read as one crowded frame instead of a sequence of shots.
 They set the item's VISIBILITY for [bornAt, bornAt + ttl) — not its opacity —
 so they compose with any keyframes, opacity fades included. Re-timing with
 pinepaper_modify_item {bornAt, ttl} replaces the previous lifetime — pass both.
-The result's lifetime field says whether it was applied; it is runtime-only
-until the studio reads bornAt / ttl itself, so re-time a reopened scene.
+The result's lifetime field says whether it was applied, and persists: true
+when it is saved with the scene; without that, re-time a reopened scene.
 
 SHADER (itemType 'shader') — a lit surface, drawn per pixel:
 - shader: 'water' (open sea, lit swell) | 'liquid_metal' (chrome) | 'heatmap' (thermal halo) | 'gem_smoke' (smoke) | 'electric_arc' (branching discharge, stepped flicker) | 'vortex' (hollow bright RING, sheared by differential rotation) | 'rain_veil' | 'caustics' | 'ink_bleed'
@@ -6083,6 +6084,59 @@ PARAMETERS:
         posterizeFps: { type: 'number', description: 'Alias for fps' },
         seed: { type: 'number', description: 'Random seed for deterministic vertex displacement (default: 1)' },
         duration: { type: 'number', description: 'reveal: seconds to draw the stroke on (default: 2)' },
+      },
+    },
+  },
+
+  {
+    name: 'pinepaper_pen_figure',
+    annotations: {
+      title: 'Pen Figure',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Draw a mathematical figure with a pen: the tip travels the figure and the ink appears behind it, in the editor and in every export.
+
+USE WHEN:
+- "draw a Lorenz attractor / Lissajous / Hilbert curve being drawn"
+- "a pen plotting a curve", "a harmonograph drawing itself"
+
+The figures are the studio's catalogue of declarative maths (parametric and polar curves, ODE attractors, iterated maps, L-systems). action 'list' returns it: id, title, kind. A figure is fitted into its box by one uniform scale, so it is the same figure on any canvas size.
+
+ACTIONS:
+- create (default): { figure, box?, margin?, duration?, delay?, loop?, pen?, strokeColor?, penColor?, strokeWidth? } → { inkId, penId, title, strokes }. The ink is a group, one child per pen stroke; the pen is a circle joined to it by the draws_figure relation. pen: false draws the ink complete, with no pen and no animation. An unknown figure is refused with the catalogue's ids.
+- list: the catalogue.
+
+To draw a static curve from your own equation, use pinepaper_equation_path.
+
+EXAMPLES:
+- { figure: 'lorenz', duration: 8 }
+- { figure: 'hilbert', box: { x: 100, y: 100, width: 600, height: 600 }, strokeColor: '#0f766e' }
+- { figure: 'harmonograph', pen: false }`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['create', 'list'], description: "'create' (default) draws a figure; 'list' returns the catalogue." },
+        figure: {
+          anyOf: [{ type: 'string' }, { type: 'object' }],
+          description: "create: a catalogue id from action 'list' (e.g. 'lorenz', 'lissajous', 'hilbert', 'harmonograph'), or an inline figure spec object.",
+        },
+        box: {
+          type: 'object',
+          properties: { x: { type: 'number' }, y: { type: 'number' }, width: { type: 'number' }, height: { type: 'number' } },
+          required: ['x', 'y', 'width', 'height'],
+          description: 'Where to draw, in canvas px (default: the whole canvas).',
+        },
+        margin: { type: 'number', description: 'Fraction of the box left clear (default 0.06).' },
+        duration: { type: 'number', description: 'Seconds the pen takes for the whole figure, pen-up travel included (default 6).' },
+        delay: { type: 'number', description: 'Seconds before the pen starts (default 0).' },
+        loop: { type: 'boolean', description: 'Draw the figure again after it finishes (default false: it stays drawn).' },
+        pen: { type: 'boolean', description: 'false: the ink only, fully drawn, no animation (default true).' },
+        strokeColor: { type: 'string', description: "Ink colour (default '#1e293b')." },
+        penColor: { type: 'string', description: "Pen tip colour (default '#e11d48')." },
+        strokeWidth: { type: 'number', description: 'Ink width in px (default 2).' },
       },
     },
   },

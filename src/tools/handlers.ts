@@ -155,6 +155,7 @@ import {
   QueryCapabilitiesInputSchema,
   DeformInputSchema,
   HandDrawnInputSchema,
+  PenFigureInputSchema,
   CreateCharacterInputSchema,
   CharacterActionInputSchema,
   CharacterPoseInputSchema,
@@ -2188,6 +2189,13 @@ async function handleToolCallInner(
         const input = HandDrawnInputSchema.parse(args);
         const code = codeGenerator.generateHandDrawn(input);
         return executeOrGenerate(code, `Hand-drawn style: ${input.style ?? input.mode ?? 'sketchy'}`, options, 'pinepaper_hand_drawn');
+      }
+
+      case 'pinepaper_pen_figure': {
+        const input = PenFigureInputSchema.parse(args);
+        const code = codeGenerator.generatePenFigure(input);
+        const what = input.action === 'list' ? 'List the pen figures' : `Draw ${typeof input.figure === 'string' ? input.figure : 'a figure'} with a pen`;
+        return executeOrGenerate(code, what, options, 'pinepaper_pen_figure');
       }
 
       case 'pinepaper_sprite_sheet': {
@@ -4985,6 +4993,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
             // Deformation, sprite sheets, interaction
             'pinepaper_deform',
             'pinepaper_hand_drawn',
+            'pinepaper_pen_figure',
             'pinepaper_sprite_sheet',
             'pinepaper_interaction',
             // Widget export

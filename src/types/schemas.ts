@@ -4182,6 +4182,23 @@ export const HandDrawnInputSchema = z.object({
 });
 export type HandDrawnInput = z.infer<typeof HandDrawnInputSchema>;
 
+// Pen figures (FxTool 671d8a58): app.createFigure builds the ink and a pen and
+// joins them with draws_figure; the catalogue is the engine's (app.listFigures).
+export const PenFigureInputSchema = z.object({
+  action: z.enum(['create', 'list']).optional().describe("'create' (default) draws a figure; 'list' returns the catalogue: id, title and kind."),
+  figure: z.union([z.string(), z.record(z.unknown())]).optional().describe("create: a catalogue id from action 'list' (e.g. 'lorenz', 'lissajous', 'hilbert', 'harmonograph'), or an inline figure spec object."),
+  box: z.object({ x: z.number(), y: z.number(), width: z.number().positive(), height: z.number().positive() }).strict().optional().describe('Where to draw, in canvas px (default: the whole canvas). The figure is fitted by one uniform scale.'),
+  margin: z.number().min(0).max(0.45).optional().describe('Fraction of the box left clear (default 0.06).'),
+  duration: z.number().positive().optional().describe('Seconds the pen takes for the whole figure, pen-up travel included (default 6).'),
+  delay: z.number().min(0).optional().describe('Seconds before the pen starts (default 0).'),
+  loop: z.boolean().optional().describe('Draw the figure again after it finishes (default false: it stays drawn).'),
+  pen: z.boolean().optional().describe('false: the ink only, fully drawn, no pen and no animation (default true).'),
+  strokeColor: z.string().optional().describe("Ink colour (default '#1e293b')."),
+  penColor: z.string().optional().describe("Pen tip colour (default '#e11d48')."),
+  strokeWidth: z.number().positive().optional().describe('Ink width in px (default 2).'),
+}).strict();
+export type PenFigureInput = z.infer<typeof PenFigureInputSchema>;
+
 // =============================================================================
 // SPRITE SHEET TOOLS
 // =============================================================================

@@ -30,7 +30,7 @@
 
 PinePaper MCP Server enables AI assistants to create and animate graphics in [PinePaper Studio](https://pinepaper.studio) via the Model Context Protocol (MCP). Works with any AI that supports MCP tool calling (Claude, GPT, Gemini, local models, etc.).
 
-The server exposes **176 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
+The server exposes **177 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
 
 - Create geometric shapes, text collages, diagrams, and data charts
 - Apply 37+ character-level text effects and 28+ vertex deformation presets
@@ -41,7 +41,7 @@ The server exposes **176 tools** across drawing, animation, diagrams, maps, typo
 
 ## Running it: local or hosted
 
-**Local is free and complete.** Every one of the 176 tools works when you run
+**Local is free and complete.** Every one of the 177 tools works when you run
 this server yourself. There is no reduced tier and nothing held back.
 
 What it needs:
@@ -276,6 +276,14 @@ bows its outline, repeatable by `seed`. `reveal` draws the stroke on over
 that boils from frame to frame, it points you to `pinepaper_design_medium`
 ink.
 
+### New: pen figures
+
+`pinepaper_pen_figure` draws a mathematical figure with a pen: the tip travels
+a Lorenz attractor, a Lissajous curve, a Hilbert curve or a harmonograph, and
+the ink appears behind it, in the editor and in every export. `action: 'list'`
+returns the catalogue. A figure is fitted into the box you give it, so it is
+the same figure on any canvas size.
+
 ### Fixed
 
 - `shader` and `field` items from `pinepaper_create_item` draw in the studio
@@ -299,6 +307,8 @@ ink.
   batch's item.
 - Keyframing `letterSpacing` reports that it is not animatable, rather than
   succeeding with no effect.
+- `pinepaper_create_item` reads a numeric `lifetime` as `ttl`, also when
+  `bornAt` is given beside it.
 
 ## What's new in 1.6.20
 
@@ -1576,7 +1586,7 @@ Fourteen new tools (121 → 135) and new actions across the surface — the rele
 
 ## Toolkits & Token Budget
 
-176 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
+177 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
 
 **Toolkit profiles** (`PINEPAPER_TOOLKIT`):
 
@@ -1779,7 +1789,7 @@ Generate instruction/code pairs for LLM fine-tuning:
 
 ## Tools Reference
 
-All 176 tools, grouped by the tag used for toolkit filtering.
+All 177 tools, grouped by the tag used for toolkit filtering.
 
 ### Canvas (`canvas`)
 | Tool | Description |
@@ -1849,6 +1859,7 @@ All 176 tools, grouped by the tag used for toolkit filtering.
 | `pinepaper_get_available_easings` | List easing functions |
 | `pinepaper_construction_sequence` | Staged construction animation |
 | `pinepaper_hand_drawn` | Hand-drawn line: a rough, bowed outline, or a stroke that draws itself on |
+| `pinepaper_pen_figure` | A pen draws a mathematical figure, the ink appearing behind it |
 
 ### Masks (`masks`)
 | Tool | Description |

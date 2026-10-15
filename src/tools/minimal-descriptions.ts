@@ -252,6 +252,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
 
   // --- Deformation, Sprite Sheets, Interaction ---
   pinepaper_deform: 'Vertex deformation. action: apply|trigger|remove. itemId, preset: fold|squeeze|squash|twist|ripple|wave|breathe|wobble..., phase, amplitude.',
+  pinepaper_pen_figure: "A pen draws a mathematical figure (Lorenz, Lissajous, Hilbert…), ink appearing behind it. action: create|list. figure, box?, duration?, delay?, loop?, pen?, strokeColor?, penColor?, strokeWidth?",
   pinepaper_hand_drawn: 'Hand-drawn line: sketchy (rough jitter) or reveal (stroke draws on). itemId, style: sketchy|reveal; roughness, bowing, seed, duration. wobble/stop_motion refused: use pinepaper_design_medium ink.',
   pinepaper_sprite_sheet: 'Sprite sheets. action: generate|play|export. skeletonId, spriteSheetId, poses, animations, format.',
   pinepaper_interaction: 'Physics behaviors. action: add_behavior|remove_behavior|trigger_action|get_state. behaviorType: repel|attract|follow|orbit|slingshot.',

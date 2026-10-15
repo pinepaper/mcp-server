@@ -506,7 +506,11 @@
     },
     {
       "name": "pinepaper_hand_drawn",
-      "description": "Procedural hand-drawn strokes, jitter, bowing, and stop-motion frame holding. itemId, style: sketchy|wobble|reveal|stop_motion, roughness, bowing, fps, seed, duration."
+      "description": "Hand-drawn line: sketchy (rough jitter) or reveal (stroke draws on). itemId, style: sketchy|reveal; roughness, bowing, seed, duration. wobble/stop_motion refused: use pinepaper_design_medium ink."
+    },
+    {
+      "name": "pinepaper_pen_figure",
+      "description": "A pen draws a mathematical figure (Lorenz, Lissajous, Hilbert…), ink appearing behind it. action: create|list. figure, box?, duration?, delay?, loop?, pen?, strokeColor?, penColor?, strokeWidth?"
     },
     {
       "name": "pinepaper_sprite_sheet",
