@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 9999e24567a7975f5143a6dc9cd2aceb7472a960
- * sha256:    80374ffd949e72797f6aa68ad267a7292c1e379eee9abc83dd6e3921ad9e2eee   (of PinePaper.js as committed)
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 636f3864280d7b33da50761d5a8af39c818f77e0
+ * sha256:    bd7d58f8016017932c6db9872143e2101436b48d481c7139ea9360db9219d9e1   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on `window.app`, with how it gets there. The parity
@@ -16,7 +16,7 @@
 /** How a name lands on `app`. */
 export type EngineMemberKind = 'method' | 'accessor' | 'property' | 'lazy' | 'lazyHeavy' | 'bootstrap';
 
-/** 1442 names, from FxTool/js/PinePaper.js. */
+/** 1446 names, from FxTool/js/PinePaper.js. */
 export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object.freeze({
   __buildFreshness: 'property',
   _activeByGroup: 'property',
@@ -231,6 +231,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _isKnownRelationEndpoint: 'method',
   _isTouchDrawing: 'property',
   _itemNamedLikePointer: 'method',
+  _keepMaskWithMove: 'method',
   _killedFrameCallbacks: 'property',
   _lastDynamicUpdate: 'property',
   _lastElapsedTime: 'property',
@@ -962,6 +963,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   isEmpty: 'method',
   isItemInViewport: 'method',
   isMasked: 'method',
+  isMaskLocked: 'method',
   isPageTransparent: 'method',
   isPanModeActive: 'method',
   isPlayingKeyframes: 'property',
@@ -1062,6 +1064,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   marqueeRectPath: 'property',
   marqueeStartPoint: 'property',
   maskingSystem: 'lazy',
+  maskUnitOf: 'method',
   matchCut: 'method',
   MAX_ZOOM: 'property',
   measureCursiveText: 'method',
@@ -1294,6 +1297,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   setItemLocked: 'method',
   setItemName: 'method',
   setLifetime: 'method',
+  setMaskLocked: 'method',
   setMotionBlur: 'method',
   setPageTransparent: 'method',
   setPaintedMedium: 'method',
