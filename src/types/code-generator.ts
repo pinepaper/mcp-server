@@ -1441,7 +1441,27 @@ function generateMovesAlongPathCode(sourceId: string, targetId: string | undefin
     if (len > 0) params.speed = len / (150 * ${duration});
     if (params.closed === undefined) params.closed = false;
   }` : ''}
-  ${hasDelay ? `if (!params.window) params.window = { start: ${delay} };` : ''}
+  // AN EQUATION ROUTE WITH A DURATION (queue item 22, ORBITDUR). There are no
+  // points here to turn a duration into speed, so it was dropped and the curve
+  // ran at the default speed. A studio whose rule times an equation (FxTool
+  // claude/engine-core-queue: its equation param says duration times it) gets
+  // duration, and delay on the same playhead clock instead of a window (a
+  // window would start the timed ride part-way through). An older studio hands
+  // a timed equation to the arm that cannot read one and loses the curve, so it
+  // keeps today's untimed ride and is told.
+  const __warnings = [];
+  let __eqTimed = false;
+  ${hasDuration ? `if (params.equation && !hasPoints) {
+    const eqDesc = rule && rule.params && rule.params.equation && rule.params.equation.description;
+    if (typeof eqDesc === 'string' && /duration/.test(eqDesc)) {
+      __eqTimed = true;
+      params.duration = ${duration};
+      ${hasDelay ? `params.delay = ${delay};` : ''}
+    } else {
+      __warnings.push('duration ${duration} was not applied: this studio cannot time an equation route (a timed equation loses its curve there), so the route stays untimed at speed ' + (params.speed !== undefined ? params.speed : 1) + ' (1 = 150 px/s). Update the studio, or pass params.path as points.');
+    }
+  }` : ''}
+  ${hasDelay ? `if (!__eqTimed && !params.window) params.window = { start: ${delay} };` : ''}
   // Before its window opens the relation does not run, so the item stays where
   // it was left — the retest saw it parked at the path END. Put it at the start.
   if (Array.isArray(params.path) && params.path.length) {
@@ -1454,7 +1474,8 @@ function generateMovesAlongPathCode(sourceId: string, targetId: string | undefin
   app.historyManager.saveState();
   return { success: true, sourceId: ${JSON.stringify(sourceId)}, relationType: 'moves_along_path', route: 'sampled-points',
     points: Array.isArray(params.path) ? params.path.length : 0, speed: params.speed, closed: params.closed,
-    ${ref ? `pathFrom: ${JSON.stringify(ref)},` : ''} window: params.window };
+    ${ref ? `pathFrom: ${JSON.stringify(ref)},` : ''} window: params.window,
+    ...(__eqTimed ? { duration: params.duration } : {}), ...(__warnings.length ? { warnings: __warnings } : {}) };
 })();`.trim();
 }
 
@@ -1653,6 +1674,36 @@ if (!_target) {
 }`.trim();
 }
 
+/**
+ * Text keys a studio may or may not animate (queue item 2, FxTool
+ * claude/engine-core-queue): fontStyle, textAlign, lineHeight and letterSpacing
+ * apply as keyframes on the current studio, which lists them (textAlign as
+ * justification, lineHeight as leading) in listAnimatableProperties. An older
+ * studio stores the keys and draws nothing, so the check runs IN THE PAGE
+ * against that list, and only the keys it does not name are reported.
+ */
+const TEXT_KEY_ENGINE_NAMES: Readonly<Record<string, readonly string[]>> = {
+  fontStyle: ['fontStyle'],
+  textAlign: ['textAlign', 'justification'],
+  lineHeight: ['lineHeight', 'leading'],
+  letterSpacing: ['letterSpacing'],
+};
+
+/** A JS expression (run in the page) → the keys of `keys` this studio does not animate. '' when none are text keys. */
+function unanimatedTextKeysJs(keys: readonly string[]): string {
+  const spec = [...new Set(keys)].filter((k) => k in TEXT_KEY_ENGINE_NAMES).map((k) => ({ key: k, names: TEXT_KEY_ENGINE_NAMES[k] }));
+  if (!spec.length) return '';
+  return `(function() {
+    let __l = null;
+    try { __l = typeof app.listAnimatableProperties === 'function' ? app.listAnimatableProperties() : null; } catch (_) { __l = null; }
+    const __names = ((__l && __l.properties) || []).map(function(p) { return p && p.name; });
+    return ${JSON.stringify(spec)}.filter(function(s) { return !s.names.some(function(n) { return __names.indexOf(n) >= 0; }); }).map(function(s) { return s.key; });
+  })()`;
+}
+
+/** The sentence for the keys unanimatedTextKeysJs found, built in the page. */
+const UNANIMATED_TEXT_KEYS_SENTENCE = `' is not an animatable property in this studio (app.listAnimatableProperties does not list it), so it had no effect. The current studio animates fontStyle, textAlign, lineHeight and letterSpacing; here, set a fixed value with pinepaper_modify_item, or animate fontSize or scaleX.'`;
+
 function generateKeyframeAnimateCode(
   itemId: string,
   keyframes: Keyframe[],
@@ -1662,7 +1713,8 @@ function generateKeyframeAnimateCode(
   clipInPoint?: number,
   clipOutPoint?: number,
   timeUnits?: 'seconds' | 'ms',
-  append = false
+  append = false,
+  easingAt?: 'arrival' | 'departure'
 ): string {
   const keyframesJson = JSON.stringify(normalizeKeyframePositions(keyframes), null, 2);
   const calculatedDuration = duration || Math.max(...keyframes.map(k => k.time));
@@ -1675,6 +1727,10 @@ function generateKeyframeAnimateCode(
   // addAnimation SETS the item's track; mode 'merge' adds to it (FxTool
   // 2475333b). An engine without merge ignores the option and replaces.
   if (append) opts.mode = 'merge';
+  // EASEPLACE (queue item 5): which side of a key its easing shapes. The
+  // current studio reads (and removes) the option; an older one leaves it on
+  // the options object, which is how the result can say it was not applied.
+  if (easingAt !== undefined) opts.easingAt = easingAt;
 
   // A FADE ON AN AUDIO ITEM WAS ACCEPTED AND NEVER HEARD. addAnimation keyframes
   // the audio item's sentinel, and the mix reads one static audioGain per clip,
@@ -1728,12 +1784,16 @@ function generateKeyframeAnimateCode(
   const loopNote = loop
     ? `, loopNote: ${JSON.stringify('loop:true repeats in the editor, but has been measured playing ONCE in an exported video and then holding the last keyframe. For an export longer than one cycle, check a frame in the second cycle — if it holds, write the keyframes out per cycle, or use a loop preset (pinepaper_animate), which does cycle in export.')}`
     : '';
-  const easingNote = first?.easing && first.easing !== 'linear'
-    ? `, note: ${JSON.stringify(`easing '${first.easing}' is on the first keyframe, where it has no effect: easing shapes the segment ARRIVING at a keyframe. Put it on the keyframe you are moving to.`)}`
+  const easingNote = easingAt !== 'departure' && first?.easing && first.easing !== 'linear'
+    ? `, note: ${JSON.stringify(`easing '${first.easing}' is on the first keyframe, where it has no effect by default: easing shapes the segment ARRIVING at a keyframe. Put it on the keyframe you are moving to, or pass easingAt: 'departure' to read every easing as the move LEAVING its key (current studio).`)}`
     : '';
-  const unsupportedKeys = [...new Set(keyframes.flatMap((k) => Object.keys((k as { properties?: object }).properties ?? {})))]
-    .filter((k) => k === 'letterSpacing');
-  const letterSpacingWarning = unsupportedKeys.length === 0 ? '' : `, ignoredProperties: ${JSON.stringify(unsupportedKeys)}, warning: ${JSON.stringify(`${unsupportedKeys.join(', ')} is not an animatable property in this engine (app.listAnimatableProperties does not list it), so it had no effect. Set a fixed value with pinepaper_modify_item, or animate fontSize or scaleX.`)}`;
+  const textKeysJs = unanimatedTextKeysJs(keyframes.flatMap((k) => Object.keys((k as { properties?: object }).properties ?? {})));
+  const textKeyCheck = textKeysJs ? `
+  const __ignored = ${textKeysJs};
+  if (__ignored.length) __warn.push(__ignored.join(', ') + ${UNANIMATED_TEXT_KEYS_SENTENCE});` : '';
+  const easingAtCheck = easingAt !== undefined ? `
+  if (__opts && Object.prototype.hasOwnProperty.call(__opts, 'easingAt')) __warn.push('easingAt ' + ${JSON.stringify(JSON.stringify(easingAt))} + ' was not applied: this studio predates it, so every easing was read as the move ARRIVING at its key. Put each easing on the key the move goes to instead.');` : '';
+  const runtimeWarning = `${textKeysJs ? ', ...(__ignored.length ? { ignoredProperties: __ignored } : {})' : ''}, ...(__warn.length ? { warning: __warn.join(' ') } : {})`;
 
   const addAnimTarget = itemId.startsWith('$') ? '_targetId' : `'${itemId}'`;
 
@@ -1746,7 +1806,9 @@ function generateKeyframeAnimateCode(
   // merge support — an older engine takes the option and replaces anyway.
   const __ki = _target && (_target.item || _target);
   const __prev = (__ki && __ki.data && Array.isArray(__ki.data.keyframes)) ? __ki.data.keyframes.map(function(k) { return k && k.time; }) : [];
-  app.addAnimation(${addAnimTarget}, ${keyframesJson}, ${JSON.stringify(opts)});
+  const __opts = ${JSON.stringify(opts)};
+  app.addAnimation(${addAnimTarget}, ${keyframesJson}, __opts);
+  const __warn = [];${easingAtCheck}${textKeyCheck}
   const __now = (__ki && __ki.data && Array.isArray(__ki.data.keyframes)) ? __ki.data.keyframes.map(function(k) { return k && k.time; }) : [];
   const __kept = __prev.every(function(t) { return __now.indexOf(t) >= 0; });${append ? `
   // Property gaps across the merged track (the same check a single call makes
@@ -1759,7 +1821,7 @@ function generateKeyframeAnimateCode(
       ? { appended: true, previousKeys: __prev.length, keys: __now.length }
       : { appended: false, replaced: true, previousKeys: __prev.length, warning: 'append was asked for, but this studio replaced the existing track (' + __prev.length + ' key(s)) instead of adding to it: it has no merge mode. Put every key in one keyframe_animate call.' })`
     : `{ replaced: true, previousKeys: __prev.length, note: 'the item already had a keyframe track (' + __prev.length + ' key(s)); this call replaced it. To add keys to it instead, pass append: true.' }`};
-  return { success: true, itemId: ${addAnimTarget}, duration: ${calculatedDuration}, loop: ${loop}${append ? ', append: true' : ''}, ...(__track ? { track: __track } : {})${append ? `, ...(__gaps.length ? { propertyGaps: __gaps.slice(0, 10), gapWarning: __gaps.length + ' key(s) of the merged track leave out a property other keys animate (' + __gaps.reduce(function(a, g) { g.missing.forEach(function(p) { if (a.indexOf(p) < 0) a.push(p); }); return a; }, []).join(', ') + '). The engine can break that property at such a key; give each key the full set — hold a value by repeating it.' } : {})` : ''}${timeOffset !== undefined ? `, timeOffset: ${timeOffset}` : ''}${clipInPoint !== undefined ? `, clipInPoint: ${clipInPoint}` : ''}${clipOutPoint !== undefined ? `, clipOutPoint: ${clipOutPoint}` : ''}${easingNote}${loopNote}${gapNote}${letterSpacingWarning} };
+  return { success: true, itemId: ${addAnimTarget}, duration: ${calculatedDuration}, loop: ${loop}${append ? ', append: true' : ''}, ...(__track ? { track: __track } : {})${append ? `, ...(__gaps.length ? { propertyGaps: __gaps.slice(0, 10), gapWarning: __gaps.length + ' key(s) of the merged track leave out a property other keys animate (' + __gaps.reduce(function(a, g) { g.missing.forEach(function(p) { if (a.indexOf(p) < 0) a.push(p); }); return a; }, []).join(', ') + '). The engine can break that property at such a key; give each key the full set — hold a value by repeating it.' } : {})` : ''}${timeOffset !== undefined ? `, timeOffset: ${timeOffset}` : ''}${clipInPoint !== undefined ? `, clipInPoint: ${clipInPoint}` : ''}${clipOutPoint !== undefined ? `, clipOutPoint: ${clipOutPoint}` : ''}${easingNote}${loopNote}${gapNote}${runtimeWarning} };
 })();
 `.trim();
 }
@@ -3204,7 +3266,8 @@ export class PinePaperCodeGenerator {
       validated.clipOutPoint,
       validated.timeUnits,
       // mode: 'merge' is the studio's name for append (B147).
-      validated.append === true || validated.mode === 'merge'
+      validated.append === true || validated.mode === 'merge',
+      validated.easingAt
     );
     if (!holds) return code;
     return `(async function() {
@@ -5059,9 +5122,9 @@ return { itemId: ${op.itemId?.startsWith('$') ? `__ref(${op.itemId.substring(1)}
         const kfUnits = (op as any).timeUnits;
         if (kfUnits === 'seconds' || kfUnits === 'ms') kfExtra.push(`timeUnits: '${kfUnits}'`);
         const kfExtraStr = kfExtra.length > 0 ? `, ${kfExtra.join(', ')}` : '';
-        const kfUnsupported = [...new Set(((kfSource || []) as any[]).flatMap((k) => Object.keys((k as { properties?: object }).properties ?? {})))]
-          .filter((k) => k === 'letterSpacing');
-        const kfIgnored = kfUnsupported.length === 0 ? '' : `, ignoredProperties: ${JSON.stringify(kfUnsupported)}, warning: ${JSON.stringify(`${kfUnsupported.join(', ')} is not an animatable property in this engine (app.listAnimatableProperties does not list it), so it had no effect. Set a fixed value with pinepaper_modify_item, or animate fontSize or scaleX.`)}`;
+        const kfTextKeysJs = unanimatedTextKeysJs(((kfSource || []) as any[]).flatMap((k) => Object.keys((k as { properties?: object }).properties ?? {})));
+        const kfTextCheck = kfTextKeysJs ? `\nconst _kfIgnored = ${kfTextKeysJs};` : '';
+        const kfIgnored = kfTextKeysJs ? `, ...(_kfIgnored.length ? { ignoredProperties: _kfIgnored, warning: _kfIgnored.join(', ') + ${UNANIMATED_TEXT_KEYS_SENTENCE} } : {})` : '';
         return `
 const targetId = ${kfItemRef};
 const _target = (app.getItemById && app.getItemById(targetId))
@@ -5071,7 +5134,7 @@ if (!_target) {
 }
 const _kfItem = _target.item || _target;
 const _prevKeys = (_kfItem.data && Array.isArray(_kfItem.data.keyframes)) ? _kfItem.data.keyframes.length : 0;
-app.addAnimation(targetId, ${kfJson}, { duration: ${kfDuration}, loop: ${kfLoop}${kfAppend ? ", mode: 'merge'" : ''}${kfExtraStr} });
+app.addAnimation(targetId, ${kfJson}, { duration: ${kfDuration}, loop: ${kfLoop}${kfAppend ? ", mode: 'merge'" : ''}${kfExtraStr} });${kfTextCheck}
 return { success: true, itemId: targetId, duration: ${kfDuration}, loop: ${kfLoop}${kfAppend ? ', append: true' : ''}${kfAppend ? '' : `, ...(_prevKeys ? { track: { replaced: true, previousKeys: _prevKeys, note: 'the item already had a keyframe track; this op replaced it. To add keys to it instead, pass append: true.' } } : {})`}${kfIgnored} };
 `;
       }
@@ -12426,9 +12489,41 @@ ${guard}
   const __baked = (__it.data && typeof __it.data._bakedRotation === 'number') ? __it.data._bakedRotation : 0;
   ${authoringFrameJs('__fr')}
   const __frame = { x: __fr.x || 0, y: __fr.y || 0, width: __fr.width, height: __fr.height };
-  const __actor = { x: __it.position.x, y: __it.position.y,
-    w: __b.width / (Math.abs(__sc.x) || 1), h: __b.height / (Math.abs(__sc.y) || 1),
-    sx: __sc.x || 1, sy: __sc.y || 1, rot: (__it.rotation || 0) + __baked };
+  // THE ACTOR AT THE FIRST BEAT, not where the playhead left it (B154 /
+  // HOOKCLOCK3). Live values of a keyframed item depend on the playhead, so a
+  // second call anchored at +0 / +57 / +22 / +43 px from session to session
+  // and multiplied scales the first track had applied. app.poseAt (FxTool,
+  // claude/engine-core-queue) answers at a track time; older studios fall back
+  // to the live read.
+  const __at0 = ${S(Math.min(...input.beats.map((b: any) => Number(b && b.at) || 0)))};
+  // A track that already keys the beat properties defines the pose before the
+  // first beat; the B109 hold key at 0 would overwrite its key there. A track
+  // of other properties (a colour) still needs the hold key.
+  const __beatProps = ['x', 'y', 'scaleX', 'scaleY', 'scale', 'rotation', 'opacity', 'position'];
+  const __hasTrack = !!(__it.data && Array.isArray(__it.data.keyframes) && __it.data.keyframes.some(function (k) {
+    return Object.keys((k && k.properties) || {}).some(function (p) { return __beatProps.indexOf(p) >= 0; });
+  }));
+  let __pose = null;
+  let __poseErr = null;
+  if (typeof app.poseAt === 'function') {
+    try { __pose = app.poseAt(__it, __at0); } catch (e) { __poseErr = (e && e.message) || String(e); }
+    if (__pose && !(isFinite(__pose.x) && isFinite(__pose.y) && __pose.width > 0 && __pose.height > 0)) __pose = null;
+  }
+  const __anchorWarnings = [];
+  if (!__pose && __hasTrack) {
+    __anchorWarnings.push((__poseErr ? 'app.poseAt failed (' + __poseErr + ')' : 'this studio has no app.poseAt')
+      + ', so the beats start from the actor\\'s LIVE transform, which on a keyframed actor is wherever the playhead left it: the first move can jump. Update the studio, or seek to ' + __at0 + ' s before choreographing.');
+  }
+  if (!__pose && __it.className === 'Raster' && ${S(input.beats.some((b: any) => b && b.verb === 'roll'))}) {
+    __anchorWarnings.push((__poseErr ? 'app.poseAt failed' : 'this studio has no app.poseAt')
+      + ', so the roll turns on the picture\\'s half-box, not its drawn radius: a picture with a transparent margin slides as it rolls.');
+  }
+  const __actor = __pose
+    ? { x: __pose.x, y: __pose.y, w: __pose.width, h: __pose.height, sx: __pose.scaleX || 1, sy: __pose.scaleY || 1, rot: isFinite(__pose.rotation) ? __pose.rotation : (__it.rotation || 0) + __baked, hasTrack: __hasTrack,
+        rollRadius: __pose.drawnHeight ? __pose.drawnHeight / 2 : undefined }
+    : { x: __it.position.x, y: __it.position.y,
+      w: __b.width / (Math.abs(__sc.x) || 1), h: __b.height / (Math.abs(__sc.y) || 1),
+      sx: __sc.x || 1, sy: __sc.y || 1, rot: (__it.rotation || 0) + __baked, hasTrack: __hasTrack };
   const __r = (${compileChoreography.toString()})(__actor, __frame, ${S(input.beats)});
   if (__r.error) { return { success: false, itemId: ${id}, error: __r.error }; }
   const __prev = (__it.data && Array.isArray(__it.data.keyframes)) ? __it.data.keyframes : [];
@@ -12437,7 +12532,7 @@ ${guard}
   const __other = __prev.reduce(function (acc, k) { Object.keys((k && k.properties) || {}).forEach(function (p) { if (__ours.indexOf(p) < 0 && acc.indexOf(p) < 0) acc.push(p); }); return acc; }, []);
   app.addAnimation(${id}, __r.keyframes, { duration: Math.max(__r.end, __prev.reduce(function (m, k) { return Math.max(m, (k && k.time) || 0); }, 0)), loop: false, mode: 'merge' });
   const __now = (__it.data && Array.isArray(__it.data.keyframes)) ? __it.data.keyframes.map(function (k) { return k && k.time; }) : [];
-  const __warnings = (__r.warnings || []).slice();
+  const __warnings = __anchorWarnings.concat(__r.warnings || []);
   if (__prevTimes.length && !__prevTimes.every(function (t) { return __now.indexOf(t) >= 0; })) {
     __warnings.push('this studio replaced the existing track of the actor (' + __prevTimes.length + ' key(s)) instead of merging: put the other keys in after choreographing.');
   }

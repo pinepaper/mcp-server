@@ -1488,6 +1488,9 @@ export const KeyframeAnimateInputSchema = z.object({
   // it and the track was replaced anyway, so the advice the engine gave could
   // not be followed through this tool.
   mode: z.enum(['replace', 'merge']).optional().describe("The studio's spelling of append: 'merge' is append: true, 'replace' (the default) replaces the track. The keyframe_track_replaced warning names it."),
+  // EASEPLACE (FxTool queue item 5): passed to addAnimation, which rewrites the
+  // keys into its own arrival form. An older studio ignores it and the result says so.
+  easingAt: z.enum(['arrival', 'departure']).optional().describe("Which segment a key's easing shapes. 'arrival' (the default): the move ARRIVING at the key, so the first key's easing has no effect. 'departure': the move LEAVING the key. Current studio; an older one reads arrival and the result says so."),
 }).refine((v) => !((v.mode === 'replace' && v.append === true) || (v.mode === 'merge' && v.append === false)), {
   message: "append and mode contradict each other — pass one of them (mode: 'merge' is the same as append: true, mode: 'replace' as append: false).",
   path: ['mode'],

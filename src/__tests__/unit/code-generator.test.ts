@@ -1593,7 +1593,7 @@ describe('PinePaperCodeGenerator', () => {
         expect(code).toContain("In the previous batch $");
       });
 
-      it('B116: keyframe_animate and batch keyframe_animate warn on letterSpacing', () => {
+      it('B116: keyframe_animate and batch keyframe_animate warn on letterSpacing', async () => {
         const single = codeGenerator.generateKeyframeAnimate({
           itemId: 'text_1',
           keyframes: [
@@ -1601,8 +1601,13 @@ describe('PinePaperCodeGenerator', () => {
             { time: 1, properties: { letterSpacing: 10 } },
           ],
         });
-        expect(single).toContain('ignoredProperties: ["letterSpacing"]');
-        expect(single).toContain('is not an animatable property');
+        // A studio that does not list letterSpacing as animatable (prod before
+        // FxTool engine-core-queue) is warned; the check runs in the page now.
+        const oldStudio = { getItemById: () => ({ data: {} }), addAnimation() {}, listAnimatableProperties: () => ({ properties: [{ name: 'x' }] }) };
+        const runIn = (code: string) => new Function('app', 'paper', 'window', 'document', code.replace(/^(\s*\/\/.*\n)+/, '').replace(/\((async )?function\(\)/, (m) => `return ${m}`))(oldStudio, {}, {}, {});
+        const r1 = runIn(single);
+        expect(r1.ignoredProperties).toEqual(['letterSpacing']);
+        expect(r1.warning).toContain('is not an animatable property');
 
         const batch = codeGenerator.generateAgentBatchExecute({
           operations: [
@@ -1613,8 +1618,9 @@ describe('PinePaperCodeGenerator', () => {
             },
           ],
         });
-        expect(batch).toContain('ignoredProperties: ["letterSpacing"]');
-        expect(batch).toContain('is not an animatable property');
+        const r2 = await runIn(batch);
+        expect(JSON.stringify(r2)).toContain('"ignoredProperties":["letterSpacing"]');
+        expect(JSON.stringify(r2)).toContain('is not an animatable property');
       });
     });
   });

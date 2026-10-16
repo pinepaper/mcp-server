@@ -3982,11 +3982,12 @@ ANIMATABLE PROPERTIES:
 - strokeColor: Color string
 - strokeWidth, width, height, radius, shadowBlur, shadowColor: Numbers / colours
 - fontSize: Number
+- TEXT (current studio): fontStyle ('normal' / 'italic' / 'oblique', discrete — switches at the next key), textAlign ('left' / 'center' / 'right', discrete; the anchor stays put), lineHeight (px, or a multiple of fontSize up to 5), letterSpacing (px, or a CSS length such as '0.1em'). An older studio stores these keys without drawing them; the result names any it did not animate (ignoredProperties).
 - STROKE DRAW-ON (paths): trimStart, trimEnd (0-1 of the path's length), trimOffset (shifts the visible window along it), dashArray. A draw-on is trimEnd 0 -> 1.
 The authoritative list for a given item is pinepaper_get_animatable_properties — ask it rather than guessing.
 
-EASING — IT SHAPES THE SEGMENT ARRIVING AT THE KEYFRAME IT IS ON.
-The move from keyframe A to keyframe B is eased by B's easing, not A's. Easing on the FIRST keyframe does nothing (no segment arrives at it) — a Ken Burns with easing only on its first key plays linear. Put the easing on the key you are moving TO.
+EASING — BY DEFAULT IT SHAPES THE SEGMENT ARRIVING AT THE KEYFRAME IT IS ON.
+The move from keyframe A to keyframe B is eased by B's easing, not A's. So by default the FIRST keyframe's easing has no effect (no segment arrives at it) — a Ken Burns with easing only on its first key plays linear. Put the easing on the key you are moving TO, or pass easingAt: 'departure' for the other reading: each key's easing shapes the move LEAVING it, so the first key's easing eases the first move (current studio; an older one reads arrival and the result says so). 'hold' / 'step' stay on the key they mark either way.
 ${EASING_LINES}
 - or a custom cubic-bezier [x1, y1, x2, y2] — x in 0..1, y may exceed 0..1 for overshoot. keyframe_animate and camera_animate only.
 COUNTERS: a text item with a counter (create_item / modify_item counter) also animates the numeric property counterValue, drawn through the counter's format — keyframe it to shape a count by hand (hold on a number, then race). Its keys override the counter's own from / to.
@@ -4022,7 +4023,7 @@ EXAMPLE — Reveal at 2s, skip first second of keyframe data, end at 4s of keyfr
               },
               easing: {
                 ...KEYFRAME_EASING_JSON_SCHEMA,
-                description: 'Shapes the segment ARRIVING at this keyframe (from the previous one). Ignored on the first keyframe. A name, or a custom cubic-bezier [x1, y1, x2, y2] — x in 0..1, y may exceed 0..1 for overshoot.',
+                description: "Shapes the segment ARRIVING at this keyframe (from the previous one), so by default it has no effect on the first keyframe; with easingAt: 'departure', the segment LEAVING it. A name, or a custom cubic-bezier [x1, y1, x2, y2] — x in 0..1, y may exceed 0..1 for overshoot.",
               },
             },
             required: ['time', 'properties'],
@@ -4057,6 +4058,11 @@ EXAMPLE — Reveal at 2s, skip first second of keyframe data, end at 4s of keyfr
           type: 'string',
           enum: ['replace', 'merge'],
           description: "The studio's spelling of append, accepted so its keyframe_track_replaced warning (\"Pass { mode: 'merge' }\") can be followed as written: 'merge' is append: true; 'replace' is the default. append and mode that disagree are refused as a contradiction.",
+        },
+        easingAt: {
+          type: 'string',
+          enum: ['arrival', 'departure'],
+          description: "Which segment a key's easing shapes. 'arrival' (default): the move ARRIVING at the key, so the first key's easing has no effect. 'departure': the move LEAVING the key, so an ease placed where a motion starts applies there. Current studio; an older one reads arrival and the result says so.",
         },
       },
       required: ['itemId', 'keyframes'],

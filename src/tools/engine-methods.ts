@@ -293,6 +293,7 @@ export const OPTIONAL_ENGINE_METHODS: readonly string[] = [
   'listTextPalettes',
   'mapSystem.canvasToGeo',
   'mapSystem.getMapSourceInfo',
+  'poseAt',
   'registerItem',
   'relationRegistry.exportForSave',
   'relationRegistry.getRule',
