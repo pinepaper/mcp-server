@@ -1483,6 +1483,14 @@ export const KeyframeAnimateInputSchema = z.object({
   clipInPoint: z.number().optional().describe('Skip the first N seconds of keyframe data — clip head trim.'),
   clipOutPoint: z.number().optional().describe('Stop at N seconds into the keyframe data — clip tail trim. Default: lastKeyframeTime.'),
   append: z.boolean().optional().describe('Add these keys to the item\'s existing track instead of replacing it (a key at the same time merges, the new values win). Without it, a second keyframe_animate on an item replaces its track. result.track says which happened.'),
+  // B147: the studio's own keyframe_track_replaced warning says "Pass { mode:
+  // 'merge' }" — the engine's spelling of append. Without this key zod stripped
+  // it and the track was replaced anyway, so the advice the engine gave could
+  // not be followed through this tool.
+  mode: z.enum(['replace', 'merge']).optional().describe("The studio's spelling of append: 'merge' is append: true, 'replace' (the default) replaces the track. The keyframe_track_replaced warning names it."),
+}).refine((v) => !((v.mode === 'replace' && v.append === true) || (v.mode === 'merge' && v.append === false)), {
+  message: "append and mode contradict each other — pass one of them (mode: 'merge' is the same as append: true, mode: 'replace' as append: false).",
+  path: ['mode'],
 });
 
 // Character — a symbol and some beats, expanded against the design graph.
@@ -3493,6 +3501,10 @@ export const ImportImageInputSchema = z.object({
   nativeSize: z.boolean().optional().describe('Place the image at its source footprint even if it was stored smaller.'),
   mask: ImageMaskSchema.optional().describe('Optional mask shape to apply to the image'),
   smoothing: z.enum(['off', 'low', 'medium', 'high']).optional().describe("Resampling when the image is scaled. 'off' = nearest-neighbour, hard pixel edges (pixel art). Default 'low'."),
+  // IMPORTSHADOW: these were not keys here, so zod stripped them and the photo
+  // arrived without the shadow it was asked for. Applied the way modify_item
+  // applies them, to the item that is drawn (the mask group when masked).
+  ...ShadowPropertiesSchema.shape,
 }).describe('Import image input');
 
 export type ImportImageInput = z.infer<typeof ImportImageInputSchema>;

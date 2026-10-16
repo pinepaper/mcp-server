@@ -1307,6 +1307,16 @@ function generateDeleteItemCode(itemId: string): string {
 /**
  * Template for adding relations
  */
+/**
+ * A JS expression: the studio's own reason for refusing a relation of `typeJs`,
+ * or null. addRelation answers a bare false; the WHY (B119: "relation
+ * 'spring_follow' is not loaded yet…") is recorded with app.noteWarning, which
+ * reaches the reply only as a governor warning. Read here without draining it.
+ */
+export function relationRefusalReasonJs(typeJs: string): string {
+  return `(function(){ var ws = (app && app._engineWarnings) || []; for (var i = ws.length - 1; i >= 0; i--) { var w = ws[i]; if (w && w.relation === ${typeJs} && typeof w.message === 'string') return w.message; } return null; })()`;
+}
+
 function generateAddRelationCode(
   sourceId: string,
   targetId: string,
@@ -1332,12 +1342,33 @@ function generateAddRelationCode(
   }
   const success = app.addRelation('${sourceId}', '${targetId}', '${relationType}', ${JSON.stringify(params, null, 2)});
   if (!success) {
-    return { success: false, relationType: '${relationType}', error: 'the studio refused the ${relationType} relation between ${sourceId} and ${targetId}.' };
+    const __why = ${relationRefusalReasonJs(JSON.stringify(relationType))};
+    return { success: false, relationType: '${relationType}', error: 'the studio refused the ${relationType} relation between ${sourceId} and ${targetId}' + (__why ? ': ' + __why : '.') };
   }
   app.historyManager.saveState();
   return { success: true, sourceId: '${sourceId}', targetId: '${targetId}', relationType: '${relationType}' };
 })();
 `.trim();
+}
+
+/** The studio's per-burst particle cap (FxTool ParticleEmitter normalizeLook). */
+export const EMITTER_MAX_PER_BURST = 2000;
+
+/** Every count in an emitter spec (the spec's own and each burst's) that the studio will clamp. */
+export function emitterCountWarnings(spec: Record<string, unknown> | undefined): string[] {
+  const out: string[] = [];
+  if (!spec || typeof spec !== 'object') return out;
+  const over = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && Math.round(v) > EMITTER_MAX_PER_BURST;
+  if (over(spec.count)) {
+    out.push(`count ${spec.count} is over the studio's ${EMITTER_MAX_PER_BURST}-particle cap per burst, so each burst draws ${EMITTER_MAX_PER_BURST}. Add bursts at the same t for more.`);
+  }
+  if (Array.isArray(spec.bursts)) {
+    spec.bursts.forEach((b, i) => {
+      const c = b && typeof b === 'object' ? (b as Record<string, unknown>).count : undefined;
+      if (over(c)) out.push(`bursts[${i}].count ${c} is over the studio's ${EMITTER_MAX_PER_BURST}-particle cap per burst, so it draws ${EMITTER_MAX_PER_BURST}. Split it into two bursts at the same t.`);
+    });
+  }
+  return out;
 }
 
 /**
@@ -3172,7 +3203,8 @@ export class PinePaperCodeGenerator {
       validated.clipInPoint,
       validated.clipOutPoint,
       validated.timeUnits,
-      validated.append
+      // mode: 'merge' is the studio's name for append (B147).
+      validated.append === true || validated.mode === 'merge'
     );
     if (!holds) return code;
     return `(async function() {
@@ -3908,8 +3940,15 @@ if (typeof _gen === 'function') {
   const targetId = nameToId['${target}'];
   if (sourceId && targetId) {
     const params = ${paramsStr};
-    app.addRelation(sourceId, targetId, '${type}', params);
-    results.relations.push({ source: '${source}', target: '${target}', type: '${type}' });
+    // A refused relation is not listed as made (owner rule 1).
+    if (app.addRelation(sourceId, targetId, '${type}', params)) {
+      results.relations.push({ source: '${source}', target: '${target}', type: '${type}' });
+    } else {
+      const __why = ${relationRefusalReasonJs(JSON.stringify(type))};
+      (results.relationsRefused = results.relationsRefused || []).push({ source: '${source}', target: '${target}', type: '${type}', reason: __why || 'the studio refused it' });
+      results.success = false;
+      results.error = 'the studio refused ' + results.relationsRefused.length + ' relation(s): ' + results.relationsRefused.map(function(r) { return r.type + ' ' + r.source + ' -> ' + r.target + ' (' + r.reason + ')'; }).join('; ') + '. The items were created.';
+    }
   }
 })();
 `);
@@ -4913,6 +4952,15 @@ const target = app.getItemById(targetId);
 if (!source) throw new Error('Source not found: ' + sourceId);
 if (!target) throw new Error('Target not found: ' + targetId);
 const relationId = app.addRelation(source, target, '${op.relationType}', ${relOpts});
+// NOT BOUND IS NOT A SUCCESS (owner rule 1, B119). addRelation answers false
+// when it refuses — spring_follow "not loaded yet" — and this op returned
+// { relationId: false } with nothing marking it failed, so the batch said
+// success over a relation that does not exist.
+if (!relationId) {
+  const __why = ${relationRefusalReasonJs(JSON.stringify(op.relationType))};
+  return { success: false, relationId: false, sourceId, targetId, relationType: ${JSON.stringify(op.relationType)},
+    error: 'the studio refused the ' + ${JSON.stringify(op.relationType)} + ' relation between ' + sourceId + ' and ' + targetId + ' — nothing was bound' + (__why ? ': ' + __why : '.') };
+}
 return { relationId, sourceId, targetId, relationType: '${op.relationType}' };
 `;
 
@@ -4998,7 +5046,10 @@ return { itemId: ${op.itemId?.startsWith('$') ? `__ref(${op.itemId.substring(1)}
           : (op.duration || (op.properties as any)?.duration || ((kfSource as any[]).length ? Math.max(...(kfSource as any[]).map((k) => Number(k.time) || 0)) : 5));
         const kfLoop = mergedPayload ? mergedPayload.loop : (op.loop ?? (op.properties as any)?.loop ?? false);
         // Same contract as pinepaper_keyframe_animate: replace unless append.
-        const kfAppend = (op as { append?: boolean }).append === true || (op.properties as any)?.append === true;
+        // mode: 'merge' is the studio's spelling (its keyframe_track_replaced
+        // warning names it), so it means append here too (B147).
+        const kfAppend = (op as { append?: boolean }).append === true || (op.properties as any)?.append === true
+          || (op as { mode?: unknown }).mode === 'merge' || (op.properties as any)?.mode === 'merge';
         // Batch ops are passthrough, so these arrive unvalidated: numbers only, and timeUnits from its enum.
         const kfExtra: string[] = [];
         for (const key of ['timeOffset', 'clipInPoint', 'clipOutPoint'] as const) {
@@ -8534,7 +8585,14 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
   }
 
   generateImportImage(input: ImportImageInput): string {
-    const { url, position, maxWidth, maxHeight, mask, smoothing, maxEdge, nativeSize } = input;
+    const { url, position, maxWidth, maxHeight, mask, smoothing, maxEdge, nativeSize, shadowColor, shadowBlur, shadowOffset } = input;
+    // IMPORTSHADOW: the shadow keys, applied through the engine's own modify
+    // door once the image is placed (and masked) — the route modify_item takes.
+    const shadow: Record<string, unknown> = {};
+    if (shadowColor !== undefined) shadow.shadowColor = shadowColor;
+    if (shadowBlur !== undefined) shadow.shadowBlur = shadowBlur;
+    if (shadowOffset !== undefined) shadow.shadowOffset = shadowOffset;
+    const hasShadow = Object.keys(shadow).length > 0;
 
     // Each fragment used to be written with a LEADING comma, as if it followed
     // an entry that no longer exists — so the first one opened the object with
@@ -8634,6 +8692,16 @@ ${mask ? `    // A MASK REPLACES THE RASTER (round 8 DD, 4.10). applyMask builds
     }
     if (app.itemRegistry && typeof app.itemRegistry.rebind === 'function') app.itemRegistry.rebind(itemId, masked);
     placed = masked;
+` : ''}${hasShadow ? `    // The shadow goes on what is DRAWN, after a mask has replaced the raster.
+    let __shadow = null;
+    {
+      const __want = ${JSON.stringify(shadow)};
+      let __ok = false;
+      try { __ok = app.modifyItem(itemId, __want) !== false; } catch (_) { __ok = false; }
+      __shadow = __ok
+        ? { applied: true, shadowColor: placed.shadowColor ? String(placed.shadowColor.toCSS ? placed.shadowColor.toCSS(true) : placed.shadowColor) : null, shadowBlur: placed.shadowBlur }
+        : { applied: false, warning: 'the image was imported but its shadow was not applied — set it with pinepaper_modify_item on ' + itemId + '.' };
+    }
 ` : ''}    const b = placed.bounds;
     if (!b || !(b.width > 0) || !(b.height > 0)) {
       return { success: false, itemId: itemId, error: 'the image was placed with no size (' + (b ? b.width + 'x' + b.height : 'no bounds') + ') — it may not have loaded. Nothing visible was drawn.' };
@@ -8642,7 +8710,7 @@ ${mask ? `    // A MASK REPLACES THE RASTER (round 8 DD, 4.10). applyMask builds
       success: true,
       itemId: itemId,
       message: 'Image imported and placed on canvas.',
-      bounds: { x: b.x, y: b.y, width: b.width, height: b.height }${mask ? `,\n      mask: '${mask}'` : ''},
+      bounds: { x: b.x, y: b.y, width: b.width, height: b.height }${mask ? `,\n      mask: '${mask}'` : ''}${hasShadow ? ',\n      shadow: __shadow' : ''},
       // Stored smaller than its source (the studio's cap): said, with the
       // way to keep every pixel. The studio reports native size where it can.
       ...((entry && entry.nativeWidth && entry.width && entry.nativeWidth > entry.width)
@@ -11794,7 +11862,9 @@ ${checks.includes('contrast') ? `  // SAMPLED OVER TIME (round 12, 12.9): text i
         app.create(op.type, { id: op.id, x: op.x, y: op.y, width: op.width, height: op.height });
         itemIds.push(op.id);
       } else if (op.op === 'addRelation') {
-        app.addRelation(op.from, op.to, op.relation, op.params || {});
+        if (!app.addRelation(op.from, op.to, op.relation, op.params || {})) {
+          errors.push({ op: op.op, id: op.from + '->' + op.to, error: 'the studio refused the ' + op.relation + ' relation' });
+        }
       }
     } catch (e) {
       errors.push({ op: op.op, id: op.id || (op.from + '->' + op.to), error: e && e.message });
@@ -12740,6 +12810,11 @@ ${cam ? `  // The camera rides the SAME timing: framing each state as its morph 
   /** pinepaper_emitter (D29): create('emitter', spec) / setEmitter(id, patch). */
   generateEmitter(input: EmitterInput): string {
     const S = (v: unknown) => JSON.stringify(v);
+    // The studio draws at most EMITTER_MAX_PER_BURST particles a burst and
+    // clamps a larger count without a word (B144: 2300 drew ~1940). Said here,
+    // where the asked-for number is still known.
+    const capWarnings = emitterCountWarnings(input.spec);
+    const capJs = capWarnings.length ? `, warnings: ${S(capWarnings)}` : '';
     if (input.action === 'set') {
       return `
 // Emitter: change a spec
@@ -12747,7 +12822,7 @@ ${cam ? `  // The camera rides the SAME timing: framing each state as its morph 
   if (typeof app.setEmitter !== 'function') { return { success: false, error: 'this studio has no emitter item (app.setEmitter) — it predates FxTool D29.' }; }
   const r = app.setEmitter(${S(input.itemId)}, ${S(input.spec)});
   if (!r || r.ok === false) { return { success: false, error: (r && r.error) || 'the emitter change was refused' }; }
-  return { success: true, action: 'set', itemId: ${S(input.itemId)}, spec: r.spec };
+  return { success: true, action: 'set', itemId: ${S(input.itemId)}, spec: r.spec${capJs} };
 })();`.trim();
     }
     return `
@@ -12760,7 +12835,7 @@ ${cam ? `  // The camera rides the SAME timing: framing each state as its morph 
   if (!it) { return { success: false, error: 'the emitter spec was refused' }; }
   const id = it.data && (it.data.registryId || it.data.id);
   if (!id) { return { success: false, error: 'the emitter was made but not registered — no usable id' }; }
-  return { success: true, action: 'create', itemId: id };
+  return { success: true, action: 'create', itemId: id${capJs} };
 })();`.trim();
   }
 
@@ -13799,7 +13874,7 @@ ${needWorld}
    * already decided by a pure function, so nothing is left for the page to
    * work out.
    */
-  generateDesignCompose(scene: { width: number; height: number; backgroundHex?: string }, ops: Array<Record<string, unknown>>, style: string, sizeWarning?: string): string {
+  generateDesignCompose(scene: { width: number; height: number; backgroundHex?: string }, ops: Array<Record<string, unknown>>, style: string, sizeWarning?: string, report: Record<string, unknown> = {}): string {
     const S = (v: unknown) => JSON.stringify(v);
     return `
 // Design: compose a ${style} scene — ${ops.length} items, laid out server-side
@@ -13829,7 +13904,7 @@ ${needWorld}
   // success is worse than a poster that says which four elements are missing.
   return { success: failed.length === 0, style: ${S(style)}, itemIds: ids, itemCount: ids.length, failed: failed,
     ...(canvasResized ? { canvasResized: canvasResized, note: 'the canvas was resized to the composition' + (${S(sizeWarning ?? '')} ? '' : '; pass width and height to compose at your canvas size') } : {}),
-    ...(${S(sizeWarning ?? '')} ? { warning: ${S(sizeWarning ?? '')} } : {}) };
+    ...(${S(sizeWarning ?? '')} ? { warning: ${S(sizeWarning ?? '')} } : {}), ...${S(report)} };
 })();`.trim();
   }
 

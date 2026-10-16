@@ -1224,6 +1224,7 @@ Use maxWidth/maxHeight to constrain the image dimensions while preserving aspect
 - maxEdge: the longest edge the studio STORES the image at (px), or 'native' to keep every pixel. The result says when it was stored smaller.
 - nativeSize: true places the image at its source footprint even if it was stored smaller.
 - smoothing: 'off' (nearest-neighbour, for pixel art) | 'low' (default) | 'medium' | 'high'.
+- shadowColor / shadowBlur / shadowOffset: a drop shadow on the placed image, the same keys pinepaper_modify_item takes.
 
 EXAMPLES:
 - Import photo: url: "https://example.com/photo.jpg"
@@ -1264,6 +1265,9 @@ EXAMPLES:
           enum: ['off', 'low', 'medium', 'high'],
           description: "Resampling when the image is scaled. 'off' = nearest-neighbour, hard pixel edges — use it for pixel art. Default 'low'. Change it later with pinepaper_modify_item {smoothing}.",
         },
+        shadowColor: { type: 'string', description: 'Drop shadow colour (hex, rgb(a) or a name), applied to the placed image — the mask group when masked. result.shadow says whether it applied.' },
+        shadowBlur: { type: 'number', description: 'Drop shadow blur radius in px.' },
+        shadowOffset: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: 'Drop shadow offset [x, y] in px.' },
       },
       required: ['url'],
     },
@@ -2795,7 +2799,7 @@ An AESTHETIC STYLE is a look: Bauhaus, Art Deco, Swiss typographic, De Stijl, va
 - list_easings: every motion curve across every system as a named easing, with its licence and whether it was authored here. Use these to make a motion match a system it has to sit beside.
 - list_motion: those curves AND the duration scale sitting beside them — the other half of a motion token, published nowhere until now. A curve is a shape; a motion is a shape over a length, and matching a system's easing while inventing its timing gets only the easy half right. Durations come back in ms and in seconds, because every animation tool here takes seconds. These are the licensed SYSTEMS' motion scales: an aesthetic style carries no upstream motion data, so pair one of these with a style rather than expecting the style to name its own.
 - list_styles: every style with its TOKENS — palette, background, font stacks, type sizes and any variants — derived by composing it, so they are what the generator will actually draw. Read these to hand-build in a style rather than reverse-engineering its colours.
-- compose: build a titled scene in a style. Layout is decided in this server by a pure function, so 'compose' with draw:false returns the scene and the ops as DATA and draws nothing — read it before committing, the same way pinepaper_story's distill works. Element boxes are converted to the centre anchor app.create wants, and text carries its alignment, so a left-aligned headline starts at its x instead of centring on it.
+- compose: build a titled scene in a style. Layout is decided in this server by a pure function, so 'compose' with draw:false returns the scene and the ops as DATA and draws nothing — read it before committing, the same way pinepaper_story's distill works. Element boxes are converted to the centre anchor app.create wants, and text carries its alignment, so a left-aligned headline starts at its x instead of centring on it. A style's circles are drawn as circles, a clip-path frame keeps its angled corners, a neon glow becomes a shadow, and a scanline overlay is drawn as lines. At a width/height the style was not laid out for, text can land on a shape it clears at its own default size; the result names each such pair in layoutCollisions rather than drawing it as intended.
 
 A partial composition reports as a failure with the elements that did not create, rather than as a success with half a poster.`,
     inputSchema: {
@@ -4048,6 +4052,11 @@ EXAMPLE — Reveal at 2s, skip first second of keyframe data, end at 4s of keyfr
         append: {
           type: 'boolean',
           description: 'Add these keys to the item\'s existing track (same-time keys merge, new values win) instead of replacing it — e.g. a button press after an entrance. Without it, a second call replaces the track. result.track says whether the track was appended to or replaced; studios without merge replace, and say so.',
+        },
+        mode: {
+          type: 'string',
+          enum: ['replace', 'merge'],
+          description: "The studio's spelling of append, accepted so its keyframe_track_replaced warning (\"Pass { mode: 'merge' }\") can be followed as written: 'merge' is append: true; 'replace' is the default. append and mode that disagree are refused as a contradiction.",
         },
       },
       required: ['itemId', 'keyframes'],
@@ -8113,6 +8122,12 @@ SPEC:
 - mode: 'burst' (default) — bursts: [{ t, x, y, count, …per-burst overrides }]: a pop of particles at scene time t.
 - mode: 'trail' (or give target) — target (an item id), rate (per second), emitWindows [[t0, t1], …], window, offset: particles shed from a moving item.
 - look and physics (per emitter or per burst): shape ('circle' | 'rect' | 'dash' | 'star' | 'confetti', or an array), palette [colours], size / sizes / sizeEnd, speed + angle ranges or velocities, gravity (px/s², +down), drag, friction, lifetime, fadeIn / fadeOut, spin, opacity, jitter, seed.
+UNITS (a number, or a [min, max] range picked per particle where it says range):
+- count: particles per burst, at most 2000 — a larger count is drawn as 2000 (the reply warns). For more, add a second burst at the same t.
+- speed: px/s (range). angle: degrees, 0 = right, 90 = down (range). gravity: px/s². lifetime: seconds (range, > 0). size: px (range).
+- fadeIn / fadeOut: SECONDS at the start / end of each particle's life. fadeOut is capped at that particle's lifetime (a 0.5 s life cannot fade for 2 s). Omitted (or fade: 'linear'), the particle fades linearly over its WHOLE life; fade: 'none' turns both off.
+- spin: DEGREES PER SECOND (range; spinAlternate flips every other particle). It turns rect, confetti, star and dash particles; a circle has no orientation, so spin on circles shows nothing.
+- jitter: PIXELS of total spread — each particle drifts up to ±jitter/2 on each axis, growing from 0 at birth to the full amount at the end of its life (so the average visible offset is a fraction of jitter). jitterHz: how many times a second that offset is re-rolled (0, the default, keeps one offset per particle).
 An unknown shape, mode or bad range is refused with the engine's reason — never defaulted.
 
 EXAMPLE — confetti at 2 s:
@@ -8810,7 +8825,7 @@ ITEMS:
 ANIMATION:
   animate — Loop animation: {itemId, animationType, animationOptions}
     animationType: ${SIMPLE_ANIMATION_TYPES_LIST}
-  keyframe_animate — Timed animation: {itemId, keyframes: [{time, properties, easing}], duration, loop, append}. Replaces the item's track unless append: true; two ops on one item in a batch are merged into one.
+  keyframe_animate — Timed animation: {itemId, keyframes: [{time, properties, easing}], duration, loop, append}. Replaces the item's track unless append: true (or mode: 'merge', the studio's spelling); two ops on one item in a batch are merged into one.
     Animatable properties: opacity, scale, scaleX, scaleY, x, y, rotation, fillColor, strokeColor, strokeWidth, width, height, radius, fontSize, trimStart/trimEnd/trimOffset (path draw-on)
     Easing (on the keyframe being moved TO): ${KEYFRAME_EASINGS_LIST}
   relation — Behavioral link: {sourceId, targetId, relationType, relationOptions}
@@ -8914,6 +8929,7 @@ EXAMPLE — Animated sky scene with timed reveals:
               duration: { type: 'number', description: 'Duration in seconds for keyframe_animate or play_timeline' },
               loop: { type: 'boolean', description: 'Loop for keyframe_animate or play_timeline' },
               append: { type: 'boolean', description: "For keyframe_animate: add these keys to the item's existing track instead of replacing it (a key at the same time merges, the new values win). Without it the op replaces the track; the op's result says which happened." },
+              mode: { type: 'string', description: "For keyframe_animate: the studio's spelling of append — 'merge' is append: true; 'replace' (the default) replaces the track." },
               // Relations
               sourceId: { type: 'string', description: 'For relation: source item ID or $N' },
               targetId: { type: 'string', description: 'For relation: target item ID or $N' },
@@ -9019,7 +9035,8 @@ Held exports last until released, or until a LATER export needs the space — an
     },
     description: `Smart export with automatic format detection and platform optimization.
 
-WHAT quality ACTUALLY SETS, because it bundles three things and only one of them is "quality": draft = 15fps / 72dpi / compression 0.6, standard = 30fps / 150dpi / 0.85, high = 60fps / 300dpi / 0.95. So asking for high DOUBLES the frame count and the render time against standard. Override either half directly - fps for frame rate, scale for resolution - and leave quality to mean compression.
+WHAT quality ACTUALLY SETS, because it bundles three things and only one of them is "quality": draft = 15fps / 72dpi / compression 0.6, standard = 30fps / 150dpi / 0.85, high = 60fps / 300dpi / 0.95. So asking for high DOUBLES the frame count and the render time against standard. Override either half directly - fps for frame rate, scale for resolution.
+The compression half is weaker than its name for VIDEO: on mp4 / webm it scales the encoder's resolution-derived target bitrate, and the browser encoder treats that target as a CEILING. A simple scene encodes well under either ceiling, so draft and high at the same fps can come out within bytes of each other; a scene with grain is encoded at a fixed quantizer and ignores it. To change a video's size or quality, use scale, or bitrate (with bitrateMode 'constant' to hold it); result.video.achievedBitrate says what the encoder produced. On jpg / webp stills compression IS the encoder quality, and lower means a smaller file.
 
 DOES THIS SURVIVE EXPORT? It is a PATH fact, not a per-feature one, so the rule is short and does not go stale as capabilities land: IF IT TICKS INSIDE THE ENGINE'S UPDATE LOOP, IT EXPORTS. Loop presets (pinepaper_animate), relations, keyframes, generators and camera moves all do - measured frame-by-frame, not assumed. What does NOT survive is anything driven by the wall clock outside that loop, or anything on the realtime recorder path.
 ONE MEASURED EXCEPTION TO CHECK: keyframe_animate's loop:true has been measured playing ONCE in an export and then holding the last keyframe. Before exporting past one cycle, sample a frame in the second cycle; if it holds, write the keyframes out for each cycle, or use a loop preset.
@@ -9135,7 +9152,7 @@ VERIFY MOTION BEFORE YOU RENDER. An export takes seconds to minutes and shows yo
         quality: {
           type: 'string',
           enum: ['draft', 'standard', 'high'],
-          description: 'Compression level (default: standard). It ALSO carries a default frame rate — draft 15, standard 30, high 60 — so "high" doubles the frame count and the render time against "standard" unless you set fps yourself. Set fps and scale to control those halves directly and leave quality meaning compression.',
+          description: 'Compression level (default: standard). It ALSO carries a default frame rate — draft 15, standard 30, high 60 — so "high" doubles the frame count and the render time against "standard" unless you set fps yourself. For mp4 / webm the compression only scales a bitrate CEILING the encoder rarely reaches on a simple scene, so it may not change the file at all — use scale or bitrate to control size. For jpg / webp it is the encoder quality.',
         },
         fps: {
           anyOf: [{ type: 'number', minimum: 1, maximum: 120 }, { type: 'string', pattern: '^[0-9]+/[0-9]+$' }],

@@ -71,6 +71,14 @@ export interface ComposedElement {
   width?: number;
   height?: number;
   textAlign?: string;
+  /** The upstream `shapeType` ('circle', 'square', 'pill', …) under a generic `type: 'shape'`. */
+  shape?: string;
+  /** A CSS `clip-path: polygon(...)` the element is cut to (cyberpunk's angular HUD frame). */
+  clipPath?: string;
+  /** A neon glow colour (`neonGlowHex`). */
+  glowHex?: string;
+  /** A CSS text-shadow (`textShadow`), e.g. '0 0 12px #00f0ff, 0 0 24px #00f0ff'. */
+  textShadow?: string;
 }
 
 export interface ComposedScene {
@@ -139,6 +147,13 @@ function normalise(style: string, raw: unknown): ComposedScene {
       width: num(e.width),
       height: num(e.height),
       textAlign: str(e.textAlign),
+      // Kept rather than dropped (CYBER-HUDFRAME, BAUHAUS-CIRCLE): a bauhaus
+      // circle is `type: 'shape', shapeType: 'circle'`, and a cyberpunk frame's
+      // angled corners and glow live in these keys. Absent keys stay absent.
+      ...(str(e.shapeType) ? { shape: str(e.shapeType) } : {}),
+      ...(str(e.clipPathAngle) ? { clipPath: str(e.clipPathAngle) } : {}),
+      ...(str(e.neonGlowHex) ? { glowHex: str(e.neonGlowHex) } : {}),
+      ...(str(e.textShadow) ? { textShadow: str(e.textShadow) } : {}),
     };
   });
 
@@ -537,6 +552,177 @@ export function compose(style: string, options: ComposeOptions): ComposedScene |
  * it; where there is not, y is left alone rather than shifted by a guess. The
  * horizontal fix — the one that put titles off-canvas — applies either way.
  */
+export interface LayoutCollision {
+  /** The text element that runs onto a shape. */
+  text: string;
+  /** The shape it runs onto. */
+  shape: string;
+}
+
+/**
+ * Text the generator laid PARTLY over a shape (BAUHAUS-SUBTITLE).
+ *
+ * The vendored layouts scale some sizes with the width and some positions with
+ * the height, so at an aspect they were not drawn for, a line of text can land
+ * half on a shape: bauhaus at 1920x1080 puts its subtitle across the red circle.
+ * The layout is upstream's to fix (it is vendored and not edited here); this
+ * says so instead of drawing it as if it were intended. Text wholly inside a
+ * shape (a label on a card, a title in a frame) is a design, not a collision,
+ * and so is anything over a full-canvas ground.
+ */
+export function layoutCollisions(scene: ComposedScene): LayoutCollision[] {
+  const out: LayoutCollision[] = [];
+  const canvasArea = scene.width * scene.height;
+  const texts = scene.elements.filter((e) => e.content && e.width && e.height);
+  for (const t of texts) {
+    const tx0 = t.x, ty0 = t.y, tx1 = t.x + t.width!, ty1 = t.y + t.height!;
+    for (const s of scene.elements) {
+      if (s === t || (s.content !== undefined && s.content !== '')) continue;
+      if (s.radius !== undefined) continue; // centre-authored rings and halos: decorative by design
+      const w = s.width ?? 0, h = s.height ?? 0;
+      if (!(w > 0 && h > 0) || w * h >= 0.9 * canvasArea) continue;
+      const round = s.type === 'circle' || s.shape === 'circle';
+      if (round) {
+        const cx = s.x + w / 2, cy = s.y + h / 2, rx = w / 2, ry = h / 2;
+        const inside = (px: number, py: number) => ((px - cx) / rx) ** 2 + ((py - cy) / ry) ** 2 <= 1;
+        // Nearest point of the text box to the centre decides whether they meet.
+        const nx = Math.max(tx0, Math.min(cx, tx1)), ny = Math.max(ty0, Math.min(cy, ty1));
+        const meets = inside(nx, ny);
+        const contained = inside(tx0, ty0) && inside(tx1, ty0) && inside(tx0, ty1) && inside(tx1, ty1);
+        if (meets && !contained) out.push({ text: t.id, shape: s.id });
+      } else {
+        const meets = tx0 < s.x + w && tx1 > s.x && ty0 < s.y + h && ty1 > s.y;
+        const contained = tx0 >= s.x && tx1 <= s.x + w && ty0 >= s.y && ty1 <= s.y + h;
+        if (meets && !contained) out.push({ text: t.id, shape: s.id });
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Collisions the requested SIZE made: pairs that collide in `scene` but not in
+ * the same composition at the generator's own default size. A text-over-shape
+ * the generator draws at its default (vaporwave's kanji over the sun) is the
+ * design; one that appears only when the layout is stretched to another aspect
+ * is the defect. Empty when no size was asked for.
+ */
+export function scalingCollisions(style: string, options: ComposeOptions, scene: ComposedScene): LayoutCollision[] {
+  if (options.width === undefined && options.height === undefined) return [];
+  let reference: ComposedScene | null = null;
+  try {
+    reference = compose(style, { ...options, width: undefined, height: undefined });
+  } catch {
+    return [];
+  }
+  if (!reference) return [];
+  const designed = new Set(layoutCollisions(reference).map((c) => `${c.text}|${c.shape}`));
+  return layoutCollisions(scene).filter((c) => !designed.has(`${c.text}|${c.shape}`));
+}
+
+/** The neon glow of an element as shadow properties: its text-shadow when it has one, else its glow colour. */
+function glowOf(el: ComposedElement): Record<string, unknown> {
+  const ts = el.textShadow ? parseTextShadow(el.textShadow) : null;
+  if (ts) return { shadowColor: ts.color, shadowBlur: ts.blur, shadowOffset: [ts.dx, ts.dy] };
+  // A glow colour with no shadow geometry upstream. 12 px is the blur the same
+  // generator gives its own glowing title (`0 0 12px`), so the frame matches it.
+  if (el.glowHex) return { shadowColor: el.glowHex, shadowBlur: 12, shadowOffset: [0, 0] };
+  return {};
+}
+
+/** The first layer of a CSS text-shadow: `<dx> <dy> [<blur>] <colour>`. Null when it cannot be read. */
+export function parseTextShadow(css: string): { dx: number; dy: number; blur: number; color: string } | null {
+  const first = splitTopLevel(css, ',')[0]?.trim();
+  if (!first) return null;
+  const parts = splitTopLevel(first, ' ').filter(Boolean);
+  const lengths: number[] = [];
+  let color: string | undefined;
+  for (const p of parts) {
+    const m = /^(-?\d+(?:\.\d+)?)(px)?$/.exec(p);
+    if (m) lengths.push(Number(m[1]));
+    else color = p;
+  }
+  if (!color || lengths.length < 2) return null;
+  return { dx: lengths[0], dy: lengths[1], blur: lengths[2] ?? 0, color };
+}
+
+/** Split on a separator that is not inside parentheses. */
+function splitTopLevel(s: string, sep: string): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let cur = '';
+  for (const ch of s) {
+    if (ch === '(') depth++;
+    else if (ch === ')') depth--;
+    if (ch === sep && depth === 0) { out.push(cur); cur = ''; } else cur += ch;
+  }
+  out.push(cur);
+  return out;
+}
+
+/** A CSS length against a reference size: `12px`, `12`, `50%`, `calc(100% - 32px)`. Null when unreadable. */
+function cssLength(token: string, size: number): number | null {
+  const t = token.trim();
+  const calc = /^calc\((.*)\)$/.exec(t);
+  if (calc) {
+    // Terms joined by + and -, each a length; CSS requires spaces around them.
+    const terms = calc[1].trim().split(/\s+([+-])\s+/);
+    let total = cssLength(terms[0], size);
+    for (let i = 1; total !== null && i < terms.length; i += 2) {
+      const v = cssLength(terms[i + 1] ?? '', size);
+      total = v === null ? null : terms[i] === '+' ? total + v : total - v;
+    }
+    return total;
+  }
+  const m = /^(-?\d+(?:\.\d+)?)(px|%)?$/.exec(t);
+  if (!m) return null;
+  return m[2] === '%' ? (Number(m[1]) / 100) * size : Number(m[1]);
+}
+
+const round2 = (v: number) => Math.round(v * 100) / 100;
+
+/** A CSS `polygon(...)` clip path over a box, as closed SVG path data in canvas coordinates. */
+export function clipPolygon(css: string, x: number, y: number, w: number, h: number):
+  { pathData: string; centreX: number; centreY: number } | null {
+  const m = /^\s*polygon\((.*)\)\s*$/.exec(css);
+  if (!m) return null;
+  const pts: Array<[number, number]> = [];
+  for (const pair of splitTopLevel(m[1], ',')) {
+    const xy = splitTopLevel(pair.trim(), ' ').filter(Boolean);
+    if (xy.length !== 2) return null;
+    const px = cssLength(xy[0], w);
+    const py = cssLength(xy[1], h);
+    if (px === null || py === null) return null;
+    pts.push([round2(x + px), round2(y + py)]);
+  }
+  if (pts.length < 3) return null;
+  const xs = pts.map((p) => p[0]);
+  const ys = pts.map((p) => p[1]);
+  return {
+    pathData: 'M' + pts.map((p) => `${p[0]} ${p[1]}`).join(' L') + ' Z',
+    // The engine places path data by its bounds centre.
+    centreX: (Math.min(...xs) + Math.max(...xs)) / 2,
+    centreY: (Math.min(...ys) + Math.max(...ys)) / 2,
+  };
+}
+
+/** Scanline period and line weight, in px: a 2 px bar every 4 px. */
+export const SCANLINE_PITCH = 4;
+export const SCANLINE_WEIGHT = 2;
+
+/** Horizontal bars over a box, as one compound path's data, centred in the box. */
+function scanlinePath(x: number, y: number, w: number, h: number): string {
+  const n = Math.max(1, Math.floor((h - SCANLINE_WEIGHT) / SCANLINE_PITCH) + 1);
+  // Centred, so the bars' bounds centre IS the box centre — the point the
+  // engine places path data by — and the overlay sits where the box was.
+  const top = y + Math.max(0, (h - ((n - 1) * SCANLINE_PITCH + SCANLINE_WEIGHT)) / 2);
+  const parts: string[] = [];
+  for (let i = 0; i < n; i++) {
+    parts.push(`M${round2(x)} ${round2(top + i * SCANLINE_PITCH)} h${round2(w)} v${SCANLINE_WEIGHT} h${round2(-w)} Z`);
+  }
+  return parts.join(' ');
+}
+
 export function sceneToOps(scene: ComposedScene): Array<Record<string, unknown>> {
   const ops: Array<Record<string, unknown>> = [];
   for (const el of scene.elements) {
@@ -565,7 +751,37 @@ export function sceneToOps(scene: ComposedScene): Array<Record<string, unknown>>
       fillColor: el.fillHex,
       ...(el.strokeHex ? { strokeColor: el.strokeHex } : {}),
       ...(el.strokeWidthPx !== undefined ? { strokeWidth: el.strokeWidthPx } : {}),
+      ...glowOf(el),
     };
+
+    // A SCANLINE OVERLAY IS LINES (CYBER-SCANLINES). It was a rectangle at the
+    // overlay's bounds in the overlay's colour — a flat 25% black veil over the
+    // whole poster, which is a dimmer, not scanlines. One compound path of
+    // thin horizontal bars, in that colour, over the same box.
+    if (el.type === 'scanline_overlay' && w > 0 && h > 0) {
+      ops.push({
+        type: 'path', name: el.id, pathData: scanlinePath(el.x, el.y, w, h),
+        x: el.x + w / 2, y: el.y + h / 2,
+        fillColor: el.fillHex,
+        note: el.type,
+      });
+      continue;
+    }
+
+    // AN ANGLED FRAME IS ITS POLYGON (CYBER-HUDFRAME). clipPathAngle carries
+    // the cut corners; a rectangle at the bounds drew them square. A polygon
+    // this cannot read keeps the rectangle rather than guessing.
+    if (!isText && el.clipPath && w > 0 && h > 0) {
+      const poly = clipPolygon(el.clipPath, el.x, el.y, w, h);
+      if (poly) {
+        ops.push({
+          type: 'path', name: el.id, ...common,
+          x: poly.centreX, y: poly.centreY, pathData: poly.pathData, closed: true,
+          note: el.type,
+        });
+        continue;
+      }
+    }
 
     if (isText) {
       ops.push({
@@ -577,6 +793,13 @@ export function sceneToOps(scene: ComposedScene): Array<Record<string, unknown>>
       });
     } else if (el.type === 'circle' || authorsOwnCentre) {
       ops.push({ type: 'circle', name: el.id, ...common, radius: el.radius ?? w / 2 });
+    } else if (el.shape === 'circle' && w > 0 && h > 0) {
+      // BAUHAUS-CIRCLE: `type: 'shape', shapeType: 'circle'` in a box. It went
+      // to the rectangle branch and the red circle rendered as a square. The
+      // box is the circle's bounds, so its centre is the box centre (above).
+      ops.push(w === h
+        ? { type: 'circle', name: el.id, ...common, radius: w / 2, note: el.shape }
+        : { type: 'ellipse', name: el.id, ...common, width: w, height: h, note: el.shape });
     } else {
       ops.push({
         type: 'rectangle', name: el.id, ...common,
