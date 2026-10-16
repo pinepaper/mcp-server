@@ -781,7 +781,8 @@ describe('tabular figures (FxTool 3354d51c)', () => {
       const r = create(s.app, { content: '$1,299', ...p });
       expect(s.seen[0]).toMatchObject(p);
       expect(r.ignoredProperties).toBeUndefined();
-      expect(r.tabularFigures).toEqual({ applied: true });
+      // No tabularFiguresReport on this fake: the flag alone is 'unverified' (9 TABNUM).
+      expect(r.tabularFigures).toMatchObject({ applied: 'unverified' });
     }
   });
 
@@ -790,7 +791,7 @@ describe('tabular figures (FxTool 3354d51c)', () => {
     const s = studio(true);
     const r = new Function('app', 'window', `return ${codeGenerator.generateModifyItem({ itemId: 'item_1', properties: { fontVariantNumeric: 'tabular-nums' } })}`)(s.app, {});
     expect(s.seen[0]).toEqual({ fontVariantNumeric: 'tabular-nums' });
-    expect(r.tabularFigures).toEqual({ applied: true });
+    expect(r.tabularFigures).toMatchObject({ applied: 'unverified' });
     expect(r.ignoredProperties).toBeUndefined();
   });
 

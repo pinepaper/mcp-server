@@ -506,7 +506,7 @@ the label to replace the content.
   fontWeight: 400 / 700 / 'bold'. fontStyle: 'italic'. leading: line spacing in px; lineHeight: a multiple of fontSize (<= 4) or px. Multi-line content splits on \n.
   fit: {maxWidth, maxHeight?, minFontSize? (8), maxFontSize? (current), wrap? (true), hold? ('top' | 'center' | …)} — auto-size the text into a box, keeping its anchored edge. The box is remembered: changing content later refits (shrinks, or grows back to maxFontSize); modify_item {fit: {...}} sets a new box; {fit: null} stops fitting. The result's textFit says {fontSize, lines, fits}; fits:false means it overflows even at minFontSize. Studios without auto-fit say so in textFit. Every export's fidelity then lists text_overflow for any text past its box or off the frame — the check to run before a batch of variants.
   direction: 'auto' (default: the first strong letter decides, so Arabic and Hebrew need nothing) | 'ltr' | 'rtl' — the paragraph's base direction, which places neutrals like the final period (aliases textDirection, dir). The result's direction says whether the studio applied it; a studio without RTL support lays text out left-to-right and says so. justification: 'right' is alignment, not direction.
-  tabularFigures: true (or fontVariantNumeric: 'tabular-nums', or fontFeatures containing 'tnum') — fixed-width digits, so a counter, price or timer does not jitter as it changes. The result's tabularFigures says whether the studio applied them.
+  tabularFigures: true (or fontVariantNumeric: 'tabular-nums', or fontFeatures containing 'tnum') — fixed-width digits, so a counter, price or timer does not jitter as it changes. The result's tabularFigures.applied is measured on the current studio: true only when the layout moves a digit's advance; false with a reason (font-digits-already-equal: the font's digits are one width already, so nothing changes and steadyWidth is true; rtl; not-requested); 'unverified' on an older studio that records the request but cannot measure it.
   strokePosition: 'outside' — the stroke sits entirely outside the letters (drawn under the fill at twice strokeWidth), so a thick caption / meme outline keeps the letterform; 'center' (default) is the ordinary stroke. The result's strokePosition says whether the studio applied it.
 - circle: Circular shape (properties: radius, color, strokeColor, strokeWidth)
 - star: Star shape (properties: radius1, radius2, points, color)
@@ -592,7 +592,8 @@ Use itemType: "path" with either:
 ADVANCED STYLING (NEW):
 All shapes support these additional properties:
 - No fill (stroke-only outlines, line art): fillColor: null, 'transparent' or 'none', with a strokeColor and strokeWidth.
-- Gradients: color can be an object: {type: "linear"|"radial", stops: [{color: "#fff", offset: 0}, {color: "#000", offset: 1}], origin: [x,y], destination: [x,y]}
+- fillOpacity (0..1): the solid fill's own alpha, apart from opacity (which fades the stroke too) — on text, fillOpacity: 0.3 with a strokeColor is a see-through letter with a solid outline. Not applied to a gradient fill. The result's fillOpacity says whether the studio applied it (an older studio ignores the key and says so).
+- Gradients: color can be an object: {type: "linear"|"radial", stops: [{color: "#fff", offset: 0}, {color: "#000", offset: 1}], origin: [x,y], destination: [x,y]}. Without origin / destination a radial gradient is centred on the item's own bounds and reaches its right edge, wherever anchor put it.
 - Shadows: shadowColor, shadowBlur (pixels), shadowOffset: [x, y]
 - Blend modes: blendMode: "multiply"|"screen"|"overlay"|"darken"|"lighten"|etc.
 - Opacity: opacity (0-1)
@@ -772,7 +773,8 @@ USE WHEN:
 
 MODIFIABLE PROPERTIES:
 - position: {x, y} or separate x, y
-- color/fillColor: Fill color (solid string OR gradient object)
+- color/fillColor: Fill color (solid string OR gradient object); null, 'transparent' or 'none' removes the fill
+- fillOpacity (0..1): the solid fill's own alpha, apart from opacity; on the current studio it is kept when a later fillColor changes the fill. The result's fillOpacity says whether the studio applied it.
 - strokeColor: Outline color (solid string OR gradient object)
 - strokeWidth: Outline thickness
 - fontSize: Text size
@@ -8127,13 +8129,13 @@ ACTIONS:
 SPEC:
 - mode: 'burst' (default) — bursts: [{ t, x, y, count, …per-burst overrides }]: a pop of particles at scene time t.
 - mode: 'trail' (or give target) — target (an item id), rate (per second), emitWindows [[t0, t1], …], window, offset: particles shed from a moving item.
-- look and physics (per emitter or per burst): shape ('circle' | 'rect' | 'dash' | 'star' | 'confetti', or an array), palette [colours], size / sizes / sizeEnd, speed + angle ranges or velocities, gravity (px/s², +down), drag, friction, lifetime, fadeIn / fadeOut, spin, opacity, jitter, seed.
+- look and physics (per emitter or per burst): shape ('circle' | 'rect' | 'dash' | 'star' | 'confetti', or an array), palette [colours], size / sizes / sizeEnd, speed + angle ranges or velocities, gravity (px/s², +down), drag, friction, lifetime, fadeIn / fadeOut, spin, opacity, jitter, jitterGrow, seed.
 UNITS (a number, or a [min, max] range picked per particle where it says range):
-- count: particles per burst, at most 2000 — a larger count is drawn as 2000 (the reply warns). For more, add a second burst at the same t.
+- count: particles per burst, at most 10000 on the current studio (2000 on older studios) — a larger count is drawn at the cap and the reply warns with the number drawn. For more, add a second burst at the same t.
 - speed: px/s (range). angle: degrees, 0 = right, 90 = down (range). gravity: px/s². lifetime: seconds (range, > 0). size: px (range).
-- fadeIn / fadeOut: SECONDS at the start / end of each particle's life. fadeOut is capped at that particle's lifetime (a 0.5 s life cannot fade for 2 s). Omitted (or fade: 'linear'), the particle fades linearly over its WHOLE life; fade: 'none' turns both off.
-- spin: DEGREES PER SECOND (range; spinAlternate flips every other particle). It turns rect, confetti, star and dash particles; a circle has no orientation, so spin on circles shows nothing.
-- jitter: PIXELS of total spread — each particle drifts up to ±jitter/2 on each axis, growing from 0 at birth to the full amount at the end of its life (so the average visible offset is a fraction of jitter). jitterHz: how many times a second that offset is re-rolled (0, the default, keeps one offset per particle).
+- fadeIn / fadeOut: SECONDS at the start / end of each particle's life. fadeOut is capped at that particle's lifetime (a 0.5 s life cannot fade for 2 s; it fades over its whole life instead), and the current studio warns when it caps one. Omitted (or fade: 'linear'), the particle fades linearly over its WHOLE life; fade: 'none' turns both off.
+- spin: DEGREES PER SECOND, positive = clockwise on screen (range; spinAlternate flips every other particle). It turns rect, confetti, star and dash particles; a circle has no orientation, so spin on circles shows nothing (the current studio warns when every particle is a circle).
+- jitter: PIXELS — on the current studio each particle is displaced up to ±jitter px on each axis from its path, at full size from birth; jitterGrow: true keeps the older ramp (zero at birth, the full ±jitter at the end of life). Older studios (before jitterGrow) displace up to ±jitter/2, growing from 0 at birth. jitterHz: how many times a second that offset is re-rolled (0, the default, keeps one offset per particle).
 An unknown shape, mode or bad range is refused with the engine's reason — never defaulted.
 
 EXAMPLE — confetti at 2 s:

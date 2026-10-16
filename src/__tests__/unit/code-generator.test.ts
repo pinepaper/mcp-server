@@ -1498,8 +1498,13 @@ describe('PinePaperCodeGenerator', () => {
             },
           },
         });
-        expect(code).toContain("origin: [500, 400]");
-        expect(code).toContain("destination: [550, 400]");
+        // 17 RADIALOFFSET: the origin is read from the created item's bounds
+        // (here centred on the requested point), with the request as fallback.
+        const item: Record<string, any> = { data: { registryId: 'item_1' }, bounds: { x: 450, y: 350, width: 100, height: 100 }, bringToFront() {} };
+        const app = { create: () => item, getItemById: () => item, itemRegistry: { get: () => ({ item }) }, historyManager: { saveState() {} } };
+        new Function('app', 'window', code.replace(/\(\{ itemId[\s\S]*\}\);\s*$/, (m) => `return ${m.slice(0, -1)}`))(app, {});
+        expect(item.fillColor.origin).toEqual([500, 400]);
+        expect(item.fillColor.destination).toEqual([550, 400]);
         expect(code).not.toContain("origin: [450, 350]");
       });
 

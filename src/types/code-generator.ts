@@ -279,20 +279,46 @@ function generateGradientCode(
   propertyName: 'fillColor' | 'strokeColor' = 'fillColor'
 ): string {
   const { type, stops, origin, destination } = gradient;
-
-  // Calculate default origin/destination based on item position.
-  // For radial gradients, origin defaults to the item center (position.x, position.y),
-  // not an offset (-50, -50), and destination to the radius edge (B88).
-  const defaultOrigin = origin || (type === 'radial' ? [position.x, position.y] : [position.x - 50, position.y - 50]);
-  const defaultDestination = destination || (type === 'radial' ? [position.x + 50, position.y] : [position.x + 50, position.y + 50]);
-
   const stopsCode = stops.map(s => `['${s.color}', ${s.offset}]`).join(', ');
+
+  if (type === 'radial') {
+    // A RADIAL CORE BELONGS ON THE ITEM, NOT ON THE NUMBER ASKED FOR (17
+    // RADIALOFFSET). The origin was the REQUESTED position and the radius a
+    // fixed 50 px: whenever (x, y) placed the item as a corner (an anchor, a
+    // default position) the core landed up-left by half the item, and a 300 px
+    // circle got a 50 px core. Read from the created item's bounds instead —
+    // centre and right-centre, as the engine's own _parseColor does — with the
+    // request only as the fallback when the item has no bounds. An origin or
+    // destination the caller gave is kept as given.
+    const fx = position.x, fy = position.y;
+    const o = origin ? `[${origin[0]}, ${origin[1]}]` : `(__gb ? [__gb.x + __gb.width / 2, __gb.y + __gb.height / 2] : [${fx}, ${fy}])`;
+    const d = destination ? `[${destination[0]}, ${destination[1]}]`
+      : origin ? `(__gb ? [${origin[0]} + __gb.width / 2, ${origin[1]}] : [${origin[0]} + 50, ${origin[1]}])`
+      : `(__gb ? [__gb.x + __gb.width, __gb.y + __gb.height / 2] : [${fx + 50}, ${fy}])`;
+    return `
+${itemVarName}.${propertyName} = (function() {
+  const __b = ${itemVarName} && ${itemVarName}.bounds;
+  const __gb = __b && isFinite(__b.x) && isFinite(__b.y) && __b.width > 0 && __b.height > 0 ? __b : null;
+  return {
+    gradient: {
+      stops: [${stopsCode}],
+      radial: true
+    },
+    origin: ${o},
+    destination: ${d}
+  };
+})();`;
+  }
+
+  // Linear: a diagonal across a 100 px box at the requested position.
+  const defaultOrigin = origin || [position.x - 50, position.y - 50];
+  const defaultDestination = destination || [position.x + 50, position.y + 50];
 
   return `
 ${itemVarName}.${propertyName} = {
   gradient: {
     stops: [${stopsCode}],
-    radial: ${type === 'radial'}
+    radial: false
   },
   origin: [${defaultOrigin[0]}, ${defaultOrigin[1]}],
   destination: [${defaultDestination[0]}, ${defaultDestination[1]}]
@@ -413,6 +439,7 @@ function generateCreateItemCode(
     textDirection.resolved = baseDirection(createProps.content);
   }
   const textTabular = itemType === 'text' && wantsTabular(createProps) === true;
+  const createFillOpacity = createProps.fillOpacity !== undefined;
   const textStrokePos = itemType === 'text' ? takeStrokePosition(createProps, false) : null;
   const params: Record<string, unknown> = {
     ...(omitXY ? {} : { x: position.x, y: position.y }),
@@ -587,6 +614,7 @@ const item = app.create('${itemType}', ${JSON.stringify(params, null, 2)});`;
   // anchored headline's top edge drifted on every refit.
   if (textDirection) code += emitDirectionCheck('item', textDirection);
   if (textTabular) code += emitTabularCheck('item');
+  if (createFillOpacity) code += emitFillOpacityCheck('item');
   if (textStrokePos) code += emitStrokePositionCheck('item', textStrokePos);
   if (textFit) code += `\nlet __textFit = null;${emitTextFit('item', textFit, JSON.stringify(anchorHold(properties.anchor ?? properties.origin) ?? null))}`;
 
@@ -625,7 +653,7 @@ const itemId = item.data.registryId;
 app.historyManager.saveState();
 
 // Return item info
-({ itemId, type: '${itemType}'${textFit ? ', textFit: __textFit' : ''}${textDirection ? ', direction: __direction' : ''}${textTabular ? ', tabularFigures: __tabular' : ''}${textStrokePos ? ', strokePosition: __strokePos' : ''}, position: ${omitXY ? `(item.position ? { x: item.position.x, y: item.position.y } : null)` : `{ x: ${position.x}, y: ${position.y} }`}${hasLifetime ? ', lifetime: __lifetime' : ''}${loadsFont ? ', ...(__font ? { font: __font } : {})' : ''}${ignored.length > 0
+({ itemId, type: '${itemType}'${textFit ? ', textFit: __textFit' : ''}${textDirection ? ', direction: __direction' : ''}${textTabular ? ', tabularFigures: __tabular' : ''}${createFillOpacity ? ', fillOpacity: __fillOpacity' : ''}${textStrokePos ? ', strokePosition: __strokePos' : ''}, position: ${omitXY ? `(item.position ? { x: item.position.x, y: item.position.y } : null)` : `{ x: ${position.x}, y: ${position.y} }`}${hasLifetime ? ', lifetime: __lifetime' : ''}${loadsFont ? ', ...(__font ? { font: __font } : {})' : ''}${ignored.length > 0
     ? `, ignoredProperties: ${JSON.stringify(ignored)}, warning: ${JSON.stringify(
       `${ignored.join(', ')} ${ignored.length > 1 ? 'are' : 'is'} not read when creating an item, so ${ignored.length > 1 ? 'they had' : 'it had'} no effect. `
       + 'Check the spelling against this item type\'s documented properties.',
@@ -654,7 +682,7 @@ const MODIFY_KNOWN_KEYS: ReadonlySet<string> = new Set([
   ...NORMALIZE_PARAM_READS,
   'contentType', 'contentFormat', 'countdownTarget', 'countdownEndText',
   'audioGain', 'volume', 'gain', 'bornAt', 'ttl', 'smoothing',
-  'fontStyle', 'leading', 'lineHeight', 'skewX', 'skewY', 'matrix', 'fit', 'direction', 'textDirection', 'dir', 'tabularFigures', 'fontVariantNumeric', 'fontFeatures', 'strokePosition',
+  'fontStyle', 'leading', 'lineHeight', 'skewX', 'skewY', 'matrix', 'fit', 'direction', 'textDirection', 'dir', 'tabularFigures', 'fontVariantNumeric', 'fontFeatures', 'strokePosition', 'fillOpacity',
 ]);
 
 /** Spellings callers reach for, and the key the engine actually reads. */
@@ -677,6 +705,9 @@ const CREATE_KNOWN_KEYS: ReadonlySet<string> = new Set([
   // Lifetimes, on ANY item: this generator applies them through app.setLifetime
   // (emitLifetime), whatever create() itself reads.
   'bornAt', 'ttl',
+  // A solid fill's own alpha (FxTool 12 STROKEFILL); confirmed per call by
+  // emitFillOpacityCheck, since an older studio ignores it.
+  'fillOpacity',
 ]);
 
 /**
@@ -821,13 +852,60 @@ function wantsTabular(p: Record<string, unknown>): boolean | null {
   const list = Array.isArray(f) ? f.map(String) : typeof f === 'string' ? [f] : f && typeof f === 'object' ? Object.keys(f).filter((k) => (f as Record<string, unknown>)[k]) : [];
   return list.some((x) => /\btnum\b/.test(x));
 }
+/**
+ * Whether tabular figures CHANGED the layout is the engine's to measure: the
+ * request flag (data.tabularFigures) is set even when the font's digits are
+ * already one width, where the layout moves nothing (9 TABNUM: DejaVu Sans
+ * reported applied while every advance matched the control). A studio with
+ * app.tabularFiguresReport measures the item's own font, and only its answer
+ * is reported as applied. One without it can only say the flag was recorded:
+ * 'unverified', never true.
+ */
 function emitTabularCheck(itemExpr: string): string {
   return `
 const __tabular = (function(it) {
   if (!it || it.className !== 'PointText') return { applied: false, note: 'tabular figures apply to text items only.' };
+  if (typeof app.tabularFiguresReport === 'function') {
+    let r = null;
+    try { r = app.tabularFiguresReport(it); } catch (e) { return { applied: 'unverified', note: 'the studio could not measure tabular figures on this text (' + ((e && e.message) || e) + ').' }; }
+    if (r && typeof r === 'object') {
+      const out = { applied: r.applied === true };
+      if (typeof r.steadyWidth === 'boolean') out.steadyWidth = r.steadyWidth;
+      if (r.reason) out.reason = r.reason;
+      if (r.note) out.note = r.note;
+      else if (r.reason === 'rtl') out.note = 'right-to-left text keeps proportional digits.';
+      else if (r.reason === 'not-requested') out.note = 'the studio did not record the request, so digits keep their proportional widths.';
+      if (typeof r.spread === 'number') out.digitSpread = r.spread;
+      if (r.width && typeof r.width === 'object') out.width = r.width;
+      return out;
+    }
+    return { applied: 'unverified', note: 'the studio returned no tabular-figures report for this text.' };
+  }
   return it.data && it.data.tabularFigures === true
-    ? { applied: true }
+    ? { applied: 'unverified', note: 'this studio recorded tabular figures but cannot measure whether they change the layout (it has no tabularFiguresReport): with a font whose digits are already one width they change nothing.' }
     : { applied: false, note: 'this studio does not lay out tabular figures (it needs an engine with them): digits keep their proportional widths. A monospaced font is the fallback.' };
+})(${itemExpr});`;
+}
+
+/**
+ * fillOpacity (FxTool 12 STROKEFILL): a solid fill's own alpha, apart from the
+ * item's opacity and its stroke, so an outline-only type is fillOpacity: 0.
+ * The engine records it on data.fillOpacity and re-applies it when a later
+ * modify changes the fill colour. A studio without it ignores the key, so the
+ * reply is read from the item: the recorded value and the fill's alpha.
+ */
+function emitFillOpacityCheck(itemExpr: string): string {
+  return `
+const __fillOpacity = (function(it) {
+  if (!it) return { applied: false, note: 'no item to check.' };
+  const v = it.data && it.data.fillOpacity;
+  if (typeof v !== 'number') return { applied: false, note: 'this studio does not read fillOpacity (it needs an engine with it): the fill keeps its own alpha. opacity fades the whole item, stroke included; an rgba() fill sets the fill alone.' };
+  const c = it.fillColor;
+  if (!c) return { applied: true, value: v, note: 'the item has no fill now, so there is nothing to see; a fill colour set later with modify_item takes this alpha.' };
+  if (c.gradient) return { applied: false, value: v, note: 'a gradient fill keeps its own stop colours: put the alpha in the stops (rgba) instead.' };
+  return (typeof c.alpha === 'number' && Math.abs(c.alpha - v) > 0.01)
+    ? { applied: false, value: v, note: 'the studio recorded fillOpacity but the fill is drawn at alpha ' + c.alpha + '.' }
+    : { applied: true, value: v };
 })(${itemExpr});`;
 }
 
@@ -1112,6 +1190,7 @@ function generateModifyItemCode(
   if (restProperties.fit && typeof restProperties.fit === 'object') delete restProperties.fit;
   const modDirection = takeDirection(restProperties);
   const modTabular = wantsTabular(restProperties) === true;
+  const modFillOpacity = restProperties.fillOpacity !== undefined;
   const modStrokePos = takeStrokePosition(restProperties, true);
 
   // modifyItem(id, changes), NOT select() + modify().
@@ -1261,8 +1340,8 @@ ${properties.content !== undefined ? `
 const __ctItem = app.getItemById('${itemId}');
 const __ctKeys = (__ctItem && __ctItem.data && Array.isArray(__ctItem.data.keyframes))
   ? __ctItem.data.keyframes.filter(function(k) { return k && k.properties && Object.prototype.hasOwnProperty.call(k.properties, 'content'); }).length : 0;` : ''}
-${modDirection ? emitDirectionCheck(`app.getItemById('${itemId}')`, modDirection) : ''}${modTabular ? emitTabularCheck(`app.getItemById('${itemId}')`) : ''}${modStrokePos ? emitStrokePositionCheck(`app.getItemById('${itemId}')`, modStrokePos) : ''}
-return { success: true, itemId: '${itemId}'${properties.content !== undefined ? `, ...(__ctKeys ? { contentTrackWarning: 'this text\\'s content is keyframed (' + __ctKeys + ' key(s)), so the track sets it on every frame and this edit does not show. Change the content keys with pinepaper_keyframe_animate (append: true replaces same-time keys), or animate another property.' } : {})` : ''}${modFit ? ', textFit: __textFit' : ''}${modDirection ? ', direction: __direction' : ''}${modTabular ? ', tabularFigures: __tabular' : ''}${modStrokePos ? ', strokePosition: __strokePos' : ''}${affine ? `, affine: ${JSON.stringify({ skewX, skewY, matrix, note: 'applied to the current shape: calling again compounds it. To undo, apply the inverse (negative skew, or the inverse matrix).' })}` : ''}${modLifetime ? ', lifetime: __lifetime' : ''}${modFont ? ', ...(__font ? { font: __font } : {})' : ''}${modWarning} };`;
+${modDirection ? emitDirectionCheck(`app.getItemById('${itemId}')`, modDirection) : ''}${modTabular ? emitTabularCheck(`app.getItemById('${itemId}')`) : ''}${modFillOpacity ? emitFillOpacityCheck(`app.getItemById('${itemId}')`) : ''}${modStrokePos ? emitStrokePositionCheck(`app.getItemById('${itemId}')`, modStrokePos) : ''}
+return { success: true, itemId: '${itemId}'${properties.content !== undefined ? `, ...(__ctKeys ? { contentTrackWarning: 'this text\\'s content is keyframed (' + __ctKeys + ' key(s)), so the track sets it on every frame and this edit does not show. Change the content keys with pinepaper_keyframe_animate (append: true replaces same-time keys), or animate another property.' } : {})` : ''}${modFit ? ', textFit: __textFit' : ''}${modDirection ? ', direction: __direction' : ''}${modTabular ? ', tabularFigures: __tabular' : ''}${modFillOpacity ? ', fillOpacity: __fillOpacity' : ''}${modStrokePos ? ', strokePosition: __strokePos' : ''}${affine ? `, affine: ${JSON.stringify({ skewX, skewY, matrix, note: 'applied to the current shape: calling again compounds it. To undo, apply the inverse (negative skew, or the inverse matrix).' })}` : ''}${modLifetime ? ', lifetime: __lifetime' : ''}${modFont ? ', ...(__font ? { font: __font } : {})' : ''}${modWarning} };`;
 
   // Wrapped, because the body now RETURNS early on a miss rather than falling
   // through to an unconditional success. Async only when a font must load
@@ -1351,24 +1430,44 @@ function generateAddRelationCode(
 `.trim();
 }
 
-/** The studio's per-burst particle cap (FxTool ParticleEmitter normalizeLook). */
-export const EMITTER_MAX_PER_BURST = 2000;
+/**
+ * The per-burst particle cap of the CURRENT studio (FxTool ParticleEmitter
+ * MAX_BURST_COUNT, B144). Studios before that change capped at
+ * EMITTER_LEGACY_MAX_PER_BURST, in silence. Which one a studio has is read
+ * back from the spec it stored (generateEmitter), not assumed.
+ */
+export const EMITTER_MAX_PER_BURST = 10000;
+/** The cap of studios before B144 (normalizeLook clamped at 2000 without a word). */
+export const EMITTER_LEGACY_MAX_PER_BURST = 2000;
 
-/** Every count in an emitter spec (the spec's own and each burst's) that the studio will clamp. */
-export function emitterCountWarnings(spec: Record<string, unknown> | undefined): string[] {
-  const out: string[] = [];
+/**
+ * Every count in an emitter spec (the spec's own and each burst's) that some
+ * studio may cap: above the legacy cap. `index` is null for the spec's own
+ * count (each burst without its own inherits it).
+ */
+export function emitterCountsToCheck(spec: Record<string, unknown> | undefined): Array<{ where: string; index: number | null; asked: number }> {
+  const out: Array<{ where: string; index: number | null; asked: number }> = [];
   if (!spec || typeof spec !== 'object') return out;
-  const over = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && Math.round(v) > EMITTER_MAX_PER_BURST;
-  if (over(spec.count)) {
-    out.push(`count ${spec.count} is over the studio's ${EMITTER_MAX_PER_BURST}-particle cap per burst, so each burst draws ${EMITTER_MAX_PER_BURST}. Add bursts at the same t for more.`);
-  }
+  const capped = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && Math.round(v) > EMITTER_LEGACY_MAX_PER_BURST;
+  if (capped(spec.count)) out.push({ where: 'count', index: null, asked: Math.round(spec.count) });
   if (Array.isArray(spec.bursts)) {
     spec.bursts.forEach((b, i) => {
       const c = b && typeof b === 'object' ? (b as Record<string, unknown>).count : undefined;
-      if (over(c)) out.push(`bursts[${i}].count ${c} is over the studio's ${EMITTER_MAX_PER_BURST}-particle cap per burst, so it draws ${EMITTER_MAX_PER_BURST}. Split it into two bursts at the same t.`);
+      if (capped(c)) out.push({ where: `bursts[${i}].count`, index: i, asked: Math.round(c) });
     });
   }
   return out;
+}
+
+/**
+ * What can be said about the counts WITHOUT the studio's answer: above the
+ * current cap is capped on every studio; between the two caps depends on the
+ * studio. Used when the stored spec cannot be read back.
+ */
+export function emitterCountWarnings(spec: Record<string, unknown> | undefined): string[] {
+  return emitterCountsToCheck(spec).map(({ where, asked }) => asked > EMITTER_MAX_PER_BURST
+    ? `${where} ${asked} is over the ${EMITTER_MAX_PER_BURST}-particle cap per burst of the current studio (${EMITTER_LEGACY_MAX_PER_BURST} on older studios), so it draws at most ${EMITTER_MAX_PER_BURST}. Split it into bursts at the same t for more.`
+    : `${where} ${asked} is over the ${EMITTER_LEGACY_MAX_PER_BURST}-particle cap per burst of studios before the ${EMITTER_MAX_PER_BURST} cap, and this studio did not report what it drew: on an older studio it draws ${EMITTER_LEGACY_MAX_PER_BURST}. Split it into bursts at the same t to be sure.`);
 }
 
 /**
@@ -6310,7 +6409,30 @@ ${stillTime !== undefined ? `
 
   if (result && result.success) Object.assign(result, fidelity(format));
   if (result && result.success && __fit) result.platformFit = __fit;
-  // A LANDSCAPE CANVAS FOR A PORTRAIT PLATFORM (or the reverse) is not an
+${usesCanvasSize ? '' : `  // A PRESET SIZE IS NOT THE CANVAS SIZE, AND THAT IS SAID (21 PLATFORMOVERRIDE).
+  // A named platform renders the FILE at the preset's size; the canvas is not
+  // resized, so the scene keeps the canvas's layout, scaled to fill the file.
+  // A 640x360 canvas under youtube came back 1920x1080 with nothing said. The
+  // size the route reports is compared with the canvas; the current studio's
+  // video report warns about an upscale too, but as plain text this reply does
+  // not pass on, so it is said here for every studio.
+  // Not said for camera framing (the camera chooses that frame) or an
+  // unbounded canvas (its stills crop to the artwork, said on their own), and
+  // a scale the caller asked for is theirs, not the preset's.
+  if (result && result.success && framing !== 'camera' && __cv && !__cv.unbounded && __cv.width > 0 && __cv.height > 0
+    && result.dimensions && typeof result.dimensions === 'object' && result.dimensions.width > 0 && result.dimensions.height > 0) {
+    const __fw = result.dimensions.width, __fh = result.dimensions.height;
+    const __us = ${scale !== undefined ? scale : 1};
+    if (Math.abs(__fw - __cv.width * __us) > 2 || Math.abs(__fh - __cv.height * __us) > 2) {
+      const __k = Math.round((__fw / __cv.width) * 1000) / 1000;
+      result.platformSize = { preset: __presetBox.width + 'x' + __presetBox.height, canvas: __cv.width + 'x' + __cv.height, file: __fw + 'x' + __fh, scale: __k, canvasResized: false };
+      result.fidelity = result.fidelity || { warnings: [] };
+      result.fidelity.warnings = (result.fidelity.warnings || []).concat([{ code: 'platform_size_differs_from_canvas',
+        message: 'the ' + platform + ' preset made the file ' + __fw + 'x' + __fh + ' while the canvas is ' + __cv.width + 'x' + __cv.height + ': the scene is drawn ' + (__k > 1 ? 'larger' : 'smaller') + ' (x' + __k + ') with the canvas\\'s layout, and the canvas itself is unchanged. For a file at the canvas size, export with platform: \\'auto\\'; for a scene laid out at ' + __fw + 'x' + __fh + ', resize the canvas (pinepaper_set_canvas_size) and re-lay it.' }]);
+      if (result.fidelity.note) delete result.fidelity.note;
+    }
+  }
+`}  // A LANDSCAPE CANVAS FOR A PORTRAIT PLATFORM (or the reverse) is not an
   // aspect nuance but the wrong deliverable: tiktok on a 16:9 canvas came out
   // 1920x1080 with only a note (round 10, 10.7). Said where a caller looks.
   if (result && result.success && __fit) {
@@ -12905,32 +13027,49 @@ ${cam ? `  // The camera rides the SAME timing: framing each state as its morph 
   /** pinepaper_emitter (D29): create('emitter', spec) / setEmitter(id, patch). */
   generateEmitter(input: EmitterInput): string {
     const S = (v: unknown) => JSON.stringify(v);
-    // The studio draws at most EMITTER_MAX_PER_BURST particles a burst and
-    // clamps a larger count without a word (B144: 2300 drew ~1940). Said here,
-    // where the asked-for number is still known.
-    const capWarnings = emitterCountWarnings(input.spec);
-    const capJs = capWarnings.length ? `, warnings: ${S(capWarnings)}` : '';
+    // A COUNT OVER THE CAP IS SAID (B144). The cap is 10000 a burst on the
+    // current studio and was 2000 before it, clamped in silence (2300 drew
+    // ~1940). Which applies is read from the spec the studio STORED — its
+    // normalised count is what it draws — so the reply names the number
+    // actually drawn on whichever studio ran it. Only when nothing can be read
+    // back does it fall back to what is known without the studio.
+    const checks = emitterCountsToCheck(input.spec);
+    const fallback = emitterCountWarnings(input.spec);
+    const capFn = checks.length ? `
+  function __capWarnings(stored) {
+    const checks = ${S(checks)};
+    if (!stored || typeof stored !== 'object') return ${S(fallback)};
+    const out = [];
+    for (const c of checks) {
+      const b = c.index === null ? null : (Array.isArray(stored.bursts) ? stored.bursts[c.index] : null);
+      const drawn = b && typeof b.count === 'number' ? b.count : stored.count;
+      if (typeof drawn !== 'number') return ${S(fallback)};
+      if (drawn < c.asked) out.push(c.where + ' ' + c.asked + ' is over this studio\\'s per-burst cap, so it draws ' + drawn + '. Split it into bursts at the same t for more.');
+    }
+    return out;
+  }` : '';
+    const capJs = (stored: string) => checks.length ? `, ...((function(w) { return w.length ? { warnings: w } : {}; })(__capWarnings(${stored})))` : '';
     if (input.action === 'set') {
       return `
 // Emitter: change a spec
 (function() {
-  if (typeof app.setEmitter !== 'function') { return { success: false, error: 'this studio has no emitter item (app.setEmitter) — it predates FxTool D29.' }; }
+  if (typeof app.setEmitter !== 'function') { return { success: false, error: 'this studio has no emitter item (app.setEmitter) — it predates FxTool D29.' }; }${capFn}
   const r = app.setEmitter(${S(input.itemId)}, ${S(input.spec)});
   if (!r || r.ok === false) { return { success: false, error: (r && r.error) || 'the emitter change was refused' }; }
-  return { success: true, action: 'set', itemId: ${S(input.itemId)}, spec: r.spec${capJs} };
+  return { success: true, action: 'set', itemId: ${S(input.itemId)}, spec: r.spec${capJs('r.spec')} };
 })();`.trim();
     }
     return `
 // Emitter: create
 (function() {
-  if (typeof app.setEmitter !== 'function') { return { success: false, error: 'this studio has no emitter item (app.setEmitter) — it predates FxTool D29.' }; }
+  if (typeof app.setEmitter !== 'function') { return { success: false, error: 'this studio has no emitter item (app.setEmitter) — it predates FxTool D29.' }; }${capFn}
   const it = app.create('emitter', ${S(input.spec)});
   // A bad spec comes back null with an emitter-invalid warning; the reason
   // reaches this reply through the governor's warnings.
   if (!it) { return { success: false, error: 'the emitter spec was refused' }; }
   const id = it.data && (it.data.registryId || it.data.id);
   if (!id) { return { success: false, error: 'the emitter was made but not registered — no usable id' }; }
-  return { success: true, action: 'create', itemId: id${capJs} };
+  return { success: true, action: 'create', itemId: id${capJs('it.data && it.data.emitter')} };
 })();`.trim();
   }
 
