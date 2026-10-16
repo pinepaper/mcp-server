@@ -248,9 +248,9 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 
 ## What's new in 1.6.21
 
-### New: craft tools from PinePaper Cloud, now local
+### New: craft tools
 
-Five tools that were cloud-only now draw in your local studio, free:
+Five tools for textile, composition and interface pieces:
 
 - `pinepaper_draw_weave`: woven cloth as vector threads (plain, twill,
   basket, herringbone).
