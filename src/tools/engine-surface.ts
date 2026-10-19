@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 636f3864280d7b33da50761d5a8af39c818f77e0
- * sha256:    bd7d58f8016017932c6db9872143e2101436b48d481c7139ea9360db9219d9e1   (of PinePaper.js as committed)
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 29df847f7e9e90d9e77ba6e48519de7bc00221b4
+ * sha256:    df9ab078f2b153dd6a5d9b43514adaaa33d80172828289a876f42df965b223b4   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on `window.app`, with how it gets there. The parity
@@ -16,9 +16,10 @@
 /** How a name lands on `app`. */
 export type EngineMemberKind = 'method' | 'accessor' | 'property' | 'lazy' | 'lazyHeavy' | 'bootstrap';
 
-/** 1446 names, from FxTool/js/PinePaper.js. */
+/** 1461 names, from FxTool/js/PinePaper.js. */
 export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object.freeze({
   __buildFreshness: 'property',
+  _aboveHooksHeld: 'property',
   _activeByGroup: 'property',
   _activeDrawingGroup: 'method',
   _addAuthoredMesh: 'method',
@@ -39,6 +40,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _applyClippedPose: 'method',
   _applyCounter: 'method',
   _applyCountersAt: 'method',
+  _applyFillOpacity: 'method',
   _applyingRemote: 'property',
   _applyItemKeyframesAt: 'method',
   _applyLifetimesAt: 'method',
@@ -88,6 +90,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _callbackWarnedNearLimit: 'property',
   _callbackWarningThreshold: 'property',
   _canvasColorSpace: 'property',
+  _canvasDrawsLetterSpacing: 'method',
   _canvasRevealed: 'property',
   _characterDrag: 'property',
   _characterDragEnd: 'method',
@@ -140,10 +143,13 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _dragBoxAnchor: 'property',
   _drainEventQueue: 'method',
   _drainSubsystemReadyHooks: 'method',
+  _drawHeldHooksOverBake: 'method',
+  _drawnSize: 'method',
   _drawOverMedia: 'property',
   _drawOverPrevLocked: 'property',
   _drawOverTarget: 'property',
   _drawRenderHookHost: 'method',
+  _drawRenderHooks: 'method',
   _dynamicContentItems: 'property',
   _emitMutation: 'method',
   _engineAddOnFrameCallback: 'method',
@@ -276,6 +282,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _panStartCenter: 'property',
   _panStartPoint: 'property',
   _parseColor: 'method',
+  _pathSpeedWarning: 'method',
   _patternRoot: 'method',
   _pausedForEditing: 'property',
   _pausedForTextEdit: 'bootstrap',
@@ -323,6 +330,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _renderLayerManager: 'property',
   _repaintScheduled: 'property',
   _repaintWithoutScreenSpace: 'method',
+  _reportRefusedColors: 'method',
   _requireHeavy: 'method',
   _rescaleRestBounds: 'method',
   _resizeDebounceTimer: 'property',
@@ -353,6 +361,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _rewriteCursive: 'method',
   _rigCharacter: 'method',
   _rlm: 'method',
+  _runRenderHook: 'method',
   _samplePointsFromItem: 'method',
   _scaledElapsed: 'method',
   _sceneAtLastT: 'property',
@@ -408,6 +417,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _styledRendererCache: 'property',
   _subjectBox: 'method',
   _subsystemReadyHooks: 'property',
+  _suppressAboveHooks: 'property',
   _surfaceState: 'property',
   _syncBackingStore: 'method',
   _syncBlendBgToView: 'method',
@@ -537,6 +547,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   applyImageFilter: 'method',
   applyImageFilterChain: 'method',
   applyInkBrush: 'method',
+  applyKeyframesAt: 'method',
   applyKeyframeState: 'method',
   applyLook: 'method',
   applyMask: 'method',
@@ -571,6 +582,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   autoIdle: 'method',
   autoJump: 'method',
   autoWalk: 'method',
+  awaitAnimatedImages: 'method',
   awaitAudioReactive: 'method',
   awaitMediaAt: 'method',
   awaitSceneFonts: 'method',
@@ -598,6 +610,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   camera: 'lazy',
   cameraViewportOverlay: 'lazy',
   cancelDrawingAnimationPath: 'method',
+  canvasA11yAuditor: 'bootstrap',
   canvasBackingInfo: 'method',
   canvasBoundary: 'property',
   canvasEl: 'property',
@@ -1132,6 +1145,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   plotFunction: 'method',
   plotParametric: 'method',
   plotSurface: 'method',
+  poseAt: 'method',
   poseStitch: 'accessor',
   prefersReducedMotion: 'method',
   prepareForExport: 'method',
@@ -1395,6 +1409,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   syncComponent: 'method',
   syncWorldNodes: 'method',
   synthSounds: 'lazy',
+  tabularFiguresReport: 'method',
   takeWarnings: 'method',
   templateManager: 'bootstrap',
   textItemGroup: 'property',
@@ -1515,13 +1530,13 @@ export const LAZY_HEAVY_CLASSES: Readonly<Record<string, string>> = Object.freez
 export const ENGINE_FACADES: Readonly<Record<string, readonly string[]>> = Object.freeze({
   cutoutStyles: Object.freeze(['_applyFiltersToItem', '_ctx', '_findRaster', '_getImageData', '_gpuPipeline', '_registerBuiltInPresets', 'applyPreset', 'getPresets', 'presets', 'registerPreset', 'removePreset', 'setGPUPipeline']),
   diagramSystem: Object.freeze(['_connectorConfig', '_createLegacyArrow', '_createLegacyHead', '_findPortOwner', '_itemRegistry', '_legacyArrowMode', '_makeOrthogonal', '_mermaidBridge', '_on', '_resolveLayoutItems', 'activate', 'addPorts', 'app', 'applyLayout', 'arrows', 'clear', 'connect', 'connectPorts', 'connectorManager', 'createArrow', 'createShape', 'currentSettings', 'deactivate', 'deserialize', 'diagramMode', 'dispose', 'exportConnectorData', 'exportMermaid', 'get', 'getConnector', 'getPorts', 'getShapes', 'importMermaid', 'isActive', 'layoutEngine', 'mermaidBridge', 'options', 'portManager', 'rebuildAfterRestore', 'removeArrow', 'serialize', 'setMode', 'setupEventListeners', 'shapeLibrary', 'toggle', 'toggleOption', 'update', 'updateArrowSettings', 'updateConnector', 'updateSettings']),
-  exportEngine: Object.freeze(['FRAMED_FORMATS', '_acquireStreamTarget', '_addAnimationToElement', '_addAnimationsToSVG', '_addAttachedAnimation', '_addBackground', '_addBounceAnimation', '_addFadeAnimation', '_addInfoLabelsToSVG', '_addJellyAnimation', '_addKeyframeAnimation', '_addMirrorAnimation', '_addOrbitAnimation', '_addPointsAtAnimation', '_addPulseAnimation', '_addRelationAnimations', '_addRotateAnimation', '_addScrollAnimation', '_addShakeAnimation', '_addSlideAnimation', '_addSwingAnimation', '_addTrimMarks', '_addWobbleAnimation', '_attachEditableSource', '_buildSvgDescription', '_calculateKeyframeDuration', '_cleanWidgetRelationParams', '_closeDialog', '_cloudProfileFor', '_collectAnimatedItems', '_contentSizeFix', '_createInfoLabel', '_createOverlay', '_determineRecommendation', '_downloadBlob', '_downloadFile', '_downloadPNG', '_downloadSVG', '_embedSvgAccessibility', '_emitExportEvent', '_encoderReports', '_ensureExportChip', '_ensureExportSpace', '_escapeHtml', '_estimateExportBytes', '_evaluateStillAt', '_evictExportsFor', '_evictedExports', '_evictedSet', '_exportAcknowledged', '_exportFrameSize', '_exportInFlight', '_exportPNGInner', '_exportSVGWithFeatures', '_exportStaticSVG', '_exportToStore', '_findMatchingSVGElement', '_finishExportChip', '_forgetEviction', '_generateAttachedCSS', '_generateCSSKeyframes', '_generateMirrorCSS', '_generateOrbitCSS', '_generatePointsAtCSS', '_generateRelationCSS', '_generateSimpleAnimationCSS', '_generateWidgetEmbedCode', '_getWidgetItemType', '_hasComplexRelations', '_injectMobileStyles', '_isCircle', '_lastExportBlob', '_lastExportFormat', '_lastExportId', '_lastExportStartedAt', '_loadPDFLibraries', '_lottieExportSettings', '_lottieImportData', '_mapEasingToCSS', '_mermaidDirection', '_mermaidExportText', '_opfsExportHandle', '_opfsExportsDir', '_persistEvicted', '_pngGround', '_quickExportPDF', '_quickExportPNG', '_quickExportSVG', '_quickExportVideo', '_rasterizeWidgetBackground', '_recordEviction', '_releaseOpfsExport', '_removeExportChip', '_renderEstimate', '_requestExportFileHandle', '_resolveWidgetExpressions', '_selectBleed', '_selectDuration', '_selectFps', '_selectImageFormat', '_selectPngDpi', '_selectQuality', '_serializeColor', '_serializeWidgetInteractions', '_serializeWidgetItem', '_serializeWidgetItems', '_serializeWidgetRelations', '_serializeWidgetSkeletons', '_setExactSize', '_setImageMaxKB', '_setupLottieImportListeners', '_setupSVGCanvas', '_showExportBlocked', '_showExportFailed', '_showExportSuccess', '_showExportWarnings', '_showMermaidExportResult', '_showWidgetExportResult', '_streamOrigin', '_svgFidelityWarnings', '_textLayerItems', '_timeSampledPoints', '_toDataURLWithColorSpace', '_updateEstimate', '_updateExportChip', '_wasEvicted', '_widgetInkRingsFor', '_widgetRingsFor', '_wireCustomDuration', 'addTextLayer', 'analyzeComplexity', 'app', 'calculatePNGDimensions', 'containerName', 'copyMermaidExport', 'detectStaticScene', 'detectUpscaledSources', 'downloadMermaidExport', 'embedTextFonts', 'executeLottieImport', 'executeMermaidImport', 'exportAnimatedSVG', 'exportAudio', 'exportFidelity', 'exportHighResPNG', 'exportImage', 'exportPDF', 'exportPNG', 'exportPrintPDF', 'exportSVG', 'exportSVGWithCSS', 'exportToStore', 'exportWidget', 'exportWidgetHTML', 'exportWithFormat', 'getCanvasLimits', 'getExportRecommendation', 'getFormatDescription', 'getFormatName', 'getPlatformExportSettings', 'isIOS', 'isPDFExportAvailable', 'isSafari', 'lastPdfReport', 'listExports', 'preflightExport', 'quickExport', 'raiseGeneratorRenderScale', 'readExport', 'releaseExport', 'sceneHasAudio', 'sceneHasWorld3D', 'showExportDialog', 'showFormatOptions', 'showImportOptions', 'showLottieExportOptions', 'showLottieImportDialog', 'showMermaidImportDialog', 'showPDFExportOptions', 'showPNGExportOptions', 'showVideoExportOptions', 'startCloudRender', 'startLottieExport', 'startPDFExport', 'startPNGExport', 'startVideoExport', 'updateMermaidDirection', 'validateCanvasForExport', 'videoCapabilities', 'videoExporter']),
+  exportEngine: Object.freeze(['FRAMED_FORMATS', 'SIZE_FREE_FORMATS', '_acquireStreamTarget', '_addAnimationToElement', '_addAnimationsToSVG', '_addAttachedAnimation', '_addBackground', '_addBounceAnimation', '_addFadeAnimation', '_addInfoLabelsToSVG', '_addJellyAnimation', '_addKeyframeAnimation', '_addMirrorAnimation', '_addOrbitAnimation', '_addPointsAtAnimation', '_addPulseAnimation', '_addRelationAnimations', '_addRotateAnimation', '_addScrollAnimation', '_addShakeAnimation', '_addSlideAnimation', '_addSwingAnimation', '_addTrimMarks', '_addWobbleAnimation', '_attachEditableSource', '_buildSvgDescription', '_calculateKeyframeDuration', '_cleanWidgetRelationParams', '_closeDialog', '_cloudProfileFor', '_collectAnimatedItems', '_contentSizeFix', '_createInfoLabel', '_createOverlay', '_determineRecommendation', '_downloadBlob', '_downloadFile', '_downloadPNG', '_downloadSVG', '_embedSvgAccessibility', '_emitExportEvent', '_encoderReports', '_ensureExportChip', '_ensureExportSpace', '_escapeHtml', '_estimateExportBytes', '_evaluateStillAt', '_evictExportsFor', '_evictedExports', '_evictedSet', '_exportAcknowledged', '_exportFrameSize', '_exportInFlight', '_exportPNGInner', '_exportSVGWithFeatures', '_exportStaticSVG', '_exportToStore', '_findMatchingSVGElement', '_finishExportChip', '_forgetEviction', '_generateAttachedCSS', '_generateCSSKeyframes', '_generateMirrorCSS', '_generateOrbitCSS', '_generatePointsAtCSS', '_generateRelationCSS', '_generateSimpleAnimationCSS', '_generateWidgetEmbedCode', '_getWidgetItemType', '_hasComplexRelations', '_injectMobileStyles', '_isCircle', '_lastExportBlob', '_lastExportFormat', '_lastExportId', '_lastExportStartedAt', '_loadPDFLibraries', '_lottieExportSettings', '_lottieImportData', '_mapEasingToCSS', '_mermaidDirection', '_mermaidExportText', '_opfsExportHandle', '_opfsExportsDir', '_persistEvicted', '_pngGround', '_quickExportPDF', '_quickExportPNG', '_quickExportSVG', '_quickExportVideo', '_rasterizeWidgetBackground', '_recordEviction', '_releaseOpfsExport', '_removeExportChip', '_renderEstimate', '_requestExportFileHandle', '_resolveWidgetExpressions', '_selectBleed', '_selectDuration', '_selectFps', '_selectImageFormat', '_selectPngDpi', '_selectQuality', '_serializeColor', '_serializeWidgetInteractions', '_serializeWidgetItem', '_serializeWidgetItems', '_serializeWidgetRelations', '_serializeWidgetSkeletons', '_setExactSize', '_setImageMaxKB', '_setupLottieImportListeners', '_setupSVGCanvas', '_showExportBlocked', '_showExportFailed', '_showExportSuccess', '_showExportWarnings', '_showMermaidExportResult', '_showWidgetExportResult', '_streamOrigin', '_svgFidelityWarnings', '_textLayerItems', '_timeSampledPoints', '_toDataURLWithColorSpace', '_updateEstimate', '_updateExportChip', '_wasEvicted', '_widgetInkRingsFor', '_widgetRingsFor', '_wireCustomDuration', 'addTextLayer', 'analyzeComplexity', 'app', 'calculatePNGDimensions', 'containerName', 'copyMermaidExport', 'detectStaticScene', 'detectUpscaledSources', 'downloadMermaidExport', 'embedTextFonts', 'executeLottieImport', 'executeMermaidImport', 'exportAnimatedSVG', 'exportAudio', 'exportFidelity', 'exportHighResPNG', 'exportImage', 'exportPDF', 'exportPNG', 'exportPrintPDF', 'exportSVG', 'exportSVGWithCSS', 'exportToStore', 'exportWidget', 'exportWidgetHTML', 'exportWithFormat', 'getCanvasLimits', 'getExportRecommendation', 'getFormatDescription', 'getFormatName', 'getPlatformExportSettings', 'isIOS', 'isPDFExportAvailable', 'isSafari', 'lastPdfReport', 'listExports', 'preflightExport', 'quickExport', 'raiseGeneratorRenderScale', 'readExport', 'releaseExport', 'sceneHasAudio', 'sceneHasWorld3D', 'showExportDialog', 'showFormatOptions', 'showImportOptions', 'showLottieExportOptions', 'showLottieImportDialog', 'showMermaidImportDialog', 'showPDFExportOptions', 'showPNGExportOptions', 'showVideoExportOptions', 'startCloudRender', 'startLottieExport', 'startPDFExport', 'startPNGExport', 'startVideoExport', 'updateMermaidDirection', 'validateCanvasForExport', 'videoCapabilities', 'videoExporter']),
   filterSystem: Object.freeze(['_applyColorTint', '_applyDither', '_applyEdgeDetect', '_applyFilterByName', '_applyFilterOverlay', '_applyHalftoneCMYK', '_applyHalftoneDots', '_applyHsl', '_applyKernel', '_applySharedCpuFilter', '_boxBlur', '_canvasEl', '_canvasSize', '_clearFilterOverlay', '_filterOverlay', '_findFilter', '_getGpuPipeline', '_getSceneTime', '_getView', '_gpuRendering', '_halftoneCell', '_noteWarning', '_parseColor', '_postFX', '_postFXFailed', '_presenter', '_registerBuiltInFilters', '_registerShaderParityFilters', '_renderCPU', '_renderGPU', '_scheduleUpdate', '_sharedFilterDef', '_sharedRegistry', '_toolLayer', '_updateScheduled', '_warn', 'addFilter', 'applyChainToImageData', 'applyPreset', 'clearFilters', 'deserialize', 'destroy', 'exportForSave', 'filterCanvas', 'filterCtx', 'filterRegistry', 'filterStack', 'get', 'getAvailableFilters', 'getFilters', 'getFiltersByCategory', 'getLayerFilters', 'getPresets', 'grainFps', 'grainTime', 'importFromSave', 'layerFilters', 'registerFilter', 'removeFilter', 'render', 'reorderFilter', 'serialize', 'toggleFilter', 'updateFilter']),
   fontStudio: Object.freeze(['__fontGenClient', '_expandSinglePath', '_fontGenClient', '_glyphFromCommands', '_isNearlyClosed', '_reapplySpacing', '_scaledGlyphWidth', '_serializeGlyphsForWorker', '_snapshotPath', 'app', 'buildCanvasPathFromCommands', 'calculateAdvanceWidth', 'canvasMetrics', 'characterSets', 'cleanupPath', 'clear', 'commandsToPaperPath', 'correctDirection', 'createGlyph', 'createGlyphWithDisplay', 'createSpaceGlyph', 'currentChar', 'deserializePaperPath', 'downloadFont', 'dumpGlyphPipeline', 'expandStroke', 'exportAsOTF', 'exportAsOTFAsync', 'exportData', 'flipY', 'fontName', 'generateFont', 'getCompletionStatus', 'getFontInfo', 'getFontReadableStrokeWidth', 'getGlyphName', 'getRequiredCharacters', 'glyphs', 'importData', 'importOpenTypeFont', 'isActive', 'loadIntoDocument', 'mergeGlyphs', 'metrics', 'normalizeGlyphCommands', 'normalizePath', 'pathToGlyphCommands', 'removeGlyph', 'removeOverlap', 'scaleX', 'serializePaperPath', 'setFontName', 'setMetrics', 'setSpacing', 'smoothPath', 'updateGlyph']),
-  generatorRegistry: Object.freeze(['_cachedCanvasCenter', '_capabilities', '_cleanupInteractiveListeners', '_clearGeneratorCallbacks', '_drainGeneratorState', '_elementSeq', '_generatorNeedsReExecution', '_mergeWithDefaults', '_normalizeRegion', '_patternSnapshot', '_pools', '_raiseNonGeneratorItems', '_refitTimer', '_regionClipPath', '_regionKey', '_regionShapeItem', '_registerA3Generators', '_registerBuiltinGenerators', '_registerPuzzleGenerators', '_removeGeneratorRegionGroup', '_removePatternClipMask', '_shouldClipToCanvas', 'acceleration', 'activeGenerator', 'align', 'animationCallback', 'app', 'arrive', 'attachMotion', 'borders', 'clear', 'cohesion', 'color', 'count', 'createPool', 'createVisual', 'currentParams', 'describeMotions', 'execute', 'executeAsync', 'flock', 'generatedElements', 'generators', 'get', 'getAll', 'getByCategory', 'getElement', 'getElementsByRole', 'getPresets', 'group', 'head', 'index', 'maxForce', 'maxSpeed', 'parallaxSpeed', 'position', 'propertyBasedSpeed', 'rebuildFromState', 'register', 'registerElement', 'run', 'seek', 'separate', 'setAnimationCallback', 'setCapabilities', 'stop', 'tail', 'tailPositions', 'unregister', 'update', 'updateElement', 'updateParam', 'updateVisual', 'velocity']),
+  generatorRegistry: Object.freeze(['_cachedCanvasCenter', '_capabilities', '_cleanupInteractiveListeners', '_clearGeneratorCallbacks', '_drainGeneratorState', '_elementSeq', '_generatorCallbackIds', '_generatorNeedsReExecution', '_mergeWithDefaults', '_normalizeRegion', '_patternSnapshot', '_pools', '_raiseNonGeneratorItems', '_refitTimer', '_regionClipPath', '_regionKey', '_regionShapeItem', '_registerA3Generators', '_registerBuiltinGenerators', '_registerPuzzleGenerators', '_removeGeneratorRegionGroup', '_removePatternClipMask', '_shouldClipToCanvas', 'acceleration', 'activeGenerator', 'align', 'animationCallback', 'app', 'arrive', 'attachMotion', 'borders', 'clear', 'cohesion', 'color', 'count', 'createPool', 'createVisual', 'currentParams', 'describeMotions', 'execute', 'executeAsync', 'flock', 'generatedElements', 'generators', 'get', 'getAll', 'getByCategory', 'getElement', 'getElementsByRole', 'getPresets', 'group', 'head', 'index', 'maxForce', 'maxSpeed', 'parallaxSpeed', 'position', 'propertyBasedSpeed', 'rebuildFromState', 'register', 'registerElement', 'run', 'seek', 'separate', 'setAnimationCallback', 'setCapabilities', 'stop', 'tail', 'tailPositions', 'unregister', 'update', 'updateElement', 'updateParam', 'updateVisual', 'velocity']),
   groupManager: Object.freeze(['_bindEventHandlers', '_createChildrenList', '_createGroupElement', '_createGroupHeader', '_flashItem', '_notifyGroupsChanged', '_notifyUser', '_refreshUngroupedItems', '_removeEmptyGroup', '_setChildrenLocked', '_setupGroupDropZone', '_updateLockButtonUI', 'addItemsToGroup', 'app', 'clear', 'createGroup', 'deleteGroup', 'elements', 'exportForSave', 'getGroupById', 'getGroups', 'getSelectedGroup', 'getUngroupedItems', 'importFromSave', 'initUI', 'isLocked', 'lockGroup', 'lockItem', 'onGroupsChanged', 'onSelectionChanged', 'refreshPanel', 'removeItemFromGroup', 'selectedGroup', 'setSelectedGroup', 'toggleLock', 'ungroupAll', 'userGroups']),
   historyManager: Object.freeze(['_asSnapshot', '_batchDepth', '_buildSessionMeta', '_channelsPresent', '_commitSnapshot', '_dirtySincePersist', '_dispatchHistoryChanged', '_externImages', '_flushPendingSave', '_gcImagePool', '_imageIds', '_imagePool', '_imageSeq', '_initFromStorage', '_internImages', '_itemIdsOf', '_lastSnapshotAt', '_lastUnserializedMissing', '_loadFromIndexedDB', '_loadedSavedAt', '_loadedSessionMeta', '_migrateFromLocalStorage', '_persistHeld', '_persistToStorage', '_replayHandle', '_replaying', '_restoreGuarded', '_restoreStep', '_restoreStepErrors', '_restoredFromStorage', '_saveDebounceTimer', '_savedKeyframeDuration', '_storageManager', 'app', 'applySnapshot', 'batchMode', 'beginBatch', 'canRedo', 'canUndo', 'captureSnapshot', 'checkpoint', 'clearHistory', 'clearStorage', 'currentIndex', 'currentProjectId', 'currentProjectName', 'discardSavedSession', 'endBatch', 'getInfo', 'getJournal', 'getLength', 'getSavedSessionInfo', 'goToIndex', 'hasRestorableSession', 'hasSavedSession', 'history', 'holdPersistUntilStorage', 'indexKey', 'isSaving', 'maxHistory', 'metaKey', 'pendingSave', 'persistDelay', 'persistTimer', 'redo', 'reinitializeAnimationState', 'releasePersist', 'replay', 'restoreCheckpoint', 'restoreSavedSession', 'restoreState', 'saveSession', 'saveState', 'saveStateDebounced', 'savedStateNeedsHeavyModules', 'sessionMarkerKey', 'setCurrentProject', 'setStorageManager', 'setWorkerPool', 'storageKey', 'undo', 'workerPool']),
-  imageTools: Object.freeze(['_applyFeatheredEdge', '_cleanupCropUI', '_cleanupMaskUI', '_constrainToAspectRatio', '_createChromaKeyPreview', '_createCropHandles', '_createCropUI', '_createMaskHandles', '_createMaskUI', '_createRuleOfThirdsGuides', '_diagnoseImageURL', '_downscaleDims', '_downscaleForImport', '_finalizeReplacement', '_generateThumbnail', '_hasAlpha', '_importMaxEdge', '_loadImage', '_loadPdfJs', '_placeAsContent', '_placeRasterFromDataURL', '_processImage', '_rebindReplacement', '_updateChromaKeyPreview', '_updateCropHandles', '_updateCropOverlay', '_updateMaskHandles', '_updateMaskOverlay', '_updateMaskPreview', 'app', 'applyChromaKey', 'applyCrop', 'applyMask', 'applyMaskFromPreview', 'aspectRatios', 'autoEstimateChromaKeyThreshold', 'cancelChromaKey', 'cancelCrop', 'cancelMask', 'chromaKeyState', 'chromaKeyTo', 'clear', 'cropState', 'cropTo', 'deleteImage', 'deserialize', 'drawCropFromTwoPoints', 'fitToCanvas', 'getChromaKeyPresets', 'getChromaKeyState', 'getImage', 'getLibrary', 'getMaskState', 'handleMaskDrag', 'imageLibrary', 'importPDF', 'isChromaKeyActive', 'isMaskActive', 'maskDefinitionFromPreview', 'maskPresets', 'maskState', 'moveCrop', 'panImageInMask', 'panMask', 'placeImage', 'recoverFromStorage', 'removeMask', 'sampleChromaKeyColor', 'scaleMask', 'serialize', 'setChromaKeyColor', 'setChromaKeySmoothing', 'setChromaKeyThreshold', 'setCropAspectRatio', 'setMaskPanMode', 'setMaskShape', 'startChromaKey', 'startCrop', 'startMask', 'updateCrop', 'updateMaskFromHandle', 'uploadFromURL', 'uploadImage']),
+  imageTools: Object.freeze(['_applyFeatheredEdge', '_cleanupCropUI', '_cleanupMaskUI', '_constrainToAspectRatio', '_createChromaKeyPreview', '_createCropHandles', '_createCropUI', '_createMaskHandles', '_createMaskUI', '_createRuleOfThirdsGuides', '_diagnoseImageURL', '_downscaleDims', '_downscaleForImport', '_finalizeReplacement', '_generateThumbnail', '_hasAlpha', '_importMaxEdge', '_loadImage', '_loadPdfJs', '_placeAsContent', '_placeRasterFromDataURL', '_processImage', '_readAnimation', '_rebindReplacement', '_updateChromaKeyPreview', '_updateCropHandles', '_updateCropOverlay', '_updateMaskHandles', '_updateMaskOverlay', '_updateMaskPreview', 'app', 'applyChromaKey', 'applyCrop', 'applyMask', 'applyMaskFromPreview', 'aspectRatios', 'autoEstimateChromaKeyThreshold', 'cancelChromaKey', 'cancelCrop', 'cancelMask', 'chromaKeyState', 'chromaKeyTo', 'clear', 'cropState', 'cropTo', 'deleteImage', 'deserialize', 'drawCropFromTwoPoints', 'fitToCanvas', 'getChromaKeyPresets', 'getChromaKeyState', 'getImage', 'getLibrary', 'getMaskState', 'handleMaskDrag', 'imageLibrary', 'importPDF', 'isChromaKeyActive', 'isMaskActive', 'maskDefinitionFromPreview', 'maskPresets', 'maskState', 'moveCrop', 'panImageInMask', 'panMask', 'placeImage', 'recoverFromStorage', 'removeMask', 'sampleChromaKeyColor', 'scaleMask', 'serialize', 'setChromaKeyColor', 'setChromaKeySmoothing', 'setChromaKeyThreshold', 'setCropAspectRatio', 'setMaskPanMode', 'setMaskShape', 'startChromaKey', 'startCrop', 'startMask', 'updateCrop', 'updateMaskFromHandle', 'uploadFromURL', 'uploadImage']),
   interactionSystem: Object.freeze(['_attachItemListener', '_behaviorTypeConfigs', '_behaviorTypes', '_displacements', '_eventListeners', '_frameCallbackId', '_getOrCreateFeedbackItem', '_interactionMode', '_lastMousePos', '_mouseTrackingEnabled', '_onMouseDown', '_onMouseEnter', '_onMouseLeave', '_onMouseMove', '_onMouseUp', '_onTouchEnd', '_onTouchMove', '_onTouchStart', '_postBehaviorState', '_registerBuiltInActions', '_registerContinuousBehaviors', '_resolveItems', '_returnToOriginalPosition', '_slingshotLine', '_startBehaviorLoop', '_stopBehaviorLoop', '_updateBehaviors', 'actions', 'addContinuousBehavior', 'addTrigger', 'app', 'complete', 'continuousBehaviors', 'createDragDrop', 'createMultipleChoice', 'defineInteraction', 'disableMouseTracking', 'emit', 'enableMouseTracking', 'executeAction', 'fromJSON', 'getBehaviorTypeConfig', 'getBehaviors', 'getRegisteredBehaviorTypes', 'getState', 'goToStep', 'handleTrigger', 'interactions', 'mouse', 'nextStep', 'off', 'on', 'prevStep', 'reapplyDisplacements', 'recordAnswer', 'registerActionType', 'registerBehaviorType', 'removeContinuousBehavior', 'removeTrigger', 'restoreBehaviors', 'setState', 'startInteraction', 'state', 'stopInteraction', 'toJSON', 'triggers']),
   itemRegistry: Object.freeze(['_registerBuiltinTypes', 'addAssociation', 'app', 'clear', 'count', 'get', 'getAll', 'getAllTypes', 'getAssociations', 'getByName', 'getBySource', 'getByType', 'getItem', 'getStats', 'getType', 'getTypesByCategory', 'has', 'itemTypes', 'items', 'nextId', 'query', 'rebind', 'rebuildFromCanvas', 'register', 'registerType', 'removeAssociation', 'repointEntry', 'setName', 'unregister', 'unregisterType', 'updateProperties']),
   magicSystem: Object.freeze(['COLOR_SCHEME_PALETTES', 'ENERGY_CYCLE', 'GENERATOR_PARAMS', 'MOOD_ANIMATIONS', 'MOOD_BLEND_PRESETS', 'MOOD_COLLAGE_STYLES', 'MOOD_CUTOUT_STYLES', 'MOOD_DEFORMS', 'MOOD_EFFECTS', 'MOOD_FILTERS', 'MOOD_GENERATORS', 'MOOD_KEYFRAMES', 'MOOD_MAP', 'MOOD_MASKS', 'ONTOLOGY_ANIMATIONS', 'STYLE_THEMES', '_applyBackgroundDNA', '_applyContextTreatments', '_applyFullTemplate', '_applyItemTreatment', '_applyKGRemix', '_applyKeyframeAnimation', '_applyPermutation', '_applyRelations', '_applyTemplateRelations', '_buildNodeTypeCounts', '_buildRelationTargetSet', '_claimProps', '_claimable', '_cleanPreviousMagic', '_createTemplateItem', '_energyIndex', '_extractAnimationPatterns', '_extractCanvasKeywords', '_extractColorPalette', '_extractDesignDNA', '_extractSelfRelations', '_fallbackBackground', '_findRasterChild', '_getItemType', '_getMoodEffectColor', '_graphRAGScore', '_hasSourceRelation', '_isMagicOwned', '_kgIndex', '_kgInvertedIndex', '_kgSimilarity', '_kgTemplateMap', '_lastBackgroundGenerator', '_lastEnergy', '_liveItem', '_loadKGIndex', '_magicBlendedItems', '_magicChangedBackground', '_magicCollageIds', '_magicConnectors', '_magicCreatedGenerator', '_magicCreatedItems', '_magicDeformedItems', '_magicEffectedItems', '_magicFilteredRasters', '_magicMaskedItems', '_magicRelations', '_permIndex', '_pickRandom', '_pickRandomExcept', '_pickWeighted', '_queryKG', '_recent', '_remember', '_remixExpressive', '_remixIndex', '_resolveMood', '_restyleCollages', '_rolePalette', '_setBackgroundColor', '_snapshotItem', '_splitTextForCollage', '_treatMedia', '_treatMultiText', '_treatShape', '_treatText', '_userOwns', 'analyzeCanvas', 'app', 'autoAnimate', 'currentEnergy', 'generateMagicBackground', 'nextEnergy', 'remixStyle', 'suggestAnimations']),

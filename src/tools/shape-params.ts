@@ -3,9 +3,9 @@
  *
  * What each registry-backed shape reads, and how a caller reaches it.
  *
- * Source: FxTool origin/main 636f3864280d7b33da50761d5a8af39c818f77e0
+ * Source: FxTool origin/main 29df847f7e9e90d9e77ba6e48519de7bc00221b4
  *   js/PinePaper.js + 5 shape modules
- * sha256: bf414e3c050199f1
+ * sha256: 710df17b381d52e3
  *
  * A shape's `create` receives a `config`, never the caller's `params`.
  * PinePaper.js's registryConfig literal is the only bridge between the two, so
@@ -17,6 +17,7 @@
 /** Every `params.*` that `create(type, params)` reads. Anything else is dropped. */
 export const ACCEPTED_CREATE_PARAMS: readonly string[] = Object.freeze([
   '_bulkCreate',
+  '_ppColorRefused',
   'alignment',
   'anchor',
   'angle',
@@ -43,6 +44,7 @@ export const ACCEPTED_CREATE_PARAMS: readonly string[] = Object.freeze([
   'dir',
   'direction',
   'fillColor',
+  'fillOpacity',
   'fit',
   'fontFamily',
   'fontSize',
@@ -91,6 +93,7 @@ export const ACCEPTED_CREATE_PARAMS: readonly string[] = Object.freeze([
   'singleStroke',
   'size',
   'smooth',
+  'smoothing',
   'soundSpec',
   'spacing',
   'src',
@@ -120,6 +123,7 @@ export const ACCEPTED_CREATE_PARAMS: readonly string[] = Object.freeze([
  * Together with ACCEPTED_CREATE_PARAMS, the full set a caller may pass.
  */
 export const NORMALIZE_PARAM_READS: readonly string[] = Object.freeze([
+  '_ppColorRefused',
   'color',
   'delay',
   'fill',
@@ -162,6 +166,7 @@ export const MODIFY_CHANGE_READS: readonly string[] = Object.freeze([
   'dashOffset',
   'direction',
   'fillColor',
+  'fillOpacity',
   'fit',
   'fontFamily',
   'fontSize',
@@ -194,6 +199,7 @@ export const MODIFY_CHANGE_READS: readonly string[] = Object.freeze([
   'shadowBlur',
   'shadowColor',
   'shadowOffset',
+  'smoothing',
   'src',
   'staggerDelay',
   'stepTiming',

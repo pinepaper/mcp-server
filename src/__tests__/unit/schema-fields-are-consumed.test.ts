@@ -79,6 +79,9 @@ function consumerSource(): string {
     // Generated DATA, not code: the engine vocabulary's description prose
     // mentions words like "gait", which would read here as a field consumed.
     .filter((f) => !f.endsWith(join('ontology', 'upstream-vocabulary.ts')))
+    // Same for the engine's generated name lists: when the engine gained an
+    // app.poseAt method, the stick tool's poseAt option looked "consumed".
+    .filter((f) => !['engine-surface.ts', 'engine-methods.ts', 'engine-lists.ts'].some((g) => f.endsWith(join('tools', g))))
     .map((f) => readFileSync(f, 'utf8'))
     .join('\n')
     .replace(/\/\*[\s\S]*?\*\//g, '')

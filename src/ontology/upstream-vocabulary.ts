@@ -4,7 +4,7 @@
  * FxTool's ITEM_TYPE_MAP and type classes (anchor, description, parentType,
  * mcpTool, mcpAction), read from the loaded module.
  *
- * Source: FxTool origin/main 636f3864280d7b33da50761d5a8af39c818f77e0
+ * Source: FxTool origin/main 29df847f7e9e90d9e77ba6e48519de7bc00221b4
  *   js/ontology/Vocabulary.js
  * sha256: 029cdf53b6af5214
  *
