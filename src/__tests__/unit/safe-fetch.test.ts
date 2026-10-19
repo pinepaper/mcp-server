@@ -131,7 +131,7 @@ describe('address classes', () => {
   it('blocks loopback, private, link-local, CGNAT, reserved and their IPv6 forms', () => {
     for (const a of ['127.0.0.1', '10.1.2.3', '172.16.0.1', '192.168.1.1', '169.254.1.1', '100.64.0.1', '0.0.0.0',
       '224.0.0.1', '255.255.255.255', '::1', '::', 'fd12::1', 'fe80::1', '::ffff:127.0.0.1', '::ffff:7f00:1',
-      '64:ff9b::7f00:1', '2002:7f00:1::1', '::ffff:10.0.0.1']) {
+      '64:ff9b::7f00:1', '64:ff9b:1::808:808', '2002:7f00:1::1', '::ffff:10.0.0.1']) {
       expect([a, classifyAddress(a)]).toEqual([a, 'private']);
     }
   });

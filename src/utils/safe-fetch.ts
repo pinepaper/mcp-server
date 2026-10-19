@@ -58,7 +58,9 @@ for (const [net, bits] of [
   ['224.0.0.0', 4], ['240.0.0.0', 4],
 ] as const) PRIVATE.addSubnet(net, bits, 'ipv4');
 for (const [net, bits] of [
-  ['::', 96], ['100::', 64], ['2001:db8::', 32], ['fc00::', 7],
+  // 64:ff9b:1::/48 is NAT64 LOCAL-USE (RFC 8215): it translates to addresses
+  // inside the operator's own network, so it is private, not unpacked.
+  ['::', 96], ['64:ff9b:1::', 48], ['100::', 64], ['2001:db8::', 32], ['fc00::', 7],
   ['fe80::', 10], ['fec0::', 10], ['ff00::', 8],
 ] as const) PRIVATE.addSubnet(net, bits, 'ipv6');
 
