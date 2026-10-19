@@ -1887,15 +1887,23 @@ function measureResponseBytes(result: CallToolResult): number {
 }
 
 /**
- * TOP-LEVEL ARGUMENTS A TOOL DROPPED, SAID OUT LOUD.
+ * TOP-LEVEL ARGUMENTS A TOOL DROPPED, SAID OUT LOUD — FOR EVERY TOOL.
  *
  * z.object() strips unknown keys, so agent_export {loop: true, seamless: true}
  * answered success and exported exactly what it would have without them — the
- * caller believed they had a loop setting. create_item / modify_item report
- * unread PROPERTIES; this is the same idea one level up, for tools listed
- * here. Keyed to the zod schema the handler parses with, so a key the handler
- * accepts is never reported, and extended one tool at a time rather than
- * guessed for all 150.
+ * caller believed they had a loop setting. keyframe_animate {mode: 'merge'}
+ * (issue #14) was the same: stripped, success, the track replaced.
+ *
+ * A key is known when the tool's published JSON schema lists it, when the zod
+ * schema in IGNORED_ARGUMENT_SCHEMAS has it, or when HIDDEN_ARGUMENTS names it.
+ * Anything else had no effect, and the reply says so. The published schema is
+ * the contract the caller reads, so it is the right default; the two lists
+ * cover what a handler accepts without advertising.
+ *
+ * ignored-arguments-coverage.test.ts pairs every tool with the zod schemas its
+ * handler parses and the args.x it reads, and fails when a key the handler
+ * accepts is neither published nor in HIDDEN_ARGUMENTS — so a working key is
+ * never reported as ignored — and when an entry here is no longer needed.
  */
 const IGNORED_ARGUMENT_SCHEMAS: Readonly<Record<string, z.ZodTypeAny>> = {
   pinepaper_agent_export: AgentExportInputSchema,
@@ -1906,6 +1914,26 @@ const IGNORED_ARGUMENT_SCHEMAS: Readonly<Record<string, z.ZodTypeAny>> = {
   // Its options live in `options` / `spec`; a key beside them was dropped.
   pinepaper_sound: SoundInputSchema,
 };
+/**
+ * Keys a handler accepts that its published schema does not list. Shrink-only:
+ * publishing one (or dropping it from the handler) means deleting it here.
+ */
+export const HIDDEN_ARGUMENTS: Readonly<Record<string, readonly string[]>> = {
+  pinepaper_agent_end_job: ['takeScreenshot'],
+  pinepaper_agent_export: ['includeRecommendations'],
+  pinepaper_agent_reset: ['preserveCanvasSize'],
+  pinepaper_agent_start_job: ['headless', 'canvasSize', 'backgroundColor'],
+  pinepaper_font: ['fontFamily'],
+  pinepaper_import_svg: ['source'],
+  // load takes its options flat as well as under `options`.
+  pinepaper_map: ['quality', 'fillColor', 'strokeColor', 'strokeWidth', 'scale', 'rotate', 'enableHover', 'enableClick', 'hoverFill', 'hoverStroke', 'animate', 'geoJson'],
+  pinepaper_map_regions: ['pulse', 'shape'],
+  pinepaper_query_capabilities: ['query'],
+  pinepaper_text_effect: ['startAt', 'hideAfter'],
+};
+/** Tools whose schema passes every key through: nothing is dropped. */
+export const PASSTHROUGH_ARGUMENT_TOOLS: ReadonlySet<string> = new Set(['pinepaper_equation_path', 'pinepaper_ui_kit']);
+
 const IGNORED_ARGUMENT_HINTS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   pinepaper_create_item: Object.fromEntries(['width', 'height', 'radius', 'color', 'fillColor', 'strokeColor', 'strokeWidth', 'content', 'fontSize', 'fontFamily', 'opacity', 'rotation', 'x', 'y']
     .map((k) => [k, 'Shape properties go INSIDE properties: {…}; only itemType, position, anchor, properties, animation*, keyframes and data are top-level.'])),
@@ -1917,18 +1945,47 @@ const IGNORED_ARGUMENT_HINTS: Readonly<Record<string, Readonly<Record<string, st
   },
 };
 
-export function ignoredArgumentsNote(toolName: string, args: Record<string, unknown>): string | null {
+let PUBLISHED_ARGUMENTS: Map<string, Set<string> | null> | null = null;
+/** Each tool's published top-level keys; null when its schema allows any key. */
+export async function publishedArguments(toolName: string): Promise<Set<string> | null | undefined> {
+  if (!PUBLISHED_ARGUMENTS) {
+    const { PINEPAPER_TOOLS } = await import('./definitions.js');
+    PUBLISHED_ARGUMENTS = new Map(PINEPAPER_TOOLS.map((t) => {
+      const js = t.inputSchema as { properties?: Record<string, unknown>; additionalProperties?: unknown };
+      return [t.name, js.additionalProperties === true ? null : new Set(Object.keys(js.properties ?? {}))];
+    }));
+  }
+  return PUBLISHED_ARGUMENTS.get(toolName);
+}
+
+/** The top-level keys of `args` the tool does not read. */
+export function ignoredArgumentKeys(toolName: string, args: Record<string, unknown>, published?: Set<string> | null): string[] {
+  if (!args || typeof args !== 'object' || PASSTHROUGH_ARGUMENT_TOOLS.has(toolName) || published === null) return [];
+  const known = new Set<string>([...(published ?? []), ...(HIDDEN_ARGUMENTS[toolName] ?? [])]);
   let schema = IGNORED_ARGUMENT_SCHEMAS[toolName];
-  if (!schema || !args || typeof args !== 'object') return null;
   while (schema instanceof z.ZodEffects) schema = schema._def.schema;
-  if (!(schema instanceof z.ZodObject)) return null;
-  const known = new Set(Object.keys(schema.shape));
-  const ignored = Object.keys(args).filter((k) => !known.has(k));
+  if (schema instanceof z.ZodObject) Object.keys(schema.shape).forEach((k) => known.add(k));
+  else if (published === undefined) return []; // neither a schema nor a published contract to judge by
+  return Object.keys(args).filter((k) => !known.has(k));
+}
+
+export function ignoredArgumentsNote(toolName: string, args: Record<string, unknown>, published?: Set<string> | null): string | null {
+  const ignored = ignoredArgumentKeys(toolName, args, published);
   if (ignored.length === 0) return null;
   const hints = ignored.map((k) => IGNORED_ARGUMENT_HINTS[toolName]?.[k]).filter(Boolean);
   return `IGNORED ARGUMENTS: ${ignored.join(', ')} ${ignored.length > 1 ? 'are' : 'is'} not a parameter of ${toolName}, so ${ignored.length > 1 ? 'they had' : 'it had'} no effect.`
     + (hints.length ? ` ${[...new Set(hints)].join(' ')}` : '');
 }
+
+/** The same check, against the tool's published schema. */
+export async function ignoredArgumentsNoteFor(toolName: string, args: Record<string, unknown>): Promise<{ note: string; ignored: string[] } | null> {
+  const published = await publishedArguments(toolName);
+  const ignored = ignoredArgumentKeys(toolName, args, published);
+  if (!ignored.length) return null;
+  return { note: ignoredArgumentsNote(toolName, args, published)!, ignored };
+}
+
+export const IGNORED_ARGUMENTS_META_KEY = 'pinepaper.studio/ignoredArguments';
 
 export async function handleToolCall(
   toolName: string,
@@ -1942,8 +1999,11 @@ export async function handleToolCall(
     { toolName, action: typeof args.action === 'string' ? args.action : undefined },
     () => handleToolCallInner(toolName, args, options, tracker, baseTimerId),
   );
-  const ignoredNote = ignoredArgumentsNote(toolName, args);
-  if (ignoredNote) result.content = [...(result.content ?? []), { type: 'text' as const, text: ignoredNote }];
+  const ignored = await ignoredArgumentsNoteFor(toolName, args);
+  if (ignored) {
+    result.content = [...(result.content ?? []), { type: 'text' as const, text: ignored.note }];
+    result._meta = { ...(result._meta ?? {}), [IGNORED_ARGUMENTS_META_KEY]: ignored.ignored };
+  }
 
   // Record response payload size for token estimation
   const responseBytes = measureResponseBytes(result);

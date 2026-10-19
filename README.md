@@ -247,6 +247,37 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - Puppeteer itself is an **optional** peer dependency, kept out of the default tree precisely because a headless browser plus an install script is what scanners flag hardest. Install it only if you want the executing mode.
 - The server itself fetches the images, SVGs and media a tool call names by URL, and reads local files named by path. URLs that resolve to loopback, private, link-local or reserved addresses are refused, redirects included, and so are cloud metadata addresses. Local files are read only from the working directory, the export folder, and folders listed in `PINEPAPER_ASSET_DIRS`. `PINEPAPER_ALLOW_PRIVATE_NETWORK=1` allows local and LAN hosts. Metadata addresses stay refused even with it set.
 
+## What's new in 1.6.23
+
+### Fixed
+
+- Every tool now says when it ignored an argument. A top-level argument a
+  tool does not take used to be dropped silently, and the call still reported
+  success. The reply now names it ("IGNORED ARGUMENTS: … had no effect"), and
+  lists it under `_meta["pinepaper.studio/ignoredArguments"]`.
+- `pinepaper_keyframe_animate` accepts `mode: 'merge'` (the same as
+  `append: true`), which the studio's own warning recommends, on the tool and
+  in batch operations.
+- `pinepaper_import_image` applies `shadowColor`, `shadowBlur` and
+  `shadowOffset`.
+- `pinepaper_design_system` `compose`: cyberpunk scanlines are drawn as lines,
+  the HUD frame keeps its angled corners, and neon glows carry over to shapes
+  and text. Bauhaus and Memphis circles are drawn as circles. Text that lands
+  on a shape at a canvas size the style was not laid out for is reported in
+  `layoutCollisions`.
+- Tool docs give the units for emitter `jitter` and `spin`, say what
+  `quality` controls on MP4 and WebM, and say how timing works on an equation
+  route in `moves_along_path`.
+- `pinepaper_choreograph` anchors each move at where the actor is on the beat,
+  not wherever the playhead was left, and a roll on a picture turns by its
+  drawn size.
+- An equation route in `moves_along_path` keeps its `duration`.
+- A radial gradient is centred on the item it fills.
+- An export whose platform preset sizes the file differently from the canvas
+  says so (`platformSize`, `platform_size_differs_from_canvas`).
+- `fillOpacity` is no longer reported as ignored, and tabular figures report
+  whether they really applied.
+
 ## What's new in 1.6.22
 
 ### Changed

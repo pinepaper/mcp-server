@@ -17,8 +17,11 @@ describe('ignoredArgumentsNote', () => {
     expect(ignoredArgumentsNote('pinepaper_agent_export', { format: 'pdf', pdf: { bleed: 3 }, duration: 5 })).toBeNull();
   });
 
-  it('is silent for tools not in the table', () => {
+  it('without a published schema to judge by, a tool outside the zod table is not guessed at', () => {
+    // handleToolCall passes the published schema, so every tool is checked
+    // there (ignored-arguments-coverage.test.ts); this is the bare function.
     expect(ignoredArgumentsNote('pinepaper_add_relation', { anything: 1 })).toBeNull();
+    expect(ignoredArgumentsNote('pinepaper_add_relation', { anything: 1 }, new Set(['sourceId']))).toContain('anything is not a parameter');
   });
 
   it('create_item names shape properties passed beside properties, and accepts a top-level anchor', () => {
