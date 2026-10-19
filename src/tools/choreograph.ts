@@ -29,6 +29,10 @@ export interface ChoreoActor {
   w: number; h: number;          // unscaled size
   sx: number; sy: number;        // base scale
   rot: number;                   // base authored rotation, degrees
+  /** The actor already has a track keying the beat properties (x, y, scale, rotation, opacity) that these beats MERGE into (B154). */
+  hasTrack?: boolean;
+  /** The radius a roll turns on: the DRAWN radius of a picture, not its box (ROLLSLIP). */
+  rollRadius?: number;
 }
 export interface ChoreoFrame { x: number; y: number; width: number; height: number }
 export interface ChoreoEvent { time: number; kind: 'pop' | 'whoosh' | 'contact' | 'shake'; strength: number }
@@ -90,7 +94,12 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
     if (firstAt > 0) {
       const firstVerb = sorted[0].b.verb;
       const isEntrance = firstVerb === 'enter' || firstVerb === 'pop' || firstVerb === 'peek';
-      if (!isEntrance) {
+      // A hold key at 0 pins the actor where it starts. Merged into a track
+      // the actor already has, that key OVERWRITES the existing track's key
+      // at 0 (B154 / HOOKCLOCK3: the first move jumped to the second call's
+      // start), so it is only written when no track keys those properties
+      // (a colour-only track still gets it, B109).
+      if (!isEntrance && !actor.hasTrack) {
         key(0, 'linear');
       }
     }
@@ -175,7 +184,10 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
         squashTo(1); key(t, 'linear');
         s.x = to.x; s.y = to.y;
         // Rolling without slipping: angle = distance / radius; y-down, so rolling right turns clockwise (+).
-        s.rot += (dist / Math.max(1, h / 2)) * (180 / Math.PI);
+        // The drawn radius when the studio measured one (a disc on a PNG with a
+        // margin rolled by its half-box and slid 9.1%, ROLLSLIP); else the box.
+        const rr = actor.rollRadius && actor.rollRadius > 0 ? actor.rollRadius : h / 2;
+        s.rot += (dist / Math.max(1, rr)) * (180 / Math.PI);
         key(t + d, 'easeInOut');
         t += d;
       } else if (verb === 'fly') {

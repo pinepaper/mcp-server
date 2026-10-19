@@ -118,7 +118,10 @@ function consumerSource(): string {
  * stick-contract.test.ts, and prefer a behavioural pin to an entry here.
  */
 const SPREAD_THROUGH_VERIFIED: Readonly<Record<string, readonly string[]>> = Object.freeze({
-  StickInputSchema: ['poseAt', 'trouser', 'withHair', 'groundY', 'gait', 'gaitSeconds', 'gaitFrom', 'sequenceFrom', 'sequenceSeconds'],
+  // poseAt left this list when choreograph began calling app.poseAt (B154): the
+  // name now appears on this side, so the text search counts it. The stick's
+  // opts.poseAt is still the spread-through read described above.
+  StickInputSchema: ['trouser', 'withHair', 'groundY', 'gait', 'gaitSeconds', 'gaitFrom', 'sequenceFrom', 'sequenceSeconds'],
   WorldTourInputSchema: ['dwell', 'highlightColors', 'showLabels', 'labelColor'],
   GlobeEnableInputSchema: ['momentum', 'showOcean'],
   TourItemInputSchema: ['dwell'],

@@ -279,20 +279,46 @@ function generateGradientCode(
   propertyName: 'fillColor' | 'strokeColor' = 'fillColor'
 ): string {
   const { type, stops, origin, destination } = gradient;
-
-  // Calculate default origin/destination based on item position.
-  // For radial gradients, origin defaults to the item center (position.x, position.y),
-  // not an offset (-50, -50), and destination to the radius edge (B88).
-  const defaultOrigin = origin || (type === 'radial' ? [position.x, position.y] : [position.x - 50, position.y - 50]);
-  const defaultDestination = destination || (type === 'radial' ? [position.x + 50, position.y] : [position.x + 50, position.y + 50]);
-
   const stopsCode = stops.map(s => `['${s.color}', ${s.offset}]`).join(', ');
+
+  if (type === 'radial') {
+    // A RADIAL CORE BELONGS ON THE ITEM, NOT ON THE NUMBER ASKED FOR (17
+    // RADIALOFFSET). The origin was the REQUESTED position and the radius a
+    // fixed 50 px: whenever (x, y) placed the item as a corner (an anchor, a
+    // default position) the core landed up-left by half the item, and a 300 px
+    // circle got a 50 px core. Read from the created item's bounds instead —
+    // centre and right-centre, as the engine's own _parseColor does — with the
+    // request only as the fallback when the item has no bounds. An origin or
+    // destination the caller gave is kept as given.
+    const fx = position.x, fy = position.y;
+    const o = origin ? `[${origin[0]}, ${origin[1]}]` : `(__gb ? [__gb.x + __gb.width / 2, __gb.y + __gb.height / 2] : [${fx}, ${fy}])`;
+    const d = destination ? `[${destination[0]}, ${destination[1]}]`
+      : origin ? `(__gb ? [${origin[0]} + __gb.width / 2, ${origin[1]}] : [${origin[0]} + 50, ${origin[1]}])`
+      : `(__gb ? [__gb.x + __gb.width, __gb.y + __gb.height / 2] : [${fx + 50}, ${fy}])`;
+    return `
+${itemVarName}.${propertyName} = (function() {
+  const __b = ${itemVarName} && ${itemVarName}.bounds;
+  const __gb = __b && isFinite(__b.x) && isFinite(__b.y) && __b.width > 0 && __b.height > 0 ? __b : null;
+  return {
+    gradient: {
+      stops: [${stopsCode}],
+      radial: true
+    },
+    origin: ${o},
+    destination: ${d}
+  };
+})();`;
+  }
+
+  // Linear: a diagonal across a 100 px box at the requested position.
+  const defaultOrigin = origin || [position.x - 50, position.y - 50];
+  const defaultDestination = destination || [position.x + 50, position.y + 50];
 
   return `
 ${itemVarName}.${propertyName} = {
   gradient: {
     stops: [${stopsCode}],
-    radial: ${type === 'radial'}
+    radial: false
   },
   origin: [${defaultOrigin[0]}, ${defaultOrigin[1]}],
   destination: [${defaultDestination[0]}, ${defaultDestination[1]}]
@@ -413,6 +439,7 @@ function generateCreateItemCode(
     textDirection.resolved = baseDirection(createProps.content);
   }
   const textTabular = itemType === 'text' && wantsTabular(createProps) === true;
+  const createFillOpacity = createProps.fillOpacity !== undefined;
   const textStrokePos = itemType === 'text' ? takeStrokePosition(createProps, false) : null;
   const params: Record<string, unknown> = {
     ...(omitXY ? {} : { x: position.x, y: position.y }),
@@ -587,6 +614,7 @@ const item = app.create('${itemType}', ${JSON.stringify(params, null, 2)});`;
   // anchored headline's top edge drifted on every refit.
   if (textDirection) code += emitDirectionCheck('item', textDirection);
   if (textTabular) code += emitTabularCheck('item');
+  if (createFillOpacity) code += emitFillOpacityCheck('item');
   if (textStrokePos) code += emitStrokePositionCheck('item', textStrokePos);
   if (textFit) code += `\nlet __textFit = null;${emitTextFit('item', textFit, JSON.stringify(anchorHold(properties.anchor ?? properties.origin) ?? null))}`;
 
@@ -625,7 +653,7 @@ const itemId = item.data.registryId;
 app.historyManager.saveState();
 
 // Return item info
-({ itemId, type: '${itemType}'${textFit ? ', textFit: __textFit' : ''}${textDirection ? ', direction: __direction' : ''}${textTabular ? ', tabularFigures: __tabular' : ''}${textStrokePos ? ', strokePosition: __strokePos' : ''}, position: ${omitXY ? `(item.position ? { x: item.position.x, y: item.position.y } : null)` : `{ x: ${position.x}, y: ${position.y} }`}${hasLifetime ? ', lifetime: __lifetime' : ''}${loadsFont ? ', ...(__font ? { font: __font } : {})' : ''}${ignored.length > 0
+({ itemId, type: '${itemType}'${textFit ? ', textFit: __textFit' : ''}${textDirection ? ', direction: __direction' : ''}${textTabular ? ', tabularFigures: __tabular' : ''}${createFillOpacity ? ', fillOpacity: __fillOpacity' : ''}${textStrokePos ? ', strokePosition: __strokePos' : ''}, position: ${omitXY ? `(item.position ? { x: item.position.x, y: item.position.y } : null)` : `{ x: ${position.x}, y: ${position.y} }`}${hasLifetime ? ', lifetime: __lifetime' : ''}${loadsFont ? ', ...(__font ? { font: __font } : {})' : ''}${ignored.length > 0
     ? `, ignoredProperties: ${JSON.stringify(ignored)}, warning: ${JSON.stringify(
       `${ignored.join(', ')} ${ignored.length > 1 ? 'are' : 'is'} not read when creating an item, so ${ignored.length > 1 ? 'they had' : 'it had'} no effect. `
       + 'Check the spelling against this item type\'s documented properties.',
@@ -654,7 +682,7 @@ const MODIFY_KNOWN_KEYS: ReadonlySet<string> = new Set([
   ...NORMALIZE_PARAM_READS,
   'contentType', 'contentFormat', 'countdownTarget', 'countdownEndText',
   'audioGain', 'volume', 'gain', 'bornAt', 'ttl', 'smoothing',
-  'fontStyle', 'leading', 'lineHeight', 'skewX', 'skewY', 'matrix', 'fit', 'direction', 'textDirection', 'dir', 'tabularFigures', 'fontVariantNumeric', 'fontFeatures', 'strokePosition',
+  'fontStyle', 'leading', 'lineHeight', 'skewX', 'skewY', 'matrix', 'fit', 'direction', 'textDirection', 'dir', 'tabularFigures', 'fontVariantNumeric', 'fontFeatures', 'strokePosition', 'fillOpacity',
 ]);
 
 /** Spellings callers reach for, and the key the engine actually reads. */
@@ -677,6 +705,9 @@ const CREATE_KNOWN_KEYS: ReadonlySet<string> = new Set([
   // Lifetimes, on ANY item: this generator applies them through app.setLifetime
   // (emitLifetime), whatever create() itself reads.
   'bornAt', 'ttl',
+  // A solid fill's own alpha (FxTool 12 STROKEFILL); confirmed per call by
+  // emitFillOpacityCheck, since an older studio ignores it.
+  'fillOpacity',
 ]);
 
 /**
@@ -821,13 +852,60 @@ function wantsTabular(p: Record<string, unknown>): boolean | null {
   const list = Array.isArray(f) ? f.map(String) : typeof f === 'string' ? [f] : f && typeof f === 'object' ? Object.keys(f).filter((k) => (f as Record<string, unknown>)[k]) : [];
   return list.some((x) => /\btnum\b/.test(x));
 }
+/**
+ * Whether tabular figures CHANGED the layout is the engine's to measure: the
+ * request flag (data.tabularFigures) is set even when the font's digits are
+ * already one width, where the layout moves nothing (9 TABNUM: DejaVu Sans
+ * reported applied while every advance matched the control). A studio with
+ * app.tabularFiguresReport measures the item's own font, and only its answer
+ * is reported as applied. One without it can only say the flag was recorded:
+ * 'unverified', never true.
+ */
 function emitTabularCheck(itemExpr: string): string {
   return `
 const __tabular = (function(it) {
   if (!it || it.className !== 'PointText') return { applied: false, note: 'tabular figures apply to text items only.' };
+  if (typeof app.tabularFiguresReport === 'function') {
+    let r = null;
+    try { r = app.tabularFiguresReport(it); } catch (e) { return { applied: 'unverified', note: 'the studio could not measure tabular figures on this text (' + ((e && e.message) || e) + ').' }; }
+    if (r && typeof r === 'object') {
+      const out = { applied: r.applied === true };
+      if (typeof r.steadyWidth === 'boolean') out.steadyWidth = r.steadyWidth;
+      if (r.reason) out.reason = r.reason;
+      if (r.note) out.note = r.note;
+      else if (r.reason === 'rtl') out.note = 'right-to-left text keeps proportional digits.';
+      else if (r.reason === 'not-requested') out.note = 'the studio did not record the request, so digits keep their proportional widths.';
+      if (typeof r.spread === 'number') out.digitSpread = r.spread;
+      if (r.width && typeof r.width === 'object') out.width = r.width;
+      return out;
+    }
+    return { applied: 'unverified', note: 'the studio returned no tabular-figures report for this text.' };
+  }
   return it.data && it.data.tabularFigures === true
-    ? { applied: true }
+    ? { applied: 'unverified', note: 'this studio recorded tabular figures but cannot measure whether they change the layout (it has no tabularFiguresReport): with a font whose digits are already one width they change nothing.' }
     : { applied: false, note: 'this studio does not lay out tabular figures (it needs an engine with them): digits keep their proportional widths. A monospaced font is the fallback.' };
+})(${itemExpr});`;
+}
+
+/**
+ * fillOpacity (FxTool 12 STROKEFILL): a solid fill's own alpha, apart from the
+ * item's opacity and its stroke, so an outline-only type is fillOpacity: 0.
+ * The engine records it on data.fillOpacity and re-applies it when a later
+ * modify changes the fill colour. A studio without it ignores the key, so the
+ * reply is read from the item: the recorded value and the fill's alpha.
+ */
+function emitFillOpacityCheck(itemExpr: string): string {
+  return `
+const __fillOpacity = (function(it) {
+  if (!it) return { applied: false, note: 'no item to check.' };
+  const v = it.data && it.data.fillOpacity;
+  if (typeof v !== 'number') return { applied: false, note: 'this studio does not read fillOpacity (it needs an engine with it): the fill keeps its own alpha. opacity fades the whole item, stroke included; an rgba() fill sets the fill alone.' };
+  const c = it.fillColor;
+  if (!c) return { applied: true, value: v, note: 'the item has no fill now, so there is nothing to see; a fill colour set later with modify_item takes this alpha.' };
+  if (c.gradient) return { applied: false, value: v, note: 'a gradient fill keeps its own stop colours: put the alpha in the stops (rgba) instead.' };
+  return (typeof c.alpha === 'number' && Math.abs(c.alpha - v) > 0.01)
+    ? { applied: false, value: v, note: 'the studio recorded fillOpacity but the fill is drawn at alpha ' + c.alpha + '.' }
+    : { applied: true, value: v };
 })(${itemExpr});`;
 }
 
@@ -1112,6 +1190,7 @@ function generateModifyItemCode(
   if (restProperties.fit && typeof restProperties.fit === 'object') delete restProperties.fit;
   const modDirection = takeDirection(restProperties);
   const modTabular = wantsTabular(restProperties) === true;
+  const modFillOpacity = restProperties.fillOpacity !== undefined;
   const modStrokePos = takeStrokePosition(restProperties, true);
 
   // modifyItem(id, changes), NOT select() + modify().
@@ -1261,8 +1340,8 @@ ${properties.content !== undefined ? `
 const __ctItem = app.getItemById('${itemId}');
 const __ctKeys = (__ctItem && __ctItem.data && Array.isArray(__ctItem.data.keyframes))
   ? __ctItem.data.keyframes.filter(function(k) { return k && k.properties && Object.prototype.hasOwnProperty.call(k.properties, 'content'); }).length : 0;` : ''}
-${modDirection ? emitDirectionCheck(`app.getItemById('${itemId}')`, modDirection) : ''}${modTabular ? emitTabularCheck(`app.getItemById('${itemId}')`) : ''}${modStrokePos ? emitStrokePositionCheck(`app.getItemById('${itemId}')`, modStrokePos) : ''}
-return { success: true, itemId: '${itemId}'${properties.content !== undefined ? `, ...(__ctKeys ? { contentTrackWarning: 'this text\\'s content is keyframed (' + __ctKeys + ' key(s)), so the track sets it on every frame and this edit does not show. Change the content keys with pinepaper_keyframe_animate (append: true replaces same-time keys), or animate another property.' } : {})` : ''}${modFit ? ', textFit: __textFit' : ''}${modDirection ? ', direction: __direction' : ''}${modTabular ? ', tabularFigures: __tabular' : ''}${modStrokePos ? ', strokePosition: __strokePos' : ''}${affine ? `, affine: ${JSON.stringify({ skewX, skewY, matrix, note: 'applied to the current shape: calling again compounds it. To undo, apply the inverse (negative skew, or the inverse matrix).' })}` : ''}${modLifetime ? ', lifetime: __lifetime' : ''}${modFont ? ', ...(__font ? { font: __font } : {})' : ''}${modWarning} };`;
+${modDirection ? emitDirectionCheck(`app.getItemById('${itemId}')`, modDirection) : ''}${modTabular ? emitTabularCheck(`app.getItemById('${itemId}')`) : ''}${modFillOpacity ? emitFillOpacityCheck(`app.getItemById('${itemId}')`) : ''}${modStrokePos ? emitStrokePositionCheck(`app.getItemById('${itemId}')`, modStrokePos) : ''}
+return { success: true, itemId: '${itemId}'${properties.content !== undefined ? `, ...(__ctKeys ? { contentTrackWarning: 'this text\\'s content is keyframed (' + __ctKeys + ' key(s)), so the track sets it on every frame and this edit does not show. Change the content keys with pinepaper_keyframe_animate (append: true replaces same-time keys), or animate another property.' } : {})` : ''}${modFit ? ', textFit: __textFit' : ''}${modDirection ? ', direction: __direction' : ''}${modTabular ? ', tabularFigures: __tabular' : ''}${modFillOpacity ? ', fillOpacity: __fillOpacity' : ''}${modStrokePos ? ', strokePosition: __strokePos' : ''}${affine ? `, affine: ${JSON.stringify({ skewX, skewY, matrix, note: 'applied to the current shape: calling again compounds it. To undo, apply the inverse (negative skew, or the inverse matrix).' })}` : ''}${modLifetime ? ', lifetime: __lifetime' : ''}${modFont ? ', ...(__font ? { font: __font } : {})' : ''}${modWarning} };`;
 
   // Wrapped, because the body now RETURNS early on a miss rather than falling
   // through to an unconditional success. Async only when a font must load
@@ -1307,6 +1386,16 @@ function generateDeleteItemCode(itemId: string): string {
 /**
  * Template for adding relations
  */
+/**
+ * A JS expression: the studio's own reason for refusing a relation of `typeJs`,
+ * or null. addRelation answers a bare false; the WHY (B119: "relation
+ * 'spring_follow' is not loaded yet…") is recorded with app.noteWarning, which
+ * reaches the reply only as a governor warning. Read here without draining it.
+ */
+export function relationRefusalReasonJs(typeJs: string): string {
+  return `(function(){ var ws = (app && app._engineWarnings) || []; for (var i = ws.length - 1; i >= 0; i--) { var w = ws[i]; if (w && w.relation === ${typeJs} && typeof w.message === 'string') return w.message; } return null; })()`;
+}
+
 function generateAddRelationCode(
   sourceId: string,
   targetId: string,
@@ -1332,12 +1421,53 @@ function generateAddRelationCode(
   }
   const success = app.addRelation('${sourceId}', '${targetId}', '${relationType}', ${JSON.stringify(params, null, 2)});
   if (!success) {
-    return { success: false, relationType: '${relationType}', error: 'the studio refused the ${relationType} relation between ${sourceId} and ${targetId}.' };
+    const __why = ${relationRefusalReasonJs(JSON.stringify(relationType))};
+    return { success: false, relationType: '${relationType}', error: 'the studio refused the ${relationType} relation between ${sourceId} and ${targetId}' + (__why ? ': ' + __why : '.') };
   }
   app.historyManager.saveState();
   return { success: true, sourceId: '${sourceId}', targetId: '${targetId}', relationType: '${relationType}' };
 })();
 `.trim();
+}
+
+/**
+ * The per-burst particle cap of the CURRENT studio (FxTool ParticleEmitter
+ * MAX_BURST_COUNT, B144). Studios before that change capped at
+ * EMITTER_LEGACY_MAX_PER_BURST, in silence. Which one a studio has is read
+ * back from the spec it stored (generateEmitter), not assumed.
+ */
+export const EMITTER_MAX_PER_BURST = 10000;
+/** The cap of studios before B144 (normalizeLook clamped at 2000 without a word). */
+export const EMITTER_LEGACY_MAX_PER_BURST = 2000;
+
+/**
+ * Every count in an emitter spec (the spec's own and each burst's) that some
+ * studio may cap: above the legacy cap. `index` is null for the spec's own
+ * count (each burst without its own inherits it).
+ */
+export function emitterCountsToCheck(spec: Record<string, unknown> | undefined): Array<{ where: string; index: number | null; asked: number }> {
+  const out: Array<{ where: string; index: number | null; asked: number }> = [];
+  if (!spec || typeof spec !== 'object') return out;
+  const capped = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && Math.round(v) > EMITTER_LEGACY_MAX_PER_BURST;
+  if (capped(spec.count)) out.push({ where: 'count', index: null, asked: Math.round(spec.count) });
+  if (Array.isArray(spec.bursts)) {
+    spec.bursts.forEach((b, i) => {
+      const c = b && typeof b === 'object' ? (b as Record<string, unknown>).count : undefined;
+      if (capped(c)) out.push({ where: `bursts[${i}].count`, index: i, asked: Math.round(c) });
+    });
+  }
+  return out;
+}
+
+/**
+ * What can be said about the counts WITHOUT the studio's answer: above the
+ * current cap is capped on every studio; between the two caps depends on the
+ * studio. Used when the stored spec cannot be read back.
+ */
+export function emitterCountWarnings(spec: Record<string, unknown> | undefined): string[] {
+  return emitterCountsToCheck(spec).map(({ where, asked }) => asked > EMITTER_MAX_PER_BURST
+    ? `${where} ${asked} is over the ${EMITTER_MAX_PER_BURST}-particle cap per burst of the current studio (${EMITTER_LEGACY_MAX_PER_BURST} on older studios), so it draws at most ${EMITTER_MAX_PER_BURST}. Split it into bursts at the same t for more.`
+    : `${where} ${asked} is over the ${EMITTER_LEGACY_MAX_PER_BURST}-particle cap per burst of studios before the ${EMITTER_MAX_PER_BURST} cap, and this studio did not report what it drew: on an older studio it draws ${EMITTER_LEGACY_MAX_PER_BURST}. Split it into bursts at the same t to be sure.`);
 }
 
 /**
@@ -1410,7 +1540,27 @@ function generateMovesAlongPathCode(sourceId: string, targetId: string | undefin
     if (len > 0) params.speed = len / (150 * ${duration});
     if (params.closed === undefined) params.closed = false;
   }` : ''}
-  ${hasDelay ? `if (!params.window) params.window = { start: ${delay} };` : ''}
+  // AN EQUATION ROUTE WITH A DURATION (queue item 22, ORBITDUR). There are no
+  // points here to turn a duration into speed, so it was dropped and the curve
+  // ran at the default speed. A studio whose rule times an equation (FxTool
+  // claude/engine-core-queue: its equation param says duration times it) gets
+  // duration, and delay on the same playhead clock instead of a window (a
+  // window would start the timed ride part-way through). An older studio hands
+  // a timed equation to the arm that cannot read one and loses the curve, so it
+  // keeps today's untimed ride and is told.
+  const __warnings = [];
+  let __eqTimed = false;
+  ${hasDuration ? `if (params.equation && !hasPoints) {
+    const eqDesc = rule && rule.params && rule.params.equation && rule.params.equation.description;
+    if (typeof eqDesc === 'string' && /duration/.test(eqDesc)) {
+      __eqTimed = true;
+      params.duration = ${duration};
+      ${hasDelay ? `params.delay = ${delay};` : ''}
+    } else {
+      __warnings.push('duration ${duration} was not applied: this studio cannot time an equation route (a timed equation loses its curve there), so the route stays untimed at speed ' + (params.speed !== undefined ? params.speed : 1) + ' (1 = 150 px/s). Update the studio, or pass params.path as points.');
+    }
+  }` : ''}
+  ${hasDelay ? `if (!__eqTimed && !params.window) params.window = { start: ${delay} };` : ''}
   // Before its window opens the relation does not run, so the item stays where
   // it was left — the retest saw it parked at the path END. Put it at the start.
   if (Array.isArray(params.path) && params.path.length) {
@@ -1423,7 +1573,8 @@ function generateMovesAlongPathCode(sourceId: string, targetId: string | undefin
   app.historyManager.saveState();
   return { success: true, sourceId: ${JSON.stringify(sourceId)}, relationType: 'moves_along_path', route: 'sampled-points',
     points: Array.isArray(params.path) ? params.path.length : 0, speed: params.speed, closed: params.closed,
-    ${ref ? `pathFrom: ${JSON.stringify(ref)},` : ''} window: params.window };
+    ${ref ? `pathFrom: ${JSON.stringify(ref)},` : ''} window: params.window,
+    ...(__eqTimed ? { duration: params.duration } : {}), ...(__warnings.length ? { warnings: __warnings } : {}) };
 })();`.trim();
 }
 
@@ -1622,6 +1773,36 @@ if (!_target) {
 }`.trim();
 }
 
+/**
+ * Text keys a studio may or may not animate (queue item 2, FxTool
+ * claude/engine-core-queue): fontStyle, textAlign, lineHeight and letterSpacing
+ * apply as keyframes on the current studio, which lists them (textAlign as
+ * justification, lineHeight as leading) in listAnimatableProperties. An older
+ * studio stores the keys and draws nothing, so the check runs IN THE PAGE
+ * against that list, and only the keys it does not name are reported.
+ */
+const TEXT_KEY_ENGINE_NAMES: Readonly<Record<string, readonly string[]>> = {
+  fontStyle: ['fontStyle'],
+  textAlign: ['textAlign', 'justification'],
+  lineHeight: ['lineHeight', 'leading'],
+  letterSpacing: ['letterSpacing'],
+};
+
+/** A JS expression (run in the page) → the keys of `keys` this studio does not animate. '' when none are text keys. */
+function unanimatedTextKeysJs(keys: readonly string[]): string {
+  const spec = [...new Set(keys)].filter((k) => k in TEXT_KEY_ENGINE_NAMES).map((k) => ({ key: k, names: TEXT_KEY_ENGINE_NAMES[k] }));
+  if (!spec.length) return '';
+  return `(function() {
+    let __l = null;
+    try { __l = typeof app.listAnimatableProperties === 'function' ? app.listAnimatableProperties() : null; } catch (_) { __l = null; }
+    const __names = ((__l && __l.properties) || []).map(function(p) { return p && p.name; });
+    return ${JSON.stringify(spec)}.filter(function(s) { return !s.names.some(function(n) { return __names.indexOf(n) >= 0; }); }).map(function(s) { return s.key; });
+  })()`;
+}
+
+/** The sentence for the keys unanimatedTextKeysJs found, built in the page. */
+const UNANIMATED_TEXT_KEYS_SENTENCE = `' is not an animatable property in this studio (app.listAnimatableProperties does not list it), so it had no effect. The current studio animates fontStyle, textAlign, lineHeight and letterSpacing; here, set a fixed value with pinepaper_modify_item, or animate fontSize or scaleX.'`;
+
 function generateKeyframeAnimateCode(
   itemId: string,
   keyframes: Keyframe[],
@@ -1631,7 +1812,8 @@ function generateKeyframeAnimateCode(
   clipInPoint?: number,
   clipOutPoint?: number,
   timeUnits?: 'seconds' | 'ms',
-  append = false
+  append = false,
+  easingAt?: 'arrival' | 'departure'
 ): string {
   const keyframesJson = JSON.stringify(normalizeKeyframePositions(keyframes), null, 2);
   const calculatedDuration = duration || Math.max(...keyframes.map(k => k.time));
@@ -1644,6 +1826,10 @@ function generateKeyframeAnimateCode(
   // addAnimation SETS the item's track; mode 'merge' adds to it (FxTool
   // 2475333b). An engine without merge ignores the option and replaces.
   if (append) opts.mode = 'merge';
+  // EASEPLACE (queue item 5): which side of a key its easing shapes. The
+  // current studio reads (and removes) the option; an older one leaves it on
+  // the options object, which is how the result can say it was not applied.
+  if (easingAt !== undefined) opts.easingAt = easingAt;
 
   // A FADE ON AN AUDIO ITEM WAS ACCEPTED AND NEVER HEARD. addAnimation keyframes
   // the audio item's sentinel, and the mix reads one static audioGain per clip,
@@ -1697,12 +1883,16 @@ function generateKeyframeAnimateCode(
   const loopNote = loop
     ? `, loopNote: ${JSON.stringify('loop:true repeats in the editor, but has been measured playing ONCE in an exported video and then holding the last keyframe. For an export longer than one cycle, check a frame in the second cycle — if it holds, write the keyframes out per cycle, or use a loop preset (pinepaper_animate), which does cycle in export.')}`
     : '';
-  const easingNote = first?.easing && first.easing !== 'linear'
-    ? `, note: ${JSON.stringify(`easing '${first.easing}' is on the first keyframe, where it has no effect: easing shapes the segment ARRIVING at a keyframe. Put it on the keyframe you are moving to.`)}`
+  const easingNote = easingAt !== 'departure' && first?.easing && first.easing !== 'linear'
+    ? `, note: ${JSON.stringify(`easing '${first.easing}' is on the first keyframe, where it has no effect by default: easing shapes the segment ARRIVING at a keyframe. Put it on the keyframe you are moving to, or pass easingAt: 'departure' to read every easing as the move LEAVING its key (current studio).`)}`
     : '';
-  const unsupportedKeys = [...new Set(keyframes.flatMap((k) => Object.keys((k as { properties?: object }).properties ?? {})))]
-    .filter((k) => k === 'letterSpacing');
-  const letterSpacingWarning = unsupportedKeys.length === 0 ? '' : `, ignoredProperties: ${JSON.stringify(unsupportedKeys)}, warning: ${JSON.stringify(`${unsupportedKeys.join(', ')} is not an animatable property in this engine (app.listAnimatableProperties does not list it), so it had no effect. Set a fixed value with pinepaper_modify_item, or animate fontSize or scaleX.`)}`;
+  const textKeysJs = unanimatedTextKeysJs(keyframes.flatMap((k) => Object.keys((k as { properties?: object }).properties ?? {})));
+  const textKeyCheck = textKeysJs ? `
+  const __ignored = ${textKeysJs};
+  if (__ignored.length) __warn.push(__ignored.join(', ') + ${UNANIMATED_TEXT_KEYS_SENTENCE});` : '';
+  const easingAtCheck = easingAt !== undefined ? `
+  if (__opts && Object.prototype.hasOwnProperty.call(__opts, 'easingAt')) __warn.push('easingAt ' + ${JSON.stringify(JSON.stringify(easingAt))} + ' was not applied: this studio predates it, so every easing was read as the move ARRIVING at its key. Put each easing on the key the move goes to instead.');` : '';
+  const runtimeWarning = `${textKeysJs ? ', ...(__ignored.length ? { ignoredProperties: __ignored } : {})' : ''}, ...(__warn.length ? { warning: __warn.join(' ') } : {})`;
 
   const addAnimTarget = itemId.startsWith('$') ? '_targetId' : `'${itemId}'`;
 
@@ -1715,7 +1905,9 @@ function generateKeyframeAnimateCode(
   // merge support — an older engine takes the option and replaces anyway.
   const __ki = _target && (_target.item || _target);
   const __prev = (__ki && __ki.data && Array.isArray(__ki.data.keyframes)) ? __ki.data.keyframes.map(function(k) { return k && k.time; }) : [];
-  app.addAnimation(${addAnimTarget}, ${keyframesJson}, ${JSON.stringify(opts)});
+  const __opts = ${JSON.stringify(opts)};
+  app.addAnimation(${addAnimTarget}, ${keyframesJson}, __opts);
+  const __warn = [];${easingAtCheck}${textKeyCheck}
   const __now = (__ki && __ki.data && Array.isArray(__ki.data.keyframes)) ? __ki.data.keyframes.map(function(k) { return k && k.time; }) : [];
   const __kept = __prev.every(function(t) { return __now.indexOf(t) >= 0; });${append ? `
   // Property gaps across the merged track (the same check a single call makes
@@ -1728,7 +1920,7 @@ function generateKeyframeAnimateCode(
       ? { appended: true, previousKeys: __prev.length, keys: __now.length }
       : { appended: false, replaced: true, previousKeys: __prev.length, warning: 'append was asked for, but this studio replaced the existing track (' + __prev.length + ' key(s)) instead of adding to it: it has no merge mode. Put every key in one keyframe_animate call.' })`
     : `{ replaced: true, previousKeys: __prev.length, note: 'the item already had a keyframe track (' + __prev.length + ' key(s)); this call replaced it. To add keys to it instead, pass append: true.' }`};
-  return { success: true, itemId: ${addAnimTarget}, duration: ${calculatedDuration}, loop: ${loop}${append ? ', append: true' : ''}, ...(__track ? { track: __track } : {})${append ? `, ...(__gaps.length ? { propertyGaps: __gaps.slice(0, 10), gapWarning: __gaps.length + ' key(s) of the merged track leave out a property other keys animate (' + __gaps.reduce(function(a, g) { g.missing.forEach(function(p) { if (a.indexOf(p) < 0) a.push(p); }); return a; }, []).join(', ') + '). The engine can break that property at such a key; give each key the full set — hold a value by repeating it.' } : {})` : ''}${timeOffset !== undefined ? `, timeOffset: ${timeOffset}` : ''}${clipInPoint !== undefined ? `, clipInPoint: ${clipInPoint}` : ''}${clipOutPoint !== undefined ? `, clipOutPoint: ${clipOutPoint}` : ''}${easingNote}${loopNote}${gapNote}${letterSpacingWarning} };
+  return { success: true, itemId: ${addAnimTarget}, duration: ${calculatedDuration}, loop: ${loop}${append ? ', append: true' : ''}, ...(__track ? { track: __track } : {})${append ? `, ...(__gaps.length ? { propertyGaps: __gaps.slice(0, 10), gapWarning: __gaps.length + ' key(s) of the merged track leave out a property other keys animate (' + __gaps.reduce(function(a, g) { g.missing.forEach(function(p) { if (a.indexOf(p) < 0) a.push(p); }); return a; }, []).join(', ') + '). The engine can break that property at such a key; give each key the full set — hold a value by repeating it.' } : {})` : ''}${timeOffset !== undefined ? `, timeOffset: ${timeOffset}` : ''}${clipInPoint !== undefined ? `, clipInPoint: ${clipInPoint}` : ''}${clipOutPoint !== undefined ? `, clipOutPoint: ${clipOutPoint}` : ''}${easingNote}${loopNote}${gapNote}${runtimeWarning} };
 })();
 `.trim();
 }
@@ -3172,7 +3364,9 @@ export class PinePaperCodeGenerator {
       validated.clipInPoint,
       validated.clipOutPoint,
       validated.timeUnits,
-      validated.append
+      // mode: 'merge' is the studio's name for append (B147).
+      validated.append === true || validated.mode === 'merge',
+      validated.easingAt
     );
     if (!holds) return code;
     return `(async function() {
@@ -3908,8 +4102,15 @@ if (typeof _gen === 'function') {
   const targetId = nameToId['${target}'];
   if (sourceId && targetId) {
     const params = ${paramsStr};
-    app.addRelation(sourceId, targetId, '${type}', params);
-    results.relations.push({ source: '${source}', target: '${target}', type: '${type}' });
+    // A refused relation is not listed as made (owner rule 1).
+    if (app.addRelation(sourceId, targetId, '${type}', params)) {
+      results.relations.push({ source: '${source}', target: '${target}', type: '${type}' });
+    } else {
+      const __why = ${relationRefusalReasonJs(JSON.stringify(type))};
+      (results.relationsRefused = results.relationsRefused || []).push({ source: '${source}', target: '${target}', type: '${type}', reason: __why || 'the studio refused it' });
+      results.success = false;
+      results.error = 'the studio refused ' + results.relationsRefused.length + ' relation(s): ' + results.relationsRefused.map(function(r) { return r.type + ' ' + r.source + ' -> ' + r.target + ' (' + r.reason + ')'; }).join('; ') + '. The items were created.';
+    }
   }
 })();
 `);
@@ -4913,6 +5114,15 @@ const target = app.getItemById(targetId);
 if (!source) throw new Error('Source not found: ' + sourceId);
 if (!target) throw new Error('Target not found: ' + targetId);
 const relationId = app.addRelation(source, target, '${op.relationType}', ${relOpts});
+// NOT BOUND IS NOT A SUCCESS (owner rule 1, B119). addRelation answers false
+// when it refuses — spring_follow "not loaded yet" — and this op returned
+// { relationId: false } with nothing marking it failed, so the batch said
+// success over a relation that does not exist.
+if (!relationId) {
+  const __why = ${relationRefusalReasonJs(JSON.stringify(op.relationType))};
+  return { success: false, relationId: false, sourceId, targetId, relationType: ${JSON.stringify(op.relationType)},
+    error: 'the studio refused the ' + ${JSON.stringify(op.relationType)} + ' relation between ' + sourceId + ' and ' + targetId + ' — nothing was bound' + (__why ? ': ' + __why : '.') };
+}
 return { relationId, sourceId, targetId, relationType: '${op.relationType}' };
 `;
 
@@ -4998,7 +5208,10 @@ return { itemId: ${op.itemId?.startsWith('$') ? `__ref(${op.itemId.substring(1)}
           : (op.duration || (op.properties as any)?.duration || ((kfSource as any[]).length ? Math.max(...(kfSource as any[]).map((k) => Number(k.time) || 0)) : 5));
         const kfLoop = mergedPayload ? mergedPayload.loop : (op.loop ?? (op.properties as any)?.loop ?? false);
         // Same contract as pinepaper_keyframe_animate: replace unless append.
-        const kfAppend = (op as { append?: boolean }).append === true || (op.properties as any)?.append === true;
+        // mode: 'merge' is the studio's spelling (its keyframe_track_replaced
+        // warning names it), so it means append here too (B147).
+        const kfAppend = (op as { append?: boolean }).append === true || (op.properties as any)?.append === true
+          || (op as { mode?: unknown }).mode === 'merge' || (op.properties as any)?.mode === 'merge';
         // Batch ops are passthrough, so these arrive unvalidated: numbers only, and timeUnits from its enum.
         const kfExtra: string[] = [];
         for (const key of ['timeOffset', 'clipInPoint', 'clipOutPoint'] as const) {
@@ -5008,9 +5221,9 @@ return { itemId: ${op.itemId?.startsWith('$') ? `__ref(${op.itemId.substring(1)}
         const kfUnits = (op as any).timeUnits;
         if (kfUnits === 'seconds' || kfUnits === 'ms') kfExtra.push(`timeUnits: '${kfUnits}'`);
         const kfExtraStr = kfExtra.length > 0 ? `, ${kfExtra.join(', ')}` : '';
-        const kfUnsupported = [...new Set(((kfSource || []) as any[]).flatMap((k) => Object.keys((k as { properties?: object }).properties ?? {})))]
-          .filter((k) => k === 'letterSpacing');
-        const kfIgnored = kfUnsupported.length === 0 ? '' : `, ignoredProperties: ${JSON.stringify(kfUnsupported)}, warning: ${JSON.stringify(`${kfUnsupported.join(', ')} is not an animatable property in this engine (app.listAnimatableProperties does not list it), so it had no effect. Set a fixed value with pinepaper_modify_item, or animate fontSize or scaleX.`)}`;
+        const kfTextKeysJs = unanimatedTextKeysJs(((kfSource || []) as any[]).flatMap((k) => Object.keys((k as { properties?: object }).properties ?? {})));
+        const kfTextCheck = kfTextKeysJs ? `\nconst _kfIgnored = ${kfTextKeysJs};` : '';
+        const kfIgnored = kfTextKeysJs ? `, ...(_kfIgnored.length ? { ignoredProperties: _kfIgnored, warning: _kfIgnored.join(', ') + ${UNANIMATED_TEXT_KEYS_SENTENCE} } : {})` : '';
         return `
 const targetId = ${kfItemRef};
 const _target = (app.getItemById && app.getItemById(targetId))
@@ -5020,7 +5233,7 @@ if (!_target) {
 }
 const _kfItem = _target.item || _target;
 const _prevKeys = (_kfItem.data && Array.isArray(_kfItem.data.keyframes)) ? _kfItem.data.keyframes.length : 0;
-app.addAnimation(targetId, ${kfJson}, { duration: ${kfDuration}, loop: ${kfLoop}${kfAppend ? ", mode: 'merge'" : ''}${kfExtraStr} });
+app.addAnimation(targetId, ${kfJson}, { duration: ${kfDuration}, loop: ${kfLoop}${kfAppend ? ", mode: 'merge'" : ''}${kfExtraStr} });${kfTextCheck}
 return { success: true, itemId: targetId, duration: ${kfDuration}, loop: ${kfLoop}${kfAppend ? ', append: true' : ''}${kfAppend ? '' : `, ...(_prevKeys ? { track: { replaced: true, previousKeys: _prevKeys, note: 'the item already had a keyframe track; this op replaced it. To add keys to it instead, pass append: true.' } } : {})`}${kfIgnored} };
 `;
       }
@@ -6196,7 +6409,30 @@ ${stillTime !== undefined ? `
 
   if (result && result.success) Object.assign(result, fidelity(format));
   if (result && result.success && __fit) result.platformFit = __fit;
-  // A LANDSCAPE CANVAS FOR A PORTRAIT PLATFORM (or the reverse) is not an
+${usesCanvasSize ? '' : `  // A PRESET SIZE IS NOT THE CANVAS SIZE, AND THAT IS SAID (21 PLATFORMOVERRIDE).
+  // A named platform renders the FILE at the preset's size; the canvas is not
+  // resized, so the scene keeps the canvas's layout, scaled to fill the file.
+  // A 640x360 canvas under youtube came back 1920x1080 with nothing said. The
+  // size the route reports is compared with the canvas; the current studio's
+  // video report warns about an upscale too, but as plain text this reply does
+  // not pass on, so it is said here for every studio.
+  // Not said for camera framing (the camera chooses that frame) or an
+  // unbounded canvas (its stills crop to the artwork, said on their own), and
+  // a scale the caller asked for is theirs, not the preset's.
+  if (result && result.success && framing !== 'camera' && __cv && !__cv.unbounded && __cv.width > 0 && __cv.height > 0
+    && result.dimensions && typeof result.dimensions === 'object' && result.dimensions.width > 0 && result.dimensions.height > 0) {
+    const __fw = result.dimensions.width, __fh = result.dimensions.height;
+    const __us = ${scale !== undefined ? scale : 1};
+    if (Math.abs(__fw - __cv.width * __us) > 2 || Math.abs(__fh - __cv.height * __us) > 2) {
+      const __k = Math.round((__fw / __cv.width) * 1000) / 1000;
+      result.platformSize = { preset: __presetBox.width + 'x' + __presetBox.height, canvas: __cv.width + 'x' + __cv.height, file: __fw + 'x' + __fh, scale: __k, canvasResized: false };
+      result.fidelity = result.fidelity || { warnings: [] };
+      result.fidelity.warnings = (result.fidelity.warnings || []).concat([{ code: 'platform_size_differs_from_canvas',
+        message: 'the ' + platform + ' preset made the file ' + __fw + 'x' + __fh + ' while the canvas is ' + __cv.width + 'x' + __cv.height + ': the scene is drawn ' + (__k > 1 ? 'larger' : 'smaller') + ' (x' + __k + ') with the canvas\\'s layout, and the canvas itself is unchanged. For a file at the canvas size, export with platform: \\'auto\\'; for a scene laid out at ' + __fw + 'x' + __fh + ', resize the canvas (pinepaper_set_canvas_size) and re-lay it.' }]);
+      if (result.fidelity.note) delete result.fidelity.note;
+    }
+  }
+`}  // A LANDSCAPE CANVAS FOR A PORTRAIT PLATFORM (or the reverse) is not an
   // aspect nuance but the wrong deliverable: tiktok on a 16:9 canvas came out
   // 1920x1080 with only a note (round 10, 10.7). Said where a caller looks.
   if (result && result.success && __fit) {
@@ -8534,7 +8770,14 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
   }
 
   generateImportImage(input: ImportImageInput): string {
-    const { url, position, maxWidth, maxHeight, mask, smoothing, maxEdge, nativeSize } = input;
+    const { url, position, maxWidth, maxHeight, mask, smoothing, maxEdge, nativeSize, shadowColor, shadowBlur, shadowOffset } = input;
+    // IMPORTSHADOW: the shadow keys, applied through the engine's own modify
+    // door once the image is placed (and masked) — the route modify_item takes.
+    const shadow: Record<string, unknown> = {};
+    if (shadowColor !== undefined) shadow.shadowColor = shadowColor;
+    if (shadowBlur !== undefined) shadow.shadowBlur = shadowBlur;
+    if (shadowOffset !== undefined) shadow.shadowOffset = shadowOffset;
+    const hasShadow = Object.keys(shadow).length > 0;
 
     // Each fragment used to be written with a LEADING comma, as if it followed
     // an entry that no longer exists — so the first one opened the object with
@@ -8634,6 +8877,16 @@ ${mask ? `    // A MASK REPLACES THE RASTER (round 8 DD, 4.10). applyMask builds
     }
     if (app.itemRegistry && typeof app.itemRegistry.rebind === 'function') app.itemRegistry.rebind(itemId, masked);
     placed = masked;
+` : ''}${hasShadow ? `    // The shadow goes on what is DRAWN, after a mask has replaced the raster.
+    let __shadow = null;
+    {
+      const __want = ${JSON.stringify(shadow)};
+      let __ok = false;
+      try { __ok = app.modifyItem(itemId, __want) !== false; } catch (_) { __ok = false; }
+      __shadow = __ok
+        ? { applied: true, shadowColor: placed.shadowColor ? String(placed.shadowColor.toCSS ? placed.shadowColor.toCSS(true) : placed.shadowColor) : null, shadowBlur: placed.shadowBlur }
+        : { applied: false, warning: 'the image was imported but its shadow was not applied — set it with pinepaper_modify_item on ' + itemId + '.' };
+    }
 ` : ''}    const b = placed.bounds;
     if (!b || !(b.width > 0) || !(b.height > 0)) {
       return { success: false, itemId: itemId, error: 'the image was placed with no size (' + (b ? b.width + 'x' + b.height : 'no bounds') + ') — it may not have loaded. Nothing visible was drawn.' };
@@ -8642,7 +8895,7 @@ ${mask ? `    // A MASK REPLACES THE RASTER (round 8 DD, 4.10). applyMask builds
       success: true,
       itemId: itemId,
       message: 'Image imported and placed on canvas.',
-      bounds: { x: b.x, y: b.y, width: b.width, height: b.height }${mask ? `,\n      mask: '${mask}'` : ''},
+      bounds: { x: b.x, y: b.y, width: b.width, height: b.height }${mask ? `,\n      mask: '${mask}'` : ''}${hasShadow ? ',\n      shadow: __shadow' : ''},
       // Stored smaller than its source (the studio's cap): said, with the
       // way to keep every pixel. The studio reports native size where it can.
       ...((entry && entry.nativeWidth && entry.width && entry.nativeWidth > entry.width)
@@ -11794,7 +12047,9 @@ ${checks.includes('contrast') ? `  // SAMPLED OVER TIME (round 12, 12.9): text i
         app.create(op.type, { id: op.id, x: op.x, y: op.y, width: op.width, height: op.height });
         itemIds.push(op.id);
       } else if (op.op === 'addRelation') {
-        app.addRelation(op.from, op.to, op.relation, op.params || {});
+        if (!app.addRelation(op.from, op.to, op.relation, op.params || {})) {
+          errors.push({ op: op.op, id: op.from + '->' + op.to, error: 'the studio refused the ' + op.relation + ' relation' });
+        }
       }
     } catch (e) {
       errors.push({ op: op.op, id: op.id || (op.from + '->' + op.to), error: e && e.message });
@@ -12356,9 +12611,41 @@ ${guard}
   const __baked = (__it.data && typeof __it.data._bakedRotation === 'number') ? __it.data._bakedRotation : 0;
   ${authoringFrameJs('__fr')}
   const __frame = { x: __fr.x || 0, y: __fr.y || 0, width: __fr.width, height: __fr.height };
-  const __actor = { x: __it.position.x, y: __it.position.y,
-    w: __b.width / (Math.abs(__sc.x) || 1), h: __b.height / (Math.abs(__sc.y) || 1),
-    sx: __sc.x || 1, sy: __sc.y || 1, rot: (__it.rotation || 0) + __baked };
+  // THE ACTOR AT THE FIRST BEAT, not where the playhead left it (B154 /
+  // HOOKCLOCK3). Live values of a keyframed item depend on the playhead, so a
+  // second call anchored at +0 / +57 / +22 / +43 px from session to session
+  // and multiplied scales the first track had applied. app.poseAt (FxTool,
+  // claude/engine-core-queue) answers at a track time; older studios fall back
+  // to the live read.
+  const __at0 = ${S(Math.min(...input.beats.map((b: any) => Number(b && b.at) || 0)))};
+  // A track that already keys the beat properties defines the pose before the
+  // first beat; the B109 hold key at 0 would overwrite its key there. A track
+  // of other properties (a colour) still needs the hold key.
+  const __beatProps = ['x', 'y', 'scaleX', 'scaleY', 'scale', 'rotation', 'opacity', 'position'];
+  const __hasTrack = !!(__it.data && Array.isArray(__it.data.keyframes) && __it.data.keyframes.some(function (k) {
+    return Object.keys((k && k.properties) || {}).some(function (p) { return __beatProps.indexOf(p) >= 0; });
+  }));
+  let __pose = null;
+  let __poseErr = null;
+  if (typeof app.poseAt === 'function') {
+    try { __pose = app.poseAt(__it, __at0); } catch (e) { __poseErr = (e && e.message) || String(e); }
+    if (__pose && !(isFinite(__pose.x) && isFinite(__pose.y) && __pose.width > 0 && __pose.height > 0)) __pose = null;
+  }
+  const __anchorWarnings = [];
+  if (!__pose && __hasTrack) {
+    __anchorWarnings.push((__poseErr ? 'app.poseAt failed (' + __poseErr + ')' : 'this studio has no app.poseAt')
+      + ', so the beats start from the actor\\'s LIVE transform, which on a keyframed actor is wherever the playhead left it: the first move can jump. Update the studio, or seek to ' + __at0 + ' s before choreographing.');
+  }
+  if (!__pose && __it.className === 'Raster' && ${S(input.beats.some((b: any) => b && b.verb === 'roll'))}) {
+    __anchorWarnings.push((__poseErr ? 'app.poseAt failed' : 'this studio has no app.poseAt')
+      + ', so the roll turns on the picture\\'s half-box, not its drawn radius: a picture with a transparent margin slides as it rolls.');
+  }
+  const __actor = __pose
+    ? { x: __pose.x, y: __pose.y, w: __pose.width, h: __pose.height, sx: __pose.scaleX || 1, sy: __pose.scaleY || 1, rot: isFinite(__pose.rotation) ? __pose.rotation : (__it.rotation || 0) + __baked, hasTrack: __hasTrack,
+        rollRadius: __pose.drawnHeight ? __pose.drawnHeight / 2 : undefined }
+    : { x: __it.position.x, y: __it.position.y,
+      w: __b.width / (Math.abs(__sc.x) || 1), h: __b.height / (Math.abs(__sc.y) || 1),
+      sx: __sc.x || 1, sy: __sc.y || 1, rot: (__it.rotation || 0) + __baked, hasTrack: __hasTrack };
   const __r = (${compileChoreography.toString()})(__actor, __frame, ${S(input.beats)});
   if (__r.error) { return { success: false, itemId: ${id}, error: __r.error }; }
   const __prev = (__it.data && Array.isArray(__it.data.keyframes)) ? __it.data.keyframes : [];
@@ -12367,7 +12654,7 @@ ${guard}
   const __other = __prev.reduce(function (acc, k) { Object.keys((k && k.properties) || {}).forEach(function (p) { if (__ours.indexOf(p) < 0 && acc.indexOf(p) < 0) acc.push(p); }); return acc; }, []);
   app.addAnimation(${id}, __r.keyframes, { duration: Math.max(__r.end, __prev.reduce(function (m, k) { return Math.max(m, (k && k.time) || 0); }, 0)), loop: false, mode: 'merge' });
   const __now = (__it.data && Array.isArray(__it.data.keyframes)) ? __it.data.keyframes.map(function (k) { return k && k.time; }) : [];
-  const __warnings = (__r.warnings || []).slice();
+  const __warnings = __anchorWarnings.concat(__r.warnings || []);
   if (__prevTimes.length && !__prevTimes.every(function (t) { return __now.indexOf(t) >= 0; })) {
     __warnings.push('this studio replaced the existing track of the actor (' + __prevTimes.length + ' key(s)) instead of merging: put the other keys in after choreographing.');
   }
@@ -12740,27 +13027,49 @@ ${cam ? `  // The camera rides the SAME timing: framing each state as its morph 
   /** pinepaper_emitter (D29): create('emitter', spec) / setEmitter(id, patch). */
   generateEmitter(input: EmitterInput): string {
     const S = (v: unknown) => JSON.stringify(v);
+    // A COUNT OVER THE CAP IS SAID (B144). The cap is 10000 a burst on the
+    // current studio and was 2000 before it, clamped in silence (2300 drew
+    // ~1940). Which applies is read from the spec the studio STORED — its
+    // normalised count is what it draws — so the reply names the number
+    // actually drawn on whichever studio ran it. Only when nothing can be read
+    // back does it fall back to what is known without the studio.
+    const checks = emitterCountsToCheck(input.spec);
+    const fallback = emitterCountWarnings(input.spec);
+    const capFn = checks.length ? `
+  function __capWarnings(stored) {
+    const checks = ${S(checks)};
+    if (!stored || typeof stored !== 'object') return ${S(fallback)};
+    const out = [];
+    for (const c of checks) {
+      const b = c.index === null ? null : (Array.isArray(stored.bursts) ? stored.bursts[c.index] : null);
+      const drawn = b && typeof b.count === 'number' ? b.count : stored.count;
+      if (typeof drawn !== 'number') return ${S(fallback)};
+      if (drawn < c.asked) out.push(c.where + ' ' + c.asked + ' is over this studio\\'s per-burst cap, so it draws ' + drawn + '. Split it into bursts at the same t for more.');
+    }
+    return out;
+  }` : '';
+    const capJs = (stored: string) => checks.length ? `, ...((function(w) { return w.length ? { warnings: w } : {}; })(__capWarnings(${stored})))` : '';
     if (input.action === 'set') {
       return `
 // Emitter: change a spec
 (function() {
-  if (typeof app.setEmitter !== 'function') { return { success: false, error: 'this studio has no emitter item (app.setEmitter) — it predates FxTool D29.' }; }
+  if (typeof app.setEmitter !== 'function') { return { success: false, error: 'this studio has no emitter item (app.setEmitter) — it predates FxTool D29.' }; }${capFn}
   const r = app.setEmitter(${S(input.itemId)}, ${S(input.spec)});
   if (!r || r.ok === false) { return { success: false, error: (r && r.error) || 'the emitter change was refused' }; }
-  return { success: true, action: 'set', itemId: ${S(input.itemId)}, spec: r.spec };
+  return { success: true, action: 'set', itemId: ${S(input.itemId)}, spec: r.spec${capJs('r.spec')} };
 })();`.trim();
     }
     return `
 // Emitter: create
 (function() {
-  if (typeof app.setEmitter !== 'function') { return { success: false, error: 'this studio has no emitter item (app.setEmitter) — it predates FxTool D29.' }; }
+  if (typeof app.setEmitter !== 'function') { return { success: false, error: 'this studio has no emitter item (app.setEmitter) — it predates FxTool D29.' }; }${capFn}
   const it = app.create('emitter', ${S(input.spec)});
   // A bad spec comes back null with an emitter-invalid warning; the reason
   // reaches this reply through the governor's warnings.
   if (!it) { return { success: false, error: 'the emitter spec was refused' }; }
   const id = it.data && (it.data.registryId || it.data.id);
   if (!id) { return { success: false, error: 'the emitter was made but not registered — no usable id' }; }
-  return { success: true, action: 'create', itemId: id };
+  return { success: true, action: 'create', itemId: id${capJs('it.data && it.data.emitter')} };
 })();`.trim();
   }
 
@@ -13799,7 +14108,7 @@ ${needWorld}
    * already decided by a pure function, so nothing is left for the page to
    * work out.
    */
-  generateDesignCompose(scene: { width: number; height: number; backgroundHex?: string }, ops: Array<Record<string, unknown>>, style: string, sizeWarning?: string): string {
+  generateDesignCompose(scene: { width: number; height: number; backgroundHex?: string }, ops: Array<Record<string, unknown>>, style: string, sizeWarning?: string, report: Record<string, unknown> = {}): string {
     const S = (v: unknown) => JSON.stringify(v);
     return `
 // Design: compose a ${style} scene — ${ops.length} items, laid out server-side
@@ -13829,7 +14138,7 @@ ${needWorld}
   // success is worse than a poster that says which four elements are missing.
   return { success: failed.length === 0, style: ${S(style)}, itemIds: ids, itemCount: ids.length, failed: failed,
     ...(canvasResized ? { canvasResized: canvasResized, note: 'the canvas was resized to the composition' + (${S(sizeWarning ?? '')} ? '' : '; pass width and height to compose at your canvas size') } : {}),
-    ...(${S(sizeWarning ?? '')} ? { warning: ${S(sizeWarning ?? '')} } : {}) };
+    ...(${S(sizeWarning ?? '')} ? { warning: ${S(sizeWarning ?? '')} } : {}), ...${S(report)} };
 })();`.trim();
   }
 

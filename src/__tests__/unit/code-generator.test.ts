@@ -1498,8 +1498,13 @@ describe('PinePaperCodeGenerator', () => {
             },
           },
         });
-        expect(code).toContain("origin: [500, 400]");
-        expect(code).toContain("destination: [550, 400]");
+        // 17 RADIALOFFSET: the origin is read from the created item's bounds
+        // (here centred on the requested point), with the request as fallback.
+        const item: Record<string, any> = { data: { registryId: 'item_1' }, bounds: { x: 450, y: 350, width: 100, height: 100 }, bringToFront() {} };
+        const app = { create: () => item, getItemById: () => item, itemRegistry: { get: () => ({ item }) }, historyManager: { saveState() {} } };
+        new Function('app', 'window', code.replace(/\(\{ itemId[\s\S]*\}\);\s*$/, (m) => `return ${m.slice(0, -1)}`))(app, {});
+        expect(item.fillColor.origin).toEqual([500, 400]);
+        expect(item.fillColor.destination).toEqual([550, 400]);
         expect(code).not.toContain("origin: [450, 350]");
       });
 
@@ -1593,7 +1598,7 @@ describe('PinePaperCodeGenerator', () => {
         expect(code).toContain("In the previous batch $");
       });
 
-      it('B116: keyframe_animate and batch keyframe_animate warn on letterSpacing', () => {
+      it('B116: keyframe_animate and batch keyframe_animate warn on letterSpacing', async () => {
         const single = codeGenerator.generateKeyframeAnimate({
           itemId: 'text_1',
           keyframes: [
@@ -1601,8 +1606,13 @@ describe('PinePaperCodeGenerator', () => {
             { time: 1, properties: { letterSpacing: 10 } },
           ],
         });
-        expect(single).toContain('ignoredProperties: ["letterSpacing"]');
-        expect(single).toContain('is not an animatable property');
+        // A studio that does not list letterSpacing as animatable (prod before
+        // FxTool engine-core-queue) is warned; the check runs in the page now.
+        const oldStudio = { getItemById: () => ({ data: {} }), addAnimation() {}, listAnimatableProperties: () => ({ properties: [{ name: 'x' }] }) };
+        const runIn = (code: string) => new Function('app', 'paper', 'window', 'document', code.replace(/^(\s*\/\/.*\n)+/, '').replace(/\((async )?function\(\)/, (m) => `return ${m}`))(oldStudio, {}, {}, {});
+        const r1 = runIn(single);
+        expect(r1.ignoredProperties).toEqual(['letterSpacing']);
+        expect(r1.warning).toContain('is not an animatable property');
 
         const batch = codeGenerator.generateAgentBatchExecute({
           operations: [
@@ -1613,8 +1623,9 @@ describe('PinePaperCodeGenerator', () => {
             },
           ],
         });
-        expect(batch).toContain('ignoredProperties: ["letterSpacing"]');
-        expect(batch).toContain('is not an animatable property');
+        const r2 = await runIn(batch);
+        expect(JSON.stringify(r2)).toContain('"ignoredProperties":["letterSpacing"]');
+        expect(JSON.stringify(r2)).toContain('is not an animatable property');
       });
     });
   });

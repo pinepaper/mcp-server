@@ -4663,10 +4663,24 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
             const sizeWarning = sizeIgnored
               ? `"${scene.style}" lays out at its own size, ${scene.width}x${scene.height}; the requested ${input.width ?? '?'}x${input.height ?? '?'} was not used`
               : undefined;
+            // BAUHAUS-SUBTITLE: at a size the style was not laid out for, its
+            // proportions can put text across a shape (bauhaus at 1920x1080
+            // runs the subtitle over the red circle). The layout is vendored;
+            // the result names each collision rather than drawing it as intended.
+            const collisions = designSystems.scalingCollisions(input.style!, {
+              title: input.title!, subtitle: input.subtitle, body: input.body,
+              width: input.width, height: input.height, variant: input.variant,
+            }, scene);
+            const layoutWarning = collisions.length
+              ? `at ${scene.width}x${scene.height} the "${scene.style}" layout runs text onto a shape it does not touch at its own default size: `
+                + collisions.map((c) => `${c.text} over ${c.shape}`).join(', ')
+                + '. Compose without width/height (its default size) for the layout as designed, or move the text afterwards with pinepaper_modify_item.'
+              : undefined;
+            const collisionReport = collisions.length ? { layoutCollisions: collisions, layoutWarning } : {};
             if (input.draw === false) {
-              return dataResult({ scene, ops, drawn: false, ...(sizeWarning ? { warning: sizeWarning } : {}) });
+              return dataResult({ scene, ops, drawn: false, ...(sizeWarning ? { warning: sizeWarning } : {}), ...collisionReport });
             }
-            const code = codeGenerator.generateDesignCompose(scene, ops, scene.style, sizeWarning);
+            const code = codeGenerator.generateDesignCompose(scene, ops, scene.style, sizeWarning, collisionReport);
             return executeOrGenerate(code, `Composed a ${scene.style} scene (${ops.length} items)`, options, 'pinepaper_design_system');
           }
         }

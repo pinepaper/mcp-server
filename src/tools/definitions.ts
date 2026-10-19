@@ -506,7 +506,7 @@ the label to replace the content.
   fontWeight: 400 / 700 / 'bold'. fontStyle: 'italic'. leading: line spacing in px; lineHeight: a multiple of fontSize (<= 4) or px. Multi-line content splits on \n.
   fit: {maxWidth, maxHeight?, minFontSize? (8), maxFontSize? (current), wrap? (true), hold? ('top' | 'center' | …)} — auto-size the text into a box, keeping its anchored edge. The box is remembered: changing content later refits (shrinks, or grows back to maxFontSize); modify_item {fit: {...}} sets a new box; {fit: null} stops fitting. The result's textFit says {fontSize, lines, fits}; fits:false means it overflows even at minFontSize. Studios without auto-fit say so in textFit. Every export's fidelity then lists text_overflow for any text past its box or off the frame — the check to run before a batch of variants.
   direction: 'auto' (default: the first strong letter decides, so Arabic and Hebrew need nothing) | 'ltr' | 'rtl' — the paragraph's base direction, which places neutrals like the final period (aliases textDirection, dir). The result's direction says whether the studio applied it; a studio without RTL support lays text out left-to-right and says so. justification: 'right' is alignment, not direction.
-  tabularFigures: true (or fontVariantNumeric: 'tabular-nums', or fontFeatures containing 'tnum') — fixed-width digits, so a counter, price or timer does not jitter as it changes. The result's tabularFigures says whether the studio applied them.
+  tabularFigures: true (or fontVariantNumeric: 'tabular-nums', or fontFeatures containing 'tnum') — fixed-width digits, so a counter, price or timer does not jitter as it changes. The result's tabularFigures.applied is measured on the current studio: true only when the layout moves a digit's advance; false with a reason (font-digits-already-equal: the font's digits are one width already, so nothing changes and steadyWidth is true; rtl; not-requested); 'unverified' on an older studio that records the request but cannot measure it.
   strokePosition: 'outside' — the stroke sits entirely outside the letters (drawn under the fill at twice strokeWidth), so a thick caption / meme outline keeps the letterform; 'center' (default) is the ordinary stroke. The result's strokePosition says whether the studio applied it.
 - circle: Circular shape (properties: radius, color, strokeColor, strokeWidth)
 - star: Star shape (properties: radius1, radius2, points, color)
@@ -592,7 +592,8 @@ Use itemType: "path" with either:
 ADVANCED STYLING (NEW):
 All shapes support these additional properties:
 - No fill (stroke-only outlines, line art): fillColor: null, 'transparent' or 'none', with a strokeColor and strokeWidth.
-- Gradients: color can be an object: {type: "linear"|"radial", stops: [{color: "#fff", offset: 0}, {color: "#000", offset: 1}], origin: [x,y], destination: [x,y]}
+- fillOpacity (0..1): the solid fill's own alpha, apart from opacity (which fades the stroke too) — on text, fillOpacity: 0.3 with a strokeColor is a see-through letter with a solid outline. Not applied to a gradient fill. The result's fillOpacity says whether the studio applied it (an older studio ignores the key and says so).
+- Gradients: color can be an object: {type: "linear"|"radial", stops: [{color: "#fff", offset: 0}, {color: "#000", offset: 1}], origin: [x,y], destination: [x,y]}. Without origin / destination a radial gradient is centred on the item's own bounds and reaches its right edge, wherever anchor put it.
 - Shadows: shadowColor, shadowBlur (pixels), shadowOffset: [x, y]
 - Blend modes: blendMode: "multiply"|"screen"|"overlay"|"darken"|"lighten"|etc.
 - Opacity: opacity (0-1)
@@ -772,7 +773,8 @@ USE WHEN:
 
 MODIFIABLE PROPERTIES:
 - position: {x, y} or separate x, y
-- color/fillColor: Fill color (solid string OR gradient object)
+- color/fillColor: Fill color (solid string OR gradient object); null, 'transparent' or 'none' removes the fill
+- fillOpacity (0..1): the solid fill's own alpha, apart from opacity; on the current studio it is kept when a later fillColor changes the fill. The result's fillOpacity says whether the studio applied it.
 - strokeColor: Outline color (solid string OR gradient object)
 - strokeWidth: Outline thickness
 - fontSize: Text size
@@ -1224,6 +1226,7 @@ Use maxWidth/maxHeight to constrain the image dimensions while preserving aspect
 - maxEdge: the longest edge the studio STORES the image at (px), or 'native' to keep every pixel. The result says when it was stored smaller.
 - nativeSize: true places the image at its source footprint even if it was stored smaller.
 - smoothing: 'off' (nearest-neighbour, for pixel art) | 'low' (default) | 'medium' | 'high'.
+- shadowColor / shadowBlur / shadowOffset: a drop shadow on the placed image, the same keys pinepaper_modify_item takes.
 
 EXAMPLES:
 - Import photo: url: "https://example.com/photo.jpg"
@@ -1264,6 +1267,9 @@ EXAMPLES:
           enum: ['off', 'low', 'medium', 'high'],
           description: "Resampling when the image is scaled. 'off' = nearest-neighbour, hard pixel edges — use it for pixel art. Default 'low'. Change it later with pinepaper_modify_item {smoothing}.",
         },
+        shadowColor: { type: 'string', description: 'Drop shadow colour (hex, rgb(a) or a name), applied to the placed image — the mask group when masked. result.shadow says whether it applied.' },
+        shadowBlur: { type: 'number', description: 'Drop shadow blur radius in px.' },
+        shadowOffset: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: 'Drop shadow offset [x, y] in px.' },
       },
       required: ['url'],
     },
@@ -2795,7 +2801,7 @@ An AESTHETIC STYLE is a look: Bauhaus, Art Deco, Swiss typographic, De Stijl, va
 - list_easings: every motion curve across every system as a named easing, with its licence and whether it was authored here. Use these to make a motion match a system it has to sit beside.
 - list_motion: those curves AND the duration scale sitting beside them — the other half of a motion token, published nowhere until now. A curve is a shape; a motion is a shape over a length, and matching a system's easing while inventing its timing gets only the easy half right. Durations come back in ms and in seconds, because every animation tool here takes seconds. These are the licensed SYSTEMS' motion scales: an aesthetic style carries no upstream motion data, so pair one of these with a style rather than expecting the style to name its own.
 - list_styles: every style with its TOKENS — palette, background, font stacks, type sizes and any variants — derived by composing it, so they are what the generator will actually draw. Read these to hand-build in a style rather than reverse-engineering its colours.
-- compose: build a titled scene in a style. Layout is decided in this server by a pure function, so 'compose' with draw:false returns the scene and the ops as DATA and draws nothing — read it before committing, the same way pinepaper_story's distill works. Element boxes are converted to the centre anchor app.create wants, and text carries its alignment, so a left-aligned headline starts at its x instead of centring on it.
+- compose: build a titled scene in a style. Layout is decided in this server by a pure function, so 'compose' with draw:false returns the scene and the ops as DATA and draws nothing — read it before committing, the same way pinepaper_story's distill works. Element boxes are converted to the centre anchor app.create wants, and text carries its alignment, so a left-aligned headline starts at its x instead of centring on it. A style's circles are drawn as circles, a clip-path frame keeps its angled corners, a neon glow becomes a shadow, and a scanline overlay is drawn as lines. At a width/height the style was not laid out for, text can land on a shape it clears at its own default size; the result names each such pair in layoutCollisions rather than drawing it as intended.
 
 A partial composition reports as a failure with the elements that did not create, rather than as a success with half a poster.`,
     inputSchema: {
@@ -3978,11 +3984,12 @@ ANIMATABLE PROPERTIES:
 - strokeColor: Color string
 - strokeWidth, width, height, radius, shadowBlur, shadowColor: Numbers / colours
 - fontSize: Number
+- TEXT (current studio): fontStyle ('normal' / 'italic' / 'oblique', discrete — switches at the next key), textAlign ('left' / 'center' / 'right', discrete; the anchor stays put), lineHeight (px, or a multiple of fontSize up to 5), letterSpacing (px, or a CSS length such as '0.1em'). An older studio stores these keys without drawing them; the result names any it did not animate (ignoredProperties).
 - STROKE DRAW-ON (paths): trimStart, trimEnd (0-1 of the path's length), trimOffset (shifts the visible window along it), dashArray. A draw-on is trimEnd 0 -> 1.
 The authoritative list for a given item is pinepaper_get_animatable_properties — ask it rather than guessing.
 
-EASING — IT SHAPES THE SEGMENT ARRIVING AT THE KEYFRAME IT IS ON.
-The move from keyframe A to keyframe B is eased by B's easing, not A's. Easing on the FIRST keyframe does nothing (no segment arrives at it) — a Ken Burns with easing only on its first key plays linear. Put the easing on the key you are moving TO.
+EASING — BY DEFAULT IT SHAPES THE SEGMENT ARRIVING AT THE KEYFRAME IT IS ON.
+The move from keyframe A to keyframe B is eased by B's easing, not A's. So by default the FIRST keyframe's easing has no effect (no segment arrives at it) — a Ken Burns with easing only on its first key plays linear. Put the easing on the key you are moving TO, or pass easingAt: 'departure' for the other reading: each key's easing shapes the move LEAVING it, so the first key's easing eases the first move (current studio; an older one reads arrival and the result says so). 'hold' / 'step' stay on the key they mark either way.
 ${EASING_LINES}
 - or a custom cubic-bezier [x1, y1, x2, y2] — x in 0..1, y may exceed 0..1 for overshoot. keyframe_animate and camera_animate only.
 COUNTERS: a text item with a counter (create_item / modify_item counter) also animates the numeric property counterValue, drawn through the counter's format — keyframe it to shape a count by hand (hold on a number, then race). Its keys override the counter's own from / to.
@@ -4018,7 +4025,7 @@ EXAMPLE — Reveal at 2s, skip first second of keyframe data, end at 4s of keyfr
               },
               easing: {
                 ...KEYFRAME_EASING_JSON_SCHEMA,
-                description: 'Shapes the segment ARRIVING at this keyframe (from the previous one). Ignored on the first keyframe. A name, or a custom cubic-bezier [x1, y1, x2, y2] — x in 0..1, y may exceed 0..1 for overshoot.',
+                description: "Shapes the segment ARRIVING at this keyframe (from the previous one), so by default it has no effect on the first keyframe; with easingAt: 'departure', the segment LEAVING it. A name, or a custom cubic-bezier [x1, y1, x2, y2] — x in 0..1, y may exceed 0..1 for overshoot.",
               },
             },
             required: ['time', 'properties'],
@@ -4048,6 +4055,16 @@ EXAMPLE — Reveal at 2s, skip first second of keyframe data, end at 4s of keyfr
         append: {
           type: 'boolean',
           description: 'Add these keys to the item\'s existing track (same-time keys merge, new values win) instead of replacing it — e.g. a button press after an entrance. Without it, a second call replaces the track. result.track says whether the track was appended to or replaced; studios without merge replace, and say so.',
+        },
+        mode: {
+          type: 'string',
+          enum: ['replace', 'merge'],
+          description: "The studio's spelling of append, accepted so its keyframe_track_replaced warning (\"Pass { mode: 'merge' }\") can be followed as written: 'merge' is append: true; 'replace' is the default. append and mode that disagree are refused as a contradiction.",
+        },
+        easingAt: {
+          type: 'string',
+          enum: ['arrival', 'departure'],
+          description: "Which segment a key's easing shapes. 'arrival' (default): the move ARRIVING at the key, so the first key's easing has no effect. 'departure': the move LEAVING the key, so an ease placed where a motion starts applies there. Current studio; an older one reads arrival and the result says so.",
         },
       },
       required: ['itemId', 'keyframes'],
@@ -8112,7 +8129,13 @@ ACTIONS:
 SPEC:
 - mode: 'burst' (default) — bursts: [{ t, x, y, count, …per-burst overrides }]: a pop of particles at scene time t.
 - mode: 'trail' (or give target) — target (an item id), rate (per second), emitWindows [[t0, t1], …], window, offset: particles shed from a moving item.
-- look and physics (per emitter or per burst): shape ('circle' | 'rect' | 'dash' | 'star' | 'confetti', or an array), palette [colours], size / sizes / sizeEnd, speed + angle ranges or velocities, gravity (px/s², +down), drag, friction, lifetime, fadeIn / fadeOut, spin, opacity, jitter, seed.
+- look and physics (per emitter or per burst): shape ('circle' | 'rect' | 'dash' | 'star' | 'confetti', or an array), palette [colours], size / sizes / sizeEnd, speed + angle ranges or velocities, gravity (px/s², +down), drag, friction, lifetime, fadeIn / fadeOut, spin, opacity, jitter, jitterGrow, seed.
+UNITS (a number, or a [min, max] range picked per particle where it says range):
+- count: particles per burst, at most 10000 on the current studio (2000 on older studios) — a larger count is drawn at the cap and the reply warns with the number drawn. For more, add a second burst at the same t.
+- speed: px/s (range). angle: degrees, 0 = right, 90 = down (range). gravity: px/s². lifetime: seconds (range, > 0). size: px (range).
+- fadeIn / fadeOut: SECONDS at the start / end of each particle's life. fadeOut is capped at that particle's lifetime (a 0.5 s life cannot fade for 2 s; it fades over its whole life instead), and the current studio warns when it caps one. Omitted (or fade: 'linear'), the particle fades linearly over its WHOLE life; fade: 'none' turns both off.
+- spin: DEGREES PER SECOND, positive = clockwise on screen (range; spinAlternate flips every other particle). It turns rect, confetti, star and dash particles; a circle has no orientation, so spin on circles shows nothing (the current studio warns when every particle is a circle).
+- jitter: PIXELS — on the current studio each particle is displaced up to ±jitter px on each axis from its path, at full size from birth; jitterGrow: true keeps the older ramp (zero at birth, the full ±jitter at the end of life). Older studios (before jitterGrow) displace up to ±jitter/2, growing from 0 at birth. jitterHz: how many times a second that offset is re-rolled (0, the default, keeps one offset per particle).
 An unknown shape, mode or bad range is refused with the engine's reason — never defaulted.
 
 EXAMPLE — confetti at 2 s:
@@ -8810,7 +8833,7 @@ ITEMS:
 ANIMATION:
   animate — Loop animation: {itemId, animationType, animationOptions}
     animationType: ${SIMPLE_ANIMATION_TYPES_LIST}
-  keyframe_animate — Timed animation: {itemId, keyframes: [{time, properties, easing}], duration, loop, append}. Replaces the item's track unless append: true; two ops on one item in a batch are merged into one.
+  keyframe_animate — Timed animation: {itemId, keyframes: [{time, properties, easing}], duration, loop, append}. Replaces the item's track unless append: true (or mode: 'merge', the studio's spelling); two ops on one item in a batch are merged into one.
     Animatable properties: opacity, scale, scaleX, scaleY, x, y, rotation, fillColor, strokeColor, strokeWidth, width, height, radius, fontSize, trimStart/trimEnd/trimOffset (path draw-on)
     Easing (on the keyframe being moved TO): ${KEYFRAME_EASINGS_LIST}
   relation — Behavioral link: {sourceId, targetId, relationType, relationOptions}
@@ -8914,6 +8937,7 @@ EXAMPLE — Animated sky scene with timed reveals:
               duration: { type: 'number', description: 'Duration in seconds for keyframe_animate or play_timeline' },
               loop: { type: 'boolean', description: 'Loop for keyframe_animate or play_timeline' },
               append: { type: 'boolean', description: "For keyframe_animate: add these keys to the item's existing track instead of replacing it (a key at the same time merges, the new values win). Without it the op replaces the track; the op's result says which happened." },
+              mode: { type: 'string', description: "For keyframe_animate: the studio's spelling of append — 'merge' is append: true; 'replace' (the default) replaces the track." },
               // Relations
               sourceId: { type: 'string', description: 'For relation: source item ID or $N' },
               targetId: { type: 'string', description: 'For relation: target item ID or $N' },
@@ -9019,7 +9043,8 @@ Held exports last until released, or until a LATER export needs the space — an
     },
     description: `Smart export with automatic format detection and platform optimization.
 
-WHAT quality ACTUALLY SETS, because it bundles three things and only one of them is "quality": draft = 15fps / 72dpi / compression 0.6, standard = 30fps / 150dpi / 0.85, high = 60fps / 300dpi / 0.95. So asking for high DOUBLES the frame count and the render time against standard. Override either half directly - fps for frame rate, scale for resolution - and leave quality to mean compression.
+WHAT quality ACTUALLY SETS, because it bundles three things and only one of them is "quality": draft = 15fps / 72dpi / compression 0.6, standard = 30fps / 150dpi / 0.85, high = 60fps / 300dpi / 0.95. So asking for high DOUBLES the frame count and the render time against standard. Override either half directly - fps for frame rate, scale for resolution.
+The compression half is weaker than its name for VIDEO: on mp4 / webm it scales the encoder's resolution-derived target bitrate, and the browser encoder treats that target as a CEILING. A simple scene encodes well under either ceiling, so draft and high at the same fps can come out within bytes of each other; a scene with grain is encoded at a fixed quantizer and ignores it. To change a video's size or quality, use scale, or bitrate (with bitrateMode 'constant' to hold it); result.video.achievedBitrate says what the encoder produced. On jpg / webp stills compression IS the encoder quality, and lower means a smaller file.
 
 DOES THIS SURVIVE EXPORT? It is a PATH fact, not a per-feature one, so the rule is short and does not go stale as capabilities land: IF IT TICKS INSIDE THE ENGINE'S UPDATE LOOP, IT EXPORTS. Loop presets (pinepaper_animate), relations, keyframes, generators and camera moves all do - measured frame-by-frame, not assumed. What does NOT survive is anything driven by the wall clock outside that loop, or anything on the realtime recorder path.
 ONE MEASURED EXCEPTION TO CHECK: keyframe_animate's loop:true has been measured playing ONCE in an export and then holding the last keyframe. Before exporting past one cycle, sample a frame in the second cycle; if it holds, write the keyframes out for each cycle, or use a loop preset.
@@ -9135,7 +9160,7 @@ VERIFY MOTION BEFORE YOU RENDER. An export takes seconds to minutes and shows yo
         quality: {
           type: 'string',
           enum: ['draft', 'standard', 'high'],
-          description: 'Compression level (default: standard). It ALSO carries a default frame rate — draft 15, standard 30, high 60 — so "high" doubles the frame count and the render time against "standard" unless you set fps yourself. Set fps and scale to control those halves directly and leave quality meaning compression.',
+          description: 'Compression level (default: standard). It ALSO carries a default frame rate — draft 15, standard 30, high 60 — so "high" doubles the frame count and the render time against "standard" unless you set fps yourself. For mp4 / webm the compression only scales a bitrate CEILING the encoder rarely reaches on a simple scene, so it may not change the file at all — use scale or bitrate to control size. For jpg / webp it is the encoder quality.',
         },
         fps: {
           anyOf: [{ type: 'number', minimum: 1, maximum: 120 }, { type: 'string', pattern: '^[0-9]+/[0-9]+$' }],
