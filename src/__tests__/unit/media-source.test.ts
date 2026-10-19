@@ -3,11 +3,19 @@
  * page's CSP refuses fetch() of third-party hosts, so a working https audio
  * URL failed "Failed to fetch" on production.
  */
-import { describe, it, expect, afterEach } from 'bun:test';
+import { describe, it, expect, afterEach, afterAll } from 'bun:test';
 import { writeFileSync, mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { resolveMediaSource } from '../../tools/handlers.js';
+import { routeSafeFetchThroughGlobalFetch, allowAssetDir } from '../helpers/public-fetch.js';
+
+// Fetches go through safeFetch; route them to the stubbed globalThis.fetch.
+routeSafeFetchThroughGlobalFetch();
+
+// Local reads are confined to cwd + PINEPAPER_ASSET_DIRS; these tests read from tmpdir.
+const restoreAssetDirs = allowAssetDir(tmpdir());
+afterAll(restoreAssetDirs);
 
 const realFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = realFetch; });

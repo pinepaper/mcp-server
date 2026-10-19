@@ -3,12 +3,17 @@
  * result (the source was inlined into the generated code), and a local path
  * failed to decode. Large sources are staged; paths are read by the server.
  */
-import { describe, it, expect } from 'bun:test';
+import { describe, it, expect, afterAll } from 'bun:test';
 import { writeFileSync, mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { handleToolCall } from '../../tools/handlers.js';
 import { codeGenerator } from '../../types/code-generator.js';
+import { allowAssetDir } from '../helpers/public-fetch.js';
+
+// Local reads are confined to cwd + PINEPAPER_ASSET_DIRS; these tests read from tmpdir.
+const restoreAssetDirs = allowAssetDir(tmpdir());
+afterAll(restoreAssetDirs);
 
 function fake() {
   const runs: Array<{ code: string; stage?: Record<string, string> }> = [];

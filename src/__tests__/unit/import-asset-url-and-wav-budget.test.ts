@@ -5,6 +5,10 @@
  */
 import { describe, it, expect, afterEach } from 'bun:test';
 import { handleToolCall } from '../../tools/handlers.js';
+import { routeSafeFetchThroughGlobalFetch } from '../helpers/public-fetch.js';
+
+// Fetches go through safeFetch; route them to the stubbed globalThis.fetch.
+routeSafeFetchThroughGlobalFetch();
 
 const realFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = realFetch; });

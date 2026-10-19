@@ -212,6 +212,8 @@ import { buildZip } from '../utils/zip.js';
 import { buildScc, type SccCue } from '../utils/scc.js';
 import { checkContrast, checkFlashes, parseCssColor, type TextSample } from '../utils/a11y.js';
 import { buildHtml5Ad, buildPlayable, externalRequests, pinSceneBackground, type CtaBox } from '../utils/ad-package.js';
+import { safeFetch, checkUrl, UnsafeUrlError } from '../utils/safe-fetch.js';
+import { confineAssetPath } from '../utils/asset-paths.js';
 
 /**
  * Registry of per-domain handler maps. Tools listed here short-circuit the
@@ -355,8 +357,9 @@ const MAX_REMOTE_IMAGE_BYTES = 32 * 1024 * 1024;
 export async function fetchImageAsDataUrl(url: string): Promise<{ src: string } | { error: string }> {
   let res: Response;
   try {
-    res = await fetch(url, { redirect: 'follow' });
+    res = await safeFetch(url);
   } catch (e) {
+    if (e instanceof UnsafeUrlError) return { error: e.message };
     const why = e instanceof Error ? e.message : 'network request failed';
     return { error: `could not reach ${url} — ${why}. This fetch runs in the MCP server, not the page, so it is not a CSP problem: check the host resolves and any proxy is reachable.` };
   }
@@ -413,14 +416,17 @@ export async function resolveImageSource(input: string): Promise<{ src: string }
   if (/^data:/i.test(raw)) return { src: raw };
   if (/^https?:/i.test(raw)) return fetchImageAsDataUrl(raw);
 
-  const path = raw.startsWith('file://') ? fileURLToPath(raw) : raw;
-  const ext = extname(path).toLowerCase();
+  const asked = raw.startsWith('file://') ? fileURLToPath(raw) : raw;
+  const ext = extname(asked).toLowerCase();
   if (!IMAGE_EXTENSIONS.has(ext)) {
     return {
       error: `"${input}" is neither an http(s) URL nor a path to an image file. `
         + `Recognised image extensions: ${[...IMAGE_EXTENSIONS].join(', ')}.`,
     };
   }
+  const confined = await confineAssetPath(asked);
+  if ('error' in confined) return confined;
+  const path = confined.path;
   let bytes: Buffer;
   try {
     const info = await stat(path);
@@ -468,8 +474,9 @@ export async function resolveMediaSource(input: string): Promise<{ src: string }
   if (/^https?:/i.test(raw)) {
     let res: Response;
     try {
-      res = await fetch(raw, { redirect: 'follow', headers: { 'User-Agent': 'PinePaper-MCP (+https://pinepaper.studio)' } });
+      res = await safeFetch(raw, { headers: { 'User-Agent': 'PinePaper-MCP (+https://pinepaper.studio)' } });
     } catch (e) {
+      if (e instanceof UnsafeUrlError) return { error: e.message };
       const why = e instanceof Error ? e.message : 'network request failed';
       return { error: `could not reach ${raw} — ${why}. This fetch runs in the MCP server, not the page, so it is not a CSP problem: check the host resolves and any proxy is reachable.` };
     }
@@ -486,11 +493,14 @@ export async function resolveMediaSource(input: string): Promise<{ src: string }
     return { src: `data:${type};base64,${buf.toString('base64')}` };
   }
 
-  const path = raw.startsWith('file://') ? fileURLToPath(raw) : raw;
-  const type = MEDIA_MIME[extname(path).toLowerCase()];
+  const asked = raw.startsWith('file://') ? fileURLToPath(raw) : raw;
+  const type = MEDIA_MIME[extname(asked).toLowerCase()];
   if (!type) {
     return { error: `"${input}" is neither an http(s) URL, a data: URL, nor a path to an audio/video file. Recognised extensions: ${Object.keys(MEDIA_MIME).join(', ')}.` };
   }
+  const confined = await confineAssetPath(asked);
+  if ('error' in confined) return confined;
+  const path = confined.path;
   try {
     const info = await stat(path);
     if (!info.isFile()) return { error: `"${path}" is not a file.` };
@@ -1277,6 +1287,12 @@ export async function customCodeRollback(
  * isolated context, so code mode cannot do it and says so.
  */
 async function brandFromUrl(url: string, shots: number, options: HandlerOptions): Promise<CallToolResult> {
+  // Same address rules as every server-side fetch, before a browser is started.
+  // The page's own requests are checked as it loads (see intakeBrand).
+  try { await checkUrl(url); } catch (e) {
+    const why = e instanceof Error ? e.message : String(e);
+    return errorResult(e instanceof UnsafeUrlError ? ErrorCodes.INVALID_PARAMS : ErrorCodes.EXECUTION_ERROR, e instanceof UnsafeUrlError ? why : `could not reach ${url}: ${why}`, {}, { toolName: 'pinepaper_brand_kit' });
+  }
   const effectiveExecMode = options.executionMode ?? getExecutionMode();
   if (effectiveExecMode === 'code' || !options.executeInBrowser) {
     return errorResult(ErrorCodes.EXECUTION_ERROR, 'brand_kit from_url reads the site in the MCP server\'s browser, so it needs browser mode; it cannot run as generated code.', {}, { toolName: 'pinepaper_brand_kit' });
@@ -3215,7 +3231,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
         let svgWarnings: Array<Record<string, string>> = [];
         if (input.url) {
           try {
-            const res = await fetch(input.url, { redirect: 'follow' });
+            const res = await safeFetch(input.url);
             if (!res.ok) {
               return errorResult(
                 ErrorCodes.EXECUTION_ERROR,
@@ -3224,6 +3240,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
             }
             svgText = await res.text();
           } catch (e) {
+            if (e instanceof UnsafeUrlError) return errorResult(ErrorCodes.INVALID_PARAMS, e.message);
             const why = e instanceof Error ? e.message : 'network request failed';
             return errorResult(
               ErrorCodes.EXECUTION_ERROR,
@@ -3245,7 +3262,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
           input.source
         );
         const description = svgWarnings.length
-          ? `Imports SVG onto the canvas (${svgWarnings.length} unreachable image(s) removed)`
+          ? `Imports SVG onto the canvas (${svgWarnings.length} unreachable image(s) removed: ${svgWarnings.map((w) => w.message).join('; ')})`
           : 'Imports SVG onto the canvas';
         return executeOrGenerate(code, description, options, 'pinepaper_import_svg');
       }
@@ -3924,8 +3941,9 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
             // third-party host under the studio's CSP and this process can.
             let res: Response;
             try {
-              res = await fetch(input.url, { redirect: 'follow' });
+              res = await safeFetch(input.url);
             } catch (e) {
+              if (e instanceof UnsafeUrlError) return errorResult(ErrorCodes.INVALID_PARAMS, e.message);
               const why = e instanceof Error ? e.message : 'network request failed';
               return errorResult(
                 ErrorCodes.EXECUTION_ERROR,

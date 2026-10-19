@@ -6,6 +6,7 @@
       "name": "@pinepaper.studio/mcp-server",
       "dependencies": {
         "@modelcontextprotocol/sdk": "^1.30.0",
+        "undici": "^6",
         "zod": "^3.22.4",
       },
       "devDependencies": {
@@ -29,7 +30,7 @@
     "basic-ftp": "^5.3.1",
     "body-parser": "^2.3.0",
     "es-define-property": "npm:@socketregistry/es-define-property@^1.0.7",
-    "fast-uri": "^3.1.7",
+    "fast-uri": "^3.1.8",
     "flatted": "^3.4.2",
     "function-bind": "npm:@socketregistry/function-bind@^1.0.7",
     "gopd": "npm:@socketregistry/gopd@^1.0.7",
@@ -365,6 +366,8 @@
     "typed-query-selector": ["typed-query-selector@2.12.2", "", {}, "sha512-EOPFbyIub4ngnEdqi2yOcNeDLaX/0jcE1JoAXQDDMIthap7FoN795lc/SHfIq2d416VufXpM8z/lD+WRm2gfOQ=="],
 
     "typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
+
+    "undici": ["undici@6.29.1", "", {}, "sha512-EvRlUt/QqAEvXdQeRMYUfwOQsfzpDztykrG2owGEE/rBOBoYv9uF39ZzsNDh4lTFHhTr2XOZjKkYgueD12ZmGA=="],
 
     "undici-types": ["undici-types@6.21.0", "", {}, "sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ=="],
 

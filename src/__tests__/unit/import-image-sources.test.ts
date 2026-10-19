@@ -14,12 +14,20 @@
  *    emitted code fetches first and reports the status, the refusal or the
  *    wrong content type.
  */
-import { describe, it, expect } from 'bun:test';
+import { describe, it, expect, afterAll } from 'bun:test';
 import { writeFile, rm, mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { resolveImageSource } from '../../tools/handlers.js';
 import { codeGenerator } from '../../types/code-generator.js';
+import { routeSafeFetchThroughGlobalFetch, allowAssetDir } from '../helpers/public-fetch.js';
+
+// Fetches go through safeFetch; route them to the stubbed globalThis.fetch.
+routeSafeFetchThroughGlobalFetch();
+
+// Local reads are confined to cwd + PINEPAPER_ASSET_DIRS; these tests read from tmpdir.
+const restoreAssetDirs = allowAssetDir(tmpdir());
+afterAll(restoreAssetDirs);
 
 const PNG_1PX = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
@@ -81,7 +89,7 @@ describe('resolveImageSource', () => {
   });
 
   it('names the actual reason a path did not work', async () => {
-    const missing = await resolveImageSource('/tmp/definitely-not-here-9f2c.png');
+    const missing = await resolveImageSource(join(tmpdir(), 'definitely-not-here-9f2c.png'));
     expect('error' in missing).toBe(true);
     if ('error' in missing) {
       // The OS reason, not a generic failure, plus the resolution rule.

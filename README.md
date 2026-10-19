@@ -245,6 +245,21 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - Code an agent writes runs with whatever that browser page has. Give this server the same trust you would give anything else you let write and run code on your machine — which is the trust you already extend to an MCP client with tool access.
 - Puppeteer mode launches Chrome with `--no-sandbox` and `--disable-setuid-sandbox`. That is routine for headless automation and it does weaken Chrome's own process sandbox. If that matters where you are running it, use `code` mode or put the server in a container.
 - Puppeteer itself is an **optional** peer dependency, kept out of the default tree precisely because a headless browser plus an install script is what scanners flag hardest. Install it only if you want the executing mode.
+- The server itself fetches the images, SVGs and media a tool call names by URL, and reads local files named by path. URLs that resolve to loopback, private, link-local or reserved addresses are refused, redirects included, and so are cloud metadata addresses. Local files are read only from the working directory, the export folder, and folders listed in `PINEPAPER_ASSET_DIRS`. `PINEPAPER_ALLOW_PRIVATE_NETWORK=1` allows local and LAN hosts. Metadata addresses stay refused even with it set.
+
+## What's new in 1.6.22
+
+### Changed
+
+- URLs that resolve to a private address are refused. Image, SVG and media
+  imports, and `pinepaper_brand_kit` `from_url`, no longer fetch from
+  loopback, private, link-local or reserved addresses, or from a cloud
+  metadata address. Every redirect is checked the same way. To import from a
+  local or LAN dev server, set `PINEPAPER_ALLOW_PRIVATE_NETWORK=1`.
+- Local imports are read only from the server's working directory, its export
+  folder, and the folders listed in `PINEPAPER_ASSET_DIRS`. Symlinks are
+  followed before the check. A path outside those folders is refused, and the
+  error names the folder to add.
 
 ## What's new in 1.6.21
 
@@ -2327,6 +2342,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 | `PINEPAPER_PROXY` | Chrome `--proxy-server` value; also ignores certificate errors, for an intercepting proxy | unset |
 | `PINEPAPER_EXPORT_TIMEOUT` | Governor budget for an export run, in ms (raise `PINEPAPER_TIMEOUT` alongside it) | `300000` |
 | `PINEPAPER_GOVERNOR` | `off` runs code by raw eval — no governor report, no error codes, no seeded determinism | on |
+| `PINEPAPER_ASSET_DIRS` | Extra folders local image and media imports may read from, separated by `:` (`;` on Windows). The working directory and the export folder are always allowed | unset |
+| `PINEPAPER_ALLOW_PRIVATE_NETWORK` | `1` lets URL imports reach loopback, private and LAN addresses, for a local dev server. Cloud metadata addresses stay refused | unset |
 
 Behind a proxy, or against a Studio with analytics or polling connections open,
 `networkidle2` may never settle: set `PINEPAPER_WAIT_UNTIL` only if you need the

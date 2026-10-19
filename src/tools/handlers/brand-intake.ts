@@ -18,6 +18,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Page } from 'puppeteer';
+import { checkUrl, safeFetch } from '../../utils/safe-fetch.js';
 
 /** One colour seen on the page, weighted by how much of the page it covers and how it is used. */
 export interface SeenColor {
@@ -200,10 +201,38 @@ export interface BrandIntakeResult {
 }
 
 /**
+ * The site is a URL the model chose, opened in a real browser: its redirects
+ * and every resource it loads are requests this machine makes. Each request's
+ * host is checked by the same rules as safeFetch (one lookup per host) and
+ * aborted when it resolves to a private address. Chrome does its own DNS, so
+ * this is check-then-connect rather than pinned; websockets are not
+ * intercepted by Puppeteer.
+ */
+async function guardPageRequests(page: Page): Promise<void> {
+  const verdicts = new Map<string, Promise<boolean>>();
+  await page.setRequestInterception(true);
+  page.on('request', (req) => {
+    if (req.isInterceptResolutionHandled()) return;
+    let u: URL;
+    try { u = new URL(req.url()); } catch { void req.abort('blockedbyclient'); return; }
+    if (u.protocol === 'data:' || u.protocol === 'blob:') { void req.continue(); return; }
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') { void req.abort('blockedbyclient'); return; }
+    let ok = verdicts.get(u.host);
+    if (!ok) {
+      ok = checkUrl(u).then(() => true, () => false);
+      verdicts.set(u.host, ok);
+    }
+    void ok.then((allowed) => (allowed ? req.continue() : req.abort('blockedbyclient'))).catch(() => {});
+  });
+}
+
+/**
  * Read a site into a folder: screenshots down the page, the logo, and a kit.
  * `page` is an isolated page the caller owns.
  */
 export async function intakeBrand(page: Page, url: string, outDir: string, shots = 3): Promise<BrandIntakeResult> {
+  await checkUrl(url);
+  await guardPageRequests(page);
   await page.setViewport({ width: 1440, height: 900 });
   await page.goto(url, { waitUntil: 'networkidle2', timeout: 45_000 });
   const m = await page.evaluate(measurePage);
@@ -223,7 +252,7 @@ export async function intakeBrand(page: Page, url: string, outDir: string, shots
   // The logo: the header's own image or SVG, else the largest icon, else og:image.
   let logo: BrandIntakeResult['logo'] = null;
   const fetchTo = async (src: string, base: string) => {
-    const res = await fetch(src);
+    const res = await safeFetch(src);
     if (!res.ok) return null;
     const type = (res.headers.get('content-type') || '').split(';')[0].trim();
     const ext = EXT_BY_TYPE[type] || (src.match(/\.(png|jpe?g|webp|svg|gif|ico)(\?|$)/i)?.[1]?.toLowerCase().replace('jpeg', 'jpg')) || 'img';
