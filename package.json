@@ -83,7 +83,7 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "undici": "^6",
     "zod": "^3.22.4"
   },
@@ -115,6 +115,7 @@
   ],
   "overrides": {
     "basic-ftp": "^5.3.1",
+    "brace-expansion": "^5.0.11",
     "body-parser": "^2.3.0",
     "es-define-property": "npm:@socketregistry/es-define-property@^1.0.7",
     "fast-uri": "^3.1.8",
@@ -123,10 +124,11 @@
     "gopd": "npm:@socketregistry/gopd@^1.0.7",
     "has-symbols": "npm:@socketregistry/has-symbols@^1.0.7",
     "hasown": "npm:@socketregistry/hasown@^1.0.7",
-    "ip-address": "^10.3.1",
+    "ip-address": "^10.7.3",
     "js-yaml": "^4.3.1",
     "object-assign": "npm:@socketregistry/object-assign@^1.0.5",
     "path-to-regexp": "^8.4.2",
+    "proxy-addr": "^2.0.8",
     "qs": "^6.16.0",
     "safer-buffer": "npm:@socketregistry/safer-buffer@^1.0.10",
     "side-channel": "npm:@socketregistry/side-channel@^1.0.10",
