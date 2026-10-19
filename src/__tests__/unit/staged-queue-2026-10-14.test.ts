@@ -182,8 +182,15 @@ describe('compose translations', () => {
     expect([op.x, op.y]).toEqual([el.x + el.width! / 2, el.y + el.height! / 2]);
   });
 
-  it('BAUHAUS-SUBTITLE: at 1920x1080 the subtitle over the circle is reported, at the default size nothing is', async () => {
-    const opts = { title: 'Form', subtitle: 'Function and form unite', width: 1920, height: 1080 };
+  it('BAUHAUS-SUBTITLE: the wide layouts clear the subtitle; where it still lands on the circle it is reported', async () => {
+    // Upstream now sizes the circle from the shorter side (mcp-cloud, vendored
+    // in 1363459), so 1920x1080 and 1280x720 no longer overlap at all.
+    for (const [width, height] of [[1920, 1080], [1280, 720]]) {
+      const o = { title: 'Form', subtitle: 'Function and form unite', width, height };
+      expect(scalingCollisions('bauhaus_geometric', o, compose('bauhaus_geometric', o)!)).toEqual([]);
+    }
+    // A squarer landscape still puts the subtitle on the circle: reported, not drawn as intended.
+    const opts = { title: 'Form', subtitle: 'Function and form unite', width: 800, height: 600 };
     const wide = compose('bauhaus_geometric', opts)!;
     expect(scalingCollisions('bauhaus_geometric', opts, wide)).toContainEqual({ text: 'bauhaus-subtitle-text', shape: 'bauhaus-red-circle' });
     const plain = { title: 'Form', subtitle: 'Function and form unite' };
