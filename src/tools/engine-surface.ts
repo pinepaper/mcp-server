@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 29df847f7e9e90d9e77ba6e48519de7bc00221b4
- * sha256:    df9ab078f2b153dd6a5d9b43514adaaa33d80172828289a876f42df965b223b4   (of PinePaper.js as committed)
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 64eff47af07766e1d3f5b66db9645685f17e8b76
+ * sha256:    9b8a7da7894b605f92c3971e5fd9adb4009819cdb9f9e0ec6ae92fbb7a89f549   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on `window.app`, with how it gets there. The parity
@@ -16,7 +16,7 @@
 /** How a name lands on `app`. */
 export type EngineMemberKind = 'method' | 'accessor' | 'property' | 'lazy' | 'lazyHeavy' | 'bootstrap';
 
-/** 1461 names, from FxTool/js/PinePaper.js. */
+/** 1479 names, from FxTool/js/PinePaper.js. */
 export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object.freeze({
   __buildFreshness: 'property',
   _aboveHooksHeld: 'property',
@@ -33,6 +33,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _animateCamera: 'method',
   _animationIntervalId: 'property',
   _announceItemEffect: 'method',
+  _applyArrangeMoves: 'method',
   _applyBackingRatio: 'method',
   _applyBrushProfile: 'method',
   _applyChangesToItem: 'method',
@@ -52,6 +53,8 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _applyTrimState: 'method',
   _appReady: 'bootstrap',
   _armGpuLossRecovery: 'method',
+  _arrangeableSelection: 'method',
+  _arrangeRect: 'method',
   _asEngine: 'method',
   _atomicLoadDepth: 'property',
   _atomicLoadFailsafe: 'property',
@@ -90,6 +93,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _callbackWarnedNearLimit: 'property',
   _callbackWarningThreshold: 'property',
   _canvasColorSpace: 'property',
+  _canvasDeltaToParent: 'method',
   _canvasDrawsLetterSpacing: 'method',
   _canvasRevealed: 'property',
   _characterDrag: 'property',
@@ -108,6 +112,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _collectPointerTriggerIds: 'method',
   _comments: 'property',
   _commitForegroundStrokes: 'method',
+  _commitItemMove: 'method',
   _componentAnchor: 'method',
   _componentPlacementDelta: 'method',
   _components: 'property',
@@ -251,9 +256,11 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _loadedMediaFile: 'method',
   _loadSceneBasic: 'method',
   _loadSceneFontsSoon: 'method',
+  _lockedInSelection: 'method',
   _loggedFallbackActivation: 'property',
   _lookContext: 'method',
   _lookRestore: 'property',
+  _loopClock: 'property',
   _luminanceUnder: 'method',
   _mapTargetBounds: 'property',
   _markViewDirty: 'method',
@@ -281,6 +288,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _paintedTicks: 'property',
   _panStartCenter: 'property',
   _panStartPoint: 'property',
+  _parentToCanvasMatrix: 'method',
   _parseColor: 'method',
   _pathSpeedWarning: 'method',
   _patternRoot: 'method',
@@ -375,6 +383,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _selectDuration: 'method',
   _selectFps: 'method',
   _selectImageFormat: 'method',
+  _selectionBoundsMoved: 'method',
   _selectionContentBounds: 'property',
   _selectionOverlayZoom: 'property',
   _selectLottieDuration: 'method',
@@ -399,6 +408,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _silhouettePolygon: 'method',
   _silhouetteRings: 'method',
   _sizeBeforeTemplate: 'property',
+  _skippedFrameDelta: 'property',
   _skipSessionRestore: 'bootstrap',
   _snapshotMotion: 'method',
   _soundtrackMixInput: 'method',
@@ -615,6 +625,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   canvasBoundary: 'property',
   canvasEl: 'property',
   canvasId: 'property',
+  canvasPositionOf: 'method',
   canvasScale: 'property',
   canvasSize: 'property',
   canvasToGround: 'method',
@@ -647,6 +658,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   clearSelection: 'method',
   clearVisualPath: 'method',
   clearWorldTimeline: 'method',
+  clipboardCount: 'bootstrap',
   clipToCard: 'method',
   codeValidator: 'lazy',
   collagePatternSchema: 'method',
@@ -663,6 +675,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   continueErasing: 'method',
   continuePanDrag: 'method',
   convertTextToCollage: 'method',
+  copySelection: 'bootstrap',
   create: 'method',
   createAreaChart: 'method',
   createArrow: 'method',
@@ -975,6 +988,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   isDrawingPath: 'property',
   isEmpty: 'method',
   isItemInViewport: 'method',
+  isItemLocked: 'method',
   isMasked: 'method',
   isMaskLocked: 'method',
   isPageTransparent: 'method',
@@ -1027,6 +1041,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   listHatchOptions: 'method',
   listImages: 'method',
   listInstruments: 'method',
+  listLockedItems: 'method',
   listLooks: 'method',
   listMaskReveals: 'method',
   listMaskShapes: 'method',
@@ -1113,6 +1128,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   panWorldCamera: 'method',
   parseColor: 'method',
   paste: 'bootstrap',
+  pasteClipboard: 'bootstrap',
   pathCompose: 'accessor',
   pathGeometry: 'method',
   pathOps: 'accessor',
@@ -1290,6 +1306,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   setBackgroundPattern: 'method',
   setCamera3D: 'method',
   setCanvasBoundaryVisible: 'method',
+  setCanvasPosition: 'method',
   setCanvasSize: 'method',
   setCanvasUnit: 'method',
   setCollageTreatment: 'method',
@@ -1325,6 +1342,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   setRgbSplit: 'method',
   setRulersEnabled: 'method',
   setScreenSpace: 'method',
+  setSelectionLocked: 'method',
   setSnapToUnitEnabled: 'method',
   setSoundPlacement: 'method',
   setStepTiming: 'method',
