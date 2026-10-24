@@ -240,6 +240,8 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 
 **What guards execution.** On current engine builds the snippet goes through `app.runGenerated(code, { source: 'agent' })` — a governor with seeded determinism, loop and item budgets, and a machine-readable report — rather than a bare `eval`. Older engine builds fall back to `eval`.
 
+**Found a vulnerability?** Report it privately, as [SECURITY.md](SECURITY.md) describes, not in a public issue.
+
 **What to weigh before running it.**
 
 - Code an agent writes runs with whatever that browser page has. Give this server the same trust you would give anything else you let write and run code on your machine — which is the trust you already extend to an MCP client with tool access.
