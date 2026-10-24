@@ -6050,6 +6050,11 @@ The tools generate Paper.js/JavaScript code that executes on the PinePaper canva
     // time (they're large and already on disk — no need to inline them).
     if (!content && uri.startsWith('pinepaper://docs/readme')) {
       const lang = uri.replace('pinepaper://docs/readme', '').replace(/^\//, '');
+      // A locale code only. The suffix went straight into the file name, so
+      // pinepaper://docs/readme/../../x read any .md file on disk (CWE-22).
+      if (lang && !/^[a-z]{2}(-[A-Z]{2})?$/.test(lang)) {
+        throw new McpError(RESOURCE_NOT_FOUND, `README not found for: ${uri}`, { uri });
+      }
       const file = lang ? `README.${lang}.md` : 'README.md';
       try {
         const { readFileSync } = await import('node:fs');

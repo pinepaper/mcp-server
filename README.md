@@ -249,6 +249,21 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - Puppeteer itself is an **optional** peer dependency, kept out of the default tree precisely because a headless browser plus an install script is what scanners flag hardest. Install it only if you want the executing mode.
 - The server itself fetches the images, SVGs and media a tool call names by URL, and reads local files named by path. URLs that resolve to loopback, private, link-local or reserved addresses are refused, redirects included, and so are cloud metadata addresses. Local files are read only from the working directory, the export folder, and folders listed in `PINEPAPER_ASSET_DIRS`. `PINEPAPER_ALLOW_PRIVATE_NETWORK=1` allows local and LAN hosts. Metadata addresses stay refused even with it set.
 
+## What's new in 1.6.24
+
+### Security
+
+- `pinepaper_import_scene` reads only from the working directory, the export
+  folder and `PINEPAPER_ASSET_DIRS`, like image and media imports. A path
+  outside them gets the same refusal whether or not the file exists, so the
+  error no longer shows what is on disk. Restoring a scene that
+  `pinepaper_export_scene` saved still works: it saves to the export folder.
+- The `pinepaper://docs/readme` resource accepts only a language code after
+  the slash (such as `/ja` or `/pt-BR`). Anything else is refused.
+- Dependency updates clear published advisories in `body-parser`, `fast-uri`,
+  `ip-address` and `hono`.
+- [SECURITY.md](SECURITY.md) explains how to report a vulnerability privately.
+
 ## What's new in 1.6.23
 
 ### Fixed

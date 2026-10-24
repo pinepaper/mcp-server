@@ -8,7 +8,9 @@
 
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { readFile, writeFile, mkdir, stat } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { confineAssetPath } from '../../utils/asset-paths.js';
 import { executeOrGenerate, getLocalizedSuccessMessage, getExportDir, errorResult, type HandlerOptions } from '../handlers.js';
 import { codeGenerator } from '../../types/code-generator.js';
 import { ExportTrainingDataInputSchema, ExportSceneInputSchema, ImportSceneInputSchema, ErrorCodes } from '../../types/schemas.js';
@@ -80,7 +82,19 @@ export const exportHandlers: Record<string, ExportHandler> = {
 
   pinepaper_import_scene: async (args, options) => {
     const input = ImportSceneInputSchema.parse(args);
-    const path = resolve(input.path.replace(/^file:\/\//, ''));
+    // Confined like image and media imports (CWE-22): this read had no bound,
+    // and although it never returns the file, its size and not-found errors
+    // said whether any path existed and how big it was. The export folder is
+    // allowed, so the restore hint export_scene returns keeps working.
+    let asked: string;
+    try {
+      asked = /^file:\/\//i.test(input.path) ? fileURLToPath(input.path) : input.path;
+    } catch {
+      return errorResult(ErrorCodes.INVALID_PARAMS, `"${input.path}" is not a valid file:// URL.`, {}, { toolName: 'pinepaper_import_scene' });
+    }
+    const confined = await confineAssetPath(asked);
+    if ('error' in confined) return errorResult(ErrorCodes.INVALID_PARAMS, confined.error, {}, { toolName: 'pinepaper_import_scene' });
+    const path = confined.path;
     let text: string;
     try {
       const st = await stat(path);

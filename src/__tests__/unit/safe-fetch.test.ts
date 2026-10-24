@@ -232,6 +232,35 @@ describe('local reads stay inside cwd, the export folder and PINEPAPER_ASSET_DIR
     }
   });
 
+  it('pinepaper_import_scene: refuses outside, answers the same whether the file exists, restores from the export folder', async () => {
+    const doc = JSON.stringify({ kind: 'pinepaper.project', formatVersion: '1', items: [] });
+    const big = join(outside, 'scene.json');
+    writeFileSync(big, doc);
+    const msg = async (path: string) => text(await handleToolCall('pinepaper_import_scene', { path }, code));
+    const present = await msg(big);
+    const absent = await msg(join(outside, 'no-such-scene.json'));
+    for (const t of [present, absent]) {
+      expect(t).toContain('outside the allowed folders');
+      expect(t).not.toMatch(/ENOENT|MB, over/);
+    }
+    expect(await msg(pathToFileURL(big).href)).toContain('outside the allowed folders');
+
+    // export_scene writes to the export folder and hands back a restore call for it.
+    const exportDir = mkdtempSync(join(tmpdir(), 'pp-exports-'));
+    const saved = process.env.PINEPAPER_EXPORT_DIR;
+    process.env.PINEPAPER_EXPORT_DIR = exportDir;
+    try {
+      writeFileSync(join(exportDir, 'project.json'), doc);
+      const r = await handleToolCall('pinepaper_import_scene', { path: join(exportDir, 'project.json') }, code);
+      expect(r.isError).toBeFalsy();
+    } finally {
+      if (saved === undefined) delete process.env.PINEPAPER_EXPORT_DIR; else process.env.PINEPAPER_EXPORT_DIR = saved;
+      rmSync(exportDir, { recursive: true, force: true });
+    }
+    process.env.PINEPAPER_ASSET_DIRS = outside;
+    expect((await handleToolCall('pinepaper_import_scene', { path: big }, code)).isError).toBeFalsy();
+  });
+
   it('a sibling folder sharing a prefix is not inside', async () => {
     const parent = mkdtempSync(join(tmpdir(), 'pp-prefix-'));
     const allowed = join(parent, 'assets');
