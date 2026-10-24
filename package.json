@@ -93,7 +93,7 @@
     "@typescript-eslint/eslint-plugin": "^8.66.0",
     "@typescript-eslint/parser": "^8.66.0",
     "eslint": "^10.8.1",
-    "puppeteer": "^25.9.0",
+    "puppeteer": "^25.16.0",
     "typescript": "^5.3.0"
   },
   "files": [
@@ -117,15 +117,15 @@
   "overrides": {
     "basic-ftp": "^5.3.1",
     "brace-expansion": "^5.0.11",
-    "body-parser": "^2.3.0",
+    "body-parser": "^2.4.0",
     "es-define-property": "npm:@socketregistry/es-define-property@^1.0.7",
-    "fast-uri": "^3.1.8",
+    "fast-uri": "^3.1.9",
     "flatted": "^3.4.2",
     "function-bind": "npm:@socketregistry/function-bind@^1.0.7",
     "gopd": "npm:@socketregistry/gopd@^1.0.7",
     "has-symbols": "npm:@socketregistry/has-symbols@^1.0.7",
     "hasown": "npm:@socketregistry/hasown@^1.0.7",
-    "ip-address": "^10.7.3",
+    "ip-address": "^10.7.4",
     "js-yaml": "^4.3.1",
     "object-assign": "npm:@socketregistry/object-assign@^1.0.5",
     "path-to-regexp": "^8.4.2",
