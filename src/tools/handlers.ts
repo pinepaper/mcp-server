@@ -183,6 +183,7 @@ import {
 import { ZodError, z } from 'zod';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { effectClass } from './effect-class.js';
+import { exportFileReceipt } from './export-file-receipt.js';
 import { EFFECT_BEFORE_JS, effectAfterJs, namedItemIds, idMayBeGone, NO_CHANGE_NOTE } from './effect-check.js';
 import { writeFile, mkdir, appendFile, unlink, readFile, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -4629,7 +4630,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
               },
               input.platform || 'auto'
             );
-            const cleanResult = { ...exportResult, data: undefined, filePath, fileSize, chunks };
+            const cleanResult = { ...exportResult, data: undefined, filePath, fileSize, chunks, file: await exportFileReceipt(filePath, exportResult) };
             return withEngineReport({
               content: [{
                 type: 'text' as const,
@@ -4677,7 +4678,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
         if (shouldSaveToFile) {
           try {
             const { filePath, fileSize } = await saveExportToFile(data, format, input.platform || 'auto');
-            const cleanResult = { ...exportResult, data: undefined, filePath, fileSize };
+            const cleanResult = { ...exportResult, data: undefined, filePath, fileSize, file: await exportFileReceipt(filePath, exportResult) };
             // A mix that dropped sounds wrote a perfectly good file that is
             // missing tracks. It rides the SUCCESS path, which is exactly why
             // it has to be said out loud here rather than left in the JSON.
