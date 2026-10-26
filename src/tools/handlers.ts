@@ -952,6 +952,32 @@ function withSessionNote(
   return out;
 }
 
+export const RECEIPTS_META_KEY = 'pinepaper.studio/receipts';
+
+/** The engine run's receipts (report.receipts: { calls, byDoor, notes }), when any call has something to say. */
+export function engineReceipts(report: Record<string, unknown> | undefined | null): { calls: number; byDoor: Record<string, number>; notes: unknown[] } | null {
+  const r = report && typeof report === 'object' ? (report.receipts as { calls?: number; byDoor?: Record<string, number>; notes?: unknown[] } | undefined) : undefined;
+  if (!r || !Array.isArray(r.notes) || r.notes.length === 0) return null;
+  return { calls: Number(r.calls) || 0, byDoor: r.byDoor ?? {}, notes: r.notes };
+}
+
+/**
+ * agent_export answered from the export's own result and never read the run's report (AR-1 R2): an export's engine
+ * warnings and receipts are now on the reply like every other tool's — a text line an agent reads, and _meta.
+ */
+export function withEngineReport(result: CallToolResult, report: Record<string, unknown> | undefined | null): CallToolResult {
+  if (!report || result.isError) return result;
+  const receipts = engineReceipts(report);
+  const engineWarnings = Array.isArray(report.engineWarnings) ? report.engineWarnings.filter((w) => w && typeof w === 'object') : [];
+  if (!receipts && !engineWarnings.length) return result;
+  const body = { ...(receipts ? { receipts } : {}), ...(engineWarnings.length ? { engineWarnings } : {}) };
+  return {
+    ...result,
+    content: [...(result.content ?? []), { type: 'text' as const, text: `ENGINE RECEIPTS: ${JSON.stringify(body)}` }],
+    _meta: { ...(result._meta ?? {}), [RECEIPTS_META_KEY]: body },
+  };
+}
+
 function executedResult(
   code: string,
   result: unknown,
@@ -979,6 +1005,10 @@ function executedResult(
     if (items && typeof items.created === 'number') governor.itemsCreated = items.created;
     if ((report.guard as { tripped?: boolean } | undefined)?.tripped) governor.loopGuardTripped = true;
     if (Object.keys(governor).length) resultObj.governor = governor;
+    // AR-1 R2: what each engine call did with what it was given (FxTool js/core/Receipt.js) — only when a call
+    // renamed, fell back, dropped or warned; a run whose calls all applied as asked adds nothing.
+    const receipts = engineReceipts(report);
+    if (receipts) resultObj.receipts = receipts;
   }
 
   // THE CODE ECHO WAS 90% OF THE RESPONSE, AND THE AGENT WROTE THE REQUEST.
@@ -4593,12 +4623,12 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
               input.platform || 'auto'
             );
             const cleanResult = { ...exportResult, data: undefined, filePath, fileSize, chunks };
-            return {
+            return withEngineReport({
               content: [{
                 type: 'text' as const,
                 text: `Export saved to file:\n\nFile: ${filePath}\nFormat: ${format}\nSize: ${(fileSize / 1024).toFixed(1)} KB\nPlatform: ${input.platform}\nPaged out of the studio's export store in ${chunks} chunk${chunks === 1 ? '' : 's'}\n\nResult: ${JSON.stringify(cleanResult, null, 2)}`,
               }],
-            };
+            }, exportBrowserResult.report);
           } catch (streamError) {
             // The export is still held — the message says so and names the id,
             // because the bytes are recoverable and re-exporting is not free.
@@ -4625,10 +4655,10 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
           const { sccCues: _c, ...rest } = exportResult as Record<string, unknown>;
           void _c;
           const cleanResult = { ...rest, filePath, fileSize, frameRate: '29.97 drop-frame', fidelity: { warnings } };
-          return { content: [{ type: 'text' as const, text: `Export saved to file:\n\nFile: ${filePath}\nFormat: scc (CEA-608, CC1, pop-on)\nSize: ${fileSize} bytes\n\nResult: ${JSON.stringify(cleanResult, null, 2)}` }] };
+          return withEngineReport({ content: [{ type: 'text' as const, text: `Export saved to file:\n\nFile: ${filePath}\nFormat: scc (CEA-608, CC1, pop-on)\nSize: ${fileSize} bytes\n\nResult: ${JSON.stringify(cleanResult, null, 2)}` }] }, exportBrowserResult.report);
         }
         if ((format === 'html5-ad' || format === 'playable') && typeof exportResult?.adPage === 'string') {
-          return saveAdExport(exportResult as AdExportResult, input, input.platform || 'auto');
+          return withEngineReport(await saveAdExport(exportResult as AdExportResult, input, input.platform || 'auto'), exportBrowserResult.report);
         }
 
         const shouldSaveToFile = data && typeof data === 'string' && (
@@ -4645,24 +4675,24 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
             // missing tracks. It rides the SUCCESS path, which is exactly why
             // it has to be said out loud here rather than left in the JSON.
             const dropNote = (exportResult as { incomplete?: string }).incomplete;
-            return {
+            return withEngineReport({
               content: [{
                 type: 'text' as const,
                 text: `Export saved to file:\n\nFile: ${filePath}\nFormat: ${format}\nSize: ${(fileSize / 1024).toFixed(1)} KB\nPlatform: ${input.platform}\n`
                   + (dropNote ? `DROPPED: ${dropNote}\n` : '')
                   + `\nResult: ${JSON.stringify(cleanResult, null, 2)}`,
               }],
-            };
+            }, exportBrowserResult.report);
           } catch (saveError) {
             console.error('[PinePaper] Failed to save export to file:', saveError);
             // Strip the massive data to prevent oversized response
             const strippedResult = { ...exportResult, data: `[${format} export data — file save failed: ${saveError instanceof Error ? saveError.message : 'unknown error'}]` };
-            return executedResult(code, strippedResult, exportBrowserResult.screenshot, description);
+            return executedResult(code, strippedResult, exportBrowserResult.screenshot, description, exportBrowserResult.report);
           }
         }
 
         // Small export — return inline (existing behavior)
-        return executedResult(code, exportResult, exportBrowserResult.screenshot, description);
+        return executedResult(code, exportResult, exportBrowserResult.screenshot, description, exportBrowserResult.report);
       }
 
       case 'pinepaper_design_styles':
