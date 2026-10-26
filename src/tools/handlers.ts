@@ -6,6 +6,7 @@
  * Supports browser execution via Puppeteer.
  */
 
+import { nestedIgnoredPaths } from './nested-ignored.js';
 import {
   CRAFT_FRAME_JS,
   generateDrawWeave,
@@ -1931,6 +1932,17 @@ export const HIDDEN_ARGUMENTS: Readonly<Record<string, readonly string[]>> = {
   pinepaper_query_capabilities: ['query'],
   pinepaper_text_effect: ['startAt', 'hideAfter'],
 };
+/**
+ * Nested keys (paths with [] for any array index) a handler accepts that its published schema closes over without
+ * listing. Shrink-only, held exact by nested-ignored-coverage.test.ts; publishing one means deleting it here.
+ */
+export const NESTED_HIDDEN: Readonly<Record<string, readonly string[]>> = {
+  pinepaper_agent_batch_execute: ['operations[].counter', 'operations[].generatorRegion', 'operations[].screenSpace', 'operations[].stepTiming'],
+  pinepaper_create_item: ['keyframes[].hold', 'keyframes[].interpolation'],
+  pinepaper_create_scene: ['animations[].startTime'],
+  pinepaper_keyframe_animate: ['keyframes[].hold', 'keyframes[].interpolation'],
+};
+
 /** Tools whose schema passes every key through: nothing is dropped. */
 export const PASSTHROUGH_ARGUMENT_TOOLS: ReadonlySet<string> = new Set(['pinepaper_equation_path', 'pinepaper_ui_kit']);
 
@@ -1977,12 +1989,26 @@ export function ignoredArgumentsNote(toolName: string, args: Record<string, unkn
     + (hints.length ? ` ${[...new Set(hints)].join(' ')}` : '');
 }
 
-/** The same check, against the tool's published schema. */
+/** The same check, against the tool's published schema, and below the top level (AR-1 R2: nested-ignored.ts). */
 export async function ignoredArgumentsNoteFor(toolName: string, args: Record<string, unknown>): Promise<{ note: string; ignored: string[] } | null> {
   const published = await publishedArguments(toolName);
-  const ignored = ignoredArgumentKeys(toolName, args, published);
+  const top = ignoredArgumentKeys(toolName, args, published);
+  const nested = PASSTHROUGH_ARGUMENT_TOOLS.has(toolName) || published === null ? [] : await nestedIgnoredFor(toolName, args);
+  const ignored = [...top, ...nested];
   if (!ignored.length) return null;
-  return { note: ignoredArgumentsNote(toolName, args, published)!, ignored };
+  const topNote = top.length ? ignoredArgumentsNote(toolName, args, published)! : '';
+  const nestedNote = nested.length
+    ? `IGNORED ARGUMENTS: ${nested.join(', ')} ${nested.length > 1 ? 'are' : 'is'} not a parameter of ${toolName}, so ${nested.length > 1 ? 'they had' : 'it had'} no effect.`
+    : '';
+  return { note: [topNote, nestedNote].filter(Boolean).join(' '), ignored };
+}
+
+async function nestedIgnoredFor(toolName: string, args: Record<string, unknown>): Promise<string[]> {
+  const { PINEPAPER_TOOLS } = await import('./definitions.js');
+  const tool = PINEPAPER_TOOLS.find((t) => t.name === toolName);
+  if (!tool) return [];
+  const hidden = new Set(NESTED_HIDDEN[toolName] ?? []);
+  return nestedIgnoredPaths(tool.inputSchema, args).filter((p) => !hidden.has(p.replace(/\[\d+\]/g, '[]')));
 }
 
 export const IGNORED_ARGUMENTS_META_KEY = 'pinepaper.studio/ignoredArguments';
