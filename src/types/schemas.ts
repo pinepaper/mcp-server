@@ -3691,6 +3691,25 @@ export const StaggerInputSchema = z.object({
 
 export type StaggerInput = z.infer<typeof StaggerInputSchema>;
 
+// pp:Pattern — many items moved by ONE stored declaration, not per-item keyframes (AR-2 P1/P2; FxTool js/core/Patterns.js).
+export const PatternMembersSchema = z.union([
+  z.array(z.string()).describe('ids or names, in order'),
+  z.object({
+    ids: z.array(z.string()).optional().describe('registry ids, in order'),
+    names: z.union([z.string(), z.array(z.string())]).optional().describe("names; '*' matches any run of characters ('strip-*')"),
+    tag: z.string().optional().describe('every item carrying this tag'),
+  }),
+]);
+export const PatternInputSchema = z.object({
+  action: z.enum(['create', 'modify', 'remove', 'list', 'get']).describe("'create' a pattern · 'modify' its params, members or window · 'remove' it (members go back) · 'list' every pattern · 'get' one and the items it holds"),
+  id: z.string().optional().describe('the pattern\'s name; required except for list'),
+  kind: z.enum(['phase_wave', 'stagger']).optional().describe('create: phase_wave (members wave, each a phase later) or stagger (each member\'s animationDelay, derived)'),
+  members: PatternMembersSchema.optional().describe('create/modify: which items, by ids, names (globs) or a tag'),
+  params: z.record(z.unknown()).optional().describe("phase_wave: { property: 'y'|'x'|'rotation'|'opacity', amplitude, period (s per cycle), wavelength (members per cycle), phase } · stagger: { step (s), start (s), order: index|reverse|center|edges }"),
+  window: z.object({ from: z.number().optional(), to: z.number().optional() }).nullable().optional().describe('phase_wave: when it plays, scene seconds; time counts from `from`'),
+});
+export type PatternInput = z.infer<typeof PatternInputSchema>;
+
 // pp:Flip — a transition DERIVED from a change rather than described.
 export const FlipInputSchema = z.object({
   action: z.enum(['record', 'apply']).default('record')

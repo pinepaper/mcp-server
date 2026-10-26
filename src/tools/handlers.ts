@@ -142,6 +142,7 @@ import {
   SceneGraphInputSchema,
   SequenceInputSchema,
   StaggerInputSchema,
+  PatternInputSchema,
   FlipInputSchema,
   // New consolidated tool schemas
   SelectionInputSchema,
@@ -2215,6 +2216,12 @@ async function handleToolCallInner(
         const input = StaggerInputSchema.parse(args);
         const code = codeGenerator.generateStagger(input);
         return executeOrGenerate(code, `Stagger: ${input.action}`, options, 'pinepaper_stagger');
+      }
+
+      case 'pinepaper_pattern': {
+        const input = PatternInputSchema.parse(args);
+        const code = codeGenerator.generatePattern(input);
+        return executeOrGenerate(code, `Pattern: ${input.action}${input.id ? ' ' + input.id : ''}`, options, 'pinepaper_pattern');
       }
 
       case 'pinepaper_flip': {

@@ -413,6 +413,10 @@
       "description": "Work out WHEN clips start, said relative to each other instead of in absolute seconds. A pure planner — it computes times and touches nothin"
     },
     {
+      "name": "pinepaper_pattern",
+      "description": "One stored declaration moves many items (no per-item keys). action: create|modify|remove|list|get. id, kind: phase_wave|stagger, members:{names|ids|tag}, params, window:{from,to}."
+    },
+    {
       "name": "pinepaper_stagger",
       "description": "Shape a delay across many items. What makes a stagger read as designed rather than as a queue is where it STARTS and how it SPREADS — a grid"
     },
