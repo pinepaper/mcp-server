@@ -4927,6 +4927,57 @@ EXAMPLE:
     },
   },
   {
+    name: 'pinepaper_pattern',
+    annotations: {
+      title: 'Pattern',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Move many items with ONE stored declaration instead of a keyframe track on each: a wave running through a row of letters, a stagger spreading across a grid. The pattern is kept as a node: change its amplitude once and every member follows; remove it and the members go back to where they were. It is saved with the scene, undone as one step and restored on load.
+
+KINDS:
+- phase_wave — members move on a sine, each a phase later than the one before. params: property ('y' default, 'x', 'rotation', 'opacity'), amplitude (px, degrees or 0..1), period (seconds per cycle), wavelength (members per full cycle), phase (radians). window { from, to } limits when it plays; time counts from \`from\`.
+- stagger — each member's animationDelay, derived from its place. params: step (s between neighbours), start (s), order: index | reverse | center | edges.
+
+MEMBERS — by names (a '*' matches any run: "letter-*"), ids, or a tag, in the order they are given; an array is taken as ids or names. A name that matches nothing is reported in the result, not ignored.
+
+ACTIONS: create (needs id, kind, members) · modify (id + params, members or window) · remove (id) · list · get (id: the pattern and the items it holds).
+
+EXAMPLE — a word waving, letter after letter:
+{ "action": "create", "id": "wave", "kind": "phase_wave", "members": { "names": "letter-*" }, "params": { "amplitude": 12, "period": 1.2, "wavelength": 6 } }`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['create', 'modify', 'remove', 'list', 'get'], description: 'create · modify · remove · list · get' },
+        id: { type: 'string', description: "the pattern's name; required except for list" },
+        kind: { type: 'string', enum: ['phase_wave', 'stagger'], description: 'create: phase_wave or stagger' },
+        members: {
+          description: 'which items: an array of ids or names, or { ids, names, tag }',
+          oneOf: [
+            { type: 'array', items: { type: 'string' } },
+            {
+              type: 'object',
+              properties: {
+                ids: { type: 'array', items: { type: 'string' } },
+                names: { oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }] },
+                tag: { type: 'string' },
+              },
+            },
+          ],
+        },
+        params: { type: 'object', description: 'phase_wave: property, amplitude, period, wavelength, phase · stagger: step, start, order' },
+        window: {
+          type: ['object', 'null'],
+          properties: { from: { type: 'number' }, to: { type: 'number' } },
+          description: 'phase_wave: when it plays, in scene seconds',
+        },
+      },
+      required: ['action'],
+    },
+  },
+  {
     name: 'pinepaper_stagger',
     annotations: {
       title: 'Stagger',

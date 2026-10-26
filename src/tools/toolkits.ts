@@ -98,6 +98,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
   ],
   animation: [
     'pinepaper_stagger',
+    'pinepaper_pattern',
     'pinepaper_flip',
     'pinepaper_animate',
     'pinepaper_motion',

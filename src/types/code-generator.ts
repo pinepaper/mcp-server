@@ -153,6 +153,8 @@ import {
   SequenceInputSchema,
   StaggerInput,
   StaggerInputSchema,
+  PatternInputSchema,
+  type PatternInput,
   FlipInput,
   FlipInputSchema,
   // New consolidated tool types
@@ -9268,6 +9270,54 @@ ${input.cutSound !== undefined ? `  const __cuts = (__cr && __cr.cuts) || (app.s
   };
 })();
 `.trim();
+  }
+
+  /**
+   * pinepaper_pattern (AR-2 P2): one stored declaration moves many items (FxTool app.addPattern / modifyPattern /
+   * removePattern / listPatterns / getPattern). No keyframes are written; the engine evaluates the node per frame.
+   */
+  generatePattern(input: PatternInput): string {
+    const v = PatternInputSchema.parse(input);
+    const S = (x: unknown) => JSON.stringify(x);
+    const need = (fn: string) => `if (typeof app.${fn} !== 'function') return { success: false, error: 'app.${fn} unavailable — this studio predates patterns (FxTool AR-2 P1); update it' };`;
+    const idNeeded = v.action !== 'list' && !v.id ? `return { success: false, error: '${v.action} needs the pattern id' };` : '';
+    let body: string;
+    switch (v.action) {
+      case 'create': {
+        const spec = { id: v.id, kind: v.kind, members: v.members, params: v.params || {}, ...(v.window ? { window: v.window } : {}) };
+        body = `${need('addPattern')}
+  if (!${S(v.kind ?? null)}) return { success: false, error: 'create needs kind: phase_wave or stagger' };
+  if (!${S(v.members ?? null)}) return { success: false, error: 'create needs members: { names: [...] }, { ids: [...] }, { tag } or an array' };
+  const r = app.addPattern(${S(spec)});
+  return Object.assign({ success: !!(r && r.ok) }, r || {}, app.lastReceipt ? { receipt: app.lastReceipt } : {});`;
+        break;
+      }
+      case 'modify': {
+        const ch = { ...(v.params ? { params: v.params } : {}), ...(v.members ? { members: v.members } : {}), ...(v.window !== undefined ? { window: v.window } : {}) };
+        body = `${need('modifyPattern')}
+  const r = app.modifyPattern(${S(v.id)}, ${S(ch)});
+  return Object.assign({ success: !!(r && r.ok) }, r || {}, app.lastReceipt ? { receipt: app.lastReceipt } : {});`;
+        break;
+      }
+      case 'remove':
+        body = `${need('removePattern')}
+  const had = app.removePattern(${S(v.id)});
+  return had ? { success: true, removed: ${S(v.id)} } : { success: false, error: 'no pattern ' + ${S(JSON.stringify(v.id ?? ''))} };`;
+        break;
+      case 'get':
+        body = `${need('getPattern')}
+  const p = app.getPattern(${S(v.id)});
+  return p ? Object.assign({ success: true }, p) : { success: false, error: 'no pattern ' + ${S(JSON.stringify(v.id ?? ''))} };`;
+        break;
+      default:
+        body = `${need('listPatterns')}
+  const list = app.listPatterns();
+  return { success: true, count: list.length, patterns: list };`;
+    }
+    return `(function() {
+  ${idNeeded}
+  ${body}
+})();`;
   }
 
   generateStagger(input: StaggerInput): string {

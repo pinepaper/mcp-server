@@ -123,6 +123,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_manage_scenes: 'Scene CRUD. action: save|load|list|delete|rename|duplicate|reorder|info|export|import. name, sceneId, transition: none|fade|zoom-in|zoom-out.',
   pinepaper_scene_playback: 'Scene chain playback. action: create_chain|play|pause|resume|stop|toggle_loop|jump. sceneIds, defaultDuration (secs), loop.',
   pinepaper_sequence: 'Relative clip timing. action: place|resolve|list_forms. clips:[{duration, position?, label?}]. Forms: "<" ">" "+=1" "-=25%" label. "-=25%"=% of INSERTED clip, "<25%"=% of PREVIOUS.',
+  pinepaper_pattern: 'One stored declaration moves many items (no per-item keys). action: create|modify|remove|list|get. id, kind: phase_wave|stagger, members:{names|ids|tag}, params, window:{from,to}.',
   pinepaper_stagger: 'Delay across items. action: apply|preview|list_origins. itemIds (in order), count, opts:{each|amount, from: start|end|center|edges|random, grid:[r,c], axis, ease, seed}.',
   pinepaper_flip: 'Animate a layout change without describing it. action: record (before the change) | apply (after). itemIds, duration, easing, enter, stagger. Writes keyframes.',
   pinepaper_scene_graph: 'Interactive story/quiz scene graph. action: create|validate. graph: {start, nodes:[{id, prompt?, text?, kind?, answers?, next?, duration?, outcome?}]}, opts: {style?, scoreItemId?, subject?}.',
