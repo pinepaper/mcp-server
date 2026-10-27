@@ -2411,9 +2411,11 @@ const remaining = app.itemRegistry ? app.itemRegistry.getAll().length : 0;
  */
 function generateExportSVGCode(): string {
   return `
-// Export animated SVG
+// Export animated SVG. An export that produced nothing is a failure, named (T-6), not a success with an empty string.
 const svgString = app.exportAnimatedSVG();
-({ success: true, svgString, hasAnimations: svgString.includes('<animate') });
+(typeof svgString !== 'string' || svgString.length === 0)
+  ? ({ success: false, step: 'export', error: 'export failed at the export step: exportAnimatedSVG returned ' + (svgString === '' ? 'an empty string' : (svgString === null ? 'null' : typeof svgString)) + ', so there is no SVG to return' })
+  : ({ success: true, svgString, hasAnimations: svgString.includes('<animate') });
 `.trim();
 }
 
@@ -5748,6 +5750,19 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
   // cannot be kept accurate — it breaks on any edit above it — so this repo
   // does not use them. Camera animation still
   // drives motion during export — framing only fixes the output frame.
+  // THE SCENE LINT, BEFORE THE EXPORT (T-6, FxTool lintScene().warnings): what the file will show wrong without
+  // anything failing — a centre-anchored text that runs out of the frame exports as "IGNAL" for "SIGNAL". Read from the
+  // scene as it is, never a refusal; a studio without the rule says nothing, a lint that throws says so.
+  const __lint = (function () {
+    if (typeof app.lintScene !== 'function') return null;
+    try {
+      const r = app.lintScene();
+      return r && Array.isArray(r.warnings) ? r.warnings : null;
+    } catch (e) {
+      return [{ code: 'LINT_FAILED', severity: 'info', message: 'the scene lint could not run before the export: ' + ((e && typeof e.message === 'string' && e.message) || 'no reason given') }];
+    }
+  })();
+
   let cameraDims = null;
   if (framing === 'camera') {
     if (!['gif', 'apng', 'mp4', 'webm'].includes(format)) {
@@ -6296,7 +6311,7 @@ ${stillTime !== undefined ? `
                     if (typeof fr.embedded === 'number') __tl.fonts.embedded = fr.embedded; // cumulative for the document
                     if (typeof fr.hiddenTextItems === 'number') __tl.fonts.hiddenTextItems = (__tl.fonts.hiddenTextItems || 0) + fr.hiddenTextItems;
                   }
-                } catch (e) { if (!__tl.fonts) __tl.fonts = { embedded: 0, reason: e && e.message }; }
+                } catch (e) { if (!__tl.fonts) __tl.fonts = { embedded: 0, reason: (e && typeof e.message === 'string' && e.message) || 'embedding the text fonts failed with no reason given' }; }
               }
               if (jpg) doc.addImage(jpg, 'JPEG', 0, 0, wMM, hMM); else doc.addImage(png, 'PNG', 0, 0, wMM, hMM);
               if (__layer) {
@@ -6304,7 +6319,7 @@ ${stillTime !== undefined ? `
                   const tr = await app.exportEngine.addTextLayer(doc, { x: 0, y: 0, width: wMM, height: hMM });
                   if (tr && tr.ok !== false) { __tl.written += tr.linesWritten || 0; __tl.skipped += tr.linesSkipped || 0; }
                   else __tl.reasons.push(id + ': ' + ((tr && tr.reason) || 'refused'));
-                } catch (e) { __tl.reasons.push(id + ': ' + e.message); }
+                } catch (e) { __tl.reasons.push(id + ': ' + ((e && typeof e.message === 'string' && e.message) || 'the text layer failed with no reason given')); }
               }
               pagesOut.push({ sceneId: id, widthMM: Math.round(wMM * 10) / 10, heightMM: Math.round(hMM * 10) / 10 });
             }
@@ -6367,7 +6382,7 @@ ${stillTime !== undefined ? `
         result = { success: false, error: 'Unknown format: ' + format };
     }
   } catch (e) {
-    result = { success: false, error: e.message, platform, format };
+    result = { success: false, error: (e && typeof e.message === 'string' && e.message) || (typeof e === 'string' && e) || ('the ' + format + ' export threw with no message'), platform, format };
   }
 
   // One site, after every branch has set its result: a successful export says
@@ -6405,11 +6420,19 @@ ${stillTime !== undefined ? `
         result = Object.assign({}, result, { format, data: encoded, mimeType: mime, size: Math.round(String(encoded).length * 0.75), encodeQuality: settings.compression });
       }
     } catch (e) {
-      result = { success: false, platform, format, error: (e && e.message) || String(e) };
+      result = { success: false, platform, format, error: (e && typeof e.message === 'string' && e.message) || (typeof e === 'string' && e) || ('re-encoding the still as ' + format + ' failed with no message') };
     }
   }
 
   if (result && result.success) Object.assign(result, fidelity(format));
+  if (result && result.success && __lint && __lint.length && !result.lintWarnings) {
+    result.lintWarnings = __lint;
+    result.fidelity = result.fidelity || { warnings: [] };
+    result.fidelity.warnings = (result.fidelity.warnings || []).concat(__lint.map(function (w) {
+      return { code: String(w.code || 'lint'), message: String(w.message || w.code || 'scene lint warning'), ...(w.itemId ? { items: [w.itemId] } : {}) };
+    }));
+    if (result.fidelity.note) delete result.fidelity.note;
+  }
   if (result && result.success && __fit) result.platformFit = __fit;
 ${usesCanvasSize ? '' : `  // A PRESET SIZE IS NOT THE CANVAS SIZE, AND THAT IS SAID (21 PLATFORMOVERRIDE).
   // A named platform renders the FILE at the preset's size; the canvas is not
@@ -11178,6 +11201,9 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
 (async function() {
   if (!app.exportEngine || !app.exportEngine.exportWidget) return { error: 'Widget export not available' };
   const result = await app.exportEngine.exportWidget(${JSON.stringify(opts)});
+  if (!result || typeof result.json !== 'string' || result.json.length === 0) {
+    return { success: false, step: 'export', error: 'export failed at the export step: exportWidget returned no scene JSON' + (result && result.error ? ' (' + result.error + ')' : '') };
+  }
   // THE EMBED BOX WAS ALWAYS 16:9, AND IT IS NOT SELF-CONTAINED (round 9 GG,
   // 8.32). The engine writes aspect-ratio: 16/9 and max-width: 800px whatever
   // the scene, so a 300x250 ad sat letterboxed in a wide box. The box is sized
@@ -11212,6 +11238,9 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
 (async function() {
   if (!app.exportEngine || !app.exportEngine.exportWidgetHTML) return { error: 'Widget HTML export not available' };
   const result = await app.exportEngine.exportWidgetHTML(${JSON.stringify(opts)});
+  if (!result || typeof result.html !== 'string' || result.html.length === 0) {
+    return { success: false, step: 'export', error: 'export failed at the export step: exportWidgetHTML returned no page' + (result && result.error ? ' (' + result.error + ')' : '') };
+  }
   ${input.lang || input.dir || input.alt ? `// lang / dir / alt on the engine's page (it writes <html lang="en"> and no
   // text alternative). Applied as string edits on the one <html> tag and the
   // first <canvas>; the result says which landed.

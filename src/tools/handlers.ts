@@ -184,6 +184,7 @@ import { ZodError, z } from 'zod';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { effectClass } from './effect-class.js';
 import { exportFileReceipt } from './export-file-receipt.js';
+import { ExportStepError, errorText, verifySavedFile, writeStep, bytesForSave } from './export-file-check.js';
 import { EFFECT_BEFORE_JS, effectAfterJs, namedItemIds, idMayBeGone, NO_CHANGE_NOTE } from './effect-check.js';
 import { writeFile, mkdir, appendFile, unlink, readFile, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -560,20 +561,24 @@ async function saveAdExport(r: AdExportResult, input: { ad?: { clickUrl?: string
     const html = buildHtml5Ad(r.adPage, opts);
     const zip = buildZip([{ name: 'index.html', data: html }]);
     files.zip = join(exportDir, `${stamp}.zip`);
-    await writeFile(files.zip, zip);
+    await writeStep(files.zip, () => writeFile(files.zip, zip));
+    await verifySavedFile(files.zip, zip.length);
     uploadBytes = zip.length;
     // The backup image is uploaded BESIDE the zip, not inside it.
     if (r.backupImage && r.backupImage.startsWith('data:')) {
       files.backupImage = join(exportDir, `${stamp}_backup.png`);
-      await writeFile(files.backupImage, Buffer.from(r.backupImage.split(',')[1], 'base64'));
+      const backup = bytesForSave(r.backupImage, 'the backup image');
+      await writeStep(files.backupImage, () => writeFile(files.backupImage, backup));
+      await verifySavedFile(files.backupImage, backup.length);
     } else {
       warnings.push({ code: 'no_backup_image', message: 'no backup image was made (the studio could not capture a frame); display networks require one — export format "png" at the same size.' });
     }
   } else {
     const html = buildPlayable(r.adPage, opts);
     files.html = join(exportDir, `${stamp}.html`);
-    await writeFile(files.html, html, 'utf-8');
+    await writeStep(files.html, () => writeFile(files.html, html, 'utf-8'));
     uploadBytes = Buffer.byteLength(html, 'utf-8');
+    await verifySavedFile(files.html, uploadBytes);
   }
 
   // 150 KB is Google Ads' display HTML5 figure; some uploads allow 600 KB, and
@@ -606,23 +611,26 @@ async function saveExportToFile(
   platform: string
 ): Promise<{ filePath: string; fileSize: number }> {
   const exportDir = getExportDir();
-  await mkdir(exportDir, { recursive: true });
+  await writeStep(exportDir, () => mkdir(exportDir, { recursive: true }));
 
   const ext = getFileExtension(format);
   const timestamp = Date.now();
   const fileName = `pinepaper_${platform}_${timestamp}.${ext}`;
   const filePath = join(exportDir, fileName);
 
-  if (data.startsWith('data:')) {
-    const base64Data = data.split(',')[1];
-    const buffer = Buffer.from(base64Data, 'base64');
-    await writeFile(filePath, buffer);
-    return { filePath, fileSize: buffer.length };
-  } else {
-    // Plain text (SVG)
-    await writeFile(filePath, data, 'utf-8');
-    return { filePath, fileSize: Buffer.byteLength(data, 'utf-8') };
+  // A data URL is decoded (base64 or percent-encoded); plain text (SVG, captions) is written as UTF-8. Nothing to
+  // write is the `export` or `save` step's failure, named — it used to write a 0-byte file and report it saved (T-6).
+  let buffer: Buffer;
+  try {
+    buffer = bytesForSave(data, `the ${format} export`);
+  } catch (e) {
+    if (e instanceof ExportStepError) throw new ExportStepError(e.step, filePath, e.reason);
+    throw e;
   }
+  await writeStep(filePath, () => writeFile(filePath, buffer));
+  // Read back: success is a file that exists and holds what was written.
+  await verifySavedFile(filePath, buffer.length);
+  return { filePath, fileSize: buffer.length };
 }
 
 /**
@@ -658,13 +666,14 @@ async function streamRetainedExportToFile(
   let chunks = 0;
 
   // Start from empty: appendFile would otherwise extend a same-millisecond file.
-  await writeFile(filePath, Buffer.alloc(0));
+  await writeStep(filePath, () => writeFile(filePath, Buffer.alloc(0)));
 
   // Returns the error rather than throwing it, so `throw await abandon(...)`
   // reads as a throw to the type checker and narrows what follows.
-  const abandon = async (why: string): Promise<Error> => {
+  // Paging the bytes out is the `save` step; a refusal from the file system is the `write` step (T-6).
+  const abandon = async (why: string, step: 'save' | 'write' = 'save'): Promise<Error> => {
     try { await unlink(filePath); } catch { /* nothing written yet */ }
-    return new Error(
+    return new ExportStepError(step, filePath,
       // The promise now names the call that keeps it. It was true before and
       // unreachable: reading a held export mutates nothing, so "it can be paged
       // again" was always correct and there was no door to page it through.
@@ -753,7 +762,11 @@ async function streamRetainedExportToFile(
 
     const buf = Buffer.from(chunk.data || '', 'base64');
     if (buf.length === 0 && chunk.eof !== true) throw await abandon('the studio returned an empty chunk before the end of the file');
-    await appendFile(filePath, buf);
+    try {
+      await appendFile(filePath, buf);
+    } catch (writeError) {
+      throw await abandon(`appending ${buf.length} bytes at offset ${offset} failed: ${errorText(writeError, 'the file system gave no reason')}`, 'write');
+    }
     offset += buf.length;
     chunks++;
 
@@ -763,6 +776,14 @@ async function streamRetainedExportToFile(
 
   if (offset !== retained.size) {
     throw await abandon(`reassembled ${offset} bytes but the studio reported ${retained.size}`);
+  }
+  // An empty export is not a saved file (T-6), and neither is one the disk does not hold: read it back BEFORE the
+  // studio's copy is released, so a failure here still leaves the bytes recoverable.
+  if (offset === 0) throw await abandon('the studio held an empty export (0 bytes): there is nothing to save');
+  try {
+    await verifySavedFile(filePath, offset);
+  } catch (verifyError) {
+    throw await abandon(errorText(verifyError instanceof ExportStepError ? verifyError.reason : verifyError, 'the written file could not be read back'), 'write');
   }
 
   // Only now is it safe to drop the studio's copy.
@@ -1080,6 +1101,25 @@ function redactGeneratedCode(details: unknown): unknown {
   };
 }
 
+/**
+ * The studio's scene-lint warnings on an export (FxTool lintScene, T-6), one line each, so a centred title that runs
+ * out of the frame ("IGNAL" for "SIGNAL") is read on the success path rather than left in the JSON. Empty when none.
+ */
+export function lintLines(exportResult: unknown): string {
+  const w = (exportResult as { lintWarnings?: unknown } | null)?.lintWarnings;
+  if (!Array.isArray(w) || !w.length) return '';
+  return w.map((x) => `LINT: ${String((x as { message?: unknown })?.message ?? (x as { code?: unknown })?.code ?? 'scene lint warning')}\n`).join('');
+}
+
+/**
+ * An export that failed at a step, as an error result: `{ step, path, reason }` in the data and in the words (T-6).
+ * A non-ExportStepError is named at `fallbackStep` with its own message, never "undefined".
+ */
+function exportStepErrorResult(e: unknown, fallbackStep: 'export' | 'save' | 'write', extra: Record<string, unknown> = {}, toolName = 'pinepaper_agent_export'): CallToolResult {
+  const err = e instanceof ExportStepError ? e : new ExportStepError(fallbackStep, null, errorText(e, `the ${fallbackStep} step failed with no reason given`));
+  return errorResult(ErrorCodes.EXECUTION_ERROR, err.message, { ...err.toData(), ...extra }, { toolName });
+}
+
 export function errorResult(
   code: string,
   message: string,
@@ -1368,19 +1408,30 @@ async function writeResultDataToFile(out: CallToolResult, ext: string): Promise<
   let obj: { result?: { data?: unknown } & Record<string, unknown> } & Record<string, unknown>;
   try { obj = JSON.parse(first.text); } catch { return out; }
   const r = obj.result;
-  if (!r || r.data === undefined || r.data === null) return out;
-  let bytes: Buffer;
-  if (typeof r.data === 'string' && r.data.startsWith('data:')) bytes = Buffer.from(r.data.slice(r.data.indexOf(',') + 1), 'base64');
-  else if (typeof r.data === 'string') bytes = Buffer.from(r.data, 'utf-8');
-  else bytes = Buffer.from(JSON.stringify(r.data), 'utf-8');
+  if (!r || r.success === false) return out;
+  if (r.data === undefined || r.data === null) {
+    // A result that says where its output stayed (png-sequence frames left in the page) claims no file: it passes as
+    // it is. Any other success with nothing to write is the exit-0-without-file case (T-6), named.
+    if (typeof r.note === 'string' && r.note.trim()) return out;
+    const err = new ExportStepError('export', null, `the ${ext} export reported success but returned no file data`);
+    return errorResult(ErrorCodes.EXECUTION_ERROR, err.message, { ...err.toData(), result: r });
+  }
   const dir = getExportDir();
-  await mkdir(dir, { recursive: true });
   const filePath = join(dir, `pinepaper_${String(r.format ?? 'export').replace(/[^a-z0-9-]/gi, '')}_${Date.now()}.${ext}`);
-  await writeFile(filePath, bytes);
-  const { data: _d, ...rest } = r;
-  void _d;
-  obj.result = { ...rest, filePath, bytes: bytes.length };
-  return { ...out, content: [{ type: 'text', text: JSON.stringify(obj, null, 2) }, ...out.content.slice(1)] };
+  // No success without a file that exists and is not empty (T-6): each failure names its step, path and reason.
+  try {
+    const bytes = typeof r.data === 'string' ? bytesForSave(r.data, `the ${ext} export`) : Buffer.from(JSON.stringify(r.data), 'utf-8');
+    await writeStep(filePath, async () => { await mkdir(dir, { recursive: true }); await writeFile(filePath, bytes); });
+    await verifySavedFile(filePath, bytes.length);
+    const { data: _d, ...rest } = r;
+    void _d;
+    obj.result = { ...rest, filePath, bytes: bytes.length };
+    return { ...out, content: [{ type: 'text', text: JSON.stringify(obj, null, 2) }, ...out.content.slice(1)] };
+  } catch (e) {
+    const err = e instanceof ExportStepError ? new ExportStepError(e.step, e.path ?? filePath, e.reason)
+      : new ExportStepError('write', filePath, errorText(e, 'the file could not be written'));
+    return errorResult(ErrorCodes.EXECUTION_ERROR, err.message, err.toData());
+  }
 }
 
 /**
@@ -4634,7 +4685,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
             return withEngineReport({
               content: [{
                 type: 'text' as const,
-                text: `Export saved to file:\n\nFile: ${filePath}\nFormat: ${format}\nSize: ${(fileSize / 1024).toFixed(1)} KB\nPlatform: ${input.platform}\nPaged out of the studio's export store in ${chunks} chunk${chunks === 1 ? '' : 's'}\n\nResult: ${JSON.stringify(cleanResult, null, 2)}`,
+                text: `Export saved to file:\n\nFile: ${filePath}\nFormat: ${format}\nSize: ${(fileSize / 1024).toFixed(1)} KB\nPlatform: ${input.platform}\nPaged out of the studio's export store in ${chunks} chunk${chunks === 1 ? '' : 's'}\n${lintLines(exportResult)}\nResult: ${JSON.stringify(cleanResult, null, 2)}`,
               }],
             }, exportBrowserResult.report);
           } catch (streamError) {
@@ -4655,7 +4706,13 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
         // SCC (CEA-608, 8.37): the studio sent the cues; encoded here.
         if (format === 'scc' && Array.isArray(exportResult?.sccCues)) {
           const scc = buildScc(exportResult.sccCues as SccCue[]);
-          const { filePath, fileSize } = await saveExportToFile(scc.text, 'scc', input.platform || 'auto');
+          let saved: { filePath: string; fileSize: number };
+          try {
+            saved = await saveExportToFile(scc.text, 'scc', input.platform || 'auto');
+          } catch (saveError) {
+            return exportStepErrorResult(saveError, 'save', { format: 'scc' });
+          }
+          const { filePath, fileSize } = saved;
           const warnings: Array<{ code: string; message: string }> = [];
           if (scc.truncated) warnings.push({ code: 'caption_truncated', message: `${scc.truncated} caption(s) did not fit two rows of 32 characters and were cut. Split long captions into more cues.` });
           if (scc.replacedChars.length) warnings.push({ code: 'caption_chars_dropped', message: `characters outside the CEA-608 set were left out: ${scc.replacedChars.join(' ')}. 608 carries Latin letters, digits, common punctuation and a few accented letters.` });
@@ -4666,7 +4723,21 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
           return withEngineReport({ content: [{ type: 'text' as const, text: `Export saved to file:\n\nFile: ${filePath}\nFormat: scc (CEA-608, CC1, pop-on)\nSize: ${fileSize} bytes\n\nResult: ${JSON.stringify(cleanResult, null, 2)}` }] }, exportBrowserResult.report);
         }
         if ((format === 'html5-ad' || format === 'playable') && typeof exportResult?.adPage === 'string') {
-          return withEngineReport(await saveAdExport(exportResult as AdExportResult, input, input.platform || 'auto'), exportBrowserResult.report);
+          try {
+            return withEngineReport(await saveAdExport(exportResult as AdExportResult, input, input.platform || 'auto'), exportBrowserResult.report);
+          } catch (saveError) {
+            return exportStepErrorResult(saveError, 'save', { format });
+          }
+        }
+
+        // NO SUCCESS WITHOUT BYTES (T-6). Every delivering branch above returned; what is left must carry the file's
+        // data. A success with none (no data field, an empty string) used to fall through to the inline return and
+        // report success with nothing in it. An estimate is the one answer that is not a file.
+        if (!exportResult?.estimateOnly && !(typeof data === 'string' && data.length > 0)) {
+          const err = new ExportStepError('export', null,
+            `the studio reported a successful ${format} export but returned no file data (${data === undefined ? 'no data field' : typeof data === 'string' ? 'an empty string' : `a ${data === null ? 'null' : typeof data}`})`);
+          return errorResult(ErrorCodes.EXECUTION_ERROR, err.message, { ...err.toData(), format, result: exportResult },
+            { toolName: 'pinepaper_agent_export' });
         }
 
         const shouldSaveToFile = data && typeof data === 'string' && (
@@ -4688,18 +4759,19 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
                 type: 'text' as const,
                 text: `Export saved to file:\n\nFile: ${filePath}\nFormat: ${format}\nSize: ${(fileSize / 1024).toFixed(1)} KB\nPlatform: ${input.platform}\n`
                   + (dropNote ? `DROPPED: ${dropNote}\n` : '')
+                  + lintLines(exportResult)
                   + `\nResult: ${JSON.stringify(cleanResult, null, 2)}`,
               }],
             }, exportBrowserResult.report);
           } catch (saveError) {
+            // A failed save is a failed export, never a success with a note inside it (T-6): the step, the path and
+            // the reason, and the data stripped so the error is not the size of the video.
             console.error('[PinePaper] Failed to save export to file:', saveError);
-            // Strip the massive data to prevent oversized response
-            const strippedResult = { ...exportResult, data: `[${format} export data — file save failed: ${saveError instanceof Error ? saveError.message : 'unknown error'}]` };
-            return executedResult(code, strippedResult, exportBrowserResult.screenshot, description, exportBrowserResult.report);
+            return exportStepErrorResult(saveError, 'save', { format, bytes: typeof data === 'string' ? data.length : 0 });
           }
         }
 
-        // Small export — return inline (existing behavior)
+        // Small export — return inline (existing behavior). The bytes are in the result, checked non-empty above.
         return executedResult(code, exportResult, exportBrowserResult.screenshot, description, exportBrowserResult.report);
       }
 
@@ -4896,11 +4968,8 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
               }],
             };
           } catch (saveError) {
-            const stripped = {
-              ...soundtrack,
-              wavBase64: `[${soundtrack.byteLength} bytes of WAV — file save failed: ${saveError instanceof Error ? saveError.message : 'unknown error'}]`,
-            };
-            return executedResult(code, stripped, wavResult.screenshot, soundDescription);
+            // The soundtrack rendered; writing it did not. That is a failed export, said as one (T-6).
+            return exportStepErrorResult(saveError, 'save', { format: 'wav', byteLength: soundtrack.byteLength }, 'pinepaper_sound');
           }
         }
 
@@ -5178,6 +5247,11 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
       }
     } catch (_stateError) {
       // Ignore errors from canvas state capture
+    }
+
+    // An export that failed at a named step keeps its step, path and reason as fields (T-6).
+    if (error instanceof ExportStepError) {
+      return errorResult(ErrorCodes.EXECUTION_ERROR, error.message, error.toData(), { toolName, canvasState: canvasState || undefined });
     }
 
     if (error instanceof Error) {
