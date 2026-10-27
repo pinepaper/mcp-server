@@ -51,9 +51,9 @@ Pass description for creative direction and canvasPreset for platform sizing. WO
 
   pinepaper_agent_analyze: `Analyze what's on the canvas and get export recommendations.`,
 
-  pinepaper_tool_guide: `Get detailed docs for any tool or category. Call with no args for the full workflow guide.`,
+  pinepaper_tool_guide: `Get detailed docs for any tool or category. Call with no args for the full workflow guide. For a scripted build of shapes, text, keyframes and relations exported to a file, PINEPAPER_TOOLKIT=lane serves a five-tool agent lane whose descriptions carry the whole contract.`,
 
-  pinepaper_set_toolkit: `Switch available tools. Toolkits: agent, diagram, map, font, full, minimal. Verbosity: verbose, compact, minimal.`,
+  pinepaper_set_toolkit: `Switch available tools. Toolkits: agent, diagram, map, font, full, minimal, lane (the five-tool agent lane). Verbosity: verbose, compact, minimal.`,
 
   // -------------------------------------------------------------------------
   // batch_execute
