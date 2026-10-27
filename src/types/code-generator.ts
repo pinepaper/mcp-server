@@ -4913,6 +4913,23 @@ throw new Error('Unknown diagram mode action: ${action}');
   };
   const results = [];
   let success = true;
+  // A failure's words, never "undefined" for a thrown non-Error.
+  const _why = (e, fb) => (e && typeof e.message === 'string' && e.message.trim()) ? e.message
+    : (typeof e === 'string' && e.trim()) ? e : fb;
+  // THE SCENE LINT AFTER THE CODE (FxTool lintScene().warnings): what the scene will show wrong without anything
+  // failing (a centred title that runs out of the frame). Carried out under __ppLint; the server moves it beside the
+  // result. A studio without lintScene says nothing.
+  const __ppLintNow = function () {
+    try {
+      if (typeof app === 'undefined' || !app || typeof app.lintScene !== 'function') return [];
+      const r = app.lintScene();
+      return r && Array.isArray(r.warnings) ? r.warnings : [];
+    } catch (e) {
+      return [{ code: 'LINT_FAILED', severity: 'info', message: 'the scene lint could not run: ' + ((e && typeof e.message === 'string' && e.message) || 'no reason given') }];
+    }
+  };
+  // Every failed op as { step, itemId, reason }, beside the per-op results.
+  const _failures = () => results.filter((r) => !r.success).map((r) => ({ step: r.step, itemId: r.itemId, reason: r.reason }));
 
   try {
 `;
@@ -4929,6 +4946,10 @@ throw new Error('Unknown diagram mode action: ${action}');
       // vehicles, 2026-07-30). `group` already follows this rule by
       // returning groupId instead of itemId.
       const claimsItemSlot = op.type === 'create';
+      // The item this op acts on, for a failure's itemId: its own id field, else what its result names.
+      const o = op as Record<string, unknown>;
+      const opItem = [o.itemId, o.targetId, o.sourceId, o.id].find((v) => typeof v === 'string') ?? null;
+      const opStep = `op ${index} (${op.type})`;
       code += `
     // Operation ${index}: ${op.type}
     try {
@@ -4945,7 +4966,7 @@ throw new Error('Unknown diagram mode action: ${action}');
       if (failed${index}) {
         // ATOMIC: throw WITHOUT recording, and let the catch below record it
         // once. Doing both put two entries in for one failed op.
-        ${isAtomic ? `throw new Error(failed${index});` : `results.push({ index: ${index}, success: false, error: failed${index}, result: result${index} });
+        ${isAtomic ? `const __e${index} = new Error(failed${index}); __e${index}.itemId = (result${index} && typeof result${index}.itemId === 'string') ? result${index}.itemId : ${JSON.stringify(opItem)}; throw __e${index};` : `results.push({ index: ${index}, success: false, step: ${JSON.stringify(opStep)}, itemId: (result${index} && typeof result${index}.itemId === 'string') ? result${index}.itemId : ${JSON.stringify(opItem)}, reason: failed${index}, error: failed${index}, result: result${index} });
         success = false;`}
       } else {
         results.push({ index: ${index}, success: true, result: result${index} });
@@ -4954,7 +4975,8 @@ throw new Error('Unknown diagram mode action: ${action}');
         }` : ''}
       }
     } catch (opError) {
-      results.push({ index: ${index}, success: false, error: opError.message });
+      const __r${index} = _why(opError, 'operation ${index} (${op.type}) threw with no message');
+      results.push({ index: ${index}, success: false, step: ${JSON.stringify(opStep)}, itemId: (opError && typeof opError.itemId === 'string') ? opError.itemId : ${JSON.stringify(opItem)}, reason: __r${index}, error: __r${index} });
       ${isAtomic ? 'throw opError;' : 'success = false;'}
     }
 `;
@@ -4975,15 +4997,19 @@ throw new Error('Unknown diagram mode action: ${action}');
     }
     return { success, itemIds, results, operationCount: ${operations.length},
       failedCount: _failed.length,
-      ...(_failed.length ? { error: _failed.map((r) => 'op ' + r.index + ': ' + r.error).join('; ') } : {}),
-      canvasSize: { width: _cs.width || 800, height: _cs.height || 600 } };
+      ...(_failed.length ? { error: _failed.map((r) => 'op ' + r.index + ': ' + r.error).join('; '), failures: _failures() } : {}),
+      canvasSize: { width: _cs.width || 800, height: _cs.height || 600 }, ...((function () { const l = __ppLintNow(); return l.length ? { __ppLint: l } : {}; })()) };
   } catch (e) {
     // A batch that created nothing keeps the previous batch's ids on record.
     if (typeof window !== 'undefined' && itemIds.length) {
       window.__pinepaper_batch_item_ids = itemIds;
     }
     const _cs = app.getCanvasSize ? app.getCanvasSize() : { width: 800, height: 600 };
-    return { success: false, error: e.message, itemIds, results, operationCount: ${operations.length}, canvasSize: { width: _cs.width || 800, height: _cs.height || 600 } };
+    const __fails = _failures();
+    const __reason = _why(e, 'the batch failed with no message');
+    return { success: false, error: __reason, itemIds, results, operationCount: ${operations.length},
+      failures: __fails.length ? __fails : [{ step: 'batch', itemId: null, reason: __reason }],
+      canvasSize: { width: _cs.width || 800, height: _cs.height || 600 }, ...((function () { const l = __ppLintNow(); return l.length ? { __ppLint: l } : {}; })()) };
   }
 })();
 `;
@@ -8439,14 +8465,39 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
     // An async IIFE is still a `(`-led expression statement, so the governor
     // captures its value, and executeCode's eval fallback already resolves a
     // returned promise. Both paths await it; neither needed changing.
+    //
+    // The code runs inside its own async arrow so its `return` is still its value; the value comes back under
+    // __ppValue with the scene lint beside it, and a throw comes back as { step, itemId, reason }, never a bare
+    // message (and never "undefined" for a thrown non-Error).
     return `
 // ${description}
 (async function() {
+  // THE SCENE LINT AFTER THE CODE (FxTool lintScene().warnings): what the scene will show wrong without anything
+  // failing (a centred title that runs out of the frame). Carried out under __ppLint; the server moves it beside the
+  // result. A studio without lintScene says nothing.
+  const __ppLintNow = function () {
+    try {
+      if (typeof app === 'undefined' || !app || typeof app.lintScene !== 'function') return [];
+      const r = app.lintScene();
+      return r && Array.isArray(r.warnings) ? r.warnings : [];
+    } catch (e) {
+      return [{ code: 'LINT_FAILED', severity: 'info', message: 'the scene lint could not run: ' + ((e && typeof e.message === 'string' && e.message) || 'no reason given') }];
+    }
+  };
+  let __ppValue;
   try {
+    __ppValue = await (async () => {
     ${validated.code}
+    })();
   } catch (error) {
-    return { success: false, error: error.message };
+    const __ppReason = (error && typeof error.message === 'string' && error.message.trim()) ? error.message
+      : (typeof error === 'string' && error.trim()) ? error : 'the custom code threw with no message';
+    return { success: false, step: 'execute_custom_code', itemId: (error && typeof error.itemId === 'string') ? error.itemId : null,
+      reason: __ppReason, error: __ppReason, ...((function () { const l = __ppLintNow(); return l.length ? { __ppLint: l } : {}; })()) };
   }
+  // Only wrapped when the lint has something to say: otherwise the value is returned exactly as before.
+  const __ppL = __ppLintNow();
+  return __ppL.length ? { __ppValue: __ppValue, __ppLint: __ppL } : __ppValue;
 })();
 `.trim();
   }
@@ -14473,10 +14524,15 @@ ${guard('exportPNGSequence')}
     return Object.assign({ success: true, format: 'png-sequence', data: dataUrl, mimeType: out.type || 'application/zip', size: out.size }, __pngSeqDefaults);
   }
   if (Array.isArray(out)) {
-    return { success: true, format: 'png-sequence', frames: out.length,
+    // NOT A SAVED FILE, and said so in fields: file null, and why.
+    return { success: true, format: 'png-sequence', frames: out.length, file: null,
+      why: 'the frames stayed in the page: the studio returned them as a list of frames, not a file, so no file was written. Pass download: true to have the browser download them as a zip.',
       note: 'the frames stayed in the page — pass download: true to write them out.' };
   }
-  return { success: true, format: 'png-sequence', result: out };
+  // download: true — the studio handed the zip to the BROWSER's download, so no bytes reached this server and no file
+  // was written by it. Said in fields, so it cannot be read as a saved file.
+  return { success: true, format: 'png-sequence', result: out, file: null,
+    why: 'the studio handed the zip to the browser as a download (download: true): it went to the browser\\'s download folder, no bytes reached the MCP server, and the server wrote no file.' };
 })();`.trim();
     }
   }

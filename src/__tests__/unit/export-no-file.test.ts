@@ -1,6 +1,5 @@
 /**
- * No export reports success without a file ("no exit-0-without-file
- * possible", "zero 'undefined' strings in any error path"). Every path that says "saved" reads the file back; a
+ * No export reports success without a file, and no error path says "undefined". Every path that says "saved" reads the file back; a
  * failure names its step (export / save / write), the path and the reason. The studio's scene-lint warnings ride on a
  * successful export.
  */
@@ -154,9 +153,20 @@ describe('pinepaper_interchange file exports', () => {
     expect(r.isError).toBe(true);
     expect(textOf(r)).toContain('export failed at the export step: the glb export reported success but returned no file data');
   });
-  it('a result that says where its output stayed passes as it is', async () => {
-    const r = await run('pinepaper_interchange', { action: 'export_png_sequence' }, { success: true, format: 'png-sequence', frames: 3, note: 'the frames stayed in the page — pass download: true to write them out.' });
+  it('a result that says in fields it wrote no file (file: null, why) passes as it is', async () => {
+    const r = await run('pinepaper_interchange', { action: 'export_png_sequence' }, { success: true, format: 'png-sequence', frames: 3, file: null, why: 'the frames stayed in the page' });
     expect(r.isError).toBeFalsy();
+    expect(textOf(r)).toContain('"file": null');
+    expect(textOf(r)).not.toContain('filePath');
+  });
+  it('a note alone no longer passes for "no file": it must say file: null and why', async () => {
+    const r = await run('pinepaper_interchange', { action: 'export_png_sequence' }, { success: true, format: 'png-sequence', frames: 3, note: 'the frames stayed in the page' });
+    expect(r.isError).toBe(true);
+  });
+  it('the emitted png-sequence code says file: null and why on both no-file branches', () => {
+    const code = codeGenerator.generateInterchange({ action: 'export_png_sequence' } as never);
+    expect(code.match(/file: null,/g)?.length).toBe(2);
+    expect(code.match(/why: '/g)?.length).toBe(2);
   });
 });
 
