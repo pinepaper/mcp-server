@@ -1289,7 +1289,7 @@ ${codes.map((code, i) => `
         if (_result${i}.registryId) _itemIds.push(_result${i}.registryId);
       }
     } catch (e) {
-      _results.push({ index: ${i}, success: false, error: e.message });
+      _results.push({ index: ${i}, success: false, step: 'operation ${i}', itemId: null, reason: (e && typeof e.message === 'string' && e.message) || 'operation ${i} threw with no message', error: (e && typeof e.message === 'string' && e.message) || 'operation ${i} threw with no message' });
       ${atomic ? 'throw e; // Atomic mode: stop on first error' : '// Continue despite error'}
     }
 `).join('\n')}
@@ -1303,7 +1303,7 @@ ${codes.map((code, i) => `
   } catch (e) {
     return {
       success: false,
-      error: e.message,
+      error: (e && typeof e.message === 'string' && e.message) || 'the batch threw with no message',
       itemIds: _itemIds,
       results: _results
     };

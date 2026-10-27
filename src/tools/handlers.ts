@@ -1010,6 +1010,9 @@ function executedResult(
 ): CallToolResult {
   const resultObj: Record<string, unknown> = { success: true, result };
   if (description) resultObj.description = description;
+  // The scene lint after the code ran, when there is something to say.
+  const lint = report && Array.isArray((report as { lintWarnings?: unknown }).lintWarnings) ? (report as { lintWarnings: unknown[] }).lintWarnings : [];
+  if (lint.length) resultObj.lintWarnings = lint;
 
   // Surface the governor's model-actionable feedback (app.runGenerated report):
   // warnings (e.g. "500 items created one-by-one — prefer a pattern"), item count,
@@ -1109,6 +1112,22 @@ export function lintLines(exportResult: unknown): string {
   const w = (exportResult as { lintWarnings?: unknown } | null)?.lintWarnings;
   if (!Array.isArray(w) || !w.length) return '';
   return w.map((x) => `LINT: ${String((x as { message?: unknown })?.message ?? (x as { code?: unknown })?.code ?? 'scene lint warning')}\n`).join('');
+}
+
+/**
+ * The file as ffprobe read it, when it disagrees with what the studio encoded: one line per field. A summary
+ * line when they agree; nothing when there is no summary.
+ */
+export function probeLines(receipt: { probe?: { container: string; codec: string; width: number; height: number; fps: number | null; durationS: number; frames: number }; probeCheck?: { tool: string | null; ok?: boolean; mismatches?: Array<{ field: string; studio: unknown; file: unknown }>; reason?: string } }): string {
+  const p = receipt.probe;
+  if (!p) return '';
+  const head = `Probe: ${p.container} ${p.codec} ${p.width}x${p.height}${p.fps ? ` @ ${p.fps} fps` : ''}, ${p.durationS} s, ${p.frames} frame${p.frames === 1 ? '' : 's'}`;
+  const c = receipt.probeCheck;
+  if (!c) return `${head}\n`;
+  if (c.tool === null) return `${head} (not read back: ${c.reason})\n`;
+  if (c.ok) return `${head} (ffprobe agrees)\n`;
+  if (!c.mismatches?.length) return `${head}\nPROBE: ${c.reason ?? 'ffprobe could not confirm the file'}\n`;
+  return `${head}\n` + c.mismatches.map((m) => `PROBE MISMATCH: ${m.field} — the studio encoded ${JSON.stringify(m.studio)}, ffprobe reads ${JSON.stringify(m.file)}\n`).join('');
 }
 
 /**
@@ -1410,9 +1429,10 @@ async function writeResultDataToFile(out: CallToolResult, ext: string): Promise<
   const r = obj.result;
   if (!r || r.success === false) return out;
   if (r.data === undefined || r.data === null) {
-    // A result that says where its output stayed (png-sequence frames left in the page) claims no file: it passes as
-    // it is. Any other success with nothing to write is the exit-0-without-file case, named.
-    if (typeof r.note === 'string' && r.note.trim()) return out;
+    // A result that says in fields that it wrote no file (png-sequence frames left in the page: `file: null` and
+    // `why`) claims no file: it passes as it is. Any other success with nothing to write is the exit-0-without-file
+    // case, named.
+    if (r.file === null && typeof r.why === 'string' && r.why.trim()) return out;
     const err = new ExportStepError('export', null, `the ${ext} export reported success but returned no file data`);
     return errorResult(ErrorCodes.EXECUTION_ERROR, err.message, { ...err.toData(), result: r });
   }
@@ -1674,6 +1694,10 @@ ${code}
   });
 
   const browserDuration = tracker.endTimer(`${timerId}_browser_execution`);
+  // THE SCENE LINT RIDES OUT OF BAND: an emitter that ran app.lintScene() returns it under __ppLint, and
+  // execute_custom_code returns its own value under __ppValue. Both are unwrapped HERE, before any verdict reads the
+  // result, so the code's own value is what is judged and returned, and the lint sits beside it.
+  const lintWarnings = unwrapLint(result);
   // THE METRIC RECORDS THE CALL'S VERDICT, NOT THE TRANSPORT'S (gate H2,
   // 1.6.19). result.success only says the code RAN; an emitter that ran and
   // returned { success: false } is a failed call, and get_performance_metrics
@@ -1725,6 +1749,8 @@ ${code}
       // PP_LOOP_BUDGET, PP_TIMEOUT) so the model can correct on the next turn.
       {
         code, errorCode: result.errorCode, governorReport: result.report,
+        failures: stepFailures(toolName, result.result, result.error || 'Failed to execute code in browser'),
+        ...(lintWarnings.length ? { lintWarnings } : {}),
         ...(rollbackOnFailure ? await customCodeRollback(controller, result.error) : {}),
       },
       {
@@ -1762,6 +1788,8 @@ ${code}
       said.length ? `${inner} The studio said: ${said.join(' | ')}` : inner,
       {
         code, result: result.result, governorReport: result.report,
+        failures: stepFailures(toolName, result.result, inner),
+        ...(lintWarnings.length ? { lintWarnings } : {}),
         ...(rollbackOnFailure ? await customCodeRollback(controller, inner) : {}),
       },
       { toolName, canvasState: canvasState || undefined }
@@ -1819,6 +1847,41 @@ ${code}
  * string with no `success: true` beside it is a failure too — it is what the
  * emitters' catch blocks return.
  */
+/**
+ * Move an emitter's out-of-band scene lint (`__ppLint`) off its result, and unwrap execute_custom_code's own value
+ * (`__ppValue`). The lint is also put on `run.report.lintWarnings`, where executedResult reads it. Returns the lint.
+ */
+export function unwrapLint(run: { result?: unknown; report?: Record<string, unknown> }): unknown[] {
+  const r = run.result as Record<string, unknown> | null | undefined;
+  if (!r || typeof r !== 'object' || Array.isArray(r) || !('__ppLint' in r)) return [];
+  const lint = Array.isArray(r.__ppLint) ? (r.__ppLint as unknown[]) : [];
+  if ('__ppValue' in r) run.result = r.__ppValue;
+  else { const { __ppLint: _l, ...rest } = r; void _l; run.result = rest; }
+  if (lint.length) run.report = { ...(run.report ?? {}), lintWarnings: lint };
+  return lint;
+}
+
+/**
+ * Every failed step of a call as `{ step, itemId, reason }`, never a bare message: a batch's own `failures`, a
+ * result that names its step, or the call itself with the item it named.
+ */
+export function stepFailures(toolName: string, value: unknown, message: string): Array<{ step: string; itemId: string | null; reason: string }> {
+  const v = value as Record<string, unknown> | null | undefined;
+  const reasonOf = (x: unknown): string => (typeof x === 'string' && x.trim() ? x : '');
+  if (v && typeof v === 'object' && Array.isArray(v.failures) && v.failures.length) {
+    return (v.failures as Array<Record<string, unknown>>).map((f) => ({
+      step: reasonOf(f.step) || toolName,
+      itemId: typeof f.itemId === 'string' ? f.itemId : null,
+      reason: reasonOf(f.reason) || reasonOf(f.error) || message,
+    }));
+  }
+  return [{
+    step: (v && typeof v === 'object' && reasonOf(v.step)) || toolName,
+    itemId: v && typeof v === 'object' && typeof v.itemId === 'string' ? v.itemId : null,
+    reason: (v && typeof v === 'object' && (reasonOf(v.reason) || reasonOf(v.error))) || reasonOf(message) || `${toolName} failed with no reason given`,
+  }];
+}
+
 export function innerFailure(value: unknown): string | null {
   if (!value || typeof value !== 'object') return null;
   const r = value as {
@@ -4681,11 +4744,12 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
               },
               input.platform || 'auto'
             );
-            const cleanResult = { ...exportResult, data: undefined, filePath, fileSize, chunks, file: await exportFileReceipt(filePath, exportResult) };
+            const receipt = await exportFileReceipt(filePath, exportResult);
+            const cleanResult = { ...exportResult, data: undefined, filePath, fileSize, chunks, file: receipt };
             return withEngineReport({
               content: [{
                 type: 'text' as const,
-                text: `Export saved to file:\n\nFile: ${filePath}\nFormat: ${format}\nSize: ${(fileSize / 1024).toFixed(1)} KB\nPlatform: ${input.platform}\nPaged out of the studio's export store in ${chunks} chunk${chunks === 1 ? '' : 's'}\n${lintLines(exportResult)}\nResult: ${JSON.stringify(cleanResult, null, 2)}`,
+                text: `Export saved to file:\n\nFile: ${filePath}\nFormat: ${format}\nSize: ${(fileSize / 1024).toFixed(1)} KB\nPlatform: ${input.platform}\nPaged out of the studio's export store in ${chunks} chunk${chunks === 1 ? '' : 's'}\n${probeLines(receipt)}${lintLines(exportResult)}\nResult: ${JSON.stringify(cleanResult, null, 2)}`,
               }],
             }, exportBrowserResult.report);
           } catch (streamError) {
@@ -4749,7 +4813,8 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
         if (shouldSaveToFile) {
           try {
             const { filePath, fileSize } = await saveExportToFile(data, format, input.platform || 'auto');
-            const cleanResult = { ...exportResult, data: undefined, filePath, fileSize, file: await exportFileReceipt(filePath, exportResult) };
+            const receipt = await exportFileReceipt(filePath, exportResult);
+            const cleanResult = { ...exportResult, data: undefined, filePath, fileSize, file: receipt };
             // A mix that dropped sounds wrote a perfectly good file that is
             // missing tracks. It rides the SUCCESS path, which is exactly why
             // it has to be said out loud here rather than left in the JSON.
@@ -4759,6 +4824,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
                 type: 'text' as const,
                 text: `Export saved to file:\n\nFile: ${filePath}\nFormat: ${format}\nSize: ${(fileSize / 1024).toFixed(1)} KB\nPlatform: ${input.platform}\n`
                   + (dropNote ? `DROPPED: ${dropNote}\n` : '')
+                  + probeLines(receipt)
                   + lintLines(exportResult)
                   + `\nResult: ${JSON.stringify(cleanResult, null, 2)}`,
               }],

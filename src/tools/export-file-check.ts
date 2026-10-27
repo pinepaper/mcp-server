@@ -1,6 +1,5 @@
 /**
- * No export reports success without a file (owner, 2026-10-27): no exit-0-without-file, and no "undefined" in any
- * error path.
+ * No export reports success without a file, and no error path says "undefined" (owner, 2026-10-27).
  *
  * An export could end with success and no file. Every path here that says "saved" now reads the
  * file back from disk first: it must exist and must not be empty. When it does not, the caller gets an error that

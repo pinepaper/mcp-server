@@ -8,6 +8,28 @@
  */
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
+import { execFile } from 'node:child_process';
+
+/** What the file is, as the studio's encoder and muxer report it (FxTool AgentMode `probe`). */
+export interface ProbeSummary {
+  container: string;
+  codec: string;
+  width: number;
+  height: number;
+  fps: number | null;
+  durationS: number;
+  frames: number;
+  audio: { codec: string; sampleRate?: number; silent?: boolean } | null;
+}
+
+/** The saved file read by ffprobe, compared field by field with the studio's summary. */
+export interface ProbeCheck {
+  tool: 'ffprobe' | null;
+  ok?: boolean;
+  mismatches?: Array<{ field: string; studio: unknown; file: unknown }>;
+  file?: Record<string, unknown>;
+  reason?: string;
+}
 
 export interface ExportFileReceipt {
   sha256: string;
@@ -15,6 +37,8 @@ export interface ExportFileReceipt {
   frameDigest?: string;
   frames?: number;
   unreadFrames?: number;
+  probe?: ProbeSummary;
+  probeCheck?: ProbeCheck;
 }
 
 /** Hash a written file (streamed: a long video is never held in memory twice). */
@@ -30,10 +54,100 @@ export async function sha256OfFile(filePath: string): Promise<{ sha256: string; 
   return { sha256: h.digest('hex'), bytes };
 }
 
+/**
+ * The studio's summary of a video it encoded: the result's own `probe` (a studio exporting through
+ * PinePaperAgent.quickExport), else built from `video.encode` and `video.audioCodec` / `audio` (the emitted agent
+ * export reads lastVideoReport directly). Null for a studio that does not report its encode.
+ */
+export function probeFromResult(exportResult: unknown): ProbeSummary | null {
+  const r = exportResult as { probe?: unknown; video?: Record<string, unknown>; audio?: Record<string, unknown> } | null;
+  if (!r || typeof r !== 'object') return null;
+  if (r.probe && typeof r.probe === 'object') return r.probe as ProbeSummary;
+  const enc = r.video && (r.video.encode as Record<string, unknown> | undefined);
+  if (!enc || typeof enc !== 'object' || typeof enc.width !== 'number') return null;
+  const ac = r.video?.audioCodec;
+  const ar = r.audio;
+  const audio = typeof ac === 'string' && ac !== 'none'
+    ? { codec: ac, ...(ar && typeof ar.sampleRate === 'number' ? { sampleRate: ar.sampleRate } : {}), ...(ar && ar.silent === true ? { silent: true } : {}) }
+    : null;
+  return {
+    container: String(enc.container), codec: String(enc.codec), width: enc.width as number, height: Number(enc.height),
+    fps: typeof enc.fps === 'number' ? enc.fps : null, durationS: Number(enc.durationS), frames: Number(enc.frames), audio,
+  };
+}
+
+let ffprobeAvailable: boolean | null = null;
+function run(cmd: string, args: string[]): Promise<{ ok: boolean; stdout: string; stderr: string }> {
+  return new Promise((resolve) => {
+    execFile(cmd, args, { timeout: 30_000, maxBuffer: 4 * 1024 * 1024 }, (err, stdout, stderr) => {
+      resolve({ ok: !err, stdout: String(stdout ?? ''), stderr: String(stderr ?? '') || (err ? err.message : '') });
+    });
+  });
+}
+
+/** ffprobe's codec_name for a studio codec string (avc1.* is h264, vp09.* is vp9). */
+function codecFamily(codec: string): string {
+  const c = codec.toLowerCase();
+  if (c.startsWith('avc1') || c.startsWith('avc3') || c === 'h264') return 'h264';
+  if (c.startsWith('vp09') || c === 'vp9') return 'vp9';
+  if (c.startsWith('vp8') || c === 'vp8') return 'vp8';
+  if (c.startsWith('av01') || c === 'av1') return 'av1';
+  if (c.startsWith('mp4a') || c === 'aac') return 'aac';
+  return c;
+}
+
+/**
+ * Read the saved file with ffprobe, when it is on PATH, and compare it with the studio's summary: container, video
+ * codec, size, frame rate, length (within one frame and 50 ms) and whether there is an audio track. Never throws: no
+ * ffprobe, or one that cannot read the file, is said in `reason`.
+ */
+export async function verifyWithFfprobe(filePath: string, probe: ProbeSummary): Promise<ProbeCheck> {
+  if (process.env.PINEPAPER_FFPROBE === 'off') return { tool: null, reason: 'PINEPAPER_FFPROBE=off' };
+  if (ffprobeAvailable === null) ffprobeAvailable = (await run('ffprobe', ['-version'])).ok;
+  if (!ffprobeAvailable) return { tool: null, reason: 'ffprobe is not on PATH, so the file was not read back; the summary is what the studio encoded' };
+  const r = await run('ffprobe', ['-v', 'error', '-show_entries',
+    'format=format_name,duration:stream=codec_type,codec_name,width,height,r_frame_rate,nb_frames', '-of', 'json', filePath]);
+  if (!r.ok) return { tool: 'ffprobe', ok: false, reason: `ffprobe could not read the file: ${r.stderr.trim() || 'no reason given'}` };
+  let j: { format?: { format_name?: string; duration?: string }; streams?: Array<Record<string, unknown>> };
+  try { j = JSON.parse(r.stdout); } catch { return { tool: 'ffprobe', ok: false, reason: 'ffprobe printed something that is not JSON' }; }
+  const v = (j.streams ?? []).find((x) => x.codec_type === 'video');
+  const a = (j.streams ?? []).find((x) => x.codec_type === 'audio');
+  const [num, den] = String(v?.r_frame_rate ?? '0/1').split('/').map(Number);
+  const fileFps = den ? Math.round((num / den) * 1000) / 1000 : null;
+  const fileDur = j.format?.duration !== undefined ? Number(j.format.duration) : null;
+  const file = {
+    container: j.format?.format_name ?? null, codec: v?.codec_name ?? null, width: v?.width ?? null, height: v?.height ?? null,
+    fps: fileFps, durationS: fileDur, frames: v?.nb_frames !== undefined ? Number(v.nb_frames) : null,
+    audio: a ? { codec: a.codec_name ?? null } : null,
+  };
+  const mismatches: Array<{ field: string; studio: unknown; file: unknown }> = [];
+  const formats = String(file.container ?? '').split(',');
+  const wantContainer = probe.container === 'webm' ? ['webm', 'matroska'] : [probe.container, 'mov'];
+  if (!formats.some((f) => wantContainer.includes(f))) mismatches.push({ field: 'container', studio: probe.container, file: file.container });
+  if (codecFamily(probe.codec) !== file.codec) mismatches.push({ field: 'codec', studio: probe.codec, file: file.codec });
+  if (probe.width !== file.width) mismatches.push({ field: 'width', studio: probe.width, file: file.width });
+  if (probe.height !== file.height) mismatches.push({ field: 'height', studio: probe.height, file: file.height });
+  if (probe.fps && fileFps && Math.abs(probe.fps - fileFps) > 0.01) mismatches.push({ field: 'fps', studio: probe.fps, file: fileFps });
+  const frameS = probe.fps ? 1 / probe.fps : 0;
+  if (fileDur !== null && Number.isFinite(fileDur) && Math.abs(fileDur - probe.durationS) > frameS + 0.05) {
+    mismatches.push({ field: 'durationS', studio: probe.durationS, file: fileDur });
+  }
+  if (file.frames !== null && Number.isFinite(file.frames) && file.frames !== probe.frames) mismatches.push({ field: 'frames', studio: probe.frames, file: file.frames });
+  if (!!probe.audio !== !!a) mismatches.push({ field: 'audio', studio: probe.audio ? probe.audio.codec : null, file: a ? a.codec_name : null });
+  else if (probe.audio && a && codecFamily(probe.audio.codec) !== a.codec_name) mismatches.push({ field: 'audio.codec', studio: probe.audio.codec, file: a.codec_name });
+  return { tool: 'ffprobe', ok: mismatches.length === 0, ...(mismatches.length ? { mismatches } : {}), file };
+}
+
 /** The receipt for an export result: the file's hash, plus the studio's frame hashes when it reported them. */
 export async function exportFileReceipt(filePath: string, exportResult: unknown): Promise<ExportFileReceipt> {
   const { sha256, bytes } = await sha256OfFile(filePath);
   const out: ExportFileReceipt = { sha256, bytes };
+  // What the file is: the studio's summary, checked against the file itself where ffprobe is on PATH.
+  const probe = probeFromResult(exportResult);
+  if (probe) {
+    out.probe = probe;
+    if (probe.container !== 'png') out.probeCheck = await verifyWithFfprobe(filePath, probe);
+  }
   const r = exportResult as { video?: { frameHashes?: { digest?: unknown; count?: unknown; unread?: unknown } } } | null;
   const fh = r && r.video && r.video.frameHashes;
   if (fh && typeof fh.digest === 'string') {
