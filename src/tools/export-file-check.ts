@@ -1,8 +1,8 @@
 /**
- * No export reports success without a file (owner, 2026-10-27; FxTool's HYPERFRAMES_SCORECARD_PLAN, T-6: "no
- * exit-0-without-file possible", "zero 'undefined' strings in any error path").
+ * No export reports success without a file (owner, 2026-10-27): no exit-0-without-file, and no "undefined" in any
+ * error path.
  *
- * The tier study met an export that ended with success and no file. Every path here that says "saved" now reads the
+ * An export could end with success and no file. Every path here that says "saved" now reads the
  * file back from disk first: it must exist and must not be empty. When it does not, the caller gets an error that
  * names the step (export, save or write), the path and the reason, never a success with a note inside it.
  *

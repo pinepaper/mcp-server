@@ -1,5 +1,5 @@
 /**
- * No export reports success without a file (T-6, FxTool's HYPERFRAMES_SCORECARD_PLAN: "no exit-0-without-file
+ * No export reports success without a file ("no exit-0-without-file
  * possible", "zero 'undefined' strings in any error path"). Every path that says "saved" reads the file back; a
  * failure names its step (export / save / write), the path and the reason. The studio's scene-lint warnings ride on a
  * successful export.

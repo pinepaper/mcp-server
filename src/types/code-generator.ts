@@ -2411,7 +2411,7 @@ const remaining = app.itemRegistry ? app.itemRegistry.getAll().length : 0;
  */
 function generateExportSVGCode(): string {
   return `
-// Export animated SVG. An export that produced nothing is a failure, named (T-6), not a success with an empty string.
+// Export animated SVG. An export that produced nothing is a failure, named, not a success with an empty string.
 const svgString = app.exportAnimatedSVG();
 (typeof svgString !== 'string' || svgString.length === 0)
   ? ({ success: false, step: 'export', error: 'export failed at the export step: exportAnimatedSVG returned ' + (svgString === '' ? 'an empty string' : (svgString === null ? 'null' : typeof svgString)) + ', so there is no SVG to return' })
@@ -5750,7 +5750,7 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
   // cannot be kept accurate — it breaks on any edit above it — so this repo
   // does not use them. Camera animation still
   // drives motion during export — framing only fixes the output frame.
-  // THE SCENE LINT, BEFORE THE EXPORT (T-6, FxTool lintScene().warnings): what the file will show wrong without
+  // THE SCENE LINT, BEFORE THE EXPORT (FxTool lintScene().warnings): what the file will show wrong without
   // anything failing — a centre-anchored text that runs out of the frame exports as "IGNAL" for "SIGNAL". Read from the
   // scene as it is, never a refusal; a studio without the rule says nothing, a lint that throws says so.
   const __lint = (function () {

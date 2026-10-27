@@ -1,5 +1,5 @@
 /**
- * T-8 (HYPERFRAMES_SCORECARD_PLAN): a fresh model, given ONLY the agent lane (PINEPAPER_TOOLKIT=lane) and no lessons
+ * A fresh model, given ONLY the agent lane (PINEPAPER_TOOLKIT=lane) and no lessons
  * file, builds T1 first try. Proven by behaviour: a real model drives the real MCP server against a real local
  * PinePaper Studio, and the MP4 it exports is checked frame by frame. Nothing here is mocked.
  *
@@ -19,9 +19,8 @@
  * "First try" is strict: the FIRST mp4 the run exported passes every T1 check AND no tool call before it failed.
  * Both halves are reported separately, with the run's tokens, so a pass that needed a retry is visible as one.
  *
- * T1 below is the tier study's low tier as this repo can state it: the study's own T1 prompt is not in either
- * repository, so this one keeps its canvas, clock, palette and title (1920×1080, 30 fps, 8.000 s, navy, "SIGNAL /
- * NOISE" at (200, 130)) and adds one keyed move. T1_PROMPT_FILE replaces the prompt; the checks then still apply,
+ * T1 below is a simple titled animation (1920×1080, 30 fps, 8.000 s, navy, "SIGNAL /
+ * NOISE" at (200, 130)) with one keyed move. T1_PROMPT_FILE replaces the prompt; the checks then still apply,
  * so a replacement must ask for the same picture.
  */
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';

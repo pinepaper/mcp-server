@@ -619,7 +619,7 @@ async function saveExportToFile(
   const filePath = join(exportDir, fileName);
 
   // A data URL is decoded (base64 or percent-encoded); plain text (SVG, captions) is written as UTF-8. Nothing to
-  // write is the `export` or `save` step's failure, named — it used to write a 0-byte file and report it saved (T-6).
+  // write is the `export` or `save` step's failure, named — it used to write a 0-byte file and report it saved.
   let buffer: Buffer;
   try {
     buffer = bytesForSave(data, `the ${format} export`);
@@ -670,7 +670,7 @@ async function streamRetainedExportToFile(
 
   // Returns the error rather than throwing it, so `throw await abandon(...)`
   // reads as a throw to the type checker and narrows what follows.
-  // Paging the bytes out is the `save` step; a refusal from the file system is the `write` step (T-6).
+  // Paging the bytes out is the `save` step; a refusal from the file system is the `write` step.
   const abandon = async (why: string, step: 'save' | 'write' = 'save'): Promise<Error> => {
     try { await unlink(filePath); } catch { /* nothing written yet */ }
     return new ExportStepError(step, filePath,
@@ -777,7 +777,7 @@ async function streamRetainedExportToFile(
   if (offset !== retained.size) {
     throw await abandon(`reassembled ${offset} bytes but the studio reported ${retained.size}`);
   }
-  // An empty export is not a saved file (T-6), and neither is one the disk does not hold: read it back BEFORE the
+  // An empty export is not a saved file, and neither is one the disk does not hold: read it back BEFORE the
   // studio's copy is released, so a failure here still leaves the bytes recoverable.
   if (offset === 0) throw await abandon('the studio held an empty export (0 bytes): there is nothing to save');
   try {
@@ -1102,7 +1102,7 @@ function redactGeneratedCode(details: unknown): unknown {
 }
 
 /**
- * The studio's scene-lint warnings on an export (FxTool lintScene, T-6), one line each, so a centred title that runs
+ * The studio's scene-lint warnings on an export (FxTool lintScene), one line each, so a centred title that runs
  * out of the frame ("IGNAL" for "SIGNAL") is read on the success path rather than left in the JSON. Empty when none.
  */
 export function lintLines(exportResult: unknown): string {
@@ -1112,7 +1112,7 @@ export function lintLines(exportResult: unknown): string {
 }
 
 /**
- * An export that failed at a step, as an error result: `{ step, path, reason }` in the data and in the words (T-6).
+ * An export that failed at a step, as an error result: `{ step, path, reason }` in the data and in the words.
  * A non-ExportStepError is named at `fallbackStep` with its own message, never "undefined".
  */
 function exportStepErrorResult(e: unknown, fallbackStep: 'export' | 'save' | 'write', extra: Record<string, unknown> = {}, toolName = 'pinepaper_agent_export'): CallToolResult {
@@ -1411,14 +1411,14 @@ async function writeResultDataToFile(out: CallToolResult, ext: string): Promise<
   if (!r || r.success === false) return out;
   if (r.data === undefined || r.data === null) {
     // A result that says where its output stayed (png-sequence frames left in the page) claims no file: it passes as
-    // it is. Any other success with nothing to write is the exit-0-without-file case (T-6), named.
+    // it is. Any other success with nothing to write is the exit-0-without-file case, named.
     if (typeof r.note === 'string' && r.note.trim()) return out;
     const err = new ExportStepError('export', null, `the ${ext} export reported success but returned no file data`);
     return errorResult(ErrorCodes.EXECUTION_ERROR, err.message, { ...err.toData(), result: r });
   }
   const dir = getExportDir();
   const filePath = join(dir, `pinepaper_${String(r.format ?? 'export').replace(/[^a-z0-9-]/gi, '')}_${Date.now()}.${ext}`);
-  // No success without a file that exists and is not empty (T-6): each failure names its step, path and reason.
+  // No success without a file that exists and is not empty: each failure names its step, path and reason.
   try {
     const bytes = typeof r.data === 'string' ? bytesForSave(r.data, `the ${ext} export`) : Buffer.from(JSON.stringify(r.data), 'utf-8');
     await writeStep(filePath, async () => { await mkdir(dir, { recursive: true }); await writeFile(filePath, bytes); });
@@ -4730,7 +4730,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
           }
         }
 
-        // NO SUCCESS WITHOUT BYTES (T-6). Every delivering branch above returned; what is left must carry the file's
+        // NO SUCCESS WITHOUT BYTES. Every delivering branch above returned; what is left must carry the file's
         // data. A success with none (no data field, an empty string) used to fall through to the inline return and
         // report success with nothing in it. An estimate is the one answer that is not a file.
         if (!exportResult?.estimateOnly && !(typeof data === 'string' && data.length > 0)) {
@@ -4764,7 +4764,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
               }],
             }, exportBrowserResult.report);
           } catch (saveError) {
-            // A failed save is a failed export, never a success with a note inside it (T-6): the step, the path and
+            // A failed save is a failed export, never a success with a note inside it: the step, the path and
             // the reason, and the data stripped so the error is not the size of the video.
             console.error('[PinePaper] Failed to save export to file:', saveError);
             return exportStepErrorResult(saveError, 'save', { format, bytes: typeof data === 'string' ? data.length : 0 });
@@ -4968,7 +4968,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
               }],
             };
           } catch (saveError) {
-            // The soundtrack rendered; writing it did not. That is a failed export, said as one (T-6).
+            // The soundtrack rendered; writing it did not. That is a failed export, said as one.
             return exportStepErrorResult(saveError, 'save', { format: 'wav', byteLength: soundtrack.byteLength }, 'pinepaper_sound');
           }
         }
@@ -5249,7 +5249,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
       // Ignore errors from canvas state capture
     }
 
-    // An export that failed at a named step keeps its step, path and reason as fields (T-6).
+    // An export that failed at a named step keeps its step, path and reason as fields.
     if (error instanceof ExportStepError) {
       return errorResult(ErrorCodes.EXECUTION_ERROR, error.message, error.toData(), { toolName, canvasState: canvasState || undefined });
     }

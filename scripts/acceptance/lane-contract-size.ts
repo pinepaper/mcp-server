@@ -1,10 +1,10 @@
 /**
- * T-9: the size of the contract an agent must load to use the agent lane — the server instructions plus the five
+ * The size of the contract an agent must load to use the agent lane — the server instructions plus the five
  * tools exactly as tools/list sends them (name, annotations, description, input schema).
  *
  *   bun scripts/acceptance/lane-contract-size.ts [--write <file>]
  *
- * Prints bytes and est. tokens (bytes / 4, the tier study's convention). --write saves the contract text so a real
+ * Prints bytes and est. tokens (bytes / 4). --write saves the contract text so a real
  * tokenizer can count it.
  */
 import { writeFileSync } from 'node:fs';

@@ -1,6 +1,6 @@
 /**
  * The agent lane (PINEPAPER_TOOLKIT=lane, src/tools/lane.ts): five existing tools, shown with descriptions that carry
- * the lessons, under a 10k-token contract (HYPERFRAMES_SCORECARD_PLAN T-8, T-9).
+ * the lessons, under a 10k-token contract.
  *
  * What this pins is what the lane PROMISES, not what is easy to assert:
  * - every call the lane shows (its schemas and every example it prints) is one the full server accepts, because the
@@ -96,7 +96,7 @@ describe('the agent lane', () => {
     expect(dangling).toEqual([]);
   });
 
-  it('the contract an agent loads is ≤ 10k tokens (bytes / 4, the tier study convention)', () => {
+  it('the contract an agent loads is ≤ 10k tokens (bytes / 4)', () => {
     const bytes = Buffer.byteLength(laneContractText(PINEPAPER_TOOLS as never), 'utf8');
     expect(bytes / 4).toBeLessThanOrEqual(10_000);
   });

@@ -69,7 +69,7 @@ export const exportHandlers: Record<string, ExportHandler> = {
     }
     const dir = getExportDir();
     const filePath = join(dir, `pinepaper_project_${Date.now()}.json`);
-    // No "Project saved" without a file that exists and holds the document (T-6).
+    // No "Project saved" without a file that exists and holds the document.
     try {
       await writeStep(filePath, async () => { await mkdir(dir, { recursive: true }); await writeFile(filePath, v.json as string, 'utf-8'); });
       await verifySavedFile(filePath, Buffer.byteLength(v.json));
