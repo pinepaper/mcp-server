@@ -1,6 +1,5 @@
 /**
- * What an export wrote, as facts a caller checks instead of re-auditing frames (owner, 2026-10-26: "hash first";
- * docs in FxTool's HYPERFRAMES_SCORECARD_PLAN, T-4 and T-7).
+ * What an export wrote, as facts a caller checks instead of re-auditing frames (owner, 2026-10-26: "hash first").
  *
  * - `sha256` and `bytes` of the file ON DISK, read back after it was written: the agent compares two renders in one
  *   field, and a file that came out empty or truncated cannot report the size it was meant to have.

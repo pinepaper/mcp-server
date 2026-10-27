@@ -2,11 +2,10 @@
  * THE AGENT LANE (PINEPAPER_TOOLKIT=lane): five tools that build, animate, pattern, export and check a scene, with
  * the lessons an agent otherwise learns by failing folded into the descriptions of the tools they belong to.
  *
- * Why it exists (owner, 2026-10-26, HYPERFRAMES_SCORECARD_PLAN phase 1d, targets T-8 and T-9): an agent given the
- * default surface loads ~170 tool schemas and still needed a separate lessons file to build the tier study's T1 —
- * the keyframe shape, the words of a text going in properties, a position being the item's centre. HyperFrames costs
- * an agent almost nothing to discover because the agent already knows HTML. The lane makes PinePaper's contract small
- * enough to read whole (≤ 10k tokens, tools + instructions), and correct enough that nothing outside it is needed.
+ * Why it exists (owner, 2026-10-26): an agent given the default surface loads ~170 tool schemas and still needed a
+ * separate lessons file to build a simple titled animation — the keyframe shape, the words of a text going in
+ * properties, a position being the item's centre. The lane makes the contract small enough to read whole (≤ 10k
+ * tokens, tools + instructions), and correct enough that nothing outside it is needed.
  *
  * Every lane tool is an EXISTING tool with its existing handler. The lane changes only what the agent is shown: a
  * description written for this surface, and an input schema that is a strict subset of the tool's full one (so any

@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
 import { exportFileReceipt, sha256OfFile } from '../../tools/export-file-receipt.js';
 
-describe('export file receipt (hash first, T-4/T-7)', () => {
+describe('export file receipt (hash first)', () => {
   const dir = mkdtempSync(join(tmpdir(), 'pp-receipt-'));
   const bytes = Buffer.from(Array.from({ length: 5000 }, (_, i) => i % 251));
   const file = join(dir, 'x.mp4');
