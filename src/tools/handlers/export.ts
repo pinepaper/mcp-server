@@ -16,6 +16,7 @@ import { codeGenerator } from '../../types/code-generator.js';
 import { ExportTrainingDataInputSchema, ExportSceneInputSchema, ImportSceneInputSchema, ErrorCodes } from '../../types/schemas.js';
 import { getBrowserController } from '../../browser/puppeteer-controller.js';
 import { getExecutionMode } from '../handlers.js';
+import { ExportStepError, errorText, verifySavedFile, writeStep } from '../export-file-check.js';
 
 /** A project document over this size is refused on import rather than staged. */
 const MAX_PROJECT_BYTES = 200 * 1024 * 1024;
@@ -62,13 +63,20 @@ export const exportHandlers: Record<string, ExportHandler> = {
     }
     const run = await controller.executeCode(code, false, { governorTimeoutMs: 120_000 });
     const v = (run.result ?? {}) as { success?: boolean; error?: string; json?: string; counts?: Record<string, unknown>; unserialized?: Array<{ kind?: string; id?: string }> };
-    if (!run.success || v.success === false || typeof v.json !== 'string') {
-      return errorResult(ErrorCodes.EXECUTION_ERROR, run.error || v.error || 'the project document could not be captured', { code }, { toolName: 'pinepaper_export_scene' });
+    if (!run.success || v.success === false || typeof v.json !== 'string' || v.json.length === 0) {
+      const why = run.error || v.error || (typeof v.json === 'string' ? 'the studio returned an empty project document' : 'the project document could not be captured');
+      return errorResult(ErrorCodes.EXECUTION_ERROR, `export failed at the export step: ${why}`, { code, step: 'export', path: null, reason: why }, { toolName: 'pinepaper_export_scene' });
     }
     const dir = getExportDir();
-    await mkdir(dir, { recursive: true });
     const filePath = join(dir, `pinepaper_project_${Date.now()}.json`);
-    await writeFile(filePath, v.json, 'utf-8');
+    // No "Project saved" without a file that exists and holds the document (T-6).
+    try {
+      await writeStep(filePath, async () => { await mkdir(dir, { recursive: true }); await writeFile(filePath, v.json as string, 'utf-8'); });
+      await verifySavedFile(filePath, Buffer.byteLength(v.json));
+    } catch (e) {
+      const err = e instanceof ExportStepError ? e : new ExportStepError('write', filePath, errorText(e, 'the file could not be written'));
+      return errorResult(ErrorCodes.EXECUTION_ERROR, err.message, err.toData(), { toolName: 'pinepaper_export_scene' });
+    }
     const lost = Array.isArray(v.unserialized) ? v.unserialized : [];
     const result = {
       success: true, filePath, bytes: Buffer.byteLength(v.json), counts: v.counts, restore: `pinepaper_import_scene { path: "${filePath}" }`,
