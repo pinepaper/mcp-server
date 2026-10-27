@@ -8,9 +8,11 @@
  * Handler dispatch is NOT filtered — hidden tools still execute if called directly.
  */
 
-export type ToolkitProfile = 'full' | 'agent' | 'diagram' | 'map' | 'font' | 'minimal';
+import { applyLane } from './lane.js';
 
-export const TOOLKIT_PROFILES_LIST: ToolkitProfile[] = ['full', 'agent', 'diagram', 'map', 'font', 'minimal'];
+export type ToolkitProfile = 'full' | 'agent' | 'diagram' | 'map' | 'font' | 'minimal' | 'lane';
+
+export const TOOLKIT_PROFILES_LIST: ToolkitProfile[] = ['full', 'agent', 'diagram', 'map', 'font', 'minimal', 'lane'];
 
 // =============================================================================
 // TAG GROUPS — each maps a category to its tool names
@@ -316,7 +318,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
     'pinepaper_query_ontology',
   ],
 
-  // --- On-demand guide & runtime config (included in ALL profiles) ---
+  // --- On-demand guide & runtime config (included in every profile but lane) ---
   guide: [
     'pinepaper_tool_guide',
     'pinepaper_set_toolkit',
@@ -381,6 +383,12 @@ export const TOOLKIT_PROFILES: Record<ToolkitProfile, string[]> = {
     'agent', 'browser', 'canvas',
     'guide',
   ],
+
+  // The agent lane is not a tag set: it is exactly LANE_TOOL_NAMES (src/tools/lane.ts), each
+  // shown with its lane description and schema, and nothing else — not even the guide, whose
+  // job (explaining a surface too big to read) the lane does not have. getToolsForToolkit
+  // serves it through applyLane; the server instructions are the lane's own.
+  lane: [],
 };
 
 // =============================================================================
@@ -401,6 +409,10 @@ interface Tool {
 export function getToolsForToolkit<T extends Tool>(tools: T[], profile: ToolkitProfile): T[] {
   if (profile === 'full') {
     return tools;
+  }
+
+  if (profile === 'lane') {
+    return applyLane(tools);
   }
 
   const tags = TOOLKIT_PROFILES[profile];

@@ -12127,7 +12127,10 @@ ${checks.includes('contrast') ? `  // SAMPLED OVER TIME (round 12, 12.9): text i
     return { success: false, error: 'app.lintScene unavailable — update FxTool to a build with the relational linter (S12-E2)' };
   }
   const result = app.lintScene(${optsJson});
-  return { success: true, density: result.density, suggestions: result.suggestions };
+  // warnings: what the engine's own rules found (TEXT_CLIPS_FRAME: a centre-anchored text running past the
+  // frame edge). Passed through when the studio reports them; an older studio has none to pass.
+  return { success: true, density: result.density, suggestions: result.suggestions,
+    ...(Array.isArray(result.warnings) && result.warnings.length ? { warnings: result.warnings } : {}) };
 })();`.trim();
   }
 

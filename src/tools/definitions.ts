@@ -114,6 +114,8 @@ The generated code is shown in tool responses and can be copied into PinePaper's
 
 ${CHOOSE_THE_DOOR}
 
+THE AGENT LANE — when the job is a scene of shapes, text, keyframes and relations exported to a file (a data animation, a title card, a motion test), and no craft tool above is wanted: PINEPAPER_TOOLKIT=lane (or pinepaper_set_toolkit {toolkit: "lane"}) serves five tools — pinepaper_agent_batch_execute, pinepaper_keyframe_animate, pinepaper_pattern, pinepaper_agent_export, pinepaper_lint_scene — whose descriptions carry the rules that otherwise cost a failed build (the keyframe shape, an item's words and look inside properties, position is the centre). The whole contract is under 10k tokens. Use the full surface for characters, styled scenes, maps, diagrams and sound.
+
 WORKFLOW — Create → Validate → Iterate:
 
 1. pinepaper_agent_start_job (clearCanvas: true, canvasPreset)
@@ -9716,6 +9718,8 @@ USE WHEN: You need full parameter docs, examples, or workflow guidance — espec
 
 PREFER RESOURCES WHERE POSSIBLE: The full AI Agent Guide is also available via the MCP resources API at pinepaper://docs/agent-guide — clients that support resources should pull it that way rather than calling this tool. Per-domain references live at pinepaper://docs/{generators,relations,masks,diagrams,maps,effects-and-filters,fonts,custom-paths,paperjs-in-pinepaper,templates,customization,getting-started}. Use this tool when the client doesn't support resources or when you want a specific tool's verbose description.
 
+THE AGENT LANE: for a scene built from shapes, text, keyframes and relations and exported to a file, a five-tool lane carries the whole contract in its descriptions (no guide, no lessons file): start the server with PINEPAPER_TOOLKIT=lane, or pinepaper_set_toolkit {toolkit: "lane"}.
+
 MODES:
 - No args → returns the full AI Agent Guide (same content as pinepaper://docs/agent-guide)
 - tool: "pinepaper_agent_batch_execute" → returns that tool's full verbose description
@@ -9763,6 +9767,7 @@ PROFILES:
 - map: Map/choropleth tools
 - font: Font creation tools
 - minimal: Bare essentials
+- lane: the agent lane — five tools (batch_execute, keyframe_animate, pattern, agent_export, lint_scene) whose descriptions carry everything needed to build and export a shape/text/keyframe scene; set it for a scripted build that needs nothing else. It lists no way back: set it last.
 
 VERBOSITY:
 - verbose: Full descriptions
@@ -9773,8 +9778,8 @@ VERBOSITY:
       properties: {
         toolkit: {
           type: 'string',
-          description: 'Toolkit profile: full, agent, diagram, map, font, minimal',
-          enum: ['full', 'agent', 'diagram', 'map', 'font', 'minimal'],
+          description: 'Toolkit profile: full, agent, diagram, map, font, minimal, lane',
+          enum: ['full', 'agent', 'diagram', 'map', 'font', 'minimal', 'lane'],
         },
         verbosity: {
           type: 'string',

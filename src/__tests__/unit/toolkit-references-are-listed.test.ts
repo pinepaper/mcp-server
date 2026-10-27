@@ -81,10 +81,15 @@ describe('every tool a profile points at, that profile lists', () => {
     minimal: 8,
   };
 
+  // The lane is read WHOLE by a model that has nothing else (agent-lane.test.ts), so it is held to zero.
+  it('the lane has no dangling reference', () => {
+    expect(danglingIn('lane')).toEqual([]);
+  });
+
   it('the domain profiles dangle only as much as they are known to', () => {
     const counts: Record<string, number> = {};
     for (const profile of TOOLKIT_PROFILES_LIST) {
-      if (profile === 'agent' || profile === 'full') continue;
+      if (profile === 'agent' || profile === 'full' || profile === 'lane') continue;
       const n = danglingIn(profile).length;
       if (n) counts[profile] = n;
     }
