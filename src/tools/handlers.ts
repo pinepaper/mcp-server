@@ -2086,7 +2086,6 @@ export const HIDDEN_ARGUMENTS: Readonly<Record<string, readonly string[]>> = {
  * listing. Shrink-only, held exact by nested-ignored-coverage.test.ts; publishing one means deleting it here.
  */
 export const NESTED_HIDDEN: Readonly<Record<string, readonly string[]>> = {
-  pinepaper_agent_batch_execute: ['operations[].counter', 'operations[].generatorRegion', 'operations[].screenSpace', 'operations[].stepTiming'],
   pinepaper_create_item: ['keyframes[].hold', 'keyframes[].interpolation'],
   pinepaper_create_scene: ['animations[].startTime'],
   pinepaper_keyframe_animate: ['keyframes[].hold', 'keyframes[].interpolation'],

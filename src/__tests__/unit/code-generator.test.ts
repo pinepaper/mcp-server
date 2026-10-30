@@ -260,7 +260,7 @@ describe('PinePaperCodeGenerator', () => {
       const code = codeGenerator.generateKeyframeAnimate(mockFadeInKeyframes);
 
       expect(code).toContain('app.addAnimation');
-      expect(code).toContain("'item_1'");
+      expect(code).toContain('"item_1"');
       expect(code).toContain('opacity');
       expect(code).toContain('duration:');
       expect(code).toContain('loop:');
@@ -491,7 +491,7 @@ describe('PinePaperCodeGenerator', () => {
       const code = codeGenerator.generateAgentBatchExecute({
         operations: [{ type: 'modify', itemId: 'item_1', properties: { color: '#00ff00' } }],
       });
-      expect(code).toContain("'item_1'");
+      expect(code).toContain('"item_1"');
       // The batch op addresses the item too — select+modify edited whatever
       // happened to be selected when the id did not resolve.
       // modify_item's own emitter, with the runtime id put in (see the batch
@@ -505,7 +505,7 @@ describe('PinePaperCodeGenerator', () => {
       const code = codeGenerator.generateAgentBatchExecute({
         operations: [{ type: 'delete', itemId: 'item_5' }],
       });
-      expect(code).toContain("'item_5'");
+      expect(code).toContain('"item_5"');
       expect(code).toContain('app.getItemById(targetId)');
       expect(code).toContain('item.remove()');
     });
@@ -549,7 +549,7 @@ describe('PinePaperCodeGenerator', () => {
       const code = codeGenerator.generateAgentBatchExecute({
         operations: [{ type: 'set_background', backgroundColor: '#0f172a' }],
       });
-      expect(code).toContain("app.setBackgroundColor('#0f172a')");
+      expect(code).toContain('app.setBackgroundColor("#0f172a")');
     });
 
     it('should generate code for execute_generator operation', () => {
@@ -612,7 +612,7 @@ describe('PinePaperCodeGenerator', () => {
       const code = codeGenerator.generateAgentBatchExecute({
         operations: [{ type: 'modify', itemId: 'item_42', properties: { opacity: 0.5 } }],
       });
-      expect(code).toContain("'item_42'");
+      expect(code).toContain('"item_42"');
       expect(code).not.toContain('__ref(');
     });
 
@@ -1423,8 +1423,8 @@ describe('PinePaperCodeGenerator', () => {
             { type: 'set_background', color: '#1a1a2e' } as never,
           ],
         });
-        expect(code).toContain("app.setBackgroundColor('#1a1a2e')");
-        expect(code).toContain("backgroundColor: '#1a1a2e'");
+        expect(code).toContain('app.setBackgroundColor("#1a1a2e")');
+        expect(code).toContain('backgroundColor: "#1a1a2e"');
       });
 
       it('B66: batch create honours op-level text, x, y, and fillColor', () => {
@@ -1651,5 +1651,21 @@ describe('emitted string literals are breakout-proof (CodeQL js/incomplete-sanit
   it('diagram labels cannot escape their literal', () => {
     const code = codeGenerator.generateCreateDiagramShape({ shapeType: 'rectangle', x: 100, y: 100, label: HOSTILE } as never);
     expect(code).toContain(JSON.stringify(HOSTILE));
+  });
+
+  it('batch item refs and background colours cannot escape their literal', () => {
+    const code = codeGenerator.generateAgentBatchExecute({
+      operations: [
+        { type: 'set_background', backgroundColor: HOSTILE },
+        { type: 'modify', itemId: HOSTILE, properties: { opacity: 1 } },
+        // `$` followed by anything but digits is an id, not a ref: it used to be spliced as __ref(1);evil();().
+        { type: 'delete', itemId: '$1);evil();(' },
+      ],
+    } as never);
+    expect(code).toContain(`app.setBackgroundColor(${JSON.stringify(HOSTILE)})`);
+    expect(code).toContain(JSON.stringify(HOSTILE));
+    expect(code).not.toContain('__ref(1);evil()');
+    expect(code).toContain(JSON.stringify('$1);evil();('));
+    expect(() => new Function(code)).not.toThrow();
   });
 });

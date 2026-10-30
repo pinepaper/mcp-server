@@ -2764,6 +2764,16 @@ ${itemSettersApplyJs(s, '__sid', '__res')}
 })();`;
 }
 
+/**
+ * A batch op's item reference as a JS expression: `$N` is the Nth item this
+ * batch created, anything else is an id, quoted. Only digits follow the `$` —
+ * the raw splice it replaces put `$1);…;(` straight into the snippet, and an id
+ * with a quote in it broke the batch's syntax.
+ */
+export function batchRef(raw: string | undefined): string {
+  return typeof raw === 'string' && /^\$\d+$/.test(raw) ? `__ref(${raw.slice(1)})` : JSON.stringify(String(raw));
+}
+
 function asReturningBody(snippet: string): string {
   const single = snippet.trim();
   if (single.startsWith('(async function()')) return `return await ${single.replace(/;\s*$/, '')};`;
@@ -5093,9 +5103,7 @@ return __created;
       }
 
       case 'modify': {
-        const itemRef = op.itemId?.startsWith('$')
-          ? `__ref(${op.itemId.substring(1)})`
-          : `'${op.itemId}'`;
+        const itemRef = batchRef(op.itemId);
         // modify_item's own emitter, as create is create_item's (see above):
         // the batch's modifyItem call missed text styles, font loading, audio
         // level, no-fill, lifetimes, smoothing and the unread-property report.
@@ -5115,9 +5123,7 @@ return __r;
       }
 
       case 'animate':
-        const animItemRef = op.itemId?.startsWith('$')
-          ? `__ref(${op.itemId.substring(1)})`
-          : `'${op.itemId}'`;
+        const animItemRef = batchRef(op.itemId);
         const animOpts = JSON.stringify(op.animationOptions || {});
         return `
 const targetId = ${animItemRef};
@@ -5128,12 +5134,8 @@ return { itemId: targetId, animationType: '${op.animationType}' };
 `;
 
       case 'relation':
-        const srcRef = op.sourceId?.startsWith('$')
-          ? `__ref(${op.sourceId.substring(1)})`
-          : `'${op.sourceId}'`;
-        const tgtRef = op.targetId?.startsWith('$')
-          ? `__ref(${op.targetId.substring(1)})`
-          : `'${op.targetId}'`;
+        const srcRef = batchRef(op.sourceId);
+        const tgtRef = batchRef(op.targetId);
         const relOpts = JSON.stringify(op.relationOptions || {});
         return `
 const sourceId = ${srcRef};
@@ -5156,9 +5158,7 @@ return { relationId, sourceId, targetId, relationType: '${op.relationType}' };
 `;
 
       case 'delete':
-        const delRef = op.itemId?.startsWith('$')
-          ? `__ref(${op.itemId.substring(1)})`
-          : `'${op.itemId}'`;
+        const delRef = batchRef(op.itemId);
         return `
 const targetId = ${delRef};
 const item = app.getItemById(targetId);
@@ -5171,7 +5171,7 @@ return { itemId: targetId, deleted: true };
       case 'group': {
         // Resolve each ref ($N → itemIds[N]; literal → quoted id) into a JS array.
         const refs = (op.itemIds || []).map((ref) =>
-          ref?.startsWith('$') ? `__ref(${ref.substring(1)})` : `'${ref}'`,
+          batchRef(ref),
         );
         const idsArrayExpr = `[${refs.join(', ')}]`;
         const nameExpr = op.groupName !== undefined ? JSON.stringify(op.groupName) : 'undefined';
@@ -5185,8 +5185,8 @@ return (function() {${this.groupCodeBody(idsArrayExpr, nameExpr)}
       case 'set_background':
         const bgColor = op.backgroundColor || (op as any).color || (op.properties as any)?.backgroundColor || (op.properties as any)?.color || '#000000';
         return `
-app.setBackgroundColor('${bgColor}');
-return { success: true, backgroundColor: '${bgColor}' };
+app.setBackgroundColor(${JSON.stringify(String(bgColor))});
+return { success: true, backgroundColor: ${JSON.stringify(String(bgColor))} };
 `;
 
       case 'execute_generator':
@@ -5220,14 +5220,12 @@ return { success: true, width: (_cs && _cs.width) || ${w}, height: (_cs && _cs.h
           return `
 // Keyframes merged into operation ${foldTarget} (same target). A keyframe track
 // is replaced wholesale, so emitting both here would silently drop one.
-return { itemId: ${op.itemId?.startsWith('$') ? `__ref(${op.itemId.substring(1)})` : `'${op.itemId}'`}, merged: true, mergedInto: ${foldTarget} };
+return { itemId: ${batchRef(op.itemId)}, merged: true, mergedInto: ${foldTarget} };
 `;
         }
         const mergedPayload = mergePlan?.merged.get(index);
         const rawItemId = String(op.itemId ?? op.id ?? (op.properties as any)?.itemId ?? (op.properties as any)?.id);
-        const kfItemRef = rawItemId?.startsWith('$')
-          ? `__ref(${rawItemId.substring(1)})`
-          : `'${rawItemId}'`;
+        const kfItemRef = batchRef(rawItemId);
         const kfSource = mergedPayload
           ? mergedPayload.keyframes
           : (op.keyframes || (op.properties && (op.properties as any).keyframes) || ((op as any).params && (op as any).params.keyframes) || []);
@@ -5268,9 +5266,7 @@ return { success: true, itemId: targetId, duration: ${kfDuration}, loop: ${kfLoo
       }
 
       case 'apply_mask': {
-        const maskItemRef = op.itemId?.startsWith('$')
-          ? `__ref(${op.itemId.substring(1)})`
-          : `'${op.itemId}'`;
+        const maskItemRef = batchRef(op.itemId);
         const maskOpts = JSON.stringify(op.maskOptions || {});
         const preset = op.maskPreset || op.maskType || 'wipeLeft';
         return `
@@ -5288,9 +5284,7 @@ return { success: !!maskedGroup, itemId: targetId, preset: '${preset}' };
       }
 
       case 'apply_effect': {
-        const effItemRef = op.itemId?.startsWith('$')
-          ? `__ref(${op.itemId.substring(1)})`
-          : `'${op.itemId}'`;
+        const effItemRef = batchRef(op.itemId);
         const effParams = JSON.stringify(op.effectParams || {});
         return `
 const targetId = ${effItemRef};

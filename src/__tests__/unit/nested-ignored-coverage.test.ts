@@ -99,4 +99,17 @@ describe('nested dropped arguments (AR-1 R2)', () => {
     expect(nestedIgnoredPaths(bc.inputSchema, { items: [{ type: 'circle', params: { anything: 1 } }] })).toEqual([]);
     expect(nestedIgnoredPaths(bc.inputSchema, { items: [{ type: 'circle', params: {}, colour: 'red' }] })).toEqual(['items[0].colour']);
   });
+
+  it('a batch op\'s flat keys are read, so they are never called ignored', async () => {
+    // The emitter forwards a create op's extra keys into properties and reads a
+    // keyframe op's timing keys at the top; the note called all of them dropped.
+    const r = await handleToolCall('pinepaper_agent_batch_execute', {
+      operations: [
+        { type: 'create', itemType: 'text', content: 'HELLO', fontSize: 72, x: 100, y: 200 },
+        { type: 'keyframe_animate', itemId: '$0', keyframes: [{ time: 0, properties: { opacity: 0 } }, { time: 1, properties: { opacity: 1 } }], timeUnits: 'seconds', timeOffset: 0.5 },
+      ],
+    }, code);
+    expect(noteOf(r)).not.toContain('IGNORED ARGUMENTS');
+    expect(r._meta?.[IGNORED_ARGUMENTS_META_KEY]).toBeUndefined();
+  });
 });

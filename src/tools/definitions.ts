@@ -9024,6 +9024,11 @@ EXAMPLE — Animated sky scene with timed reveals:
               time: { type: 'number', description: 'For play_timeline seek: time in seconds' },
             },
             required: ['type'],
+            // Open, as the zod schema is (.passthrough()): a create op takes its
+            // properties flat (content, fontSize, x, y …) and a keyframe op takes
+            // timeOffset / timeUnits / clipInPoint / clipOutPoint at the top.
+            // create_item's own check still names a property the studio ignores.
+            additionalProperties: true,
           },
           description: 'Array of operations to execute in order',
         },
