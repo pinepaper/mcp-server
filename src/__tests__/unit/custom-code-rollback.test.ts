@@ -47,6 +47,44 @@ describe('execute_custom_code rollback', () => {
   });
 });
 
+describe('atomic batch rollback (the lane says a refused call can be sent again)', () => {
+  // A fake studio: the mark and the sweep answer as the page does; the batch
+  // itself fails at op 1 after op 0 made an item.
+  const studio = () => {
+    const calls: string[] = [];
+    const controller = { connected: true, connect: async () => undefined,
+      executeCode: async (code: string) => {
+        if (code.includes('__ppPreRunIds = ids')) { calls.push('mark'); return { success: true, result: { ok: true } }; }
+        if (code.includes('const pre = window.__ppPreRunIds')) { calls.push('sweep'); return { success: true, result: { ok: true, removed: 1, left: 0 } }; }
+        if (code.includes('// Batch execute')) {
+          calls.push('batch');
+          return { success: true, result: { success: false, error: 'op 1: Item not found: nope', itemIds: ['item_1'], results: [] } };
+        }
+        return { success: true, result: { success: true } };
+      } };
+    return { controller, calls };
+  };
+  const opts = (c: unknown) => ({ executeInBrowser: true, browserController: c as never, executionMode: 'puppeteer' as const });
+  const ops = [{ type: 'create', itemType: 'circle', position: { x: 10, y: 10 } }, { type: 'modify', itemId: 'nope', properties: { opacity: 0 } }];
+
+  it('a failed atomic batch removes what it created, and says so', async () => {
+    const { handleToolCall } = await import('../../tools/handlers.js');
+    const s = studio();
+    const r = await handleToolCall('pinepaper_agent_batch_execute', { operations: ops }, opts(s.controller));
+    expect(s.calls).toEqual(['mark', 'batch', 'sweep']);
+    const text = (r.content ?? []).map((c) => ('text' in c ? c.text : '')).join('\n');
+    expect(text).toContain('1 item(s) this call created before it stopped were removed');
+  });
+
+  it('atomic: false keeps what the ops before the failure made', async () => {
+    const { handleToolCall } = await import('../../tools/handlers.js');
+    const s = studio();
+    await handleToolCall('pinepaper_agent_batch_execute', { operations: ops, atomic: false }, opts(s.controller));
+    expect(s.calls).not.toContain('mark');
+    expect(s.calls).not.toContain('sweep');
+  });
+});
+
 describe('apply_thread spine points', () => {
   it('[x, y] pairs reach the engine as {x, y}, the only form its spine reader takes', () => {
     const i = DesignMediumInputSchema.parse({ action: 'apply_thread', itemId: 'a', field: { kind: 'spine', spine: [[400, 200], { x: 400, y: 520 }] } });

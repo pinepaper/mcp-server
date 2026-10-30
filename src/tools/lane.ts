@@ -35,7 +35,7 @@ ORDER OF WORK:
 Use pinepaper_keyframe_animate to re-key one item afterwards, and pinepaper_pattern to move many named items with one declaration.
 
 UNITS: pixels, top-left origin, y down; time in seconds; angles in degrees; colours as "#rrggbb".
-Every call acts on the live canvas at once: re-sending a batch ADDS its items again. A failed atomic batch changed nothing, so fix it and send it again.
+Every call acts on the live canvas at once: re-sending a batch ADDS its items again. A failed atomic batch removes the items it made, so fix it and send it again (edits it made to items that already existed stay: the result says so).
 Report a tool error as it is; do not write HTML or other code instead of these tools.
 This lane is for scenes built from shapes, text, keyframes and relations. For characters, styled scenes, maps, diagrams or sound, the full surface is PINEPAPER_TOOLKIT=agent.`;
 
@@ -86,7 +86,7 @@ RULES (each one has cost a failed build):
 - Name every item (properties.name). pinepaper_pattern selects members by name, e.g. "bar-*".
 - Relations: orbits {radius, speed (turns per second), direction, phaseDegrees}, follows {offset, smoothing}, attached_to {offset}, points_at, moves_along_path {path:[{x,y},…], speed}. sourceId moves; targetId is what it moves relative to.
 - set_canvas_size comes first; a video exports at the canvas size.
-- The call is LIVE: sending it twice makes every item twice. atomic (default) rolls the whole call back on any failure, so a refused call changed nothing: fix the op it names and send it again.
+- The call is LIVE: sending it twice makes every item twice. atomic (default) stops at the first failure and removes every item the call created, so the canvas holds no half batch: fix the op it names and send it again. Edits to items that already existed are not undone; the result says what was removed.
 
 itemType: text, circle, rectangle, ellipse, star, triangle, polygon, line, arc, path, hexagon, diamond, arrow, heart.`,
     inputSchema: {
@@ -117,7 +117,7 @@ itemType: text, circle, rectangle, ellipse, star, triangle, polygon, line, arc, 
             required: ['type'],
           },
         },
-        atomic: { type: 'boolean', description: 'default true: any failure rolls the whole call back' },
+        atomic: { type: 'boolean', description: 'default true: the first failure stops the call and removes the items it created (edits to existing items stay)' },
       },
       required: ['operations'],
     },

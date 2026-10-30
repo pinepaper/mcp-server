@@ -844,6 +844,8 @@ export interface HandlerOptions {
   executionMode?: ExecutionMode;
   /** agent_export: write the result to a file at any size (render_batch needs a file per row). */
   saveToFile?: boolean;
+  /** Internal: an atomic batch removes the items it created when it fails (see customCodeRollback). */
+  rollbackCreatedOnFailure?: boolean;
   /**
    * The HOST runs the generated code later (the hosted service records each
    * call and replays it when the scene renders). The agent is then told the
@@ -1669,8 +1671,9 @@ ${code}
   }
 
   // Agent-written code is rolled back when it fails part-way; a tool's own
-  // emitter is not (its verdict already describes what it left behind).
-  const rollbackOnFailure = toolName === 'pinepaper_execute_custom_code'
+  // emitter is not (its verdict already describes what it left behind), except
+  // an atomic batch, whose contract is that a refused call changed nothing.
+  const rollbackOnFailure = (toolName === 'pinepaper_execute_custom_code' || options.rollbackCreatedOnFailure === true)
     && await markItemsBeforeRun(controller);
   const governorTimeoutMs = LONG_GOVERNOR_BUDGET_MS[toolName];
 
@@ -4510,7 +4513,8 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
           }
         }
 
-        const batchResult = await executeOrGenerate(code, description, options, 'pinepaper_agent_batch_execute');
+        const batchResult = await executeOrGenerate(code, description,
+          input.atomic !== false ? { ...options, rollbackCreatedOnFailure: true } : options, 'pinepaper_agent_batch_execute');
 
         // Append bounds warning if any
         if (boundsWarning && batchResult.content && batchResult.content.length > 0) {
