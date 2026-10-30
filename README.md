@@ -251,6 +251,51 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 
 ## What's new in 1.6.24
 
+### Added
+
+- `pinepaper_pattern`: one stored declaration moves many items, with no
+  keyframes on each. `phase_wave` sends a wave through the members, `stagger`
+  offsets them in turn. Members are chosen by id, by name pattern or by tag.
+  `create`, `modify`, `remove`, `list` and `get` manage patterns afterwards.
+- A five-tool toolkit for agents, `PINEPAPER_TOOLKIT=lane`:
+  `pinepaper_agent_batch_execute`, `pinepaper_keyframe_animate`,
+  `pinepaper_pattern`, `pinepaper_agent_export` and `pinepaper_lint_scene`,
+  with descriptions written to be read on their own.
+- Batch operations `ring`, `grid`, `orbit`, `stagger` and `patch`.
+  - `ring` and `grid` lay out many items in one operation. Each item is made
+    the same way `create` makes it and fills the next `$N` slot.
+  - `orbit` binds an orbiting item to a centre, making the orbiting item if
+    you pass `itemType`.
+  - `stagger` plays the same keyframes on several items, one after another.
+  - `patch` changes an item by its name.
+- `pinepaper_agent_export` returns the saved file's `sha256` and size. When
+  the studio reports per-frame hashes, it also returns a `frameDigest`, so two
+  renders can be compared in one field. When `ffprobe` is installed, the saved
+  video is checked against what the studio encoded, and any field that
+  disagrees is named (`PINEPAPER_FFPROBE=off` turns this off).
+- `pinepaper_execute_custom_code` and `pinepaper_agent_batch_execute` return
+  the scene lint's warnings (`lintWarnings`), such as a title that runs out of
+  the frame. Every failed step is listed in `failures` as
+  `{ step, itemId, reason }`.
+
+### Fixed
+
+- An atomic batch that fails removes the items it created, so it can be fixed
+  and sent again without making them twice. Changes it made to items that
+  already existed are not undone, and the result says what was removed.
+- An argument a tool ignores is now also named when it is nested, at its full
+  path (for example `keyframes[1].ease`). Keys that a batch operation reads
+  directly (`content`, `fontSize`, `x`, `y`, `timeOffset` and the like) are
+  not reported.
+- No export reports success without a file. Every saved file is read back
+  from disk and must exist and not be empty. A failure names its step, the
+  path and the reason.
+- A batch `modify` or `patch` addressed by a name that several items hold is
+  refused, and the result lists their ids. It used to change whichever of them
+  was made first.
+- Item ids and colours in batch operations are always quoted correctly in the
+  generated code.
+
 ### Security
 
 - `pinepaper_import_scene` reads only from the working directory, the export
@@ -261,7 +306,7 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - The `pinepaper://docs/readme` resource accepts only a language code after
   the slash (such as `/ja` or `/pt-BR`). Anything else is refused.
 - Dependency updates clear published advisories in `body-parser`, `fast-uri`,
-  `ip-address` and `hono`.
+  `ip-address`, `hono` and `zod` (now zod 4).
 - [SECURITY.md](SECURITY.md) explains how to report a vulnerability privately.
 
 ## What's new in 1.6.23
@@ -2394,6 +2439,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 | `PINEPAPER_GOVERNOR` | `off` runs code by raw eval — no governor report, no error codes, no seeded determinism | on |
 | `PINEPAPER_ASSET_DIRS` | Extra folders local image and media imports may read from, separated by `:` (`;` on Windows). The working directory and the export folder are always allowed | unset |
 | `PINEPAPER_ALLOW_PRIVATE_NETWORK` | `1` lets URL imports reach loopback, private and LAN addresses, for a local dev server. Cloud metadata addresses stay refused | unset |
+| `PINEPAPER_FFPROBE` | `off` skips the ffprobe check of a saved video export. Without `ffprobe` on `PATH` the check is skipped and the result says so | on |
 
 Behind a proxy, or against a Studio with analytics or polling connections open,
 `networkidle2` may never settle: set `PINEPAPER_WAIT_UNTIL` only if you need the
