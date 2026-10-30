@@ -11,6 +11,7 @@ import { WORLD3D_COLOR_PATHS } from '../tools/engine-lists.js';
 import { REQUIRED_ENGINE_METHODS, OPTIONAL_ENGINE_METHODS } from '../tools/engine-methods.js';
 import { ACCEPTED_CREATE_PARAMS, NORMALIZE_PARAM_READS, MODIFY_CHANGE_READS } from '../tools/shape-params.js';
 import { generateP5DrawCode } from '../tools/p5-compat/p5-helpers.js';
+import { expandBatchMacros } from '../tools/batch-macros.js';
 import {
   ItemType,
   SimpleAnimationType,
@@ -4888,7 +4889,9 @@ throw new Error('Unknown diagram mode action: ${action}');
    */
   generateAgentBatchExecute(input: AgentBatchExecuteInput): string {
     const validated = AgentBatchExecuteInputSchema.parse(input);
-    const { operations, atomic } = validated;
+    const { atomic } = validated;
+    // ring / grid / orbit / stagger / patch become the batch's own ops (batch-macros.ts).
+    const operations = expandBatchMacros(validated.operations as Array<Record<string, unknown>>) as typeof validated.operations;
     const isAtomic = atomic !== false;
     // Fold duplicate keyframe_animate targets so a later op can't silently
     // clobber an earlier track (app.addAnimation replaces, never merges).
@@ -4958,7 +4961,7 @@ throw new Error('Unknown diagram mode action: ${action}');
       // The item this op acts on, for a failure's itemId: its own id field, else what its result names.
       const o = op as Record<string, unknown>;
       const opItem = [o.itemId, o.targetId, o.sourceId, o.id].find((v) => typeof v === 'string') ?? null;
-      const opStep = `op ${index} (${op.type})`;
+      const opStep = typeof o._step === 'string' ? `op ${index}: ${o._step}` : `op ${index} (${op.type})`;
       code += `
     // Operation ${index}: ${op.type}
     try {
@@ -5057,7 +5060,7 @@ throw new Error('Unknown diagram mode action: ${action}');
           'backgroundColor', 'generatorName', 'generatorParams', 'generatorRegion',
           'width', 'height', 'preset', 'keyframes', 'duration', 'loop',
           'maskPreset', 'maskType', 'maskOptions', 'effectType', 'effectParams',
-          'action', 'time', 'append'
+          'action', 'time', 'append', '_step'
         ]);
         for (const [k, v] of Object.entries(anyOp)) {
           if (!batchKeys.has(k) && v !== undefined && opProps[k] === undefined) {
@@ -5116,6 +5119,14 @@ return __created;
           .replace(/;\s*$/, '');
         return `
 const __mid = ${itemRef};
+if (app.itemRegistry && app.itemRegistry.getItem && !app.itemRegistry.getItem(__mid) && typeof app.getItemsByName === 'function') {
+  // A NAME HELD BY SEVERAL ITEMS is refused, not resolved: getItemById answers
+  // the first holder, so a patch by name would change whichever came first.
+  const __held = app.getItemsByName(__mid) || [];
+  if (__held.length > 1) {
+    return { success: false, itemId: __mid, error: __held.length + ' items are named ' + JSON.stringify(__mid) + ' (' + __held.map(function (h) { return (h && h.data && h.data.id) || '?'; }).join(', ') + '); pass one of their ids.' };
+  }
+}
 const __r = await ${single};
 if (__r && __r.success !== false) __r.modified = true;
 return __r;

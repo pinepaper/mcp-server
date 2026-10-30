@@ -2530,6 +2530,7 @@ export const AgentBatchOperationTypeSchema = z.enum([
   'animate', 'keyframe_animate', 'relation',
   'apply_mask', 'apply_effect',
   'play_timeline',
+  'ring', 'grid', 'orbit', 'stagger', 'patch',
 ]).describe('Type of batch operation');
 
 /**
@@ -2588,6 +2589,21 @@ export const AgentBatchOperationSchema = z.object({
   // Play timeline fields
   action: z.string().optional().describe('Timeline action for play_timeline (play, stop, seek)'),
   time: z.number().optional().describe('Seek time for play_timeline'),
+  // Macros (batch-macros.ts): expanded into create / keyframe_animate / relation / modify ops.
+  count: z.number().int().min(1).max(200).optional().describe('ring: how many items (default 12)'),
+  center: PositionSchema.optional().describe('ring: the centre (default 400, 300)'),
+  radius: z.number().optional().describe('ring: the circle the items sit on; orbit: the orbit radius'),
+  startAngle: z.number().optional().describe('ring: degrees of the first item, clockwise from 3 o\'clock (default -90, the top)'),
+  orient: z.boolean().optional().describe('ring: turn each item to face out from the centre'),
+  period: z.number().optional().describe('ring: seconds for the stagger to travel once round (stagger = period / count)'),
+  stagger: z.number().optional().describe('ring, grid, stagger: seconds between one item\'s keyframes and the next'),
+  rows: z.number().int().min(1).optional().describe('grid: rows'),
+  cols: z.number().int().min(1).optional().describe('grid: columns'),
+  origin: PositionSchema.optional().describe('grid: the first item (default 100, 100)'),
+  spacing: z.union([z.number(), z.tuple([z.number(), z.number()])]).optional().describe('grid: gap between centres, or [dx, dy] (default 50)'),
+  name: z.string().optional().describe('ring, grid: name prefix (items are name_0, name_1 … or name_row_col); orbit: the made item\'s name; patch: the item to change'),
+  speed: z.number().optional().describe('orbit: the orbits relation\'s speed (its own units; omit for the studio default)'),
+  phaseDegrees: z.number().optional().describe('orbit: starting angle in degrees'),
 }).passthrough().describe('Single batch operation');
 
 export type AgentBatchOperation = z.infer<typeof AgentBatchOperationSchema>;

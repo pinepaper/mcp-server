@@ -120,6 +120,9 @@ export const VOCABULARY_FIELD_NAMES = Object.keys(VOCABULARY_FIELDS);
  */
 const BATCH_OP_VOCABULARY_FIELDS: Record<string, readonly string[]> = {
   create: ['itemType'],
+  ring: ['itemType'],
+  grid: ['itemType'],
+  orbit: ['itemType'],
   relation: ['relationType'],
   apply_effect: ['effectType'],
   execute_generator: ['generatorName'],

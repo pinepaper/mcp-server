@@ -19,6 +19,7 @@ import {
 } from './craft-tools.js';
 import { CallToolResult, TextContent, ImageContent } from '@modelcontextprotocol/sdk/types.js';
 import { codeGenerator, generateQueryMutationsCode, SHEET_RUBRIC } from '../types/code-generator.js';
+import { expandBatchMacros, BatchMacroError } from './batch-macros.js';
 import {
   CreateItemInputSchema,
   ModifyItemInputSchema,
@@ -4490,8 +4491,16 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
           }
         }
 
+        let expanded: Array<Record<string, unknown>>;
+        try {
+          expanded = expandBatchMacros(input.operations as Array<Record<string, unknown>>);
+        } catch (e) {
+          if (e instanceof BatchMacroError) return errorResult(ErrorCodes.VALIDATION_ERROR, e.message, {}, { toolName: 'pinepaper_agent_batch_execute' });
+          throw e;
+        }
         const code = codeGenerator.generateAgentBatchExecute(input);
-        const description = `Batch executed ${input.operations.length} operations${input.atomic !== false ? ' (atomic)' : ''}`;
+        const description = `Batch executed ${input.operations.length} operations${input.atomic !== false ? ' (atomic)' : ''}`
+          + (expanded.length !== input.operations.length ? ` (${expanded.length} after expanding ring / grid / orbit / stagger)` : '');
 
         // Check for out-of-bounds items before execution
         let boundsWarning = '';
@@ -4500,7 +4509,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
           const cw = (sizeOp as any).width || 1920;
           const ch = (sizeOp as any).height || 1080;
           const oobItems: string[] = [];
-          input.operations.forEach((op: any, idx: number) => {
+          expanded.forEach((op: any, idx: number) => {
             if (op.type === 'create' && op.position) {
               const { x, y } = op.position;
               if (x < 0 || y < 0 || x > cw || y > ch) {

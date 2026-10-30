@@ -8934,8 +8934,8 @@ EXAMPLE — Animated sky scene with timed reveals:
             properties: {
               type: {
                 type: 'string',
-                enum: ['set_canvas_size', 'set_background', 'execute_generator', 'create', 'modify', 'delete', 'group', 'animate', 'keyframe_animate', 'relation', 'apply_mask', 'apply_effect', 'play_timeline'],
-                description: 'Operation type',
+                enum: ['set_canvas_size', 'set_background', 'execute_generator', 'create', 'modify', 'delete', 'group', 'animate', 'keyframe_animate', 'relation', 'apply_mask', 'apply_effect', 'play_timeline', 'ring', 'grid', 'orbit', 'stagger', 'patch'],
+                description: 'Operation type. ring / grid make many items in one op (each a create, so each fills a $N slot in order), orbit binds an orbits relation (making the orbiting item when itemType is given), stagger plays the same keyframes on itemIds one after another, patch changes the item with that name (refused when several items hold it).',
               },
               // Canvas setup
               width: { type: 'number', description: 'Canvas width for set_canvas_size (100-16384)' },
@@ -9022,6 +9022,21 @@ EXAMPLE — Animated sky scene with timed reveals:
                 description: 'For play_timeline: action',
               },
               time: { type: 'number', description: 'For play_timeline seek: time in seconds' },
+              // Macros
+              count: { type: 'integer', minimum: 1, maximum: 200, description: 'ring: how many items (default 12)' },
+              center: { type: 'object', properties: { x: { type: 'number' }, y: { type: 'number' } }, description: 'ring: the centre {x, y} (default 400, 300)' },
+              radius: { type: 'number', description: 'ring: the circle the items sit on (default 150). orbit: the orbit radius.' },
+              startAngle: { type: 'number', description: 'ring: degrees of the first item, clockwise from 3 o\'clock (default -90, the top)' },
+              orient: { type: 'boolean', description: 'ring: turn each item to face out from the centre' },
+              period: { type: 'number', description: 'ring: seconds for the stagger to travel once round (stagger = period / count)' },
+              stagger: { type: 'number', description: 'ring, grid, stagger: seconds between one item\'s keyframes and the next' },
+              rows: { type: 'integer', minimum: 1, description: 'grid: rows' },
+              cols: { type: 'integer', minimum: 1, description: 'grid: columns (rows × cols up to 200)' },
+              origin: { type: 'object', properties: { x: { type: 'number' }, y: { type: 'number' } }, description: 'grid: the first item {x, y} (default 100, 100)' },
+              spacing: { oneOf: [{ type: 'number' }, { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2 }], description: 'grid: gap between centres, or [dx, dy] (default 50)' },
+              name: { type: 'string', description: 'ring, grid: name prefix (items are name_0, name_1 … or name_row_col). orbit: the made item\'s name. patch: the item to change.' },
+              speed: { type: 'number', description: 'orbit: the orbits relation\'s speed (its own units; omit for the studio default)' },
+              phaseDegrees: { type: 'number', description: 'orbit: starting angle in degrees' },
             },
             required: ['type'],
             // Open, as the zod schema is (.passthrough()): a create op takes its

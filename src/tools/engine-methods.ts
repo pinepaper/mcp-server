@@ -282,6 +282,7 @@ export const OPTIONAL_ENGINE_METHODS: readonly string[] = [
   'getCutoutStylePresets',
   'getDPI',
   'getInterpolatedState',
+  'getItemsByName',
   'getRelight',
   'getUnitGridEnabled',
   'hashFrame',
