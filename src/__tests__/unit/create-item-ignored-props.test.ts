@@ -41,7 +41,7 @@ describe('create_item reports unread properties', () => {
   it('never flags a key the engine reads (generated allowlist is wired in)', () => {
     // Text-only keys the engine reads (it gates them on PointText) are the one
     // exception on other types; they are checked on a text item instead.
-    const TEXT_ONLY = ['fontWeight', 'fontStyle', 'leading', 'lineHeight', 'fit', 'textDirection', 'dir', 'tabularFigures', 'fontVariantNumeric', 'fontFeatures', 'strokePosition'];
+    const TEXT_ONLY = ['fontWeight', 'fontStyle', 'leading', 'lineHeight', 'textAlign', 'fit', 'textDirection', 'dir', 'tabularFigures', 'fontVariantNumeric', 'fontFeatures', 'strokePosition'];
     const all = [...ACCEPTED_CREATE_PARAMS, ...NORMALIZE_PARAM_READS].filter((k) => !['anchor', 'origin', 'position'].includes(k)); // validated / consumed separately
     const circleProps = Object.fromEntries(all.filter((k) => !TEXT_ONLY.includes(k)).map((k) => [k, 1]));
     expect(gen.generateCreateItem({ itemType: 'circle', position: { x: 0, y: 0 }, properties: circleProps })).not.toContain('ignoredProperties');

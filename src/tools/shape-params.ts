@@ -3,9 +3,9 @@
  *
  * What each registry-backed shape reads, and how a caller reaches it.
  *
- * Source: FxTool origin/main 64eff47af07766e1d3f5b66db9645685f17e8b76
+ * Source: FxTool origin/main 2762b9b8f11b84c37b28619cf9059631e3c78731
  *   js/PinePaper.js + 5 shape modules
- * sha256: 59fff535118d770b
+ * sha256: 30f26a319ddc7d5a
  *
  * A shape's `create` receives a `config`, never the caller's `params`.
  * PinePaper.js's registryConfig literal is the only bridge between the two, so
@@ -18,6 +18,7 @@
 export const ACCEPTED_CREATE_PARAMS: readonly string[] = Object.freeze([
   '_bulkCreate',
   '_ppColorRefused',
+  'alias',
   'alignment',
   'anchor',
   'angle',
@@ -106,6 +107,7 @@ export const ACCEPTED_CREATE_PARAMS: readonly string[] = Object.freeze([
   'tailDirection',
   'tailSize',
   'tension',
+  'textAlign',
   'textDirection',
   'through',
   'timeOffset',
@@ -124,6 +126,7 @@ export const ACCEPTED_CREATE_PARAMS: readonly string[] = Object.freeze([
  */
 export const NORMALIZE_PARAM_READS: readonly string[] = Object.freeze([
   '_ppColorRefused',
+  '_ppTransforms',
   'color',
   'delay',
   'fill',
@@ -150,6 +153,8 @@ export const NORMALIZE_PARAM_READS: readonly string[] = Object.freeze([
  * NORMALIZE_PARAM_READS (modify normalises too), the keys modify_item can act on.
  */
 export const MODIFY_CHANGE_READS: readonly string[] = Object.freeze([
+  'alias',
+  'anchor',
   'animationIntensity',
   'animationSpeed',
   'animationType',
@@ -183,6 +188,7 @@ export const MODIFY_CHANGE_READS: readonly string[] = Object.freeze([
   'keyframes',
   'label',
   'motionBlur',
+  'name',
   'opacity',
   'paintedMedium',
   'palette',
@@ -206,6 +212,7 @@ export const MODIFY_CHANGE_READS: readonly string[] = Object.freeze([
   'strokeColor',
   'strokePosition',
   'strokeWidth',
+  'textAlign',
   'textColor',
   'textDirection',
   'timeOffset',

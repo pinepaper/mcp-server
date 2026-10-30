@@ -9,12 +9,12 @@
  * across five lists is exactly the shape that drifts, and every enum this repo
  * hand-maintained against FxTool drifted silently.
  *
- * Source: FxTool origin/main 64eff47af07766e1d3f5b66db9645685f17e8b76
+ * Source: FxTool origin/main 2762b9b8f11b84c37b28619cf9059631e3c78731
  *   js/vendor/stick/figure-rigged.js
- * sha256: bb2faa1ff5f0f83a
+ * sha256: cf8f8bfc9b37b0aa
  */
 
-/** 9 names — how a figure walks — gait. */
+/** 10 names — how a figure walks — gait. */
 export const STICK_GAITS: readonly string[] = Object.freeze([
   'walk',
   'stroll',
@@ -22,6 +22,7 @@ export const STICK_GAITS: readonly string[] = Object.freeze([
   'sneak',
   'run',
   'trudge',
+  'carry',
   'strut',
   'skip',
   'tiptoe',
@@ -97,10 +98,13 @@ export const STICK_EXPRESSIONS: readonly string[] = Object.freeze([
   'panicked',
 ]);
 
-/** 4 names — something held in hand — prop. */
+/** 7 names — something held in hand — prop. */
 export const STICK_PROPS: readonly string[] = Object.freeze([
   'tray',
   'box',
   'cup',
+  'parcel',
+  'package',
+  'bag',
   'sign',
 ]);
