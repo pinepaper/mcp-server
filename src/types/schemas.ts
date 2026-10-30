@@ -369,7 +369,7 @@ export type SimpleAnimationType = z.infer<typeof SimpleAnimationTypeSchema>;
 // Keyframe schema
 export const KeyframeSchema = z.object({
   time: z.number().describe('Time in seconds for this keyframe'),
-  properties: z.record(z.unknown()).describe('Property values at this keyframe'),
+  properties: z.record(z.string(), z.unknown()).describe('Property values at this keyframe'),
   easing: KeyframeEasingSchema.optional().default('linear'),
   interpolation: z.literal('hold').optional().describe("'hold': this key holds ITS OWN value until the next key, then jumps (FxTool D11). Refused on a studio without hold keys."),
   hold: z.boolean().optional().describe("Same as interpolation: 'hold'."),
@@ -734,7 +734,7 @@ export const EquationPathInputSchema = z.object({
   }).optional().describe('Numerically integrate an ODE instead of plotting a closed-form expression, and return the SOLUTION rather than drawing it. The trajectory comes back as data, so a caller can inspect it, feed it to a path, or drive keyframes with it.'),
   x:     z.number().optional().describe('Canvas origin x (default: canvas center)'),
   y:     z.number().optional().describe('Canvas origin y (default: canvas center)'),
-  style: z.record(z.unknown()).optional().describe('Path style forwarded to create (strokeColor, strokeWidth, fillColor, …)'),
+  style: z.record(z.string(), z.unknown()).optional().describe('Path style forwarded to create (strokeColor, strokeWidth, fillColor, …)'),
 }).passthrough();
 export type EquationPathInput = z.infer<typeof EquationPathInputSchema>;
 
@@ -793,7 +793,7 @@ export const OnEventFireAfterParamsSchema = z.object({
 export const OnEventAddRelationParamsSchema = z.object({
   type:   z.string().describe('Relation type to add (e.g. orbits, moves_along_path, driven_by)'),
   target: z.string().nullish().describe('Target item id for the added relation (null for self-relations)'),
-  params: z.record(z.unknown()).optional().default({}).describe('Params for the added relation'),
+  params: z.record(z.string(), z.unknown()).optional().default({}).describe('Params for the added relation'),
 });
 
 // on_event_remove_relation (event→item): tear down a relation added earlier.
@@ -1298,7 +1298,7 @@ export type GetCanvasOntologyInput = z.infer<typeof GetCanvasOntologyInputSchema
 // Add Filter
 export const AddFilterInputSchema = z.object({
   filterType: FilterTypeSchema,
-  params: z.record(z.unknown()).optional().default({}),
+  params: z.record(z.string(), z.unknown()).optional().default({}),
 });
 
 // Create Item
@@ -1350,7 +1350,7 @@ export const CounterSchema = z.union([
 export const CreateItemInputSchema = z.object({
   itemType: ItemTypeSchema,
   position: PositionSchema.optional().default({ x: 400, y: 300 }),
-  properties: z.record(z.unknown()).optional().default({}),
+  properties: z.record(z.string(), z.unknown()).optional().default({}),
   animationType: z.string().optional().describe('Inline animation to apply on creation. Loop presets (bounce, breathe, fade, glow, jelly, path, pulse, rotate, scrollDown, scrollLeft, scrollRight, scrollUp, shake, slideLeftRight, slideUpDown, swing, typewriter, wobble) or "keyframe" with keyframes array. Equivalent to a follow-up pinepaper_animate / pinepaper_keyframe_animate call.'),
   animationSpeed: z.number().optional().describe('Speed multiplier for loop animations (default: 1.0). Ignored when animationType is "keyframe".'),
   animationIntensity: z.number().optional().describe('Loop animation amplitude (0.1 = ±10%, default 0.15). Drives pulse/wobble/bounce/breathe amplitude; honored by SVG/SMIL/widget export.'),
@@ -1409,7 +1409,7 @@ export type CreateDiagonalStripesInput = z.infer<typeof CreateDiagonalStripesInp
 // Modify Item
 export const ModifyItemInputSchema = z.object({
   itemId: z.string().describe('Registry ID of the item'),
-  properties: z.record(z.unknown()).describe('Properties to update'),
+  properties: z.record(z.string(), z.unknown()).describe('Properties to update'),
   data: ItemDataFlagsSchema.optional(),
   atTime: z.number().min(0).optional().describe('AUTO-KEY: write these properties as keyframes at this time (seconds) instead of a static edit — eased from the previous value, other keys kept.'),
   easing: z.string().optional().describe('atTime: easing of the segment arriving at the new key (default linear).'),
@@ -1428,10 +1428,10 @@ export const AddRelationInputSchema = z.object({
   sourceId: z.string().describe('Registry ID of the source item'),
   targetId: z.string().nullish().describe('Registry ID of the target item; null/omitted for self-relations (animates, moves_along_path, construction_reveal, time_expression)'),
   relationType: RelationTypeSchema.optional().describe('The relation to create. Required unless presetId is given.'),
-  params: z.record(z.unknown()).optional().default({}),
+  params: z.record(z.string(), z.unknown()).optional().default({}),
   presetId: z.string().optional()
     .describe("Apply a community relation PRESET instead of naming a type and params yourself — a tuned motion someone already got right, with its symbols exposed as knobs. List them with pinepaper_query_capabilities { action: 'catalogue', catalogue: 'relation_presets' }. The preset decides the relationType, so relationType is not needed and is ignored if sent."),
-  presetValues: z.record(z.number()).optional()
+  presetValues: z.record(z.string(), z.number()).optional()
     .describe('presetId: symbol → number. Any symbol you omit takes the midpoint of its declared range, so a preset applies sensibly with no values at all.'),
 })
   .refine((v) => !!v.relationType || !!v.presetId, { message: 'relationType is required unless presetId is given', path: ['relationType'] })
@@ -1635,7 +1635,7 @@ export type GeneratorRegion = z.infer<typeof GeneratorRegionSchema>;
 
 export const ExecuteGeneratorInputSchema = z.object({
   generatorName: GeneratorNameSchema,
-  params: z.record(z.unknown()).optional().default({}),
+  params: z.record(z.string(), z.unknown()).optional().default({}),
   region: GeneratorRegionSchema.optional(),
 });
 
@@ -1643,7 +1643,7 @@ export const ExecuteGeneratorInputSchema = z.object({
 export const ApplyEffectInputSchema = z.object({
   itemId: z.string().describe('Registry ID of the item'),
   effectType: EffectTypeSchema,
-  params: z.record(z.unknown()).optional().default({}),
+  params: z.record(z.string(), z.unknown()).optional().default({}),
 });
 
 // Get Items
@@ -1729,7 +1729,7 @@ export const ExportTrainingDataInputSchema = z.object({
 // Single item specification for batch create
 export const BatchCreateItemSchema = z.object({
   type: ItemTypeSchema.describe('Type of item to create'),
-  params: z.record(z.unknown()).describe('Item-specific parameters (position, properties, etc.)'),
+  params: z.record(z.string(), z.unknown()).describe('Item-specific parameters (position, properties, etc.)'),
 });
 
 export type BatchCreateItem = z.infer<typeof BatchCreateItemSchema>;
@@ -1744,7 +1744,7 @@ export type BatchCreateInput = z.infer<typeof BatchCreateInputSchema>;
 // Single modification specification for batch modify
 export const BatchModifyItemSchema = z.object({
   itemId: z.string().describe('Registry ID of the item to modify'),
-  params: z.record(z.unknown()).describe('Properties to update on this item'),
+  params: z.record(z.string(), z.unknown()).describe('Properties to update on this item'),
 });
 
 export type BatchModifyItem = z.infer<typeof BatchModifyItemSchema>;
@@ -1913,7 +1913,7 @@ export const SceneItemSchema = z.object({
   /** Position on canvas */
   position: PositionSchema.optional(),
   /** Item-specific properties */
-  properties: z.record(z.unknown()).optional().describe('Type-specific properties (color, radius, content, etc.)'),
+  properties: z.record(z.string(), z.unknown()).optional().describe('Type-specific properties (color, radius, content, etc.)'),
 });
 
 export const SceneRelationSchema = z.object({
@@ -1928,7 +1928,7 @@ export const SceneRelationSchema = z.object({
   // than the documentation it shares. The catalogue is the contract.
   type: RelationTypeSchema,
   /** Relation-specific parameters */
-  params: z.record(z.unknown()).optional().describe('Relation parameters (radius, speed, distance, etc.)'),
+  params: z.record(z.string(), z.unknown()).optional().describe('Relation parameters (radius, speed, distance, etc.)'),
 });
 
 export const SceneAnimationSchema = z.object({
@@ -1941,7 +1941,7 @@ export const SceneAnimationSchema = z.object({
   speed: z.number().optional(),
   startTime: z.number().min(0).optional().describe('Seconds before this animation begins. These are ambient LOOPS, so this staggers when each one starts rather than scheduling a one-shot — which is what makes a scene read as choreographed instead of everything moving at once from frame zero.'),
   /** Animation parameters */
-  params: z.record(z.unknown()).optional().describe('Animation-specific parameters'),
+  params: z.record(z.string(), z.unknown()).optional().describe('Animation-specific parameters'),
 });
 
 export const CreateSceneInputSchema = z.object({
@@ -2272,7 +2272,7 @@ export const UpdateConnectorInputSchema = z.object({
     tailStyle: ArrowHeadStyleSchema.optional(),
     routing: ConnectorRoutingSchema.optional(),
     lineStyle: ConnectorLineStyleSchema.optional(),
-  }).strict(`a connector's style takes ${CONNECTOR_STYLE_KEYS.join(', ')} (strokeColor, strokeWidth and dashArray are accepted for lineColor, lineWidth and lineStyle)`)).optional(),
+  }, { error: (iss) => (iss.code === 'unrecognized_keys' ? `a connector's style takes ${CONNECTOR_STYLE_KEYS.join(', ')} (strokeColor, strokeWidth and dashArray are accepted for lineColor, lineWidth and lineStyle)` : undefined) }).strict()).optional(),
   label: z.string().optional().describe('Update connector label'),
   labelPosition: z.number().min(0).max(1).optional().describe('Label position along path (0-1)'),
 });
@@ -2541,7 +2541,7 @@ export const AgentBatchOperationSchema = z.object({
   itemType: z.string().optional().describe('Item type for create operations'),
   // PositionSchema, as create_item takes: [x, y] was refused here (1.6.19 gate).
   position: PositionSchema.optional().describe('Position for create operations: {x, y} or [x, y]'),
-  properties: z.record(z.unknown()).optional().describe('Properties for create/modify operations'),
+  properties: z.record(z.string(), z.unknown()).optional().describe('Properties for create/modify operations'),
   screenSpace: ScreenSpaceSchema.optional().describe('create: keep the item fixed in the frame under camera moves (HUD).'),
   stepTiming: StepTimingSchema.optional().describe("create: step this item's animation (N, {every, baseFps?} or {fps})."),
   counter: CounterSchema.optional().describe('create (text): count on the scene clock.'),
@@ -2552,18 +2552,18 @@ export const AgentBatchOperationSchema = z.object({
   groupName: z.string().optional().describe('Optional name for the group created by a "group" operation (e.g. "car").'),
   // Animate operation fields
   animationType: z.string().optional().describe('Animation type for animate operations'),
-  animationOptions: z.record(z.unknown()).optional().describe('Animation options'),
+  animationOptions: z.record(z.string(), z.unknown()).optional().describe('Animation options'),
   // Relation operation fields
   sourceId: z.string().optional().describe('Source item ID for relations'),
   targetId: z.string().optional().describe('Target item ID for relations'),
   relationType: z.string().optional().describe('Relation type'),
-  relationOptions: z.record(z.unknown()).optional().describe('Relation options'),
+  relationOptions: z.record(z.string(), z.unknown()).optional().describe('Relation options'),
   // Set background fields
   backgroundColor: z.string().optional().describe('Background color for set_background'),
   color: z.string().optional().describe('Alias for backgroundColor in set_background, or color property'),
   // Execute generator fields
   generatorName: z.string().optional().describe('Generator name for execute_generator'),
-  generatorParams: z.record(z.unknown()).optional().describe('Generator parameters'),
+  generatorParams: z.record(z.string(), z.unknown()).optional().describe('Generator parameters'),
   generatorRegion: GeneratorRegionSchema.optional().describe('Optional sub-region {x, y, width, height} for execute_generator'),
   // Set canvas size fields
   width: z.number().min(100).max(16384).optional().describe('Canvas width for set_canvas_size (100-16384)'),
@@ -2572,7 +2572,7 @@ export const AgentBatchOperationSchema = z.object({
   // Keyframe animate fields
   keyframes: z.array(z.object({
     time: z.number(),
-    properties: z.record(z.unknown()),
+    properties: z.record(z.string(), z.unknown()),
     easing: z.string().optional(),
   })).optional().describe('Keyframes for keyframe_animate [{time, properties, easing}]'),
   duration: z.number().optional().describe('Duration in seconds for keyframe_animate or play_timeline'),
@@ -2581,10 +2581,10 @@ export const AgentBatchOperationSchema = z.object({
   // Apply mask fields
   maskPreset: z.string().optional().describe('Mask preset for apply_mask (wipeLeft, wipeRight, wipeUp, wipeDown, iris, irisOut, star, heart, curtainHorizontal, curtainVertical, cinematic, diagonalWipe, revealUp, revealDown)'),
   maskType: z.string().optional().describe('Mask shape for apply_mask (rectangle, circle, ellipse, star, triangle, hexagon, heart, rounded)'),
-  maskOptions: z.record(z.unknown()).optional().describe('Mask options'),
+  maskOptions: z.record(z.string(), z.unknown()).optional().describe('Mask options'),
   // Apply effect fields
   effectType: z.string().optional().describe('Effect type for apply_effect (sparkle, blast)'),
-  effectParams: z.record(z.unknown()).optional().describe('Effect parameters'),
+  effectParams: z.record(z.string(), z.unknown()).optional().describe('Effect parameters'),
   // Play timeline fields
   action: z.string().optional().describe('Timeline action for play_timeline (play, stop, seek)'),
   time: z.number().optional().describe('Seek time for play_timeline'),
@@ -3539,10 +3539,10 @@ export const ValidateInputSchema = z.object({
     from: z.string().optional().describe('Source item id (addRelation)'),
     to: z.string().optional().describe('Target item id (addRelation)'),
     relation: z.string().optional().describe('Relation type (addRelation)'),
-    params: z.record(z.unknown()).optional().describe('Relation params (addRelation)'),
+    params: z.record(z.string(), z.unknown()).optional().describe('Relation params (addRelation)'),
     type: z.string().optional().describe('Item type (create)'),
     id: z.string().optional().describe('Item id (modify)'),
-    changes: z.record(z.unknown()).optional().describe('Property changes (modify)'),
+    changes: z.record(z.string(), z.unknown()).optional().describe('Property changes (modify)'),
   }).optional().describe("Required when mode='op': the proposed mutation to validate"),
 }).describe('Semantic validation input');
 
@@ -3705,7 +3705,7 @@ export const PatternInputSchema = z.object({
   id: z.string().optional().describe('the pattern\'s name; required except for list'),
   kind: z.enum(['phase_wave', 'stagger']).optional().describe('create: phase_wave (members wave, each a phase later) or stagger (each member\'s animationDelay, derived)'),
   members: PatternMembersSchema.optional().describe('create/modify: which items, by ids, names (globs) or a tag'),
-  params: z.record(z.unknown()).optional().describe("phase_wave: { property: 'y'|'x'|'rotation'|'opacity', amplitude, period (s per cycle), wavelength (members per cycle), phase } · stagger: { step (s), start (s), order: index|reverse|center|edges }"),
+  params: z.record(z.string(), z.unknown()).optional().describe("phase_wave: { property: 'y'|'x'|'rotation'|'opacity', amplitude, period (s per cycle), wavelength (members per cycle), phase } · stagger: { step (s), start (s), order: index|reverse|center|edges }"),
   window: z.object({ from: z.number().optional(), to: z.number().optional() }).nullable().optional().describe('phase_wave: when it plays, scene seconds; time counts from `from`'),
 });
 export type PatternInput = z.infer<typeof PatternInputSchema>;
@@ -3876,7 +3876,7 @@ export const BrandKitInputSchema = z.object({
   url: z.string().url().optional().describe("from_url: the product's site (http/https). Read in an isolated browser context: the studio is not navigated."),
   screenshots: z.number().int().min(1).max(6).optional().describe('from_url: screenshots taken down the page (default 3).'),
   // Spelled out rather than a loose record. A first version typed this as
-  // `z.record(...)` described as a "role → colour map", which is NOT the shape
+  // `z.record(z.string(), ...)` described as a "role → colour map", which is NOT the shape
   // the engine takes — every call was rejected with "name is required;
   // colors.primary is required". A permissive schema over a strict engine just
   // moves the failure to runtime and teaches the model the wrong shape.
@@ -4073,13 +4073,13 @@ export const QueryMutationsInputSchema = z.object({
 // then agent_export, so every per-tool check applies to every row.
 export const RenderBatchRowSchema = z.object({
   id: z.string().min(1).max(64).optional().describe('A name for this row, echoed in its result.'),
-  changes: z.record(z.string(), z.record(z.unknown())).optional().describe('itemId → properties, applied with modify_item (content, fillColor, fit, …).'),
-  template: z.object({ templateId: z.string().min(1), params: z.record(z.unknown()) }).optional().describe('Apply a template\'s params (template_params apply).'),
+  changes: z.record(z.string(), z.record(z.string(), z.unknown())).optional().describe('itemId → properties, applied with modify_item (content, fillColor, fit, …).'),
+  template: z.object({ templateId: z.string().min(1), params: z.record(z.string(), z.unknown()) }).optional().describe('Apply a template\'s params (template_params apply).'),
 }).refine((r) => r.changes !== undefined || r.template !== undefined, { message: 'a row needs changes and / or template.' });
 
 export const RenderBatchInputSchema = z.object({
   rows: z.array(RenderBatchRowSchema).min(1).max(100).describe('One entry per creative (max 100).'),
-  export: z.record(z.unknown()).describe('agent_export options used for every row (format, platform, quality, duration, ad, …).'),
+  export: z.record(z.string(), z.unknown()).describe('agent_export options used for every row (format, platform, quality, duration, ad, …).'),
   estimateOnly: z.boolean().optional().describe('Validate the rows and return the plan without rendering.'),
 });
 export type RenderBatchInput = z.infer<typeof RenderBatchInputSchema>;
@@ -4104,10 +4104,10 @@ export const ImageFilterInputSchema = z.object({
   action: z.enum(['apply', 'chain', 'analyze_palette', 'recolor_palette']),
   itemId: z.string(),
   filterName: z.string().optional(),
-  params: z.record(z.unknown()).optional(),
+  params: z.record(z.string(), z.unknown()).optional(),
   filters: z.array(z.object({
     name: z.string(),
-    params: z.record(z.unknown()).optional(),
+    params: z.record(z.string(), z.unknown()).optional(),
   })).optional(),
   // analyze_palette / recolor_palette (GPU path)
   maxSwatches: z.number().int().positive().max(32).optional().describe('analyze_palette: swatch count cap (default 8).'),
@@ -4135,7 +4135,7 @@ export const CutoutStyleInputSchema = z.object({
   action: z.enum(['apply', 'list']),
   itemId: z.string().optional(),
   preset: z.string().optional(),
-  options: z.record(z.unknown()).optional(),
+  options: z.record(z.string(), z.unknown()).optional(),
 });
 export type CutoutStyleInput = z.infer<typeof CutoutStyleInputSchema>;
 
@@ -4160,7 +4160,7 @@ export const BackgroundInputSchema = z.object({
   color: z.string().optional(),
   pattern: z.string().optional(),
   generator: z.string().optional(),
-  generatorParams: z.record(z.unknown()).optional(),
+  generatorParams: z.record(z.string(), z.unknown()).optional(),
 });
 export type BackgroundInput = z.infer<typeof BackgroundInputSchema>;
 
@@ -4220,7 +4220,7 @@ export type HandDrawnInput = z.infer<typeof HandDrawnInputSchema>;
 // joins them with draws_figure; the catalogue is the engine's (app.listFigures).
 export const PenFigureInputSchema = z.object({
   action: z.enum(['create', 'list']).optional().describe("'create' (default) draws a figure; 'list' returns the catalogue: id, title and kind."),
-  figure: z.union([z.string(), z.record(z.unknown())]).optional().describe("create: a catalogue id from action 'list' (e.g. 'lorenz', 'lissajous', 'hilbert', 'harmonograph'), or an inline figure spec object."),
+  figure: z.union([z.string(), z.record(z.string(), z.unknown())]).optional().describe("create: a catalogue id from action 'list' (e.g. 'lorenz', 'lissajous', 'hilbert', 'harmonograph'), or an inline figure spec object."),
   box: z.object({ x: z.number(), y: z.number(), width: z.number().positive(), height: z.number().positive() }).strict().optional().describe('Where to draw, in canvas px (default: the whole canvas). The figure is fitted by one uniform scale.'),
   margin: z.number().min(0).max(0.45).optional().describe('Fraction of the box left clear (default 0.06).'),
   duration: z.number().positive().optional().describe('Seconds the pen takes for the whole figure, pen-up travel included (default 6).'),
@@ -4254,7 +4254,7 @@ export const SpriteSheetInputSchema = z.object({
     fps: z.number().optional(),
     name: z.string().optional(),
   }).optional(),
-  animations: z.record(z.object({
+  animations: z.record(z.string(), z.object({
     frames: z.array(z.string()),
     fps: z.number().optional(),
     loop: z.boolean().optional(),
@@ -4286,7 +4286,7 @@ export const InteractionInputSchema = z.object({
     'setState', 'incrementScore', 'playTimeline', 'pauseTimeline',
     'seekTimeline', 'showFeedback', 'complete',
   ]).optional(),
-  params: z.record(z.unknown()).optional(),
+  params: z.record(z.string(), z.unknown()).optional(),
 });
 export type InteractionInput = z.infer<typeof InteractionInputSchema>;
 
@@ -4321,8 +4321,8 @@ export const CreateChartInputSchema = z.object({
   action: z.enum(['create', 'update', 'reconfigure', 'remove']),
   chartType: z.enum(['bar', 'line', 'scatter', 'area']).optional(),
   chartId: z.string().optional(),
-  data: z.array(z.record(z.unknown())).optional(),
-  options: z.record(z.unknown()).optional(),
+  data: z.array(z.record(z.string(), z.unknown())).optional(),
+  options: z.record(z.string(), z.unknown()).optional(),
 });
 export type CreateChartInput = z.infer<typeof CreateChartInputSchema>;
 
@@ -4358,7 +4358,7 @@ export const PhysicsInputSchema = z.object({
   width: z.number().optional(),
   targetItemId: z.string().optional(),
   jointType: z.enum(['revolute', 'distance', 'weld', 'prismatic']).optional(),
-  jointParams: z.record(z.unknown()).optional(),
+  jointParams: z.record(z.string(), z.unknown()).optional(),
 });
 export type PhysicsInput = z.infer<typeof PhysicsInputSchema>;
 

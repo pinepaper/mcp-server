@@ -16,6 +16,7 @@
 import { describe, it, expect } from 'bun:test';
 import { PinePaperCodeGenerator } from '../../types/code-generator.js';
 import { GetCanvasOntologyInputSchema } from '../../types/schemas.js';
+import { maxOf } from '../zod-walk';
 
 const gen = new PinePaperCodeGenerator();
 
@@ -97,10 +98,8 @@ describe('scene reads report their own truncation', () => {
     // Unwrap .optional().default() rather than reaching for a fixed depth: the
     // checks live on the innermost ZodNumber, and a hard-coded path breaks
     // silently when a modifier is added to the field.
-    let node: any = shape.maxItems;
-    while (node?._def && !node._def.checks) node = node._def.innerType;
-    const max = (node?._def?.checks ?? []).find((c: any) => c.kind === 'max');
-    expect(max, 'maxItems has no upper bound to compare against').toBeTruthy();
-    expect(String(max.value)).toBe(advertised);
+    const max = maxOf(shape.maxItems);
+    expect(max, 'maxItems has no upper bound to compare against').not.toBeNull();
+    expect(String(max)).toBe(advertised);
   });
 });

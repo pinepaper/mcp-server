@@ -28,6 +28,7 @@ import { join } from 'node:path';
 import { PINEPAPER_TOOLS } from '../../tools/definitions.js';
 import { DesignMediumInputSchema, ComposeInputSchema } from '../../types/schemas.js';
 import { DESIGN_MEDIA, DESIGN_MEDIA_APPLY } from '../../tools/engine-lists.js';
+import { descriptionOf } from '../zod-walk';
 
 const fixture = (name: string) =>
   readFileSync(join(import.meta.dir, '..', 'fixtures', name), 'utf-8')
@@ -69,9 +70,7 @@ describe('design media parity with the engine', () => {
     for (let i = 0; i < 8 && node && !node.shape; i++) node = node._def?.schema ?? node._def?.innerType;
     expect(node?.shape?.medium, 'could not reach DesignMediumInputSchema.shape.medium').toBeTruthy();
 
-    let field: any = node.shape.medium;
-    let zod = '';
-    for (let i = 0; i < 6 && field && !zod; i++) { zod = field._def?.description ?? ''; field = field._def?.innerType; }
+    const zod = descriptionOf(node.shape.medium);
     expect(zod, 'the Zod medium field carries no description to compare').toBeTruthy();
 
     // They are separate copies — schemas.ts feeds anyone reading the source,

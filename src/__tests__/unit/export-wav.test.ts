@@ -22,6 +22,7 @@ import { PinePaperCodeGenerator } from '../../types/code-generator.js';
 import { AgentExportInputSchema } from '../../types/schemas.js';
 import { PINEPAPER_TOOLS } from '../../tools/definitions.js';
 import { ALWAYS_SAVE_FORMATS, getFileExtension } from '../../tools/handlers.js';
+import { enumValues } from '../zod-walk';
 
 const gen = new PinePaperCodeGenerator();
 const emit = (input: Record<string, unknown>) => gen.generateAgentExport(input as any);
@@ -164,10 +165,8 @@ describe('wav rejects the knobs that do not apply to it', () => {
     // Walk .optional().default() rather than reaching a fixed depth: the
     // options live on the innermost union, and a hard-coded path breaks
     // silently the moment a modifier is added to the field.
-    let field: any = node.shape.format;
-    for (let i = 0; i < 8 && field && !field._def?.options; i++) field = field._def?.innerType;
-    expect(field?._def?.options, 'could not reach the format union options').toBeTruthy();
-    const zodVals = field._def.options.flatMap((o: any) => o._def.values ?? [o._def.value]);
+    const zodVals = enumValues(node.shape.format) as string[];
+    expect(zodVals.length, 'could not reach the format union options').toBeGreaterThan(0);
     expect([...served].sort()).toEqual([...zodVals].filter((v: string) => v !== 'auto').sort());
   });
 });

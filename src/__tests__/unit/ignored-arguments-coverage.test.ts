@@ -21,17 +21,14 @@ import { handlerBodies, LOCAL_SCHEMAS } from './_handler-bodies.js';
 import {
   handleToolCall, HIDDEN_ARGUMENTS, PASSTHROUGH_ARGUMENT_TOOLS, IGNORED_ARGUMENTS_META_KEY,
 } from '../../tools/handlers.js';
+import { unwrap as walkUnwrap, isPassthrough } from '../zod-walk';
 
 /** Dispatched by the server (index.ts) before handleToolCall, so never noted. */
 const NOT_THROUGH_HANDLE_TOOL_CALL = new Set(['pinepaper_set_toolkit']);
 
-function unwrap(t: z.ZodTypeAny | undefined): z.ZodTypeAny | undefined {
-  let cur = t;
-  for (;;) {
-    if (cur instanceof z.ZodEffects) cur = cur._def.schema;
-    else if (cur instanceof z.ZodOptional || cur instanceof z.ZodDefault) cur = cur._def.innerType;
-    else return cur;
-  }
+// zod 3 and 4 alike (../zod-walk).
+function unwrap(t: unknown): any {
+  return walkUnwrap(t);
 }
 
 function survey() {
@@ -49,7 +46,7 @@ function survey() {
     for (const m of body.matchAll(/(\w+Schema)\.(?:safeParse|parse)\(\s*args\b/g)) {
       const obj = unwrap(((schemas as Record<string, unknown>)[m[1]!] ?? LOCAL_SCHEMAS[m[1]!]) as z.ZodTypeAny | undefined);
       if (!(obj instanceof z.ZodObject)) { unreadable.push(`${tool.name}: ${m[1]}`); continue; }
-      if (obj._def.unknownKeys === 'passthrough') passthrough.add(tool.name);
+      if (isPassthrough(obj)) passthrough.add(tool.name);
       for (const k of Object.keys(obj.shape)) accepted.add(k);
     }
     for (const m of body.matchAll(/\bargs\??\.(\w+)/g)) accepted.add(m[1]!);

@@ -1182,20 +1182,23 @@ export function errorResult(
   };
 }
 
-function handleValidationError(error: ZodError, i18n?: I18nManager): CallToolResult {
+function handleValidationError(error: ZodError, i18n?: I18nManager, args?: unknown): CallToolResult {
   const message = i18n
     ? i18n.getError('validationError', { message: 'Invalid input parameters' })
     : 'Invalid input parameters';
 
-  const details = error.errors.map((e) => {
+  const details = error.issues.map((e) => {
     const path = e.path.join('.');
     const detail: {
       path: string;
       message: string;
       vocabulary?: ReturnType<typeof vocabularyHintForPath>;
     } = { path, message: e.message };
-    if (e.code === 'invalid_enum_value') {
-      const received = (e as unknown as { received?: unknown }).received;
+    // zod 4 names a value outside an enum `invalid_value` and no longer carries what was sent; it is read back from the
+    // call's own arguments along the issue's path, so the vocabulary hint ("did you mean …") still has a word to match.
+    if (e.code === 'invalid_value') {
+      let received: unknown = args;
+      for (const k of e.path) received = received && typeof received === 'object' ? (received as Record<PropertyKey, unknown>)[k as PropertyKey] : undefined;
       const hint = vocabularyHintForPath(path, received);
       if (hint) detail.vocabulary = hint;
     }
@@ -2121,7 +2124,8 @@ export function ignoredArgumentKeys(toolName: string, args: Record<string, unkno
   if (!args || typeof args !== 'object' || PASSTHROUGH_ARGUMENT_TOOLS.has(toolName) || published === null) return [];
   const known = new Set<string>([...(published ?? []), ...(HIDDEN_ARGUMENTS[toolName] ?? [])]);
   let schema = IGNORED_ARGUMENT_SCHEMAS[toolName];
-  while (schema instanceof z.ZodEffects) schema = schema._def.schema;
+  // zod 4: a preprocess or transform is a ZodPipe (preprocess: transform → object; .transform: object → transform).
+  while (schema instanceof z.ZodPipe) schema = (schema._def.in instanceof z.ZodObject || !(schema._def.out instanceof z.ZodObject) ? schema._def.in : schema._def.out) as typeof schema;
   if (schema instanceof z.ZodObject) Object.keys(schema.shape).forEach((k) => known.add(k));
   else if (published === undefined) return []; // neither a schema nor a published contract to judge by
   return Object.keys(args).filter((k) => !known.has(k));
@@ -5301,7 +5305,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
     }
   } catch (error) {
     if (error instanceof ZodError) {
-      return handleValidationError(error, i18n);
+      return handleValidationError(error, i18n, args);
     }
 
     // Try to capture canvas state for error context (if browser is connected)

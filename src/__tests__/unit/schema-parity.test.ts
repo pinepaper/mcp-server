@@ -28,6 +28,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import { PINEPAPER_TOOLS } from '../../tools/definitions.js';
 import * as schemas from '../../types/schemas.js';
+import { unwrap as walkUnwrap, isPassthrough } from '../zod-walk';
 
 const KNOWN_DRIFT: readonly string[] = [
   'pinepaper_agent_end_job: zod-only key takeScreenshot',
@@ -46,14 +47,9 @@ const KNOWN_DRIFT: readonly string[] = [
 
 type AnyZod = z.ZodTypeAny;
 
-function unwrap(t: AnyZod | undefined): AnyZod | undefined {
-  let cur = t;
-  for (;;) {
-    if (cur instanceof z.ZodOptional || cur instanceof z.ZodNullable) cur = cur._def.innerType;
-    else if (cur instanceof z.ZodDefault) cur = cur._def.innerType;
-    else if (cur instanceof z.ZodEffects) cur = cur._def.schema;
-    else return cur;
-  }
+// zod 3 and 4 alike (../zod-walk).
+function unwrap(t: unknown): any {
+  return walkUnwrap(t);
 }
 
 function pairs(): Map<string, string> {
@@ -76,7 +72,7 @@ function drift(): { found: string[]; checked: number } {
     checked++;
     const shape = obj.shape as Record<string, AnyZod>;
     const props = ((tool.inputSchema as { properties?: Record<string, { enum?: unknown[] }> }).properties) ?? {};
-    const passthrough = obj._def.unknownKeys === 'passthrough';
+    const passthrough = isPassthrough(obj);
 
     for (const k of Object.keys(props)) {
       if (!(k in shape) && !passthrough) found.push(`${tool.name}: stripped key ${k}`);
