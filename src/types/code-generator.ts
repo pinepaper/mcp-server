@@ -224,7 +224,6 @@ import {
   EASING_DESCRIPTIONS,
   MaskTypeSchema,
   MaskPresetSchema,
-  StyledSceneInputSchema,
   StyledSceneInput,
 } from './schemas.js';
 import { OntologyCompiler } from '../ontology/ontology-compiler.js';

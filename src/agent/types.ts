@@ -401,7 +401,7 @@ export const BatchOperationTypeSchema = z.enum([
 export const BatchOperationSchema = z.object({
   type: BatchOperationTypeSchema,
   itemType: z.string().optional().describe('Item type for create operations'),
-  params: z.record(z.unknown()).describe('Operation parameters'),
+  params: z.record(z.string(), z.unknown()).describe('Operation parameters'),
   sourceRef: z.string().optional().describe('Reference to source item ($0, $1, etc.)'),
   targetRef: z.string().optional().describe('Reference to target item'),
 }).describe('Single batch operation');

@@ -14,20 +14,14 @@ import * as schemas from '../../types/schemas.js';
 import { handlerBodies, LOCAL_SCHEMAS } from './_handler-bodies.js';
 import { nestedIgnoredPaths } from '../../tools/nested-ignored.js';
 import { handleToolCall, NESTED_HIDDEN, IGNORED_ARGUMENTS_META_KEY } from '../../tools/handlers.js';
+import { unwrap as walkUnwrap } from '../zod-walk';
 
 type Json = Record<string, unknown>;
 const isObj = (v: unknown): v is Json => !!v && typeof v === 'object' && !Array.isArray(v);
 
-function unwrap(t: z.ZodTypeAny | undefined): z.ZodTypeAny | undefined {
-  let cur = t;
-  for (let i = 0; i < 50 && cur; i++) {
-    if (cur instanceof z.ZodEffects) cur = cur._def.schema;
-    else if (cur instanceof z.ZodOptional || cur instanceof z.ZodNullable || cur instanceof z.ZodDefault) cur = cur._def.innerType;
-    else if (cur instanceof z.ZodLazy) cur = cur._def.getter();
-    else if (cur instanceof z.ZodPipeline) cur = cur._def.in;
-    else return cur;
-  }
-  return cur;
+// zod 3 and 4 alike (../zod-walk).
+function unwrap(t: unknown): any {
+  return walkUnwrap(t);
 }
 
 /** The zod object branches of a node (a union contributes each branch). */
@@ -40,7 +34,7 @@ function zodObjects(t: z.ZodTypeAny | undefined): z.ZodObject<z.ZodRawShape>[] {
 }
 function zodElement(t: z.ZodTypeAny | undefined): z.ZodTypeAny | undefined {
   const u = unwrap(t);
-  if (u instanceof z.ZodArray) return u._def.type;
+  if (u instanceof z.ZodArray) return u._def.element ?? u._def.type;
   if (u instanceof z.ZodUnion) for (const o of u._def.options) { const e = zodElement(o); if (e) return e; }
   return undefined;
 }

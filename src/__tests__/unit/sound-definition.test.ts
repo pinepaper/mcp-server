@@ -20,6 +20,7 @@ import { join } from 'node:path';
 import { PinePaperCodeGenerator } from '../../types/code-generator.js';
 import { SoundInputSchema } from '../../types/schemas.js';
 import { PINEPAPER_TOOLS } from '../../tools/definitions.js';
+import { enumValues, shapeOf } from '../zod-walk';
 
 const gen = new PinePaperCodeGenerator();
 
@@ -185,10 +186,9 @@ describe('the schema mirrors the engine rules rather than tightening them', () =
       ?.inputSchema as any)?.properties?.action?.enum as string[];
     // Walk the ZodEffects wrappers the refinements add — seven of them here,
     // so any fixed-depth lookup finds nothing and the test would skip itself.
-    let node: any = SoundInputSchema;
-    for (let i = 0; i < 16 && node && !node.shape; i++) node = node._def?.schema ?? node._def?.innerType;
-    expect(node?.shape?.action, 'could not reach the action enum').toBeTruthy();
-    expect([...served].sort()).toEqual([...node.shape.action._def.values].sort());
+    const shape: any = shapeOf(SoundInputSchema);
+    expect(shape?.action, 'could not reach the action enum').toBeTruthy();
+    expect([...served].sort()).toEqual([...(enumValues(shape.action) as string[])].sort());
     for (const a of ['define_instrument', 'define_percussion', 'define_sfx', 'render_soundtrack']) {
       expect(served).toContain(a);
     }

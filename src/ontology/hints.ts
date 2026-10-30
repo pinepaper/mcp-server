@@ -142,9 +142,10 @@ export interface BatchVocabularyViolation {
  * top-level vocabulary fields.
  */
 function shapeKeys(schema: unknown): string[] {
-  const def = (schema as { _def?: { shape?: () => Record<string, unknown> } })._def;
+  // zod 4 keeps an object's shape as an object (zod 3 had a function); both are read.
+  const def = (schema as { _def?: { shape?: Record<string, unknown> | (() => Record<string, unknown>) } })._def;
   if (!def?.shape) return [];
-  return Object.keys(def.shape());
+  return Object.keys(typeof def.shape === 'function' ? def.shape() : def.shape);
 }
 
 const baseVisualKeys = shapeKeys(BaseVisualPropertiesSchema);

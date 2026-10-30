@@ -38,7 +38,7 @@ const actionsOf = (schema: unknown): string[] => {
 
 /** Throws on a syntax error without running anything. */
 const parses = (code: string) => {
-  // eslint-disable-next-line no-new-func
+   
   new Function(`return (function(app, paper){ ${code} });`);
 };
 
