@@ -2537,6 +2537,26 @@ const MEDIA_PURGE = `
   }`;
 
 /**
+ * THE ITEM-ID COUNTER STARTS AGAIN AFTER A CLEAR (O1, mcp-server#29). Run after clearCanvas.
+ *
+ * The studio's clearCanvas keeps uploaded clips, so it calls itemRegistry.clear with preserveTypes, and that branch
+ * never resets nextId: a batch that made item_1 made item_2 when replayed after a clear. The rule: the next id is one
+ * past the highest item_N still registered, so 1 on an empty canvas and never an id a kept clip holds. (An undo of
+ * the clear restores the old items through rebuildFromCanvas, which moves nextId past them, as the studio's own
+ * full clear already relies on.) The previous batch's $N ids named items that are gone, so they are forgotten too.
+ */
+const ID_COUNTER_RESET = `
+  if (app.itemRegistry && typeof app.itemRegistry.nextId === 'number' && typeof app.itemRegistry.getAll === 'function') {
+    let __maxLive = 0;
+    app.itemRegistry.getAll().forEach(function (e) {
+      const m = /^item_(\\d+)$/.exec((e && (e.id || e.itemId || (e.item && e.item.data && (e.item.data.registryId || e.item.data.id)))) || '');
+      if (m) __maxLive = Math.max(__maxLive, Number(m[1]));
+    });
+    app.itemRegistry.nextId = __maxLive + 1;
+  }
+  if (typeof window !== 'undefined') window.__pinepaper_batch_item_ids = [];`;
+
+/**
  * Template for clearing all items from canvas
  */
 function generateClearCanvasCode(): string {
@@ -2559,6 +2579,7 @@ if (typeof app.clearCanvas === 'function') {
   if (app.itemRegistry) app.itemRegistry.clear();
   if (app.relationRegistry) app.relationRegistry.clear();
 }
+${ID_COUNTER_RESET}
 
 if (app.historyManager) app.historyManager.saveState();
 
@@ -4766,7 +4787,7 @@ throw new Error('Unknown diagram mode action: ${action}');
     if (app.patternGroup) app.patternGroup.removeChildren();
     if (app.itemRegistry) app.itemRegistry.clear();
     if (app.relationRegistry) app.relationRegistry.clear();
-  }
+  }${ID_COUNTER_RESET}
 `;
     }
 
@@ -5022,14 +5043,14 @@ throw new Error('Unknown diagram mode action: ${action}');
     if (app.patternGroup) app.patternGroup.removeChildren();
     if (app.itemRegistry) app.itemRegistry.clear();
     if (app.relationRegistry) app.relationRegistry.clear();
-  }
+  }${ID_COUNTER_RESET}
 `;
     } else {
       code += `
   // Clear items but preserve background
   if (app.textItemGroup) app.textItemGroup.removeChildren();
   if (app.itemRegistry) app.itemRegistry.clear();
-  if (app.relationRegistry) app.relationRegistry.clear();
+  if (app.relationRegistry) app.relationRegistry.clear();${ID_COUNTER_RESET}
 `;
     }
 
