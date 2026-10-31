@@ -51,7 +51,7 @@ describe('PP_VOCABULARY', () => {
   });
 
   it('all types with parentType reference valid types', () => {
-    for (const [key, typeDef] of Object.entries(PP_VOCABULARY.types)) {
+    for (const typeDef of Object.values(PP_VOCABULARY.types)) {
       if (typeDef.parentType) {
         expect(PP_VOCABULARY.types[typeDef.parentType]).toBeDefined();
       }
@@ -59,7 +59,7 @@ describe('PP_VOCABULARY', () => {
   });
 
   it('all edges with parentType reference valid edges', () => {
-    for (const [key, edgeDef] of Object.entries(PP_VOCABULARY.edges)) {
+    for (const edgeDef of Object.values(PP_VOCABULARY.edges)) {
       if (edgeDef.parentType) {
         expect(PP_VOCABULARY.edges[edgeDef.parentType]).toBeDefined();
       }
@@ -67,7 +67,7 @@ describe('PP_VOCABULARY', () => {
   });
 
   it('all generators with parentType reference valid generators', () => {
-    for (const [key, genDef] of Object.entries(PP_VOCABULARY.generators)) {
+    for (const genDef of Object.values(PP_VOCABULARY.generators)) {
       if (genDef.parentType) {
         expect(PP_VOCABULARY.generators[genDef.parentType]).toBeDefined();
       }
@@ -75,7 +75,7 @@ describe('PP_VOCABULARY', () => {
   });
 
   it('all edge mathFunctions reference valid math function keys', () => {
-    for (const [key, edgeDef] of Object.entries(PP_VOCABULARY.edges)) {
+    for (const edgeDef of Object.values(PP_VOCABULARY.edges)) {
       if (edgeDef.mathFunctions) {
         for (const fn of edgeDef.mathFunctions) {
           expect(PP_VOCABULARY.mathFunctions[fn]).toBeDefined();
@@ -85,7 +85,7 @@ describe('PP_VOCABULARY', () => {
   });
 
   it('all generator mathFunctions reference valid math function keys', () => {
-    for (const [key, genDef] of Object.entries(PP_VOCABULARY.generators)) {
+    for (const genDef of Object.values(PP_VOCABULARY.generators)) {
       if (genDef.mathFunctions) {
         for (const fn of genDef.mathFunctions) {
           expect(PP_VOCABULARY.mathFunctions[fn]).toBeDefined();
@@ -95,7 +95,7 @@ describe('PP_VOCABULARY', () => {
   });
 
   it('all pattern requiredEdges reference valid edge keys', () => {
-    for (const [key, patternDef] of Object.entries(PP_VOCABULARY.patterns)) {
+    for (const patternDef of Object.values(PP_VOCABULARY.patterns)) {
       if (patternDef.requiredEdges) {
         for (const edge of patternDef.requiredEdges) {
           expect(PP_VOCABULARY.edges[edge]).toBeDefined();
@@ -105,7 +105,7 @@ describe('PP_VOCABULARY', () => {
   });
 
   it('all pattern nodeTypes reference valid type keys', () => {
-    for (const [key, patternDef] of Object.entries(PP_VOCABULARY.patterns)) {
+    for (const patternDef of Object.values(PP_VOCABULARY.patterns)) {
       if (patternDef.nodeTypes) {
         for (const nt of patternDef.nodeTypes) {
           expect(PP_VOCABULARY.types[nt]).toBeDefined();
@@ -115,7 +115,7 @@ describe('PP_VOCABULARY', () => {
   });
 
   it('all pattern mathFunctions reference valid math function keys', () => {
-    for (const [key, patternDef] of Object.entries(PP_VOCABULARY.patterns)) {
+    for (const patternDef of Object.values(PP_VOCABULARY.patterns)) {
       if (patternDef.mathFunctions) {
         for (const fn of patternDef.mathFunctions) {
           expect(PP_VOCABULARY.mathFunctions[fn]).toBeDefined();
@@ -125,7 +125,7 @@ describe('PP_VOCABULARY', () => {
   });
 
   it('all property appliesTo reference valid type keys', () => {
-    for (const [key, propDef] of Object.entries(PP_VOCABULARY.properties)) {
+    for (const propDef of Object.values(PP_VOCABULARY.properties)) {
       for (const target of propDef.appliesTo) {
         expect(PP_VOCABULARY.types[target]).toBeDefined();
       }
@@ -135,31 +135,31 @@ describe('PP_VOCABULARY', () => {
 
 describe('Mapping Tables', () => {
   it('ITEM_TYPE_MAP values exist in PP_VOCABULARY.types', () => {
-    for (const [key, ppType] of Object.entries(ITEM_TYPE_MAP)) {
+    for (const ppType of Object.values(ITEM_TYPE_MAP)) {
       expect(PP_VOCABULARY.types[ppType]).toBeDefined();
     }
   });
 
   it('RELATION_TYPE_MAP values exist in PP_VOCABULARY.edges', () => {
-    for (const [key, ppEdge] of Object.entries(RELATION_TYPE_MAP)) {
+    for (const ppEdge of Object.values(RELATION_TYPE_MAP)) {
       expect(PP_VOCABULARY.edges[ppEdge]).toBeDefined();
     }
   });
 
   it('DIAGRAM_SHAPE_MAP values exist in PP_VOCABULARY.types', () => {
-    for (const [key, ppType] of Object.entries(DIAGRAM_SHAPE_MAP)) {
+    for (const ppType of Object.values(DIAGRAM_SHAPE_MAP)) {
       expect(PP_VOCABULARY.types[ppType]).toBeDefined();
     }
   });
 
   it('CONNECTOR_STYLE_MAP values exist in PP_VOCABULARY.types', () => {
-    for (const [key, ppType] of Object.entries(CONNECTOR_STYLE_MAP)) {
+    for (const ppType of Object.values(CONNECTOR_STYLE_MAP)) {
       expect(PP_VOCABULARY.types[ppType]).toBeDefined();
     }
   });
 
   it('EASING_TO_MATH values exist in PP_VOCABULARY.mathFunctions (except null)', () => {
-    for (const [key, fn] of Object.entries(EASING_TO_MATH)) {
+    for (const fn of Object.values(EASING_TO_MATH)) {
       if (fn !== null) {
         expect(PP_VOCABULARY.mathFunctions[fn]).toBeDefined();
       }

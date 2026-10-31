@@ -667,7 +667,7 @@ export class PinePaperBrowserController {
    */
   private async ensureStudioPage(): Promise<'ok' | 'reloaded' | 'restored'> {
     if (!this.page) return 'ok';
-    let state: { hasApp: boolean; token: string | null } | null = null;
+    let state: { hasApp: boolean; token: string | null } | null;
     try {
       state = await this.page.evaluate(() => {
         const app = (window as any).app || (window as any).PinePaper;

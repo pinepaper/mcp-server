@@ -278,7 +278,7 @@ export function styleTokens(style: string): StyleTokens | null {
     return { style, composable, palette: [], fonts: [], fontSizes: [] };
   }
 
-  let scene: ComposedScene | null = null;
+  let scene: ComposedScene | null;
   try {
     scene = compose(style, { title: 'Title', subtitle: 'Subtitle', body: 'Body' });
   } catch {
@@ -609,7 +609,7 @@ export function layoutCollisions(scene: ComposedScene): LayoutCollision[] {
  */
 export function scalingCollisions(style: string, options: ComposeOptions, scene: ComposedScene): LayoutCollision[] {
   if (options.width === undefined && options.height === undefined) return [];
-  let reference: ComposedScene | null = null;
+  let reference: ComposedScene | null;
   try {
     reference = compose(style, { ...options, width: undefined, height: undefined });
   } catch {

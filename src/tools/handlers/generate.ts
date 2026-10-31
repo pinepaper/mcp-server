@@ -242,7 +242,7 @@ export const generateHandlers: Record<string, (args: Record<string, unknown>, op
         const laid = await handleToolCall('pinepaper_execute_custom_code', { code: emitTextLayersPlacement(job.textLayers, String(placement.itemId)) }, options);
         // The first text block is the executed result as JSON: {success, result}.
         const first = laid.content?.[0];
-        let body: { result?: { textItems?: unknown[]; fonts?: unknown[] } } | null = null;
+        let body: { result?: { textItems?: unknown[]; fonts?: unknown[] } } | null;
         try { body = first && 'text' in first ? JSON.parse(first.text) : null; } catch { body = null; }
         const items = body?.result?.textItems;
         placement.text = laid.isError || !Array.isArray(items)
