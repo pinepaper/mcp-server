@@ -1368,7 +1368,7 @@ export async function customCodeRollback(
     rolledBack = !!(r.success && v.ok);
     removed = v.removed ?? 0;
     left = typeof v.left === 'number' ? v.left : -1;
-  } catch { rolledBack = false; }
+  } catch { /* rolledBack stays false: nothing was confirmed removed */ }
   const scene = rolledBack
     ? (removed > 0
       ? `The ${removed} item(s) this call created before it stopped were removed. Changes it made to items that already existed are not reverted.`

@@ -12,7 +12,7 @@
  * - Client profile auto-detection
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
+import { describe, it, expect, afterEach } from 'bun:test';
 import { PINEPAPER_TOOLS, getToolsForVerbosity } from '../../tools/definitions.js';
 import {
   TOOL_TAGS,
@@ -43,7 +43,7 @@ describe('TOOL_TAGS', () => {
   });
 
   it('no duplicate tool names within a single tag', () => {
-    for (const [tag, names] of Object.entries(TOOL_TAGS)) {
+    for (const names of Object.values(TOOL_TAGS)) {
       const seen = new Set<string>();
       for (const name of names) {
         expect(seen.has(name)).toBe(false);

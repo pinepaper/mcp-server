@@ -137,7 +137,7 @@ describe('Ontology-vs-Schema parity', () => {
   });
 
   it('every DIAGRAM_SHAPE_MAP key maps to a pp: diagram shape', () => {
-    for (const [k, v] of Object.entries(DIAGRAM_SHAPE_MAP)) {
+    for (const v of Object.values(DIAGRAM_SHAPE_MAP)) {
       expect(v).toMatch(/^pp:.*Shape$/);
     }
   });

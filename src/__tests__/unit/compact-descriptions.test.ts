@@ -35,7 +35,7 @@ describe('Compact Descriptions', () => {
   });
 
   it('every compact description is non-empty (>20 chars)', () => {
-    for (const [name, desc] of Object.entries(COMPACT_DESCRIPTIONS)) {
+    for (const desc of Object.values(COMPACT_DESCRIPTIONS)) {
       expect(desc.length).toBeGreaterThan(20);
     }
   });
@@ -75,7 +75,7 @@ describe('Minimal Descriptions', () => {
   });
 
   it('every minimal description is non-empty and concise (<200 chars)', () => {
-    for (const [name, desc] of Object.entries(MINIMAL_DESCRIPTIONS)) {
+    for (const desc of Object.values(MINIMAL_DESCRIPTIONS)) {
       expect(desc.length).toBeGreaterThan(10);
       expect(desc.length).toBeLessThan(200);
     }

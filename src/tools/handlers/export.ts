@@ -118,7 +118,7 @@ export const exportHandlers: Record<string, ExportHandler> = {
     // Paper JSON), so {"foo":1,"items":[]} passed its validation, loaded as an
     // empty scene and wiped the canvas with success:true. Only the document a
     // full export writes (kind "pinepaper.project") is restored here.
-    let doc: { kind?: unknown; formatVersion?: unknown } | null = null;
+    let doc: { kind?: unknown; formatVersion?: unknown } | null;
     try { doc = JSON.parse(text); } catch {
       return errorResult(ErrorCodes.VALIDATION_ERROR, `${path} is not a PinePaper scene file (not JSON). Save one with pinepaper_export_scene { full: true }.`, {}, { toolName: 'pinepaper_import_scene' });
     }

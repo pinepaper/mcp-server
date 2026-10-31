@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test';
-import { PINEPAPER_TOOLS, getToolByName } from '../../tools/definitions.js';
+import { getToolByName } from '../../tools/definitions.js';
 import { HandDrawnInputSchema, CreateCharacterInputSchema, CharacterActionInputSchema, CharacterPoseInputSchema } from '../../types/schemas.js';
 import { codeGenerator } from '../../types/code-generator.js';
 import { handleToolCall } from '../../tools/handlers.js';

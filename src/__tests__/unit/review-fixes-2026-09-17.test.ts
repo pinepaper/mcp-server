@@ -11,7 +11,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { planCharacter } from '../../tools/handlers/character.js';
 import { channelsOf } from '../../character/resolve.js';
-import { codeGenerator } from '../../types/code-generator.js';
+import '../../types/code-generator.js';
 import { AddRelationInputSchema, CharacterInputSchema } from '../../types/schemas.js';
 import { PINEPAPER_TOOLS } from '../../tools/definitions.js';
 
