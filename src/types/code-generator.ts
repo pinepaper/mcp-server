@@ -6,6 +6,7 @@
  */
 
 import { compileChoreography } from '../tools/choreograph.js';
+import { compileBatchTimelines, emitTimelineOpBody, type TimelinePlan } from '../tools/timeline.js';
 import { normalizeSvgSize } from '../utils/svg-size.js';
 import { WORLD3D_COLOR_PATHS } from '../tools/engine-lists.js';
 import { REQUIRED_ENGINE_METHODS, OPTIONAL_ENGINE_METHODS } from '../tools/engine-methods.js';
@@ -4959,6 +4960,9 @@ throw new Error('Unknown diagram mode action: ${action}');
     // Fold duplicate keyframe_animate targets so a later op can't silently
     // clobber an earlier track (app.addAnimation replaces, never merges).
     const mergePlan = planKeyframeMerges(operations as never);
+    // Timeline ops compile here, on the server: the handler refuses a batch whose timeline does not compile before
+    // anything runs; a direct caller gets the op's own failure instead.
+    const timelines = compileBatchTimelines(operations as never);
 
     let code = `
 // Batch execute ${operations.length} operations
@@ -5010,7 +5014,11 @@ throw new Error('Unknown diagram mode action: ${action}');
 `;
 
     operations.forEach((op, index) => {
-      const opCode = this.generateBatchOperationCode(op, index, mergePlan);
+      const opCode = op.type === 'timeline'
+        ? (timelines.plans.has(index)
+          ? emitTimelineOpBody(timelines.plans.get(index) as TimelinePlan, (t) => (t.startsWith('$') ? `__ref(${t.substring(1)})` : JSON.stringify(t)))
+          : `return { success: false, error: ${JSON.stringify(timelines.errors.filter((e) => e.path.startsWith(`operations[${index}]`)).map((e) => `${e.path}: ${e.message}`).join('; ') || 'the timeline did not compile')} };`)
+        : this.generateBatchOperationCode(op, index, mergePlan);
       // $N variable references are documented as "items CREATED in earlier
       // operations" — only `create` results may extend the itemIds array.
       // animate/keyframe_animate/modify/delete also return { itemId } (the

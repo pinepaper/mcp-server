@@ -249,7 +249,7 @@ Call \`pinepaper_agent_start_job\` with canvasPreset: "youtube", then call \`pin
 \`\`\`
 Then call \`pinepaper_agent_end_job\` to see the result.
 
-## Operation Types (12)
+## Operation Types (14)
 
 | Type | Purpose |
 |------|---------|
@@ -259,8 +259,10 @@ Then call \`pinepaper_agent_end_job\` to see the result.
 | create | Add items: text, circle, rectangle, star, triangle, polygon, ellipse, path, line, arc |
 | modify | Change item properties |
 | delete | Remove item |
+| group | Combine the parts of one object into one entity |
 | animate | Loop animation: pulse, rotate, bounce, fade, wobble, slideLeftRight, slideUpDown |
 | keyframe_animate | Timed animation: [{time, properties, easing}] |
+| timeline | GSAP-shaped tweens [{to, vars, from, duration, at, stagger, ease, repeat, yoyo}], compiled onto keyframe tracks |
 | relation | Behavioral link: orbits, follows, attached_to, points_at, mirrors, parallax |
 | apply_mask | Reveal effects: wipeLeft, iris, curtain, cinematic, etc. |
 | apply_effect | Visual effects: sparkle, blast |
