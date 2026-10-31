@@ -4,7 +4,7 @@
  * This module provides a unified interface for creating server transports.
  */
 
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { StdioServerTransport } from '../mcp/index.js';
 
 // =============================================================================
 // TYPES

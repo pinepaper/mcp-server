@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'bun:test';
 import { createServer } from '../../index.js';
 import { startProgress } from '../../utils/progress.js';
-import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
+import { McpError, ErrorCode } from '../../mcp/index.js';
 
 describe('MCP Spec Gaps (MCPA Domains)', () => {
   it('declares logging capability in server capabilities', async () => {

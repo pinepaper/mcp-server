@@ -8,7 +8,7 @@
  * itself here at start; the SDK applies the client's logging/setLevel filter.
  * With no server registered (tests, CLI), this is a no-op.
  */
-import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import type { Server } from '../mcp/index.js';
 
 type Level = 'debug' | 'info' | 'notice' | 'warning' | 'error';
 

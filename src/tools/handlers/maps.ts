@@ -13,7 +13,7 @@
  * Each handler parses its Zod schema, dispatches to codeGenerator.
  */
 
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '../../mcp/index.js';
 import { errorResult, executeOrGenerate, type HandlerOptions } from '../handlers.js';
 import { codeGenerator } from '../../types/code-generator.js';
 import {

@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { createServer } from '../../index.js';
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { Server } from '../../mcp/index.js';
 
 describe('PinePaper MCP Server', () => {
   let server: Promise<any>;

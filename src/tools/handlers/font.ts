@@ -6,7 +6,7 @@
  * losing capability.
  */
 
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '../../mcp/index.js';
 import { errorResult, executeOrGenerate, type HandlerOptions } from '../handlers.js';
 import { ErrorCodes } from '../../types/schemas.js';
 import { emitEnsureFont } from '../../types/code-generator.js';

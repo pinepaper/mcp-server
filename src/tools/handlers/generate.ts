@@ -11,7 +11,7 @@
  * /v1/generate/{id}), shared by stills now and video next; video only needs a
  * longer poll, so the timeout is a parameter, not a per-model constant.
  */
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '../../mcp/index.js';
 import { z } from 'zod';
 import { errorResult, handleToolCall, type HandlerOptions } from '../handlers.js';
 import { ErrorCodes } from '../../types/schemas.js';

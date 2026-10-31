@@ -1,0 +1,23 @@
+[
+  {
+    "result": {
+      "protocolVersion": "2024-10-07",
+      "capabilities": {
+        "tools": {
+          "listChanged": true
+        },
+        "resources": {},
+        "prompts": {},
+        "logging": {}
+      },
+      "serverInfo": {
+        "name": "pinepaper-mcp",
+        "version": "1.6.25",
+        "description": "<description>"
+      },
+      "instructions": "<instructions>"
+    },
+    "jsonrpc": "2.0",
+    "id": 1
+  }
+]

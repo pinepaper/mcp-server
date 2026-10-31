@@ -1,0 +1,99 @@
+[
+  {
+    "result": {
+      "protocolVersion": "2025-06-18",
+      "capabilities": {
+        "tools": {
+          "listChanged": true
+        },
+        "resources": {},
+        "prompts": {},
+        "logging": {}
+      },
+      "serverInfo": {
+        "name": "pinepaper-mcp",
+        "version": "1.6.25",
+        "description": "<description>"
+      },
+      "instructions": "<instructions>"
+    },
+    "jsonrpc": "2.0",
+    "id": 1
+  },
+  {
+    "result": {},
+    "jsonrpc": "2.0",
+    "id": 2
+  },
+  {
+    "result": {
+      "tools": [
+        "pinepaper_agent_batch_execute",
+        "pinepaper_keyframe_animate",
+        "pinepaper_pattern",
+        "pinepaper_agent_export",
+        "pinepaper_lint_scene"
+      ]
+    },
+    "jsonrpc": "2.0",
+    "id": 3
+  },
+  {
+    "result": {
+      "prompts": [
+        "motivational-quote",
+        "text-reveal-up",
+        "simple-decision-flow",
+        "solar-system-education",
+        "cinema-titles",
+        "social-graphic",
+        "animated-infographic",
+        "mermaid-diagram",
+        "loading-screen",
+        "letter-collage"
+      ]
+    },
+    "jsonrpc": "2.0",
+    "id": 4
+  },
+  {
+    "result": {
+      "resources": [
+        "pinepaper://docs/agent-guide",
+        "pinepaper://docs/getting-started",
+        "pinepaper://docs/templates",
+        "pinepaper://docs/map-tools",
+        "pinepaper://docs/diagrams",
+        "pinepaper://docs/masks",
+        "pinepaper://docs/relations",
+        "pinepaper://docs/generators",
+        "pinepaper://docs/effects-and-filters",
+        "pinepaper://docs/customization",
+        "pinepaper://examples/us-states-animated",
+        "pinepaper://examples/world-population-map",
+        "pinepaper://examples/flowchart",
+        "pinepaper://examples/solar-system",
+        "pinepaper://examples/reveal-animation",
+        "pinepaper://docs/fonts",
+        "pinepaper://docs/readme",
+        "pinepaper://docs/readme/zh-CN",
+        "pinepaper://docs/readme/ja",
+        "pinepaper://docs/readme/ko",
+        "pinepaper://docs/readme/es",
+        "pinepaper://docs/readme/pt-BR",
+        "pinepaper://docs/readme/fr",
+        "pinepaper://docs/readme/de",
+        "pinepaper://docs/readme/hi",
+        "pinepaper://docs/custom-paths",
+        "pinepaper://docs/paperjs-in-pinepaper"
+      ]
+    },
+    "jsonrpc": "2.0",
+    "id": 5
+  },
+  {
+    "result": {},
+    "jsonrpc": "2.0",
+    "id": 6
+  }
+]

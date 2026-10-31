@@ -10,8 +10,8 @@
  * Supports i18n for 41 locales matching PinePaper Studio.
  */
 
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { Server } from './mcp/index.js';
+import { StdioServerTransport } from './mcp/index.js';
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
@@ -21,7 +21,7 @@ import {
   GetPromptRequestSchema,
   McpError,
   ErrorCode,
-} from '@modelcontextprotocol/sdk/types.js';
+} from './mcp/index.js';
 
 import { PINEPAPER_TOOLS, getToolsForVerbosity, AI_AGENT_GUIDE, CHOOSE_THE_DOOR } from './tools/definitions.js';
 import { LANE_INSTRUCTIONS } from './tools/lane.js';

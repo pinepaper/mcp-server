@@ -1,0 +1,56 @@
+[
+  {
+    "result": {
+      "protocolVersion": "2025-06-18",
+      "capabilities": {
+        "tools": {
+          "listChanged": true
+        },
+        "resources": {},
+        "prompts": {},
+        "logging": {}
+      },
+      "serverInfo": {
+        "name": "pinepaper-mcp",
+        "version": "1.6.25",
+        "description": "<description>"
+      },
+      "instructions": "<instructions>"
+    },
+    "jsonrpc": "2.0",
+    "id": 1
+  },
+  {
+    "result": {
+      "_meta": {
+        "pinepaper.studio/timing": "TIMING"
+      },
+      "content": [
+        {
+          "type": "text",
+          "text": "<text>"
+        }
+      ],
+      "structuredContent": "<structured>"
+    },
+    "jsonrpc": "2.0",
+    "id": 2
+  },
+  {
+    "result": {
+      "_meta": {
+        "pinepaper.studio/timing": "TIMING"
+      },
+      "content": [
+        {
+          "type": "text",
+          "text": "<text>"
+        }
+      ],
+      "structuredContent": "<structured>",
+      "isError": true
+    },
+    "jsonrpc": "2.0",
+    "id": 3
+  }
+]

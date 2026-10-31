@@ -6,7 +6,7 @@
  * split), so their checks apply: large sources are staged, ids resolve,
  * a refused split is named.
  */
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '../../mcp/index.js';
 import { z } from 'zod';
 import { errorResult, getExecutionMode, handleToolCall, type HandlerOptions } from '../handlers.js';
 import { ErrorCodes } from '../../types/schemas.js';

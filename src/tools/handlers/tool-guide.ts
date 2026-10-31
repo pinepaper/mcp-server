@@ -8,7 +8,7 @@
  * requested.
  */
 
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '../../mcp/index.js';
 import { type HandlerOptions } from '../handlers.js';
 import { ToolGuideInputSchema } from '../../types/schemas.js';
 

@@ -6,7 +6,7 @@
  */
 
 import { createServer, ServerOptions } from './index.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { StdioServerTransport } from './mcp/index.js';
 import { ExecutionMode } from './tools/handlers.js';
 import { TOOLKIT_PROFILES_LIST } from './tools/toolkits.js';
 import type { ToolkitProfile } from './tools/toolkits.js';

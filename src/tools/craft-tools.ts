@@ -26,7 +26,7 @@
  *     brand of its own — the cloud does the same from the scene's brand_kit op
  *     (ui-kit-attach.ts).
  */
-import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+import type { Tool } from '../mcp/index.js';
 import { generateTextileCode } from '../vendor/design/textile-weave-generator.js';
 import { generateRecursiveSubdivisionCode } from '../vendor/design/recursive-subdivision-generator.js';
 import { textileTools } from '../vendor/design/textile-tool-schema.js';

@@ -258,6 +258,17 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   The list of kinds now comes from the studio, so a kind it adds appears here
   too.
 
+### Changed
+
+- The server speaks MCP itself instead of through the MCP SDK, so installing
+  it pulls in 2 packages (`zod` and `undici`) instead of 78. It behaves the
+  same on the wire: the same protocol versions (2024-10-07 to 2025-11-25),
+  errors, progress, cancellation and logging, checked against recordings of
+  the previous server. `createServer()` still accepts any MCP transport,
+  including the SDK's.
+- The published code no longer uses `eval` or runs `git`, and it reads
+  environment variables in one place.
+
 ### Fixed
 
 - `pinepaper_pattern` no longer warns "NO CHANGE" after a `create` or

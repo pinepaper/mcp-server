@@ -17,7 +17,7 @@ import {
   uiKitCallProblems,
   type CraftBounds,
 } from './craft-tools.js';
-import { CallToolResult, TextContent, ImageContent } from '@modelcontextprotocol/sdk/types.js';
+import { CallToolResult, TextContent, ImageContent } from '../mcp/index.js';
 import { codeGenerator, generateQueryMutationsCode, SHEET_RUBRIC } from '../types/code-generator.js';
 import { expandBatchMacros, BatchMacroError } from './batch-macros.js';
 import {

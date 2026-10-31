@@ -1,0 +1,25 @@
+[
+  {
+    "result": {},
+    "jsonrpc": "2.0",
+    "id": 1
+  },
+  {
+    "result": {
+      "prompts": [
+        "motivational-quote",
+        "text-reveal-up",
+        "simple-decision-flow",
+        "solar-system-education",
+        "cinema-titles",
+        "social-graphic",
+        "animated-infographic",
+        "mermaid-diagram",
+        "loading-screen",
+        "letter-collage"
+      ]
+    },
+    "jsonrpc": "2.0",
+    "id": 2
+  }
+]

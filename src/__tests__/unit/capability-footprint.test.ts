@@ -41,3 +41,14 @@ describe('capability footprint of the published code', () => {
     expect(using(/\beval\s*\(|new\s+Function\s*\(/)).toEqual([]);
   });
 });
+
+describe('runtime dependencies', () => {
+  it('ships with zod and undici only; the MCP layer is the server\'s own (src/mcp)', () => {
+    const pkg = JSON.parse(readFileSync(join(SRC, '..', 'package.json'), 'utf8')) as { dependencies: Record<string, string> };
+    expect(Object.keys(pkg.dependencies).sort()).toEqual(['undici', 'zod']);
+  });
+
+  it('no shipped file imports @modelcontextprotocol/sdk (a devDependency, for the tests)', () => {
+    expect(using(/from\s+['"]@modelcontextprotocol\/sdk/)).toEqual([]);
+  });
+});
