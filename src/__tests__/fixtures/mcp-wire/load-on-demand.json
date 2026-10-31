@@ -1,0 +1,213 @@
+[
+  {
+    "result": {
+      "protocolVersion": "2025-06-18",
+      "capabilities": {
+        "tools": {
+          "listChanged": true
+        },
+        "resources": {},
+        "prompts": {},
+        "logging": {}
+      },
+      "serverInfo": {
+        "name": "pinepaper-mcp",
+        "version": "1.6.25",
+        "description": "<description>"
+      },
+      "instructions": "<instructions>"
+    },
+    "jsonrpc": "2.0",
+    "id": 1
+  },
+  {
+    "result": {
+      "tools": [
+        "pinepaper_set_background_color",
+        "pinepaper_set_canvas_size",
+        "pinepaper_get_canvas_size",
+        "pinepaper_clear_canvas",
+        "pinepaper_refresh_page",
+        "pinepaper_create_item",
+        "pinepaper_modify_item",
+        "pinepaper_import_image",
+        "pinepaper_beat_cuts",
+        "pinepaper_camera_director",
+        "pinepaper_media",
+        "pinepaper_text_style",
+        "pinepaper_design_medium",
+        "pinepaper_text_effect",
+        "pinepaper_design_system",
+        "pinepaper_stick",
+        "pinepaper_story",
+        "pinepaper_interchange",
+        "pinepaper_sound",
+        "pinepaper_world3d",
+        "pinepaper_character",
+        "pinepaper_rigging",
+        "pinepaper_lint_scene",
+        "pinepaper_add_relation",
+        "pinepaper_register_custom_relation",
+        "pinepaper_execute_custom_code",
+        "pinepaper_animate",
+        "pinepaper_keyframe_animate",
+        "pinepaper_get_animatable_properties",
+        "pinepaper_manage_scenes",
+        "pinepaper_scene_playback",
+        "pinepaper_compose",
+        "pinepaper_brand_kit",
+        "pinepaper_audio_beats",
+        "pinepaper_image_filter",
+        "pinepaper_background",
+        "pinepaper_query",
+        "pinepaper_query_capabilities",
+        "pinepaper_deform",
+        "pinepaper_create_letter_collage",
+        "pinepaper_apply_effect",
+        "pinepaper_add_filter",
+        "pinepaper_get_items",
+        "pinepaper_get_relation_stats",
+        "pinepaper_export_scene",
+        "pinepaper_styled_scene",
+        "pinepaper_look",
+        "pinepaper_original_character",
+        "pinepaper_morph_sequence",
+        "pinepaper_emitter",
+        "pinepaper_render_hook",
+        "pinepaper_choreograph",
+        "pinepaper_relight",
+        "pinepaper_import_scene",
+        "pinepaper_browser_connect",
+        "pinepaper_browser_disconnect",
+        "pinepaper_browser_screenshot",
+        "pinepaper_browser_status",
+        "pinepaper_agent_start_job",
+        "pinepaper_agent_end_job",
+        "pinepaper_agent_reset",
+        "pinepaper_agent_batch_execute",
+        "pinepaper_export_store",
+        "pinepaper_agent_export",
+        "pinepaper_agent_analyze",
+        "pinepaper_get_canvas_ontology",
+        "pinepaper_query_ontology",
+        "pinepaper_tool_guide",
+        "pinepaper_set_toolkit",
+        "pinepaper_physics"
+      ]
+    },
+    "jsonrpc": "2.0",
+    "id": 2
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "notifications/tools/list_changed"
+  },
+  {
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "<text>"
+        }
+      ]
+    },
+    "jsonrpc": "2.0",
+    "id": 3
+  },
+  {
+    "result": {
+      "tools": [
+        "pinepaper_set_background_color",
+        "pinepaper_set_canvas_size",
+        "pinepaper_get_canvas_size",
+        "pinepaper_clear_canvas",
+        "pinepaper_refresh_page",
+        "pinepaper_create_item",
+        "pinepaper_modify_item",
+        "pinepaper_import_image",
+        "pinepaper_beat_cuts",
+        "pinepaper_camera_director",
+        "pinepaper_media",
+        "pinepaper_text_style",
+        "pinepaper_design_medium",
+        "pinepaper_text_effect",
+        "pinepaper_design_system",
+        "pinepaper_stick",
+        "pinepaper_story",
+        "pinepaper_interchange",
+        "pinepaper_sound",
+        "pinepaper_world3d",
+        "pinepaper_character",
+        "pinepaper_rigging",
+        "pinepaper_lint_scene",
+        "pinepaper_add_relation",
+        "pinepaper_register_custom_relation",
+        "pinepaper_execute_custom_code",
+        "pinepaper_animate",
+        "pinepaper_keyframe_animate",
+        "pinepaper_get_animatable_properties",
+        "pinepaper_manage_scenes",
+        "pinepaper_scene_playback",
+        "pinepaper_compose",
+        "pinepaper_brand_kit",
+        "pinepaper_audio_beats",
+        "pinepaper_image_filter",
+        "pinepaper_background",
+        "pinepaper_query",
+        "pinepaper_query_capabilities",
+        "pinepaper_deform",
+        "pinepaper_map",
+        "pinepaper_map_regions",
+        "pinepaper_map_animation",
+        "pinepaper_map_data",
+        "pinepaper_globe",
+        "pinepaper_create_letter_collage",
+        "pinepaper_apply_effect",
+        "pinepaper_add_filter",
+        "pinepaper_get_items",
+        "pinepaper_get_relation_stats",
+        "pinepaper_export_scene",
+        "pinepaper_styled_scene",
+        "pinepaper_look",
+        "pinepaper_original_character",
+        "pinepaper_morph_sequence",
+        "pinepaper_emitter",
+        "pinepaper_render_hook",
+        "pinepaper_choreograph",
+        "pinepaper_relight",
+        "pinepaper_import_scene",
+        "pinepaper_browser_connect",
+        "pinepaper_browser_disconnect",
+        "pinepaper_browser_screenshot",
+        "pinepaper_browser_status",
+        "pinepaper_agent_start_job",
+        "pinepaper_agent_end_job",
+        "pinepaper_agent_reset",
+        "pinepaper_agent_batch_execute",
+        "pinepaper_export_store",
+        "pinepaper_agent_export",
+        "pinepaper_agent_analyze",
+        "pinepaper_get_canvas_ontology",
+        "pinepaper_query_ontology",
+        "pinepaper_tool_guide",
+        "pinepaper_set_toolkit",
+        "pinepaper_physics"
+      ]
+    },
+    "jsonrpc": "2.0",
+    "id": 4
+  },
+  {
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "<text>"
+        }
+      ],
+      "isError": true
+    },
+    "jsonrpc": "2.0",
+    "id": 5
+  }
+]

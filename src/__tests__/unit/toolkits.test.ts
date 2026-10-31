@@ -211,9 +211,9 @@ describe('detectToolkitFromEnvironment', () => {
     }
   });
 
-  it('defaults to agent when not set', () => {
+  it('defaults to core when not set (1.6.25: the lean default; more loads on demand)', () => {
     delete process.env.PINEPAPER_TOOLKIT;
-    expect(detectToolkitFromEnvironment()).toBe('agent');
+    expect(detectToolkitFromEnvironment()).toBe('core');
   });
 
   it('returns explicit value when set', () => {
@@ -221,9 +221,9 @@ describe('detectToolkitFromEnvironment', () => {
     expect(detectToolkitFromEnvironment()).toBe('full');
   });
 
-  it('returns agent for invalid value', () => {
+  it('returns core for invalid value', () => {
     process.env.PINEPAPER_TOOLKIT = 'nonexistent';
-    expect(detectToolkitFromEnvironment()).toBe('agent');
+    expect(detectToolkitFromEnvironment()).toBe('core');
   });
 });
 
@@ -326,25 +326,17 @@ describe('isVerbosityExplicitlySet', () => {
 // =============================================================================
 
 describe('getClientProfile', () => {
-  it('returns profile for known clients', () => {
-    expect(getClientProfile('claude-desktop')).toEqual({ toolkit: 'full', verbosity: 'compact' });
-    expect(getClientProfile('claude-code')).toEqual({ toolkit: 'agent', verbosity: 'compact' });
-    expect(getClientProfile('cursor')).toEqual({ toolkit: 'full', verbosity: 'compact' });
-    expect(getClientProfile('windsurf')).toEqual({ toolkit: 'full', verbosity: 'compact' });
+  // Every client starts on core since 1.6.25 (it gave Desktop, Cursor and Windsurf all 178 tools, ~115k tokens
+  // of definitions, and claude-ai a list without the craft tools). The table is kept for a client that needs a
+  // different start, made from the client name the server now logs at initialize.
+  it('no client is profiled away from the default any more', () => {
+    for (const name of ['claude-desktop', 'claude-code', 'claude-ai', 'cursor', 'windsurf', 'Claude-Desktop', 'cursor-nightly']) {
+      expect(getClientProfile(name)).toBeNull();
+    }
   });
 
   it('returns null for unknown clients', () => {
     expect(getClientProfile('unknown-client')).toBeNull();
     expect(getClientProfile('')).toBeNull();
-  });
-
-  it('case-insensitive matching', () => {
-    expect(getClientProfile('Claude-Desktop')).toEqual({ toolkit: 'full', verbosity: 'compact' });
-    expect(getClientProfile('CURSOR')).toEqual({ toolkit: 'full', verbosity: 'compact' });
-  });
-
-  it('prefix matching works', () => {
-    expect(getClientProfile('claude-desktop-v2')).toEqual({ toolkit: 'full', verbosity: 'compact' });
-    expect(getClientProfile('cursor-nightly')).toEqual({ toolkit: 'full', verbosity: 'compact' });
   });
 });

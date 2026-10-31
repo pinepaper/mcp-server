@@ -268,6 +268,12 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   including the SDK's.
 - The published code no longer uses `eval` or runs `git`, and it reads
   environment variables in one place.
+- New sessions start with a leaner tool list: the `core` toolkit, about half
+  the context of the previous default, with every craft tool the server
+  recommends. Other tools load when needed with `pinepaper_set_toolkit`
+  `{"load": ["map"]}` (a group) or a tool's name, and the list updates at
+  once. Claude Desktop, Cursor and Windsurf used to get all 178 tools.
+  `PINEPAPER_TOOLKIT=agent` or `full` restores a larger list.
 
 ### Fixed
 
@@ -1778,27 +1784,20 @@ Fourteen new tools (121 → 135) and new actions across the surface — the rele
 
 | Profile | Contents |
 |---------|----------|
+| `core` | **The default.** The craft tools the server's instructions point to, the agent workflow, canvas and query tools, plus every tool those name, so no listed tool points at a missing one. About half the tokens of `agent`. Anything else loads on demand (below) |
 | `full` | Every tool, no filtering |
-| `agent` | Every tool except the diagnostics (`pinepaper_get_performance_metrics`, `pinepaper_diagnostic_report`) and `pinepaper_register_item`. The default for a client not listed below |
+| `agent` | Every tool except the diagnostics (`pinepaper_get_performance_metrics`, `pinepaper_diagnostic_report`) and `pinepaper_register_item` |
 | `diagram` | Canvas + diagram + query/export |
 | `map` | Canvas + map + query/export |
 | `font` | Canvas + font + letter collage + export |
 | `minimal` | Agent, browser, canvas, and guide only |
-| `lane` | **The agent lane**: exactly five tools — `pinepaper_agent_batch_execute`, `pinepaper_keyframe_animate`, `pinepaper_pattern`, `pinepaper_agent_export`, `pinepaper_lint_scene` — shown with descriptions that carry the rules an agent otherwise learns by failing (the keyframe shape, an item's words and look inside `properties`, a position being the item's centre, the export's 5 s default). The whole contract, instructions included, is ~3.3k tokens. For scripted builds of shapes, text, keyframes and relations; use `agent` for characters, styled scenes, maps, diagrams and sound |
+| `lane` | **The agent lane**: exactly five tools — `pinepaper_agent_batch_execute`, `pinepaper_keyframe_animate`, `pinepaper_pattern`, `pinepaper_agent_export`, `pinepaper_lint_scene` — shown with descriptions that carry the rules an agent otherwise learns by failing (the keyframe shape, an item's words and look inside `properties`, a position being the item's centre, the export's 5 s default). The whole contract, instructions included, is ~3.3k tokens. For scripted builds of shapes, text, keyframes and relations; use `core` for characters, styled scenes, maps, diagrams and sound |
 
 **Verbosity tiers** (`PINEPAPER_VERBOSITY`): `verbose`, `compact` (default), `minimal`.
 
-**Client auto-detection.** When neither env var is set explicitly, the server picks a profile from the MCP `initialize` handshake:
+**Load on demand.** Every client starts on `core`. When a task needs more, the model calls `pinepaper_set_toolkit` with `load`: a group (`{"load": ["map"]}`, `["diagram"]`, `["font"]`, `["physics"]`, …) or a tool's own name. The tools are added for the session, along with any tools they mention, and the client is told the list changed. The server logs each client's name at start-up.
 
-| Client | Toolkit | Verbosity |
-|--------|---------|-----------|
-| `claude-ai` | `minimal` | `compact` |
-| `claude-desktop` | `full` | `compact` |
-| `claude-code` | `agent` | `compact` |
-| `cursor` | `full` | `compact` |
-| `windsurf` | `full` | `compact` |
-
-Explicit env vars always win. You can also hand-pick tools with `PINEPAPER_TOOLS` (comma-separated names), or switch profiles at runtime with the `pinepaper_set_toolkit` tool. Start with `pinepaper_tool_guide` to have the server explain its own surface.
+`PINEPAPER_TOOLKIT` always wins. You can also hand-pick tools with `PINEPAPER_TOOLS` (comma-separated names), or switch profiles at runtime with the `pinepaper_set_toolkit` tool. Start with `pinepaper_tool_guide` to have the server explain its own surface.
 
 ## Features
 
@@ -2500,7 +2499,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 | `PINEPAPER_EXECUTION_MODE` | `puppeteer` (execute in a real browser) or `code` (return generated code only) | `puppeteer` |
 | `PINEPAPER_EXPORT_DIR` | Directory for exported files | `<tmpdir>/pinepaper-exports` |
 | `PINEPAPER_LOCALE` | Language locale code | `en` |
-| `PINEPAPER_TOOLKIT` | Toolkit profile (`full`/`agent`/`diagram`/`map`/`font`/`minimal`/`lane`) | auto-detected |
+| `PINEPAPER_TOOLKIT` | Toolkit profile (`core`/`full`/`agent`/`diagram`/`map`/`font`/`minimal`/`lane`) | `core` |
 | `PINEPAPER_TOOLS` | Explicit comma-separated tool allowlist | unset |
 | `PINEPAPER_VERBOSITY` | Description verbosity (`verbose`/`compact`/`minimal`) | `compact` |
 | `PINEPAPER_TOOL_VERBOSITY` | Deprecated alias for `PINEPAPER_VERBOSITY` | unset |

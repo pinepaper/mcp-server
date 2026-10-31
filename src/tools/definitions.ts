@@ -13,6 +13,7 @@ import { I18nManager } from '../i18n/index.js';
 import { COMPACT_DESCRIPTIONS } from './compact-descriptions.js';
 import { MINIMAL_DESCRIPTIONS } from './minimal-descriptions.js';
 import { craftToolDefinitions } from './craft-tools.js';
+import { TOOL_TAGS } from './toolkits.js';
 import { STICK_GAITS, STICK_POSES, STICK_SEQUENCES, STICK_EXPRESSIONS, STICK_PROPS } from './stick-vocabulary.js';
 import { AgentBatchOperationTypeSchema, GeneratorNameSchema, ItemTypeSchema } from '../types/schemas.js';
 import { DESIGN_MEDIA, DESIGN_MEDIA_APPLY, FILTER_TYPES, FILTER_DOCS, LINEAGE_KINDS, STYLED_SCENE_STYLES, STYLED_SCENE_STYLE_INFO, PATTERN_KINDS } from './engine-lists.js';
@@ -98,6 +99,9 @@ export function buildDoorBlock(available?: Iterable<string>): string {
 
 /** The full door block (every tool), for the guide and a local server. */
 export const CHOOSE_THE_DOOR = buildDoorBlock();
+
+/** The tools the door table sends a model to (the core profile's `craft` seed is held equal to this). */
+export const DOOR_TOOLS: readonly string[] = [...new Set(DOORS.flatMap((d) => d.doors.map((x) => x.tool).filter((t): t is string => !!t)))];
 
 export const AI_AGENT_GUIDE = `⚠️ You are connected to PinePaper Studio via MCP tools. ALWAYS use these tools to create visual content.
 NEVER create standalone HTML pages, React components, or web apps as a substitute. Do NOT use frontend design skills or CSS-only animations instead of PinePaper.
@@ -9783,16 +9787,21 @@ CATEGORIES: agent, browser, canvas, core, import, assets, batch, relations, anim
       idempotentHint: true,
       openWorldHint: false,
     },
-    description: `Switch the active toolkit profile and/or verbosity level at runtime. The tools/list updates immediately.
+    description: `Load more tools, or switch the toolkit profile and/or verbosity, at runtime. The tools/list updates immediately.
+
+The list starts with the CORE tools (the craft tools, the agent workflow, canvas and query). Everything else loads on demand:
+- load: ["map"] adds a group; load: ["<a tool's name>"] adds one tool. Loaded tools stay for the session, and the tools they name come with them.
+- Groups: ${Object.keys(TOOL_TAGS).join(', ')}.
 
 USE WHEN:
-- You need diagram tools but are on the 'agent' profile → switch to 'diagram' or 'full'
-- You need map tools → switch to 'map' or 'full'
+- You need a tool that is not listed (maps, diagrams, fonts, physics, ontology…) → load its group or its name
+- You want everything at once → toolkit: 'full' (or 'agent', which leaves out three diagnostics)
 - You want more/less detail in tool descriptions → switch verbosity
 
 PROFILES:
+- core: the craft tools and what they name, the agent workflow, canvas and query — default
 - full: Every tool, no filtering
-- agent: Every tool except the diagnostics (get_performance_metrics, diagnostic_report) and register_item — default
+- agent: Every tool except the diagnostics (get_performance_metrics, diagnostic_report) and register_item
 - diagram: Diagram/flowchart tools
 - map: Map/choropleth tools
 - font: Font creation tools
@@ -9808,8 +9817,13 @@ VERBOSITY:
       properties: {
         toolkit: {
           type: 'string',
-          description: 'Toolkit profile: full, agent, diagram, map, font, minimal, lane',
-          enum: ['full', 'agent', 'diagram', 'map', 'font', 'minimal', 'lane'],
+          description: 'Toolkit profile: core (default), full, agent, diagram, map, font, minimal, lane',
+          enum: ['core', 'full', 'agent', 'diagram', 'map', 'font', 'minimal', 'lane'],
+        },
+        load: {
+          type: 'array',
+          items: { type: 'string' },
+          description: `Tool groups or tool names to add to the list for this session. Groups: ${Object.keys(TOOL_TAGS).join(', ')}.`,
         },
         verbosity: {
           type: 'string',

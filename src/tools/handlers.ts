@@ -3901,6 +3901,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
             })),
             profiles: {
               'full+verbose': fullTokens,
+              'core+compact': Math.ceil(Buffer.byteLength(JSON.stringify(getToolsForToolkit(getToolsForVerbosity('compact'), 'core')), 'utf-8') / 4),
               'agent+compact': agentCompactTokens,
               'agent+minimal': agentMinimalTokens,
             },
@@ -3914,7 +3915,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
           const recs = toolDefsSection.recommendations as string[];
           const alternatives: Array<{ label: string; how: string; tokens: number }> = [];
           for (const v of ['compact', 'minimal'] as const) {
-            for (const k of ['full', 'agent', 'minimal'] as const) {
+            for (const k of ['full', 'agent', 'core', 'minimal'] as const) {
               if (k === toolkit && v === verbosity) continue;
               const t = Math.ceil(Buffer.byteLength(JSON.stringify(getToolsForToolkit(getToolsForVerbosity(v), k)), 'utf-8') / 4);
               alternatives.push({ label: `${k}+${v}`, how: `PINEPAPER_TOOLKIT=${k} PINEPAPER_VERBOSITY=${v}`, tokens: t });

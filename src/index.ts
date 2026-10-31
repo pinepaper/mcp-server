@@ -33,6 +33,8 @@ import {
   isToolkitExplicitlySet,
   isVerbosityExplicitlySet,
   getClientProfile,
+  unknownLoadNames,
+  TOOL_TAGS,
 } from './tools/toolkits.js';
 import type { ToolkitProfile } from './tools/toolkits.js';
 import { handleToolCall, ExecutionMode, getExecutionMode, withTiming } from './tools/handlers.js';
@@ -5853,7 +5855,9 @@ export async function createServer(options: ServerOptions = {}): Promise<Server>
   let effectiveToolkit: ToolkitProfile = options.toolkit || detectToolkitFromEnvironment();
 
   /** Compute the current filtered tools list (sub-ms, called per tools/list request). */
-  const getEffectiveTools = () => getToolsForToolkit(getToolsForVerbosity(effectiveVerbosity), effectiveToolkit);
+  // Groups or tools loaded on top of the profile this session (pinepaper_set_toolkit {load}).
+  const loaded = new Set<string>();
+  const getEffectiveTools = () => getToolsForToolkit(getToolsForVerbosity(effectiveVerbosity), effectiveToolkit, [...loaded]);
 
   const server = new Server(SERVER_INFO, {
     capabilities: {
@@ -5877,6 +5881,8 @@ WORKFLOW (always follow this):
 3. pinepaper_agent_end_job — returns a screenshot to show the user
 4. pinepaper_agent_export — exports as MP4, GIF, PNG, SVG, or PDF
 
+MORE TOOLS LOAD ON DEMAND: the list starts with the core tools. Maps, diagrams, fonts, physics, ontology and the rest load with pinepaper_set_toolkit {load: ["map"]} (a group) or {load: ["pinepaper_map"]} (a tool); the list updates at once.
+
 A scripted build of shapes, text, keyframes and relations needs none of the craft tools: PINEPAPER_TOOLKIT=lane serves a five-tool agent lane whose descriptions carry the whole contract (pinepaper_tool_guide says more).
 
 The tools generate Paper.js/JavaScript code that executes on the PinePaper canvas. The generated code is visible in responses and can be copied into PinePaper's Code Console.`,
@@ -5885,6 +5891,8 @@ The tools generate Paper.js/JavaScript code that executes on the PinePaper canva
   // Client auto-detection: upgrade toolkit/verbosity based on MCP client identity
   server.oninitialized = () => {
     const clientVersion = server.getClientVersion();
+    // Every client's name, so a profile for it can be made from a real connection rather than a guess.
+    console.error(`[client] ${clientVersion?.name ?? '(unnamed)'} ${clientVersion?.version ?? ''} → toolkit=${effectiveToolkit}`);
     if (!clientVersion?.name) return;
 
     const profile = getClientProfile(clientVersion.name);
@@ -5942,26 +5950,45 @@ The tools generate Paper.js/JavaScript code that executes on the PinePaper canva
     if (name === 'pinepaper_set_toolkit') {
       const { SetToolkitInputSchema } = await import('./types/schemas.js');
       const input = SetToolkitInputSchema.parse(args);
+      const before = new Set(getEffectiveTools().map((t) => t.name));
 
       let changed = false;
       if (input.toolkit && input.toolkit !== effectiveToolkit) {
         effectiveToolkit = input.toolkit;
         changed = true;
       }
+      // LOAD: groups or tools on top of the profile, kept for the session. Refused whole when a name is unknown,
+      // so a typo is said rather than half-applied.
+      if (input.load?.length) {
+        const unknown = unknownLoadNames(input.load, new Set(PINEPAPER_TOOLS.map((t) => t.name)));
+        if (unknown.length) {
+          return {
+            content: [{ type: 'text' as const, text: `Not loaded: ${unknown.join(', ')} ${unknown.length > 1 ? 'are' : 'is'} neither a tool group nor a tool. Groups: ${Object.keys(TOOL_TAGS).join(', ')}. A tool's own name works too.` }],
+            isError: true,
+          };
+        }
+        for (const n of input.load) if (!loaded.has(n)) { loaded.add(n); changed = true; }
+      }
       if (input.verbosity && input.verbosity !== effectiveVerbosity) {
         effectiveVerbosity = input.verbosity;
         changed = true;
       }
 
+      const tools = getEffectiveTools();
+      const added = tools.map((t) => t.name).filter((n) => !before.has(n));
+      // A load that listed nothing new (a tool core already lists) is not a change, and the client need not re-list.
+      if (changed && !added.length && !input.toolkit && !input.verbosity) changed = false;
       if (changed) {
         server.sendToolListChanged().catch(() => {});
       }
-
-      const tools = getEffectiveTools();
+      const already = (input.load ?? []).filter((n) => before.has(n));
       return {
         content: [{
           type: 'text' as const,
-          text: `Toolkit: ${effectiveToolkit}, Verbosity: ${effectiveVerbosity}, Tools: ${tools.length}${changed ? ' (updated)' : ' (no change)'}`,
+          text: `Toolkit: ${effectiveToolkit}, Verbosity: ${effectiveVerbosity}, Tools: ${tools.length}${changed ? ' (updated)' : ' (no change)'}`
+            + (loaded.size ? `\nLoaded: ${[...loaded].join(', ')}` : '')
+            + (added.length ? `\nNow listed: ${added.join(', ')}` : '')
+            + (already.length ? `\nAlready listed: ${already.join(', ')}` : ''),
         }],
       };
     }

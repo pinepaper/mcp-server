@@ -3,10 +3,11 @@
  * and compares every frame it writes with a recording.
  *
  * The recordings were made from the @modelcontextprotocol/sdk server (1.32.1)
- * before the server's own protocol layer replaced it (1.6.25), so they are what
+ * before the server's own protocol layer replaced it (1.6.25), except
+ * load-on-demand, which is new and says so, so they are what
  * "behaves like the SDK" means here: version negotiation, ping, setLevel, the
  * error codes, a malformed line dropped without a reply, tools/list_changed
- * after client auto-detection. UPDATE_MCP_GOLDEN=1 re-records; do that only
+ * after a load. UPDATE_MCP_GOLDEN=1 re-records; do that only
  * when a difference is intended, and say why in the commit. Tool, prompt and
  * resource NAMES are recorded, so adding one is a re-record; editing one is not.
  */
@@ -129,12 +130,17 @@ const SESSIONS: Record<string, { steps: Step[]; env?: Record<string, string> }> 
       { send: { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'pinepaper_no_such_tool', arguments: {} } }, await: true },
     ],
   },
-  // Client auto-detection: claude-ai is profiled to the minimal toolkit, so the list changes after initialized.
-  'client-auto-detect': {
+  // LOAD ON DEMAND (1.6.25, recorded from this server: the SDK server had no such call). A client starts on core,
+  // loads a group, is told the list changed, and the next tools/list carries it. Every client starts on core, so
+  // a claude-ai initialize no longer changes the list by itself (it was profiled to `minimal` before).
+  'load-on-demand': {
     steps: [
       { send: init('2025-06-18', 'claude-ai'), await: true },
-      { send: initialized, settleMs: 400 },
+      { send: initialized, settleMs: 300 },
       { send: { jsonrpc: '2.0', id: 2, method: 'tools/list' }, await: true },
+      { send: { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'pinepaper_set_toolkit', arguments: { load: ['map'] } } }, await: true, settleMs: 300 },
+      { send: { jsonrpc: '2.0', id: 4, method: 'tools/list' }, await: true },
+      { send: { jsonrpc: '2.0', id: 5, method: 'tools/call', params: { name: 'pinepaper_set_toolkit', arguments: { load: ['no_such_group'] } } }, await: true },
     ],
   },
   'before-initialize': {

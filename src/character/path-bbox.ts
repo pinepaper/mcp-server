@@ -131,9 +131,10 @@ function arcExtrema(
     cy + rx * Math.cos(t) * sinP + ry * Math.sin(t) * cosP,
   ];
   const inSweep = (t: number) => {
+    let k = (t - theta0) / (delta || 1);
     // Normalise the candidate into the sweep's own parameter space.
     for (let n = -2; n <= 2; n++) {
-      const k = (t + n * 2 * Math.PI - theta0) / (delta || 1);
+      k = (t + n * 2 * Math.PI - theta0) / (delta || 1);
       if (k >= 0 && k <= 1) return true;
     }
     return false;

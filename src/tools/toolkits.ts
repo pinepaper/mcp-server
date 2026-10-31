@@ -11,13 +11,32 @@
 import { applyLane } from './lane.js';
 import { env } from '../utils/env.js';
 
-export type ToolkitProfile = 'full' | 'agent' | 'diagram' | 'map' | 'font' | 'minimal' | 'lane';
+export type ToolkitProfile = 'core' | 'full' | 'agent' | 'diagram' | 'map' | 'font' | 'minimal' | 'lane';
 
-export const TOOLKIT_PROFILES_LIST: ToolkitProfile[] = ['full', 'agent', 'diagram', 'map', 'font', 'minimal', 'lane'];
+export const TOOLKIT_PROFILES_LIST: ToolkitProfile[] = ['core', 'full', 'agent', 'diagram', 'map', 'font', 'minimal', 'lane'];
+
+/** The profile a session starts on when nothing chooses one. */
+export const DEFAULT_TOOLKIT: ToolkitProfile = 'core';
 
 // =============================================================================
 // TAG GROUPS — each maps a category to its tool names
 // =============================================================================
+
+/**
+ * The craft tools the server instructions send a model to (CHOOSE_THE_DOOR in definitions.ts): the core profile's
+ * seed beside its tag groups. Not a tag itself, since every tool already belongs to exactly one tag group.
+ * toolkit-references-are-listed.test.ts holds this equal to the tools the door block names, so an instruction never
+ * points at a tool the default list leaves out.
+ */
+export const CRAFT_TOOLS: readonly string[] = [
+  'pinepaper_styled_scene', 'pinepaper_look', 'pinepaper_story', 'pinepaper_scene_playback',
+  'pinepaper_original_character', 'pinepaper_character', 'pinepaper_stick', 'pinepaper_rigging', 'pinepaper_deform',
+  'pinepaper_choreograph', 'pinepaper_morph_sequence', 'pinepaper_text_style', 'pinepaper_text_effect',
+  'pinepaper_design_system', 'pinepaper_compose', 'pinepaper_design_medium', 'pinepaper_image_filter',
+  'pinepaper_brand_kit', 'pinepaper_sound', 'pinepaper_audio_beats', 'pinepaper_beat_cuts', 'pinepaper_emitter',
+  'pinepaper_render_hook', 'pinepaper_camera_director', 'pinepaper_world3d', 'pinepaper_relight',
+  'pinepaper_agent_batch_execute', 'pinepaper_create_item',
+];
 
 export const TOOL_TAGS: Record<string, string[]> = {
   // --- Core infrastructure (included in most profiles) ---
@@ -331,6 +350,11 @@ export const TOOL_TAGS: Record<string, string[]> = {
 // =============================================================================
 
 export const TOOLKIT_PROFILES: Record<ToolkitProfile, string[]> = {
+  // THE DEFAULT (1.6.25). The seed below, then every tool a listed tool names, until nothing new is named
+  // (getToolsForToolkit closes it over the tools it is given). About half the agent profile's tokens, and no
+  // listed tool points at one the list leaves out. Domain tools load on demand: pinepaper_set_toolkit {load}.
+  core: ['agent', 'browser', 'canvas', 'guide', 'query'], // + CRAFT_TOOLS
+
   full: [], // Empty = no filtering, return all tools
 
   agent: [
@@ -402,12 +426,59 @@ interface Tool {
   inputSchema: unknown;
 }
 
+const TOOL_NAME_TOKEN = /\bpinepaper_[a-z0-9_]+\b/g;
+
+/**
+ * The tool names a tool's definition mentions, as WHOLE names: `pinepaper_camera` is not a reference inside
+ * `pinepaper_camera_director`. The one definition of "names", shared by the core closure and the test that holds
+ * every profile to it.
+ */
+export function referencedToolNames(tool: Tool, known: ReadonlySet<string>): string[] {
+  const out = new Set<string>();
+  for (const m of JSON.stringify(tool).match(TOOL_NAME_TOKEN) ?? []) if (m !== tool.name && known.has(m)) out.add(m);
+  return [...out];
+}
+
+/** Every tool reachable from `seed` by references, within `tools`. */
+function closeOverReferences<T extends Tool>(tools: T[], seed: Iterable<string>): Set<string> {
+  const byName = new Map(tools.map((t) => [t.name, t]));
+  const known = new Set(byName.keys());
+  const listed = new Set([...seed].filter((n) => known.has(n)));
+  const queue = [...listed];
+  while (queue.length) {
+    const tool = byName.get(queue.pop()!)!;
+    for (const ref of referencedToolNames(tool, known)) if (!listed.has(ref)) { listed.add(ref); queue.push(ref); }
+  }
+  return listed;
+}
+
+const closureCache = new WeakMap<object, Map<string, Set<string>>>();
+
+/** The names a profile's tags (and any loaded groups or tools) put on the list, before the closure. */
+function seedNames(profile: ToolkitProfile, load: readonly string[]): Set<string> {
+  return loadedNames([...(TOOLKIT_PROFILES[profile] ?? []), ...(profile === 'core' ? CRAFT_TOOLS : []), ...load]);
+}
+
+/** The names `load` adds: each group's tools, or the tool itself. */
+function loadedNames(load: readonly string[]): Set<string> {
+  const out = new Set<string>();
+  for (const n of load) (TOOL_TAGS[n] ?? [n]).forEach((x) => out.add(x));
+  return out;
+}
+
+/** What `load` accepts: a tag group, or a tool's own name. Unknown entries come back to be refused by name. */
+export function unknownLoadNames(load: readonly string[], allToolNames: ReadonlySet<string>): string[] {
+  return load.filter((n) => !TOOL_TAGS[n] && !allToolNames.has(n));
+}
+
 /**
  * Filter tools based on a toolkit profile.
  * Returns only the tools whose names appear in the selected profile's tag groups.
- * The 'full' profile returns all tools unchanged (no filtering).
+ * The 'full' profile returns all tools unchanged (no filtering). The core profile, and any profile with groups or
+ * tools loaded on top (pinepaper_set_toolkit {load}), is closed over references: a listed tool's named tools are
+ * listed too. Cached per tools array, so a tools/list costs the closure once.
  */
-export function getToolsForToolkit<T extends Tool>(tools: T[], profile: ToolkitProfile): T[] {
+export function getToolsForToolkit<T extends Tool>(tools: T[], profile: ToolkitProfile, load: readonly string[] = []): T[] {
   if (profile === 'full') {
     return tools;
   }
@@ -421,7 +492,22 @@ export function getToolsForToolkit<T extends Tool>(tools: T[], profile: ToolkitP
     return tools; // Unknown profile = no filtering
   }
 
-  // Build set of allowed tool names from all tags in this profile
+  if (profile === 'core' || load.length) {
+    const key = `${profile}|${[...load].sort().join(',')}`;
+    let byKey = closureCache.get(tools);
+    if (!byKey) { byKey = new Map(); closureCache.set(tools, byKey); }
+    let names = byKey.get(key);
+    if (!names) {
+      const seed = seedNames(profile, load);
+      // A domain profile keeps its own narrowing; only what was loaded on top of it is closed over.
+      names = profile === 'core'
+        ? closeOverReferences(tools, seed)
+        : new Set([...seedNames(profile, []), ...closeOverReferences(tools, loadedNames(load))]);
+      byKey.set(key, names);
+    }
+    return tools.filter((tool) => names!.has(tool.name));
+  }
+
   const allowed = new Set<string>();
   for (const tag of tags) {
     const toolNames = TOOL_TAGS[tag];
@@ -435,16 +521,12 @@ export function getToolsForToolkit<T extends Tool>(tools: T[], profile: ToolkitP
   return tools.filter(tool => allowed.has(tool.name));
 }
 
-/**
- * Detect toolkit profile from PINEPAPER_TOOLKIT environment variable.
- * Returns 'agent' if not set or invalid.
- */
 export function detectToolkitFromEnvironment(): ToolkitProfile {
   const value = env('PINEPAPER_TOOLKIT');
   if (value && TOOLKIT_PROFILES_LIST.includes(value as ToolkitProfile)) {
     return value as ToolkitProfile;
   }
-  return 'agent';
+  return DEFAULT_TOOLKIT;
 }
 
 /** Returns true if PINEPAPER_TOOLKIT was explicitly set in the environment. */
@@ -493,13 +575,13 @@ export interface ClientProfile {
  * Known client profiles for auto-detection via MCP initialize handshake.
  * Applied only when env vars are NOT explicitly set.
  */
-const CLIENT_PROFILES: Record<string, ClientProfile> = {
-  'claude-ai': { toolkit: 'minimal', verbosity: 'compact' },
-  'claude-desktop': { toolkit: 'full', verbosity: 'compact' },
-  'claude-code': { toolkit: 'agent', verbosity: 'compact' },
-  cursor: { toolkit: 'full', verbosity: 'compact' },
-  windsurf: { toolkit: 'full', verbosity: 'compact' },
-};
+/**
+ * A client that should START on another profile. Empty since 1.6.25: every client starts on core and loads what
+ * it needs. It used to give Claude Desktop, Cursor and Windsurf `full` (178 tools, ~115k tokens of definitions
+ * before the first message) and claude-ai `minimal`, which listed none of the craft tools the instructions name.
+ * The client's name is logged at initialize either way, so an entry here can be made from a real connection.
+ */
+const CLIENT_PROFILES: Record<string, ClientProfile> = {};
 
 /**
  * Get client profile by name. Exact match first, then prefix match, case-insensitive.

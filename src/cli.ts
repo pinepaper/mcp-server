@@ -39,7 +39,8 @@ OPTIONS:
   --mode <mode>           Execution mode: 'puppeteer' or 'code'
                           - puppeteer: Open browser and execute code (default)
                           - code: Generate code only for manual paste
-  --toolkit <profile>     Tool visibility profile (default: agent)
+  --toolkit <profile>     Tool visibility profile (default: core)
+                          - core: The craft tools and what they name, the agent workflow, canvas and query (${countFor('core')}); load more with pinepaper_set_toolkit {load}
                           - full: Every tool (${countFor('full')})
                           - agent: Every tool except the diagnostics and register_item (${countFor('agent')})
                           - diagram: Diagram/flowchart tools
@@ -138,7 +139,7 @@ SUPPORT:
     const transport = new StdioServerTransport();
 
     const modeDisplay = executionMode || env('PINEPAPER_EXECUTION_MODE') || 'puppeteer';
-    const toolkitDisplay = toolkit || env('PINEPAPER_TOOLKIT') || 'agent';
+    const toolkitDisplay = toolkit || env('PINEPAPER_TOOLKIT') || 'core';
     const verbosityDisplay = verbosity || env('PINEPAPER_VERBOSITY') || env('PINEPAPER_TOOL_VERBOSITY') || 'compact';
     const toolCount = getToolsForToolkit(getToolsForVerbosity(verbosityDisplay as ToolVerbosity), toolkitDisplay as ToolkitProfile).length;
 

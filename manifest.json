@@ -50,15 +50,17 @@
       },
       "toolkit": {
         "type": "string",
-        "description": "Tool visibility profile controlling which tools are exposed",
-        "default": "agent",
+        "description": "Tool visibility profile. core (default) lists the craft tools and what they name; more load on demand with pinepaper_set_toolkit",
+        "default": "core",
         "enum": [
+          "core",
           "full",
           "agent",
           "diagram",
           "map",
           "font",
-          "minimal"
+          "minimal",
+          "lane"
         ]
       },
       "verbosity": {

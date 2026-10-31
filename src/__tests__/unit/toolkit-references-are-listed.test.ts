@@ -18,8 +18,8 @@
  * simply cannot follow the instruction it was given.
  */
 import { describe, it, expect } from 'bun:test';
-import { PINEPAPER_TOOLS } from '../../tools/definitions.js';
-import { getToolsForToolkit, TOOLKIT_PROFILES_LIST } from '../../tools/toolkits.js';
+import { PINEPAPER_TOOLS, CHOOSE_THE_DOOR, DOOR_TOOLS, getToolsForVerbosity } from '../../tools/definitions.js';
+import { getToolsForToolkit, referencedToolNames, CRAFT_TOOLS, TOOLKIT_PROFILES_LIST, DEFAULT_TOOLKIT } from '../../tools/toolkits.js';
 
 const ALL = PINEPAPER_TOOLS.map((t) => t.name);
 
@@ -28,10 +28,11 @@ function danglingIn(profile: string): Array<{ missing: string; referencedBy: str
   const listedTools = getToolsForToolkit(PINEPAPER_TOOLS as never, profile as never);
   const listed = new Set(listedTools.map((t) => t.name));
   const out = new Map<string, string[]>();
+  const known = new Set(ALL);
+  // WHOLE names (referencedToolNames): pinepaper_camera is not named inside pinepaper_camera_director.
   for (const tool of listedTools) {
-    const text = JSON.stringify(tool);
-    for (const name of ALL) {
-      if (listed.has(name) || !text.includes(name)) continue;
+    for (const name of referencedToolNames(tool, known)) {
+      if (listed.has(name)) continue;
       out.set(name, [...(out.get(name) ?? []), tool.name]);
     }
   }
@@ -46,8 +47,35 @@ describe('every tool a profile points at, that profile lists', () => {
     expect(TOOLKIT_PROFILES_LIST).toContain('agent');
   });
 
-  it('the agent profile — the default — has no dangling reference', () => {
+  it('the agent profile has no dangling reference', () => {
     expect(danglingIn('agent')).toEqual([]);
+  });
+
+  // THE DEFAULT since 1.6.25. Closed by construction (getToolsForToolkit follows references), and checked here so
+  // the construction is proved rather than assumed — at every verbosity, since descriptions differ by verbosity.
+  it('core — the default — has no dangling reference at any verbosity', () => {
+    expect(DEFAULT_TOOLKIT).toBe('core');
+    for (const v of ['minimal', 'compact', 'verbose'] as const) {
+      const tools = getToolsForVerbosity(v);
+      const listed = getToolsForToolkit(tools, 'core');
+      const names = new Set(listed.map((t) => t.name));
+      const known = new Set(tools.map((t) => t.name));
+      const dangling = listed.flatMap((t) => referencedToolNames(t, known).filter((r) => !names.has(r)).map((r) => `${t.name} -> ${r}`));
+      expect(dangling, v).toEqual([]);
+    }
+  });
+
+  it('core lists every tool the server instructions send a model to', () => {
+    // The craft seed is exactly what the door block names: its structured doors and the tools its text mentions.
+    const named = [...new Set(CHOOSE_THE_DOOR.match(/\bpinepaper_[a-z0-9_]+\b/g) ?? [])].filter((n) => ALL.includes(n));
+    expect([...CRAFT_TOOLS].sort()).toEqual([...new Set([...DOOR_TOOLS, ...named])].sort());
+    const core = new Set(getToolsForToolkit(PINEPAPER_TOOLS as never, 'core' as never).map((t: { name: string }) => t.name));
+    expect(named.filter((n) => !core.has(n))).toEqual([]);
+  });
+
+  it('core is the lean default: well under the agent profile', () => {
+    const size = (p: string) => Buffer.byteLength(JSON.stringify(getToolsForToolkit(getToolsForVerbosity('compact'), p as never)));
+    expect(size('core')).toBeLessThan(size('agent') * 0.6);
   });
 
   /**
@@ -89,7 +117,7 @@ describe('every tool a profile points at, that profile lists', () => {
   it('the domain profiles dangle only as much as they are known to', () => {
     const counts: Record<string, number> = {};
     for (const profile of TOOLKIT_PROFILES_LIST) {
-      if (profile === 'agent' || profile === 'full' || profile === 'lane') continue;
+      if (profile === 'agent' || profile === 'full' || profile === 'lane' || profile === 'core') continue;
       const n = danglingIn(profile).length;
       if (n) counts[profile] = n;
     }
