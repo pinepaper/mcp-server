@@ -127,6 +127,7 @@
     "hasown": "npm:@socketregistry/hasown@^1.0.7",
     "ip-address": "^10.7.4",
     "js-yaml": "^4.3.1",
+    "minimatch": "^11.0.3",
     "object-assign": "npm:@socketregistry/object-assign@^1.0.5",
     "path-to-regexp": "^8.4.2",
     "proxy-addr": "^2.0.8",
