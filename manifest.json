@@ -8,6 +8,7 @@
   "long_description": "PinePaper MCP Server enables Claude to create, animate, and export graphics through PinePaper Studio. Features include shape creation, relation-based animations (orbits, follows, attached_to), procedural generators, visual effects, SVG export with animations, icon search & import from Iconify and Font Awesome, performance metrics tracking, diagram tools for flowcharts/UML/network diagrams with smart connectors and auto-layout, enhanced error messages with canvas context, Agent Flow Mode for content automation pipelines with batch operations and smart platform exports (Instagram, TikTok, YouTube, etc.), interactive triggers (click, hover, drag events), interactive stories and quizzes, Letter Collage for stylized text with per-letter customization (Wordle, magazine cutout, gradient styles and tile palettes), and canvas presets for social media platforms. Supports two execution modes: Puppeteer (live browser execution) and Code (generate code for manual paste).",
   "author": {
     "name": "PinePaper Studio",
+    "email": "support@pinepaper.studio",
     "url": "https://github.com/pinepaper"
   },
   "support": "https://github.com/pinepaper/mcp-server/issues",
