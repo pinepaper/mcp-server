@@ -1575,6 +1575,8 @@ export function normalizeEmitterSpec(spec: Record<string, unknown>, assumeDefaul
   const DEFAULT_COUNT = 12;
   const mismatch = (where: string, count: unknown, velocities: unknown) => {
     if (!Array.isArray(velocities) || !velocities.length) return;
+    // A count given as a range is not read (said below); comparing it as the default 12 would be a false warning.
+    if (Array.isArray(count)) return;
     const n = typeof count === 'number' && Number.isFinite(count) ? Math.round(count) : (assumeDefaultCount ? DEFAULT_COUNT : null);
     if (n === null || n === velocities.length) return;
     warnings.push(n > velocities.length
@@ -1591,19 +1593,28 @@ export function normalizeEmitterSpec(spec: Record<string, unknown>, assumeDefaul
   });
   // A RANGE WHERE THE STUDIO READS ONE NUMBER is not read at all (1.6.24 probe:
   // gravity [100, 300] fell to 0, opacity [0.2, 1] to 1, no word). These keys go
-  // through the studio's num(), which turns an array into NaN and takes the
-  // default; size, speed, angle, spawn, lifetime and spin go through range().
+  // through the studio's num(), which turns an array into NaN and takes num()'s
+  // fallback; size, speed, angle, spawn, lifetime and spin go through range().
+  // The fallback is not always the unset value, so those three say what it is.
   const SCALAR_ONLY = ['gravity', 'drag', 'friction', 'opacity', 'fadeIn', 'fadeOut', 'strokeWidth', 'jitter', 'jitterHz', 'aspect', 'sizeEnd', 'count'];
-  const scalarRanges = (where: string, o: Record<string, unknown>) => {
-    for (const k of SCALAR_ONLY) {
+  const SPEC_ONLY = ['rate', 'start', 'end', 'seed'];
+  const OUTCOME: Record<string, string> = {
+    count: 'the studio reads it as 0, so this draws no particles',
+    fadeOut: 'the studio reads it as 0, so particles do not fade out (unset, they fade over their life)',
+    strokeWidth: 'the studio reads it as 1 (unset, it is 2)',
+  };
+  const scalarRanges = (where: string, o: Record<string, unknown>, keys: string[]) => {
+    for (const k of keys) {
       const v = o[k];
       if (Array.isArray(v) && v.length >= 2) {
-        warnings.push(`${where}.${k} ${JSON.stringify(v)} was NOT read: ${k} takes one number, so the studio used its default, as if ${k} were not set. Pass a single value. Only size, speed, angle, spawn, lifetime and spin take a [min, max] range.`);
+        warnings.push(`${where}.${k} ${JSON.stringify(v)} was NOT read: ${k} takes one number, and ${OUTCOME[k] ?? `the studio uses its default, as if ${k} were not set`}. Pass a single value. Only size, speed, angle, spawn, lifetime and spin take a [min, max] range.`);
       }
     }
+    const f = o.fade;
+    if (f && typeof f === 'object' && !Array.isArray(f)) scalarRanges(`${where}.fade`, f as Record<string, unknown>, ['in', 'out']);
   };
-  scalarRanges('spec', out);
-  bursts.forEach((b, i) => { if (b && typeof b === 'object') scalarRanges(`bursts[${i}]`, b as Record<string, unknown>); });
+  scalarRanges('spec', out, [...SCALAR_ONLY, ...SPEC_ONLY]);
+  bursts.forEach((b, i) => { if (b && typeof b === 'object') scalarRanges(`bursts[${i}]`, b as Record<string, unknown>, SCALAR_ONLY); });
   return { spec: out, warnings };
 }
 
@@ -8654,8 +8665,10 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
       reason: __ppReason, error: __ppReason, ...((function () { const l = __ppLintNow(); return l.length ? { __ppLint: l } : {}; })()) };
   }
   // Only wrapped when the lint has something to say: otherwise the value is returned exactly as before.
+  // __ppWrapped marks the wrapper itself: a code that returned undefined loses the __ppValue key on its way out
+  // of the page (JSON drops undefined), and without the mark the server read the bare wrapper as the value, {}.
   const __ppL = __ppLintNow();
-  return __ppL.length ? { __ppValue: __ppValue, __ppLint: __ppL } : __ppValue;
+  return __ppL.length ? { __ppWrapped: true, __ppValue: __ppValue, __ppLint: __ppL } : __ppValue;
 })();
 `.trim();
   }

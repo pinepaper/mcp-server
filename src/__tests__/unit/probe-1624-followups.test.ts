@@ -36,3 +36,18 @@ describe('import_image name', () => {
     expect(gen.generateImportImage({ url: 'https://example.com/a.png' } as never)).not.toContain('placed.name =');
   });
 });
+
+describe('emitter range warning says what the studio actually used', () => {
+  it('count as a range draws nothing, and is not also compared as 12', () => {
+    const w = normalizeEmitterSpec({ count: [10, 20], velocities: [[1, 0]], bursts: [{ t: 0, x: 0, y: 0 }] }).warnings;
+    expect(w.join(' ')).toContain('draws no particles');
+    expect(w.join(' ')).not.toContain('count 12');
+  });
+  it('covers strokeWidth, fadeOut, fade.out and the spec-level rate', () => {
+    const w = normalizeEmitterSpec({ strokeWidth: [1, 3], fadeOut: [0.2, 0.5], fade: { out: [1, 2] }, rate: [10, 20] }, false).warnings.join('\n');
+    expect(w).toContain('reads it as 1 (unset, it is 2)');
+    expect(w).toContain('do not fade out');
+    expect(w).toContain('spec.fade.out');
+    expect(w).toContain('spec.rate');
+  });
+});

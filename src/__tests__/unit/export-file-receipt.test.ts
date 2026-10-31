@@ -27,3 +27,12 @@ describe('export file receipt (hash first)', () => {
     expect(Object.keys(r).sort()).toEqual(['bytes', 'sha256']);
   });
 });
+
+describe('a receipt that fails after a good save', () => {
+  it('is its own failure, not the save\'s', async () => {
+    const { exportFileReceiptOrReason, receiptErrorLine } = await import('../../tools/export-file-receipt.js');
+    const r = await exportFileReceiptOrReason('/nonexistent/dir/x.mp4', null);
+    expect('receiptError' in r).toBe(true);
+    expect(receiptErrorLine(r)).toContain('the file was saved');
+  });
+});

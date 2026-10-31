@@ -184,7 +184,7 @@ import {
 import { ZodError, z } from 'zod';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { effectClass } from './effect-class.js';
-import { exportFileReceipt } from './export-file-receipt.js';
+import { exportFileReceiptOrReason, receiptErrorLine } from './export-file-receipt.js';
 import { ExportStepError, errorText, verifySavedFile, writeStep, bytesForSave } from './export-file-check.js';
 import { EFFECT_BEFORE_JS, effectAfterJs, namedItemIds, idMayBeGone, NO_CHANGE_NOTE } from './effect-check.js';
 import { writeFile, mkdir, appendFile, unlink, readFile, stat } from 'node:fs/promises';
@@ -1863,7 +1863,7 @@ export function unwrapLint(run: { result?: unknown; report?: Record<string, unkn
   const r = run.result as Record<string, unknown> | null | undefined;
   if (!r || typeof r !== 'object' || Array.isArray(r) || !('__ppLint' in r)) return [];
   const lint = Array.isArray(r.__ppLint) ? (r.__ppLint as unknown[]) : [];
-  if ('__ppValue' in r) run.result = r.__ppValue;
+  if ('__ppValue' in r || r.__ppWrapped === true) run.result = r.__ppValue;
   else { const { __ppLint: _l, ...rest } = r; void _l; run.result = rest; }
   if (lint.length) run.report = { ...(run.report ?? {}), lintWarnings: lint };
   return lint;
@@ -4774,12 +4774,12 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
               },
               input.platform || 'auto'
             );
-            const receipt = await exportFileReceipt(filePath, exportResult);
+            const receipt = await exportFileReceiptOrReason(filePath, exportResult);
             const cleanResult = { ...exportResult, data: undefined, filePath, fileSize, chunks, file: receipt };
             return withEngineReport({
               content: [{
                 type: 'text' as const,
-                text: `Export saved to file:\n\nFile: ${filePath}\nFormat: ${format}\nSize: ${(fileSize / 1024).toFixed(1)} KB\nPlatform: ${input.platform}\nPaged out of the studio's export store in ${chunks} chunk${chunks === 1 ? '' : 's'}\n${probeLines(receipt)}${lintLines(exportResult)}\nResult: ${JSON.stringify(cleanResult, null, 2)}`,
+                text: `Export saved to file:\n\nFile: ${filePath}\nFormat: ${format}\nSize: ${(fileSize / 1024).toFixed(1)} KB\nPlatform: ${input.platform}\nPaged out of the studio's export store in ${chunks} chunk${chunks === 1 ? '' : 's'}\n${receiptErrorLine(receipt)}${'receiptError' in receipt ? '' : probeLines(receipt)}${lintLines(exportResult)}\nResult: ${JSON.stringify(cleanResult, null, 2)}`,
               }],
             }, exportBrowserResult.report);
           } catch (streamError) {
@@ -4843,7 +4843,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
         if (shouldSaveToFile) {
           try {
             const { filePath, fileSize } = await saveExportToFile(data, format, input.platform || 'auto');
-            const receipt = await exportFileReceipt(filePath, exportResult);
+            const receipt = await exportFileReceiptOrReason(filePath, exportResult);
             const cleanResult = { ...exportResult, data: undefined, filePath, fileSize, file: receipt };
             // A mix that dropped sounds wrote a perfectly good file that is
             // missing tracks. It rides the SUCCESS path, which is exactly why
@@ -4854,7 +4854,8 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
                 type: 'text' as const,
                 text: `Export saved to file:\n\nFile: ${filePath}\nFormat: ${format}\nSize: ${(fileSize / 1024).toFixed(1)} KB\nPlatform: ${input.platform}\n`
                   + (dropNote ? `DROPPED: ${dropNote}\n` : '')
-                  + probeLines(receipt)
+                  + receiptErrorLine(receipt)
+                  + ('receiptError' in receipt ? '' : probeLines(receipt))
                   + lintLines(exportResult)
                   + `\nResult: ${JSON.stringify(cleanResult, null, 2)}`,
               }],

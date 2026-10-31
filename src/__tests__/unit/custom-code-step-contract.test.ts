@@ -25,7 +25,7 @@ describe('execute_custom_code: the emitted wrapper', () => {
   });
   it('carries the lint beside the value when there is something to say', async () => {
     const code = codeGenerator.generateExecuteCustomCode({ code: 'return 7;' });
-    expect(await runCode(code, { lintScene: () => ({ warnings: LINT }) })).toEqual({ __ppValue: 7, __ppLint: LINT });
+    expect(await runCode(code, { lintScene: () => ({ warnings: LINT }) })).toEqual({ __ppWrapped: true, __ppValue: 7, __ppLint: LINT });
   });
   it('a throw is { step, itemId, reason }, and a thrown non-Error is not "undefined"', async () => {
     const thrown = await runCode(codeGenerator.generateExecuteCustomCode({ code: 'const e = new Error("no such item"); e.itemId = "item_9"; throw e;' }), {});
@@ -97,6 +97,12 @@ describe('stepFailures / unwrapLint', () => {
     const run = { result: { a: 1 } };
     expect(unwrapLint(run)).toEqual([]);
     expect(run.result).toEqual({ a: 1 });
+  });
+  it('a code that returned undefined stays undefined when lint rides beside it', () => {
+    // JSON drops the undefined __ppValue on the way out of the page; the wrapper mark is what is left.
+    const run: { result?: unknown } = { result: JSON.parse(JSON.stringify({ __ppWrapped: true, __ppValue: undefined, __ppLint: [{ code: 'X' }] })) };
+    expect(unwrapLint(run)).toEqual([{ code: 'X' }]);
+    expect(run.result).toBeUndefined();
   });
 });
 

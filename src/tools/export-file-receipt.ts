@@ -157,3 +157,23 @@ export async function exportFileReceipt(filePath: string, exportResult: unknown)
   }
   return out;
 }
+
+/**
+ * The receipt for a file that IS saved. A throw here (the hash read, ffprobe) came after a good save, and the
+ * callers' catch reported it as the save failing, telling the agent to redo an export that is on disk. The
+ * receipt step fails on its own instead, and the result says the file was saved without it.
+ */
+export async function exportFileReceiptOrReason(filePath: string, exportResult: unknown): Promise<ExportFileReceipt | { receiptError: string }> {
+  try {
+    return await exportFileReceipt(filePath, exportResult);
+  } catch (e) {
+    return { receiptError: (e instanceof Error && e.message) || 'no reason given' };
+  }
+}
+
+/** The line a result carries when the file was saved but its receipt could not be made. */
+export function receiptErrorLine(receipt: ExportFileReceipt | { receiptError: string }): string {
+  return 'receiptError' in receipt
+    ? `RECEIPT: the file was saved, but it could not be hashed or read back (${receipt.receiptError}); it has no sha256 or probe.\n`
+    : '';
+}

@@ -278,16 +278,20 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   rather than as a file.
 - `on_event_fire_if` is documented: its predicate is an ExpressionIR object
   (comparisons, and/or/not, reads of an item's data, active or visible
-  state), and it fires the event in `params.event`, not its target. A
-  predicate written as a string, or a relation with no event to fire, is
-  refused with the shape that works, instead of silently never firing.
+  state), and it fires the event in `params.event`, not its target.
+  `pinepaper_add_relation` and batch `relation` steps refuse a predicate
+  written as a string, or a relation with no event to fire, and show the shape
+  that works. Before, the relation silently never fired.
 - An emitter given a `[min, max]` range for a key that takes one number
-  (`gravity`, `drag`, `friction`, `opacity`, `fadeIn`, `fadeOut`,
-  `strokeWidth`, `jitter`, `jitterHz`, `aspect`, `sizeEnd`, `count`) now gets
-  a warning. The studio ignores the range and uses its default, which used to
-  happen with no warning.
+  (such as `gravity`, `opacity` or `count`) now gets a warning that says what
+  the studio used instead. Before, the range was ignored with no warning. A
+  range for `count` draws no particles at all.
 - `pinepaper_import_image` takes a `name`, so a batch `patch` can address an
   imported image by name.
+- Custom code that returns nothing is reported as returning nothing, not as
+  `{}`, when the scene lint has warnings.
+- An export whose file was saved but could not be hashed or read back says
+  so. It used to report the save as failed.
 
 ## What's new in 1.6.24
 
