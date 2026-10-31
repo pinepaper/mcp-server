@@ -268,6 +268,11 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
     you pass `itemType`.
   - `stagger` plays the same keyframes on several items, one after another.
   - `patch` changes an item by its name.
+- Batch operation `timeline`: GSAP-style tweens written as JSON (`to`, `from`,
+  `at`, `stagger`, `ease`, `repeat`, `yoyo`, labels), turned into ordinary
+  keyframe tracks, so the result exports, saves and edits like hand-written
+  keyframes. A tween that cannot be built is refused before anything runs,
+  with the path of the bad value. The result says what each tween became.
 - `pinepaper_agent_export` returns the saved file's `sha256` and size. When
   the studio reports per-frame hashes, it also returns a `frameDigest`, so two
   renders can be compared in one field. When `ffprobe` is installed, the saved
