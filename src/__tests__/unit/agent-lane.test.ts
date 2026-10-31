@@ -15,7 +15,7 @@ import { getToolsForToolkit } from '../../tools/toolkits.js';
 import { LANE_TOOL_NAMES, LANE_TOOLS, LANE_INSTRUCTIONS, laneContractText } from '../../tools/lane.js';
 import {
   AgentBatchExecuteInputSchema, AgentBatchOperationSchema, KeyframeAnimateInputSchema, PatternInputSchema,
-  AgentExportInputSchema, LintSceneInputSchema, SetToolkitInputSchema,
+  AgentExportInputSchema, LintSceneInputSchema, SetToolkitInputSchema, EventInputSchema,
 } from '../../types/schemas.js';
 import { validateBatchVocabulary, detectBatchPropertyTypos } from '../../ontology/hints.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -70,9 +70,40 @@ function inlineExample(text: string): Record<string, unknown> {
 }
 
 describe('the agent lane', () => {
-  it('lists exactly the five lane tools, in lane order', () => {
+  it('lists exactly the lane tools, in lane order', () => {
     expect(lane.map((t) => t.name)).toEqual([...LANE_TOOL_NAMES]);
-    expect(lane.length).toBe(5);
+    expect(lane.length).toBe(7);
+  });
+
+  // O10 (mcp-server#29): the lane had no way to start over and no events. It keeps every tool it had.
+  it('keeps the five it had, and adds clearing and events (O10)', () => {
+    const names = lane.map((t) => t.name);
+    for (const had of ['pinepaper_agent_batch_execute', 'pinepaper_keyframe_animate', 'pinepaper_pattern', 'pinepaper_agent_export', 'pinepaper_lint_scene']) {
+      expect(names).toContain(had);
+    }
+    expect(names).toContain('pinepaper_clear_canvas');
+    expect(names).toContain('pinepaper_event');
+    expect(LANE_INSTRUCTIONS).toMatch(/pinepaper_clear_canvas/);
+    expect(LANE_INSTRUCTIONS).toMatch(/pinepaper_event/);
+  });
+
+  it('teaches a timed event and a click, and every example is accepted (O10)', () => {
+    const ev = LANE_TOOLS.pinepaper_event.description;
+    for (const line of exampleLines(ev)) expect(EventInputSchema.safeParse(line).success, JSON.stringify(line)).toBe(true);
+    expect(ev).toContain('"at":');
+    // The reactions ride in the batch as relation ops; their examples are batch ops the preflight accepts.
+    const batch = LANE_TOOLS.pinepaper_agent_batch_execute.description;
+    expect(batch).toMatch(/"relationType":"on_event_set_visibility"/);
+    expect(batch).toMatch(/"relationType":"on_click_fire"/);
+    // show/hide is params.visible: the engine reads visible, not value (O4).
+    expect(batch).toContain('"visible":true');
+  });
+
+  it('the lane tools/list stays small: ≤ 16,000 bytes (13,441 before O10)', async () => {
+    const client = await connect('lane');
+    const listed = await client.listTools();
+    expect(Buffer.byteLength(JSON.stringify(listed), 'utf8')).toBeLessThanOrEqual(16_000);
+    await client.close();
   });
 
   it('is the same tools whatever the verbosity', () => {
@@ -111,6 +142,7 @@ describe('the agent lane', () => {
   });
 
   it('every other tool\'s example is accepted by that tool', () => {
+    expect(LANE_TOOLS.pinepaper_clear_canvas.inputSchema).toEqual({ type: 'object', properties: {} });
     expect(KeyframeAnimateInputSchema.safeParse(inlineExample(LANE_TOOLS.pinepaper_keyframe_animate.description)).success).toBe(true);
     expect(PatternInputSchema.safeParse(inlineExample(LANE_TOOLS.pinepaper_pattern.description)).success).toBe(true);
     expect(AgentExportInputSchema.safeParse({ format: 'mp4', duration: 8, fps: 30 }).success).toBe(true);
@@ -136,7 +168,7 @@ describe('the agent lane', () => {
     expect(SetToolkitInputSchema.parse({ toolkit: 'lane' }).toolkit).toBe('lane');
   });
 
-  it('a lane server lists the five with their lane descriptions, and its instructions are the lane\'s', async () => {
+  it('a lane server lists the lane tools with their lane descriptions, and its instructions are the lane\'s', async () => {
     const client = await connect('lane');
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name)).toEqual([...LANE_TOOL_NAMES]);
@@ -146,6 +178,13 @@ describe('the agent lane', () => {
     const ops = exampleLines(LANE_TOOLS.pinepaper_agent_batch_execute.description).filter((o) => o.type !== 'modify');
     const r = await client.callTool({ name: 'pinepaper_agent_batch_execute', arguments: { operations: ops } });
     expect(r.isError, JSON.stringify(r.content).slice(0, 400)).toBeFalsy();
+    // O10: the lane's own event examples and a bare clear reach their handlers and are accepted.
+    for (const args of exampleLines(LANE_TOOLS.pinepaper_event.description)) {
+      const e = await client.callTool({ name: 'pinepaper_event', arguments: args });
+      expect(e.isError, JSON.stringify(e.content).slice(0, 400)).toBeFalsy();
+    }
+    const c = await client.callTool({ name: 'pinepaper_clear_canvas', arguments: {} });
+    expect(c.isError, JSON.stringify(c.content).slice(0, 400)).toBeFalsy();
     await client.close();
   });
 

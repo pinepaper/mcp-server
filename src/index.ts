@@ -5883,7 +5883,7 @@ WORKFLOW (always follow this):
 
 MORE TOOLS LOAD ON DEMAND: the list starts with the core tools. Maps, diagrams, fonts, physics, ontology and the rest load with pinepaper_set_toolkit {load: ["map"]} (a group) or {load: ["pinepaper_map"]} (a tool); the list updates at once.
 
-A scripted build of shapes, text, keyframes and relations needs none of the craft tools: PINEPAPER_TOOLKIT=lane serves a five-tool agent lane whose descriptions carry the whole contract (pinepaper_tool_guide says more).
+A scripted build of shapes, text, keyframes and relations needs none of the craft tools: PINEPAPER_TOOLKIT=lane serves a seven-tool agent lane whose descriptions carry the whole contract (pinepaper_tool_guide says more).
 
 The tools generate Paper.js/JavaScript code that executes on the PinePaper canvas. The generated code is visible in responses and can be copied into PinePaper's Code Console.`,
   });
