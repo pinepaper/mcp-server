@@ -150,7 +150,8 @@ export function expandBatchMacros(ops: readonly Op[]): Op[] {
         return;
       }
       default:
-        if (op.type === 'create') slots.n++;
+        // A group makes an item, so it takes a $N slot as a create does (O2).
+        if (op.type === 'create' || op.type === 'group') slots.n++;
         out.push(op);
     }
   });
