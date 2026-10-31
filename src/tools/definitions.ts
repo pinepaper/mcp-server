@@ -1229,6 +1229,7 @@ Use maxWidth/maxHeight to constrain the image dimensions while preserving aspect
 - nativeSize: true places the image at its source footprint even if it was stored smaller.
 - smoothing: 'off' (nearest-neighbour, for pixel art) | 'low' (default) | 'medium' | 'high'.
 - shadowColor / shadowBlur / shadowOffset: a drop shadow on the placed image, the same keys pinepaper_modify_item takes.
+- name: a name for the image, so a batch patch or any tool that takes an item can address it by name instead of its id.
 
 EXAMPLES:
 - Import photo: url: "https://example.com/photo.jpg"
@@ -1259,6 +1260,7 @@ EXAMPLES:
         },
         maxEdge: { anyOf: [{ type: 'integer', minimum: 1 }, { type: 'string', enum: ['native'] }], description: "The longest edge the studio STORES the image at (px); 'native' keeps every pixel. Default: the studio's cap, which follows the canvas on desktop. The result says when the image was stored smaller than its source." },
         nativeSize: { type: 'boolean', description: 'Place the image at its source footprint even if it was stored smaller.' },
+        name: { type: 'string', description: 'A name for the image, so a batch patch (or any tool that takes an item) can address it by name instead of its id.' },
         mask: {
           type: 'string',
           enum: ['circle', 'rounded', 'hexagon', 'star'],

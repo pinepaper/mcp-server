@@ -3523,6 +3523,7 @@ export const ImportImageInputSchema = z.object({
   maxHeight: z.number().optional().describe('Maximum height constraint in pixels'),
   maxEdge: z.union([z.number().int().positive(), z.literal('native')]).optional().describe("The longest edge the studio STORES the image at, in px; 'native' keeps every pixel. Default: the studio's cap (it follows the canvas on desktop)."),
   nativeSize: z.boolean().optional().describe('Place the image at its source footprint even if it was stored smaller.'),
+  name: z.string().min(1).optional().describe('A name for the image, so a batch patch (or any tool that takes an item) can address it by name instead of its id.'),
   mask: ImageMaskSchema.optional().describe('Optional mask shape to apply to the image'),
   smoothing: z.enum(['off', 'low', 'medium', 'high']).optional().describe("Resampling when the image is scaled. 'off' = nearest-neighbour, hard pixel edges (pixel art). Default 'low'."),
   // IMPORTSHADOW: these were not keys here, so zod stripped them and the photo

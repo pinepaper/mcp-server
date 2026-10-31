@@ -281,6 +281,13 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   state), and it fires the event in `params.event`, not its target. A
   predicate written as a string, or a relation with no event to fire, is
   refused with the shape that works, instead of silently never firing.
+- An emitter given a `[min, max]` range for a key that takes one number
+  (`gravity`, `drag`, `friction`, `opacity`, `fadeIn`, `fadeOut`,
+  `strokeWidth`, `jitter`, `jitterHz`, `aspect`, `sizeEnd`, `count`) now gets
+  a warning. The studio ignores the range and uses its default, which used to
+  happen with no warning.
+- `pinepaper_import_image` takes a `name`, so a batch `patch` can address an
+  imported image by name.
 
 ## What's new in 1.6.24
 

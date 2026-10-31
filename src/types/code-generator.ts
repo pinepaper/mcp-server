@@ -1589,6 +1589,21 @@ export function normalizeEmitterSpec(spec: Record<string, unknown>, assumeDefaul
     const own = (b && typeof b === 'object' ? b : {}) as Record<string, unknown>;
     if (own.count !== undefined || own.velocities !== undefined) mismatch(`bursts[${i}]`, own.count ?? out.count, own.velocities ?? out.velocities);
   });
+  // A RANGE WHERE THE STUDIO READS ONE NUMBER is not read at all (1.6.24 probe:
+  // gravity [100, 300] fell to 0, opacity [0.2, 1] to 1, no word). These keys go
+  // through the studio's num(), which turns an array into NaN and takes the
+  // default; size, speed, angle, spawn, lifetime and spin go through range().
+  const SCALAR_ONLY = ['gravity', 'drag', 'friction', 'opacity', 'fadeIn', 'fadeOut', 'strokeWidth', 'jitter', 'jitterHz', 'aspect', 'sizeEnd', 'count'];
+  const scalarRanges = (where: string, o: Record<string, unknown>) => {
+    for (const k of SCALAR_ONLY) {
+      const v = o[k];
+      if (Array.isArray(v) && v.length >= 2) {
+        warnings.push(`${where}.${k} ${JSON.stringify(v)} was NOT read: ${k} takes one number, so the studio used its default, as if ${k} were not set. Pass a single value. Only size, speed, angle, spawn, lifetime and spin take a [min, max] range.`);
+      }
+    }
+  };
+  scalarRanges('spec', out);
+  bursts.forEach((b, i) => { if (b && typeof b === 'object') scalarRanges(`bursts[${i}]`, b as Record<string, unknown>); });
   return { spec: out, warnings };
 }
 
@@ -8989,7 +9004,7 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
   }
 
   generateImportImage(input: ImportImageInput): string {
-    const { url, position, maxWidth, maxHeight, mask, smoothing, maxEdge, nativeSize, shadowColor, shadowBlur, shadowOffset } = input;
+    const { url, position, maxWidth, maxHeight, mask, smoothing, maxEdge, nativeSize, shadowColor, shadowBlur, shadowOffset, name } = input;
     // IMPORTSHADOW: the shadow keys, applied through the engine's own modify
     // door once the image is placed (and masked) — the route modify_item takes.
     const shadow: Record<string, unknown> = {};
@@ -9106,6 +9121,11 @@ ${mask ? `    // A MASK REPLACES THE RASTER (round 8 DD, 4.10). applyMask builds
         ? { applied: true, shadowColor: placed.shadowColor ? String(placed.shadowColor.toCSS ? placed.shadowColor.toCSS(true) : placed.shadowColor) : null, shadowBlur: placed.shadowBlur }
         : { applied: false, warning: 'the image was imported but its shadow was not applied — set it with pinepaper_modify_item on ' + itemId + '.' };
     }
+` : ''}${name ? `    // PATCHIMG24: an image had no name, so a batch patch (which addresses by
+    // name) could not reach it. Set where the registry's name lookup reads it,
+    // on what is drawn (the mask group when masked).
+    placed.name = ${JSON.stringify(name)};
+    if (placed.data) placed.data.name = ${JSON.stringify(name)};
 ` : ''}    const b = placed.bounds;
     if (!b || !(b.width > 0) || !(b.height > 0)) {
       return { success: false, itemId: itemId, error: 'the image was placed with no size (' + (b ? b.width + 'x' + b.height : 'no bounds') + ') — it may not have loaded. Nothing visible was drawn.' };
@@ -9113,7 +9133,7 @@ ${mask ? `    // A MASK REPLACES THE RASTER (round 8 DD, 4.10). applyMask builds
     return {
       success: true,
       itemId: itemId,
-      message: 'Image imported and placed on canvas.',
+      message: 'Image imported and placed on canvas.',${name ? `\n      name: ${JSON.stringify(name)},` : ''}
       bounds: { x: b.x, y: b.y, width: b.width, height: b.height }${mask ? `,\n      mask: '${mask}'` : ''}${hasShadow ? ',\n      shadow: __shadow' : ''},
       // Stored smaller than its source (the studio's cap): said, with the
       // way to keep every pixel. The studio reports native size where it can.
