@@ -88,7 +88,7 @@ USE WHEN:
 - "player stays in arena" → relationType: bounds_to
 
 RELATION TYPES:
-- orbits: Circular motion around target (params: radius, speed, direction)
+- orbits: Circular motion around target (params: radius, speed in revolutions per second, direction)
 - follows: Move toward target with smoothing (params: offset, smoothing, delay)
 - attached_to: Fixed offset from target (params: offset, inherit_rotation)
 - maintains_distance: Stay fixed distance from target (params: distance, strength)
