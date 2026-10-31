@@ -65,7 +65,7 @@ const KEYFRAMES = {
 
 export const LANE_TOOLS: Readonly<Record<(typeof LANE_TOOL_NAMES)[number], LaneTool>> = {
   pinepaper_agent_batch_execute: {
-    description: `Build the scene in ONE call: canvas, background, items, keyframes, relations. Ops run in order. "$0", "$1", … are the items THIS call created, in create order (only create ops count). The result lists their ids in itemIds; use those ids in later calls.
+    description: `Build the scene in ONE call: canvas, background, items, keyframes, relations. Ops run in order. "$0", "$1", … are the items THIS call made, in op order (create and group ops are numbered; a group of "$0","$1" made next is "$2"). The result lists their ids in itemIds; use those ids in later calls.
 
 Each line is a correct op:
 {"type":"set_canvas_size","width":1920,"height":1080}

@@ -1209,7 +1209,7 @@ describe('PinePaperCodeGenerator', () => {
   // a [create ×2, keyframe_animate ×2, create ×2, keyframe_animate($2) ×2]
   // batch silently re-animated the FIRST items and left the later creates
   // without keyframes (mis-animated vehicles, 2026-07-30).
-  describe('generateAgentBatchExecute — only create ops claim $N slots', () => {
+  describe('generateAgentBatchExecute — only ops that make an item (create, group) claim $N slots', () => {
     it('emits itemIds.push only for create operations', () => {
       const code = codeGenerator.generateAgentBatchExecute({
         operations: [

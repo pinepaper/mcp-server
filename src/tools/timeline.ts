@@ -33,7 +33,7 @@ import { ENGINE_EASING_NAMES } from './engine-lists.js';
 // ---------------------------------------------------------------------------------------------------------------
 // Types
 
-/** What the batch knows about the items it creates, in create order: "$N" is creates[N]. */
+/** What the batch knows about the items it makes, in $N order (create and group ops): "$N" is creates[N]. */
 export interface TimelineCreateInfo {
   name?: string;
   anchor?: string;
@@ -853,11 +853,13 @@ export function compileTimeline(op: Record<string, unknown>, ctx: { creates: Tim
 // ---------------------------------------------------------------------------------------------------------------
 // Batch integration
 
-/** What the batch creates, in create order, for name resolution and anchors. */
+/** What the batch makes, in $N order (create and group ops), for name resolution and anchors. */
 export function batchCreatesBefore(operations: ReadonlyArray<Record<string, unknown>>, index: number): TimelineCreateInfo[] {
   const out: TimelineCreateInfo[] = [];
   for (let i = 0; i < index; i++) {
     const op = operations[i];
+    // A group makes an item and takes a $N slot (O2); it is known by its groupName and has no anchor.
+    if (op.type === 'group') { out.push({ name: typeof op.groupName === 'string' ? op.groupName : undefined }); continue; }
     if (op.type !== 'create') continue;
     const p = (op.properties || {}) as Record<string, unknown>;
     const name = typeof p.name === 'string' ? p.name : typeof op.name === 'string' ? (op.name as string) : undefined;
