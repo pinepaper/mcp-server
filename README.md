@@ -276,6 +276,11 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - The agent toolkit's export description now says what each format returns:
   only MP4 and WebM carry a frame digest, and a small SVG comes back inline
   rather than as a file.
+- `on_event_fire_if` is documented: its predicate is an ExpressionIR object
+  (comparisons, and/or/not, reads of an item's data, active or visible
+  state), and it fires the event in `params.event`, not its target. A
+  predicate written as a string, or a relation with no event to fire, is
+  refused with the shape that works, instead of silently never firing.
 
 ## What's new in 1.6.24
 

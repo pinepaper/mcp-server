@@ -1414,6 +1414,54 @@ export function relationRefusalReasonJs(typeJs: string): string {
   return `(function(){ var ws = (app && app._engineWarnings) || []; for (var i = ws.length - 1; i >= 0; i--) { var w = ws[i]; if (w && w.relation === ${typeJs} && typeof w.message === 'string') return w.message; } return null; })()`;
 }
 
+/**
+ * on_event_fire_if FAILS SILENTLY ON A BAD SPEC (1.6.24 probe). The engine
+ * evaluates params.predicate with the ExpressionIR interpreter, which is total:
+ * a string such as "1 > 0" has no `op`, evaluates to 0 and takes the else
+ * branch without a warning. And it pulses params.event, never the target, so a
+ * relation with no event fires nothing at all. Both are refused here with the
+ * shape that works. Only the predicate ops' own fields are checked; any other
+ * op passes, so an op the engine adds later is not refused by a stale list.
+ */
+export function fireIfProblem(params: Record<string, unknown> | undefined): string | null {
+  const p = params ?? {};
+  const example = 'e.g. predicate: { op: "cmp", cmp: "eq", a: { op: "graph", read: "data", item: "item_3", property: "score" }, b: { op: "const", value: 3 } }, event: "<event to fire when it holds>"';
+  const walk = (n: unknown, path: string, depth: number): string | null => {
+    if (depth > 32) return `${path} nests deeper than 32 levels`;
+    if (!n || typeof n !== 'object' || Array.isArray(n) || typeof (n as { op?: unknown }).op !== 'string') {
+      return `${path} must be an ExpressionIR node (an object with an "op"), got ${JSON.stringify(n)}`;
+    }
+    const node = n as Record<string, unknown>;
+    if (node.op === 'cmp') {
+      if (!['eq', 'neq', 'gt', 'gte', 'lt', 'lte'].includes(node.cmp as string)) return `${path}.cmp must be eq, neq, gt, gte, lt or lte, got ${JSON.stringify(node.cmp)}`;
+      return walk(node.a, `${path}.a`, depth + 1) ?? walk(node.b, `${path}.b`, depth + 1);
+    }
+    if (node.op === 'logic') {
+      if (!['and', 'or', 'not'].includes(node.logic as string)) return `${path}.logic must be and, or or not, got ${JSON.stringify(node.logic)}`;
+      if (!Array.isArray(node.args) || !node.args.length) return `${path}.args must be a non-empty array of nodes`;
+      for (let i = 0; i < node.args.length; i++) {
+        const bad = walk(node.args[i], `${path}.args[${i}]`, depth + 1);
+        if (bad) return bad;
+      }
+      return null;
+    }
+    if (node.op === 'graph') {
+      if (!['data', 'active', 'visible'].includes(node.read as string)) return `${path}.read must be data, active or visible, got ${JSON.stringify(node.read)}`;
+      if (typeof node.item !== 'string' || !node.item) return `${path}.item must name the item to read`;
+      if (node.read === 'data' && (typeof node.property !== 'string' || !node.property)) return `${path}.property must name the item.data key to read`;
+    }
+    return null;
+  };
+  const bad = walk(p.predicate, 'params.predicate', 0);
+  if (bad) return `${bad}. ${example}.`;
+  const named = (v: unknown) => typeof v === 'string' && v.length > 0;
+  if (!named(p.event) && !named(p.else)) {
+    return 'params.event is missing, so nothing would fire: on_event_fire_if pulses params.event when the predicate holds (and params.else when it does not), never its target. '
+      + 'Make the event to fire with pinepaper_event and pass its id as params.event.';
+  }
+  return null;
+}
+
 function generateAddRelationCode(
   sourceId: string,
   targetId: string,
@@ -3376,6 +3424,11 @@ export class PinePaperCodeGenerator {
 })();`.trim();
     }
 
+    if (validated.relationType === 'on_event_fire_if') {
+      const problem = fireIfProblem(validated.params as Record<string, unknown>);
+      if (problem) return `(function() { return { success: false, relationType: 'on_event_fire_if', error: ${JSON.stringify(problem)} }; })();`;
+    }
+
     if (validated.relationType === 'moves_along_path') {
       return generateMovesAlongPathCode(validated.sourceId, validated.targetId ?? undefined, (validated.params ?? {}) as Record<string, unknown>);
     }
@@ -5230,6 +5283,10 @@ return { itemId: targetId, animationType: ${JSON.stringify(String(op.animationTy
         const srcRef = batchRef(op.sourceId);
         const tgtRef = batchRef(op.targetId);
         const relOpts = JSON.stringify(op.relationOptions || {});
+        const fireIf = op.relationType === 'on_event_fire_if' ? fireIfProblem(op.relationOptions as Record<string, unknown>) : null;
+        if (fireIf) return `
+throw new Error(${JSON.stringify('on_event_fire_if: ' + fireIf)});
+`;
         return `
 const sourceId = ${srcRef};
 const targetId = ${tgtRef};
