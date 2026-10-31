@@ -837,13 +837,13 @@ function takeDirection(props: Record<string, unknown>): DirectionRequest | null 
  */
 function emitDirectionCheck(itemExpr: string, req: DirectionRequest): string {
   if ('error' in req) return `
-const __direction = ${JSON.stringify({ applied: false, error: req.error })};`;
-  const v = JSON.stringify(req.value);
+const __direction = ${jsLiteral({ applied: false, error: req.error })};`;
+  const v = jsLiteral(req.value);
   return `
 const __direction = (function(it) {
   if (!it || it.className !== 'PointText') return { applied: false, note: 'direction applies to text items only.' };
   return it.data && it.data.direction === ${v}
-    ? { applied: true, value: ${v}${req.resolved ? `, resolved: ${JSON.stringify(req.resolved)}` : ''} }
+    ? { applied: true, value: ${v}${req.resolved ? `, resolved: ${jsLiteral(req.resolved)}` : ''} }
     : { applied: false, note: 'this studio does not set a paragraph direction (it needs an engine with RTL text support): the text is laid out left-to-right.' };
 })(${itemExpr});`;
 }
@@ -940,7 +940,7 @@ function takeStrokePosition(props: Record<string, unknown>, allowNull: boolean):
   return { error: `strokePosition ${JSON.stringify(raw)} is not 'outside' or 'center' — the stroke is unchanged.` };
 }
 function emitStrokePositionCheck(itemExpr: string, req: StrokePositionRequest): string {
-  if ('error' in req) return `\nconst __strokePos = ${JSON.stringify({ applied: false, error: req.error })};`;
+  if ('error' in req) return `\nconst __strokePos = ${jsLiteral({ applied: false, error: req.error })};`;
   if (req.value === 'center') return `\nconst __strokePos = { applied: true, value: 'center' };`;
   return `
 const __strokePos = (function(it) {
@@ -959,7 +959,7 @@ function anchorHold(anchor: unknown): 'top' | 'bottom' | undefined {
 function emitTextFit(itemExpr: string, box: Record<string, unknown>, holdFallback = 'undefined'): string {
   return `
 if (typeof app.fitText === 'function') {
-  const __fbox = ${JSON.stringify(box)};
+  const __fbox = ${jsLiteral(box)};
   if (__fbox.hold === undefined) { const __h = ${holdFallback}; if (__h) __fbox.hold = __h; }
   const __fr = app.fitText(${itemExpr}, __fbox);
   __textFit = __fr && __fr.ok !== false
@@ -1028,11 +1028,11 @@ function emitTextStyle(itemExpr: string, props: Record<string, unknown>): string
   const edge = function(b) { return j === 'left' ? b.left : j === 'right' ? b.right : b.center.x; };
   const b0 = it.bounds, ax = edge(b0), ay = b0.center.y;
   ${weight !== undefined || props.fontStyle !== undefined
-    ? `it.fontWeight = ${JSON.stringify(`${italic ? 'italic ' : ''}${weight ?? 'normal'}`)};`
+    ? `it.fontWeight = ${jsLiteral(`${italic ? 'italic ' : ''}${weight ?? 'normal'}`)};`
     : ''}
   ${leading !== undefined ? `it.leading = ${leading};` : ''}
   ${lh !== undefined ? `it.leading = ${lh} <= 4 ? ${lh} * it.fontSize : ${lh};` : ''}
-  ${ls !== undefined ? `it.letterSpacing = ${JSON.stringify(ls)};` : ''}
+  ${ls !== undefined ? `it.letterSpacing = ${jsLiteral(ls)};` : ''}
   const b1 = it.bounds;
   it.position = it.position.add([ax - edge(b1), ay - b1.center.y]);
 })(${itemExpr});`;
