@@ -15,17 +15,16 @@
  * pinepaper_import_image. Refusing that would break the tool's own advice.
  */
 import { realpath } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import { basename, delimiter, dirname, join, resolve, sep } from 'node:path';
 import { env } from './env.js';
+import { getExportDir } from './export-dir.js';
 
 async function real(p: string): Promise<string | null> {
   try { return await realpath(p); } catch { return null; }
 }
 
 export async function allowedAssetRoots(): Promise<string[]> {
-  // Same default as getExportDir() in handlers.ts (not imported: that module imports this one).
-  const exportDir = env('PINEPAPER_EXPORT_DIR') || join(tmpdir(), 'pinepaper-exports');
+  const exportDir = getExportDir();
   const entries = [process.cwd(), exportDir, ...(env('PINEPAPER_ASSET_DIRS') ?? '').split(delimiter).filter(Boolean)];
   const roots = await Promise.all(entries.map((e) => real(resolve(e))));
   return [...new Set(roots.filter((r): r is string => r !== null))];

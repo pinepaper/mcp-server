@@ -12,6 +12,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { confineAssetPath } from '../../utils/asset-paths.js';
 import { executeOrGenerate, getLocalizedSuccessMessage, getExportDir, errorResult, type HandlerOptions } from '../handlers.js';
+import { exportFileLink } from '../../utils/export-dir.js';
 import { codeGenerator } from '../../types/code-generator.js';
 import { ExportTrainingDataInputSchema, ExportSceneInputSchema, ImportSceneInputSchema, ErrorCodes } from '../../types/schemas.js';
 import { getBrowserController } from '../../browser/puppeteer-controller.js';
@@ -85,7 +86,7 @@ export const exportHandlers: Record<string, ExportHandler> = {
         warning: `${lost.length} piece(s) of per-frame drawing will NOT be in the file: ${lost.map((u) => `${u.kind ?? 'callback'} ${u.id ?? ''}`.trim()).join(', ')}. They are JavaScript functions, which a document cannot carry. Re-create them as pinepaper_render_hook (saved as source) or pinepaper_emitter (saved as data) to keep them.`,
       } : {}),
     };
-    return { content: [{ type: 'text' as const, text: `Project saved: ${filePath}\n\n${JSON.stringify(result, null, 2)}` }] };
+    return { content: [{ type: 'text' as const, text: `Project saved: ${filePath}\n\n${JSON.stringify(result, null, 2)}` }, exportFileLink(filePath, Buffer.byteLength(v.json))] };
   },
 
   pinepaper_import_scene: async (args, options) => {

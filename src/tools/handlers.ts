@@ -189,7 +189,6 @@ import { exportFileReceiptOrReason, receiptErrorLine } from './export-file-recei
 import { ExportStepError, errorText, verifySavedFile, writeStep, bytesForSave } from './export-file-check.js';
 import { EFFECT_BEFORE_JS, effectAfterJs, namedItemIds, idMayBeGone, NO_CHANGE_NOTE } from './effect-check.js';
 import { writeFile, mkdir, appendFile, unlink, readFile, stat } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import { join, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { I18nManager } from '../i18n/index.js';
@@ -222,6 +221,7 @@ import { buildHtml5Ad, buildPlayable, externalRequests, pinSceneBackground, type
 import { safeFetch, checkUrl, UnsafeUrlError } from '../utils/safe-fetch.js';
 import { confineAssetPath } from '../utils/asset-paths.js';
 import { env } from '../utils/env.js';
+import { getExportDir, exportFileLink } from '../utils/export-dir.js';
 
 /**
  * Registry of per-domain handler maps. Tools listed here short-circuit the
@@ -272,9 +272,8 @@ export function getScreenshotMode(): ScreenshotMode {
 // EXPORT FILE SAVE HELPERS
 // =============================================================================
 
-export function getExportDir(): string {
-  return env('PINEPAPER_EXPORT_DIR') || join(tmpdir(), 'pinepaper-exports');
-}
+// The export folder, one definition for the writers and for path confinement (utils/export-dir.ts).
+export { getExportDir };
 
 // wav joins them: a minute of 48kHz 16-bit is ~5.8 MB of base64 and the ten
 // minutes the schema allows is ~77 MB. Deliverable across the bridge, useless
@@ -605,7 +604,7 @@ async function saveAdExport(r: AdExportResult, input: { ad?: { clickUrl?: string
     content: [{
       type: 'text' as const,
       text: `Ad saved:\n\n${Object.entries(files).map(([k, v]) => `${k}: ${v}`).join('\n')}\nFormat: ${r.format}\nSize: ${r.adSize.width}x${r.adSize.height}, upload ${(uploadBytes / 1024).toFixed(1)} KB\n\nResult: ${JSON.stringify(cleanResult, null, 2)}`,
-    }],
+    }, ...Object.values(files).filter((f): f is string => typeof f === 'string').map((f) => exportFileLink(f))],
   };
 }
 
@@ -1455,7 +1454,7 @@ async function writeResultDataToFile(out: CallToolResult, ext: string): Promise<
     const { data: _d, ...rest } = r;
     void _d;
     obj.result = { ...rest, filePath, bytes: bytes.length };
-    return { ...out, content: [{ type: 'text', text: JSON.stringify(obj, null, 2) }, ...out.content.slice(1)] };
+    return { ...out, content: [{ type: 'text', text: JSON.stringify(obj, null, 2) }, ...out.content.slice(1), exportFileLink(filePath, bytes.length)] };
   } catch (e) {
     const err = e instanceof ExportStepError ? new ExportStepError(e.step, e.path ?? filePath, e.reason)
       : new ExportStepError('write', filePath, errorText(e, 'the file could not be written'));
@@ -4822,7 +4821,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
               content: [{
                 type: 'text' as const,
                 text: `Export saved to file:\n\nFile: ${filePath}\nFormat: ${format}\nSize: ${(fileSize / 1024).toFixed(1)} KB\nPlatform: ${input.platform}\nPaged out of the studio's export store in ${chunks} chunk${chunks === 1 ? '' : 's'}\n${receiptErrorLine(receipt)}${'receiptError' in receipt ? '' : probeLines(receipt)}${lintLines(exportResult)}\nResult: ${JSON.stringify(cleanResult, null, 2)}`,
-              }],
+              }, exportFileLink(filePath, fileSize)],
             }, exportBrowserResult.report);
           } catch (streamError) {
             // The export is still held — the message says so and names the id,
@@ -4856,7 +4855,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
           const { sccCues: _c, ...rest } = exportResult as Record<string, unknown>;
           void _c;
           const cleanResult = { ...rest, filePath, fileSize, frameRate: '29.97 drop-frame', fidelity: { warnings } };
-          return withEngineReport({ content: [{ type: 'text' as const, text: `Export saved to file:\n\nFile: ${filePath}\nFormat: scc (CEA-608, CC1, pop-on)\nSize: ${fileSize} bytes\n\nResult: ${JSON.stringify(cleanResult, null, 2)}` }] }, exportBrowserResult.report);
+          return withEngineReport({ content: [{ type: 'text' as const, text: `Export saved to file:\n\nFile: ${filePath}\nFormat: scc (CEA-608, CC1, pop-on)\nSize: ${fileSize} bytes\n\nResult: ${JSON.stringify(cleanResult, null, 2)}` }, exportFileLink(filePath, fileSize)] }, exportBrowserResult.report);
         }
         if ((format === 'html5-ad' || format === 'playable') && typeof exportResult?.adPage === 'string') {
           try {
@@ -4900,7 +4899,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
                   + ('receiptError' in receipt ? '' : probeLines(receipt))
                   + lintLines(exportResult)
                   + `\nResult: ${JSON.stringify(cleanResult, null, 2)}`,
-              }],
+              }, exportFileLink(filePath, fileSize)],
             }, exportBrowserResult.report);
           } catch (saveError) {
             // A failed save is a failed export, never a success with a note inside it: the step, the path and

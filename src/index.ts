@@ -6078,6 +6078,13 @@ The tools generate Paper.js/JavaScript code that executes on the PinePaper canva
   // Read resource content
   server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     const { uri } = request.params;
+    // An export's resource_link (utils/export-dir.ts): the saved file, from the export folder only.
+    if (uri.startsWith('file:')) {
+      const { readExportFile } = await import('./utils/export-dir.js');
+      const r = await readExportFile(uri);
+      if (!r.ok) throw new McpError(RESOURCE_NOT_FOUND, `Resource not readable: ${uri} — ${r.reason}`, { uri, ...(r.path ? { path: r.path } : {}), ...(r.size !== undefined ? { size: r.size } : {}) });
+      return { contents: [r.contents] };
+    }
     let content = RESOURCE_CONTENTS[uri];
 
     // README resources are read from the shipped package files at request

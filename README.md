@@ -274,6 +274,11 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   `{"load": ["map"]}` (a group) or a tool's name, and the list updates at
   once. Claude Desktop, Cursor and Windsurf used to get all 178 tools.
   `PINEPAPER_TOOLKIT=agent` or `full` restores a larger list.
+- Exports are saved to `~/Downloads/PinePaper` instead of a temporary folder,
+  so Desktop users can find them (`PINEPAPER_EXPORT_DIR` still overrides it,
+  and machines without a Downloads folder keep the temporary folder). Each
+  saved file also comes back as a link the client can open, and
+  `resources/read` returns files up to 10 MB from the export folder.
 
 ### Fixed
 
@@ -2497,7 +2502,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 | `PINEPAPER_API_KEY` | Service-account key (`pp_sa_…`) for the cloud-backed tools (`pinepaper_generate`) | — |
 | `PINEPAPER_CLOUD_URL` | The PinePaper cloud those tools call | `https://cloud.pinepaper.studio` |
 | `PINEPAPER_EXECUTION_MODE` | `puppeteer` (execute in a real browser) or `code` (return generated code only) | `puppeteer` |
-| `PINEPAPER_EXPORT_DIR` | Directory for exported files | `<tmpdir>/pinepaper-exports` |
+| `PINEPAPER_EXPORT_DIR` | Directory for exported files | `~/Downloads/PinePaper` (`<tmpdir>/pinepaper-exports` where there is no Downloads folder) |
 | `PINEPAPER_LOCALE` | Language locale code | `en` |
 | `PINEPAPER_TOOLKIT` | Toolkit profile (`core`/`full`/`agent`/`diagram`/`map`/`font`/`minimal`/`lane`) | `core` |
 | `PINEPAPER_TOOLS` | Explicit comma-separated tool allowlist | unset |
