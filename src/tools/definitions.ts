@@ -8889,6 +8889,8 @@ ANIMATION:
   keyframe_animate — Timed animation: {itemId, keyframes: [{time, properties, easing}], duration, loop, append}. Replaces the item's track unless append: true (or mode: 'merge', the studio's spelling); two ops on one item in a batch are merged into one.
     Animatable properties: opacity, scale, scaleX, scaleY, x, y, rotation, fillColor, strokeColor, strokeWidth, width, height, radius, fontSize, trimStart/trimEnd/trimOffset (path draw-on)
     Easing (on the keyframe being moved TO): ${KEYFRAME_EASINGS_LIST}
+  timeline — GSAP's timeline as JSON, compiled onto keyframe tracks (nothing is evaluated): {defaults: {ease, duration}, tweens: [{to: name | id | "$N" | [...] | "bar-*", vars: end values, from: start values, duration, delay, at: seconds | "<" | ">" | "+=0.2" | label, stagger: N | {each, from}, ease: "power2.out" | "none" | "back.out" | …, repeat, yoyo, repeatDelay}], duration?, labels?}. x/y are OFFSETS from where the item was created (as in GSAP); scale/scaleY on a bottom-anchored item (or transformOrigin "bottom") holds its edge; drawSVG "0%"→"100%" draws a path on; fill/color → fillColor. Every track is as long as the timeline. A tween it cannot carry is refused by name; the result has a receipt per tween.
+    {type: "timeline", defaults: {ease: "power2.out"}, tweens: [{to: "bar-*", from: {scaleY: 0}, vars: {scaleY: 1}, duration: 0.8, at: 0.5, stagger: 0.15}, {to: "ring", vars: {rotation: 480}, duration: 8, ease: "none", at: 0}]}
   relation — Behavioral link: {sourceId, targetId, relationType, relationOptions}
     relationType: orbits, follows, attached_to, points_at, mirrors, parallax, wave_through, morphs_to, group_morphs_to, moves_along_path (+ 9 more in schema)
 
@@ -8934,8 +8936,8 @@ EXAMPLE — Animated sky scene with timed reveals:
             properties: {
               type: {
                 type: 'string',
-                enum: ['set_canvas_size', 'set_background', 'execute_generator', 'create', 'modify', 'delete', 'group', 'animate', 'keyframe_animate', 'relation', 'apply_mask', 'apply_effect', 'play_timeline', 'ring', 'grid', 'orbit', 'stagger', 'patch'],
-                description: 'Operation type. ring / grid make many items in one op (each a create, so each fills a $N slot in order), orbit binds an orbits relation (making the orbiting item when itemType is given), stagger plays the same keyframes on itemIds one after another, patch changes the item with that name (refused when several items hold it).',
+                enum: ['set_canvas_size', 'set_background', 'execute_generator', 'create', 'modify', 'delete', 'group', 'animate', 'keyframe_animate', 'relation', 'apply_mask', 'apply_effect', 'play_timeline', 'ring', 'grid', 'orbit', 'stagger', 'patch', 'timeline'],
+                description: 'Operation type. timeline compiles a GSAP-shaped timeline onto keyframe tracks. ring / grid make many items in one op (each a create, so each fills a $N slot in order), orbit binds an orbits relation (making the orbiting item when itemType is given), stagger plays the same keyframes on itemIds one after another, patch changes the item with that name (refused when several items hold it).',
               },
               // Canvas setup
               width: { type: 'number', description: 'Canvas width for set_canvas_size (100-16384)' },
@@ -9037,6 +9039,10 @@ EXAMPLE — Animated sky scene with timed reveals:
               name: { type: 'string', description: 'ring, grid: name prefix (items are name_0, name_1 … or name_row_col). orbit: the made item\'s name. patch: the item to change.' },
               speed: { type: 'number', description: 'orbit: the orbits relation\'s speed (its own units; omit for the studio default)' },
               phaseDegrees: { type: 'number', description: 'orbit: starting angle in degrees' },
+              // GSAP-shaped timeline (src/tools/timeline.ts)
+              tweens: { type: 'array', items: { type: 'object' }, description: 'For timeline: [{to, vars, from, duration, delay, at, stagger, ease, repeat, yoyo, repeatDelay}]' },
+              defaults: { type: 'object', description: 'For timeline: {ease, duration} for tweens that give none' },
+              labels: { type: 'object', description: 'For timeline: {name: seconds}, for at: "name" or "name+=0.5"' },
             },
             required: ['type'],
             // Open, as the zod schema is (.passthrough()): a create op takes its

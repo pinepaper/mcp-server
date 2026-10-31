@@ -77,12 +77,14 @@ Each line is a correct op:
 {"type":"keyframe_animate","itemId":"$1","keyframes":[{"time":1,"properties":{"x":300}},{"time":7,"properties":{"x":1620},"easing":"easeInOut"}]}
 {"type":"relation","sourceId":"$1","targetId":"$2","relationType":"orbits","relationOptions":{"radius":260,"speed":0.1667}}
 {"type":"modify","itemId":"item_3","properties":{"color":"#f472b6"}}
+{"type":"timeline","defaults":{"ease":"power2.out"},"tweens":[{"to":"bar-*","from":{"scaleY":0},"vars":{"scaleY":1},"duration":0.8,"at":0.5,"stagger":0.15}]}
 
 RULES (each one has cost a failed build):
 - position {x,y} goes at the op's top level. Everything else about the item goes INSIDE properties: a text's words are properties.content, and so are fontSize, color, radius, width, height, opacity, name and anchor.
 - position is the item's CENTRE. A text grows both ways from it, so a title whose centre sits near an edge runs off the frame and the video shows "IGNAL / NOISE". When a spec gives a corner ("top-left at (200, 130)"), pass properties.anchor: "top-left" (or top-right, bottom-left, bottom-right). A bar that grows up from a baseline: anchor "bottom-left" at the baseline, key height.
 - ${KEYFRAME_RULE}
 - Two keyframe_animate ops on one item in a batch are merged into one track.
+- A timeline op is GSAP's timeline as JSON, compiled onto keyframe tracks: tweens [{to: a name, id, "$N", array or "bar-*"; vars: end values; from: start values; duration; at: seconds, "<", ">" or "+=0.2"; stagger; ease: "power2.out", "none", "back.out"…; repeat; yoyo}]. There x and y are OFFSETS from where the item was created, as in GSAP; scaleY on a bottom-anchored item holds its baseline; drawSVG "0%"→"100%" draws a path on. Every track lasts the whole timeline. What it cannot carry is refused by name; each tween gets a receipt. An item takes keys from a timeline or keyframe_animate ops, not both.
 - Name every item (properties.name). pinepaper_pattern selects members by name, e.g. "bar-*".
 - Relations: orbits {radius, speed (turns per second), direction, phaseDegrees}, follows {offset, smoothing}, attached_to {offset}, points_at, moves_along_path {path:[{x,y},…], speed}. sourceId moves; targetId is what it moves relative to.
 - set_canvas_size comes first; a video exports at the canvas size.
@@ -97,7 +99,7 @@ itemType: text, circle, rectangle, ellipse, star, triangle, polygon, line, arc, 
           items: {
             type: 'object',
             properties: {
-              type: { type: 'string', enum: ['set_canvas_size', 'set_background', 'create', 'modify', 'delete', 'group', 'keyframe_animate', 'relation'] },
+              type: { type: 'string', enum: ['set_canvas_size', 'set_background', 'create', 'modify', 'delete', 'group', 'keyframe_animate', 'relation', 'timeline'] },
               width: { type: 'number', description: 'set_canvas_size' },
               height: { type: 'number', description: 'set_canvas_size' },
               backgroundColor: { type: 'string', description: 'set_background' },
@@ -113,6 +115,9 @@ itemType: text, circle, rectangle, ellipse, star, triangle, polygon, line, arc, 
               targetId: { type: 'string', description: 'relation: what it moves relative to' },
               relationType: { type: 'string', description: 'relation' },
               relationOptions: { type: 'object', description: 'relation: its parameters' },
+              tweens: { type: 'array', items: { type: 'object' }, description: 'timeline: the tweens' },
+              defaults: { type: 'object', description: 'timeline: {ease, duration}' },
+              duration: { type: 'number', description: 'timeline: the clip length (default: the last tween\'s end)' },
             },
             required: ['type'],
           },

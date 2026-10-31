@@ -203,6 +203,7 @@ import { ErrorContext, formatErrorContext, captureCanvasState } from '../executi
 import { FILTER_PARAM_RANGES } from './engine-lists.js';
 import { getSessionManager } from '../agent/session-manager.js';
 import { vocabularyHintForPath, validateBatchVocabulary, detectBatchPropertyTypos } from '../ontology/hints.js';
+import { compileBatchTimelines } from './timeline.js';
 import { cameraHandlers } from './handlers/camera.js';
 import { fontHandlers } from './handlers/font.js';
 import { toolGuideHandlers } from './handlers/tool-guide.js';
@@ -4498,6 +4499,19 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
           if (e instanceof BatchMacroError) return errorResult(ErrorCodes.VALIDATION_ERROR, e.message, {}, { toolName: 'pinepaper_agent_batch_execute' });
           throw e;
         }
+        // A timeline op compiles on the server: a tween it cannot honour is refused by name here, before the canvas is
+        // touched (skipValidation does not bypass it — there is nothing to send for a tween that did not compile).
+        if (expanded.some((op) => op.type === 'timeline')) {
+          const tl = compileBatchTimelines(expanded as ReadonlyArray<Record<string, unknown>>);
+          if (tl.errors.length > 0) {
+            return errorResult(
+              ErrorCodes.VALIDATION_ERROR,
+              `The timeline was refused (${tl.errors.length} problem${tl.errors.length > 1 ? 's' : ''}); nothing was run. Fix ${tl.errors.length > 1 ? 'each' : 'it'} and send the batch again.`,
+              tl.errors.map((e) => ({ path: e.path, reason: e.message })),
+            );
+          }
+        }
+
         const code = codeGenerator.generateAgentBatchExecute(input);
         const description = `Batch executed ${input.operations.length} operations${input.atomic !== false ? ' (atomic)' : ''}`
           + (expanded.length !== input.operations.length ? ` (${expanded.length} after expanding ring / grid / orbit / stagger)` : '');

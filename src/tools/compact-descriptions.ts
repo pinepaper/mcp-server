@@ -60,7 +60,7 @@ Pass description for creative direction and canvasPreset for platform sizing. WO
   // -------------------------------------------------------------------------
   pinepaper_agent_batch_execute: `Execute multiple operations in a single call — canvas setup, items, animations, effects, playback. Call ONCE per pipeline — calling twice doubles all items. This is the GLUE: a styled scene, a character, a story or a crafted title has its own tool (styled_scene, character, story, text_style), called first; shapes over a generator backdrop is the stock look.
 
-OPERATION TYPES (${AgentBatchOperationTypeSchema.options.length}): ${AgentBatchOperationTypeSchema.options.join(', ')}. create takes position {x, y} or [x, y].
+OPERATION TYPES (${AgentBatchOperationTypeSchema.options.length}): ${AgentBatchOperationTypeSchema.options.join(', ')}. create takes position {x, y} or [x, y]. timeline takes GSAP-shaped tweens {to, vars, from, duration, at, stagger, ease, repeat, yoyo} and compiles them onto keyframe tracks (x/y are offsets from home).
 
 VARIABLE REFERENCES: "$0", "$1" etc. reference items by creation order within the batch.`,
 

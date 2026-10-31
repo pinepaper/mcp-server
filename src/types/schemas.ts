@@ -2531,6 +2531,7 @@ export const AgentBatchOperationTypeSchema = z.enum([
   'apply_mask', 'apply_effect',
   'play_timeline',
   'ring', 'grid', 'orbit', 'stagger', 'patch',
+  'timeline',
 ]).describe('Type of batch operation');
 
 /**
@@ -2586,6 +2587,10 @@ export const AgentBatchOperationSchema = z.object({
   // Apply effect fields
   effectType: z.string().optional().describe('Effect type for apply_effect (sparkle, blast)'),
   effectParams: z.record(z.string(), z.unknown()).optional().describe('Effect parameters'),
+  // Timeline (GSAP-shaped, compiled onto keyframe tracks: src/tools/timeline.ts)
+  tweens: z.array(z.record(z.string(), z.unknown())).optional().describe('timeline: [{to, vars, from, duration, at, stagger, ease, repeat, yoyo}] — GSAP tweens, compiled onto keyframe tracks'),
+  defaults: z.record(z.string(), z.unknown()).optional().describe('timeline: {ease, duration} for every tween that does not give its own'),
+  labels: z.record(z.string(), z.number()).optional().describe('timeline: {name: seconds}, for at: "name" or "name+=0.5"'),
   // Play timeline fields
   action: z.string().optional().describe('Timeline action for play_timeline (play, stop, seek)'),
   time: z.number().optional().describe('Seek time for play_timeline'),
