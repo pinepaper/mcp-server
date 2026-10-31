@@ -5877,7 +5877,7 @@ WORKFLOW (always follow this):
 3. pinepaper_agent_end_job — returns a screenshot to show the user
 4. pinepaper_agent_export — exports as MP4, GIF, PNG, SVG, or PDF
 
-A scripted build of shapes, text, keyframes and relations needs none of the craft tools: PINEPAPER_TOOLKIT=lane serves a five-tool agent lane whose descriptions carry the whole contract (pinepaper_tool_guide says more).
+A scripted build of shapes, text, keyframes and relations needs none of the craft tools: PINEPAPER_TOOLKIT=lane serves a seven-tool agent lane whose descriptions carry the whole contract (pinepaper_tool_guide says more).
 
 The tools generate Paper.js/JavaScript code that executes on the PinePaper canvas. The generated code is visible in responses and can be copied into PinePaper's Code Console.`,
   });

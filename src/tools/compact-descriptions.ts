@@ -29,7 +29,7 @@ export const COMPACT_DESCRIPTIONS: Record<string, string> = {
 
   pinepaper_get_canvas_size: `Get current canvas width and height.`,
 
-  pinepaper_clear_canvas: `Remove all items from the canvas.`,
+  pinepaper_clear_canvas: `Remove all items from the canvas. Item ids start again at item_1.`,
 
   pinepaper_refresh_page: `Reload the PinePaper browser page for a clean start.`,
 
@@ -53,7 +53,7 @@ Pass description for creative direction and canvasPreset for platform sizing. WO
 
   pinepaper_tool_guide: `Get detailed docs for any tool or category. Call with no args for the full workflow guide. For a scripted build of shapes, text, keyframes and relations exported to a file, PINEPAPER_TOOLKIT=lane serves a five-tool agent lane whose descriptions carry the whole contract.`,
 
-  pinepaper_set_toolkit: `Switch available tools. Toolkits: agent, diagram, map, font, full, minimal, lane (the five-tool agent lane). Verbosity: verbose, compact, minimal.`,
+  pinepaper_set_toolkit: `Switch available tools. Toolkits: agent, diagram, map, font, full, minimal, lane (the seven-tool agent lane). Verbosity: verbose, compact, minimal.`,
 
   // -------------------------------------------------------------------------
   // batch_execute

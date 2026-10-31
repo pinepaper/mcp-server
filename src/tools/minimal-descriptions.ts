@@ -269,6 +269,6 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_measurement: 'Rulers/grid. action: set_rulers|set_grid|get_dimensions|set_snap. enabled, itemId.',
 
   // --- Guide & runtime config ---
-  pinepaper_tool_guide: 'Get detailed guidance for any tool, category, or the full AI Agent Guide. A five-tool agent lane for scripted builds: PINEPAPER_TOOLKIT=lane.',
+  pinepaper_tool_guide: 'Get detailed guidance for any tool, category, or the full AI Agent Guide. A seven-tool agent lane for scripted builds: PINEPAPER_TOOLKIT=lane.',
   pinepaper_set_toolkit: 'Switch toolkit (full|agent|diagram|map|font|minimal|lane) and/or verbosity (verbose|compact|minimal) at runtime.',
 };
