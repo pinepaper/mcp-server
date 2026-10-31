@@ -61,7 +61,8 @@
     "sync:engine-lists": "node scripts/sync-engine-lists.mjs",
     "fix:engine-lists": "node scripts/sync-engine-lists.mjs",
     "check:engine-lists": "node scripts/sync-engine-lists.mjs --check",
-    "check:relation-names": "node scripts/check-relation-names.mjs"
+    "check:relation-names": "node scripts/check-relation-names.mjs",
+    "build:mcpb": "bun run build && node scripts/build-mcpb.mjs"
   },
   "keywords": [
     "mcp",

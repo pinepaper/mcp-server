@@ -32,3 +32,6 @@ docs-internal/
 
 # Claude Code session scratch (worktree diff stashes, local agent state)
 .claude/
+
+# Claude Desktop bundle (scripts/build-mcpb.mjs)
+mcpb/

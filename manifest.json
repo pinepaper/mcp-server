@@ -36,42 +36,11 @@
       "command": "node",
       "args": [
         "${__dirname}/dist/cli.js"
-      ]
-    },
-    "options": {
-      "mode": {
-        "type": "string",
-        "description": "Execution mode: 'puppeteer' (live browser) or 'code' (generate only)",
-        "default": "puppeteer",
-        "enum": [
-          "puppeteer",
-          "code"
-        ]
-      },
-      "toolkit": {
-        "type": "string",
-        "description": "Tool visibility profile. core (default) lists the craft tools and what they name; more load on demand with pinepaper_set_toolkit",
-        "default": "core",
-        "enum": [
-          "core",
-          "full",
-          "agent",
-          "diagram",
-          "map",
-          "font",
-          "minimal",
-          "lane"
-        ]
-      },
-      "verbosity": {
-        "type": "string",
-        "description": "Tool description detail level. 'minimal' uses 1-line summaries with on-demand guide tool",
-        "default": "compact",
-        "enum": [
-          "verbose",
-          "compact",
-          "minimal"
-        ]
+      ],
+      "env": {
+        "PINEPAPER_CHROME_PATH": "${user_config.chrome_path}",
+        "PINEPAPER_EXPORT_DIR": "${user_config.export_dir}",
+        "PINEPAPER_TOOLKIT": "${user_config.toolkit}"
       }
     },
     "env": {
@@ -95,6 +64,36 @@
         "description": "UI locale (e.g., 'en', 'ja', 'zh-CN')",
         "default": "en"
       }
+    }
+  },
+  "user_config": {
+    "chrome_path": {
+      "type": "file",
+      "title": "Browser for the canvas",
+      "description": "Optional. The canvas tools drive Google Chrome. To use another Chromium-based browser (Edge, Brave, Chromium), choose its program here.",
+      "required": false
+    },
+    "export_dir": {
+      "type": "directory",
+      "title": "Export folder",
+      "description": "Optional. Where exports are saved. Empty means Downloads/PinePaper.",
+      "required": false
+    },
+    "toolkit": {
+      "type": "string",
+      "title": "Tool list",
+      "description": "Optional. Empty or \"core\" starts with the core tools and loads more on demand; \"agent\" or \"full\" lists everything up front (much more context).",
+      "required": false
+    }
+  },
+  "compatibility": {
+    "platforms": [
+      "darwin",
+      "win32",
+      "linux"
+    ],
+    "runtimes": {
+      "node": ">=18.0.0"
     }
   },
   "tools": [

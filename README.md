@@ -279,6 +279,11 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   and machines without a Downloads folder keep the temporary folder). Each
   saved file also comes back as a link the client can open, and
   `resources/read` returns files up to 10 MB from the export folder.
+- A Claude Desktop extension (`.mcpb`) can be built with `bun run
+  build:mcpb`: one file to open, no config to edit. It uses your installed
+  Chrome for the canvas tools. Without full `puppeteer`, the server now also
+  works with `puppeteer-core` and your installed Chrome, or another browser
+  set in `PINEPAPER_CHROME_PATH`.
 
 ### Fixed
 
@@ -2387,6 +2392,10 @@ bun install
 bun run build
 ```
 
+### Claude Desktop extension (.mcpb)
+
+`bun run build:mcpb` builds `mcpb/pinepaper-mcp-server-<version>.mcpb`, a one-file Claude Desktop extension: open it and Desktop installs the server, with no config file to edit. The extension drives your installed Google Chrome (choose another Chromium-based browser in its settings), and its settings also set the export folder and the tool list.
+
 ### Test with MCP Client (Local)
 
 1. Build the server:
@@ -2502,6 +2511,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 | `PINEPAPER_API_KEY` | Service-account key (`pp_sa_…`) for the cloud-backed tools (`pinepaper_generate`) | — |
 | `PINEPAPER_CLOUD_URL` | The PinePaper cloud those tools call | `https://cloud.pinepaper.studio` |
 | `PINEPAPER_EXECUTION_MODE` | `puppeteer` (execute in a real browser) or `code` (return generated code only) | `puppeteer` |
+| `PINEPAPER_CHROME_PATH` | A Chromium-based browser for the canvas tools when full `puppeteer` is not installed (the Desktop extension uses your installed Chrome by default) | installed Google Chrome |
 | `PINEPAPER_EXPORT_DIR` | Directory for exported files | `~/Downloads/PinePaper` (`<tmpdir>/pinepaper-exports` where there is no Downloads folder) |
 | `PINEPAPER_LOCALE` | Language locale code | `en` |
 | `PINEPAPER_TOOLKIT` | Toolkit profile (`core`/`full`/`agent`/`diagram`/`map`/`font`/`minimal`/`lane`) | `core` |

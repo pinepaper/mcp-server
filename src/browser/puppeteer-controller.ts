@@ -224,6 +224,46 @@ const BOOTSTRAP_SUBSYSTEMS: readonly string[] = Object.freeze(
  */
 export const BROWSER_TIME = { executeMs: 0, screenshotMs: 0 };
 
+/**
+ * The browser driver. Puppeteer is an OPTIONAL peer (1.6.5): browser automation
+ * is a handful of tools, and a headless-browser download with an install script
+ * in the default tree is what supply-chain scanners flag hardest.
+ *
+ * Tried in order: `puppeteer` (its own Chrome), then `puppeteer-core` driving a
+ * browser already on the machine (1.6.25: the Claude Desktop bundle ships
+ * puppeteer-core, not a Chrome download): PINEPAPER_CHROME_PATH when set, else
+ * the installed Chrome. Neither present → the install instruction, not a crash.
+ */
+async function loadPuppeteer(): Promise<{ launch: (opts: Record<string, unknown>) => Promise<Browser> }> {
+  try {
+    const full = await import('puppeteer');
+    return { launch: (opts) => full.default.launch(opts) };
+  } catch { /* not installed: try the core driver */ }
+  let core: { default: { launch: (opts: Record<string, unknown>) => Promise<Browser> } } | null = null;
+  try {
+    const specifier = 'puppeteer-core'; // a variable, so the build does not need the package installed
+    core = await import(specifier);
+  } catch { /* not installed either */ }
+  if (core) {
+    const executablePath = env('PINEPAPER_CHROME_PATH')?.trim();
+    return {
+      launch: async (opts) => {
+        try {
+          return await core!.default.launch({ ...opts, ...(executablePath ? { executablePath } : { channel: 'chrome' }) });
+        } catch (e) {
+          const why = e instanceof Error ? e.message.split('\n')[0] : String(e);
+          throw new Error(executablePath
+            ? `Could not start the browser at PINEPAPER_CHROME_PATH (${executablePath}): ${why}`
+            : `The canvas tools drive your installed Google Chrome, and it could not be started (${why}). Install Chrome from https://www.google.com/chrome/, or set PINEPAPER_CHROME_PATH to another Chromium-based browser (Edge, Brave, Chromium), then retry.`);
+        }
+      },
+    };
+  }
+  throw new Error(
+    'The browser tools need puppeteer, which is an optional install. Under npx, add it to the same call — args ["-y", "-p", "puppeteer", "-p", "@pinepaper.studio/mcp-server", "pinepaper-mcp"] — since a separate `npm i puppeteer` is not visible to npx\'s copy. Installed globally: `npm i -g puppeteer`; in a project: `npm i puppeteer`. Then retry. It is kept out of the default dependency tree for supply-chain hygiene.',
+  );
+}
+
 export class PinePaperBrowserController {
   private browser: Browser | null = null;
   private page: Page | null = null;
@@ -470,21 +510,10 @@ export class PinePaperBrowserController {
         this.page = null;
       }
 
-      // Puppeteer is an OPTIONAL peer (1.6.5): browser automation is 4 of 135
-      // tools, and carrying a headless-browser + install-script dependency in
-      // the default tree is what supply-chain scanners flag hardest. Absent →
-      // a clear instruction, not a crash.
-      let puppeteer: { default: { launch: (opts: object) => Promise<import('puppeteer').Browser> } };
-      try {
-        puppeteer = await import('puppeteer');
-      } catch {
-        throw new Error(
-          'The browser tools need puppeteer, which is an optional install. Under npx, add it to the same call — args ["-y", "-p", "puppeteer", "-p", "@pinepaper.studio/mcp-server", "pinepaper-mcp"] — since a separate `npm i puppeteer` is not visible to npx\'s copy. Installed globally: `npm i -g puppeteer`; in a project: `npm i puppeteer`. Then retry. It is kept out of the default dependency tree for supply-chain hygiene.',
-        );
-      }
+      const puppeteer = await loadPuppeteer();
 
       console.error('[PinePaper] Launching browser...');
-      this.browser = await puppeteer.default.launch(
+      this.browser = await puppeteer.launch(
         this.launchOptions(
           this.config.headless,
           this.launchArgs(this.config.viewportWidth, this.config.viewportHeight),
@@ -1151,18 +1180,7 @@ export class PinePaperBrowserController {
         this.page = null;
       }
 
-      // Puppeteer is an OPTIONAL peer (1.6.5): browser automation is 4 of 135
-      // tools, and carrying a headless-browser + install-script dependency in
-      // the default tree is what supply-chain scanners flag hardest. Absent →
-      // a clear instruction, not a crash.
-      let puppeteer: { default: { launch: (opts: object) => Promise<import('puppeteer').Browser> } };
-      try {
-        puppeteer = await import('puppeteer');
-      } catch {
-        throw new Error(
-          'The browser tools need puppeteer, which is an optional install. Under npx, add it to the same call — args ["-y", "-p", "puppeteer", "-p", "@pinepaper.studio/mcp-server", "pinepaper-mcp"] — since a separate `npm i puppeteer` is not visible to npx\'s copy. Installed globally: `npm i -g puppeteer`; in a project: `npm i puppeteer`. Then retry. It is kept out of the default dependency tree for supply-chain hygiene.',
-        );
-      }
+      const puppeteer = await loadPuppeteer();
 
       // Agent mode defaults to visible browser so user can see PinePaper Studio
       const useHeadless = options.headless ?? this.config.headless;
@@ -1170,7 +1188,7 @@ export class PinePaperBrowserController {
       const viewportHeight = options.viewportHeight ?? this.config.viewportHeight;
 
       console.error(`[PinePaper] Launching browser in agent mode (headless: ${useHeadless})...`);
-      this.browser = await puppeteer.default.launch(
+      this.browser = await puppeteer.launch(
         this.launchOptions(
           useHeadless,
           this.launchArgs(viewportWidth, viewportHeight, [
