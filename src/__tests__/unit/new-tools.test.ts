@@ -163,9 +163,10 @@ describe('TransformInputSchema', () => {
 describe('Transform code generation', () => {
   it('nudge modifies position', () => {
     const code = codeGenerator.generateTransform({ action: 'nudge', itemId: 'item_1', dx: 10, dy: 5 });
-    expect(code).toContain('position.x += 10');
-    expect(code).toContain('position.y += 5');
-    expect(code).toContain('app.itemRegistry.get');
+    // Through modifyItem, so the engine's bookkeeping runs (issue #29 O8; benchmark-o-defects.test.ts runs it).
+    expect(code).toContain('entry.item.position.x + 10');
+    expect(code).toContain('entry.item.position.y + 5');
+    expect(code).toContain('app.modifyItem("item_1", { x: x, y: y })');
   });
 
   it('flip horizontal uses scale(-1, 1)', () => {

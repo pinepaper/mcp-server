@@ -26,7 +26,7 @@ describe('an export is sized by the request, not by the renderer', () => {
   it('png scales the board to the resolved target instead of passing dpi', () => {
     const code = png({ format: 'png', platform: 'youtube-thumbnail' });
     expect(code).toContain('dimensions.width / pngBoard.width');
-    expect(code).toContain('exportPNG({ scale: pngScale })');
+    expect(code).toContain('exportPNG({ scale: pngScale, ...(__stillT !== null ? { time: __stillT } : {}) })');
     // dpi WAS the whole bug: it scaled the board and ignored the platform.
     expect(code).not.toContain('exportPNG({ dpi:');
   });

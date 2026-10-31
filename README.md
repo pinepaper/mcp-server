@@ -325,6 +325,42 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   the key had no effect and nothing said so. The common mix-ups get a hint:
   `params` on a `relation` step (it takes `relationOptions`), and `x`/`y` on
   a `modify` step (changes go inside `properties`).
+- Clearing the canvas starts item ids again at `item_1`
+  (`pinepaper_clear_canvas`, `pinepaper_agent_start_job` and
+  `pinepaper_agent_reset`), so a batch sent after a clear gets the same ids
+  every time. Before, the numbering carried on from the cleared items, and
+  only a server restart reset it.
+- A `group` step in a batch now takes the next `$N`, as a `create` does, so
+  a later step can animate the group: in `[create, create, group, …]` the
+  group is `$2`. This renumbers batches that create items after a group:
+  in `[create, create, group, create]` the last item was `$2` and is now
+  `$3`. Before, a `$N` meant for the group failed with "it has created 2 so
+  far".
+- An event reaction that shows or hides an item (`on_event_set_visibility`,
+  and its `on_enter_` and `on_exit_` forms) refuses `value` and asks for
+  `visible`, the field it reads. Before, `{"value": false}` showed the item
+  instead of hiding it.
+- A PNG, JPG, WebP, SVG or PDF of a scene that is playing is its first frame
+  (time 0), the frame a video starts on, and the result says so. Before, it
+  was whatever frame playback had reached, so items moved by relations (an
+  orbit) were in a different place on every export. `time` still picks
+  another moment.
+- A closed shape given a `strokeColor` and no fill is drawn as an outline.
+  Before, it got the default fill, or the active brand's colour.
+- A batch no longer flags `ttl` or `bornAt` on a `line` as a likely typo.
+- A line created with `from` and `to` reports where it actually is, and says
+  that `position` does not move it: `from` and `to` are canvas coordinates.
+  Before, the result reported the position asked for while the line was
+  drawn at the top left.
+- `pinepaper_transform` `nudge` moves an item the way `pinepaper_modify_item`
+  does, so an item with a loop animation keeps its new place, and the
+  result no longer reports the move as no change.
+- `create_item` documents `properties.id`: an id of your own, so replays
+  address the same items.
+- The `lane` toolkit adds `pinepaper_event`, for things that happen at a
+  set time or on a click (a panel that hides at 3 s), and
+  `pinepaper_clear_canvas`, to start over. Its batch description shows how
+  to attach an event's reactions and triggers.
 
 ## What's new in 1.6.24
 
@@ -334,11 +370,10 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   keyframes on each. `phase_wave` sends a wave through the members, `stagger`
   offsets them in turn. Members are chosen by id, by name pattern or by tag.
   `create`, `modify`, `remove`, `list` and `get` manage patterns afterwards.
-- A seven-tool toolkit for agents, `PINEPAPER_TOOLKIT=lane`:
+- A five-tool toolkit for agents, `PINEPAPER_TOOLKIT=lane`:
   `pinepaper_agent_batch_execute`, `pinepaper_keyframe_animate`,
-  `pinepaper_pattern`, `pinepaper_agent_export`, `pinepaper_lint_scene`,
-  `pinepaper_event` (timed and clicked events) and `pinepaper_clear_canvas`
-  (start over), with descriptions written to be read on their own.
+  `pinepaper_pattern`, `pinepaper_agent_export` and `pinepaper_lint_scene`,
+  with descriptions written to be read on their own.
 - Batch operations `ring`, `grid`, `orbit`, `stagger` and `patch`.
   - `ring` and `grid` lay out many items in one operation. Each item is made
     the same way `create` makes it and fills the next `$N` slot.

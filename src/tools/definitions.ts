@@ -469,6 +469,8 @@ USE WHEN:
 
 IMPORTANT:
 - Save the returned itemId! You need it for pinepaper_add_relation, pinepaper_modify_item, pinepaper_delete_item, etc.
+- properties.id chooses the itemId yourself ("sun", "title"): the same call names the same item on every run, so a replay after pinepaper_clear_canvas addresses the same ids. An id a live item already holds gets a suffix ("sun_2"); the returned itemId is always the one to use. Without it, ids are item_1, item_2, … and start again at item_1 after a clear.
+- A closed shape with a strokeColor and no fill (fillColor, color) is an OUTLINE; name a fillColor to fill it.
 - If there's a welcome template on the canvas, use pinepaper_clear_canvas first
 - Position defaults to canvas center (400, 300). Use position: {x, y} or [x, y] (both forms accepted) to place elsewhere. Position is the item's bounding-box CENTRE, not its top-left corner.
 - ROTATION is a property, at creation: properties: { rotation: 45 } — degrees, clockwise, about the item's own centre. It does not need a second call, and pinepaper_update_item takes the same property afterwards; keyframe_animate and the driven_by relation both animate it. A radial figure — a sunburst of thin triangles, a clock face, a compass rose — is N creates at rotation: i * (360/N), which is what pinepaper_agent_batch_execute is for. Nothing here needs to be faked with arcs or chevrons.
@@ -3582,8 +3584,9 @@ INTERACTIVE RELATIONS — the state machine lives in the graph.
 An event channel (pinepaper_event) is the hub: something FIRES it, and reactions bound to it run. Nothing here is a callback; it is all queryable graph, so it scrubs, exports and survives a reload.
 
 - Input triggers (item → event): on_click_fire, on_pointer_enter_fire, on_pointer_exit_fire, on_key_fire (params: key, modifiers, global, preventDefault). { key: 'Enter' } makes Enter activate a button exactly as a click does. The chord is matched EXACTLY in both directions — { key: 'Enter' } does NOT fire on Ctrl+Enter, and { key: 's' } does not steal the browser's Ctrl+S; ask for a modifier with modifiers: { ctrl: true }. Listens only while the source item has focus unless global: true, so it will not take keys from the rest of the page.
-- Event reactions (event → item), params in common: property, value, key, by, color, template, delay, timeline.
-  · on_event_set_property / _set_color / _set_visibility / _set_data — write a value.
+- Event reactions (event → item). Each reads its own params:
+  · on_event_set_property { property, value } / _set_color { color, which } / _set_data { property, value } (into item.data) — write a value.
+  · on_event_set_visibility { visible } — true shows, false hides (value is not read, and is refused).
   · on_event_set_property_from_template — write a value built from a '{token}' TEMPLATE read off item.data, so the text can quote live state ("Score: {score}") instead of a literal fixed when you authored it.
   · on_event_increment (params: property, by) / on_event_toggle — counters and flip-flops.
   · on_event_fire_after (params: delay, timeline) — chain one beat to the next.
@@ -3626,7 +3629,7 @@ EVENT-DRIVEN SCENE CHAINS (S11) — build a LONG scene as a graph of timed event
 - on_event_remove_relation: sourceId=event, targetId=item. Tears down a previously-added relation: params { type, target }.
 - on_event_set_color: sourceId=event, targetId=item. params { color, which: 'fill'|'stroke' }.
 - on_event_set_property: sourceId=event, targetId=item. params { property, value } — set any item property (opacity, rotation, strokeWidth, …).
-- on_event_set_visibility: sourceId=event, targetId=item. params { visible } (default true).
+- on_event_set_visibility: sourceId=event, targetId=item. params { visible } (default true; false hides). params.value is not read: it is refused.
 
 STRUCTURAL LAYOUT (S12) — express STATIC COMPOSITION as relations instead of hardcoded x/y. Placement is computed from the TARGET'S BOUNDS and re-derived every frame, so moving or resizing the target moves the dependent with it, and the layout survives as editable graph data. Reach for these whenever the intent is "on", "under", "next to", "inside", or "lined up with" — a create_item with literal coordinates cannot express that intent and silently breaks when the target moves. All six need a target; all accept params.signal (deterministic IR port) and params.window.
 - on_top_of: source's BOTTOM edge rests on the target's TOP edge — stacking (a cocktail on a bar). params { gap (px between edges, default 0), align: 'left'|'center'(default)|'right', overhang (extra signed x-offset) }.

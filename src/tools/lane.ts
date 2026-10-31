@@ -97,6 +97,8 @@ RULES (each one has cost a failed build):
 - Two keyframe_animate ops on one item in a batch are merged into one track.
 - A timeline op is GSAP's timeline as JSON, compiled onto keyframe tracks: tweens [{to: a name, id, "$N", array or "bar-*"; vars: end values; from: start values; duration; at: seconds, "<", ">" or "+=0.2"; stagger; ease: "power2.out", "none", "back.out"…; repeat; yoyo}]. There x and y are OFFSETS from where the item was created, as in GSAP; scaleY on a bottom-anchored item holds its baseline; drawSVG "0%"→"100%" draws a path on. Every track lasts the whole timeline. What it cannot carry is refused by name; each tween gets a receipt. An item takes keys from a timeline or keyframe_animate ops, not both.
 - Name every item (properties.name). pinepaper_pattern selects members by name, e.g. "bar-*".
+- properties.id chooses an item's id ("dot"), so a replay after pinepaper_clear_canvas addresses the same ids.
+- A shape with a strokeColor and no color is an outline.
 - Relations: orbits {radius, speed (turns per second), direction, phaseDegrees}, follows {offset, smoothing}, attached_to {offset}, points_at, moves_along_path {path:[{x,y},…], speed}. sourceId moves; targetId is what it moves relative to.
 - Events (item_9 above is an eventId from pinepaper_event): an event → item relation is a reaction, run each time it fires: on_event_set_visibility {visible: true|false}, on_event_set_color {color}, on_event_set_property {property, value}. An item → event relation fires it: on_click_fire, on_pointer_enter_fire, on_key_fire {key}. An item a reaction reveals starts hidden: properties.visible false.
 - set_canvas_size comes first; a video exports at the canvas size.

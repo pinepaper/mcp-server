@@ -10,7 +10,8 @@ import { compileBatchTimelines, emitTimelineOpBody, type TimelinePlan } from '..
 import { normalizeSvgSize } from '../utils/svg-size.js';
 import { WORLD3D_COLOR_PATHS, PATTERN_KINDS } from '../tools/engine-lists.js';
 import { REQUIRED_ENGINE_METHODS, OPTIONAL_ENGINE_METHODS } from '../tools/engine-methods.js';
-import { ACCEPTED_CREATE_PARAMS, NORMALIZE_PARAM_READS, MODIFY_CHANGE_READS } from '../tools/shape-params.js';
+import { NORMALIZE_PARAM_READS, MODIFY_CHANGE_READS } from '../tools/shape-params.js';
+import { CREATE_KNOWN_KEYS } from '../tools/create-known-keys.js';
 import { jsLiteral } from '../utils/js-literal.js';
 import { generateP5DrawCode } from '../tools/p5-compat/p5-helpers.js';
 import { expandBatchMacros } from '../tools/batch-macros.js';
@@ -457,6 +458,10 @@ function generateCreateItemCode(
   // All three now mean no fill, applied after the item exists.
   const noFill = (v: unknown) => v === null || (typeof v === 'string' && /^(transparent|none)$/i.test(v.trim()));
   const clearFill = (fillColor !== undefined && noFill(fillColor)) || (fillColor === undefined && color !== undefined && noFill(color));
+  // A STROKE WITH NO FILL IS AN OUTLINE (issue #29 O7). A closed shape given
+  // only a strokeColor took the engine's default fill, so a ring came out as a
+  // blue disc with a red rim. Naming a stroke and no fill now means no fill.
+  const outlineOnly = isStrokeOnly(itemType, properties) && !clearFill;
 
   // `color` ON A CLOSED PATH IS ITS FILL.
   //
@@ -594,7 +599,7 @@ const item = app.create('${itemType}', ${JSON.stringify(params, null, 2)});`;
     code += '\n' + generateBlendModeCode('item', blendMode as string);
   }
 
-  if (clearFill) code += `\nitem.fillColor = null;`;
+  if (clearFill || outlineOnly) code += `\nitem.fillColor = null;`;
 
   // DASHES, CAPS AND JOINS FOR EVERY SHAPE (round 7 Z, 1.54). create() applies
   // them only in its path / line / pattern branches; the shared tail sets a
@@ -652,18 +657,28 @@ const item = app.create('${itemType}', ${JSON.stringify(params, null, 2)});`;
   }
 
   const loadsFont = itemType === 'text' && typeof properties.fontFamily === 'string' && properties.fontFamily.trim() !== '';
+  // A LINE WITH `from` IS DRAWN WHERE from AND to SAY (issue #29 O8). They are
+  // canvas coordinates, so position does not move it, and the result reported
+  // the position asked for while the line sat at the top-left: a line from
+  // [0, 0] to [200, 0] "created at (400, 300)". The result reads where it is.
+  const lineIgnoresPosition = itemType === 'line' && properties.from !== undefined && positionGiven;
+  const reportActualPosition = omitXY || lineIgnoresPosition;
+  const warnings: string[] = [];
+  if (ignored.length > 0) {
+    warnings.push(`${ignored.join(', ')} ${ignored.length > 1 ? 'are' : 'is'} not read when creating an item, so ${ignored.length > 1 ? 'they had' : 'it had'} no effect. `
+      + 'Check the spelling against this item type\'s documented properties.');
+  }
+  if (lineIgnoresPosition) {
+    warnings.push('a line runs from `from` to `to` in canvas coordinates, so position did not move it: position is where the line is now. Give the endpoints where the line goes.');
+  }
 
   code += `
 const itemId = item.data.registryId;
 app.historyManager.saveState();
 
 // Return item info
-({ itemId, type: '${itemType}'${textFit ? ', textFit: __textFit' : ''}${textDirection ? ', direction: __direction' : ''}${textTabular ? ', tabularFigures: __tabular' : ''}${createFillOpacity ? ', fillOpacity: __fillOpacity' : ''}${textStrokePos ? ', strokePosition: __strokePos' : ''}, position: ${omitXY ? `(item.position ? { x: item.position.x, y: item.position.y } : null)` : `{ x: ${position.x}, y: ${position.y} }`}${hasLifetime ? ', lifetime: __lifetime' : ''}${loadsFont ? ', ...(__font ? { font: __font } : {})' : ''}${ignored.length > 0
-    ? `, ignoredProperties: ${JSON.stringify(ignored)}, warning: ${JSON.stringify(
-      `${ignored.join(', ')} ${ignored.length > 1 ? 'are' : 'is'} not read when creating an item, so ${ignored.length > 1 ? 'they had' : 'it had'} no effect. `
-      + 'Check the spelling against this item type\'s documented properties.',
-    )}`
-    : ''} });`;
+({ itemId, type: '${itemType}'${outlineOnly ? `, fill: ${JSON.stringify(OUTLINE_NOTE)}` : ''}${textFit ? ', textFit: __textFit' : ''}${textDirection ? ', direction: __direction' : ''}${textTabular ? ', tabularFigures: __tabular' : ''}${createFillOpacity ? ', fillOpacity: __fillOpacity' : ''}${textStrokePos ? ', strokePosition: __strokePos' : ''}, position: ${reportActualPosition ? `(item.position ? { x: item.position.x, y: item.position.y } : null)` : `{ x: ${position.x}, y: ${position.y} }`}${hasLifetime ? ', lifetime: __lifetime' : ''}${loadsFont ? ', ...(__font ? { font: __font } : {})' : ''}${ignored.length > 0
+    ? `, ignoredProperties: ${JSON.stringify(ignored)}` : ''}${warnings.length > 0 ? `, warning: ${JSON.stringify(warnings.join(' '))}` : ''} });`;
 
   // Loading a font is async, and it has to happen BEFORE create() measures the
   // text — so only this case becomes an async IIFE; every other create stays a
@@ -696,24 +711,6 @@ const MODIFY_DID_YOU_MEAN: Readonly<Record<string, string>> = {
   alpha: 'opacity', text: 'content', stroke_width: 'strokeWidth', lineWidth: 'strokeWidth',
 };
 
-/**
- * Every `properties` key create_item can act on: what the engine's create()
- * and normalizeParams() read (generated — see shape-params.ts), plus the keys
- * generateCreateItemCode consumes itself before the engine sees them.
- */
-const CREATE_KNOWN_KEYS: ReadonlySet<string> = new Set([
-  ...ACCEPTED_CREATE_PARAMS,
-  ...NORMALIZE_PARAM_READS,
-  // withRadiusAxes, gradients / shadow / blend / opacity emitted here, and
-  // setDynamicContent for text.
-  'radiusX', 'radiusY', 'contentType', 'contentFormat', 'countdownTarget', 'countdownEndText',
-  // Lifetimes, on ANY item: this generator applies them through app.setLifetime
-  // (emitLifetime), whatever create() itself reads.
-  'bornAt', 'ttl',
-  // A solid fill's own alpha (FxTool 12 STROKEFILL); confirmed per call by
-  // emitFillOpacityCheck, since an older studio ignores it.
-  'fillOpacity',
-]);
 
 /**
  * Load a font family before text is drawn with it, and say if it still is not there.
@@ -1472,11 +1469,25 @@ export function fireIfProblem(params: Record<string, unknown> | undefined): stri
 export function relationSpecProblem(relationType: unknown, params: unknown): string | null {
   const p = (params && typeof params === 'object' ? params : {}) as Record<string, unknown>;
   if (relationType === 'on_event_fire_if') return fireIfProblem(p);
-  if (relationType === 'on_event_add_relation' && p.type === 'on_event_fire_if') {
-    const inner = fireIfProblem((p.params && typeof p.params === 'object' ? p.params : {}) as Record<string, unknown>);
-    return inner ? `the on_event_fire_if it adds: ${inner.replace(/params\./g, 'params.params.')}` : null;
+  if (typeof relationType === 'string' && VISIBILITY_REACTION.test(relationType)) return visibilityProblem(relationType, p);
+  if (relationType === 'on_event_add_relation' && (p.type === 'on_event_fire_if' || (typeof p.type === 'string' && VISIBILITY_REACTION.test(p.type)))) {
+    const innerParams = (p.params && typeof p.params === 'object' ? p.params : {}) as Record<string, unknown>;
+    const inner = p.type === 'on_event_fire_if' ? fireIfProblem(innerParams) : visibilityProblem(p.type as string, innerParams);
+    return inner ? `the ${String(p.type)} it adds: ${inner.replace(/params\./g, 'params.params.')}` : null;
   }
   return null;
+}
+
+const VISIBILITY_REACTION = /^on_(event|enter|exit)_set_visibility$/;
+
+/**
+ * A visibility reaction reads params.visible and nothing else: absent means show. `value`, which the other set_*
+ * reactions take, was ignored, so {value: false} SHOWED the item and a hide did nothing (issue #29 O4).
+ */
+function visibilityProblem(relationType: string, p: Record<string, unknown>): string | null {
+  if (p.visible !== undefined || !('value' in p)) return null;
+  return `${relationType} reads params.visible (true shows, false hides; absent shows), not params.value, so this would `
+    + `${p.value === false || p.value === 0 || p.value === 'hidden' ? 'show the item instead of hiding it' : 'do nothing the value says'}. Pass params.visible: ${JSON.stringify(p.value === false || p.value === 0 || p.value === 'hidden' ? false : true)}.`;
 }
 
 function generateAddRelationCode(
@@ -2851,11 +2862,21 @@ export function planKeyframeMerges(
  * through modifyItem after create, so the engine's own bookkeeping runs.
  */
 const BRAND_FILL_TYPES = new Set(['circle', 'star', 'rectangle', 'triangle', 'polygon', 'ellipse', 'pentagon', 'hexagon', 'diamond', 'arrow', 'heart']);
+
+/** A closed shape given a stroke colour and no fill of any spelling: drawn as an outline (issue #29 O7). */
+function isStrokeOnly(itemType: string, props: Record<string, unknown>): boolean {
+  if (!BRAND_FILL_TYPES.has(itemType)) return false;
+  if (props.strokeColor === undefined || props.strokeColor === null) return false;
+  return ['color', 'fillColor', 'fill', 'gradient'].every((k) => props[k] === undefined);
+}
+const OUTLINE_NOTE = 'none: a strokeColor with no fill draws an outline. Pass fillColor to fill it.';
+
 function withBrandDefaults(code: string, itemType: string, props: Record<string, unknown>): string {
   if (props.noBrand === true) return code;
   const isText = itemType === 'text';
   if (!isText && !BRAND_FILL_TYPES.has(itemType)) return code;
-  const hasColor = ['color', 'fillColor', 'fill'].some((k) => props[k] !== undefined);
+  // An outline is a colour choice: the brand does not fill it in.
+  const hasColor = ['color', 'fillColor', 'fill'].some((k) => props[k] !== undefined) || isStrokeOnly(itemType, props);
   const hasFont = props.fontFamily !== undefined;
   if (hasColor && (!isText || hasFont)) return code;
   const size = typeof props.fontSize === 'number' ? props.fontSize : 36;
@@ -6087,14 +6108,36 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
   });
 
   let result = { success: false, platform, format, quality, framing };
-  // A STILL SHOWS WHAT IS ALIVE AT ITS MOMENT. Lifetimes that fall back to the
+  // THE MOMENT A STILL SHOWS (issue #29 O6). With no time, a still of a scene
+  // that is playing was whatever frame the live playhead had reached when the
+  // call landed: an orbiting planet sat at a different angle on every run, and
+  // nowhere near its place in the video's first frame. A playing scene's still
+  // is now its first frame (time 0), and the result says so; a stopped
+  // playhead is a moment someone chose, and is kept.
+  let __stillT = ${stillTime !== undefined ? stillTime : 'null'};
+  let __stillTimeNote = null;
+${stillTime === undefined ? `  if (['png', 'jpg', 'webp', 'svg', 'pdf'].indexOf(format) !== -1 && typeof app.setPlaybackTime === 'function') {
+    const __tr = app.transport;
+    let __playing = !!(__tr && __tr.isPlaying) || !!(app.isPlayingKeyframes && !app.isAnimationPaused);
+    if (!__playing && typeof app.playbackTime === 'number') {
+      // The flags are not the only clock: watch the playhead for two frames.
+      const __t0 = app.playbackTime;
+      await new Promise((r) => { if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => requestAnimationFrame(r)); else setTimeout(r, 40); });
+      __playing = app.playbackTime !== __t0;
+    }
+    if (__playing) {
+      __stillT = 0;
+      __stillTimeNote = 'the scene was playing, so this still is its first frame (time 0), the frame a video starts on. Pass time for another moment.';
+    }
+  }
+` : ''}  // A STILL SHOWS WHAT IS ALIVE AT ITS MOMENT. Lifetimes that fall back to the
   // MCP's frame callback are applied by the frame loop, and a seek does not run
   // it — so a png at time 0.8 s drew nothing staged at 0.8 s, and an item past
   // its ttl still showed (retest). The visibility pass runs here for stills.
   if (['png', 'jpg', 'webp', 'svg', 'pdf'].indexOf(format) !== -1) {
     const __L = globalThis.__ppMcp;
     if (__L && __L.lifetimeApp === app && typeof __L.applyLifetimes === 'function') {
-      try { __L.applyLifetimes(${stillTime !== undefined ? stillTime : "typeof app.playbackTime === 'number' ? app.playbackTime : 0"}); } catch (_) { /* the still renders either way */ }
+      try { __L.applyLifetimes(__stillT !== null ? __stillT : (typeof app.playbackTime === 'number' ? app.playbackTime : 0)); } catch (_) { /* the still renders either way */ }
     }
   }
   // The engine's report on the audio track of THIS export (FxTool b41860aa:
@@ -6103,18 +6146,19 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
   const __vx = app.exportEngine && app.exportEngine.videoExporter;
   if (__vx && 'lastAudioReport' in __vx) __vx.lastAudioReport = null;
   if (__vx && 'lastVideoReport' in __vx) __vx.lastVideoReport = null;
-${stillTime !== undefined ? `
   // A STILL AT A CHOSEN MOMENT (round 7 X, 1.57). Without this a png is
   // whatever frame the playhead is on — two identical builds gave PNGs that
   // differed in the animated streak while their MP4s were byte-identical.
   // Seek, render, and put the playhead back afterwards.
   const __prevT = typeof app.playbackTime === 'number' ? app.playbackTime : 0;
-  if (typeof app.setPlaybackTime !== 'function') {
-    return { success: false, platform, format, error: 'app.setPlaybackTime unavailable — this studio cannot render a still at a chosen time.' };
+  if (__stillT !== null) {
+    if (typeof app.setPlaybackTime !== 'function') {
+      return { success: false, platform, format, error: 'app.setPlaybackTime unavailable — this studio cannot render a still at a chosen time.' };
+    }
+    app.setPlaybackTime(__stillT);
+    if (typeof paper !== 'undefined' && paper.view && typeof paper.view.update === 'function') paper.view.update();
   }
-  app.setPlaybackTime(${stillTime});
-  if (typeof paper !== 'undefined' && paper.view && typeof paper.view.update === 'function') paper.view.update();
-` : ''}
+
   try {
     // jpg / webp render as png, then re-encode below.
     switch ((format === 'jpg' || format === 'webp') ? 'png' : format) {
@@ -6149,7 +6193,7 @@ ${stillTime !== undefined ? `
           if ('lastRegionExcluded' in app) app.lastRegionExcluded = null;
           // A video in the region is waited for at this time (round 12, 12.5):
           // the render drew before the clip's seek landed.
-          if (typeof app.awaitMediaAt === 'function') await app.awaitMediaAt(${stillTime !== undefined ? stillTime : "typeof app.playbackTime === 'number' ? app.playbackTime : 0"});
+          if (typeof app.awaitMediaAt === 'function') await app.awaitMediaAt(__stillT !== null ? __stillT : (typeof app.playbackTime === 'number' ? app.playbackTime : 0));
           const regionUrl = app.renderRegionToDataURL(new paper.Rectangle(${region.x}, ${region.y}, ${region.width}, ${region.height}), rw, rh${region.excludeForeign === false ? '' : ', { excludeForeign: true }'});
           const __excluded = Array.isArray(app.lastRegionExcluded) ? app.lastRegionExcluded.filter(function(id) { return id; }) : null;
           // ITEMS THAT CROSS THE REGION'S EDGE (round 9 II, 1.78). In the sheet
@@ -6206,7 +6250,9 @@ ${stillTime !== undefined ? `
             || app.canvasSize
             || { width: dimensions.width, height: dimensions.height };
           const pngScale = pngBoard.width > 0 ? dimensions.width / pngBoard.width : 1;
-          const png = await app.exportEngine.exportPNG({ scale: pngScale });
+          // The engine evaluates the scene at time itself (keyframes, relations, loops); without it, a playing
+          // scene's still is left as the live frame.
+          const png = await app.exportEngine.exportPNG({ scale: pngScale, ...(__stillT !== null ? { time: __stillT } : {}) });
           const dataUrl = (png && png.dataUrl) ? png.dataUrl : png;
           result = {
             success: true,
@@ -6928,8 +6974,10 @@ ${(() => {
       warning: `${frames} frames at ${Math.round(fps * 1000) / 1000} fps is ${actual.toFixed(3)} s — ${((actual - videoDuration) * 1000).toFixed(1)} ms over the ${videoDuration} s asked for. For a hard cap (e.g. a 6 s bumper) use duration ${fit.toFixed(4)} (${Math.floor(videoDuration * fps)} frames).`,
     })};\n`;
   })()}
-${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) { /* the still is already rendered */ }
-  if (result && result.success) result.time = ${stillTime};` : ''}
+  if (__stillT !== null) {
+    try { app.setPlaybackTime(__prevT); } catch (_) { /* the still is already rendered */ }
+    if (result && result.success) { result.time = __stillT; if (__stillTimeNote) result.stillTimeNote = __stillTimeNote; }
+  }
   // SCREEN-SPACE ITEMS (FxTool D20): SVG and Lottie write geometry, not the
   // camera's frame map, so a HUD item is placed as if the camera had not moved.
   if (result && result.success && typeof app.screenSpaceItems === 'function' && ['svg', 'lottie', 'dotlottie'].indexOf(${JSON.stringify(format)}) !== -1) {
@@ -10280,6 +10328,8 @@ ${resolveSource}
   }
 
   generateTransform(input: TransformInput): string {
+    // Every id is a quoted literal: an id with a quote in it was a syntax error, and an id is caller text.
+    const ID = JSON.stringify(input.itemId || '');
     switch (input.action) {
       case 'fit': {
         const mode = input.mode || 'contain';
@@ -10291,31 +10341,37 @@ ${resolveSource}
   // id space from canvas item ids. PinePaperAgent.fitToFrame resolves either.
   const A = (typeof window !== 'undefined') && window.PinePaperAgent;
   if (A && typeof A.fitToFrame === 'function') {
-    const ok = A.fitToFrame(${JSON.stringify(input.itemId || '')}, '${mode}');
+    const ok = A.fitToFrame(${ID}, ${JSON.stringify(mode)});
     return ok
-      ? { success: true, action: 'fit', itemId: '${input.itemId}', mode: '${mode}' }
-      : { success: false, error: 'Item not found or not fittable: ${input.itemId}' };
+      ? { success: true, action: 'fit', itemId: ${ID}, mode: ${JSON.stringify(mode)} }
+      : { success: false, error: 'Item not found or not fittable: ' + ${ID} };
   }
   if (typeof app.fitToFrame !== 'function') {
     return { success: false, error: 'fitToFrame unavailable — update FxTool' };
   }
-  const ok = app.fitToFrame(${JSON.stringify(input.itemId || '')}, '${mode}');
+  const ok = app.fitToFrame(${ID}, ${JSON.stringify(mode)});
   return ok
-    ? { success: true, action: 'fit', itemId: '${input.itemId}', mode: '${mode}' }
-    : { success: false, error: 'Item not found: ${input.itemId}' };
+    ? { success: true, action: 'fit', itemId: ${ID}, mode: ${JSON.stringify(mode)} }
+    : { success: false, error: 'Item not found: ' + ${ID} };
 })();`.trim();
       }
       case 'nudge': {
-        const dx = input.dx ?? 0;
-        const dy = input.dy ?? 0;
+        const dx = Number(input.dx ?? 0);
+        const dy = Number(input.dy ?? 0);
+        // THROUGH modifyItem (issue #29 O8). Writing item.position directly
+        // skipped the engine's bookkeeping: an item with a loop animation kept
+        // its old home (data.originalPosition), and the change check, which
+        // reads authored state, reported the move as no change.
         return `
 // Nudge item position
 (function() {
-  const entry = app.itemRegistry.get(${JSON.stringify(input.itemId || '')});
-  if (!entry || !entry.item) return { error: 'Item not found: ${input.itemId}' };
-  entry.item.position.x += ${dx};
-  entry.item.position.y += ${dy};
-  return { success: true, action: 'nudge', itemId: '${input.itemId}', dx: ${dx}, dy: ${dy}, position: { x: entry.item.position.x, y: entry.item.position.y } };
+  const entry = app.itemRegistry.get(${ID});
+  if (!entry || !entry.item) return { error: 'Item not found: ' + ${ID} };
+  const x = entry.item.position.x + ${dx};
+  const y = entry.item.position.y + ${dy};
+  if (typeof app.modifyItem === 'function') app.modifyItem(${ID}, { x: x, y: y });
+  else { entry.item.position.x = x; entry.item.position.y = y; }
+  return { success: true, action: 'nudge', itemId: ${ID}, dx: ${dx}, dy: ${dy}, position: { x: entry.item.position.x, y: entry.item.position.y } };
 })();`.trim();
       }
       case 'flip': {
@@ -10323,10 +10379,10 @@ ${resolveSource}
         return `
 // Flip item ${dir}ly
 (function() {
-  const entry = app.itemRegistry.get(${JSON.stringify(input.itemId || '')});
-  if (!entry || !entry.item) return { error: 'Item not found: ${input.itemId}' };
+  const entry = app.itemRegistry.get(${ID});
+  if (!entry || !entry.item) return { error: 'Item not found: ' + ${ID} };
   ${dir === 'horizontal' ? 'entry.item.scale(-1, 1);' : 'entry.item.scale(1, -1);'}
-  return { success: true, action: 'flip', itemId: '${input.itemId}', direction: '${dir}' };
+  return { success: true, action: 'flip', itemId: ${ID}, direction: ${JSON.stringify(dir)} };
 })();`.trim();
       }
       case 'reorder': {
@@ -10344,20 +10400,20 @@ ${resolveSource}
           return `
 // Reorder item: ${order}
 (function() {
-  const entry = app.itemRegistry.get(${JSON.stringify(input.itemId || '')});
-  if (!entry || !entry.item) return { error: 'Item not found: ${input.itemId}' };
+  const entry = app.itemRegistry.get(${ID});
+  if (!entry || !entry.item) return { error: 'Item not found: ' + ${ID} };
   const sibling = ${siblingExpr};
   if (sibling) entry.item.${method}(sibling);
-  return { success: true, action: 'reorder', itemId: '${input.itemId}', order: '${order}' };
+  return { success: true, action: 'reorder', itemId: ${ID}, order: ${JSON.stringify(order)} };
 })();`.trim();
         }
         return `
 // Reorder item: ${order}
 (function() {
-  const entry = app.itemRegistry.get(${JSON.stringify(input.itemId || '')});
-  if (!entry || !entry.item) return { error: 'Item not found: ${input.itemId}' };
+  const entry = app.itemRegistry.get(${ID});
+  if (!entry || !entry.item) return { error: 'Item not found: ' + ${ID} };
   entry.item.${method}();
-  return { success: true, action: 'reorder', itemId: '${input.itemId}', order: '${order}' };
+  return { success: true, action: 'reorder', itemId: ${ID}, order: ${JSON.stringify(order)} };
 })();`.trim();
       }
       default:

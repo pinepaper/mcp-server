@@ -62,12 +62,12 @@ Pass description for creative direction and canvasPreset for platform sizing. WO
 
 OPERATION TYPES (${AgentBatchOperationTypeSchema.options.length}): ${AgentBatchOperationTypeSchema.options.join(', ')}. create takes position {x, y} or [x, y]. timeline takes GSAP-shaped tweens {to, vars, from, duration, at, stagger, ease, repeat, yoyo} and compiles them onto keyframe tracks (x/y are offsets from home).
 
-VARIABLE REFERENCES: "$0", "$1" etc. reference the items this batch makes, in op order: create and group ops are numbered, nothing else.`,
+VARIABLE REFERENCES: "$0", "$1" etc. reference the items this batch makes, in op order: create and group ops are numbered, nothing else. properties.id on a create chooses the item's id.`,
 
   // -------------------------------------------------------------------------
   // create_item
   // -------------------------------------------------------------------------
-  pinepaper_create_item: `Create a text, shape, or graphic on the canvas. Returns an itemId for later reference.
+  pinepaper_create_item: `Create a text, shape, or graphic on the canvas. Returns an itemId for later reference; properties.id chooses it ("sun"), so replays address the same ids. A closed shape with a strokeColor and no fill is an outline.
 
 ITEM TYPES: ${ITEM_TYPES}.
 STYLING: gradients (color object with stops), shadows, blend modes, opacity. See inputSchema for properties.`,

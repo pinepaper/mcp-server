@@ -24,6 +24,7 @@ import {
   BaseVisualPropertiesSchema,
 } from '../types/schemas.js';
 import { ITEM_TYPE_MAP, RELATION_TYPE_MAP, DIAGRAM_SHAPE_MAP } from './vocabulary.js';
+import { CREATE_KNOWN_KEYS } from '../tools/create-known-keys.js';
 
 /**
  * Known vocabulary field names → canonical valid-value list.
@@ -197,7 +198,8 @@ export function detectBatchPropertyTypos(
     const props = op.properties;
     if (!props || typeof props !== 'object') return;
     for (const key of Object.keys(props)) {
-      if (knownKeys.includes(key)) continue;
+      // A key create acts on is never a typo, whatever it is close to (ttl on a line read as "to").
+      if (knownKeys.includes(key) || CREATE_KNOWN_KEYS.has(key)) continue;
       const suggestion = suggestTypo(key, knownKeys);
       if (!suggestion) continue;
       violations.push({
