@@ -1607,23 +1607,23 @@ export function normalizeEmitterSpec(spec: Record<string, unknown>, assumeDefaul
     const own = (b && typeof b === 'object' ? b : {}) as Record<string, unknown>;
     if (own.count !== undefined || own.velocities !== undefined) mismatch(`bursts[${i}]`, own.count ?? out.count, own.velocities ?? out.velocities);
   });
-  // A RANGE WHERE THE STUDIO READS ONE NUMBER is not read at all (1.6.24 probe:
-  // gravity [100, 300] fell to 0, opacity [0.2, 1] to 1, no word). These keys go
-  // through the studio's num(), which turns an array into NaN and takes num()'s
-  // fallback; size, speed, angle, spawn, lifetime and spin go through range().
-  // The fallback is not always the unset value, so those three say what it is.
+  // A RANGE WHERE THE STUDIO READS ONE NUMBER is not drawn as a range (1.6.24
+  // probe: gravity [100, 300] fell to 0, opacity [0.2, 1] to 1, no word). What
+  // it draws instead depends on the studio build: older ones take num()'s
+  // fallback (count [a, b] → 0, so nothing is drawn); FxTool #228 draws the
+  // middle and says so (emitter-range-not-read). Only size, speed, angle,
+  // spawn, lifetime and spin go through range(). The text says what holds on
+  // both, so it is true whichever studio the server is pointed at.
   const SCALAR_ONLY = ['gravity', 'drag', 'friction', 'opacity', 'fadeIn', 'fadeOut', 'strokeWidth', 'jitter', 'jitterHz', 'aspect', 'sizeEnd', 'count'];
   const SPEC_ONLY = ['rate', 'start', 'end', 'seed'];
   const OUTCOME: Record<string, string> = {
-    count: 'the studio reads it as 0, so this draws no particles',
-    fadeOut: 'the studio reads it as 0, so particles do not fade out (unset, they fade over their life)',
-    strokeWidth: 'the studio reads it as 1 (unset, it is 2)',
+    count: 'an older studio reads a range here as 0 and draws no particles',
   };
   const scalarRanges = (where: string, o: Record<string, unknown>, keys: string[]) => {
     for (const k of keys) {
       const v = o[k];
       if (Array.isArray(v) && v.length >= 2) {
-        warnings.push(`${where}.${k} ${JSON.stringify(v)} was NOT read: ${k} takes one number, and ${OUTCOME[k] ?? `the studio uses its default, as if ${k} were not set`}. Pass a single value. Only size, speed, angle, spawn, lifetime and spin take a [min, max] range.`);
+        warnings.push(`${where}.${k} ${JSON.stringify(v)} is not drawn as a range: ${k} takes one number, so the studio draws one value for every particle (its default, or the middle of the range, depending on the build${OUTCOME[k] ? `; ${OUTCOME[k]}` : ''}). Pass the single value you want. Only size, speed, angle, spawn, lifetime and spin take a [min, max] range.`);
       }
     }
     const f = o.fade;

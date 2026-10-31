@@ -285,9 +285,8 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   `pinepaper_instantiate_ontology`, or an `on_event_add_relation` that adds
   one later. Before, the relation silently never fired.
 - An emitter given a `[min, max]` range for a key that takes one number
-  (such as `gravity`, `opacity` or `count`) now gets a warning that says what
-  the studio used instead. Before, the range was ignored with no warning. A
-  range for `count` draws no particles at all.
+  (such as `gravity`, `opacity` or `count`) now gets a warning: the key draws
+  one value for every particle, not a spread. Before, there was no warning.
 - `pinepaper_import_image` takes a `name`, so a batch `patch` can address an
   imported image by name.
 - Custom code that returns nothing is reported as returning nothing, not as
