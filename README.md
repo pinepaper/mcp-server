@@ -278,10 +278,12 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   rather than as a file.
 - `on_event_fire_if` is documented: its predicate is an ExpressionIR object
   (comparisons, and/or/not, reads of an item's data, active or visible
-  state), and it fires the event in `params.event`, not its target.
-  `pinepaper_add_relation` and batch `relation` steps refuse a predicate
-  written as a string, or a relation with no event to fire, and show the shape
-  that works. Before, the relation silently never fired.
+  state), and it fires the event in `params.event`, not its target. A
+  predicate written as a string, or a relation with no event to fire, is
+  refused with the shape that works, wherever the relation comes from:
+  `pinepaper_add_relation`, a batch `relation` step, `pinepaper_create_scene`,
+  `pinepaper_instantiate_ontology`, or an `on_event_add_relation` that adds
+  one later. Before, the relation silently never fired.
 - An emitter given a `[min, max]` range for a key that takes one number
   (such as `gravity`, `opacity` or `count`) now gets a warning that says what
   the studio used instead. Before, the range was ignored with no warning. A
@@ -292,6 +294,11 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   `{}`, when the scene lint has warnings.
 - An export whose file was saved but could not be hashed or read back says
   so. It used to report the save as failed.
+- A batch step other than `create` that carries a key it does not read
+  now gets an `IGNORED ARGUMENTS` note naming the step and the key. Before,
+  the key had no effect and nothing said so. The common mix-ups get a hint:
+  `params` on a `relation` step (it takes `relationOptions`), and `x`/`y` on
+  a `modify` step (changes go inside `properties`).
 
 ## What's new in 1.6.24
 

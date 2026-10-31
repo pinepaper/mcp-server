@@ -117,6 +117,7 @@ import {
   AgentEndJobInputSchema,
   AgentResetInputSchema,
   AgentBatchExecuteInputSchema,
+  AgentBatchOperationSchema,
   AgentExportInputSchema,
   ExportStoreInputSchema,
   AgentAnalyzeInputSchema,
@@ -2162,7 +2163,46 @@ async function nestedIgnoredFor(toolName: string, args: Record<string, unknown>)
   const tool = PINEPAPER_TOOLS.find((t) => t.name === toolName);
   if (!tool) return [];
   const hidden = new Set(NESTED_HIDDEN[toolName] ?? []);
-  return nestedIgnoredPaths(tool.inputSchema, args).filter((p) => !hidden.has(p.replace(/\[\d+\]/g, '[]')));
+  const paths = nestedIgnoredPaths(tool.inputSchema, args).filter((p) => !hidden.has(p.replace(/\[\d+\]/g, '[]')));
+  return toolName === 'pinepaper_agent_batch_execute' ? [...paths, ...batchOpIgnoredPaths(args)] : paths;
+}
+
+/**
+ * Batch op keys the batch reads that AgentBatchOperationSchema does not list. The op schema is passthrough (a create
+ * takes shape properties flat), so these arrive intact; batch-op-keys.test.ts fails when the batch code reads a key
+ * that is in neither list, so a working key is never reported. Shrink-only.
+ */
+export const BATCH_OP_HIDDEN: Readonly<Record<string, readonly string[]>> = {
+  '*': ['_step', 'id'],
+  keyframe_animate: ['params', 'timeUnits', 'timeOffset', 'clipInPoint', 'clipOutPoint'],
+  timeline: ['repeat', 'yoyo', 'anchor'],
+};
+/** Hints for the slips that land on a key another op type reads. */
+const BATCH_OP_HINTS: Readonly<Record<string, string>> = {
+  'relation.params': 'a relation op takes its parameters as relationOptions',
+  'modify.x': 'a modify op takes changes inside properties', 'modify.y': 'a modify op takes changes inside properties',
+};
+
+/**
+ * A key on a batch op that nothing reads (the passthrough schema let it in, so the nested walk cannot see it). A
+ * `create` folds every op-level key into its properties, which create_item's own property report covers, so only the
+ * other op types are checked here.
+ */
+export function batchOpIgnoredPaths(args: Record<string, unknown>): string[] {
+  const ops = Array.isArray(args.operations) ? args.operations : [];
+  const shape = Object.keys(AgentBatchOperationSchema.shape);
+  const out: string[] = [];
+  ops.forEach((op, i) => {
+    const type = op && typeof op === 'object' && !Array.isArray(op) ? String((op as { type?: unknown }).type) : 'create';
+    if (type === 'create') return;
+    const known = new Set<string>([...shape, ...BATCH_OP_HIDDEN['*'], ...(BATCH_OP_HIDDEN[type] ?? [])]);
+    for (const k of Object.keys(op as object)) {
+      if (known.has(k)) continue;
+      const hint = BATCH_OP_HINTS[`${type}.${k}`];
+      out.push(`operations[${i}].${k}${hint ? ` (${hint})` : ''}`);
+    }
+  });
+  return out.slice(0, 50);
 }
 
 export const IGNORED_ARGUMENTS_META_KEY = 'pinepaper.studio/ignoredArguments';

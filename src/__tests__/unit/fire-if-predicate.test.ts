@@ -50,3 +50,28 @@ describe('on_event_fire_if spec check', () => {
     expect(code).toContain('params.event is missing');
   });
 });
+
+describe('every path that adds a relation runs the fire_if check', () => {
+  it('an on_event_add_relation that would add a bad fire_if is refused', () => {
+    const code = gen.generateAddRelation({ sourceId: 'evt_1', targetId: 'item_2', relationType: 'on_event_add_relation', params: { type: 'on_event_fire_if', target: 'item_2', params: { predicate: '1 > 0', event: 'evt_2' } } } as never);
+    expect(code).not.toContain('app.addRelation');
+    expect(code).toContain('params.params.predicate');
+  });
+
+  it('create_scene lists a bad fire_if as refused and does not add it', () => {
+    const code = gen.generateCreateScene({
+      items: [{ name: 'a', itemType: 'circle', position: { x: 10, y: 10 } }, { name: 'b', itemType: 'circle', position: { x: 50, y: 10 } }],
+      relations: [{ source: 'a', target: 'b', type: 'on_event_fire_if', params: { predicate: score3 } }],
+    } as never);
+    expect(code).toContain('relationsRefused');
+    expect(code).toContain('params.event is missing');
+    expect(code).not.toContain("'on_event_fire_if', params)");
+  });
+
+  it('instantiate_ontology refuses the whole document before building', () => {
+    const doc = { nodes: [{ id: 'a', type: 'pp:Circle', x: 1, y: 1 }, { id: 'b', type: 'pp:Circle', x: 2, y: 2 }], edges: [{ type: 'on_event_fire_if', source: 'a', target: 'b', params: { predicate: 'x' } }] };
+    const code = gen.generateInstantiateOntology({ doc, canvas: { width: 800, height: 600 } } as never);
+    expect(code).toContain('nothing was built');
+    expect(code).not.toContain('app.instantiateOntology');
+  });
+});

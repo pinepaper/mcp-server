@@ -1462,6 +1462,22 @@ export function fireIfProblem(params: Record<string, unknown> | undefined): stri
   return null;
 }
 
+/**
+ * fireIfProblem for any relation a tool is about to add: an on_event_fire_if
+ * itself, or one an on_event_add_relation will add when its event fires
+ * (params.type / params.params). Every path that adds relations asks this, so
+ * the check does not depend on which tool built the relation.
+ */
+export function relationSpecProblem(relationType: unknown, params: unknown): string | null {
+  const p = (params && typeof params === 'object' ? params : {}) as Record<string, unknown>;
+  if (relationType === 'on_event_fire_if') return fireIfProblem(p);
+  if (relationType === 'on_event_add_relation' && p.type === 'on_event_fire_if') {
+    const inner = fireIfProblem((p.params && typeof p.params === 'object' ? p.params : {}) as Record<string, unknown>);
+    return inner ? `the on_event_fire_if it adds: ${inner.replace(/params\./g, 'params.params.')}` : null;
+  }
+  return null;
+}
+
 function generateAddRelationCode(
   sourceId: string,
   targetId: string,
@@ -3450,9 +3466,9 @@ export class PinePaperCodeGenerator {
 })();`.trim();
     }
 
-    if (validated.relationType === 'on_event_fire_if') {
-      const problem = fireIfProblem(validated.params as Record<string, unknown>);
-      if (problem) return `(function() { return { success: false, relationType: 'on_event_fire_if', error: ${JSON.stringify(problem)} }; })();`;
+    {
+      const problem = relationSpecProblem(validated.relationType, validated.params);
+      if (problem) return `(function() { return { success: false, relationType: ${JSON.stringify(validated.relationType)}, error: ${JSON.stringify(problem)} }; })();`;
     }
 
     if (validated.relationType === 'moves_along_path') {
@@ -4259,6 +4275,15 @@ if (typeof _gen === 'function') {
     for (const relation of relations) {
       const { source, target, type, params = {} } = relation;
       const paramsStr = JSON.stringify(params);
+      const specProblem = relationSpecProblem(type, params);
+      if (specProblem) {
+        codeParts.push(`
+// Refused relation: ${source} ${type} ${target}
+(results.relationsRefused = results.relationsRefused || []).push(${JSON.stringify({ source, target, type, reason: specProblem })});
+results.success = false;
+results.error = 'refused ' + results.relationsRefused.length + ' relation(s): ' + results.relationsRefused.map(function(r) { return r.type + ' ' + r.source + ' -> ' + r.target + ' (' + r.reason + ')'; }).join('; ') + '. The items were created.';`);
+        continue;
+      }
 
       codeParts.push(`
 // Add relation: ${source} ${type} ${target}
@@ -5309,9 +5334,9 @@ return { itemId: targetId, animationType: ${JSON.stringify(String(op.animationTy
         const srcRef = batchRef(op.sourceId);
         const tgtRef = batchRef(op.targetId);
         const relOpts = JSON.stringify(op.relationOptions || {});
-        const fireIf = op.relationType === 'on_event_fire_if' ? fireIfProblem(op.relationOptions as Record<string, unknown>) : null;
+        const fireIf = relationSpecProblem(op.relationType, op.relationOptions);
         if (fireIf) return `
-throw new Error(${JSON.stringify('on_event_fire_if: ' + fireIf)});
+throw new Error(${JSON.stringify(String(op.relationType) + ': ' + fireIf)});
 `;
         return `
 const sourceId = ${srcRef};
@@ -12289,6 +12314,14 @@ ${checks.includes('contrast') ? `  // SAMPLED OVER TIME (round 12, 12.9): text i
       canvas: input.canvas,
       defaultGeometry: input.defaultGeometry,
     }).compile(input.doc);
+    // A fire_if the doc declares is checked before anything is built: refused, the whole document is, with every reason.
+    const specProblems = ops
+      .filter((o) => o.op === 'addRelation')
+      .map((o) => { const r = o as { from?: string; to?: string; relation?: string; params?: unknown }; const why = relationSpecProblem(r.relation, r.params); return why ? `${r.from} -> ${r.to} (${r.relation}): ${why}` : null; })
+      .filter((x): x is string => !!x);
+    if (specProblems.length) {
+      return `(function() { return { success: false, error: ${JSON.stringify('nothing was built: ' + specProblems.join(' | '))} }; })();`;
+    }
     const opsJson = JSON.stringify(ops, null, 2);
     const diagJson = JSON.stringify(diagnostics);
     const docJson = JSON.stringify(input.doc);
