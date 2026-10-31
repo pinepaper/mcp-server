@@ -18,6 +18,10 @@ describe('jsLiteral', () => {
     for (const v of values) expect(jsLiteral(v)).not.toMatch(/[<>\u2028\u2029]/);
   });
 
+  it('indents like JSON.stringify when asked', () => {
+    expect(jsLiteral({ a: 1 }, 2)).toBe(JSON.stringify({ a: 1 }, null, 2));
+  });
+
   it('undefined is the undefined literal', () => {
     expect(jsLiteral(undefined)).toBe('undefined');
   });

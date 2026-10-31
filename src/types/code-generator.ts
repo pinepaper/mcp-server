@@ -1237,7 +1237,7 @@ let _modified = true;`;
 
   if (Object.keys(restProperties).length > 0) {
     code += `
-_modified = app.modifyItem(${ID}, ${JSON.stringify(restProperties, null, 2)}) !== false;
+_modified = app.modifyItem(${ID}, ${jsLiteral(restProperties, 2)}) !== false;
 if (!_modified) { return { success: false, error: 'no item ' + ${ID} + ' — nothing was modified' }; }`;
   } else {
     code += `
@@ -1259,7 +1259,7 @@ if (entry && entry.item && app.removeDynamicContent) app.removeDynamicContent(en
       if (countdownEndText) opts.countdownEndText = countdownEndText;
       code += `
 const entry = app.itemRegistry.get(${ID});
-if (entry && entry.item && app.setDynamicContent) app.setDynamicContent(entry.item, '${contentType}', ${JSON.stringify(opts)});`;
+if (entry && entry.item && app.setDynamicContent) app.setDynamicContent(entry.item, '${contentType}', ${jsLiteral(opts)});`;
     }
   }
 
@@ -1290,7 +1290,7 @@ if (_ae && _ae.type === 'audio') {
 const _sm = app.itemRegistry.get(${ID});
 const _smR = _sm && _sm.item && (_sm.item.className === 'Raster' ? _sm.item
   : (typeof _sm.item.getItem === 'function' ? _sm.item.getItem({ className: 'Raster' }) : null));
-if (_smR) _smR.smoothing = ${JSON.stringify(properties.smoothing)};`;
+if (_smR) _smR.smoothing = ${jsLiteral(properties.smoothing)};`;
   }
 
   // No fill on modify too: null / 'transparent' / 'none' clear it outright,
@@ -1327,7 +1327,7 @@ if (_afi) {
   if (modFit) {
     code += `
 let __textFit = null;
-const _tf = app.itemRegistry.get(${ID});${emitTextFit('_tf && _tf.item', modFit, JSON.stringify(anchorHold(properties.anchor ?? properties.origin) ?? null) + " || (_tf && _tf.item && _tf.item.data && _tf.item.data.fitBox && _tf.item.data.fitBox.hold)")}`;
+const _tf = app.itemRegistry.get(${ID});${emitTextFit('_tf && _tf.item', modFit, jsLiteral(anchorHold(properties.anchor ?? properties.origin) ?? null) + " || (_tf && _tf.item && _tf.item.data && _tf.item.data.fitBox && _tf.item.data.fitBox.hold)")}`;
   }
 
   const textStyle = emitTextStyle('_ts && _ts.item', properties);
@@ -1346,7 +1346,7 @@ const _lt = app.itemRegistry.get(${ID});${emitLifetime('_lt && _lt.item', proper
   if (dataFlags && Object.keys(dataFlags).length > 0) {
     code += `
 const _flagged = app.itemRegistry.get(${ID});
-if (_flagged && _flagged.item && _flagged.item.data) Object.assign(_flagged.item.data, ${JSON.stringify(dataFlags)});`;
+if (_flagged && _flagged.item && _flagged.item.data) Object.assign(_flagged.item.data, ${jsLiteral(dataFlags)});`;
   }
 
   const modFont = typeof properties.fontFamily === 'string' && properties.fontFamily.trim() !== '';
@@ -1356,7 +1356,7 @@ if (_flagged && _flagged.item && _flagged.item.data) Object.assign(_flagged.item
   // report create_item gives, against the engine's modify path (generated).
   if (textStyle && letterSpacingCss(properties.letterSpacing) !== undefined) aliased.add('letterSpacing');
   const modIgnored = Object.keys(properties).filter((k) => !MODIFY_KNOWN_KEYS.has(k) && !aliased.has(k));
-  const modWarning = modIgnored.length === 0 ? '' : `, ignoredProperties: ${JSON.stringify(modIgnored)}, warning: ${JSON.stringify(
+  const modWarning = modIgnored.length === 0 ? '' : `, ignoredProperties: ${jsLiteral(modIgnored)}, warning: ${jsLiteral(
     `${modIgnored.join(', ')} ${modIgnored.length > 1 ? 'are' : 'is'} not read when modifying an item, so ${modIgnored.length > 1 ? 'they had' : 'it had'} no effect.`
     + modIgnored.filter((k) => MODIFY_DID_YOU_MEAN[k]).map((k) => ` Did you mean ${MODIFY_DID_YOU_MEAN[k]} (not ${k})?`).join(''),
   )}`;
@@ -1370,7 +1370,7 @@ const __ctItem = app.getItemById(${ID});
 const __ctKeys = (__ctItem && __ctItem.data && Array.isArray(__ctItem.data.keyframes))
   ? __ctItem.data.keyframes.filter(function(k) { return k && k.properties && Object.prototype.hasOwnProperty.call(k.properties, 'content'); }).length : 0;` : ''}
 ${modDirection ? emitDirectionCheck(`app.getItemById(${ID})`, modDirection) : ''}${modTabular ? emitTabularCheck(`app.getItemById(${ID})`) : ''}${modFillOpacity ? emitFillOpacityCheck(`app.getItemById(${ID})`) : ''}${modStrokePos ? emitStrokePositionCheck(`app.getItemById(${ID})`, modStrokePos) : ''}
-return { success: true, itemId: ${ID}${properties.content !== undefined ? `, ...(__ctKeys ? { contentTrackWarning: 'this text\\'s content is keyframed (' + __ctKeys + ' key(s)), so the track sets it on every frame and this edit does not show. Change the content keys with pinepaper_keyframe_animate (append: true replaces same-time keys), or animate another property.' } : {})` : ''}${modFit ? ', textFit: __textFit' : ''}${modDirection ? ', direction: __direction' : ''}${modTabular ? ', tabularFigures: __tabular' : ''}${modFillOpacity ? ', fillOpacity: __fillOpacity' : ''}${modStrokePos ? ', strokePosition: __strokePos' : ''}${affine ? `, affine: ${JSON.stringify({ skewX, skewY, matrix, note: 'applied to the current shape: calling again compounds it. To undo, apply the inverse (negative skew, or the inverse matrix).' })}` : ''}${modLifetime ? ', lifetime: __lifetime' : ''}${modFont ? ', ...(__font ? { font: __font } : {})' : ''}${modWarning} };`;
+return { success: true, itemId: ${ID}${properties.content !== undefined ? `, ...(__ctKeys ? { contentTrackWarning: 'this text\\'s content is keyframed (' + __ctKeys + ' key(s)), so the track sets it on every frame and this edit does not show. Change the content keys with pinepaper_keyframe_animate (append: true replaces same-time keys), or animate another property.' } : {})` : ''}${modFit ? ', textFit: __textFit' : ''}${modDirection ? ', direction: __direction' : ''}${modTabular ? ', tabularFigures: __tabular' : ''}${modFillOpacity ? ', fillOpacity: __fillOpacity' : ''}${modStrokePos ? ', strokePosition: __strokePos' : ''}${affine ? `, affine: ${jsLiteral({ skewX, skewY, matrix, note: 'applied to the current shape: calling again compounds it. To undo, apply the inverse (negative skew, or the inverse matrix).' })}` : ''}${modLifetime ? ', lifetime: __lifetime' : ''}${modFont ? ', ...(__font ? { font: __font } : {})' : ''}${modWarning} };`;
 
   // Wrapped, because the body now RETURNS early on a miss rather than falling
   // through to an unconditional success. Async only when a font must load

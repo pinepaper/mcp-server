@@ -19,8 +19,8 @@ export function escapeUnsafeChars(json: string): string {
   return json.replace(/[<>\u2028\u2029]/g, (c) => UNSAFE[c]);
 }
 
-/** JSON.stringify(value) with the unsafe characters escaped; `undefined` for a value JSON has no text for. */
-export function jsLiteral(value: unknown): string {
-  const json = JSON.stringify(value);
+/** JSON.stringify(value, null, indent) with the unsafe characters escaped; `undefined` for a value JSON has no text for. */
+export function jsLiteral(value: unknown, indent?: number): string {
+  const json = JSON.stringify(value, null, indent);
   return json === undefined ? 'undefined' : escapeUnsafeChars(json);
 }
