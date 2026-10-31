@@ -5111,7 +5111,8 @@ throw new Error('Unknown diagram mode action: ${action}');
       || (typeof v.reason === 'string' && v.reason)
       || 'the operation reported failure without naming a reason';
   };
-  // $N is the Nth item THIS batch created (the documented contract). The
+  // $N is the Nth item THIS batch made (the documented contract): create and group ops take a slot each, in op
+  // order (O2, mcp-server#29: a group is an item every later op addresses, and it had no slot). The
   // previous batch's ids are kept only to name the right id when a $N reaches
   // past what this batch has made: picking it silently shifted every $N in a
   // batch that also creates (B115 follow-up).
@@ -5120,8 +5121,8 @@ throw new Error('Unknown diagram mode action: ${action}');
   const __ref = function (n) {
     if (itemIds[n] !== undefined) return itemIds[n];
     const prev = __prevBatchIds[n];
-    throw new Error('$' + n + ' is the item number ' + n + ' THIS batch created, and it has created ' + itemIds.length + ' so far.'
-      + (prev ? ' In the previous batch $' + n + ' was ' + prev + ' — pass that id instead.' : ' Put the create ops first, or pass the item id.'));
+    throw new Error('$' + n + ' is item number ' + n + ' THIS batch made (create and group ops are numbered, in op order, from $0), and it has made ' + itemIds.length + ' so far.'
+      + (prev ? ' In the previous batch $' + n + ' was ' + prev + ' — pass that id instead.' : ' Put the ops that make it first, or pass the item id.'));
   };
   // A failure names the item, not the "$1" that addressed it; the ref as written when the batch never made it.
   const __refName = function (n) { return itemIds[n] !== undefined ? itemIds[n] : '$' + n; };
@@ -5161,9 +5162,10 @@ throw new Error('Unknown diagram mode action: ${action}');
       // $N reference: a batch of [create ×5, keyframe_animate ×5, create ×5,
       // keyframe_animate ×5] silently re-animated the FIRST five items and
       // left the second five without keyframes (mis-oriented/mis-animated
-      // vehicles, 2026-07-30). `group` already follows this rule by
-      // returning groupId instead of itemId.
-      const claimsItemSlot = op.type === 'create';
+      // vehicles, 2026-07-30). A `group` MAKES an item (the group), so it
+      // claims a slot too (O2, mcp-server#29): [create, create, group,
+      // keyframe_animate "$2"] keys the group.
+      const claimsItemSlot = op.type === 'create' || op.type === 'group';
       // The item this op acts on, for a failure's itemId: its own id field, else what its result names.
       const o = op as Record<string, unknown>;
       const opItem = [o.itemId, o.targetId, o.sourceId, o.id].find((v) => typeof v === 'string') ?? null;
@@ -5397,7 +5399,7 @@ return { itemId: targetId, deleted: true };
         );
         const idsArrayExpr = `[${refs.join(', ')}]`;
         const nameExpr = op.groupName !== undefined ? JSON.stringify(op.groupName) : 'undefined';
-        // Returns { groupId, ... } (no itemId) so it does NOT shift $N indices — like relation.
+        // Returns { groupId, itemId }: the group takes the next $N slot (O2), as a create does.
         return `
 return (function() {${this.groupCodeBody(idsArrayExpr, nameExpr)}
 })();
@@ -12021,8 +12023,8 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
   if (app.historyManager) app.historyManager.saveState();
   const groupId = (group.data && (group.data.registryId || group.data.groupId)) || null;
   // itemId too (round 8 BB, 1.70): every other create answers itemId, and a
-  // group is an item every other tool addresses by that id. In a batch this
-  // does not claim a $N slot — only create ops do.
+  // group is an item every other tool addresses by that id. In a batch it
+  // claims the next $N slot, as a create does (O2).
   return { success: true, groupId: groupId, itemId: groupId, groupName: group.data && group.data.groupName, itemCount: items.length };`;
   }
 

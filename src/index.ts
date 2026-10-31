@@ -269,7 +269,7 @@ Then call \`pinepaper_agent_end_job\` to see the result.
 | apply_effect | Visual effects: sparkle, blast |
 | play_timeline | Start playback (REQUIRED for animation) |
 
-Use "$0", "$1" etc. to reference items by creation order within the batch.
+Use "$0", "$1" etc. to reference the items a batch makes, in op order (create and group ops are numbered).
 
 ## Tool Categories
 

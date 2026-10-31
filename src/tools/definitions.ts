@@ -137,7 +137,7 @@ RULES:
 - Primitive operations go in the ONE batch_execute — canvas, background, items, animation, masks, effects, playback
 - EXCEPTION: Diagrams (flowcharts, UML) use pinepaper_create_diagram_shape + pinepaper_connect, NOT batch_execute
 - A generator is a BACKDROP: under a composed scene it adds texture; on its own it is the stock look. Prefer a styled scene, a drawn world or a real photo for the ground of a piece
-- Use "$0", "$1" to reference items by creation order within the batch
+- Use "$0", "$1" to reference the items a batch makes, in op order (create and group ops are numbered)
 
 ─── BATCH OPERATIONS (${AgentBatchOperationTypeSchema.options.length} types, in order) ───
 
@@ -8885,7 +8885,7 @@ ITEMS:
     All: opacity, shadowColor, shadowBlur, blendMode, strokeColor, strokeWidth
   modify — {itemId, properties} — instant reposition/restyle. To MOVE an item, set {x,y} here (a one-shot position change, not an animation).
   delete — {itemId}
-  group — {itemIds: ["$0","$1",...], groupName} — combine the parts of a composite object into ONE draggable/animatable entity. ALWAYS group a specific named object (car, robot, house, character) after creating its parts. Returns {groupId}; safe — user can ungroup. Do NOT group a whole scene whose pieces move independently.
+  group — {itemIds: ["$0","$1",...], groupName} — combine the parts of a composite object into ONE draggable/animatable entity. ALWAYS group a specific named object (car, robot, house, character) after creating its parts. Returns {groupId}, and the group takes the next "$N" like a create; safe — user can ungroup. Do NOT group a whole scene whose pieces move independently.
 
 ANIMATION:
   animate — Loop animation: {itemId, animationType, animationOptions}
@@ -8909,7 +8909,7 @@ EFFECTS:
 PLAYBACK:
   play_timeline — {action: "play"|"stop"|"seek", duration, loop}
 
-VARIABLE REFERENCES: "$0", "$1" etc. reference items by creation order within the batch. Place ALL create ops before any ops that reference them so the indices stay stable.
+VARIABLE REFERENCES: "$0", "$1" etc. reference the items this batch makes, in op order: create and group ops each take the next number (a ring / grid / orbit that makes items takes one per item); no other op does. [create, create, group, …] makes the group "$2". Place the ops that make an item before any op that references it.
 
 ANIMATION NOTES:
 - keyframe_animate position accepts [x, y] or { x, y } (normalized). fillColor/strokeColor accept rgba() for alpha. The create "opacity" and "blendMode" props are applied to the item.

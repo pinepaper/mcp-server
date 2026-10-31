@@ -62,7 +62,7 @@ Pass description for creative direction and canvasPreset for platform sizing. WO
 
 OPERATION TYPES (${AgentBatchOperationTypeSchema.options.length}): ${AgentBatchOperationTypeSchema.options.join(', ')}. create takes position {x, y} or [x, y]. timeline takes GSAP-shaped tweens {to, vars, from, duration, at, stagger, ease, repeat, yoyo} and compiles them onto keyframe tracks (x/y are offsets from home).
 
-VARIABLE REFERENCES: "$0", "$1" etc. reference items by creation order within the batch.`,
+VARIABLE REFERENCES: "$0", "$1" etc. reference the items this batch makes, in op order: create and group ops are numbered, nothing else.`,
 
   // -------------------------------------------------------------------------
   // create_item
