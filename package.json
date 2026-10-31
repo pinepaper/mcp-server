@@ -7,7 +7,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "pinepaper-mcp": "./dist/cli.js"
+    "pinepaper-mcp": "dist/cli.js"
   },
   "exports": {
     ".": {
@@ -78,7 +78,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/pinepaper/mcp-server"
+    "url": "git+https://github.com/pinepaper/mcp-server.git"
   },
   "engines": {
     "node": ">=18.0.0"

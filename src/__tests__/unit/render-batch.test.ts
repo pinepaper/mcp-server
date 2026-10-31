@@ -14,7 +14,7 @@ function fakeStudio() {
     executeCode: async (code: string) => {
       if (code.includes('app.modifyItem(')) {
         calls.push('modify');
-        if (code.includes("'missing'")) return { success: true, result: { success: false, error: 'no item missing — nothing was modified' } };
+        if (code.includes('"missing"')) return { success: true, result: { success: false, error: 'no item missing — nothing was modified' } };
         return { success: true, result: { success: true, itemId: 'x', ...(code.includes('"colour"') ? { ignoredProperties: ['colour'] } : {}) } };
       }
       if (code.includes('exportPDF') || code.includes('Smart') || code.includes('platform')) {

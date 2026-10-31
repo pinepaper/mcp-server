@@ -368,6 +368,8 @@ function generateBlendModeCode(itemVarName: string, blendMode: string): string {
 /**
  * Template for creating items with support for gradients, shadows, and blend modes
  */
+const UNSAFE_ID_CHARS = /['"`\\\n\r\u2028\u2029]/;
+
 function generateCreateItemCode(
   itemType: ItemType,
   position: { x: number; y: number },
@@ -375,6 +377,14 @@ function generateCreateItemCode(
   dataFlags?: Record<string, unknown>,
   positionGiven = true,
 ): string {
+  // AN ID OF YOUR OWN IS SPLICED INTO LATER CALLS' CODE. Most tools now quote it,
+  // not all yet, so an id carrying a quote, a backslash or a line break would
+  // break those later calls: refused here, by name, before anything is made.
+  if (typeof properties.id === 'string' && UNSAFE_ID_CHARS.test(properties.id)) {
+    return `
+// Create ${itemType} — refused: an id later calls could not address
+({ success: false, error: ${jsLiteral(`properties.id ${JSON.stringify(properties.id)} has a quote, backslash or line break, so later calls could not address the item. Nothing was made. Use letters, digits, spaces, - and _ (e.g. "bobs-hat").`)} });`.trim();
+  }
   // Colour objects are gradient specs: normalised, or refused by name.
   for (const key of ['color', 'fillColor', 'strokeColor']) {
     const v = properties[key];
@@ -1177,6 +1187,9 @@ function generateModifyItemCode(
   properties: Record<string, unknown>,
   dataFlags?: Record<string, unknown>
 ): string {
+  // The id as a quoted literal everywhere below: an id is caller text ("Bob's hat" is a valid properties.id), and a
+  // quote spliced raw ended the string and broke the whole call.
+  const ID = jsLiteral(itemId);
   const { contentType, contentFormat, countdownTarget, countdownEndText, ...restProperties } = properties;
   // Aliases for text items: text -> content (B66), textAlign / align -> justification (B89).
   // A key consumed here was applied, so the unread-key report below must not
@@ -1219,16 +1232,16 @@ function generateModifyItemCode(
   // The warning the engine logs on that path is console.warn, which production
   // strips, so the failure was invisible twice over.
   let code = `
-// Modify item ${itemId}
+// Modify item ${ID}
 let _modified = true;`;
 
   if (Object.keys(restProperties).length > 0) {
     code += `
-_modified = app.modifyItem('${itemId}', ${JSON.stringify(restProperties, null, 2)}) !== false;
-if (!_modified) { return { success: false, error: 'no item ${itemId} — nothing was modified' }; }`;
+_modified = app.modifyItem(${ID}, ${JSON.stringify(restProperties, null, 2)}) !== false;
+if (!_modified) { return { success: false, error: 'no item ' + ${ID} + ' — nothing was modified' }; }`;
   } else {
     code += `
-if (!app.getItemById('${itemId}')) { return { success: false, error: 'no item ${itemId}' }; }`;
+if (!app.getItemById(${ID})) { return { success: false, error: 'no item ' + ${ID} }; }`;
   }
 
   // Handle dynamic content type changes
@@ -1236,7 +1249,7 @@ if (!app.getItemById('${itemId}')) { return { success: false, error: 'no item ${
     if (contentType === null || contentType === 'none' || contentType === '') {
       // Remove dynamic content
       code += `
-const entry = app.itemRegistry.get('${itemId}');
+const entry = app.itemRegistry.get(${ID});
 if (entry && entry.item && app.removeDynamicContent) app.removeDynamicContent(entry.item);`;
     } else {
       // Set dynamic content
@@ -1245,7 +1258,7 @@ if (entry && entry.item && app.removeDynamicContent) app.removeDynamicContent(en
       if (countdownTarget !== undefined) opts.countdownTarget = countdownTarget;
       if (countdownEndText) opts.countdownEndText = countdownEndText;
       code += `
-const entry = app.itemRegistry.get('${itemId}');
+const entry = app.itemRegistry.get(${ID});
 if (entry && entry.item && app.setDynamicContent) app.setDynamicContent(entry.item, '${contentType}', ${JSON.stringify(opts)});`;
     }
   }
@@ -1259,13 +1272,13 @@ if (entry && entry.item && app.setDynamicContent) app.setDynamicContent(entry.it
   if (levelKey) {
     const level = Math.max(0, Math.min(1, properties[levelKey] as number));
     code += `
-const _ae = app.itemRegistry.get('${itemId}');
+const _ae = app.itemRegistry.get(${ID});
 if (_ae && _ae.type === 'audio') {
   _ae.properties = _ae.properties || {};
   _ae.properties.audioGain = ${level};
   _ae.properties.gain = ${level};
   const _A = (typeof window !== 'undefined') && window.PinePaperAgent;
-  const _m = _A && typeof _A.listMedia === 'function' ? _A.listMedia().find(function(x) { return x.registryId === '${itemId}'; }) : null;
+  const _m = _A && typeof _A.listMedia === 'function' ? _A.listMedia().find(function(x) { return x.registryId === ${ID}; }) : null;
   if (_m && app.audioLayer && typeof app.audioLayer.setVolume === 'function') app.audioLayer.setVolume(${level}, _m.id);
 }`;
   }
@@ -1274,7 +1287,7 @@ if (_ae && _ae.type === 'audio') {
   // does not pass on; applied to a raster, or to the raster an image group holds.
   if (typeof properties.smoothing === 'string') {
     code += `
-const _sm = app.itemRegistry.get('${itemId}');
+const _sm = app.itemRegistry.get(${ID});
 const _smR = _sm && _sm.item && (_sm.item.className === 'Raster' ? _sm.item
   : (typeof _sm.item.getItem === 'function' ? _sm.item.getItem({ className: 'Raster' }) : null));
 if (_smR) _smR.smoothing = ${JSON.stringify(properties.smoothing)};`;
@@ -1285,7 +1298,7 @@ if (_smR) _smR.smoothing = ${JSON.stringify(properties.smoothing)};`;
   const fillNone = (v: unknown) => v === null || (typeof v === 'string' && /^(transparent|none)$/i.test(v.trim()));
   if (fillNone(properties.fillColor) || (properties.fillColor === undefined && properties.color !== undefined && fillNone(properties.color))) {
     code += `
-const _nf = app.itemRegistry.get('${itemId}');
+const _nf = app.itemRegistry.get(${ID});
 if (_nf && _nf.item) _nf.item.fillColor = null;`;
   }
 
@@ -1302,7 +1315,7 @@ if (_nf && _nf.item) _nf.item.fillColor = null;`;
   const affine = skewX !== 0 || skewY !== 0 || matrix !== null;
   if (affine) {
     code += `
-const _af = app.itemRegistry.get('${itemId}');
+const _af = app.itemRegistry.get(${ID});
 const _afi = _af && _af.item;
 if (_afi) {
   ${skewX !== 0 || skewY !== 0 ? `_afi.shear(Math.tan(${skewX} * Math.PI / 180), Math.tan(${skewY} * Math.PI / 180), _afi.bounds.center);` : ''}
@@ -1314,25 +1327,25 @@ if (_afi) {
   if (modFit) {
     code += `
 let __textFit = null;
-const _tf = app.itemRegistry.get('${itemId}');${emitTextFit('_tf && _tf.item', modFit, JSON.stringify(anchorHold(properties.anchor ?? properties.origin) ?? null) + " || (_tf && _tf.item && _tf.item.data && _tf.item.data.fitBox && _tf.item.data.fitBox.hold)")}`;
+const _tf = app.itemRegistry.get(${ID});${emitTextFit('_tf && _tf.item', modFit, JSON.stringify(anchorHold(properties.anchor ?? properties.origin) ?? null) + " || (_tf && _tf.item && _tf.item.data && _tf.item.data.fitBox && _tf.item.data.fitBox.hold)")}`;
   }
 
   const textStyle = emitTextStyle('_ts && _ts.item', properties);
   if (textStyle) {
     code += `
-const _ts = app.itemRegistry.get('${itemId}');${textStyle}`;
+const _ts = app.itemRegistry.get(${ID});${textStyle}`;
   }
 
   const modLifetime = properties.bornAt !== undefined || properties.ttl !== undefined;
   if (modLifetime) {
     code += `
 let __lifetime = null;
-const _lt = app.itemRegistry.get('${itemId}');${emitLifetime('_lt && _lt.item', properties.bornAt, properties.ttl)}`;
+const _lt = app.itemRegistry.get(${ID});${emitLifetime('_lt && _lt.item', properties.bornAt, properties.ttl)}`;
   }
 
   if (dataFlags && Object.keys(dataFlags).length > 0) {
     code += `
-const _flagged = app.itemRegistry.get('${itemId}');
+const _flagged = app.itemRegistry.get(${ID});
 if (_flagged && _flagged.item && _flagged.item.data) Object.assign(_flagged.item.data, ${JSON.stringify(dataFlags)});`;
   }
 
@@ -1353,11 +1366,11 @@ ${properties.content !== undefined ? `
 // CONTENT UNDER A CONTENT TRACK (round 10, 10.13): the keyframes set the text
 // on every frame, so a direct edit is overwritten at once — it answered
 // success and changed nothing visible.
-const __ctItem = app.getItemById('${itemId}');
+const __ctItem = app.getItemById(${ID});
 const __ctKeys = (__ctItem && __ctItem.data && Array.isArray(__ctItem.data.keyframes))
   ? __ctItem.data.keyframes.filter(function(k) { return k && k.properties && Object.prototype.hasOwnProperty.call(k.properties, 'content'); }).length : 0;` : ''}
-${modDirection ? emitDirectionCheck(`app.getItemById('${itemId}')`, modDirection) : ''}${modTabular ? emitTabularCheck(`app.getItemById('${itemId}')`) : ''}${modFillOpacity ? emitFillOpacityCheck(`app.getItemById('${itemId}')`) : ''}${modStrokePos ? emitStrokePositionCheck(`app.getItemById('${itemId}')`, modStrokePos) : ''}
-return { success: true, itemId: '${itemId}'${properties.content !== undefined ? `, ...(__ctKeys ? { contentTrackWarning: 'this text\\'s content is keyframed (' + __ctKeys + ' key(s)), so the track sets it on every frame and this edit does not show. Change the content keys with pinepaper_keyframe_animate (append: true replaces same-time keys), or animate another property.' } : {})` : ''}${modFit ? ', textFit: __textFit' : ''}${modDirection ? ', direction: __direction' : ''}${modTabular ? ', tabularFigures: __tabular' : ''}${modFillOpacity ? ', fillOpacity: __fillOpacity' : ''}${modStrokePos ? ', strokePosition: __strokePos' : ''}${affine ? `, affine: ${JSON.stringify({ skewX, skewY, matrix, note: 'applied to the current shape: calling again compounds it. To undo, apply the inverse (negative skew, or the inverse matrix).' })}` : ''}${modLifetime ? ', lifetime: __lifetime' : ''}${modFont ? ', ...(__font ? { font: __font } : {})' : ''}${modWarning} };`;
+${modDirection ? emitDirectionCheck(`app.getItemById(${ID})`, modDirection) : ''}${modTabular ? emitTabularCheck(`app.getItemById(${ID})`) : ''}${modFillOpacity ? emitFillOpacityCheck(`app.getItemById(${ID})`) : ''}${modStrokePos ? emitStrokePositionCheck(`app.getItemById(${ID})`, modStrokePos) : ''}
+return { success: true, itemId: ${ID}${properties.content !== undefined ? `, ...(__ctKeys ? { contentTrackWarning: 'this text\\'s content is keyframed (' + __ctKeys + ' key(s)), so the track sets it on every frame and this edit does not show. Change the content keys with pinepaper_keyframe_animate (append: true replaces same-time keys), or animate another property.' } : {})` : ''}${modFit ? ', textFit: __textFit' : ''}${modDirection ? ', direction: __direction' : ''}${modTabular ? ', tabularFigures: __tabular' : ''}${modFillOpacity ? ', fillOpacity: __fillOpacity' : ''}${modStrokePos ? ', strokePosition: __strokePos' : ''}${affine ? `, affine: ${JSON.stringify({ skewX, skewY, matrix, note: 'applied to the current shape: calling again compounds it. To undo, apply the inverse (negative skew, or the inverse matrix).' })}` : ''}${modLifetime ? ', lifetime: __lifetime' : ''}${modFont ? ', ...(__font ? { font: __font } : {})' : ''}${modWarning} };`;
 
   // Wrapped, because the body now RETURNS early on a miss rather than falling
   // through to an unconditional success. Async only when a font must load
@@ -1372,8 +1385,9 @@ return { success: true, itemId: '${itemId}'${properties.content !== undefined ? 
  * Template for deleting items
  */
 function generateDeleteItemCode(itemId: string): string {
+  const ID = jsLiteral(itemId); // caller text: a quoted literal, never spliced raw
   return `
-// Delete item ${itemId}
+// Delete item ${ID}
 //
 // Delegate to app.deleteItem rather than hand-rolling the removal. The old
 // inline version called \`app.itemRegistry.remove(...)\`, which does not exist —
@@ -1390,11 +1404,11 @@ function generateDeleteItemCode(itemId: string): string {
   if (typeof app.deleteItem !== 'function') {
     return { success: false, error: 'app.deleteItem unavailable — update FxTool' };
   }
-  const ok = app.deleteItem('${itemId}');
+  const ok = app.deleteItem(${ID});
   if (!ok) {
-    return { success: false, error: 'Item not found: ${itemId}' };
+    return { success: false, error: 'Item not found: ' + ${ID} };
   }
-  return { success: true, itemId: '${itemId}' };
+  return { success: true, itemId: ${ID} };
 })();
 `.trim();
 }
@@ -1803,15 +1817,16 @@ function generateQueryRelationsCode(
   relationType?: RelationType,
   direction: 'outgoing' | 'incoming' = 'outgoing'
 ): string {
+  const ID = jsLiteral(itemId); // caller text: a quoted literal, never spliced raw
   if (direction === 'outgoing') {
     const typeArg = relationType ? `'${relationType}'` : 'undefined';
     return `
-// Query outgoing relations for ${itemId}
-const relations = app.getRelations('${itemId}', ${typeArg});
+// Query outgoing relations for ${ID}
+const relations = app.getRelations(${ID}, ${typeArg});
 
 // Format results
 const formatted = relations.map(r => ({
-  sourceId: r.sourceId || '${itemId}',
+  sourceId: r.sourceId || ${ID},
   // RelationRegistry.getAssociations returns { relation, target, params } —
   // there is no \`targetId\` on it. Reading the wrong field made EVERY edge come
   // back with an undefined destination, so the graph was unreadable through
@@ -1826,13 +1841,13 @@ const formatted = relations.map(r => ({
   } else {
     const typeArg = relationType ? `'${relationType}'` : 'undefined';
     return `
-// Query incoming relations for ${itemId}
-const results = app.queryByRelationTarget('${itemId}', ${typeArg});
+// Query incoming relations for ${ID}
+const results = app.queryByRelationTarget(${ID}, ${typeArg});
 
 // Format results
 const relations = results.map(r => ({
   sourceId: r.itemId,
-  targetId: '${itemId}',
+  targetId: ${ID},
   // queryByTarget returns the real relation name on each result. Hardcoding
   // the filter string labelled every edge 'unknown' on an unfiltered query —
   // which is exactly the query you make when exploring an unfamiliar graph.
@@ -1855,14 +1870,15 @@ function generateAnimateCode(
   intensity?: number,
   delay?: number
 ): string {
+  const ID = jsLiteral(itemId); // caller text: a quoted literal, never spliced raw
   const extra =
     (intensity !== undefined ? `,\n  animationIntensity: ${intensity}` : '') +
     (delay !== undefined ? `,\n  animationDelay: ${delay}` : '');
   return `
-// Apply ${animationType} animation to ${itemId}
-const item = app.getItemById('${itemId}');
+// Apply ${animationType} animation to ${ID}
+const item = app.getItemById(${ID});
 if (!item) {
-  throw new Error('Item not found: ${itemId}');
+  throw new Error('Item not found: ' + ${ID});
 }
 app.animate(item, {
   animationType: '${animationType}',
@@ -1878,13 +1894,13 @@ app.animate(item, {
   if (r) {
     return {
       success: false,
-      itemId: '${itemId}',
+      itemId: ${ID},
       error: 'Unknown animationType "' + r.requested + '" — nothing will move.',
       requested: r.requested,
       known: r.known,
     };
   }
-  return { success: true, itemId: '${itemId}', animationType: '${animationType}' };
+  return { success: true, itemId: ${ID}, animationType: '${animationType}' };
 })();
 `.trim();
 }
@@ -1936,10 +1952,11 @@ function normalizeKeyframePositions<T extends { properties?: Record<string, unkn
  * "item_7 is not on the canvas" is actionable, silence is not.
  */
 function requireItem(itemId: string, what: string): string {
+  const ID = jsLiteral(itemId); // caller text: a quoted literal, never spliced raw
   const isRef = typeof itemId === 'string' && itemId.startsWith('$');
   const targetExpr = isRef
-    ? `((typeof window !== 'undefined' && window.__pinepaper_batch_item_ids && window.__pinepaper_batch_item_ids[${itemId.substring(1)}]) || '${itemId}')`
-    : `'${itemId}'`;
+    ? `((typeof window !== 'undefined' && window.__pinepaper_batch_item_ids && window.__pinepaper_batch_item_ids[${itemId.substring(1)}]) || ${ID})`
+    : `${ID}`;
   return `
 const _targetId = ${targetExpr};
 const _target = (app.getItemById && app.getItemById(_targetId))
@@ -1991,6 +2008,7 @@ function generateKeyframeAnimateCode(
   append = false,
   easingAt?: 'arrival' | 'departure'
 ): string {
+  const ID = jsLiteral(itemId); // caller text: a quoted literal, never spliced raw
   const keyframesJson = JSON.stringify(normalizeKeyframePositions(keyframes), null, 2);
   const calculatedDuration = duration || Math.max(...keyframes.map(k => k.time));
 
@@ -2070,10 +2088,10 @@ function generateKeyframeAnimateCode(
   if (__opts && Object.prototype.hasOwnProperty.call(__opts, 'easingAt')) __warn.push('easingAt ' + ${JSON.stringify(JSON.stringify(easingAt))} + ' was not applied: this studio predates it, so every easing was read as the move ARRIVING at its key. Put each easing on the key the move goes to instead.');` : '';
   const runtimeWarning = `${textKeysJs ? ', ...(__ignored.length ? { ignoredProperties: __ignored } : {})' : ''}, ...(__warn.length ? { warning: __warn.join(' ') } : {})`;
 
-  const addAnimTarget = itemId.startsWith('$') ? '_targetId' : `'${itemId}'`;
+  const addAnimTarget = itemId.startsWith('$') ? '_targetId' : `${ID}`;
 
   return `
-// Apply keyframe animation to ${itemId}
+// Apply keyframe animation to ${ID}
 (function() {
   ${requireItem(itemId, 'the animation')}${audioLevelGuard}
   // The track as it was, so the result can say what happened to it: merged
@@ -2190,15 +2208,16 @@ function generateApplyEffectCode(
   effectType: string,
   params: Record<string, unknown>
 ): string {
+  const ID = jsLiteral(itemId); // caller text: a quoted literal, never spliced raw
   return `
-// Apply ${effectType} effect to ${itemId}
-const item = app.getItemById('${itemId}');
+// Apply ${effectType} effect to ${ID}
+const item = app.getItemById(${ID});
 if (!item) {
-  throw new Error('Item not found: ${itemId}');
+  throw new Error('Item not found: ' + ${ID});
 }
 app.applyEffect(item, '${effectType}', ${JSON.stringify(params, null, 2)});
 
-({ success: true, itemId: '${itemId}', effectType: '${effectType}' });
+({ success: true, itemId: ${ID}, effectType: '${effectType}' });
 `.trim();
 }
 
@@ -5345,7 +5364,7 @@ return __created;
         // at run time, so it is generated with a placeholder and the runtime
         // variable put in its place.
         const single = generateModifyItemCode('__MID__', (op.properties || {}) as Record<string, unknown>).trim()
-          .replace(/'__MID__'/g, '__mid')
+          .replace(/"__MID__"/g, '__mid')
           .replace(/__MID__/g, "' + __mid + '")
           .replace(/;\s*$/, '');
         return `

@@ -469,7 +469,7 @@ USE WHEN:
 
 IMPORTANT:
 - Save the returned itemId! You need it for pinepaper_add_relation, pinepaper_modify_item, pinepaper_delete_item, etc.
-- properties.id chooses the itemId yourself ("sun", "title"): the same call names the same item on every run, so a replay after pinepaper_clear_canvas addresses the same ids. An id a live item already holds gets a suffix ("sun_2"); the returned itemId is always the one to use. Without it, ids are item_1, item_2, … and start again at item_1 after a clear.
+- properties.id chooses the itemId yourself ("sun", "title"): the same call names the same item on every run, so a replay after pinepaper_clear_canvas addresses the same ids. An id a live item already holds gets a suffix ("sun_2"); the returned itemId is always the one to use. Letters, digits, spaces, - and _: an id with a quote, backslash or line break is refused. Without it, ids are item_1, item_2, … and start again at item_1 after a clear.
 - A closed shape with a strokeColor and no fill (fillColor, color) is an OUTLINE; name a fillColor to fill it.
 - If there's a welcome template on the canvas, use pinepaper_clear_canvas first
 - Position defaults to canvas center (400, 300). Use position: {x, y} or [x, y] (both forms accepted) to place elsewhere. Position is the item's bounding-box CENTRE, not its top-left corner.

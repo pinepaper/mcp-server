@@ -110,7 +110,7 @@ describe('PinePaperCodeGenerator', () => {
 
       // modifyItem, not select+modify: modify() operates on the SELECTION, so a
       // bad id left the previous selection to be edited instead.
-      expect(code).toContain("app.modifyItem('item_1'");
+      expect(code).toContain('app.modifyItem("item_1"');
       expect(code).not.toContain("app.select('item_1')");
       expect(code).toContain('app.modifyItem(');
       expect(code).toContain('#ff0000');
@@ -125,7 +125,7 @@ describe('PinePaperCodeGenerator', () => {
 
       // modifyItem, not select+modify: modify() operates on the SELECTION, so a
       // bad id left the previous selection to be edited instead.
-      expect(code).toContain("app.modifyItem('item_1'");
+      expect(code).toContain('app.modifyItem("item_1"');
       expect(code).not.toContain("app.select('item_1')");
       expect(code).toContain('app.modifyItem(');
     });
@@ -134,7 +134,7 @@ describe('PinePaperCodeGenerator', () => {
   describe('generateDeleteItem', () => {
     it('delegates to app.deleteItem instead of hand-rolling the removal', () => {
       const code = codeGenerator.generateDeleteItem('item_5');
-      expect(code).toContain("app.deleteItem('item_5')");
+      expect(code).toContain('app.deleteItem("item_5")');
       // app.deleteItem also clears animatedItems / keyframeItems / selection,
       // redraws, snapshots history and emits the collaboration mutation — none
       // of which the old inline version did.
@@ -228,13 +228,13 @@ describe('PinePaperCodeGenerator', () => {
     it('should generate outgoing relations query', () => {
       const code = codeGenerator.generateQueryRelations('item_1', undefined, 'outgoing');
 
-      expect(code).toContain("app.getRelations('item_1'");
+      expect(code).toContain('app.getRelations("item_1"');
     });
 
     it('should generate incoming relations query', () => {
       const code = codeGenerator.generateQueryRelations('item_1', undefined, 'incoming');
 
-      expect(code).toContain("app.queryByRelationTarget('item_1'");
+      expect(code).toContain('app.queryByRelationTarget("item_1"');
     });
 
     it('should filter by relation type', () => {
@@ -248,7 +248,7 @@ describe('PinePaperCodeGenerator', () => {
     it('should generate simple animation code', () => {
       const code = codeGenerator.generateAnimate(mockPulseAnimation);
 
-      expect(code).toContain("app.getItemById('item_1')");
+      expect(code).toContain('app.getItemById("item_1")');
       expect(code).toContain('app.animate(item');
       expect(code).toContain("animationType: 'pulse'");
       expect(code).toContain('animationSpeed: 1');

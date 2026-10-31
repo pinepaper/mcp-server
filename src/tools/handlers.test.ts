@@ -66,7 +66,7 @@ describe('handleToolCall', () => {
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
-      expect(text).toContain("app.modifyItem('item_1'");
+      expect(text).toContain('app.modifyItem("item_1"');
       expect(text).toContain('app.modify');
       expect(text).toContain('#00ff00');
     });
@@ -91,7 +91,7 @@ describe('handleToolCall', () => {
       // Deletion goes through the engine facade. The old expectations pinned a
       // hand-rolled removal that called `app.itemRegistry.remove(...)` — a
       // method that does not exist — so the registry row outlived the item.
-      expect(text).toContain("app.deleteItem('item_5')");
+      expect(text).toContain('app.deleteItem("item_5")');
       // Comment lines stripped — the emitted source names the old bug in prose.
       const executable = text.split('\n').filter((l) => !l.trim().startsWith('//')).join('\n');
       expect(executable).not.toContain('itemRegistry.remove');
@@ -183,7 +183,7 @@ describe('handleToolCall', () => {
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
-      expect(text).toContain("app.getRelations('item_1'");
+      expect(text).toContain('app.getRelations("item_1"');
     });
 
     it('should generate code for querying incoming relations', async () => {
@@ -194,7 +194,7 @@ describe('handleToolCall', () => {
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
-      expect(text).toContain("app.queryByRelationTarget('item_1'");
+      expect(text).toContain('app.queryByRelationTarget("item_1"');
     });
   });
 

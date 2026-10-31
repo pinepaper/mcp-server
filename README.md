@@ -356,7 +356,12 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   does, so an item with a loop animation keeps its new place, and the
   result no longer reports the move as no change.
 - `create_item` documents `properties.id`: an id of your own, so replays
-  address the same items.
+  address the same items. An id with a quote, backslash or line break is
+  refused, since later calls could not address it.
+- An item id containing a quote no longer breaks `pinepaper_modify_item`,
+  `pinepaper_delete_item`, `pinepaper_animate`,
+  `pinepaper_keyframe_animate`, `pinepaper_apply_effect` or
+  `pinepaper_query_relations`. Before, the call failed with a syntax error.
 - The `lane` toolkit adds `pinepaper_event`, for things that happen at a
   set time or on a click (a panel that hides at 3 s), and
   `pinepaper_clear_canvas`, to start over. Its batch description shows how
