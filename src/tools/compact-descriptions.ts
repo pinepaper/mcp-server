@@ -106,7 +106,8 @@ GENERATORS (${GeneratorNameSchema.options.length}): ${GENERATORS}.`,
   // -------------------------------------------------------------------------
   pinepaper_add_relation: `Add a behavior relation between two items (orbits, follows, attached_to, etc.). Relations are compositional — an item can have multiple.
 
-RELATION TYPES: ${RELATION_TYPES}. A name registered with pinepaper_register_custom_relation this session is accepted too.`,
+RELATION TYPES: ${RELATION_TYPES}. A name registered with pinepaper_register_custom_relation this session is accepted too.
+UNITS: orbits speed is revolutions per second (0.5 = one turn every 2 s); angles are degrees.`,
 
   // -------------------------------------------------------------------------
   // create_diagram_shape

@@ -3550,7 +3550,7 @@ USE WHEN:
 - Building live geometric constructions (GeoGebra-style — dragging an anchor updates the dependent)
 
 RELATION TYPES:
-- orbits: Circular motion around target (params: radius, speed, direction, phaseDegrees). Use phaseDegrees. 'phase' is the one parameter in the whole relation vocabulary measured in RADIANS — the documented exception to "angles are DEGREES", kept only for scenes that already set it. phaseDegrees wins when both are given.
+- orbits: Circular motion around target (params: radius, speed, direction, phaseDegrees). speed is REVOLUTIONS PER SECOND: 0.5 is one turn every 2 s, 0.1 one turn every 10 s (not radians, not a period). Use phaseDegrees. 'phase' is the one parameter in the whole relation vocabulary measured in RADIANS — the documented exception to "angles are DEGREES", kept only for scenes that already set it. phaseDegrees wins when both are given.
 - follows: Move toward target with smoothing (params: offset, smoothing, delay)
 - attached_to: Fixed offset from target (params: offset, inherit_rotation)
 - maintains_distance: Stay fixed distance from target (params: distance, strength)
