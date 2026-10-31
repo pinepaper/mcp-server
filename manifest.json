@@ -10,17 +10,16 @@
     "name": "PinePaper Studio",
     "url": "https://github.com/pinepaper"
   },
-  "support": {
-    "email": "support@pinepaper.studio",
-    "url": "https://github.com/pinepaper/mcp-server/issues"
-  },
+  "support": "https://github.com/pinepaper/mcp-server/issues",
   "repository": {
     "type": "git",
     "url": "https://github.com/pinepaper/mcp-server"
   },
   "homepage": "https://pinepaper.studio",
   "license": "MIT",
-  "privacy_policy": "https://pinepaper.studio/privacy-policy",
+  "privacy_policies": [
+    "https://pinepaper.studio/privacy-policy"
+  ],
   "keywords": [
     "animation",
     "graphics",
@@ -41,28 +40,6 @@
         "PINEPAPER_CHROME_PATH": "${user_config.chrome_path}",
         "PINEPAPER_EXPORT_DIR": "${user_config.export_dir}",
         "PINEPAPER_TOOLKIT": "${user_config.toolkit}"
-      }
-    },
-    "env": {
-      "PINEPAPER_EXECUTION_MODE": {
-        "description": "Set default execution mode ('puppeteer' or 'code')",
-        "default": "puppeteer"
-      },
-      "PINEPAPER_TOOLKIT": {
-        "description": "Tool visibility profile: 'full', 'agent', 'diagram', 'map', 'font', 'minimal'",
-        "default": "agent"
-      },
-      "PINEPAPER_VERBOSITY": {
-        "description": "Tool description detail: 'verbose', 'compact', 'minimal'",
-        "default": "compact"
-      },
-      "PINEPAPER_SCREENSHOT_MODE": {
-        "description": "Screenshot behavior ('on_request', 'always', 'never')",
-        "default": "on_request"
-      },
-      "PINEPAPER_LOCALE": {
-        "description": "UI locale (e.g., 'en', 'ja', 'zh-CN')",
-        "default": "en"
       }
     }
   },
