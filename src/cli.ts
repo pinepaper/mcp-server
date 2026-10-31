@@ -13,6 +13,7 @@ import type { ToolkitProfile } from './tools/toolkits.js';
 import type { ToolVerbosity } from './tools/definitions.js';
 import { getToolsForToolkit, getToolsForVerbosity } from './tools/index.js';
 import { SERVER_VERSION } from './version.js';
+import { env } from './utils/env.js';
 
 const VERSION = SERVER_VERSION;
 const VALID_VERBOSITIES: ToolVerbosity[] = ['verbose', 'compact', 'minimal'];
@@ -136,9 +137,9 @@ SUPPORT:
     const server = await createServer(serverOptions);
     const transport = new StdioServerTransport();
 
-    const modeDisplay = executionMode || process.env.PINEPAPER_EXECUTION_MODE || 'puppeteer';
-    const toolkitDisplay = toolkit || process.env.PINEPAPER_TOOLKIT || 'agent';
-    const verbosityDisplay = verbosity || process.env.PINEPAPER_VERBOSITY || process.env.PINEPAPER_TOOL_VERBOSITY || 'compact';
+    const modeDisplay = executionMode || env('PINEPAPER_EXECUTION_MODE') || 'puppeteer';
+    const toolkitDisplay = toolkit || env('PINEPAPER_TOOLKIT') || 'agent';
+    const verbosityDisplay = verbosity || env('PINEPAPER_VERBOSITY') || env('PINEPAPER_TOOL_VERBOSITY') || 'compact';
     const toolCount = getToolsForToolkit(getToolsForVerbosity(verbosityDisplay as ToolVerbosity), toolkitDisplay as ToolkitProfile).length;
 
     console.error('╔═══════════════════════════════════════════════════╗');

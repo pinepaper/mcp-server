@@ -221,6 +221,7 @@ import { checkContrast, checkFlashes, parseCssColor, type TextSample } from '../
 import { buildHtml5Ad, buildPlayable, externalRequests, pinSceneBackground, type CtaBox } from '../utils/ad-package.js';
 import { safeFetch, checkUrl, UnsafeUrlError } from '../utils/safe-fetch.js';
 import { confineAssetPath } from '../utils/asset-paths.js';
+import { env } from '../utils/env.js';
 
 /**
  * Registry of per-domain handler maps. Tools listed here short-circuit the
@@ -259,7 +260,7 @@ export type ScreenshotMode = 'on_request' | 'always' | 'never';
  * Defaults to 'on_request' for optimal performance.
  */
 export function getScreenshotMode(): ScreenshotMode {
-  const mode = process.env.PINEPAPER_SCREENSHOT_MODE?.toLowerCase();
+  const mode = env('PINEPAPER_SCREENSHOT_MODE')?.toLowerCase();
   if (mode === 'always' || mode === 'never' || mode === 'on_request') {
     return mode;
   }
@@ -272,7 +273,7 @@ export function getScreenshotMode(): ScreenshotMode {
 // =============================================================================
 
 export function getExportDir(): string {
-  return process.env.PINEPAPER_EXPORT_DIR || join(tmpdir(), 'pinepaper-exports');
+  return env('PINEPAPER_EXPORT_DIR') || join(tmpdir(), 'pinepaper-exports');
 }
 
 // wav joins them: a minute of 48kHz 16-bit is ~5.8 MB of base64 and the ten
@@ -312,9 +313,9 @@ const SAVE_THRESHOLD_BYTES = 180_000; // ~180KB base64 ≈ 135KB decoded
 const EXPORT_GOVERNOR_DEFAULT_MS = 300_000;
 
 function exportGovernorTimeoutMs(): number {
-  const raw = Number(process.env.PINEPAPER_EXPORT_TIMEOUT);
+  const raw = Number(env('PINEPAPER_EXPORT_TIMEOUT'));
   if (!Number.isFinite(raw) || raw <= 0) return EXPORT_GOVERNOR_DEFAULT_MS;
-  const protocolFloor = Math.max(Number(process.env.PINEPAPER_TIMEOUT) || 0, EXPORT_GOVERNOR_DEFAULT_MS);
+  const protocolFloor = Math.max(Number(env('PINEPAPER_TIMEOUT')) || 0, EXPORT_GOVERNOR_DEFAULT_MS);
   if (raw > protocolFloor) {
     console.error(
       `[PinePaper] PINEPAPER_EXPORT_TIMEOUT=${raw}ms is above the browser's protocol timeout (${protocolFloor}ms) — ` +
@@ -823,7 +824,7 @@ export type ExecutionMode = 'puppeteer' | 'code';
  * Defaults to 'puppeteer' for live execution.
  */
 export function getExecutionMode(): ExecutionMode {
-  const mode = process.env.PINEPAPER_EXECUTION_MODE?.toLowerCase();
+  const mode = env('PINEPAPER_EXECUTION_MODE')?.toLowerCase();
   if (mode === 'puppeteer' || mode === 'code') {
     return mode;
   }
@@ -1058,7 +1059,7 @@ function executedResult(
   const content: (TextContent | ImageContent)[] = [
     { type: 'text', text: JSON.stringify(resultObj, null, 2) },
   ];
-  if (process.env.PINEPAPER_ECHO_CODE === '1') {
+  if (env('PINEPAPER_ECHO_CODE') === '1') {
     content.push({ type: 'text', text: `Generated code:\n\`\`\`javascript\n${code}\n\`\`\`` });
   }
 
@@ -1092,7 +1093,7 @@ function screenshotResult(screenshot: string): CallToolResult {
  * error code, not a program, and stripping those would take information away.
  */
 function redactGeneratedCode(details: unknown): unknown {
-  if (process.env.PINEPAPER_ECHO_CODE === '1') return details;
+  if (env('PINEPAPER_ECHO_CODE') === '1') return details;
   if (!details || typeof details !== 'object' || Array.isArray(details)) return details;
   const d = details as Record<string, unknown>;
   const script = d.code;
@@ -3599,7 +3600,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
         // Falls back to the PINEPAPER_STUDIO_URL env var, else PuppeteerController's
         // built-in prod default. "/editor" + agent params are appended by the controller.
         const rawUrl = typeof args.url === 'string' ? args.url.trim() : '';
-        const studioUrl = (rawUrl || (process.env.PINEPAPER_STUDIO_URL || '').trim()) || undefined;
+        const studioUrl = (rawUrl || (env('PINEPAPER_STUDIO_URL') || '').trim()) || undefined;
 
         // Only http(s) is supported — reject file://, data://, javascript:, etc.
         if (studioUrl) {
@@ -3793,7 +3794,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
           version: SERVER_VERSION,
           toolkit: detectToolkit(),
           verbosity: detectVerbosity(),
-          locale: process.env.PINEPAPER_LOCALE || 'en',
+          locale: env('PINEPAPER_LOCALE') || 'en',
           executionMode: options.executionMode || getExecutionMode(),
           screenshotMode: options.screenshotMode || getScreenshotMode(),
         };
@@ -4456,7 +4457,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
               type: 'text' as const,
               // The script is not part of the answer here either — same reason
               // errors no longer carry it. PINEPAPER_ECHO_CODE=1 brings it back.
-              text: (process.env.PINEPAPER_ECHO_CODE === '1'
+              text: (env('PINEPAPER_ECHO_CODE') === '1'
                 ? `Executed PinePaper code:\n\n\`\`\`javascript\n${code}\n\`\`\`\n\n`
                 : '')
                 + `Full screenshot saved to: ${filePath} (${(fileSize / 1024).toFixed(1)} KB)\n\nResult: ${JSON.stringify(cleanResult, null, 2)}`,

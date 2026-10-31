@@ -9,6 +9,7 @@
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { execFile } from 'node:child_process';
+import { env } from '../utils/env.js';
 
 /** What the file is, as the studio's encoder and muxer report it (FxTool AgentMode `probe`). */
 export interface ProbeSummary {
@@ -102,7 +103,7 @@ function codecFamily(codec: string): string {
  * ffprobe, or one that cannot read the file, is said in `reason`.
  */
 export async function verifyWithFfprobe(filePath: string, probe: ProbeSummary): Promise<ProbeCheck> {
-  if (process.env.PINEPAPER_FFPROBE === 'off') return { tool: null, reason: 'PINEPAPER_FFPROBE=off' };
+  if (env('PINEPAPER_FFPROBE') === 'off') return { tool: null, reason: 'PINEPAPER_FFPROBE=off' };
   if (ffprobeAvailable === null) ffprobeAvailable = (await run('ffprobe', ['-version'])).ok;
   if (!ffprobeAvailable) return { tool: null, reason: 'ffprobe is not on PATH, so the file was not read back; the summary is what the studio encoded' };
   const r = await run('ffprobe', ['-v', 'error', '-show_entries',

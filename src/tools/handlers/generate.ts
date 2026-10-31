@@ -16,6 +16,7 @@ import { z } from 'zod';
 import { errorResult, handleToolCall, type HandlerOptions } from '../handlers.js';
 import { ErrorCodes } from '../../types/schemas.js';
 import { emitTextLayersPlacement } from '../../types/code-generator.js';
+import { env } from '../../utils/env.js';
 
 const GenerateInputSchema = z.object({
   prompt: z.string().min(1),
@@ -67,8 +68,8 @@ export const generateDeps = {
 };
 
 function cloudConfig(): { base: string; key: string } | { error: string } {
-  const key = (process.env.PINEPAPER_API_KEY || '').trim();
-  const base = (process.env.PINEPAPER_CLOUD_URL || 'https://cloud.pinepaper.studio').replace(/\/+$/, '');
+  const key = (env('PINEPAPER_API_KEY') || '').trim();
+  const base = (env('PINEPAPER_CLOUD_URL') || 'https://cloud.pinepaper.studio').replace(/\/+$/, '');
   if (!key) {
     return { error: 'generation runs in the PinePaper cloud and needs a service-account key: set PINEPAPER_API_KEY (pp_sa_…, with the render:create scope) in this server\'s environment. Generation is an internal beta, enabled per organisation (the ai-media feature).' };
   }

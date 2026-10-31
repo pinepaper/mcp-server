@@ -9,7 +9,6 @@
  */
 
 import { readFileSync, existsSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -26,8 +25,10 @@ export const SERVER_VERSION: string = pkg.version;
 /**
  * WHICH BUILD, not which release (tester request, round 9: several builds in
  * a row all reported 1.6.14). A built package reads dist/build-info.json,
- * written at build time; running from source asks git. null when neither
- * knows — never a guess.
+ * written at build time. null when it is absent (running from source) —
+ * never a guess. This asked git when running from source until 1.6.25; that
+ * put a child_process call in the published package for a path no installed
+ * copy ever takes, so the build step is now the only place that asks git.
  */
 function readBuild(): string | null {
   try {
@@ -37,12 +38,7 @@ function readBuild(): string | null {
       if (b.sha) return b.sha + (b.dirty ? '.dirty' : '');
     }
   } catch { /* fall through */ }
-  try {
-    const repo = join(here, '..');
-    const sha = execFileSync('git', ['-C', repo, 'rev-parse', '--short=7', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-    const dirty = execFileSync('git', ['-C', repo, 'status', '--porcelain', '--untracked-files=no'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() !== '';
-    return sha ? sha + (dirty ? '.dirty' : '') : null;
-  } catch { return null; }
+  return null;
 }
 
 export const SERVER_BUILD: string | null = readBuild();

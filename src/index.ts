@@ -54,6 +54,7 @@ import { PROMPTS, getPromptMessages } from './prompts/index.js';
 // =============================================================================
 
 import { SERVER_VERSION_WITH_BUILD } from './version.js';
+import { env } from './utils/env.js';
 
 /**
  * SUBSTITUTION, NOT FORMAT. This string said "NEVER generate HTML or React"
@@ -6116,14 +6117,14 @@ The tools generate Paper.js/JavaScript code that executes on the PinePaper canva
  */
 function detectLocaleFromEnvironment(): SupportedLocale {
   // Check explicit PinePaper locale setting
-  const pinepaperLocale = process.env.PINEPAPER_LOCALE;
+  const pinepaperLocale = env('PINEPAPER_LOCALE');
   if (pinepaperLocale && isValidLocale(pinepaperLocale)) {
     return pinepaperLocale as SupportedLocale;
   }
 
   // Check standard locale environment variables
   const envLocale =
-    process.env.LC_ALL || process.env.LC_MESSAGES || process.env.LANG || '';
+    env('LC_ALL') || env('LC_MESSAGES') || env('LANG') || '';
 
   // Parse locale string (e.g., "en_US.UTF-8" -> "en")
   const localePart = envLocale.split('.')[0]; // Remove encoding

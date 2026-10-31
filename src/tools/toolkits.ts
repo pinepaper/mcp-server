@@ -9,6 +9,7 @@
  */
 
 import { applyLane } from './lane.js';
+import { env } from '../utils/env.js';
 
 export type ToolkitProfile = 'full' | 'agent' | 'diagram' | 'map' | 'font' | 'minimal' | 'lane';
 
@@ -439,7 +440,7 @@ export function getToolsForToolkit<T extends Tool>(tools: T[], profile: ToolkitP
  * Returns 'agent' if not set or invalid.
  */
 export function detectToolkitFromEnvironment(): ToolkitProfile {
-  const value = process.env.PINEPAPER_TOOLKIT;
+  const value = env('PINEPAPER_TOOLKIT');
   if (value && TOOLKIT_PROFILES_LIST.includes(value as ToolkitProfile)) {
     return value as ToolkitProfile;
   }
@@ -448,7 +449,7 @@ export function detectToolkitFromEnvironment(): ToolkitProfile {
 
 /** Returns true if PINEPAPER_TOOLKIT was explicitly set in the environment. */
 export function isToolkitExplicitlySet(): boolean {
-  const value = process.env.PINEPAPER_TOOLKIT;
+  const value = env('PINEPAPER_TOOLKIT');
   return !!value && TOOLKIT_PROFILES_LIST.includes(value as ToolkitProfile);
 }
 
@@ -466,7 +467,7 @@ const VALID_VERBOSITIES: ToolVerbosity[] = ['verbose', 'compact', 'minimal'];
  * Returns 'compact' if not set or invalid.
  */
 export function detectVerbosityFromEnvironment(): ToolVerbosity {
-  const value = process.env.PINEPAPER_VERBOSITY || process.env.PINEPAPER_TOOL_VERBOSITY;
+  const value = env('PINEPAPER_VERBOSITY') || env('PINEPAPER_TOOL_VERBOSITY');
   if (value && VALID_VERBOSITIES.includes(value as ToolVerbosity)) {
     return value as ToolVerbosity;
   }
@@ -475,7 +476,7 @@ export function detectVerbosityFromEnvironment(): ToolVerbosity {
 
 /** Returns true if PINEPAPER_VERBOSITY or PINEPAPER_TOOL_VERBOSITY was explicitly set. */
 export function isVerbosityExplicitlySet(): boolean {
-  const value = process.env.PINEPAPER_VERBOSITY || process.env.PINEPAPER_TOOL_VERBOSITY;
+  const value = env('PINEPAPER_VERBOSITY') || env('PINEPAPER_TOOL_VERBOSITY');
   return !!value && VALID_VERBOSITIES.includes(value as ToolVerbosity);
 }
 

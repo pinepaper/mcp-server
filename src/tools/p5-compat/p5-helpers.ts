@@ -16,7 +16,7 @@
 
 /**
  * Browser-side p5.js compatibility helpers.
- * This code is injected into the PinePaper page context and executed via eval().
+ * This code is injected into the PinePaper page context and run there as a script.
  */
 export const P5_HELPERS = `
 (function() {

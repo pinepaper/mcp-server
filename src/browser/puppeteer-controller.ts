@@ -8,6 +8,7 @@
 import type { Browser, Page } from 'puppeteer';
 import { mcpLog } from '../utils/mcp-log.js';
 import { LAZY_HEAVY_SUBSYSTEMS, LAZY_HEAVY_CLASSES, ENGINE_SURFACE } from '../tools/engine-surface.js';
+import { env } from '../utils/env.js';
 
 // =============================================================================
 // TYPES
@@ -710,6 +711,28 @@ export class PinePaperBrowserController {
   /**
    * Execute JavaScript code in PinePaper Studio
    */
+  /**
+   * The ungoverned path: the code as a CDP Runtime.evaluate (Puppeteer's string form awaits a promise and keeps the
+   * script's trailing value), then the in-page bridgeSafe the governed path uses, so a value holding live Paper items
+   * still crosses. A throw comes back as { success: false, error }, as it did from eval.
+   */
+  private async runUngoverned(code: string): Promise<{ success: boolean; result?: unknown; error?: string; executedVia: 'eval' }> {
+    if (!this.page) return { success: false, error: 'Browser not connected', executedVia: 'eval' };
+    let handle: Awaited<ReturnType<Page['evaluateHandle']>> | null = null;
+    try {
+      handle = await this.page.evaluateHandle(code);
+      const value = await this.page.evaluate((v: unknown) => {
+        const safe = (window as unknown as { __ppBridgeSafe?: (x: unknown) => unknown }).__ppBridgeSafe;
+        return safe ? safe(v) : v;
+      }, handle);
+      return { success: true, result: value, executedVia: 'eval' };
+    } catch (e) {
+      return { success: false, error: e instanceof Error ? e.message : 'Execution error', executedVia: 'eval' };
+    } finally {
+      if (handle) await handle.dispose().catch(() => {});
+    }
+  }
+
   async executeCode(code: string, takeScreenshot = true, options: ExecuteCodeOptions = {}): Promise<ExecuteResult> {
     if (!this.page || !this.isConnected) {
       return {
@@ -777,7 +800,7 @@ export class PinePaperBrowserController {
         stage: options.stage ?? null,
       };
       const __evalStart = Date.now();
-      const result = await this.page.evaluate(async (codeToRun: string, opts: { bypass: boolean; timeoutMs?: number; heavyClass: string | null; awaitBoot: boolean; stage: Record<string, string> | null }) => {
+      const evaluated = await this.page.evaluate(async (codeToRun: string, opts: { bypass: boolean; timeoutMs?: number; heavyClass: string | null; awaitBoot: boolean; stage: Record<string, string> | null }) => {
         // THE BRIDGE USES STRUCTURED CLONE, AND JSON.stringify DOES NOT PROVE IT.
         //
         // A result crosses CDP by structured clone, which refuses to carry a
@@ -870,24 +893,17 @@ export class PinePaperBrowserController {
             return { success: false, error: e instanceof Error ? e.message : 'Execution error', executedVia: 'governed' as const };
           }
         }
-        // Fallback: raw eval — a pre-governor FxTool build, or an explicit
-        // bypass. Both generated-code shapes are `(`-led expression statements,
-        // so eval returns the same trailing value runGenerated captures.
-        try {
-          // eslint-disable-next-line no-eval
-          const evalResult = eval(codeToRun);
-          if (evalResult instanceof Promise) {
-            return evalResult.then((r) => ({ success: true, result: bridgeSafe(r), executedVia: 'eval' as const }));
-          }
-          return { success: true, result: bridgeSafe(evalResult), executedVia: 'eval' as const };
-        } catch (e) {
-          return {
-            success: false,
-            error: e instanceof Error ? e.message : 'Execution error',
-            executedVia: 'eval' as const,
-          };
-        }
+        // Fallback: run ungoverned — a pre-governor FxTool build, or an explicit
+        // bypass. The code is run from the Node side as a CDP Runtime.evaluate
+        // (below), which returns the script's trailing value exactly as eval did:
+        // both generated-code shapes are `(`-led expression statements. It used
+        // to be eval() here; the published package then carried an eval call
+        // that supply-chain scanners flag, for what CDP already does.
+        (window as unknown as { __ppBridgeSafe?: (v: unknown) => unknown }).__ppBridgeSafe = bridgeSafe;
+        return { success: true, __ppRaw: true, executedVia: 'eval' as const };
       }, code, runOptions);
+      let result: typeof evaluated | { success: boolean; result?: unknown; error?: string; executedVia: 'eval' } = evaluated;
+      if ((evaluated as { __ppRaw?: boolean }).__ppRaw) result = await this.runUngoverned(code);
       BROWSER_TIME.executeMs += Date.now() - __evalStart;
 
       // Take screenshot if requested
@@ -1312,23 +1328,13 @@ ${codes.map((code, i) => `
     `.trim();
 
     try {
-      const result = await this.page.evaluate((codeToRun: string) => {
-        try {
-          // eslint-disable-next-line no-eval
-          const evalResult = eval(codeToRun);
-          if (evalResult instanceof Promise) {
-            return evalResult;
-          }
-          return evalResult;
-        } catch (e) {
-          return {
-            success: false,
-            error: e instanceof Error ? e.message : 'Batch execution error',
-            results: [],
-            itemIds: [],
-          };
-        }
-      }, batchCode);
+      // A string is run as a CDP Runtime.evaluate: the script's value, awaited, by value (no eval in this package).
+      const result = await this.page.evaluate(batchCode).catch((e: unknown) => ({
+        success: false,
+        error: e instanceof Error ? e.message : 'Batch execution error',
+        results: [],
+        itemIds: [],
+      })) as { success: boolean; error?: string; results: Array<{ index: number; success: boolean; result?: unknown; itemId?: string; error?: string }>; itemIds: string[] };
 
       const executionTime = Date.now() - startTime;
 
@@ -1463,10 +1469,10 @@ export function getBrowserController(
     // Env resolution lives here, not in the controller: explicit config wins,
     // then the env var, then the default — the shape PINEPAPER_HEADLESS and
     // PINEPAPER_STUDIO_URL already use.
-    const envHeadless = process.env.PINEPAPER_HEADLESS;
+    const envHeadless = env('PINEPAPER_HEADLESS');
     const headless = config?.headless ?? (envHeadless !== undefined ? envHeadless !== 'false' : true);
 
-    const envWaitUntil = process.env.PINEPAPER_WAIT_UNTIL?.trim() as PageWaitUntil | undefined;
+    const envWaitUntil = env('PINEPAPER_WAIT_UNTIL')?.trim() as PageWaitUntil | undefined;
     if (envWaitUntil && !PAGE_WAIT_UNTIL.includes(envWaitUntil)) {
       // Loudly, because a typo here silently reinstates the hang it was set to
       // avoid — and a 30s connect failure looks nothing like a bad env var.
@@ -1475,9 +1481,9 @@ export function getBrowserController(
       );
     }
 
-    const envTimeout = Number(process.env.PINEPAPER_TIMEOUT);
-    if (process.env.PINEPAPER_TIMEOUT && !Number.isFinite(envTimeout)) {
-      console.error(`[PinePaper] PINEPAPER_TIMEOUT="${process.env.PINEPAPER_TIMEOUT}" is not a number — ignoring it.`);
+    const envTimeout = Number(env('PINEPAPER_TIMEOUT'));
+    if (env('PINEPAPER_TIMEOUT') && !Number.isFinite(envTimeout)) {
+      console.error(`[PinePaper] PINEPAPER_TIMEOUT="${env('PINEPAPER_TIMEOUT')}" is not a number — ignoring it.`);
     }
 
     const mcpConfig: BrowserControllerConfig = {
@@ -1485,8 +1491,8 @@ export function getBrowserController(
       headless,
       waitUntil: config?.waitUntil ?? (envWaitUntil && PAGE_WAIT_UNTIL.includes(envWaitUntil) ? envWaitUntil : undefined),
       timeout: config?.timeout ?? (Number.isFinite(envTimeout) && envTimeout > 0 ? envTimeout : undefined),
-      proxy: config?.proxy ?? process.env.PINEPAPER_PROXY?.trim(),
-      governor: config?.governor ?? (process.env.PINEPAPER_GOVERNOR?.trim().toLowerCase() !== 'off'),
+      proxy: config?.proxy ?? env('PINEPAPER_PROXY')?.trim(),
+      governor: config?.governor ?? (env('PINEPAPER_GOVERNOR')?.trim().toLowerCase() !== 'off'),
     };
     globalController = new PinePaperBrowserController(mcpConfig);
   } else if (config) {

@@ -17,6 +17,7 @@
 import { realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, delimiter, dirname, join, resolve, sep } from 'node:path';
+import { env } from './env.js';
 
 async function real(p: string): Promise<string | null> {
   try { return await realpath(p); } catch { return null; }
@@ -24,8 +25,8 @@ async function real(p: string): Promise<string | null> {
 
 export async function allowedAssetRoots(): Promise<string[]> {
   // Same default as getExportDir() in handlers.ts (not imported: that module imports this one).
-  const exportDir = process.env.PINEPAPER_EXPORT_DIR || join(tmpdir(), 'pinepaper-exports');
-  const entries = [process.cwd(), exportDir, ...(process.env.PINEPAPER_ASSET_DIRS ?? '').split(delimiter).filter(Boolean)];
+  const exportDir = env('PINEPAPER_EXPORT_DIR') || join(tmpdir(), 'pinepaper-exports');
+  const entries = [process.cwd(), exportDir, ...(env('PINEPAPER_ASSET_DIRS') ?? '').split(delimiter).filter(Boolean)];
   const roots = await Promise.all(entries.map((e) => real(resolve(e))));
   return [...new Set(roots.filter((r): r is string => r !== null))];
 }

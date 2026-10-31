@@ -13,6 +13,7 @@ import {
   MetricsExportFormat,
   MetricsSummary,
 } from './types.js';
+import { env } from '../utils/env.js';
 
 /**
  * Configuration options for PerformanceTracker
@@ -321,9 +322,9 @@ export function getPerformanceTracker(config?: PerformanceTrackerConfig): Perfor
   if (!globalTracker) {
     // Check environment variables for configuration
     const envConfig: PerformanceTrackerConfig = {
-      enabled: process.env.PINEPAPER_METRICS_ENABLED !== 'false',
-      maxRetention: process.env.PINEPAPER_METRICS_RETENTION
-        ? parseInt(process.env.PINEPAPER_METRICS_RETENTION, 10)
+      enabled: env('PINEPAPER_METRICS_ENABLED') !== 'false',
+      maxRetention: env('PINEPAPER_METRICS_RETENTION')
+        ? parseInt(env('PINEPAPER_METRICS_RETENTION') as string, 10)
         : 1000,
     };
 
