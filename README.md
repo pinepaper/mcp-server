@@ -249,6 +249,32 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - Puppeteer itself is an **optional** peer dependency, kept out of the default tree precisely because a headless browser plus an install script is what scanners flag hardest. Install it only if you want the executing mode.
 - The server itself fetches the images, SVGs and media a tool call names by URL, and reads local files named by path. URLs that resolve to loopback, private, link-local or reserved addresses are refused, redirects included, and so are cloud metadata addresses. Local files are read only from the working directory, the export folder, and folders listed in `PINEPAPER_ASSET_DIRS`. `PINEPAPER_ALLOW_PRIVATE_NETWORK=1` allows local and LAN hosts. Metadata addresses stay refused even with it set.
 
+## What's new in 1.6.25
+
+### Added
+
+- `pinepaper_pattern` kinds `ring` and `orbit`: members spaced evenly round a
+  turning circle, with a fixed `center` or a `target` item the centre follows.
+  The list of kinds now comes from the studio, so a kind it adds appears here
+  too.
+
+### Fixed
+
+- `pinepaper_pattern` no longer warns "NO CHANGE" after a `create` or
+  `modify` that has not moved anything yet, such as a wave at time 0 or one
+  whose window starts later.
+- A failed batch step addressed by `$N` names the item that `$N` resolved to,
+  not `"$N"`.
+- Batch `animate` and `relation` operations quote their `animationType` and
+  `relationType` correctly in the generated code.
+- On a scene of more than 1000 items, batches and custom code skip the scene
+  lint on each call and say so. It checks every pair of items, which made
+  every call on a large scene slower. `pinepaper_agent_export` still lints
+  before it renders.
+- The agent toolkit's export description now says what each format returns:
+  only MP4 and WebM carry a frame digest, and a small SVG comes back inline
+  rather than as a file.
+
 ## What's new in 1.6.24
 
 ### Added
