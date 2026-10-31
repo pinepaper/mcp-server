@@ -11,6 +11,7 @@ import { normalizeSvgSize } from '../utils/svg-size.js';
 import { WORLD3D_COLOR_PATHS, PATTERN_KINDS } from '../tools/engine-lists.js';
 import { REQUIRED_ENGINE_METHODS, OPTIONAL_ENGINE_METHODS } from '../tools/engine-methods.js';
 import { ACCEPTED_CREATE_PARAMS, NORMALIZE_PARAM_READS, MODIFY_CHANGE_READS } from '../tools/shape-params.js';
+import { jsLiteral } from '../utils/js-literal.js';
 import { generateP5DrawCode } from '../tools/p5-compat/p5-helpers.js';
 import { expandBatchMacros } from '../tools/batch-macros.js';
 import {
@@ -734,11 +735,11 @@ export function emitEnsureFont(family: string): string {
   return `
 let __font = null;
 if (typeof app.checkFont === 'function') {
-  const __v0 = app.checkFont(${JSON.stringify(family)});
+  const __v0 = app.checkFont(${jsLiteral(family)});
   if (__v0 && __v0.available === false) {
     if (typeof app.ensureFontsLoaded === 'function') { try { await app.ensureFontsLoaded('all'); } catch (_) { /* reported below */ } }
-    try { if (typeof document !== 'undefined' && document.fonts) await document.fonts.load('16px ' + ${JSON.stringify(JSON.stringify(primary))}); } catch (_) { /* reported below */ }
-    let __v1 = app.checkFont(${JSON.stringify(family)});
+    try { if (typeof document !== 'undefined' && document.fonts) await document.fonts.load('16px ' + ${jsLiteral(jsLiteral(primary))}); } catch (_) { /* reported below */ }
+    let __v1 = app.checkFont(${jsLiteral(family)});
     let __via = 'studio';
     // Not in the studio's own sheets (Monoton, a common neon face, is not):
     // the page's CSP allows fonts.googleapis.com stylesheets and
@@ -746,21 +747,21 @@ if (typeof app.checkFont === 'function') {
     if (!(__v1 && __v1.available === true) && typeof document !== 'undefined' && document.head) {
       __via = 'google-fonts';
       await new Promise(function(res) {
-        const id = 'pp-gf-' + ${JSON.stringify(primary)}.replace(/[^a-z0-9]+/gi, '-');
+        const id = 'pp-gf-' + ${jsLiteral(primary)}.replace(/[^a-z0-9]+/gi, '-');
         if (document.getElementById(id)) return res();
         const l = document.createElement('link');
         l.id = id; l.rel = 'stylesheet';
-        l.href = 'https://fonts.googleapis.com/css2?family=' + encodeURIComponent(${JSON.stringify(primary)}).replace(/%20/g, '+') + '&display=swap';
+        l.href = 'https://fonts.googleapis.com/css2?family=' + encodeURIComponent(${jsLiteral(primary)}).replace(/%20/g, '+') + '&display=swap';
         l.onload = res; l.onerror = res; setTimeout(res, 5000);
         document.head.appendChild(l);
       });
-      try { if (document.fonts) await document.fonts.load('16px ' + ${JSON.stringify(JSON.stringify(primary))}); } catch (_) { /* reported below */ }
-      __v1 = app.checkFont(${JSON.stringify(family)});
+      try { if (document.fonts) await document.fonts.load('16px ' + ${jsLiteral(jsLiteral(primary))}); } catch (_) { /* reported below */ }
+      __v1 = app.checkFont(${jsLiteral(family)});
     }
     __font = (__v1 && __v1.available === true)
-      ? { family: ${JSON.stringify(primary)}, available: true, loadedNow: true, via: __via }
-      : { family: ${JSON.stringify(primary)}, available: false,
-          warning: ${JSON.stringify(primary)} + ' could not be loaded, so this text is drawn in a fallback face. '
+      ? { family: ${jsLiteral(primary)}, available: true, loadedNow: true, via: __via }
+      : { family: ${jsLiteral(primary)}, available: false,
+          warning: ${jsLiteral(primary)} + ' could not be loaded, so this text is drawn in a fallback face. '
             + ((__v1 && __v1.reason) || '') + ' font list_available names the families this studio can load.' };
   }
 }`;
@@ -1503,7 +1504,7 @@ function generateAddRelationCode(
   }
   const success = app.addRelation('${sourceId}', '${targetId}', '${relationType}', ${JSON.stringify(params, null, 2)});
   if (!success) {
-    const __why = ${relationRefusalReasonJs(JSON.stringify(relationType))};
+    const __why = ${relationRefusalReasonJs(jsLiteral(relationType))};
     return { success: false, relationType: '${relationType}', error: 'the studio refused the ${relationType} relation between ${sourceId} and ${targetId}' + (__why ? ': ' + __why : '.') };
   }
   app.historyManager.saveState();
@@ -3489,7 +3490,7 @@ export class PinePaperCodeGenerator {
 
     {
       const problem = relationSpecProblem(validated.relationType, validated.params);
-      if (problem) return `(function() { return { success: false, relationType: ${JSON.stringify(validated.relationType)}, error: ${JSON.stringify(problem)} }; })();`;
+      if (problem) return `(function() { return { success: false, relationType: ${jsLiteral(validated.relationType)}, error: ${jsLiteral(problem)} }; })();`;
     }
 
     if (validated.relationType === 'moves_along_path') {
@@ -4317,7 +4318,7 @@ results.error = 'refused ' + results.relationsRefused.length + ' relation(s): ' 
     if (app.addRelation(sourceId, targetId, '${type}', params)) {
       results.relations.push({ source: '${source}', target: '${target}', type: '${type}' });
     } else {
-      const __why = ${relationRefusalReasonJs(JSON.stringify(type))};
+      const __why = ${relationRefusalReasonJs(jsLiteral(type))};
       (results.relationsRefused = results.relationsRefused || []).push({ source: '${source}', target: '${target}', type: '${type}', reason: __why || 'the studio refused it' });
       results.success = false;
       results.error = 'the studio refused ' + results.relationsRefused.length + ' relation(s): ' + results.relationsRefused.map(function(r) { return r.type + ' ' + r.source + ' -> ' + r.target + ' (' + r.reason + ')'; }).join('; ') + '. The items were created.';
@@ -5374,7 +5375,7 @@ const relationId = app.addRelation(source, target, ${JSON.stringify(String(op.re
 // { relationId: false } with nothing marking it failed, so the batch said
 // success over a relation that does not exist.
 if (!relationId) {
-  const __why = ${relationRefusalReasonJs(JSON.stringify(op.relationType))};
+  const __why = ${relationRefusalReasonJs(jsLiteral(op.relationType))};
   return { success: false, relationId: false, sourceId, targetId, relationType: ${JSON.stringify(op.relationType)},
     error: 'the studio refused the ' + ${JSON.stringify(op.relationType)} + ' relation between ' + sourceId + ' and ' + targetId + ' — nothing was bound' + (__why ? ': ' + __why : '.') };
 }
@@ -7680,7 +7681,7 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
     // unchanged. The map itself cannot be moved without breaking geoToCanvas
     // (it projects against the untransformed map, so markers would land in the
     // wrong place). Until the engine has a map view transform, say so.
-    return `(function() { return { success: false, error: ${JSON.stringify(MAP_VIEW_REFUSAL('pan'))} }; })();`;
+    return `(function() { return { success: false, error: ${jsLiteral(MAP_VIEW_REFUSAL('pan'))} }; })();`;
   }
 
   /**
@@ -7693,7 +7694,7 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
     if (validated.duration !== undefined) options.duration = validated.duration;
 
     // Refused for the same reason as pan (see generatePanMap).
-    return `(function() { return { success: false, error: ${JSON.stringify(MAP_VIEW_REFUSAL('zoom'))} }; })();`;
+    return `(function() { return { success: false, error: ${jsLiteral(MAP_VIEW_REFUSAL('zoom'))} }; })();`;
   }
 
   /**
@@ -11136,7 +11137,7 @@ case 'analyze_palette':
   // ===========================================================================
 
   generateHandDrawn(input: HandDrawnInput): string {
-    const S = (v: unknown) => JSON.stringify(v);
+    const S = jsLiteral;
     // style carries no schema default: with one, `mode` (its alias) was never read.
     const requested = input.style ?? input.mode ?? 'sketchy';
     const style = requested === 'ink_reveal' ? 'reveal' : requested;
@@ -11522,7 +11523,7 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
   const __esc = function(v) { return String(v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); };
   let __html = String(result.html || '');
   const __applied = [];
-  ${input.lang || input.dir ? `__html = __html.replace(/<html\\b[^>]*>/i, function() { __applied.push('html'); return '<html lang="' + __esc(${JSON.stringify(input.lang ?? 'en')}) + '"' + ${JSON.stringify(input.dir ? ` dir="${input.dir}"` : '')} + '>'; });` : ''}
+  ${input.lang || input.dir ? `__html = __html.replace(/<html\\b[^>]*>/i, function() { __applied.push('html'); return '<html lang="' + __esc(${jsLiteral(input.lang ?? 'en')}) + '"' + ${jsLiteral(input.dir ? ` dir="${input.dir}"` : '')} + '>'; });` : ''}
   ${input.alt ? `// The engine's widget draws its canvas from script, so there is no <canvas>
   // tag to label (prod retest): its accessible name is div#w's aria-label,
   // mirrored in the screen-reader text #w-desc. Both carry the alt; a literal
@@ -11549,7 +11550,7 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
         if (!input.chartType) return `(function() { return { error: 'chartType is required for create' }; })();`;
         if (!input.data) return `(function() { return { error: 'data is required for create' }; })();`;
         const fields = resolveChartFields(input.chartType, input.data, input.options || {});
-        if ('error' in fields) return `(function() { return { success: false, error: ${JSON.stringify(fields.error)} }; })();`;
+        if ('error' in fields) return `(function() { return { success: false, error: ${jsLiteral(fields.error)} }; })();`;
         const dataStr = JSON.stringify(input.data);
         const optsStr = JSON.stringify(fields.options);
         return `
@@ -12343,7 +12344,7 @@ ${checks.includes('contrast') ? `  // SAMPLED OVER TIME (round 12, 12.9): text i
       .map((o) => { const r = o as { from?: string; to?: string; relation?: string; params?: unknown }; const why = relationSpecProblem(r.relation, r.params); return why ? `${r.from} -> ${r.to} (${r.relation}): ${why}` : null; })
       .filter((x): x is string => !!x);
     if (specProblems.length) {
-      return `(function() { return { success: false, error: ${JSON.stringify('nothing was built: ' + specProblems.join(' | '))} }; })();`;
+      return `(function() { return { success: false, error: ${jsLiteral('nothing was built: ' + specProblems.join(' | '))} }; })();`;
     }
     const opsJson = JSON.stringify(ops, null, 2);
     const diagJson = JSON.stringify(diagnostics);
@@ -13391,7 +13392,7 @@ ${cam ? `  // The camera rides the SAME timing: framing each state as its morph 
 
   /** pinepaper_emitter (D29): create('emitter', spec) / setEmitter(id, patch). */
   generateEmitter(raw: EmitterInput): string {
-    const S = (v: unknown) => JSON.stringify(v);
+    const S = jsLiteral;
     const normalized = normalizeEmitterSpec(raw.spec as Record<string, unknown>, raw.action !== 'set');
     const input = { ...raw, spec: normalized.spec } as EmitterInput;
     // A COUNT OVER THE CAP IS SAID (B144). The cap is 10000 a burst on the

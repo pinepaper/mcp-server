@@ -214,6 +214,7 @@ import { exportHandlers } from './handlers/export.js';
 import { generateHandlers } from './handlers/generate.js';
 import { beatHandlers } from './handlers/beats.js';
 import { planCharacter, generateCharacterCode } from './handlers/character.js';
+import { jsLiteral } from '../utils/js-literal.js';
 import { buildZip } from '../utils/zip.js';
 import { buildScc, type SccCue } from '../utils/scc.js';
 import { checkContrast, checkFlashes, parseCssColor, type TextSample } from '../utils/a11y.js';
@@ -3054,7 +3055,7 @@ async function handleToolCallInner(
             try {
               const controller = options.browserController || getBrowserController();
               if (!controller.connected) await controller.connect();
-              const r = await controller.executeCode(`(function() { const ids = ${JSON.stringify(itemIds)}; return ids.filter(function(id) { const e = app.itemRegistry && app.itemRegistry.get(id); return !(e && e.item); }); })();`, false);
+              const r = await controller.executeCode(`(function() { const ids = ${jsLiteral(itemIds)}; return ids.filter(function(id) { const e = app.itemRegistry && app.itemRegistry.get(id); return !(e && e.item); }); })();`, false);
               if (r.success && Array.isArray(r.result)) missingItems = r.result as string[];
             } catch { /* unchecked: said below */ }
           }
