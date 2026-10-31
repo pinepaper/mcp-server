@@ -32,7 +32,9 @@
         "pinepaper_keyframe_animate",
         "pinepaper_pattern",
         "pinepaper_agent_export",
-        "pinepaper_lint_scene"
+        "pinepaper_lint_scene",
+        "pinepaper_event",
+        "pinepaper_clear_canvas"
       ]
     },
     "jsonrpc": "2.0",

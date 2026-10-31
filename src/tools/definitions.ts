@@ -118,7 +118,7 @@ The generated code is shown in tool responses and can be copied into PinePaper's
 
 ${CHOOSE_THE_DOOR}
 
-THE AGENT LANE — when the job is a scene of shapes, text, keyframes and relations exported to a file (a data animation, a title card, a motion test), and no craft tool above is wanted: PINEPAPER_TOOLKIT=lane (or pinepaper_set_toolkit {toolkit: "lane"}) serves five tools — pinepaper_agent_batch_execute, pinepaper_keyframe_animate, pinepaper_pattern, pinepaper_agent_export, pinepaper_lint_scene — whose descriptions carry the rules that otherwise cost a failed build (the keyframe shape, an item's words and look inside properties, position is the centre). The whole contract is under 10k tokens. Use the full surface for characters, styled scenes, maps, diagrams and sound.
+THE AGENT LANE — when the job is a scene of shapes, text, keyframes and relations exported to a file (a data animation, a title card, a motion test), and no craft tool above is wanted: PINEPAPER_TOOLKIT=lane (or pinepaper_set_toolkit {toolkit: "lane"}) serves seven tools — pinepaper_agent_batch_execute, pinepaper_keyframe_animate, pinepaper_pattern, pinepaper_agent_export, pinepaper_lint_scene, pinepaper_event (timed and clicked events), pinepaper_clear_canvas (start over) — whose descriptions carry the rules that otherwise cost a failed build (the keyframe shape, an item's words and look inside properties, position is the centre). The whole contract is under 10k tokens. Use the full surface for characters, styled scenes, maps, diagrams and sound.
 
 WORKFLOW — Create → Validate → Iterate:
 
@@ -401,6 +401,7 @@ IMPORTANT NOTES:
 - This removes ALL items from the canvas permanently
 - The welcome template (shown to first-time visitors) will be cleared
 - After clearing, use pinepaper_get_items to verify the canvas is empty
+- Item ids start again at item_1 (one past any id still on the canvas), so a batch replayed after a clear gets the same ids
 - If items persist after clearing, try pinepaper_refresh_page instead`,
     inputSchema: {
       type: 'object',
@@ -9752,7 +9753,7 @@ USE WHEN: You need full parameter docs, examples, or workflow guidance — espec
 
 PREFER RESOURCES WHERE POSSIBLE: The full AI Agent Guide is also available via the MCP resources API at pinepaper://docs/agent-guide — clients that support resources should pull it that way rather than calling this tool. Per-domain references live at pinepaper://docs/{generators,relations,masks,diagrams,maps,effects-and-filters,fonts,custom-paths,paperjs-in-pinepaper,templates,customization,getting-started}. Use this tool when the client doesn't support resources or when you want a specific tool's verbose description.
 
-THE AGENT LANE: for a scene built from shapes, text, keyframes and relations and exported to a file, a five-tool lane carries the whole contract in its descriptions (no guide, no lessons file): start the server with PINEPAPER_TOOLKIT=lane, or pinepaper_set_toolkit {toolkit: "lane"}.
+THE AGENT LANE: for a scene built from shapes, text, keyframes and relations and exported to a file, a seven-tool lane carries the whole contract in its descriptions (no guide, no lessons file): start the server with PINEPAPER_TOOLKIT=lane, or pinepaper_set_toolkit {toolkit: "lane"}.
 
 MODES:
 - No args → returns the full AI Agent Guide (same content as pinepaper://docs/agent-guide)
@@ -9806,7 +9807,7 @@ PROFILES:
 - map: Map/choropleth tools
 - font: Font creation tools
 - minimal: Bare essentials
-- lane: the agent lane — five tools (batch_execute, keyframe_animate, pattern, agent_export, lint_scene) whose descriptions carry everything needed to build and export a shape/text/keyframe scene; set it for a scripted build that needs nothing else. It lists no way back: set it last.
+- lane: the agent lane — seven tools (batch_execute, keyframe_animate, pattern, agent_export, lint_scene, event, clear_canvas) whose descriptions carry everything needed to build and export a shape/text/keyframe scene; set it for a scripted build that needs nothing else. It lists no way back: set it last.
 
 VERBOSITY:
 - verbose: Full descriptions

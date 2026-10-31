@@ -1,5 +1,6 @@
 /**
- * THE AGENT LANE (PINEPAPER_TOOLKIT=lane): five tools that build, animate, pattern, export and check a scene, with
+ * THE AGENT LANE (PINEPAPER_TOOLKIT=lane): seven tools that build, animate, pattern, export and check a scene, give it
+ * timed or clicked events, and start it over, with
  * the lessons an agent otherwise learns by failing folded into the descriptions of the tools they belong to.
  *
  * Why it exists (owner, 2026-10-26): an agent given the default surface loads ~170 tool schemas and still needed a
@@ -13,29 +14,37 @@
  * implementation, and a lane call is billed, validated and reported exactly as the same call on the full surface.
  */
 
-/** The five, in the order an agent uses them. */
+/**
+ * The lane's tools. The first five are the lane as it shipped, in the order an agent uses them; O10 (mcp-server#29)
+ * added the two after them, appended so nothing a lane client had moves: events (timed and clicked; their reactions
+ * ride in the batch as relation ops) and clearing (start over, so a replay gets the same ids).
+ */
 export const LANE_TOOL_NAMES = [
   'pinepaper_agent_batch_execute', // create / batch, with names
   'pinepaper_keyframe_animate',    // animate / keyframe
   'pinepaper_pattern',             // pattern (relations ride in the batch)
   'pinepaper_agent_export',        // render / export, with the file receipt
   'pinepaper_lint_scene',          // inspect / lint
+  'pinepaper_event',               // events: timed (at) or fired by a click / key (O10)
+  'pinepaper_clear_canvas',        // start over (O10)
 ] as const;
 
 /** The one keyframe shape, said once and used by both tools that take keyframes. */
 const KEYFRAME_RULE = `A keyframe is {"time": seconds, "properties": {…}, "easing"?: name}. The values go INSIDE properties, never beside time: {"time":1,"properties":{"opacity":1}}, not {"time":1,"opacity":1} (refused). easing shapes the move ARRIVING at that key: linear (default), easeIn, easeOut, easeInOut, easeOutBack, easeInOutCubic, easeOutBounce, spring, hold. Before its first key an item holds the first key's values; after its last, the last key's. Keyable: x, y (the centre), opacity, scale, scaleX, scaleY, rotation (degrees), fillColor, strokeColor, strokeWidth, width, height, radius, fontSize, trimEnd (0→1 draws a path on).`;
 
 /** Read by the model before any tool: what the lane is, the order of work, and what it cannot do. */
-export const LANE_INSTRUCTIONS = `PinePaper Studio, agent lane: five tools that build an animated scene on a live canvas and export it to a file.
+export const LANE_INSTRUCTIONS = `PinePaper Studio, agent lane: seven tools that build an animated scene on a live canvas and export it to a file.
 
 ORDER OF WORK:
 1. pinepaper_agent_batch_execute: ONE call with the canvas size, the background, every item, their keyframes and any relations.
 2. pinepaper_lint_scene: check the scene before exporting (text running off the frame, unrelated items).
 3. pinepaper_agent_export: format, duration and fps for a video. It returns the file path and the file's sha256 (a small SVG comes back inline).
 Use pinepaper_keyframe_animate to re-key one item afterwards, and pinepaper_pattern to move many named items with one declaration.
+Something that happens AT a time or ON a click (show, hide, recolour): make the event with pinepaper_event first, then bind it in the batch with relation ops.
+To start over, call pinepaper_clear_canvas: it empties the canvas and ids start again at item_1, so the same batch gives the same ids.
 
 UNITS: pixels, top-left origin, y down; time in seconds; angles in degrees; colours as "#rrggbb".
-Every call acts on the live canvas at once: re-sending a batch ADDS its items again. A failed atomic batch removes the items it made, so fix it and send it again (edits it made to items that already existed stay: the result says so).
+Every call acts on the live canvas at once: re-sending a batch ADDS its items again (clear first to replay it). A failed atomic batch removes the items it made, so fix it and send it again (edits it made to items that already existed stay: the result says so).
 Report a tool error as it is; do not write HTML or other code instead of these tools.
 This lane is for scenes built from shapes, text, keyframes and relations. For characters, styled scenes, maps, diagrams or sound, the full surface is PINEPAPER_TOOLKIT=agent.`;
 
@@ -78,6 +87,8 @@ Each line is a correct op:
 {"type":"relation","sourceId":"$1","targetId":"$2","relationType":"orbits","relationOptions":{"radius":260,"speed":0.1667}}
 {"type":"modify","itemId":"item_3","properties":{"color":"#f472b6"}}
 {"type":"timeline","defaults":{"ease":"power2.out"},"tweens":[{"to":"bar-*","from":{"scaleY":0},"vars":{"scaleY":1},"duration":0.8,"at":0.5,"stagger":0.15}]}
+{"type":"relation","sourceId":"item_9","targetId":"$0","relationType":"on_event_set_visibility","relationOptions":{"visible":true}}
+{"type":"relation","sourceId":"$1","targetId":"item_9","relationType":"on_click_fire"}
 
 RULES (each one has cost a failed build):
 - position {x,y} goes at the op's top level. Everything else about the item goes INSIDE properties: a text's words are properties.content, and so are fontSize, color, radius, width, height, opacity, name and anchor.
@@ -87,6 +98,7 @@ RULES (each one has cost a failed build):
 - A timeline op is GSAP's timeline as JSON, compiled onto keyframe tracks: tweens [{to: a name, id, "$N", array or "bar-*"; vars: end values; from: start values; duration; at: seconds, "<", ">" or "+=0.2"; stagger; ease: "power2.out", "none", "back.out"…; repeat; yoyo}]. There x and y are OFFSETS from where the item was created, as in GSAP; scaleY on a bottom-anchored item holds its baseline; drawSVG "0%"→"100%" draws a path on. Every track lasts the whole timeline. What it cannot carry is refused by name; each tween gets a receipt. An item takes keys from a timeline or keyframe_animate ops, not both.
 - Name every item (properties.name). pinepaper_pattern selects members by name, e.g. "bar-*".
 - Relations: orbits {radius, speed (turns per second), direction, phaseDegrees}, follows {offset, smoothing}, attached_to {offset}, points_at, moves_along_path {path:[{x,y},…], speed}. sourceId moves; targetId is what it moves relative to.
+- Events (item_9 above is an eventId from pinepaper_event): an event → item relation is a reaction, run each time it fires: on_event_set_visibility {visible: true|false}, on_event_set_color {color}, on_event_set_property {property, value}. An item → event relation fires it: on_click_fire, on_pointer_enter_fire, on_key_fire {key}. An item a reaction reveals starts hidden: properties.visible false.
 - set_canvas_size comes first; a video exports at the canvas size.
 - The call is LIVE: sending it twice makes every item twice. atomic (default) stops at the first failure and removes every item the call created, so the canvas holds no half batch: fix the op it names and send it again. Edits to items that already existed are not undone; the result says what was removed.
 
@@ -196,6 +208,31 @@ RETURNS "File: <path>", plus file {sha256, bytes}: the sha256 of the file on dis
     },
   },
 
+  pinepaper_event: {
+    description: `Make an event: a named channel that reactions bound to it run on. It returns {eventId} (an item id); bind it in pinepaper_agent_batch_execute with relation ops (event → item reactions, item → event triggers such as on_click_fire).
+
+A TIMED event fires itself at scene times, in the preview and in every video export: pass at (seconds, or a list). Without at, it fires when a trigger fires it, or when you pulse it.
+{"action":"create","name":"reveal","at":2}
+{"action":"create","name":"blink","at":[1,3,5]}
+{"action":"create","name":"tap"}
+{"action":"pulse","eventId":"item_9"}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['create', 'pulse'] },
+        name: { type: 'string', description: 'create: the event\'s name (required)' },
+        at: { description: 'create: fire at these scene times (seconds)', oneOf: [{ type: 'number' }, { type: 'array', items: { type: 'number' } }] },
+        eventId: { type: 'string', description: 'pulse: the eventId to fire now' },
+      },
+      required: ['action'],
+    },
+  },
+
+  pinepaper_clear_canvas: {
+    description: `Start over: remove every item (events included), relation, keyframe track and uploaded clip, and the background colour; the canvas size stays. Ids start again at item_1, so a batch sent after a clear returns the same ids as the first time it was sent. Takes no arguments.`,
+    inputSchema: { type: 'object', properties: {} },
+  },
+
   pinepaper_lint_scene: {
     description: `Check the live scene before exporting; read-only. Returns warnings (a text that runs past the frame edge, by item, side and pixels, where the studio reports it), density (how many items are tied together by relations) and suggestions (relations that would hold the layout together: {from, to, type, params}). Fix a clipped text by moving its centre in with a modify op in pinepaper_agent_batch_execute ({"type":"modify","itemId":"item_1","properties":{"x":474}}: the centre is the left edge plus half the width), or delete it and create it again with properties.anchor; a modify does not read anchor.`,
     inputSchema: {
@@ -213,7 +250,7 @@ interface ToolLike {
   inputSchema: unknown;
 }
 
-/** The lane: the five tools, in lane order, each shown with its lane description and schema. */
+/** The lane: its tools, in lane order, each shown with its lane description and schema. */
 export function applyLane<T extends ToolLike>(tools: T[]): T[] {
   const byName = new Map(tools.map((t) => [t.name, t]));
   const out: T[] = [];
@@ -225,7 +262,7 @@ export function applyLane<T extends ToolLike>(tools: T[]): T[] {
   return out;
 }
 
-/** The contract an agent loads for the lane: the instructions plus the five tools as tools/list sends them. */
+/** The contract an agent loads for the lane: the instructions plus the lane tools as tools/list sends them. */
 export function laneContractText(tools: ToolLike[]): string {
   return LANE_INSTRUCTIONS + JSON.stringify(applyLane(tools));
 }
