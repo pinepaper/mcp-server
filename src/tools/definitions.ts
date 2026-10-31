@@ -15,7 +15,7 @@ import { MINIMAL_DESCRIPTIONS } from './minimal-descriptions.js';
 import { craftToolDefinitions } from './craft-tools.js';
 import { STICK_GAITS, STICK_POSES, STICK_SEQUENCES, STICK_EXPRESSIONS, STICK_PROPS } from './stick-vocabulary.js';
 import { AgentBatchOperationTypeSchema, GeneratorNameSchema, ItemTypeSchema } from '../types/schemas.js';
-import { DESIGN_MEDIA, DESIGN_MEDIA_APPLY, FILTER_TYPES, FILTER_DOCS, LINEAGE_KINDS, STYLED_SCENE_STYLES, STYLED_SCENE_STYLE_INFO } from './engine-lists.js';
+import { DESIGN_MEDIA, DESIGN_MEDIA_APPLY, FILTER_TYPES, FILTER_DOCS, LINEAGE_KINDS, STYLED_SCENE_STYLES, STYLED_SCENE_STYLE_INFO, PATTERN_KINDS } from './engine-lists.js';
 import {
   EffectTypeSchema,
   AgentExportFormatSchema,
@@ -4942,6 +4942,7 @@ EXAMPLE:
 KINDS:
 - phase_wave — members move on a sine, each a phase later than the one before. params: property ('y' default, 'x', 'rotation', 'opacity'), amplitude (px, degrees or 0..1), period (seconds per cycle), wavelength (members per full cycle), phase (radians). window { from, to } limits when it plays; time counts from \`from\`.
 - stagger — each member's animationDelay, derived from its place. params: step (s between neighbours), start (s), order: index | reverse | center | edges.
+- ring / orbit (the same motion) — members spaced evenly round a circle that turns. params: center ([x, y] or {x, y}; default 960, 540), target (an item id or name: the centre follows it), radius (px, default 200), period (seconds per turn, default 6), phase (RADIANS, the first member's angle), direction (1 clockwise, -1 or 'ccw'). Each member's own position is overwritten while it plays and comes back when the pattern is removed. window as for phase_wave.
 
 MEMBERS — by names (a '*' matches any run: "letter-*"), ids, or a tag, in the order they are given; an array is taken as ids or names. A name that matches nothing is reported in the result, not ignored.
 
@@ -4954,7 +4955,7 @@ EXAMPLE — a word waving, letter after letter:
       properties: {
         action: { type: 'string', enum: ['create', 'modify', 'remove', 'list', 'get'], description: 'create · modify · remove · list · get' },
         id: { type: 'string', description: "the pattern's name; required except for list" },
-        kind: { type: 'string', enum: ['phase_wave', 'stagger'], description: 'create: phase_wave or stagger' },
+        kind: { type: 'string', enum: [...PATTERN_KINDS], description: 'create: ' + PATTERN_KINDS.join(', ') },
         members: {
           description: 'which items: an array of ids or names, or { ids, names, tag }',
           oneOf: [
@@ -4969,11 +4970,11 @@ EXAMPLE — a word waving, letter after letter:
             },
           ],
         },
-        params: { type: 'object', description: 'phase_wave: property, amplitude, period, wavelength, phase · stagger: step, start, order' },
+        params: { type: 'object', description: 'phase_wave: property, amplitude, period, wavelength, phase · stagger: step, start, order · ring / orbit: center, target, radius, period, phase, direction' },
         window: {
           type: ['object', 'null'],
           properties: { from: { type: 'number' }, to: { type: 'number' } },
-          description: 'phase_wave: when it plays, in scene seconds',
+          description: 'phase_wave, ring, orbit: when it plays, in scene seconds',
         },
       },
       required: ['action'],

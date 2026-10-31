@@ -31,7 +31,7 @@ export const LANE_INSTRUCTIONS = `PinePaper Studio, agent lane: five tools that 
 ORDER OF WORK:
 1. pinepaper_agent_batch_execute: ONE call with the canvas size, the background, every item, their keyframes and any relations.
 2. pinepaper_lint_scene: check the scene before exporting (text running off the frame, unrelated items).
-3. pinepaper_agent_export: format, duration and fps for a video. It returns the file path and the file's sha256.
+3. pinepaper_agent_export: format, duration and fps for a video. It returns the file path and the file's sha256 (a small SVG comes back inline).
 Use pinepaper_keyframe_animate to re-key one item afterwards, and pinepaper_pattern to move many named items with one declaration.
 
 UNITS: pixels, top-left origin, y down; time in seconds; angles in degrees; colours as "#rrggbb".
@@ -182,7 +182,7 @@ EXAMPLE: {"action":"create","id":"wave","kind":"phase_wave","members":{"names":"
 A video needs format, duration and fps: {"format":"mp4","duration":8,"fps":30}. duration defaults to 5 s, so an 8 s piece without it is cut at 5. The file is the canvas size; leave platform out. A still: {"format":"png","time":4}.
 An 8 s 1080p video takes a few minutes to render: wait for this call, and do not send it again while it runs.
 
-RETURNS "File: <path>", plus file {sha256, bytes, frameDigest, frames}: the sha256 of the file on disk, and a digest of every rendered frame (two renders of the same scene agree frame for frame when their frameDigest agrees). video.frames {fed, distinct} says whether anything moved. fidelity.warnings names what the format could not carry. A failed export is an error naming the reason; it never reports a file it did not write.`,
+RETURNS "File: <path>", plus file {sha256, bytes}: the sha256 of the file on disk. MP4 and WebM add frameDigest and frames, a digest of every rendered frame (two renders of the same scene agree frame for frame when their frameDigest agrees); unreadFrames counts frames the digest could not read. A small SVG comes back inline, with no file. video.frames {fed, distinct} says whether anything moved. fidelity.warnings names what the format could not carry. A failed export is an error naming the reason; it never reports a file it did not write.`,
     inputSchema: {
       type: 'object',
       properties: {

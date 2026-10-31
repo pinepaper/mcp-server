@@ -25,6 +25,18 @@ describe('pinepaper_pattern', () => {
     expect(res.members).toBe(5);
   });
 
+  it('ring and orbit, the engine\'s other kinds, are accepted and passed through', () => {
+    for (const kind of ['ring', 'orbit'] as const) {
+      let got: any;
+      const spec = PatternInputSchema.parse({ action: 'create', id: kind, kind, members: ['a', 'b', 'c'], params: { target: 'sun', radius: 120, period: 4 } });
+      const res = run(codeGenerator.generatePattern(spec), { addPattern: (s: any) => { got = s; return { ok: true, id: s.id, members: 3 }; } });
+      expect(res.success).toBe(true);
+      expect(got.kind).toBe(kind);
+      expect(got.params).toEqual({ target: 'sun', radius: 120, period: 4 });
+    }
+    expect(() => PatternInputSchema.parse({ action: 'create', id: 'x', kind: 'spiral', members: ['a'] })).toThrow();
+  });
+
   it('an engine refusal is a failure with the engine\'s reason', () => {
     const code = codeGenerator.generatePattern(PatternInputSchema.parse({ action: 'create', id: 'w', kind: 'stagger', members: ['a'] }));
     const res = run(code, { addPattern: () => ({ ok: false, error: "addPattern: a pattern 'w' exists", code: 'PATTERN_ID_TAKEN' }) });

@@ -515,7 +515,7 @@ describe('PinePaperCodeGenerator', () => {
         operations: [{ type: 'animate', itemId: '$0', animationType: 'pulse', animationOptions: { speed: 0.5 } }],
       });
       expect(code).toContain('__ref(0)');
-      expect(code).toContain("animationType: 'pulse'");
+      expect(code).toContain('animationType: "pulse"');
       expect(code).toContain('0.5');
     });
 
@@ -541,7 +541,7 @@ describe('PinePaperCodeGenerator', () => {
       });
       expect(code).toContain('__ref(1)');
       expect(code).toContain('__ref(0)');
-      expect(code).toContain("app.addRelation(source, target, 'orbits'");
+      expect(code).toContain('app.addRelation(source, target, "orbits"');
       expect(code).toContain('150');
     });
 
@@ -1666,6 +1666,19 @@ describe('emitted string literals are breakout-proof (CodeQL js/incomplete-sanit
     expect(code).toContain(JSON.stringify(HOSTILE));
     expect(code).not.toContain('__ref(1);evil()');
     expect(code).toContain(JSON.stringify('$1);evil();('));
+    expect(() => new Function(code)).not.toThrow();
+  });
+
+  it('batch animationType and relationType cannot escape their literal', () => {
+    const code = codeGenerator.generateAgentBatchExecute({
+      operations: [
+        { type: 'animate', itemId: 'item_1', animationType: HOSTILE },
+        { type: 'relation', sourceId: 'item_1', targetId: 'item_2', relationType: HOSTILE },
+      ],
+    } as never);
+    expect(code).not.toContain(`'${HOSTILE}'`);
+    expect(code).toContain(`animationType: ${JSON.stringify(HOSTILE)}`);
+    expect(code).toContain(`app.addRelation(source, target, ${JSON.stringify(HOSTILE)}`);
     expect(() => new Function(code)).not.toThrow();
   });
 });

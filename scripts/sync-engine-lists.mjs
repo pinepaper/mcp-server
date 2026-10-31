@@ -39,6 +39,9 @@
  *   scene in (STYLES), with each one's own line (STYLE_INFO). The engine
  *   resolves aliases ('watercolour', 'papercut') itself; the tool offers the
  *   canonical names.
+ * - PATTERN_KINDS. The kinds core/Patterns.js KINDS accepts. pinepaper_pattern
+ *   hand-copied two of four (phase_wave, stagger) and refused ring and orbit,
+ *   which the engine always had.
  * Descriptions are NOT generated: they are prose, written here. The type of
  * EASING_DESCRIPTIONS is keyed on the generated union, so a new engine easing
  * fails the TYPECHECK until someone writes its line.
@@ -68,6 +71,7 @@ const MEDIA_REL = 'js/core/DesignMedia.js';
 const FILTER_REL = 'js/FilterSystem.js';
 const PROVENANCE_REL = 'js/core/Provenance.js';
 const STYLED_REL = 'js/core/StyledScene.js';
+const PATTERNS_REL = 'js/core/Patterns.js';
 
 function resolveRef() {
   for (const ref of [ENGINE_REF, 'HEAD']) {
@@ -128,6 +132,14 @@ function lineageKinds(src) {
   if (!m) throw new Error(`sync-engine-lists: LINEAGE_KINDS not found in ${PROVENANCE_REL}`);
   const kinds = [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]);
   if (kinds.length === 0) throw new Error(`sync-engine-lists: LINEAGE_KINDS is empty in ${PROVENANCE_REL}`);
+  return kinds;
+}
+
+function patternKinds(src) {
+  const m = /const KINDS\s*=\s*Object\.freeze\(\[([^\]]*)\]\)/.exec(src);
+  if (!m) throw new Error(`sync-engine-lists: KINDS not found in ${PATTERNS_REL}`);
+  const kinds = [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]);
+  if (kinds.length === 0) throw new Error(`sync-engine-lists: KINDS is empty in ${PATTERNS_REL}`);
   return kinds;
 }
 
@@ -219,6 +231,9 @@ async function generate() {
   const styledSrc = readCommitted(STYLED_REL);
   if (!styledSrc) throw new Error(`sync-engine-lists: cannot read ${STYLED_REL}`);
   const styled = styledStyles(styledSrc);
+  const patternsSrc = readCommitted(PATTERNS_REL);
+  if (!patternsSrc) throw new Error(`sync-engine-lists: cannot read ${PATTERNS_REL}`);
+  const patterns = patternKinds(patternsSrc);
 
   return `/**
  * GENERATED — DO NOT EDIT. Run \`bun run sync:engine-lists\`.
@@ -233,6 +248,7 @@ async function generate() {
  *   ${FILTER_REL}  sha256: ${digest(filterSrc)}
  *   ${PROVENANCE_REL}  sha256: ${digest(provSrc)}
  *   ${STYLED_REL}  sha256: ${digest(styledSrc)}
+ *   ${PATTERNS_REL}  sha256: ${digest(patternsSrc)}
  */
 
 /** ${easings.length} names: EASING_NAMES, the keys of the engine's easing table. Keyframes, masks, relations and the camera all resolve through it. */
@@ -279,6 +295,11 @@ ${list(styled.map((x) => x.name))}
 export const STYLED_SCENE_STYLE_INFO: Readonly<Record<string, string>> = Object.freeze({
 ${styled.map((x) => `  ${x.name}: ${JSON.stringify(x.info)},`).join('\n')}
 });
+
+/** ${patterns.length} kinds: Patterns.js KINDS, what pinepaper_pattern can create. */
+export const PATTERN_KINDS = [
+${list(patterns)}
+] as const;
 
 /** One line per filter: the engine's own description and parameter ranges. */
 export const FILTER_DOCS: Readonly<Record<string, string>> = Object.freeze({

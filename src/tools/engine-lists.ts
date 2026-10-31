@@ -11,6 +11,7 @@
  *   js/FilterSystem.js  sha256: 2cf5c8ce2a737958
  *   js/core/Provenance.js  sha256: 27e4d8becfa382c8
  *   js/core/StyledScene.js  sha256: ea647c014de59faf
+ *   js/core/Patterns.js  sha256: c23b186ebf6e8a6d
  */
 
 /** 39 names: EASING_NAMES, the keys of the engine's easing table. Keyframes, masks, relations and the camera all resolve through it. */
@@ -171,6 +172,14 @@ export const STYLED_SCENE_STYLE_INFO: Readonly<Record<string, string>> = Object.
   flow: "contour streamlines on dark ground, animated along their length",
   ascii: "ASCII broadcast with scanlines and a timecode",
 });
+
+/** 4 kinds: Patterns.js KINDS, what pinepaper_pattern can create. */
+export const PATTERN_KINDS = [
+  'phase_wave',
+  'stagger',
+  'ring',
+  'orbit',
+] as const;
 
 /** One line per filter: the engine's own description and parameter ranges. */
 export const FILTER_DOCS: Readonly<Record<string, string>> = Object.freeze({

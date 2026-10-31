@@ -5,7 +5,7 @@
  */
 import { describe, it, expect } from 'bun:test';
 import { handleToolCall } from '../../tools/handlers.js';
-import { EFFECT_BEFORE_JS, namedItemIds, idMayBeGone } from '../../tools/effect-check.js';
+import { EFFECT_BEFORE_JS, effectAfterJs, namedItemIds, idMayBeGone } from '../../tools/effect-check.js';
 
 function controller(main: unknown, after: Record<string, unknown>) {
   const calls: string[] = [];
@@ -52,6 +52,18 @@ describe('effect check', () => {
     const c = controller({ success: true, played: true }, { changed: [], missing: [] });
     await handleToolCall('pinepaper_sound', { action: 'play_sfx', name: 'pop' }, opts(c));
     expect(c.calls).toEqual(['main']);
+  });
+
+  it('a pattern change that moves no item yet is a change (a phase_wave at t=0, or before its window)', () => {
+    let patterns: unknown[] = [];
+    const app = { itemRegistry: { getAll: () => [] }, listPatterns: () => patterns };
+    const run = (code: string) => new Function('app', 'window', `return ${code}`)(app, win);
+    const win: Record<string, unknown> = {};
+    run(EFFECT_BEFORE_JS);
+    patterns = [{ id: 'wave', kind: 'phase_wave', params: { amplitude: 12, period: 1.2 }, window: { from: 3 } }];
+    expect(run(effectAfterJs([])).changed).toContain('patterns');
+    run(EFFECT_BEFORE_JS);
+    expect(run(effectAfterJs([])).changed).toEqual([]);
   });
 
   it('helpers', () => {

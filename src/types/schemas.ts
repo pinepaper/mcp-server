@@ -9,7 +9,7 @@
  */
 
 import { z } from 'zod';
-import { ENGINE_EASING_NAMES, DESIGN_MEDIA, DESIGN_MEDIA_APPLY, FILTER_TYPES, LINEAGE_KINDS, STYLED_SCENE_STYLES } from '../tools/engine-lists.js';
+import { ENGINE_EASING_NAMES, DESIGN_MEDIA, DESIGN_MEDIA_APPLY, FILTER_TYPES, LINEAGE_KINDS, STYLED_SCENE_STYLES, PATTERN_KINDS } from '../tools/engine-lists.js';
 
 // =============================================================================
 // COMMON SCHEMAS
@@ -3724,10 +3724,10 @@ export const PatternMembersSchema = z.union([
 export const PatternInputSchema = z.object({
   action: z.enum(['create', 'modify', 'remove', 'list', 'get']).describe("'create' a pattern · 'modify' its params, members or window · 'remove' it (members go back) · 'list' every pattern · 'get' one and the items it holds"),
   id: z.string().optional().describe('the pattern\'s name; required except for list'),
-  kind: z.enum(['phase_wave', 'stagger']).optional().describe('create: phase_wave (members wave, each a phase later) or stagger (each member\'s animationDelay, derived)'),
+  kind: z.enum(PATTERN_KINDS).optional().describe('create: phase_wave (members wave, each a phase later), stagger (each member\'s animationDelay, derived), ring / orbit (members spaced round a turning circle)'),
   members: PatternMembersSchema.optional().describe('create/modify: which items, by ids, names (globs) or a tag'),
-  params: z.record(z.string(), z.unknown()).optional().describe("phase_wave: { property: 'y'|'x'|'rotation'|'opacity', amplitude, period (s per cycle), wavelength (members per cycle), phase } · stagger: { step (s), start (s), order: index|reverse|center|edges }"),
-  window: z.object({ from: z.number().optional(), to: z.number().optional() }).nullable().optional().describe('phase_wave: when it plays, scene seconds; time counts from `from`'),
+  params: z.record(z.string(), z.unknown()).optional().describe("phase_wave: { property: 'y'|'x'|'rotation'|'opacity', amplitude, period (s per cycle), wavelength (members per cycle), phase } · stagger: { step (s), start (s), order: index|reverse|center|edges } · ring / orbit: { center: [x, y] or {x, y}, target (an item the centre follows), radius (px), period (s per turn), phase (radians), direction: 1|-1|'ccw' }"),
+  window: z.object({ from: z.number().optional(), to: z.number().optional() }).nullable().optional().describe('phase_wave, ring, orbit: when it plays, scene seconds; time counts from `from`'),
 });
 export type PatternInput = z.infer<typeof PatternInputSchema>;
 

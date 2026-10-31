@@ -56,6 +56,10 @@ const FINGERPRINT_JS = `function __ppFingerprint() {
   } catch (e) {}
   try { const rr = app.relationRegistry; if (rr && rr.exportForSave) o.relations = S(rr.exportForSave()); } catch (e) {}
   try { if (app.listRenderHooks) o.renderHooks = S(app.listRenderHooks()); } catch (e) {}
+  // Patterns are scene state of their own: a phase_wave at t=0 or before its
+  // window moves no member, so the items alone read a real create or modify as
+  // no change.
+  try { if (app.listPatterns) o.patterns = S(app.listPatterns()); } catch (e) {}
   // SCENE-LEVEL STATE OUTSIDE ITEMS (sweep v2: add_filter and camera_animate
   // were real changes read as none). The camera's track is a relation on the
   // pseudo-source 'camera', which no registry item carries.

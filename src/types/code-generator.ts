@@ -8,7 +8,7 @@
 import { compileChoreography } from '../tools/choreograph.js';
 import { compileBatchTimelines, emitTimelineOpBody, type TimelinePlan } from '../tools/timeline.js';
 import { normalizeSvgSize } from '../utils/svg-size.js';
-import { WORLD3D_COLOR_PATHS } from '../tools/engine-lists.js';
+import { WORLD3D_COLOR_PATHS, PATTERN_KINDS } from '../tools/engine-lists.js';
 import { REQUIRED_ENGINE_METHODS, OPTIONAL_ENGINE_METHODS } from '../tools/engine-methods.js';
 import { ACCEPTED_CREATE_PARAMS, NORMALIZE_PARAM_READS, MODIFY_CHANGE_READS } from '../tools/shape-params.js';
 import { generateP5DrawCode } from '../tools/p5-compat/p5-helpers.js';
@@ -1487,6 +1487,20 @@ export function emitterCountWarnings(spec: Record<string, unknown> | undefined):
     ? `${where} ${asked} is over the ${EMITTER_MAX_PER_BURST}-particle cap per burst of the current studio (${EMITTER_LEGACY_MAX_PER_BURST} on older studios), so it draws at most ${EMITTER_MAX_PER_BURST}. Split it into bursts at the same t for more.`
     : `${where} ${asked} is over the ${EMITTER_LEGACY_MAX_PER_BURST}-particle cap per burst of studios before the ${EMITTER_MAX_PER_BURST} cap, and this studio did not report what it drew: on an older studio it draws ${EMITTER_LEGACY_MAX_PER_BURST}. Split it into bursts at the same t to be sure.`);
 }
+
+/**
+ * The per-call scene lint is skipped on a large scene, and says so.
+ *
+ * Only lintScene().warnings is used (the text-clipping rule), but lintScene
+ * first runs RelationalLinter.analyze, a pairwise pass over every item that
+ * FxTool documents as fine below ~1000 items, and its result is thrown away.
+ * Batches and custom code run it on EVERY call, so a large scene paid that on
+ * each one. The export's lint runs once per export and is not gated.
+ */
+export const LINT_ITEM_LIMIT = 1000;
+const LINT_SIZE_GATE_JS = `
+      const __lintN = app.itemRegistry && typeof app.itemRegistry.getAll === 'function' ? (app.itemRegistry.getAll() || []).length : 0;
+      if (__lintN > ${LINT_ITEM_LIMIT}) return [{ code: 'LINT_SKIPPED', severity: 'info', message: 'the scene lint was skipped: ' + __lintN + ' items is over the ${LINT_ITEM_LIMIT} it checks on every call. pinepaper_agent_export still lints before it renders.' }];`;
 
 /**
  * An emitter spec as the studio reads it, and what the reply says about it.
@@ -4990,6 +5004,8 @@ throw new Error('Unknown diagram mode action: ${action}');
     throw new Error('$' + n + ' is the item number ' + n + ' THIS batch created, and it has created ' + itemIds.length + ' so far.'
       + (prev ? ' In the previous batch $' + n + ' was ' + prev + ' — pass that id instead.' : ' Put the create ops first, or pass the item id.'));
   };
+  // A failure names the item, not the "$1" that addressed it; the ref as written when the batch never made it.
+  const __refName = function (n) { return itemIds[n] !== undefined ? itemIds[n] : '$' + n; };
   const results = [];
   let success = true;
   // A failure's words, never "undefined" for a thrown non-Error.
@@ -5000,7 +5016,7 @@ throw new Error('Unknown diagram mode action: ${action}');
   // result. A studio without lintScene says nothing.
   const __ppLintNow = function () {
     try {
-      if (typeof app === 'undefined' || !app || typeof app.lintScene !== 'function') return [];
+      if (typeof app === 'undefined' || !app || typeof app.lintScene !== 'function') return [];${LINT_SIZE_GATE_JS}
       const r = app.lintScene();
       return r && Array.isArray(r.warnings) ? r.warnings : [];
     } catch (e) {
@@ -5032,6 +5048,7 @@ throw new Error('Unknown diagram mode action: ${action}');
       // The item this op acts on, for a failure's itemId: its own id field, else what its result names.
       const o = op as Record<string, unknown>;
       const opItem = [o.itemId, o.targetId, o.sourceId, o.id].find((v) => typeof v === 'string') ?? null;
+      const opItemJs = typeof opItem === 'string' && /^\$\d+$/.test(opItem) ? `__refName(${opItem.slice(1)})` : JSON.stringify(opItem);
       const opStep = typeof o._step === 'string' ? `op ${index}: ${o._step}` : `op ${index} (${op.type})`;
       code += `
     // Operation ${index}: ${op.type}
@@ -5049,7 +5066,7 @@ throw new Error('Unknown diagram mode action: ${action}');
       if (failed${index}) {
         // ATOMIC: throw WITHOUT recording, and let the catch below record it
         // once. Doing both put two entries in for one failed op.
-        ${isAtomic ? `const __e${index} = new Error(failed${index}); __e${index}.itemId = (result${index} && typeof result${index}.itemId === 'string') ? result${index}.itemId : ${JSON.stringify(opItem)}; throw __e${index};` : `results.push({ index: ${index}, success: false, step: ${JSON.stringify(opStep)}, itemId: (result${index} && typeof result${index}.itemId === 'string') ? result${index}.itemId : ${JSON.stringify(opItem)}, reason: failed${index}, error: failed${index}, result: result${index} });
+        ${isAtomic ? `const __e${index} = new Error(failed${index}); __e${index}.itemId = (result${index} && typeof result${index}.itemId === 'string') ? result${index}.itemId : ${opItemJs}; throw __e${index};` : `results.push({ index: ${index}, success: false, step: ${JSON.stringify(opStep)}, itemId: (result${index} && typeof result${index}.itemId === 'string') ? result${index}.itemId : ${opItemJs}, reason: failed${index}, error: failed${index}, result: result${index} });
         success = false;`}
       } else {
         results.push({ index: ${index}, success: true, result: result${index} });
@@ -5059,7 +5076,7 @@ throw new Error('Unknown diagram mode action: ${action}');
       }
     } catch (opError) {
       const __r${index} = _why(opError, 'operation ${index} (${op.type}) threw with no message');
-      results.push({ index: ${index}, success: false, step: ${JSON.stringify(opStep)}, itemId: (opError && typeof opError.itemId === 'string') ? opError.itemId : ${JSON.stringify(opItem)}, reason: __r${index}, error: __r${index} });
+      results.push({ index: ${index}, success: false, step: ${JSON.stringify(opStep)}, itemId: (opError && typeof opError.itemId === 'string') ? opError.itemId : ${opItemJs}, reason: __r${index}, error: __r${index} });
       ${isAtomic ? 'throw opError;' : 'success = false;'}
     }
 `;
@@ -5211,8 +5228,8 @@ return __r;
 const targetId = ${animItemRef};
 const item = app.getItemById(targetId);
 if (!item) throw new Error('Item not found: ' + targetId);
-app.animate(item, { animationType: '${op.animationType}', ...${animOpts} });
-return { itemId: targetId, animationType: '${op.animationType}' };
+app.animate(item, { animationType: ${JSON.stringify(String(op.animationType))}, ...${animOpts} });
+return { itemId: targetId, animationType: ${JSON.stringify(String(op.animationType))} };
 `;
 
       case 'relation':
@@ -5226,7 +5243,7 @@ const source = app.getItemById(sourceId);
 const target = app.getItemById(targetId);
 if (!source) throw new Error('Source not found: ' + sourceId);
 if (!target) throw new Error('Target not found: ' + targetId);
-const relationId = app.addRelation(source, target, '${op.relationType}', ${relOpts});
+const relationId = app.addRelation(source, target, ${JSON.stringify(String(op.relationType))}, ${relOpts});
 // NOT BOUND IS NOT A SUCCESS (owner rule 1, B119). addRelation answers false
 // when it refuses — spring_follow "not loaded yet" — and this op returned
 // { relationId: false } with nothing marking it failed, so the batch said
@@ -5236,7 +5253,7 @@ if (!relationId) {
   return { success: false, relationId: false, sourceId, targetId, relationType: ${JSON.stringify(op.relationType)},
     error: 'the studio refused the ' + ${JSON.stringify(op.relationType)} + ' relation between ' + sourceId + ' and ' + targetId + ' — nothing was bound' + (__why ? ': ' + __why : '.') };
 }
-return { relationId, sourceId, targetId, relationType: '${op.relationType}' };
+return { relationId, sourceId, targetId, relationType: ${JSON.stringify(String(op.relationType))} };
 `;
 
       case 'delete':
@@ -8552,7 +8569,7 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
   // result. A studio without lintScene says nothing.
   const __ppLintNow = function () {
     try {
-      if (typeof app === 'undefined' || !app || typeof app.lintScene !== 'function') return [];
+      if (typeof app === 'undefined' || !app || typeof app.lintScene !== 'function') return [];${LINT_SIZE_GATE_JS}
       const r = app.lintScene();
       return r && Array.isArray(r.warnings) ? r.warnings : [];
     } catch (e) {
@@ -9435,7 +9452,7 @@ ${input.cutSound !== undefined ? `  const __cuts = (__cr && __cr.cuts) || (app.s
       case 'create': {
         const spec = { id: v.id, kind: v.kind, members: v.members, params: v.params || {}, ...(v.window ? { window: v.window } : {}) };
         body = `${need('addPattern')}
-  if (!${S(v.kind ?? null)}) return { success: false, error: 'create needs kind: phase_wave or stagger' };
+  if (!${S(v.kind ?? null)}) return { success: false, error: ${S('create needs kind: ' + PATTERN_KINDS.join(', '))} };
   if (!${S(v.members ?? null)}) return { success: false, error: 'create needs members: { names: [...] }, { ids: [...] }, { tag } or an array' };
   const r = app.addPattern(${S(spec)});
   return Object.assign({ success: !!(r && r.ok) }, r || {}, app.lastReceipt ? { receipt: app.lastReceipt } : {});`;

@@ -151,6 +151,25 @@ describe('patch (modify by name)', () => {
   });
 });
 
+describe('a failed op addressed by $N', () => {
+  it('names the item the batch made, not "$0"', async () => {
+    const r = await runBatch({ operations: [
+      { type: 'create', itemType: 'circle', position: { x: 1, y: 1 } },
+      // The stub studio has no animate(), so this op throws.
+      { type: 'animate', itemId: '$0', animationType: 'pulse' },
+    ] });
+    expect(r.result.success).toBe(false);
+    expect(r.result.failures?.[0]).toMatchObject({ step: 'op 1 (animate)' });
+    expect((r.result.failures?.[0] as { itemId?: string }).itemId).toBe('item_1');
+  });
+
+  it('keeps the ref as written when the batch never made that item', async () => {
+    const r = await runBatch({ operations: [{ type: 'modify', itemId: '$3', properties: { opacity: 0 } }] });
+    expect(r.result.success).toBe(false);
+    expect((r.result.failures?.[0] as { itemId?: string }).itemId).toBe('$3');
+  });
+});
+
 describe('through the tool', () => {
   const code = { executionMode: 'code' as const, executeInBrowser: false };
   it('a malformed macro is a validation error naming the op', async () => {
@@ -163,5 +182,31 @@ describe('through the tool', () => {
     const r = await handleToolCall('pinepaper_agent_batch_execute', { operations: [{ type: 'ring', itemType: 'circel' }] }, code);
     expect(r.isError).toBe(true);
     expect(JSON.stringify(r.content)).toContain('circle');
+  });
+});
+
+describe('the per-call scene lint on a large scene', () => {
+  const lintApp = (n: number) => {
+    const s = studio();
+    let lints = 0;
+    const many = Array.from({ length: n }, (_, i) => ({ id: `x${i}` }));
+    Object.assign(s.app, { lintScene: () => { lints++; return { warnings: [{ code: 'TEXT_CLIPS_FRAME' }] }; } });
+    (s.app.itemRegistry as Record<string, unknown>).getAll = () => many;
+    return { s, lints: () => lints };
+  };
+  const run = (app: unknown) => {
+    const code = gen.generateAgentBatchExecute({ operations: [{ type: 'create', itemType: 'circle', position: { x: 1, y: 1 } }] } as never);
+    return new Function('app', 'window', 'paper', `return (\n${code.trim().replace(/;\s*$/, '')}\n);`)(app, {}, undefined);
+  };
+
+  it('runs at the limit and is skipped above it, saying so', async () => {
+    const small = lintApp(1000);
+    expect((await run(small.s.app)).__ppLint).toEqual([{ code: 'TEXT_CLIPS_FRAME' }]);
+    expect(small.lints()).toBe(1);
+    const big = lintApp(1001);
+    const r = await run(big.s.app);
+    expect(big.lints()).toBe(0);
+    expect(r.__ppLint[0]).toMatchObject({ code: 'LINT_SKIPPED', severity: 'info' });
+    expect(r.__ppLint[0].message).toContain('1001 items');
   });
 });
