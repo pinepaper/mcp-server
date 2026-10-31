@@ -19,6 +19,7 @@ concentric_with
 connects_to
 construction_reveal
 contained_in_place
+controls
 deform_breathe
 deform_bulge
 deform_fluid_bleed

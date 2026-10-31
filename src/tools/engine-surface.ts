@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 8b198c4989561d918e6c388b72103c2001abfff4
- * sha256:    6aa861caf31e6090c13a76cb08e52b85511c034fd6ecd68deaf78928a7b9170b   (of PinePaper.js as committed)
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main f457b919679e41421594bf590a370f9bd65e645f
+ * sha256:    68cb4f561cab899e204c4aac16600779947dd8824278d345ab6cb642e4cd0312   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on `window.app`, with how it gets there. The parity
@@ -16,7 +16,7 @@
 /** How a name lands on `app`. */
 export type EngineMemberKind = 'method' | 'accessor' | 'property' | 'lazy' | 'lazyHeavy' | 'bootstrap';
 
-/** 1507 names, from FxTool/js/PinePaper.js. */
+/** 1518 names, from FxTool/js/PinePaper.js. */
 export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object.freeze({
   __buildFreshness: 'property',
   _aboveHooksHeld: 'property',
@@ -72,6 +72,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _bindOnEnterExitRelation: 'method',
   _bindOnEventRelation: 'method',
   _bindPointerEventRelation: 'method',
+  _bindWorldController: 'method',
   _blendBgRect: 'property',
   _blendChainCapture: 'method',
   _boundaryZoom: 'property',
@@ -354,6 +355,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _rescaleRestBounds: 'method',
   _resizeDebounceTimer: 'property',
   _resizeEngaged: 'property',
+  _resolveCaptureTimes: 'method',
   _resolveDirectorShots: 'method',
   _resolveId: 'method',
   _resolveImageSlot: 'method',
@@ -721,6 +723,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   createMagazineText: 'method',
   createObject3D: 'method',
   createPaperCutText: 'method',
+  createParticleCollage: 'method',
   createPrecomp: 'method',
   createRiggedCharacter: 'method',
   createScatterPlot: 'method',
@@ -822,6 +825,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   exportDotLottie: 'method',
   exportEngine: 'lazyHeavy',
   exportFrameRect: 'method',
+  exportGenerativeFont: 'method',
   exportGLB: 'method',
   exportGLBBlob: 'method',
   exportImage: 'method',
@@ -906,6 +910,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   getFrameMetrics: 'method',
   getFrameSkipStatus: 'method',
   getGeneratedElements: 'method',
+  getGenerativeFont: 'method',
   getHistoryJournal: 'method',
   getInterpolatedState: 'method',
   getItemById: 'method',
@@ -948,6 +953,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   getUsedRegion: 'method',
   getViewCenter: 'method',
   getViewPoint: 'method',
+  getWordTimings: 'method',
   getWorld3D: 'method',
   getWorldMeshMorphs: 'method',
   getWorldNavTarget: 'method',
@@ -1056,6 +1062,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   listFlowFields: 'method',
   listFontAxes: 'method',
   listFonts: 'method',
+  listGenerativeFonts: 'method',
   listGeneratorMotions: 'method',
   listGenerators: 'method',
   listGrowthPresets: 'method',
@@ -1220,6 +1227,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   refreshTextOutlines: 'method',
   regenerateStroke: 'method',
   registerArrowHead: 'method',
+  registerGenerativeFont: 'method',
   registerGenerator: 'method',
   registerInstrument: 'method',
   registerItem: 'method',
@@ -1381,6 +1389,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   setupItemHoverCursor: 'method',
   setupMobileSupport: 'method',
   setupTools: 'method',
+  setWordTimings: 'method',
   setWorldActorPose: 'method',
   setWorldCamera: 'method',
   setWorldCameraPath: 'method',
@@ -1466,6 +1475,8 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   textToOutlines: 'method',
   threadPainting: 'accessor',
   threeD: 'lazy',
+  tileContactSheet: 'method',
+  tileContactSheetSync: 'method',
   timbreFromPath: 'method',
   timelineState: 'bootstrap',
   timeScale: 'property',

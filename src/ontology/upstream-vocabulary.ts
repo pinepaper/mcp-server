@@ -4,9 +4,9 @@
  * FxTool's ITEM_TYPE_MAP and type classes (anchor, description, parentType,
  * mcpTool, mcpAction), read from the loaded module.
  *
- * Source: FxTool origin/main 8b198c4989561d918e6c388b72103c2001abfff4
+ * Source: FxTool origin/main f457b919679e41421594bf590a370f9bd65e645f
  *   js/ontology/Vocabulary.js
- * sha256: 029cdf53b6af5214
+ * sha256: d9a98832f9ed2a8f
  *
  * vocabulary.ts merges these over its hand-written port: the engine's map
  * wins where the two disagree, and a class the port lacks is added.
@@ -37,6 +37,7 @@ export const UPSTREAM_ITEM_TYPE_MAP: Readonly<Record<string, string>> = Object.f
   "compound-path": "pp:CompoundPath",
   "compoundpath": "pp:CompoundPath",
   "connector": "pp:Connector",
+  "controller": "pp:Controller",
   "diagram-shape": "pp:DiagramShape",
   "disk": "pp:Disk",
   "ellipse": "pp:Ellipse",
@@ -342,6 +343,11 @@ export const UPSTREAM_TYPES: Readonly<Record<string, UpstreamTypeDef>> = Object.
     "anchor": null,
     "description": "One step of a pp:ConstructionSequence: the item(s) introduced at a given stepOrder, mapped to a timeline reveal time (stepOrder × stepDuration).",
     "parentType": "pp:Concept"
+  },
+  "pp:Controller": {
+    "anchor": null,
+    "description": "A first-class interactive controller node (keyboard, WASD, arrows, space, or event-driven) that drives character motion in 2D rigs and 3D worlds (pp:World3D) via pp:controls relations.",
+    "parentType": "pp:CanvasElement"
   },
   "pp:CoordinateSystem": {
     "description": "Abstract coordinate system for spatial data mapping (its three concrete members carry Wikidata anchors; the rest of the visualization taxonomy — marks, encoding channels, analytical tasks, composition modes — deliberately does NOT, because Vega-Lite and the Grammar of Graphics are specifications rather than published RDF vocabularies, and Wikidata has chart TYPES where we have mark PRIMITIVES. A bar mark is not a bar chart, and asserting it is would publish a claim we do not mean) The choice decides which comparisons are easy: Cartesian favours magnitude, polar favours cycles, geographic favours location."

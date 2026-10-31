@@ -70,6 +70,9 @@ const ROUTED_TO_A_TOOL: Record<string, RegExp | string[]> = {
   // tool lands, rename the key to it.
   'tool pending: app.addSpeechLine': ['says'],
   'tool pending: app.addAudioReactive': ['reacts_to_audio'],
+  // The engine binds it itself when a 3D world is created with { control: true } (_bindWorldController, FxTool
+  // #232); pinepaper_world3d create does not pass control yet. When it does, rename the key to pinepaper_world3d.
+  'tool pending: pinepaper_world3d create {control}': ['controls'],
 };
 
 const isExcluded = (name: string) =>

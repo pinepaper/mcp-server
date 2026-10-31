@@ -3,9 +3,9 @@
  *
  * What each registry-backed shape reads, and how a caller reaches it.
  *
- * Source: FxTool origin/main 8b198c4989561d918e6c388b72103c2001abfff4
+ * Source: FxTool origin/main f457b919679e41421594bf590a370f9bd65e645f
  *   js/PinePaper.js + 5 shape modules
- * sha256: 75016f254f032988
+ * sha256: dacda56c125e0436
  *
  * A shape's `create` receives a `config`, never the caller's `params`.
  * PinePaper.js's registryConfig literal is the only bridge between the two, so
@@ -60,6 +60,7 @@ export const ACCEPTED_CREATE_PARAMS: readonly string[] = Object.freeze([
   'innerRadiusRatio',
   'justification',
   'keyframes',
+  'keys',
   'kind',
   'label',
   'labelPosition',
@@ -98,6 +99,7 @@ export const ACCEPTED_CREATE_PARAMS: readonly string[] = Object.freeze([
   'smoothing',
   'soundSpec',
   'spacing',
+  'speed',
   'src',
   'stepTiming',
   'strokeCap',
@@ -107,6 +109,7 @@ export const ACCEPTED_CREATE_PARAMS: readonly string[] = Object.freeze([
   'strokeWidth',
   'tailDirection',
   'tailSize',
+  'targetActor',
   'tension',
   'textAlign',
   'textDirection',
@@ -156,6 +159,7 @@ export const NORMALIZE_PARAM_READS: readonly string[] = Object.freeze([
 export const MODIFY_CHANGE_READS: readonly string[] = Object.freeze([
   'alias',
   'anchor',
+  'animPivot',
   'animationIntensity',
   'animationSpeed',
   'animationType',
