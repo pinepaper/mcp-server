@@ -267,10 +267,12 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   not `"$N"`.
 - Batch `animate` and `relation` operations quote their `animationType` and
   `relationType` correctly in the generated code.
-- On a scene of more than 1000 items, batches and custom code skip the scene
-  lint on each call and say so. It checks every pair of items, which made
-  every call on a large scene slower. `pinepaper_agent_export` still lints
-  before it renders.
+- The scene lint that batches and custom code run on every call no longer
+  checks every pair of items, which made each call on a large scene slower.
+  It reports the same warnings.
+- A video export that goes over the bitrate you asked for says so: the studio
+  reports `bitrate_exceeded` with the bitrate the file actually has, and how
+  to land under the target.
 - The agent toolkit's export description now says what each format returns:
   only MP4 and WebM carry a frame digest, and a small SVG comes back inline
   rather than as a file.

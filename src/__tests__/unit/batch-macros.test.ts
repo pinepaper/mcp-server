@@ -185,28 +185,14 @@ describe('through the tool', () => {
   });
 });
 
-describe('the per-call scene lint on a large scene', () => {
-  const lintApp = (n: number) => {
+describe('the per-call scene lint', () => {
+  it('asks the studio for warnings only, and carries them out', async () => {
     const s = studio();
-    let lints = 0;
-    const many = Array.from({ length: n }, (_, i) => ({ id: `x${i}` }));
-    Object.assign(s.app, { lintScene: () => { lints++; return { warnings: [{ code: 'TEXT_CLIPS_FRAME' }] }; } });
-    (s.app.itemRegistry as Record<string, unknown>).getAll = () => many;
-    return { s, lints: () => lints };
-  };
-  const run = (app: unknown) => {
+    const calls: unknown[] = [];
+    Object.assign(s.app, { lintScene: (o: unknown) => { calls.push(o); return { density: null, suggestions: [], warnings: [{ code: 'TEXT_CLIPS_FRAME' }] }; } });
     const code = gen.generateAgentBatchExecute({ operations: [{ type: 'create', itemType: 'circle', position: { x: 1, y: 1 } }] } as never);
-    return new Function('app', 'window', 'paper', `return (\n${code.trim().replace(/;\s*$/, '')}\n);`)(app, {}, undefined);
-  };
-
-  it('runs at the limit and is skipped above it, saying so', async () => {
-    const small = lintApp(1000);
-    expect((await run(small.s.app)).__ppLint).toEqual([{ code: 'TEXT_CLIPS_FRAME' }]);
-    expect(small.lints()).toBe(1);
-    const big = lintApp(1001);
-    const r = await run(big.s.app);
-    expect(big.lints()).toBe(0);
-    expect(r.__ppLint[0]).toMatchObject({ code: 'LINT_SKIPPED', severity: 'info' });
-    expect(r.__ppLint[0].message).toContain('1001 items');
+    const r = await new Function('app', 'window', 'paper', `return (\n${code.trim().replace(/;\s*$/, '')}\n);`)(s.app, {}, undefined);
+    expect(calls).toEqual([{ warningsOnly: true }]);
+    expect(r.__ppLint).toEqual([{ code: 'TEXT_CLIPS_FRAME' }]);
   });
 });

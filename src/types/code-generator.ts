@@ -1489,19 +1489,13 @@ export function emitterCountWarnings(spec: Record<string, unknown> | undefined):
 }
 
 /**
- * The per-call scene lint is skipped on a large scene, and says so.
- *
- * Only lintScene().warnings is used (the text-clipping rule), but lintScene
- * first runs RelationalLinter.analyze, a pairwise pass over every item that
- * FxTool documents as fine below ~1000 items, and its result is thrown away.
- * Batches and custom code run it on EVERY call, so a large scene paid that on
- * each one. The export's lint runs once per export and is not gated.
+ * The scene lint every batch and custom-code call runs asks for warnings only.
+ * Only lintScene().warnings (the text-clipping rule) is used, and a full
+ * lintScene first runs RelationalLinter.analyze, a pairwise pass over every
+ * item, whose result was thrown away. FxTool #220 added { warningsOnly: true },
+ * which skips it and returns the same warnings; a studio before that ignores
+ * the option and runs the full lint, as it always did.
  */
-export const LINT_ITEM_LIMIT = 1000;
-const LINT_SIZE_GATE_JS = `
-      const __lintN = app.itemRegistry && typeof app.itemRegistry.getAll === 'function' ? (app.itemRegistry.getAll() || []).length : 0;
-      if (__lintN > ${LINT_ITEM_LIMIT}) return [{ code: 'LINT_SKIPPED', severity: 'info', message: 'the scene lint was skipped: ' + __lintN + ' items is over the ${LINT_ITEM_LIMIT} it checks on every call. pinepaper_agent_export still lints before it renders.' }];`;
-
 /**
  * An emitter spec as the studio reads it, and what the reply says about it.
  *
@@ -5016,8 +5010,8 @@ throw new Error('Unknown diagram mode action: ${action}');
   // result. A studio without lintScene says nothing.
   const __ppLintNow = function () {
     try {
-      if (typeof app === 'undefined' || !app || typeof app.lintScene !== 'function') return [];${LINT_SIZE_GATE_JS}
-      const r = app.lintScene();
+      if (typeof app === 'undefined' || !app || typeof app.lintScene !== 'function') return [];
+      const r = app.lintScene({ warningsOnly: true });
       return r && Array.isArray(r.warnings) ? r.warnings : [];
     } catch (e) {
       return [{ code: 'LINT_FAILED', severity: 'info', message: 'the scene lint could not run: ' + ((e && typeof e.message === 'string' && e.message) || 'no reason given') }];
@@ -5874,7 +5868,7 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
   const __lint = (function () {
     if (typeof app.lintScene !== 'function') return null;
     try {
-      const r = app.lintScene();
+      const r = app.lintScene({ warningsOnly: true });
       return r && Array.isArray(r.warnings) ? r.warnings : null;
     } catch (e) {
       return [{ code: 'LINT_FAILED', severity: 'info', message: 'the scene lint could not run before the export: ' + ((e && typeof e.message === 'string' && e.message) || 'no reason given') }];
@@ -8569,8 +8563,8 @@ ${stillTime !== undefined ? `  try { app.setPlaybackTime(__prevT); } catch (_) {
   // result. A studio without lintScene says nothing.
   const __ppLintNow = function () {
     try {
-      if (typeof app === 'undefined' || !app || typeof app.lintScene !== 'function') return [];${LINT_SIZE_GATE_JS}
-      const r = app.lintScene();
+      if (typeof app === 'undefined' || !app || typeof app.lintScene !== 'function') return [];
+      const r = app.lintScene({ warningsOnly: true });
       return r && Array.isArray(r.warnings) ? r.warnings : [];
     } catch (e) {
       return [{ code: 'LINT_FAILED', severity: 'info', message: 'the scene lint could not run: ' + ((e && typeof e.message === 'string' && e.message) || 'no reason given') }];
