@@ -556,7 +556,8 @@ if (item && item.data) { item.data.renderAs = ${JSON.stringify(itemType)}; item.
   const textOnly = (k: string) => (TEXT_STYLE_KEYS as readonly string[]).includes(k) || k === 'fit' || k === 'textDirection' || k === 'dir'
     || (TABULAR_KEYS as readonly string[]).includes(k) || k === 'strokePosition';
   const ignored = Object.keys(properties).filter((k) => itemType === 'text'
-    ? !CREATE_KNOWN_KEYS.has(k) && !textOnly(k) && !(DIRECTION_KEYS as readonly string[]).includes(k)
+    ? (!CREATE_KNOWN_KEYS.has(k) && !textOnly(k) && !(DIRECTION_KEYS as readonly string[]).includes(k))
+      || (k === 'letterSpacing' && letterSpacingCss(properties[k]) === undefined)
     : !CREATE_KNOWN_KEYS.has(k) || textOnly(k));
 
   // Build the code
@@ -992,13 +993,25 @@ function authoringFrameJs(name: string): string {
   })();`;
 }
 
-const TEXT_STYLE_KEYS = ['fontWeight', 'fontStyle', 'leading', 'lineHeight', 'textAlign', 'align', 'text'] as const;
+const TEXT_STYLE_KEYS = ['fontWeight', 'fontStyle', 'leading', 'lineHeight', 'letterSpacing', 'textAlign', 'align', 'text'] as const;
+/**
+ * letterSpacing as the studio draws it, or undefined if it cannot be. create()
+ * and modifyItem() do not read it (B108); the studio draws the item's own
+ * letterSpacing, a CSS length, as its keyframes set it, and a number is px.
+ */
+function letterSpacingCss(v: unknown): string | undefined {
+  if (typeof v === 'number' && Number.isFinite(v)) return `${v}px`;
+  if (typeof v === 'string' && /^-?\d*\.?\d+(px|em)?$/.test(v.trim())) return /\d$/.test(v.trim()) ? `${v.trim()}px` : v.trim();
+  return undefined;
+}
+
 function emitTextStyle(itemExpr: string, props: Record<string, unknown>): string {
   const weight = props.fontWeight;
   const italic = props.fontStyle === 'italic' || props.fontStyle === 'oblique';
   const lh = typeof props.lineHeight === 'number' ? props.lineHeight : undefined;
   const leading = typeof props.leading === 'number' ? props.leading : undefined;
-  if (weight === undefined && props.fontStyle === undefined && leading === undefined && lh === undefined) return '';
+  const ls = letterSpacingCss(props.letterSpacing);
+  if (weight === undefined && props.fontStyle === undefined && leading === undefined && lh === undefined && ls === undefined) return '';
   return `
 (function(it) {
   if (!it || it.className !== 'PointText') return;
@@ -1010,6 +1023,7 @@ function emitTextStyle(itemExpr: string, props: Record<string, unknown>): string
     : ''}
   ${leading !== undefined ? `it.leading = ${leading};` : ''}
   ${lh !== undefined ? `it.leading = ${lh} <= 4 ? ${lh} * it.fontSize : ${lh};` : ''}
+  ${ls !== undefined ? `it.letterSpacing = ${JSON.stringify(ls)};` : ''}
   const b1 = it.bounds;
   it.position = it.position.add([ax - edge(b1), ay - b1.center.y]);
 })(${itemExpr});`;
@@ -1328,6 +1342,7 @@ if (_flagged && _flagged.item && _flagged.item.data) Object.assign(_flagged.item
   // AN UNREAD KEY HAD NO EFFECT, AND THE CALL SAID SUCCESS. {scaling: 8} on a
   // raster answered success and left it 16 px; the engine reads `scale`. Same
   // report create_item gives, against the engine's modify path (generated).
+  if (textStyle && letterSpacingCss(properties.letterSpacing) !== undefined) aliased.add('letterSpacing');
   const modIgnored = Object.keys(properties).filter((k) => !MODIFY_KNOWN_KEYS.has(k) && !aliased.has(k));
   const modWarning = modIgnored.length === 0 ? '' : `, ignoredProperties: ${JSON.stringify(modIgnored)}, warning: ${JSON.stringify(
     `${modIgnored.join(', ')} ${modIgnored.length > 1 ? 'are' : 'is'} not read when modifying an item, so ${modIgnored.length > 1 ? 'they had' : 'it had'} no effect.`
@@ -1470,6 +1485,54 @@ export function emitterCountWarnings(spec: Record<string, unknown> | undefined):
   return emitterCountsToCheck(spec).map(({ where, asked }) => asked > EMITTER_MAX_PER_BURST
     ? `${where} ${asked} is over the ${EMITTER_MAX_PER_BURST}-particle cap per burst of the current studio (${EMITTER_LEGACY_MAX_PER_BURST} on older studios), so it draws at most ${EMITTER_MAX_PER_BURST}. Split it into bursts at the same t for more.`
     : `${where} ${asked} is over the ${EMITTER_LEGACY_MAX_PER_BURST}-particle cap per burst of studios before the ${EMITTER_MAX_PER_BURST} cap, and this studio did not report what it drew: on an older studio it draws ${EMITTER_LEGACY_MAX_PER_BURST}. Split it into bursts at the same t to be sure.`);
+}
+
+/**
+ * An emitter spec as the studio reads it, and what the reply says about it.
+ *
+ * The studio reads velocities and offsets as [x, y] pairs only and drops any
+ * other entry, so velocities: [{x, y}] made particles with no velocity and no
+ * word (VELOC23). Point objects are turned into pairs here. And a burst draws
+ * `count` particles, the i-th taking velocities[i % length]: with fewer
+ * velocities than particles the extras repeat a velocity and draw on top of an
+ * earlier particle, and with more the extras go unused, both in silence
+ * (VELOCMISMATCH23). That is said, not changed: cycling is the studio's rule.
+ * `assumeDefaultCount` is false for a set, whose spec is only the keys changed.
+ */
+export function normalizeEmitterSpec(spec: Record<string, unknown>, assumeDefaultCount = true): { spec: Record<string, unknown>; warnings: string[] } {
+  const warnings: string[] = [];
+  if (!spec || typeof spec !== 'object') return { spec, warnings };
+  const pairs = (v: unknown): unknown => (Array.isArray(v)
+    ? v.map((p) => (p && typeof p === 'object' && !Array.isArray(p) && ('x' in p || 'y' in p)
+      ? [Number((p as { x?: unknown }).x ?? 0), Number((p as { y?: unknown }).y ?? 0)]
+      : p))
+    : v);
+  const fix = (o: Record<string, unknown>): Record<string, unknown> => {
+    const out = { ...o };
+    for (const k of ['velocities', 'offsets']) if (out[k] !== undefined) out[k] = pairs(out[k]);
+    return out;
+  };
+  const out = fix(spec);
+  if (Array.isArray(spec.bursts)) out.bursts = spec.bursts.map((b) => (b && typeof b === 'object' ? fix(b as Record<string, unknown>) : b));
+  // The studio's default count per burst (ParticleEmitter DEFAULT_LOOK).
+  const DEFAULT_COUNT = 12;
+  const mismatch = (where: string, count: unknown, velocities: unknown) => {
+    if (!Array.isArray(velocities) || !velocities.length) return;
+    const n = typeof count === 'number' && Number.isFinite(count) ? Math.round(count) : (assumeDefaultCount ? DEFAULT_COUNT : null);
+    if (n === null || n === velocities.length) return;
+    warnings.push(n > velocities.length
+      ? `${where}: count ${n} with ${velocities.length} velocities: particle i takes velocities[i % ${velocities.length}], so ${n - velocities.length} particles repeat an earlier particle's path and draw on top of it. Give one velocity per particle, or set count to ${velocities.length}.`
+      : `${where}: count ${n} with ${velocities.length} velocities: only the first ${n} velocities are used. Set count to ${velocities.length} to draw them all.`);
+  };
+  // The spec's own pair once; a burst only where it sets either itself (it inherits the rest).
+  const bursts = Array.isArray(out.bursts) ? out.bursts as unknown[] : [];
+  const inherited = bursts.some((b) => !b || typeof b !== 'object' || ((b as Record<string, unknown>).count === undefined && (b as Record<string, unknown>).velocities === undefined));
+  if (out.velocities !== undefined && (out.count !== undefined || inherited)) mismatch('spec', out.count, out.velocities);
+  bursts.forEach((b, i) => {
+    const own = (b && typeof b === 'object' ? b : {}) as Record<string, unknown>;
+    if (own.count !== undefined || own.velocities !== undefined) mismatch(`bursts[${i}]`, own.count ?? out.count, own.velocities ?? out.velocities);
+  });
+  return { spec: out, warnings };
 }
 
 /**
@@ -13162,8 +13225,10 @@ ${cam ? `  // The camera rides the SAME timing: framing each state as its morph 
   }
 
   /** pinepaper_emitter (D29): create('emitter', spec) / setEmitter(id, patch). */
-  generateEmitter(input: EmitterInput): string {
+  generateEmitter(raw: EmitterInput): string {
     const S = (v: unknown) => JSON.stringify(v);
+    const normalized = normalizeEmitterSpec(raw.spec as Record<string, unknown>, raw.action !== 'set');
+    const input = { ...raw, spec: normalized.spec } as EmitterInput;
     // A COUNT OVER THE CAP IS SAID (B144). The cap is 10000 a burst on the
     // current studio and was 2000 before it, clamped in silence (2300 drew
     // ~1940). Which applies is read from the spec the studio STORED — its
@@ -13185,7 +13250,10 @@ ${cam ? `  // The camera rides the SAME timing: framing each state as its morph 
     }
     return out;
   }` : '';
-    const capJs = (stored: string) => checks.length ? `, ...((function(w) { return w.length ? { warnings: w } : {}; })(__capWarnings(${stored})))` : '';
+    const fixed = normalized.warnings;
+    const capJs = (stored: string) => checks.length || fixed.length
+      ? `, ...((function(w) { return w.length ? { warnings: w } : {}; })(${S(fixed)}.concat(${checks.length ? `__capWarnings(${stored})` : '[]'})))`
+      : '';
     if (input.action === 'set') {
       return `
 // Emitter: change a spec

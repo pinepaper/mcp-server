@@ -8182,7 +8182,7 @@ ACTIONS:
 SPEC:
 - mode: 'burst' (default) — bursts: [{ t, x, y, count, …per-burst overrides }]: a pop of particles at scene time t.
 - mode: 'trail' (or give target) — target (an item id), rate (per second), emitWindows [[t0, t1], …], window, offset: particles shed from a moving item.
-- look and physics (per emitter or per burst): shape ('circle' | 'rect' | 'dash' | 'star' | 'confetti', or an array), palette [colours], size / sizes / sizeEnd, speed + angle ranges or velocities, gravity (px/s², +down), drag, friction, lifetime, fadeIn / fadeOut, spin, opacity, jitter, jitterGrow, seed.
+- look and physics (per emitter or per burst): shape ('circle' | 'rect' | 'dash' | 'star' | 'confetti', or an array), palette [colours], size / sizes / sizeEnd, speed + angle ranges or velocities ([[vx, vy], …] px/s, or [{x, y}, …]; particle i takes velocities[i % length], so give one per particle — the reply warns when count and the list differ), gravity (px/s², +down), drag, friction, lifetime, fadeIn / fadeOut, spin, opacity, jitter, jitterGrow, seed.
 UNITS (a number, or a [min, max] range picked per particle where it says range):
 - count: particles per burst, at most 10000 on the current studio (2000 on older studios) — a larger count is drawn at the cap and the reply warns with the number drawn. For more, add a second burst at the same t.
 - speed: px/s (range). angle: degrees, 0 = right, 90 = down (range). gravity: px/s². lifetime: seconds (range, > 0). size: px (range).

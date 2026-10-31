@@ -119,14 +119,15 @@ describe('pinepaper_choreograph emitted code', () => {
     expect(() => ChoreographInputSchema.parse({ itemId: 'item_1', beats: [{ at: 0, verb: 'roll' }] })).toThrow(/roll needs to/);
   });
 
-  it('sound: true places a sound on every pop and landing, quieter as bounces decay (D68)', () => {
+  it('sound: true places a sound on every pop, launch and landing, quieter as bounces decay (D68)', () => {
     const app = fakeApp() as Record<string, any>;
     const placed: Array<{ spec: Record<string, any>; at: number }> = [];
     app.sfxSpec = (n: string) => (['pop', 'whoosh'].includes(n) ? { gain: 0.8, duration: 0.3, sfx: n } : null);
     app.percussionSpec = (n: string) => (['tom', 'hat', 'kick'].includes(n) ? { gain: 0.9, duration: 0.35, drum: n } : null);
     app.createSound = (spec: Record<string, any>, o: { startTime: number }) => { placed.push({ spec, at: o.startTime }); return { data: { id: 'snd_' + placed.length } }; };
     const r = run({ itemId: 'item_1', sound: true, beats: [{ at: 0, verb: 'pop' }, { at: 0.6, verb: 'bounce', times: 3, to: [700, 760] }] }, app);
-    expect(r.sounds.map((x: any) => x.sound)).toEqual(['pop', 'tom', 'tom', 'tom']);
+    // The bounce's push-off is a whoosh, as a hop's is; then one tom per landing (CHORSND23).
+    expect(r.sounds.map((x: any) => x.sound)).toEqual(['pop', 'whoosh', 'tom', 'tom', 'tom']);
     // MP4 priming swallows the first ~50 ms: the 0 s pop is placed at 0.06 s.
     expect(r.sounds[0]).toMatchObject({ t: 0.06, movedFrom: 0 });
     expect(placed[0].at).toBe(0.06);

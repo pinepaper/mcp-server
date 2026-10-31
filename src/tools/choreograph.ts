@@ -163,6 +163,8 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
         const from = { x: s.x, y: s.y };
         const dest = to || from;
         squashTo(1); key(t, 'linear');
+        // The push-off sounds like a hop's; every later rebound is a contact (CHORSND23).
+        ev(t + per * 0.1, 'whoosh', 0.35);
         for (let k = 0; k < times; k++) {
           const f0 = k / times, f1 = (k + 1) / times;
           const gx = (f: number) => from.x + (dest.x - from.x) * f;

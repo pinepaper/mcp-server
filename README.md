@@ -295,6 +295,15 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   was made first.
 - Item ids and colours in batch operations are always quoted correctly in the
   generated code.
+- `pinepaper_choreograph` with `sound: true` now plays a launch sound at the
+  start of a `bounce`, as it already did for a `hop`.
+- `pinepaper_emitter` accepts `velocities` and `offsets` written as
+  `[{ x, y }, …]` as well as `[[x, y], …]`. Before, the object form was
+  dropped and the particles had no velocity. The reply now warns when a
+  burst's `count` differs from the number of `velocities`.
+- A `letterSpacing` set on a text item in `pinepaper_create_item` or
+  `pinepaper_modify_item` is applied. It was reported as ignored at creation
+  and only took effect through keyframes.
 
 ### Security
 
