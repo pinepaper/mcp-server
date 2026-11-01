@@ -280,11 +280,28 @@ interface ToolLike {
   inputSchema: unknown;
 }
 
-/** The lane: its tools, in lane order, each shown with its lane description and schema. */
-export function applyLane<T extends ToolLike>(tools: T[]): T[] {
+/** The edit profile (#43): an agent changing a scene that exists reads it with lint, changes it with the batch. */
+export const EDIT_TOOL_NAMES = [
+  'pinepaper_lint_scene',
+  'pinepaper_agent_batch_execute',
+  'pinepaper_register_custom_relation',
+  'pinepaper_agent_export',
+] as const;
+
+/** Read by an editing agent before any tool. */
+export const EDIT_INSTRUCTIONS = `PinePaper Studio, edit profile: four tools for changing a scene that is already on the canvas.
+
+1. pinepaper_lint_scene first. Its edit section lists every relation and custom motion with the exact op that changes it, and for a group bound by a name pattern ("dot-*"), the ops that add or remove a member.
+2. Send those ops, with your values, in ONE pinepaper_agent_batch_execute call.
+3. pinepaper_agent_export to render; perScene: true on a scene chain renders only what changed.
+Change a custom motion's formula by sending its pinepaper_register_custom_relation call again with the new body.
+Units: pixels, top-left origin, y down; seconds; degrees. Report a tool error as it is.`;
+
+/** The lane (or another set of lane tools): in order, each shown with its lane description and schema. */
+export function applyLane<T extends ToolLike>(tools: T[], names: readonly string[] = LANE_TOOL_NAMES): T[] {
   const byName = new Map(tools.map((t) => [t.name, t]));
   const out: T[] = [];
-  for (const name of LANE_TOOL_NAMES) {
+  for (const name of names as readonly (typeof LANE_TOOL_NAMES)[number][]) {
     const tool = byName.get(name);
     if (!tool) continue;
     out.push({ ...tool, description: LANE_TOOLS[name].description, inputSchema: LANE_TOOLS[name].inputSchema } as T);

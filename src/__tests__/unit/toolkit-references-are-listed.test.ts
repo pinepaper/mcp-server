@@ -107,6 +107,9 @@ describe('every tool a profile points at, that profile lists', () => {
     // 8: the same pinepaper_animate pointer as map (keyframe loop:true
     // measured playing once in export; the loop presets do cycle).
     minimal: 8,
+    // 3: the batch's lane description names pinepaper_pattern, pinepaper_clear_canvas and pinepaper_event, which
+    // build a scene; the edit profile (#43) changes one, and set_toolkit {load} widens it when an edit needs them.
+    edit: 3,
   };
 
   // The lane is read WHOLE by a model that has nothing else (agent-lane.test.ts), so it is held to zero.

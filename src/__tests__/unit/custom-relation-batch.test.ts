@@ -37,7 +37,7 @@ describe('mcp-server#37: name patterns, update, read-back', () => {
     const code = gen({ sourceId: 'dot-*' });
     expect(code).toContain('new RegExp("^dot-.*$")');
     expect(code).toContain("localeCompare(b.name, undefined, { numeric: true })");
-    expect(code).toContain('{ index: i, count: __members.length }');
+    expect(code).toContain('{ index: i, count: __members.length, pattern: "dot-*" }');
   });
 
   it('a pattern re-sent after adding members changes the bound ones instead of binding them twice', () => {
@@ -95,5 +95,49 @@ describe('unknown relation options are said, not accepted silently', () => {
     expect(relationOptionWarning('orbits', { radius: 1, speed: 1, direction: 1, phaseDegrees: 0 })).toBeNull();
     expect(relationOptionWarning('bobs', { anything: 1 })).toBeNull();
     expect(relationOptionWarning('orbits', { radius: 1, index: 0, count: 3 }, ['index', 'count'])).toBeNull();
+  });
+});
+
+describe('#43: lint_scene says how to change what it lists', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { codeGenerator } = require('../../types/code-generator.js');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { getToolsForToolkit } = require('../../tools/toolkits.js');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { PINEPAPER_TOOLS } = require('../../tools/definitions.js');
+
+  function lint(rels: Array<Record<string, unknown>>, custom: unknown[] = []) {
+    const code = codeGenerator.generateLintScene({});
+    const types: Record<string, string> = {};
+    rels.forEach((r) => { types[String(r.from)] = 'circle'; });
+    const app = {
+      lintScene: () => ({ density: {}, suggestions: [] }),
+      relationRegistry: { queryActive: () => rels.map((r) => ({ itemId: r.from, item: { data: { name: r.name } }, associations: [{ relation: r.type, target: r.to, params: r.params }] })) },
+      itemRegistry: { get: (id: string) => ({ type: types[id] }) },
+    };
+    const win = { __ppCustomRelations: Object.fromEntries((custom as Array<{ name: string }>).map((d) => [d.name, d])) };
+    const body = code.split('\n').filter((l: string) => !l.trim().startsWith('//')).join('\n');
+    return new Function('app', 'window', `return ${body}`)(app, win);
+  }
+
+  it('a pattern group comes once, with the op that changes it and the ops that add and remove a member', () => {
+    const rels = [1, 2, 3].map((i) => ({ from: `item_${i}`, name: `dot-${i}`, type: 'wave', to: null, params: { amp: 40, index: i - 1, count: 3, pattern: 'dot-*' } }));
+    const out = lint(rels, [{ name: 'wave', computeFunction: 'return {};', applyFunction: '' }]);
+    const g = out.edit.groups[0];
+    expect(g).toMatchObject({ pattern: 'dot-*', members: 3, first: 'dot-1', last: 'dot-3', relationOptions: { amp: 40 } });
+    expect(g.change).toEqual({ type: 'relation', sourceId: 'dot-*', relationType: 'wave', relationOptions: { amp: 40 }, update: true });
+    expect(g.addMember[0]).toMatchObject({ type: 'create', itemType: 'circle', properties: { name: 'dot-4' } });
+    expect(g.removeMember[0]).toEqual({ type: 'delete', itemId: 'dot-3' });
+    expect(out.edit.customRelations[0].change.tool).toBe('pinepaper_register_custom_relation');
+    expect(out.edit.hint).toContain('ONE pinepaper_agent_batch_execute');
+  });
+
+  it('a single relation comes with its update op', () => {
+    const out = lint([{ from: 'item_1', name: 'moon', type: 'orbits', to: 'item_2', params: { radius: 50, speed: 1 } }]);
+    expect(out.edit.relations[0].change).toEqual({ type: 'relation', sourceId: 'moon', targetId: 'item_2', relationType: 'orbits', update: true, relationOptions: { radius: 50, speed: 1 } });
+  });
+
+  it('the edit profile is lint, batch, custom relations and export', () => {
+    expect(getToolsForToolkit(PINEPAPER_TOOLS, 'edit').map((t: { name: string }) => t.name)).toEqual(['pinepaper_lint_scene', 'pinepaper_agent_batch_execute', 'pinepaper_register_custom_relation', 'pinepaper_agent_export']);
   });
 });

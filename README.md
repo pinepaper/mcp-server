@@ -260,6 +260,18 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 
 ## What's new in 1.6.28
 
+### Added
+
+- `pinepaper_lint_scene` says how to change what it lists: an `edit` section
+  with, for every relation, the batch op that changes it; for a group bound by
+  a name pattern (`"dot-*"`), one entry with the op that changes the group and
+  the ops that add or remove a member; and for a custom motion, the call that
+  redefines it. An editing agent can work from that alone.
+- An `edit` toolkit (`PINEPAPER_TOOLKIT=edit`, or `pinepaper_set_toolkit`):
+  `pinepaper_lint_scene`, `pinepaper_agent_batch_execute`,
+  `pinepaper_register_custom_relation` and `pinepaper_agent_export`, with the
+  lane's short descriptions, for changing a scene that already exists.
+
 ### Fixed
 
 - A batch `modify` with a top-level `position` (`{x, y}` or `[x, y]`) moves

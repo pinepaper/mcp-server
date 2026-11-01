@@ -5532,7 +5532,7 @@ const targetId = ${noTarget ? 'null' : tgtRef};
 const target = ${noTarget ? 'null' : 'app.getItemById(targetId)'};
 ${noTarget ? '' : "if (!target) throw new Error('Target not found: ' + targetId);\n"}${op.update === true ? "if (typeof app.modifyRelationParams !== 'function') throw new Error('this studio cannot change a bound relation (app.modifyRelationParams): update PinePaper Studio');\n" : ''}const __done = [], __failed = [];
 __members.forEach((m, i) => {
-  const __p = Object.assign({}, ${relOpts}${glob ? ', { index: i, count: __members.length }' : ''});
+  const __p = Object.assign({}, ${relOpts}${glob ? `, { index: i, count: __members.length, pattern: ${jsLiteral(op.sourceId)} }` : ''});
   const ok = ${op.update === true
     ? `app.modifyRelationParams(m.id, targetId, ${type}, __p) || (targetId === null && app.modifyRelationParams(m.id, undefined, ${type}, __p))`
     : glob
@@ -5547,7 +5547,7 @@ if (!__done.length) {
   const __why = ${op.update === true ? `'no ' + ${type} + ' relation is bound from ' + __failed.join(', ') + (targetId === null ? '' : ' to ' + targetId) + ' to change: bind it first (a relation op without update)'` : relationRefusalReasonJs(type)};
   return { success: false, relationType: ${type}, sourceIds: __failed, error: ${op.update === true ? '__why' : `'the studio refused the ' + ${type} + ' relation for ' + __failed.join(', ') + ' — nothing was bound' + (__why ? ': ' + __why : '.')`} };
 }
-return { success: true, relationType: ${type}, ${op.update === true ? 'updated' : 'bound'}: __done, targetId${glob ? ', count: __members.length' : ''}${(() => { const w = relationOptionWarning(op.relationType, op.relationOptions, ['index', 'count']); return w ? `, optionWarning: ${jsLiteral(w)}` : ''; })()}, ...(__failed.length ? { failed: __failed, warning: __failed.length + ' of ' + __members.length + ' were not ${op.update === true ? 'changed' : 'bound'}: ' + __failed.join(', ') } : {}) };
+return { success: true, relationType: ${type}, ${op.update === true ? 'updated' : 'bound'}: __done, targetId${glob ? ', count: __members.length' : ''}${(() => { const w = relationOptionWarning(op.relationType, op.relationOptions, ['index', 'count', 'pattern']); return w ? `, optionWarning: ${jsLiteral(w)}` : ''; })()}, ...(__failed.length ? { failed: __failed, warning: __failed.length + ' of ' + __members.length + ' were not ${op.update === true ? 'changed' : 'bound'}: ' + __failed.join(', ') } : {}) };
 `;
         }
         return `
@@ -12708,12 +12708,45 @@ ${checks.includes('contrast') ? `  // SAMPLED OVER TIME (round 12, 12.9): text i
     }));
   } catch (e) { /* the relations are an addition; the lint stands without them */ }
   const __custom = (typeof window !== 'undefined' && window.__ppCustomRelations) ? Object.values(window.__ppCustomRelations) : [];
+  // HOW TO CHANGE IT (#43): an editing agent needs the op, not the schemas. Each relation comes with the batch op that
+  // changes it; a group bound by a name pattern ("dot-*", recorded in each member's params) comes once, with the ops
+  // that add and remove a member; a custom motion with the call that redefines it.
+  const __edit = { hint: 'To change this scene, send the ops below (your values in relationOptions) in ONE pinepaper_agent_batch_execute call; a custom motion changes by sending its pinepaper_register_custom_relation call again.', groups: [], relations: [], customRelations: [] };
+  try {
+    const __byPat = new Map();
+    __rels.forEach((r) => {
+      const pat = r.params && r.params.pattern;
+      if (typeof pat === 'string') {
+        const k = pat + '|' + r.type + '|' + r.to;
+        if (!__byPat.has(k)) __byPat.set(k, { pattern: pat, type: r.type, to: r.to, members: [] });
+        __byPat.get(k).members.push(r);
+        return;
+      }
+      __edit.relations.push({ from: r.from, ...(r.fromName ? { fromName: r.fromName } : {}), to: r.to, relationType: r.type,
+        change: { type: 'relation', sourceId: r.fromName || r.from, ...(r.to != null ? { targetId: r.to } : {}), relationType: r.type, update: true, relationOptions: r.params } });
+    });
+    __byPat.forEach((g) => {
+      const base = Object.assign({}, g.members[0].params); delete base.index; delete base.count; delete base.pattern;
+      const names = g.members.map((m) => m.fromName).filter(Boolean).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+      const prefix = g.pattern.split('*')[0];
+      const nums = names.map((n) => Number(n.slice(prefix.length))).filter((n) => Number.isFinite(n));
+      const next = prefix + (nums.length ? Math.max.apply(null, nums) + 1 : g.members.length + 1);
+      const firstEntry = app.itemRegistry.get(g.members[0].from);
+      const bind = { type: 'relation', sourceId: g.pattern, ...(g.to != null ? { targetId: g.to } : {}), relationType: g.type, relationOptions: base };
+      __edit.groups.push({ pattern: g.pattern, relationType: g.type, members: g.members.length, ...(names.length ? { first: names[0], last: names[names.length - 1] } : {}), relationOptions: base,
+        change: Object.assign({}, bind, { update: true }),
+        addMember: [{ type: 'create', itemType: (firstEntry && firstEntry.type) || 'circle', position: [0, 0], properties: { name: next } }, bind],
+        ...(names.length ? { removeMember: [{ type: 'delete', itemId: names[names.length - 1] }, bind] } : {}) });
+    });
+    __custom.forEach((d) => __edit.customRelations.push({ name: d.name, change: { tool: 'pinepaper_register_custom_relation', args: d } }));
+  } catch (e) { /* the read-back stands without the edit ops */ }
   // warnings: what the engine's own rules found (TEXT_CLIPS_FRAME: a centre-anchored text running past the
   // frame edge). Passed through when the studio reports them; an older studio has none to pass.
   return { success: true, density: result.density, suggestions: result.suggestions,
     ...(Array.isArray(result.warnings) && result.warnings.length ? { warnings: result.warnings } : {}),
     relations: __rels, ...(__relCount > __rels.length ? { relationsShown: __rels.length, relationCount: __relCount } : {}),
-    ...(__custom.length ? { customRelations: __custom } : {}) };
+    ...(__custom.length ? { customRelations: __custom } : {}),
+    ...(__edit.groups.length || __edit.relations.length || __edit.customRelations.length ? { edit: __edit } : {}) };
 })();`.trim();
   }
 

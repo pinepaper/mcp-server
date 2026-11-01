@@ -9835,7 +9835,7 @@ VERBOSITY:
         toolkit: {
           type: 'string',
           description: 'Toolkit profile: core (default), full, agent, diagram, map, font, minimal, lane',
-          enum: ['core', 'full', 'agent', 'diagram', 'map', 'font', 'minimal', 'lane'],
+          enum: ['core', 'full', 'agent', 'diagram', 'map', 'font', 'minimal', 'lane', 'edit'],
         },
         load: {
           type: 'array',

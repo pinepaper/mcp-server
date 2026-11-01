@@ -1853,7 +1853,7 @@ export type ToolGuideInput = z.infer<typeof ToolGuideInputSchema>;
 // =============================================================================
 
 export const SetToolkitInputSchema = z.object({
-  toolkit: z.enum(['core', 'full', 'agent', 'diagram', 'map', 'font', 'minimal', 'lane']).optional().describe('Toolkit profile to switch to'),
+  toolkit: z.enum(['core', 'full', 'agent', 'diagram', 'map', 'font', 'minimal', 'lane', 'edit']).optional().describe('Toolkit profile to switch to'),
   verbosity: z.enum(['verbose', 'compact', 'minimal']).optional().describe('Verbosity level to switch to'),
   load: z.array(z.string()).optional().describe('Tool groups or tool names to add to the list for this session'),
 });

@@ -8,12 +8,12 @@
  * Handler dispatch is NOT filtered — hidden tools still execute if called directly.
  */
 
-import { applyLane } from './lane.js';
+import { applyLane, EDIT_TOOL_NAMES } from './lane.js';
 import { env } from '../utils/env.js';
 
-export type ToolkitProfile = 'core' | 'full' | 'agent' | 'diagram' | 'map' | 'font' | 'minimal' | 'lane';
+export type ToolkitProfile = 'core' | 'full' | 'agent' | 'diagram' | 'map' | 'font' | 'minimal' | 'lane' | 'edit';
 
-export const TOOLKIT_PROFILES_LIST: ToolkitProfile[] = ['core', 'full', 'agent', 'diagram', 'map', 'font', 'minimal', 'lane'];
+export const TOOLKIT_PROFILES_LIST: ToolkitProfile[] = ['core', 'full', 'agent', 'diagram', 'map', 'font', 'minimal', 'lane', 'edit'];
 
 /** The profile a session starts on when nothing chooses one. */
 export const DEFAULT_TOOLKIT: ToolkitProfile = 'core';
@@ -414,6 +414,9 @@ export const TOOLKIT_PROFILES: Record<ToolkitProfile, string[]> = {
   // job (explaining a surface too big to read) the lane does not have. getToolsForToolkit
   // serves it through applyLane; the server instructions are the lane's own.
   lane: [],
+  // Editing a scene that exists (#43): pinepaper_lint_scene's edit section names the op that changes each relation,
+  // so the editor needs that, the batch, the custom-relation definer and the export, each with its lane description.
+  edit: [],
 };
 
 // =============================================================================
@@ -485,6 +488,9 @@ export function getToolsForToolkit<T extends Tool>(tools: T[], profile: ToolkitP
 
   if (profile === 'lane') {
     return applyLane(tools);
+  }
+  if (profile === 'edit') {
+    return applyLane(tools, EDIT_TOOL_NAMES);
   }
 
   const tags = TOOLKIT_PROFILES[profile];

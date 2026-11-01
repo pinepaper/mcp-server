@@ -24,7 +24,7 @@ import {
 } from './mcp/index.js';
 
 import { PINEPAPER_TOOLS, getToolsForVerbosity, AI_AGENT_GUIDE, CHOOSE_THE_DOOR } from './tools/definitions.js';
-import { LANE_INSTRUCTIONS } from './tools/lane.js';
+import { LANE_INSTRUCTIONS, EDIT_INSTRUCTIONS } from './tools/lane.js';
 import type { ToolVerbosity } from './tools/definitions.js';
 import {
   getToolsForToolkit,
@@ -5867,7 +5867,7 @@ export async function createServer(options: ServerOptions = {}): Promise<Server>
       logging: {},
     },
     // The lane brings its own instructions: the default text names tools the lane does not list.
-    instructions: effectiveToolkit === 'lane' ? LANE_INSTRUCTIONS : `You are connected to PinePaper Studio — a canvas animation engine with tools for creating animations, videos, and graphics.
+    instructions: effectiveToolkit === 'lane' ? LANE_INSTRUCTIONS : effectiveToolkit === 'edit' ? EDIT_INSTRUCTIONS : `You are connected to PinePaper Studio — a canvas animation engine with tools for creating animations, videos, and graphics.
 
 CRITICAL: When the user asks to create any visual content (animation, video, graphic, poster, diagram, or design), you MUST use PinePaper tools. Do NOT create standalone HTML pages, React components, or web apps as a substitute. Do NOT use frontend design skills or CSS-only animations instead of PinePaper. PinePaper tools ARE the implementation — they run on a real browser canvas and produce real exports (Canvas 2D, SVG, JavaScript, MP4, GIF, PNG are all valid PinePaper outputs).
 
