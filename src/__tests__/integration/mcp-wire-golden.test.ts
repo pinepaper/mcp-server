@@ -19,6 +19,7 @@ import { join } from 'node:path';
 const ROOT = join(import.meta.dir, '..', '..', '..');
 const FIXTURES = join(import.meta.dir, '..', 'fixtures', 'mcp-wire');
 const UPDATE = process.env.UPDATE_MCP_GOLDEN === '1';
+const PKG_VERSION: string = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version;
 
 type Frame = Record<string, unknown>;
 /** A step: a message (or a raw line) to send, and whether to wait for a reply with its id. */
@@ -30,10 +31,10 @@ const init = (protocolVersion: string, name = 'golden') => ({
 });
 const initialized = { jsonrpc: '2.0', method: 'notifications/initialized' };
 
-/** Strip what legitimately differs run to run: the build id and timings. */
+/** Strip what legitimately differs run to run: the build id and timings, and our own version (so a bump re-records nothing). */
 function normalize(f: Frame): Frame {
   return JSON.parse(JSON.stringify(f, (k, v) => {
-    if (k === 'version' && typeof v === 'string' && /^\d+\.\d+\.\d+/.test(v)) return v.replace(/\+.*$/, '+BUILD');
+    if (k === 'version' && typeof v === 'string' && /^\d+\.\d+\.\d+/.test(v)) return v.replace(/\+.*$/, '+BUILD').replace(PKG_VERSION, 'PKG_VERSION');
     if (k === 'pinepaper.studio/timing') return 'TIMING';
     return v;
   }));

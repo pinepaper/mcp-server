@@ -12,7 +12,7 @@
       },
       "serverInfo": {
         "name": "pinepaper-mcp",
-        "version": "1.6.25",
+        "version": "PKG_VERSION",
         "description": "<description>"
       },
       "instructions": "<instructions>"
