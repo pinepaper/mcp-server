@@ -258,6 +258,15 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - The package starts one child process, and only when an export is saved: `ffprobe -show_entries … <file>` (via `execFile`, no shell, fixed binary and argument list, an absolute path) to check the saved video against what the studio encoded. Without `ffprobe` on `PATH` the check is skipped and said so; `PINEPAPER_FFPROBE=off` turns it off.
 - The server itself fetches the images, SVGs and media a tool call names by URL, and reads local files named by path. URLs that resolve to loopback, private, link-local or reserved addresses are refused, redirects included, and so are cloud metadata addresses. Local files are read only from the working directory, the export folder, and folders listed in `PINEPAPER_ASSET_DIRS`. `PINEPAPER_ALLOW_PRIVATE_NETWORK=1` allows local and LAN hosts. Metadata addresses stay refused even with it set.
 
+## What's new in 1.6.27
+
+### Added
+
+- `pinepaper_world3d create { control: true }`: a viewer walks the 3D
+  character with the keyboard (arrows or WASD, Space jumps, Shift runs) when
+  the scene plays in the studio. The result says whether the studio turned it
+  on. With `character: false` there is nothing to walk, so the call is refused.
+
 ## What's new in 1.6.26
 
 ### Changed

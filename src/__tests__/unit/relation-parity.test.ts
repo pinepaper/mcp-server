@@ -70,9 +70,8 @@ const ROUTED_TO_A_TOOL: Record<string, RegExp | string[]> = {
   // tool lands, rename the key to it.
   'tool pending: app.addSpeechLine': ['says'],
   'tool pending: app.addAudioReactive': ['reacts_to_audio'],
-  // The engine binds it itself when a 3D world is created with { control: true } (_bindWorldController, FxTool
-  // #232); pinepaper_world3d create does not pass control yet. When it does, rename the key to pinepaper_world3d.
-  'tool pending: pinepaper_world3d create {control}': ['controls'],
+  // The engine binds it itself when a 3D world is created with { control: true } (_bindWorldController, FxTool #232).
+  'pinepaper_world3d create {control}': ['controls'],
   // AgentSoundManager.addFromPrompt binds it when a prompted sound is given a targetItemId (the sound pans with that
   // item); no tool calls app.agentSound yet. When one does, rename the key to that tool.
   'tool pending: app.agentSound.addFromPrompt {targetItemId}': ['localizes_sound'],

@@ -14098,7 +14098,10 @@ ${body}
     const needWorld = `  if (!app._world3d) { return { success: false, error: "no 3D world — call pinepaper_world3d create first" }; }`;
     switch (input.action) {
       case 'create': {
-        const opts = S({ ...(input.character !== undefined ? { character: input.character } : {}) });
+        if (input.control === true && input.character === false) {
+          return `({ success: false, error: ${jsLiteral('control: true walks the character, and character: false leaves it out. Nothing was made. Drop one of the two.')} });`;
+        }
+        const opts = S({ ...(input.character !== undefined ? { character: input.character } : {}), ...(input.control === true ? { control: true } : {}) });
         return `
 // World3D: create — terrain, sky, shadows, walkable character, under the Paper canvas
 (async function() {
@@ -14111,7 +14114,11 @@ ${body}
   // params is WORLD_SCHEMA: an ARRAY of {path, kind, doc}. Object.keys on it
   // returned "0", "1", "2"… — the indexes, not a single usable key.
   const keys = !d ? [] : Array.isArray(d.params) ? d.params.map(function (e) { return e && e.path; }).filter(Boolean) : Object.keys(d.params || d);
-  return { success: true, action: 'create', spec: ${S(input.spec ?? 'forest')}, configurableKeys: keys };
+  // What the world reports, not what was asked: an engine without the option takes the world and ignores control.
+  const result = { success: true, action: 'create', spec: ${S(input.spec ?? 'forest')}, configurableKeys: keys };${input.control === true ? `
+  result.control = !!(app._world3d && app._world3d.controlEnabled);
+  if (!result.control) result.warning = 'control was asked for and this studio did not turn it on: the character cannot be walked with the keyboard. Update PinePaper Studio.';` : ''}
+  return result;
 })();`.trim();
       }
       case 'describe':

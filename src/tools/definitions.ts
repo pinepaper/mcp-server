@@ -3151,7 +3151,7 @@ The engine names each refusal — "a boolean needs at least two paths", "that pa
     description: `A real 3D WORLD under the canvas — depth-buffered terrain, sky, sun shadows, an addressable actor stage and a directed camera. ADDITIVE: Paper.js keeps every vector item, hit-test and export path; the world composites underneath the (transparent) Paper canvas.
 
 ACTIONS:
-- create: { spec? ('forest' | 'snowMountain' | 'field' | 'jungle' | a full spec object), character? (true/config → a walkable character) } → { configurableKeys }
+- create: { spec? ('forest' | 'snowMountain' | 'field' | 'jungle' | a full spec object), character? (true/config → a walkable character), control? (true: a viewer walks the character with the keyboard — arrows/WASD, Space jumps, Shift runs — when the scene plays in the studio; the editor's own shortcuts pause while it is on) } → { configurableKeys, control }
 - describe: {} → the ENGINE'S OWN parameter schema — every world parameter with type, range and description. Call this before configure; the tool does not restate the schema, so it cannot drift from the engine.
 - configure: { patch } — live deep-merged change to anything describe lists (colours, fog, sun, terrain amplitude/ridge, seed…). Schema-validated: a wrong key errors NAMING the right one, never a silent no-op.
 - add_actor: { actorId?, x, z, height?, sprite? (a canvas item id), live? } → { actorId }. live: true re-rasterizes the item as it animates — a RIGGED character (walk cycle, expressions) PERFORMS in the world instead of standing there as a photograph of itself.
@@ -3212,6 +3212,10 @@ RECIPE — a character walking through a forest: create {spec:'forest'} → impo
         character: {
           anyOf: [{ type: 'boolean' }, { type: 'object' }],
           description: 'create: include the walkable character (boolean or config).',
+        },
+        control: {
+          type: 'boolean',
+          description: 'create: true lets a viewer walk the character with the keyboard (arrows/WASD, Space jumps, Shift runs) when the scene plays in the studio. Needs the character (not character: false).',
         },
         patch: { type: 'object', description: 'configure: partial world spec, validated against describe. Colours (env.zenith, env.horizon, env.fogColor, env.sunColor, env.ambient, env.lowColor … env.propColorB) take hex ("#03050c") or [r, g, b] in 0..1.' },
         actorId: { type: 'string', description: 'Actor id.' },
