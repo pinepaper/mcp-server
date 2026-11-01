@@ -153,7 +153,7 @@ describe('the emitted program', () => {
       { createItem: (a) => CreateItemInputSchema.parse(a), keyframeAnimate: (a) => KeyframeAnimateInputSchema.parse(a) },
     );
     expect(() => new Function(code)).not.toThrow();
-    expect(code).toContain("app.create('path'");
+    expect(code).toContain('app.create("path"');
     expect(code).toContain('addAnimation');
     // one authoring act, one undo
     expect(code).toContain('beginBatch');

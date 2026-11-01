@@ -53,7 +53,7 @@ describe('platform → canvas preset', () => {
     const code = codeGenerator.generateAgentStartJob({
       name: 'job', canvasPreset: 'instagram',
     } as never);
-    expect(code).toContain("app.setCanvasSize('instagram-post')");
+    expect(code).toContain('app.setCanvasSize("instagram-post")');
     expect(code).not.toContain("app.setCanvasSize('instagram')");
   });
 });

@@ -80,7 +80,7 @@ describe('the map tools speak the engine vocabulary', () => {
 
   it('load carries options through to the engine', () => {
     const code = codeGenerator.generateLoadMap({ mapId: 'world', options: { style: 'dark' } } as never);
-    const m = /loadMap\('world',\s*(\{[\s\S]*?\})\)/.exec(code)!;
+    const m = /loadMap\("world",\s*(\{[\s\S]*?\})\)/.exec(code)!;
     expect(JSON.parse(m[1])).toMatchObject({ style: 'dark' });
   });
 
@@ -88,7 +88,7 @@ describe('the map tools speak the engine vocabulary', () => {
     const code = codeGenerator.generateLoadMap({
       mapId: 'world', projection: 'mercator', options: { projection: 'naturalEarth' },
     } as never);
-    const m = /loadMap\('world',\s*(\{[\s\S]*?\})\)/.exec(code)!;
+    const m = /loadMap\("world",\s*(\{[\s\S]*?\})\)/.exec(code)!;
     expect(JSON.parse(m[1]).projection).toBe('mercator');
   });
 });

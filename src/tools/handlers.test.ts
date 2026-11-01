@@ -17,7 +17,7 @@ describe('handleToolCall', () => {
       expect(result.isError).toBeFalsy();
       expect(result.content[0].type).toBe('text');
       const text = (result.content[0] as { type: string; text: string }).text;
-      expect(text).toContain("app.create('text'");
+      expect(text).toContain('app.create("text"');
       expect(text).toContain('Hello World');
       expect(text).toContain('100');
       expect(text).toContain('200');
@@ -32,7 +32,7 @@ describe('handleToolCall', () => {
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
-      expect(text).toContain("app.create('circle'");
+      expect(text).toContain('app.create("circle"');
       expect(text).toContain('50');
     });
 
@@ -109,7 +109,7 @@ describe('handleToolCall', () => {
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
-      expect(text).toContain("app.addRelation('item_2', 'item_1', 'orbits'");
+      expect(text).toContain('app.addRelation("item_2", "item_1", "orbits"');
       expect(text).toContain('150');
       expect(text).toContain('0.5');
     });
@@ -124,7 +124,7 @@ describe('handleToolCall', () => {
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
-      expect(text).toContain("'follows'");
+      expect(text).toContain('"follows"');
     });
 
     it('should generate code for attached_to relation', async () => {
@@ -137,7 +137,7 @@ describe('handleToolCall', () => {
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
-      expect(text).toContain("'attached_to'");
+      expect(text).toContain('"attached_to"');
     });
 
     it('should reject invalid relation types', async () => {
@@ -161,7 +161,7 @@ describe('handleToolCall', () => {
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
-      expect(text).toContain("app.removeRelation('item_2', 'item_1'");
+      expect(text).toContain('app.removeRelation("item_2", "item_1"');
     });
 
     it('should generate code for removing all relations between items', async () => {
@@ -223,7 +223,7 @@ describe('handleToolCall', () => {
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
-      expect(text).toContain("registerRelationRule('repels'");
+      expect(text).toContain('registerRelationRule("repels"');
       expect(text).toContain('compute');
       expect(text).toContain('apply');
     });
@@ -242,7 +242,7 @@ describe('handleToolCall', () => {
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
-      expect(text).toContain("registerRelationRule('wobbles_with'");
+      expect(text).toContain('registerRelationRule("wobbles_with"');
     });
   });
 
@@ -292,7 +292,7 @@ describe('handleToolCall', () => {
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
       expect(text).toContain('app.animate');
-      expect(text).toContain("'pulse'");
+      expect(text).toContain('"pulse"');
       expect(text).toContain('1.5');
     });
 
@@ -304,7 +304,7 @@ describe('handleToolCall', () => {
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
-      expect(text).toContain("'rotate'");
+      expect(text).toContain('"rotate"');
     });
   });
 
@@ -336,7 +336,7 @@ describe('handleToolCall', () => {
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
-      expect(text).toContain("app.executeGenerator('drawSunburst'");
+      expect(text).toContain('app.executeGenerator("drawSunburst"');
       expect(text).toContain('12');
     });
 
@@ -348,7 +348,7 @@ describe('handleToolCall', () => {
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
-      expect(text).toContain("'drawGrid'");
+      expect(text).toContain('"drawGrid"');
     });
   });
 
@@ -372,7 +372,7 @@ describe('handleToolCall', () => {
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
-      expect(text).toContain("app.applyEffect(item, 'sparkle'");
+      expect(text).toContain('app.applyEffect(item, "sparkle"');
     });
 
     it('should generate code for blast effect', async () => {
@@ -384,7 +384,7 @@ describe('handleToolCall', () => {
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
-      expect(text).toContain("'blast'");
+      expect(text).toContain('"blast"');
     });
   });
 
@@ -405,7 +405,7 @@ describe('handleToolCall', () => {
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
       expect(text).toContain('filter');
-      expect(text).toContain("'circle'");
+      expect(text).toContain('"circle"');
     });
   });
 
@@ -463,7 +463,7 @@ describe('handleToolCall', () => {
 
       expect(result.isError).toBeFalsy();
       const text = (result.content[0] as { type: string; text: string }).text;
-      expect(text).toContain("app.setBackgroundColor('#0f172a')");
+      expect(text).toContain('app.setBackgroundColor("#0f172a")');
     });
   });
 

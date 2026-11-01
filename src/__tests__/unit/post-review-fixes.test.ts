@@ -287,7 +287,7 @@ describe('Mask codegen — FxTool symbol mismatches (1.5.5)', () => {
     });
     expect(code).not.toContain('app.maskSystem');
     expect(code).toContain('app.getItemById(targetId)');
-    expect(code).toContain("app.applyAnimatedMask(item, 'iris'");
+    expect(code).toContain('app.applyAnimatedMask(item, "iris"');
     expect(code).toContain('"duration":1.2');
   });
 
@@ -298,7 +298,7 @@ describe('Mask codegen — FxTool symbol mismatches (1.5.5)', () => {
       options: { duration: 0.8 },
     });
     expect(code).not.toContain('app.maskSystem');
-    expect(code).toContain("app.applyAnimatedMask(item, 'wipeLeft'");
+    expect(code).toContain('app.applyAnimatedMask(item, "wipeLeft"');
     expect(code).toContain('app.getItemById');
   });
 
@@ -320,7 +320,7 @@ describe('Mask codegen — FxTool symbol mismatches (1.5.5)', () => {
     } as any);
     expect(code).not.toContain('app.maskSystem');
     expect(code).toContain('app.maskingSystem.applyCustomMask(item,');
-    expect(code).toContain("'star'");
+    expect(code).toContain('"star"');
     expect(code).toContain('app.getItemById');
   });
 
@@ -365,7 +365,7 @@ describe('Other FxTool symbol mismatches (1.5.5)', () => {
       relations: [{ source: 'a', target: 'b', type: 'orbits' }],
     } as any);
     expect(code).not.toContain('app.relationManager');
-    expect(code).toMatch(/app\.addRelation\(\s*sourceId,\s*targetId,\s*'orbits'/);
+    expect(code).toMatch(/app\.addRelation\(\s*sourceId,\s*targetId,\s*"orbits"/);
   });
 
   it('selection codegen: uses app.getSelectedItems() (FxTool has no getSelection)', () => {
@@ -570,7 +570,7 @@ describe('pinepaper_execute_generator — optional region (1.5.6)', () => {
       params: { bgColor: '#0b0f1a' },
     });
     // No region → options is {} but still positionally present.
-    expect(code).toMatch(/app\.executeGenerator\('drawBokeh',\s*\{[^}]*"bgColor":\s*"#0b0f1a"[^}]*\},\s*\{\}\)/);
+    expect(code).toMatch(/app\.executeGenerator\("drawBokeh",\s*\{[^}]*"bgColor":\s*"#0b0f1a"[^}]*\},\s*\{\}\)/);
   });
 
   it('codegen routes region into options.region (FxTool reads it from arg #3)', () => {
@@ -579,7 +579,7 @@ describe('pinepaper_execute_generator — optional region (1.5.6)', () => {
       params: {},
       region: { x: 100, y: 200, width: 400, height: 300 },
     });
-    expect(code).toMatch(/app\.executeGenerator\('drawBokeh',\s*\{\},\s*\{"region":\{"x":100,"y":200,"width":400,"height":300\}\}\)/);
+    expect(code).toMatch(/app\.executeGenerator\("drawBokeh",\s*\{\},\s*\{"region":\{"x":100,"y":200,"width":400,"height":300\}\}\)/);
   });
 
   it('codegen surfaces region in the return payload for agent feedback', () => {
@@ -616,6 +616,6 @@ describe('pinepaper_execute_generator — optional region (1.5.6)', () => {
         generatorRegion: { x: 50, y: 50, width: 300, height: 150 },
       }],
     });
-    expect(code).toMatch(/app\.executeGenerator\('drawWaves',\s*\{\},\s*\{"region":\{"x":50,"y":50,"width":300,"height":150\}\}\)/);
+    expect(code).toMatch(/app\.executeGenerator\("drawWaves",\s*\{\},\s*\{"region":\{"x":50,"y":50,"width":300,"height":150\}\}\)/);
   });
 });

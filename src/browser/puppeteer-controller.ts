@@ -9,6 +9,7 @@ import type { Browser, Page } from 'puppeteer';
 import { mcpLog } from '../utils/mcp-log.js';
 import { LAZY_HEAVY_SUBSYSTEMS, LAZY_HEAVY_CLASSES, ENGINE_SURFACE } from '../tools/engine-surface.js';
 import { env } from '../utils/env.js';
+import { jsLiteral } from '../utils/js-literal.js';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
@@ -1503,8 +1504,8 @@ ${codes.map((code, i) => `
     const code = `
 (function() {
   if (app.setCanvasSize) {
-    app.setCanvasSize('${preset}');
-    return { success: true, preset: '${preset}' };
+    app.setCanvasSize(${jsLiteral(preset)});
+    return { success: true, preset: ${jsLiteral(preset)} };
   }
   return { success: false, error: 'setCanvasSize not available' };
 })();

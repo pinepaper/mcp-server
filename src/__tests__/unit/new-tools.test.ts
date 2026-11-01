@@ -583,7 +583,7 @@ describe('Dynamic content code generation', () => {
       properties: { content: '00:00', contentType: 'clock' },
     });
     expect(code).toContain('app.setDynamicContent');
-    expect(code).toContain("'clock'");
+    expect(code).toContain('"clock"');
   });
 
   it('create_item without contentType skips setDynamicContent', () => {
@@ -599,7 +599,7 @@ describe('Dynamic content code generation', () => {
       itemId: 'item_1', properties: { contentType: 'timer' },
     });
     expect(code).toContain('app.setDynamicContent');
-    expect(code).toContain("'timer'");
+    expect(code).toContain('"timer"');
   });
 
   it('modify_item with contentType null generates removeDynamicContent', () => {
@@ -665,7 +665,7 @@ describe('Deform code generation', () => {
   it('apply generates deformPresets.apply call', () => {
     const code = codeGenerator.generateDeform({ action: 'apply', itemId: 'item_1', preset: 'ripple', amplitude: 0.5, phase: 'elastic' });
     expect(code).toContain("app.deformPresets.apply");
-    expect(code).toContain("'ripple'");
+    expect(code).toContain('"ripple"');
     expect(code).toContain('"amplitude":0.5');
     expect(code).toContain('"phase":"elastic"');
   });
@@ -673,7 +673,7 @@ describe('Deform code generation', () => {
   it('trigger generates deformPresets.trigger call', () => {
     const code = codeGenerator.generateDeform({ action: 'trigger', itemId: 'item_1', preset: 'squeeze' });
     expect(code).toContain('app.deformPresets.trigger');
-    expect(code).toContain("'squeeze'");
+    expect(code).toContain('"squeeze"');
   });
 
   it('remove generates deformPresets.remove call', () => {
@@ -766,7 +766,7 @@ describe('Sprite sheet code generation', () => {
     const code = codeGenerator.generateSpriteSheet({ action: 'export', spriteSheetId: 'sheet_1', format: 'webp' });
     expect(code).toContain('app.exportSpriteSheet');
     expect(code).not.toContain('app.spriteSheetSystem');
-    expect(code).toContain("'webp'");
+    expect(code).toContain('"webp"');
   });
 });
 
@@ -803,7 +803,7 @@ describe('Interaction code generation', () => {
   it('add_behavior generates addContinuousBehavior call', () => {
     const code = codeGenerator.generateInteraction({ action: 'add_behavior', itemId: 'item_1', behaviorType: 'orbit', params: { radius: 50 } });
     expect(code).toContain('app.interactionSystem.addContinuousBehavior');
-    expect(code).toContain("'orbit'");
+    expect(code).toContain('"orbit"');
   });
 
   it('remove_behavior generates removeContinuousBehavior call', () => {
@@ -816,7 +816,7 @@ describe('Interaction code generation', () => {
     const code = codeGenerator.generateInteraction({ action: 'trigger_action', actionType: 'incrementScore', params: { points: 10 } });
     // triggerAction has never existed on InteractionSystem; executeAction has.
     expect(code).toContain('app.interactionSystem.executeAction');
-    expect(code).toContain("'incrementScore'");
+    expect(code).toContain('"incrementScore"');
   });
 
   it('get_state returns interaction state', () => {

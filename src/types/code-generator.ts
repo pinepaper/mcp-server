@@ -13,6 +13,11 @@ import { REQUIRED_ENGINE_METHODS, OPTIONAL_ENGINE_METHODS } from '../tools/engin
 import { NORMALIZE_PARAM_READS, MODIFY_CHANGE_READS } from '../tools/shape-params.js';
 import { CREATE_KNOWN_KEYS } from '../tools/create-known-keys.js';
 import { jsLiteral } from '../utils/js-literal.js';
+
+/** A value spliced into a generated `//` comment, on one line: a line break in caller text would end the comment and run the rest as code. */
+function oneLine(v: unknown): string {
+  return String(v).replace(/[\r\n\u2028\u2029]+/g, ' ');
+}
 import { generateP5DrawCode } from '../tools/p5-compat/p5-helpers.js';
 import { expandBatchMacros } from '../tools/batch-macros.js';
 import {
@@ -284,7 +289,7 @@ function generateGradientCode(
   propertyName: 'fillColor' | 'strokeColor' = 'fillColor'
 ): string {
   const { type, stops, origin, destination } = gradient;
-  const stopsCode = stops.map(s => `['${s.color}', ${s.offset}]`).join(', ');
+  const stopsCode = stops.map(s => `[${jsLiteral(s.color)}, ${s.offset}]`).join(', ');
 
   if (type === 'radial') {
     // A RADIAL CORE BELONGS ON THE ITEM, NOT ON THE NUMBER ASKED FOR (17
@@ -342,7 +347,7 @@ function generateShadowCode(
   const lines: string[] = [];
 
   if (shadowColor) {
-    lines.push(`${itemVarName}.shadowColor = '${shadowColor}';`);
+    lines.push(`${itemVarName}.shadowColor = ${jsLiteral(shadowColor)};`);
   }
   if (shadowBlur !== undefined) {
     lines.push(`${itemVarName}.shadowBlur = ${shadowBlur};`);
@@ -358,7 +363,7 @@ function generateShadowCode(
  * Generate blend mode code for an item
  */
 function generateBlendModeCode(itemVarName: string, blendMode: string): string {
-  return `${itemVarName}.blendMode = '${blendMode}';`;
+  return `${itemVarName}.blendMode = ${jsLiteral(blendMode)};`;
 }
 
 // =============================================================================
@@ -382,7 +387,7 @@ function generateCreateItemCode(
   // break those later calls: refused here, by name, before anything is made.
   if (typeof properties.id === 'string' && UNSAFE_ID_CHARS.test(properties.id)) {
     return `
-// Create ${itemType} — refused: an id later calls could not address
+// Create ${oneLine(itemType)} — refused: an id later calls could not address
 ({ success: false, error: ${jsLiteral(`properties.id ${JSON.stringify(properties.id)} has a quote, backslash or line break, so later calls could not address the item. Nothing was made. Use letters, digits, spaces, - and _ (e.g. "bobs-hat").`)} });`.trim();
   }
   // Colour objects are gradient specs: normalised, or refused by name.
@@ -392,7 +397,7 @@ function generateCreateItemCode(
       const g = normalizeGradientSpec(v, key);
       if ('error' in g) {
         return `
-// Create ${itemType} — refused: an unreadable gradient would draw nothing
+// Create ${oneLine(itemType)} — refused: an unreadable gradient would draw nothing
 ({ success: false, error: ${JSON.stringify(g.error)} });`.trim();
       }
       properties = { ...properties, [key]: g.gradient };
@@ -519,7 +524,7 @@ function generateCreateItemCode(
     if (params.id) plate.id = params.id;
     if (params.opacity != null) plate.opacity = params.opacity;
     return `
-// ${itemType} — a render-time surface: a plate tagged with what to draw over it.
+// ${oneLine(itemType)} — a render-time surface: a plate tagged with what to draw over it.
 const item = app.create('rectangle', ${JSON.stringify(plate, null, 2)});
 if (item && item.data) { item.data.renderAs = ${JSON.stringify(itemType)}; item.data.renderParams = ${JSON.stringify(params)}; }
 // The snippet's value is its last statement's, which was the assignment above:
@@ -529,7 +534,7 @@ if (item && item.data) { item.data.renderAs = ${JSON.stringify(itemType)}; item.
 // and its value is lost.
 ((item && item.data)
   ? { itemId: item.data.registryId, type: ${JSON.stringify(itemType)}, position: { x: ${position.x}, y: ${position.y} } }
-  : { success: false, error: 'the plate for this ${itemType} was not created.' });`;
+  : { success: false, error: 'the plate for this ' + ${jsLiteral(itemType)} + ' was not created.' });`;
   }
 
   // AN UNKNOWN ANCHOR IS INVISIBLE OVER MCP.
@@ -545,7 +550,7 @@ if (item && item.data) { item.data.renderAs = ${JSON.stringify(itemType)}; item.
     const normalized = String(anchorGiven).toLowerCase().replace(/[\s_]+/g, '-');
     if (!ANCHORS.includes(normalized)) {
       return `
-// Create ${itemType} — refused, rather than silently centred
+// Create ${oneLine(itemType)} — refused, rather than silently centred
 ({ success: false, error: ${JSON.stringify(
         `anchor ${JSON.stringify(String(anchorGiven))} is not one of ${ANCHORS.slice(0, 5).join(', ')}. `
         + 'The engine would leave x/y as the CENTRE and say so only in a console this tool cannot read, '
@@ -579,8 +584,8 @@ if (item && item.data) { item.data.renderAs = ${JSON.stringify(itemType)}; item.
 
   // Build the code
   let code = `
-// Create ${itemType} item
-const item = app.create('${itemType}', ${JSON.stringify(params, null, 2)});`;
+// Create ${oneLine(itemType)} item
+const item = app.create(${jsLiteral(itemType)}, ${JSON.stringify(params, null, 2)});`;
 
   // Add gradient support for colors
   if (color && isGradient(color)) {
@@ -663,7 +668,7 @@ const item = app.create('${itemType}', ${JSON.stringify(params, null, 2)});`;
     if (contentFormat) opts.format = contentFormat;
     if (countdownTarget !== undefined) opts.countdownTarget = countdownTarget;
     if (countdownEndText) opts.countdownEndText = countdownEndText;
-    code += `\nif (app.setDynamicContent) app.setDynamicContent(item, '${contentType}', ${JSON.stringify(opts)});`;
+    code += `\nif (app.setDynamicContent) app.setDynamicContent(item, ${jsLiteral(contentType)}, ${JSON.stringify(opts)});`;
   }
 
   const loadsFont = itemType === 'text' && typeof properties.fontFamily === 'string' && properties.fontFamily.trim() !== '';
@@ -687,7 +692,7 @@ const itemId = item.data.registryId;
 app.historyManager.saveState();
 
 // Return item info
-({ itemId, type: '${itemType}'${outlineOnly ? `, fill: ${JSON.stringify(OUTLINE_NOTE)}` : ''}${textFit ? ', textFit: __textFit' : ''}${textDirection ? ', direction: __direction' : ''}${textTabular ? ', tabularFigures: __tabular' : ''}${createFillOpacity ? ', fillOpacity: __fillOpacity' : ''}${textStrokePos ? ', strokePosition: __strokePos' : ''}, position: ${reportActualPosition ? `(item.position ? { x: item.position.x, y: item.position.y } : null)` : `{ x: ${position.x}, y: ${position.y} }`}${hasLifetime ? ', lifetime: __lifetime' : ''}${loadsFont ? ', ...(__font ? { font: __font } : {})' : ''}${ignored.length > 0
+({ itemId, type: ${jsLiteral(itemType)}${outlineOnly ? `, fill: ${JSON.stringify(OUTLINE_NOTE)}` : ''}${textFit ? ', textFit: __textFit' : ''}${textDirection ? ', direction: __direction' : ''}${textTabular ? ', tabularFigures: __tabular' : ''}${createFillOpacity ? ', fillOpacity: __fillOpacity' : ''}${textStrokePos ? ', strokePosition: __strokePos' : ''}, position: ${reportActualPosition ? `(item.position ? { x: item.position.x, y: item.position.y } : null)` : `{ x: ${position.x}, y: ${position.y} }`}${hasLifetime ? ', lifetime: __lifetime' : ''}${loadsFont ? ', ...(__font ? { font: __font } : {})' : ''}${ignored.length > 0
     ? `, ignoredProperties: ${JSON.stringify(ignored)}` : ''}${warnings.length > 0 ? `, warning: ${JSON.stringify(warnings.join(' '))}` : ''} });`;
 
   // Loading a font is async, and it has to happen BEFORE create() measures the
@@ -1259,7 +1264,7 @@ if (entry && entry.item && app.removeDynamicContent) app.removeDynamicContent(en
       if (countdownEndText) opts.countdownEndText = countdownEndText;
       code += `
 const entry = app.itemRegistry.get(${ID});
-if (entry && entry.item && app.setDynamicContent) app.setDynamicContent(entry.item, '${contentType}', ${jsLiteral(opts)});`;
+if (entry && entry.item && app.setDynamicContent) app.setDynamicContent(entry.item, ${jsLiteral(contentType)}, ${jsLiteral(opts)});`;
     }
   }
 
@@ -1517,23 +1522,23 @@ function generateAddRelationCode(
   // an item, the camera, a cursor target — is asked first here, after the same
   // '#id' forgiveness the engine applies.
   return `
-// Add ${relationType} relation: ${sourceId} -> ${targetId}
+// Add ${oneLine(relationType)} relation: ${oneLine(sourceId)} -> ${oneLine(targetId)}
 (function() {
   const norm = function(id) { return typeof app._resolveRelationEndpoint === 'function' ? app._resolveRelationEndpoint(id) : id; };
   if (typeof app._isKnownRelationEndpoint === 'function') {
     const bad = [${JSON.stringify(sourceId)}, ${JSON.stringify(targetId)}].filter(function(id) { return !app._isKnownRelationEndpoint(norm(id)); });
     if (bad.length) {
-      return { success: false, relationType: '${relationType}', error: bad.map(function(id) { return JSON.stringify(id); }).join(' and ')
+      return { success: false, relationType: ${jsLiteral(relationType)}, error: bad.map(function(id) { return JSON.stringify(id); }).join(' and ')
         + ' ' + (bad.length > 1 ? 'are not items' : 'is not an item') + ' on the canvas, so the relation would be stored and skipped every frame. Check the id (pinepaper_get_items lists them).' };
     }
   }
-  const success = app.addRelation('${sourceId}', '${targetId}', '${relationType}', ${JSON.stringify(params, null, 2)});
+  const success = app.addRelation(${jsLiteral(sourceId)}, ${jsLiteral(targetId)}, ${jsLiteral(relationType)}, ${JSON.stringify(params, null, 2)});
   if (!success) {
     const __why = ${relationRefusalReasonJs(jsLiteral(relationType))};
-    return { success: false, relationType: '${relationType}', error: 'the studio refused the ${relationType} relation between ${sourceId} and ${targetId}' + (__why ? ': ' + __why : '.') };
+    return { success: false, relationType: ${jsLiteral(relationType)}, error: 'the studio refused the ' + ${jsLiteral(relationType)} + ' relation between ' + ${jsLiteral(sourceId)} + ' and ' + ${jsLiteral(targetId)} + (__why ? ': ' + __why : '.') };
   }
   app.historyManager.saveState();
-  return { success: true, sourceId: '${sourceId}', targetId: '${targetId}', relationType: '${relationType}' };
+  return { success: true, sourceId: ${jsLiteral(sourceId)}, targetId: ${jsLiteral(targetId)}, relationType: ${jsLiteral(relationType)} };
 })();
 `.trim();
 }
@@ -1682,7 +1687,7 @@ function generateMovesAlongPathCode(sourceId: string, targetId: string | undefin
   const hasDuration = typeof duration === 'number' && duration > 0;
   const hasDelay = typeof delay === 'number' && delay > 0;
   return `
-// moves_along_path: ${sourceId}${ref ? ` along ${ref}` : ''}
+// moves_along_path: ${oneLine(sourceId)}${ref ? ` along ${oneLine(ref)}` : ''}
 (function() {
   const params = ${JSON.stringify(params)};
   const hasPoints = Array.isArray(params.path) && params.path.length >= 2;
@@ -1798,14 +1803,14 @@ function generateRemoveRelationCode(
   targetId: string,
   relationType?: RelationType
 ): string {
-  const relationArg = relationType ? `'${relationType}'` : 'undefined';
+  const relationArg = relationType ? jsLiteral(relationType) : 'undefined';
   return `
-// Remove relation: ${sourceId} -> ${targetId}${relationType ? ` (${relationType})` : ''}
-app.removeRelation('${sourceId}', '${targetId}', ${relationArg});
+// Remove relation: ${oneLine(sourceId)} -> ${oneLine(targetId)}${relationType ? ` (${oneLine(relationType)})` : ''}
+app.removeRelation(${jsLiteral(sourceId)}, ${jsLiteral(targetId)}, ${relationArg});
 app.historyManager.saveState();
 
 // Return success
-({ success: true, sourceId: '${sourceId}', targetId: '${targetId}' });
+({ success: true, sourceId: ${jsLiteral(sourceId)}, targetId: ${jsLiteral(targetId)} });
 `.trim();
 }
 
@@ -1819,7 +1824,7 @@ function generateQueryRelationsCode(
 ): string {
   const ID = jsLiteral(itemId); // caller text: a quoted literal, never spliced raw
   if (direction === 'outgoing') {
-    const typeArg = relationType ? `'${relationType}'` : 'undefined';
+    const typeArg = relationType ? jsLiteral(relationType) : 'undefined';
     return `
 // Query outgoing relations for ${ID}
 const relations = app.getRelations(${ID}, ${typeArg});
@@ -1839,7 +1844,7 @@ const formatted = relations.map(r => ({
 ({ relations: formatted });
 `.trim();
   } else {
-    const typeArg = relationType ? `'${relationType}'` : 'undefined';
+    const typeArg = relationType ? jsLiteral(relationType) : 'undefined';
     return `
 // Query incoming relations for ${ID}
 const results = app.queryByRelationTarget(${ID}, ${typeArg});
@@ -1851,7 +1856,7 @@ const relations = results.map(r => ({
   // queryByTarget returns the real relation name on each result. Hardcoding
   // the filter string labelled every edge 'unknown' on an unfiltered query —
   // which is exactly the query you make when exploring an unfamiliar graph.
-  relationType: r.relation || ${relationType ? `'${relationType}'` : "'unknown'"},
+  relationType: r.relation || ${relationType ? jsLiteral(relationType) : "'unknown'"},
   params: r.params || {}
 }));
 
@@ -1875,13 +1880,13 @@ function generateAnimateCode(
     (intensity !== undefined ? `,\n  animationIntensity: ${intensity}` : '') +
     (delay !== undefined ? `,\n  animationDelay: ${delay}` : '');
   return `
-// Apply ${animationType} animation to ${ID}
+// Apply ${oneLine(animationType)} animation to ${ID}
 const item = app.getItemById(${ID});
 if (!item) {
   throw new Error('Item not found: ' + ${ID});
 }
 app.animate(item, {
-  animationType: '${animationType}',
+  animationType: ${jsLiteral(animationType)},
   animationSpeed: ${speed}${extra}
 });
 
@@ -1900,7 +1905,7 @@ app.animate(item, {
       known: r.known,
     };
   }
-  return { success: true, itemId: ${ID}, animationType: '${animationType}' };
+  return { success: true, itemId: ${ID}, animationType: ${jsLiteral(animationType)} };
 })();
 `.trim();
 }
@@ -2167,7 +2172,7 @@ function generateExecuteGeneratorCode(
     ? ` in region ${region.width}×${region.height} @ (${region.x},${region.y})`
     : ` in the shape of ${(region.shape as { itemId: string }).itemId}`;
   return `
-// Execute ${generatorName} generator${where}
+// Execute ${oneLine(generatorName)} generator${oneLine(where)}
 (async function() {${emitGeneratorRun(generatorName, JSON.stringify(params, null, 2), region)}
 })();
 `.trim();
@@ -2195,9 +2200,9 @@ function emitGeneratorRun(generatorName: string, paramsJson: string, region?: Ge
     if (!__si) return { success: false, error: ${JSON.stringify(`region.shape names no item "${itemId}" — nothing was drawn. List items with pinepaper_get_items.`)} };
     if (__si.className !== 'Path' && __si.className !== 'CompoundPath') return { success: false, error: ${JSON.stringify(`region.shape item "${itemId}" is a `)} + __si.className + ', and a clip needs a path (a shape, not text, a group or an image) — nothing was drawn.' };
   }` : ''}
-  await app.executeGenerator('${generatorName}', ${paramsJson}, ${options});${shaped ? `
+  await app.executeGenerator(${jsLiteral(generatorName)}, ${paramsJson}, ${options});${shaped ? `
   const __shapes = !!(app.generatorRegistry && typeof app.generatorRegistry._regionClipPath === 'function');` : ''}
-  return { success: true, generator: '${generatorName}'${region ? `, region: ${JSON.stringify(region)}` : ''}${shaped ? `, ...(__shapes ? {} : { regionShapeApplied: false, warning: ${JSON.stringify(`this studio does not clip generator regions to a shape, so ${typeof region!.shape === 'object' ? 'the region had no box and the generator drew across the whole canvas' : `the ${region!.shape} was drawn as a rectangle`}. It needs an engine with region shapes.`)} })` : ''} };`;
+  return { success: true, generator: ${jsLiteral(generatorName)}${region ? `, region: ${JSON.stringify(region)}` : ''}${shaped ? `, ...(__shapes ? {} : { regionShapeApplied: false, warning: ${JSON.stringify(`this studio does not clip generator regions to a shape, so ${typeof region!.shape === 'object' ? 'the region had no box and the generator drew across the whole canvas' : `the ${region!.shape} was drawn as a rectangle`}. It needs an engine with region shapes.`)} })` : ''} };`;
 }
 
 /**
@@ -2210,14 +2215,14 @@ function generateApplyEffectCode(
 ): string {
   const ID = jsLiteral(itemId); // caller text: a quoted literal, never spliced raw
   return `
-// Apply ${effectType} effect to ${ID}
+// Apply ${oneLine(effectType)} effect to ${ID}
 const item = app.getItemById(${ID});
 if (!item) {
   throw new Error('Item not found: ' + ${ID});
 }
-app.applyEffect(item, '${effectType}', ${JSON.stringify(params, null, 2)});
+app.applyEffect(item, ${jsLiteral(effectType)}, ${JSON.stringify(params, null, 2)});
 
-({ success: true, itemId: ${ID}, effectType: '${effectType}' });
+({ success: true, itemId: ${ID}, effectType: ${jsLiteral(effectType)} });
 `.trim();
 }
 
@@ -2272,8 +2277,8 @@ function generateGetItemsCode(filter?: {
   // a wrong answer — the whole call dies before it runs. Decide on the
   // conditions, not on the keys.
   const conditions: string[] = [];
-  if (filter?.type) conditions.push(`entry.type === '${filter.type}'`);
-  if (filter?.source) conditions.push(`entry.source === '${filter.source}'`);
+  if (filter?.type) conditions.push(`entry.type === ${jsLiteral(filter.type)}`);
+  if (filter?.source) conditions.push(`entry.source === ${jsLiteral(filter.source)}`);
   if (filter?.hasAnimation !== undefined) {
     // 'none' is what the engine stores on a still item, and !!'none' is true
     // (gate H5): animated means a real loop animation OR keyframes.
@@ -2499,8 +2504,8 @@ app.setPlaybackTime(${time || 0});
 function generateSetBackgroundColorCode(color: string): string {
   return `
 // Set background color
-app.setBackgroundColor('${color}');
-({ success: true, color: '${color}' });
+app.setBackgroundColor(${jsLiteral(color)});
+({ success: true, color: ${jsLiteral(color)} });
 `.trim();
 }
 
@@ -3038,7 +3043,7 @@ ${body}
   } catch (e) { errors.push({ index: ${i}, error: (e && e.message) || String(e) }); }`;
   });
   return `
-// Batch create ${items.length} items — create_item for each, one history save
+// Batch create ${oneLine(items.length)} items — create_item for each, one history save
 (async function() {
   const results = [];
   const errors = [];
@@ -3072,7 +3077,7 @@ function generateBatchModifyCode(modifications: BatchModifyItem[]): string {
   } catch (e) { skipped.push({ itemId: ${JSON.stringify(m.itemId)}, reason: (e && e.message) || String(e) }); }`;
   });
   return `
-// Batch modify ${modifications.length} items — modify_item for each, one history save
+// Batch modify ${oneLine(modifications.length)} items — modify_item for each, one history save
 (async function() {
   let count = 0;
   const skipped = [];
@@ -3103,11 +3108,11 @@ function generateCreateGridCode(
   waveAmplitude: number
 ): string {
   return `
-// Create grid with ${cols} columns and ${rows} rows
+// Create grid with ${oneLine(cols)} columns and ${oneLine(rows)} rows
 const grid = app.createGrid({
   cols: ${cols},
   rows: ${rows},
-  strokeColor: '${strokeColor}',
+  strokeColor: ${jsLiteral(strokeColor)},
   strokeWidth: ${strokeWidth},
   animated: ${animated},
   waveSpeed: ${waveSpeed},
@@ -3512,7 +3517,7 @@ export class PinePaperCodeGenerator {
     // than read as a single string, which would render "[object Object]".
     if (validated.presetId) {
       return `
-// Adopt relation preset "${validated.presetId}" on ${validated.sourceId}
+// Adopt relation preset ${jsLiteral(validated.presetId)} on ${jsLiteral(validated.sourceId)}
 (async function() {
   if (typeof app.applyRelationPreset !== 'function') { return { success: false, error: 'app.applyRelationPreset unavailable — update FxTool' }; }
   const r = await app.applyRelationPreset(${JSON.stringify(validated.sourceId)}, ${JSON.stringify(validated.presetId)}, ${JSON.stringify(validated.presetValues ?? {})});
@@ -3548,8 +3553,8 @@ export class PinePaperCodeGenerator {
     // "item_2 → item_2" — a model reads that as the event wired to itself.
     if (validated.targetId) return code;
     return code
-      .replace(`return { success: true, sourceId: '${validated.sourceId}', targetId: '${validated.sourceId}',`,
-        `return { success: true, sourceId: '${validated.sourceId}', targetId: null,`)
+      .replace(`return { success: true, sourceId: ${jsLiteral(validated.sourceId)}, targetId: ${jsLiteral(validated.sourceId)},`,
+        `return { success: true, sourceId: ${jsLiteral(validated.sourceId)}, targetId: null,`)
       .replace(`relation between ${validated.sourceId} and ${validated.sourceId}.`, `relation on ${validated.sourceId} (no target).`);
   }
 
@@ -3784,7 +3789,7 @@ ${asReturningBody(code)}
 
     if (url) {
       return `
-// Import SVG from URL${source === 'figma' ? ' (Figma-normalised)' : ''}
+// Import SVG from URL${oneLine(source === 'figma' ? ' (Figma-normalised)' : '')}
 // WRAPPED, because these were bare top-level statements with an await. That
 // parses under the governor, which builds an AsyncFunction, and is a SYNTAX
 // ERROR on the eval fallback — so importing an SVG by URL never ran at all on
@@ -3793,12 +3798,12 @@ ${asReturningBody(code)}
 (async function() {
   let response;
   try {
-    response = await fetch('${url}');
+    response = await fetch(${jsLiteral(url)});
   } catch (netErr) {
-    return { success: false, error: 'could not reach ${url} — ' + ((netErr && netErr.message) || 'network request failed') };
+    return { success: false, error: 'could not reach ' + ${jsLiteral(url)} + ' — ' + ((netErr && netErr.message) || 'network request failed') };
   }
   if (!response.ok) {
-    return { success: false, error: 'the server refused ${url} — HTTP ' + response.status + ' ' + (response.statusText || ''), status: response.status };
+    return { success: false, error: 'the server refused ' + ${jsLiteral(url)} + ' — HTTP ' + response.status + ' ' + (response.statusText || ''), status: response.status };
   }
   let svgText = await response.text();
 ${INLINE_REMOTE_IMAGES}
@@ -3807,7 +3812,7 @@ ${INLINE_REMOTE_IMAGES}
   const _r = ${importExpr('svgText')};
   const imported = _r.item;
   if (!imported) {
-    return { success: false, error: 'the response from ${url} did not parse as SVG. Check the URL serves the file itself rather than a page around it.' };
+    return { success: false, error: 'the response from ' + ${jsLiteral(url)} + ' did not parse as SVG. Check the URL serves the file itself rather than a page around it.' };
   }
   imported.position = new paper.Point(${position.x}, ${position.y});
   imported.scale(${scale});
@@ -3832,7 +3837,7 @@ ${INLINE_REMOTE_IMAGES}
       // Escape the SVG string for embedding in code
       const escapedSvg = svgString.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
       return `
-// Import SVG string${source === 'figma' ? ' (Figma-normalised)' : ''}
+// Import SVG string${oneLine(source === 'figma' ? ' (Figma-normalised)' : '')}
 (async function() {
 let svgString = \`${escapedSvg}\`;
 ${INLINE_REMOTE_IMAGES}
@@ -4027,9 +4032,9 @@ throw new Error('Either svgString or url must be provided');
     params: Record<string, unknown> = {}
   ): string {
     return `
-// Add ${filterType} filter
-const filterId = app.filterSystem.addFilter('${filterType}', ${JSON.stringify(params, null, 2)});
-({ success: true, filterId, filterType: '${filterType}' });
+// Add ${oneLine(filterType)} filter
+const filterId = app.filterSystem.addFilter(${jsLiteral(filterType)}, ${JSON.stringify(params, null, 2)});
+({ success: true, filterId, filterType: ${jsLiteral(filterType)} });
 `.trim();
   }
 
@@ -4063,7 +4068,7 @@ const filterId = app.filterSystem.addFilter('${filterType}', ${JSON.stringify(pa
     return `
 // Create glossy 3D sphere effect
 const sphereGroup = new paper.Group({ parent: app.textItemGroup });
-const baseColor = new paper.Color('${baseColor}');
+const baseColor = new paper.Color(${jsLiteral(baseColor)});
 
 ${castShadow ? `// Shadow underneath
 const shadow = new paper.Path.Ellipse({
@@ -4270,7 +4275,7 @@ paper.project.activeLayer.children.forEach(c => {
 const bg = new paper.Path.Rectangle({
   point: [0, 0],
   size: [paper.view.size.width, paper.view.size.height],
-  fillColor: '${backgroundColor}',
+  fillColor: ${jsLiteral(backgroundColor)},
   name: 'background'
 });
 bg.sendToBack();
@@ -4281,7 +4286,7 @@ bg.sendToBack();
     if (backgroundGenerator) {
       codeParts.push(`
 // Execute background generator
-const _gen = app.generatorRegistry?.get('${backgroundGenerator}');
+const _gen = app.generatorRegistry?.get(${jsLiteral(backgroundGenerator)});
 if (typeof _gen === 'function') {
   _gen();
 } else if (_gen && typeof _gen.generate === 'function') {
@@ -4316,20 +4321,20 @@ if (typeof _gen === 'function') {
       };
 
       codeParts.push(`
-// Create item: ${name}
+// Create item: ${oneLine(name)}
 (function() {
-  const item = app.create('${itemType}', ${JSON.stringify(sceneParams)});
+  const item = app.create(${jsLiteral(itemType)}, ${JSON.stringify(sceneParams)});
   if (!item) {
-    results.items.push({ name: '${name}', error: 'app.create returned nothing for type ${itemType} — check the type and its properties.' });
+    results.items.push({ name: ${jsLiteral(name)}, error: 'app.create returned nothing for type ' + ${jsLiteral(itemType)} + ' — check the type and its properties.' });
     return;
   }
   // create() registers and mints the id; only fall back for an older studio.
   const itemId = (item.data && item.data.id)
     ? item.data.id
-    : app.registerItem(item, '${itemType}', { source: 'mcp-scene' });
+    : app.registerItem(item, ${jsLiteral(itemType)}, { source: 'mcp-scene' });
   if (item.bringToFront) item.bringToFront();
-  nameToId['${name}'] = itemId;
-  results.items.push({ name: '${name}', itemId, type: '${itemType}' });
+  nameToId[${jsLiteral(name)}] = itemId;
+  results.items.push({ name: ${jsLiteral(name)}, itemId, type: ${jsLiteral(itemType)} });
 })();`);
     }
 
@@ -4340,7 +4345,7 @@ if (typeof _gen === 'function') {
       const specProblem = relationSpecProblem(type, params);
       if (specProblem) {
         codeParts.push(`
-// Refused relation: ${source} ${type} ${target}
+// Refused relation: ${oneLine(source)} ${oneLine(type)} ${oneLine(target)}
 (results.relationsRefused = results.relationsRefused || []).push(${JSON.stringify({ source, target, type, reason: specProblem })});
 results.success = false;
 results.error = 'refused ' + results.relationsRefused.length + ' relation(s): ' + results.relationsRefused.map(function(r) { return r.type + ' ' + r.source + ' -> ' + r.target + ' (' + r.reason + ')'; }).join('; ') + '. The items were created.';`);
@@ -4348,18 +4353,18 @@ results.error = 'refused ' + results.relationsRefused.length + ' relation(s): ' 
       }
 
       codeParts.push(`
-// Add relation: ${source} ${type} ${target}
+// Add relation: ${oneLine(source)} ${oneLine(type)} ${oneLine(target)}
 (function() {
-  const sourceId = nameToId['${source}'];
-  const targetId = nameToId['${target}'];
+  const sourceId = nameToId[${jsLiteral(source)}];
+  const targetId = nameToId[${jsLiteral(target)}];
   if (sourceId && targetId) {
     const params = ${paramsStr};
     // A refused relation is not listed as made (owner rule 1).
-    if (app.addRelation(sourceId, targetId, '${type}', params)) {
-      results.relations.push({ source: '${source}', target: '${target}', type: '${type}' });
+    if (app.addRelation(sourceId, targetId, ${jsLiteral(type)}, params)) {
+      results.relations.push({ source: ${jsLiteral(source)}, target: ${jsLiteral(target)}, type: ${jsLiteral(type)} });
     } else {
       const __why = ${relationRefusalReasonJs(jsLiteral(type))};
-      (results.relationsRefused = results.relationsRefused || []).push({ source: '${source}', target: '${target}', type: '${type}', reason: __why || 'the studio refused it' });
+      (results.relationsRefused = results.relationsRefused || []).push({ source: ${jsLiteral(source)}, target: ${jsLiteral(target)}, type: ${jsLiteral(type)}, reason: __why || 'the studio refused it' });
       results.success = false;
       results.error = 'the studio refused ' + results.relationsRefused.length + ' relation(s): ' + results.relationsRefused.map(function(r) { return r.type + ' ' + r.source + ' -> ' + r.target + ' (' + r.reason + ')'; }).join('; ') + '. The items were created.';
     }
@@ -4378,9 +4383,9 @@ results.error = 'refused ' + results.relationsRefused.length + ' relation(s): ' 
       });
 
       codeParts.push(`
-// Apply animation: ${type} to ${target}
+// Apply animation: ${oneLine(type)} to ${oneLine(target)}
 (function() {
-  const targetId = nameToId['${target}'];
+  const targetId = nameToId[${jsLiteral(target)}];
   if (targetId) {
     const targetItem = app.itemRegistry.get(targetId);
     if (targetItem) {
@@ -4390,8 +4395,8 @@ results.error = 'refused ' + results.relationsRefused.length + ' relation(s): ' 
       // loops with no end, so there is no duration to map and none is invented
       // — staggering the STARTS is what makes a scene read as choreographed
       // rather than everything moving at once from frame zero.
-      app.animate(targetItem, { animationType: '${type}', ...params });
-      results.animations.push({ target: '${target}', type: '${type}'${startTime !== undefined ? `, startTime: ${startTime}` : ''} });
+      app.animate(targetItem, { animationType: ${jsLiteral(type)}, ...params });
+      results.animations.push({ target: ${jsLiteral(target)}, type: ${jsLiteral(type)}${startTime !== undefined ? `, startTime: ${startTime}` : ''} });
     }
   }
 })();
@@ -4431,7 +4436,7 @@ return results;
     const labelStr = label ? JSON.stringify(label) : 'null';
 
     return `
-// Create diagram shape: ${shapeType}
+// Create diagram shape: ${oneLine(shapeType)}
 // POSITIONAL: createShape(shapeType, config). The type was being passed
 // INSIDE the config object, where nothing reads it.
 const shapeConfig = {
@@ -4442,12 +4447,12 @@ const shapeConfig = {
   style: ${styleStr}
 };
 
-const shape = app.diagramSystem.createShape('${shapeType}', shapeConfig);
-if (!shape) throw new Error('createShape returned nothing for shapeType "${shapeType}" — call pinepaper_get_diagram_shapes for the registered types.');
+const shape = app.diagramSystem.createShape(${jsLiteral(shapeType)}, shapeConfig);
+if (!shape) throw new Error('createShape returned nothing for shapeType ' + ${jsLiteral(shapeType)} + ' — call pinepaper_get_diagram_shapes for the registered types.');
 const itemId = shape.data?.registryId || shape.id;
 app.historyManager.saveState();
 
-({ itemId, shapeType: '${shapeType}', position: { x: ${position.x}, y: ${position.y} } });
+({ itemId, shapeType: ${jsLiteral(shapeType)}, position: { x: ${position.x}, y: ${position.y} } });
 `.trim();
   }
 
@@ -4494,12 +4499,12 @@ app.historyManager.saveState();
     if (label) config.label = label;
 
     return `
-// Connect items: ${sourceItemId} -> ${targetItemId}
-const sourceItem = app.getItemById('${sourceItemId}');
-const targetItem = app.getItemById('${targetItemId}');
+// Connect items: ${oneLine(sourceItemId)} -> ${oneLine(targetItemId)}
+const sourceItem = app.getItemById(${jsLiteral(sourceItemId)});
+const targetItem = app.getItemById(${jsLiteral(targetItemId)});
 
-if (!sourceItem) throw new Error('Source item not found: ${sourceItemId}');
-if (!targetItem) throw new Error('Target item not found: ${targetItemId}');
+if (!sourceItem) throw new Error('Source item not found: ' + ${jsLiteral(sourceItemId)});
+if (!targetItem) throw new Error('Target item not found: ' + ${jsLiteral(targetItemId)});
 
 const config = ${JSON.stringify(config, null, 2)};
 const connector = app.diagramSystem.connect(sourceItem, targetItem, config);
@@ -4517,8 +4522,8 @@ app.historyManager.saveState();
 // mismatch is REPORTED rather than left for a later call to trip over.
 ({
   connectorId,
-  sourceItemId: '${sourceItemId}',
-  targetItemId: '${targetItemId}',
+  sourceItemId: ${jsLiteral(sourceItemId)},
+  targetItemId: ${jsLiteral(targetItemId)},
   ...(${JSON.stringify(id ?? null)} && connectorId !== ${JSON.stringify(id ?? null)}
     ? { requestedId: ${JSON.stringify(id ?? null)},
         idHonoured: false,
@@ -4543,12 +4548,12 @@ app.historyManager.saveState();
     const configStr = merged ? JSON.stringify(merged, null, 2) : '{}';
 
     return `
-// Connect ports: ${sourceItemId}:${sourcePort} -> ${targetItemId}:${targetPort}
-const sourceItem = app.getItemById('${sourceItemId}');
-const targetItem = app.getItemById('${targetItemId}');
+// Connect ports: ${oneLine(sourceItemId)}:${oneLine(sourcePort)} -> ${oneLine(targetItemId)}:${oneLine(targetPort)}
+const sourceItem = app.getItemById(${jsLiteral(sourceItemId)});
+const targetItem = app.getItemById(${jsLiteral(targetItemId)});
 
-if (!sourceItem) throw new Error('Source item not found: ${sourceItemId}');
-if (!targetItem) throw new Error('Target item not found: ${targetItemId}');
+if (!sourceItem) throw new Error('Source item not found: ' + ${jsLiteral(sourceItemId)});
+if (!targetItem) throw new Error('Target item not found: ' + ${jsLiteral(targetItemId)});
 
 const config = ${configStr};
 // connectPorts(sourcePort, targetPort, config) takes PORT OBJECTS (gate C8,
@@ -4573,7 +4578,7 @@ if (!connector) { return { success: false, error: 'the diagram system did not cr
 const connectorId = connector.id || connector.data?.registryId;
 app.historyManager.saveState();
 
-({ connectorId, sourceItemId: '${sourceItemId}', sourcePort: '${sourcePort}', targetItemId: '${targetItemId}', targetPort: '${targetPort}' });
+({ connectorId, sourceItemId: ${jsLiteral(sourceItemId)}, sourcePort: ${jsLiteral(sourcePort)}, targetItemId: ${jsLiteral(targetItemId)}, targetPort: ${jsLiteral(targetPort)} });
 `.trim();
   }
 
@@ -4594,24 +4599,24 @@ app.historyManager.saveState();
       const named = [ports !== undefined && 'ports', count !== undefined && 'count'].filter(Boolean).join(' and ');
       throw new Error(
         `add_ports cannot honour ${named}: this engine lays out a whole port SET by type `
-        + `(portType '${portType}'), with no per-port placement or count. Drop ${named}, or place `
+        + `(portType ${jsLiteral(portType)}), with no per-port placement or count. Drop ${named}, or place `
         + 'individual connection points as items and join them with pinepaper_connect.',
       );
     }
 
     return `
-// Add ports to item: ${itemId}
-const item = app.getItemById('${itemId}');
-if (!item) throw new Error('Item not found: ${itemId}');
+// Add ports to item: ${oneLine(itemId)}
+const item = app.getItemById(${jsLiteral(itemId)});
+if (!item) throw new Error('Item not found: ' + ${jsLiteral(itemId)});
 
 // The second argument is a TYPE STRING, not a config object. Passing an
 // object made the engine iterate it as a list — "t.forEach is not a function".
-const result = app.diagramSystem.addPorts(item, '${portType}');
+const result = app.diagramSystem.addPorts(item, ${jsLiteral(portType)});
 app.historyManager.saveState();
 
 // addPorts returns the ports it made; older builds returned a count object.
 const _added = Array.isArray(result) ? result.length : (result?.portsAdded ?? 0);
-({ itemId: '${itemId}', portsAdded: _added, portType: '${portType}' });
+({ itemId: ${jsLiteral(itemId)}, portsAdded: _added, portType: ${jsLiteral(portType)} });
 `.trim();
   }
 
@@ -4626,7 +4631,7 @@ const _added = Array.isArray(result) ? result.length : (result?.portsAdded ?? 0)
     const optionsStr = options ? JSON.stringify(options, null, 2) : '{}';
 
     return `
-// Apply auto-layout: ${layoutType}
+// Apply auto-layout: ${oneLine(layoutType)}
 // Wrapped: applyLayout is async, and a bare top-level await only works on the
 // governed path. A paren-led IIFE also keeps the trailing-expression capture.
 (async function() {
@@ -4642,10 +4647,10 @@ const items = itemIds
   : (app.itemRegistry?.getAll?.() ?? []);
 if (!items.length) throw new Error('auto_layout found no items to lay out' + (itemIds ? ' for the given itemIds' : ' on the canvas'));
 
-await app.diagramSystem.applyLayout(items, '${layoutType}', options);
+await app.diagramSystem.applyLayout(items, ${jsLiteral(layoutType)}, options);
 app.historyManager.saveState();
 
-return { layoutType: '${layoutType}', itemsAffected: items.length, success: true };
+return { layoutType: ${jsLiteral(layoutType)}, itemsAffected: items.length, success: true };
 })();
 `.trim();
   }
@@ -4657,7 +4662,7 @@ return { layoutType: '${layoutType}', itemsAffected: items.length, success: true
     const validated = GetDiagramShapesInputSchema.parse(input);
     const { category } = validated;
 
-    const categoryFilter = category ? `'${category}'` : 'null';
+    const categoryFilter = category ? jsLiteral(category) : 'null';
 
     return `
 // Get available diagram shapes
@@ -4679,7 +4684,7 @@ const shapes = category ? _lib.getByCategory(category) : _lib.getAll();
     const { connectorId, style, label, labelPosition } = validated;
 
     return `
-// Update connector: ${connectorId}
+// Update connector: ${oneLine(connectorId)}
 (function() {
   // CONNECTORS LIVE IN THE DIAGRAM SYSTEM, NOT THE ITEM REGISTRY (gate D1,
   // 1.6.19): getItemById never resolves the id connect returned.
@@ -4733,7 +4738,7 @@ const shapes = category ? _lib.getByCategory(category) : _lib.getAll();
     const { connectorId } = validated;
 
     return `
-// Remove connector: ${connectorId}
+// Remove connector: ${oneLine(connectorId)}
 // Resolved through the diagram system (gate D1, 1.6.19), as update_connector is.
 const __cid = ${JSON.stringify(connectorId)};
 const connector = (app.diagramSystem && app.diagramSystem.getConnector(__cid)) || app.getItemById(__cid);
@@ -4742,7 +4747,7 @@ if (!connector) throw new Error('Connector not found: ' + __cid);
 app.diagramSystem.connectorManager.removeConnector(connector);
 app.historyManager.saveState();
 
-({ connectorId: '${connectorId}', removed: true });
+({ connectorId: ${jsLiteral(connectorId)}, removed: true });
 `.trim();
   }
 
@@ -4776,18 +4781,18 @@ const isActive = app.diagramSystem.toggle();
 `.trim();
 
       case 'setMode':
-        const modeStr = mode ? `'${mode}'` : "'select'";
-        const shapeStr = shapeType ? `, '${shapeType}'` : '';
+        const modeStr = mode ? jsLiteral(mode) : "'select'";
+        const shapeStr = shapeType ? `, ${jsLiteral(shapeType)}` : '';
         return `
 // Set diagram tool mode
 app.diagramSystem.setMode(${modeStr}${shapeStr});
-({ action: 'setMode', mode: ${modeStr}${shapeType ? `, shapeType: '${shapeType}'` : ''} });
+({ action: 'setMode', mode: ${modeStr}${shapeType ? `, shapeType: ${jsLiteral(shapeType)}` : ''} });
 `.trim();
 
       default:
         return `
 // Unknown diagram mode action
-throw new Error('Unknown diagram mode action: ${action}');
+throw new Error('Unknown diagram mode action: ' + ${jsLiteral(action)});
 `.trim();
     }
   }
@@ -4813,7 +4818,7 @@ throw new Error('Unknown diagram mode action: ${action}');
 (async function() {
   const jobOptions = {
     name: ${nameStr},
-    screenshotPolicy: '${policyStr}',
+    screenshotPolicy: ${jsLiteral(policyStr)},
     agentMode: true
   };
 `;
@@ -4835,7 +4840,7 @@ throw new Error('Unknown diagram mode action: ${action}');
     if (canvasPreset) {
       code += `
   // Set canvas size to preset (platform name → engine preset key)
-  app.setCanvasSize('${canvasPresetFor(canvasPreset)}');
+  app.setCanvasSize(${jsLiteral(canvasPresetFor(canvasPreset))});
   // Allow canvas resize to take effect
   await new Promise(r => setTimeout(r, 50));
 `;
@@ -4880,14 +4885,14 @@ throw new Error('Unknown diagram mode action: ${action}');
     }
 
     code += `
-  // Return job context with canvas size${wantOntology ? ' + initial ontology' : ''}
+  // Return job context with canvas size${oneLine(wantOntology ? ' + initial ontology' : '')}
   const _cs = app.getCanvasSize ? app.getCanvasSize() : { width: 800, height: 600 };
   return {
     success: true,
     jobStarted: true,
     name: ${nameStr},
-    screenshotPolicy: '${policyStr}',
-    canvasPreset: ${canvasPreset ? `'${canvasPreset}'` : 'null'},
+    screenshotPolicy: ${jsLiteral(policyStr)},
+    canvasPreset: ${canvasPreset ? jsLiteral(canvasPreset) : 'null'},
     canvasCleared: ${shouldClear},
     canvasSize: { width: _cs.width || 800, height: _cs.height || 600 }${canvasPreset ? '' : `,
     ...(_boundedFrom ? { note: 'the canvas was unbounded (it exported the artwork, not the board); it is now fixed at ' + (_cs.width || 800) + 'x' + (_cs.height || 600) + ', so stills and video both export that size.' } : {})`}${wantOntology ? `,
@@ -5098,7 +5103,7 @@ throw new Error('Unknown diagram mode action: ${action}');
     if (canvasPreset) {
       code += `
   // Set canvas to preset (platform name → engine preset key)
-  app.setCanvasSize('${canvasPresetFor(canvasPreset)}');
+  app.setCanvasSize(${jsLiteral(canvasPresetFor(canvasPreset))});
   // Allow canvas resize to take effect
   await new Promise(r => setTimeout(r, 50));
 `;
@@ -5107,7 +5112,7 @@ throw new Error('Unknown diagram mode action: ${action}');
     if (backgroundColor && !preserveBackground) {
       code += `
   // Set background color
-  app.setBackgroundColor('${backgroundColor}');
+  app.setBackgroundColor(${jsLiteral(backgroundColor)});
 `;
     }
 
@@ -5115,7 +5120,7 @@ throw new Error('Unknown diagram mode action: ${action}');
   // Save state
   if (app.historyManager) app.historyManager.saveState();
   const _cs = app.getCanvasSize ? app.getCanvasSize() : { width: 800, height: 600 };
-  return { success: true, reset: true, canvasPreset: ${canvasPreset ? `'${canvasPreset}'` : 'null'}, canvasSize: { width: _cs.width || 800, height: _cs.height || 600 } };
+  return { success: true, reset: true, canvasPreset: ${canvasPreset ? jsLiteral(canvasPreset) : 'null'}, canvasSize: { width: _cs.width || 800, height: _cs.height || 600 } };
 })();
 `;
 
@@ -5139,7 +5144,7 @@ throw new Error('Unknown diagram mode action: ${action}');
     const timelines = compileBatchTimelines(operations as never);
 
     let code = `
-// Batch execute ${operations.length} operations
+// Batch execute ${oneLine(operations.length)} operations
 (async function() {
   // An op's own verdict. Deliberately narrow, matching the server-side rule:
   // only an explicit success:false or ok:false is a failure, because most ops
@@ -5213,7 +5218,7 @@ throw new Error('Unknown diagram mode action: ${action}');
       const opItemJs = typeof opItem === 'string' && /^\$\d+$/.test(opItem) ? `__refName(${opItem.slice(1)})` : JSON.stringify(opItem);
       const opStep = typeof o._step === 'string' ? `op ${index}: ${o._step}` : `op ${index} (${op.type})`;
       code += `
-    // Operation ${index}: ${op.type}
+    // Operation ${oneLine(index)}: ${oneLine(op.type)}
     try {
       const result${index} = await (async () => {
         ${opCode}
@@ -5483,7 +5488,7 @@ return { success: true, width: (_cs && _cs.width) || ${w}, height: (_cs && _cs.h
         const foldTarget = mergePlan?.foldedInto.get(index);
         if (foldTarget !== undefined) {
           return `
-// Keyframes merged into operation ${foldTarget} (same target). A keyframe track
+// Keyframes merged into operation ${oneLine(foldTarget)} (same target). A keyframe track
 // is replaced wholesale, so emitting both here would silently drop one.
 return { itemId: ${batchRef(op.itemId)}, merged: true, mergedInto: ${foldTarget} };
 `;
@@ -5511,7 +5516,7 @@ return { itemId: ${batchRef(op.itemId)}, merged: true, mergedInto: ${foldTarget}
           if ((op as any)[key] !== undefined && Number.isFinite(v)) kfExtra.push(`${key}: ${v}`);
         }
         const kfUnits = (op as any).timeUnits;
-        if (kfUnits === 'seconds' || kfUnits === 'ms') kfExtra.push(`timeUnits: '${kfUnits}'`);
+        if (kfUnits === 'seconds' || kfUnits === 'ms') kfExtra.push(`timeUnits: ${jsLiteral(kfUnits)}`);
         const kfExtraStr = kfExtra.length > 0 ? `, ${kfExtra.join(', ')}` : '';
         const kfTextKeysJs = unanimatedTextKeysJs(((kfSource || []) as any[]).flatMap((k) => Object.keys((k as { properties?: object }).properties ?? {})));
         const kfTextCheck = kfTextKeysJs ? `\nconst _kfIgnored = ${kfTextKeysJs};` : '';
@@ -5539,12 +5544,12 @@ const targetId = ${maskItemRef};
 const item = app.getItemById(targetId);
 if (!item) throw new Error('Item not found: ' + targetId);
 if (!app.applyAnimatedMask) throw new Error('Mask system not available');
-const maskedGroup = app.applyAnimatedMask(item, '${preset}', ${maskOpts});
+const maskedGroup = app.applyAnimatedMask(item, ${jsLiteral(preset)}, ${maskOpts});
 const maskRej = maskedGroup && maskedGroup.data && maskedGroup.data.maskAnimationRejected;
 if (maskRej) {
   return { success: false, itemId: targetId, error: 'Masked, but animation preset "' + maskRej.requested + '" is unknown — it will NOT animate.', requested: maskRej.requested, known: maskRej.known };
 }
-return { success: !!maskedGroup, itemId: targetId, preset: '${preset}' };
+return { success: !!maskedGroup, itemId: targetId, preset: ${jsLiteral(preset)} };
 `;
       }
 
@@ -5559,12 +5564,12 @@ if (!item) throw new Error('Item not found: ' + targetId);
 // shape, so an effect the engine refused — an unknown preset, a facade that
 // is not loaded — was recorded as applied. The batch cannot report what the
 // op never tells it.
-const _eff = app.applyEffect(item, '${op.effectType || 'sparkle'}', ${effParams});
+const _eff = app.applyEffect(item, ${jsLiteral(op.effectType || 'sparkle')}, ${effParams});
 if (_eff && (_eff.success === false || _eff.ok === false)) {
-  return { success: false, itemId: targetId, effectType: '${op.effectType || 'sparkle'}',
+  return { success: false, itemId: targetId, effectType: ${jsLiteral(op.effectType || 'sparkle')},
     error: _eff.error || _eff.reason || 'the effect was refused without a reason' };
 }
-return { itemId: targetId, effectType: '${op.effectType || 'sparkle'}' };
+return { itemId: targetId, effectType: ${jsLiteral(op.effectType || 'sparkle')} };
 `;
       }
 
@@ -5612,7 +5617,7 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
     const range: Record<string, number> = { offset };
     if (typeof length === 'number') range.length = length;
     return `
-// Read export chunk at ${offset}
+// Read export chunk at ${oneLine(offset)}
 (async function() {
   if (!app.exportEngine || typeof app.exportEngine.readExport !== 'function') {
     return { ok: false, reason: 'app.exportEngine.readExport unavailable — update FxTool' };
@@ -5777,10 +5782,10 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
     if (exportFormat === 'srt' || exportFormat === 'vtt' || exportFormat === 'scc') {
       const fmt = exportFormat;
       return `
-// Export: captions (${fmt}) from text items with a lifetime
+// Export: captions (${oneLine(fmt)}) from text items with a lifetime
 (function() {
   if (!app.itemRegistry || typeof app.itemRegistry.getAll !== 'function') {
-    return { success: false, format: '${fmt}', error: 'this studio cannot list items (app.itemRegistry.getAll) — update PinePaper Studio.' };
+    return { success: false, format: ${jsLiteral(fmt)}, error: 'this studio cannot list items (app.itemRegistry.getAll) — update PinePaper Studio.' };
   }
   const texts = app.itemRegistry.getAll().filter(function(e) {
     const it = e && e.item;
@@ -5788,7 +5793,7 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
   });
   const timed = texts.filter(function(e) { return e.item.data && typeof e.item.data.bornAt === 'number'; });
   if (!timed.length) {
-    return { success: false, format: '${fmt}', error: 'no captions to export: no text item has a lifetime. Stage each caption with properties.bornAt / ttl (seconds) on create_item or modify_item, then export ${fmt}.', untimedText: texts.length };
+    return { success: false, format: ${jsLiteral(fmt)}, error: 'no captions to export: no text item has a lifetime. Stage each caption with properties.bornAt / ttl (seconds) on create_item or modify_item, then export ${fmt}.', untimedText: texts.length };
   }
   const end = ${videoDuration};
   const ts = function(t, sep) {
@@ -5808,7 +5813,7 @@ ${fmt === 'scc' ? `  return { success: true, format: 'scc', sccCues: cues, cues:
     return ${fmt === 'srt' ? `(i + 1) + '\\n' + ts(c.start, ',') + ' --> ' + ts(c.stop, ',')` : `ts(c.start, '.') + ' --> ' + ts(c.stop, '.')`} + '\\n' + c.text;
   }).join('\\n\\n') + '\\n';
   const text = ${fmt === 'vtt' ? `'WEBVTT\\n\\n' + body` : 'body'};
-  return { success: true, format: '${fmt}', data: text, mimeType: '${fmt === 'srt' ? 'application/x-subrip' : 'text/vtt'}', size: text.length, cues: cues.length, untimedText: texts.length - timed.length };
+  return { success: true, format: ${jsLiteral(fmt)}, data: text, mimeType: ${jsLiteral(fmt === 'srt' ? 'application/x-subrip' : 'text/vtt')}, size: text.length, cues: cues.length, untimedText: texts.length - timed.length };
 })();`.trim();
     }
 
@@ -5859,7 +5864,7 @@ ${fmt === 'scc' ? `  return { success: true, format: 'scc', sccCues: cues, cues:
     bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
   }
   return {
-    success: true, format: 'wav', platform: '${platform}',
+    success: true, format: 'wav', platform: ${jsLiteral(platform)},
     data: 'data:audio/wav;base64,' + btoa(bin),
     size: bytes.length,
     duration: r.duration, sampleRate: r.sampleRate, sounds: r.sounds, placed: r.placed,
@@ -5871,12 +5876,12 @@ ${fmt === 'scc' ? `  return { success: true, format: 'scc', sccCues: cues, cues:
     }
 
     return `
-// Smart export for ${platform}
+// Smart export for ${oneLine(platform)}
 (async function() {${ENSURE_EXPORT_ENGINE}
-  const platform = '${platform}';
-  const format = '${exportFormat}';
-  const quality = '${qualityLevel}';
-  const framing = '${framing}';
+  const platform = ${jsLiteral(platform)};
+  const format = ${jsLiteral(exportFormat)};
+  const quality = ${jsLiteral(qualityLevel)};
+  const framing = ${jsLiteral(framing)};
   // An explicit fps wins over the tier's. The tiers bundle frame rate with
   // compression (draft 15 / standard 30 / high 60), so "higher quality" also
   // doubled the frame count and the render time — a surprise the schema used
@@ -7055,7 +7060,7 @@ ${(() => {
       if (__rl && __rl.enabled) {
         result.fidelity = result.fidelity || { warnings: [] };
         if (['png', 'jpg', 'webp', 'pdf', 'mp4', 'webm'].indexOf(${JSON.stringify(format)}) === -1) {
-          result.fidelity.warnings = (result.fidelity.warnings || []).concat([{ code: 'relight_not_applied', message: 'a relight rig is set, but ${format} is not relit. Export png, pdf, mp4 or webm to keep the lighting.' }]);
+          result.fidelity.warnings = (result.fidelity.warnings || []).concat([{ code: 'relight_not_applied', message: 'a relight rig is set, but ' + ${jsLiteral(format)} + ' is not relit. Export png, pdf, mp4 or webm to keep the lighting.' }]);
         } else {
           result.relight = { applied: true, lights: (__rl.lights || []).length };
         }
@@ -7308,7 +7313,7 @@ ${(() => {
     } = validated;
 
     return `
-// Animate letter collage: ${collageId}
+// Animate letter collage: ${oneLine(collageId)}
 (function() {
   const collageId = ${JSON.stringify(collageId)};
   const animationType = ${JSON.stringify(animationType)};
@@ -7404,10 +7409,10 @@ ${(() => {
   }
 
   try {
-    const result = await app.mapSystem.loadMap('${mapId}', ${optionsStr});
+    const result = await app.mapSystem.loadMap(${jsLiteral(mapId)}, ${optionsStr});
     return {
       success: true,
-      mapId: result.mapId || '${mapId}',
+      mapId: result.mapId || ${jsLiteral(mapId)},
       // regionPaths is a Map: .length was undefined, so every load reported
       // regions: 0 (gate D3). size, with the feature count as a fallback.
       regions: (result.regions && (result.regions.size ?? result.regions.length)) || (result.geoData && result.geoData.features ? result.geoData.features.length : 0),
@@ -7830,7 +7835,7 @@ ${(() => {
   }
 
   try {
-    const result = await app.mapSystem.importCustomMap('${validated.url}', ${optionsStr});
+    const result = await app.mapSystem.importCustomMap(${jsLiteral(validated.url)}, ${optionsStr});
     // A summary, not the engine's return: that carries the Paper group and
     // the region Map, which serialised into a raw Paper.js dump (gate N1).
     const __r = result && result.regions;
@@ -7955,7 +7960,7 @@ ${(() => {
       loop: ${validated.loop !== false},
       colors: ${colorsStr},${validated.waveSpeed !== undefined ? `
       waveSpeed: ${validated.waveSpeed},` : ''}
-      waveDirection: '${validated.waveDirection || 'horizontal'}'
+      waveDirection: ${jsLiteral(validated.waveDirection || 'horizontal')}
     });
     return { success: true, animatedRegions: result?.animatedRegions || [], totalRegions: result?.totalRegions || 0 };
   } catch (error) {
@@ -8032,7 +8037,7 @@ ${(() => {
       includeSelected: ${validated.includeSelected !== false},
       includeColors: ${validated.includeColors !== false},
       download: ${validated.download === true},
-      filename: '${validated.filename || 'map-regions.csv'}'
+      filename: ${jsLiteral(validated.filename || 'map-regions.csv')}
     });
     return { success: true, csv: result?.csv || '', regionCount: result?.regionCount || 0 };
   } catch (error) {
@@ -8309,7 +8314,7 @@ ${(() => {
 
   const item = (app.getItemById && app.getItemById(${JSON.stringify(itemId)})) || (app.itemRegistry && app.itemRegistry.get && app.itemRegistry.get(${JSON.stringify(itemId)}) && (app.itemRegistry.get(${JSON.stringify(itemId)}).item || app.itemRegistry.get(${JSON.stringify(itemId)})));
   if (!item) {
-    return { success: false, error: 'Item ${itemId} not found' };
+    return { success: false, error: 'Item ' + ${jsLiteral(itemId)} + ' not found' };
   }
 
   try {
@@ -8340,7 +8345,7 @@ ${(() => {
 
   const item = (app.getItemById && app.getItemById(${JSON.stringify(itemId)})) || (app.itemRegistry && app.itemRegistry.get && app.itemRegistry.get(${JSON.stringify(itemId)}) && (app.itemRegistry.get(${JSON.stringify(itemId)}).item || app.itemRegistry.get(${JSON.stringify(itemId)})));
   if (!item) {
-    return { success: false, error: 'Item ${itemId} not found' };
+    return { success: false, error: 'Item ' + ${jsLiteral(itemId)} + ' not found' };
   }
 
   try {
@@ -8727,10 +8732,10 @@ ${(() => {
     const templatesStr = validated.templates ? JSON.stringify(validated.templates) : '[]';
 
     return `
-// Register custom relation: ${validated.name}
+// Register custom relation: ${oneLine(validated.name)}
 (function() {
   try {
-    app.registerRelationRule('${validated.name}', {
+    app.registerRelationRule(${jsLiteral(validated.name)}, {
       description: ${JSON.stringify(validated.description || '')},
       params: ${paramsStr},
       compute: (ctx) => {
@@ -8744,7 +8749,7 @@ ${(() => {
       continuous: ${validated.continuous !== false},
       priority: ${validated.priority || 0}
     });
-    return { success: true, relationName: '${validated.name}', message: 'Custom relation registered successfully' };
+    return { success: true, relationName: ${jsLiteral(validated.name)}, message: 'Custom relation registered successfully' };
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -8777,7 +8782,7 @@ ${(() => {
     // __ppValue with the scene lint beside it, and a throw comes back as { step, itemId, reason }, never a bare
     // message (and never "undefined" for a thrown non-Error).
     return `
-// ${description}
+// ${oneLine(description)}
 (async function() {
   // THE SCENE LINT AFTER THE CODE (FxTool lintScene().warnings): what the scene will show wrong without anything
   // failing (a centred title that runs out of the frame). Carried out under __ppLint; the server moves it beside the
@@ -8837,21 +8842,21 @@ ${(() => {
     // Per-preset options. Custom keyframes are an animated-mask extension —
     // when supplied, fall through to maskingSystem.applyCustomMask instead.
     return `
-// Apply animated mask to ${validated.itemId}
+// Apply animated mask to ${oneLine(validated.itemId)}
 (function() {
   if (!app.applyAnimatedMask) {
     return { success: false, error: 'Mask system not available' };
   }
-  const item = app.getItemById('${validated.itemId}');
-  if (!item) return { success: false, error: 'Item not found: ${validated.itemId}' };
+  const item = app.getItemById(${jsLiteral(validated.itemId)});
+  if (!item) return { success: false, error: 'Item not found: ' + ${jsLiteral(validated.itemId)} };
 
   try {
     const mergedOpts = Object.assign({}, ${optionsStr}, ${maskOptionsStr});
     let maskedGroup;
     if (${keyframesStr} && app.maskingSystem && app.maskingSystem.applyCustomMask) {
-      maskedGroup = app.maskingSystem.applyCustomMask(item, '${customShape}', ${keyframesStr}, mergedOpts);
+      maskedGroup = app.maskingSystem.applyCustomMask(item, ${jsLiteral(customShape)}, ${keyframesStr}, mergedOpts);
     } else {
-      maskedGroup = app.applyAnimatedMask(item, '${preset}', mergedOpts);
+      maskedGroup = app.applyAnimatedMask(item, ${jsLiteral(preset)}, mergedOpts);
     }
     // A mask with an unknown ANIMATION preset still masks — the item just never
     // animates — so !!maskedGroup is true either way. The engine records which.
@@ -8859,13 +8864,13 @@ ${(() => {
     if (rej) {
       return {
         success: false,
-        itemId: '${validated.itemId}',
+        itemId: ${jsLiteral(validated.itemId)},
         error: 'Masked, but the animation preset "' + rej.requested + '" is unknown — it will NOT animate.',
         requested: rej.requested,
         known: rej.known,
       };
     }
-    return { success: !!maskedGroup, itemId: '${validated.itemId}', preset: '${preset}' };
+    return { success: !!maskedGroup, itemId: ${jsLiteral(validated.itemId)}, preset: ${jsLiteral(preset)} };
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -8879,17 +8884,17 @@ ${(() => {
     const maskOptionsStr = validated.maskOptions ? JSON.stringify(validated.maskOptions) : '{}';
 
     return `
-// Apply custom mask to ${validated.itemId}
+// Apply custom mask to ${oneLine(validated.itemId)}
 (function() {
   if (!app.maskingSystem || !app.maskingSystem.applyCustomMask) {
     return { success: false, error: 'Mask system not available' };
   }
-  const item = app.getItemById('${validated.itemId}');
-  if (!item) return { success: false, error: 'Item not found: ${validated.itemId}' };
+  const item = app.getItemById(${jsLiteral(validated.itemId)});
+  if (!item) return { success: false, error: 'Item not found: ' + ${jsLiteral(validated.itemId)} };
 
   try {
-    const maskedGroup = app.maskingSystem.applyCustomMask(item, '${validated.maskType}', ${keyframesStr}, ${maskOptionsStr});
-    return { success: !!maskedGroup, itemId: '${validated.itemId}', maskType: '${validated.maskType}' };
+    const maskedGroup = app.maskingSystem.applyCustomMask(item, ${jsLiteral(validated.maskType)}, ${keyframesStr}, ${maskOptionsStr});
+    return { success: !!maskedGroup, itemId: ${jsLiteral(validated.itemId)}, maskType: ${jsLiteral(validated.maskType)} };
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -8901,20 +8906,20 @@ ${(() => {
     const validated = RemoveMaskInputSchema.parse(input);
 
     return `
-// Remove mask from ${validated.itemId}
+// Remove mask from ${oneLine(validated.itemId)}
 (function() {
   if (!app.removeMask) {
     return { success: false, error: 'Mask system not available' };
   }
   // The item id may point at either the masked group OR the original item;
   // app.removeMask expects the masked group, so resolve and walk up if needed.
-  const item = app.getItemById('${validated.itemId}');
-  if (!item) return { success: false, error: 'Item not found: ${validated.itemId}' };
+  const item = app.getItemById(${jsLiteral(validated.itemId)});
+  if (!item) return { success: false, error: 'Item not found: ' + ${jsLiteral(validated.itemId)} };
   const maskedGroup = (item.data && item.data.isMaskedGroup) ? item : (item.parent && item.parent.data && item.parent.data.isMaskedGroup ? item.parent : item);
 
   try {
     app.removeMask(maskedGroup);
-    return { success: true, itemId: '${validated.itemId}', message: 'Mask removed' };
+    return { success: true, itemId: ${jsLiteral(validated.itemId)}, message: 'Mask removed' };
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -8944,7 +8949,7 @@ ${(() => {
     return { success: false, error: 'app.listAnimatableProperties unavailable — update the studio. The keyframe tool lists the properties it accepts in its own description meanwhile.' };
   }
   const item = app.getItemById(${JSON.stringify(itemId)});
-  if (!item) { return { success: false, error: 'no item ${itemId}' }; }
+  if (!item) { return { success: false, error: 'no item ' + ${jsLiteral(itemId)} }; }
   const r = app.listAnimatableProperties(item);
   return { success: true, ...r };
 })();`.trim();
@@ -9049,7 +9054,7 @@ ${(() => {
     const { templateId, category, listOnly } = input;
 
     if (listOnly || !templateId) {
-      const categoryFilter = category ? `'${category}'` : 'null';
+      const categoryFilter = category ? jsLiteral(category) : 'null';
       return `
 // List available templates
 (async function() {
@@ -9078,7 +9083,7 @@ ${(() => {
     }
 
     return `
-// Apply template: ${templateId}
+// Apply template: ${oneLine(templateId)}
 (async function() {
   if (!app.templateManager) {
     return { error: 'Template manager not available. Make sure PinePaper Studio is loaded.' };
@@ -9125,7 +9130,7 @@ ${(() => {
     let fidelity = {};
     try {
       const tpl = (app.templateManager.getAllTemplates() || [])
-        .find(function(t) { return t && (t.id === '${templateId}' || t.templateId === '${templateId}'); });
+        .find(function(t) { return t && (t.id === ${jsLiteral(templateId)} || t.templateId === ${jsLiteral(templateId)}); });
       const items = tpl && tpl.data && Array.isArray(tpl.data.items) ? tpl.data.items : null;
       const declared = items ? items.filter(function(i) { return i && i.type === 'group' && i.paperJSON; }).length : 0;
       if (declared > 0 && app.itemRegistry && typeof app.itemRegistry.getAll === 'function') {
@@ -9146,7 +9151,7 @@ ${(() => {
       }
     } catch (e) { /* a check that cannot run must not fail the load */ }
 
-    return { success: true, templateId: '${templateId}', message: 'Template applied successfully. Canvas has been replaced with template content.', ...fidelity };
+    return { success: true, templateId: ${jsLiteral(templateId)}, message: 'Template applied successfully. Canvas has been replaced with template content.', ...fidelity };
   } catch (e) {
     return { error: 'Failed to apply template: ' + e.message };
   }
@@ -9196,7 +9201,7 @@ ${(() => {
     // The bytes then go in as a DATA URL, which img.src loads without touching
     // the network again — so a host that allows fetch but blocks the image
     // load (CORS on <img>, a tainted-canvas refusal) now works too.
-    let src = '${url}';
+    let src = ${jsLiteral(url)};
     // A STAGED KEY, not the bytes. The handler writes anything over ~64KB to
     // window.__ppStage and passes the key instead, because the governor's
     // loop-guard transform bails on a code string that large and takes the
@@ -9258,7 +9263,7 @@ ${mask ? `    // A MASK REPLACES THE RASTER (round 8 DD, 4.10). applyMask builds
     // refused instead of answered with the raster's bounds.
     const masked = app.imageTools.applyMask(raster, ${JSON.stringify(mask)});
     if (!masked) {
-      return { success: false, itemId: itemId, error: 'the ${mask} mask was not applied — the image may not be a raster yet. The unmasked image is on the canvas as ' + itemId + '.' };
+      return { success: false, itemId: itemId, error: 'the ' + ${jsLiteral(mask)} + ' mask was not applied — the image may not be a raster yet. The unmasked image is on the canvas as ' + itemId + '.' };
     }
     if (app.itemRegistry && typeof app.itemRegistry.rebind === 'function') app.itemRegistry.rebind(itemId, masked);
     placed = masked;
@@ -9285,7 +9290,7 @@ ${mask ? `    // A MASK REPLACES THE RASTER (round 8 DD, 4.10). applyMask builds
       success: true,
       itemId: itemId,
       message: 'Image imported and placed on canvas.',${name ? `\n      name: ${JSON.stringify(name)},` : ''}
-      bounds: { x: b.x, y: b.y, width: b.width, height: b.height }${mask ? `,\n      mask: '${mask}'` : ''}${hasShadow ? ',\n      shadow: __shadow' : ''},
+      bounds: { x: b.x, y: b.y, width: b.width, height: b.height }${mask ? `,\n      mask: ${jsLiteral(mask)}` : ''}${hasShadow ? ',\n      shadow: __shadow' : ''},
       // Stored smaller than its source (the studio's cap): said, with the
       // way to keep every pixel. The studio reports native size where it can.
       ...((entry && entry.nativeWidth && entry.width && entry.nativeWidth > entry.width)
@@ -9387,7 +9392,7 @@ ${mask ? `    // A MASK REPLACES THE RASTER (round 8 DD, 4.10). applyMask builds
 (function() {
   ${guard}
   const scene = app.sceneManager.getScene(${JSON.stringify(input.sceneId)});
-  if (!scene) return { error: 'Scene not found: ${input.sceneId}' };
+  if (!scene) return { error: 'Scene not found: ' + ${jsLiteral(input.sceneId)} };
   return { success: true, action: 'info', scene: scene };
 })();
 `.trim();
@@ -9872,7 +9877,7 @@ ${input.cutSound !== undefined ? `  const __cuts = (__cr && __cr.cuts) || (app.s
       selected.push(id);
     }
   }
-  return { success: true, action: 'select', mode: '${mode}', selected };
+  return { success: true, action: 'select', mode: ${jsLiteral(mode)}, selected };
 })();`.trim();
       }
       case 'select_all':
@@ -9930,7 +9935,7 @@ ${input.cutSound !== undefined ? `  const __cuts = (__cr && __cr.cuts) || (app.s
    */
   private _facadeCall(method: string, args: string, label: string): string {
     return `
-// ${label}
+// ${oneLine(label)}
 (async function() {
   if (typeof app.${method} !== 'function') {
     return { success: false, error: 'app.${method}() unavailable — update PinePaper Studio to a build that has it.' };
@@ -9953,7 +9958,7 @@ ${input.cutSound !== undefined ? `  const __cuts = (__cr && __cr.cuts) || (app.s
     // studios, and a brand must not cross between them.
     if (input.action === 'get' || input.action === 'clear') {
       return `
-// Brand kit: ${input.action} the active brand
+// Brand kit: ${oneLine(input.action)} the active brand
 (function() {
   const b = (typeof window !== 'undefined' && window.__ppActiveBrand) || null;
   ${input.action === 'clear' ? 'if (typeof window !== "undefined") window.__ppActiveBrand = null;' : ''}
@@ -10223,7 +10228,7 @@ ${loads}
     __src = raster.url;
   }`;
     const call = (method: string, args: string, label: string) => `
-// ${label}
+// ${oneLine(label)}
 (async function() {
   if (typeof app.${method} !== 'function') {
     return { success: false, error: 'app.${method}() unavailable — update PinePaper Studio to a build that has it.' };
@@ -10375,7 +10380,7 @@ ${resolveSource}
       case 'fit': {
         const mode = input.mode || 'contain';
         return `
-// Fit item to the export frame (${mode})
+// Fit item to the export frame (${oneLine(mode)})
 (function() {
   // Route through the agent facade, not app.fitToFrame directly: an agent that
   // just called upload_video holds a MEDIA id (vraster_…), which is a different
@@ -10418,7 +10423,7 @@ ${resolveSource}
       case 'flip': {
         const dir = input.direction || 'horizontal';
         return `
-// Flip item ${dir}ly
+// Flip item ${oneLine(dir)}ly
 (function() {
   const entry = app.itemRegistry.get(${ID});
   if (!entry || !entry.item) return { error: 'Item not found: ' + ${ID} };
@@ -10439,7 +10444,7 @@ ${resolveSource}
         if (needsSibling) {
           const siblingExpr = order === 'moveUp' ? 'entry.item.nextSibling' : 'entry.item.previousSibling';
           return `
-// Reorder item: ${order}
+// Reorder item: ${oneLine(order)}
 (function() {
   const entry = app.itemRegistry.get(${ID});
   if (!entry || !entry.item) return { error: 'Item not found: ' + ${ID} };
@@ -10449,7 +10454,7 @@ ${resolveSource}
 })();`.trim();
         }
         return `
-// Reorder item: ${order}
+// Reorder item: ${oneLine(order)}
 (function() {
   const entry = app.itemRegistry.get(${ID});
   if (!entry || !entry.item) return { error: 'Item not found: ' + ${ID} };
@@ -10542,7 +10547,7 @@ ${resolve}
     // otherwise; a falsy answer is a refusal it did not raise.
     if (r === false || r === null) {
       return { success: false, action: 'apply', itemId: ${JSON.stringify(input.itemId)},
-        error: 'the filter did not apply — ${input.filterName || ''} may not be available on this studio.' };
+        error: 'the filter did not apply — ' + ${jsLiteral(input.filterName || '')} + ' may not be available on this studio.' };
     }
     return { success: true, action: 'apply', itemId: ${JSON.stringify(input.itemId)}, filter: ${JSON.stringify(input.filterName || '')} };
   } catch (e) {
@@ -10899,7 +10904,7 @@ case 'analyze_palette':
 // Get item details by ID
 (function() {
   const entry = app.itemRegistry.get(${JSON.stringify(input.itemId || '')});
-  if (!entry || !entry.item) return { error: 'Item not found: ${input.itemId}' };
+  if (!entry || !entry.item) return { error: 'Item not found: ' + ${jsLiteral(input.itemId)} };
   const item = entry.item;
   return {
     success: true, action: 'get_by_id',
@@ -11190,8 +11195,8 @@ case 'analyze_palette':
   ${guard}
   const entry = app.itemRegistry.get(${itemIdStr});
   if (!entry || !entry.item) return { error: 'Item not found: ' + ${itemIdStr} };
-  app.deformPresets.apply(entry.item, '${input.preset}', ${JSON.stringify(params)});
-  return { success: true, action: 'apply', itemId: ${itemIdStr}, preset: '${input.preset}' };
+  app.deformPresets.apply(entry.item, ${jsLiteral(input.preset)}, ${JSON.stringify(params)});
+  return { success: true, action: 'apply', itemId: ${itemIdStr}, preset: ${jsLiteral(input.preset)} };
 })();`.trim();
       }
       case 'trigger': {
@@ -11207,8 +11212,8 @@ case 'analyze_palette':
   ${guard}
   const entry = app.itemRegistry.get(${itemIdStr});
   if (!entry || !entry.item) return { error: 'Item not found: ' + ${itemIdStr} };
-  app.deformPresets.trigger(entry.item, '${input.preset}', ${JSON.stringify(params)});
-  return { success: true, action: 'trigger', itemId: ${itemIdStr}, preset: '${input.preset}' };
+  app.deformPresets.trigger(entry.item, ${jsLiteral(input.preset)}, ${JSON.stringify(params)});
+  return { success: true, action: 'trigger', itemId: ${itemIdStr}, preset: ${jsLiteral(input.preset)} };
 })();`.trim();
       }
       case 'remove': {
@@ -11464,8 +11469,8 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
 // Export sprite sheet
 (async function() {
   ${guard}
-  const result = await app.exportSpriteSheet(${JSON.stringify(input.spriteSheetId || '')}, { format: '${input.format || 'png'}', download: true, includeMetadata: true });
-  return { success: true, action: 'export', format: '${input.format || 'png'}' };
+  const result = await app.exportSpriteSheet(${JSON.stringify(input.spriteSheetId || '')}, { format: ${jsLiteral(input.format || 'png')}, download: true, includeMetadata: true });
+  return { success: true, action: 'export', format: ${jsLiteral(input.format || 'png')} };
 })();`.trim();
       default:
         return `(function() { return { error: 'Unknown sprite sheet action: ${(input as any).action}' }; })();`;
@@ -11488,8 +11493,8 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
   ${guard}
   const entry = app.itemRegistry.get(${itemIdStr});
   if (!entry || !entry.item) return { error: 'Item not found: ' + ${itemIdStr} };
-  const behaviorId = app.interactionSystem.addContinuousBehavior(entry.item, '${input.behaviorType}', ${params});
-  return { success: true, action: 'add_behavior', itemId: ${itemIdStr}, behaviorType: '${input.behaviorType}', behaviorId };
+  const behaviorId = app.interactionSystem.addContinuousBehavior(entry.item, ${jsLiteral(input.behaviorType)}, ${params});
+  return { success: true, action: 'add_behavior', itemId: ${itemIdStr}, behaviorType: ${jsLiteral(input.behaviorType)}, behaviorId };
 })();`.trim();
       }
       case 'remove_behavior': {
@@ -11542,8 +11547,8 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
 // Trigger interaction action
 (function() {
   ${guard}
-  app.interactionSystem.executeAction('${input.actionType}', ${params});
-  return { success: true, action: 'trigger_action', actionType: '${input.actionType}' };
+  app.interactionSystem.executeAction(${jsLiteral(input.actionType)}, ${params});
+  return { success: true, action: 'trigger_action', actionType: ${jsLiteral(input.actionType)} };
 })();`.trim();
       }
       case 'get_state':
@@ -11947,14 +11952,14 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
     }[input.action];
     const id = JSON.stringify(input.itemId);
     return `
-// Arrange ${input.itemId} → ${input.action}
+// Arrange ${oneLine(input.itemId)} → ${oneLine(input.action)}
 (function() {
   const item = app.getItemById(${id});
   if (!item) return { success: false, error: 'Item not found: ' + ${id} };
   if (typeof app.${method} !== 'function') return { success: false, error: 'app.${method} unavailable — update FxTool' };
   app.select(${id});
   app.${method}();
-  return { success: true, itemId: ${id}, action: '${input.action}' };
+  return { success: true, itemId: ${id}, action: ${jsLiteral(input.action)} };
 })();`.trim();
   }
 
@@ -11989,7 +11994,7 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
       ...(input.queries !== undefined ? { queries: input.queries } : {}),
     });
     return `
-// Detect objects${input.queries !== undefined ? ' (open-vocabulary / OWL-ViT)' : ''}${input.asNodes ? ' (asNodes — relational compositing)' : ''}
+// Detect objects${oneLine(input.queries !== undefined ? ' (open-vocabulary / OWL-ViT)' : '')}${oneLine(input.asNodes ? ' (asNodes — relational compositing)' : '')}
 (async function() {
   if (typeof app.detectObjects !== 'function') {
     return { success: false, error: 'app.detectObjects unavailable — update FxTool to a build that exposes on-device object detection on app' };
@@ -12020,7 +12025,7 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
       ...(input.id !== undefined ? { id: input.id } : {}),
     };
     return `
-// Styled scene${input.style ? ` (${input.style.replace(/[\r\n]/g, ' ')})` : ''}
+// Styled scene${input.style ? ` (${oneLine(input.style.replace(/[\r\n]/g, ' '))})` : ''}
 (async function() {
   if (typeof app.styledScene !== 'function') { return { success: false, error: 'app.styledScene unavailable — update FxTool' }; }
   const r = await app.styledScene(${JSON.stringify(input.spec ?? {})}, ${JSON.stringify(opts)});
@@ -12041,7 +12046,7 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
       ...(input.threshold !== undefined ? { threshold: input.threshold } : {}),
     });
     return `
-// Extract object${input.label ? ` "${input.label}"` : ''} from the image
+// Extract object${input.label ? ` ${jsLiteral(input.label)}` : ''} from the image
 (async function() {
   if (typeof app.extractObject !== 'function') {
     return { success: false, error: 'app.extractObject unavailable — update FxTool to a build that exposes on-device object detection on app' };
@@ -12134,7 +12139,7 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
     if (input.action === 'break_apart') {
       const idExpr = JSON.stringify(input.itemId || '');
       return `
-// Break apart ${input.itemId || ''} into movable parts
+// Break apart ${oneLine(input.itemId || '')} into movable parts
 (function() {
   if (typeof app.breakApart !== 'function') return { success: false, error: 'app.breakApart unavailable — update FxTool to a build with SVG/group segmentation' };
   const target = app.getItemById(${idExpr});
@@ -12149,7 +12154,7 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
     if (input.action === 'ungroup') {
       const idExpr = JSON.stringify(input.groupId || '');
       return `
-// Ungroup ${input.groupId || ''}
+// Ungroup ${oneLine(input.groupId || '')}
 (function() {
   if (!app.groupManager) return { success: false, error: 'GroupManager not available — update FxTool' };
   const gid = ${idExpr};
@@ -12163,7 +12168,7 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
     const idsArrayExpr = JSON.stringify(input.itemIds ?? []);
     const nameExpr = input.groupName !== undefined ? JSON.stringify(input.groupName) : 'undefined';
     return `
-// Group ${(input.itemIds || []).length} items${input.groupName ? ` as "${input.groupName}"` : ''}
+// Group ${oneLine((input.itemIds || []).length)} items${input.groupName ? ` as ${jsLiteral(input.groupName)}` : ''}
 (function() {${this.groupCodeBody(idsArrayExpr, nameExpr)}
 })();`.trim();
   }
@@ -12215,7 +12220,7 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
     const duration = input.duration ?? 5;
     const n = Math.min(1200, Math.max(3, Math.round(duration * fps)));
     return `
-// Accessibility measurements (${checks.join(', ')})
+// Accessibility measurements (${oneLine(checks.join(', '))})
 (async function() {
   const out = { success: true, fps: ${fps}, duration: ${duration} };
   const rgba = function(c) {
@@ -12374,7 +12379,7 @@ ${checks.includes('contrast') ? `  // SAMPLED OVER TIME (round 12, 12.9): text i
     const mime = sheet.format === 'png' ? 'image/png' : 'image/jpeg';
     const S = (v: unknown) => JSON.stringify(v);
     return `
-// Contact sheet of ${n} frame(s)
+// Contact sheet of ${oneLine(n)} frame(s)
 (async function() {
   if (typeof app.captureFramesAt !== 'function') {
     return { success: false, error: 'app.captureFramesAt unavailable — update FxTool to a build with the deterministic capture entrypoint' };
@@ -12451,7 +12456,7 @@ ${checks.includes('contrast') ? `  // SAMPLED OVER TIME (round 12, 12.9): text i
     // tool call that screenshots next wants that to have happened.
     const engineOptsJson = JSON.stringify({ canvas: input.canvas, defaultGeometry: input.defaultGeometry, awaitImages: true });
     return `
-// Instantiate ontology → scene (${ops.filter((o) => o.op === 'create').length} items, ${ops.filter((o) => o.op === 'addRelation').length} relations)
+// Instantiate ontology → scene (${oneLine(ops.filter((o) => o.op === 'create').length)} items, ${oneLine(ops.filter((o) => o.op === 'addRelation').length)} relations)
 (async function() {
   // Engine door first: the studio's own OntologyCompiler reads every node facet
   // (geometry, paint, text, the keyframe track, masks) and builds through the
@@ -12572,11 +12577,11 @@ ${checks.includes('contrast') ? `  // SAMPLED OVER TIME (round 12, 12.9): text i
     if (u.indexOf('data:') !== 0) return u;
     const comma = u.indexOf(',');
     const meta = u.slice(5, comma);
-    const mime = meta.split(';')[0] || '${kind === 'audio' ? 'audio/mpeg' : 'video/mp4'}';
+    const mime = meta.split(';')[0] || ${jsLiteral(kind === 'audio' ? 'audio/mpeg' : 'video/mp4')};
     const body = u.slice(comma + 1);
     const bin = /;base64/i.test(meta) ? atob(body) : decodeURIComponent(body);
     const bytes = Uint8Array.from(bin, function(c) { return c.charCodeAt(0); });
-    const ext = (mime.split('/')[1] || '${kind === 'audio' ? 'mp3' : 'mp4'}').replace(/[^a-z0-9]/gi, '');
+    const ext = (mime.split('/')[1] || ${jsLiteral(kind === 'audio' ? 'mp3' : 'mp4')}).replace(/[^a-z0-9]/gi, '');
     return new File([bytes], '${kind}.' + ext, { type: mime });
   })(${JSON.stringify(url ?? '')})`;
     // TWO ID SPACES, AND THE CALLER HOLDS THE WRONG ONE.
@@ -12686,7 +12691,7 @@ ${input.timeOffset !== undefined ? `  // Moving the clip is the 4th argument, wh
       // refusals come back as {ok:false, reason} and are errors here.
       case 'split':
         return `
-// Split a media clip at canvas time ${input.at}
+// Split a media clip at canvas time ${oneLine(input.at)}
 (async function() {
 ${guard}
   if (typeof A.splitMedia !== 'function') { return { success: false, action: 'split', error: 'this studio is too old to split a clip (no splitMedia) — nothing was changed.' }; }
@@ -12697,7 +12702,7 @@ ${guard}
 
       case 'add_transition':
         return `
-// ${input.transition?.type ?? 'crossfade'} between ${input.fromItemId} and ${input.toItemId}
+// ${oneLine(input.transition?.type ?? 'crossfade')} between ${oneLine(input.fromItemId)} and ${oneLine(input.toItemId)}
 (function() {
 ${guard}
   if (typeof A.addTransition !== 'function') { return { success: false, action: 'add_transition', error: 'this studio is too old for clip transitions (no addTransition) — nothing was changed.' }; }
@@ -12820,7 +12825,7 @@ ${guard}
           ...(input.live !== undefined ? { live: input.live } : {}),
         });
         return `
-// Track matte: the matte item's ${input.channel || 'luma'} drives the target's alpha${input.live ? ' (LIVE — re-cuts as the matte animates)' : ''}
+// Track matte: the matte item's ${oneLine(input.channel || 'luma')} drives the target's alpha${oneLine(input.live ? ' (LIVE — re-cuts as the matte animates)' : '')}
 (async function() {
   // A media id (vraster_ / araster_, what upload returns) is resolved to the
   // registry id these app facades take (round 10, 10.12).
@@ -12908,7 +12913,7 @@ ${guard}
           ...(input.fontSize !== undefined ? { fontSize: input.fontSize } : {}),
         });
         return `
-// Display text style: ${input.styleKey} — stacked-layer title, id adopted from the text
+// Display text style: ${oneLine(input.styleKey)} — stacked-layer title, id adopted from the text
 (async function() {
   if (typeof app.applyTextStyle !== 'function') { return { success: false, error: 'app.applyTextStyle unavailable — update FxTool to a text-styles build' }; }
   // LOAD THE FACES FIRST. The decorative stylesheet is fetched on pointerenter
@@ -13064,7 +13069,7 @@ ${guard}
     const S = (v: unknown) => JSON.stringify(v);
     const id = S(input.itemId);
     return `
-// Choreograph ${input.beats.length} beat(s) for ${input.itemId}
+// Choreograph ${oneLine(input.beats.length)} beat(s) for ${oneLine(input.itemId)}
 (function() {
   const __it = (app.getItemById && app.getItemById(${id}))
     || (app.itemRegistry && app.itemRegistry.get && (app.itemRegistry.get(${id}) || {}).item);
@@ -13173,7 +13178,7 @@ ${input.sound ? `  // SOUND ON THE ACTION (D68): one placed sound per moment the
     const cam = input.camera === true ? { fill: 0.45 } : (input.camera || null);
     const sound = input.sound === true ? 'whoosh' : (input.sound || null);
     return `
-// Morph sequence: ${states.length} state(s)
+// Morph sequence: ${oneLine(states.length)} state(s)
 (function() {
   const src = app.getItemById && app.getItemById(${S(input.itemId)});
   if (!src) { return { success: false, error: ${S(input.itemId)} + ' is not on the canvas.' }; }
@@ -13662,7 +13667,7 @@ ${cam ? `  // The camera rides the SAME timing: framing each state as its morph 
       }
     })();
     return `
-// Shader graph: ${input.action}
+// Shader graph: ${oneLine(input.action)}
 (async function() {
 ${head}
 ${body}
@@ -13684,7 +13689,7 @@ ${body}
         // or brush-only medium with the reason. The Paper item it returns is not
         // passed back (it cannot cross the bridge); its id is.
         return `
-// Medium: apply ${input.medium}
+// Medium: apply ${oneLine(input.medium)}
 (async function() {
   if (typeof app.applyMedium !== 'function') { return { success: false, error: 'app.applyMedium unavailable — update FxTool' }; }
   const r = await app.applyMedium(${S(input.itemId)}, ${S(input.medium)}, ${S(input.options ?? {})});
@@ -13887,7 +13892,7 @@ ${body}
           ...(input.keepSource !== undefined ? { keepSource: input.keepSource } : {}),
         });
         return `
-// Text effect: ${input.effect} — the text becomes one animated item PER CHARACTER
+// Text effect: ${oneLine(input.effect)} — the text becomes one animated item PER CHARACTER
 (async function() {
   if (typeof app.applyTextEffect !== 'function') { return { success: false, error: 'app.applyTextEffect unavailable — update FxTool to a text-effects build' }; }
   const r = await app.applyTextEffect(${S(input.itemId)}, ${S(input.effect)}, ${opts});
@@ -13960,7 +13965,7 @@ ${body}
       ...(input.keepSource !== undefined ? { keepSource: input.keepSource } : {}),
     });
     return `
-// Shatter ${input.itemId} into tiles (inert until animated — that is the point)
+// Shatter ${oneLine(input.itemId)} into tiles (inert until animated — that is the point)
 (function() {
   if (typeof app.shatterImage !== 'function') { return { success: false, error: 'app.shatterImage unavailable — update FxTool to a shatter-capable build' }; }
   const r = app.shatterImage(${S(input.itemId)}, ${opts});
@@ -14148,7 +14153,7 @@ ${needWorld}
           ...(input.live !== undefined ? { live: input.live } : {}),
         });
         return `
-// World3D: put an actor on the stage${input.live ? ' (live sprite — a rigged character PERFORMS, not a photograph of itself)' : ''}
+// World3D: put an actor on the stage${oneLine(input.live ? ' (live sprite — a rigged character PERFORMS, not a photograph of itself)' : '')}
 (function() {
   if (typeof app.addWorldActor !== 'function') { return { success: false, error: 'app.addWorldActor unavailable — update FxTool' }; }
 ${needWorld}
@@ -14246,7 +14251,7 @@ ${needWorld}
           mesh.uniforms = uniforms;
         }
         return `
-// World3D: ${input.action} — a canvas path becomes real geometry
+// World3D: ${oneLine(input.action)} — a canvas path becomes real geometry
 (async function() {
   // @engine-methods extrudeToMesh latheToMesh importOBJToWorld importGLTFToWorld
   if (typeof app.${fn} !== 'function') { return { success: false, error: 'app.${fn} unavailable — update FxTool to a world3d-capable build' }; }
@@ -14364,7 +14369,7 @@ ${needWorld}
       case 'import_gltf': {
         const fn = input.action === 'import_obj' ? 'importOBJToWorld' : 'importGLTFToWorld';
         return `
-// World3D: ${input.action}
+// World3D: ${oneLine(input.action)}
 (async function() {
   // @engine-methods extrudeToMesh latheToMesh importOBJToWorld importGLTFToWorld
   if (typeof app.${fn} !== 'function') { return { success: false, error: 'app.${fn} unavailable — update FxTool to a world3d-capable build' }; }
@@ -14586,7 +14591,7 @@ ${needWorld}
   generateDesignCompose(scene: { width: number; height: number; backgroundHex?: string }, ops: Array<Record<string, unknown>>, style: string, sizeWarning?: string, report: Record<string, unknown> = {}): string {
     const S = (v: unknown) => JSON.stringify(v);
     return `
-// Design: compose a ${style} scene — ${ops.length} items, laid out server-side
+// Design: compose a ${oneLine(style)} scene — ${oneLine(ops.length)} items, laid out server-side
 (function() {
   if (typeof app.create !== 'function') { return { success: false, error: 'app.create unavailable — update FxTool' }; }
   const size = ${S({ width: scene.width, height: scene.height })};
@@ -14667,7 +14672,7 @@ ${needWorld}
 
     const fn = action === 'figure' ? 'stickFigure' : 'stickSet';
     return `
-// Stick: ${action}
+// Stick: ${oneLine(action)}
 (async function() {
   // @engine-methods stickFigure stickSet
   if (typeof app.${fn} !== 'function') { return { success: false, error: 'app.${fn} unavailable — update FxTool (the stick kit is vendored from mcp-cloud)' }; }
@@ -14768,7 +14773,7 @@ ${needWorld}
       case 'export_dotlottie': {
         const fn = input.action === 'export_lottie' ? 'exportLottie' : 'exportDotLottie';
         return `
-// Interchange: ${fn}
+// Interchange: ${oneLine(fn)}
 (async function() {
 ${guard(fn)}
   ${TO_DATA_URL_JS}
@@ -14891,7 +14896,7 @@ ${guard('exportPNGSequence')}
     const guard = (fn: string) =>
       `  if (typeof app.${fn} !== 'function') { return { success: false, error: 'app.${fn} unavailable — update FxTool' }; }`;
     const simple = (fn: string, args: string, key: string, label: string) => key === 'played' ? `
-// Sound: ${label}
+// Sound: ${oneLine(label)}
 (function() {
 ${guard(fn)}
   // A play that returns no voice played nothing, and reported success (gate
@@ -14900,7 +14905,7 @@ ${guard(fn)}
   if (__v == null) { return { success: false, error: 'nothing played: the studio returned no voice (it may have no audio output). Placed sounds (create, sequence) and render_soundtrack work without one.' }; }
   return { success: true, played: __v };
 })();`.trim() : `
-// Sound: ${label}
+// Sound: ${oneLine(label)}
 (function() {
 ${guard(fn)}
   return { success: true, ${key}: app.${fn}(${args}) };
@@ -14925,7 +14930,7 @@ ${guard(fn)}
 
       case 'from_text':
         return `
-// Sound: resolve "${input.text}" to a spec WITHOUT playing it
+// Sound: resolve ${jsLiteral(input.text)} to a spec WITHOUT playing it
 (function() {
 ${guard('buildSoundFromText')}
   const spec = app.buildSoundFromText(${S(input.text)});
@@ -14969,7 +14974,7 @@ ${guard('buildSoundFromText')}
         // checking the method a caller needs. It extracted only
         // renderSoundtrackWav until this line existed.
         return `
-// Sound: define ${input.name} at runtime
+// Sound: define ${oneLine(input.name)} at runtime
 (function() {
 ${guard(fn)}
   var name;
@@ -15159,7 +15164,7 @@ ${guard('timbreFromPath')}
       if (input[k] !== undefined) opts[k] = input[k];
     }
     return `
-// Motion: ${input.motion} on ${input.itemIds?.length ? `${input.itemIds.length} items` : input.itemId}
+// Motion: ${oneLine(input.motion)} on ${input.itemIds?.length ? `${oneLine(input.itemIds.length)} items` : input.itemId}
 (async function() {
   if (typeof app.animateItems !== 'function') { return { success: false, error: 'app.animateItems unavailable — update FxTool' }; }
   const r = await app.animateItems(${target}, ${S(opts)});
@@ -15200,7 +15205,7 @@ ${guard('timbreFromPath')}
     switch (input.action) {
       case 'boolean':
         return `
-// Path boolean: ${input.op} — CONSUMES its operands and leaves one result
+// Path boolean: ${oneLine(input.op)} — CONSUMES its operands and leaves one result
 (function() {
 ${guard('booleanOp')}${pass(`app.booleanOp(${S(input.itemIds)}, ${S(input.op)})`)}
 })();`.trim();
@@ -15228,7 +15233,7 @@ ${guard('togglePathClosed')}${pass(`app.togglePathClosed(${S(input.itemId)})`)}
 
       case 'pattern':
         return `
-// Pattern: repeat the item — ${input.kind}
+// Pattern: repeat the item — ${oneLine(input.kind)}
 (function() {
 ${guard('patternFrom')}${pass(`app.patternFrom(${S(input.itemId)}, ${S(input.kind)}, ${S(input.pattern ?? {})})`)}
 })();`.trim();
@@ -15268,7 +15273,7 @@ ${guard('unlockAllItems')}${pass('app.unlockAllItems()')}
   generateCropImage(input: CropImageInput): string {
     const opts = input.aspectRatio ? JSON.stringify({ aspectRatio: input.aspectRatio }) : '{}';
     return `
-// Crop image ${input.itemId}
+// Crop image ${oneLine(input.itemId)}
 (async function() {
   if (typeof app.cropImage !== 'function') { return { success: false, error: 'app.cropImage unavailable — update FxTool to a build with one-shot image ops' }; }
   const result = await app.cropImage(${JSON.stringify(input.itemId)}, ${JSON.stringify(input.rect)}, ${opts});
@@ -15288,7 +15293,7 @@ ${guard('unlockAllItems')}${pass('app.unlockAllItems()')}
       ...(input.smoothing !== undefined ? { smoothing: input.smoothing } : {}),
     });
     return `
-// Chroma-key image ${input.itemId}
+// Chroma-key image ${oneLine(input.itemId)}
 (async function() {
   if (typeof app.applyChromaKey !== 'function') { return { success: false, error: 'app.applyChromaKey unavailable — update FxTool to a build with one-shot image ops' }; }
   const result = await app.applyChromaKey(${JSON.stringify(input.itemId)}, ${opts});
@@ -15736,7 +15741,7 @@ ${guard('unlockAllItems')}${pass('app.unlockAllItems()')}
     const argsJson = JSON.stringify(input.args ?? []);
     const createAsJson = input.createAs ? JSON.stringify(input.createAs) : 'null';
     return `
-// Geometry construction: ${input.operation}
+// Geometry construction: ${oneLine(input.operation)}
 (function() {
   const g = app.geometry;
   if (!g || typeof g[${op}] !== 'function') {
@@ -15800,7 +15805,7 @@ ${guard('unlockAllItems')}${pass('app.unlockAllItems()')}
     const optsJson = JSON.stringify(input);
     const kindJson = JSON.stringify(input.kind);
     return `
-// Equation-driven path: ${input.kind}${input.preset ? ' ' + input.preset : ''}
+// Equation-driven path: ${oneLine(input.kind)}${oneLine(input.preset ? ' ' + input.preset : '')}
 (function() {
   if (typeof app.createEquationPath !== 'function') {
     return { success: false, error: 'app.createEquationPath unavailable — update FxTool to a build with the Expression IR equation-path API (S10 B5)' };
@@ -15825,7 +15830,7 @@ ${guard('unlockAllItems')}${pass('app.unlockAllItems()')}
       const nameJson = JSON.stringify(input.name);
       const optsJson = JSON.stringify({ payloadType: input.payloadType, x: input.x, y: input.y, ...(input.at !== undefined ? { at: input.at } : {}) });
       return `
-// Create event: ${input.name}
+// Create event: ${oneLine(input.name)}
 (function() {
   if (typeof app.createEvent !== 'function') {
     return { success: false, error: 'app.createEvent unavailable — update FxTool to a build with the event system (S11)' };
@@ -15840,7 +15845,7 @@ ${guard('unlockAllItems')}${pass('app.unlockAllItems()')}
     const eventIdJson = JSON.stringify(input.eventId);
     const payloadJson = JSON.stringify(input.payload ?? null);
     return `
-// Pulse event: ${input.eventId}
+// Pulse event: ${oneLine(input.eventId)}
 (function() {
   if (typeof app.pulseEvent !== 'function') {
     return { success: false, error: 'app.pulseEvent unavailable — update FxTool to a build with the event system (S11)' };
@@ -15988,7 +15993,7 @@ return {
  */
 export function generateAutoKeyCode(itemId: string, props: Record<string, unknown>, atTime: number, easing?: string): string {
   return `
-// Auto-key ${itemId} at ${atTime}s
+// Auto-key ${oneLine(itemId)} at ${oneLine(atTime)}s
 (function() {
   const item = app.getItemById(${JSON.stringify(itemId)});
   if (!item) return { success: false, error: ${JSON.stringify(`no item "${itemId}" on the canvas — check the id with pinepaper_get_items.`)} };
@@ -16047,7 +16052,7 @@ export function generateAutoKeyCode(itemId: string, props: Record<string, unknow
  */
 export function generateQueryMutationsCode(itemId: string, property?: string, range?: [number, number], fps = 30): string {
   return `
-// Keyframe series for ${itemId}${property ? '.' + property : ''}
+// Keyframe series for ${oneLine(itemId)}${oneLine(property ? '.' + property : '')}
 (function() {
   const item = app.getItemById(${JSON.stringify(itemId)});
   if (!item) return { success: false, error: ${JSON.stringify(`no item "${itemId}" on the canvas.`)} };

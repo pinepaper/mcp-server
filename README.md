@@ -267,6 +267,13 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   the scene plays in the studio. The result says whether the studio turned it
   on. With `character: false` there is nothing to walk, so the call is refused.
 
+### Fixed
+
+- Names, ids, colours, URLs and other text you pass now reach the studio
+  intact on every tool. Before, a quote or a line break in one could break the
+  generated code, and the call failed with a syntax error instead of doing
+  what it was asked.
+
 ## What's new in 1.6.26
 
 ### Changed

@@ -115,7 +115,7 @@ describe('the stick schema types match what the engine coerces', () => {
 describe('load_map speaks the engine vocabulary', () => {
   const optsOf = (input: unknown): Record<string, unknown> => {
     const code = codeGenerator.generateLoadMap(input as never);
-    const m = /loadMap\('[^']*',\s*(\{[\s\S]*?\})\)/.exec(code);
+    const m = /loadMap\("[^"]*",\s*(\{[\s\S]*?\})\)/.exec(code);
     if (!m) throw new Error(`no loadMap call in:\n${code}`);
     return JSON.parse(m[1]) as Record<string, unknown>;
   };

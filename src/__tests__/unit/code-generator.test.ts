@@ -25,7 +25,7 @@ describe('PinePaperCodeGenerator', () => {
     it('should generate code for text item', () => {
       const code = codeGenerator.generateCreateItem(mockTextItem);
 
-      expect(code).toContain("app.create('text'");
+      expect(code).toContain('app.create("text"');
       expect(code).toContain('Hello World');
       expect(code).toContain('400');
       expect(code).toContain('300');
@@ -36,7 +36,7 @@ describe('PinePaperCodeGenerator', () => {
     it('should generate code for circle item', () => {
       const code = codeGenerator.generateCreateItem(mockCircleItem);
 
-      expect(code).toContain("app.create('circle'");
+      expect(code).toContain('app.create("circle"');
       expect(code).toContain('50'); // radius
       expect(code).toContain('#3b82f6'); // color
     });
@@ -44,7 +44,7 @@ describe('PinePaperCodeGenerator', () => {
     it('should generate code for star item', () => {
       const code = codeGenerator.generateCreateItem(mockStarItem);
 
-      expect(code).toContain("app.create('star'");
+      expect(code).toContain('app.create("star"');
       expect(code).toContain('60'); // radius1
       expect(code).toContain('30'); // radius2
     });
@@ -167,7 +167,7 @@ describe('PinePaperCodeGenerator', () => {
     it('should generate orbits relation code', () => {
       const code = codeGenerator.generateAddRelation(mockOrbitsRelation);
 
-      expect(code).toContain("app.addRelation('item_2', 'item_1', 'orbits'");
+      expect(code).toContain('app.addRelation("item_2", "item_1", "orbits"');
       expect(code).toContain('150'); // radius
       expect(code).toContain('0.5'); // speed
     });
@@ -175,14 +175,14 @@ describe('PinePaperCodeGenerator', () => {
     it('should generate follows relation code', () => {
       const code = codeGenerator.generateAddRelation(mockFollowsRelation);
 
-      expect(code).toContain("app.addRelation('item_3', 'item_1', 'follows'");
+      expect(code).toContain('app.addRelation("item_3", "item_1", "follows"');
       expect(code).toContain('smoothing');
     });
 
     it('should generate attached_to relation code', () => {
       const code = codeGenerator.generateAddRelation(mockAttachedToRelation);
 
-      expect(code).toContain("'attached_to'");
+      expect(code).toContain('"attached_to"');
       expect(code).toContain('offset');
     });
 
@@ -194,7 +194,7 @@ describe('PinePaperCodeGenerator', () => {
     it('should generate driven_by code preserving signal + color binding params', () => {
       const code = codeGenerator.generateAddRelation(mockDrivenByRelation);
 
-      expect(code).toContain("app.addRelation('dot_1', 'planet_1', 'driven_by'");
+      expect(code).toContain('app.addRelation("dot_1", "planet_1", "driven_by"');
       expect(code).toContain('fillColor');       // sourceProperty
       expect(code).toContain('#0055ff');          // colorFrom
       expect(code).toContain('#ff3300');          // colorTo
@@ -204,7 +204,7 @@ describe('PinePaperCodeGenerator', () => {
     it('should generate time_expression self-relation preserving the expression', () => {
       const code = codeGenerator.generateAddRelation(mockTimeExpressionRelation);
 
-      expect(code).toContain("'time_expression'");
+      expect(code).toContain('"time_expression"');
       expect(code).toContain('sin(t * 2) * 50 + v'); // expression preserved verbatim
       expect(code).toContain('"signal": true');
     });
@@ -214,13 +214,13 @@ describe('PinePaperCodeGenerator', () => {
     it('should generate remove relation code with type', () => {
       const code = codeGenerator.generateRemoveRelation('item_2', 'item_1', 'orbits');
 
-      expect(code).toContain("app.removeRelation('item_2', 'item_1', 'orbits'");
+      expect(code).toContain('app.removeRelation("item_2", "item_1", "orbits"');
     });
 
     it('should generate remove relation code without type', () => {
       const code = codeGenerator.generateRemoveRelation('item_2', 'item_1');
 
-      expect(code).toContain("app.removeRelation('item_2', 'item_1', undefined");
+      expect(code).toContain('app.removeRelation("item_2", "item_1", undefined');
     });
   });
 
@@ -240,7 +240,7 @@ describe('PinePaperCodeGenerator', () => {
     it('should filter by relation type', () => {
       const code = codeGenerator.generateQueryRelations('item_1', 'orbits', 'outgoing');
 
-      expect(code).toContain("'orbits'");
+      expect(code).toContain('"orbits"');
     });
   });
 
@@ -250,7 +250,7 @@ describe('PinePaperCodeGenerator', () => {
 
       expect(code).toContain('app.getItemById("item_1")');
       expect(code).toContain('app.animate(item');
-      expect(code).toContain("animationType: 'pulse'");
+      expect(code).toContain('animationType: "pulse"');
       expect(code).toContain('animationSpeed: 1');
     });
   });
@@ -326,7 +326,7 @@ describe('PinePaperCodeGenerator', () => {
     it('should generate sunburst generator code', () => {
       const code = codeGenerator.generateExecuteGenerator(mockSunburstGenerator);
 
-      expect(code).toContain("app.executeGenerator('drawSunburst'");
+      expect(code).toContain('app.executeGenerator("drawSunburst"');
       expect(code).toContain('rayCount');
       expect(code).toContain('16');
     });
@@ -334,7 +334,7 @@ describe('PinePaperCodeGenerator', () => {
     it('should generate grid generator code', () => {
       const code = codeGenerator.generateExecuteGenerator(mockGridGenerator);
 
-      expect(code).toContain("'drawGrid'");
+      expect(code).toContain('"drawGrid"');
       expect(code).toContain('spacing');
     });
 
@@ -352,7 +352,7 @@ describe('PinePaperCodeGenerator', () => {
         params: { color: '#fbbf24', speed: 2 },
       });
 
-      expect(code).toContain("app.applyEffect(item, 'sparkle'");
+      expect(code).toContain('app.applyEffect(item, "sparkle"');
       expect(code).toContain('#fbbf24');
     });
 
@@ -363,7 +363,7 @@ describe('PinePaperCodeGenerator', () => {
         params: { radius: 100, count: 20 },
       });
 
-      expect(code).toContain("'blast'");
+      expect(code).toContain('"blast"');
       expect(code).toContain('100');
     });
   });
@@ -382,7 +382,7 @@ describe('PinePaperCodeGenerator', () => {
       });
 
       expect(code).toContain('filter');
-      expect(code).toContain("'circle'");
+      expect(code).toContain('"circle"');
     });
   });
 
@@ -410,7 +410,7 @@ describe('PinePaperCodeGenerator', () => {
     it('should generate background color code', () => {
       const code = codeGenerator.generateSetBackgroundColor({ color: '#0f172a' });
 
-      expect(code).toContain("app.setBackgroundColor('#0f172a')");
+      expect(code).toContain('app.setBackgroundColor("#0f172a")');
     });
   });
 
@@ -481,7 +481,7 @@ describe('PinePaperCodeGenerator', () => {
       const code = codeGenerator.generateAgentBatchExecute({
         operations: [{ type: 'create', itemType: 'circle', position: { x: 100, y: 200 }, properties: { radius: 50, color: '#ff0000' } }],
       });
-      expect(code).toContain("app.create('circle'");
+      expect(code).toContain('app.create("circle"');
       expect(code).toContain('100');
       expect(code).toContain('200');
       expect(code).toContain('#ff0000');
@@ -556,7 +556,7 @@ describe('PinePaperCodeGenerator', () => {
       const code = codeGenerator.generateAgentBatchExecute({
         operations: [{ type: 'execute_generator', generatorName: 'drawBokeh', generatorParams: { count: 30 } }],
       });
-      expect(code).toContain("app.executeGenerator('drawBokeh'");
+      expect(code).toContain('app.executeGenerator("drawBokeh"');
       expect(code).toContain('30');
     });
 
@@ -580,14 +580,14 @@ describe('PinePaperCodeGenerator', () => {
       });
       // 1.5.5: app.maskSystem was a phantom; calls app.applyAnimatedMask directly now.
       expect(code).toContain('app.applyAnimatedMask(item,');
-      expect(code).toContain("'wipeLeft'");
+      expect(code).toContain('"wipeLeft"');
     });
 
     it('should generate code for apply_effect operation', () => {
       const code = codeGenerator.generateAgentBatchExecute({
         operations: [{ type: 'apply_effect', itemId: 'item_1', effectType: 'sparkle', effectParams: { color: '#fbbf24' } }],
       });
-      expect(code).toContain("app.applyEffect(item, 'sparkle'");
+      expect(code).toContain('app.applyEffect(item, "sparkle"');
       expect(code).toContain('#fbbf24');
     });
 
@@ -697,7 +697,7 @@ describe('PinePaperCodeGenerator', () => {
         platform: 'youtube',
         format: 'mp4',
       });
-      expect(code).toContain("const framing = 'canvas'");
+      expect(code).toContain('const framing = "canvas"');
       expect(code).toContain('cameraDims = null');
     });
 
@@ -707,7 +707,7 @@ describe('PinePaperCodeGenerator', () => {
         format: 'mp4',
         framing: 'camera',
       });
-      expect(code).toContain("const framing = 'camera'");
+      expect(code).toContain('const framing = "camera"');
       expect(code).toContain('hasCameraAnimation');
       expect(code).toContain('getCameraAnimationParams');
       expect(code).toContain('Math.round(');
@@ -1440,7 +1440,7 @@ describe('PinePaperCodeGenerator', () => {
             } as never,
           ],
         });
-        expect(code).toContain("app.create('text'");
+        expect(code).toContain('app.create("text"');
         expect(code).toContain('Headline Title');
         expect(code).toContain('250');
         expect(code).toContain('180');
@@ -1538,7 +1538,7 @@ describe('PinePaperCodeGenerator', () => {
         });
         expect(code).toContain('"position":[10,20]');
         expect(code).toContain('"position":[30,40]');
-        expect(code).toContain("duration: 4, loop: false, timeOffset: 2, clipOutPoint: 3, timeUnits: 'seconds'");
+        expect(code).toContain('duration: 4, loop: false, timeOffset: 2, clipOutPoint: 3, timeUnits: "seconds"');
       });
 
       it('B134: unvalidated batch clip options never reach the script raw', () => {

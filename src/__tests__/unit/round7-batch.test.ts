@@ -475,7 +475,7 @@ describe('component instantiate returns its id and the keys overrides use (1.80)
 
 describe('a pathData path keeps its coordinates without a position (1.81)', () => {
   const params = (input: Record<string, unknown>) =>
-    JSON.parse(/app\.create\('path', ([\s\S]*?)\);\n/.exec(codeGenerator.generateCreateItem(input as never))![1]!);
+    JSON.parse(/app\.create\("path", ([\s\S]*?)\);\n/.exec(codeGenerator.generateCreateItem(input as never))![1]!);
 
   it('no position → no x / y sent', () => {
     const p = params({ itemType: 'path', properties: { pathData: 'M500 130 L700 130 L600 300 Z' } });
@@ -566,7 +566,7 @@ describe('gradient specs are checked (1.82)', () => {
   it('bare string stops and a missing type are normalised to a linear gradient', () => {
     const code = make({ stops: ['#ff0000', '#0000ff'] });
     expect(code).not.toContain('success: false');
-    expect(code).toContain("stops: [['#ff0000', 0], ['#0000ff', 1]]");
+    expect(code).toContain('stops: [["#ff0000", 0], ["#0000ff", 1]]');
     expect(code).toContain('radial: false');
   });
 
@@ -581,7 +581,7 @@ describe('1.81 through the HANDLER, not just the generator', () => {
     const out = JSON.stringify(await handleToolCall('pinepaper_create_item',
       { itemType: 'path', properties: { pathData: 'M100 300 L400 300 L250 500 Z' } }, { executionMode: 'code' } as never));
     // out is JSON-stringified, so the emitted code's quotes appear escaped.
-    expect(out).toContain('app.create(\'path\'');
+    expect(out).toContain('app.create(\\"path\\"');
     expect(out).not.toContain('\\"x\\": 400');
     const withPos = JSON.stringify(await handleToolCall('pinepaper_create_item',
       { itemType: 'path', position: { x: 50, y: 60 }, properties: { pathData: 'M0 0 L10 10' } }, { executionMode: 'code' } as never));

@@ -7,7 +7,7 @@ import { codeGenerator } from '../../types/code-generator.js';
 
 const params = (properties: Record<string, unknown>) => {
   const code = codeGenerator.generateCreateItem({ itemType: 'path', position: { x: 0, y: 0 }, properties });
-  return JSON.parse(/app\.create\('path', ([\s\S]*?)\);\n/.exec(code)![1]!);
+  return JSON.parse(/app\.create\("path", ([\s\S]*?)\);\n/.exec(code)![1]!);
 };
 
 describe('path color', () => {

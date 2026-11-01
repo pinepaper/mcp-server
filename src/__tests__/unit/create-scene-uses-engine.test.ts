@@ -22,7 +22,7 @@ describe('create_scene builds through the engine, not beside it', () => {
   it('calls app.create for every type', () => {
     for (const t of ['ellipse', 'triangle', 'polygon', 'heart', 'speech-bubble']) {
       const code = scene({ items: [{ name: 'x', itemType: t, position: { x: 1, y: 2 } }] });
-      expect(code, t).toContain(`app.create('${t}'`);
+      expect(code, t).toContain(`app.create("${t}"`);
     }
   });
 

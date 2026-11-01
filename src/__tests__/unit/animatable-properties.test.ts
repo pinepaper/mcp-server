@@ -53,7 +53,7 @@ describe('get_animatable_properties answers for an item', () => {
 
   it('a missing item is named, not answered for', () => {
     const code = codeGenerator.generateListItemAnimatableProperties('item_99');
-    expect(code).toContain('no item item_99');
+    expect(code).toContain(`'no item ' + "item_99"`);
   });
 });
 
