@@ -80,8 +80,9 @@ shareable. It is in invite-only beta.
 
 ### Quick start
 
-Puppeteer is an **optional** install, so a plain `npx @pinepaper.studio/mcp-server`
-has no browser: every tool then returns the code it would run instead of running
+Puppeteer is **not a dependency** of this package (not even an optional peer), so a
+plain `npx @pinepaper.studio/mcp-server` has no browser: install puppeteer to use the
+browser tools (`npm i puppeteer`, or `-p puppeteer` in the `npx` call below). Without it every tool then returns the code it would run instead of running
 it (the result says so). To execute in a real browser, install Puppeteer **in the
 same `npx` call** — a separate `npm i puppeteer` in your project is not visible to
 `npx`'s copy of the server:
@@ -246,7 +247,8 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 
 - Code an agent writes runs with whatever that browser page has. Give this server the same trust you would give anything else you let write and run code on your machine — which is the trust you already extend to an MCP client with tool access.
 - Puppeteer mode launches Chrome with `--no-sandbox` and `--disable-setuid-sandbox`. That is routine for headless automation and it does weaken Chrome's own process sandbox. If that matters where you are running it, use `code` mode or put the server in a container.
-- Puppeteer itself is an **optional** peer dependency, kept out of the default tree precisely because a headless browser plus an install script is what scanners flag hardest. Install it only if you want the executing mode.
+- Puppeteer itself is not a dependency at all (it was an optional peer until 1.6.25), kept out of the tree precisely because a headless browser plus an install script is what scanners flag hardest. Install it only if you want the executing mode. The server loads it only from where its own dependencies would be found (the same `npx` call, a global install, a project install) or from a folder you name in `PINEPAPER_PUPPETEER_FROM`; never from the folder it happens to be started in. puppeteer 22 or newer is required.
+- The package starts one child process, and only when an export is saved: `ffprobe -show_entries … <file>` (via `execFile`, no shell, fixed binary and argument list, an absolute path) to check the saved video against what the studio encoded. Without `ffprobe` on `PATH` the check is skipped and said so; `PINEPAPER_FFPROBE=off` turns it off.
 - The server itself fetches the images, SVGs and media a tool call names by URL, and reads local files named by path. URLs that resolve to loopback, private, link-local or reserved addresses are refused, redirects included, and so are cloud metadata addresses. Local files are read only from the working directory, the export folder, and folders listed in `PINEPAPER_ASSET_DIRS`. `PINEPAPER_ALLOW_PRIVATE_NETWORK=1` allows local and LAN hosts. Metadata addresses stay refused even with it set.
 
 ## What's new in 1.6.25
@@ -2552,6 +2554,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 | `PINEPAPER_API_KEY` | Service-account key (`pp_sa_…`) for the cloud-backed tools (`pinepaper_generate`) | — |
 | `PINEPAPER_CLOUD_URL` | The PinePaper cloud those tools call | `https://cloud.pinepaper.studio` |
 | `PINEPAPER_EXECUTION_MODE` | `puppeteer` (execute in a real browser) or `code` (return generated code only) | `puppeteer` |
+| `PINEPAPER_PUPPETEER_FROM` | An absolute project folder to load `puppeteer` / `puppeteer-core` from, for a strict layout (pnpm `hoist=false`, Yarn PnP strict) where the server cannot see its project's packages | unset |
 | `PINEPAPER_CHROME_PATH` | A Chromium-based browser for the canvas tools when full `puppeteer` is not installed (the Desktop extension uses your installed Chrome by default) | installed Google Chrome |
 | `PINEPAPER_EXPORT_DIR` | Directory for exported files | `~/Downloads/PinePaper` (`<tmpdir>/pinepaper-exports` where there is no Downloads folder) |
 | `PINEPAPER_LOCALE` | Language locale code | `en` |
