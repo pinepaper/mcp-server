@@ -9,6 +9,10 @@ import type { Browser, Page } from 'puppeteer';
 import { mcpLog } from '../utils/mcp-log.js';
 import { LAZY_HEAVY_SUBSYSTEMS, LAZY_HEAVY_CLASSES, ENGINE_SURFACE } from '../tools/engine-surface.js';
 import { env } from '../utils/env.js';
+import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
+import { isAbsolute, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 // =============================================================================
 // TYPES
@@ -17,7 +21,7 @@ import { env } from '../utils/env.js';
 /**
  * What a navigation waits for. Puppeteer's own union, spelled out here so the
  * env var can be validated against it without importing puppeteer — which is
- * an optional peer, absent on most installs (see connect()).
+ * not a dependency, absent on most installs (see loadPuppeteer()).
  */
 export type PageWaitUntil = 'load' | 'domcontentloaded' | 'networkidle0' | 'networkidle2';
 
@@ -225,31 +229,77 @@ const BOOTSTRAP_SUBSYSTEMS: readonly string[] = Object.freeze(
 export const BROWSER_TIME = { executeMs: 0, screenshotMs: 0 };
 
 /**
- * The browser driver. Puppeteer is an OPTIONAL peer (1.6.5): browser automation
- * is a handful of tools, and a headless-browser download with an install script
- * in the default tree is what supply-chain scanners flag hardest.
+ * The browser driver. Puppeteer is NOT a dependency of this package, not even an
+ * optional peer (it was one up to 1.6.25): browser automation is a handful of tools, and a
+ * headless-browser download with an install script is what supply-chain
+ * scanners flag hardest. A declared peer, optional or not, still puts its whole
+ * tree in a scanner's view of this package. The user installs it beside the
+ * server when they want the executing mode (README, "Install").
  *
  * Tried in order: `puppeteer` (its own Chrome), then `puppeteer-core` driving a
  * browser already on the machine (1.6.25: the Claude Desktop bundle ships
  * puppeteer-core, not a Chrome download): PINEPAPER_CHROME_PATH when set, else
  * the installed Chrome. Neither present → the install instruction, not a crash.
  */
+const PUPPETEER_MIN_MAJOR = 22;
+
+/**
+ * Import a package this server does not depend on, by a name held in a
+ * variable (so neither the build nor a scanner sees a dependency it does not
+ * have). Resolution starts from THIS package, as a declared dependency's would:
+ * `npx -p puppeteer -p @pinepaper.studio/mcp-server`, a global install of both,
+ * and a project install all put puppeteer where that finds it.
+ *
+ * It is never resolved from process.cwd(): an MCP client starts the server in
+ * whatever folder is open, which can be a cloned repository, and a
+ * node_modules/puppeteer planted there would then run as this process. The one
+ * other place looked in is a folder the user names in PINEPAPER_PUPPETEER_FROM
+ * (for a strict layout — pnpm with hoist=false, Yarn PnP strict — where a
+ * package cannot see its project's undeclared packages).
+ */
+async function importOptional(name: string): Promise<{ mod: unknown; version: string | null } | null> {
+  const versionFrom = (base: string): string | null => {
+    try {
+      const pkgPath = createRequire(base).resolve(`${name}/package.json`);
+      return String(JSON.parse(readFileSync(pkgPath, 'utf8')).version ?? '') || null;
+    } catch { return null; /* no exported package.json: version unknown, not refused */ }
+  };
+  try {
+    return { mod: await import(name), version: versionFrom(import.meta.url) };
+  } catch { /* not beside this package (or present and failing to load: treated as absent, as before) */ }
+  const from = env('PINEPAPER_PUPPETEER_FROM')?.trim();
+  if (!from || !isAbsolute(from)) return null;
+  const base = pathToFileURL(join(from, 'package.json')).href;
+  try {
+    const entry = createRequire(base).resolve(name);
+    return { mod: await import(pathToFileURL(entry).href), version: versionFrom(base) };
+  } catch { return null; }
+}
+
+function refuseOldPuppeteer(name: string, version: string | null): void {
+  const major = version ? Number(version.split('.')[0]) : NaN;
+  if (Number.isFinite(major) && major < PUPPETEER_MIN_MAJOR) {
+    throw new Error(`The browser tools need ${name} ${PUPPETEER_MIN_MAJOR} or newer; ${version} is installed. Run \`npm i ${name}@latest\` (or add -p ${name}@latest to the npx call), then retry.`);
+  }
+}
+
 async function loadPuppeteer(): Promise<{ launch: (opts: Record<string, unknown>) => Promise<Browser> }> {
-  try {
-    const full = await import('puppeteer');
-    return { launch: (opts) => full.default.launch(opts) };
-  } catch { /* not installed: try the core driver */ }
-  let core: { default: { launch: (opts: Record<string, unknown>) => Promise<Browser> } } | null = null;
-  try {
-    const specifier = 'puppeteer-core'; // a variable, so the build does not need the package installed
-    core = await import(specifier);
-  } catch { /* not installed either */ }
+  const fullName = 'puppeteer'; // a variable: see importOptional
+  const full = await importOptional(fullName) as { mod: { default: { launch: (opts: Record<string, unknown>) => Promise<Browser> } }; version: string | null } | null;
+  if (full) {
+    refuseOldPuppeteer(fullName, full.version);
+    return { launch: (opts) => full.mod.default.launch(opts) };
+  }
+  const coreName = 'puppeteer-core';
+  const coreLoaded = await importOptional(coreName) as { mod: { default: { launch: (opts: Record<string, unknown>) => Promise<Browser> } }; version: string | null } | null;
+  if (coreLoaded) refuseOldPuppeteer(coreName, coreLoaded.version);
+  const core = coreLoaded?.mod ?? null;
   if (core) {
     const executablePath = env('PINEPAPER_CHROME_PATH')?.trim();
     return {
       launch: async (opts) => {
         try {
-          return await core!.default.launch({ ...opts, ...(executablePath ? { executablePath } : { channel: 'chrome' }) });
+          return await core.default.launch({ ...opts, ...(executablePath ? { executablePath } : { channel: 'chrome' }) });
         } catch (e) {
           const why = e instanceof Error ? e.message.split('\n')[0] : String(e);
           throw new Error(executablePath
@@ -260,7 +310,7 @@ async function loadPuppeteer(): Promise<{ launch: (opts: Record<string, unknown>
     };
   }
   throw new Error(
-    'The browser tools need puppeteer, which is an optional install. Under npx, add it to the same call — args ["-y", "-p", "puppeteer", "-p", "@pinepaper.studio/mcp-server", "pinepaper-mcp"] — since a separate `npm i puppeteer` is not visible to npx\'s copy. Installed globally: `npm i -g puppeteer`; in a project: `npm i puppeteer`. Then retry. It is kept out of the default dependency tree for supply-chain hygiene.',
+    'The browser tools need puppeteer, which this package does not install: install puppeteer to use the browser tools (npm i puppeteer). Under npx, add it to the same call — args ["-y", "-p", "puppeteer", "-p", "@pinepaper.studio/mcp-server", "pinepaper-mcp"] — since a separate `npm i puppeteer` is not visible to npx\'s copy. Installed globally: `npm i -g puppeteer`; in a project: `npm i puppeteer` (with pnpm hoist=false or Yarn PnP strict, also set PINEPAPER_PUPPETEER_FROM to the project folder). Then retry. It is kept out of the dependency tree for supply-chain hygiene.',
   );
 }
 

@@ -9,6 +9,7 @@
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { execFile } from 'node:child_process';
+import { resolve as resolvePath } from 'node:path';
 import { env } from '../utils/env.js';
 
 /** What the file is, as the studio's encoder and muxer report it (FxTool AgentMode `probe`). */
@@ -78,6 +79,12 @@ export function probeFromResult(exportResult: unknown): ProbeSummary | null {
 }
 
 let ffprobeAvailable: boolean | null = null;
+/**
+ * The package's one child process. execFile, never exec or spawn with a shell: the binary is the literal `ffprobe`,
+ * the arguments an array this file writes, and the one value from outside it, the saved file's path, is made absolute
+ * first, so it can never be read as an option (a leading `-`) or an ffmpeg protocol (`concat:`, `http:`). Turn it off
+ * with PINEPAPER_FFPROBE=off.
+ */
 function run(cmd: string, args: string[]): Promise<{ ok: boolean; stdout: string; stderr: string }> {
   return new Promise((resolve) => {
     execFile(cmd, args, { timeout: 30_000, maxBuffer: 4 * 1024 * 1024 }, (err, stdout, stderr) => {
@@ -107,7 +114,7 @@ export async function verifyWithFfprobe(filePath: string, probe: ProbeSummary): 
   if (ffprobeAvailable === null) ffprobeAvailable = (await run('ffprobe', ['-version'])).ok;
   if (!ffprobeAvailable) return { tool: null, reason: 'ffprobe is not on PATH, so the file was not read back; the summary is what the studio encoded' };
   const r = await run('ffprobe', ['-v', 'error', '-show_entries',
-    'format=format_name,duration:stream=codec_type,codec_name,width,height,r_frame_rate,nb_frames', '-of', 'json', filePath]);
+    'format=format_name,duration:stream=codec_type,codec_name,width,height,r_frame_rate,nb_frames', '-of', 'json', resolvePath(filePath)]);
   if (!r.ok) return { tool: 'ffprobe', ok: false, reason: `ffprobe could not read the file: ${r.stderr.trim() || 'no reason given'}` };
   let j: { format?: { format_name?: string; duration?: string }; streams?: Array<Record<string, unknown>> };
   try { j = JSON.parse(r.stdout); } catch { return { tool: 'ffprobe', ok: false, reason: 'ffprobe printed something that is not JSON' }; }
