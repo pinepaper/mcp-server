@@ -283,6 +283,9 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   keyframes: `time_expression` for one item, a custom relation bound to a name
   pattern for many items.
 
+- `localizes_sound`, a relation from a sound to an item: the sound's stereo
+  position follows the item across the frame, in the preview and in exported
+  audio.
 - `pinepaper_agent_export { perScene: true }` exports a scene chain as one
   cached segment per scene and joins them, so an export after editing one
   scene renders only that scene. The cache key is the scene's own data, its

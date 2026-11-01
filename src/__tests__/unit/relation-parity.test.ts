@@ -72,11 +72,6 @@ const ROUTED_TO_A_TOOL: Record<string, RegExp | string[]> = {
   'tool pending: app.addAudioReactive': ['reacts_to_audio'],
   // The engine binds it itself when a 3D world is created with { control: true } (_bindWorldController, FxTool #232).
   'pinepaper_world3d create {control}': ['controls'],
-  // AgentSoundManager.addFromPrompt binds it when a prompted sound is given a targetItemId (the sound pans with that
-  // item). Held back on purpose: it pans the live preview only. A 3 s MP4 of a tone tied to an item crossing the frame
-  // was equally loud left and right at both ends (measured on prod 57cd7b41, reported to the engine), so a tool for it
-  // would report a success the video does not have. When the export honours it, rename the key to that tool.
-  'tool pending: app.agentSound.addFromPrompt {targetItemId}': ['localizes_sound'],
 };
 
 const isExcluded = (name: string) =>
