@@ -262,45 +262,44 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 
 ### Added
 
-- `pinepaper_world3d create { control: true }`: a viewer walks the 3D
-  character with the keyboard (arrows or WASD, Space jumps, Shift runs) when
-  the scene plays in the studio. The result says whether the studio turned it
-  on. With `character: false` there is nothing to walk, so the call is refused.
-
-- The `lane` toolkit includes `pinepaper_register_custom_relation`, with a
-  short lane description, so a lane agent can define a motion once and bind
-  it to many items. The lane is now 8 tools.
-- A batch relation op can bind a name pattern: `sourceId: "dot-*"` binds
-  every item named like it, in name order, each with `index` and `count` in
-  its params. Send the same op again after adding items and they join, with
-  `index` and `count` updated. `update: true` changes the params of a
-  relation already bound.
-- `pinepaper_lint_scene` lists every relation bound (from, to, type, params)
-  and every custom relation definition, so a later call can find the one to
-  change.
-
-- The `lane` toolkit says when motion should be a relation instead of
-  keyframes: `time_expression` for one item, a custom relation bound to a name
-  pattern for many items.
-
+- `pinepaper_agent_export { perScene: true }` exports a scene chain as cached
+  segments and joins them, so an export after editing one scene renders only
+  what that edit touched. The cache key is everything a segment depends on:
+  the scenes in it, their timing, the export settings and the studio build.
+  Hard cuts render scene by scene. Crossfades and cut sounds render as ranges
+  of the chain, frame for frame what a whole export shows. The sound is the
+  whole program, rendered once, so cached segments never carry a stale level
+  and there is no seam. It needs `ffmpeg` on `PATH`; without it, or for a
+  looping chain, the chain is exported whole and the result says why.
+- `pinepaper_agent_export { startTime }` exports a range of the timeline
+  (mp4 / webm): each frame is the whole export's frame at that time.
 - `localizes_sound`, a relation from a sound to an item: the sound's stereo
   position follows the item across the frame, in the preview and in exported
   audio.
-- `pinepaper_agent_export { perScene: true }` exports a scene chain as one
-  cached segment per scene and joins them, so an export after editing one
-  scene renders only that scene. The cache key is the scene's own data, its
-  length, the export settings and the studio build. It needs `ffmpeg` on
-  `PATH`. Chains with crossfades or cut sounds are exported whole for now, and
-  the result says why.
-- Custom relation definitions are saved with the scene by
-  `pinepaper_export_scene { full: true }`. `pinepaper_import_scene` registers
-  them before loading when passed `registerCustomRelations: true`, so the
-  scene's custom motion runs again. Their code runs in the studio, so this is
-  opt-in; without it, the result names the definitions the file carries.
+- Custom relations, for agents that edit a scene later:
+  - A batch relation op can bind a name pattern: `sourceId: "dot-*"` binds
+    every item named like it, in name order, each with `index` and `count` in
+    its params. Send the same op again after adding items and they join, with
+    `index` and `count` updated. `update: true` changes the params of a
+    relation already bound.
+  - `pinepaper_lint_scene` lists every relation bound (from, to, type,
+    params) and every custom relation definition.
+  - `pinepaper_export_scene { full: true }` saves the definitions with the
+    scene. `pinepaper_import_scene` registers them before loading when passed
+    `registerCustomRelations: true`. Their code runs in the studio, so this
+    is opt-in; without it, the result names them.
 - A relation option the engine never reads (a typo such as `sped`, or a
   parameter from another relation) is named in a warning, with the likely
   intended key and the list the relation does read. Before, it was accepted
   and ignored in silence.
+- The `lane` toolkit (now 8 tools) includes
+  `pinepaper_register_custom_relation`, and says when motion should be a
+  relation instead of keyframes: `time_expression` for one item, a custom
+  relation bound to a name pattern for many.
+- `pinepaper_world3d create { control: true }`: a viewer walks the 3D
+  character with the keyboard (arrows or WASD, Space jumps, Shift runs) when
+  the scene plays in the studio. The result says whether the studio turned it
+  on. With `character: false` there is nothing to walk, so the call is refused.
 
 ### Fixed
 
