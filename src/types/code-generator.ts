@@ -5454,7 +5454,22 @@ return __created;
         // The emitter embeds the id as a literal; a batch ref ($N) is only known
         // at run time, so it is generated with a placeholder and the runtime
         // variable put in its place.
-        const single = generateModifyItemCode('__MID__', (op.properties || {}) as Record<string, unknown>).trim()
+        // A TOP-LEVEL position moves the item, as it places one on create (#42: it reported modified:true and the
+        // item stayed put; only properties were read). properties.x / y / position, when given, win.
+        const modProps: Record<string, unknown> = { ...((op.properties || {}) as Record<string, unknown>) };
+        const pos = op.position as unknown;
+        const hasOwn = modProps.x !== undefined || modProps.y !== undefined || modProps.position !== undefined;
+        if (pos !== undefined && !hasOwn) {
+          const [px, py] = Array.isArray(pos) ? pos : [(pos as { x?: unknown }).x, (pos as { y?: unknown }).y];
+          if (typeof px === 'number') modProps.x = px;
+          if (typeof py === 'number') modProps.y = py;
+        }
+        if (!Object.keys(modProps).length) {
+          return `
+return { success: false, itemId: ${itemRef}, error: 'modify changes nothing: pass properties ({"x": 700}, {"fillColor": "#f00"}) or a top-level position.' };
+`;
+        }
+        const single = generateModifyItemCode('__MID__', modProps).trim()
           .replace(/"__MID__"/g, '__mid')
           .replace(/__MID__/g, "' + __mid + '")
           .replace(/;\s*$/, '');

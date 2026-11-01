@@ -258,6 +258,15 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - The package runs two binaries, both via `execFile` (no shell, fixed binary and argument list, absolute paths) from one file, and only for exports: `ffprobe -show_entries … <file>` checks a saved video against what the studio encoded (without `ffprobe` on `PATH` the check is skipped and said so; `PINEPAPER_FFPROBE=off` turns it off), and `ffmpeg -f concat` joins the cached segments of a `perScene` export (without `ffmpeg` the chain is exported whole).
 - The server itself fetches the images, SVGs and media a tool call names by URL, and reads local files named by path. URLs that resolve to loopback, private, link-local or reserved addresses are refused, redirects included, and so are cloud metadata addresses. Local files are read only from the working directory, the export folder, and folders listed in `PINEPAPER_ASSET_DIRS`. `PINEPAPER_ALLOW_PRIVATE_NETWORK=1` allows local and LAN hosts. Metadata addresses stay refused even with it set.
 
+## What's new in 1.6.28
+
+### Fixed
+
+- A batch `modify` with a top-level `position` (`{x, y}` or `[x, y]`) moves
+  the item, as `position` places one on `create`. Before, it reported
+  `modified: true` and the item stayed where it was. A `modify` with nothing
+  to change is refused by name.
+
 ## What's new in 1.6.27
 
 ### Added
