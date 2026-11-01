@@ -312,8 +312,10 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   come out byte-identical, but an MP4 can differ in its encoded bytes, so
   compare MP4s by the receipt's `frameDigest`.
 - The docs say a discrete change (a colour switching at a key) needs a `hold`
-  or `step` key, that font weight steps rather than ramps, and that two
-  patterns should not drive the same property of one item.
+  or `step` key, that font weight steps rather than ramps, that `phase_wave`
+  patterns on one item add up, and that two `ring` or `orbit` patterns on one
+  item conflict. Emitter `gravity`, `drag`, `friction`, `opacity`, `sizeEnd`
+  and `jitter` are documented as taking a `[min, max]` range.
 - A batch `modify` with a top-level `position` (`{x, y}` or `[x, y]`) moves
   the item, as `position` places one on `create`. Before, it reported
   `modified: true` and the item stayed where it was. A `modify` with nothing
