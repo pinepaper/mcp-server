@@ -257,6 +257,18 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - Puppeteer itself is an **optional** peer dependency, kept out of the default tree precisely because a headless browser plus an install script is what scanners flag hardest. Install it only if you want the executing mode.
 - The server itself fetches the images, SVGs and media a tool call names by URL, and reads local files named by path. URLs that resolve to loopback, private, link-local or reserved addresses are refused, redirects included, and so are cloud metadata addresses. Local files are read only from the working directory, the export folder, and folders listed in `PINEPAPER_ASSET_DIRS`. `PINEPAPER_ALLOW_PRIVATE_NETWORK=1` allows local and LAN hosts. Metadata addresses stay refused even with it set.
 
+## What's new in 1.6.26
+
+### Fixed
+
+- A video whose motion comes from relations (an orbit, an item attached to a
+  moving one, a generator, the camera) reported `animated: false` in its export
+  result, although the frames moved. When the studio says not animated, the
+  export now compares frames from across the video. If they differ, it reports
+  `animated: true` and says how it knows (`fidelity.checked.motion`). The
+  frozen-video check, which runs only on animated exports, now covers these
+  scenes too.
+
 ## What's new in 1.6.25
 
 ### Added

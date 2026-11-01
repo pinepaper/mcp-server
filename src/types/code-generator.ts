@@ -6734,6 +6734,27 @@ ${stillTime === undefined ? `  if (['png', 'jpg', 'webp', 'svg', 'pdf'].indexOf(
   }
 
   if (result && result.success) Object.assign(result, fidelity(format));
+  // MOTION FROM RELATIONS IS MOTION. The studio's check counts keyframe tracks
+  // and simple animations only, so an orbit (or attached_to a moving item, a
+  // generator, the camera) exported with animated:false while the frames moved,
+  // and callers rebuilt the scene with keyframes. When it says false, the
+  // frames decide: four captures across the export. The times are uneven so a
+  // loop cannot land on whole periods and look still. After the export, so it
+  // cannot touch the file.
+  if (result && result.success && ['mp4', 'webm', 'gif', 'apng'].indexOf(format) !== -1
+      && result.fidelity && result.fidelity.checked && result.fidelity.checked.animated === false
+      && typeof app.captureFramesAt === 'function') {
+    try {
+      const __mt = [0, 0.17, 0.43, 0.71].map((k) => Math.round(k * ${videoDuration} * 1000) / 1000);
+      const __mcap = typeof app.captureFramesAtAsync === 'function' ? app.captureFramesAtAsync.bind(app) : app.captureFramesAt.bind(app);
+      const __mf = await __mcap(__mt, { seed: 0, capture: (c) => (typeof app.captureFrameDataURL === 'function' ? app.captureFrameDataURL() : (c && c.toDataURL ? c.toDataURL() : '')) });
+      const __mu = new Set((__mf || []).filter((u) => typeof u === 'string' && u.length > 0));
+      if (__mu.size > 1) {
+        result.fidelity.checked.animated = true;
+        result.fidelity.checked.motion = 'frames differ across the export (sampled at ' + __mt.join(', ') + ' s): the motion comes from relations, generators or the camera, not keyframe tracks';
+      }
+    } catch (e) { /* the studio's answer stands */ }
+  }
   if (result && result.success && __lint && __lint.length && !result.lintWarnings) {
     result.lintWarnings = __lint;
     result.fidelity = result.fidelity || { warnings: [] };
