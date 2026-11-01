@@ -8438,12 +8438,14 @@ EXAMPLE: { action: 'apply', target: 'item_4', graph: { nodes: [{ id: 'in', type:
 The engine validates the document before applying it: a truncated file, a foreign JSON blob or a document from a newer major version is refused, not half-applied. Returns counts (items, animated items, keyframes, relations): compare them with the export's to confirm nothing was lost.
 
 - path: the file the export wrote (absolute, or relative to the server's working directory).
-- strict: false loads a document with validation problems anyway and returns them as warnings (default true: refuse).`,
+- strict: false loads a document with validation problems anyway and returns them as warnings (default true: refuse).
+- registerCustomRelations: true registers the custom relation definitions the file carries (a full export saves them with the scene) before loading, so its relations of those types run. Their compute and apply code runs in the studio, so pass it only for a file you trust; without it the result names them and they stay unregistered.`,
     inputSchema: {
       type: 'object',
       properties: {
         path: { type: 'string', description: 'The project document file.' },
         strict: { type: 'boolean', description: 'Refuse a document with validation problems (default true).' },
+        registerCustomRelations: { type: 'boolean', description: 'Register the custom relation definitions saved in the file first (their code runs in the studio: only for a file you trust).' },
       },
       required: ['path'],
     },

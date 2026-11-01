@@ -4516,6 +4516,7 @@ export const ExportSceneInputSchema = z.object({
 export const ImportSceneInputSchema = z.object({
   path: z.string().min(1).describe('The project document a full pinepaper_export_scene saved (absolute path, or relative to the server working directory).'),
   strict: z.boolean().optional().describe('Refuse a document with validation problems (default true). false loads anyway and returns the problems as warnings.'),
+  registerCustomRelations: z.boolean().optional().describe('Register the custom relation definitions saved in the file before loading it, so its relations of those types run. Their compute and apply code runs in the studio: pass true only for a file you trust (one this server saved). Default false: the result names them.'),
 });
 
 export const CaptureSheetSchema = z.object({

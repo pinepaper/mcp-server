@@ -11,10 +11,10 @@ import { readFile, writeFile, mkdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { confineAssetPath } from '../../utils/asset-paths.js';
-import { executeOrGenerate, getLocalizedSuccessMessage, getExportDir, errorResult, type HandlerOptions } from '../handlers.js';
+import { executeOrGenerate, getLocalizedSuccessMessage, getExportDir, errorResult, CUSTOM_RELATION_NAMES, type HandlerOptions } from '../handlers.js';
 import { exportFileLink } from '../../utils/export-dir.js';
 import { codeGenerator } from '../../types/code-generator.js';
-import { ExportTrainingDataInputSchema, ExportSceneInputSchema, ImportSceneInputSchema, ErrorCodes } from '../../types/schemas.js';
+import { ExportTrainingDataInputSchema, ExportSceneInputSchema, ImportSceneInputSchema, RegisterCustomRelationInputSchema, ErrorCodes } from '../../types/schemas.js';
 import { getBrowserController } from '../../browser/puppeteer-controller.js';
 import { getExecutionMode } from '../handlers.js';
 import { ExportStepError, errorText, verifySavedFile, writeStep } from '../export-file-check.js';
@@ -69,6 +69,20 @@ export const exportHandlers: Record<string, ExportHandler> = {
       return errorResult(ErrorCodes.EXECUTION_ERROR, `export failed at the export step: ${why}`, { code, step: 'export', path: null, reason: why }, { toolName: 'pinepaper_export_scene' });
     }
     const dir = getExportDir();
+    // CUSTOM RELATIONS TRAVEL WITH THE SCENE (#37). The engine's document keeps each bound relation by type name
+    // and not the rule a register_custom_relation call compiled, so a reload had relations nothing could run. The
+    // definitions as given (recorded on the page at registration) ride in the file under a key of this server's.
+    let customNames: string[] = [];
+    try {
+      const cr = await controller.executeCode(`(function () { return (typeof window !== 'undefined' && window.__ppCustomRelations) ? Object.values(window.__ppCustomRelations) : []; })();`, false, { bypassGovernor: true });
+      const list = cr.success && Array.isArray(cr.result) ? (cr.result as Array<{ name?: unknown }>).filter((d) => d && typeof d.name === 'string') : [];
+      if (list.length) {
+        const docOut = JSON.parse(v.json) as Record<string, unknown>;
+        docOut.mcpCustomRelations = list;
+        v.json = JSON.stringify(docOut);
+        customNames = list.map((d) => String(d.name));
+      }
+    } catch { /* the scene saves without them; nothing to report beyond the absence */ }
     const filePath = join(dir, `pinepaper_project_${Date.now()}.json`);
     // No "Project saved" without a file that exists and holds the document.
     try {
@@ -80,7 +94,9 @@ export const exportHandlers: Record<string, ExportHandler> = {
     }
     const lost = Array.isArray(v.unserialized) ? v.unserialized : [];
     const result = {
-      success: true, filePath, bytes: Buffer.byteLength(v.json), counts: v.counts, restore: `pinepaper_import_scene { path: "${filePath}" }`,
+      success: true, filePath, bytes: Buffer.byteLength(v.json), counts: v.counts,
+      restore: customNames.length ? `pinepaper_import_scene { path: "${filePath}", registerCustomRelations: true }` : `pinepaper_import_scene { path: "${filePath}" }`,
+      ...(customNames.length ? { customRelations: customNames } : {}),
       ...(lost.length ? {
         unserialized: lost,
         warning: `${lost.length} piece(s) of per-frame drawing will NOT be in the file: ${lost.map((u) => `${u.kind ?? 'callback'} ${u.id ?? ''}`.trim()).join(', ')}. They are JavaScript functions, which a document cannot carry. Re-create them as pinepaper_render_hook (saved as source) or pinepaper_emitter (saved as data) to keep them.`,
@@ -129,6 +145,30 @@ export const exportHandlers: Record<string, ExportHandler> = {
     // Staged beside the code, never inlined: a megabyte document inside the
     // generated code is what makes the governor's transform bail.
     const code = codeGenerator.generateLoadProject(input.strict !== false);
-    return executeOrGenerate(code, `Load project document ${path}`, options, 'pinepaper_import_scene', { projectDoc: text });
+    // Custom relation definitions saved with the scene are code (compute and apply bodies) that runs in the studio,
+    // and a scene file can come from anywhere, so they are registered only when asked, and before the load, so the
+    // scene's relations of those types bind.
+    const defs = Array.isArray((doc as { mcpCustomRelations?: unknown }).mcpCustomRelations)
+      ? ((doc as { mcpCustomRelations: unknown[] }).mcpCustomRelations).map((d) => RegisterCustomRelationInputSchema.safeParse(d)).filter((r) => r.success).map((r) => r.data!)
+      : [];
+    let note = '';
+    if (defs.length) {
+      const names = defs.map((d) => d.name).join(', ');
+      const mode = options.executionMode ?? getExecutionMode();
+      if (input.registerCustomRelations === true && mode !== 'code' && options.executeInBrowser) {
+        const controller = options.browserController || getBrowserController();
+        if (!controller.connected) { try { await controller.connect(); } catch { /* executeOrGenerate reports it */ } }
+        const failed: string[] = [];
+        for (const d of defs) {
+          const r = await controller.executeCode(codeGenerator.generateRegisterCustomRelation(d), false).catch(() => null);
+          const ok = !!(r && r.success && (r.result as { success?: boolean } | undefined)?.success !== false);
+          if (ok) CUSTOM_RELATION_NAMES.add(d.name); else failed.push(d.name);
+        }
+        note = failed.length ? ` — custom relations registered except ${failed.join(', ')}` : ` — custom relations registered first: ${names}`;
+      } else {
+        note = ` — this file carries custom relation definitions (${names}) that were NOT registered: their compute and apply code runs in the studio, so they load only with registerCustomRelations: true. Relations of those types in the scene do nothing until they are registered.`;
+      }
+    }
+    return executeOrGenerate(code, `Load project document ${path}${note}`, options, 'pinepaper_import_scene', { projectDoc: text });
   },
 };

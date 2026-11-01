@@ -283,6 +283,11 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   keyframes: `time_expression` for one item, a custom relation bound to a name
   pattern for many items.
 
+- Custom relation definitions are saved with the scene by
+  `pinepaper_export_scene { full: true }`. `pinepaper_import_scene` registers
+  them before loading when passed `registerCustomRelations: true`, so the
+  scene's custom motion runs again. Their code runs in the studio, so this is
+  opt-in; without it, the result names the definitions the file carries.
 - A relation option the engine never reads (a typo such as `sped`, or a
   parameter from another relation) is named in a warning, with the likely
   intended key and the list the relation does read. Before, it was accepted
