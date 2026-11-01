@@ -6,9 +6,8 @@
  *   loaded only if the user installed it, by a name held in a variable.
  * - It is never resolved from process.cwd(): an MCP client starts the server in whatever folder is open, which can
  *   be an untrusted checkout with a planted node_modules/puppeteer.
- * - The package starts no process. ffprobe and ffmpeg run through the optional add-on @pinepaper.studio/mcp-ffmpeg
- *   (packages/mcp-ffmpeg), loaded by a name held in a variable and never a dependency, so a scanner does not fold
- *   its shell access into this package. The add-on runs those two binaries only, via execFile (no shell).
+ * - The package starts no process. ffprobe and ffmpeg run through packages/mcp-ffmpeg, which is never published
+ *   (private) and only the .mcpb bundles; it is loaded by a name held in a variable and is never a dependency. The add-on runs those two binaries only, via execFile (no shell).
  * - No eval and no new Function in the source.
  */
 import { describe, expect, test } from 'bun:test';
@@ -65,6 +64,7 @@ describe('supply-chain surface', () => {
     expect(Object.keys(pkg.optionalDependencies ?? {})).not.toContain('@pinepaper.studio/mcp-ffmpeg');
     const receipt = readFileSync(join(ROOT, 'src', 'tools', 'export-file-receipt.ts'), 'utf8');
     expect(receipt).toMatch(/const spec = FFMPEG_ADDON;[\s\S]*await import\(spec\)/);
+    expect(JSON.parse(readFileSync(join(ROOT, 'packages', 'mcp-ffmpeg', 'package.json'), 'utf8')).private).toBe(true);
     const addon = readFileSync(join(ROOT, 'packages', 'mcp-ffmpeg', 'index.js'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
     expect(addon).toMatch(/import \{ execFile \} from 'node:child_process'/);
     expect(addon).not.toMatch(/\b(exec|execSync|spawn|spawnSync|fork)\b\s*\(/);

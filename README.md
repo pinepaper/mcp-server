@@ -257,7 +257,7 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - Code an agent writes runs with whatever that browser page has. Give this server the same trust you would give anything else you let write and run code on your machine — which is the trust you already extend to an MCP client with tool access.
 - Puppeteer mode launches Chrome with `--no-sandbox` and `--disable-setuid-sandbox`. That is routine for headless automation and it does weaken Chrome's own process sandbox. If that matters where you are running it, use `code` mode or put the server in a container.
 - Puppeteer itself is not a dependency at all (it was an optional peer until 1.6.25), kept out of the tree precisely because a headless browser plus an install script is what scanners flag hardest. Install it only if you want the executing mode. The server loads it only from where its own dependencies would be found (the same `npx` call, a global install, a project install) or from a folder you name in `PINEPAPER_PUPPETEER_FROM`; never from the folder it happens to be started in. puppeteer 22 or newer is required.
-- The package starts no process. Two export features use `ffprobe` and `ffmpeg`, and they run through a separate, optional add-on, [`@pinepaper.studio/mcp-ffmpeg`](packages/mcp-ffmpeg): `ffprobe` checks a saved video against what the studio encoded, and `ffmpeg -f concat` joins the cached segments of a `perScene` export. The add-on runs only those two binaries, via `execFile` (no shell, argument lists the server writes, absolute paths). Without it the check is skipped and said so, and a `perScene` export runs whole. To add it: `npx -y -p @pinepaper.studio/mcp-server -p @pinepaper.studio/mcp-ffmpeg pinepaper-mcp`. The Claude Desktop extension includes it.
+- The npm package starts no process. Two export features use `ffprobe` and `ffmpeg`: checking a saved video against what the studio encoded, and joining the cached segments of a `perScene` export (`ffmpeg -f concat`). Only the Claude Desktop extension runs them, through a small runner it bundles that allows those two binaries alone, via `execFile` (no shell, argument lists the server writes, absolute paths). From npm, the check is skipped and said so, and a `perScene` export runs whole.
 - The server itself fetches the images, SVGs and media a tool call names by URL, and reads local files named by path. URLs that resolve to loopback, private, link-local or reserved addresses are refused, redirects included, and so are cloud metadata addresses. Local files are read only with `PINEPAPER_ALLOW_LOCAL_FILES=1`, and then only from the working directory, the export folder, and folders listed in `PINEPAPER_ASSET_DIRS` (the export folder is readable without the switch). `PINEPAPER_ALLOW_PRIVATE_NETWORK=1` allows local and LAN hosts. Metadata addresses stay refused even with it set.
 
 ## What's new in 1.6.28
@@ -273,11 +273,10 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   names it. Files in the export folder stay readable, so saving and restoring a
   scene works as before. URL imports are unchanged. In the Claude Desktop
   extension both are settings ("Allow custom code", "Allow local files").
-- **The server starts no process.** `ffprobe` (checking a saved video) and
-  `ffmpeg` (joining a `perScene` export) moved to an optional add-on,
-  `@pinepaper.studio/mcp-ffmpeg`. Install it beside the server to keep them:
-  `npx -y -p @pinepaper.studio/mcp-server -p @pinepaper.studio/mcp-ffmpeg pinepaper-mcp`.
-  The Claude Desktop extension includes it.
+- **The npm package starts no process.** `ffprobe` (checking a saved video)
+  and `ffmpeg` (joining a `perScene` export) now run only in the Claude
+  Desktop extension, which bundles them. From npm, a `perScene` export runs as
+  one whole export and says why.
 
 ### Added
 

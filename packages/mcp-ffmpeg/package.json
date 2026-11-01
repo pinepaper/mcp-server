@@ -1,7 +1,8 @@
 {
   "name": "@pinepaper.studio/mcp-ffmpeg",
   "version": "1.0.0",
-  "description": "Optional add-on for @pinepaper.studio/mcp-server: lets it run ffmpeg / ffprobe (per-scene cached exports, reading a saved video back).",
+  "private": true,
+  "description": "Internal, never published: the ffmpeg / ffprobe runner the Claude Desktop extension (.mcpb) bundles beside @pinepaper.studio/mcp-server. The npm package runs no external programs.",
   "type": "module",
   "main": "index.js",
   "types": "index.d.ts",
@@ -32,8 +33,5 @@
     "pinepaper",
     "mcp",
     "ffmpeg"
-  ],
-  "publishConfig": {
-    "access": "public"
-  }
+  ]
 }

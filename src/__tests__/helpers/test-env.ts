@@ -13,7 +13,7 @@ if (!process.env.PINEPAPER_EXPORT_DIR) process.env.PINEPAPER_EXPORT_DIR = mkdtem
 /*
  * The high-impact capabilities are OFF by default (utils/capabilities.ts). Most tests exercise what they do, so the
  * suite runs with both on; capabilities.test.ts turns them off to check the refusals. ffprobe / ffmpeg run through the
- * add-on, which an installed server loads by name; here it is the in-repo copy.
+ * runner in packages/mcp-ffmpeg, which the .mcpb bundles; here it is the in-repo copy.
  */
 import { setCapability } from '../../utils/capabilities.js';
 import { setFfmpegRunner } from '../../tools/export-file-receipt.js';

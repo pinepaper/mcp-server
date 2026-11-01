@@ -15,9 +15,9 @@
  * (capability-footprint.test.ts), because the npm package is what supply-chain
  * scores read.
  *
- * THE FFMPEG ADD-ON (@pinepaper.studio/mcp-ffmpeg, packages/mcp-ffmpeg) is
- * copied into the bundle's node_modules for the same reason: the npm package
- * starts no process, the bundle can.
+ * THE FFMPEG RUNNER (packages/mcp-ffmpeg, never published) is copied into
+ * the bundle's node_modules for the same reason: the npm package starts no
+ * process, the bundle can.
  *
  * Installs with --ignore-scripts and --omit=dev into a staging folder, and
  * writes the zip with the system `zip`. Validate the result with the official

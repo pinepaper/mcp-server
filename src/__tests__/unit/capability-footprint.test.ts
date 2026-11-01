@@ -33,7 +33,7 @@ describe('capability footprint of the published code', () => {
     expect(using(/process\.env/)).toEqual(['utils/env.ts', 'utils/safe-fetch.ts']);
   });
 
-  it('runs no command: ffmpeg / ffprobe live in the optional @pinepaper.studio/mcp-ffmpeg add-on', () => {
+  it('runs no command: ffmpeg / ffprobe live in packages/mcp-ffmpeg, bundled in the .mcpb only', () => {
     expect(using(/child_process/)).toEqual([]);
   });
 

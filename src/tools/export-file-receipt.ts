@@ -79,11 +79,12 @@ export function probeFromResult(exportResult: unknown): ProbeSummary | null {
 
 let ffprobeAvailable: boolean | null = null;
 /**
- * ffprobe and ffmpeg run through the optional add-on @pinepaper.studio/mcp-ffmpeg, so this package starts no
- * process itself. The add-on runs only those two binaries, through execFile (no shell), with the arguments array
- * this file writes; file paths are made absolute first, so none can be read as an option (a leading `-`) or an
- * ffmpeg protocol (`concat:`, `http:`). Without the add-on both are simply unavailable: the receipt says the file
- * was not read back, and a per-scene export runs whole. Turn the read-back off with PINEPAPER_FFPROBE=off.
+ * ffprobe and ffmpeg run through packages/mcp-ffmpeg, which is never published: only the Claude Desktop extension
+ * (.mcpb) carries it, in its node_modules. So the npm package starts no process. The runner allows only those two
+ * binaries, through execFile (no shell), with the arguments array this file writes; file paths are made absolute
+ * first, so none can be read as an option (a leading `-`) or an ffmpeg protocol (`concat:`, `http:`). Without it both
+ * are unavailable: the receipt says the file was not read back, and a per-scene export runs whole. Turn the
+ * read-back off with PINEPAPER_FFPROBE=off.
  *
  * The specifier is a variable so a bundler does not try to resolve a package that is not a dependency.
  */
@@ -106,7 +107,7 @@ async function loadRunner(): Promise<Runner | null> {
 export async function hasFfmpegAddon(): Promise<boolean> { return (await loadRunner()) !== null; }
 async function run(cmd: 'ffprobe' | 'ffmpeg', args: string[], timeout = 30_000): Promise<{ ok: boolean; stdout: string; stderr: string }> {
   const r = await loadRunner();
-  if (!r) return { ok: false, stdout: '', stderr: `${cmd} runs through the optional ${FFMPEG_ADDON} add-on, which is not installed` };
+  if (!r) return { ok: false, stdout: '', stderr: `${cmd} is not run by the npm package (it starts no external programs); the Claude Desktop extension runs it` };
   return r(cmd, args, timeout);
 }
 
@@ -132,7 +133,7 @@ export async function verifyWithFfprobe(filePath: string, probe: ProbeSummary): 
   if (!ffprobeAvailable) {
     return { tool: null, reason: (await hasFfmpegAddon())
       ? 'ffprobe is not on PATH, so the file was not read back; the summary is what the studio encoded'
-      : `the file was not read back (that needs the optional ${FFMPEG_ADDON} add-on and ffprobe on PATH); the summary is what the studio encoded` };
+      : 'the file was not read back: the npm package runs no external programs (the Claude Desktop extension checks a saved video with ffprobe); the summary is what the studio encoded' };
   }
   const r = await run('ffprobe', ['-v', 'error', '-show_entries',
     'format=format_name,duration:stream=codec_type,codec_name,width,height,r_frame_rate,nb_frames', '-of', 'json', resolvePath(filePath)]);

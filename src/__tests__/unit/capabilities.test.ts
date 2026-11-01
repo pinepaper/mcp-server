@@ -100,14 +100,14 @@ describe('capabilities are off by default', () => {
   });
 });
 
-describe('without the ffmpeg add-on', () => {
+describe('without the ffmpeg runner (the npm package)', () => {
   afterAll(() => setFfmpegRunner(ffmpegAddonRun));
-  it('the receipt says the file was not read back and names the add-on', async () => {
+  it('the receipt says the file was not read back and where it is', async () => {
     setFfmpegRunner(null);
     const f = join(mkdtempSync(join(tmpdir(), 'pp-cap-')), 'v.mp4');
     writeFileSync(f, 'x');
     const r = await verifyWithFfprobe(f, { container: 'mp4', codec: 'avc1', width: 2, height: 2, fps: 30, durationS: 1, frames: 30, audio: null } as never);
     expect(r.tool).toBeNull();
-    expect(r.reason).toContain('@pinepaper.studio/mcp-ffmpeg');
+    expect(r.reason).toContain('Claude Desktop extension');
   });
 });

@@ -9,8 +9,8 @@
  *
  * Nor may it load node:child_process (1.6.28). A scanner reads the published
  * files, and shell access in any of them is an alert on the whole package:
- * ffmpeg and ffprobe run through the optional @pinepaper.studio/mcp-ffmpeg
- * add-on instead (packages/mcp-ffmpeg).
+ * ffmpeg and ffprobe run through packages/mcp-ffmpeg, which only the Claude
+ * Desktop extension bundles; it is never published.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -35,7 +35,7 @@ if (hits.length) {
   process.exit(1);
 }
 if (shell.length) {
-  console.error(`dist/ loads node:child_process, which belongs in the @pinepaper.studio/mcp-ffmpeg add-on:\n  ${shell.join('\n  ')}`);
+  console.error(`dist/ loads node:child_process, which belongs in packages/mcp-ffmpeg (bundled in the .mcpb only):\n  ${shell.join('\n  ')}`);
   process.exit(1);
 }
 console.log('✅ dist/ does not refer to @modelcontextprotocol/sdk or load node:child_process');
