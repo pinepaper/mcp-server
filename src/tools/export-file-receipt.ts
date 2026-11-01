@@ -211,12 +211,24 @@ export async function segmentStreams(filePath: string): Promise<{ ok: boolean; s
  * to 90 ms of silence at each seam; decoded and re-encoded, the next scene's sound starts on the cut (measured). The
  * list file holds absolute paths, quoted for the demuxer; -safe 0 lets it read them.
  */
-export async function concatSegments(segments: string[], listFile: string, outFile: string, opts: { audio?: boolean; format?: string } = {}): Promise<{ ok: boolean; reason?: string }> {
+export async function concatSegments(segments: string[], listFile: string, outFile: string, opts: { audio?: boolean; format?: string; videoOnly?: boolean } = {}): Promise<{ ok: boolean; reason?: string }> {
   const { writeFile } = await import('node:fs/promises');
   const quote = (p: string) => `'${resolvePath(p).replace(/'/g, "'\\''")}'`;
   await writeFile(listFile, segments.map((p) => `file ${quote(p)}`).join('\n') + '\n', 'utf-8');
-  const audio = opts.audio ? (opts.format === 'webm' ? ['-c:a', 'libopus', '-b:a', '128k'] : ['-c:a', 'aac', '-b:a', '192k']) : [];
+  const audio = opts.videoOnly ? ['-an'] : opts.audio ? (opts.format === 'webm' ? ['-c:a', 'libopus', '-b:a', '128k'] : ['-c:a', 'aac', '-b:a', '192k']) : [];
   const r = await run('ffmpeg', ['-v', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', resolvePath(listFile), '-c:v', 'copy', ...audio,
     ...(opts.format === 'webm' ? [] : ['-movflags', '+faststart']), resolvePath(outFile)], 300_000);
+  return r.ok ? { ok: true } : { ok: false, reason: r.stderr.trim() || 'ffmpeg failed with no message' };
+}
+
+/**
+ * Put one audio file under a video: the video stream copied, the audio encoded for the container, cut to the
+ * video's length. The per-scene export's program audio (the studio's own full-export bake) goes on this way, so a
+ * cached segment never carries a level that an edit elsewhere changed, and there is no seam to hear.
+ */
+export async function muxAudio(videoFile: string, audioFile: string, outFile: string, opts: { format?: string; seconds: number }): Promise<{ ok: boolean; reason?: string }> {
+  const codec = opts.format === 'webm' ? ['-c:a', 'libopus', '-b:a', '128k'] : ['-c:a', 'aac', '-b:a', '192k'];
+  const r = await run('ffmpeg', ['-v', 'error', '-y', '-i', resolvePath(videoFile), '-i', resolvePath(audioFile), '-map', '0:v:0', '-map', '1:a:0',
+    '-c:v', 'copy', ...codec, '-t', String(opts.seconds), ...(opts.format === 'webm' ? [] : ['-movflags', '+faststart']), resolvePath(outFile)], 300_000);
   return r.ok ? { ok: true } : { ok: false, reason: r.stderr.trim() || 'ffmpeg failed with no message' };
 }

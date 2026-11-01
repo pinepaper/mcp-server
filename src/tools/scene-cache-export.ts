@@ -21,18 +21,20 @@ import { mkdir, stat, copyFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { CallToolResult } from '../mcp/index.js';
-import { hasFfmpeg, segmentStreams, concatSegments } from './export-file-receipt.js';
+import { hasFfmpeg, segmentStreams, concatSegments, muxAudio } from './export-file-receipt.js';
 import { exportFileLink } from '../utils/export-dir.js';
 
 interface ChainEntry { sceneId: string; duration: number; transition: string | null; cutSound: boolean }
-interface ChainInfo { ok: boolean; reason?: string; chain?: ChainEntry[]; entries?: unknown[]; loop?: boolean; ranges?: boolean; current?: string | null; scenes?: string; buildId?: string | null }
+interface ChainInfo { ok: boolean; reason?: string; chain?: ChainEntry[]; entries?: unknown[]; loop?: boolean; ranges?: boolean; programAudio?: boolean; current?: string | null; scenes?: string; buildId?: string | null }
 
 /** What the export needs from the studio and the server, injected so the flow is testable without either. */
 export interface SceneCacheDeps {
   exec: (code: string) => Promise<{ success: boolean; result?: unknown; error?: string }>;
   exportOnce: (args: Record<string, unknown>) => Promise<CallToolResult>;
   exportDir: string;
-  ffmpeg?: { available: () => Promise<boolean>; streams: typeof segmentStreams; concat: typeof concatSegments };
+  /** The studio's program audio for `seconds` (exportProgramAudio), saved to a local WAV; null when it cannot. */
+  programAudio?: (seconds: number) => Promise<{ file: string } | { reason: string }>;
+  ffmpeg?: { available: () => Promise<boolean>; streams: typeof segmentStreams; concat: typeof concatSegments; mux?: typeof muxAudio };
 }
 
 const READ_CHAIN = `(function () {
@@ -44,6 +46,7 @@ const READ_CHAIN = `(function () {
     entries: JSON.parse(JSON.stringify(sm.sceneChain)),
     loop: sm.chainLoop === true,
     ranges: !!(app.exportEngine && app.exportEngine.supportsTimeRange === true),
+    programAudio: !!(app.exportEngine && app.exportEngine.supportsProgramAudio === true),
     current: sm.currentSceneId || null,
     scenes: typeof sm.exportScenes === 'function' ? sm.exportScenes() : '',
     buildId: app.buildId || null,
@@ -104,7 +107,7 @@ export function segmentKey(sceneData: unknown, durationMs: number, settings: Rec
 }
 
 export async function exportPerScene(args: Record<string, unknown>, format: string, deps: SceneCacheDeps): Promise<CallToolResult> {
-  const ff = deps.ffmpeg ?? { available: hasFfmpeg, streams: segmentStreams, concat: concatSegments };
+  const ff = deps.ffmpeg ?? { available: hasFfmpeg, streams: segmentStreams, concat: concatSegments, mux: muxAudio };
   const { perScene: _p, ...settings } = args;
   const whole = async (why: string): Promise<CallToolResult> => {
     const r = await deps.exportOnce(settings);
@@ -126,6 +129,10 @@ export async function exportPerScene(args: Record<string, unknown>, format: stri
     scenesById = new Map((parsed.scenes ?? []).filter((s) => s && typeof s.id === 'string').map((s) => [s.id as string, s]));
   } catch { return whole('the studio\'s scene export did not parse'); }
 
+  // PROGRAM AUDIO (FxTool #251): segments render without sound and the studio's own full-export audio goes on once,
+  // after the join. A cached segment's sound would otherwise carry a master level an edit elsewhere has changed.
+  const program = info.programAudio === true && !!deps.programAudio && !!ff.mux;
+  const segSettings: Record<string, unknown> = program ? { ...settings, audio: false } : settings;
   const cacheDir = join(deps.exportDir, '.scene-cache');
   await mkdir(cacheDir, { recursive: true });
   const segments: Array<{ sceneId: string; file: string; cached: boolean; seconds: number }> = [];
@@ -136,10 +143,10 @@ export async function exportPerScene(args: Record<string, unknown>, format: stri
     const chain = info.chain!;
     for (const seg of rangeSegments(chain, fps)) {
       const inputs = [seg.index - 1, seg.index].filter((k) => k >= 0).map((k) => ({ scene: scenesById.get(chain[k].sceneId) ?? null, entry: (info.entries ?? [])[k] ?? null }));
-      const file = join(cacheDir, `${segmentKey({ range: seg, inputs }, Math.round(seg.duration * 1000), settings, info.buildId ?? null)}.${format}`);
+      const file = join(cacheDir, `${segmentKey({ range: seg, inputs }, Math.round(seg.duration * 1000), segSettings, info.buildId ?? null)}.${format}`);
       const sceneId = chain[seg.index].sceneId;
       if (existsSync(file)) { segments.push({ sceneId, file, cached: true, seconds: seg.duration }); continue; }
-      const r = await deps.exportOnce({ ...settings, startTime: seg.start, duration: seg.duration });
+      const r = await deps.exportOnce({ ...segSettings, startTime: seg.start, duration: seg.duration });
       const made = /File: (\S+)/.exec(textOf(r))?.[1];
       if (r.isError || !made) return whole(`the range from ${seg.start} s (scene ${JSON.stringify(sceneId)}) did not export: ${textOf(r).slice(0, 200)}`);
       await copyFile(made, file);
@@ -150,13 +157,13 @@ export async function exportPerScene(args: Record<string, unknown>, format: stri
       const scene = scenesById.get(entry.sceneId);
       if (!scene) return whole(`scene ${JSON.stringify(entry.sceneId)} is in the chain but not in the studio's scene list`);
       const seconds = entry.duration / 1000;
-      const file = join(cacheDir, `${segmentKey(scene, entry.duration, settings, info.buildId ?? null)}.${format}`);
+      const file = join(cacheDir, `${segmentKey(scene, entry.duration, segSettings, info.buildId ?? null)}.${format}`);
       if (existsSync(file)) { segments.push({ sceneId: entry.sceneId, file, cached: true, seconds }); continue; }
       const loaded = await deps.exec(LOAD_ALONE(entry.sceneId));
       if (!loaded.success || (loaded.result as { success?: boolean } | undefined)?.success === false) {
         return whole(`scene ${JSON.stringify(entry.sceneId)} could not be loaded on its own`);
       }
-      const r = await deps.exportOnce({ ...settings, duration: seconds });
+      const r = await deps.exportOnce({ ...segSettings, duration: seconds });
       const made = /File: (\S+)/.exec(textOf(r))?.[1];
       if (r.isError || !made) return whole(`scene ${JSON.stringify(entry.sceneId)} did not export: ${textOf(r).slice(0, 200)}`);
       await copyFile(made, file);
@@ -172,14 +179,29 @@ export async function exportPerScene(args: Record<string, unknown>, format: stri
   if (bad >= 0) return whole(`segment ${bad + 1} (${segments[bad].sceneId}) does not match the first one's streams${sigs[bad].reason ? ': ' + sigs[bad].reason : ''} (a scene with sound beside one without, for instance)`);
 
   const out = join(deps.exportDir, `pinepaper_scenes_${Date.now()}.${format}`);
+  const total = Math.round(segments.reduce((a, s) => a + s.seconds, 0) * 1000) / 1000;
   const hasAudio = /"audio"/.test(sigs[0].signature ?? '');
-  const joined = await ff.concat(segments.map((s) => s.file), join(cacheDir, `join_${Date.now()}.txt`), out, { audio: hasAudio, format });
-  if (!joined.ok) return whole(`ffmpeg could not join the segments: ${joined.reason}`);
+  let audioNote: string | undefined;
+  if (program) {
+    const videoOnly = join(cacheDir, `video_${Date.now()}.${format}`);
+    const joined = await ff.concat(segments.map((s) => s.file), join(cacheDir, `join_${Date.now()}.txt`), videoOnly, { format, videoOnly: true });
+    if (!joined.ok) return whole(`ffmpeg could not join the segments: ${joined.reason}`);
+    const wav = await deps.programAudio!(total);
+    if ('reason' in wav) return whole(`the program audio could not be rendered: ${wav.reason}`);
+    const muxed = await ff.mux!(videoOnly, wav.file, out, { format, seconds: total });
+    if (!muxed.ok) return whole(`ffmpeg could not put the program audio on: ${muxed.reason}`);
+    audioNote = 'the audio is the whole program, rendered once by the studio (the same mix a whole export carries)';
+  } else {
+    const joined = await ff.concat(segments.map((s) => s.file), join(cacheDir, `join_${Date.now()}.txt`), out, { audio: hasAudio, format });
+    if (!joined.ok) return whole(`ffmpeg could not join the segments: ${joined.reason}`);
+    if (hasAudio) audioNote = 'the audio is joined from the segments (re-encoded at the seams); a studio with program audio renders it whole';
+  }
   const bytes = (await stat(out)).size;
   const reused = segments.filter((s) => s.cached).length;
   const result = {
     success: true, format, filePath: out, bytes,
-    duration: Math.round(segments.reduce((a, s) => a + s.seconds, 0) * 1000) / 1000,
+    duration: total,
+    ...(audioNote ? { audio: audioNote } : {}),
     perScene: { mode: ranges ? 'chain ranges (transitions kept)' : 'scene by scene (hard cuts)', segments: segments.length, rendered: segments.length - reused, reused, cache: cacheDir },
     scenes: segments.map((s) => ({ sceneId: s.sceneId, seconds: s.seconds, cached: s.cached })),
     note: reused ? `${reused} of ${segments.length} scenes came from the cache: only what changed was rendered.` : 'every scene was rendered and cached; an export after editing one scene renders only that one.',

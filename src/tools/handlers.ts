@@ -4734,6 +4734,19 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
               exec: (c) => ctl.executeCode(c, false, { bypassGovernor: true }),
               exportOnce: (a) => handleToolCall('pinepaper_agent_export', a, options),
               exportDir: getExportDir(),
+              programAudio: async (seconds) => {
+                const r = await ctl.executeCode(`(async function () {
+  const E = app.exportEngine;
+  if (!E || E.supportsProgramAudio !== true) return { ok: false, reason: 'this studio cannot render program audio' };
+  return await E.exportProgramAudio({ format: 'wav', sampleRate: 48000, duration: ${Number(seconds)} });
+})();`, false, { bypassGovernor: true, governorTimeoutMs: 600_000 });
+                const v = (r.result ?? {}) as { ok?: boolean; reason?: string; error?: string; exportId?: string; size?: number };
+                if (!r.success || !v.ok || !v.exportId || !v.size) return { reason: v.reason || v.error || r.error || 'no program audio came back' };
+                try {
+                  const saved = await streamRetainedExportToFile(ctl as never, { exportId: v.exportId, size: v.size, format: 'wav' }, 'program_audio');
+                  return { file: saved.filePath };
+                } catch (e) { return { reason: e instanceof Error ? e.message : String(e) }; }
+              },
             });
           }
         }

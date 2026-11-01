@@ -130,3 +130,27 @@ describe('agent_export startTime', () => {
     expect(codeGenerator.generateAgentExport({ format: 'mp4', duration: 2 })).not.toContain('supportsTimeRange');
   });
 });
+
+describe('perScene with program audio (FxTool #251)', () => {
+  it('segments render silent, the video joins alone, and the studio program audio goes on once, cut to length', async () => {
+    const chain = [{ sceneId: 's1' }, { sceneId: 's2' }];
+    const h = harness(chain);
+    const exec0 = h.deps.exec;
+    h.deps.exec = async (code: string) => {
+      const r = await exec0(code);
+      if (code.includes('sm.sceneChain.map')) (r.result as Record<string, unknown>).programAudio = true;
+      return r;
+    };
+    const asked: Array<Record<string, unknown>> = [];
+    const once = h.deps.exportOnce;
+    h.deps.exportOnce = async (a: Record<string, unknown>) => { asked.push(a); return once(a); };
+    const calls: string[] = [];
+    (h.deps.ffmpeg as Record<string, unknown>).concat = async (_s: string[], _l: string, out: string, o: { videoOnly?: boolean }) => { calls.push(`concat videoOnly=${!!o?.videoOnly}`); writeFileSync(out, 'v'); return { ok: true }; };
+    (h.deps.ffmpeg as Record<string, unknown>).mux = async (_v: string, _a: string, out: string, o: { seconds: number }) => { calls.push(`mux ${o.seconds}`); writeFileSync(out, 'va'); return { ok: true }; };
+    (h.deps as Record<string, unknown>).programAudio = async (s: number) => { calls.push(`program ${s}`); return { file: '/tmp/x.wav' }; };
+    const r = JSON.parse(text(await exportPerScene({ format: 'mp4' }, 'mp4', h.deps as never)).split('\n\n')[1]);
+    expect(asked.every((a) => a.audio === false)).toBe(true);
+    expect(calls).toEqual(['concat videoOnly=true', 'program 4', 'mux 4']);
+    expect(r.audio).toContain('whole program');
+  });
+});
