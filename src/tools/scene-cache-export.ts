@@ -33,7 +33,7 @@ export interface SceneCacheDeps {
   exportOnce: (args: Record<string, unknown>) => Promise<CallToolResult>;
   exportDir: string;
   /** The studio's program audio for `seconds` (exportProgramAudio), saved to a local WAV; null when it cannot. */
-  programAudio?: (seconds: number) => Promise<{ file: string } | { reason: string }>;
+  programAudio?: (seconds: number) => Promise<{ file: string } | { none: true } | { reason: string }>;
   ffmpeg?: { available: () => Promise<boolean>; streams: typeof segmentStreams; concat: typeof concatSegments; mux?: typeof muxAudio };
 }
 
@@ -109,14 +109,17 @@ export function segmentKey(sceneData: unknown, durationMs: number, settings: Rec
 export async function exportPerScene(args: Record<string, unknown>, format: string, deps: SceneCacheDeps): Promise<CallToolResult> {
   const ff = deps.ffmpeg ?? { available: hasFfmpeg, streams: segmentStreams, concat: concatSegments, mux: muxAudio };
   const { perScene: _p, ...settings } = args;
+  let chainSeconds: number | undefined;
   const whole = async (why: string): Promise<CallToolResult> => {
-    const r = await deps.exportOnce(settings);
+    // A chain exported whole runs its length: the export's own default (5 s) would cut a longer one short.
+    const r = await deps.exportOnce(args.duration === undefined && chainSeconds ? { ...settings, duration: chainSeconds } : settings);
     const note = `perScene was not used: ${why}.`;
     return { ...r, content: [{ type: 'text' as const, text: note }, ...(r.content ?? [])] };
   };
 
   const info = (await deps.exec(READ_CHAIN)).result as ChainInfo | undefined;
   if (!info || !info.ok) return whole(info?.reason ?? 'the studio did not report its scene chain');
+  chainSeconds = (info.chain ?? []).reduce((a, e) => a + Math.max(0, e.duration) / 1000, 0) || undefined;
   if (info.loop) return whole('the chain loops, and a per-scene export joins one pass; export it whole');
   const refusal = perSceneRefusal(info.chain, format);
   const ranges = !!refusal && needsRanges(info.chain) && info.ranges === true && (format === 'mp4' || format === 'webm');
@@ -187,10 +190,17 @@ export async function exportPerScene(args: Record<string, unknown>, format: stri
     const joined = await ff.concat(segments.map((s) => s.file), join(cacheDir, `join_${Date.now()}.txt`), videoOnly, { format, videoOnly: true });
     if (!joined.ok) return whole(`ffmpeg could not join the segments: ${joined.reason}`);
     const wav = await deps.programAudio!(total);
-    if ('reason' in wav) return whole(`the program audio could not be rendered: ${wav.reason}`);
-    const muxed = await ff.mux!(videoOnly, wav.file, out, { format, seconds: total });
-    if (!muxed.ok) return whole(`ffmpeg could not put the program audio on: ${muxed.reason}`);
-    audioNote = 'the audio is the whole program, rendered once by the studio (the same mix a whole export carries)';
+    if ('none' in wav) {
+      // Nothing in the program makes a sound: the joined video is the file.
+      await copyFile(videoOnly, out);
+      audioNote = 'the program has no sound, so the file has no audio track';
+    } else if ('reason' in wav) {
+      return whole(`the program audio could not be rendered: ${wav.reason}`);
+    } else {
+      const muxed = await ff.mux!(videoOnly, wav.file, out, { format, seconds: total });
+      if (!muxed.ok) return whole(`ffmpeg could not put the program audio on: ${muxed.reason}`);
+      audioNote = 'the audio is the whole program, rendered once by the studio (the same mix a whole export carries)';
+    }
   } else {
     const joined = await ff.concat(segments.map((s) => s.file), join(cacheDir, `join_${Date.now()}.txt`), out, { audio: hasAudio, format });
     if (!joined.ok) return whole(`ffmpeg could not join the segments: ${joined.reason}`);

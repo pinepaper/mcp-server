@@ -154,3 +154,28 @@ describe('perScene with program audio (FxTool #251)', () => {
     expect(r.audio).toContain('whole program');
   });
 });
+
+describe('perScene edge cases found live', () => {
+  it('a program with no sound keeps the joined video and says so', async () => {
+    const h = harness([{ sceneId: 's1' }, { sceneId: 's2' }]);
+    const exec0 = h.deps.exec;
+    h.deps.exec = async (code: string) => { const r = await exec0(code); if (code.includes('sm.sceneChain.map')) (r.result as Record<string, unknown>).programAudio = true; return r; };
+    (h.deps.ffmpeg as Record<string, unknown>).mux = async () => { throw new Error('must not mux'); };
+    (h.deps as Record<string, unknown>).programAudio = async () => ({ none: true });
+    const r = JSON.parse(text(await exportPerScene({ format: 'mp4' }, 'mp4', h.deps as never)).split('\n\n')[1]);
+    expect(r.audio).toContain('no sound');
+    expect(existsSync(r.filePath)).toBe(true);
+  });
+
+  it('a chain exported whole runs its own length, not the 5 s default', async () => {
+    const h = harness([{ sceneId: 's1', duration: 4000 }, { sceneId: 's2', duration: 3000 }], { ffmpeg: false });
+    const asked: Array<Record<string, unknown>> = [];
+    const once = h.deps.exportOnce;
+    h.deps.exportOnce = async (a: Record<string, unknown>) => { asked.push(a); return once(a); };
+    await exportPerScene({ format: 'mp4' }, 'mp4', h.deps as never);
+    expect(asked[0].duration).toBe(7);
+    asked.length = 0;
+    await exportPerScene({ format: 'mp4', duration: 2 }, 'mp4', h.deps as never);
+    expect(asked[0].duration).toBe(2);
+  });
+});
