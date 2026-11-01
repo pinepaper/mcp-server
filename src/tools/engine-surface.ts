@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 6469699ad78ca7e70f0d2a7c99ad1b8587ce7e53
- * sha256:    ce6270eeff519c5866fa9df1ad090c57793c05faae34d7634244f25c82afbd6e   (of PinePaper.js as committed)
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main cca1ba5e721eb2361300bd29d53ebe9f5a6daeb3
+ * sha256:    f8ec3bdcfe97510082f64720397d50501994fd5a9c54678e99f9d055ebd0163d   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on `window.app`, with how it gets there. The parity
@@ -16,7 +16,7 @@
 /** How a name lands on `app`. */
 export type EngineMemberKind = 'method' | 'accessor' | 'property' | 'lazy' | 'lazyHeavy' | 'bootstrap';
 
-/** 1519 names, from FxTool/js/PinePaper.js. */
+/** 1522 names, from FxTool/js/PinePaper.js. */
 export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object.freeze({
   __buildFreshness: 'property',
   _aboveHooksHeld: 'property',
@@ -250,6 +250,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _isKnownRelationEndpoint: 'method',
   _isTouchDrawing: 'property',
   _itemNamedLikePointer: 'method',
+  _journalReaction: 'method',
   _keepMaskWithMove: 'method',
   _killedFrameCallbacks: 'property',
   _lastDynamicUpdate: 'property',
@@ -319,6 +320,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _propertyCache: 'property',
   _qualityLevel: 'property',
   _rasterMissReason: 'method',
+  _reactionJournal: 'property',
   _reapplyKeyframeStateNow: 'method',
   _rebaseRestBounds: 'method',
   _rebuildGradientToBounds: 'method',
@@ -374,6 +376,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _restoreCharacterFields: 'method',
   _restoreCharacters: 'method',
   _restoreMotionOntoMask: 'method',
+  _restoreReactionJournal: 'method',
   _restoreSettled: 'property',
   _restoreSoundChips: 'method',
   _retargetBVHUnrecorded: 'method',
