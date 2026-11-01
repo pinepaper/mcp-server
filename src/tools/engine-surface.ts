@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main d21057aaed3c12d68baad4614893d521c5cabd22
- * sha256:    f8ec3bdcfe97510082f64720397d50501994fd5a9c54678e99f9d055ebd0163d   (of PinePaper.js as committed)
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 97bd96e298807adf6f230c5348d273349c4be973
+ * sha256:    9c009bb513fdcf7b00f20027641212af0810284554a9e9077cc6b276b95ddf3d   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on `window.app`, with how it gets there. The parity
@@ -16,7 +16,7 @@
 /** How a name lands on `app`. */
 export type EngineMemberKind = 'method' | 'accessor' | 'property' | 'lazy' | 'lazyHeavy' | 'bootstrap';
 
-/** 1522 names, from FxTool/js/PinePaper.js. */
+/** 1525 names, from FxTool/js/PinePaper.js. */
 export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object.freeze({
   __buildFreshness: 'property',
   _aboveHooksHeld: 'property',
@@ -182,6 +182,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _exportChromeDepth: 'property',
   _exportingOriginals: 'property',
   _exportPassDepth: 'property',
+  _exportReactionJournal: 'property',
   _exportResetTime: 'property',
   _exportStartFrame: 'property',
   _exportView: 'property',
@@ -279,6 +280,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _migrateClonedSubtree: 'method',
   _motionFxEvaluateAt: 'method',
   _nativePixelRatio: 'property',
+  _newReactionJournal: 'method',
   _normalizeSegment: 'method',
   _noteBrushStyled: 'method',
   _notePainted: 'method',
@@ -475,6 +477,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _uiSuspended: 'property',
   _uiSuspendedAt: 'property',
   _unbakeRotation: 'method',
+  _undoReactionJournal: 'method',
   _uninstallPattern: 'method',
   _unregisterWorldNode: 'method',
   _unwireComponentParts: 'method',
