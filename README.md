@@ -88,12 +88,11 @@ browser, the export folder and the tool list. Each
 [release](https://github.com/pinepaper/mcp-server/releases) lists the file's
 SHA-256.
 
-For other MCP clients: Puppeteer is **not a dependency** of this package (not even an optional peer), so a
-plain `npx @pinepaper.studio/mcp-server` has no browser: install puppeteer to use the
-browser tools (`npm i puppeteer`, or `-p puppeteer` in the `npx` call below). Without it every tool then returns the code it would run instead of running
-it (the result says so). To execute in a real browser, install Puppeteer **in the
-same `npx` call** — a separate `npm i puppeteer` in your project is not visible to
-`npx`'s copy of the server:
+For other MCP clients: this package does not install Puppeteer, so a plain
+`npx @pinepaper.studio/mcp-server` has no browser, and every tool returns the
+code it would run instead of running it (the result says so). To execute in a
+real browser, install Puppeteer **in the same `npx` call**. A separate
+`npm i puppeteer` in your project is not visible to `npx`'s copy of the server:
 
 ```json
 {
@@ -260,6 +259,15 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - The server itself fetches the images, SVGs and media a tool call names by URL, and reads local files named by path. URLs that resolve to loopback, private, link-local or reserved addresses are refused, redirects included, and so are cloud metadata addresses. Local files are read only from the working directory, the export folder, and folders listed in `PINEPAPER_ASSET_DIRS`. `PINEPAPER_ALLOW_PRIVATE_NETWORK=1` allows local and LAN hosts. Metadata addresses stay refused even with it set.
 
 ## What's new in 1.6.26
+
+### Changed
+
+- The package installs two dependencies, zod and undici. Puppeteer is no
+  longer declared, not even as an optional peer; install it yourself for the
+  browser tools, as before (`-p puppeteer` in the `npx` call, a global install
+  or a project install). The Desktop extension includes what it needs.
+  puppeteer 22 or newer is required. With pnpm `hoist=false` or Yarn PnP
+  strict, set `PINEPAPER_PUPPETEER_FROM` to the project folder that has it.
 
 ### Fixed
 

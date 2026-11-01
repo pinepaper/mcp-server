@@ -976,7 +976,7 @@ export class PinePaperBrowserController {
         // bypass. The code is run from the Node side as a CDP Runtime.evaluate
         // (below), which returns the script's trailing value exactly as eval did:
         // both generated-code shapes are `(`-led expression statements. It used
-        // to be eval() here; the published package then carried an eval call
+        // to be evaluated here; the published package then carried an evaluating call
         // that supply-chain scanners flag, for what CDP already does.
         (window as unknown as { __ppBridgeSafe?: (v: unknown) => unknown }).__ppBridgeSafe = bridgeSafe;
         return { success: true, __ppRaw: true, executedVia: 'eval' as const };
