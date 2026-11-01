@@ -76,3 +76,57 @@ describe('perScene export', () => {
     expect(segmentKey({ a: 1 }, 2000, { fps: 30 }, 'b1')).toBe(k);
   });
 });
+
+describe('perScene with transitions: chain ranges (FxTool #250)', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { rangeSegments } = require('../../tools/scene-cache-export.js');
+
+  it('segments start at the cuts, snapped to frames, and cover the chain', () => {
+    const segs = rangeSegments([{ sceneId: 'a', duration: 2000 }, { sceneId: 'b', duration: 1010 }, { sceneId: 'c', duration: 3000 }], 30);
+    expect(segs.map((s: { start: number }) => s.start)).toEqual([0, 2, 3]);
+    expect(segs.reduce((a: number, s: { duration: number }) => a + s.duration, 0)).toBeCloseTo(6, 6);
+  });
+
+  it('with a crossfade and a range-capable studio, each scene is a range of the chain, and an edit re-renders its range and the next', async () => {
+    const chain = [{ sceneId: 's1' }, { sceneId: 's2', transition: 'fade' }, { sceneId: 's3', transition: 'fade' }];
+    const h = harness(chain);
+    const exec0 = h.deps.exec;
+    let color2 = 'red';
+    h.deps.exec = async (code: string) => {
+      const r = await exec0(code);
+      if (code.includes('sm.sceneChain.map')) {
+        const v = r.result as Record<string, unknown>;
+        v.ranges = true;
+        v.scenes = JSON.stringify({ scenes: chain.map((e) => ({ id: e.sceneId, data: { color: e.sceneId === 's2' ? color2 : 'red' } })) });
+      }
+      return r;
+    };
+    const asked: Array<Record<string, unknown>> = [];
+    const once = h.deps.exportOnce;
+    h.deps.exportOnce = async (a: Record<string, unknown>) => { asked.push(a); return once(a); };
+    const first = JSON.parse(text(await exportPerScene({ format: 'mp4', fps: 30 }, 'mp4', h.deps as never)).split('\n\n')[1]);
+    expect(first.perScene.mode).toContain('chain ranges');
+    expect(asked.map((a) => a.startTime)).toEqual([0, 2, 4]);
+    expect(h.execs.some((c) => c.includes('sm.sceneChain = [];'))).toBe(false);
+    color2 = 'blue';
+    const second = JSON.parse(text(await exportPerScene({ format: 'mp4', fps: 30 }, 'mp4', h.deps as never)).split('\n\n')[1]);
+    expect(second.perScene).toMatchObject({ rendered: 2, reused: 1 });
+  });
+
+  it('with a crossfade and a studio without ranges: whole, saying an update keeps them', async () => {
+    const h = harness([{ sceneId: 's1' }, { sceneId: 's2', transition: 'fade' }]);
+    expect(text(await exportPerScene({ format: 'mp4' }, 'mp4', h.deps as never))).toContain('a studio that renders time ranges keeps them');
+  });
+});
+
+describe('agent_export startTime', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { codeGenerator } = require('../../types/code-generator.js');
+  it('passes the range to the engine, mp4 / webm only, and only where the studio can render ranges', () => {
+    const code = codeGenerator.generateAgentExport({ format: 'mp4', duration: 2, startTime: 4 });
+    expect(code).toContain('"startTime":4');
+    expect(code).toContain("app.exportEngine.supportsTimeRange === true");
+    expect(code).toContain('only mp4 and webm can');
+    expect(codeGenerator.generateAgentExport({ format: 'mp4', duration: 2 })).not.toContain('supportsTimeRange');
+  });
+});

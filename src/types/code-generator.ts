@@ -5792,9 +5792,12 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
 
   generateAgentExport(input: AgentExportInput): string {
     const validated = AgentExportInputSchema.parse(input);
-    const { platform, format, quality, framing, duration, estimateOnly, scale, fps, pdf: pdfOpts, region, time: stillTime, maxBytes, loop: gifLoop, broadcast, broadcastHeadroom, bitrate, minBitrate, bitrateMode, transparent, alphaQuantizer, deterministic, motionBlur, ad: adOpts, frames } = validated;
+    const { platform, format, quality, framing, duration, estimateOnly, scale, fps, pdf: pdfOpts, region, time: stillTime, maxBytes, loop: gifLoop, broadcast, broadcastHeadroom, bitrate, minBitrate, bitrateMode, transparent, alphaQuantizer, deterministic, motionBlur, ad: adOpts, frames, startTime } = validated;
   // Encoder options (FxTool 16719759); the schema keeps them to mp4 / webm.
   const videoEncodeOpts: Record<string, unknown> = {};
+  // A RANGE of the timeline (FxTool #250): frames for t in [startTime, startTime + duration), each exactly the frame
+  // a full export has at that time (the engine renders the frames before startTime without encoding them).
+  if (startTime !== undefined) videoEncodeOpts.startTime = startTime;
   if (broadcast) videoEncodeOpts.broadcast = true;
   // Headroom defaults to 12 with broadcast (retest of caa9560): on a
   // hard-edged white-on-black scene it measured 17-233 with nothing out of
@@ -6006,7 +6009,9 @@ ${fmt === 'scc' ? `  return { success: true, format: 'scc', sccCues: cues, cues:
 // Smart export for ${oneLine(platform)}
 (async function() {${ENSURE_EXPORT_ENGINE}
   const platform = ${jsLiteral(platform)};
-  const format = ${jsLiteral(exportFormat)};
+  const format = ${jsLiteral(exportFormat)};${startTime !== undefined ? `
+  if (format !== 'mp4' && format !== 'webm') return { success: false, format, error: 'startTime exports a range of the timeline, which only mp4 and webm can: ' + format + ' would start from 0.' };
+  if (!(app.exportEngine && app.exportEngine.supportsTimeRange === true)) return { success: false, format, error: 'this studio cannot export a range of the timeline (startTime): update PinePaper Studio, or export from 0.' };` : ''}
   const quality = ${jsLiteral(qualityLevel)};
   const framing = ${jsLiteral(framing)};
   // An explicit fps wins over the tier's. The tiers bundle frame rate with
