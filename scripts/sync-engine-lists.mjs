@@ -55,6 +55,11 @@
  *   (benchmark: "warn on unknown relation options"). A rule whose block cannot
  *   be bounded cleanly, or that declares nothing (event reactions take opaque
  *   params), is left out: no list means no warning, never a wrong one.
+ * - ANIMATION_TYPES / ANIMATION_WAVEFORMS / ANIMATION_ORIGINS. The loop
+ *   animations core/AnimationDriver.js switches on, and the waveform and
+ *   origin a field motion (ripple, undulate) reads. animationType was checked
+ *   against a hand-refreshed fixture that nothing compared with the engine,
+ *   so FxTool #255 added ripple and undulate and the enum refused both.
  * Descriptions are NOT generated: they are prose, written here. The type of
  * EASING_DESCRIPTIONS is keyed on the generated union, so a new engine easing
  * fails the TYPECHECK until someone writes its line.
@@ -87,6 +92,7 @@ const STYLED_REL = 'js/core/StyledScene.js';
 const PATTERNS_REL = 'js/core/Patterns.js';
 const EXPR_REL = 'js/relations/expr-to-ir.js';
 const RELATIONS_REL = 'js/RelationRegistry.js';
+const ANIM_REL = 'js/core/AnimationDriver.js';
 
 function resolveRef() {
   for (const ref of [ENGINE_REF, 'HEAD']) {
@@ -156,6 +162,15 @@ function patternKinds(src) {
   const kinds = [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]);
   if (kinds.length === 0) throw new Error(`sync-engine-lists: KINDS is empty in ${PATTERNS_REL}`);
   return kinds;
+}
+
+/** A frozen string list `export const NAME = Object.freeze([...])` in AnimationDriver.js. */
+function frozenList(src, name) {
+  const m = new RegExp(`export const ${name}\\s*=\\s*Object\\.freeze\\(\\[([^\\]]*)\\]\\)`).exec(src);
+  if (!m) throw new Error(`sync-engine-lists: ${name} not found in ${ANIM_REL}`);
+  const names = [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]);
+  if (names.length === 0) throw new Error(`sync-engine-lists: ${name} is empty in ${ANIM_REL}`);
+  return names;
 }
 
 function styledStyles(src) {
@@ -314,6 +329,9 @@ async function generate() {
   const relSrc = readCommitted(RELATIONS_REL);
   if (!relSrc) throw new Error(`sync-engine-lists: cannot read ${RELATIONS_REL}`);
   const relKeys = relationParamKeys(relSrc);
+  const animSrc = readCommitted(ANIM_REL);
+  if (!animSrc) throw new Error(`sync-engine-lists: cannot read ${ANIM_REL}`);
+  const anim = { types: frozenList(animSrc, 'ANIMATION_TYPES'), waveforms: frozenList(animSrc, 'ANIMATION_WAVEFORMS'), origins: frozenList(animSrc, 'ANIMATION_ORIGINS') };
 
   return `/**
  * GENERATED — DO NOT EDIT. Run \`bun run sync:engine-lists\`.
@@ -331,6 +349,7 @@ async function generate() {
  *   ${PATTERNS_REL}  sha256: ${digest(patternsSrc)}
  *   ${EXPR_REL}  sha256: ${digest(exprSrc)}
  *   ${RELATIONS_REL}  sha256: ${digest(relSrc)}
+ *   ${ANIM_REL}  sha256: ${digest(animSrc)}
  */
 
 /** ${easings.length} names: EASING_NAMES, the keys of the engine's easing table. Keyframes, masks, relations and the camera all resolve through it. */
@@ -401,6 +420,21 @@ ${relKeys.map(([n, ks]) => `  ${n}: [${ks.map((k) => `'${k}'`).join(', ')}],`).j
 /** Names the grammar refuses outright (expr-to-ir.js REJECT): not deterministic. */
 export const EXPRESSION_REJECTED = [
 ${list(expr.rejected)}
+] as const;
+
+/** ${anim.types.length} loop animations: AnimationDriver.js ANIMATION_TYPES, the types its switch draws. */
+export const ANIMATION_TYPES = [
+${list(anim.types)}
+] as const;
+
+/** ${anim.waveforms.length} cycle shapes a field motion (ripple, undulate) reads: ANIMATION_WAVEFORMS. */
+export const ANIMATION_WAVEFORMS = [
+${list(anim.waveforms)}
+] as const;
+
+/** ${anim.origins.length} points a field motion starts from on a group: ANIMATION_ORIGINS. */
+export const ANIMATION_ORIGINS = [
+${list(anim.origins)}
 ] as const;
 
 /** One line per filter: the engine's own description and parameter ranges. */

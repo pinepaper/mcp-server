@@ -1574,6 +1574,25 @@ function editDistance(a: string, b: string): number {
 }
 
 export function relationOptionWarning(relationType: unknown, params: unknown, injected: readonly string[] = []): string | null {
+  const flip = equationFlipNote(relationType, params);
+  const unread = unreadOptionWarning(relationType, params, injected);
+  return unread && flip ? `${unread} ${flip}` : unread ?? flip;
+}
+
+/**
+ * An equation route is in math coordinates, y up, unless flipY: false. Authored
+ * as screen coordinates it rode the curve mirrored about cy, every centroid
+ * within a pixel of the mirror and up to 300 px off the curve as written, with
+ * nothing said (ORBDUR26, ASYMORB27). Said when the caller left flipY to the default.
+ */
+function equationFlipNote(relationType: unknown, params: unknown): string | null {
+  if (relationType !== 'moves_along_path' || !params || typeof params !== 'object') return null;
+  const eq = (params as Record<string, unknown>).equation;
+  if (!eq || typeof eq !== 'object' || (eq as Record<string, unknown>).flipY !== undefined) return null;
+  return 'params.equation is read with y UP (flipY defaults to true), so on screen the curve is mirrored about cy. If you wrote it in screen coordinates (y down), add flipY: false to the equation.';
+}
+
+function unreadOptionWarning(relationType: unknown, params: unknown, injected: readonly string[]): string | null {
   const keys = typeof relationType === 'string' ? RELATION_PARAM_KEYS[relationType] : undefined;
   if (!keys || !params || typeof params !== 'object') return null;
   const unknown = Object.keys(params as Record<string, unknown>).filter((k) => !keys.includes(k) && !injected.includes(k));
@@ -1959,12 +1978,22 @@ function generateAnimateCode(
   animationType: SimpleAnimationType,
   speed: number,
   intensity?: number,
-  delay?: number
+  delay?: number,
+  waveform?: string,
+  origin?: string
 ): string {
   const ID = jsLiteral(itemId); // caller text: a quoted literal, never spliced raw
   const extra =
     (intensity !== undefined ? `,\n  animationIntensity: ${intensity}` : '') +
-    (delay !== undefined ? `,\n  animationDelay: ${delay}` : '');
+    (delay !== undefined ? `,\n  animationDelay: ${delay}` : '') +
+    (waveform !== undefined ? `,\n  animationWaveform: ${jsLiteral(waveform)}` : '') +
+    (origin !== undefined ? `,\n  animationOrigin: ${jsLiteral(origin)}` : '');
+  // A studio from before field motions (FxTool #255) drops waveform and origin
+  // without a word, and the wave runs as sine from the centre. Read them back.
+  const optionCheck = waveform === undefined && origin === undefined ? '' : `
+  const __unset = [${waveform !== undefined ? `['waveform', 'animationWaveform', ${jsLiteral(waveform)}]` : ''}${waveform !== undefined && origin !== undefined ? ', ' : ''}${origin !== undefined ? `['origin', 'animationOrigin', ${jsLiteral(origin)}]` : ''}]
+    .filter(function (o) { return !item.data || item.data[o[1]] !== o[2]; }).map(function (o) { return o[0]; });
+  if (__unset.length) out.warning = __unset.join(' and ') + ' did not take: this studio predates field-motion options (or refused the value), so the wave runs as sine from the centre. Update the studio.';`;
   return `
 // Apply ${oneLine(animationType)} animation to ${ID}
 const item = app.getItemById(${ID});
@@ -1991,7 +2020,8 @@ app.animate(item, {
       known: r.known,
     };
   }
-  return { success: true, itemId: ${ID}, animationType: ${jsLiteral(animationType)} };
+  const out = { success: true, itemId: ${ID}, animationType: ${jsLiteral(animationType)} };${optionCheck}
+  return out;
 })();
 `.trim();
 }
@@ -2070,6 +2100,12 @@ const TEXT_KEY_ENGINE_NAMES: Readonly<Record<string, readonly string[]>> = {
   textAlign: ['textAlign', 'justification'],
   lineHeight: ['lineHeight', 'leading'],
   letterSpacing: ['letterSpacing'],
+  // Text style keys no studio has animated so far. Keyed, they were stored and
+  // drew nothing, with success:true (WORDSPC26). Checked against the same list,
+  // so a studio that learns one is believed and the warning stops.
+  wordSpacing: ['wordSpacing'],
+  textDecoration: ['textDecoration'],
+  textTransform: ['textTransform'],
 };
 
 /** A JS expression (run in the page) → the keys of `keys` this studio does not animate. '' when none are text keys. */
@@ -2085,7 +2121,7 @@ function unanimatedTextKeysJs(keys: readonly string[]): string {
 }
 
 /** The sentence for the keys unanimatedTextKeysJs found, built in the page. */
-const UNANIMATED_TEXT_KEYS_SENTENCE = `' is not an animatable property in this studio (app.listAnimatableProperties does not list it), so it had no effect. The current studio animates fontStyle, textAlign, lineHeight and letterSpacing; here, set a fixed value with pinepaper_modify_item, or animate fontSize or scaleX.'`;
+const UNANIMATED_TEXT_KEYS_SENTENCE = `' is not an animatable property in this studio (app.listAnimatableProperties does not list it), so it had no effect: a text key animates only where that list names it. Here, set a fixed value with pinepaper_modify_item, or animate fontSize or scaleX.'`;
 
 function generateKeyframeAnimateCode(
   itemId: string,
@@ -3676,7 +3712,9 @@ export class PinePaperCodeGenerator {
       validated.animationType,
       validated.speed,
       validated.intensity,
-      validated.delay
+      validated.delay,
+      validated.waveform,
+      validated.origin
     );
   }
 
@@ -9838,8 +9876,17 @@ ${input.cutSound !== undefined ? `  const __cuts = (__cr && __cr.cuts) || (app.s
       }
       case 'modify': {
         const ch = { ...(v.params ? { params: v.params } : {}), ...(v.members ? { members: v.members } : {}), ...(v.window !== undefined ? { window: v.window } : {}) };
+        // A pattern made with members as a plain array is stored as { refs }, a
+        // shape the engine's own re-check does not accept, so a params-only
+        // modify of it failed with "members is …" (PATIMG24). The stored refs
+        // are handed back as the array they came from.
+        const keep = v.members ? '' : `
+  const __cur = typeof app.getPattern === 'function' ? app.getPattern(${S(v.id)}) : null;
+  const __m = __cur && __cur.spec && __cur.spec.members;
+  if (__m && Array.isArray(__m.refs)) __ch.members = __m.refs.slice();`;
         body = `${need('modifyPattern')}
-  const r = app.modifyPattern(${S(v.id)}, ${S(ch)});
+  const __ch = ${S(ch)};${keep}
+  const r = app.modifyPattern(${S(v.id)}, __ch);
   return Object.assign({ success: !!(r && r.ok) }, r || {}, app.lastReceipt ? { receipt: app.lastReceipt } : {});`;
         break;
       }

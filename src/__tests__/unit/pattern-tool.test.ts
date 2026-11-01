@@ -37,6 +37,22 @@ describe('pinepaper_pattern', () => {
     expect(() => PatternInputSchema.parse({ action: 'create', id: 'x', kind: 'spiral', members: ['a'] })).toThrow();
   });
 
+  it('a params-only modify of an array-membered pattern keeps its members (PATIMG24)', () => {
+    let got: any;
+    // The engine stores an array as { refs } and its own re-check refuses that shape.
+    const app = {
+      getPattern: () => ({ spec: { id: 'w', kind: 'phase_wave', members: { refs: ['item_1', 'item_2'] }, params: {} } }),
+      modifyPattern: (_id: string, ch: any) => { got = ch; return { ok: true }; },
+    };
+    const res = run(codeGenerator.generatePattern(PatternInputSchema.parse({ action: 'modify', id: 'w', params: { amplitude: 40 } })), app);
+    expect(res.success).toBe(true);
+    expect(got).toEqual({ params: { amplitude: 40 }, members: ['item_1', 'item_2'] });
+    // Members the engine re-accepts ({ names }, { ids }) are left to it.
+    app.getPattern = () => ({ spec: { id: 'w', kind: 'phase_wave', members: { names: ['dot-*'] } as any, params: {} } });
+    run(codeGenerator.generatePattern(PatternInputSchema.parse({ action: 'modify', id: 'w', params: { amplitude: 41 } })), app);
+    expect(got).toEqual({ params: { amplitude: 41 } });
+  });
+
   it('an engine refusal is a failure with the engine\'s reason', () => {
     const code = codeGenerator.generatePattern(PatternInputSchema.parse({ action: 'create', id: 'w', kind: 'stagger', members: ['a'] }));
     const res = run(code, { addPattern: () => ({ ok: false, error: "addPattern: a pattern 'w' exists", code: 'PATTERN_ID_TAKEN' }) });

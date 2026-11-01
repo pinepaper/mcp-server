@@ -271,9 +271,31 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   `pinepaper_lint_scene`, `pinepaper_agent_batch_execute`,
   `pinepaper_register_custom_relation` and `pinepaper_agent_export`, with the
   lane's short descriptions, for changing a scene that already exists.
+- `pinepaper_animate` has the `ripple` and `undulate` field motions: a wave
+  that sweeps through a group's children from an `origin` (centre, a side or a
+  corner), with a `waveform` (sine, triangle, square, sawtooth, spike, pulse).
+  The list of loop animations now comes from the studio itself, so a new one
+  can be named the day it ships.
 
 ### Fixed
 
+- A `moves_along_path` equation is read with y up, so on screen it is mirrored
+  against a curve written in screen coordinates. The result now says so and
+  points to `flipY: false`, and the docs say the item moves at constant speed
+  along the route.
+- Keyframes on `wordSpacing`, `textDecoration` or `textTransform`, which the
+  studio does not animate, are named in `ignoredProperties` with a warning
+  instead of being accepted silently.
+- `pinepaper_choreograph` says when a beat other than `shake` is given
+  `intensity` (only `shake` reads it), and names the beat's own size option.
+- `pinepaper_pattern modify` with only new `params` works on a pattern whose
+  members were given as a plain list. Before, it was refused.
+- The `deterministic` export option is described as it behaves: WebM files
+  come out byte-identical, but an MP4 can differ in its encoded bytes, so
+  compare MP4s by the receipt's `frameDigest`.
+- The docs say a discrete change (a colour switching at a key) needs a `hold`
+  or `step` key, that font weight steps rather than ramps, and that two
+  patterns should not drive the same property of one item.
 - A batch `modify` with a top-level `position` (`{x, y}` or `[x, y]`) moves
   the item, as `position` places one on `create`. Before, it reported
   `modified: true` and the item stayed where it was. A `modify` with nothing

@@ -4,7 +4,7 @@
  * Name lists the engine owns and the tool surface must offer exactly. See
  * scripts/sync-engine-lists.mjs for why each is generated.
  *
- * Source: FxTool origin/main 3b311787d66e8baaad7119bc5020a18e95e2f47e
+ * Source: FxTool origin/main 1155bc47abe750deb68283fc345fdccdaae9fdb0
  *   js/core/KeyframeInterpolator.js  sha256: c0062d98a83491e9
  *   js/world3d/worlds.js  sha256: 0e0973f7587c06e1
  *   js/core/DesignMedia.js  sha256: ab07f330e4060cb7
@@ -14,6 +14,7 @@
  *   js/core/Patterns.js  sha256: c23b186ebf6e8a6d
  *   js/relations/expr-to-ir.js  sha256: 4d92d2f42b3356e9
  *   js/RelationRegistry.js  sha256: fcffa9fc0eb74a53
+ *   js/core/AnimationDriver.js  sha256: 6741a73f5f489355
  */
 
 /** 39 names: EASING_NAMES, the keys of the engine's easing table. Keyframes, masks, relations and the camera all resolve through it. */
@@ -291,6 +292,53 @@ export const RELATION_PARAM_KEYS: Readonly<Record<string, readonly string[]>> = 
 /** Names the grammar refuses outright (expr-to-ir.js REJECT): not deterministic. */
 export const EXPRESSION_REJECTED = [
   'random',
+] as const;
+
+/** 20 loop animations: AnimationDriver.js ANIMATION_TYPES, the types its switch draws. */
+export const ANIMATION_TYPES = [
+  'bounce',
+  'breathe',
+  'fade',
+  'glow',
+  'jelly',
+  'path',
+  'pulse',
+  'ripple',
+  'rotate',
+  'scrollDown',
+  'scrollLeft',
+  'scrollRight',
+  'scrollUp',
+  'shake',
+  'slideLeftRight',
+  'slideUpDown',
+  'swing',
+  'typewriter',
+  'undulate',
+  'wobble',
+] as const;
+
+/** 6 cycle shapes a field motion (ripple, undulate) reads: ANIMATION_WAVEFORMS. */
+export const ANIMATION_WAVEFORMS = [
+  'sine',
+  'triangle',
+  'square',
+  'sawtooth',
+  'spike',
+  'pulse',
+] as const;
+
+/** 9 points a field motion starts from on a group: ANIMATION_ORIGINS. */
+export const ANIMATION_ORIGINS = [
+  'center',
+  'top',
+  'bottom',
+  'left',
+  'right',
+  'topLeft',
+  'topRight',
+  'bottomLeft',
+  'bottomRight',
 ] as const;
 
 /** One line per filter: the engine's own description and parameter ranges. */

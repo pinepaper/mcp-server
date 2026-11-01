@@ -9,7 +9,7 @@
  */
 
 import { z } from 'zod';
-import { ENGINE_EASING_NAMES, DESIGN_MEDIA, DESIGN_MEDIA_APPLY, FILTER_TYPES, LINEAGE_KINDS, STYLED_SCENE_STYLES, PATTERN_KINDS } from '../tools/engine-lists.js';
+import { ENGINE_EASING_NAMES, DESIGN_MEDIA, DESIGN_MEDIA_APPLY, FILTER_TYPES, LINEAGE_KINDS, STYLED_SCENE_STYLES, PATTERN_KINDS, ANIMATION_TYPES, ANIMATION_WAVEFORMS, ANIMATION_ORIGINS } from '../tools/engine-lists.js';
 
 // =============================================================================
 // COMMON SCHEMAS
@@ -343,26 +343,8 @@ export const ArcPropertiesSchema = z.object({
 // The engine stored the unknown value and the driver's switch fell through, so
 // the item sat still while its data claimed a slide, and nothing anywhere said
 // so. It also hid twelve types that do work.
-export const SimpleAnimationTypeSchema = z.enum([
-  'bounce',
-  'breathe',
-  'fade',
-  'glow',
-  'jelly',
-  'path',
-  'pulse',
-  'rotate',
-  'scrollDown',
-  'scrollLeft',
-  'scrollRight',
-  'scrollUp',
-  'shake',
-  'slideLeftRight',
-  'slideUpDown',
-  'swing',
-  'typewriter',
-  'wobble',
-]).describe('Simple loop animation type');
+/** GENERATED list (AnimationDriver.js ANIMATION_TYPES, scripts/sync-engine-lists.mjs): the types the driver draws. */
+export const SimpleAnimationTypeSchema = z.enum(ANIMATION_TYPES).describe('Simple loop animation type');
 
 export type SimpleAnimationType = z.infer<typeof SimpleAnimationTypeSchema>;
 
@@ -1471,6 +1453,8 @@ export const AnimateItemInputSchema = z.object({
   speed: z.number().optional().default(1).describe('Animation speed multiplier'),
   intensity: z.number().optional().describe('Animation amplitude (animationIntensity): 0.1 = ±10%, 0.2 = ±20% (default 0.15). Drives pulse/wobble/bounce/breathe amplitude and is now honored by SVG/SMIL/widget export.'),
   delay: z.number().optional().describe('Animation start delay in seconds (animationDelay).'),
+  waveform: z.enum(ANIMATION_WAVEFORMS).optional().describe('ripple / undulate: the shape of one cycle (animationWaveform; default sine).'),
+  origin: z.enum(ANIMATION_ORIGINS).optional().describe('ripple / undulate on a group: where the wave starts (animationOrigin; default center).'),
 });
 
 // Keyframe Animate
@@ -2828,7 +2812,7 @@ export const AgentExportInputSchema = z.object({
     subframes: z.number().int().min(1).max(32).optional().describe('Renders per frame (default 8; 1 = no blur). Export time scales with it.'),
     shutter: z.number().min(0).max(1).optional().describe('Fraction of the frame interval the shutter is open (default 0.5, a 180° shutter).'),
   }).optional().describe('mp4 / webm: real motion blur. Each frame is rendered subframes times across the shutter and averaged, so fast movement smears instead of strobing. Costs subframes× the render time: run estimateOnly first, which reports renders and renderCost.'),
-  deterministic: z.boolean().optional().describe('mp4 / webm: byte-identical files for the same scene, so an export can be checksummed or cached by hash. The container\'s creation / modification timestamps are pinned; nothing about the pixels changes.'),
+  deterministic: z.boolean().optional().describe('mp4 / webm: pins the container\'s creation / modification timestamps; nothing about the pixels changes. WebM then comes out byte-identical. An MP4\'s encoded bytes can still differ run to run (the H.264 encoder is not bit-exact), so compare MP4s by the receipt\'s frameDigest, not sha256.'),
   broadcastHeadroom: z.number().int().min(0).max(40).optional().describe('mp4 with broadcast only (default 12 with broadcast): luma codes kept clear at both ends of 16-235, so encoder ringing stays legal. 12 measured clean on hard edges; 4 cuts out-of-range samples ~100x, 12 ~1000x; never to zero, so a legaliser pass is still required (result fidelity names it).'),
   bitrate: z.number().int().min(100_000).max(200_000_000).optional().describe('mp4 / webm: target bits per second, replacing the quality-derived one. The browser encoder treats it as a CEILING: simple content comes out lower, and result.video.achievedBitrate says what it was.'),
   minBitrate: z.number().int().min(100_000).max(200_000_000).optional().describe('mp4 / webm: a floor under the target. If the achieved bitrate misses it, fidelity warns and names the re-encode a delivery spec needs.'),

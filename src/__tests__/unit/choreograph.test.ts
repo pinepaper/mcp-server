@@ -145,3 +145,18 @@ describe('pinepaper_choreograph emitted code', () => {
     expect(r.sounds).toEqual([]);
   });
 });
+
+describe('intensity is shake\'s alone, and said elsewhere', () => {
+  const BALL = { x: 500, y: 800, w: 100, h: 100, sx: 1, sy: 1, rot: 0 };
+  const FRAME = { x: 0, y: 0, width: 1920, height: 1080 };
+  it('a non-shake beat with intensity is warned, naming the verb\'s own size', () => {
+    const r = compileChoreography(BALL, FRAME, [{ at: 0, verb: 'hop', intensity: 3 }, { at: 1, verb: 'pop', intensity: 2 }]);
+    expect(r.warnings!.some((w) => /beat 0 \(hop\): intensity .* height/.test(w))).toBe(true);
+    expect(r.warnings!.some((w) => /beat 1 \(pop\): intensity/.test(w) && !/size this beat/.test(w))).toBe(true);
+  });
+  it('shake reads it quietly', () => {
+    const r = compileChoreography(BALL, FRAME, [{ at: 0, verb: 'shake', intensity: 30 }]);
+    expect(r.warnings).toEqual([]);
+    expect(Math.max(...r.keyframes!.map((k) => Math.abs(k.properties.x - 500)))).toBeGreaterThan(20);
+  });
+});

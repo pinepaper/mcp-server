@@ -17,7 +17,7 @@ import { TOOL_TAGS } from './toolkits.js';
 import { STICK_GAITS, STICK_POSES, STICK_SEQUENCES, STICK_EXPRESSIONS, STICK_PROPS } from './stick-vocabulary.js';
 import { AgentBatchOperationTypeSchema, GeneratorNameSchema, ItemTypeSchema } from '../types/schemas.js';
 import { expressionGrammarText } from './expression-grammar.js';
-import { DESIGN_MEDIA, DESIGN_MEDIA_APPLY, FILTER_TYPES, FILTER_DOCS, LINEAGE_KINDS, STYLED_SCENE_STYLES, STYLED_SCENE_STYLE_INFO, PATTERN_KINDS } from './engine-lists.js';
+import { DESIGN_MEDIA, DESIGN_MEDIA_APPLY, FILTER_TYPES, FILTER_DOCS, LINEAGE_KINDS, STYLED_SCENE_STYLES, STYLED_SCENE_STYLE_INFO, PATTERN_KINDS, ANIMATION_TYPES, ANIMATION_WAVEFORMS, ANIMATION_ORIGINS } from './engine-lists.js';
 import {
   EffectTypeSchema,
   AgentExportFormatSchema,
@@ -1697,7 +1697,7 @@ warp (optional): chained parametric warp(s) — displace each sampled point by {
 
 RETURNS: { success, kind, itemId } — itemId is the created path. Bad expressions / empty ranges return { success:false, error }.
 
-To make an item TRAVEL along an equation curve (instead of drawing it), use pinepaper_add_relation relationType moves_along_path with params.equation — but note that equation is read ONLY on the relation's signal path. An option that leaves that path takes the equation with it and the item simply does not move: easing 'bounce' is piecewise and falls back, so bounce + equation is a static item reporting success. Use a signal-friendly easing (linear, easeIn, easeOut, easeInOut, sine, pingpong) with an equation, or supply params.path instead.
+To make an item TRAVEL along an equation curve (instead of drawing it), use pinepaper_add_relation relationType moves_along_path with params.equation. The same flipY applies there: by default y is math-up, so the item rides the curve mirrored about cy compared with screen coordinates (y down). Pass flipY: false to author the curve in screen coordinates.
 
 EXAMPLES:
 - Sine wave: { kind: "function", expr: "sin(x/40) * 60", min: -300, max: 300, style: { strokeColor: "#4f46e5" } }
@@ -3546,6 +3546,8 @@ PARAMS: { eps? (bounds-match tolerance px, default 4), cap? (max suggestions, de
 MOVES_ALONG_PATH — ride a path (a hand tracing a stroke, a car on a road):
 - sourceId: the item that moves. The path comes from ONE of: targetId (or params.pathId) naming a PATH ITEM, sampled into points for you; params.path as points [[x, y], …]; or params.equation.
 - params.duration: seconds for one traversal (or pass speed directly, 1 ≈ 150 px/s). params.delay: seconds on the timeline before it starts; until then the item waits at the path start. params.offset: [dx, dy] added to the point on the path — set it to (centre - pen tip) so a hand image's TIP, not its centre, rides the stroke. closed (loop back to the start; default from the path item), phase (0–1 start point), easing (linear | easeIn | easeOut | easeInOut | sine | bounce | pingpong), signal (deterministic, frame-rate-invariant — prefer it for export).
+- The item travels at CONSTANT SPEED along the route: the fraction of the duration elapsed is the fraction of the route's LENGTH covered, not of the equation's parameter or of the point count. Where the curve is long it moves the same speed as where it is short; easing reshapes that progress. For a route timed by the parameter instead, key the position with pinepaper_keyframe_animate.
+- params.equation is in math coordinates with y UP (flipY: true by default), placed at cx, cy: on screen the curve is mirrored about cy. Write flipY: false to author it in screen coordinates (y down).
 - With no path from any of those it is refused, not accepted as a still item.
 
 USE WHEN:
@@ -3616,7 +3618,7 @@ RELATION COMPATIBILITY:
   Text→Text: font blend
   Cross-type: particle denoising transition
 - group_morphs_to: pair-by-index morph between two paper.Groups (any two — graph vertices+edges, letter collages, dashboard clusters). Path.Line children deform via endpoints; other children translate; excess children fade. Params: duration, hold, loop, easing (linear|easeIn|easeOut|easeInOut), deformLines.
-- moves_along_path: self-relation (targetId=null); item is driven along a path. Source the path EITHER from params.path (array of {x,y} or [x,y]) OR from params.equation (S10 B5) — a math curve the item TRAVERSES, sampled deterministically on the Expression IR: params.equation = { kind: function|parametric|fourier|preset, expr | xExpr/yExpr | harmonics | preset, min, max, samples, scale, cx, cy, flipY, warp } (same equation contract as pinepaper_equation_path, but origin is cx/cy, default 0). READ ONLY ON THE SIGNAL PATH: easing 'bounce' is piecewise and leaves it, which silently discards the equation and leaves the item where it started. Params: path OR equation, speed, closed, phase, easing (linear|easeIn|easeOut|easeInOut|sine|bounce|pingpong).
+- moves_along_path: self-relation (targetId=null); item is driven along a path. Source the path EITHER from params.path (array of {x,y} or [x,y]) OR from params.equation (S10 B5) — a math curve the item TRAVERSES, sampled deterministically on the Expression IR: params.equation = { kind: function|parametric|fourier|preset, expr | xExpr/yExpr | harmonics | preset, min, max, samples, scale, cx, cy, flipY, warp } (same equation contract as pinepaper_equation_path, but origin is cx/cy, default 0). y is MATH-UP by default (flipY: true): on screen the curve is mirrored about cy, so a curve written in screen coordinates (y down) needs flipY: false. Params: path OR equation, speed, closed, phase, easing (linear|easeIn|easeOut|easeInOut|sine|bounce|pingpong).
 
 GEOMETRIC CONSTRUCTION CONSTRAINTS (Layer 2) — the source item is RE-DERIVED every frame from its anchor item(s), so dragging an anchor updates the dependent live (GeoGebra-style), and the construction persists as relation graph data (edit it by editing relations, not by re-running code). Anchor A is the relation target; extra anchors ride in params:
 - is_midpoint_of: source = midpoint(target, params.other). params.other = id of the second endpoint (B).
@@ -3939,6 +3941,9 @@ ANIMATION TYPES (18 — the list the driver actually switches on):
 - scrollLeft / scrollRight / scrollUp / scrollDown: Continuous scroll, wrapping
 - path: Travel along an assigned path
 - typewriter: Character-by-character reveal
+- ripple: An opacity wave. On a GROUP it sweeps through the children outward from origin, each a little later; on a single item it pulses the item.
+- undulate: A vertical lift wave, swept through a group's children the same way (intensity 0.4 ≈ 14 px).
+  ripple and undulate take waveform (the shape of one cycle) and origin (where the wave starts on a group). SVG and Lottie exports draw them static; export MP4, WebM or GIF to keep the wave.
 
 There is NO 'slide'. An unknown type is stored and then ignored — the item sits still while its data claims otherwise, and the call still reports success — so use the exact names above.`,
     inputSchema: {
@@ -3947,7 +3952,7 @@ There is NO 'slide'. An unknown type is stored and then ignored — the item sit
         itemId: { type: 'string', description: 'Registry ID of the item' },
         animationType: {
           type: 'string',
-          enum: ['bounce', 'breathe', 'fade', 'glow', 'jelly', 'path', 'pulse', 'rotate', 'scrollDown', 'scrollLeft', 'scrollRight', 'scrollUp', 'shake', 'slideLeftRight', 'slideUpDown', 'swing', 'typewriter', 'wobble'],
+          enum: [...ANIMATION_TYPES],
           description: 'Type of animation',
         },
         speed: {
@@ -3962,6 +3967,8 @@ There is NO 'slide'. An unknown type is stored and then ignored — the item sit
           type: 'number',
           description: 'Animation start delay in seconds.',
         },
+        waveform: { type: 'string', enum: [...ANIMATION_WAVEFORMS], description: 'ripple / undulate: the shape of one cycle (default sine).' },
+        origin: { type: 'string', enum: [...ANIMATION_ORIGINS], description: 'ripple / undulate on a group: where the wave starts (default center).' },
       },
       required: ['itemId', 'animationType'],
     },
@@ -4005,7 +4012,7 @@ ANIMATABLE PROPERTIES:
 - strokeColor: Color string
 - strokeWidth, width, height, radius, shadowBlur, shadowColor: Numbers / colours
 - fontSize: Number
-- TEXT (current studio): fontStyle ('normal' / 'italic' / 'oblique', discrete — switches at the next key), textAlign ('left' / 'center' / 'right', discrete; the anchor stays put), lineHeight (px, or a multiple of fontSize up to 5), letterSpacing (px, or a CSS length such as '0.1em'). An older studio stores these keys without drawing them; the result names any it did not animate (ignoredProperties).
+- TEXT (current studio): fontStyle ('normal' / 'italic' / 'oblique', discrete — switches at the next key), textAlign ('left' / 'center' / 'right', discrete; the anchor stays put), lineHeight (px, or a multiple of fontSize up to 5), letterSpacing (px, or a CSS length such as '0.1em'). An older studio stores these keys without drawing them; the result names any it did not animate (ignoredProperties). fontWeight keys STEP: a font with fixed weights switches from one weight to the next once, partway through the move, and does not ramp. Key fontSize or scale for a smooth change.
 - STROKE DRAW-ON (paths): trimStart, trimEnd (0-1 of the path's length), trimOffset (shifts the visible window along it), dashArray. A draw-on is trimEnd 0 -> 1.
 The authoritative list for a given item is pinepaper_get_animatable_properties — ask it rather than guessing.
 
@@ -4015,7 +4022,7 @@ ${EASING_LINES}
 - or a custom cubic-bezier [x1, y1, x2, y2] — x in 0..1, y may exceed 0..1 for overshoot. keyframe_animate and camera_animate only.
 COUNTERS: a text item with a counter (create_item / modify_item counter) also animates the numeric property counterValue, drawn through the counter's format — keyframe it to shape a count by hand (hold on a number, then race). Its keys override the counter's own from / to.
 
-HOLD KEYS (where the studio has them): interpolation: 'hold' on a key holds ITS value until the next key, then cuts — no in-between. Easing 'hold' / 'step' on the ARRIVING key does the same. A studio without hold keys refuses rather than interpolate; there, two keys a frame apart make the cut. For a whole layer 'on twos', set stepTiming on the item (create_item / modify_item).
+HOLD KEYS (where the studio has them): interpolation: 'hold' on a key holds ITS value until the next key, then cuts — no in-between. Easing 'hold' / 'step' on the ARRIVING key does the same. A studio without hold keys refuses rather than interpolate; there, two keys a frame apart make the cut. For a whole layer 'on twos', set stepTiming on the item (create_item / modify_item). A DISCRETE change (a bar turning red at 2 s, a label switching colour) needs this too: without hold / step every key ramps from the one before it, so the colour fades across the whole gap instead of switching. This applies to batch keyframe ops the same way.
 
 Every easing renders exactly in video, GIF and APNG. Lottie and CSS get the closest single Bézier: springPlayful loses its wobble, and the in-out quart/quint/expo/circ curves are within 2–4 %. SMIL is exact for springs and those four.
 
@@ -4962,6 +4969,7 @@ KINDS:
 - phase_wave — members move on a sine, each a phase later than the one before. params: property ('y' default, 'x', 'rotation', 'opacity'), amplitude (px, degrees or 0..1), period (seconds per cycle), wavelength (members per full cycle), phase (radians). window { from, to } limits when it plays; time counts from \`from\`.
 - stagger — each member's animationDelay, derived from its place. params: step (s between neighbours), start (s), order: index | reverse | center | edges.
 - ring / orbit (the same motion) — members spaced evenly round a circle that turns. params: center ([x, y] or {x, y}; default 960, 540), target (an item id or name: the centre follows it), radius (px, default 200), period (seconds per turn, default 6), phase (RADIANS, the first member's angle), direction (1 clockwise, -1 or 'ccw'). Each member's own position is overwritten while it plays and comes back when the pattern is removed. window as for phase_wave.
+- ONE PATTERN PER MEMBER AND PROPERTY. Each pattern adds its offset to the member's current value, so two patterns moving the same property of the same member (even in windows one after the other) build on each other's writes: their offsets add, and a member can stay displaced after a window ends. To sequence motions on one member, modify one pattern's params and window rather than stacking a second.
 
 MEMBERS — by names (a '*' matches any run: "letter-*"), ids, or a tag, in the order they are given; an array is taken as ids or names. A name that matches nothing is reported in the result, not ignored.
 
@@ -8286,7 +8294,7 @@ EXAMPLE — a ball comes to life and crosses the frame:
         sound: { description: "true, or {pop?, whoosh?, contact?, shake? (catalogue name or false), gain? 0..1}: a sound on every pop, launch, landing and shake.", oneOf: [{ type: 'boolean' }, { type: 'object', additionalProperties: true }] },
         beats: {
           type: 'array',
-          description: 'Beats in time order: [{at, verb, to?, duration?, height?, times?, decay?, arc?, edge?, from?, amount?, hold?, intensity?}].',
+          description: 'Beats in time order: [{at, verb, to?, duration?, height?, times?, decay?, arc?, edge?, from?, amount?, hold?, intensity?}]. intensity is the amplitude of shake in px; no other verb reads it.',
           items: {
             type: 'object',
             properties: {
@@ -9220,7 +9228,7 @@ VERIFY MOTION BEFORE YOU RENDER. An export takes seconds to minutes and shows yo
         loop: { anyOf: [{ type: 'boolean' }, { type: 'integer', minimum: 0, maximum: 1000 }], description: 'gif / apng: true = loop forever, false / 0 / 1 = play once, n = play n times (email clients often want a few plays, not forever). Refused on video formats — see SEAMLESS LOOPS.' },
         broadcast: { type: 'boolean', description: 'mp4 only: broadcast-safe — BT.709, limited range (16-235), tagged bt709, constant bitrate with an 8 Mbps floor at 720p+ (4 below). result.video reports what the encoder did.' },
         frames: { type: 'integer', minimum: 1, maximum: 36000, description: 'Animated formats: exactly this many frames instead of duration. A duration makes ceil(duration x fps) frames (7.91667 s at 24 fps is 191, not 190), so use frames for frame-exact segments.' },
-        deterministic: { type: 'boolean', description: 'mp4 / webm: byte-identical files for the same scene (pins the container timestamps), so exports can be checksummed or cached by hash.' },
+        deterministic: { type: 'boolean', description: 'mp4 / webm: pins the container timestamps. WebM then comes out byte-identical; an MP4\'s encoded bytes can still differ run to run (the H.264 encoder is not bit-exact), so compare MP4s by the receipt\'s frameDigest, which is the same for the same frames, not by sha256.' },
         motionBlur: {
           type: 'object',
           description: 'mp4 / webm: real motion blur. Each frame is rendered `subframes` times across the shutter and averaged, so fast movement smears instead of strobing. Costs subframes× the render time: run estimateOnly first (it reports renders and renderCost). The result carries motionBlur (what the exporter applied).',

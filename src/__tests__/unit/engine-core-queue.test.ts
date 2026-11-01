@@ -226,6 +226,17 @@ describe('keyframe_animate: text keys and easingAt (2, 5 EASEPLACE)', () => {
     expect(none.ignoredProperties).toEqual(['letterSpacing', 'lineHeight']);
   });
 
+  it('wordSpacing, textDecoration and textTransform keys are named, not accepted silently (WORDSPC26)', () => {
+    const keys = [{ time: 0, properties: { wordSpacing: 0, textDecoration: 'none', textTransform: 'none', x: 0 } },
+      { time: 1, properties: { wordSpacing: 84, textDecoration: 'underline', textTransform: 'uppercase', x: 10 } }];
+    const r = run({ itemId: 'a', keyframes: keys }, studio({ consumesEasingAt: true, animatable: ['letterSpacing', 'leading', 'x'] }));
+    expect(r.ignoredProperties).toEqual(['wordSpacing', 'textDecoration', 'textTransform']);
+    expect(r.warning).toContain('wordSpacing');
+    // A studio that lists one is believed.
+    const later = run({ itemId: 'a', keyframes: keys }, studio({ consumesEasingAt: true, animatable: ['wordSpacing', 'textDecoration', 'textTransform', 'x'] }));
+    expect(later.ignoredProperties).toBeUndefined();
+  });
+
   it('batch keyframe_animate checks the same way', async () => {
     const code = codeGenerator.generateAgentBatchExecute({ operations: [
       { type: 'keyframe_animate', itemId: 'a', keyframes: [{ time: 0, properties: { letterSpacing: 0 } }, { time: 1, properties: { letterSpacing: 5 } }] },

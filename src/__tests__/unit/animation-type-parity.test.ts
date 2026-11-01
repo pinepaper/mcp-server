@@ -11,21 +11,22 @@
  * asserted the SMIL export of one for years and read the empty result as "slide
  * does not export". The same enum also hid twelve types that do work.
  *
- * The fixture is `AnimationDriver.ANIMATION_TYPES` — the list the driver
+ * The list is `AnimationDriver.ANIMATION_TYPES` — the one the driver
  * switches on, which is the only list that decides whether anything moves.
  * (FxTool's own CodeValidator carries a DIFFERENT, shorter set; it is not the
- * runtime authority and must not be used here.)
+ * runtime authority and must not be used here.) It was a hand-refreshed
+ * fixture, and nothing compared the fixture with the engine: FxTool #255 added
+ * ripple and undulate and this test went on passing against the old 18. It is
+ * now GENERATED (scripts/sync-engine-lists.mjs, checked in prepublishOnly), so
+ * the schema is the engine's list and this test guards the copies.
  */
 
 import { describe, it, expect } from 'bun:test';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { PINEPAPER_TOOLS } from '../../tools/definitions.js';
 import { SimpleAnimationTypeSchema } from '../../types/schemas.js';
+import { ANIMATION_TYPES } from '../../tools/engine-lists.js';
 
-const ENGINE = readFileSync(
-  join(import.meta.dir, '..', 'fixtures', 'engine-animation-types.txt'), 'utf-8',
-).split('\n').map((l) => l.trim()).filter(Boolean);
+const ENGINE: readonly string[] = ANIMATION_TYPES;
 
 /**
  * Letter collages are a DIFFERENT namespace — animateCollage maps its own four

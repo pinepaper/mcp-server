@@ -114,6 +114,13 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
       if (to && (to.x < frame.x || to.x > frame.x + frame.width || to.y < frame.y || to.y > frame.y + frame.height)) {
         warnings.push('beat ' + i + ' (' + verb + '): to [' + to.x + ', ' + to.y + '] is outside the frame, so the actor ends off screen there');
       }
+      // intensity is shake's amplitude in px and nothing else reads it: on the
+      // other ten verbs it was accepted and ignored (11/11 probed). Said, with
+      // the verb's own size where it has one.
+      if (b.intensity !== undefined && verb !== 'shake') {
+        const own = verb === 'hop' || verb === 'bounce' || verb === 'drop' ? 'height' : verb === 'fly' ? 'arc' : verb === 'squash' || verb === 'peek' ? 'amount' : '';
+        warnings.push('beat ' + i + ' (' + verb + '): intensity is read only by shake (its amplitude in px), so it changed nothing here' + (own ? '; size this beat with ' + own : ''));
+      }
       t = at;
       started = true;
       if (verb === 'pop') {
