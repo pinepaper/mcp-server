@@ -69,12 +69,10 @@ const METADATA = new BlockList();
 for (const a of ['169.254.169.254', '169.254.170.2', '100.100.100.200']) METADATA.addAddress(a, 'ipv4');
 METADATA.addAddress('fd00:ec2::254', 'ipv6');
 
-function env(name: string): string | undefined {
-  return typeof process !== 'undefined' ? process.env?.[name] : undefined;
-}
-
+/** The one variable this file reads, by its literal name (utils/env.ts lists the rest). */
 export function privateNetworkAllowed(): boolean {
-  return /^(1|true|yes)$/i.test(env('PINEPAPER_ALLOW_PRIVATE_NETWORK') ?? '');
+  const value = typeof process !== 'undefined' ? process.env?.PINEPAPER_ALLOW_PRIVATE_NETWORK : undefined;
+  return /^(1|true|yes)$/i.test(value ?? '');
 }
 
 /** The IPv4 address an IPv6 address carries, for NAT64 (64:ff9b::/96) and 6to4 (2002::/16). */
