@@ -33,7 +33,9 @@ export function setCapability(capability: Capability, on: boolean | undefined): 
 export function capabilityAllowed(capability: Capability): boolean {
   const set = overrides[capability];
   if (set !== undefined) return set;
-  const v = (env(CAPABILITY_SWITCH[capability]) ?? '').trim().toLowerCase();
+  // Each switch read by its literal name (the environment allow-list, utils/env.ts), not looked up from the table.
+  const raw = capability === 'code' ? env('PINEPAPER_ALLOW_CODE') : env('PINEPAPER_ALLOW_LOCAL_FILES');
+  const v = (raw ?? '').trim().toLowerCase();
   return v === '1' || v === 'true' || v === 'yes' || v === 'on';
 }
 
