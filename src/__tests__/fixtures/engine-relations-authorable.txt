@@ -79,6 +79,7 @@ is_centroid_of
 is_circumcenter_of
 is_midpoint_of
 lies_on_line
+localizes_sound
 locomotion
 looks_at
 maintains_distance

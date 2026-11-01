@@ -9,9 +9,9 @@
  * across five lists is exactly the shape that drifts, and every enum this repo
  * hand-maintained against FxTool drifted silently.
  *
- * Source: FxTool origin/main 107e8fd0d9aa827d5db5c6d2a474c987d38f2695
+ * Source: FxTool origin/main 6469699ad78ca7e70f0d2a7c99ad1b8587ce7e53
  *   js/vendor/stick/figure-rigged.js
- * sha256: cf8f8bfc9b37b0aa
+ * sha256: 582d1fd66061000d
  */
 
 /** 10 names — how a figure walks — gait. */

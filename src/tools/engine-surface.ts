@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 107e8fd0d9aa827d5db5c6d2a474c987d38f2695
- * sha256:    68cb4f561cab899e204c4aac16600779947dd8824278d345ab6cb642e4cd0312   (of PinePaper.js as committed)
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 6469699ad78ca7e70f0d2a7c99ad1b8587ce7e53
+ * sha256:    ce6270eeff519c5866fa9df1ad090c57793c05faae34d7634244f25c82afbd6e   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on `window.app`, with how it gets there. The parity
@@ -16,7 +16,7 @@
 /** How a name lands on `app`. */
 export type EngineMemberKind = 'method' | 'accessor' | 'property' | 'lazy' | 'lazyHeavy' | 'bootstrap';
 
-/** 1518 names, from FxTool/js/PinePaper.js. */
+/** 1519 names, from FxTool/js/PinePaper.js. */
 export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object.freeze({
   __buildFreshness: 'property',
   _aboveHooksHeld: 'property',
@@ -99,6 +99,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _canvasDeltaToParent: 'method',
   _canvasDrawsLetterSpacing: 'method',
   _canvasRevealed: 'property',
+  _captureTimedEvents: 'method',
   _characterDrag: 'property',
   _characterDragEnd: 'method',
   _characterDragMove: 'method',
