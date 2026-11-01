@@ -267,8 +267,16 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   the scene plays in the studio. The result says whether the studio turned it
   on. With `character: false` there is nothing to walk, so the call is refused.
 
+- The `lane` toolkit includes `pinepaper_register_custom_relation`, with a
+  short lane description, so a lane agent can define a motion once and bind
+  it to many items. The lane is now 8 tools.
+
 ### Fixed
 
+- A relation type registered with `pinepaper_register_custom_relation` is
+  accepted in `pinepaper_agent_batch_execute`, as it already was in
+  `pinepaper_add_relation`. Before, the batch's vocabulary check refused it.
+  A relation op may leave out `targetId` when the motion needs no other item.
 - Names, ids, colours, URLs and other text you pass now reach the studio
   intact on every tool. Before, a quote or a line break in one could break the
   generated code, and the call failed with a syntax error instead of doing

@@ -17,7 +17,8 @@
 /**
  * The lane's tools. The first five are the lane as it shipped, in the order an agent uses them; O10 (mcp-server#29)
  * added the two after them, appended so nothing a lane client had moves: events (timed and clicked; their reactions
- * ride in the batch as relation ops) and clearing (start over, so a replay gets the same ids).
+ * ride in the batch as relation ops) and clearing (start over, so a replay gets the same ids). #36 appended custom
+ * relations: one definition drives many items, and a parameter edit is one call instead of a keyframe rebuild.
  */
 export const LANE_TOOL_NAMES = [
   'pinepaper_agent_batch_execute', // create / batch, with names
@@ -27,13 +28,14 @@ export const LANE_TOOL_NAMES = [
   'pinepaper_lint_scene',          // inspect / lint
   'pinepaper_event',               // events: timed (at) or fired by a click / key (O10)
   'pinepaper_clear_canvas',        // start over (O10)
+  'pinepaper_register_custom_relation', // a motion of your own, bound in the batch (mcp-server#36)
 ] as const;
 
 /** The one keyframe shape, said once and used by both tools that take keyframes. */
 const KEYFRAME_RULE = `A keyframe is {"time": seconds, "properties": {…}, "easing"?: name}. The values go INSIDE properties, never beside time: {"time":1,"properties":{"opacity":1}}, not {"time":1,"opacity":1} (refused). easing shapes the move ARRIVING at that key: linear (default), easeIn, easeOut, easeInOut, easeOutBack, easeInOutCubic, easeOutBounce, spring, hold. Before its first key an item holds the first key's values; after its last, the last key's. Keyable: x, y (the centre), opacity, scale, scaleX, scaleY, rotation (degrees), fillColor, strokeColor, strokeWidth, width, height, radius, fontSize, trimEnd (0→1 draws a path on).`;
 
 /** Read by the model before any tool: what the lane is, the order of work, and what it cannot do. */
-export const LANE_INSTRUCTIONS = `PinePaper Studio, agent lane: seven tools that build an animated scene on a live canvas and export it to a file.
+export const LANE_INSTRUCTIONS = `PinePaper Studio, agent lane: eight tools that build an animated scene on a live canvas and export it to a file.
 
 ORDER OF WORK:
 1. pinepaper_agent_batch_execute: ONE call with the canvas size, the background, every item, their keyframes and any relations.
@@ -42,6 +44,7 @@ ORDER OF WORK:
 Use pinepaper_keyframe_animate to re-key one item afterwards, and pinepaper_pattern to move many named items with one declaration.
 Something that happens AT a time or ON a click (show, hide, recolour): make the event with pinepaper_event first, then bind it in the batch with relation ops.
 To start over, call pinepaper_clear_canvas: it empties the canvas and ids start again at item_1, so the same batch gives the same ids.
+A motion the built-in relations do not have (a bob, a custom path): define it once with pinepaper_register_custom_relation, then bind it to each item in the batch with relation ops of that relationType.
 
 UNITS: pixels, top-left origin, y down; time in seconds; angles in degrees; colours as "#rrggbb".
 Every call acts on the live canvas at once: re-sending a batch ADDS its items again (clear first to replay it). A failed atomic batch removes the items it made, so fix it and send it again (edits it made to items that already existed stay: the result says so).
@@ -233,6 +236,25 @@ A TIMED event fires itself at scene times, in the preview and in every video exp
   pinepaper_clear_canvas: {
     description: `Start over: remove every item (events included), relation, keyframe track and uploaded clip, and the background colour; the canvas size stays. Ids start again at item_1, so a batch sent after a clear returns the same ids as the first time it was sent. Takes no arguments.`,
     inputSchema: { type: 'object', properties: {} },
+  },
+
+  pinepaper_register_custom_relation: {
+    description: `Define a relation of your own, then bind it in pinepaper_agent_batch_execute with relation ops: relationType is its name, relationOptions its params, targetId optional (leave it out when the motion needs no other item). One definition drives many items, and changing a param later is one call. It lasts for this session: register it again after a restart.
+
+computeFunction is a function BODY that gets fromPosition, toPosition, params, delta and time (scene seconds) and returns what apply needs. applyFunction is a body that gets item, target, computed and params and changes the item.
+{"name":"bobs","params":{"amp":{"type":"number","default":40}},"computeFunction":"return {y: 360 + params.amp * Math.sin(Math.PI * time)};","applyFunction":"if (computed) item.position.y = computed.y;"}
+then in the batch: {"type":"relation","sourceId":"$0","relationType":"bobs","relationOptions":{"amp":100}}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'the relation type name, used as relationType' },
+        params: { type: 'object', description: 'its parameters: {"amp": {"type": "number", "default": 40}}' },
+        computeFunction: { type: 'string', description: 'function body: (fromPosition, toPosition, params, delta, time) → computed' },
+        applyFunction: { type: 'string', description: 'function body: (item, target, computed, params) → changes the item' },
+        description: { type: 'string' },
+      },
+      required: ['name', 'computeFunction', 'applyFunction'],
+    },
   },
 
   pinepaper_lint_scene: {

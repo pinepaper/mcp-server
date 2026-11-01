@@ -4501,7 +4501,8 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
         // doing (e.g. experimental vocabulary).
         if (!input.skipValidation) {
           const ops = input.operations as ReadonlyArray<Record<string, unknown>>;
-          const violations = validateBatchVocabulary(ops);
+          // A relation registered with register_custom_relation this session is a valid relationType, as in add_relation.
+          const violations = validateBatchVocabulary(ops, { relationType: CUSTOM_RELATION_NAMES });
           if (violations.length > 0) {
             return errorResult(
               ErrorCodes.VALIDATION_ERROR,

@@ -72,7 +72,7 @@ function inlineExample(text: string): Record<string, unknown> {
 describe('the agent lane', () => {
   it('lists exactly the lane tools, in lane order', () => {
     expect(lane.map((t) => t.name)).toEqual([...LANE_TOOL_NAMES]);
-    expect(lane.length).toBe(7);
+    expect(lane.length).toBe(8);
   });
 
   // O10 (mcp-server#29): the lane had no way to start over and no events. It keeps every tool it had.
@@ -99,10 +99,11 @@ describe('the agent lane', () => {
     expect(batch).toContain('"visible":true');
   });
 
-  it('the lane tools/list stays small: ≤ 16,000 bytes (13,441 before O10)', async () => {
+  // 13,441 before O10; ~15.9k after it; 17,715 with register_custom_relation (#36), its lane schema not its 3.4 KB full one.
+  it('the lane tools/list stays small: ≤ 18,000 bytes', async () => {
     const client = await connect('lane');
     const listed = await client.listTools();
-    expect(Buffer.byteLength(JSON.stringify(listed), 'utf8')).toBeLessThanOrEqual(16_000);
+    expect(Buffer.byteLength(JSON.stringify(listed), 'utf8')).toBeLessThanOrEqual(18_000);
     await client.close();
   });
 

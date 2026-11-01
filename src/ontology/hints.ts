@@ -225,6 +225,8 @@ export function detectBatchPropertyTypos(
  */
 export function validateBatchVocabulary(
   operations: ReadonlyArray<Record<string, unknown>>,
+  /** Values valid this session beyond the built-in vocabulary, by field: relationType gets the names registered with register_custom_relation. */
+  sessionValues: Readonly<Record<string, ReadonlySet<string>>> = {},
 ): BatchVocabularyViolation[] {
   const violations: BatchVocabularyViolation[] = [];
   operations.forEach((op, opIndex) => {
@@ -237,7 +239,7 @@ export function validateBatchVocabulary(
       if (typeof value !== 'string') continue;
       const hint = vocabularyHintForPath(field, value);
       if (!hint) continue;
-      const isValid = (hint.validValues as readonly string[]).includes(value);
+      const isValid = (hint.validValues as readonly string[]).includes(value) || !!sessionValues[field]?.has(value);
       if (!isValid) violations.push({ opIndex, opType, field, hint });
     }
   });

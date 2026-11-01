@@ -5407,14 +5407,16 @@ return { itemId: targetId, animationType: ${JSON.stringify(String(op.animationTy
         if (fireIf) return `
 throw new Error(${JSON.stringify(String(op.relationType) + ': ' + fireIf)});
 `;
+        // No targetId is a relation on the item alone (the engine takes a null target, as staggered_with does); a
+        // custom relation whose compute ignores the target needed a stand-in before.
+        const noTarget = op.targetId === undefined || op.targetId === null || op.targetId === '';
         return `
 const sourceId = ${srcRef};
-const targetId = ${tgtRef};
+const targetId = ${noTarget ? 'null' : tgtRef};
 const source = app.getItemById(sourceId);
-const target = app.getItemById(targetId);
+const target = ${noTarget ? 'null' : 'app.getItemById(targetId)'};
 if (!source) throw new Error('Source not found: ' + sourceId);
-if (!target) throw new Error('Target not found: ' + targetId);
-const relationId = app.addRelation(source, target, ${JSON.stringify(String(op.relationType))}, ${relOpts});
+${noTarget ? '' : "if (!target) throw new Error('Target not found: ' + targetId);\n"}const relationId = app.addRelation(source, target, ${JSON.stringify(String(op.relationType))}, ${relOpts});
 // NOT BOUND IS NOT A SUCCESS (owner rule 1, B119). addRelation answers false
 // when it refuses — spring_follow "not loaded yet" — and this op returned
 // { relationId: false } with nothing marking it failed, so the batch said

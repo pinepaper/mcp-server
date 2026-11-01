@@ -34,7 +34,8 @@
         "pinepaper_agent_export",
         "pinepaper_lint_scene",
         "pinepaper_event",
-        "pinepaper_clear_canvas"
+        "pinepaper_clear_canvas",
+        "pinepaper_register_custom_relation"
       ]
     },
     "jsonrpc": "2.0",
