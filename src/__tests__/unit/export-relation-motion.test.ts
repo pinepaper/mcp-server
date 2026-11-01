@@ -11,11 +11,15 @@ describe('export: motion from relations counts as animated', () => {
   it('asks the frames only when the studio said not animated, and only for a moving format', () => {
     expect(code).toContain("['mp4', 'webm', 'gif', 'apng'].indexOf(format) !== -1");
     expect(code).toContain('result.fidelity.checked.animated === false');
-    expect(code).toMatch(/__mcap\(__mt,/);
+    expect(code).toMatch(/__mcap\(__mt\.concat\(\[0\]\),/);
   });
 
   it('samples at uneven times across the export, so a loop cannot land on whole periods', () => {
     expect(code).toContain('[0, 0.17, 0.43, 0.71].map((k) => Math.round(k * 2 * 1000) / 1000)');
+  });
+
+  it('ends on t=0, so the canvas is left at rest (a capture keeps the pose of the last time it drew)', () => {
+    expect(code).toContain('__mt.concat([0])');
   });
 
   it('runs after the export result exists, and before the frozen-output check that reads the flag', () => {
