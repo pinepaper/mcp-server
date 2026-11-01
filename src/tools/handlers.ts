@@ -4739,8 +4739,9 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
   const E = app.exportEngine;
   if (!E || E.supportsProgramAudio !== true) return { ok: false, reason: 'this studio cannot render program audio' };
   const r = await E.exportProgramAudio({ format: 'wav', sampleRate: 48000, duration: ${Number(seconds)} });
-  // A program with nothing that sounds is refused with a reason, not an empty WAV: say it as such.
-  if (r && r.ok === false && typeof E.sceneHasAudio === 'function' && !E.sceneHasAudio()) return { ok: false, none: true };
+  // A program with nothing that sounds is refused, not an empty WAV: code 'no-audio' (FxTool #252); an older studio
+  // gives only a reason, so there the scene's own answer decides.
+  if (r && r.ok === false && (r.code === 'no-audio' || (r.code === undefined && typeof E.sceneHasAudio === 'function' && !E.sceneHasAudio()))) return { ok: false, none: true };
   return r;
 })();`, false, { bypassGovernor: true, governorTimeoutMs: 600_000 });
                 const v = (r.result ?? {}) as { ok?: boolean; none?: boolean; reason?: string; error?: string; exportId?: string; size?: number };
