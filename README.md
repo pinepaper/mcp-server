@@ -285,6 +285,11 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 
 ### Fixed
 
+- A studio page that opens on an older build (right after a deploy) is moved
+  to the live build when the server connects, and `pinepaper_clear_canvas`
+  does the same before it empties the canvas. Before, every export from such
+  a page warned to start a new job, which the `lane` toolkit cannot do. The
+  warning now names `pinepaper_clear_canvas` and says the file may differ.
 - A `time_expression` formula the engine cannot read is refused, with the
   reason and the grammar: `Math.sin(...)`, an unknown name, a wrong
   capitalisation, `random()`, or a function given the wrong number of

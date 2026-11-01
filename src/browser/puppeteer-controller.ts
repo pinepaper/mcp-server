@@ -597,6 +597,15 @@ export class PinePaperBrowserController {
       await this.waitForPinePaper();
 
       this.isConnected = true;
+      // A page that loads on an old build (a service worker serving the build before a deploy) is reloaded now,
+      // while it is empty: otherwise every export from it carries the stale-build warning, and the lane has no
+      // start_job to clear it (#40).
+      try {
+        const fresh = await this.reloadIfStale();
+        if (fresh) console.error(`[PinePaper] Studio was on build ${fresh.fromBuild}; reloaded to ${fresh.toBuild}`);
+      } catch (e) {
+        console.error('[PinePaper] build freshness check skipped:', e instanceof Error ? e.message : e);
+      }
       console.error('[PinePaper] Connected to PinePaper Studio');
     } catch (error) {
       await this.disconnect();
@@ -1167,6 +1176,29 @@ export class PinePaperBrowserController {
 
     console.error('[PinePaper] Page refreshed and ready');
     return {};
+  }
+
+  /**
+   * Put the studio on the live build when it is on an old one (FxTool D92: PinePaperAgent.reloadIfStale checks
+   * /build.json, and when stale lets the new service worker activate and reloads the page). Everything on the canvas
+   * goes with the old page, so callers use it only where the canvas is empty or about to be emptied: a fresh
+   * connect and clear_canvas. Resolves with the two builds when it reloaded, null when there was nothing to do (or
+   * the studio cannot say).
+   */
+  async reloadIfStale(): Promise<{ fromBuild?: string; toBuild?: string } | null> {
+    if (!this.page) return null;
+    const first = await this.page.evaluate(`(async function () {
+  const A = typeof window !== 'undefined' ? window.PinePaperAgent : null;
+  if (!A || typeof A.reloadIfStale !== 'function') return null;
+  try { return await A.reloadIfStale(); } catch (e) { return null; }
+})()`) as { reloading?: boolean; fromBuild?: string; toBuild?: string } | null;
+    if (!first || !first.reloading) return null;
+    // The page reloads ~100 ms after answering; wait for the new one to be the studio again.
+    await new Promise((r) => setTimeout(r, 500));
+    await this.waitForPinePaper();
+    await this.rememberCanvasSize();
+    await this.plantSessionToken();
+    return { fromBuild: first.fromBuild, toBuild: first.toBuild };
   }
 
   /**

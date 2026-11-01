@@ -7150,7 +7150,7 @@ ${(() => {
       if (__bs.stale) {
         result.stale = true;
         result.fidelity = result.fidelity || { warnings: [] };
-        result.fidelity.warnings = (result.fidelity.warnings || []).concat([{ code: 'stale_build', message: 'this studio is running an old build (' + __bs.buildId + '; the live build is ' + __bs.liveBuildId + '): this file was made by the old code. Start a new job (pinepaper_agent_start_job, which reloads it) and export again.' }]);
+        result.fidelity.warnings = (result.fidelity.warnings || []).concat([{ code: 'stale_build', message: 'this studio is running an old build (' + __bs.buildId + '; the live build is ' + __bs.liveBuildId + '): this file was made by the old code, so it may differ from what the live build makes. pinepaper_clear_canvas (or pinepaper_agent_start_job) loads the live build; it empties the canvas, so rebuild the scene and export again if the difference matters.' }]);
       }
     }
   } catch (_) { /* older studio */ }

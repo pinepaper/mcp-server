@@ -3443,7 +3443,18 @@ async function handleToolCallInner(
 
       case 'pinepaper_clear_canvas': {
         const code = codeGenerator.generateClearCanvas();
-        const description = 'Clears all items from the canvas, including any welcome template items';
+        // Starting over is also the moment to leave an old build: everything on the canvas is going anyway, and the
+        // lane has no start_job, which was the only other reload point (#40).
+        let reloaded: { fromBuild?: string; toBuild?: string } | null = null;
+        const mode = options.executionMode ?? getExecutionMode();
+        if (mode !== 'code' && options.executeInBrowser && !options.deferred) {
+          const controller = options.browserController || getBrowserController();
+          if (controller.connected && typeof (controller as { reloadIfStale?: unknown }).reloadIfStale === 'function') {
+            try { reloaded = await (controller as unknown as { reloadIfStale(): Promise<typeof reloaded> }).reloadIfStale(); } catch { reloaded = null; }
+          }
+        }
+        const description = 'Clears all items from the canvas, including any welcome template items'
+          + (reloaded ? ` (the studio was on build ${reloaded.fromBuild} and was reloaded to the live build ${reloaded.toBuild} first)` : '');
         return executeOrGenerate(code, description, options, 'pinepaper_clear_canvas');
       }
 
