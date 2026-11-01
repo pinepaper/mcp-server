@@ -157,7 +157,7 @@ if (!it || !b || !(b.width > 0)) return { fitted: false };
 const s = ${mode === 'cover' ? 'Math.max' : 'Math.min'}(cs.width / b.width, cs.height / b.height);
 it.scale(s); it.position = new paper.Point(cs.width / 2, cs.height / 2);
 return { fitted: true, width: Math.round(it.bounds.width), height: Math.round(it.bounds.height) };`,
-  }, options);
+  }, { ...options, serverWrittenCode: true });
   return {
     placed: true, kind: isVideo ? 'video' : 'image', itemId: ref, fit: mode,
     ...(isVideo ? { durationSeconds: asset.durationSeconds, ...(asset.fps ? { fps: asset.fps } : {}) } : {}),
@@ -239,7 +239,7 @@ export const generateHandlers: Record<string, (args: Record<string, unknown>, op
       // The words, as real text over the plate (role layout, title-safe,
       // contrast-checked against the plate). Their ids come back to restyle.
       if (placement.placed && Array.isArray(job.textLayers) && job.textLayers.length) {
-        const laid = await handleToolCall('pinepaper_execute_custom_code', { code: emitTextLayersPlacement(job.textLayers, String(placement.itemId)) }, options);
+        const laid = await handleToolCall('pinepaper_execute_custom_code', { code: emitTextLayersPlacement(job.textLayers, String(placement.itemId)) }, { ...options, serverWrittenCode: true });
         // The first text block is the executed result as JSON: {success, result}.
         const first = laid.content?.[0];
         let body: { result?: { textItems?: unknown[]; fonts?: unknown[] } } | null;

@@ -840,6 +840,11 @@ export function getExecutionMode(): ExecutionMode {
 
 export interface HandlerOptions {
   i18n?: I18nManager;
+  /**
+   * The code in this call was written by the server itself (place's fit, a generated text layer), not by the
+   * caller, so PINEPAPER_ALLOW_CODE does not apply. Set only in server code; tool arguments cannot reach it.
+   */
+  serverWrittenCode?: boolean;
   /** If true, execute code in browser instead of just generating it */
   executeInBrowser?: boolean;
   /** Browser controller instance (uses singleton if not provided) */
@@ -3245,7 +3250,7 @@ async function handleToolCallInner(
 
       case 'pinepaper_execute_custom_code': {
         const input = ExecuteCustomCodeInputSchema.parse(args);
-        if (!capabilityAllowed('code')) {
+        if (!capabilityAllowed('code') && options.serverWrittenCode !== true) {
           return errorResult(ErrorCodes.INVALID_PARAMS, capabilityRefusal('code', 'pinepaper_execute_custom_code'), { switch: CAPABILITY_SWITCH.code }, { toolName: 'pinepaper_execute_custom_code' });
         }
         const code = codeGenerator.generateExecuteCustomCode(input);

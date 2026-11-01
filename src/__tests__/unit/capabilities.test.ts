@@ -52,6 +52,13 @@ describe('capabilities are off by default', () => {
     });
   }
 
+  it('code the server wrote itself (place fitting a downloaded asset) still runs', async () => {
+    const c = controller();
+    const r = await handleToolCall('pinepaper_execute_custom_code', { code: 'return 1;' }, { ...opts(c), serverWrittenCode: true }) as { isError?: boolean };
+    expect(r.isError).not.toBe(true);
+    expect(c.codes.length).toBeGreaterThan(0);
+  });
+
   it('render_hook list still works', async () => {
     const c = controller();
     const r = await handleToolCall('pinepaper_render_hook', { action: 'list' }, opts(c)) as { isError?: boolean };

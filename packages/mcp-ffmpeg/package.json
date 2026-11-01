@@ -5,12 +5,35 @@
   "type": "module",
   "main": "index.js",
   "types": "index.d.ts",
-  "exports": { ".": { "types": "./index.d.ts", "import": "./index.js" } },
-  "files": ["index.js", "index.d.ts", "README.md", "LICENSE"],
-  "engines": { "node": ">=18.0.0" },
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js"
+    }
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "license": "MIT",
   "author": "PinePaper Studio",
   "homepage": "https://pinepaper.studio",
-  "repository": { "type": "git", "url": "git+https://github.com/pinepaper/mcp-server.git", "directory": "packages/mcp-ffmpeg" },
-  "keywords": ["pinepaper", "mcp", "ffmpeg"]
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pinepaper/mcp-server.git",
+    "directory": "packages/mcp-ffmpeg"
+  },
+  "keywords": [
+    "pinepaper",
+    "mcp",
+    "ffmpeg"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }
