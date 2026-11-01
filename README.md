@@ -80,7 +80,15 @@ shareable. It is in invite-only beta.
 
 ### Quick start
 
-Puppeteer is an **optional** install, so a plain `npx @pinepaper.studio/mcp-server`
+**Claude Desktop:** download
+[pinepaper-mcp-server.mcpb](https://github.com/pinepaper/mcp-server/releases/latest/download/pinepaper-mcp-server.mcpb)
+and open it. Desktop installs the server, with no config file to edit. It
+drives your installed Google Chrome; its settings choose another Chromium-based
+browser, the export folder and the tool list. Each
+[release](https://github.com/pinepaper/mcp-server/releases) lists the file's
+SHA-256.
+
+For other MCP clients: Puppeteer is an **optional** install, so a plain `npx @pinepaper.studio/mcp-server`
 has no browser: every tool then returns the code it would run instead of running
 it (the result says so). To execute in a real browser, install Puppeteer **in the
 same `npx` call** — a separate `npm i puppeteer` in your project is not visible to
@@ -2435,7 +2443,7 @@ bun run build
 
 ### Claude Desktop extension (.mcpb)
 
-`bun run build:mcpb` builds `mcpb/pinepaper-mcp-server-<version>.mcpb`, a one-file Claude Desktop extension: open it and Desktop installs the server, with no config file to edit. The extension drives your installed Google Chrome (choose another Chromium-based browser in its settings), and its settings also set the export folder and the tool list.
+Each release ships it ready-made ([latest](https://github.com/pinepaper/mcp-server/releases/latest/download/pinepaper-mcp-server.mcpb)). `bun run build:mcpb` builds `mcpb/pinepaper-mcp-server-<version>.mcpb`, a one-file Claude Desktop extension: open it and Desktop installs the server, with no config file to edit. The extension drives your installed Google Chrome (choose another Chromium-based browser in its settings), and its settings also set the export folder and the tool list.
 
 ### Test with MCP Client (Local)
 
