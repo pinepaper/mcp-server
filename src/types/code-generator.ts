@@ -15,6 +15,9 @@ import { CREATE_KNOWN_KEYS } from '../tools/create-known-keys.js';
 import { jsLiteral } from '../utils/js-literal.js';
 
 /** A value spliced into a generated `//` comment, on one line: a line break in caller text would end the comment and run the rest as code. */
+/** How many relations pinepaper_lint_scene lists back; past it the result says how many there are. */
+const RELATIONS_READBACK_CAP = 200;
+
 function oneLine(v: unknown): string {
   return String(v).replace(/[\r\n\u2028\u2029]+/g, ' ');
 }
@@ -5410,6 +5413,45 @@ throw new Error(${JSON.stringify(String(op.relationType) + ': ' + fireIf)});
         // No targetId is a relation on the item alone (the engine takes a null target, as staggered_with does); a
         // custom relation whose compute ignores the target needed a stand-in before.
         const noTarget = op.targetId === undefined || op.targetId === null || op.targetId === '';
+        // A NAME PATTERN AND AN UPDATE (mcp-server#37). sourceId "dot-*" binds every item named like it, in name
+        // order (dot-2 before dot-10), each with index and count added to its params, so "12 → 20 dots" is
+        // adding members. update: true changes the params of the relation already bound instead of adding one.
+        const glob = typeof op.sourceId === 'string' && op.sourceId.includes('*') && !op.sourceId.startsWith('$');
+        if (glob || op.update === true) {
+          const type = jsLiteral(String(op.relationType));
+          const members = glob
+            ? `const __re = new RegExp(${jsLiteral('^' + String(op.sourceId).split('*').map((p) => p.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*') + '$')});
+const __members = app.itemRegistry.getAll()
+  .map((e) => ({ id: e.id || e.itemId, name: (e.item && ((e.item.data && e.item.data.name) || e.item.name)) || '' }))
+  .filter((m) => __re.test(m.name))
+  .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+if (!__members.length) throw new Error('no item is named like ' + ${jsLiteral(op.sourceId)} + ': name items with properties.name');`
+            : `const __members = [{ id: ${srcRef} }];
+if (!app.getItemById(__members[0].id)) throw new Error('Source not found: ' + __members[0].id);`;
+          return `
+${members}
+const targetId = ${noTarget ? 'null' : tgtRef};
+const target = ${noTarget ? 'null' : 'app.getItemById(targetId)'};
+${noTarget ? '' : "if (!target) throw new Error('Target not found: ' + targetId);\n"}${op.update === true ? "if (typeof app.modifyRelationParams !== 'function') throw new Error('this studio cannot change a bound relation (app.modifyRelationParams): update PinePaper Studio');\n" : ''}const __done = [], __failed = [];
+__members.forEach((m, i) => {
+  const __p = Object.assign({}, ${relOpts}${glob ? ', { index: i, count: __members.length }' : ''});
+  const ok = ${op.update === true
+    ? `app.modifyRelationParams(m.id, targetId, ${type}, __p) || (targetId === null && app.modifyRelationParams(m.id, undefined, ${type}, __p))`
+    : glob
+      // Already bound (a re-run after adding members): its params change, so index and count follow the new set.
+      ? `((app.relationRegistry && app.relationRegistry.getAssociations(m.id, ${type}).some((a) => a.target === targetId || (targetId === null && a.target == null)) && typeof app.modifyRelationParams === 'function')
+      ? (app.modifyRelationParams(m.id, targetId, ${type}, __p) || (targetId === null && app.modifyRelationParams(m.id, undefined, ${type}, __p)))
+      : app.addRelation(app.getItemById(m.id), target, ${type}, __p))`
+      : `app.addRelation(app.getItemById(m.id), target, ${type}, __p)`};
+  (ok ? __done : __failed).push(m.id);
+});
+if (!__done.length) {
+  const __why = ${op.update === true ? `'no ' + ${type} + ' relation is bound from ' + __failed.join(', ') + (targetId === null ? '' : ' to ' + targetId) + ' to change: bind it first (a relation op without update)'` : relationRefusalReasonJs(type)};
+  return { success: false, relationType: ${type}, sourceIds: __failed, error: ${op.update === true ? '__why' : `'the studio refused the ' + ${type} + ' relation for ' + __failed.join(', ') + ' — nothing was bound' + (__why ? ': ' + __why : '.')`} };
+}
+return { success: true, relationType: ${type}, ${op.update === true ? 'updated' : 'bound'}: __done, targetId${glob ? ', count: __members.length' : ''}, ...(__failed.length ? { failed: __failed, warning: __failed.length + ' of ' + __members.length + ' were not ${op.update === true ? 'changed' : 'bound'}: ' + __failed.join(', ') } : {}) };
+`;
+        }
         return `
 const sourceId = ${srcRef};
 const targetId = ${noTarget ? 'null' : tgtRef};
@@ -8751,6 +8793,10 @@ ${(() => {
       continuous: ${validated.continuous !== false},
       priority: ${validated.priority || 0}
     });
+    // The definition as given, kept on the page so a later call can read it back (pinepaper_lint_scene
+    // customRelations): the engine keeps the compiled rule, not the text an agent would edit.
+    window.__ppCustomRelations = window.__ppCustomRelations || {};
+    window.__ppCustomRelations[${jsLiteral(validated.name)}] = ${jsLiteral({ name: validated.name, ...(validated.description ? { description: validated.description } : {}), params: validated.params ?? {}, computeFunction: validated.computeFunction, applyFunction: validated.applyFunction })};
     return { success: true, relationName: ${jsLiteral(validated.name)}, message: 'Custom relation registered successfully' };
   } catch (error) {
     return { success: false, error: error.message };
@@ -12544,10 +12590,27 @@ ${checks.includes('contrast') ? `  // SAMPLED OVER TIME (round 12, 12.9): text i
     return { success: false, error: 'app.lintScene unavailable — update FxTool to a build with the relational linter (S12-E2)' };
   }
   const result = app.lintScene(${optsJson});
+  // THE RELATIONS AS BOUND, so a later agent can find the one to edit without exporting the scene to read it:
+  // from, to, type and params, capped. And the custom relation definitions registered on this page, as given.
+  const __rels = [];
+  let __relCount = 0;
+  try {
+    const __rr = app.relationRegistry;
+    const __active = __rr && typeof __rr.queryActive === 'function' ? __rr.queryActive() : [];
+    __active.forEach((e) => (e.associations || []).forEach((a) => {
+      __relCount++;
+      if (__rels.length >= ${RELATIONS_READBACK_CAP}) return;
+      const __name = e.item && e.item.data && e.item.data.name;
+      __rels.push({ from: e.itemId, ...(__name ? { fromName: __name } : {}), to: a.target === undefined ? null : a.target, type: a.relation, params: a.params || {} });
+    }));
+  } catch (e) { /* the relations are an addition; the lint stands without them */ }
+  const __custom = (typeof window !== 'undefined' && window.__ppCustomRelations) ? Object.values(window.__ppCustomRelations) : [];
   // warnings: what the engine's own rules found (TEXT_CLIPS_FRAME: a centre-anchored text running past the
   // frame edge). Passed through when the studio reports them; an older studio has none to pass.
   return { success: true, density: result.density, suggestions: result.suggestions,
-    ...(Array.isArray(result.warnings) && result.warnings.length ? { warnings: result.warnings } : {}) };
+    ...(Array.isArray(result.warnings) && result.warnings.length ? { warnings: result.warnings } : {}),
+    relations: __rels, ...(__relCount > __rels.length ? { relationsShown: __rels.length, relationCount: __relCount } : {}),
+    ...(__custom.length ? { customRelations: __custom } : {}) };
 })();`.trim();
   }
 

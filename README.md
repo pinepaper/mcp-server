@@ -270,6 +270,14 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - The `lane` toolkit includes `pinepaper_register_custom_relation`, with a
   short lane description, so a lane agent can define a motion once and bind
   it to many items. The lane is now 8 tools.
+- A batch relation op can bind a name pattern: `sourceId: "dot-*"` binds
+  every item named like it, in name order, each with `index` and `count` in
+  its params. Send the same op again after adding items and they join, with
+  `index` and `count` updated. `update: true` changes the params of a
+  relation already bound.
+- `pinepaper_lint_scene` lists every relation bound (from, to, type, params)
+  and every custom relation definition, so a later call can find the one to
+  change.
 
 ### Fixed
 

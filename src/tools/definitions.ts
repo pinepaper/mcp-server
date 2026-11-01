@@ -3508,6 +3508,8 @@ EXAMPLE doc: { "nodes": [ {"id":"bar","type":"pp:Rectangle","width":300,"height"
     description: `Audit the LIVE scene's relational structure (FxTool S12-E2) — read-only, nothing is changed. Answers "is this scene composed with relations, or just a pile of absolutely-positioned items?" and proposes fixes.
 
 RETURNS:
+- relations: every relation bound — [{ from, fromName?, to, type, params }], the first 200 (relationCount says how many when there are more). Use it to find the relation to change, then a batch relation op with update: true.
+- customRelations: each pinepaper_register_custom_relation definition as it was given (name, params, computeFunction, applyFunction).
 - density: { itemCount, relationalItemCount, relationalDensity (0..1 — fraction of items touching the relation graph), edgeCount, componentCount }. A low relationalDensity means items are placed by hardcoded coordinates and won't hold together if something moves.
 - suggestions: structural relations for unrelated item pairs that ALREADY sit in a structural configuration — [{ from, to, type (on_top_of/below/beside/inside/centered_on/aligned_with), params, confidence }], ranked by confidence. Apply the good ones with pinepaper_add_relation to make the layout robust.
 
@@ -9010,7 +9012,8 @@ EXAMPLE — Animated sky scene with timed reveals:
               append: { type: 'boolean', description: "For keyframe_animate: add these keys to the item's existing track instead of replacing it (a key at the same time merges, the new values win). Without it the op replaces the track; the op's result says which happened." },
               mode: { type: 'string', description: "For keyframe_animate: the studio's spelling of append — 'merge' is append: true; 'replace' (the default) replaces the track." },
               // Relations
-              sourceId: { type: 'string', description: 'For relation: source item ID or $N' },
+              sourceId: { type: 'string', description: 'For relation: source item ID or $N, or a name pattern ("dot-*"): every item named like it, in name order, each with index and count added to relationOptions; re-sending it after adding members binds the new ones and updates index and count' },
+              update: { type: 'boolean', description: 'relation: true changes the relationOptions of the relation already bound (same sourceId, targetId, relationType) instead of binding another' },
               targetId: { type: 'string', description: 'For relation: target item ID or $N' },
               relationType: {
                 type: 'string',

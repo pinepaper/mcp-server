@@ -2557,7 +2557,8 @@ export const AgentBatchOperationSchema = z.object({
   animationType: z.string().optional().describe('Animation type for animate operations'),
   animationOptions: z.record(z.string(), z.unknown()).optional().describe('Animation options'),
   // Relation operation fields
-  sourceId: z.string().optional().describe('Source item ID for relations'),
+  sourceId: z.string().optional().describe('Source item ID for relations; a name pattern ("dot-*") binds every item named like it, in name order, each with index and count in its params'),
+  update: z.boolean().optional().describe('relation: true changes the params of the relation already bound (same sourceId, targetId, relationType) instead of binding another'),
   targetId: z.string().optional().describe('Target item ID for relations'),
   relationType: z.string().optional().describe('Relation type'),
   relationOptions: z.record(z.string(), z.unknown()).optional().describe('Relation options'),

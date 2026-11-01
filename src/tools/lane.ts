@@ -102,7 +102,7 @@ RULES (each one has cost a failed build):
 - Name every item (properties.name). pinepaper_pattern selects members by name, e.g. "bar-*".
 - properties.id chooses an item's id ("dot"), so a replay after pinepaper_clear_canvas addresses the same ids.
 - A shape with a strokeColor and no color is an outline.
-- Relations: orbits {radius, speed (turns per second), direction, phaseDegrees}, follows {offset, smoothing}, attached_to {offset}, points_at, moves_along_path {path:[{x,y},…], speed}. sourceId moves; targetId is what it moves relative to.
+- Relations: orbits {radius, speed (turns per second), direction, phaseDegrees}, follows {offset, smoothing}, attached_to {offset}, points_at, moves_along_path {path:[{x,y},…], speed}. sourceId moves; targetId is what it moves relative to. A name pattern as sourceId ("dot-*") binds every item named like it, in name order, each with index and count added to relationOptions; send the same op again after adding members and they join, with index and count updated. update: true changes the relationOptions of a relation already bound (same sourceId, targetId, relationType) instead of adding one.
 - Events (item_9 above is an eventId from pinepaper_event): an event → item relation is a reaction, run each time it fires: on_event_set_visibility {visible: true|false}, on_event_set_color {color}, on_event_set_property {property, value}. An item → event relation fires it: on_click_fire, on_pointer_enter_fire, on_key_fire {key}. An item a reaction reveals starts hidden: properties.visible false.
 - set_canvas_size comes first; a video exports at the canvas size.
 - The call is LIVE: sending it twice makes every item twice. atomic (default) stops at the first failure and removes every item the call created, so the canvas holds no half batch: fix the op it names and send it again. Edits to items that already existed are not undone; the result says what was removed.
@@ -128,7 +128,8 @@ itemType: text, circle, rectangle, ellipse, star, triangle, polygon, line, arc, 
               groupName: { type: 'string', description: 'group' },
               keyframes: { ...KEYFRAMES, description: 'keyframe_animate' },
               append: { type: 'boolean', description: "keyframe_animate: add to the item's track instead of replacing it" },
-              sourceId: { type: 'string', description: 'relation: the item that moves' },
+              sourceId: { type: 'string', description: 'relation: the item that moves, or a name pattern ("dot-*")' },
+              update: { type: 'boolean', description: 'relation: change the params of the relation already bound' },
               targetId: { type: 'string', description: 'relation: what it moves relative to' },
               relationType: { type: 'string', description: 'relation' },
               relationOptions: { type: 'object', description: 'relation: its parameters' },
@@ -239,7 +240,7 @@ A TIMED event fires itself at scene times, in the preview and in every video exp
   },
 
   pinepaper_register_custom_relation: {
-    description: `Define a relation of your own, then bind it in pinepaper_agent_batch_execute with relation ops: relationType is its name, relationOptions its params, targetId optional (leave it out when the motion needs no other item). One definition drives many items, and changing a param later is one call. It lasts for this session: register it again after a restart.
+    description: `Define a relation of your own, then bind it in pinepaper_agent_batch_execute with relation ops: relationType is its name, relationOptions its params, targetId optional (leave it out when the motion needs no other item). One definition drives many items: bind it to a name pattern (sourceId "dot-*", each member gets index and count), and change a param later with one relation op with update: true. pinepaper_lint_scene lists the relations bound and the definitions registered. It lasts for this session: register it again after a restart.
 
 computeFunction is a function BODY that gets fromPosition, toPosition, params, delta and time (scene seconds) and returns what apply needs. applyFunction is a body that gets item, target, computed and params and changes the item.
 {"name":"bobs","params":{"amp":{"type":"number","default":40}},"computeFunction":"return {y: 360 + params.amp * Math.sin(Math.PI * time)};","applyFunction":"if (computed) item.position.y = computed.y;"}
@@ -258,7 +259,7 @@ then in the batch: {"type":"relation","sourceId":"$0","relationType":"bobs","rel
   },
 
   pinepaper_lint_scene: {
-    description: `Check the live scene before exporting; read-only. Returns warnings (a text that runs past the frame edge, by item, side and pixels, where the studio reports it), density (how many items are tied together by relations) and suggestions (relations that would hold the layout together: {from, to, type, params}). Fix a clipped text by moving its centre in with a modify op in pinepaper_agent_batch_execute ({"type":"modify","itemId":"item_1","properties":{"x":474}}: the centre is the left edge plus half the width), or delete it and create it again with properties.anchor; a modify does not read anchor.`,
+    description: `Check the live scene before exporting; read-only. Returns relations (every relation bound: from, fromName, to, type, params; the first 200), customRelations (each pinepaper_register_custom_relation definition, as given), warnings (a text that runs past the frame edge, by item, side and pixels, where the studio reports it), density (how many items are tied together by relations) and suggestions (relations that would hold the layout together: {from, to, type, params}). Fix a clipped text by moving its centre in with a modify op in pinepaper_agent_batch_execute ({"type":"modify","itemId":"item_1","properties":{"x":474}}: the centre is the left edge plus half the width), or delete it and create it again with properties.anchor; a modify does not read anchor.`,
     inputSchema: {
       type: 'object',
       properties: {

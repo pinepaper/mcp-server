@@ -163,6 +163,7 @@ export const REQUIRED_ENGINE_METHODS: readonly string[] = [
   'mapSystem.tourRegions',
   'mapSystem.worldTour',
   'matchCut',
+  'modifyRelationParams',
   'outlineStroke',
   'panWorldCamera',
   'patternFrom',

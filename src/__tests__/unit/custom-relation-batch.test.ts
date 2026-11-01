@@ -29,3 +29,36 @@ describe('batch: custom relations', () => {
     expect(code).toContain("Target not found: ' + targetId");
   });
 });
+
+describe('mcp-server#37: name patterns, update, read-back', () => {
+  const gen = (op: Record<string, unknown>) => codeGenerator.generateAgentBatchExecute({ operations: [{ type: 'relation', relationType: 'wave', ...op }] } as never);
+
+  it('a name pattern binds every item named like it, in name order, with index and count', () => {
+    const code = gen({ sourceId: 'dot-*' });
+    expect(code).toContain('new RegExp("^dot-.*$")');
+    expect(code).toContain("localeCompare(b.name, undefined, { numeric: true })");
+    expect(code).toContain('{ index: i, count: __members.length }');
+  });
+
+  it('a pattern re-sent after adding members changes the bound ones instead of binding them twice', () => {
+    expect(gen({ sourceId: 'dot-*' })).toContain('app.relationRegistry.getAssociations(m.id, "wave")');
+  });
+
+  it('update changes the params of the relation already bound, and says when there is none', () => {
+    const code = gen({ sourceId: 'item_1', update: true, relationOptions: { amp: 90 } });
+    expect(code).toContain('app.modifyRelationParams(m.id, targetId, "wave", __p)');
+    expect(code).not.toContain('app.addRelation(');
+    expect(code).toContain('to change: bind it first');
+  });
+
+  it('a pattern with regex characters matches them literally', () => {
+    expect(gen({ sourceId: 'a.b(1)-*' })).toContain('new RegExp("^a\\\\.b\\\\(1\\\\)-.*$")');
+  });
+
+  it('lint_scene reads back the relations and the custom definitions', () => {
+    const code = codeGenerator.generateLintScene({} as never);
+    expect(code).toContain('queryActive()');
+    expect(code).toContain('customRelations: __custom');
+    expect(codeGenerator.generateRegisterCustomRelation({ name: 'wave', computeFunction: 'return {};', applyFunction: '' } as never)).toContain('window.__ppCustomRelations["wave"] = ');
+  });
+});

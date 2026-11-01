@@ -99,11 +99,12 @@ describe('the agent lane', () => {
     expect(batch).toContain('"visible":true');
   });
 
-  // 13,441 before O10; ~15.9k after it; 17,715 with register_custom_relation (#36), its lane schema not its 3.4 KB full one.
-  it('the lane tools/list stays small: ≤ 18,000 bytes', async () => {
+  // 13,441 before O10; ~15.9k after it; 17,715 with register_custom_relation (#36), its lane schema not its 3.4 KB full
+  // one; 18,556 with name patterns, update and the lint read-back documented (#37).
+  it('the lane tools/list stays small: ≤ 19,000 bytes', async () => {
     const client = await connect('lane');
     const listed = await client.listTools();
-    expect(Buffer.byteLength(JSON.stringify(listed), 'utf8')).toBeLessThanOrEqual(18_000);
+    expect(Buffer.byteLength(JSON.stringify(listed), 'utf8')).toBeLessThanOrEqual(19_000);
     await client.close();
   });
 
