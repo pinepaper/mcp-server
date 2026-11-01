@@ -269,7 +269,8 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   Hard cuts render scene by scene. Crossfades and cut sounds render as ranges
   of the chain, frame for frame what a whole export shows. The sound is the
   whole program, rendered once, so cached segments never carry a stale level
-  and there is no seam. It needs `ffmpeg` on `PATH`; without it, or for a
+  and there is no seam (a silent program gets a silent track, as a whole
+  export does). It needs `ffmpeg` on `PATH`; without it, or for a
   looping chain, the chain is exported whole and the result says why.
 - `pinepaper_agent_export { startTime }` exports a range of the timeline
   (mp4 / webm): each frame is the whole export's frame at that time.
@@ -303,6 +304,11 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 
 ### Fixed
 
+- The connector relations (`connects_to`, `attached_to_tail`,
+  `head_points_to`) say what they do: they record which item and port each
+  end of a connector belongs to, and only connectors made with
+  `pinepaper_connect` follow their items. Before, they read as if they would
+  move any line.
 - A studio page that opens on an older build (right after a deploy) is moved
   to the live build when the server connects, and `pinepaper_clear_canvas`
   does the same before it empties the canvas. Before, every export from such

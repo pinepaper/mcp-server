@@ -21,7 +21,7 @@ import { mkdir, stat, copyFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { CallToolResult } from '../mcp/index.js';
-import { hasFfmpeg, segmentStreams, concatSegments, muxAudio } from './export-file-receipt.js';
+import { hasFfmpeg, segmentStreams, concatSegments, muxAudio, muxSilence } from './export-file-receipt.js';
 import { exportFileLink } from '../utils/export-dir.js';
 
 interface ChainEntry { sceneId: string; duration: number; transition: string | null; cutSound: boolean }
@@ -34,7 +34,7 @@ export interface SceneCacheDeps {
   exportDir: string;
   /** The studio's program audio for `seconds` (exportProgramAudio), saved to a local WAV; null when it cannot. */
   programAudio?: (seconds: number) => Promise<{ file: string } | { none: true } | { reason: string }>;
-  ffmpeg?: { available: () => Promise<boolean>; streams: typeof segmentStreams; concat: typeof concatSegments; mux?: typeof muxAudio };
+  ffmpeg?: { available: () => Promise<boolean>; streams: typeof segmentStreams; concat: typeof concatSegments; mux?: typeof muxAudio; silence?: typeof muxSilence };
 }
 
 const READ_CHAIN = `(function () {
@@ -107,7 +107,7 @@ export function segmentKey(sceneData: unknown, durationMs: number, settings: Rec
 }
 
 export async function exportPerScene(args: Record<string, unknown>, format: string, deps: SceneCacheDeps): Promise<CallToolResult> {
-  const ff = deps.ffmpeg ?? { available: hasFfmpeg, streams: segmentStreams, concat: concatSegments, mux: muxAudio };
+  const ff = deps.ffmpeg ?? { available: hasFfmpeg, streams: segmentStreams, concat: concatSegments, mux: muxAudio, silence: muxSilence };
   const { perScene: _p, ...settings } = args;
   let chainSeconds: number | undefined;
   const whole = async (why: string): Promise<CallToolResult> => {
@@ -191,9 +191,10 @@ export async function exportPerScene(args: Record<string, unknown>, format: stri
     if (!joined.ok) return whole(`ffmpeg could not join the segments: ${joined.reason}`);
     const wav = await deps.programAudio!(total);
     if ('none' in wav) {
-      // Nothing in the program makes a sound: the joined video is the file.
-      await copyFile(videoOnly, out);
-      audioNote = 'the program has no sound, so the file has no audio track';
+      // Nothing in the program makes a sound: a silent track, as a whole export carries one.
+      const quiet = ff.silence ? await ff.silence(videoOnly, out, { format, seconds: total }) : { ok: false };
+      if (!quiet.ok) await copyFile(videoOnly, out);
+      audioNote = quiet.ok ? 'the program has no sound: the audio track is silent, as in a whole export' : 'the program has no sound, so the file has no audio track';
     } else if ('reason' in wav) {
       return whole(`the program audio could not be rendered: ${wav.reason}`);
     } else {

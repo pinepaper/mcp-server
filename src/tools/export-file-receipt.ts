@@ -232,3 +232,11 @@ export async function muxAudio(videoFile: string, audioFile: string, outFile: st
     '-c:v', 'copy', ...codec, '-t', String(opts.seconds), ...(opts.format === 'webm' ? [] : ['-movflags', '+faststart']), resolvePath(outFile)], 300_000);
   return r.ok ? { ok: true } : { ok: false, reason: r.stderr.trim() || 'ffmpeg failed with no message' };
 }
+
+/** A silent stereo track under a video (48 kHz, the rate every export muxes), so a file from a silent program carries an audio track as a whole export does. */
+export async function muxSilence(videoFile: string, outFile: string, opts: { format?: string; seconds: number }): Promise<{ ok: boolean; reason?: string }> {
+  const codec = opts.format === 'webm' ? ['-c:a', 'libopus', '-b:a', '64k'] : ['-c:a', 'aac', '-b:a', '64k'];
+  const r = await run('ffmpeg', ['-v', 'error', '-y', '-i', resolvePath(videoFile), '-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo', '-map', '0:v:0', '-map', '1:a:0',
+    '-c:v', 'copy', ...codec, '-t', String(opts.seconds), ...(opts.format === 'webm' ? [] : ['-movflags', '+faststart']), resolvePath(outFile)], 300_000);
+  return r.ok ? { ok: true } : { ok: false, reason: r.stderr.trim() || 'ffmpeg failed with no message' };
+}
