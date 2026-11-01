@@ -137,13 +137,5 @@
     "side-channel": "npm:@socketregistry/side-channel@^1.0.10",
     "ws": "^8.21.1",
     "hono": "^4.13.13"
-  },
-  "peerDependencies": {
-    "puppeteer": ">=22"
-  },
-  "peerDependenciesMeta": {
-    "puppeteer": {
-      "optional": true
-    }
   }
 }
