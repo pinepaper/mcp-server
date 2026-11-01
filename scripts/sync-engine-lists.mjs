@@ -42,6 +42,12 @@
  * - PATTERN_KINDS. The kinds core/Patterns.js KINDS accepts. pinepaper_pattern
  *   hand-copied two of four (phase_wave, stagger) and refused ring and orbit,
  *   which the engine always had.
+ * - EXPRESSION_FUNCTIONS / EXPRESSION_CONSTANTS / EXPRESSION_REJECTED. The
+ *   grammar of a time_expression formula (relations/expr-to-ir.js: FN1, FN2,
+ *   COMPOSITE_ARITY, FNN, CONSTS, REJECT). An expression outside it parses to
+ *   nothing and the relation does nothing, with success reported: an agent
+ *   wrote Math.sin(...) from JavaScript habit and got no motion (#39). The
+ *   tool documents the grammar from these and refuses an unknown name.
  * Descriptions are NOT generated: they are prose, written here. The type of
  * EASING_DESCRIPTIONS is keyed on the generated union, so a new engine easing
  * fails the TYPECHECK until someone writes its line.
@@ -72,6 +78,7 @@ const FILTER_REL = 'js/FilterSystem.js';
 const PROVENANCE_REL = 'js/core/Provenance.js';
 const STYLED_REL = 'js/core/StyledScene.js';
 const PATTERNS_REL = 'js/core/Patterns.js';
+const EXPR_REL = 'js/relations/expr-to-ir.js';
 
 function resolveRef() {
   for (const ref of [ENGINE_REF, 'HEAD']) {
@@ -212,6 +219,32 @@ function filters(src) {
 
 const list = (names) => names.map((n) => `  '${n}',`).join('\n');
 
+function expressionGrammar(src) {
+  const set = (name) => {
+    const m = new RegExp(`const ${name}\\s*=\\s*new Set\\(\\[([^\\]]*)\\]\\)`).exec(src);
+    if (!m) throw new Error(`sync-engine-lists: ${name} not found in ${EXPR_REL}`);
+    return [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]);
+  };
+  const keys = (name) => {
+    const m = new RegExp(`const ${name}\\s*=\\s*\\{([^}]*)\\}`).exec(src);
+    if (!m) throw new Error(`sync-engine-lists: ${name} not found in ${EXPR_REL}`);
+    return [...m[1].matchAll(/([A-Za-z_][A-Za-z0-9_]*)\s*:/g)].map((x) => x[1]);
+  };
+  const arities = (name) => {
+    const m = new RegExp(`const ${name}\\s*=\\s*\\{([^}]*)\\}`).exec(src);
+    if (!m) throw new Error(`sync-engine-lists: ${name} not found in ${EXPR_REL}`);
+    return [...m[1].matchAll(/([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(\d+)/g)].map((x) => [x[1], Number(x[2])]);
+  };
+  const functions = [
+    ...set('FN1').map((n) => [n, 1]), ...set('FN2').map((n) => [n, 2]),
+    ...arities('COMPOSITE_ARITY'), ...arities('FNN'),
+  ];
+  const constants = keys('CONSTS');
+  const rejected = set('REJECT');
+  if (!functions.length || !constants.length) throw new Error(`sync-engine-lists: empty expression grammar in ${EXPR_REL}`);
+  return { functions, constants, rejected };
+}
+
 async function generate() {
   const easingSrc = readCommitted(EASING_REL);
   const worldSrc = readCommitted(WORLD_REL);
@@ -234,6 +267,9 @@ async function generate() {
   const patternsSrc = readCommitted(PATTERNS_REL);
   if (!patternsSrc) throw new Error(`sync-engine-lists: cannot read ${PATTERNS_REL}`);
   const patterns = patternKinds(patternsSrc);
+  const exprSrc = readCommitted(EXPR_REL);
+  if (!exprSrc) throw new Error(`sync-engine-lists: cannot read ${EXPR_REL}`);
+  const expr = expressionGrammar(exprSrc);
 
   return `/**
  * GENERATED — DO NOT EDIT. Run \`bun run sync:engine-lists\`.
@@ -249,6 +285,7 @@ async function generate() {
  *   ${PROVENANCE_REL}  sha256: ${digest(provSrc)}
  *   ${STYLED_REL}  sha256: ${digest(styledSrc)}
  *   ${PATTERNS_REL}  sha256: ${digest(patternsSrc)}
+ *   ${EXPR_REL}  sha256: ${digest(exprSrc)}
  */
 
 /** ${easings.length} names: EASING_NAMES, the keys of the engine's easing table. Keyframes, masks, relations and the camera all resolve through it. */
@@ -299,6 +336,21 @@ ${styled.map((x) => `  ${x.name}: ${JSON.stringify(x.info)},`).join('\n')}
 /** ${patterns.length} kinds: Patterns.js KINDS, what pinepaper_pattern can create. */
 export const PATTERN_KINDS = [
 ${list(patterns)}
+] as const;
+
+/** ${expr.functions.length} functions a time_expression formula may call, each with its argument count (expr-to-ir.js FN1 = 1, FN2 = 2, COMPOSITE_ARITY, FNN). */
+export const EXPRESSION_FUNCTION_ARITY: Readonly<Record<string, number>> = Object.freeze({
+${expr.functions.map(([n, a]) => `  ${n}: ${a},`).join('\n')}
+});
+
+/** ${expr.constants.length} constants a time_expression formula may name (expr-to-ir.js CONSTS); t and v are its variables. */
+export const EXPRESSION_CONSTANTS = [
+${list(expr.constants)}
+] as const;
+
+/** Names the grammar refuses outright (expr-to-ir.js REJECT): not deterministic. */
+export const EXPRESSION_REJECTED = [
+${list(expr.rejected)}
 ] as const;
 
 /** One line per filter: the engine's own description and parameter ranges. */

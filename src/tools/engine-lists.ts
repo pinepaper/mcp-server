@@ -12,6 +12,7 @@
  *   js/core/Provenance.js  sha256: 27e4d8becfa382c8
  *   js/core/StyledScene.js  sha256: ea647c014de59faf
  *   js/core/Patterns.js  sha256: c23b186ebf6e8a6d
+ *   js/relations/expr-to-ir.js  sha256: 4d92d2f42b3356e9
  */
 
 /** 39 names: EASING_NAMES, the keys of the engine's easing table. Keyframes, masks, relations and the camera all resolve through it. */
@@ -179,6 +180,61 @@ export const PATTERN_KINDS = [
   'stagger',
   'ring',
   'orbit',
+] as const;
+
+/** 39 functions a time_expression formula may call, each with its argument count (expr-to-ir.js FN1 = 1, FN2 = 2, COMPOSITE_ARITY, FNN). */
+export const EXPRESSION_FUNCTION_ARITY: Readonly<Record<string, number>> = Object.freeze({
+  sin: 1,
+  cos: 1,
+  tan: 1,
+  abs: 1,
+  floor: 1,
+  ceil: 1,
+  round: 1,
+  trunc: 1,
+  sign: 1,
+  sqrt: 1,
+  cbrt: 1,
+  exp: 1,
+  log: 1,
+  log2: 1,
+  log10: 1,
+  asin: 1,
+  acos: 1,
+  atan: 1,
+  sinh: 1,
+  cosh: 1,
+  tanh: 1,
+  pow: 2,
+  min: 2,
+  max: 2,
+  atan2: 2,
+  hypot: 2,
+  clamp: 3,
+  mod: 2,
+  lerp: 3,
+  step: 2,
+  smoothstep: 3,
+  fract: 1,
+  noise: 1,
+  sec: 1,
+  csc: 1,
+  cot: 1,
+  pingpong: 2,
+  inverseLerp: 3,
+  remap: 5,
+});
+
+/** 3 constants a time_expression formula may name (expr-to-ir.js CONSTS); t and v are its variables. */
+export const EXPRESSION_CONSTANTS = [
+  'PI',
+  'E',
+  'TAU',
+] as const;
+
+/** Names the grammar refuses outright (expr-to-ir.js REJECT): not deterministic. */
+export const EXPRESSION_REJECTED = [
+  'random',
 ] as const;
 
 /** One line per filter: the engine's own description and parameter ranges. */

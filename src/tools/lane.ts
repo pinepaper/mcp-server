@@ -14,6 +14,8 @@
  * implementation, and a lane call is billed, validated and reported exactly as the same call on the full surface.
  */
 
+import { expressionGrammarText } from './expression-grammar.js';
+
 /**
  * The lane's tools. The first five are the lane as it shipped, in the order an agent uses them; O10 (mcp-server#29)
  * added the two after them, appended so nothing a lane client had moves: events (timed and clicked; their reactions
@@ -44,7 +46,9 @@ ORDER OF WORK:
 Use pinepaper_keyframe_animate to re-key one item afterwards, and pinepaper_pattern to move many named items with one declaration.
 Something that happens AT a time or ON a click (show, hide, recolour): make the event with pinepaper_event first, then bind it in the batch with relation ops.
 To start over, call pinepaper_clear_canvas: it empties the canvas and ids start again at item_1, so the same batch gives the same ids.
-A motion the built-in relations do not have (a bob, a custom path): define it once with pinepaper_register_custom_relation, then bind it to each item in the batch with relation ops of that relationType.
+MOTION THAT IS A FUNCTION OF TIME (a bob, a pulse, a sweep, a wave) is a relation, not keyframes: a track of hundreds of keys computed from a formula is the sign of the wrong route.
+- One item: a relation op {"type":"relation","sourceId":"$0","relationType":"time_expression","relationOptions":{"property":"y","expression":"360 + 40*sin(2*PI*t)"}} with no targetId; property is x, y, rotation, opacity or scale.
+- Many items, each offset (a wave across dots): define it once with pinepaper_register_custom_relation, its formula reading params.index, and bind it to a name pattern (sourceId "dot-*"): each member gets index and count. Adding members later is the same op again.
 
 UNITS: pixels, top-left origin, y down; time in seconds; angles in degrees; colours as "#rrggbb".
 Every call acts on the live canvas at once: re-sending a batch ADDS its items again (clear first to replay it). A failed atomic batch removes the items it made, so fix it and send it again (edits it made to items that already existed stay: the result says so).
@@ -102,7 +106,7 @@ RULES (each one has cost a failed build):
 - Name every item (properties.name). pinepaper_pattern selects members by name, e.g. "bar-*".
 - properties.id chooses an item's id ("dot"), so a replay after pinepaper_clear_canvas addresses the same ids.
 - A shape with a strokeColor and no color is an outline.
-- Relations: orbits {radius, speed (turns per second), direction, phaseDegrees}, follows {offset, smoothing}, attached_to {offset}, points_at, moves_along_path {path:[{x,y},…], speed}. sourceId moves; targetId is what it moves relative to. A name pattern as sourceId ("dot-*") binds every item named like it, in name order, each with index and count added to relationOptions; send the same op again after adding members and they join, with index and count updated. update: true changes the relationOptions of a relation already bound (same sourceId, targetId, relationType) instead of adding one.
+- Relations: orbits {radius, speed (turns per second), direction, phaseDegrees}, follows {offset, smoothing}, attached_to {offset}, points_at, moves_along_path {path:[{x,y},…], speed}, time_expression {property, expression} (no targetId; the formula grammar: ${expressionGrammarText()}). sourceId moves; targetId is what it moves relative to. A name pattern as sourceId ("dot-*") binds every item named like it, in name order, each with index and count added to relationOptions; send the same op again after adding members and they join, with index and count updated. update: true changes the relationOptions of a relation already bound (same sourceId, targetId, relationType) instead of adding one.
 - Events (item_9 above is an eventId from pinepaper_event): an event → item relation is a reaction, run each time it fires: on_event_set_visibility {visible: true|false}, on_event_set_color {color}, on_event_set_property {property, value}. An item → event relation fires it: on_click_fire, on_pointer_enter_fire, on_key_fire {key}. An item a reaction reveals starts hidden: properties.visible false.
 - set_canvas_size comes first; a video exports at the canvas size.
 - The call is LIVE: sending it twice makes every item twice. atomic (default) stops at the first failure and removes every item the call created, so the canvas holds no half batch: fix the op it names and send it again. Edits to items that already existed are not undone; the result says what was removed.

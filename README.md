@@ -279,8 +279,17 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   and every custom relation definition, so a later call can find the one to
   change.
 
+- The `lane` toolkit says when motion should be a relation instead of
+  keyframes: `time_expression` for one item, a custom relation bound to a name
+  pattern for many items.
+
 ### Fixed
 
+- A `time_expression` formula the engine cannot read is refused, with the
+  reason and the grammar: `Math.sin(...)`, an unknown name, a wrong
+  capitalisation, `random()`, or a function given the wrong number of
+  arguments. Before, the call reported success and nothing moved. The tool
+  descriptions now list the grammar, read from the engine.
 - A relation type registered with `pinepaper_register_custom_relation` is
   accepted in `pinepaper_agent_batch_execute`, as it already was in
   `pinepaper_add_relation`. Before, the batch's vocabulary check refused it.

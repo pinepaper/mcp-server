@@ -62,3 +62,22 @@ describe('mcp-server#37: name patterns, update, read-back', () => {
     expect(codeGenerator.generateRegisterCustomRelation({ name: 'wave', computeFunction: 'return {};', applyFunction: '' } as never)).toContain('window.__ppCustomRelations["wave"] = ');
   });
 });
+
+describe('time_expression formulas outside the grammar are refused (#39)', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { relationSpecProblem } = require('../../types/code-generator.js');
+  const why = (e: string) => relationSpecProblem('time_expression', { property: 'y', expression: e });
+
+  it('Math.sin is refused with what to write instead', () => {
+    expect(why('360 + 100*Math.sin(Math.PI*t)')).toContain('Write sin(…) without Math');
+  });
+  it('an unknown name, a wrong case, random(), a wrong argument count', () => {
+    expect(why('foo(t)')).toContain('names foo');
+    expect(why('Sin(t)')).toContain('Did you mean sin?');
+    expect(why('random()')).toContain('refuses');
+    expect(why('min(1, 2, 3)')).toContain('takes 2');
+  });
+  it('the grammar itself passes: constants, ^, %, nested calls, exponents', () => {
+    for (const e of ['360 + 100*sin(PI*t)', '2^t % 3', 'clamp(t, 0, 1)*remap(t, 0, 1, 0, 10)', 'pow(2, sin(t*2))', '1e3*t + v', 'noise(t) * TAU']) expect(why(e), e).toBeNull();
+  });
+});

@@ -8,7 +8,8 @@
 import { compileChoreography } from '../tools/choreograph.js';
 import { compileBatchTimelines, emitTimelineOpBody, type TimelinePlan } from '../tools/timeline.js';
 import { normalizeSvgSize } from '../utils/svg-size.js';
-import { WORLD3D_COLOR_PATHS, PATTERN_KINDS } from '../tools/engine-lists.js';
+import { WORLD3D_COLOR_PATHS, PATTERN_KINDS, EXPRESSION_FUNCTION_ARITY, EXPRESSION_CONSTANTS, EXPRESSION_REJECTED } from '../tools/engine-lists.js';
+import { expressionGrammarText } from '../tools/expression-grammar.js';
 import { REQUIRED_ENGINE_METHODS, OPTIONAL_ENGINE_METHODS } from '../tools/engine-methods.js';
 import { NORMALIZE_PARAM_READS, MODIFY_CHANGE_READS } from '../tools/shape-params.js';
 import { CREATE_KNOWN_KEYS } from '../tools/create-known-keys.js';
@@ -1491,11 +1492,68 @@ export function fireIfProblem(params: Record<string, unknown> | undefined): stri
 export function relationSpecProblem(relationType: unknown, params: unknown): string | null {
   const p = (params && typeof params === 'object' ? params : {}) as Record<string, unknown>;
   if (relationType === 'on_event_fire_if') return fireIfProblem(p);
+  if (relationType === 'time_expression' && typeof p.expression === 'string') return expressionProblem(p.expression);
   if (typeof relationType === 'string' && VISIBILITY_REACTION.test(relationType)) return visibilityProblem(relationType, p);
   if (relationType === 'on_event_add_relation' && (p.type === 'on_event_fire_if' || (typeof p.type === 'string' && VISIBILITY_REACTION.test(p.type)))) {
     const innerParams = (p.params && typeof p.params === 'object' ? p.params : {}) as Record<string, unknown>;
     const inner = p.type === 'on_event_fire_if' ? fireIfProblem(innerParams) : visibilityProblem(p.type as string, innerParams);
     return inner ? `the ${String(p.type)} it adds: ${inner.replace(/params\./g, 'params.params.')}` : null;
+  }
+  return null;
+}
+
+/**
+ * A time_expression formula outside the engine's grammar parses to nothing, and the relation then does nothing with
+ * success reported (#39: Math.sin(...) from JavaScript habit, no motion). Names are checked against the grammar the
+ * engine publishes (engine-lists, generated from expr-to-ir.js); syntax is the engine's to judge.
+ */
+function expressionProblem(expr: string): string | null {
+  const allowed = new Set<string>([...Object.keys(EXPRESSION_FUNCTION_ARITY), ...EXPRESSION_CONSTANTS, 't', 'v']);
+  const grammar = expressionGrammarText();
+  for (let i = 0; i < expr.length;) {
+    const c = expr[i];
+    if (/[0-9]/.test(c) || (c === '.' && /[0-9]/.test(expr[i + 1] ?? ''))) {
+      i++;
+      while (i < expr.length && /[0-9.]/.test(expr[i])) i++;
+      if (/[eE]/.test(expr[i] ?? '') && /[0-9+-]/.test(expr[i + 1] ?? '')) { i += 2; while (i < expr.length && /[0-9]/.test(expr[i])) i++; }
+      continue;
+    }
+    if (/[A-Za-z_]/.test(c)) {
+      let j = i + 1;
+      while (j < expr.length && /[A-Za-z0-9_]/.test(expr[j])) j++;
+      const name = expr.slice(i, j);
+      if (expr[j] === '.') {
+        const member = /^[A-Za-z_][A-Za-z0-9_]*/.exec(expr.slice(j + 1))?.[0] ?? '';
+        return `expression ${JSON.stringify(expr)} uses ${name}.${member}, and the formula is not JavaScript: it would parse to nothing and the item would not move. Write ${member || 'the function'}(…) without ${name}. The grammar: ${grammar}.`;
+      }
+      if ((EXPRESSION_REJECTED as readonly string[]).includes(name)) {
+        return `expression ${JSON.stringify(expr)} uses ${name}(), which the engine refuses: a formula must give the same value at the same time in every export. Use noise(t) for a varying value that repeats.`;
+      }
+      const arity = EXPRESSION_FUNCTION_ARITY[name];
+      if (arity !== undefined) {
+        // Count the call's top-level arguments: a wrong count parses to nothing as well (min(1, 2, 3)).
+        let k = j; while (expr[k] === ' ') k++;
+        if (expr[k] === '(') {
+          let depth = 0, args = 0, any = false;
+          for (let q = k; q < expr.length; q++) {
+            const ch = expr[q];
+            if (ch === '(') { depth++; continue; }
+            if (ch === ')') { depth--; if (depth === 0) break; continue; }
+            if (depth === 1 && ch === ',') args++;
+            if (depth >= 1 && ch.trim()) any = true;
+          }
+          const given = any ? args + 1 : 0;
+          if (given !== arity) return `expression ${JSON.stringify(expr)} calls ${name} with ${given} argument${given === 1 ? '' : 's'}; it takes ${arity}, and any other count parses to nothing, so the item would not move.`;
+        }
+      }
+      if (!allowed.has(name)) {
+        const near = [...allowed].find((a) => a.toLowerCase() === name.toLowerCase());
+        return `expression ${JSON.stringify(expr)} names ${name}, which the formula grammar does not have, so it would parse to nothing and the item would not move.${near ? ` Did you mean ${near}?` : ''} The grammar: ${grammar}.`;
+      }
+      i = j;
+      continue;
+    }
+    i++;
   }
   return null;
 }
