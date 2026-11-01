@@ -18,6 +18,7 @@ import {
   type CraftBounds,
 } from './craft-tools.js';
 import { CallToolResult, TextContent, ImageContent } from '../mcp/index.js';
+import { exportPerScene } from './scene-cache-export.js';
 import { codeGenerator, generateQueryMutationsCode, SHEET_RUBRIC } from '../types/code-generator.js';
 import { expandBatchMacros, BatchMacroError } from './batch-macros.js';
 import {
@@ -4723,6 +4724,19 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
             + ' — or webm / apng for alpha in the browser.');
         }
         const input = AgentExportInputSchema.parse(args);
+        // A chain as cached segments, joined (scene-cache-export.ts). Only where it can execute; in code mode the
+        // flag has nothing to cache and the plain export code is returned.
+        if (input.perScene === true && (options.executionMode ?? getExecutionMode()) !== 'code' && options.executeInBrowser) {
+          const ctl = options.browserController || getBrowserController();
+          if (!ctl.connected) { try { await ctl.connect(); } catch { /* the plain export below reports it */ } }
+          if (ctl.connected) {
+            return exportPerScene(args as Record<string, unknown>, String(input.format), {
+              exec: (c) => ctl.executeCode(c, false, { bypassGovernor: true }),
+              exportOnce: (a) => handleToolCall('pinepaper_agent_export', a, options),
+              exportDir: getExportDir(),
+            });
+          }
+        }
         const code = codeGenerator.generateAgentExport(input);
         const description = `Smart export for ${input.platform} as ${input.format || 'auto'}`;
 

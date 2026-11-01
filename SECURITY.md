@@ -42,7 +42,7 @@ Examples of what is in scope:
 - tool input that escapes the generated snippet and runs in the server process instead of the page;
 - exposing a credential such as `PINEPAPER_API_KEY`, or sending it somewhere it should not go;
 - a crash or hang of the server caused by a single crafted tool call;
-- the server loading `puppeteer` (or any module) from somewhere other than where its own dependencies resolve or `PINEPAPER_PUPPETEER_FROM`, or running a child process other than the `ffprobe` read-back described below.
+- the server loading `puppeteer` (or any module) from somewhere other than where its own dependencies resolve or `PINEPAPER_PUPPETEER_FROM`, or running a child process other than the `ffprobe` read-back and the `ffmpeg` join described below.
 
 The server's own defences, `PINEPAPER_ALLOW_PRIVATE_NETWORK` and `PINEPAPER_ASSET_DIRS`, are documented in the README. Bypassing either one is in scope.
 
@@ -55,6 +55,6 @@ The package installs two runtime dependencies and nothing else:
 
 **Puppeteer is not a dependency**, not even an optional peer (it was one up to 1.6.25). It brings a browser download with an install script, shell access and a large network tree, and the browser tools are a minority of what the server does. Install it yourself to use them (`npm i puppeteer`, or `-p puppeteer` in the `npx` call; see the README). The server imports it by name only from where its own dependencies resolve, or from an absolute folder you set in `PINEPAPER_PUPPETEER_FROM`; never from its working directory, which can be an untrusted checkout. puppeteer 22 or newer is required and an older one is refused.
 
-**One child process.** When an exported video is saved, the server runs `ffprobe` through `execFile` (no shell) with a fixed argument list and the file's absolute path, to compare the file with what the studio encoded. It is skipped when `ffprobe` is not on `PATH`, and `PINEPAPER_FFPROBE=off` turns it off.
+**Two binaries, one place.** Both run through `execFile` (no shell) from one file, `src/tools/export-file-receipt.ts`, with argument lists that file writes and absolute file paths. When an exported video is saved, `ffprobe` compares the file with what the studio encoded; it is skipped when `ffprobe` is not on `PATH`, and `PINEPAPER_FFPROBE=off` turns it off. When an export asks for `perScene`, `ffmpeg` joins the cached per-scene segments (`-f concat`, video copied, audio re-encoded); without `ffmpeg` on `PATH` the chain is exported whole instead.
 
 The source contains no `eval` or `new Function`.

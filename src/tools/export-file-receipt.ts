@@ -80,14 +80,15 @@ export function probeFromResult(exportResult: unknown): ProbeSummary | null {
 
 let ffprobeAvailable: boolean | null = null;
 /**
- * The package's one child process. execFile, never exec or spawn with a shell: the binary is the literal `ffprobe`,
- * the arguments an array this file writes, and the one value from outside it, the saved file's path, is made absolute
- * first, so it can never be read as an option (a leading `-`) or an ffmpeg protocol (`concat:`, `http:`). Turn it off
- * with PINEPAPER_FFPROBE=off.
+ * The package's only child processes, both in this file. execFile, never exec or spawn with a shell: the binary is
+ * the literal `ffprobe` (reading a saved video back) or `ffmpeg` (joining the per-scene segments of a cached
+ * export), the arguments an array this file writes, and the values from outside it, file paths, are made absolute
+ * first, so none can be read as an option (a leading `-`) or an ffmpeg protocol (`concat:`, `http:`). Turn the
+ * read-back off with PINEPAPER_FFPROBE=off.
  */
-function run(cmd: string, args: string[]): Promise<{ ok: boolean; stdout: string; stderr: string }> {
+function run(cmd: 'ffprobe' | 'ffmpeg', args: string[], timeout = 30_000): Promise<{ ok: boolean; stdout: string; stderr: string }> {
   return new Promise((resolve) => {
-    execFile(cmd, args, { timeout: 30_000, maxBuffer: 4 * 1024 * 1024 }, (err, stdout, stderr) => {
+    execFile(cmd, args, { timeout, maxBuffer: 4 * 1024 * 1024 }, (err, stdout, stderr) => {
       resolve({ ok: !err, stdout: String(stdout ?? ''), stderr: String(stderr ?? '') || (err ? err.message : '') });
     });
   });
@@ -184,4 +185,38 @@ export function receiptErrorLine(receipt: ExportFileReceipt | { receiptError: st
   return 'receiptError' in receipt
     ? `RECEIPT: the file was saved, but it could not be hashed or read back (${receipt.receiptError}); it has no sha256 or probe.\n`
     : '';
+}
+
+let ffmpegAvailable: boolean | null = null;
+/** Whether ffmpeg is on PATH (asked once). The per-scene export joins its segments with it. */
+export async function hasFfmpeg(): Promise<boolean> {
+  if (ffmpegAvailable === null) ffmpegAvailable = (await run('ffmpeg', ['-version'])).ok;
+  return ffmpegAvailable;
+}
+
+/** The streams a segment carries, for the join's precondition: every segment must match the first. */
+export async function segmentStreams(filePath: string): Promise<{ ok: boolean; signature?: string; reason?: string }> {
+  const r = await run('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_type,codec_name,width,height,r_frame_rate,sample_rate,channels', '-of', 'json', resolvePath(filePath)]);
+  if (!r.ok) return { ok: false, reason: r.stderr.trim() || 'ffprobe could not read it' };
+  try {
+    const j = JSON.parse(r.stdout) as { streams?: Array<Record<string, unknown>> };
+    return { ok: true, signature: JSON.stringify((j.streams ?? []).map((x) => [x.codec_type, x.codec_name, x.width, x.height, x.r_frame_rate, x.sample_rate, x.channels])) };
+  } catch { return { ok: false, reason: 'ffprobe printed something that is not JSON' }; }
+}
+
+/**
+ * Join video segments end to end (ffmpeg's concat demuxer). The video is stream-copied: same encoder settings,
+ * every segment starting on a keyframe. The AUDIO is re-encoded, because a copy cannot honour each segment's AAC
+ * priming edit list: copied, three 2 s segments came out 48 ms longer than the video, with timestamp warnings and up
+ * to 90 ms of silence at each seam; decoded and re-encoded, the next scene's sound starts on the cut (measured). The
+ * list file holds absolute paths, quoted for the demuxer; -safe 0 lets it read them.
+ */
+export async function concatSegments(segments: string[], listFile: string, outFile: string, opts: { audio?: boolean; format?: string } = {}): Promise<{ ok: boolean; reason?: string }> {
+  const { writeFile } = await import('node:fs/promises');
+  const quote = (p: string) => `'${resolvePath(p).replace(/'/g, "'\\''")}'`;
+  await writeFile(listFile, segments.map((p) => `file ${quote(p)}`).join('\n') + '\n', 'utf-8');
+  const audio = opts.audio ? (opts.format === 'webm' ? ['-c:a', 'libopus', '-b:a', '128k'] : ['-c:a', 'aac', '-b:a', '192k']) : [];
+  const r = await run('ffmpeg', ['-v', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', resolvePath(listFile), '-c:v', 'copy', ...audio,
+    ...(opts.format === 'webm' ? [] : ['-movflags', '+faststart']), resolvePath(outFile)], 300_000);
+  return r.ok ? { ok: true } : { ok: false, reason: r.stderr.trim() || 'ffmpeg failed with no message' };
 }

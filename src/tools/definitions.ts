@@ -9278,6 +9278,7 @@ VERIFY MOTION BEFORE YOU RENDER. An export takes seconds to minutes and shows yo
           enum: ['canvas', 'camera'],
           description: 'Output framing. "canvas" (default) renders the full canvas. "camera" renders only the first-keyframe viewport of a camera_animates walkthrough — video formats only.',
         },
+        perScene: { type: 'boolean', description: 'mp4 / webm of a scene chain: one cached segment per scene, joined (video copied, audio re-encoded), so after an edit only the scenes that changed render again. Needs ffmpeg on PATH; a chain with crossfades or cut sounds is exported whole and the result says why.' },
         estimateOnly: {
           type: 'boolean',
           description: 'Preflight only — return the estimated file size for these exact settings and render nothing. Modeled for mp4/webm/gif; png/pdf/svg report confidence "none" (no dimension-based model exists for them); wav reports confidence "exact", because uncompressed PCM size is arithmetic. Also answers what THIS scene would lose to this format — a png of an animated scene is one frame, a gif drops the soundtrack — under "fidelity", which is present only when there is something to lose.',

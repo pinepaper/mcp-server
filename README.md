@@ -255,7 +255,7 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - Code an agent writes runs with whatever that browser page has. Give this server the same trust you would give anything else you let write and run code on your machine — which is the trust you already extend to an MCP client with tool access.
 - Puppeteer mode launches Chrome with `--no-sandbox` and `--disable-setuid-sandbox`. That is routine for headless automation and it does weaken Chrome's own process sandbox. If that matters where you are running it, use `code` mode or put the server in a container.
 - Puppeteer itself is not a dependency at all (it was an optional peer until 1.6.25), kept out of the tree precisely because a headless browser plus an install script is what scanners flag hardest. Install it only if you want the executing mode. The server loads it only from where its own dependencies would be found (the same `npx` call, a global install, a project install) or from a folder you name in `PINEPAPER_PUPPETEER_FROM`; never from the folder it happens to be started in. puppeteer 22 or newer is required.
-- The package starts one child process, and only when an export is saved: `ffprobe -show_entries … <file>` (via `execFile`, no shell, fixed binary and argument list, an absolute path) to check the saved video against what the studio encoded. Without `ffprobe` on `PATH` the check is skipped and said so; `PINEPAPER_FFPROBE=off` turns it off.
+- The package runs two binaries, both via `execFile` (no shell, fixed binary and argument list, absolute paths) from one file, and only for exports: `ffprobe -show_entries … <file>` checks a saved video against what the studio encoded (without `ffprobe` on `PATH` the check is skipped and said so; `PINEPAPER_FFPROBE=off` turns it off), and `ffmpeg -f concat` joins the cached segments of a `perScene` export (without `ffmpeg` the chain is exported whole).
 - The server itself fetches the images, SVGs and media a tool call names by URL, and reads local files named by path. URLs that resolve to loopback, private, link-local or reserved addresses are refused, redirects included, and so are cloud metadata addresses. Local files are read only from the working directory, the export folder, and folders listed in `PINEPAPER_ASSET_DIRS`. `PINEPAPER_ALLOW_PRIVATE_NETWORK=1` allows local and LAN hosts. Metadata addresses stay refused even with it set.
 
 ## What's new in 1.6.27
@@ -283,6 +283,12 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   keyframes: `time_expression` for one item, a custom relation bound to a name
   pattern for many items.
 
+- `pinepaper_agent_export { perScene: true }` exports a scene chain as one
+  cached segment per scene and joins them, so an export after editing one
+  scene renders only that scene. The cache key is the scene's own data, its
+  length, the export settings and the studio build. It needs `ffmpeg` on
+  `PATH`. Chains with crossfades or cut sounds are exported whole for now, and
+  the result says why.
 - Custom relation definitions are saved with the scene by
   `pinepaper_export_scene { full: true }`. `pinepaper_import_scene` registers
   them before loading when passed `registerCustomRelations: true`, so the

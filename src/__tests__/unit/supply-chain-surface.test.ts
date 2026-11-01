@@ -6,7 +6,7 @@
  *   loaded only if the user installed it, by a name held in a variable.
  * - It is never resolved from process.cwd(): an MCP client starts the server in whatever folder is open, which can
  *   be an untrusted checkout with a planted node_modules/puppeteer.
- * - The one child process is ffprobe, via execFile (no shell), from one file.
+ * - The only child processes are ffprobe and ffmpeg, via execFile (no shell), from one file.
  * - No eval and no new Function in the source.
  */
 import { describe, expect, test } from 'bun:test';
@@ -56,7 +56,7 @@ describe('supply-chain surface', () => {
     expect(controller).not.toMatch(/process\.cwd\(\)/);
   });
 
-  test('the only child process is ffprobe through execFile, in export-file-receipt', () => {
+  test('the only child processes are ffprobe and ffmpeg through execFile, in export-file-receipt', () => {
     const users = SRC.filter((p) => /(from|import\(|require\()\s*['"](node:)?child_process['"]/.test(readFileSync(p, 'utf8')));
     expect(users.map((p) => p.slice(ROOT.length + 1))).toEqual(['src/tools/export-file-receipt.ts']);
     const receipt = readFileSync(users[0], 'utf8');

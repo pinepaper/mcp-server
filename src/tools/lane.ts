@@ -213,6 +213,7 @@ RETURNS "File: <path>", plus file {sha256, bytes}: the sha256 of the file on dis
         fps: { type: 'number', description: 'video: frames per second' },
         time: { type: 'number', description: 'still: the moment to render, in seconds' },
         deterministic: { type: 'boolean', description: 'mp4 / webm: the same scene gives the same bytes' },
+        perScene: { type: 'boolean', description: 'mp4 / webm of a scene chain: cached per scene, so an export after an edit renders only the changed scenes (needs ffmpeg)' },
       },
       required: ['format'],
     },
