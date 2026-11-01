@@ -25,6 +25,60 @@ export interface I18nConfig {
 }
 
 // =============================================================================
+// LOCALE MODULES
+// =============================================================================
+
+/**
+ * One literal import per supported locale. A locale file is loaded only from this table, so a locale name (it can
+ * come from PINEPAPER_LOCALE or LANG) never becomes part of a module path: an unknown name finds no entry and falls
+ * back to English rather than importing whatever file a crafted name points at. Literal specifiers also let a
+ * reader or a bundler see exactly which files can be loaded.
+ */
+const LOCALE_MODULES: Record<SupportedLocale, () => Promise<Record<string, unknown>>> = {
+  'en': () => import('./locales/en.js'),
+  'es': () => import('./locales/es.js'),
+  'fr': () => import('./locales/fr.js'),
+  'de': () => import('./locales/de.js'),
+  'it': () => import('./locales/it.js'),
+  'pt': () => import('./locales/pt.js'),
+  'pt-BR': () => import('./locales/pt-BR.js'),
+  'nl': () => import('./locales/nl.js'),
+  'pl': () => import('./locales/pl.js'),
+  'ru': () => import('./locales/ru.js'),
+  'uk': () => import('./locales/uk.js'),
+  'zh-CN': () => import('./locales/zh-CN.js'),
+  'zh-TW': () => import('./locales/zh-TW.js'),
+  'ja': () => import('./locales/ja.js'),
+  'ko': () => import('./locales/ko.js'),
+  'th': () => import('./locales/th.js'),
+  'vi': () => import('./locales/vi.js'),
+  'id': () => import('./locales/id.js'),
+  'ms': () => import('./locales/ms.js'),
+  'tl': () => import('./locales/tl.js'),
+  'hi': () => import('./locales/hi.js'),
+  'bn': () => import('./locales/bn.js'),
+  'ta': () => import('./locales/ta.js'),
+  'te': () => import('./locales/te.js'),
+  'mr': () => import('./locales/mr.js'),
+  'gu': () => import('./locales/gu.js'),
+  'kn': () => import('./locales/kn.js'),
+  'ml': () => import('./locales/ml.js'),
+  'pa': () => import('./locales/pa.js'),
+  'ar': () => import('./locales/ar.js'),
+  'he': () => import('./locales/he.js'),
+  'fa': () => import('./locales/fa.js'),
+  'tr': () => import('./locales/tr.js'),
+  'sv': () => import('./locales/sv.js'),
+  'da': () => import('./locales/da.js'),
+  'no': () => import('./locales/no.js'),
+  'fi': () => import('./locales/fi.js'),
+  'cs': () => import('./locales/cs.js'),
+  'el': () => import('./locales/el.js'),
+  'hu': () => import('./locales/hu.js'),
+  'ro': () => import('./locales/ro.js'),
+};
+
+// =============================================================================
 // I18N MANAGER
 // =============================================================================
 
@@ -48,9 +102,10 @@ export class I18nManager {
     }
 
     try {
-      // Dynamic import of locale file
-      const module = await import(`./locales/${locale}.js`);
-      this.translations.set(locale, module.default || module[locale]);
+      const load = Object.prototype.hasOwnProperty.call(LOCALE_MODULES, locale) ? LOCALE_MODULES[locale] : undefined;
+      if (!load) throw new Error(`not a supported locale`);
+      const module = await load();
+      this.translations.set(locale, (module.default || module[locale]) as TranslationKeys);
       this.loadedLocales.add(locale);
     } catch (error) {
       console.error(`Failed to load locale ${locale}:`, error);

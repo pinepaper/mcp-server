@@ -232,9 +232,9 @@ export const BROWSER_TIME = { executeMs: 0, screenshotMs: 0 };
 /**
  * The browser driver. Puppeteer is NOT a dependency of this package, not even an
  * optional peer (it was one up to 1.6.25): browser automation is a handful of tools, and a
- * headless-browser download with an install script is what supply-chain
- * scanners flag hardest. A declared peer, optional or not, still puts its whole
- * tree in a scanner's view of this package. The user installs it beside the
+ * headless-browser download with an install script is a large thing to put
+ * in every user's install. A declared peer, optional or not, still puts its whole
+ * tree in an audit of this package. The user installs it beside the
  * server when they want the executing mode (README, "Install").
  *
  * Tried in order: `puppeteer` (its own Chrome), then `puppeteer-core` driving a
@@ -244,36 +244,57 @@ export const BROWSER_TIME = { executeMs: 0, screenshotMs: 0 };
  */
 const PUPPETEER_MIN_MAJOR = 22;
 
+type PuppeteerModule = { default: { launch: (opts: Record<string, unknown>) => Promise<Browser> } };
+
 /**
- * Import a package this server does not depend on, by a name held in a
- * variable (so neither the build nor a scanner sees a dependency it does not
- * have). Resolution starts from THIS package, as a declared dependency's would:
- * `npx -p puppeteer -p @pinepaper.studio/mcp-server`, a global install of both,
- * and a project install all put puppeteer where that finds it.
+ * How each browser driver is found. Every module specifier is a string LITERAL, so a reader sees exactly which two
+ * packages this file can load; nothing here builds a module name at run time.
  *
- * It is never resolved from process.cwd(): an MCP client starts the server in
- * whatever folder is open, which can be a cloned repository, and a
- * node_modules/puppeteer planted there would then run as this process. The one
- * other place looked in is a folder the user names in PINEPAPER_PUPPETEER_FROM
- * (for a strict layout — pnpm with hoist=false, Yarn PnP strict — where a
- * package cannot see its project's undeclared packages).
+ * `importHere` is an ordinary `import('puppeteer')`. Node resolves a bare specifier from the importing file's own
+ * location, walking up through the node_modules folders above dist/browser/, as it would for a declared dependency:
+ * `npx -p puppeteer -p @pinepaper.studio/mcp-server`, a global install of both, and a project install all put
+ * puppeteer where that finds it. It is NOT resolved from process.cwd() (ESM ignores the working directory and
+ * NODE_PATH): an MCP client starts the server in whatever folder is open, which can be a cloned repository, and a
+ * node_modules/puppeteer planted there must not run as this process.
+ *
+ * `resolveFrom` serves the one other place looked in: a folder the user names in PINEPAPER_PUPPETEER_FROM (an
+ * absolute path), for a strict layout — pnpm with hoist=false, Yarn PnP strict — where a package cannot see its
+ * project's undeclared packages. It resolves the same literal specifier from that folder and returns the file it
+ * finds, which the caller imports as a file URL; that file URL is the only module path in the package that is not
+ * written in the source, and it is reached only when the user has set the variable.
  */
-async function importOptional(name: string): Promise<{ mod: unknown; version: string | null } | null> {
+const DRIVERS = {
+  puppeteer: {
+    importHere: (): Promise<unknown> => import('puppeteer'),
+    resolveFrom: (req: NodeRequire): string => req.resolve('puppeteer'),
+    packageJson: (req: NodeRequire): string => req.resolve('puppeteer/package.json'),
+  },
+  'puppeteer-core': {
+    importHere: (): Promise<unknown> => import('puppeteer-core'),
+    resolveFrom: (req: NodeRequire): string => req.resolve('puppeteer-core'),
+    packageJson: (req: NodeRequire): string => req.resolve('puppeteer-core/package.json'),
+  },
+} as const;
+type DriverName = keyof typeof DRIVERS;
+
+/** Load a driver the user installed beside this package (or in PINEPAPER_PUPPETEER_FROM); null when absent. */
+async function importOptional(name: DriverName): Promise<{ mod: PuppeteerModule; version: string | null } | null> {
+  const driver = DRIVERS[name];
   const versionFrom = (base: string): string | null => {
     try {
-      const pkgPath = createRequire(base).resolve(`${name}/package.json`);
+      const pkgPath = driver.packageJson(createRequire(base));
       return String(JSON.parse(readFileSync(pkgPath, 'utf8')).version ?? '') || null;
     } catch { return null; /* no exported package.json: version unknown, not refused */ }
   };
   try {
-    return { mod: await import(name), version: versionFrom(import.meta.url) };
+    return { mod: await driver.importHere() as PuppeteerModule, version: versionFrom(import.meta.url) };
   } catch { /* not beside this package (or present and failing to load: treated as absent, as before) */ }
   const from = env('PINEPAPER_PUPPETEER_FROM')?.trim();
   if (!from || !isAbsolute(from)) return null;
   const base = pathToFileURL(join(from, 'package.json')).href;
   try {
-    const entry = createRequire(base).resolve(name);
-    return { mod: await import(pathToFileURL(entry).href), version: versionFrom(base) };
+    const entry = driver.resolveFrom(createRequire(base));
+    return { mod: await import(pathToFileURL(entry).href) as PuppeteerModule, version: versionFrom(base) };
   } catch { return null; }
 }
 
@@ -285,15 +306,13 @@ function refuseOldPuppeteer(name: string, version: string | null): void {
 }
 
 async function loadPuppeteer(): Promise<{ launch: (opts: Record<string, unknown>) => Promise<Browser> }> {
-  const fullName = 'puppeteer'; // a variable: see importOptional
-  const full = await importOptional(fullName) as { mod: { default: { launch: (opts: Record<string, unknown>) => Promise<Browser> } }; version: string | null } | null;
+  const full = await importOptional('puppeteer');
   if (full) {
-    refuseOldPuppeteer(fullName, full.version);
+    refuseOldPuppeteer('puppeteer', full.version);
     return { launch: (opts) => full.mod.default.launch(opts) };
   }
-  const coreName = 'puppeteer-core';
-  const coreLoaded = await importOptional(coreName) as { mod: { default: { launch: (opts: Record<string, unknown>) => Promise<Browser> } }; version: string | null } | null;
-  if (coreLoaded) refuseOldPuppeteer(coreName, coreLoaded.version);
+  const coreLoaded = await importOptional('puppeteer-core');
+  if (coreLoaded) refuseOldPuppeteer('puppeteer-core', coreLoaded.version);
   const core = coreLoaded?.mod ?? null;
   if (core) {
     const executablePath = env('PINEPAPER_CHROME_PATH')?.trim();
@@ -986,8 +1005,8 @@ export class PinePaperBrowserController {
         // bypass. The code is run from the Node side as a CDP Runtime.evaluate
         // (below), which returns the script's trailing value exactly as eval did:
         // both generated-code shapes are `(`-led expression statements. It used
-        // to be evaluated here; the published package then carried an evaluating call
-        // that supply-chain scanners flag, for what CDP already does.
+        // to be evaluated inside this callback; CDP already does that job, so this
+        // package contains no evaluating call of its own, in the page or in Node.
         (window as unknown as { __ppBridgeSafe?: (v: unknown) => unknown }).__ppBridgeSafe = bridgeSafe;
         return { success: true, __ppRaw: true, executedVia: 'eval' as const };
       }, code, runOptions);

@@ -762,7 +762,7 @@ export const DrivenByParamsSchema = z.object({
 // (replay-stable).
 //
 // THERE IS NO LONGER A PER-FRAME FALLBACK FOR random(). The engine used to
-// build a `new Function` from the scene's own text on the per-frame path, which
+// compile the scene's own text as JavaScript on the per-frame path, which
 // made the authoring language JavaScript rather than the grammar the other
 // renderers speak — `^` was bitwise XOR there and exponentiation everywhere
 // else, so one scene string drew two different pictures, and `random()` could
