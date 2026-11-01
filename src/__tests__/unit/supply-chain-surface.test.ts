@@ -6,7 +6,9 @@
  *   loaded only if the user installed it, by a name held in a variable.
  * - It is never resolved from process.cwd(): an MCP client starts the server in whatever folder is open, which can
  *   be an untrusted checkout with a planted node_modules/puppeteer.
- * - The only child processes are ffprobe and ffmpeg, via execFile (no shell), from one file.
+ * - The package starts no process. ffprobe and ffmpeg run through the optional add-on @pinepaper.studio/mcp-ffmpeg
+ *   (packages/mcp-ffmpeg), loaded by a name held in a variable and never a dependency, so a scanner does not fold
+ *   its shell access into this package. The add-on runs those two binaries only, via execFile (no shell).
  * - No eval and no new Function in the source.
  */
 import { describe, expect, test } from 'bun:test';
@@ -56,15 +58,24 @@ describe('supply-chain surface', () => {
     expect(controller).not.toMatch(/process\.cwd\(\)/);
   });
 
-  test('the only child processes are ffprobe and ffmpeg through execFile, in export-file-receipt', () => {
+  test('no child process in the package; the add-on runs only ffmpeg / ffprobe through execFile', () => {
     const users = SRC.filter((p) => /(from|import\(|require\()\s*['"](node:)?child_process['"]/.test(readFileSync(p, 'utf8')));
-    expect(users.map((p) => p.slice(ROOT.length + 1))).toEqual(['src/tools/export-file-receipt.ts']);
-    const receipt = readFileSync(users[0], 'utf8');
-    expect(receipt).toMatch(/import \{ execFile \} from 'node:child_process'/);
-    const body = code(users[0]);
-    expect(body).not.toMatch(/\b(exec|execSync|spawn|spawnSync|fork)\b\s*\(/);
-    expect(body).not.toMatch(/\bshell\s*:/);
-    expect(body).toMatch(/execFile\(cmd, args, \{/);
+    expect(users).toEqual([]);
+    expect(Object.keys(pkg.dependencies ?? {})).not.toContain('@pinepaper.studio/mcp-ffmpeg');
+    expect(Object.keys(pkg.optionalDependencies ?? {})).not.toContain('@pinepaper.studio/mcp-ffmpeg');
+    const receipt = readFileSync(join(ROOT, 'src', 'tools', 'export-file-receipt.ts'), 'utf8');
+    expect(receipt).toMatch(/const spec = FFMPEG_ADDON;[\s\S]*await import\(spec\)/);
+    const addon = readFileSync(join(ROOT, 'packages', 'mcp-ffmpeg', 'index.js'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(addon).toMatch(/import \{ execFile \} from 'node:child_process'/);
+    expect(addon).not.toMatch(/\b(exec|execSync|spawn|spawnSync|fork)\b\s*\(/);
+    expect(addon).not.toMatch(/\bshell\s*:/);
+    expect(addon).toMatch(/new Set\(\['ffmpeg', 'ffprobe'\]\)/);
+  });
+
+  test('the add-on refuses any other binary before a process starts', async () => {
+    const { run } = await import('../../../packages/mcp-ffmpeg/index.js');
+    expect(await run('sh' as never, ['-c', 'echo hi'])).toMatchObject({ ok: false, stderr: expect.stringContaining('refused') });
+    expect(await run('ffmpeg', [1 as never])).toMatchObject({ ok: false });
   });
 
   test('no eval and no new Function in the source', () => {

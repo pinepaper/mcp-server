@@ -6,5 +6,6 @@
  * reader: it is bundled on its own and takes no relative imports.
  */
 export function env(name: string): string | undefined {
-  return process.env[name];
+  // A Worker build (mcp-cloud) may have no process at all.
+  return typeof process !== 'undefined' && process.env ? process.env[name] : undefined;
 }

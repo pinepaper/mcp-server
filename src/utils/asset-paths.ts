@@ -13,11 +13,18 @@
  * The export folder is allowed because the server's own results point into
  * it: brand_kit from_url saves the logo there and says to import it with
  * pinepaper_import_image. Refusing that would break the tool's own advice.
+ *
+ * OFF BY DEFAULT OUTSIDE THE EXPORT FOLDER (1.6.28): reading the working
+ * directory or PINEPAPER_ASSET_DIRS needs PINEPAPER_ALLOW_LOCAL_FILES=1
+ * (utils/capabilities.ts). The export folder holds the server's own results
+ * (a saved scene, a brand_kit logo), so it is read without the switch, and a
+ * save / restore round trip keeps working.
  */
 import { realpath } from 'node:fs/promises';
 import { basename, delimiter, dirname, join, resolve, sep } from 'node:path';
 import { env } from './env.js';
 import { getExportDir } from './export-dir.js';
+import { capabilityAllowed, capabilityRefusal } from './capabilities.js';
 
 async function real(p: string): Promise<string | null> {
   try { return await realpath(p); } catch { return null; }
@@ -25,6 +32,7 @@ async function real(p: string): Promise<string | null> {
 
 export async function allowedAssetRoots(): Promise<string[]> {
   const exportDir = getExportDir();
+  if (!capabilityAllowed('localFiles')) return [...new Set([await real(resolve(exportDir))].filter((r): r is string => r !== null))];
   const entries = [process.cwd(), exportDir, ...(env('PINEPAPER_ASSET_DIRS') ?? '').split(delimiter).filter(Boolean)];
   const roots = await Promise.all(entries.map((e) => real(resolve(e))));
   return [...new Set(roots.filter((r): r is string => r !== null))];
@@ -55,6 +63,7 @@ export async function confineAssetPath(path: string): Promise<{ path: string } |
 }
 
 function outside(path: string, folder: string): { error: string } {
+  if (!capabilityAllowed('localFiles')) return { error: capabilityRefusal('localFiles', `Importing "${path}"`) + ` (Files in the export folder, ${getExportDir()}, are read without it.)` };
   return {
     error: `"${path}" is outside the allowed folders (cwd, the export folder, PINEPAPER_ASSET_DIRS). `
       + `Add its folder (${folder}) to PINEPAPER_ASSET_DIRS to import it.`,

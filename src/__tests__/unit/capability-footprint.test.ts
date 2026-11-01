@@ -33,8 +33,8 @@ describe('capability footprint of the published code', () => {
     expect(using(/process\.env/)).toEqual(['utils/env.ts', 'utils/safe-fetch.ts']);
   });
 
-  it('runs a command only to read an export back with ffprobe', () => {
-    expect(using(/child_process/)).toEqual(['tools/export-file-receipt.ts']);
+  it('runs no command: ffmpeg / ffprobe live in the optional @pinepaper.studio/mcp-ffmpeg add-on', () => {
+    expect(using(/child_process/)).toEqual([]);
   });
 
   it('has no eval or new Function: page code runs through CDP Runtime.evaluate', () => {

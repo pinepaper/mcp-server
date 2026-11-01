@@ -40,7 +40,9 @@
       "env": {
         "PINEPAPER_CHROME_PATH": "${user_config.chrome_path}",
         "PINEPAPER_EXPORT_DIR": "${user_config.export_dir}",
-        "PINEPAPER_TOOLKIT": "${user_config.toolkit}"
+        "PINEPAPER_TOOLKIT": "${user_config.toolkit}",
+        "PINEPAPER_ALLOW_CODE": "${user_config.allow_code}",
+        "PINEPAPER_ALLOW_LOCAL_FILES": "${user_config.allow_local_files}"
       }
     }
   },
@@ -61,6 +63,20 @@
       "type": "string",
       "title": "Tool list",
       "description": "Optional. Empty or \"core\" starts with the core tools and loads more on demand; \"agent\" or \"full\" lists everything up front (much more context).",
+      "required": false
+    },
+    "allow_code": {
+      "type": "boolean",
+      "title": "Allow custom code",
+      "description": "Off by default. Lets the assistant run JavaScript it writes in the canvas: custom code, p5-style drawing, render hooks, custom relations, and the custom relations saved in a scene file. Turn on only if you trust what the assistant reads.",
+      "default": false,
+      "required": false
+    },
+    "allow_local_files": {
+      "type": "boolean",
+      "title": "Allow local files",
+      "description": "Off by default. Lets the assistant import images, audio, video and scenes from your disk (the working folder and PINEPAPER_ASSET_DIRS). Files in the export folder are always readable.",
+      "default": false,
       "required": false
     }
   },

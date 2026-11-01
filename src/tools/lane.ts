@@ -48,7 +48,7 @@ Something that happens AT a time or ON a click (show, hide, recolour): make the 
 To start over, call pinepaper_clear_canvas: it empties the canvas and ids start again at item_1, so the same batch gives the same ids.
 MOTION THAT IS A FUNCTION OF TIME (a bob, a pulse, a sweep, a wave) is a relation, not keyframes: a track of hundreds of keys computed from a formula is the sign of the wrong route.
 - One item: a relation op {"type":"relation","sourceId":"$0","relationType":"time_expression","relationOptions":{"property":"y","expression":"360 + 40*sin(2*PI*t)"}} with no targetId; property is x, y, rotation, opacity or scale.
-- Many items, each offset (a wave across dots): define it once with pinepaper_register_custom_relation, its formula reading params.index, and bind it to a name pattern (sourceId "dot-*"): each member gets index and count. Adding members later is the same op again.
+- Many items, each offset (a wave across dots): define it once with pinepaper_register_custom_relation (on a server started with PINEPAPER_ALLOW_CODE=1), its formula reading params.index, and bind it to a name pattern (sourceId "dot-*"): each member gets index and count. Adding members later is the same op again.
 
 UNITS: pixels, top-left origin, y down; time in seconds; angles in degrees; colours as "#rrggbb".
 Every call acts on the live canvas at once: re-sending a batch ADDS its items again (clear first to replay it). A failed atomic batch removes the items it made, so fix it and send it again (edits it made to items that already existed stay: the result says so).
@@ -245,7 +245,7 @@ A TIMED event fires itself at scene times, in the preview and in every video exp
   },
 
   pinepaper_register_custom_relation: {
-    description: `Define a relation of your own, then bind it in pinepaper_agent_batch_execute with relation ops: relationType is its name, relationOptions its params, targetId optional (leave it out when the motion needs no other item). One definition drives many items: bind it to a name pattern (sourceId "dot-*", each member gets index and count), and change a param later with one relation op with update: true. pinepaper_lint_scene lists the relations bound and the definitions registered. It lasts for this session: register it again after a restart.
+    description: `Needs a server started with PINEPAPER_ALLOW_CODE=1 (its bodies are JavaScript); otherwise it is refused, and time_expression relation ops do the motion instead. Define a relation of your own, then bind it in pinepaper_agent_batch_execute with relation ops: relationType is its name, relationOptions its params, targetId optional (leave it out when the motion needs no other item). One definition drives many items: bind it to a name pattern (sourceId "dot-*", each member gets index and count), and change a param later with one relation op with update: true. pinepaper_lint_scene lists the relations bound and the definitions registered. It lasts for this session: register it again after a restart.
 
 computeFunction is a function BODY that gets fromPosition, toPosition, params, delta and time (scene seconds) and returns what apply needs. applyFunction is a body that gets item, target, computed and params and changes the item.
 {"name":"bobs","params":{"amp":{"type":"number","default":40}},"computeFunction":"return {y: 360 + params.amp * Math.sin(Math.PI * time)};","applyFunction":"if (computed) item.position.y = computed.y;"}
@@ -294,7 +294,7 @@ export const EDIT_INSTRUCTIONS = `PinePaper Studio, edit profile: four tools for
 1. pinepaper_lint_scene first. Its edit section lists every relation and custom motion with the exact op that changes it, and for a group bound by a name pattern ("dot-*"), the ops that add or remove a member.
 2. Send those ops, with your values, in ONE pinepaper_agent_batch_execute call.
 3. pinepaper_agent_export to render; perScene: true on a scene chain renders only what changed.
-Change a custom motion's formula by sending its pinepaper_register_custom_relation call again with the new body.
+Change a custom motion's formula by sending its pinepaper_register_custom_relation call again with the new body (the server must be started with PINEPAPER_ALLOW_CODE=1).
 Units: pixels, top-left origin, y down; seconds; degrees. Report a tool error as it is.`;
 
 /** The lane (or another set of lane tools): in order, each shown with its lane description and schema. */

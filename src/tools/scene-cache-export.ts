@@ -12,7 +12,8 @@
  *
  * HARD CUTS ONLY, for now: each scene is rendered alone (the chain set aside, then put back), so a crossfade or a
  * cut sound, which spans two scenes, would be lost. A chain with either is exported whole, as before, and the
- * result says why. The join needs ffmpeg on PATH; without it the chain is exported whole too. When the engine
+ * result says why. The join needs ffmpeg on PATH and the optional @pinepaper.studio/mcp-ffmpeg add-on; without
+ * them the chain is exported whole too. When the engine
  * can render a time range of the chain (app.exportEngine.supportsTimeRange, FxTool branch claude/export-time-range),
  * segments become ranges of the chain timeline and transitions stay in.
  */
@@ -21,7 +22,7 @@ import { mkdir, stat, copyFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { CallToolResult } from '../mcp/index.js';
-import { hasFfmpeg, segmentStreams, concatSegments, muxAudio, muxSilence } from './export-file-receipt.js';
+import { hasFfmpeg, hasFfmpegAddon, FFMPEG_ADDON, segmentStreams, concatSegments, muxAudio, muxSilence } from './export-file-receipt.js';
 import { exportFileLink } from '../utils/export-dir.js';
 
 interface ChainEntry { sceneId: string; duration: number; transition: string | null; cutSound: boolean }
@@ -124,7 +125,11 @@ export async function exportPerScene(args: Record<string, unknown>, format: stri
   const refusal = perSceneRefusal(info.chain, format);
   const ranges = !!refusal && needsRanges(info.chain) && info.ranges === true && (format === 'mp4' || format === 'webm');
   if (refusal && !ranges) return whole(refusal + (needsRanges(info.chain) && !info.ranges ? ' (a studio that renders time ranges keeps them: update PinePaper Studio)' : ''));
-  if (!(await ff.available())) return whole('ffmpeg is not on PATH, and the segments are joined with it (install ffmpeg to cache per scene)');
+  if (!(await ff.available())) {
+    return whole((deps.ffmpeg || await hasFfmpegAddon())
+      ? 'ffmpeg is not on PATH, and the segments are joined with it (install ffmpeg to cache per scene)'
+      : `the segments are joined with ffmpeg, which runs through the optional ${FFMPEG_ADDON} add-on: install it beside the server (npx -p @pinepaper.studio/mcp-server -p ${FFMPEG_ADDON} pinepaper-mcp) with ffmpeg on PATH to cache per scene`);
+  }
 
   let scenesById = new Map<string, unknown>();
   try {

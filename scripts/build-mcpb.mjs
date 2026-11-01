@@ -15,6 +15,10 @@
  * (capability-footprint.test.ts), because the npm package is what supply-chain
  * scores read.
  *
+ * THE FFMPEG ADD-ON (@pinepaper.studio/mcp-ffmpeg, packages/mcp-ffmpeg) is
+ * copied into the bundle's node_modules for the same reason: the npm package
+ * starts no process, the bundle can.
+ *
  * Installs with --ignore-scripts and --omit=dev into a staging folder, and
  * writes the zip with the system `zip`. Validate the result with the official
  * packer's validator before publishing it: `npx @anthropic-ai/mcpb validate manifest.json`.
@@ -51,8 +55,14 @@ writeFileSync(join(STAGE, 'package.json'), JSON.stringify({
 
 execFileSync('npm', ['install', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund', '--no-package-lock'], { cwd: STAGE, stdio: 'inherit' });
 
+// The ffmpeg add-on (packages/mcp-ffmpeg) rides in the bundle, from this repo, so a Desktop install has per-scene
+// exports and the ffprobe read-back without a second package. The npm package never depends on it.
+const ADDON = join(STAGE, 'node_modules', '@pinepaper.studio', 'mcp-ffmpeg');
+mkdirSync(ADDON, { recursive: true });
+for (const f of ['package.json', 'index.js', 'index.d.ts', 'README.md', 'LICENSE']) cpSync(join(ROOT, 'packages', 'mcp-ffmpeg', f), join(ADDON, f));
+
 rmSync(OUT, { force: true });
 execFileSync('zip', ['-q', '-r', '-X', OUT, '.'], { cwd: STAGE });
 const mb = (statSync(OUT).size / 1048576).toFixed(1);
 const packages = execFileSync('npm', ['ls', '--all', '--parseable', '--omit=dev'], { cwd: STAGE, encoding: 'utf8' }).trim().split('\n').length - 1;
-console.log(`✅ ${OUT.replace(ROOT + '/', '')}: ${mb} MB, ${packages} packages (zod, undici, puppeteer-core ${coreVersion} and theirs)`);
+console.log(`✅ ${OUT.replace(ROOT + '/', '')}: ${mb} MB, ${packages} packages (zod, undici, puppeteer-core ${coreVersion} and theirs, and the ffmpeg add-on)`);

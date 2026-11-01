@@ -1,0 +1,16 @@
+{
+  "name": "@pinepaper.studio/mcp-ffmpeg",
+  "version": "1.0.0",
+  "description": "Optional add-on for @pinepaper.studio/mcp-server: lets it run ffmpeg / ffprobe (per-scene cached exports, reading a saved video back).",
+  "type": "module",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "exports": { ".": { "types": "./index.d.ts", "import": "./index.js" } },
+  "files": ["index.js", "index.d.ts", "README.md", "LICENSE"],
+  "engines": { "node": ">=18.0.0" },
+  "license": "MIT",
+  "author": "PinePaper Studio",
+  "homepage": "https://pinepaper.studio",
+  "repository": { "type": "git", "url": "git+https://github.com/pinepaper/mcp-server.git", "directory": "packages/mcp-ffmpeg" },
+  "keywords": ["pinepaper", "mcp", "ffmpeg"]
+}

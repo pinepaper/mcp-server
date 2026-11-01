@@ -18,6 +18,7 @@ import { ExportTrainingDataInputSchema, ExportSceneInputSchema, ImportSceneInput
 import { getBrowserController } from '../../browser/puppeteer-controller.js';
 import { getExecutionMode } from '../handlers.js';
 import { ExportStepError, errorText, verifySavedFile, writeStep } from '../export-file-check.js';
+import { capabilityAllowed, capabilityRefusal, CAPABILITY_SWITCH } from '../../utils/capabilities.js';
 
 /** A project document over this size is refused on import rather than staged. */
 const MAX_PROJECT_BYTES = 200 * 1024 * 1024;
@@ -155,7 +156,9 @@ export const exportHandlers: Record<string, ExportHandler> = {
     if (defs.length) {
       const names = defs.map((d) => d.name).join(', ');
       const mode = options.executionMode ?? getExecutionMode();
-      if (input.registerCustomRelations === true && mode !== 'code' && options.executeInBrowser) {
+      if (input.registerCustomRelations === true && !capabilityAllowed('code')) {
+        note = ` — this file carries custom relation definitions (${names}) that were NOT registered: ${capabilityRefusal('code', 'registerCustomRelations')} The scene itself loaded; relations of those types do nothing until they are registered.`;
+      } else if (input.registerCustomRelations === true && mode !== 'code' && options.executeInBrowser) {
         const controller = options.browserController || getBrowserController();
         if (!controller.connected) { try { await controller.connect(); } catch { /* executeOrGenerate reports it */ } }
         const failed: string[] = [];
@@ -166,7 +169,7 @@ export const exportHandlers: Record<string, ExportHandler> = {
         }
         note = failed.length ? ` — custom relations registered except ${failed.join(', ')}` : ` — custom relations registered first: ${names}`;
       } else {
-        note = ` — this file carries custom relation definitions (${names}) that were NOT registered: their compute and apply code runs in the studio, so they load only with registerCustomRelations: true. Relations of those types in the scene do nothing until they are registered.`;
+        note = ` — this file carries custom relation definitions (${names}) that were NOT registered: their compute and apply code runs in the studio, so they load only with registerCustomRelations: true (on a server started with ${CAPABILITY_SWITCH.code}=1). Relations of those types in the scene do nothing until they are registered.`;
       }
     }
     return executeOrGenerate(code, `Load project document ${path}${note}`, options, 'pinepaper_import_scene', { projectDoc: text });

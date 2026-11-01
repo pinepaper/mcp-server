@@ -186,6 +186,7 @@ import {
 import { ZodError, z } from 'zod';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { effectClass } from './effect-class.js';
+import { capabilityAllowed, capabilityRefusal, CAPABILITY_SWITCH } from '../utils/capabilities.js';
 import { exportFileReceiptOrReason, receiptErrorLine } from './export-file-receipt.js';
 import { ExportStepError, errorText, verifySavedFile, writeStep, bytesForSave } from './export-file-check.js';
 import { EFFECT_BEFORE_JS, effectAfterJs, namedItemIds, idMayBeGone, NO_CHANGE_NOTE } from './effect-check.js';
@@ -2850,6 +2851,9 @@ async function handleToolCallInner(
 
       case 'pinepaper_render_hook': {
         const input = RenderHookInputSchema.parse(args);
+        if (input.action === 'register' && !capabilityAllowed('code')) {
+          return errorResult(ErrorCodes.INVALID_PARAMS, capabilityRefusal('code', 'pinepaper_render_hook register'), { switch: CAPABILITY_SWITCH.code }, { toolName: 'pinepaper_render_hook' });
+        }
         return executeOrGenerate(codeGenerator.generateRenderHook(input), `Render hook: ${input.action}`, options, 'pinepaper_render_hook');
       }
 
@@ -3226,6 +3230,9 @@ async function handleToolCallInner(
 
       case 'pinepaper_register_custom_relation': {
         const input = RegisterCustomRelationInputSchema.parse(args);
+        if (!capabilityAllowed('code')) {
+          return errorResult(ErrorCodes.INVALID_PARAMS, capabilityRefusal('code', `pinepaper_register_custom_relation (its computeFunction and applyFunction)`) + ' For motion without code, use time_expression or a built-in relation.', { switch: CAPABILITY_SWITCH.code }, { toolName: 'pinepaper_register_custom_relation' });
+        }
         CUSTOM_RELATION_NAMES.add(input.name);
         const code = codeGenerator.generateRegisterCustomRelation(input);
         return executeOrGenerate(
@@ -3238,6 +3245,9 @@ async function handleToolCallInner(
 
       case 'pinepaper_execute_custom_code': {
         const input = ExecuteCustomCodeInputSchema.parse(args);
+        if (!capabilityAllowed('code')) {
+          return errorResult(ErrorCodes.INVALID_PARAMS, capabilityRefusal('code', 'pinepaper_execute_custom_code'), { switch: CAPABILITY_SWITCH.code }, { toolName: 'pinepaper_execute_custom_code' });
+        }
         const code = codeGenerator.generateExecuteCustomCode(input);
         return executeOrGenerate(
           code,
@@ -4308,6 +4318,9 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
       // -----------------------------------------------------------------------
       case 'pinepaper_p5_draw': {
         const input = P5DrawInputSchema.parse(args);
+        if (!capabilityAllowed('code')) {
+          return errorResult(ErrorCodes.INVALID_PARAMS, capabilityRefusal('code', 'pinepaper_p5_draw'), { switch: CAPABILITY_SWITCH.code }, { toolName: 'pinepaper_p5_draw' });
+        }
         const code = codeGenerator.generateP5Draw(input.code);
         const description = 'Executed p5.js-style drawing code';
         return executeOrGenerate(code, description, options, 'pinepaper_p5_draw');

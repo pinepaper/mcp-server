@@ -8,7 +8,6 @@
  */
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import { execFile } from 'node:child_process';
 import { resolve as resolvePath } from 'node:path';
 import { env } from '../utils/env.js';
 
@@ -80,18 +79,35 @@ export function probeFromResult(exportResult: unknown): ProbeSummary | null {
 
 let ffprobeAvailable: boolean | null = null;
 /**
- * The package's only child processes, both in this file. execFile, never exec or spawn with a shell: the binary is
- * the literal `ffprobe` (reading a saved video back) or `ffmpeg` (joining the per-scene segments of a cached
- * export), the arguments an array this file writes, and the values from outside it, file paths, are made absolute
- * first, so none can be read as an option (a leading `-`) or an ffmpeg protocol (`concat:`, `http:`). Turn the
- * read-back off with PINEPAPER_FFPROBE=off.
+ * ffprobe and ffmpeg run through the optional add-on @pinepaper.studio/mcp-ffmpeg, so this package starts no
+ * process itself. The add-on runs only those two binaries, through execFile (no shell), with the arguments array
+ * this file writes; file paths are made absolute first, so none can be read as an option (a leading `-`) or an
+ * ffmpeg protocol (`concat:`, `http:`). Without the add-on both are simply unavailable: the receipt says the file
+ * was not read back, and a per-scene export runs whole. Turn the read-back off with PINEPAPER_FFPROBE=off.
+ *
+ * The specifier is a variable so a bundler does not try to resolve a package that is not a dependency.
  */
-function run(cmd: 'ffprobe' | 'ffmpeg', args: string[], timeout = 30_000): Promise<{ ok: boolean; stdout: string; stderr: string }> {
-  return new Promise((resolve) => {
-    execFile(cmd, args, { timeout, maxBuffer: 4 * 1024 * 1024 }, (err, stdout, stderr) => {
-      resolve({ ok: !err, stdout: String(stdout ?? ''), stderr: String(stderr ?? '') || (err ? err.message : '') });
-    });
-  });
+export const FFMPEG_ADDON = '@pinepaper.studio/mcp-ffmpeg';
+type Runner = (cmd: 'ffprobe' | 'ffmpeg', args: string[], timeout?: number) => Promise<{ ok: boolean; stdout: string; stderr: string }>;
+let runner: Runner | null | undefined;
+/** Tests replace the runner; undefined goes back to loading the add-on. */
+export function setFfmpegRunner(r: Runner | null | undefined): void { runner = r; ffprobeAvailable = null; ffmpegAvailable = null; }
+async function loadRunner(): Promise<Runner | null> {
+  if (runner === undefined) {
+    const spec = FFMPEG_ADDON;
+    try {
+      const mod = (await import(spec)) as { run?: unknown };
+      runner = typeof mod.run === 'function' ? (mod.run as Runner) : null;
+    } catch { runner = null; }
+  }
+  return runner;
+}
+/** Whether the add-on is installed (the binaries may still be missing from PATH). */
+export async function hasFfmpegAddon(): Promise<boolean> { return (await loadRunner()) !== null; }
+async function run(cmd: 'ffprobe' | 'ffmpeg', args: string[], timeout = 30_000): Promise<{ ok: boolean; stdout: string; stderr: string }> {
+  const r = await loadRunner();
+  if (!r) return { ok: false, stdout: '', stderr: `${cmd} runs through the optional ${FFMPEG_ADDON} add-on, which is not installed` };
+  return r(cmd, args, timeout);
 }
 
 /** ffprobe's codec_name for a studio codec string (avc1.* is h264, vp09.* is vp9). */
@@ -113,7 +129,11 @@ function codecFamily(codec: string): string {
 export async function verifyWithFfprobe(filePath: string, probe: ProbeSummary): Promise<ProbeCheck> {
   if (env('PINEPAPER_FFPROBE') === 'off') return { tool: null, reason: 'PINEPAPER_FFPROBE=off' };
   if (ffprobeAvailable === null) ffprobeAvailable = (await run('ffprobe', ['-version'])).ok;
-  if (!ffprobeAvailable) return { tool: null, reason: 'ffprobe is not on PATH, so the file was not read back; the summary is what the studio encoded' };
+  if (!ffprobeAvailable) {
+    return { tool: null, reason: (await hasFfmpegAddon())
+      ? 'ffprobe is not on PATH, so the file was not read back; the summary is what the studio encoded'
+      : `the file was not read back (that needs the optional ${FFMPEG_ADDON} add-on and ffprobe on PATH); the summary is what the studio encoded` };
+  }
   const r = await run('ffprobe', ['-v', 'error', '-show_entries',
     'format=format_name,duration:stream=codec_type,codec_name,width,height,r_frame_rate,nb_frames', '-of', 'json', resolvePath(filePath)]);
   if (!r.ok) return { tool: 'ffprobe', ok: false, reason: `ffprobe could not read the file: ${r.stderr.trim() || 'no reason given'}` };

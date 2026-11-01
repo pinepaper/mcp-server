@@ -235,6 +235,8 @@ The same code an agent generates is the code you can paste — the canvas is you
 
 **Every tool emits JavaScript — that is the architecture, not an exception.** A tool call is compiled into a snippet written against the PinePaper and Paper.js APIs; the snippet is the product. `pinepaper_execute_custom_code` is simply the case where the *agent* writes the snippet instead of the server generating it, which is what lets a model draw something no other tool has a name for. Removing execution would not harden this package, it would delete it.
 
+**Code the agent writes is off unless you turn it on.** The tools that run JavaScript the agent wrote (`pinepaper_execute_custom_code`, `pinepaper_p5_draw`, `pinepaper_render_hook` register, `pinepaper_register_custom_relation`, and `pinepaper_import_scene`'s `registerCustomRelations`) refuse, naming the switch, unless the server is started with `PINEPAPER_ALLOW_CODE=1`. Reading files from your disk for an import (images, audio, video, scenes) needs `PINEPAPER_ALLOW_LOCAL_FILES=1`; files in the export folder, the server's own results, are always readable. In the Claude Desktop extension both are settings, off by default. An agent takes instructions from whatever it reads, a web page or a scene file included, so whether that text may become code is the decision of whoever starts the server.
+
 **Where the code runs.** In a browser page on your own machine, against your own canvas. It does not run in the server process, and nothing is sent anywhere else to be executed.
 
 **Two modes, and one of them never executes anything:**
@@ -255,10 +257,27 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - Code an agent writes runs with whatever that browser page has. Give this server the same trust you would give anything else you let write and run code on your machine — which is the trust you already extend to an MCP client with tool access.
 - Puppeteer mode launches Chrome with `--no-sandbox` and `--disable-setuid-sandbox`. That is routine for headless automation and it does weaken Chrome's own process sandbox. If that matters where you are running it, use `code` mode or put the server in a container.
 - Puppeteer itself is not a dependency at all (it was an optional peer until 1.6.25), kept out of the tree precisely because a headless browser plus an install script is what scanners flag hardest. Install it only if you want the executing mode. The server loads it only from where its own dependencies would be found (the same `npx` call, a global install, a project install) or from a folder you name in `PINEPAPER_PUPPETEER_FROM`; never from the folder it happens to be started in. puppeteer 22 or newer is required.
-- The package runs two binaries, both via `execFile` (no shell, fixed binary and argument list, absolute paths) from one file, and only for exports: `ffprobe -show_entries … <file>` checks a saved video against what the studio encoded (without `ffprobe` on `PATH` the check is skipped and said so; `PINEPAPER_FFPROBE=off` turns it off), and `ffmpeg -f concat` joins the cached segments of a `perScene` export (without `ffmpeg` the chain is exported whole).
-- The server itself fetches the images, SVGs and media a tool call names by URL, and reads local files named by path. URLs that resolve to loopback, private, link-local or reserved addresses are refused, redirects included, and so are cloud metadata addresses. Local files are read only from the working directory, the export folder, and folders listed in `PINEPAPER_ASSET_DIRS`. `PINEPAPER_ALLOW_PRIVATE_NETWORK=1` allows local and LAN hosts. Metadata addresses stay refused even with it set.
+- The package starts no process. Two export features use `ffprobe` and `ffmpeg`, and they run through a separate, optional add-on, [`@pinepaper.studio/mcp-ffmpeg`](packages/mcp-ffmpeg): `ffprobe` checks a saved video against what the studio encoded, and `ffmpeg -f concat` joins the cached segments of a `perScene` export. The add-on runs only those two binaries, via `execFile` (no shell, argument lists the server writes, absolute paths). Without it the check is skipped and said so, and a `perScene` export runs whole. To add it: `npx -y -p @pinepaper.studio/mcp-server -p @pinepaper.studio/mcp-ffmpeg pinepaper-mcp`. The Claude Desktop extension includes it.
+- The server itself fetches the images, SVGs and media a tool call names by URL, and reads local files named by path. URLs that resolve to loopback, private, link-local or reserved addresses are refused, redirects included, and so are cloud metadata addresses. Local files are read only with `PINEPAPER_ALLOW_LOCAL_FILES=1`, and then only from the working directory, the export folder, and folders listed in `PINEPAPER_ASSET_DIRS` (the export folder is readable without the switch). `PINEPAPER_ALLOW_PRIVATE_NETWORK=1` allows local and LAN hosts. Metadata addresses stay refused even with it set.
 
 ## What's new in 1.6.28
+
+### Changed
+
+- **Code the agent writes and local file imports are off by default.**
+  `pinepaper_execute_custom_code`, `pinepaper_p5_draw`, `pinepaper_render_hook`
+  (register), `pinepaper_register_custom_relation` and `pinepaper_import_scene`'s
+  `registerCustomRelations` need a server started with `PINEPAPER_ALLOW_CODE=1`;
+  importing an image, audio, video or scene from your disk needs
+  `PINEPAPER_ALLOW_LOCAL_FILES=1`. Without the switch the call is refused and
+  names it. Files in the export folder stay readable, so saving and restoring a
+  scene works as before. URL imports are unchanged. In the Claude Desktop
+  extension both are settings ("Allow custom code", "Allow local files").
+- **The server starts no process.** `ffprobe` (checking a saved video) and
+  `ffmpeg` (joining a `perScene` export) moved to an optional add-on,
+  `@pinepaper.studio/mcp-ffmpeg`. Install it beside the server to keep them:
+  `npx -y -p @pinepaper.studio/mcp-server -p @pinepaper.studio/mcp-ffmpeg pinepaper-mcp`.
+  The Claude Desktop extension includes it.
 
 ### Added
 
