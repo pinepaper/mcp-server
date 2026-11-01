@@ -48,6 +48,13 @@
  *   nothing and the relation does nothing, with success reported: an agent
  *   wrote Math.sin(...) from JavaScript habit and got no motion (#39). The
  *   tool documents the grammar from these and refuses an unknown name.
+ * - RELATION_PARAM_KEYS. For each rule RelationRegistry.js registers itself,
+ *   the params it declares plus every params.X its own block reads (internal
+ *   _state keys left out). A relationOptions key outside that set is one the
+ *   rule never looks at; the tool says so instead of accepting it silently
+ *   (benchmark: "warn on unknown relation options"). A rule whose block cannot
+ *   be bounded cleanly, or that declares nothing (event reactions take opaque
+ *   params), is left out: no list means no warning, never a wrong one.
  * Descriptions are NOT generated: they are prose, written here. The type of
  * EASING_DESCRIPTIONS is keyed on the generated union, so a new engine easing
  * fails the TYPECHECK until someone writes its line.
@@ -79,6 +86,7 @@ const PROVENANCE_REL = 'js/core/Provenance.js';
 const STYLED_REL = 'js/core/StyledScene.js';
 const PATTERNS_REL = 'js/core/Patterns.js';
 const EXPR_REL = 'js/relations/expr-to-ir.js';
+const RELATIONS_REL = 'js/RelationRegistry.js';
 
 function resolveRef() {
   for (const ref of [ENGINE_REF, 'HEAD']) {
@@ -245,6 +253,39 @@ function expressionGrammar(src) {
   return { functions, constants, rejected };
 }
 
+function relationParamKeys(src) {
+  const out = [];
+  const re = /\n(\s*)this\.registerRule\('([a-z_0-9]+)'/g;
+  let m;
+  while ((m = re.exec(src))) {
+    const [, indent, name] = m;
+    const close = src.indexOf(`\n${indent}});`, m.index + 1);
+    if (close < 0 || close - m.index > 30000) continue;
+    const block = src.slice(m.index, close);
+    const at = /params:\s*\{/.exec(block);
+    if (!at) continue;
+    let depth = 1, i = at.index + at[0].length;
+    const start = i;
+    while (depth && i < block.length) { if (block[i] === '{') depth++; else if (block[i] === '}') depth--; i++; }
+    const body = block.slice(start, i - 1);
+    const declared = new Set();
+    for (let d = 0, k = 0; k < body.length; k++) {
+      const c = body[k];
+      if (c === '{' || c === '[' || c === '(') d++;
+      else if (c === '}' || c === ']' || c === ')') d--;
+      else if (d === 0 && /[A-Za-z_]/.test(c) && (k === 0 || !/[A-Za-z0-9_'"]/.test(body[k - 1]))) {
+        const key = /^([A-Za-z_][A-Za-z0-9_]*)\s*:/.exec(body.slice(k));
+        if (key) { declared.add(key[1]); k += key[0].length - 1; }
+      }
+    }
+    if (!declared.size) continue;
+    const reads = [...block.matchAll(/params\??\.([A-Za-z][A-Za-z0-9_]*)/g)].map((x) => x[1]);
+    out.push([name, [...new Set([...declared, ...reads])].sort()]);
+  }
+  if (out.length < 20) throw new Error(`sync-engine-lists: only ${out.length} relation rules read from ${RELATIONS_REL}`);
+  return out.sort((a, b) => a[0].localeCompare(b[0]));
+}
+
 async function generate() {
   const easingSrc = readCommitted(EASING_REL);
   const worldSrc = readCommitted(WORLD_REL);
@@ -270,6 +311,9 @@ async function generate() {
   const exprSrc = readCommitted(EXPR_REL);
   if (!exprSrc) throw new Error(`sync-engine-lists: cannot read ${EXPR_REL}`);
   const expr = expressionGrammar(exprSrc);
+  const relSrc = readCommitted(RELATIONS_REL);
+  if (!relSrc) throw new Error(`sync-engine-lists: cannot read ${RELATIONS_REL}`);
+  const relKeys = relationParamKeys(relSrc);
 
   return `/**
  * GENERATED — DO NOT EDIT. Run \`bun run sync:engine-lists\`.
@@ -286,6 +330,7 @@ async function generate() {
  *   ${STYLED_REL}  sha256: ${digest(styledSrc)}
  *   ${PATTERNS_REL}  sha256: ${digest(patternsSrc)}
  *   ${EXPR_REL}  sha256: ${digest(exprSrc)}
+ *   ${RELATIONS_REL}  sha256: ${digest(relSrc)}
  */
 
 /** ${easings.length} names: EASING_NAMES, the keys of the engine's easing table. Keyframes, masks, relations and the camera all resolve through it. */
@@ -347,6 +392,11 @@ ${expr.functions.map(([n, a]) => `  ${n}: ${a},`).join('\n')}
 export const EXPRESSION_CONSTANTS = [
 ${list(expr.constants)}
 ] as const;
+
+/** ${relKeys.length} relation rules: the params each declares or reads (RelationRegistry.js). A key outside its list is never read. */
+export const RELATION_PARAM_KEYS: Readonly<Record<string, readonly string[]>> = Object.freeze({
+${relKeys.map(([n, ks]) => `  ${n}: [${ks.map((k) => `'${k}'`).join(', ')}],`).join('\n')}
+});
 
 /** Names the grammar refuses outright (expr-to-ir.js REJECT): not deterministic. */
 export const EXPRESSION_REJECTED = [

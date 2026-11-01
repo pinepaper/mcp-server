@@ -283,6 +283,11 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   keyframes: `time_expression` for one item, a custom relation bound to a name
   pattern for many items.
 
+- A relation option the engine never reads (a typo such as `sped`, or a
+  parameter from another relation) is named in a warning, with the likely
+  intended key and the list the relation does read. Before, it was accepted
+  and ignored in silence.
+
 ### Fixed
 
 - A studio page that opens on an older build (right after a deploy) is moved

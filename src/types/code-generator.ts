@@ -8,7 +8,7 @@
 import { compileChoreography } from '../tools/choreograph.js';
 import { compileBatchTimelines, emitTimelineOpBody, type TimelinePlan } from '../tools/timeline.js';
 import { normalizeSvgSize } from '../utils/svg-size.js';
-import { WORLD3D_COLOR_PATHS, PATTERN_KINDS, EXPRESSION_FUNCTION_ARITY, EXPRESSION_CONSTANTS, EXPRESSION_REJECTED } from '../tools/engine-lists.js';
+import { WORLD3D_COLOR_PATHS, PATTERN_KINDS, EXPRESSION_FUNCTION_ARITY, EXPRESSION_CONSTANTS, EXPRESSION_REJECTED, RELATION_PARAM_KEYS } from '../tools/engine-lists.js';
 import { expressionGrammarText } from '../tools/expression-grammar.js';
 import { REQUIRED_ENGINE_METHODS, OPTIONAL_ENGINE_METHODS } from '../tools/engine-methods.js';
 import { NORMALIZE_PARAM_READS, MODIFY_CHANGE_READS } from '../tools/shape-params.js';
@@ -1558,6 +1558,31 @@ function expressionProblem(expr: string): string | null {
   return null;
 }
 
+/**
+ * A relationOptions key the rule never reads, said instead of accepted in silence. The list is the engine's own
+ * (RELATION_PARAM_KEYS: what each rule declares or reads); a rule without one (custom, event reactions) gets no
+ * warning. `injected` are keys the tool added itself (a name pattern's index and count).
+ */
+/** Levenshtein distance, for a "did you mean" on a misspelt key. */
+function editDistance(a: string, b: string): number {
+  const row = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = row[0]; row[0] = i;
+    for (let j = 1; j <= b.length; j++) { const t = row[j]; row[j] = Math.min(row[j] + 1, row[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1)); prev = t; }
+  }
+  return row[b.length];
+}
+
+export function relationOptionWarning(relationType: unknown, params: unknown, injected: readonly string[] = []): string | null {
+  const keys = typeof relationType === 'string' ? RELATION_PARAM_KEYS[relationType] : undefined;
+  if (!keys || !params || typeof params !== 'object') return null;
+  const unknown = Object.keys(params as Record<string, unknown>).filter((k) => !keys.includes(k) && !injected.includes(k));
+  if (!unknown.length) return null;
+  const norm = (x: string) => x.replace(/_/g, '').toLowerCase();
+  const hint = unknown.map((k) => keys.find((x) => norm(x) === norm(k)) ?? keys.find((x) => editDistance(norm(x), norm(k)) <= (k.length > 5 ? 2 : 1))).map((x, i) => (x ? `${unknown[i]} → ${x}?` : '')).filter(Boolean);
+  return `${relationType} does not read ${unknown.join(', ')}, so ${unknown.length > 1 ? 'they were' : 'it was'} ignored${hint.length ? ` (${hint.join('; ')})` : ''}. ${relationType} reads: ${keys.join(', ')}.`;
+}
+
 const VISIBILITY_REACTION = /^on_(event|enter|exit)_set_visibility$/;
 
 /**
@@ -1599,7 +1624,7 @@ function generateAddRelationCode(
     return { success: false, relationType: ${jsLiteral(relationType)}, error: 'the studio refused the ' + ${jsLiteral(relationType)} + ' relation between ' + ${jsLiteral(sourceId)} + ' and ' + ${jsLiteral(targetId)} + (__why ? ': ' + __why : '.') };
   }
   app.historyManager.saveState();
-  return { success: true, sourceId: ${jsLiteral(sourceId)}, targetId: ${jsLiteral(targetId)}, relationType: ${jsLiteral(relationType)} };
+  return { success: true, sourceId: ${jsLiteral(sourceId)}, targetId: ${jsLiteral(targetId)}, relationType: ${jsLiteral(relationType)}${(() => { const w = relationOptionWarning(relationType, params); return w ? `, warning: ${jsLiteral(w)}` : ''; })()} };
 })();
 `.trim();
 }
@@ -5507,7 +5532,7 @@ if (!__done.length) {
   const __why = ${op.update === true ? `'no ' + ${type} + ' relation is bound from ' + __failed.join(', ') + (targetId === null ? '' : ' to ' + targetId) + ' to change: bind it first (a relation op without update)'` : relationRefusalReasonJs(type)};
   return { success: false, relationType: ${type}, sourceIds: __failed, error: ${op.update === true ? '__why' : `'the studio refused the ' + ${type} + ' relation for ' + __failed.join(', ') + ' — nothing was bound' + (__why ? ': ' + __why : '.')`} };
 }
-return { success: true, relationType: ${type}, ${op.update === true ? 'updated' : 'bound'}: __done, targetId${glob ? ', count: __members.length' : ''}, ...(__failed.length ? { failed: __failed, warning: __failed.length + ' of ' + __members.length + ' were not ${op.update === true ? 'changed' : 'bound'}: ' + __failed.join(', ') } : {}) };
+return { success: true, relationType: ${type}, ${op.update === true ? 'updated' : 'bound'}: __done, targetId${glob ? ', count: __members.length' : ''}${(() => { const w = relationOptionWarning(op.relationType, op.relationOptions, ['index', 'count']); return w ? `, optionWarning: ${jsLiteral(w)}` : ''; })()}, ...(__failed.length ? { failed: __failed, warning: __failed.length + ' of ' + __members.length + ' were not ${op.update === true ? 'changed' : 'bound'}: ' + __failed.join(', ') } : {}) };
 `;
         }
         return `
@@ -5526,7 +5551,7 @@ if (!relationId) {
   return { success: false, relationId: false, sourceId, targetId, relationType: ${JSON.stringify(op.relationType)},
     error: 'the studio refused the ' + ${JSON.stringify(op.relationType)} + ' relation between ' + sourceId + ' and ' + targetId + ' — nothing was bound' + (__why ? ': ' + __why : '.') };
 }
-return { relationId, sourceId, targetId, relationType: ${JSON.stringify(String(op.relationType))} };
+return { relationId, sourceId, targetId, relationType: ${JSON.stringify(String(op.relationType))}${(() => { const w = relationOptionWarning(op.relationType, op.relationOptions); return w ? `, warning: ${jsLiteral(w)}` : ''; })()} };
 `;
 
       case 'delete':

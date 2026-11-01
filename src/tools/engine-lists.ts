@@ -4,7 +4,7 @@
  * Name lists the engine owns and the tool surface must offer exactly. See
  * scripts/sync-engine-lists.mjs for why each is generated.
  *
- * Source: FxTool origin/main 97bd96e298807adf6f230c5348d273349c4be973
+ * Source: FxTool origin/main a9725ef597ee5050284aed4ee94815964b65d8c3
  *   js/core/KeyframeInterpolator.js  sha256: c0062d98a83491e9
  *   js/world3d/worlds.js  sha256: 0e0973f7587c06e1
  *   js/core/DesignMedia.js  sha256: ab07f330e4060cb7
@@ -13,6 +13,7 @@
  *   js/core/StyledScene.js  sha256: ea647c014de59faf
  *   js/core/Patterns.js  sha256: c23b186ebf6e8a6d
  *   js/relations/expr-to-ir.js  sha256: 4d92d2f42b3356e9
+ *   js/RelationRegistry.js  sha256: fcffa9fc0eb74a53
  */
 
 /** 39 names: EASING_NAMES, the keys of the engine's easing table. Keyframes, masks, relations and the camera all resolve through it. */
@@ -231,6 +232,61 @@ export const EXPRESSION_CONSTANTS = [
   'E',
   'TAU',
 ] as const;
+
+/** 51 relation rules: the params each declares or reads (RelationRegistry.js). A key outside its list is never read. */
+export const RELATION_PARAM_KEYS: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  aligned_with: ['axis', 'offset', 'signal'],
+  anchored_in_world: ['hideWhenBehind', 'offsetY', 'scaleWithDistance', 'screenOffsetX', 'screenOffsetY', 'target', 'x', 'y', 'z'],
+  animates: ['autoplay', 'duration', 'keyframes', 'loop', 'pingPong', 'signal'],
+  attached_to: ['inherit_rotation', 'offset'],
+  attached_to_tail: ['port'],
+  attracts: ['force', 'maxDistance', 'maxSpeed', 'minDistance', 'returnSpeed'],
+  below: ['align', 'gap', 'overhang', 'signal'],
+  beside: ['align', 'gap', 'side', 'signal'],
+  bounds_to: ['bounce', 'padding', 'signal'],
+  camera_animates: ['delay', 'duration', 'fov', 'keyframes', 'loop', 'pitch', 'yaw'],
+  camera_follows: ['bounds', 'deadzone', 'offset', 'smoothing', 'zoom'],
+  centered_on: ['offsetX', 'offsetY', 'signal'],
+  circumscribes: ['color', 'delay', 'duration', 'fadeOut', 'padding', 'shape', 'strokeWidth'],
+  connects_to: ['label', 'sourcePort', 'targetPort', 'via'],
+  construction_reveal: ['fadeIn', 'revealAt'],
+  contained_in_place: ['bounce', 'padding', 'regionId', 'signal'],
+  controls: ['keys', 'speed'],
+  draws_figure: ['delay', 'duration', 'figure', 'loop'],
+  driven_by: ['anchor', 'clamp', 'colorFrom', 'colorTo', 'multiplier', 'offset', 'signal', 'sourceProperty', 'targetProperty'],
+  effect_: ['intensity', 'mode', 'offsetX', 'offsetY', 'padding', 'palette', 'radius', 'speed'],
+  follows: ['delay', 'offset', 'signal', 'smoothing', 'startOnTarget'],
+  geo_adjacent_to: ['offset', 'regionId', 'side', 'signal'],
+  geo_centers_on: ['animate', 'duration', 'padding', 'regionId'],
+  geo_highlights: ['active', 'highlightColor', 'regionId', 'strokeColor'],
+  geo_travels_to: ['duration', 'easing', 'fromRegion', 'loop', 'pathStyle', 'signal', 'toRegion'],
+  group_morphs_to: ['deformLines', 'duration', 'easing', 'hold', 'loop'],
+  grows_from: ['delay', 'duration', 'easing', 'origin'],
+  head_points_to: ['port'],
+  indicates: ['color', 'delay', 'duration', 'repeat', 'scale'],
+  inside: ['anchor', 'padding', 'signal'],
+  is_centroid_of: ['others', 'signal'],
+  is_circumcenter_of: ['other1', 'other2', 'signal'],
+  is_midpoint_of: ['other', 'signal'],
+  lies_on_line: ['other', 'signal', 't'],
+  localizes_sound: ['axis', 'distanceGain', 'reference', 'smoothing', 'spread'],
+  maintains_distance: ['distance', 'signal', 'strength'],
+  mirrors: ['axis', 'center'],
+  on_event_play_sound: ['gain', 'note', 'sound'],
+  on_top_of: ['align', 'gap', 'overhang', 'signal'],
+  orbits: ['direction', 'phase', 'phaseDegrees', 'radius', 'speed'],
+  parallax: ['depth', 'origin'],
+  points_at: ['offset_angle', 'signal', 'smoothing'],
+  reacts_to_audio: ['attack', 'base', 'beatsPerBar', 'colorFrom', 'colorTo', 'decay', 'feature', 'gain', 'halfLife', 'inPoint', 'loop', 'onsets', 'outPoint', 'peak', 'property', 'source', 'start', 'threshold'],
+  repels: ['force', 'maxDistance', 'minDistance', 'returnSpeed', 'signal'],
+  staggered_with: ['amount', 'axis', 'count', 'delay', 'distributeEase', 'duration', 'effect', 'from', 'grid', 'index', 'stagger'],
+  syncs_with: ['offset', 'speedRatio'],
+  time_expression: ['baseValue', 'expression', 'property', 'signal'],
+  tours: ['dwell', 'easing', 'loop', 'orient', 'stopEvent', 'travel', 'waypoints'],
+  triggers_animation: ['atTime', 'delay', 'trigger'],
+  wave_through: ['amplitude', 'delay', 'direction', 'duration', 'frequency', 'signal'],
+  wiggle: ['amplitude', 'dimensions', 'frequency', 'octaves', 'property', 'seed', 'signal'],
+});
 
 /** Names the grammar refuses outright (expr-to-ir.js REJECT): not deterministic. */
 export const EXPRESSION_REJECTED = [

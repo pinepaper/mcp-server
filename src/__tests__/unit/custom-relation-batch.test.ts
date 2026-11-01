@@ -81,3 +81,19 @@ describe('time_expression formulas outside the grammar are refused (#39)', () =>
     for (const e of ['360 + 100*sin(PI*t)', '2^t % 3', 'clamp(t, 0, 1)*remap(t, 0, 1, 0, 10)', 'pow(2, sin(t*2))', '1e3*t + v', 'noise(t) * TAU']) expect(why(e), e).toBeNull();
   });
 });
+
+describe('unknown relation options are said, not accepted silently', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { relationOptionWarning } = require('../../types/code-generator.js');
+  it('a key the rule never reads is named, with a suggestion when it is close', () => {
+    const w = relationOptionWarning('orbits', { radius: 100, sped: 0.5, phase_degrees: 90 });
+    expect(w).toContain('does not read sped, phase_degrees');
+    expect(w).toContain('sped → speed?');
+    expect(w).toContain('phase_degrees → phaseDegrees?');
+  });
+  it('known keys, custom relations and injected pattern keys are quiet', () => {
+    expect(relationOptionWarning('orbits', { radius: 1, speed: 1, direction: 1, phaseDegrees: 0 })).toBeNull();
+    expect(relationOptionWarning('bobs', { anything: 1 })).toBeNull();
+    expect(relationOptionWarning('orbits', { radius: 1, index: 0, count: 3 }, ['index', 'count'])).toBeNull();
+  });
+});
