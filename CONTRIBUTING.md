@@ -6,7 +6,7 @@ Thank you for your interest in contributing to PinePaper MCP Server! This docume
 
 ### Prerequisites
 
-- Node.js 18+ or Bun 1.0+
+- Node.js 22.13+ or Bun 1.0+
 - Git
 - A code editor (VS Code recommended)
 

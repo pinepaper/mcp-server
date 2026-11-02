@@ -74,7 +74,7 @@ npm install -g @pinepaper.studio/mcp-server
 **本地运行免费且功能完整。** 只要你自己运行这个服务器，所有工具都可用，
 没有功能缩水的版本。
 
-需要：Node 18 或更高版本、约 **320 MB** 磁盘空间（Puppeteer 会下载 Chrome），
+需要：Node 22.13 或更高版本、约 **320 MB** 磁盘空间（Puppeteer 会下载 Chrome），
 以及任务运行期间约 1 GB 内存。笔记本电脑没问题，小型 VPS 或受限的办公电脑
 则未必。
 

@@ -74,7 +74,7 @@ Bitten Sie Ihre KI zum Beispiel:
 **Lokal ist kostenlos und vollständig.** Alle Tools funktionieren, wenn Sie
 diesen Server selbst betreiben. Es gibt keine reduzierte Stufe.
 
-Benötigt: Node 18 oder neuer, rund **320 MB** Speicherplatz (Puppeteer lädt
+Benötigt: Node 22.13 oder neuer, rund **320 MB** Speicherplatz (Puppeteer lädt
 Chrome herunter) und etwa 1 GB Arbeitsspeicher, solange ein Job läuft. Auf
 einem Laptop ist das unproblematisch, auf einem kleinen VPS oder einem
 gesperrten Arbeitsrechner eher nicht.
