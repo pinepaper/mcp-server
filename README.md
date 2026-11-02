@@ -296,6 +296,9 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   sent (`verbose: true` lists every op); and the `edit` toolkit's batch
   description covers editing, not building. One edit pass over a 20-dot scene
   went from 44 KB to 15 KB.
+- New relation `on_event_step_active`, for next and previous arrows: an event
+  moves the active member of an `exclusive_group` forward or back by `delta`
+  (default +1), wrapping at the ends unless `wrap: false`.
 - `pinepaper_lint_scene` lists only the custom relations the scene uses, and
   names the rest in `registeredUnused` (one registered before a
   `pinepaper_clear_canvas` no longer shows up as part of the scene).

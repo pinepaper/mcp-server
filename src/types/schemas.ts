@@ -435,6 +435,7 @@ export const RelationTypeSchema = z.enum([
   'on_event_set_property_from_template',
   'on_event_set_visibility',
   'on_event_set_active',
+  'on_event_step_active',
   'on_event_set_data',
   'on_event_increment',
   'on_event_toggle',
