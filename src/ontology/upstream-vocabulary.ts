@@ -4,9 +4,9 @@
  * FxTool's ITEM_TYPE_MAP and type classes (anchor, description, parentType,
  * mcpTool, mcpAction), read from the loaded module.
  *
- * Source: FxTool origin/main 56c7920299d6b7705c651bf401273ac71ac4c586
+ * Source: FxTool origin/main 63f6bf7d86481f0db268fd5ce0b656ecc12d4ab7
  *   js/ontology/Vocabulary.js
- * sha256: 7eb77611218ee9b6
+ * sha256: da20dfd493e60485
  *
  * vocabulary.ts merges these over its hand-written port: the engine's map
  * wins where the two disagree, and a class the port lacks is added.
