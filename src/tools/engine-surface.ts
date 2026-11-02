@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 11cd6959010ba1934e930644b05b936d8cac6170
- * sha256:    ce25a49fa33b36359fed6bdd182847b7252238cb523a27f77baa009ec9dc8d98   (of PinePaper.js as committed)
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 1c2e17f011d28ad22932ad27fed17f968edd2a4a
+ * sha256:    da6953a9c32c35e1d8019e8b262c425d51f848c11de66c6af97b70da09b3ab02   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on `window.app`, with how it gets there. The parity
@@ -16,7 +16,7 @@
 /** How a name lands on `app`. */
 export type EngineMemberKind = 'method' | 'accessor' | 'property' | 'lazy' | 'lazyHeavy' | 'bootstrap';
 
-/** 1552 names, from FxTool/js/PinePaper.js. */
+/** 1553 names, from FxTool/js/PinePaper.js. */
 export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object.freeze({
   __buildFreshness: 'property',
   _aboveHooksHeld: 'property',
@@ -1500,6 +1500,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   synthSounds: 'lazy',
   tabularFiguresReport: 'method',
   takeWarnings: 'method',
+  TARGETLESS_EVENT_RELATIONS: 'accessor',
   templateManager: 'bootstrap',
   textItemGroup: 'property',
   textLayer: 'property',
