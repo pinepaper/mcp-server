@@ -4016,6 +4016,7 @@ ANIMATABLE PROPERTIES:
 - strokeColor: Color string
 - strokeWidth, width, height, radius, shadowBlur, shadowColor: Numbers / colours
 - fontSize: Number
+- skewX, skewY (current studio): degrees, clamped to ±89; they combine with rotation and scale. An older studio stores them without drawing and the result names them in ignoredProperties; there, a shear is a transform matrix track.
 - TEXT (current studio): fontStyle ('normal' / 'italic' / 'oblique', discrete — switches at the next key), textAlign ('left' / 'center' / 'right', discrete; the anchor stays put), lineHeight (px, or a multiple of fontSize up to 5), letterSpacing (px, or a CSS length such as '0.1em'). An older studio stores these keys without drawing them; the result names any it did not animate (ignoredProperties). fontWeight keys STEP: a font with fixed weights switches from one weight to the next once, partway through the move, and does not ramp. Key fontSize or scale for a smooth change.
 - STROKE DRAW-ON (paths): trimStart, trimEnd (0-1 of the path's length), trimOffset (shifts the visible window along it), dashArray. A draw-on is trimEnd 0 -> 1.
 The authoritative list for a given item is pinepaper_get_animatable_properties — ask it rather than guessing.

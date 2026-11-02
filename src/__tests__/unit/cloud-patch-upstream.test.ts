@@ -107,3 +107,54 @@ describe('INKCOLOR: ink with keepColor and no color takes the item colour for it
     expect(code).not.toContain('__mopts');
   });
 });
+
+/**
+ * FxTool #261–#263 fixed all six in the engine (pinepaper-0.5.4-beta+56c79202). On such a studio the server steps
+ * aside; on an older one it keeps the workaround or the warning. Each fix is recognised by what its own change
+ * brought: _applyScaleParams (#262), _writeRasterPixels (#261), _applySkewKeyframePose (#263), and for scale and skew
+ * by reading the result itself.
+ */
+describe('a studio with the engine fixes: the server steps aside', () => {
+  it('create scale already applied by create(): no modifyItem', () => {
+    const calls: unknown[] = [];
+    const item = { data: { registryId: 'item_1' }, scaling: { x: 1, y: 0.4 }, bringToFront() {} };
+    const app = { create: () => item, historyManager: { saveState() {} }, modifyItem: (...a: unknown[]) => { calls.push(a); } };
+    const code = gen.generateCreateItem({ itemType: 'circle', position: { x: 0, y: 0 }, properties: { radius: 40, scaleX: 1, scaleY: 0.4 } } as never);
+    const r = new Function('app', `${code.replace(/\(\{ itemId[\s\S]*\}\);\s*$/, (m) => `return ${m.slice(0, -1)}`)}`)(app) as Record<string, any>;
+    expect(calls).toEqual([]);
+    expect(r.scale).toEqual({ applied: true, x: 1, y: 0.4 });
+  });
+
+  it('x beside fontSize: quiet on a studio with _applyScaleParams', () => {
+    const item = { data: { keyframes: [] as unknown[] } };
+    const app = { _applyScaleParams() {}, getItemById: () => item, addAnimation: (_i: string, k: unknown[]) => { item.data.keyframes = k; }, listAnimatableProperties: () => ({ properties: [{ name: 'x' }, { name: 'fontSize' }] }) };
+    const code = gen.generateKeyframeAnimate({ itemId: 'a', keyframes: [{ time: 0, properties: { x: 0, fontSize: 20 } }, { time: 1, properties: { x: 100, fontSize: 40 } }] } as never);
+    const r = new Function('app', code.replace(/^(\s*\/\/.*\n)+/, '').replace(/\((async )?function\(\)/, (m) => `return ${m}`))(app) as Record<string, any>;
+    expect(r.sizekeyPairWarning).toBeUndefined();
+  });
+
+  it('skew keys: quiet on a studio that lists skewX', () => {
+    const item = { data: { keyframes: [] as unknown[] } };
+    const app = { getItemById: () => item, addAnimation: (_i: string, k: unknown[]) => { item.data.keyframes = k; }, listAnimatableProperties: () => ({ properties: [{ name: 'skewX' }, { name: 'skewY' }] }) };
+    const code = gen.generateKeyframeAnimate({ itemId: 'a', keyframes: [{ time: 0, properties: { skewX: 0 } }, { time: 1, properties: { skewX: 20 } }] } as never);
+    const r = new Function('app', code.replace(/^(\s*\/\/.*\n)+/, '').replace(/\((async )?function\(\)/, (m) => `return ${m}`))(app) as Record<string, any>;
+    expect(r.ignoredProperties).toBeUndefined();
+  });
+
+  it('ink with keepColor and no color is left to a studio with _writeRasterPixels', async () => {
+    let got: Record<string, unknown> | null = null;
+    const app = {
+      _writeRasterPixels() {},
+      itemRegistry: { get: () => ({ item: { strokeColor: { toCSS: () => '#2e86de' } } }) },
+      applyMedium: async (_id: string, _m: string, o: Record<string, unknown>) => { got = o; return { ok: true, id: 'leaf' }; },
+    };
+    const code = gen.generateDesignMedium(DesignMediumInputSchema.parse({ action: 'apply', itemId: 'leaf', medium: 'ink', options: { keepColor: true } }) as never);
+    await new Function('app', code.replace(/^(\s*\/\/.*\n)+/, '').replace(/\((async )?function\(\)/, (m) => `return ${m}`))(app);
+    expect(got).toEqual({ keepColor: true });
+  });
+
+  it('bloom and look-remove are conditioned on the studio lacking the fix', () => {
+    expect(gen.generateImageFilter(ImageFilterInputSchema.parse({ action: 'apply', itemId: 'img', filterName: 'bloom' }) as never)).toContain("typeof app._writeRasterPixels !== 'function'");
+    expect(gen.generateLook(LookInputSchema.parse({ action: 'remove' }) as never)).toContain("typeof app._applySkewKeyframePose !== 'function'");
+  });
+});

@@ -288,6 +288,17 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   constants are typed as plain strings, and the p5 drawing generator checks
   `PINEPAPER_ALLOW_CODE` itself as well as the tool handler.
 
+### Fixed
+
+- `skewX` and `skewY` keyframes are documented: the current studio animates
+  them (degrees, up to ±89).
+- On the current studio, scale at create, text keyed on both `x` and
+  `fontSize`, `bloom`, ink `keepColor` and removing a look are now fixed in the
+  studio itself. The 1.6.29 warnings and workarounds for them only appear on
+  an older studio that still needs them.
+- `pinepaper_modify_item` no longer calls `scale`, `scaleX` or `scaleY`
+  ignored on the current studio.
+
 ## What's new in 1.6.29
 
 ### Changed

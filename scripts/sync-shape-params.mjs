@@ -198,18 +198,31 @@ function normalizeParamReads(engineRaw) {
 }
 
 /**
- * Every `changes.*` the modify path reads: modifyItem(itemId, changes) and the
- * _applyChangesToItem(item, changes) it hands off to. modify_item reports any
+ * Every `changes.*` the modify path reads: modifyItem(itemId, changes), the
+ * _applyChangesToItem(item, changes) it hands off to, and any helper either
+ * passes `changes` on to (this._x(item, changes …), followed recursively). modify_item reports any
  * other key as having had no effect, the way create_item does against create().
  */
 function modifyChangeReads(engineRaw) {
   const engine = stripComments(engineRaw);
   const out = new Set();
-  for (const sig of [/^\s{2}modifyItem\(itemId, changes\) \{/m, /^\s{2}_applyChangesToItem\(item, changes\) \{/m]) {
+  // A block's reads, plus those of every helper it hands `changes` to (this._x(item, changes …)): FxTool #262 moved
+  // the scale blocks into _applyScaleParams, and a scrape of the two entry points alone lost scale / scaleX / scaleY,
+  // so modify_item called them ignored.
+  const seen = new Set();
+  const scrape = (sig, label) => {
     const m = sig.exec(engine);
-    if (!m) throw new Error(`sync-shape-params: ${sig} not found in PinePaper.js`);
-    for (const n of names(/\bchanges\.([A-Za-z_]\w*)/g, blockAfter(engine, m.index + m[0].length - 1))) out.add(n);
-  }
+    if (!m) throw new Error(`sync-shape-params: ${label} not found in PinePaper.js`);
+    const block = blockAfter(engine, m.index + m[0].length - 1);
+    for (const n of names(/\bchanges\.([A-Za-z_]\w*)/g, block)) out.add(n);
+    for (const h of names(/\bthis\.(_[A-Za-z_]\w*)\(\s*item\s*,\s*changes\s*[,)]/g, block)) {
+      if (seen.has(h)) continue;
+      seen.add(h);
+      scrape(new RegExp(`^\\s{2}${h}\\(item, changes\\b[^)]*\\) \\{`, 'm'), h);
+    }
+  };
+  scrape(/^\s{2}modifyItem\(itemId, changes\) \{/m, 'modifyItem(itemId, changes)');
+  scrape(/^\s{2}_applyChangesToItem\(item, changes\) \{/m, '_applyChangesToItem(item, changes)');
   return [...out].sort();
 }
 

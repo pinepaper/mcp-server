@@ -17,6 +17,9 @@
  * it one call at a time.
  */
 export const REQUIRED_ENGINE_METHODS: readonly string[] = [
+  '_applyScaleParams',
+  '_applySkewKeyframePose',
+  '_writeRasterPixels',
   'addAnimation',
   'addComment',
   'addOnFrameCallback',

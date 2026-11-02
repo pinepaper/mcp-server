@@ -653,8 +653,13 @@ const item = app.create(${jsLiteral(itemType)}, ${JSON.stringify(params, null, 2
   if (hasCreateScale) {
     code += `
 const __scale = (function(it) {
+  // A studio whose create() applies scale (FxTool #262) already has it: nothing to redo.
+  const __want = ${JSON.stringify(createScale)};
+  const __s0 = (it && it.scaling) || { x: 1, y: 1 };
+  const __near = function(a, b) { return b === undefined || Math.abs(a - b) < 1e-6; };
+  if (__near(__s0.x, __want.scaleX) && __near(__s0.y, __want.scaleY)) return { applied: true, x: __s0.x, y: __s0.y };
   if (!it || !it.data || typeof app.modifyItem !== 'function') return { applied: false, note: 'this studio has no app.modifyItem, so the scale was not applied at create; set it with pinepaper_modify_item.' };
-  app.modifyItem(it.data.registryId, ${JSON.stringify(createScale)});
+  app.modifyItem(it.data.registryId, __want);
   const s = it.scaling || { x: 1, y: 1 };
   return { applied: true, x: s.x, y: s.y };
 })(item);`;
@@ -2233,12 +2238,13 @@ function generateKeyframeAnimateCode(
   const loopNote = loop
     ? `, loopNote: ${JSON.stringify('loop:true repeats in the editor, but has been measured playing ONCE in an exported video and then holding the last keyframe. For an export longer than one cycle, check a frame in the second cycle — if it holds, write the keyframes out per cycle, or use a loop preset (pinepaper_animate), which does cycle in export.')}`
     : '';
-  // SIZEKEY-PAIR (mcp-cloud #28): x (or position) keyed beside fontSize on one
-  // text item has been measured drifting in an export: the size is applied
-  // after the position, and a text resizes around its anchor, so the box leaves
-  // the keyed x. Said, with the two ways that hold.
+  // SIZEKEY-PAIR (mcp-cloud #28): on a studio before FxTool #262, x (or
+  // position) keyed beside fontSize on one text item drifted in an export: the
+  // size was applied after the position, and a text resizes around its anchor.
+  // Said there, with the two ways that hold; a current studio is quiet.
   const sizekeyPairNote = (allProps.includes('x') || allProps.includes('position')) && allProps.includes('fontSize')
-    ? `, sizekeyPairWarning: ${JSON.stringify('x (or position) and fontSize keyed on the same text item have been measured drifting off the keyed position in an export (SIZEKEY-PAIR). Animate scaleX / scaleY instead of fontSize, or move a group that holds the text.')}`
+    // A studio that writes text size before position (FxTool #262, which also brought _applyScaleParams) holds x.
+    ? `, ...(typeof app._applyScaleParams !== 'function' ? { sizekeyPairWarning: ${JSON.stringify('x (or position) and fontSize keyed on the same text item drift off the keyed position in an export on this studio (SIZEKEY-PAIR). Animate scaleX / scaleY instead of fontSize, or move a group that holds the text; or update the studio.')} } : {})`
     : '';
   const easingNote = easingAt !== 'departure' && first?.easing && first.easing !== 'linear'
     ? `, note: ${JSON.stringify(`easing '${first.easing}' is on the first keyframe, where it has no effect by default: easing shapes the segment ARRIVING at a keyframe. Put it on the keyframe you are moving to, or pass easingAt: 'departure' to read every easing as the move LEAVING its key (current studio).`)}`
@@ -10783,7 +10789,7 @@ ${resolve}
       return { success: false, action: 'apply', itemId: ${JSON.stringify(input.itemId)},
         error: 'the filter did not apply — ' + ${jsLiteral(input.filterName || '')} + ' may not be available on this studio.' };
     }
-    return { success: true, action: 'apply', itemId: ${JSON.stringify(input.itemId)}, filter: ${JSON.stringify(input.filterName || '')}${input.filterName === 'bloom' ? `, warning: 'bloom is drawn inside the image\\'s own pixels, so its halo stops at the image edge and does not spill onto the canvas (BLOOMCLIP). For a halo past the edge, use pinepaper_apply_effect glow or a shadow.'` : ''} };
+    return { success: true, action: 'apply', itemId: ${JSON.stringify(input.itemId)}, filter: ${JSON.stringify(input.filterName || '')}${input.filterName === 'bloom' ? `, ...(typeof app._writeRasterPixels !== 'function' ? { warning: 'on this studio bloom is drawn inside the image\\'s own pixels, so its halo stops at the image edge (BLOOMCLIP). For a halo past the edge, use pinepaper_apply_effect glow or a shadow, or update the studio.' } : {})` : ''} };
   } catch (e) {
     return { success: false, action: 'apply', error: 'Failed to apply filter: ' + e.message };
   }
@@ -13739,7 +13745,7 @@ ${cam ? `  // The camera rides the SAME timing: framing each state as its morph 
   ${guard}
   const r = await app.removeLook(${target});
   if (!r || r.ok === false) return { success: false, action: 'remove', error: (r && r.error) || 'nothing to remove' };
-  return { success: true, action: 'remove', target: ${target}, removed: r.removed, scene: r.scene, note: 'removing a look restores colours, strokes, shadows, fonts and pixels, not geometry; it has been measured leaving a multi-part character rig about 1 px off its pose (LOOKRESTORE). Check the pose if pixel-exact alignment matters.' };
+  return { success: true, action: 'remove', target: ${target}, removed: r.removed, scene: r.scene, ...(typeof app._applySkewKeyframePose !== 'function' ? { note: 'this studio restores colours, strokes, shadows, fonts and pixels when a look is removed, not geometry; it has been measured leaving a multi-part character rig about 1 px off its pose (LOOKRESTORE). Check the pose if pixel-exact alignment matters, or update the studio.' } : {}) };
 })();`.trim();
       case 'grid':
         return `
@@ -13983,8 +13989,10 @@ ${input.medium === 'ink' && input.options && (input.options as Record<string, un
   // color the ink MARKS take the brush default (#16141c). They take the item's
   // own colour instead.
   const __mopts = ${S(input.options)};
-  const __e0 = app.itemRegistry && app.itemRegistry.get(${S(input.itemId)});
-  const __it0 = (__e0 && __e0.item) || (app.getItemById ? app.getItemById(${S(input.itemId)}) : null);
+  // A studio from FxTool #261 on (which also brought _writeRasterPixels) picks the item's colour itself, gradients
+  // and text included, and says so in colorNote: leave it to the studio there.
+  const __e0 = typeof app._writeRasterPixels === 'function' ? null : app.itemRegistry && app.itemRegistry.get(${S(input.itemId)});
+  const __it0 = typeof app._writeRasterPixels === 'function' ? null : ((__e0 && __e0.item) || (app.getItemById ? app.getItemById(${S(input.itemId)}) : null));
   const __css = function(c) { try { return c && typeof c.toCSS === 'function' ? c.toCSS(true) : null; } catch (_) { return null; } };
   const __c0 = __it0 && (__css(__it0.strokeColor) || __css(__it0.fillColor));
   if (__c0) __mopts.color = __c0;
