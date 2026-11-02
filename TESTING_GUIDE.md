@@ -4,7 +4,7 @@ This guide covers how to test the MCP server with Claude Desktop.
 
 ## Prerequisites
 
-1. Node.js 18+ installed
+1. Node.js 22.13+ installed
 2. Claude Desktop installed
 3. PinePaper Studio open in browser (for code execution)
 
@@ -185,7 +185,7 @@ tail -f ~/Library/Logs/Claude/mcp-pinepaper.log
 Check:
 - Correct absolute path in config
 - `npm run build` completed successfully
-- Node.js 18+ is installed
+- Node.js 22.13+ is installed
 
 #### 2. Tools Not Appearing
 

@@ -6,8 +6,9 @@
  *   loaded only if the user installed it.
  * - Every module specifier is a literal. puppeteer and puppeteer-core are imported as `import('puppeteer')`, which
  *   Node resolves from the importing file's own node_modules chain — never from process.cwd(), where an MCP client
- *   may have opened an untrusted checkout with a planted node_modules/puppeteer. The one import of a computed path is
- *   the file PINEPAPER_PUPPETEER_FROM points at, resolved from that literal name.
+ *   may have opened an untrusted checkout with a planted node_modules/puppeteer. PINEPAPER_PUPPETEER_FROM requires
+ *   the same literal names from the folder the user named (createRequire; require() of ESM needs Node ≥ 22.12, and
+ *   engines says ≥ 22.13), so no module path in the package is computed.
  * - Locale files load from a table of literal imports, so a locale name never becomes a module path.
  * - The environment is read only in utils/env.ts (and one literal read in safe-fetch.ts), each variable by its
  *   literal name: no `process.env[name]`.
@@ -61,14 +62,15 @@ describe('supply-chain surface', () => {
     const raw = readFileSync(join(ROOT, 'src', 'browser', 'puppeteer-controller.ts'), 'utf8');
     expect(raw).toMatch(/importHere: \(\): Promise<unknown> => import\('puppeteer'\),/);
     expect(raw).toMatch(/importHere: \(\): Promise<unknown> => import\('puppeteer-core'\),/);
-    expect(raw).toMatch(/req\.resolve\('puppeteer'\)/);
-    expect(raw).toMatch(/req\.resolve\('puppeteer-core'\)/);
+    // PINEPAPER_PUPPETEER_FROM: the same literal names, required from the folder the user named (Node ≥ 22.13).
+    expect(raw).toMatch(/requireFrom: \(req: NodeRequire\): unknown => req\('puppeteer'\),/);
+    expect(raw).toMatch(/requireFrom: \(req: NodeRequire\): unknown => req\('puppeteer-core'\),/);
     const controller = code(join(ROOT, 'src', 'browser', 'puppeteer-controller.ts'));
     expect(controller).not.toMatch(/createRequire\(\s*process\.cwd/);
     expect(controller).not.toMatch(/process\.cwd\(\)/);
   });
 
-  test('every import() names a literal module, except the PINEPAPER_PUPPETEER_FROM file URL', () => {
+  test('every import() names a literal module, with no exception', () => {
     const computed: string[] = [];
     for (const p of SRC) {
       const raw = noComments(p);
@@ -79,7 +81,7 @@ describe('supply-chain surface', () => {
         computed.push(`${p.slice(ROOT.length + 1)}: import(${m[1]})`);
       }
     }
-    expect(computed).toEqual(['src/browser/puppeteer-controller.ts: import(pathToFileURL(entry)']);
+    expect(computed).toEqual([]);
   });
 
   test('locale files load from a table of literal imports', () => {

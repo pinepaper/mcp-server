@@ -48,7 +48,7 @@ What it needs:
 
 | | |
 |---|---|
-| Node | 18 or newer |
+| Node | 22.13 or newer (any supported Node release: 22, 24 or 26) |
 | Disk | With Puppeteer (below), Chrome is downloaded on install — roughly **320 MB** per version |
 | Memory | a Chrome process plus the Studio canvas, so budget ~1 GB while a job runs |
 

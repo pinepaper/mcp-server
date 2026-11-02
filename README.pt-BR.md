@@ -74,7 +74,7 @@ Experimente pedir à sua IA:
 **Local é gratuito e completo.** Todas as ferramentas funcionam se você mesmo
 executar este servidor. Não existe uma versão reduzida.
 
-Requisitos: Node 18 ou mais recente, cerca de **320 MB** de disco (o Puppeteer
+Requisitos: Node 22.13 ou mais recente, cerca de **320 MB** de disco (o Puppeteer
 baixa o Chrome) e aproximadamente 1 GB de memória enquanto um trabalho roda. Em
 um notebook isso é tranquilo; em um VPS pequeno ou uma máquina de trabalho
 restrita, nem tanto.

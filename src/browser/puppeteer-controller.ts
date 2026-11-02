@@ -257,21 +257,20 @@ type PuppeteerModule = { default: { launch: (opts: Record<string, unknown>) => P
  * NODE_PATH): an MCP client starts the server in whatever folder is open, which can be a cloned repository, and a
  * node_modules/puppeteer planted there must not run as this process.
  *
- * `resolveFrom` serves the one other place looked in: a folder the user names in PINEPAPER_PUPPETEER_FROM (an
+ * `requireFrom` serves the one other place looked in: a folder the user names in PINEPAPER_PUPPETEER_FROM (an
  * absolute path), for a strict layout — pnpm with hoist=false, Yarn PnP strict — where a package cannot see its
- * project's undeclared packages. It resolves the same literal specifier from that folder and returns the file it
- * finds, which the caller imports as a file URL; that file URL is the only module path in the package that is not
- * written in the source, and it is reached only when the user has set the variable.
+ * project's undeclared packages. It requires the same literal specifier from that folder (createRequire), so every
+ * module the package loads is named in its source; it is reached only when the user has set the variable.
  */
 const DRIVERS = {
   puppeteer: {
     importHere: (): Promise<unknown> => import('puppeteer'),
-    resolveFrom: (req: NodeRequire): string => req.resolve('puppeteer'),
+    requireFrom: (req: NodeRequire): unknown => req('puppeteer'),
     packageJson: (req: NodeRequire): string => req.resolve('puppeteer/package.json'),
   },
   'puppeteer-core': {
     importHere: (): Promise<unknown> => import('puppeteer-core'),
-    resolveFrom: (req: NodeRequire): string => req.resolve('puppeteer-core'),
+    requireFrom: (req: NodeRequire): unknown => req('puppeteer-core'),
     packageJson: (req: NodeRequire): string => req.resolve('puppeteer-core/package.json'),
   },
 } as const;
@@ -293,8 +292,9 @@ async function importOptional(name: DriverName): Promise<{ mod: PuppeteerModule;
   if (!from || !isAbsolute(from)) return null;
   const base = pathToFileURL(join(from, 'package.json')).href;
   try {
-    const entry = driver.resolveFrom(createRequire(base));
-    return { mod: await import(pathToFileURL(entry).href) as PuppeteerModule, version: versionFrom(base) };
+    // require() of an ES module (Node ≥ 22.12 unflagged; engines says ≥ 22.13): the literal name, resolved from
+    // the folder the user named, and no import() of a computed path anywhere in the package.
+    return { mod: driver.requireFrom(createRequire(base)) as PuppeteerModule, version: versionFrom(base) };
   } catch { return null; }
 }
 
