@@ -4902,7 +4902,9 @@ export const MorphSequenceInputSchema = z.object({
       position: z.object({ x: z.number(), y: z.number() }),
       properties: z.record(z.string(), z.unknown()).optional(),
     }).optional().describe('Or describe the state: it is created hidden as the reference.'),
+    hideTarget: z.boolean().optional().describe('false keeps this state\'s reference item visible (default true: hidden).'),
   }).refine((s) => !!s.to !== !!s.shape, { message: 'each state takes exactly one of to or shape' })).min(1).max(40),
+  hideTarget: z.boolean().optional().describe('Default for every state: false keeps the reference items visible (default true: hidden).'),
   easing: z.enum(['linear', 'easeIn', 'easeOut', 'easeInOut']).optional().describe('Morph easing (default easeInOut) — the morph supports these four.'),
   camera: z.union([z.boolean(), z.object({ fill: z.number().min(0.05).max(1).optional(), easing: z.string().optional() })]).optional()
     .describe('true: the camera rides every morph on the same timing, framing each state (fill = share of the frame the state fills, default 0.45).'),

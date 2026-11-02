@@ -581,7 +581,21 @@ if (item && item.data) { item.data.renderAs = ${JSON.stringify(itemType)}; item.
   // not among them: an arc reads it as its sweep.
   const textOnly = (k: string) => (TEXT_STYLE_KEYS as readonly string[]).includes(k) || k === 'fit' || k === 'textDirection' || k === 'dir'
     || (TABULAR_KEYS as readonly string[]).includes(k) || k === 'strokePosition';
-  const ignored = Object.keys(properties).filter((k) => itemType === 'text'
+  // SCALE AT CREATE (CROWMOON, mcp-cloud #25). create() reads no scale, so a
+  // squashed circle (a crescent's cutter) came back round and the keys were
+  // reported ignored. They are applied right after create through
+  // app.modifyItem, the engine's own modify path: ABSOLUTE scaling (Paper's
+  // item.scale() is relative, so a later modify_item {scaleX} would multiply on
+  // top of it). `scale` sets both axes; scaleX / scaleY override it.
+  const createScale: { scaleX?: number; scaleY?: number } = {};
+  const num = (v: unknown) => (typeof v === 'number' || typeof v === 'string') && Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : undefined;
+  const uniform = num(properties.scale);
+  if (uniform !== undefined) { createScale.scaleX = uniform; createScale.scaleY = uniform; }
+  if (num(properties.scaleX) !== undefined) createScale.scaleX = num(properties.scaleX);
+  if (num(properties.scaleY) !== undefined) createScale.scaleY = num(properties.scaleY);
+  const hasCreateScale = Object.keys(createScale).length > 0;
+  const SCALE_KEYS = ['scale', 'scaleX', 'scaleY'];
+  const ignored = Object.keys(properties).filter((k) => !(hasCreateScale && SCALE_KEYS.includes(k) && num(properties[k]) !== undefined)).filter((k) => itemType === 'text'
     ? (!CREATE_KNOWN_KEYS.has(k) && !textOnly(k) && !(DIRECTION_KEYS as readonly string[]).includes(k))
       || (k === 'letterSpacing' && letterSpacingCss(properties[k]) === undefined)
     : !CREATE_KNOWN_KEYS.has(k) || textOnly(k));
@@ -635,6 +649,15 @@ const item = app.create(${jsLiteral(itemType)}, ${JSON.stringify(params, null, 2
   // Add opacity support
   if (opacity !== undefined) {
     code += `\nitem.opacity = ${opacity};`;
+  }
+  if (hasCreateScale) {
+    code += `
+const __scale = (function(it) {
+  if (!it || !it.data || typeof app.modifyItem !== 'function') return { applied: false, note: 'this studio has no app.modifyItem, so the scale was not applied at create; set it with pinepaper_modify_item.' };
+  app.modifyItem(it.data.registryId, ${JSON.stringify(createScale)});
+  const s = it.scaling || { x: 1, y: 1 };
+  return { applied: true, x: s.x, y: s.y };
+})(item);`;
   }
 
   if (itemType === 'text') code += emitTextStyle('item', properties);
@@ -696,7 +719,7 @@ const itemId = item.data.registryId;
 app.historyManager.saveState();
 
 // Return item info
-({ itemId, type: ${jsLiteral(itemType)}${outlineOnly ? `, fill: ${JSON.stringify(OUTLINE_NOTE)}` : ''}${textFit ? ', textFit: __textFit' : ''}${textDirection ? ', direction: __direction' : ''}${textTabular ? ', tabularFigures: __tabular' : ''}${createFillOpacity ? ', fillOpacity: __fillOpacity' : ''}${textStrokePos ? ', strokePosition: __strokePos' : ''}, position: ${reportActualPosition ? `(item.position ? { x: item.position.x, y: item.position.y } : null)` : `{ x: ${position.x}, y: ${position.y} }`}${hasLifetime ? ', lifetime: __lifetime' : ''}${loadsFont ? ', ...(__font ? { font: __font } : {})' : ''}${ignored.length > 0
+({ itemId, type: ${jsLiteral(itemType)}${outlineOnly ? `, fill: ${JSON.stringify(OUTLINE_NOTE)}` : ''}${textFit ? ', textFit: __textFit' : ''}${textDirection ? ', direction: __direction' : ''}${textTabular ? ', tabularFigures: __tabular' : ''}${createFillOpacity ? ', fillOpacity: __fillOpacity' : ''}${textStrokePos ? ', strokePosition: __strokePos' : ''}${hasCreateScale ? ', scale: __scale' : ''}, position: ${reportActualPosition ? `(item.position ? { x: item.position.x, y: item.position.y } : null)` : `{ x: ${position.x}, y: ${position.y} }`}${hasLifetime ? ', lifetime: __lifetime' : ''}${loadsFont ? ', ...(__font ? { font: __font } : {})' : ''}${ignored.length > 0
     ? `, ignoredProperties: ${JSON.stringify(ignored)}` : ''}${warnings.length > 0 ? `, warning: ${JSON.stringify(warnings.join(' '))}` : ''} });`;
 
   // Loading a font is async, and it has to happen BEFORE create() measures the
@@ -2106,6 +2129,12 @@ const TEXT_KEY_ENGINE_NAMES: Readonly<Record<string, readonly string[]>> = {
   wordSpacing: ['wordSpacing'],
   textDecoration: ['textDecoration'],
   textTransform: ['textTransform'],
+  // Not text, same failure (SHEARKEY, mcp-cloud #29): no studio has a skew
+  // channel yet, so skew keys were stored and drew nothing. A sheared motion
+  // today is a `transform` matrix track.
+  skewX: ['skewX'],
+  skewY: ['skewY'],
+  shear: ['shear', 'skewX'],
 };
 
 /** A JS expression (run in the page) → the keys of `keys` this studio does not animate. '' when none are text keys. */
@@ -2121,7 +2150,7 @@ function unanimatedTextKeysJs(keys: readonly string[]): string {
 }
 
 /** The sentence for the keys unanimatedTextKeysJs found, built in the page. */
-const UNANIMATED_TEXT_KEYS_SENTENCE = `' is not an animatable property in this studio (app.listAnimatableProperties does not list it), so it had no effect: a text key animates only where that list names it. Here, set a fixed value with pinepaper_modify_item, or animate fontSize or scaleX.'`;
+const UNANIMATED_TEXT_KEYS_SENTENCE = `' is not an animatable property in this studio (app.listAnimatableProperties does not list it), so it had no effect: a key animates only where that list names it. Here, set a fixed value with pinepaper_modify_item, or animate fontSize or scaleX (a skew: a transform matrix track).'`;
 
 function generateKeyframeAnimateCode(
   itemId: string,
@@ -2204,6 +2233,13 @@ function generateKeyframeAnimateCode(
   const loopNote = loop
     ? `, loopNote: ${JSON.stringify('loop:true repeats in the editor, but has been measured playing ONCE in an exported video and then holding the last keyframe. For an export longer than one cycle, check a frame in the second cycle — if it holds, write the keyframes out per cycle, or use a loop preset (pinepaper_animate), which does cycle in export.')}`
     : '';
+  // SIZEKEY-PAIR (mcp-cloud #28): x (or position) keyed beside fontSize on one
+  // text item has been measured drifting in an export: the size is applied
+  // after the position, and a text resizes around its anchor, so the box leaves
+  // the keyed x. Said, with the two ways that hold.
+  const sizekeyPairNote = (allProps.includes('x') || allProps.includes('position')) && allProps.includes('fontSize')
+    ? `, sizekeyPairWarning: ${JSON.stringify('x (or position) and fontSize keyed on the same text item have been measured drifting off the keyed position in an export (SIZEKEY-PAIR). Animate scaleX / scaleY instead of fontSize, or move a group that holds the text.')}`
+    : '';
   const easingNote = easingAt !== 'departure' && first?.easing && first.easing !== 'linear'
     ? `, note: ${JSON.stringify(`easing '${first.easing}' is on the first keyframe, where it has no effect by default: easing shapes the segment ARRIVING at a keyframe. Put it on the keyframe you are moving to, or pass easingAt: 'departure' to read every easing as the move LEAVING its key (current studio).`)}`
     : '';
@@ -2241,7 +2277,7 @@ function generateKeyframeAnimateCode(
       ? { appended: true, previousKeys: __prev.length, keys: __now.length }
       : { appended: false, replaced: true, previousKeys: __prev.length, warning: 'append was asked for, but this studio replaced the existing track (' + __prev.length + ' key(s)) instead of adding to it: it has no merge mode. Put every key in one keyframe_animate call.' })`
     : `{ replaced: true, previousKeys: __prev.length, note: 'the item already had a keyframe track (' + __prev.length + ' key(s)); this call replaced it. To add keys to it instead, pass append: true.' }`};
-  return { success: true, itemId: ${addAnimTarget}, duration: ${calculatedDuration}, loop: ${loop}${append ? ', append: true' : ''}, ...(__track ? { track: __track } : {})${append ? `, ...(__gaps.length ? { propertyGaps: __gaps.slice(0, 10), gapWarning: __gaps.length + ' key(s) of the merged track leave out a property other keys animate (' + __gaps.reduce(function(a, g) { g.missing.forEach(function(p) { if (a.indexOf(p) < 0) a.push(p); }); return a; }, []).join(', ') + '). The engine can break that property at such a key; give each key the full set — hold a value by repeating it.' } : {})` : ''}${timeOffset !== undefined ? `, timeOffset: ${timeOffset}` : ''}${clipInPoint !== undefined ? `, clipInPoint: ${clipInPoint}` : ''}${clipOutPoint !== undefined ? `, clipOutPoint: ${clipOutPoint}` : ''}${easingNote}${loopNote}${gapNote}${runtimeWarning} };
+  return { success: true, itemId: ${addAnimTarget}, duration: ${calculatedDuration}, loop: ${loop}${append ? ', append: true' : ''}, ...(__track ? { track: __track } : {})${append ? `, ...(__gaps.length ? { propertyGaps: __gaps.slice(0, 10), gapWarning: __gaps.length + ' key(s) of the merged track leave out a property other keys animate (' + __gaps.reduce(function(a, g) { g.missing.forEach(function(p) { if (a.indexOf(p) < 0) a.push(p); }); return a; }, []).join(', ') + '). The engine can break that property at such a key; give each key the full set — hold a value by repeating it.' } : {})` : ''}${timeOffset !== undefined ? `, timeOffset: ${timeOffset}` : ''}${clipInPoint !== undefined ? `, clipInPoint: ${clipInPoint}` : ''}${clipOutPoint !== undefined ? `, clipOutPoint: ${clipOutPoint}` : ''}${easingNote}${sizekeyPairNote}${loopNote}${gapNote}${runtimeWarning} };
 })();
 `.trim();
 }
@@ -10747,7 +10783,7 @@ ${resolve}
       return { success: false, action: 'apply', itemId: ${JSON.stringify(input.itemId)},
         error: 'the filter did not apply — ' + ${jsLiteral(input.filterName || '')} + ' may not be available on this studio.' };
     }
-    return { success: true, action: 'apply', itemId: ${JSON.stringify(input.itemId)}, filter: ${JSON.stringify(input.filterName || '')} };
+    return { success: true, action: 'apply', itemId: ${JSON.stringify(input.itemId)}, filter: ${JSON.stringify(input.filterName || '')}${input.filterName === 'bloom' ? `, warning: 'bloom is drawn inside the image\\'s own pixels, so its halo stops at the image edge and does not spill onto the canvas (BLOOMCLIP). For a halo past the edge, use pinepaper_apply_effect glow or a shadow.'` : ''} };
   } catch (e) {
     return { success: false, action: 'apply', error: 'Failed to apply filter: ' + e.message };
   }
@@ -13422,7 +13458,10 @@ ${input.sound ? `  // SOUND ON THE ACTION (D68): one placed sound per moment the
    */
   generateMorphSequence(input: MorphSequenceInput): string {
     const S = (v: unknown) => JSON.stringify(v);
-    const states = [...input.states].sort((a, b) => a.at - b.at).map((st) => ({ at: st.at, duration: st.duration ?? 0.8, to: st.to ?? null, shape: st.shape ?? null }));
+    // hideTarget (HIDETARGET, mcp-cloud #44): per state, else the call's, else true (the reference is hidden, as
+    // before). morphs_to reads it: false keeps a named target on screen.
+    const states = [...input.states].sort((a, b) => a.at - b.at).map((st) => ({ at: st.at, duration: st.duration ?? 0.8, to: st.to ?? null, shape: st.shape ?? null,
+      hideTarget: st.hideTarget !== undefined ? st.hideTarget : (input.hideTarget !== undefined ? input.hideTarget : true) }));
     const cam = input.camera === true ? { fill: 0.45 } : (input.camera || null);
     const sound = input.sound === true ? 'whoosh' : (input.sound || null);
     return `
@@ -13445,7 +13484,7 @@ ${input.sound ? `  // SOUND ON THE ACTION (D68): one placed sound per moment the
     } else if (!(app.getItemById && app.getItemById(tid))) {
       return { success: false, error: 'state ' + i + ': ' + tid + ' is not on the canvas', states: done };
     }
-    const ok = app.addRelation(${S(input.itemId)}, tid, 'morphs_to', { duration: st.duration, delay: st.at, easing: ${S(input.easing ?? 'easeInOut')}, hideTarget: true });
+    const ok = app.addRelation(${S(input.itemId)}, tid, 'morphs_to', { duration: st.duration, delay: st.at, easing: ${S(input.easing ?? 'easeInOut')}, hideTarget: st.hideTarget !== false });
     if (ok === false) { return { success: false, error: 'state ' + i + ': the studio refused the morph into ' + tid, states: done }; }
     done.push({ at: st.at, duration: st.duration, targetId: tid });
   }
@@ -13700,7 +13739,7 @@ ${cam ? `  // The camera rides the SAME timing: framing each state as its morph 
   ${guard}
   const r = await app.removeLook(${target});
   if (!r || r.ok === false) return { success: false, action: 'remove', error: (r && r.error) || 'nothing to remove' };
-  return { success: true, action: 'remove', target: ${target}, removed: r.removed, scene: r.scene };
+  return { success: true, action: 'remove', target: ${target}, removed: r.removed, scene: r.scene, note: 'removing a look restores colours, strokes, shadows, fonts and pixels, not geometry; it has been measured leaving a multi-part character rig about 1 px off its pose (LOOKRESTORE). Check the pose if pixel-exact alignment matters.' };
 })();`.trim();
       case 'grid':
         return `
@@ -13940,7 +13979,16 @@ ${body}
 // Medium: apply ${oneLine(input.medium)}
 (async function() {
   if (typeof app.applyMedium !== 'function') { return { success: false, error: 'app.applyMedium unavailable — update FxTool' }; }
-  const r = await app.applyMedium(${S(input.itemId)}, ${S(input.medium)}, ${S(input.options ?? {})});
+${input.medium === 'ink' && input.options && (input.options as Record<string, unknown>).keepColor && !(input.options as Record<string, unknown>).color ? `  // INKCOLOR (mcp-cloud #30): keepColor keeps the item's colour, but with no
+  // color the ink MARKS take the brush default (#16141c). They take the item's
+  // own colour instead.
+  const __mopts = ${S(input.options)};
+  const __e0 = app.itemRegistry && app.itemRegistry.get(${S(input.itemId)});
+  const __it0 = (__e0 && __e0.item) || (app.getItemById ? app.getItemById(${S(input.itemId)}) : null);
+  const __css = function(c) { try { return c && typeof c.toCSS === 'function' ? c.toCSS(true) : null; } catch (_) { return null; } };
+  const __c0 = __it0 && (__css(__it0.strokeColor) || __css(__it0.fillColor));
+  if (__c0) __mopts.color = __c0;
+  const r = await app.applyMedium(${S(input.itemId)}, ${S(input.medium)}, __mopts);` : `  const r = await app.applyMedium(${S(input.itemId)}, ${S(input.medium)}, ${S(input.options ?? {})});`}
   if (!r || r.ok === false) {
     return { success: false, error: (r && (r.error || r.reason)) || 'the medium could not be applied', medium: ${S(input.medium)}, ...(r && r.fidelity ? { fidelity: r.fidelity } : {}) };
   }

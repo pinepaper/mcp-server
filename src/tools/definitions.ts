@@ -8176,8 +8176,8 @@ EXAMPLE: { action: 'create', base: 'person', at: { x: 480, y: 900 }, variant: { 
     annotations: { title: 'Morph Sequence', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     description: `ONE element through many states, with no cuts: each state grows out of the last (a pill becomes an input field becomes a dot becomes a card). The one-take UI-launch idiom, from one call.
 
-{ itemId, states: [{ at, duration? (0.8), to: itemId | shape: { itemType, position, properties? } }], easing?, camera?, sound? }
-- Each state is the shape the element morphs INTO, starting at \`at\` seconds. Name an existing item (to) or describe one (shape); either way the reference is hidden and the element keeps its own id throughout. States run one after another; an overlap is refused.
+{ itemId, states: [{ at, duration? (0.8), to: itemId | shape: { itemType, position, properties? }, hideTarget? }], easing?, camera?, sound?, hideTarget? }
+- Each state is the shape the element morphs INTO, starting at \`at\` seconds. Name an existing item (to) or describe one (shape); either way the reference is hidden (hideTarget: false keeps it visible, per state or for the whole call) and the element keeps its own id throughout. States run one after another; an overlap is refused.
 - easing: linear | easeIn | easeOut | easeInOut (default easeInOut) — the four the morph supports.
 - camera: true (or { fill, easing }) keys the camera on the SAME timing: it holds while a state rests and moves with each morph, framing the new state to \`fill\` of the frame (default 0.45).
 - sound: true puts a whoosh at each morph start (or name any catalogue sound).
@@ -8194,7 +8194,8 @@ EXAMPLE — pill → field → dot:
       type: 'object',
       properties: {
         itemId: { type: 'string' },
-        states: { type: 'array', items: { type: 'object', properties: { at: { type: 'number' }, duration: { type: 'number' }, to: { type: 'string' }, shape: { type: 'object', additionalProperties: true } }, required: ['at'] } },
+        states: { type: 'array', items: { type: 'object', properties: { at: { type: 'number' }, duration: { type: 'number' }, to: { type: 'string' }, shape: { type: 'object', additionalProperties: true }, hideTarget: { type: 'boolean' } }, required: ['at'] } },
+        hideTarget: { type: 'boolean', description: 'Default for every state; false keeps the reference items visible (default true).' },
         easing: { type: 'string', enum: ['linear', 'easeIn', 'easeOut', 'easeInOut'] },
         camera: { description: 'true, or {fill, easing}', oneOf: [{ type: 'boolean' }, { type: 'object', additionalProperties: true }] },
         sound: { description: 'true, or a catalogue sound name', oneOf: [{ type: 'boolean' }, { type: 'string' }] },

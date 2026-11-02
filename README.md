@@ -291,6 +291,21 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   generation API, goes through that one guarded module.
 - `package.json` names the issue tracker and homepage.
 
+### Fixed
+
+- `scale`, `scaleX` and `scaleY` on `pinepaper_create_item` are applied (a
+  squashed circle stays squashed). Before, the studio ignored them at create.
+- `pinepaper_morph_sequence` takes `hideTarget` (per state or for the whole
+  call): `false` keeps the reference item visible.
+- `pinepaper_design_medium` ink with `keepColor` and no `color` draws its marks
+  in the item's own colour, not the brush default.
+- Keyframes on `skewX`, `skewY` or `shear`, which the studio does not animate,
+  are named in `ignoredProperties`. A sheared motion is a `transform` track.
+- New warnings where the result used to look right but wasn't: `x` keyed
+  beside `fontSize` on one text item (it drifts in export), a `bloom` image
+  filter (its halo stops at the image edge), and removing a look (geometry is
+  not restored).
+
 ## What's new in 1.6.28
 
 ### Changed
