@@ -105,6 +105,25 @@ real browser, install Puppeteer **in the same `npx` call**. A separate
 }
 ```
 
+> **Security switches: off by default.** Two capabilities are a security
+> boundary and stay off until you, the person running the server, turn them on.
+> An agent cannot turn them on from a tool call.
+>
+> | Switch | Turns on |
+> |---|---|
+> | `PINEPAPER_ALLOW_CODE=1` | Running JavaScript the agent writes: `pinepaper_execute_custom_code`, `pinepaper_p5_draw`, `pinepaper_render_hook` (register), `pinepaper_register_custom_relation`, and the custom relations saved in a scene file (`pinepaper_import_scene` `registerCustomRelations`). |
+> | `PINEPAPER_ALLOW_LOCAL_FILES=1` | Importing images, audio, video and scenes from your disk (the working folder and `PINEPAPER_ASSET_DIRS`). URLs and the export folder always work. |
+>
+> With a switch off, those calls are refused with the switch named, and
+> everything else works. Turn one on only if you trust what your agent reads,
+> since a web page or a scene file can steer what it writes. In the Claude
+> Desktop extension they are the "Allow custom code" and "Allow local files"
+> settings. In a config file, add them to the server's `env`:
+>
+> ```json
+> "env": { "PINEPAPER_ALLOW_CODE": "1", "PINEPAPER_ALLOW_LOCAL_FILES": "1" }
+> ```
+
 For code-only use (no Chrome, no 320 MB download), use
 `"args": ["-y", "@pinepaper.studio/mcp-server"]` and set
 `"env": { "PINEPAPER_EXECUTION_MODE": "code" }`. A global install works too:
@@ -264,7 +283,8 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 
 ### Changed
 
-- **Code the agent writes and local file imports are off by default.**
+- **Security boundary: code the agent writes and local file imports are off
+  by default, and only you can turn them on** (see Quick start).
   `pinepaper_execute_custom_code`, `pinepaper_p5_draw`, `pinepaper_render_hook`
   (register), `pinepaper_register_custom_relation` and `pinepaper_import_scene`'s
   `registerCustomRelations` need a server started with `PINEPAPER_ALLOW_CODE=1`;

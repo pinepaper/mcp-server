@@ -21,6 +21,7 @@ import { validateBatchVocabulary, detectBatchPropertyTypos } from '../../ontolog
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { createServer } from '../../index.js';
+import { securityBoundaryNotice } from '../../utils/capabilities.js';
 
 async function connect(toolkit: string): Promise<Client> {
   const server = await createServer({ browserMode: false, executionMode: 'code', toolkit } as never);
@@ -176,7 +177,9 @@ describe('the agent lane', () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name)).toEqual([...LANE_TOOL_NAMES]);
     expect(tools.map((t) => t.description)).toEqual(LANE_TOOL_NAMES.map((n) => LANE_TOOLS[n].description));
-    expect(client.getInstructions()).toBe(LANE_INSTRUCTIONS);
+    // The security boundary leads every instruction set; the rest is the lane's own text.
+    expect(client.getInstructions()).toBe(securityBoundaryNotice() + '\n\n' + LANE_INSTRUCTIONS);
+    expect(client.getInstructions()).toContain('PINEPAPER_ALLOW_CODE=1');
     // The handler behind the lane is the full one: the description's own batch runs (code mode here).
     const ops = exampleLines(LANE_TOOLS.pinepaper_agent_batch_execute.description).filter((o) => o.type !== 'modify');
     const r = await client.callTool({ name: 'pinepaper_agent_batch_execute', arguments: { operations: ops } });

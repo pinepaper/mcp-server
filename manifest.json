@@ -68,14 +68,14 @@
     "allow_code": {
       "type": "boolean",
       "title": "Allow custom code",
-      "description": "Off by default. Lets the assistant run JavaScript it writes in the canvas: custom code, p5-style drawing, render hooks, custom relations, and the custom relations saved in a scene file. Turn on only if you trust what the assistant reads.",
+      "description": "Security switch, off by default. Lets the assistant run JavaScript it writes in the canvas: custom code, p5-style drawing, render hooks, custom relations, and the custom relations saved in a scene file. Turn on only if you trust what the assistant reads.",
       "default": false,
       "required": false
     },
     "allow_local_files": {
       "type": "boolean",
       "title": "Allow local files",
-      "description": "Off by default. Lets the assistant import images, audio, video and scenes from your disk (the working folder and PINEPAPER_ASSET_DIRS). Files in the export folder are always readable.",
+      "description": "Security switch, off by default. Lets the assistant import images, audio, video and scenes from your disk (the working folder and PINEPAPER_ASSET_DIRS). Files in the export folder are always readable.",
       "default": false,
       "required": false
     }

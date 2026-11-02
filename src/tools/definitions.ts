@@ -3762,15 +3762,17 @@ USE WHEN:
   {
     name: 'pinepaper_register_custom_relation',
     annotations: {
-      title: 'Register Custom Relation',
+      title: 'Register Custom Relation (needs PINEPAPER_ALLOW_CODE)',
       readOnlyHint: false,
       destructiveHint: false,
       idempotentHint: false,
       openWorldHint: false,
     },
-    description: `PARAMS ARE DEFINITIONS, not values: { gap: { type: 'number', default: 60, min: 0 } } (type is number | string | boolean | array | object). Once registered, the name is a valid relationType for pinepaper_add_relation in this session.
+    description: `SECURITY SWITCH: needs a server started with PINEPAPER_ALLOW_CODE=1 (off by default; only the person running the server can turn it on). Otherwise it is refused and nothing runs.
 
-Register a custom relation type with compute and apply functions. Needs a server started with PINEPAPER_ALLOW_CODE=1; otherwise it is refused, naming the switch, and nothing runs. For motion without code, use time_expression.
+PARAMS ARE DEFINITIONS, not values: { gap: { type: 'number', default: 60, min: 0 } } (type is number | string | boolean | array | object). Once registered, the name is a valid relationType for pinepaper_add_relation in this session.
+
+Register a custom relation type with compute and apply functions. For motion without code, use time_expression.
 
 USE WHEN:
 - Creating physics-based behaviors (attraction, repulsion, collision)
@@ -3834,13 +3836,15 @@ applyFunction: \`
   {
     name: 'pinepaper_execute_custom_code',
     annotations: {
-      title: 'Execute Custom Code',
+      title: 'Execute Custom Code (needs PINEPAPER_ALLOW_CODE)',
       readOnlyHint: false,
       destructiveHint: true,
       idempotentHint: false,
       openWorldHint: true,
     },
-    description: `Execute arbitrary JavaScript code in the PinePaper context. Needs a server started with PINEPAPER_ALLOW_CODE=1; otherwise it is refused, naming the switch, and nothing runs.
+    description: `SECURITY SWITCH: needs a server started with PINEPAPER_ALLOW_CODE=1 (off by default; only the person running the server can turn it on). Otherwise it is refused and nothing runs.
+
+Execute arbitrary JavaScript code in the PinePaper context.
 
 USE WHEN:
 - Advanced Paper.js operations not covered by other tools
@@ -8234,14 +8238,16 @@ EXAMPLE — confetti at 2 s:
   },
   {
     name: 'pinepaper_render_hook',
-    annotations: { title: 'Render Hook', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    description: `Custom per-frame drawing that a saved scene CARRIES: SOURCE TEXT, compiled and run under the governor's loop guards with seeded Math, saved in the project document, the template and undo, and re-installed on load. (A raw function added with code is not saved — pinepaper_export_scene { full: true } names any such as unserialized.)
+    annotations: { title: 'Render Hook (register needs PINEPAPER_ALLOW_CODE)', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    description: `SECURITY SWITCH: register needs a server started with PINEPAPER_ALLOW_CODE=1 (off by default; only the person running the server can turn it on). list and unregister always work.
+
+Custom per-frame drawing that a saved scene CARRIES: SOURCE TEXT, compiled and run under the governor's loop guards with seeded Math, saved in the project document, the template and undo, and re-installed on load. (A raw function added with code is not saved — pinepaper_export_scene { full: true } names any such as unserialized.)
 
 ACTIONS:
 - register: { id, source, layer? ('above' | 'below'), deterministic? (true), seed? } — source evaluates to (ctx, t, info) => {}: ctx in canvas coordinates, t the scene time in seconds, info { width, height, frame, seed }. 'above' draws over every item, 'below' under them. deterministic reseeds Math.random from (seed, frame) each call, so a frame always draws the same.
 - unregister: { id }   list: the saved hooks.
 
-Reach for it when no tool draws the look (a scanline overlay, a custom texture pass). For particles, pinepaper_emitter is data rather than code. register needs a server started with PINEPAPER_ALLOW_CODE=1; otherwise it is refused, naming the switch.
+Reach for it when no tool draws the look (a scanline overlay, a custom texture pass). For particles, pinepaper_emitter is data rather than code.
 
 EXAMPLE: { action: 'register', id: 'scanlines', layer: 'above', source: "(ctx, t, info) => { ctx.globalAlpha = 0.08; for (let y = (t * 40) % 4; y < info.height; y += 4) ctx.fillRect(0, y, info.width, 1); }" }`,
     inputSchema: {
@@ -9370,13 +9376,15 @@ EXAMPLE RESPONSE:
   {
     name: 'pinepaper_p5_draw',
     annotations: {
-      title: 'p5.js Draw',
+      title: 'p5.js Draw (needs PINEPAPER_ALLOW_CODE)',
       readOnlyHint: false,
       destructiveHint: false,
       idempotentHint: false,
       openWorldHint: false,
     },
-    description: `Execute p5.js-style drawing code on the PinePaper canvas. Needs a server started with PINEPAPER_ALLOW_CODE=1; otherwise it is refused, naming the switch, and nothing runs.
+    description: `SECURITY SWITCH: needs a server started with PINEPAPER_ALLOW_CODE=1 (off by default; only the person running the server can turn it on). Otherwise it is refused and nothing runs.
+
+Execute p5.js-style drawing code on the PinePaper canvas.
 
 AI assistants can use familiar p5.js syntax - the code is translated to Paper.js automatically.
 This is a SUBSET of p5.js functions optimized for static drawings.

@@ -9,7 +9,8 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { handleToolCall, getExportDir } from '../../tools/handlers.js';
-import { setCapability, capabilityAllowed } from '../../utils/capabilities.js';
+import { setCapability, capabilityAllowed, capabilityRefusal, securityBoundaryNotice } from '../../utils/capabilities.js';
+import { PINEPAPER_TOOLS } from '../../tools/definitions.js';
 import { setFfmpegRunner, verifyWithFfprobe } from '../../tools/export-file-receipt.js';
 import { run as ffmpegAddonRun } from '../../../packages/mcp-ffmpeg/index.js';
 
@@ -97,6 +98,34 @@ describe('capabilities are off by default', () => {
     writeFileSync(p, JSON.stringify({ kind: 'pinepaper.project', formatVersion: '1.0.0', items: [] }));
     const r = await handleToolCall('pinepaper_import_scene', { path: p }, opts(controller()));
     expect(text(r as never)).not.toContain('PINEPAPER_ALLOW_LOCAL_FILES');
+  });
+});
+
+describe('agents are told before their first call', () => {
+  afterAll(() => { setCapability('code', true); setCapability('localFiles', true); });
+  it('the notice names every gated tool, both switches, the state on this server, and that no tool can change it', () => {
+    setCapability('code', false); setCapability('localFiles', false);
+    const off = securityBoundaryNotice();
+    for (const t of ['pinepaper_execute_custom_code', 'pinepaper_p5_draw', 'pinepaper_render_hook', 'pinepaper_register_custom_relation', 'registerCustomRelations']) expect(off).toContain(t);
+    expect(off).toContain('PINEPAPER_ALLOW_CODE=1');
+    expect(off).toContain('PINEPAPER_ALLOW_LOCAL_FILES=1');
+    expect(off).toMatch(/JavaScript you write is OFF/);
+    expect(off).toContain('no tool call can change it');
+    setCapability('code', true);
+    expect(securityBoundaryNotice()).toMatch(/JavaScript you write is ON/);
+  });
+  it('a refusal says it is a security boundary and who turns it on', () => {
+    const r = capabilityRefusal('code', 'pinepaper_execute_custom_code');
+    expect(r.startsWith('SECURITY BOUNDARY')).toBe(true);
+    expect(r).toContain('No tool call can change it');
+    expect(r).toContain('restart the server');
+  });
+  it('each gated tool says so in its title and the first line of its description', () => {
+    for (const name of ['pinepaper_execute_custom_code', 'pinepaper_p5_draw', 'pinepaper_render_hook', 'pinepaper_register_custom_relation']) {
+      const t = (PINEPAPER_TOOLS as Array<{ name: string; description: string; annotations?: { title?: string } }>).find((x) => x.name === name)!;
+      expect(t.annotations?.title).toContain('PINEPAPER_ALLOW_CODE');
+      expect(t.description.split('\n')[0]).toContain('PINEPAPER_ALLOW_CODE=1');
+    }
   });
 });
 

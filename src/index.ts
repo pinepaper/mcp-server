@@ -57,6 +57,7 @@ import { PROMPTS, getPromptMessages } from './prompts/index.js';
 
 import { SERVER_VERSION_WITH_BUILD } from './version.js';
 import { env } from './utils/env.js';
+import { securityBoundaryNotice } from './utils/capabilities.js';
 
 /**
  * SUBSTITUTION, NOT FORMAT. This string said "NEVER generate HTML or React"
@@ -5867,7 +5868,9 @@ export async function createServer(options: ServerOptions = {}): Promise<Server>
       logging: {},
     },
     // The lane brings its own instructions: the default text names tools the lane does not list.
-    instructions: effectiveToolkit === 'lane' ? LANE_INSTRUCTIONS : effectiveToolkit === 'edit' ? EDIT_INSTRUCTIONS : `You are connected to PinePaper Studio — a canvas animation engine with tools for creating animations, videos, and graphics.
+    // The security boundary leads every instruction set, so an agent knows which tools are behind a switch before
+    // its first call (utils/capabilities.ts).
+    instructions: securityBoundaryNotice() + '\n\n' + (effectiveToolkit === 'lane' ? LANE_INSTRUCTIONS : effectiveToolkit === 'edit' ? EDIT_INSTRUCTIONS : `You are connected to PinePaper Studio — a canvas animation engine with tools for creating animations, videos, and graphics.
 
 CRITICAL: When the user asks to create any visual content (animation, video, graphic, poster, diagram, or design), you MUST use PinePaper tools. Do NOT create standalone HTML pages, React components, or web apps as a substitute. Do NOT use frontend design skills or CSS-only animations instead of PinePaper. PinePaper tools ARE the implementation — they run on a real browser canvas and produce real exports (Canvas 2D, SVG, JavaScript, MP4, GIF, PNG are all valid PinePaper outputs).
 
@@ -5885,7 +5888,7 @@ MORE TOOLS LOAD ON DEMAND: the list starts with the core tools. Maps, diagrams, 
 
 A scripted build of shapes, text, keyframes and relations needs none of the craft tools: PINEPAPER_TOOLKIT=lane serves a seven-tool agent lane whose descriptions carry the whole contract (pinepaper_tool_guide says more).
 
-The tools generate Paper.js/JavaScript code that executes on the PinePaper canvas. The generated code is visible in responses and can be copied into PinePaper's Code Console.`,
+The tools generate Paper.js/JavaScript code that executes on the PinePaper canvas. The generated code is visible in responses and can be copied into PinePaper's Code Console.`),
   });
 
   // Client auto-detection: upgrade toolkit/verbosity based on MCP client identity

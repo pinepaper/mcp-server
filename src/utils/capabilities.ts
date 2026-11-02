@@ -37,10 +37,33 @@ export function capabilityAllowed(capability: Capability): boolean {
   return v === '1' || v === 'true' || v === 'yes' || v === 'on';
 }
 
+/** The tools behind PINEPAPER_ALLOW_CODE, as the notice and the docs name them. */
+export const CODE_GATED_TOOLS = Object.freeze([
+  'pinepaper_execute_custom_code',
+  'pinepaper_p5_draw',
+  'pinepaper_render_hook (register)',
+  'pinepaper_register_custom_relation',
+  'pinepaper_import_scene (registerCustomRelations)',
+]);
+
+const HOW_TO_ENABLE = 'The person running the server enables it: add it to this server\'s "env" in their MCP client config, or tick the setting in the Claude Desktop extension, then restart the server. No tool call can change it.';
+
 /** The refusal for a call that needs a capability that is off: what was refused, and the switch that allows it. */
 export function capabilityRefusal(capability: Capability, what: string): string {
   const name = CAPABILITY_SWITCH[capability];
   return capability === 'code'
-    ? `${what} runs JavaScript in the studio, which this server does not do unless it is started with ${name}=1 (set it in the MCP client's env for this server, or the extension's "Allow custom code" setting). Nothing was run.`
-    : `${what} reads a file from this machine's disk, which this server does not do unless it is started with ${name}=1 (set it in the MCP client's env for this server, or the extension's "Allow local files" setting). Pass an http(s) URL instead, or turn it on.`;
+    ? `SECURITY BOUNDARY: ${what} runs JavaScript in the studio, which is off unless the server is started with ${name}=1. Nothing was run. ${HOW_TO_ENABLE} Until then, use the built-in tools (shapes, keyframes, relations such as time_expression, generators, patterns).`
+    : `SECURITY BOUNDARY: ${what} reads a file from this machine's disk, which is off unless the server is started with ${name}=1. ${HOW_TO_ENABLE} Until then, pass an http(s) URL, or a file in the export folder.`;
+}
+
+/**
+ * What an agent reads on connect (the server's instructions), so it knows before its first call which tools are
+ * behind a switch, whether this server has them on, and that turning them on is the user's decision, not a tool's.
+ */
+export function securityBoundaryNotice(): string {
+  const on = (c: Capability) => (capabilityAllowed(c) ? 'ON' : 'OFF');
+  return `SECURITY BOUNDARY (set by the person running this server; no tool call can change it):
+- Running JavaScript you write is ${on('code')} on this server (${CAPABILITY_SWITCH.code}=1 turns it on): ${CODE_GATED_TOOLS.join(', ')}.
+- Reading files from disk outside the export folder is ${on('localFiles')} (${CAPABILITY_SWITCH.localFiles}=1 turns it on). URLs and the export folder always work.
+When a switch is OFF, build with the other tools. If the user needs one of these, tell them which switch to set in their MCP client config (or the Claude Desktop extension's settings) and to restart the server; do not retry the call.`;
 }
