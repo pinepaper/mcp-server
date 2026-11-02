@@ -5,6 +5,7 @@
  * Repository info: 2,000+ free icons (CC BY 4.0 license)
  */
 
+import { trustedFetch } from '../../utils/safe-fetch.js';
 import { AssetRepository, AssetResult, AssetMetadata } from '../types.js';
 
 /**
@@ -144,7 +145,7 @@ export class FontAwesomeAdapter implements AssetRepository {
       const [, style, iconName] = match;
       const svgUrl = `${this.cdnBase}/${style}/${iconName}.svg`;
 
-      const response = await fetch(svgUrl, {
+      const response = await trustedFetch(svgUrl, {
         headers: {
           'User-Agent': 'PinePaper-MCP-Server/1.2.2',
         },

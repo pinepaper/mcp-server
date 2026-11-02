@@ -14,11 +14,12 @@
  *    followed here, one hop at a time (at most MAX_REDIRECTS), and every
  *    Location is checked by the same rules before it is connected to.
  *  - DNS REBINDING. A name can resolve to a public address for the check and
- *    to 127.0.0.1 for the connection. The connection is pinned: undici's
- *    connect.lookup returns exactly the addresses that were checked, so the
- *    socket cannot go anywhere else. (Bun's undici shim ignores
- *    connect.lookup; the published bin runs under node, where it holds.
- *    Under bun this degrades to check-then-connect.)
+ *    to 127.0.0.1 for the connection. The connection is pinned: node:http /
+ *    node:https are given a `lookup` that returns exactly the addresses that
+ *    were checked, so the socket cannot go anywhere else. TLS still verifies
+ *    the certificate against the URL's host name (servername). The published
+ *    bin runs under node, where this holds; bun may ignore `lookup`, and there
+ *    it degrades to check-then-connect.
  *  - MAPPED FORMS. ::ffff:127.0.0.1 and 64:ff9b::7f00:1 are loopback in
  *    IPv6 clothing. BlockList matches IPv4 rules against mapped addresses;
  *    the NAT64 and 6to4 prefixes are unpacked and checked as IPv4.
@@ -27,13 +28,21 @@
  * LAN addresses, for a local dev server. Cloud metadata addresses stay
  * refused with it set: nothing a design tool does needs them.
  *
- * undici and node:dns are loaded lazily. This module is also bundled into a
- * Cloudflare Worker, which has neither in the same form; there, the literal
- * address is still checked and the platform's own fetch does the rest
- * (Workers cannot open connections to private addresses).
+ * node:http, node:https and node:dns are loaded lazily. This module is also
+ * bundled into a Cloudflare Worker, which has none of them in the same form;
+ * there, the literal address is still checked and the platform's own fetch
+ * does the rest (Workers cannot open connections to private addresses).
  *
- * Keep this file to node builtins and undici, with no relative imports: the
- * pinning test loads it in a plain node process (bun cannot exercise pinning).
+ * NO DEPENDENCY (1.6.29). This was built on undici, the package's only
+ * runtime dependency besides zod, for its pinnable connect.lookup. node:http
+ * takes the same `lookup`, so undici went, and with it about 25 network,
+ * environment and wasm findings a supply-chain scanner counted against the
+ * package. Every outbound request the server makes goes through this file:
+ * safeFetch for a URL a model named, trustedFetch for the server's own
+ * configured services (the hosted API, the icon libraries).
+ *
+ * Keep this file to node builtins, with no relative imports: the pinning test
+ * loads it in a plain node process (bun cannot exercise pinning).
  */
 import { BlockList, isIP } from 'node:net';
 
@@ -45,9 +54,12 @@ export interface ResolvedAddress { address: string; family: 4 | 6 }
 export const safeFetchDeps: {
   lookup: (host: string) => Promise<ResolvedAddress[]>;
   request: (url: URL, addresses: ResolvedAddress[], init: RequestInit) => Promise<Response>;
+  /** The transport for trustedFetch: the same node request, unpinned. */
+  trusted: (url: URL, init: RequestInit) => Promise<Response>;
 } = {
   lookup: defaultLookup,
-  request: pinnedRequest,
+  request: (url, addresses, init) => pinnedRequest(url, addresses, init),
+  trusted: (url, init) => nodeRequest(url, [], init),
 };
 
 const PRIVATE = new BlockList();
@@ -195,25 +207,93 @@ export async function safeFetch(input: string | URL, init: RequestInit = {}): Pr
   }
 }
 
-async function pinnedRequest(url: URL, addresses: ResolvedAddress[], init: RequestInit): Promise<Response> {
-  const undici = await import('undici').catch(() => null);
-  // No undici, or no resolver (a Worker): the platform fetch, which cannot
-  // reach private addresses.
-  if (!undici || !addresses.length) return fetch(url, init);
-  const agent = new undici.Agent({
-    connect: {
-      lookup: (_host: string, opts: { all?: boolean }, cb: (...a: unknown[]) => void) => {
-        if (opts?.all) cb(null, addresses);
-        else cb(null, addresses[0].address, addresses[0].family);
-      },
-    } as never,
+/** The request body as bytes: what the server sends is a string or bytes, never a stream. */
+function bodyBytes(body: unknown): Buffer | null {
+  if (body === undefined || body === null) return null;
+  if (typeof body === 'string') return Buffer.from(body);
+  if (body instanceof URLSearchParams) return Buffer.from(body.toString());
+  if (body instanceof ArrayBuffer) return Buffer.from(body);
+  if (ArrayBuffer.isView(body)) return Buffer.from(body.buffer, body.byteOffset, body.byteLength);
+  throw new TypeError('safe-fetch sends a string, URLSearchParams or bytes as a request body, not a stream');
+}
+
+/** Response headers from node's IncomingMessage, repeated ones (set-cookie) kept. */
+function toHeaders(raw: Record<string, string | string[] | undefined>): Headers {
+  const h = new Headers();
+  for (const [k, v] of Object.entries(raw)) {
+    if (Array.isArray(v)) for (const x of v) h.append(k, x);
+    else if (v !== undefined) h.append(k, v);
+  }
+  return h;
+}
+
+/** No byte arrives for this long: the request is abandoned. */
+const IDLE_TIMEOUT_MS = 120_000;
+
+/**
+ * One request over node:http / node:https, its connection pinned to `addresses` when there are any. The whole body is
+ * read before returning. Where node:http is missing (a Worker), the platform fetch, which cannot reach private
+ * addresses.
+ */
+async function nodeRequest(url: URL, addresses: ResolvedAddress[], init: RequestInit): Promise<Response> {
+  const secure = url.protocol === 'https:';
+  const mod = await (secure ? import('node:https') : import('node:http')).catch(() => null);
+  if (!mod || typeof mod.request !== 'function') return fetch(url, init);
+  const headers: Record<string, string> = {};
+  new Headers(init.headers).forEach((v, k) => { headers[k] = v; });
+  const body = bodyBytes(init.body);
+  if (body && headers['content-length'] === undefined) headers['content-length'] = String(body.length);
+  const host = url.hostname.replace(/^\[|\]$/g, '');
+  const pinned = addresses.length
+    ? (_h: string, opts: { all?: boolean }, cb: (...a: unknown[]) => void) => {
+      if (opts && opts.all) cb(null, addresses);
+      else cb(null, addresses[0].address, addresses[0].family);
+    }
+    : undefined;
+  return new Promise<Response>((resolve, reject) => {
+    const req = mod.request(url, {
+      method: (init.method || 'GET').toUpperCase(),
+      headers,
+      ...(pinned ? { lookup: pinned as never } : {}),
+      ...(secure && !isIP(host) ? { servername: host } : {}),
+      agent: false,
+    }, (res) => {
+      const chunks: Buffer[] = [];
+      res.on('data', (c: Buffer) => chunks.push(c));
+      res.on('error', reject);
+      res.on('end', () => {
+        const status = res.statusCode || 0;
+        resolve(new Response(NULL_BODY.has(status) ? null : Buffer.concat(chunks), { status, statusText: res.statusMessage || '', headers: toHeaders(res.headers) }));
+      });
+    });
+    req.setTimeout(IDLE_TIMEOUT_MS, () => req.destroy(new Error(`no response from ${url.host} in ${IDLE_TIMEOUT_MS / 1000} s`)));
+    req.on('error', reject);
+    const signal = init.signal;
+    if (signal) {
+      if (signal.aborted) { req.destroy(new Error('aborted')); return; }
+      signal.addEventListener('abort', () => req.destroy(new Error('aborted')), { once: true });
+    }
+    if (body) req.write(body);
+    req.end();
   });
-  try {
-    const res = await undici.fetch(url, { ...(init as object), dispatcher: agent } as never);
-    const body = NULL_BODY.has(res.status) ? null : Buffer.from(await res.arrayBuffer());
-    return new Response(body, { status: res.status, statusText: res.statusText, headers: res.headers as unknown as HeadersInit });
-  } finally {
-    // Bun's undici shim has no close().
-    await (agent as { close?: () => Promise<void> }).close?.().catch(() => {});
+}
+
+function pinnedRequest(url: URL, addresses: ResolvedAddress[], init: RequestInit): Promise<Response> {
+  return nodeRequest(url, addresses, init);
+}
+
+/**
+ * A request to a service the server itself is configured with: the hosted API (PINEPAPER_CLOUD_URL, which may be a
+ * local dev server) and the icon libraries' fixed hosts. Not a URL a model named, so no private-address check; it
+ * follows redirects like fetch. Kept here so the package's network access is this one file.
+ */
+export async function trustedFetch(input: string | URL, init: RequestInit = {}): Promise<Response> {
+  let url = typeof input === 'string' ? new URL(input) : input;
+  for (let hop = 0; ; hop++) {
+    const res = await safeFetchDeps.trusted(url, init);
+    if (!REDIRECT.has(res.status) || init.redirect === 'manual') return res;
+    const location = res.headers.get('location');
+    if (!location || hop >= MAX_REDIRECTS) return res;
+    url = new URL(location, url);
   }
 }

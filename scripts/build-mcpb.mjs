@@ -11,7 +11,7 @@
  * THE BROWSER: the bundle carries puppeteer-core, which drives the user's own
  * Chrome (or PINEPAPER_CHROME_PATH, the manifest's chrome_path setting), not
  * Puppeteer's Chrome download. puppeteer-core goes in the BUNDLE's
- * node_modules only. The npm package's dependencies stay zod and undici
+ * node_modules only. The npm package's dependency stays zod alone
  * (capability-footprint.test.ts), because the npm package is what supply-chain
  * scores read.
  *
@@ -65,4 +65,4 @@ rmSync(OUT, { force: true });
 execFileSync('zip', ['-q', '-r', '-X', OUT, '.'], { cwd: STAGE });
 const mb = (statSync(OUT).size / 1048576).toFixed(1);
 const packages = execFileSync('npm', ['ls', '--all', '--parseable', '--omit=dev'], { cwd: STAGE, encoding: 'utf8' }).trim().split('\n').length - 1;
-console.log(`✅ ${OUT.replace(ROOT + '/', '')}: ${mb} MB, ${packages} packages (zod, undici, puppeteer-core ${coreVersion} and theirs, and the ffmpeg add-on)`);
+console.log(`✅ ${OUT.replace(ROOT + '/', '')}: ${mb} MB, ${packages} packages (zod, puppeteer-core ${coreVersion} and theirs, and the ffmpeg runner)`);

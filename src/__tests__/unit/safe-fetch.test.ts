@@ -304,3 +304,49 @@ describe('the connection is pinned to the checked address (node)', () => {
     });
   });
 });
+
+/**
+ * The transport is node:http itself (1.6.29, undici removed): a POST body and its headers go out, response headers
+ * come back (repeated ones kept), and a redirect is followed and re-checked. Run under node, like the pinning test.
+ */
+describe('the node transport carries bodies, headers and redirects (node)', () => {
+  const node = spawnSync('node', ['-e', 'process.stdout.write(process.versions.node)'], { encoding: 'utf8' });
+  const major = Number((node.stdout || '0').split('.')[0]);
+  let echo: Server;
+  beforeAll(async () => {
+    echo = createServer((req, res) => {
+      if (req.url === '/hop') { res.writeHead(302, { location: '/echo' }); res.end(); return; }
+      const chunks: Buffer[] = [];
+      req.on('data', (c) => chunks.push(c));
+      req.on('end', () => {
+        res.setHeader('set-cookie', ['a=1', 'b=2']);
+        res.setHeader('content-type', 'application/json');
+        res.end(JSON.stringify({ method: req.method, auth: req.headers.authorization ?? null, body: Buffer.concat(chunks).toString() }));
+      });
+    });
+    await new Promise<void>((r) => echo.listen(0, '127.0.0.1', () => r()));
+  });
+  afterAll(() => { echo.close(); });
+  it.skipIf(node.status !== 0 || major < 22)('POSTs, reads headers back, and follows a redirect (safeFetch and trustedFetch)', () => {
+    const port = (echo.address() as { port: number }).port;
+    const mod = pathToFileURL(resolve(__dirname, '../../utils/safe-fetch.ts')).href;
+    const script = `
+      const { safeFetch, trustedFetch, safeFetchDeps } = await import(${JSON.stringify(mod)});
+      safeFetchDeps.lookup = async () => [{ address: '127.0.0.1', family: 4 }];
+      process.env.PINEPAPER_ALLOW_PRIVATE_NETWORK = '1';
+      const a = await trustedFetch('http://127.0.0.1:${port}/echo', { method: 'POST', headers: { Authorization: 'Bearer k', 'content-type': 'application/json' }, body: JSON.stringify({ x: 1 }) });
+      const b = await safeFetch('http://pinned.invalid:${port}/hop');
+      const out = { a: await a.json(), cookies: a.headers.get('set-cookie'), b: b.status, bBody: await b.json() };
+      process.stdout.write(JSON.stringify(out));
+    `;
+    const run = Bun.spawn(['node', '--experimental-strip-types', '--no-warnings', '--input-type=module', '-e', script], { stdout: 'pipe', stderr: 'pipe' });
+    return Promise.all([new Response(run.stdout).text(), new Response(run.stderr).text(), run.exited]).then(([out, err]) => {
+      expect(err).toBe('');
+      const r = JSON.parse(out);
+      expect(r.a).toEqual({ method: 'POST', auth: 'Bearer k', body: '{"x":1}' });
+      expect(r.cookies).toBe('a=1, b=2');
+      expect(r.b).toBe(200);
+      expect(r.bBody.method).toBe('GET');
+    });
+  });
+});

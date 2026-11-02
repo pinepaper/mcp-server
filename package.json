@@ -28,7 +28,7 @@
     }
   },
   "scripts": {
-    "build": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\" && bun run tsc && node scripts/write-build-info.mjs",
+    "build": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\" && bun run tsc && node scripts/split-long-strings.mjs && node scripts/write-build-info.mjs",
     "dev": "bun --watch src/index.ts",
     "start": "bun run src/index.ts",
     "start:dist": "bun dist/index.js",
@@ -38,7 +38,7 @@
     "typecheck": "tsc --noEmit",
     "check:manifest": "bun scripts/check-manifest-tools.mjs",
     "fix:manifest": "bun scripts/check-manifest-tools.mjs --fix",
-    "prepublishOnly": "bun run check:manifest && bun run check:design && bun run check:character && bun run check:engine-methods && bun run check:engine-surface && bun run check:shape-params && bun run check:stick-vocabulary && bun run check:ontology-vocabulary && bun run check:engine-lists && bun run check:relation-names && bun run build && node scripts/check-dist-no-sdk.mjs",
+    "prepublishOnly": "bun run check:manifest && bun run check:design && bun run check:character && bun run check:engine-methods && bun run check:engine-surface && bun run check:shape-params && bun run check:stick-vocabulary && bun run check:ontology-vocabulary && bun run check:engine-lists && bun run check:relation-names && bun run build && node scripts/check-dist-no-sdk.mjs && node scripts/split-long-strings.mjs --check",
     "lint:errors": "eslint src --quiet",
     "sync:design": "node scripts/sync-design-systems.mjs",
     "check:design": "node scripts/sync-design-systems.mjs --check",
@@ -84,7 +84,6 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "undici": "^6",
     "zod": "^4.6.7"
   },
   "devDependencies": {
@@ -137,5 +136,9 @@
     "side-channel": "npm:@socketregistry/side-channel@^1.0.10",
     "ws": "^8.21.1",
     "hono": "^4.13.13"
+  },
+  "homepage": "https://pinepaper.studio",
+  "bugs": {
+    "url": "https://github.com/pinepaper/mcp-server/issues"
   }
 }

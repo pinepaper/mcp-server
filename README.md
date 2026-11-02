@@ -279,6 +279,18 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - The npm package starts no process. Two export features use `ffprobe` and `ffmpeg`: checking a saved video against what the studio encoded, and joining the cached segments of a `perScene` export (`ffmpeg -f concat`). Only the Claude Desktop extension runs them, through a small runner it bundles that allows those two binaries alone, via `execFile` (no shell, argument lists the server writes, absolute paths). From npm, the check is skipped and said so, and a `perScene` export runs whole.
 - The server itself fetches the images, SVGs and media a tool call names by URL, and reads local files named by path. URLs that resolve to loopback, private, link-local or reserved addresses are refused, redirects included, and so are cloud metadata addresses. Local files are read only with `PINEPAPER_ALLOW_LOCAL_FILES=1`, and then only from the working directory, the export folder, and folders listed in `PINEPAPER_ASSET_DIRS` (the export folder is readable without the switch). `PINEPAPER_ALLOW_PRIVATE_NETWORK=1` allows local and LAN hosts. Metadata addresses stay refused even with it set.
 
+## What's new in 1.6.29
+
+### Changed
+
+- The package installs one dependency, `zod`. The guarded fetch that protects
+  URL imports from reaching private and loopback addresses now runs on Node's
+  own `http` / `https`, with every connection still pinned to the addresses
+  that passed the check. `undici` is no longer installed.
+- Every request the server makes, including icon search and the hosted
+  generation API, goes through that one guarded module.
+- `package.json` names the issue tracker and homepage.
+
 ## What's new in 1.6.28
 
 ### Changed

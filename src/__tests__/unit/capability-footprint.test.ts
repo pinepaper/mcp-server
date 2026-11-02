@@ -37,15 +37,24 @@ describe('capability footprint of the published code', () => {
     expect(using(/child_process/)).toEqual([]);
   });
 
+  it('reaches the network in safe-fetch.ts only: every outbound request goes through the guarded fetch', () => {
+    // A bare fetch( outside a string (generated page code is a string, so it does not count), or a node network module.
+    const bareFetch = (code: string) => code.replace(/`(?:\\[\s\S]|[^`\\])*`|'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"/g, '""');
+    // code-generator.ts writes page code whose fetch() runs in the browser; its nested template literals defeat this
+    // stripping, so it is named here rather than read as a server-side request.
+    expect(files.filter((f) => /(^|[^.\w])fetch\s*\(/.test(bareFetch(f.code))).map((f) => f.rel).sort()).toEqual(['types/code-generator.ts', 'utils/safe-fetch.ts']);
+    expect(using(/['"](node:)?(http|https|net|tls|dns|dgram)(\/promises)?['"]/)).toEqual(['utils/safe-fetch.ts']);
+  });
+
   it('has no eval or new Function: page code runs through CDP Runtime.evaluate', () => {
     expect(using(/\beval\s*\(|new\s+Function\s*\(/)).toEqual([]);
   });
 });
 
 describe('runtime dependencies', () => {
-  it('ships with zod and undici only; the MCP layer is the server\'s own (src/mcp)', () => {
+  it('ships with zod only; the MCP layer is the server\'s own (src/mcp), the fetch is node:http (utils/safe-fetch)', () => {
     const pkg = JSON.parse(readFileSync(join(SRC, '..', 'package.json'), 'utf8')) as { dependencies: Record<string, string> };
-    expect(Object.keys(pkg.dependencies).sort()).toEqual(['undici', 'zod']);
+    expect(Object.keys(pkg.dependencies).sort()).toEqual(['zod']);
   });
 
   it('no shipped file imports @modelcontextprotocol/sdk (a devDependency, for the tests)', () => {

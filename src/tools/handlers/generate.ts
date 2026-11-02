@@ -17,6 +17,7 @@ import { errorResult, handleToolCall, type HandlerOptions } from '../handlers.js
 import { ErrorCodes } from '../../types/schemas.js';
 import { emitTextLayersPlacement } from '../../types/code-generator.js';
 import { env } from '../../utils/env.js';
+import { trustedFetch } from '../../utils/safe-fetch.js';
 
 const GenerateInputSchema = z.object({
   prompt: z.string().min(1),
@@ -62,7 +63,7 @@ export const GenerateArgsSchema = z.object({
 
 /** Injectable for tests: the network and the clock. */
 export const generateDeps = {
-  fetch: (url: string, init?: RequestInit) => fetch(url, init),
+  fetch: (url: string, init?: RequestInit) => trustedFetch(url, init),
   sleep: (ms: number) => new Promise<void>((r) => setTimeout(r, ms)),
   now: () => Date.now(),
 };

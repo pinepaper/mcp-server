@@ -5,6 +5,7 @@
  * Repository info: 200,000+ icons from various icon sets with different licenses
  */
 
+import { trustedFetch } from '../../utils/safe-fetch.js';
 import { AssetRepository, AssetResult, AssetMetadata, AssetLicense } from '../types.js';
 
 /**
@@ -57,7 +58,7 @@ export class IconifyAdapter implements AssetRepository {
       // Iconify search endpoint
       const searchUrl = `${this.apiUrl}/search?query=${encodeURIComponent(query)}&limit=${limit}`;
 
-      const response = await fetch(searchUrl, {
+      const response = await trustedFetch(searchUrl, {
         headers: {
           'User-Agent': 'PinePaper-MCP-Server/1.2.2',
         },
@@ -119,7 +120,7 @@ export class IconifyAdapter implements AssetRepository {
       // Download SVG from Iconify API
       const svgUrl = `${this.apiUrl}/${iconName}.svg`;
 
-      const response = await fetch(svgUrl, {
+      const response = await trustedFetch(svgUrl, {
         headers: {
           'User-Agent': 'PinePaper-MCP-Server/1.2.2',
         },
@@ -156,7 +157,7 @@ export class IconifyAdapter implements AssetRepository {
       // Fetch collection info
       const collectionUrl = `${this.apiUrl}/collection?prefix=${collection}`;
 
-      const response = await fetch(collectionUrl, {
+      const response = await trustedFetch(collectionUrl, {
         headers: {
           'User-Agent': 'PinePaper-MCP-Server/1.2.2',
         },

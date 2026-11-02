@@ -2,7 +2,7 @@
  * For tests that stub globalThis.fetch with a made-up host (cdn.example).
  *
  * Server-side fetches go through safeFetch, which resolves the host and pins
- * the connection with undici, so a globalThis.fetch stub alone is never
+ * the connection (node:http with a pinned lookup), so a globalThis.fetch stub alone is never
  * reached. This resolves every host to a public address and sends the request
  * through globalThis.fetch, so those stubs keep testing what they test.
  * The address rules themselves are tested in safe-fetch.test.ts.
@@ -15,6 +15,7 @@ export function routeSafeFetchThroughGlobalFetch(): void {
   beforeEach(() => {
     safeFetchDeps.lookup = async () => [{ address: '93.184.216.34', family: 4 }];
     safeFetchDeps.request = (url, _addresses, init) => globalThis.fetch(url, init);
+    safeFetchDeps.trusted = (url, init) => globalThis.fetch(url, init);
   });
   afterEach(() => { Object.assign(safeFetchDeps, saved); });
 }

@@ -49,10 +49,9 @@ The server's own defences, `PINEPAPER_ALLOW_CODE`, `PINEPAPER_ALLOW_LOCAL_FILES`
 
 ## Dependencies
 
-The package installs two runtime dependencies and nothing else:
+The package installs one runtime dependency, `zod`, for tool input schemas, and nothing else.
 
-- `zod`, for tool input schemas;
-- `undici`, used only by the guarded fetch (`src/utils/safe-fetch.ts`) to pin each connection to the addresses that passed the private-network check, which closes DNS rebinding. Node's built-in `fetch` cannot be given that pinned resolver, so undici stays.
+Every outbound request goes through one file, `src/utils/safe-fetch.ts`, on Node's built-in `http` / `https`. A URL a tool call names is checked against private, loopback, link-local, reserved and cloud-metadata addresses, every redirect included, and the connection is pinned to the addresses that passed (a `lookup` that returns only those), which closes DNS rebinding. Requests to the server's own configured services (the hosted API, the icon libraries) go through the same file. Up to 1.6.28 the pinning used `undici`; Node's own `http` takes the same pinned `lookup`, so it was removed.
 
 **Puppeteer is not a dependency**, not even an optional peer (it was one up to 1.6.25). It brings a browser download with an install script, shell access and a large network tree, and the browser tools are a minority of what the server does. Install it yourself to use them (`npm i puppeteer`, or `-p puppeteer` in the `npx` call; see the README). The server imports it by name only from where its own dependencies resolve, or from an absolute folder you set in `PINEPAPER_PUPPETEER_FROM`; never from its working directory, which can be an untrusted checkout. puppeteer 22 or newer is required and an older one is refused.
 

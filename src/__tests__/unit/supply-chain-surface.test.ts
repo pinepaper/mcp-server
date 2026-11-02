@@ -1,7 +1,7 @@
 /**
  * What a supply-chain scanner sees in the published package, held where a PR can break it.
  *
- * - The install tree is zod and undici, nothing else. Puppeteer was an OPTIONAL peer up to 1.6.25 and a scanner
+ * - The install tree is zod, nothing else (undici went in 1.6.29: safe-fetch pins node:http itself). Puppeteer was an OPTIONAL peer up to 1.6.25 and a scanner
  *   still counted its tree (a Chrome download behind an install script, shell access, eval, network): it is now
  *   loaded only if the user installed it, by a name held in a variable.
  * - It is never resolved from process.cwd(): an MCP client starts the server in whatever folder is open, which can
@@ -37,8 +37,8 @@ function code(p: string): string {
 const SRC = sourceFiles(join(ROOT, 'src'));
 
 describe('supply-chain surface', () => {
-  test('the install tree is zod and undici; puppeteer is neither a dependency nor a peer', () => {
-    expect(Object.keys(pkg.dependencies ?? {}).sort()).toEqual(['undici', 'zod']);
+  test('the install tree is zod; puppeteer is neither a dependency nor a peer', () => {
+    expect(Object.keys(pkg.dependencies ?? {}).sort()).toEqual(['zod']);
     expect(pkg.peerDependencies).toBeUndefined();
     expect(pkg.peerDependenciesMeta).toBeUndefined();
     expect(pkg.optionalDependencies).toBeUndefined();
