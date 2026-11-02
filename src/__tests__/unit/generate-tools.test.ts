@@ -14,7 +14,7 @@ let clock = 0;
 
 function cloud(routes: Record<string, (body: any) => { status: number; json: any } | Array<{ status: number; json: any }>>) {
   const queues: Record<string, Array<{ status: number; json: any }>> = {};
-  generateDeps.fetch = (async (url: string, init?: RequestInit) => {
+  generateDeps.request = (async (url: string, init?: RequestInit) => {
     const method = init?.method ?? 'GET';
     const path = url.replace('https://cloud.test', '');
     const body = init?.body ? JSON.parse(String(init.body)) : undefined;
@@ -25,7 +25,7 @@ function cloud(routes: Record<string, (body: any) => { status: number; json: any
     let r = h(body);
     if (Array.isArray(r)) { queues[key] = queues[key] ?? r.slice(); r = queues[key].length > 1 ? queues[key].shift()! : queues[key][0]; }
     return new Response(JSON.stringify(r.json), { status: r.status, headers: { 'content-type': 'application/json' } });
-  }) as typeof generateDeps.fetch;
+  }) as typeof generateDeps.request;
 }
 const out = (r: { content?: Array<{ type: string; text?: string }>; isError?: boolean }) => (r.content ?? []).map((c) => c.text ?? '').join('\n');
 
@@ -113,10 +113,10 @@ describe('place', () => {
       'POST /v1/generate': () => ({ status: 202, json: { ok: true, job: { id: 'g4', status: 'queued' }, estimate: {} } }),
       'GET /v1/generate/g4': () => ({ status: 200, json: { ok: true, job: { id: 'g4', status: 'done', assets: [{ assetId: 'a9', ref: '/scene-assets/a9', width: 1024, height: 576 }], chargedUsd: 0.12 } } }),
     });
-    const base = generateDeps.fetch;
-    generateDeps.fetch = (async (url: string, init?: RequestInit) => url.endsWith('/v1/assets/a9')
+    const base = generateDeps.request;
+    generateDeps.request = (async (url: string, init?: RequestInit) => url.endsWith('/v1/assets/a9')
       ? (calls.push({ method: 'GET', url: '/v1/assets/a9', auth: (init?.headers as Record<string, string>)?.Authorization }), new Response(new Uint8Array([137, 80, 78, 71]), { headers: { 'content-type': 'image/png' } }))
-      : base(url, init)) as typeof generateDeps.fetch;
+      : base(url, init)) as typeof generateDeps.request;
     const ran: string[] = [];
     const controller = { connected: true, connect: async () => undefined,
       executeCode: async (code: string) => { ran.push(code); return { success: true, result: code.includes('it.scale(') ? { fitted: true, width: 1920, height: 1080 } : { success: true, itemId: 'item_7' } }; } };
@@ -133,10 +133,10 @@ describe('place a video asset', () => {
       'POST /v1/generate': () => ({ status: 202, json: { ok: true, job: { id: 'v1', status: 'queued' }, estimate: {} } }),
       'GET /v1/generate/v1': () => ({ status: 200, json: { ok: true, job: { id: 'v1', status: 'done', assets: [{ assetId: 'av', ref: '/scene-assets/av', width: 1280, height: 720, durationSeconds: 8, fps: 24 }], chargedUsd: 1.2 } } }),
     });
-    const base = generateDeps.fetch;
-    generateDeps.fetch = (async (url: string, init?: RequestInit) => url.endsWith('/v1/assets/av')
+    const base = generateDeps.request;
+    generateDeps.request = (async (url: string, init?: RequestInit) => url.endsWith('/v1/assets/av')
       ? new Response(new Uint8Array([0, 0, 0, 24]), { headers: { 'content-type': 'video/mp4' } })
-      : base(url, init)) as typeof generateDeps.fetch;
+      : base(url, init)) as typeof generateDeps.request;
     const ran: string[] = [];
     const controller = { connected: true, connect: async () => undefined,
       executeCode: async (code: string) => { ran.push(code); return { success: true, result: code.includes('it.scale(') ? { fitted: true } : { success: true, action: 'upload_video', media: { id: 'vraster_1', registryId: 'item_9' } } }; } };

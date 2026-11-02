@@ -61,9 +61,9 @@ export const GenerateArgsSchema = z.object({
   timeoutSec: z.number().int().min(10).max(1800).optional(),
 }).refine((v) => !!(v.model || v.useCase), { message: 'give a model (see pinepaper_generate_estimate listModels) or a useCase' });
 
-/** Injectable for tests: the network and the clock. */
+/** Injectable for tests: the network (through safe-fetch's trustedFetch) and the clock. */
 export const generateDeps = {
-  fetch: (url: string, init?: RequestInit) => trustedFetch(url, init),
+  request: (url: string, init?: RequestInit) => trustedFetch(url, init),
   sleep: (ms: number) => new Promise<void>((r) => setTimeout(r, ms)),
   now: () => Date.now(),
 };
@@ -95,7 +95,7 @@ function explain(status: number, body: Record<string, any>): string {
 async function call(cfg: { base: string; key: string }, method: 'GET' | 'POST', path: string, body?: unknown): Promise<CloudResult> {
   let res: Response;
   try {
-    res = await generateDeps.fetch(cfg.base + path, {
+    res = await generateDeps.request(cfg.base + path, {
       method,
       headers: { Authorization: `Bearer ${cfg.key}`, ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}), 'User-Agent': 'PinePaper-MCP' },
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
@@ -129,7 +129,7 @@ type GenAsset = { assetId: string; ref?: string; width: number; height: number; 
 async function placeAsset(cfg: { base: string; key: string }, asset: GenAsset, mode: 'cover' | 'contain', options: HandlerOptions): Promise<Record<string, unknown>> {
   let res: Response;
   try {
-    res = await generateDeps.fetch(`${cfg.base}/v1/assets/${encodeURIComponent(asset.assetId)}`, { headers: { Authorization: `Bearer ${cfg.key}` } });
+    res = await generateDeps.request(`${cfg.base}/v1/assets/${encodeURIComponent(asset.assetId)}`, { headers: { Authorization: `Bearer ${cfg.key}` } });
   } catch (e) {
     return { placed: false, error: `could not download the asset: ${e instanceof Error ? e.message : String(e)}` };
   }

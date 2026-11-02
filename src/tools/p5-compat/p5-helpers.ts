@@ -13,12 +13,13 @@
  * - Mode: rectMode, ellipseMode
  * - Constants: PI, TWO_PI, HALF_PI, QUARTER_PI, CENTER, CORNER
  */
+import { capabilityAllowed, capabilityRefusal } from '../../utils/capabilities.js';
 
 /**
  * Browser-side p5.js compatibility helpers.
  * This code is injected into the PinePaper page context and run there as a script.
  */
-export const P5_HELPERS = `
+export const P5_HELPERS: string = `
 (function() {
   // Prevent double-initialization
   if (window._p5Initialized) {
@@ -372,9 +373,14 @@ export const P5_HELPERS = `
 `;
 
 /**
- * Generate code that initializes p5 helpers and executes user code
+ * Generate code that initializes p5 helpers and runs the caller's p5-style code in the studio page.
+ *
+ * SECURITY BOUNDARY: this runs caller-written JavaScript, so it is off unless the person running the server started it
+ * with PINEPAPER_ALLOW_CODE=1 (utils/capabilities.ts). The handler refuses first; this refuses again, so no other path
+ * can produce the code with the switch off. The code runs in the browser page, never in the server process.
  */
 export function generateP5DrawCode(userCode: string): string {
+  if (!capabilityAllowed('code')) throw new Error(capabilityRefusal('code', 'pinepaper_p5_draw'));
   return `
 // Initialize p5.js compatibility layer if not already loaded
 if (!window._p5Initialized) {

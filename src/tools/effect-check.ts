@@ -86,7 +86,7 @@ const FINGERPRINT_JS = `function __ppFingerprint() {
   return o;
 }`;
 
-export const EFFECT_BEFORE_JS = `(function () {
+export const EFFECT_BEFORE_JS: string = `(function () {
   ${FINGERPRINT_JS}
   window.__ppEffectBefore = __ppFingerprint();
   return { ok: true };

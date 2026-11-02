@@ -21,7 +21,7 @@
  * so line numbers (and the source maps) still line up.
  *
  *   node scripts/split-long-strings.mjs          rewrite dist/
- *   node scripts/split-long-strings.mjs --check  exit 1 if dist/ still has a long literal
+ *   node scripts/split-long-strings.mjs --check  exit 1 if dist/ still has a long literal (.js, or a literal type in a .d.ts)
  */
 import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -40,7 +40,7 @@ function jsFiles(dir, out = []) {
   for (const name of readdirSync(dir)) {
     const full = join(dir, name);
     if (statSync(full).isDirectory()) jsFiles(full, out);
-    else if (name.endsWith('.js')) out.push(full);
+    else if (name.endsWith('.js') || name.endsWith('.d.ts')) out.push(full);
   }
   return out;
 }
@@ -155,7 +155,7 @@ function pass(file, text) {
 
 /** Long literals left in a file (for --check and the final count). */
 function longLiterals(file, text) {
-  const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
+  const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, file.endsWith('.d.ts') ? ts.ScriptKind.TS : ts.ScriptKind.JS);
   let n = 0;
   const visit = (node) => {
     if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateHead(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node)) {
@@ -174,7 +174,9 @@ const leftIn = [];
 for (const file of jsFiles(DIST)) {
   const original = readFileSync(file, 'utf8');
   let text = original;
-  if (!CHECK) {
+  // A .d.ts is only checked: a long literal there is a literal TYPE (`export declare const X = "…"`), which cannot be
+  // a concatenation. Annotate the constant `: string` in the source instead.
+  if (!CHECK && !file.endsWith('.d.ts')) {
     for (let i = 0; i < 8; i++) {
       const r = pass(file, text);
       if (!r.count) break;
@@ -191,7 +193,7 @@ for (const file of jsFiles(DIST)) {
   if (n) { left += n; leftIn.push(`${relative(DIST, file)} (${n})`); }
 }
 if (CHECK) {
-  if (left) { console.error(`dist/ has ${left} string literal(s) over ${LIMIT} characters: ${leftIn.join(', ')}\nRun: node scripts/split-long-strings.mjs`); process.exit(1); }
+  if (left) { console.error(`dist/ has ${left} string literal(s) over ${LIMIT} characters: ${leftIn.join(', ')}\nIn a .js, run: node scripts/split-long-strings.mjs. In a .d.ts, annotate the constant ': string' in its source.`); process.exit(1); }
   console.log(`✅ no string literal in dist/ is over ${LIMIT} characters`);
 } else {
   console.log(`✅ split ${rewritten} long string literal(s) in ${files} file(s)${left ? `; ${left} left (names, specifiers or tagged templates): ${leftIn.join(', ')}` : ''}`);

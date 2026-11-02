@@ -37,7 +37,7 @@ export const LANE_TOOL_NAMES = [
 const KEYFRAME_RULE = `A keyframe is {"time": seconds, "properties": {…}, "easing"?: name}. The values go INSIDE properties, never beside time: {"time":1,"properties":{"opacity":1}}, not {"time":1,"opacity":1} (refused). easing shapes the move ARRIVING at that key: linear (default), easeIn, easeOut, easeInOut, easeOutBack, easeInOutCubic, easeOutBounce, spring, hold. Before its first key an item holds the first key's values; after its last, the last key's. Keyable: x, y (the centre), opacity, scale, scaleX, scaleY, rotation (degrees), fillColor, strokeColor, strokeWidth, width, height, radius, fontSize, trimEnd (0→1 draws a path on).`;
 
 /** Read by the model before any tool: what the lane is, the order of work, and what it cannot do. */
-export const LANE_INSTRUCTIONS = `PinePaper Studio, agent lane: eight tools that build an animated scene on a live canvas and export it to a file.
+export const LANE_INSTRUCTIONS: string = `PinePaper Studio, agent lane: eight tools that build an animated scene on a live canvas and export it to a file.
 
 ORDER OF WORK:
 1. pinepaper_agent_batch_execute: ONE call with the canvas size, the background, every item, their keyframes and any relations.
