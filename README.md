@@ -283,6 +283,12 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 
 ### Changed
 
+- An idle server pauses the studio page after 30 s with no tool call
+  (`PINEPAPER_IDLE_PAUSE_SECONDS`, `0` to turn it off), and the next call
+  resumes it. A 400-item scene's live preview used about half a core to one
+  and a half cores with nobody watching; paused, it uses almost none. Exports
+  come out identical either way.
+
 - Housekeeping for supply-chain scanners, with no change in behaviour: the
   hosted-API client's request helper is named for what it is, three long text
   constants are typed as plain strings, and the p5 drawing generator checks
@@ -2781,6 +2787,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 |----------|-------------|---------|
 | `PINEPAPER_STUDIO_URL` | PinePaper Studio URL to connect to (`/editor` is appended automatically) | `https://pinepaper.studio` |
 | `PINEPAPER_HEADLESS` | Run the browser headless (set `false` to watch it work) | `true` |
+| `PINEPAPER_IDLE_PAUSE_SECONDS` | Seconds with no tool call before the studio page is paused, so an idle server uses almost no CPU; the next call resumes it. Exports are unaffected. `0` never pauses | `30` |
 | `PINEPAPER_API_KEY` | Service-account key (`pp_sa_…`) for the cloud-backed tools (`pinepaper_generate`) | — |
 | `PINEPAPER_CLOUD_URL` | The PinePaper cloud those tools call | `https://cloud.pinepaper.studio` |
 | `PINEPAPER_EXECUTION_MODE` | `puppeteer` (execute in a real browser) or `code` (return generated code only) | `puppeteer` |

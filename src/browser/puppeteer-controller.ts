@@ -5,7 +5,7 @@
  * Executes code directly via page.evaluate() and provides screenshots.
  */
 
-import type { Browser, Page } from 'puppeteer';
+import type { Browser, Page, CDPSession } from 'puppeteer';
 import { mcpLog } from '../utils/mcp-log.js';
 import { LAZY_HEAVY_SUBSYSTEMS, LAZY_HEAVY_CLASSES, ENGINE_SURFACE } from '../tools/engine-surface.js';
 import { env } from '../utils/env.js';
@@ -615,10 +615,105 @@ export class PinePaperBrowserController {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // IDLE PAUSE (#45). With a scene loaded and nothing asked of it, the studio's
+  // live preview kept animating: 1.49 cores for a 400-item scene on a fast
+  // machine, 0.44 on the tester's VM. Nobody watches a headless preview. After
+  // PINEPAPER_IDLE_PAUSE_SECONDS (default 30; 0 = never) with no tool call in
+  // progress, the page is frozen (CDP Page.setWebLifecycleState), which stops
+  // its timers and animation frames: 0.03 cores. The next tool call thaws it
+  // first. A thawed page came back "hidden", with no animation frames, so focus
+  // emulation is switched on as it thaws, and the preview runs again. Exports
+  // render each frame at its exact time, so a pause changes nothing in a file
+  // (frame digests identical across a freeze, measured).
+  // ---------------------------------------------------------------------------
+  private activity = 0;
+  private frozen = false;
+  private freezing: Promise<void> | null = null;
+  private idleTimer: ReturnType<typeof setTimeout> | null = null;
+  private idleSession: { page: Page; session: CDPSession } | null = null;
+
+  /** Milliseconds of no activity before the page is frozen; 0 = never. */
+  static idlePauseMs(): number {
+    const v = env('PINEPAPER_IDLE_PAUSE_SECONDS');
+    if (v === undefined || v.trim() === '') return 30_000;
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n * 1000 : 0;
+  }
+
+  /** Whether the page is frozen for idleness right now. */
+  get isIdlePaused(): boolean {
+    return this.frozen;
+  }
+
+  /** A tool call starts: stop the idle countdown and thaw the page if it was frozen. */
+  async beginActivity(): Promise<void> {
+    this.activity++;
+    if (this.idleTimer) { clearTimeout(this.idleTimer); this.idleTimer = null; }
+    if (this.freezing) await this.freezing.catch(() => undefined);
+    if (this.frozen) await this.thaw();
+  }
+
+  /** A tool call ends: when none is left, start the idle countdown. */
+  endActivity(): void {
+    this.activity = Math.max(0, this.activity - 1);
+    if (this.activity === 0) this.scheduleIdlePause();
+  }
+
+  /** Start (or restart) the idle countdown, if a page is up and the pause is on. */
+  scheduleIdlePause(): void {
+    const ms = PinePaperBrowserController.idlePauseMs();
+    if (this.idleTimer) { clearTimeout(this.idleTimer); this.idleTimer = null; }
+    if (!ms || !this.page || !this.isConnected || this.activity > 0) return;
+    this.idleTimer = setTimeout(() => { this.idleTimer = null; void this.freezeForIdle(); }, ms);
+    (this.idleTimer as { unref?: () => void }).unref?.();
+  }
+
+  private async lifecycleSession(): Promise<CDPSession | null> {
+    if (!this.page) return null;
+    if (!this.idleSession || this.idleSession.page !== this.page) {
+      this.idleSession = { page: this.page, session: await this.page.createCDPSession() };
+    }
+    return this.idleSession.session;
+  }
+
+  private async freezeForIdle(): Promise<void> {
+    if (this.activity > 0 || this.frozen || !this.page) return;
+    this.freezing = (async () => {
+      try {
+        const s = await this.lifecycleSession();
+        if (!s || this.activity > 0) return;
+        await s.send('Page.setWebLifecycleState', { state: 'frozen' });
+        this.frozen = true;
+      } catch {
+        // A browser that cannot freeze keeps running, as before.
+      }
+    })();
+    try { await this.freezing; } finally { this.freezing = null; }
+    // A call that began during the freeze waited for it; if it is still running, thaw now.
+    if (this.frozen && this.activity > 0) await this.thaw();
+  }
+
+  private async thaw(): Promise<void> {
+    try {
+      const s = await this.lifecycleSession();
+      if (s) {
+        await s.send('Page.setWebLifecycleState', { state: 'active' });
+        await s.send('Emulation.setFocusEmulationEnabled', { enabled: true });
+      }
+    } catch {
+      // The page went away while frozen: the call's own recovery takes over.
+    }
+    this.frozen = false;
+  }
+
   /**
    * Disconnect and close browser
    */
   async disconnect(): Promise<void> {
+    if (this.idleTimer) { clearTimeout(this.idleTimer); this.idleTimer = null; }
+    this.frozen = false;
+    this.idleSession = null;
     if (this.browser) {
       try {
         await this.browser.close();
@@ -1563,6 +1658,11 @@ let globalController: PinePaperBrowserController | null = null;
  * NOTE: MCP server ALWAYS uses agent mode with ?agent=1&mode=agent URL parameters.
  * This uses headless browser by default for optimal performance.
  */
+/** The controller if one exists, without creating it (code mode never launches a browser). */
+export function peekBrowserController(): PinePaperBrowserController | null {
+  return globalController;
+}
+
 export function getBrowserController(
   config?: BrowserControllerConfig
 ): PinePaperBrowserController {

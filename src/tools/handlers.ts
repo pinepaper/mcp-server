@@ -197,6 +197,7 @@ import { I18nManager } from '../i18n/index.js';
 import {
   PinePaperBrowserController,
   getBrowserController,
+  peekBrowserController,
   resetBrowserController,
 } from '../browser/puppeteer-controller.js';
 import { sameStudioTarget, validateStudioUrl } from '../browser/url-target.js';
@@ -2223,10 +2224,24 @@ export async function handleToolCall(
   const tracker = getPerformanceTracker();
   const baseTimerId = `${toolName}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-  const result = await callContext.run(
-    { toolName, action: typeof args.action === 'string' ? args.action : undefined },
-    () => handleToolCallInner(toolName, args, options, tracker, baseTimerId),
-  );
+  // IDLE PAUSE (#45): the page is thawed before the call and the idle countdown restarts after it. A controller
+  // made DURING the call (the first browser tool) has nothing to thaw; it only starts its countdown at the end.
+  type Idle = { beginActivity?: () => Promise<void>; endActivity?: () => void; scheduleIdlePause?: () => void };
+  const idleBefore = (options.browserController ?? peekBrowserController()) as Idle | null;
+  if (idleBefore && typeof idleBefore.beginActivity === 'function') await idleBefore.beginActivity();
+  let result: CallToolResult;
+  try {
+    result = await callContext.run(
+      { toolName, action: typeof args.action === 'string' ? args.action : undefined },
+      () => handleToolCallInner(toolName, args, options, tracker, baseTimerId),
+    );
+  } finally {
+    if (idleBefore && typeof idleBefore.endActivity === 'function') idleBefore.endActivity();
+    else {
+      const idleAfter = (options.browserController ?? peekBrowserController()) as Idle | null;
+      if (idleAfter && typeof idleAfter.scheduleIdlePause === 'function') idleAfter.scheduleIdlePause();
+    }
+  }
   const ignored = await ignoredArgumentsNoteFor(toolName, args);
   if (ignored) {
     result.content = [...(result.content ?? []), { type: 'text' as const, text: ignored.note }];
