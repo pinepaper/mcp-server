@@ -307,6 +307,15 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 
 ### Fixed
 
+- A very large batch (more than about 200 creates) now waits until every op has
+  run before it replies, and its reply lists the items it made. It used to
+  answer success immediately with no result while the work carried on, so the
+  next call could act on a half-built scene. An export sent right after it
+  could miss the background colour set in the same batch.
+- An opaque export of a scene with no background colour (`mp4`, `webm`, or
+  `apng` with `transparent: false`) warns that the frames are filled with the
+  studio's page colour. The warning used to say black, but the current studio
+  fills them white.
 - `skewX` and `skewY` keyframes are documented: the current studio animates
   them (degrees, up to ±89). A `shear` key, which is not a channel on any
   studio, is named in `ignoredProperties` with a pointer to `skewX` / `skewY`

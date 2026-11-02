@@ -28,6 +28,30 @@ export type PageWaitUntil = 'load' | 'domcontentloaded' | 'networkidle0' | 'netw
 
 export const PAGE_WAIT_UNTIL: readonly PageWaitUntil[] = ['load', 'domcontentloaded', 'networkidle0', 'networkidle2'];
 
+/**
+ * FxTool's governor (GeneratedCodeRunner) does not scan code longer than this:
+ * injectLoopGuards and wrapTrailingReturn both give up and run it as written.
+ */
+export const GOVERNOR_MAX_CODE_CHARS = 400_000;
+
+/**
+ * Whether app.runGenerated would LOSE this code's value, so it must run
+ * ungoverned instead.
+ *
+ * Every emitter ends in a trailing `(async function () { … })();`, and the
+ * governor only hands its value back by rewriting that into `return (…)`. Past
+ * GOVERNOR_MAX_CODE_CHARS it does not rewrite, so the promise is dropped: the
+ * call answers success with no result AT ONCE while the code keeps running in
+ * the page. A 403-op batch (754 KB, ~1.9 KB per create) replied in 83 ms; the
+ * export sent next started before the batch's set_background ran, and the APNG
+ * came out on the empty page colour, intermittently, depending on who won.
+ * A batch passes the limit at about 215 creates. Running it ungoverned costs
+ * only what the governor had already given up at that size: its loop guards.
+ */
+export function governorDropsValue(code: string): boolean {
+  return code.length > GOVERNOR_MAX_CODE_CHARS;
+}
+
 export interface BrowserControllerConfig {
   /** PinePaper Studio URL (default: https://pinepaper.studio) */
   studioUrl?: string;
@@ -977,7 +1001,7 @@ export class PinePaperBrowserController {
       const awaitBoot = BOOTSTRAP_SUBSYSTEMS.some((name) => code.includes(`app.${name}`));
 
       const runOptions = {
-        bypass: options.bypassGovernor ?? !this.config.governor,
+        bypass: options.bypassGovernor ?? (!this.config.governor || governorDropsValue(code)),
         timeoutMs: options.governorTimeoutMs,
         heavyClass: heavyClass ?? null,
         awaitBoot,
