@@ -133,6 +133,15 @@ describe('a studio with the engine fixes: the server steps aside', () => {
     expect(r.sizekeyPairWarning).toBeUndefined();
   });
 
+  it('shear is named even on a studio with skew channels: it is not one (measured on 56c79202)', () => {
+    const item = { data: { keyframes: [] as unknown[] } };
+    const app = { getItemById: () => item, addAnimation: (_i: string, k: unknown[]) => { item.data.keyframes = k; }, listAnimatableProperties: () => ({ properties: [{ name: 'skewX' }, { name: 'skewY' }] }) };
+    const code = gen.generateKeyframeAnimate({ itemId: 'a', keyframes: [{ time: 0, properties: { shear: 0 } }, { time: 1, properties: { shear: 30 } }] } as never);
+    const r = new Function('app', code.replace(/^(\s*\/\/.*\n)+/, '').replace(/\((async )?function\(\)/, (m) => `return ${m}`))(app) as Record<string, any>;
+    expect(r.ignoredProperties).toEqual(['shear']);
+    expect(r.warning).toContain('skewX / skewY');
+  });
+
   it('skew keys: quiet on a studio that lists skewX', () => {
     const item = { data: { keyframes: [] as unknown[] } };
     const app = { getItemById: () => item, addAnimation: (_i: string, k: unknown[]) => { item.data.keyframes = k; }, listAnimatableProperties: () => ({ properties: [{ name: 'skewX' }, { name: 'skewY' }] }) };

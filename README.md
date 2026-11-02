@@ -291,7 +291,9 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 ### Fixed
 
 - `skewX` and `skewY` keyframes are documented: the current studio animates
-  them (degrees, up to ±89).
+  them (degrees, up to ±89). A `shear` key, which is not a channel on any
+  studio, is named in `ignoredProperties` with a pointer to `skewX` / `skewY`
+  instead of being accepted silently.
 - On the current studio, scale at create, text keyed on both `x` and
   `fontSize`, `bloom`, ink `keepColor` and removing a look are now fixed in the
   studio itself. The 1.6.29 warnings and workarounds for them only appear on

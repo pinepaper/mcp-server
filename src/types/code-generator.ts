@@ -2134,12 +2134,14 @@ const TEXT_KEY_ENGINE_NAMES: Readonly<Record<string, readonly string[]>> = {
   wordSpacing: ['wordSpacing'],
   textDecoration: ['textDecoration'],
   textTransform: ['textTransform'],
-  // Not text, same failure (SHEARKEY, mcp-cloud #29): no studio has a skew
-  // channel yet, so skew keys were stored and drew nothing. A sheared motion
-  // today is a `transform` matrix track.
+  // Not text, same failure (SHEARKEY, mcp-cloud #29): a studio before FxTool
+  // #263 has no skew channel, so skew keys were stored and drew nothing. The
+  // current one animates skewX / skewY. `shear` is no channel on any studio:
+  // keyed, it drew nothing with no word (measured on 56c79202), so it is named
+  // unless a studio ever lists `shear` itself.
   skewX: ['skewX'],
   skewY: ['skewY'],
-  shear: ['shear', 'skewX'],
+  shear: ['shear'],
 };
 
 /** A JS expression (run in the page) → the keys of `keys` this studio does not animate. '' when none are text keys. */
@@ -2155,7 +2157,7 @@ function unanimatedTextKeysJs(keys: readonly string[]): string {
 }
 
 /** The sentence for the keys unanimatedTextKeysJs found, built in the page. */
-const UNANIMATED_TEXT_KEYS_SENTENCE = `' is not an animatable property in this studio (app.listAnimatableProperties does not list it), so it had no effect: a key animates only where that list names it. Here, set a fixed value with pinepaper_modify_item, or animate fontSize or scaleX (a skew: a transform matrix track).'`;
+const UNANIMATED_TEXT_KEYS_SENTENCE = `' is not an animatable property in this studio (app.listAnimatableProperties does not list it), so it had no effect: a key animates only where that list names it. Here, set a fixed value with pinepaper_modify_item, or animate fontSize or scaleX. For a skew, key skewX / skewY (degrees) where the studio lists them, else a transform matrix track.'`;
 
 function generateKeyframeAnimateCode(
   itemId: string,
