@@ -236,6 +236,9 @@ const IDLE_TIMEOUT_MS = 120_000;
  * addresses.
  */
 async function nodeRequest(url: URL, addresses: ResolvedAddress[], init: RequestInit): Promise<Response> {
+  // A Cloudflare Worker (mcp-cloud bundles this file) may offer a node:https shim over its own fetch; use the
+  // platform fetch there directly, as before undici went: a Worker cannot open connections to private addresses.
+  if (typeof navigator !== 'undefined' && (navigator as { userAgent?: string }).userAgent === 'Cloudflare-Workers') return fetch(url, init);
   const secure = url.protocol === 'https:';
   const mod = await (secure ? import('node:https') : import('node:http')).catch(() => null);
   if (!mod || typeof mod.request !== 'function') return fetch(url, init);
