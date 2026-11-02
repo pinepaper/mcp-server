@@ -80,3 +80,15 @@ describe('standalone names are read on batch ops', () => {
     expect(renamedArgumentsNote(['operations[0].params → relationOptions'])).toBe("Read under the batch op's own names: operations[0].params → relationOptions.");
   });
 });
+
+describe('an animationOptions key app.animate never reads is named', () => {
+  it('a misspelt key gets a "did you mean"; a read key passes; the reply carries it on the op', async () => {
+    const { animationOptionWarning, codeGenerator } = await import('../../types/code-generator.js');
+    expect(animationOptionWarning({ animationIntensity: 0.4 })).toBeNull();
+    const w = animationOptionWarning({ animationIntensty: 0.4, glow: true });
+    expect(w).toContain('does not read animationIntensty, glow');
+    expect(w).toContain('animationIntensty → animationIntensity?');
+    const code = codeGenerator.generateAgentBatchExecute({ operations: [{ type: 'animate', itemId: 'a', animationType: 'pulse', animationOptions: { glow: true } }] } as never);
+    expect(code).toContain('warning:');
+  });
+});

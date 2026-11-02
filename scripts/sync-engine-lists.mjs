@@ -60,6 +60,13 @@
  *   origin a field motion (ripple, undulate) reads. animationType was checked
  *   against a hand-refreshed fixture that nothing compared with the engine,
  *   so FxTool #255 added ripple and undulate and the enum refused both.
+ * - ANIMATION_OPTION_KEYS. Every params.X that PinePaper.animate(item, params)
+ *   and AnimationDriver's checkAnimationOptions read. A batch animate op hands
+ *   animationOptions to app.animate as they are, so a key outside this set is
+ *   dropped (pinepaper_animate's own intensity / speed were, until the batch
+ *   translated them); the op now says so. If animate ever passes params on
+ *   whole to something else, the list could not be trusted, so this fails
+ *   instead of writing it.
  * Descriptions are NOT generated: they are prose, written here. The type of
  * EASING_DESCRIPTIONS is keyed on the generated union, so a new engine easing
  * fails the TYPECHECK until someone writes its line.
@@ -93,6 +100,29 @@ const PATTERNS_REL = 'js/core/Patterns.js';
 const EXPR_REL = 'js/relations/expr-to-ir.js';
 const RELATIONS_REL = 'js/RelationRegistry.js';
 const ANIM_REL = 'js/core/AnimationDriver.js';
+const PINEPAPER_REL = 'js/PinePaper.js';
+
+/** The body of a method or function `head(...) {`, brace-matched; null when it cannot be found. */
+function blockAfter(src, head) {
+  const at = src.search(head);
+  if (at < 0) return null;
+  let i = src.indexOf('{', at) + 1, depth = 1;
+  while (depth && i < src.length) { const c = src[i++]; if (c === '{') depth++; else if (c === '}') depth--; }
+  return depth ? null : src.slice(at, i);
+}
+
+function animationOptionKeys(ppSrc, animSrc) {
+  const animate = blockAfter(ppSrc, /\n  animate\(item, params\)\s*\{/);
+  const check = blockAfter(animSrc, /export function checkAnimationOptions\(params[^)]*\)\s*\{/);
+  if (!animate || !check) throw new Error('sync-engine-lists: cannot find PinePaper.animate(item, params) or checkAnimationOptions');
+  // params handed on whole would be read somewhere this scan cannot see.
+  const handedOn = [...animate.matchAll(/\bparams\b(?!\??\.)/g)].map((m) => animate.slice(Math.max(0, m.index - 30), m.index + 30))
+    .filter((ctx) => !/animate\(item, params\)|params &&|checkAnimationOptions\(params\)/.test(ctx));
+  if (handedOn.length) throw new Error(`sync-engine-lists: PinePaper.animate passes params on whole (${handedOn[0].trim()}); ANIMATION_OPTION_KEYS cannot be read from it`);
+  const keys = new Set();
+  for (const src of [animate, check]) for (const m of src.matchAll(/\bparams\??\.(\w+)/g)) keys.add(m[1]);
+  return [...keys].sort();
+}
 
 function resolveRef() {
   for (const ref of [ENGINE_REF, 'HEAD']) {
@@ -332,6 +362,9 @@ async function generate() {
   const animSrc = readCommitted(ANIM_REL);
   if (!animSrc) throw new Error(`sync-engine-lists: cannot read ${ANIM_REL}`);
   const anim = { types: frozenList(animSrc, 'ANIMATION_TYPES'), waveforms: frozenList(animSrc, 'ANIMATION_WAVEFORMS'), origins: frozenList(animSrc, 'ANIMATION_ORIGINS') };
+  const ppSrc = readCommitted(PINEPAPER_REL);
+  if (!ppSrc) throw new Error(`sync-engine-lists: cannot read ${PINEPAPER_REL}`);
+  const animKeys = animationOptionKeys(ppSrc, animSrc);
 
   return `/**
  * GENERATED — DO NOT EDIT. Run \`bun run sync:engine-lists\`.
@@ -350,6 +383,7 @@ async function generate() {
  *   ${EXPR_REL}  sha256: ${digest(exprSrc)}
  *   ${RELATIONS_REL}  sha256: ${digest(relSrc)}
  *   ${ANIM_REL}  sha256: ${digest(animSrc)}
+ *   ${PINEPAPER_REL}  sha256: ${digest(ppSrc)}
  */
 
 /** ${easings.length} names: EASING_NAMES, the keys of the engine's easing table. Keyframes, masks, relations and the camera all resolve through it. */
@@ -436,6 +470,11 @@ ${list(anim.waveforms)}
 export const ANIMATION_ORIGINS = [
 ${list(anim.origins)}
 ] as const;
+
+/** ${animKeys.length} option keys app.animate reads (PinePaper.animate + checkAnimationOptions). */
+export const ANIMATION_OPTION_KEYS: readonly string[] = Object.freeze([
+${list(animKeys)}
+]);
 
 /** One line per filter: the engine's own description and parameter ranges. */
 export const FILTER_DOCS: Readonly<Record<string, string>> = Object.freeze({

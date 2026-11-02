@@ -308,6 +308,10 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - A batch op's ignored-argument check now knows which keys each op type reads.
   A key that only another op type uses (`speed` on `animate`, `preset` on a
   mask, `itemId` on a generator) is reported instead of passing as known.
+- An `animate` op names any `animationOptions` key the studio does not read,
+  with the likely intended name (`animationIntensty → animationIntensity?`).
+  The list comes from the studio's own code, so it follows the studio as it
+  changes.
 - `on_event_step_active` without a `targetId` is refused with the fix in the
   message. It steps a group rather than its target, but the studio runs an
   event reaction only when it has a target, so a target-less one reported

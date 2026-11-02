@@ -15,6 +15,7 @@
  *   js/relations/expr-to-ir.js  sha256: 4d92d2f42b3356e9
  *   js/RelationRegistry.js  sha256: 7cb35fa5702cd42a
  *   js/core/AnimationDriver.js  sha256: 6741a73f5f489355
+ *   js/PinePaper.js  sha256: da6953a9c32c35e1
  */
 
 /** 39 names: EASING_NAMES, the keys of the engine's easing table. Keyframes, masks, relations and the camera all resolve through it. */
@@ -340,6 +341,19 @@ export const ANIMATION_ORIGINS = [
   'bottomLeft',
   'bottomRight',
 ] as const;
+
+/** 9 option keys app.animate reads (PinePaper.animate + checkAnimationOptions). */
+export const ANIMATION_OPTION_KEYS: readonly string[] = Object.freeze([
+  'animationDelay',
+  'animationIntensity',
+  'animationOrigin',
+  'animationSpeed',
+  'animationType',
+  'animationWaveform',
+  'duration',
+  'keyframes',
+  'staggerDelay',
+]);
 
 /** One line per filter: the engine's own description and parameter ranges. */
 export const FILTER_DOCS: Readonly<Record<string, string>> = Object.freeze({

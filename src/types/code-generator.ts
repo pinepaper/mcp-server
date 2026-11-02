@@ -8,7 +8,7 @@
 import { compileChoreography } from '../tools/choreograph.js';
 import { compileBatchTimelines, emitTimelineOpBody, type TimelinePlan } from '../tools/timeline.js';
 import { normalizeSvgSize } from '../utils/svg-size.js';
-import { WORLD3D_COLOR_PATHS, PATTERN_KINDS, EXPRESSION_FUNCTION_ARITY, EXPRESSION_CONSTANTS, EXPRESSION_REJECTED, RELATION_PARAM_KEYS } from '../tools/engine-lists.js';
+import { WORLD3D_COLOR_PATHS, PATTERN_KINDS, EXPRESSION_FUNCTION_ARITY, EXPRESSION_CONSTANTS, EXPRESSION_REJECTED, RELATION_PARAM_KEYS, ANIMATION_OPTION_KEYS } from '../tools/engine-lists.js';
 import { expressionGrammarText } from '../tools/expression-grammar.js';
 import { REQUIRED_ENGINE_METHODS, OPTIONAL_ENGINE_METHODS } from '../tools/engine-methods.js';
 import { NORMALIZE_PARAM_READS, MODIFY_CHANGE_READS } from '../tools/shape-params.js';
@@ -1628,12 +1628,26 @@ function equationFlipNote(relationType: unknown, params: unknown): string | null
 
 function unreadOptionWarning(relationType: unknown, params: unknown, injected: readonly string[]): string | null {
   const keys = typeof relationType === 'string' ? RELATION_PARAM_KEYS[relationType] : undefined;
-  if (!keys || !params || typeof params !== 'object') return null;
+  return keys ? unreadKeysWarning(String(relationType), keys, params, injected) : null;
+}
+
+/** The keys of `params` outside `keys`, named with a "did you mean" and the list that is read; null when all are read. */
+function unreadKeysWarning(reader: string, keys: readonly string[], params: unknown, injected: readonly string[] = []): string | null {
+  if (!params || typeof params !== 'object') return null;
   const unknown = Object.keys(params as Record<string, unknown>).filter((k) => !keys.includes(k) && !injected.includes(k));
   if (!unknown.length) return null;
   const norm = (x: string) => x.replace(/_/g, '').toLowerCase();
   const hint = unknown.map((k) => keys.find((x) => norm(x) === norm(k)) ?? keys.find((x) => editDistance(norm(x), norm(k)) <= (k.length > 5 ? 2 : 1))).map((x, i) => (x ? `${unknown[i]} → ${x}?` : '')).filter(Boolean);
-  return `${relationType} does not read ${unknown.join(', ')}, so ${unknown.length > 1 ? 'they were' : 'it was'} ignored${hint.length ? ` (${hint.join('; ')})` : ''}. ${relationType} reads: ${keys.join(', ')}.`;
+  return `${reader} does not read ${unknown.join(', ')}, so ${unknown.length > 1 ? 'they were' : 'it was'} ignored${hint.length ? ` (${hint.join('; ')})` : ''}. ${reader} reads: ${keys.join(', ')}.`;
+}
+
+/**
+ * An animationOptions key app.animate never reads (ANIMATION_OPTION_KEYS, generated from the engine). The batch hands
+ * the options over as they are, so an unknown key was dropped with the op reported done. pinepaper_animate's own
+ * names (intensity, speed …) are translated before this (batch-op-names.ts), so they never reach it.
+ */
+export function animationOptionWarning(options: unknown): string | null {
+  return unreadKeysWarning('animationOptions', ANIMATION_OPTION_KEYS, options);
 }
 
 const VISIBILITY_REACTION = /^on_(event|enter|exit)_set_visibility$/;
@@ -5585,7 +5599,7 @@ const targetId = ${animItemRef};
 const item = app.getItemById(targetId);
 if (!item) throw new Error('Item not found: ' + targetId);
 app.animate(item, { animationType: ${JSON.stringify(String(op.animationType))}, ...${animOpts} });
-return { itemId: targetId, animationType: ${JSON.stringify(String(op.animationType))} };
+return { itemId: targetId, animationType: ${JSON.stringify(String(op.animationType))}${(() => { const w = animationOptionWarning(op.animationOptions); return w ? `, warning: ${jsLiteral(w)}` : ''; })()} };
 `;
 
       case 'relation':
