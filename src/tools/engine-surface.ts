@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main c7d337c1df99ba406db316161dab721fc2c9a0c0
- * sha256:    69a151af6a98f24af67fdc109c996e89baaf3840f0af5f248b812b5a1da82c6a   (of PinePaper.js as committed)
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 56c7920299d6b7705c651bf401273ac71ac4c586
+ * sha256:    01f2e1aa2c7cd11930ee1a99aead80af4cfc1b5528c83816f5f04348b11113e7   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on `window.app`, with how it gets there. The parity
@@ -16,7 +16,7 @@
 /** How a name lands on `app`. */
 export type EngineMemberKind = 'method' | 'accessor' | 'property' | 'lazy' | 'lazyHeavy' | 'bootstrap';
 
-/** 1537 names, from FxTool/js/PinePaper.js. */
+/** 1544 names, from FxTool/js/PinePaper.js. */
 export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object.freeze({
   __buildFreshness: 'property',
   _aboveHooksHeld: 'property',
@@ -46,9 +46,12 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _applyItemKeyframesAt: 'method',
   _applyLifetimesAt: 'method',
   _applyMediumToParts: 'method',
+  _applyPaddedImageFilters: 'method',
   _applyPatternsAt: 'method',
   _applyRestoresFrom: 'method',
   _applyRigPresetUnrecorded: 'method',
+  _applyScaleParams: 'method',
+  _applySkewKeyframePose: 'method',
   _applySMILAnimations: 'method',
   _applyStagger: 'method',
   _applyStyledScenesAt: 'method',
@@ -256,6 +259,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _journalReaction: 'method',
   _keepMaskWithMove: 'method',
   _killedFrameCallbacks: 'property',
+  _lastBrushColorNotes: 'property',
   _lastDynamicUpdate: 'property',
   _lastElapsedTime: 'property',
   _lastMediumError: 'property',
@@ -271,6 +275,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _lockedInSelection: 'method',
   _loggedFallbackActivation: 'property',
   _lookContext: 'method',
+  _lookKeepsMasks: 'property',
   _lookRestore: 'property',
   _loopClock: 'property',
   _luminanceUnder: 'method',
@@ -464,6 +469,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _templateItemSpecFields: 'method',
   _templateMediaRecords: 'method',
   _templateNodeForm: 'method',
+  _templateScaleFields: 'method',
   _templateSize: 'property',
   _templateTextAnchor: 'method',
   _tempPanMode: 'property',
@@ -512,6 +518,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _writeCounterText: 'method',
   _writeCounterValue: 'method',
   _writePatternOffset: 'method',
+  _writeRasterPixels: 'method',
   _writeTrimDash: 'method',
   _zoomClusterHidden: 'property',
   a11yAuditor: 'bootstrap',
