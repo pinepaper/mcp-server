@@ -7,7 +7,7 @@ import { describe, it, expect } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { AgentBatchOperationSchema } from '../../types/schemas.js';
-import { BATCH_OP_HIDDEN, batchOpIgnoredPaths } from '../../tools/handlers.js';
+import { BATCH_OP_HIDDEN, BATCH_OP_READS, batchOpIgnoredPaths } from '../../tools/handlers.js';
 
 const root = join(import.meta.dir, '..', '..');
 const gen = readFileSync(join(root, 'types', 'code-generator.ts'), 'utf8');
@@ -44,4 +44,26 @@ describe('batch op keys', () => {
       { type: 'keyframe_animate', itemId: 'a', keyframes: [], timeOffset: 1 },
     ] })).toEqual(['operations[1].opacity', 'operations[2].params (a relation op takes its parameters as relationOptions)']);
   });
+
+  it('BATCH_OP_READS is exactly what each op type\'s code reads', () => {
+    const sw = gen.indexOf('switch (op.type)', gen.indexOf('generateBatchOperationCode('));
+    const end = gen.indexOf('\n      default:', sw);
+    const cases = [...gen.slice(sw, end).matchAll(/\n      case '([a-z_]+)':/g)].map((m) => ({ name: m[1], at: sw + (m.index ?? 0) }));
+    const OP_READ = /\b(?:op|anyOp|o)\.([a-zA-Z_]+)|\(op as [^)]*\)\.([a-zA-Z_]+)/g;
+    for (const [type, listed] of Object.entries(BATCH_OP_READS)) {
+      const i = cases.findIndex((c) => c.name === type);
+      expect(i, type).toBeGreaterThanOrEqual(0);
+      const body = gen.slice(cases[i].at, i + 1 < cases.length ? cases[i + 1].at : end);
+      const reads = new Set([...body.matchAll(OP_READ)].map((m) => m[1] ?? m[2]));
+      expect([...reads].filter((k) => k !== 'type').sort(), type).toEqual([...listed].sort());
+    }
+  });
+
+  it('a key another op type reads is no longer taken as read', () => {
+    expect(batchOpIgnoredPaths({ operations: [
+      { type: 'animate', itemId: 'a', animationType: 'pulse', speed: 2 },
+      { type: 'apply_mask', itemId: 'a', maskPreset: 'iris', preset: 'youtube' },
+    ] })).toEqual(['operations[0].speed', 'operations[1].preset']);
+  });
 });
+

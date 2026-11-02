@@ -6,6 +6,7 @@
  * Supports browser execution via Puppeteer.
  */
 
+import { normalizeBatchOperationNames, renamedArgumentsNote, RENAMED_ARGUMENTS_META_KEY } from './batch-op-names.js';
 import { nestedIgnoredPaths } from './nested-ignored.js';
 import {
   CRAFT_FRAME_JS,
@@ -2186,6 +2187,24 @@ export const BATCH_OP_HIDDEN: Readonly<Record<string, readonly string[]>> = {
   keyframe_animate: ['params', 'timeUnits', 'timeOffset', 'clipInPoint', 'clipOutPoint'],
   timeline: ['repeat', 'yoyo', 'anchor'],
 };
+/**
+ * The keys each op type's code reads (generateBatchOperationCode), so a key another op type uses is not taken as read
+ * here: `speed` on an animate op and `preset` on a mask op used to pass as known and be dropped in silence.
+ * batch-op-keys.test.ts extracts these from the code and fails when they drift. An op type not listed (the macros and
+ * timeline, expanded before this) falls back to the whole op schema.
+ */
+export const BATCH_OP_READS: Readonly<Record<string, readonly string[]>> = {
+  modify: ['itemId', 'position', 'properties'],
+  animate: ['animationOptions', 'animationType', 'itemId'],
+  relation: ['relationOptions', 'relationType', 'sourceId', 'targetId', 'update'],
+  delete: ['itemId'],
+  group: ['groupName', 'itemIds'],
+  set_background: ['backgroundColor', 'color', 'properties'],
+  execute_generator: ['generatorName', 'generatorParams', 'generatorRegion'],
+  set_canvas_size: ['height', 'preset', 'width'],
+  apply_mask: ['itemId', 'maskOptions', 'maskPreset', 'maskType'],
+  apply_effect: ['effectParams', 'effectType', 'itemId'],
+};
 /** Hints for the slips that land on a key another op type reads. */
 const BATCH_OP_HINTS: Readonly<Record<string, string>> = {
   'relation.params': 'a relation op takes its parameters as relationOptions',
@@ -2204,7 +2223,7 @@ export function batchOpIgnoredPaths(args: Record<string, unknown>): string[] {
   ops.forEach((op, i) => {
     const type = op && typeof op === 'object' && !Array.isArray(op) ? String((op as { type?: unknown }).type) : 'create';
     if (type === 'create') return;
-    const known = new Set<string>([...shape, ...BATCH_OP_HIDDEN['*'], ...(BATCH_OP_HIDDEN[type] ?? [])]);
+    const known = new Set<string>(['type', ...(BATCH_OP_READS[type] ?? shape), ...BATCH_OP_HIDDEN['*'], ...(BATCH_OP_HIDDEN[type] ?? [])]);
     for (const k of Object.keys(op as object)) {
       if (known.has(k)) continue;
       const hint = BATCH_OP_HINTS[`${type}.${k}`];
@@ -2223,6 +2242,11 @@ export async function handleToolCall(
 ): Promise<CallToolResult> {
   const tracker = getPerformanceTracker();
   const baseTimerId = `${toolName}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+  // A batch op takes its standalone tool's names (params, preset, intensity …): translated here, before the handler
+  // and the ignored-argument check see them, and listed in the reply (batch-op-names.ts).
+  let renamed: string[] = [];
+  if (toolName === 'pinepaper_agent_batch_execute') ({ args, renamed } = normalizeBatchOperationNames(args));
 
   // IDLE PAUSE (#45): the page is thawed before the call and the idle countdown restarts after it. A controller
   // made DURING the call (the first browser tool) has nothing to thaw; it only starts its countdown at the end.
@@ -2246,6 +2270,10 @@ export async function handleToolCall(
   if (ignored) {
     result.content = [...(result.content ?? []), { type: 'text' as const, text: ignored.note }];
     result._meta = { ...(result._meta ?? {}), [IGNORED_ARGUMENTS_META_KEY]: ignored.ignored };
+  }
+  if (renamed.length) {
+    result.content = [...(result.content ?? []), { type: 'text' as const, text: renamedArgumentsNote(renamed) }];
+    result._meta = { ...(result._meta ?? {}), [RENAMED_ARGUMENTS_META_KEY]: renamed };
   }
 
   // Record response payload size for token estimation

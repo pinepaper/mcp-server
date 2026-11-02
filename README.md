@@ -298,6 +298,16 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 
 ### Fixed
 
+- A batch op now takes the parameter names its standalone tool takes, and the
+  reply lists each name it translated. Before, they were dropped, sometimes
+  without a word: `animationOptions: { intensity, speed, delay }` on an
+  `animate` op applied none of them. Relations, effects and generators take
+  `params`, masks take `preset` and `options`, generators take `region`,
+  `animate` takes `intensity` / `speed` / `delay` / `waveform` / `origin`,
+  and a `modify` op takes its changes beside `itemId`.
+- A batch op's ignored-argument check now knows which keys each op type reads.
+  A key that only another op type uses (`speed` on `animate`, `preset` on a
+  mask, `itemId` on a generator) is reported instead of passing as known.
 - `on_event_step_active` without a `targetId` is refused with the fix in the
   message. It steps a group rather than its target, but the studio runs an
   event reaction only when it has a target, so a target-less one reported

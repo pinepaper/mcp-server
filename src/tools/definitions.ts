@@ -8902,6 +8902,7 @@ WORKFLOW:
 After validation: user reviews screenshot → feedback → modify/recreate as needed.
 
 OPERATION TYPES (${AgentBatchOperationTypeSchema.options.length}) — use in this order:
+Each op also takes its standalone tool's names: params (relation, apply_effect, execute_generator), preset / options (apply_mask), region (execute_generator), intensity / speed / delay / waveform / origin (animate, at the top or in animationOptions), and a modify op's changes flat beside itemId. The reply lists what it translated.
 
 CANVAS SETUP:
   set_canvas_size — {width, height} or {preset: "instagram-post"|"instagram-story"|"youtube-thumbnail"|"tiktok"|"full-hd-1080p"|...} (studio preset keys, not platform names; an unknown one is refused with the list)
