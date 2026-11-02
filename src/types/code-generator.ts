@@ -6187,11 +6187,15 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
       const hasStyledScene = !!(app.textItemGroup && app.textItemGroup.children
         && app.textItemGroup.children.some(function (it) { return it && it.data && it.data.styledScene && it.visible !== false; }));
       if (hasColor || hasBgItems || hasWorld || hasStyledScene) return [];
+      // The fill is the studio's page colour, not black: every opaque export
+      // path asks the engine's _pageColor, which is white when no page colour
+      // is set (an older engine fell back to black for video). An apng was
+      // measured white (bitrate sweep, 11.02), so name the page colour, not a hue.
       return [{ code: 'alpha_dropped', message: fmt === 'apng'
-        ? 'apng with transparent: false and no background colour: the frames are filled BLACK. Set a background colour, or drop transparent: false to keep the alpha.'
+        ? 'apng with transparent: false and no background colour: the frames are filled with the studio page colour (white in current studios), not a colour this scene chose. Set a background colour, or drop transparent: false to keep the alpha.'
         : fmt === 'jpg'
         ? 'jpg has no transparency and this scene has no background, so transparent areas are filled white. Use png or webp to keep them.'
-        : fmt + ' is exported without transparency and this scene has no background, so transparent areas come out BLACK. Set a background colour, or export apng (animated, full alpha) or png to keep it.' }];
+        : fmt + ' is exported without transparency and this scene has no background, so transparent areas are filled with the studio page colour (white in current studios), not a colour this scene chose. Set a background colour, or export apng (animated, full alpha) or png to keep it.' }];
     } catch (e) { return []; }
   }
   // TEXT THAT DOES NOT FIT (FxTool 661224ef: textOverflowReport) — text past

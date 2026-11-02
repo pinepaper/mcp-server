@@ -45,9 +45,19 @@ describe('fidelity names alpha a format drops (8.12)', () => {
   it('warns for webm / mp4 / jpg on a transparent scene', () => {
     const app = { canvasEl: { style: { backgroundColor: '' } }, patternGroup: { children: [] } };
     expect(alphaLoss(app, 'webm')[0].code).toBe('alpha_dropped');
-    expect(alphaLoss(app, 'mp4')[0].message).toContain('BLACK');
+    expect(alphaLoss(app, 'mp4')[0].message).toContain('page colour');
+    expect(alphaLoss(app, 'mp4')[0].message).not.toContain('BLACK');
     expect(alphaLoss(app, 'jpg')[0].message).toContain('white');
     expect(alphaLoss(app, 'png')).toEqual([]);
+  });
+
+  it('apng transparent:false names the page colour, not a BLACK fill the studio does not give', () => {
+    const apng = gen.generateAgentExport({ platform: 'youtube', format: 'apng', transparent: false } as never);
+    const apngSrc = /function alphaLoss\(fmt\) \{[\s\S]*?\n  \}\n/.exec(apng)?.[0];
+    const loss = new Function('app', 'fmt', `${apngSrc}; return alphaLoss(fmt);`);
+    const msg = loss({ canvasEl: { style: { backgroundColor: '' } }, patternGroup: { children: [] } }, 'apng')[0].message;
+    expect(msg).toContain('page colour');
+    expect(msg).not.toContain('BLACK');
   });
 
   it('is silent when there is a background colour or backdrop items', () => {

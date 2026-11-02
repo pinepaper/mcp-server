@@ -583,7 +583,7 @@ describe('broadcast luma is measured, and a legaliser named (8.35, FxTool 4f1ec3
   });
 });
 
-describe('opaque apng on a page with no colour is filled black — said so (FxTool 4f1ec3ae)', () => {
+describe('opaque apng on a page with no colour is filled with the page colour — said so (FxTool 4f1ec3ae, _pageColor)', () => {
   class FR { result = 'data:image/apng;base64,AA'; onloadend: (() => void) | null = null; readAsDataURL() { this.onloadend?.(); } }
   const run = async (args: Record<string, unknown>, bg: string) => {
     class VX { static getCapabilities() { return { apng: true }; } async export() { return { size: 10, slice() { return this; } }; } }
@@ -592,7 +592,7 @@ describe('opaque apng on a page with no colour is filled black — said so (FxTo
     return (r.fidelity?.warnings ?? []).map((x: { code: string; message: string }) => x);
   };
   it('transparent: false with no background warns; with a background, or transparent, it does not', async () => {
-    expect((await run({ transparent: false }, '')).find((x: { code: string }) => x.code === 'alpha_dropped')?.message).toContain('BLACK');
+    expect((await run({ transparent: false }, '')).find((x: { code: string }) => x.code === 'alpha_dropped')?.message).toContain('page colour');
     expect((await run({ transparent: false }, '#ff0')).map((x: { code: string }) => x.code)).not.toContain('alpha_dropped');
     expect((await run({}, '')).map((x: { code: string }) => x.code)).not.toContain('alpha_dropped');
   });
