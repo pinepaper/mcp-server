@@ -321,10 +321,10 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   fades). `gravity`, `drag`, `friction`, `opacity`, `sizeEnd` and `jitter` are
   sampled per particle on the current studio, and an older one reports a range
   it can't draw itself.
-- `on_event_step_active` without a `targetId` is refused with the fix in the
-  message. It steps a group rather than its target, but the studio runs an
-  event reaction only when it has a target, so a target-less one reported
-  success and never stepped. Point it at any member of the group.
+- `on_event_step_active` works without a `targetId` on the current studio. On
+  an older studio, which runs an event reaction only when it has a target, a
+  target-less one used to report success and never step; it is now refused
+  there, with the fix in the message (point it at any member of the group).
 - The relation docs now say how a stepper or tab strip is built. Members join
   an `exclusive_group` only through `exclusive_group` relations between them.
   Being active has no look of its own: `on_enter_*` / `on_exit_*` reactions on

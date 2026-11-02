@@ -1512,19 +1512,32 @@ export function fireIfProblem(params: Record<string, unknown> | undefined): stri
 }
 
 /**
+ * A TARGET-LESS on_event_step_active runs only on a studio that says so. An older studio runs an event reaction only
+ * when its target exists (a sound alone was exempt), and step_active acts on its GROUP, not its target, so one bound
+ * with no target reported success and never stepped (beta STEPACT30). FxTool #281 runs it target-less and lists it in
+ * PinePaper.TARGETLESS_EVENT_RELATIONS, the set _bindOnEventRelation itself reads, so the marker cannot say yes while
+ * the engine says no. The refusal is decided in the page (STEP_ACTIVE_TARGETLESS_JS); here, only whether to ask.
+ */
+export function targetlessStepProblem(relationType: unknown, target: unknown): string | null {
+  if (relationType !== 'on_event_step_active' || (target != null && target !== '')) return null;
+  return 'on_event_step_active needs a targetId on this studio. It steps the group named in params.groupName, not its target, but this studio runs an event reaction only when its target exists: without one it binds, reports success and never runs. Point it at any item, for example one member of the group (a current studio runs it without one).';
+}
+
+/** True in the page when the studio runs on_event_step_active with no target. */
+export const STEP_ACTIVE_TARGETLESS_JS = "(typeof app !== 'undefined' && !!app && app.TARGETLESS_EVENT_RELATIONS?.has?.('on_event_step_active') === true)";
+
+/**
  * fireIfProblem for any relation a tool is about to add: an on_event_fire_if
  * itself, or one an on_event_add_relation will add when its event fires
  * (params.type / params.params). Every path that adds relations asks this, so
  * the check does not depend on which tool built the relation.
  */
-export function relationSpecProblem(relationType: unknown, params: unknown, ...target: [unknown?]): string | null {
+export function relationSpecProblem(relationType: unknown, params: unknown, ...target: [unknown?, 'no-page'?]): string | null {
   const p = (params && typeof params === 'object' ? params : {}) as Record<string, unknown>;
-  // AN EVENT REACTION RUNS ONLY WITH A TARGET. The studio skips a reaction whose target is missing (only a sound is
-  // exempt), and on_event_step_active acts on its GROUP, not its target, so a target-less one read as complete: it
-  // bound, reported success and never stepped (beta STEPACT30). Checked only where the caller passed a target slot.
-  if (relationType === 'on_event_step_active' && target.length > 0 && (target[0] == null || target[0] === '')) {
-    return 'on_event_step_active needs a targetId. It steps the group named in params.groupName, not its target, but the studio runs an event reaction only when its target exists: without one it binds, reports success and never runs. Point it at any item, for example one member of the group.';
-  }
+  // A target-less on_event_step_active is decided in the page, not here (targetlessStepProblem): it runs on a studio
+  // that lists it in TARGETLESS_EVENT_RELATIONS and does nothing on an older one. Only a caller with no page to ask
+  // (create_scene, which binds no relation without a target) refuses it outright.
+  if (target.length > 1 && target[1] === 'no-page' && targetlessStepProblem(relationType, target[0])) return targetlessStepProblem(relationType, target[0]);
   if (relationType === 'on_event_fire_if') return fireIfProblem(p);
   if (relationType === 'time_expression' && typeof p.expression === 'string') return expressionProblem(p.expression);
   if (typeof relationType === 'string' && VISIBILITY_REACTION.test(relationType)) return visibilityProblem(relationType, p);
@@ -3740,12 +3753,20 @@ export class PinePaperCodeGenerator {
       return generateMovesAlongPathCode(validated.sourceId, validated.targetId ?? undefined, (validated.params ?? {}) as Record<string, unknown>);
     }
 
-    const code = generateAddRelationCode(
+    const built = generateAddRelationCode(
       validated.sourceId,
       validated.targetId || validated.sourceId,
       validated.relationType as RelationType,
       validated.params as Record<string, unknown>
     );
+    // Target-less step_active: refused in the page, only on a studio that would drop it (targetlessStepProblem).
+    const stepNoTarget = targetlessStepProblem(validated.relationType, validated.targetId);
+    const code = stepNoTarget
+      ? `(function() {
+  if (!${STEP_ACTIVE_TARGETLESS_JS}) return { success: false, relationType: 'on_event_step_active', error: ${jsLiteral(stepNoTarget)} };
+  return ${built.trim().replace(/;$/, '')};
+})();`
+      : built;
     // NO TARGET (event reactions like on_event_play_sound, self-relations): the
     // engine is handed the source as the target, but the reply must not say
     // "item_2 → item_2" — a model reads that as the event wired to itself.
@@ -4542,7 +4563,7 @@ if (typeof _gen === 'function') {
     for (const relation of relations) {
       const { source, target, type, params = {} } = relation;
       const paramsStr = JSON.stringify(params);
-      const specProblem = relationSpecProblem(type, params, target);
+      const specProblem = relationSpecProblem(type, params, target, 'no-page');
       if (specProblem) {
         codeParts.push(`
 // Refused relation: ${oneLine(source)} ${oneLine(type)} ${oneLine(target)}
@@ -5619,6 +5640,9 @@ return { itemId: targetId, animationType: ${JSON.stringify(String(op.animationTy
         const tgtRef = batchRef(op.targetId);
         const relOpts = JSON.stringify(op.relationOptions || {});
         const fireIf = relationSpecProblem(op.relationType, op.relationOptions, op.targetId);
+        // Target-less step_active: refused in the page, only on a studio that would drop it (targetlessStepProblem).
+        const stepNoTarget = targetlessStepProblem(op.relationType, op.targetId);
+        const stepGuard = stepNoTarget ? `if (!${STEP_ACTIVE_TARGETLESS_JS}) throw new Error(${jsLiteral('on_event_step_active: ' + stepNoTarget)});\n` : '';
         if (fireIf) return `
 throw new Error(${JSON.stringify(String(op.relationType) + ': ' + fireIf)});
 `;
@@ -5641,7 +5665,7 @@ if (!__members.length) throw new Error('no item is named like ' + ${jsLiteral(op
             : `const __members = [{ id: ${srcRef} }];
 if (!app.getItemById(__members[0].id)) throw new Error('Source not found: ' + __members[0].id);`;
           return `
-${members}
+${stepGuard}${members}
 const targetId = ${noTarget ? 'null' : tgtRef};
 const target = ${noTarget ? 'null' : 'app.getItemById(targetId)'};
 ${noTarget ? '' : "if (!target) throw new Error('Target not found: ' + targetId);\n"}${op.update === true ? "if (typeof app.modifyRelationParams !== 'function') throw new Error('this studio cannot change a bound relation (app.modifyRelationParams): update PinePaper Studio');\n" : ''}const __done = [], __failed = [];
@@ -5665,7 +5689,7 @@ return { success: true, relationType: ${type}, ${op.update === true ? 'updated' 
 `;
         }
         return `
-const sourceId = ${srcRef};
+${stepGuard}const sourceId = ${srcRef};
 const targetId = ${noTarget ? 'null' : tgtRef};
 const source = app.getItemById(sourceId);
 const target = ${noTarget ? 'null' : 'app.getItemById(targetId)'};
@@ -12726,6 +12750,14 @@ ${checks.includes('contrast') ? `  // SAMPLED OVER TIME (round 12, 12.9): text i
     if (specProblems.length) {
       return `(function() { return { success: false, error: ${jsLiteral('nothing was built: ' + specProblems.join(' | '))} }; })();`;
     }
+    // Target-less step_active relations refuse the whole document in the page, only on a studio that would drop them.
+    const stepNoTarget = ops
+      .filter((o) => o.op === 'addRelation')
+      .map((o) => { const r = o as { from?: string; to?: string; relation?: string }; const why = targetlessStepProblem(r.relation, r.to); return why ? `${r.from} -> (no target) (${r.relation}): ${why}` : null; })
+      .filter((x): x is string => !!x);
+    const stepDocGuard = stepNoTarget.length
+      ? `if (!${STEP_ACTIVE_TARGETLESS_JS}) return { success: false, error: ${jsLiteral('nothing was built: ' + stepNoTarget.join(' | '))} };\n`
+      : '';
     const opsJson = JSON.stringify(ops, null, 2);
     const diagJson = JSON.stringify(diagnostics);
     const docJson = JSON.stringify(input.doc);
@@ -12736,7 +12768,7 @@ ${checks.includes('contrast') ? `  // SAMPLED OVER TIME (round 12, 12.9): text i
     return `
 // Instantiate ontology → scene (${oneLine(ops.filter((o) => o.op === 'create').length)} items, ${oneLine(ops.filter((o) => o.op === 'addRelation').length)} relations)
 (async function() {
-  // Engine door first: the studio's own OntologyCompiler reads every node facet
+  ${stepDocGuard}  // Engine door first: the studio's own OntologyCompiler reads every node facet
   // (geometry, paint, text, the keyframe track, masks) and builds through the
   // template loader's paths — the round trip the studio's pixel tests verify
   // (e2e/graph-instantiate-parity.spec.js). The server-side compile above is
