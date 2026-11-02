@@ -2,6 +2,9 @@
  * Follow-ups from the 1.6.24 probes.
  *   - Emitter keys the studio reads as ONE number turned a [min, max] range into
  *     the default without a word (gravity [100, 300] → 0, opacity [0.2, 1] → 1).
+ *     The studio has since sampled gravity, drag, friction, opacity, sizeEnd and
+ *     jitter per particle, so only the keys that take one number everywhere are
+ *     named now.
  *   - PATCHIMG24: an imported image had no name, so a batch patch (which
  *     addresses by name) could not reach it.
  */
@@ -9,14 +12,21 @@ import { describe, it, expect } from 'bun:test';
 import { codeGenerator as gen, normalizeEmitterSpec } from '../../types/code-generator.js';
 
 describe('emitter ranges on single-number keys', () => {
-  it('says a range on gravity and opacity was not read', () => {
-    const w = normalizeEmitterSpec({ gravity: [100, 300], opacity: [0.2, 1], count: 4, bursts: [{ t: 0, x: 0, y: 0 }] }).warnings.join('\n');
-    expect(w).toContain('spec.gravity [100,300] is not drawn as a range');
-    expect(w).toContain('spec.opacity [0.2,1] is not drawn as a range');
+  it('says a range on a key that takes one number on every build was not read', () => {
+    const w = normalizeEmitterSpec({ strokeWidth: [1, 3], aspect: [1, 2], count: 4, bursts: [{ t: 0, x: 0, y: 0 }] }).warnings.join('\n');
+    expect(w).toContain('spec.strokeWidth [1,3] is not drawn as a range');
+    expect(w).toContain('spec.aspect [1,2] is not drawn as a range');
+    // The old closing sentence listed the range keys and went stale when the studio began sampling more of them.
+    expect(w).not.toContain('take a [min, max] range');
   });
 
   it('checks a burst\'s own keys too', () => {
-    expect(normalizeEmitterSpec({ bursts: [{ t: 0, x: 0, y: 0, count: 3, drag: [1, 2] }] }).warnings.join(' ')).toContain('bursts[0].drag');
+    expect(normalizeEmitterSpec({ bursts: [{ t: 0, x: 0, y: 0, count: 3, strokeWidth: [1, 2] }] }).warnings.join(' ')).toContain('bursts[0].strokeWidth');
+  });
+
+  it('leaves the per-particle keys to the studio: a range on gravity, drag, friction, opacity, sizeEnd or jitter is not called unread', () => {
+    // The studio samples these per particle (tester: drag 101–206, opacity 0.25–0.98); an older one says so itself.
+    expect(normalizeEmitterSpec({ gravity: [100, 300], drag: [1, 2], friction: [0, 1], opacity: [0.2, 1], sizeEnd: [1, 4], jitter: [0, 2], count: 4, bursts: [{ t: 0, x: 0, y: 0 }] }).warnings).toEqual([]);
   });
 
   it('leaves the range keys and single numbers alone', () => {

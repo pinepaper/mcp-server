@@ -1792,13 +1792,14 @@ export function normalizeEmitterSpec(spec: Record<string, unknown>, assumeDefaul
     if (own.count !== undefined || own.velocities !== undefined) mismatch(`bursts[${i}]`, own.count ?? out.count, own.velocities ?? out.velocities);
   });
   // A RANGE WHERE THE STUDIO READS ONE NUMBER is not drawn as a range (1.6.24
-  // probe: gravity [100, 300] fell to 0, opacity [0.2, 1] to 1, no word). What
-  // it draws instead depends on the studio build: older ones take num()'s
-  // fallback (count [a, b] → 0, so nothing is drawn); FxTool #228 draws the
-  // middle and says so (emitter-range-not-read). Only size, speed, angle,
-  // spawn, lifetime and spin go through range(). The text says what holds on
-  // both, so it is true whichever studio the server is pointed at.
-  const SCALAR_ONLY = ['gravity', 'drag', 'friction', 'opacity', 'fadeIn', 'fadeOut', 'strokeWidth', 'jitter', 'jitterHz', 'aspect', 'sizeEnd', 'count'];
+  // probe: count [a, b] → 0 on older studios, the middle on FxTool #228). Only
+  // the keys that take one number on EVERY build are named here. gravity, drag,
+  // friction, opacity, sizeEnd and jitter were too, until the studio began to
+  // sample them per particle: the tester measured drag 101–206 against this text
+  // saying one value. What a given studio does with a range on those is its own
+  // to say (emitter-range-not-read, in engineWarnings), so it is true for
+  // whichever studio the server is pointed at.
+  const SCALAR_ONLY = ['fadeIn', 'fadeOut', 'strokeWidth', 'jitterHz', 'aspect', 'count'];
   const SPEC_ONLY = ['rate', 'start', 'end', 'seed'];
   const OUTCOME: Record<string, string> = {
     count: 'an older studio reads a range here as 0 and draws no particles',
@@ -1807,7 +1808,7 @@ export function normalizeEmitterSpec(spec: Record<string, unknown>, assumeDefaul
     for (const k of keys) {
       const v = o[k];
       if (Array.isArray(v) && v.length >= 2) {
-        warnings.push(`${where}.${k} ${JSON.stringify(v)} is not drawn as a range: ${k} takes one number, so the studio draws one value for every particle (its default, or the middle of the range, depending on the build${OUTCOME[k] ? `; ${OUTCOME[k]}` : ''}). Pass the single value you want. Only size, speed, angle, spawn, lifetime and spin take a [min, max] range.`);
+        warnings.push(`${where}.${k} ${JSON.stringify(v)} is not drawn as a range: ${k} takes one number, so the studio draws one value for every particle (its default, or the middle of the range, depending on the build${OUTCOME[k] ? `; ${OUTCOME[k]}` : ''}). Pass the single value you want.`);
       }
     }
     const f = o.fade;
@@ -2179,6 +2180,49 @@ function unanimatedTextKeysJs(keys: readonly string[]): string {
 /** The sentence for the keys unanimatedTextKeysJs found, built in the page. */
 const UNANIMATED_TEXT_KEYS_SENTENCE = `' is not an animatable property in this studio (app.listAnimatableProperties does not list it), so it had no effect: a key animates only where that list names it. Here, set a fixed value with pinepaper_modify_item, or animate fontSize or scaleX. For a skew, key skewX / skewY (degrees) where the studio lists them, else a transform matrix track.'`;
 
+/**
+ * The warnings a keyframe track's result carries, as object-literal fields (", key: value" …): keys that leave out a
+ * property, loop in an export, x beside fontSize on an older studio, easing on the first key. One function for
+ * pinepaper_keyframe_animate and the batch keyframe_animate op: the batch had its own copy of the emitter and none
+ * of these (SIZEKEY-PAIR: the same keys warned through the tool and not through the batch).
+ */
+function keyframeResultNotes(keyframes: readonly Keyframe[], { loop = false, append = false, easingAt }: { loop?: boolean; append?: boolean; easingAt?: 'arrival' | 'departure' } = {}): string {
+  // A KEY THAT LEAVES A PROPERTY OUT (round 9 HH, engine 2.30): the engine
+  // treats the gap as a break in that property's track rather than holding or
+  // interpolating across it, silently. Named here — which keys lack which
+  // properties — with the fix a caller can make now: give every key the full set.
+  const propSets = keyframes.map((k) => Object.keys((k as { properties?: object }).properties ?? {}));
+  const allProps = [...new Set(propSets.flat())];
+  const gaps = keyframes
+    .map((k, i) => ({ time: k.time, missing: allProps.filter((p) => !propSets[i].includes(p)) }))
+    .filter((g) => g.missing.length);
+  // With append the gaps that matter are the MERGED track's (an earlier key
+  // with no scale beside a new key with one), so that check runs in the page
+  // on the result instead (below).
+  const gapNote = !append && gaps.length && keyframes.length > 1
+    ? `, propertyGaps: ${JSON.stringify(gaps.slice(0, 10))}, gapWarning: ${JSON.stringify(`${gaps.length} keyframe(s) leave out a property other keys animate (${[...new Set(gaps.flatMap((g) => g.missing))].join(', ')}). The engine can break that property's track at such a key; repeat the value on every key — hold it by repeating the previous value.`)}`
+    : '';
+  const first = [...keyframes].sort((a, b) => a.time - b.time)[0] as { easing?: string } | undefined;
+  // loop:true repeats in the editor; an export of the measured build played
+  // the keyframes ONCE and held (round 7, 2.24). Said where it is set, with
+  // the two ways that do export, until the engine's export clock wraps them.
+  const loopNote = loop
+    ? `, loopNote: ${JSON.stringify('loop:true repeats in the editor, but has been measured playing ONCE in an exported video and then holding the last keyframe. For an export longer than one cycle, check a frame in the second cycle — if it holds, write the keyframes out per cycle, or use a loop preset (pinepaper_animate), which does cycle in export.')}`
+    : '';
+  // SIZEKEY-PAIR (mcp-cloud #28): on a studio before FxTool #262, x (or
+  // position) keyed beside fontSize on one text item drifted in an export: the
+  // size was applied after the position, and a text resizes around its anchor.
+  // Said there, with the two ways that hold; a current studio is quiet.
+  const sizekeyPairNote = (allProps.includes('x') || allProps.includes('position')) && allProps.includes('fontSize')
+    // A studio that writes text size before position (FxTool #262, which also brought _applyScaleParams) holds x.
+    ? `, ...(typeof app._applyScaleParams !== 'function' ? { sizekeyPairWarning: ${JSON.stringify('x (or position) and fontSize keyed on the same text item drift off the keyed position in an export on this studio (SIZEKEY-PAIR). Animate scaleX / scaleY instead of fontSize, or move a group that holds the text; or update the studio.')} } : {})`
+    : '';
+  const easingNote = easingAt !== 'departure' && first?.easing && first.easing !== 'linear'
+    ? `, note: ${JSON.stringify(`easing '${first.easing}' is on the first keyframe, where it has no effect by default: easing shapes the segment ARRIVING at a keyframe. Put it on the keyframe you are moving to, or pass easingAt: 'departure' to read every easing as the move LEAVING its key (current studio).`)}`
+    : '';
+  return `${easingNote}${sizekeyPairNote}${loopNote}${gapNote}`;
+}
+
 function generateKeyframeAnimateCode(
   itemId: string,
   keyframes: Keyframe[],
@@ -2238,39 +2282,7 @@ function generateKeyframeAnimateCode(
   // never applies — a Ken Burns eased only there rendered linear. Said in the
   // result rather than silently moved: moving it would change what the other
   // keys the caller wrote mean.
-  // A KEY THAT LEAVES A PROPERTY OUT (round 9 HH, engine 2.30): the engine
-  // treats the gap as a break in that property's track rather than holding or
-  // interpolating across it, silently. Named here — which keys lack which
-  // properties — with the fix a caller can make now: give every key the full set.
-  const propSets = keyframes.map((k) => Object.keys((k as { properties?: object }).properties ?? {}));
-  const allProps = [...new Set(propSets.flat())];
-  const gaps = keyframes
-    .map((k, i) => ({ time: k.time, missing: allProps.filter((p) => !propSets[i].includes(p)) }))
-    .filter((g) => g.missing.length);
-  // With append the gaps that matter are the MERGED track's (an earlier key
-  // with no scale beside a new key with one), so that check runs in the page
-  // on the result instead (below).
-  const gapNote = !append && gaps.length && keyframes.length > 1
-    ? `, propertyGaps: ${JSON.stringify(gaps.slice(0, 10))}, gapWarning: ${JSON.stringify(`${gaps.length} keyframe(s) leave out a property other keys animate (${[...new Set(gaps.flatMap((g) => g.missing))].join(', ')}). The engine can break that property's track at such a key; repeat the value on every key — hold it by repeating the previous value.`)}`
-    : '';
-  const first = [...keyframes].sort((a, b) => a.time - b.time)[0] as { easing?: string } | undefined;
-  // loop:true repeats in the editor; an export of the measured build played
-  // the keyframes ONCE and held (round 7, 2.24). Said where it is set, with
-  // the two ways that do export, until the engine's export clock wraps them.
-  const loopNote = loop
-    ? `, loopNote: ${JSON.stringify('loop:true repeats in the editor, but has been measured playing ONCE in an exported video and then holding the last keyframe. For an export longer than one cycle, check a frame in the second cycle — if it holds, write the keyframes out per cycle, or use a loop preset (pinepaper_animate), which does cycle in export.')}`
-    : '';
-  // SIZEKEY-PAIR (mcp-cloud #28): on a studio before FxTool #262, x (or
-  // position) keyed beside fontSize on one text item drifted in an export: the
-  // size was applied after the position, and a text resizes around its anchor.
-  // Said there, with the two ways that hold; a current studio is quiet.
-  const sizekeyPairNote = (allProps.includes('x') || allProps.includes('position')) && allProps.includes('fontSize')
-    // A studio that writes text size before position (FxTool #262, which also brought _applyScaleParams) holds x.
-    ? `, ...(typeof app._applyScaleParams !== 'function' ? { sizekeyPairWarning: ${JSON.stringify('x (or position) and fontSize keyed on the same text item drift off the keyed position in an export on this studio (SIZEKEY-PAIR). Animate scaleX / scaleY instead of fontSize, or move a group that holds the text; or update the studio.')} } : {})`
-    : '';
-  const easingNote = easingAt !== 'departure' && first?.easing && first.easing !== 'linear'
-    ? `, note: ${JSON.stringify(`easing '${first.easing}' is on the first keyframe, where it has no effect by default: easing shapes the segment ARRIVING at a keyframe. Put it on the keyframe you are moving to, or pass easingAt: 'departure' to read every easing as the move LEAVING its key (current studio).`)}`
-    : '';
+  const __notes = keyframeResultNotes(keyframes, { loop, append, easingAt });
   const textKeysJs = unanimatedTextKeysJs(keyframes.flatMap((k) => Object.keys((k as { properties?: object }).properties ?? {})));
   const textKeyCheck = textKeysJs ? `
   const __ignored = ${textKeysJs};
@@ -2305,7 +2317,7 @@ function generateKeyframeAnimateCode(
       ? { appended: true, previousKeys: __prev.length, keys: __now.length }
       : { appended: false, replaced: true, previousKeys: __prev.length, warning: 'append was asked for, but this studio replaced the existing track (' + __prev.length + ' key(s)) instead of adding to it: it has no merge mode. Put every key in one keyframe_animate call.' })`
     : `{ replaced: true, previousKeys: __prev.length, note: 'the item already had a keyframe track (' + __prev.length + ' key(s)); this call replaced it. To add keys to it instead, pass append: true.' }`};
-  return { success: true, itemId: ${addAnimTarget}, duration: ${calculatedDuration}, loop: ${loop}${append ? ', append: true' : ''}, ...(__track ? { track: __track } : {})${append ? `, ...(__gaps.length ? { propertyGaps: __gaps.slice(0, 10), gapWarning: __gaps.length + ' key(s) of the merged track leave out a property other keys animate (' + __gaps.reduce(function(a, g) { g.missing.forEach(function(p) { if (a.indexOf(p) < 0) a.push(p); }); return a; }, []).join(', ') + '). The engine can break that property at such a key; give each key the full set — hold a value by repeating it.' } : {})` : ''}${timeOffset !== undefined ? `, timeOffset: ${timeOffset}` : ''}${clipInPoint !== undefined ? `, clipInPoint: ${clipInPoint}` : ''}${clipOutPoint !== undefined ? `, clipOutPoint: ${clipOutPoint}` : ''}${easingNote}${sizekeyPairNote}${loopNote}${gapNote}${runtimeWarning} };
+  return { success: true, itemId: ${addAnimTarget}, duration: ${calculatedDuration}, loop: ${loop}${append ? ', append: true' : ''}, ...(__track ? { track: __track } : {})${append ? `, ...(__gaps.length ? { propertyGaps: __gaps.slice(0, 10), gapWarning: __gaps.length + ' key(s) of the merged track leave out a property other keys animate (' + __gaps.reduce(function(a, g) { g.missing.forEach(function(p) { if (a.indexOf(p) < 0) a.push(p); }); return a; }, []).join(', ') + '). The engine can break that property at such a key; give each key the full set — hold a value by repeating it.' } : {})` : ''}${timeOffset !== undefined ? `, timeOffset: ${timeOffset}` : ''}${clipInPoint !== undefined ? `, clipInPoint: ${clipInPoint}` : ''}${clipOutPoint !== undefined ? `, clipOutPoint: ${clipOutPoint}` : ''}${__notes}${runtimeWarning} };
 })();
 `.trim();
 }
@@ -5775,7 +5787,7 @@ if (!_target) {
 const _kfItem = _target.item || _target;
 const _prevKeys = (_kfItem.data && Array.isArray(_kfItem.data.keyframes)) ? _kfItem.data.keyframes.length : 0;
 app.addAnimation(targetId, ${kfJson}, { duration: ${kfDuration}, loop: ${kfLoop}${kfAppend ? ", mode: 'merge'" : ''}${kfExtraStr} });${kfTextCheck}
-return { success: true, itemId: targetId, duration: ${kfDuration}, loop: ${kfLoop}${kfAppend ? ', append: true' : ''}${kfAppend ? '' : `, ...(_prevKeys ? { track: { replaced: true, previousKeys: _prevKeys, note: 'the item already had a keyframe track; this op replaced it. To add keys to it instead, pass append: true.' } } : {})`}${kfIgnored} };
+return { success: true, itemId: targetId, duration: ${kfDuration}, loop: ${kfLoop}${kfAppend ? ', append: true' : ''}${keyframeResultNotes(kfSource as never, { loop: kfLoop === true, append: kfAppend })}${kfAppend ? '' : `, ...(_prevKeys ? { track: { replaced: true, previousKeys: _prevKeys, note: 'the item already had a keyframe track; this op replaced it. To add keys to it instead, pass append: true.' } } : {})`}${kfIgnored} };
 `;
       }
 

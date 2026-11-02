@@ -312,6 +312,15 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   with the likely intended name (`animationIntensty → animationIntensity?`).
   The list comes from the studio's own code, so it follows the studio as it
   changes.
+- A batch `keyframe_animate` op gives the same warnings as
+  `pinepaper_keyframe_animate`: a key that leaves out a property another key
+  animates, `loop` in an export, easing on the first key, and `x` keyed beside
+  `fontSize` on an older studio. The batch op used to give none of them.
+- An emitter warns about a `[min, max]` range only on keys that take one number
+  in every studio build (`count`, `aspect`, `strokeWidth`, `jitterHz`, the
+  fades). `gravity`, `drag`, `friction`, `opacity`, `sizeEnd` and `jitter` are
+  sampled per particle on the current studio, and an older one reports a range
+  it can't draw itself.
 - `on_event_step_active` without a `targetId` is refused with the fix in the
   message. It steps a group rather than its target, but the studio runs an
   event reaction only when it has a target, so a target-less one reported
