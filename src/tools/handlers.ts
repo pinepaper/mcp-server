@@ -4627,6 +4627,30 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
         const batchResult = await executeOrGenerate(code, description,
           input.atomic !== false ? { ...options, rollbackCreatedOnFailure: true } : options, 'pinepaper_agent_batch_execute');
 
+        // SHORT REPLIES (#43): a 21-op batch answered with one entry per op, and for a plain create that entry only
+        // echoed the id, type and position the caller had sent (itemIds already lists the ids). Kept: failures, and
+        // any entry that says something the caller did not send (a warning, a refusal, a count). verbose: true
+        // returns every entry.
+        if (input.verbose !== true) {
+          const first = batchResult.content?.[0];
+          if (first && first.type === 'text') {
+            try {
+              const obj = JSON.parse(first.text) as { result?: { results?: Array<{ success?: boolean; result?: unknown }> } };
+              const results = obj.result && Array.isArray(obj.result.results) ? obj.result.results : null;
+              if (results) {
+                const echo = new Set(['itemId', 'type', 'position']);
+                const kept = results.filter((e) => e.success === false || !e.result || typeof e.result !== 'object'
+                  || Object.keys(e.result as object).some((k) => !echo.has(k)));
+                if (kept.length < results.length) {
+                  (obj.result as Record<string, unknown>).results = kept;
+                  (obj.result as Record<string, unknown>).resultsOmitted = results.length - kept.length;
+                  batchResult.content = [{ type: 'text', text: JSON.stringify(obj, null, 2) }, ...batchResult.content.slice(1)];
+                }
+              }
+            } catch { /* not a JSON reply (code mode, an error): as it was */ }
+          }
+        }
+
         // Append bounds warning if any
         if (boundsWarning && batchResult.content && batchResult.content.length > 0) {
           const firstContent = batchResult.content[0] as TextContent;

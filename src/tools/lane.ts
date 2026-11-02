@@ -264,11 +264,13 @@ then in the batch: {"type":"relation","sourceId":"$0","relationType":"bobs","rel
   },
 
   pinepaper_lint_scene: {
-    description: `Check the live scene before exporting; read-only. Returns relations (every relation bound: from, fromName, to, type, params; the first 200), customRelations (each pinepaper_register_custom_relation definition, as given), warnings (a text that runs past the frame edge, by item, side and pixels, where the studio reports it), density (how many items are tied together by relations) and suggestions (relations that would hold the layout together: {from, to, type, params}). Fix a clipped text by moving its centre in with a modify op in pinepaper_agent_batch_execute ({"type":"modify","itemId":"item_1","properties":{"x":474}}: the centre is the left edge plus half the width), or delete it and create it again with properties.anchor; a modify does not read anchor.`,
+    description: `Check the live scene before exporting; read-only. Returns relations (every relation bound: from, fromName, to, type, params; the first 200), customRelations (each pinepaper_register_custom_relation definition the scene uses; its source only with withSource: true), edit (the exact ops that change the scene; only: 'edit' returns just these, which is all an edit needs), warnings (a text that runs past the frame edge, by item, side and pixels, where the studio reports it), density (how many items are tied together by relations) and suggestions (relations that would hold the layout together: {from, to, type, params}). Fix a clipped text by moving its centre in with a modify op in pinepaper_agent_batch_execute ({"type":"modify","itemId":"item_1","properties":{"x":474}}: the centre is the left edge plus half the width), or delete it and create it again with properties.anchor; a modify does not read anchor.`,
     inputSchema: {
       type: 'object',
       properties: {
         cap: { type: 'number', description: 'max suggestions (default 20)' },
+        only: { type: 'string', enum: ['edit'], description: "'edit': only the ops that change this scene" },
+        withSource: { type: 'boolean', description: 'include custom relation source (default false)' },
       },
     },
   },
@@ -291,20 +293,39 @@ export const EDIT_TOOL_NAMES = [
 /** Read by an editing agent before any tool. */
 export const EDIT_INSTRUCTIONS = `PinePaper Studio, edit profile: four tools for changing a scene that is already on the canvas.
 
-1. pinepaper_lint_scene first. Its edit section lists every relation and custom motion with the exact op that changes it, and for a group bound by a name pattern ("dot-*"), the ops that add or remove a member.
+1. pinepaper_lint_scene { only: 'edit' } first. Its edit section lists every relation and custom motion with the exact op that changes it, complete as given (you do not need the batch op schema to send it), and for a group bound by a name pattern ("dot-*"), the ops that add or remove a member.
 2. Send those ops, with your values, in ONE pinepaper_agent_batch_execute call.
 3. pinepaper_agent_export to render; perScene: true on a scene chain renders only what changed.
 Change a custom motion's formula by sending its pinepaper_register_custom_relation call again with the new body (the server must be started with PINEPAPER_ALLOW_CODE=1).
 Units: pixels, top-left origin, y down; seconds; degrees. Report a tool error as it is.`;
 
 /** The lane (or another set of lane tools): in order, each shown with its lane description and schema. */
+/**
+ * The edit profile's batch description (#43). The lane's is 6 KB of op examples for BUILDING a scene; an editing
+ * agent sends the ops lint_scene hands it, so it gets those rules and the few shapes an edit adds, nothing more.
+ * The schema is the lane's, unchanged.
+ */
+export const EDIT_BATCH_DESCRIPTION: string = `Change the scene in ONE call. Send the ops pinepaper_lint_scene { only: 'edit' } gave you, as given, with your values in relationOptions; they are complete (a group's change, addMember and removeMember ops included). Ops run in order; "$0", "$1" are the items this call made.
+
+Other shapes an edit may need:
+{"type":"modify","itemId":"dot-3","properties":{"x":480,"color":"#ff5252"}}
+{"type":"delete","itemId":"dot-3"}
+{"type":"create","itemType":"circle","position":[480,300],"properties":{"radius":10,"name":"dot-21"}}
+{"type":"keyframe_animate","itemId":"title","keyframes":[{"time":0,"properties":{"opacity":0}},{"time":1,"properties":{"opacity":1}}]}
+A relation op with update: true changes that relation's options in place; without it, a second relation is added.
+Units: pixels, top-left origin, y down; seconds; degrees. atomic (default true): a failure undoes the whole call. The reply lists failures and notes; verbose: true lists every op.`;
+
+const EDIT_DESCRIPTIONS: Partial<Record<string, string>> = { pinepaper_agent_batch_execute: EDIT_BATCH_DESCRIPTION };
+
 export function applyLane<T extends ToolLike>(tools: T[], names: readonly string[] = LANE_TOOL_NAMES): T[] {
   const byName = new Map(tools.map((t) => [t.name, t]));
+  const edit = names === EDIT_TOOL_NAMES;
   const out: T[] = [];
   for (const name of names as readonly (typeof LANE_TOOL_NAMES)[number][]) {
     const tool = byName.get(name);
     if (!tool) continue;
-    out.push({ ...tool, description: LANE_TOOLS[name].description, inputSchema: LANE_TOOLS[name].inputSchema } as T);
+    const description = (edit && EDIT_DESCRIPTIONS[name]) || LANE_TOOLS[name].description;
+    out.push({ ...tool, description, inputSchema: LANE_TOOLS[name].inputSchema } as T);
   }
   return out;
 }

@@ -6047,19 +6047,25 @@ The tools generate Paper.js/JavaScript code that executes on the PinePaper canva
       });
     }
 
-    // STRUCTURED CONTENT, BOUNDED. A result whose text is a JSON object also
-    // carries it as structuredContent, so a client can read fields without
-    // parsing text. Capped at 16 KB: the text block stays (for clients that
-    // only read text), so a large payload would be sent twice. Results with a
-    // prose preamble (an export's "saved to file" line) are not pure JSON and
-    // keep text only.
+    // STRUCTURED CONTENT, BOUNDED, AND THE TEXT COMPACT (#43). A result whose
+    // text is a JSON object also carries it as structuredContent, so a client
+    // can read fields without parsing text. The text block stays (the spec asks
+    // for it, for clients that only read text), so the payload goes out twice:
+    // the text copy is compact JSON, not indented (an edit agent's lint reply
+    // was 14-20 KB, much of it whitespace, read 2-3 times), and the structured
+    // copy is capped at 16 KB. Results with a prose preamble (an export's "saved
+    // to file" line) are not pure JSON and keep their text as written.
     const first = result?.content?.[0];
-    if (result && !result.structuredContent && first?.type === 'text' && first.text.length <= 16_384) {
+    if (result && first?.type === 'text') {
       const text = first.text.trim();
       if (text.startsWith('{') && text.endsWith('}')) {
         try {
           const parsed = JSON.parse(text);
-          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) result.structuredContent = parsed;
+          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            const compact = JSON.stringify(parsed);
+            result.content = [{ ...first, text: compact }, ...result.content.slice(1)];
+            if (!result.structuredContent && compact.length <= 16_384) result.structuredContent = parsed;
+          }
         } catch { /* not JSON after all: text only */ }
       }
     }

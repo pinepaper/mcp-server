@@ -12798,7 +12798,15 @@ ${checks.includes('contrast') ? `  // SAMPLED OVER TIME (round 12, 12.9): text i
       __rels.push({ from: e.itemId, ...(__name ? { fromName: __name } : {}), to: a.target === undefined ? null : a.target, type: a.relation, params: a.params || {} });
     }));
   } catch (e) { /* the relations are an addition; the lint stands without them */ }
-  const __custom = (typeof window !== 'undefined' && window.__ppCustomRelations) ? Object.values(window.__ppCustomRelations) : [];
+  // CUSTOM RELATIONS THIS SCENE USES (#43): one registered before a clear_canvas stayed in the read-back of the scene
+  // after it. Those in use are listed; the rest are named in registeredUnused. Their source (computeFunction /
+  // applyFunction) only with withSource: true, since an edit of params never needs it.
+  const __usedTypes = new Set();
+  try { const __rr2 = app.relationRegistry; (__rr2 && typeof __rr2.queryActive === 'function' ? __rr2.queryActive() : []).forEach((e) => (e.associations || []).forEach((a) => __usedTypes.add(a.relation))); } catch (e) { /* none known */ }
+  const __allCustom = (typeof window !== 'undefined' && window.__ppCustomRelations) ? Object.values(window.__ppCustomRelations) : [];
+  const __strip = (d) => { if (${input.withSource === true ? 'true' : 'false'}) return d; const o = Object.assign({}, d); delete o.computeFunction; delete o.applyFunction; return o; };
+  const __custom = __allCustom.filter((d) => __usedTypes.has(d.name)).map(__strip);
+  const __unusedCustom = __allCustom.filter((d) => !__usedTypes.has(d.name)).map((d) => d.name);
   // HOW TO CHANGE IT (#43): an editing agent needs the op, not the schemas. Each relation comes with the batch op that
   // changes it; a group bound by a name pattern ("dot-*", recorded in each member's params) comes once, with the ops
   // that add and remove a member; a custom motion with the call that redefines it.
@@ -12831,13 +12839,25 @@ ${checks.includes('contrast') ? `  // SAMPLED OVER TIME (round 12, 12.9): text i
     });
     __custom.forEach((d) => __edit.customRelations.push({ name: d.name, change: { tool: 'pinepaper_register_custom_relation', args: d } }));
   } catch (e) { /* the read-back stands without the edit ops */ }
+  if (!${input.withSource === true ? 'true' : 'false'} && __custom.length) __edit.customHint = 'custom relation source is left out; pass withSource: true to read the current computeFunction / applyFunction before rewriting one.';
+  // A GROUP IS LISTED ONCE (#43): members bound by a name pattern repeated the same relation once per item in
+  // \`relations\`; they are in edit.groups, and counted here.
+  const __loose = __rels.filter((r) => !(r.params && typeof r.params.pattern === 'string'));
+  const __grouped = __rels.length - __loose.length;
+  const __editOut = __edit.groups.length || __edit.relations.length || __edit.customRelations.length ? { edit: __edit } : {};
+  if (${input.only === 'edit' ? 'true' : 'false'}) {
+    return Object.assign({ success: true }, __editOut.edit ? __editOut : { edit: { hint: 'nothing to change: this scene binds no relations.' } },
+      __unusedCustom.length ? { registeredUnused: __unusedCustom } : {});
+  }
   // warnings: what the engine's own rules found (TEXT_CLIPS_FRAME: a centre-anchored text running past the
   // frame edge). Passed through when the studio reports them; an older studio has none to pass.
   return { success: true, density: result.density, suggestions: result.suggestions,
     ...(Array.isArray(result.warnings) && result.warnings.length ? { warnings: result.warnings } : {}),
-    relations: __rels, ...(__relCount > __rels.length ? { relationsShown: __rels.length, relationCount: __relCount } : {}),
+    relations: __loose, ...(__grouped ? { groupedRelations: __grouped, groupedNote: 'relations bound by a name pattern are listed once per group in edit.groups' } : {}),
+    ...(__relCount > __rels.length ? { relationsShown: __rels.length, relationCount: __relCount } : {}),
     ...(__custom.length ? { customRelations: __custom } : {}),
-    ...(__edit.groups.length || __edit.relations.length || __edit.customRelations.length ? { edit: __edit } : {}) };
+    ...(__unusedCustom.length ? { registeredUnused: __unusedCustom } : {}),
+    ...__editOut };
 })();`.trim();
   }
 

@@ -106,8 +106,8 @@ describe('#43: lint_scene says how to change what it lists', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { PINEPAPER_TOOLS } = require('../../tools/definitions.js');
 
-  function lint(rels: Array<Record<string, unknown>>, custom: unknown[] = []) {
-    const code = codeGenerator.generateLintScene({});
+  function lint(rels: Array<Record<string, unknown>>, custom: unknown[] = [], input: Record<string, unknown> = {}) {
+    const code = codeGenerator.generateLintScene(input as never);
     const types: Record<string, string> = {};
     rels.forEach((r) => { types[String(r.from)] = 'circle'; });
     const app = {
@@ -135,6 +135,35 @@ describe('#43: lint_scene says how to change what it lists', () => {
   it('a single relation comes with its update op', () => {
     const out = lint([{ from: 'item_1', name: 'moon', type: 'orbits', to: 'item_2', params: { radius: 50, speed: 1 } }]);
     expect(out.edit.relations[0].change).toEqual({ type: 'relation', sourceId: 'moon', targetId: 'item_2', relationType: 'orbits', update: true, relationOptions: { radius: 50, speed: 1 } });
+  });
+
+  describe('the read-back an edit agent needs, and no more (#43)', () => {
+    const group = [1, 2, 3].map((i) => ({ from: `item_${i}`, name: `dot-${i}`, type: 'wave', to: null, params: { amp: 40, index: i - 1, count: 3, pattern: 'dot-*' } }));
+    const defs = [{ name: 'wave', params: { amp: { type: 'number' } }, computeFunction: 'return { y: params.amp };', applyFunction: 'item.position.y = computed.y;' },
+      { name: 'old_motion', computeFunction: 'return {};', applyFunction: '' }];
+
+    it('a group is listed once (in edit.groups), not once per member in relations', () => {
+      const out = lint([...group, { from: 'item_9', name: 'moon', type: 'orbits', to: 'item_2', params: { radius: 50 } }], defs);
+      expect(out.relations.map((r: { from: string }) => r.from)).toEqual(['item_9']);
+      expect(out.groupedRelations).toBe(3);
+      expect(out.edit.groups).toHaveLength(1);
+    });
+
+    it('custom relation source only with withSource; unused registrations are named, not listed', () => {
+      const out = lint(group, defs);
+      expect(out.customRelations).toEqual([{ name: 'wave', params: { amp: { type: 'number' } } }]);
+      expect(out.registeredUnused).toEqual(['old_motion']);
+      expect(out.edit.customRelations[0].change.args.computeFunction).toBeUndefined();
+      expect(out.edit.customHint).toContain('withSource: true');
+      const full = lint(group, defs, { withSource: true });
+      expect(full.customRelations[0].computeFunction).toBe('return { y: params.amp };');
+    });
+
+    it("only: 'edit' returns the edit section alone", () => {
+      const out = lint(group, defs, { only: 'edit' });
+      expect(Object.keys(out).sort()).toEqual(['edit', 'registeredUnused', 'success']);
+      expect(out.edit.groups[0].change.update).toBe(true);
+    });
   });
 
   it('the edit profile is lint, batch, custom relations and export', () => {

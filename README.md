@@ -288,6 +288,17 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   resumes it. A 400-item scene's live preview used about half a core to one
   and a half cores with nobody watching; paused, it uses almost none. Exports
   come out identical either way.
+- Replies are much smaller for an agent editing a scene. JSON results are sent
+  compact; `pinepaper_lint_scene { only: "edit" }` returns just the ops that
+  change the scene, lists a group bound by a name pattern once instead of once
+  per member, and includes a custom relation's source only with
+  `withSource: true`; a batch reply leaves out entries that only repeat what you
+  sent (`verbose: true` lists every op); and the `edit` toolkit's batch
+  description covers editing, not building. One edit pass over a 20-dot scene
+  went from 44 KB to 15 KB.
+- `pinepaper_lint_scene` lists only the custom relations the scene uses, and
+  names the rest in `registeredUnused` (one registered before a
+  `pinepaper_clear_canvas` no longer shows up as part of the scene).
 
 - Housekeeping for supply-chain scanners, with no change in behaviour: the
   hosted-API client's request helper is named for what it is, three long text

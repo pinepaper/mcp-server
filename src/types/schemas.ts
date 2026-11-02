@@ -2669,6 +2669,7 @@ export type ArrangeInput = z.infer<typeof ArrangeInputSchema>;
 export const AgentBatchExecuteInputSchema = z.object({
   operations: z.array(AgentBatchOperationSchema).min(1).describe('Array of operations to execute'),
   atomic: z.boolean().optional().default(true).describe('Rollback all operations on any failure'),
+  verbose: z.boolean().optional().describe('Return one result entry per operation. By default an entry that only echoes the id, type and position you sent is left out (itemIds lists every id; resultsOmitted counts them); failures and anything with a note are kept.'),
   skipValidation: z.boolean().optional().default(false).describe('Skip the ontology preflight that catches typos in itemType/relationType/effectType/generatorName before browser execution. Use only when intentionally passing experimental vocabulary values.'),
 }).describe('Batch execution input');
 
@@ -4558,6 +4559,8 @@ export type InstantiateOntologyInput = z.infer<typeof InstantiateOntologyInputSc
 export const LintSceneInputSchema = z.object({
   eps: z.number().positive().optional().describe('Bounds-match tolerance in px for structural-configuration detection (default 4).'),
   cap: z.number().int().positive().optional().describe('Max number of suggestions to return, ranked by confidence (default 20).'),
+  only: z.enum(['edit']).optional().describe("'edit': return only the edit section (the ops that change this scene), for an agent changing a scene that exists."),
+  withSource: z.boolean().optional().describe('Include each custom relation\'s computeFunction / applyFunction source (default false: names and params only).'),
 });
 export type LintSceneInput = z.infer<typeof LintSceneInputSchema>;
 

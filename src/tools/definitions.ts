@@ -3509,8 +3509,9 @@ EXAMPLE doc: { "nodes": [ {"id":"bar","type":"pp:Rectangle","width":300,"height"
     description: `Audit the LIVE scene's relational structure (FxTool S12-E2) — read-only, nothing is changed. Answers "is this scene composed with relations, or just a pile of absolutely-positioned items?" and proposes fixes.
 
 RETURNS:
-- relations: every relation bound — [{ from, fromName?, to, type, params }], the first 200 (relationCount says how many when there are more). Use it to find the relation to change, then a batch relation op with update: true.
-- customRelations: each pinepaper_register_custom_relation definition as it was given (name, params, computeFunction, applyFunction).
+- relations: every relation bound — [{ from, fromName?, to, type, params }], the first 200 (relationCount says how many when there are more). Relations bound by a name pattern ("dot-*") are listed once per group in edit.groups instead (groupedRelations counts them). Use it to find the relation to change, then a batch relation op with update: true.
+- customRelations: each pinepaper_register_custom_relation definition the scene uses (name, params; computeFunction / applyFunction with withSource: true). registeredUnused names any registered that no relation uses.
+- edit: the exact ops that change this scene (per relation, per group with add / remove member ops, per custom motion). With only: 'edit' the reply is just this section.
 - density: { itemCount, relationalItemCount, relationalDensity (0..1 — fraction of items touching the relation graph), edgeCount, componentCount }. A low relationalDensity means items are placed by hardcoded coordinates and won't hold together if something moves.
 - suggestions: structural relations for unrelated item pairs that ALREADY sit in a structural configuration — [{ from, to, type (on_top_of/below/beside/inside/centered_on/aligned_with), params, confidence }], ranked by confidence. Apply the good ones with pinepaper_add_relation to make the layout robust.
 
@@ -3519,12 +3520,14 @@ USE WHEN:
 - To discover which items SHOULD be related (labels on shapes, a badge on a card, stacked elements) but aren't
 - Before export, as a composition-quality gate
 
-PARAMS: { eps? (bounds-match tolerance px, default 4), cap? (max suggestions, default 20) }`,
+PARAMS: { eps? (bounds-match tolerance px, default 4), cap? (max suggestions, default 20), only? ('edit'), withSource? (custom relation source, default false) }`,
     inputSchema: {
       type: 'object',
       properties: {
         eps: { type: 'number', description: 'Bounds-match tolerance in px for structural-configuration detection (default 4).' },
         cap: { type: 'number', description: 'Max suggestions to return, ranked by confidence (default 20).' },
+        only: { type: 'string', enum: ['edit'], description: "'edit': return only the edit section (the ops that change this scene)." },
+        withSource: { type: 'boolean', description: "Include each custom relation's computeFunction / applyFunction source (default false)." },
       },
     },
   },
@@ -9100,6 +9103,10 @@ EXAMPLE — Animated sky scene with timed reveals:
         skipValidation: {
           type: 'boolean',
           description: 'Skip the ontology preflight that catches vocabulary typos before browser execution (default: false). Only set true when knowingly using experimental values.',
+        },
+        verbose: {
+          type: 'boolean',
+          description: 'One result entry per operation. By default an entry that only echoes the id, type and position you sent is left out (itemIds lists every id; resultsOmitted counts them); failures and anything with a note are kept.',
         },
       },
       required: ['operations'],
