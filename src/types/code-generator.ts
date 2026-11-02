@@ -1517,8 +1517,14 @@ export function fireIfProblem(params: Record<string, unknown> | undefined): stri
  * (params.type / params.params). Every path that adds relations asks this, so
  * the check does not depend on which tool built the relation.
  */
-export function relationSpecProblem(relationType: unknown, params: unknown): string | null {
+export function relationSpecProblem(relationType: unknown, params: unknown, ...target: [unknown?]): string | null {
   const p = (params && typeof params === 'object' ? params : {}) as Record<string, unknown>;
+  // AN EVENT REACTION RUNS ONLY WITH A TARGET. The studio skips a reaction whose target is missing (only a sound is
+  // exempt), and on_event_step_active acts on its GROUP, not its target, so a target-less one read as complete: it
+  // bound, reported success and never stepped (beta STEPACT30). Checked only where the caller passed a target slot.
+  if (relationType === 'on_event_step_active' && target.length > 0 && (target[0] == null || target[0] === '')) {
+    return 'on_event_step_active needs a targetId. It steps the group named in params.groupName, not its target, but the studio runs an event reaction only when its target exists: without one it binds, reports success and never runs. Point it at any item, for example one member of the group.';
+  }
   if (relationType === 'on_event_fire_if') return fireIfProblem(p);
   if (relationType === 'time_expression' && typeof p.expression === 'string') return expressionProblem(p.expression);
   if (typeof relationType === 'string' && VISIBILITY_REACTION.test(relationType)) return visibilityProblem(relationType, p);
@@ -3700,7 +3706,7 @@ export class PinePaperCodeGenerator {
     }
 
     {
-      const problem = relationSpecProblem(validated.relationType, validated.params);
+      const problem = relationSpecProblem(validated.relationType, validated.params, validated.targetId);
       if (problem) return `(function() { return { success: false, relationType: ${jsLiteral(validated.relationType)}, error: ${jsLiteral(problem)} }; })();`;
     }
 
@@ -4510,7 +4516,7 @@ if (typeof _gen === 'function') {
     for (const relation of relations) {
       const { source, target, type, params = {} } = relation;
       const paramsStr = JSON.stringify(params);
-      const specProblem = relationSpecProblem(type, params);
+      const specProblem = relationSpecProblem(type, params, target);
       if (specProblem) {
         codeParts.push(`
 // Refused relation: ${oneLine(source)} ${oneLine(type)} ${oneLine(target)}
@@ -5586,7 +5592,7 @@ return { itemId: targetId, animationType: ${JSON.stringify(String(op.animationTy
         const srcRef = batchRef(op.sourceId);
         const tgtRef = batchRef(op.targetId);
         const relOpts = JSON.stringify(op.relationOptions || {});
-        const fireIf = relationSpecProblem(op.relationType, op.relationOptions);
+        const fireIf = relationSpecProblem(op.relationType, op.relationOptions, op.targetId);
         if (fireIf) return `
 throw new Error(${JSON.stringify(String(op.relationType) + ': ' + fireIf)});
 `;
@@ -12689,7 +12695,7 @@ ${checks.includes('contrast') ? `  // SAMPLED OVER TIME (round 12, 12.9): text i
     // A fire_if the doc declares is checked before anything is built: refused, the whole document is, with every reason.
     const specProblems = ops
       .filter((o) => o.op === 'addRelation')
-      .map((o) => { const r = o as { from?: string; to?: string; relation?: string; params?: unknown }; const why = relationSpecProblem(r.relation, r.params); return why ? `${r.from} -> ${r.to} (${r.relation}): ${why}` : null; })
+      .map((o) => { const r = o as { from?: string; to?: string; relation?: string; params?: unknown }; const why = relationSpecProblem(r.relation, r.params, r.to); return why ? `${r.from} -> ${r.to} (${r.relation}): ${why}` : null; })
       .filter((x): x is string => !!x);
     if (specProblems.length) {
       return `(function() { return { success: false, error: ${jsLiteral('nothing was built: ' + specProblems.join(' | '))} }; })();`;

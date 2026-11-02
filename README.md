@@ -296,6 +296,17 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - A `PINEPAPER_LOCALE` that is not a supported language falls back to English.
   Before, the value became part of a file path.
 
+### Fixed
+
+- `on_event_step_active` without a `targetId` is refused with the fix in the
+  message. It steps a group rather than its target, but the studio runs an
+  event reaction only when it has a target, so a target-less one reported
+  success and never stepped. Point it at any member of the group.
+- The relation docs now say how a stepper or tab strip is built. Members join
+  an `exclusive_group` only through `exclusive_group` relations between them.
+  Being active has no look of its own: `on_enter_*` / `on_exit_*` reactions on
+  each member draw it, in exports too. `items` only sets the step order.
+
 ## What's new in 1.6.30
 
 ### Changed
