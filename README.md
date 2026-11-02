@@ -279,6 +279,23 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - The npm package starts no process. Two export features use `ffprobe` and `ffmpeg`: checking a saved video against what the studio encoded, and joining the cached segments of a `perScene` export (`ffmpeg -f concat`). Only the Claude Desktop extension runs them, through a small runner it bundles that allows those two binaries alone, via `execFile` (no shell, argument lists the server writes, absolute paths). From npm, the check is skipped and said so, and a `perScene` export runs whole.
 - The server itself fetches the images, SVGs and media a tool call names by URL, and reads local files named by path. URLs that resolve to loopback, private, link-local or reserved addresses are refused, redirects included, and so are cloud metadata addresses. Local files are read only with `PINEPAPER_ALLOW_LOCAL_FILES=1`, and then only from the working directory, the export folder, and folders listed in `PINEPAPER_ASSET_DIRS` (the export folder is readable without the switch). `PINEPAPER_ALLOW_PRIVATE_NETWORK=1` allows local and LAN hosts. Metadata addresses stay refused even with it set.
 
+## What's new in 1.6.31
+
+### Changed
+
+- **Requires Node 22.13 or newer.** Node 18 and 20 are end of life, and this
+  package's dependencies already needed 20.19 or 22.13, so `>=18` was never
+  really true. On an older Node, upgrade before updating.
+- The server reads only a fixed list of environment variables, each by name
+  (`src/utils/env.ts`), and SECURITY.md lists what each capability of the
+  package is for and where it lives.
+- Every module the package loads is named literally. `PINEPAPER_PUPPETEER_FROM`
+  now loads puppeteer from the folder you name with `createRequire`. The one
+  exception is the optional ffmpeg add-on that only the Claude Desktop
+  extension bundles.
+- A `PINEPAPER_LOCALE` that is not a supported language falls back to English.
+  Before, the value became part of a file path.
+
 ## What's new in 1.6.30
 
 ### Changed
