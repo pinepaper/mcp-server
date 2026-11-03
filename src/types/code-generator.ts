@@ -1620,6 +1620,42 @@ function editDistance(a: string, b: string): number {
   return row[b.length];
 }
 
+/**
+ * The params keys a custom relation reads, worked out when it is registered: what it declares, every `params.X` its
+ * compute / apply source reads, and the index / count a name pattern adds. null when the source uses params any other
+ * way (params[k], destructuring, handing params on), because then the list could not be trusted and a warning could
+ * name a key that works; null means no check, never a wrong one (RELWARN27: a bogus option on a built-in relation was
+ * named, the same option on a custom one was stored in silence).
+ */
+export function customRelationReads(params: unknown, computeFunction: unknown, applyFunction: unknown): string[] | null {
+  const src = `${String(computeFunction ?? '')}\n${String(applyFunction ?? '')}`.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, '');
+  const bare = [...src.matchAll(/\bparams\b(?!\s*\??\.\s*[A-Za-z_$])/g)];
+  if (bare.length) return null;
+  const keys = new Set<string>(['index', 'count']);
+  if (params && typeof params === 'object') Object.keys(params as Record<string, unknown>).forEach((k) => keys.add(k));
+  for (const m of src.matchAll(/\bparams\s*\??\.\s*([A-Za-z_$][\w$]*)/g)) keys.add(m[1]);
+  return [...keys].sort();
+}
+
+/**
+ * A relation's options checked against a CUSTOM relation's read list, in the page (the rule was registered there, maybe
+ * in an earlier call). A fragment for a result object: `, ...{ key: warning }` or nothing. Built-ins are checked here
+ * already (relationOptionWarning), so only a type without a built-in list is asked about.
+ */
+function customOptionWarningJs(relationType: unknown, params: unknown, key: 'warning' | 'optionWarning', injected: readonly string[] = []): string {
+  if (typeof relationType !== 'string' || RELATION_PARAM_KEYS[relationType] || !params || typeof params !== 'object') return '';
+  const keys = Object.keys(params as Record<string, unknown>);
+  if (!keys.length) return '';
+  return `, ...(function () { try {
+    var cr = typeof window !== 'undefined' && window.__ppCustomRelations && window.__ppCustomRelations[${jsLiteral(relationType)}];
+    if (!cr || !Array.isArray(cr.reads)) return {};
+    var skip = ${JSON.stringify(injected)};
+    var un = ${JSON.stringify(keys)}.filter(function (k) { return cr.reads.indexOf(k) < 0 && skip.indexOf(k) < 0; });
+    if (!un.length) return {};
+    return { ${key}: ${jsLiteral(relationType)} + ' does not read ' + un.join(', ') + ', so ' + (un.length > 1 ? 'they were' : 'it was') + ' ignored. ' + ${jsLiteral(relationType)} + ' reads: ' + cr.reads.join(', ') + '.' };
+  } catch (e) { return {}; } })()`;
+}
+
 export function relationOptionWarning(relationType: unknown, params: unknown, injected: readonly string[] = []): string | null {
   const flip = equationFlipNote(relationType, params);
   const unread = unreadOptionWarning(relationType, params, injected);
@@ -1704,7 +1740,7 @@ function generateAddRelationCode(
     return { success: false, relationType: ${jsLiteral(relationType)}, error: 'the studio refused the ' + ${jsLiteral(relationType)} + ' relation between ' + ${jsLiteral(sourceId)} + ' and ' + ${jsLiteral(targetId)} + (__why ? ': ' + __why : '.') };
   }
   app.historyManager.saveState();
-  return { success: true, sourceId: ${jsLiteral(sourceId)}, targetId: ${jsLiteral(targetId)}, relationType: ${jsLiteral(relationType)}${(() => { const w = relationOptionWarning(relationType, params); return w ? `, warning: ${jsLiteral(w)}` : ''; })()} };
+  return { success: true, sourceId: ${jsLiteral(sourceId)}, targetId: ${jsLiteral(targetId)}, relationType: ${jsLiteral(relationType)}${(() => { const w = relationOptionWarning(relationType, params); return w ? `, warning: ${jsLiteral(w)}` : ''; })()}${customOptionWarningJs(relationType, params, 'warning')} };
 })();
 `.trim();
 }
@@ -5697,7 +5733,7 @@ if (!__done.length) {
   const __why = ${op.update === true ? `'no ' + ${type} + ' relation is bound from ' + __failed.join(', ') + (targetId === null ? '' : ' to ' + targetId) + ' to change: bind it first (a relation op without update)'` : relationRefusalReasonJs(type)};
   return { success: false, relationType: ${type}, sourceIds: __failed, error: ${op.update === true ? '__why' : `'the studio refused the ' + ${type} + ' relation for ' + __failed.join(', ') + ' — nothing was bound' + (__why ? ': ' + __why : '.')`} };
 }
-return { success: true, relationType: ${type}, ${op.update === true ? 'updated' : 'bound'}: __done, targetId${glob ? ', count: __members.length' : ''}${(() => { const w = relationOptionWarning(op.relationType, op.relationOptions, ['index', 'count', 'pattern']); return w ? `, optionWarning: ${jsLiteral(w)}` : ''; })()}, ...(__failed.length ? { failed: __failed, warning: __failed.length + ' of ' + __members.length + ' were not ${op.update === true ? 'changed' : 'bound'}: ' + __failed.join(', ') } : {}) };
+return { success: true, relationType: ${type}, ${op.update === true ? 'updated' : 'bound'}: __done, targetId${glob ? ', count: __members.length' : ''}${(() => { const w = relationOptionWarning(op.relationType, op.relationOptions, ['index', 'count', 'pattern']); return w ? `, optionWarning: ${jsLiteral(w)}` : ''; })()}${customOptionWarningJs(op.relationType, op.relationOptions, 'optionWarning', ['index', 'count', 'pattern'])}, ...(__failed.length ? { failed: __failed, warning: __failed.length + ' of ' + __members.length + ' were not ${op.update === true ? 'changed' : 'bound'}: ' + __failed.join(', ') } : {}) };
 `;
         }
         return `
@@ -5716,7 +5752,7 @@ if (!relationId) {
   return { success: false, relationId: false, sourceId, targetId, relationType: ${JSON.stringify(op.relationType)},
     error: 'the studio refused the ' + ${JSON.stringify(op.relationType)} + ' relation between ' + sourceId + ' and ' + targetId + ' — nothing was bound' + (__why ? ': ' + __why : '.') };
 }
-return { relationId, sourceId, targetId, relationType: ${JSON.stringify(String(op.relationType))}${(() => { const w = relationOptionWarning(op.relationType, op.relationOptions); return w ? `, warning: ${jsLiteral(w)}` : ''; })()} };
+return { relationId, sourceId, targetId, relationType: ${JSON.stringify(String(op.relationType))}${(() => { const w = relationOptionWarning(op.relationType, op.relationOptions); return w ? `, warning: ${jsLiteral(w)}` : ''; })()}${customOptionWarningJs(op.relationType, op.relationOptions, 'warning')} };
 `;
 
       case 'delete':
@@ -9053,7 +9089,7 @@ ${(() => {
     // The definition as given, kept on the page so a later call can read it back (pinepaper_lint_scene
     // customRelations): the engine keeps the compiled rule, not the text an agent would edit.
     window.__ppCustomRelations = window.__ppCustomRelations || {};
-    window.__ppCustomRelations[${jsLiteral(validated.name)}] = ${jsLiteral({ name: validated.name, ...(validated.description ? { description: validated.description } : {}), params: validated.params ?? {}, computeFunction: validated.computeFunction, applyFunction: validated.applyFunction })};
+    window.__ppCustomRelations[${jsLiteral(validated.name)}] = ${jsLiteral({ name: validated.name, ...(validated.description ? { description: validated.description } : {}), params: validated.params ?? {}, computeFunction: validated.computeFunction, applyFunction: validated.applyFunction, reads: customRelationReads(validated.params, validated.computeFunction, validated.applyFunction) })};
     return { success: true, relationName: ${jsLiteral(validated.name)}, message: 'Custom relation registered successfully' };
   } catch (error) {
     return { success: false, error: error.message };

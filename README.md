@@ -283,6 +283,11 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 
 ### Fixed
 
+- A custom relation now names an option it never reads, as built-in relations
+  do (`bobble does not read ampp, so it was ignored`). What it reads is worked
+  out when it is registered: its declared params and every `params.X` in its
+  code. If the code uses `params` another way, no list is kept and nothing is
+  named.
 - `pinepaper_get_items` shows what create applied: each item's `name` (the
   name a patch addresses it by), and its `scale`, `rotation` and `opacity`
   when they are not the default.
