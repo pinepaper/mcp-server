@@ -281,6 +281,12 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 
 ## What's new in 1.6.32
 
+### Fixed
+
+- `pinepaper_get_items` shows what create applied: each item's `name` (the
+  name a patch addresses it by), and its `scale`, `rotation` and `opacity`
+  when they are not the default.
+
 ### Changed
 
 - The server reads the environment in one place, and only for a variable on its

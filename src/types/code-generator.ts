@@ -2475,6 +2475,30 @@ function withRadiusAxes(props: Record<string, unknown>): Record<string, unknown>
   return out;
 }
 
+/**
+ * One get_items entry. What create applied is read back here, so an agent can check it: the name a patch addresses
+ * the item by, and scale, rotation and opacity when they are not the default (CROWSCALE30: a create-time scale
+ * rendered exactly and get_items did not show it; PATCHIMG29: an import's name was not shown either). Defaults are
+ * left out, so a plain item's entry stays as small as before.
+ */
+const GET_ITEMS_ENTRY_JS = `entry => {
+  const it = entry.item || {};
+  const out = {
+    id: entry.id || entry.itemId,
+    type: entry.type,
+    position: it.position ? { x: it.position.x, y: it.position.y } : null,
+    hasAnimation: !!((it.data?.animationType && it.data.animationType !== 'none') || (Array.isArray(it.data?.keyframes) && it.data.keyframes.length > 0)),
+    relations: app.getRelations(entry.id || entry.itemId).map(r => r.relation || r.type)
+  };
+  const name = it.name || entry.name || (it.data && it.data.name);
+  if (name) out.name = name;
+  const r2 = (v) => Math.round(v * 1000) / 1000;
+  if (it.scaling && (Math.abs(it.scaling.x - 1) > 1e-6 || Math.abs(it.scaling.y - 1) > 1e-6)) out.scale = { x: r2(it.scaling.x), y: r2(it.scaling.y) };
+  if (typeof it.rotation === 'number' && Math.abs(it.rotation) > 1e-6) out.rotation = r2(it.rotation);
+  if (typeof it.opacity === 'number' && it.opacity !== 1) out.opacity = r2(it.opacity);
+  return out;
+}`;
+
 function generateGetItemsCode(filter?: {
   type?: ItemType;
   source?: string;
@@ -2503,13 +2527,7 @@ function generateGetItemsCode(filter?: {
     return `
 // Get all items
 const entries = app.itemRegistry.getAll();
-const items = entries.map(entry => ({
-  id: entry.id || entry.itemId,
-  type: entry.type,
-  position: entry.item.position ? { x: entry.item.position.x, y: entry.item.position.y } : null,
-  hasAnimation: !!((entry.item.data?.animationType && entry.item.data.animationType !== 'none') || (Array.isArray(entry.item.data?.keyframes) && entry.item.data.keyframes.length > 0)),
-  relations: app.getRelations(entry.id || entry.itemId).map(r => r.relation || r.type)
-}));
+const items = entries.map(${GET_ITEMS_ENTRY_JS});
 
 ({ items, count: items.length });
 `.trim();
@@ -2519,13 +2537,7 @@ const items = entries.map(entry => ({
 // Get items with filter
 const entries = app.itemRegistry.getAll();
 const filtered = entries.filter(entry => ${conditions.join(' && ')});
-const items = filtered.map(entry => ({
-  id: entry.id || entry.itemId,
-  type: entry.type,
-  position: entry.item.position ? { x: entry.item.position.x, y: entry.item.position.y } : null,
-  hasAnimation: !!((entry.item.data?.animationType && entry.item.data.animationType !== 'none') || (Array.isArray(entry.item.data?.keyframes) && entry.item.data.keyframes.length > 0)),
-  relations: app.getRelations(entry.id || entry.itemId).map(r => r.relation || r.type)
-}));
+const items = filtered.map(${GET_ITEMS_ENTRY_JS});
 
 ({ items, count: items.length });
 `.trim();
