@@ -279,6 +279,15 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - The npm package starts no process. Two export features use `ffprobe` and `ffmpeg`: checking a saved video against what the studio encoded, and joining the cached segments of a `perScene` export (`ffmpeg -f concat`). Only the Claude Desktop extension runs them, through a small runner it bundles that allows those two binaries alone, via `execFile` (no shell, argument lists the server writes, absolute paths). From npm, the check is skipped and said so, and a `perScene` export runs whole.
 - The server itself fetches the images, SVGs and media a tool call names by URL, and reads local files named by path. URLs that resolve to loopback, private, link-local or reserved addresses are refused, redirects included, and so are cloud metadata addresses. Local files are read only with `PINEPAPER_ALLOW_LOCAL_FILES=1`, and then only from the working directory, the export folder, and folders listed in `PINEPAPER_ASSET_DIRS` (the export folder is readable without the switch). `PINEPAPER_ALLOW_PRIVATE_NETWORK=1` allows local and LAN hosts. Metadata addresses stay refused even with it set.
 
+## What's new in 1.6.32
+
+### Changed
+
+- The server reads the environment in one place, and only for a variable on its
+  fixed list (`src/utils/env.ts`), instead of one read per variable. The list
+  and what it allows are unchanged. 1.6.31's separate reads each counted as
+  their own finding in supply-chain scans.
+
 ## What's new in 1.6.31
 
 ### Changed

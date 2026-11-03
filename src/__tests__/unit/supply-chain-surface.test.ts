@@ -11,8 +11,8 @@
  *   of ESM needs Node ≥ 22.12, and engines says ≥ 22.13). The exception is the ffmpeg add-on, whose name is held in a
  *   variable so the published package never names a package it does not ship.
  * - Locale files load from a table of literal imports, so a locale name never becomes a module path.
- * - The environment is read only in utils/env.ts (and one literal read in safe-fetch.ts), each variable by its
- *   literal name: no `process.env[name]`.
+ * - The environment is read only in utils/env.ts, once, for a name on its list (and one literal read in
+ *   safe-fetch.ts). Not one literal read per name: Socket counts each read as a finding.
  * - The package starts no process. ffprobe and ffmpeg run through packages/mcp-ffmpeg, which is never published
  *   (private) and only the .mcpb bundles; it is never a dependency. The add-on runs those two binaries only, via
  *   execFile (no shell).
@@ -93,15 +93,21 @@ describe('supply-chain surface', () => {
     expect(raw).not.toMatch(/import\(\s*`/);
   });
 
-  test('the environment is read by literal names, in utils/env.ts and one line of safe-fetch.ts', () => {
+  test('the environment is read once, in utils/env.ts, only for a listed name; and one literal line of safe-fetch.ts', () => {
     const readers = SRC.filter((p) => /process\.env/.test(code(p))).map((p) => p.slice(ROOT.length + 1)).sort();
     expect(readers).toEqual(['src/utils/env.ts', 'src/utils/safe-fetch.ts']);
+    // One read, not one per name: Socket counts each read as a finding (31 on 1.6.31, the 83 → 81 drop).
+    const envSrc = code(join(ROOT, 'src', 'utils', 'env.ts'));
+    expect(envSrc.match(/process\.env/g)?.length).toBe(1);
+    expect(envSrc).toMatch(/vars && LISTED\.has\(name\) \? vars\[name\] : undefined/);
     for (const p of SRC) expect(code(p)).not.toMatch(/process\.env\s*(\?\.)?\s*\[/);
     const fetchReads = [...code(join(ROOT, 'src', 'utils', 'safe-fetch.ts')).matchAll(/process\.env\??\.(\w+)/g)].map((m) => m[1]);
     expect([...new Set(fetchReads)]).toEqual(['PINEPAPER_ALLOW_PRIVATE_NETWORK']);
-    // Every env('NAME') call names a variable in the table, so the table is the whole list.
+    // Every env('NAME') call names a variable in the list, so the list is the whole list.
     const table = readFileSync(join(ROOT, 'src', 'utils', 'env.ts'), 'utf8');
-    const listed = new Set([...table.matchAll(/^\s+(\w+): \(\) => process\.env\.(\w+),$/gm)].map((m) => { expect(m[1]).toBe(m[2]); return m[1]; }));
+    const list = table.slice(table.indexOf('const NAMES = ['), table.indexOf('] as const;'));
+    const listed = new Set([...list.matchAll(/'([A-Z_]+)'/g)].map((m) => m[1]));
+    expect(listed.size).toBeGreaterThan(25);
     for (const p of SRC) {
       for (const m of noComments(p).matchAll(/(?<![\w.])env\(\s*([^)]*)\)/g)) {
         if (/function env\(/.test(m[0]) || m[1].startsWith('name')) continue;
