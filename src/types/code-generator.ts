@@ -13559,7 +13559,7 @@ ${guard}
   }
   if (__r.final && !__r.final.onScreen) __warnings.push('after the last beat the actor is off screen at [' + __r.final.x + ', ' + __r.final.y + '].');
   if (__fr.unbounded && __warnings.some(function (w) { return /off screen/.test(w); })) __warnings.push('the canvas is unbounded, so it has no fixed frame: on-screen was checked against its nominal ' + __fr.width + 'x' + __fr.height + ' artboard. Set a canvas size or preset to fix the frame.');
-  const __res = { success: true, itemId: ${id}, beats: ${input.beats.length}, keyframes: __r.keyframes.length, duration: __r.end, final: __r.final };
+  const __res = { success: true, itemId: ${id}, beats: ${input.beats.length}, keyframes: __r.keyframes.length, duration: __r.end, final: __r.final, ...(__r.defaultsUsed ? { defaultsUsed: __r.defaultsUsed } : {}) };
 ${input.sound ? `  // SOUND ON THE ACTION (D68): one placed sound per moment the motion makes —
   // pop, launch, contact, shake — loud as the moment is strong. A sound that
   // does not place is reported; it never undoes the motion.

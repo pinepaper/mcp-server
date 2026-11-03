@@ -43,6 +43,8 @@ export interface ChoreoResult {
   end?: number;
   final?: { x: number; y: number; onScreen: boolean };
   warnings?: string[];
+  /** Beats whose size was left out: the setting and the value the default came to, so a default is never silent. */
+  defaultsUsed?: Array<{ beat: number; verb: string; setting: string; value: number; rule: string }>;
   error?: string;
 }
 
@@ -50,6 +52,8 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
   const VERBS = ['pop', 'drop', 'hop', 'bounce', 'roll', 'fly', 'peek', 'shake', 'squash', 'enter', 'exit'];
   const h = actor.h, w = actor.w;
   const warnings: string[] = [];
+  const defaultsUsed: Array<{ beat: number; verb: string; setting: string; value: number; rule: string }> = [];
+  const dflt = function (beat: number, verb: string, setting: string, value: number, rule: string) { defaultsUsed.push({ beat: beat, verb: verb, setting: setting, value: Math.round(value * 1000) / 1000, rule: rule }); return value; };
   const keys: Array<{ time: number; properties: Record<string, number>; easing: string }> = [];
   const events: Array<{ time: number; kind: string; strength: number }> = [];
   const ev = (time: number, kind: string, strength: number) => { events.push({ time: Math.round(time * 1000) / 1000, kind, strength: Math.round(Math.max(0.05, Math.min(1, strength)) * 100) / 100 }); };
@@ -150,7 +154,7 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
         const d = +b.duration || 0.7;
         const from = { x: s.x, y: s.y };
         const dest = to || from;
-        const height = b.height !== undefined ? +b.height : h * 1.2;
+        const height = b.height !== undefined ? +b.height : dflt(i, verb, 'height', h * 1.2, "1.2 x the actor's height, in px");
         squashTo(1); key(t, 'linear');
         squashTo(0.8); key(t + d * 0.15, 'easeOut');                         // anticipation
         ev(t + d * 0.2, 'whoosh', 0.35);
@@ -165,7 +169,7 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
       } else if (verb === 'bounce') {
         const times = Math.max(1, Math.round(+b.times || 3));
         const decay = b.decay !== undefined ? Math.min(0.95, Math.max(0.1, +b.decay)) : 0.6;
-        let height = b.height !== undefined ? +b.height : h * 1.5;
+        let height = b.height !== undefined ? +b.height : dflt(i, verb, 'height', h * 1.5, "1.5 x the actor's height, in px");
         const per = (+b.duration || times * 0.5) / times;
         const from = { x: s.x, y: s.y };
         const dest = to || from;
@@ -203,7 +207,7 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
         const d = +b.duration || 1.2;
         if (!to) throw new Error('beat ' + i + ': fly needs to: [x, y]');
         const from = { x: s.x, y: s.y };
-        const arc = b.arc !== undefined ? +b.arc : h * 2;
+        const arc = b.arc !== undefined ? +b.arc : dflt(i, verb, 'arc', h * 2, "2 x the actor's height, in px");
         const cx = (from.x + to.x) / 2, cy = Math.min(from.y, to.y) - arc;
         const tilt = Math.max(-18, Math.min(18, (to.x - from.x) / Math.max(1, frame.width) * 40));
         const r0 = s.rot;
@@ -222,7 +226,7 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
         t += d;
       } else if (verb === 'peek') {
         const edge = b.edge || 'left';
-        const amount = b.amount !== undefined ? Math.min(1, Math.max(0.1, +b.amount)) : 0.5;
+        const amount = b.amount !== undefined ? Math.min(1, Math.max(0.1, +b.amount)) : dflt(i, verb, 'amount', 0.5, 'half the actor shows');
         const hold = b.hold !== undefined ? +b.hold : 1;
         const d = +b.duration || 0.5;
         const anchor = to || { x: s.x, y: s.y };
@@ -236,7 +240,7 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
         t += d * 2 + hold;
       } else if (verb === 'shake') {
         const d = +b.duration || 0.4;
-        const amp = b.intensity !== undefined ? +b.intensity : Math.max(2, w * 0.08);
+        const amp = b.intensity !== undefined ? +b.intensity : dflt(i, verb, 'intensity', Math.max(2, w * 0.08), "8% of the actor's width, in px (at least 2)");
         const x0 = s.x;
         key(t, 'linear');
         ev(t, 'shake', 0.6);
@@ -245,7 +249,7 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
         t += d;
       } else if (verb === 'squash') {
         const d = +b.duration || 0.3;
-        const a = b.amount !== undefined ? Math.min(0.8, Math.max(0.05, +b.amount)) : 0.25;
+        const a = b.amount !== undefined ? Math.min(0.8, Math.max(0.05, +b.amount)) : dflt(i, verb, 'amount', 0.25, 'a 25% squash');
         key(t, 'linear');
         squashTo(1 - a); key(t + d * 0.35, 'easeOut');
         ev(t + d * 0.3, 'contact', a * 2);
@@ -278,5 +282,5 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
   }
   if (!keys.length) return { error: 'no beats' };
   const onScreen = s.x >= frame.x && s.x <= frame.x + frame.width && s.y >= frame.y && s.y <= frame.y + frame.height;
-  return { keyframes: keys, events: events as ChoreoEvent[], end: r3(t), final: { x: r3(s.x), y: r3(s.y), onScreen }, warnings };
+  return { keyframes: keys, events: events as ChoreoEvent[], end: r3(t), final: { x: r3(s.x), y: r3(s.y), onScreen }, warnings, ...(defaultsUsed.length ? { defaultsUsed } : {}) };
 }

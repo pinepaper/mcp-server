@@ -288,6 +288,9 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   out when it is registered: its declared params and every `params.X` in its
   code. If the code uses `params` another way, no list is kept and nothing is
   named.
+- `pinepaper_choreograph` reports, in `defaultsUsed`, each beat whose size you
+  left out (`height`, `arc`, `amount` or `intensity`) and the value it used, so
+  a beat drawn larger or smaller than you meant is visible in the reply.
 - `pinepaper_get_items` shows what create applied: each item's `name` (the
   name a patch addresses it by), and its `scale`, `rotation` and `opacity`
   when they are not the default.
