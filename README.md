@@ -291,6 +291,9 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - `pinepaper_choreograph` reports, in `defaultsUsed`, each beat whose size you
   left out (`height`, `arc`, `amount` or `intensity`) and the value it used, so
   a beat drawn larger or smaller than you meant is visible in the reply.
+- The relation docs say how a stepper starts: a current studio enters the
+  group's first member (or `relationOptions.initial`) at t=0 and runs its
+  `on_enter` reactions, and an older one starts with none entered.
 - `pinepaper_get_items` shows what create applied: each item's `name` (the
   name a patch addresses it by), and its `scale`, `rotation` and `opacity`
   when they are not the default.

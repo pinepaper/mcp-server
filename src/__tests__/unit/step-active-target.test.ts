@@ -51,5 +51,6 @@ describe('the relation docs say how a stepper is built', () => {
     expect(docs).toContain('NO LOOK OF ITS OWN');
     expect(docs).toMatch(/on_event_step_active[^\n]*an older one needs a targetId/);
     expect(docs).toContain('only sets the step order of items already in the group');
+    expect(docs).toContain("relationOptions.initial: '<itemId>' picks another, 'none' starts with none");
   });
 });
