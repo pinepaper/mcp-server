@@ -3516,7 +3516,7 @@ export const ImportImageInputSchema = z.object({
   nativeSize: z.boolean().optional().describe('Place the image at its source footprint even if it was stored smaller.'),
   name: z.string().min(1).optional().describe('A name for the image, so a batch patch (or any tool that takes an item) can address it by name instead of its id.'),
   mask: ImageMaskSchema.optional().describe('Optional mask shape to apply to the image'),
-  smoothing: z.enum(['off', 'low', 'medium', 'high']).optional().describe("Resampling when the image is scaled. 'off' = nearest-neighbour, hard pixel edges (pixel art). Default 'low'."),
+  smoothing: z.enum(['off', 'low', 'medium', 'high']).optional().describe("Resampling when the image is scaled. 'off' = nearest-neighbour, hard pixel edges (pixel art). Default 'low'. In Chromium 'low', 'medium' and 'high' draw the same (its filter is already near the exact average, measured within 0.6 RMSE of each other), so the visible choice is 'off' or not."),
   // IMPORTSHADOW: these were not keys here, so zod stripped them and the photo
   // arrived without the shadow it was asked for. Applied the way modify_item
   // applies them, to the item that is drawn (the mask group when masked).

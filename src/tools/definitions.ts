@@ -1235,7 +1235,7 @@ SIZE CONSTRAINTS:
 Use maxWidth/maxHeight to constrain the image dimensions while preserving aspect ratio.
 - maxEdge: the longest edge the studio STORES the image at (px), or 'native' to keep every pixel. The result says when it was stored smaller.
 - nativeSize: true places the image at its source footprint even if it was stored smaller.
-- smoothing: 'off' (nearest-neighbour, for pixel art) | 'low' (default) | 'medium' | 'high'.
+- smoothing: 'off' (nearest-neighbour, for pixel art) | 'low' (default) | 'medium' | 'high'. Chromium draws 'low', 'medium' and 'high' the same; the visible choice is 'off' or not.
 - shadowColor / shadowBlur / shadowOffset: a drop shadow on the placed image, the same keys pinepaper_modify_item takes.
 - name: a name for the image, so a batch patch or any tool that takes an item can address it by name instead of its id.
 
@@ -1277,7 +1277,7 @@ EXAMPLES:
         smoothing: {
           type: 'string',
           enum: ['off', 'low', 'medium', 'high'],
-          description: "Resampling when the image is scaled. 'off' = nearest-neighbour, hard pixel edges — use it for pixel art. Default 'low'. Change it later with pinepaper_modify_item {smoothing}.",
+          description: "Resampling when the image is scaled. 'off' = nearest-neighbour, hard pixel edges — use it for pixel art. Default 'low'. In Chromium 'low', 'medium' and 'high' draw the same (its filter is already near the exact average, measured within 0.6 RMSE of each other), so the visible choice is 'off' or not. Change it later with pinepaper_modify_item {smoothing}.",
         },
         shadowColor: { type: 'string', description: 'Drop shadow colour (hex, rgb(a) or a name), applied to the placed image — the mask group when masked. result.shadow says whether it applied.' },
         shadowBlur: { type: 'number', description: 'Drop shadow blur radius in px.' },

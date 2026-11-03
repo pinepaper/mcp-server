@@ -294,6 +294,8 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - The relation docs say how a stepper starts: a current studio enters the
   group's first member (or `relationOptions.initial`) at t=0 and runs its
   `on_enter` reactions, and an older one starts with none entered.
+- `pinepaper_import_image`'s `smoothing` docs say what Chromium shows: `low`,
+  `medium` and `high` draw the same, so the visible choice is `off` or not.
 - `pinepaper_get_items` shows what create applied: each item's `name` (the
   name a patch addresses it by), and its `scale`, `rotation` and `opacity`
   when they are not the default.
