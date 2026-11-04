@@ -172,6 +172,24 @@ function configToParams(engineRaw) {
   return map;
 }
 
+/**
+ * The reads of `arg.*` in `block`, plus those of every helper the block hands `arg` to as
+ * `this._x(item, arg …)`, followed recursively. A helper names its own second parameter as it likes:
+ * FxTool's WORDSPC (#289) added `_applyTextTypography(item, params, door)`, called from modify() with
+ * `changes` — matching only a helper whose parameter is also called `changes` threw, and missing it would
+ * have called wordSpacing / textTransform / textDecoration ignored on a studio that draws them.
+ */
+function readsThroughHelpers(engine, block, arg, out, seen) {
+  for (const n of names(new RegExp(`\\b${arg}\\.([A-Za-z_]\\w*)`, 'g'), block)) out.add(n);
+  for (const h of names(new RegExp(`\\bthis\\.(_[A-Za-z_]\\w*)\\(\\s*item\\s*,\\s*${arg}\\s*[,)]`, 'g'), block)) {
+    if (seen.has(h)) continue;
+    seen.add(h);
+    const def = new RegExp(`^\\s{2}${h}\\(item, ([A-Za-z_]\\w*)\\b[^)]*\\) \\{`, 'm').exec(engine);
+    if (!def) throw new Error(`sync-shape-params: ${h}(item, …) not found in PinePaper.js`);
+    readsThroughHelpers(engine, blockAfter(engine, def.index + def[0].length - 1), def[1], out, seen);
+  }
+}
+
 /** Every `params.*` create() looks at — the widest set a caller may legally pass. */
 function acceptedParams(engineRaw) {
   const engine = stripComments(engineRaw);
@@ -180,7 +198,9 @@ function acceptedParams(engineRaw) {
   // Anchor PAST the signature: `blockAfter` from the method's start matched the
   // `{}` default parameter and returned an empty body, so this list read as
   // "create() accepts nothing" — a guard that would have blessed every name.
-  return names(/\bparams\.([A-Za-z_]\w*)/g, blockAfter(engine, m.index + m[0].length - 1));
+  const out = new Set();
+  readsThroughHelpers(engine, blockAfter(engine, m.index + m[0].length - 1), 'params', out, new Set());
+  return [...out].sort();
 }
 
 /**
@@ -213,13 +233,7 @@ function modifyChangeReads(engineRaw) {
   const scrape = (sig, label) => {
     const m = sig.exec(engine);
     if (!m) throw new Error(`sync-shape-params: ${label} not found in PinePaper.js`);
-    const block = blockAfter(engine, m.index + m[0].length - 1);
-    for (const n of names(/\bchanges\.([A-Za-z_]\w*)/g, block)) out.add(n);
-    for (const h of names(/\bthis\.(_[A-Za-z_]\w*)\(\s*item\s*,\s*changes\s*[,)]/g, block)) {
-      if (seen.has(h)) continue;
-      seen.add(h);
-      scrape(new RegExp(`^\\s{2}${h}\\(item, changes\\b[^)]*\\) \\{`, 'm'), h);
-    }
+    readsThroughHelpers(engine, blockAfter(engine, m.index + m[0].length - 1), 'changes', out, seen);
   };
   scrape(/^\s{2}modifyItem\(itemId, changes\) \{/m, 'modifyItem(itemId, changes)');
   scrape(/^\s{2}_applyChangesToItem\(item, changes\) \{/m, '_applyChangesToItem(item, changes)');

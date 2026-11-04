@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 69c432caafd2cb7ab563910864f7e32135f4937d
- * sha256:    fc71be78ef8640bb60c68180a1115a8738d65734528ed0378124522bfb596b0c   (of PinePaper.js as committed)
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 0434e9601ac9e5576a4f85dfa0fc75ad8718bfa5
+ * sha256:    f70e0a44ff1313faf289c2fea83c3a3986952167fa69862ecc87042d29ee277d   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on `window.app`, with how it gets there. The parity
@@ -16,7 +16,7 @@
 /** How a name lands on `app`. */
 export type EngineMemberKind = 'method' | 'accessor' | 'property' | 'lazy' | 'lazyHeavy' | 'bootstrap';
 
-/** 1556 names, from FxTool/js/PinePaper.js. */
+/** 1559 names, from FxTool/js/PinePaper.js. */
 export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object.freeze({
   __buildFreshness: 'property',
   _aboveHooksHeld: 'property',
@@ -56,6 +56,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _applyStagger: 'method',
   _applyStyledScenesAt: 'method',
   _applyTextEffectToCollage: 'method',
+  _applyTextTypography: 'method',
   _applyTrimState: 'method',
   _appReady: 'bootstrap',
   _armGpuLossRecovery: 'method',
@@ -102,6 +103,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _canvasColorSpace: 'property',
   _canvasDeltaToParent: 'method',
   _canvasDrawsLetterSpacing: 'method',
+  _canvasDrawsWordSpacing: 'method',
   _canvasRevealed: 'property',
   _captureTimedEvents: 'method',
   _characterDrag: 'property',
@@ -430,6 +432,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _setExactSize: 'method',
   _setImageMaxKB: 'method',
   _setNibReveal: 'method',
+  _setTextJustify: 'method',
   _settleComponentPartsToRest: 'method',
   _setVideoFilterChain: 'method',
   _shaderGraphCtx: 'method',
