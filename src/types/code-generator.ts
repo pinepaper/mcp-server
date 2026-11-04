@@ -463,6 +463,7 @@ function generateCreateItemCode(
     textDirection.resolved = baseDirection(createProps.content);
   }
   const textTabular = itemType === 'text' && wantsTabular(createProps) === true;
+  const textTypography = itemType === 'text' ? typographyRequest(createProps) : [];
   const createFillOpacity = createProps.fillOpacity !== undefined;
   const textStrokePos = itemType === 'text' ? takeStrokePosition(createProps, false) : null;
   const params: Record<string, unknown> = {
@@ -671,6 +672,7 @@ const __scale = (function(it) {
   // anchored headline's top edge drifted on every refit.
   if (textDirection) code += emitDirectionCheck('item', textDirection);
   if (textTabular) code += emitTabularCheck('item');
+  if (textTypography.length) code += emitTypographyCheck('item', textTypography);
   if (createFillOpacity) code += emitFillOpacityCheck('item');
   if (textStrokePos) code += emitStrokePositionCheck('item', textStrokePos);
   if (textFit) code += `\nlet __textFit = null;${emitTextFit('item', textFit, JSON.stringify(anchorHold(properties.anchor ?? properties.origin) ?? null))}`;
@@ -724,7 +726,7 @@ const itemId = item.data.registryId;
 app.historyManager.saveState();
 
 // Return item info
-({ itemId, type: ${jsLiteral(itemType)}${outlineOnly ? `, fill: ${JSON.stringify(OUTLINE_NOTE)}` : ''}${textFit ? ', textFit: __textFit' : ''}${textDirection ? ', direction: __direction' : ''}${textTabular ? ', tabularFigures: __tabular' : ''}${createFillOpacity ? ', fillOpacity: __fillOpacity' : ''}${textStrokePos ? ', strokePosition: __strokePos' : ''}${hasCreateScale ? ', scale: __scale' : ''}, position: ${reportActualPosition ? `(item.position ? { x: item.position.x, y: item.position.y } : null)` : `{ x: ${position.x}, y: ${position.y} }`}${hasLifetime ? ', lifetime: __lifetime' : ''}${loadsFont ? ', ...(__font ? { font: __font } : {})' : ''}${ignored.length > 0
+({ itemId, type: ${jsLiteral(itemType)}${outlineOnly ? `, fill: ${JSON.stringify(OUTLINE_NOTE)}` : ''}${textFit ? ', textFit: __textFit' : ''}${textDirection ? ', direction: __direction' : ''}${textTabular ? ', tabularFigures: __tabular' : ''}${textTypography.length ? ', typography: __typography' : ''}${createFillOpacity ? ', fillOpacity: __fillOpacity' : ''}${textStrokePos ? ', strokePosition: __strokePos' : ''}${hasCreateScale ? ', scale: __scale' : ''}, position: ${reportActualPosition ? `(item.position ? { x: item.position.x, y: item.position.y } : null)` : `{ x: ${position.x}, y: ${position.y} }`}${hasLifetime ? ', lifetime: __lifetime' : ''}${loadsFont ? ', ...(__font ? { font: __font } : {})' : ''}${ignored.length > 0
     ? `, ignoredProperties: ${JSON.stringify(ignored)}` : ''}${warnings.length > 0 ? `, warning: ${JSON.stringify(warnings.join(' '))}` : ''} });`;
 
   // Loading a font is async, and it has to happen BEFORE create() measures the
@@ -993,6 +995,39 @@ function anchorHold(anchor: unknown): 'top' | 'bottom' | undefined {
   return /^top/.test(a) ? 'top' : /^bottom/.test(a) ? 'bottom' : undefined;
 }
 
+/**
+ * wordSpacing, textTransform, textDecoration and justify (FxTool #289, WORDSPC).
+ * The engine stores them on item.data and its text layer draws them; a studio
+ * before #289 has no such layer and the keys are lost. These keys are on the
+ * current engine's read list (shape-params.ts), so the unread-key report no
+ * longer names them; the reply instead reads item.data, so an older studio is
+ * still named rather than reported as done.
+ */
+const TYPOGRAPHY_KEYS = ['wordSpacing', 'textTransform', 'textDecoration'] as const;
+function typographyRequest(props: Record<string, unknown>): string[] {
+  const keys: string[] = TYPOGRAPHY_KEYS.filter((k) => props[k] !== undefined);
+  const align = props.justification ?? props.textAlign ?? props.align;
+  if (typeof align === 'string' && align.trim().toLowerCase() === 'justify') keys.push('justify');
+  return keys;
+}
+function emitTypographyCheck(itemExpr: string, keys: readonly string[]): string {
+  return `
+const __typography = (function(it, keys) {
+  if (!it || it.className !== 'PointText') return { applied: false, note: keys.join(', ') + ' apply to text items only.' };
+  const d = it.data || {};
+  if (typeof app._applyTextTypography !== 'function') return { applied: false, ignored: keys, note: 'this studio does not draw ' + keys.join(', ') + ' (it needs an engine with text typography): the text is drawn without ' + (keys.length > 1 ? 'them' : 'it') + '. Set the case in the content itself; for an underline, a line item under the text.' };
+  const out = { applied: true };
+  const unset = [];
+  for (const k of keys) {
+    const v = k === 'justify' ? (d.justify === true ? true : undefined) : d[k];
+    out[k] = v === undefined ? null : v;
+    if (v === undefined) unset.push(k);
+  }
+  if (unset.length) out.note = unset.join(', ') + (unset.length > 1 ? ' are' : ' is') + ' not set on the item now: a clearing value (none / normal / 0) removes it, and a value the studio cannot draw is refused by name in the engine receipt.';
+  return out;
+})(${itemExpr}, ${JSON.stringify(keys)});`;
+}
+
 function emitTextFit(itemExpr: string, box: Record<string, unknown>, holdFallback = 'undefined'): string {
   return `
 if (typeof app.fitText === 'function') {
@@ -1255,6 +1290,7 @@ function generateModifyItemCode(
   if (restProperties.fit && typeof restProperties.fit === 'object') delete restProperties.fit;
   const modDirection = takeDirection(restProperties);
   const modTabular = wantsTabular(restProperties) === true;
+  const modTypography = typographyRequest(restProperties);
   const modFillOpacity = restProperties.fillOpacity !== undefined;
   const modStrokePos = takeStrokePosition(restProperties, true);
 
@@ -1406,8 +1442,8 @@ ${properties.content !== undefined ? `
 const __ctItem = app.getItemById(${ID});
 const __ctKeys = (__ctItem && __ctItem.data && Array.isArray(__ctItem.data.keyframes))
   ? __ctItem.data.keyframes.filter(function(k) { return k && k.properties && Object.prototype.hasOwnProperty.call(k.properties, 'content'); }).length : 0;` : ''}
-${modDirection ? emitDirectionCheck(`app.getItemById(${ID})`, modDirection) : ''}${modTabular ? emitTabularCheck(`app.getItemById(${ID})`) : ''}${modFillOpacity ? emitFillOpacityCheck(`app.getItemById(${ID})`) : ''}${modStrokePos ? emitStrokePositionCheck(`app.getItemById(${ID})`, modStrokePos) : ''}
-return { success: true, itemId: ${ID}${properties.content !== undefined ? `, ...(__ctKeys ? { contentTrackWarning: 'this text\\'s content is keyframed (' + __ctKeys + ' key(s)), so the track sets it on every frame and this edit does not show. Change the content keys with pinepaper_keyframe_animate (append: true replaces same-time keys), or animate another property.' } : {})` : ''}${modFit ? ', textFit: __textFit' : ''}${modDirection ? ', direction: __direction' : ''}${modTabular ? ', tabularFigures: __tabular' : ''}${modFillOpacity ? ', fillOpacity: __fillOpacity' : ''}${modStrokePos ? ', strokePosition: __strokePos' : ''}${affine ? `, affine: ${jsLiteral({ skewX, skewY, matrix, note: 'applied to the current shape: calling again compounds it. To undo, apply the inverse (negative skew, or the inverse matrix).' })}` : ''}${modLifetime ? ', lifetime: __lifetime' : ''}${modFont ? ', ...(__font ? { font: __font } : {})' : ''}${modWarning} };`;
+${modDirection ? emitDirectionCheck(`app.getItemById(${ID})`, modDirection) : ''}${modTabular ? emitTabularCheck(`app.getItemById(${ID})`) : ''}${modTypography.length ? emitTypographyCheck(`app.getItemById(${ID})`, modTypography) : ''}${modFillOpacity ? emitFillOpacityCheck(`app.getItemById(${ID})`) : ''}${modStrokePos ? emitStrokePositionCheck(`app.getItemById(${ID})`, modStrokePos) : ''}
+return { success: true, itemId: ${ID}${properties.content !== undefined ? `, ...(__ctKeys ? { contentTrackWarning: 'this text\\'s content is keyframed (' + __ctKeys + ' key(s)), so the track sets it on every frame and this edit does not show. Change the content keys with pinepaper_keyframe_animate (append: true replaces same-time keys), or animate another property.' } : {})` : ''}${modFit ? ', textFit: __textFit' : ''}${modDirection ? ', direction: __direction' : ''}${modTabular ? ', tabularFigures: __tabular' : ''}${modTypography.length ? ', typography: __typography' : ''}${modFillOpacity ? ', fillOpacity: __fillOpacity' : ''}${modStrokePos ? ', strokePosition: __strokePos' : ''}${affine ? `, affine: ${jsLiteral({ skewX, skewY, matrix, note: 'applied to the current shape: calling again compounds it. To undo, apply the inverse (negative skew, or the inverse matrix).' })}` : ''}${modLifetime ? ', lifetime: __lifetime' : ''}${modFont ? ', ...(__font ? { font: __font } : {})' : ''}${modWarning} };`;
 
   // Wrapped, because the body now RETURNS early on a miss rather than falling
   // through to an unconditional success. Async only when a font must load
@@ -5993,7 +6029,7 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
 
   generateAgentExport(input: AgentExportInput): string {
     const validated = AgentExportInputSchema.parse(input);
-    const { platform, format, quality, framing, duration, estimateOnly, scale, fps, pdf: pdfOpts, region, time: stillTime, maxBytes, loop: gifLoop, broadcast, broadcastHeadroom, bitrate, minBitrate, bitrateMode, transparent, alphaQuantizer, deterministic, motionBlur, ad: adOpts, frames, startTime } = validated;
+    const { platform, format, quality, framing, duration, estimateOnly, scale, fps, pdf: pdfOpts, region, time: stillTime, maxBytes, loop: gifLoop, broadcast, broadcastHeadroom, bitrate, minBitrate, bitrateMode, audioCodec, transparent, alphaQuantizer, deterministic, motionBlur, ad: adOpts, frames, startTime } = validated;
   // Encoder options (FxTool 16719759); the schema keeps them to mp4 / webm.
   const videoEncodeOpts: Record<string, unknown> = {};
   // A RANGE of the timeline (FxTool #250): frames for t in [startTime, startTime + duration), each exactly the frame
@@ -6009,8 +6045,12 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
   if (bitrate !== undefined) videoEncodeOpts.bitrate = bitrate;
   if (minBitrate !== undefined) videoEncodeOpts.minBitrate = minBitrate;
   if (bitrateMode !== undefined) videoEncodeOpts.bitrateMode = bitrateMode;
-  // Byte-identical repeats (FxTool 3b335567): the container timestamps are
-  // the only bytes that varied, and this pins them.
+  // B45 (FxTool #288): 'aac' makes the studio refuse an MP4 whose soundtrack would be Opus (code
+  // audio_codec_unavailable) rather than write a file WhatsApp rejects. 'any' is the engine's default, so not sent.
+  if (audioCodec === 'aac') videoEncodeOpts.audioCodec = 'aac';
+  // Determinism (B31, the contract signed off in FxTool #290): identical encoder
+  // input and a container identical apart from the encoded samples; the file
+  // itself repeats only where the studio reports bitExact: true.
   if (deterministic) videoEncodeOpts.deterministic = true;
   // Motion blur (FxTool #55): the engine forwards it on every mp4/webm path
   // (quickExport, the agent paths, the export store, videoExporter.export).
@@ -7277,7 +7317,8 @@ ${deterministic ? `  // DETERMINISTIC: the container timestamps are pinned eithe
     if (__exact === false) {
       result.fidelity = result.fidelity || { warnings: [] };
       result.fidelity.warnings = (result.fidelity.warnings || []).concat([{ code: 'determinism_not_pinned',
-        message: 'deterministic was asked for, but no encoder on this machine repeats byte for byte at this size (the studio test-encoded and checked): the pixels may differ slightly between runs. Do not cache this file by hash; a different frame size may repeat.' }]);
+        ...(__vr && __vr.cause ? { cause: __vr.cause } : {}),
+        message: 'deterministic was asked for, but no encoder on this machine repeats byte for byte at this size (the studio test-encoded and checked' + (__vr && __vr.cause === 'h264-threaded' ? ': the software H.264 encoder is multi-threaded and takes no fixed quantizer' : '') + '). What still holds: the frames fed to the encoder are identical (compare frameDigest, not sha256), and the container is identical apart from the encoded samples. Do not cache this file by hash; export WebM for a byte-identical file.' }]);
       if (result.fidelity.note) delete result.fidelity.note;
     } else if (__exact === null && __hw !== 'prefer-software') {
       result.fidelity = result.fidelity || { warnings: [] };

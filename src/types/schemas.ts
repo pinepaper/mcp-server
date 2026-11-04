@@ -2814,11 +2814,12 @@ export const AgentExportInputSchema = z.object({
     subframes: z.number().int().min(1).max(32).optional().describe('Renders per frame (default 8; 1 = no blur). Export time scales with it.'),
     shutter: z.number().min(0).max(1).optional().describe('Fraction of the frame interval the shutter is open (default 0.5, a 180° shutter).'),
   }).optional().describe('mp4 / webm: real motion blur. Each frame is rendered subframes times across the shutter and averaged, so fast movement smears instead of strobing. Costs subframes× the render time: run estimateOnly first, which reports renders and renderCost.'),
-  deterministic: z.boolean().optional().describe('mp4 / webm: pins the container\'s creation / modification timestamps; nothing about the pixels changes. WebM then comes out byte-identical. An MP4\'s encoded bytes can still differ run to run (the H.264 encoder is not bit-exact), so compare MP4s by the receipt\'s frameDigest, not sha256.'),
+  deterministic: z.boolean().optional().describe('mp4 / webm: the same scene, seed and settings feed the encoder identical frames (the receipt\'s frameHashes / frameDigest show it) and the container is identical apart from the encoded samples. WebM is byte-identical. An MP4 is byte-identical only when result.video reports bitExact: true (same machine and browser build); a software H.264 MP4 at 640x480 and above is not, and says so with a determinism_not_pinned warning. Compare MP4s by frameDigest, not sha256.'),
   broadcastHeadroom: z.number().int().min(0).max(40).optional().describe('mp4 with broadcast only (default 12 with broadcast): luma codes kept clear at both ends of 16-235, so encoder ringing stays legal. 12 measured clean on hard edges; 4 cuts out-of-range samples ~100x, 12 ~1000x; never to zero, so a legaliser pass is still required (result fidelity names it).'),
   bitrate: z.number().int().min(100_000).max(200_000_000).optional().describe('mp4 / webm: target bits per second, replacing the quality-derived one. The browser encoder treats it as a CEILING: simple content comes out lower, and result.video.achievedBitrate says what it was.'),
   minBitrate: z.number().int().min(100_000).max(200_000_000).optional().describe('mp4 / webm: a floor under the target. If the achieved bitrate misses it, fidelity warns and names the re-encode a delivery spec needs.'),
   bitrateMode: z.enum(['constant', 'variable']).optional().describe("mp4 / webm: 'constant' (the default with broadcast) or 'variable'."),
+  audioCodec: z.enum(['any', 'aac']).optional().describe("mp4 only: 'aac' demands an AAC soundtrack. Where the browser has no AAC encoder (Chromium on Linux; macOS and Windows use the system encoder) the export is refused before its first frame with code audio_codec_unavailable instead of muxing Opus, which WhatsApp and many players reject. 'any' (the default) muxes Opus there and warns (audio_codec_opus, whatsappSafe: false). A silent MP4 is AAC everywhere. A current studio reads it; an older one ignores it."),
   time: z.number().min(0).optional().describe('Stills only (png / jpg / webp / svg / pdf): render the scene at this time in seconds. Without it a still is taken at wherever the playhead happens to be, so two identical runs can differ.'),
   region: z.object({
     x: z.number(), y: z.number(),
@@ -2845,6 +2846,9 @@ export const AgentExportInputSchema = z.object({
       if (val[k] !== undefined && val.format !== 'mp4' && val.format !== 'webm') {
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: [k], message: `${k} is a video setting: mp4 or webm. A gif's size is set by maxBytes and scale.` });
       }
+    }
+    if (val.audioCodec !== undefined && val.format !== 'mp4') {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['audioCodec'], message: "audioCodec is an mp4 setting. A webm's soundtrack is Opus, which WebM players expect." });
     }
     if (val.bitrate !== undefined && val.minBitrate !== undefined && val.minBitrate > val.bitrate) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['minBitrate'], message: 'minBitrate is above bitrate; the floor would override the target. Drop one, or lower minBitrate.' });

@@ -19,6 +19,7 @@
 export const REQUIRED_ENGINE_METHODS: readonly string[] = [
   '_applyScaleParams',
   '_applySkewKeyframePose',
+  '_applyTextTypography',
   '_writeRasterPixels',
   'addAnimation',
   'addComment',

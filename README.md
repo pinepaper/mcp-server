@@ -281,8 +281,28 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 
 ## What's new in 1.6.32
 
+### Added
+
+- Text takes `wordSpacing`, `textTransform` (`uppercase`, `lowercase`,
+  `capitalize`), `textDecoration` (`underline`, `line-through`, `overline`,
+  combinable) and `textAlign: 'justify'` on create, modify and keyframes, on a
+  studio that draws them. They are no longer reported as ignored. The reply's
+  `typography` reads back what the item holds, and says so where the studio
+  does not draw them.
+- `pinepaper_agent_export` takes `audioCodec: 'aac'` for an MP4. Where the
+  browser has no AAC encoder (Chromium on Linux), the export is refused before
+  the first frame (`audio_codec_unavailable`) instead of writing a file whose
+  Opus soundtrack WhatsApp rejects. Without it, such an export carries Opus and
+  the `audio_codec_opus` warning, as before.
+
 ### Fixed
 
+- The `deterministic` docs state what a repeat export guarantees: identical
+  frames into the encoder (compare `frameDigest`), and a container identical
+  apart from the encoded samples. WebM is byte-identical; an MP4 is
+  byte-identical only where the export reports `bitExact: true`. The
+  `determinism_not_pinned` warning now says what still holds and names the
+  cause when the studio reports one.
 - A custom relation now names an option it never reads, as built-in relations
   do (`bobble does not read ampp, so it was ignored`). What it reads is worked
   out when it is registered: its declared params and every `params.X` in its
