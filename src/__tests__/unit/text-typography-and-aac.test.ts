@@ -77,6 +77,24 @@ describe('WORDSPC: text typography on create and modify', () => {
     expect(runModify({ itemId: 'item_1', properties: { wordSpacing: 8 } }, studio(false).app).typography.applied).toBe(false);
   });
 
+  it('textAlign is replaced by justification, not sent beside it (the engine called it refused)', () => {
+    const seen: Array<Record<string, unknown>> = [];
+    const { app } = studio(true);
+    const create = app.create as (t: string, p: Record<string, unknown>) => unknown;
+    app.create = (t: string, p: Record<string, unknown>) => { seen.push(p); return create(t, p); };
+    runCreate({ itemType: 'text', position: { x: 0, y: 0 }, properties: { content: 'a b', textAlign: 'justify' } }, app);
+    runCreate({ itemType: 'text', position: { x: 0, y: 0 }, properties: { content: 'a b', align: 'end' } }, app);
+    expect(seen[0].justification).toBe('justify');
+    expect('textAlign' in seen[0]).toBe(false);
+    expect(seen[1].justification).toBe('right');
+    expect('align' in seen[1]).toBe(false);
+    const modified: Array<Record<string, unknown>> = [];
+    const mod = app.modifyItem as (id: string, ch: Record<string, unknown>) => unknown;
+    app.modifyItem = (id: string, ch: Record<string, unknown>) => { modified.push(ch); return mod(id, ch); };
+    runModify({ itemId: 'item_1', properties: { textAlign: 'start' } }, app);
+    expect(modified[0]).toEqual({ justification: 'left' });
+  });
+
   it('text without these keys carries no typography field', () => {
     const r = runCreate({ itemType: 'text', position: { x: 0, y: 0 }, properties: { content: 'plain', textAlign: 'left' } }, studio(true).app);
     expect(r.typography).toBeUndefined();

@@ -412,11 +412,13 @@ function generateCreateItemCode(
   if (properties.content === undefined && properties.text !== undefined) {
     properties = { ...properties, content: properties.text };
   }
+  // The alias replaces the key: left beside justification, the engine's receipt
+  // reported textAlign 'justify' as refused while it had been applied.
   if (properties.justification === undefined) {
-    if (properties.textAlign !== undefined) {
-      properties = { ...properties, justification: properties.textAlign };
-    } else if (properties.align !== undefined) {
-      properties = { ...properties, justification: properties.align };
+    const alignKey = properties.textAlign !== undefined ? 'textAlign' : properties.align !== undefined ? 'align' : null;
+    if (alignKey) {
+      const { [alignKey]: alignValue, ...rest } = properties;
+      properties = { ...rest, justification: cssAlignToJustification(alignValue) };
     }
   }
 
@@ -1003,6 +1005,17 @@ function anchorHold(anchor: unknown): 'top' | 'bottom' | undefined {
  * longer names them; the reply instead reads item.data, so an older studio is
  * still named rather than reported as done.
  */
+/**
+ * textAlign / align, the CSS names, as Paper's justification: start / end read
+ * left / right and centre reads center, as the engine's own textAlign door does.
+ * Anything else passes through for the engine to judge (and report).
+ */
+function cssAlignToJustification(v: unknown): unknown {
+  if (typeof v !== 'string') return v;
+  const k = v.trim().toLowerCase();
+  return ({ start: 'left', end: 'right', centre: 'center', left: 'left', center: 'center', right: 'right', justify: 'justify' } as Record<string, string>)[k] ?? v;
+}
+
 const TYPOGRAPHY_KEYS = ['wordSpacing', 'textTransform', 'textDecoration'] as const;
 function typographyRequest(props: Record<string, unknown>): string[] {
   const keys: string[] = TYPOGRAPHY_KEYS.filter((k) => props[k] !== undefined);
@@ -1269,11 +1282,11 @@ function generateModifyItemCode(
   const aliased = new Set<string>();
   if (restProperties.justification === undefined) {
     if (restProperties.textAlign !== undefined) {
-      restProperties.justification = restProperties.textAlign;
+      restProperties.justification = cssAlignToJustification(restProperties.textAlign);
       delete restProperties.textAlign;
       aliased.add('textAlign');
     } else if (restProperties.align !== undefined) {
-      restProperties.justification = restProperties.align;
+      restProperties.justification = cssAlignToJustification(restProperties.align);
       delete restProperties.align;
       aliased.add('align');
     }
