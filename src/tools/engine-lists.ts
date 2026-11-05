@@ -4,7 +4,7 @@
  * Name lists the engine owns and the tool surface must offer exactly. See
  * scripts/sync-engine-lists.mjs for why each is generated.
  *
- * Source: FxTool origin/main 0434e9601ac9e5576a4f85dfa0fc75ad8718bfa5
+ * Source: FxTool origin/main 7c9f66e78256f3b86732ddec994070a63079befd
  *   js/core/KeyframeInterpolator.js  sha256: 342034825a057d6d
  *   js/world3d/worlds.js  sha256: 0e0973f7587c06e1
  *   js/core/DesignMedia.js  sha256: ab07f330e4060cb7
@@ -13,9 +13,9 @@
  *   js/core/StyledScene.js  sha256: 550fd9b58b7f5d87
  *   js/core/Patterns.js  sha256: a04fe3805f4e9d4f
  *   js/relations/expr-to-ir.js  sha256: 4d92d2f42b3356e9
- *   js/RelationRegistry.js  sha256: d97cf08c75ffdb7c
+ *   js/RelationRegistry.js  sha256: 3b336929df56ac5c
  *   js/core/AnimationDriver.js  sha256: 6741a73f5f489355
- *   js/PinePaper.js  sha256: f70e0a44ff1313fa
+ *   js/PinePaper.js  sha256: de95df018289a9eb
  */
 
 /** 39 names: EASING_NAMES, the keys of the engine's easing table. Keyframes, masks, relations and the camera all resolve through it. */

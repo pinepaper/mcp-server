@@ -278,6 +278,15 @@ export const PP_VOCABULARY: PinePaperVocabulary = {
     'pp:restoresFrom': { description: 'At LOAD, once, before the first frame, set a property on this item from a stored key — with a fallback when the key is absent. The read half of persistence: without it a store is write-only and continuity across sessions, the entire point, does not exist.', category: 'event', directionality: 'item → store', parentType: 'pp:Relation' },
     'pp:attachedToTail': { description: 'A diagram port is bound to an arrow\'s TAIL, so the connector\'s start follows the item as it moves. Half of what makes a flowchart survive being rearranged.', category: 'structural', directionality: 'port → arrow', parentType: 'pp:Relation' },
     'pp:headPointsTo': { description: 'An arrow\'s HEAD is bound to a diagram port, so the connector\'s end follows the item. The counterpart of pp:attachedToTail; together they are why a connector stays connected.', category: 'structural', directionality: 'arrow → port', parentType: 'pp:Relation' },
+    'pp:then': { description: 'The target item begins playback when the source item completes, with an optional time offset. Moving or extending the source re-times the target and any downstream sequence chain automatically.', category: 'animation', directionality: 'source → target', parentType: 'pp:Relation' },
+    'pp:after': { description: 'The source item begins playback after the target item completes, with an optional time offset. Moving or extending the target re-times the source and any downstream sequence chain automatically.', category: 'animation', directionality: 'source → target', parentType: 'pp:Relation' },
+    'pp:onComplete': { description: 'Fires an event pulse or triggers target animation when source completes its track across choreograph, keyframe, morph, or rig tracks.', category: 'animation', directionality: 'source → target', parentType: 'pp:Relation' },
+    'pp:atBeat': { description: 'Fires an event pulse or triggers target animation when source reaches a declared musical beat or time along its track clock.', category: 'animation', directionality: 'source → target', parentType: 'pp:Relation' },
+    'pp:phaseWave': { description: 'Applies a traveling phase wave (phase = index * delta) across a collection (Group or set of members) on property x, y, rotation, opacity, or scale. Declared once over the set.', category: 'animation', directionality: 'source → target', parentType: 'pp:Relation' },
+    'pp:ringForming': { description: 'Assembles collection members into an evenly spaced circular/elliptical ring around a center point or target item over a declared duration.', category: 'animation', directionality: 'source → target', parentType: 'pp:Relation' },
+    'pp:flock': { description: 'Simulates deterministic Reynolds boids flocking (separation, alignment, cohesion, target seeking) across members of a collection.', category: 'animation', directionality: 'source → target', parentType: 'pp:Relation' },
+    'pp:cameraTracks': { description: 'Camera viewport tracks target item with smooth pursuit, deadzone, composition framing (rule of thirds, lead room) and optional cinematic letterbox framing.', category: 'camera', behaviorType: 'constraint', directionality: 'viewport follows target item', mathFunctions: ['exponentialPursuit'], parentType: 'pp:SpatialRelation', mcpToolRef: 'pinepaper_add_relation' },
+    'pp:soundtrackCue': { description: 'Soundtrack cue anchored to an item\'s start, beat, or completion, honoring cue gain, note, and duration.', category: 'audio', behaviorType: 'trigger', directionality: 'source item timing anchors soundtrack cue', parentType: 'pp:AnimationRelation', mcpToolRef: 'pinepaper_add_relation' },
   },
 
   // --- Mathematical Functions Catalogue ---
@@ -692,6 +701,15 @@ export const RELATION_TYPE_MAP: Record<string, string> = {
   'syncs_with':            'pp:syncsWith',
   'tours':                 'pp:tours',
   'triggers_animation':    'pp:triggersAnimation',
+  'then':                  'pp:then',
+  'after':                 'pp:after',
+  'on_complete':           'pp:onComplete',
+  'at_beat':               'pp:atBeat',
+  'phase_wave':            'pp:phaseWave',
+  'ring_forming':          'pp:ringForming',
+  'flock':                 'pp:flock',
+  'camera_tracks':         'pp:cameraTracks',
+  'soundtrack_cue':        'pp:soundtrackCue',
 };
 
 /** Known easing names that map to math function keys. */

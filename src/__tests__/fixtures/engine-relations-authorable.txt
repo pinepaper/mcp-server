@@ -1,6 +1,8 @@
+after
 aligned_with
 anchored_in_world
 animates
+at_beat
 attached_to
 attached_to_tail
 attracts
@@ -13,6 +15,7 @@ bone_skinned
 bounds_to
 camera_animates
 camera_follows
+camera_tracks
 centered_on
 circumscribes
 concentric_with
@@ -62,6 +65,7 @@ effect_trail
 effect_vortex
 exclusive_group
 expresses
+flock
 follows
 geo_adjacent_to
 geo_centers_on
@@ -88,6 +92,7 @@ mirrors
 morphs_to
 moves_along_path
 on_click_fire
+on_complete
 on_enter_increment
 on_enter_set_color
 on_enter_set_data
@@ -125,17 +130,21 @@ on_top_of
 orbits
 parallax
 part_of
+phase_wave
 points_at
 pose_layer
 reacts_to
 reacts_to_audio
 repels
 restores_from
+ring_forming
 says
+soundtrack_cue
 spring_follow
 staggered_with
 synced_to_audio
 syncs_with
+then
 time_expression
 tours
 triggers_animation

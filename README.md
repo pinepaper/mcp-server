@@ -283,6 +283,12 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 
 ### Added
 
+- Nine long-form relations from FxTool #162: `then` and `after` for cascading
+  sequential re-timing, collection relations `phase_wave`, `ring_forming` and
+  `flock` (boids simulation with per-member phase), event triggers `on_complete`
+  and `at_beat` on the unified hook clock, and shot and cue relations
+  `camera_tracks` (smooth tracking with rule-of-thirds framing and letterbox
+  integration) and `soundtrack_cue`.
 - Text takes `wordSpacing`, `textTransform` (`uppercase`, `lowercase`,
   `capitalize`), `textDecoration` (`underline`, `line-through`, `overline`,
   combinable) and `textAlign: 'justify'` on create, modify and keyframes, on a

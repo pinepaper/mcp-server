@@ -9,9 +9,9 @@
  * across five lists is exactly the shape that drifts, and every enum this repo
  * hand-maintained against FxTool drifted silently.
  *
- * Source: FxTool origin/main 0434e9601ac9e5576a4f85dfa0fc75ad8718bfa5
+ * Source: FxTool origin/main 7c9f66e78256f3b86732ddec994070a63079befd
  *   js/vendor/stick/figure-rigged.js
- * sha256: 582d1fd66061000d
+ * sha256: 7f12d6cd71ab111f
  */
 
 /** 10 names — how a figure walks — gait. */
@@ -28,7 +28,7 @@ export const STICK_GAITS: readonly string[] = Object.freeze([
   'tiptoe',
 ]);
 
-/** 27 names — a single pose, and the entries of a `poses` track. */
+/** 34 names — a single pose, and the entries of a `poses` track. */
 export const STICK_POSES: readonly string[] = Object.freeze([
   'stand',
   'walkA',
@@ -56,10 +56,17 @@ export const STICK_POSES: readonly string[] = Object.freeze([
   'pull',
   'offer',
   'hug',
+  'guard',
+  'punch',
+  'kick',
+  'dodge',
+  'bow',
+  'think',
+  'dance',
   'holdHands',
 ]);
 
-/** 14 names — a named pose track — sequence. */
+/** 18 names — a named pose track — sequence. */
 export const STICK_SEQUENCES: readonly string[] = Object.freeze([
   'greet',
   'agree',
@@ -75,6 +82,10 @@ export const STICK_SEQUENCES: readonly string[] = Object.freeze([
   'startle',
   'embrace',
   'letGo',
+  'boxCombo',
+  'dodgeCounter',
+  'eureka',
+  'groove',
 ]);
 
 /** 17 names — a face — expression, and the entries of `expressions`. */

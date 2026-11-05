@@ -403,6 +403,14 @@ export const RelationTypeSchema = z.enum([
   'moves_along_path',
   'construction_reveal',
   'triggers_animation',
+  'then',
+  'after',
+  'on_complete',
+  'at_beat',
+  'phase_wave',
+  'ring_forming',
+  'flock',
+  'soundtrack_cue',
   'syncs_with',
   'tours',
   'synced_to_audio',
@@ -410,6 +418,7 @@ export const RelationTypeSchema = z.enum([
   'expresses',
   // --- Camera ---
   'camera_follows',
+  'camera_tracks',
   'camera_animates',
   // --- Geometry ---
   'is_midpoint_of',
