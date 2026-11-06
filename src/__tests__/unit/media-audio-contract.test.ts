@@ -223,10 +223,9 @@ describe('a remap that the clip window cannot carry is warned about (2.17)', () 
 });
 
 describe('keyframe loop:true carries the export caveat (2.24)', () => {
-  it('notes it only when loop is on', () => {
+  it('makes no claim about a loop: loop:true cycles in export (LOOPKEY31)', () => {
     const kf = [{ time: 0, properties: { rotation: 0 } }, { time: 1, properties: { rotation: 90 } }];
-    expect(codeGenerator.generateKeyframeAnimate({ itemId: 'item_4', keyframes: kf, loop: true } as never)).toContain('loopNote');
-    expect(codeGenerator.generateKeyframeAnimate({ itemId: 'item_4', keyframes: kf } as never)).not.toContain('loopNote');
+    expect(codeGenerator.generateKeyframeAnimate({ itemId: 'item_4', keyframes: kf, loop: true } as never)).not.toContain('loopNote');
   });
 });
 

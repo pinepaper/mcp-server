@@ -17,7 +17,7 @@ describe('keyframe warnings on both routes', () => {
   const batch = gen.generateAgentBatchExecute({ operations: [{ type: 'keyframe_animate', itemId: 'item_1', keyframes: KEYS, loop: true }] } as never);
   for (const [field, why] of [
     ['sizekeyPairWarning', 'x beside fontSize on an older studio'],
-    ['loopNote', 'loop in an export'],
+    
     ['gapWarning', 'a key that leaves out fontSize'],
     ['note:', 'easing on the first key'],
   ]) {

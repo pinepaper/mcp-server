@@ -38,8 +38,14 @@ function writtenIndexes(ops: unknown[], expandedLength: (op: Record<string, unkn
 }
 
 /** Where a property the run reported was written: inside `properties`, or flat on the call. */
-const propertyPath = (at: string, holder: unknown, key: string): string =>
-  (isObj(holder) && isObj(holder.properties) && holder.properties[key] !== undefined ? `${at}properties.${key}` : `${at}${key}`);
+function propertyPath(at: string, holder: unknown, key: string): string {
+  if (!isObj(holder)) return `${at}${key}`;
+  if (isObj(holder.properties) && holder.properties[key] !== undefined) return `${at}properties.${key}`;
+  // A keyframe track: the first key that has it.
+  const keys = Array.isArray(holder.keyframes) ? holder.keyframes : [];
+  const i = keys.findIndex((k) => isObj(k) && isObj(k.properties) && k.properties[key] !== undefined);
+  return i >= 0 ? `${at}keyframes[${i}].properties.${key}` : `${at}${key}`;
+}
 
 const OP_OPTIONS: Readonly<Record<string, string>> = { relation: 'relationOptions', animate: 'animationOptions' };
 

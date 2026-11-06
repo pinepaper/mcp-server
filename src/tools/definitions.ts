@@ -604,7 +604,7 @@ ADVANCED STYLING (NEW):
 All shapes support these additional properties:
 - No fill (stroke-only outlines, line art): fillColor: null, 'transparent' or 'none', with a strokeColor and strokeWidth.
 - fillOpacity (0..1): the solid fill's own alpha, apart from opacity (which fades the stroke too) — on text, fillOpacity: 0.3 with a strokeColor is a see-through letter with a solid outline. Not applied to a gradient fill. The result's fillOpacity says whether the studio applied it (an older studio ignores the key and says so).
-- Gradients: color can be an object: {type: "linear"|"radial", stops: [{color: "#fff", offset: 0}, {color: "#000", offset: 1}], origin: [x,y], destination: [x,y]}. Without origin / destination a radial gradient is centred on the item's own bounds and reaches its right edge, wherever anchor put it.
+- Gradients: color can be an object: {type: "linear"|"radial", stops: [{color: "#fff", offset: 0}, {color: "#000", offset: 1}], origin: [x,y], destination: [x,y]}. Without origin / destination a radial gradient is centred on the item's own bounds and reaches its right edge, wherever anchor put it; a linear one is a short fixed ramp around the item's centre, not fitted to its bounds, so pass origin and destination (canvas px) for a ramp across the item.
 - Shadows: shadowColor, shadowBlur (pixels), shadowOffset: [x, y]
 - Blend modes: blendMode: "multiply"|"screen"|"overlay"|"darken"|"lighten"|etc.
 - Opacity: opacity (0-1)
@@ -1247,6 +1247,9 @@ EXAMPLES:
     inputSchema: {
       type: 'object',
       properties: {
+        opacity: { type: 'number', minimum: 0, maximum: 1, description: 'Opacity, 0 to 1. The same as pinepaper_modify_item after the import.' },
+        blendMode: { type: 'string', description: "How it composites over what is below: 'multiply', 'screen' and the other pinepaper_modify_item blend modes." },
+        scale: { type: 'number', exclusiveMinimum: 0, description: 'Multiplies the size maxWidth / maxHeight / maxEdge gave it.' },
         url: {
           type: 'string',
           description: 'URL of the image to import',
@@ -3716,7 +3719,7 @@ STRUCTURAL LAYOUT (S12) — express STATIC COMPOSITION as relations instead of h
 
 CURSOR / MOUSE AS TARGET — a relation can target the live pointer instead of an item by passing the reserved targetId 'cursor' (aliases 'mouse' / 'pointer'); collaborator cursors are 'cursor:<peerId>'. e.g. make an item flee the mouse: relationType 'repels', targetId 'cursor', params { returnSpeed: 0.08 }. The cursor is a virtual target (no canvas item) and its interactions are inspectable in FxTool's "Mouse / Cursor" registry section.
 
-TEMPORAL VALIDITY WINDOWS (temporal-model v1) — ANY relation may carry params.window = { start, end?, repeat? } (scene seconds) to gate WHEN it is active. The engine only applies the relation within [start, end) and feeds it window-relative local time (so an orbit/wave starts its phase at the window open, not at scene 0). repeat ∈ once (default) | loop | pingpong. Omit end for open-ended. Windowless relations are always active. e.g. params: { ...relationParams, window: { start: 2, end: 5 } } makes the relation live only from 2s to 5s.
+TEMPORAL VALIDITY WINDOWS (temporal-model v1) — ANY relation may carry params.window = { start, end?, repeat? } (scene seconds) to gate WHEN it is active. The engine only applies the relation within [start, end) and feeds it window-relative local time (so an orbit/wave starts its phase at the window open, not at scene 0). repeat ∈ once (default) | loop | pingpong. Omit end for open-ended. Windowless relations are always active. An on_event_* reaction fires outside this check, so a window does not gate it. e.g. params: { ...relationParams, window: { start: 2, end: 5 } } makes the relation live only from 2s to 5s.
 
 VERIFYING ANIMATION WORKS:
 After adding a relation, verify the animation is running:
@@ -4075,7 +4078,7 @@ ANIMATABLE PROPERTIES:
 - x, y: Individual coordinates
 - scale: Uniform scale
 - scaleX, scaleY: Axis scaling
-- rotation: Degrees
+- rotation: Degrees. Keys interpolate as plain numbers, with no short way round: 350 to 10 sweeps back through 180. Key 350 to 370 to cross zero.
 - opacity: 0-1
 - fillColor: Color string
 - strokeColor: Color string
@@ -4086,7 +4089,7 @@ ANIMATABLE PROPERTIES:
 - STROKE DRAW-ON (paths): trimStart, trimEnd (0-1 of the path's length), trimOffset (shifts the visible window along it), dashArray. A draw-on is trimEnd 0 -> 1.
 The authoritative list for a given item is pinepaper_get_animatable_properties — ask it rather than guessing.
 
-EASING — BY DEFAULT IT SHAPES THE SEGMENT ARRIVING AT THE KEYFRAME IT IS ON.
+EASING — BY DEFAULT IT SHAPES THE SEGMENT ARRIVING AT THE KEYFRAME IT IS ON. It belongs to the key, not to one property: 'step' on a key holds every property in that key, so keep a stepped property in its own call from one that moves.
 The move from keyframe A to keyframe B is eased by B's easing, not A's. So by default the FIRST keyframe's easing has no effect (no segment arrives at it) — a Ken Burns with easing only on its first key plays linear. Put the easing on the key you are moving TO, or pass easingAt: 'departure' for the other reading: each key's easing shapes the move LEAVING it, so the first key's easing eases the first move (current studio; an older one reads arrival and the result says so). 'hold' / 'step' stay on the key they mark either way.
 ${EASING_LINES}
 - or a custom cubic-bezier [x1, y1, x2, y2] — x in 0..1, y may exceed 0..1 for overshoot. keyframe_animate and camera_animate only.
@@ -8280,8 +8283,8 @@ ACTIONS:
 
 SPEC:
 - mode: 'burst' (default) — bursts: [{ t, x, y, count, …per-burst overrides }]: a pop of particles at scene time t.
-- mode: 'trail' (or give target) — target (an item id), rate (per second), emitWindows [[t0, t1], …], window, offset: particles shed from a moving item.
-- look and physics (per emitter or per burst): shape ('circle' | 'rect' | 'dash' | 'star' | 'confetti', or an array), palette [colours], size / sizes / sizeEnd, speed + angle ranges or velocities ([[vx, vy], …] px/s, or [{x, y}, …]; particle i takes velocities[i % length], so give one per particle — the reply warns when count and the list differ), gravity (px/s², +down), drag, friction, lifetime, fadeIn / fadeOut, spin, opacity, jitter, jitterGrow, seed.
+- mode: 'trail' (or give target) — target (an item id), rate (per second), emitWindows [[t0, t1], …] (when it sheds), window [t0, t1] (when the WHOLE trail shows: it switches on and off at those times, with what was shed before t0 already there), offset ([dx, dy] or {x, y}): particles shed from a moving item. rate, start and end are trail settings: a burst emitter does not read them.
+- look and physics (per emitter or per burst): shape ('circle' | 'rect' | 'dash' | 'star' | 'confetti', or an array; size is a circle's diameter, a rect's or confetti's width (height is half of it), and a star's extent is 0.8 of it; a dash is a thin line drawn forward from the particle along its velocity), palette [colours], size / sizes / sizeEnd, speed + angle ranges or velocities ([[vx, vy], …] px/s, or [{x, y}, …]; particle i takes velocities[i % length], so give one per particle — the reply warns when count and the list differ), gravity (px/s², +down), drag (slows the launch velocity only: what gravity adds is not damped, so a falling particle has no terminal velocity), friction, lifetime, fadeIn / fadeOut, spin, opacity, jitter, jitterGrow, seed.
 UNITS (a number, or a [min, max] range picked per particle where it says range):
 - count: particles per burst, at most 10000 on the current studio (2000 on older studios) — a larger count is drawn at the cap and the reply warns with the number drawn. For more, add a second burst at the same t.
 - speed: px/s (range). angle: degrees, 0 = right, 90 = down (range). gravity: px/s². lifetime: seconds (range, > 0). size: px (range).
@@ -9236,7 +9239,6 @@ WHAT quality ACTUALLY SETS, because it bundles three things and only one of them
 The compression half is weaker than its name for VIDEO: on mp4 / webm it scales the encoder's resolution-derived target bitrate, and the browser encoder treats that target as a CEILING. A simple scene encodes well under either ceiling, so draft and high at the same fps can come out within bytes of each other; a scene with grain is encoded at a fixed quantizer and ignores it. To change a video's size or quality, use scale, or bitrate (with bitrateMode 'constant' to hold it); result.video.achievedBitrate says what the encoder produced. On jpg / webp stills compression IS the encoder quality, and lower means a smaller file.
 
 DOES THIS SURVIVE EXPORT? It is a PATH fact, not a per-feature one, so the rule is short and does not go stale as capabilities land: IF IT TICKS INSIDE THE ENGINE'S UPDATE LOOP, IT EXPORTS. Loop presets (pinepaper_animate), relations, keyframes, generators and camera moves all do - measured frame-by-frame, not assumed. What does NOT survive is anything driven by the wall clock outside that loop, or anything on the realtime recorder path.
-ONE MEASURED EXCEPTION TO CHECK: keyframe_animate's loop:true has been measured playing ONCE in an export and then holding the last keyframe. Before exporting past one cycle, sample a frame in the second cycle; if it holds, write the keyframes out for each cycle, or use a loop preset.
 
 SEAMLESS LOOPS: there is no loop switch on export. Key the animation to the SAME state at t = 0 and at t = duration, and export exactly that duration — the export renders t = 0 up to one frame before duration, so no frame is doubled at the wrap. A GIF's play count is the loop parameter.
 
@@ -9354,7 +9356,7 @@ VERIFY MOTION BEFORE YOU RENDER. An export takes seconds to minutes and shows yo
         },
         fps: {
           anyOf: [{ type: 'number', minimum: 1, maximum: 120 }, { type: 'string', pattern: '^[0-9]+/[0-9]+$' }],
-          description: 'Video only: frames per second, overriding whatever `quality` implies. Integers, NTSC rates (23.976, 29.97, 59.94 — snapped to the exact 24000/1001, 30000/1001, 60000/1001, which CTV / OTT specs require) or a rational string "30000/1001". At an NTSC rate a duration of N seconds is round(N x fps) frames, so 6 s at 29.97 is 180 frames = 6.006 s — the result says when that overruns the duration you asked for. File size is bitrate x duration and does not move with fps.',
+          description: 'Video only: frames per second, overriding whatever `quality` implies. Integers, NTSC rates (23.976, 29.97, 59.94 — snapped to the exact 24000/1001, 30000/1001, 60000/1001, which CTV / OTT specs require) or a rational string "30000/1001". At an NTSC rate a duration of N seconds is round(N x fps) frames, so 6 s at 29.97 is 180 frames = 6.006 s — the result says when that overruns the duration you asked for. The bitrate is a ceiling. A picture that needs it gets fewer bits per frame at a higher fps, at about the same size; one under it costs what its frames need, so its file grows with fps.',
         },
         scale: {
           type: 'number',

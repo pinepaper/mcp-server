@@ -2818,7 +2818,7 @@ export const ExportStoreInputSchema = z.object({
 export type ExportStoreInput = z.infer<typeof ExportStoreInputSchema>;
 
 export const AgentExportInputSchema = z.object({
-  platform: z.union([AgentPlatformSchema, z.literal('auto')]).optional().default('auto').describe('Target platform'),
+  platform: z.enum([...AgentPlatformSchema.options, 'auto']).optional().default('auto').describe('Target platform'),
   format: z.union([AgentExportFormatSchema, z.literal('auto')]).optional().default('auto').describe('Export format'),
   quality: z.enum(['draft', 'standard', 'high']).optional().default('standard').describe('Compression level, and the default frame rate unless fps is set: draft 15, standard 30, high 60. To control the size of an mp4 / webm, use scale or bitrate.'),
   includeRecommendations: z.boolean().optional().default(true).describe('Include alternative format recommendations'),
@@ -2842,7 +2842,7 @@ export const AgentExportInputSchema = z.object({
   }, z.number().min(1).max(120).transform((n) => {
     const ntsc: Record<string, number> = { '23.976': 24000 / 1001, '29.97': 30000 / 1001, '59.94': 60000 / 1001, '119.88': 120000 / 1001 };
     return ntsc[(Math.round(n * 1000) / 1000).toString()] ?? ntsc[(Math.round(n * 100) / 100).toString()] ?? n;
-  })).optional().describe('Video only: frames per second — an integer, an NTSC rate (23.976, 29.97, 59.94; snapped to the exact 24000/1001 …), or a rational string like "30000/1001". Overrides whatever `quality` implies. The tiers set it — draft 15, standard 30, high 60 — so asking for higher quality DOUBLES the frame count and the render time unless you say otherwise. File size is bitrate x duration and does not move with fps, but the picture gets fewer bits per frame at a higher one.'),
+  })).optional().describe('Video only: frames per second — an integer, an NTSC rate (23.976, 29.97, 59.94; snapped to the exact 24000/1001 …), or a rational string like "30000/1001". Overrides whatever `quality` implies. The tiers set it — draft 15, standard 30, high 60 — so asking for higher quality DOUBLES the frame count and the render time unless you say otherwise. The bitrate is a ceiling. A picture that needs it gets fewer bits per frame at a higher fps, at about the same size; one under it costs what its frames need, so its file grows with fps.'),
   scale: z.number().min(0.1).max(1).optional().describe('Video only: render at this fraction of the platform preset\'s dimensions (0.1-1). The engine derives its encode target from RESOLUTION unless bitrate is given, so this is the size control; halving the frame roughly quarters the pixels and the file. It is also the preview knob: scale 0.5 with quality "draft" is the fast look-check before committing to a full render. Rounded to even dimensions, which H.264 requires.'),
   sampleRate: z.number().int().positive().optional().describe('wav only: samples per second (default 48000). Ignored by every other format.'),
   bitDepth: z.union([z.literal(16), z.literal(32)]).optional().describe('wav only: 16 (default) or 32-bit float. Ignored by every other format.'),
@@ -3586,6 +3586,9 @@ export const ImportImageInputSchema = z.object({
   // arrived without the shadow it was asked for. Applied the way modify_item
   // applies them, to the item that is drawn (the mask group when masked).
   ...ShadowPropertiesSchema.shape,
+  opacity: z.number().min(0).max(1).optional().describe('Opacity, 0 to 1. The same as pinepaper_modify_item after the import.'),
+  blendMode: z.string().optional().describe("How it composites over what is below: 'multiply', 'screen' and the other pinepaper_modify_item blend modes."),
+  scale: z.number().positive().optional().describe('Multiplies the size maxWidth / maxHeight / maxEdge gave it.'),
 }).describe('Import image input');
 
 export type ImportImageInput = z.infer<typeof ImportImageInputSchema>;

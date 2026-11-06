@@ -98,3 +98,57 @@ describe('studioBuild on what renders', () => {
     expect(c.calls.some((x) => x.includes('app.buildId ?'))).toBe(false);
   });
 });
+
+describe('the tester package fixes', () => {
+  it('a target-less step relation actually returns its IIFE (no return + comment + newline)', () => {
+    const code = codeGenerator.generateAddRelation({ sourceId: 'item_5', relationType: 'on_event_step_active', params: { delta: 1, groupName: 'g' } } as never);
+    expect(code).not.toMatch(/return\s*\/\//);
+    const ran = new Function('app', `return ${code.trim().replace(/;$/, '')}`);
+    const calls: unknown[][] = [];
+    const app = { TARGETLESS_EVENT_RELATIONS: new Set(['on_event_step_active']), addRelation: (...a: unknown[]) => { calls.push(a); return true; }, historyManager: { saveState() {} } };
+    expect(ran(app)).toMatchObject({ success: true, targetId: null });
+    expect(calls).toHaveLength(1);
+  });
+
+  it('refuses it on a studio that would drop it', () => {
+    const code = codeGenerator.generateAddRelation({ sourceId: 'item_5', relationType: 'on_event_step_active', params: {} } as never);
+    const ran = new Function('app', `return ${code.trim().replace(/;$/, '')}`);
+    expect(ran({ addRelation() { throw new Error('must not bind'); } }).success).toBe(false);
+  });
+
+  it('a keyed filter setting is named by its key, and an animatable one is not', () => {
+    const r = reply({ ignoredProperties: ['brightness'] });
+    expect(reportedIgnoredPaths('pinepaper_keyframe_animate', { keyframes: [{ time: 0, properties: { x: 1 } }, { time: 1, properties: { brightness: 5 } }] }, r)).toEqual(['keyframes[1].properties.brightness']);
+    const code = (keys: Record<string, number>) => codeGenerator.generateKeyframeAnimate({ itemId: 'item_1', keyframes: [{ time: 0, properties: keys }, { time: 1, properties: keys }] } as never);
+    expect(code({ brightness: 1 })).toContain('"brightness"');
+    expect(code({ opacity: 1 })).not.toContain('"opacity"].filter');
+  });
+
+  it('import takes opacity, blendMode and scale through modify, on what is drawn', () => {
+    const code = codeGenerator.generateImportImage({ url: 'https://x/y.png', opacity: 0.5, blendMode: 'screen', scale: 2 } as never);
+    expect(code).toContain('app.modifyItem(itemId, {"opacity":0.5,"blendMode":"screen","scale":2})');
+    expect(codeGenerator.generateImportImage({ url: 'https://x/y.png' } as never)).not.toContain('__look');
+  });
+
+  it('an export names a sound past its end', () => {
+    expect(codeGenerator.generateAgentExport({ format: 'mp4', platform: 'auto', duration: 2 } as never)).toContain('sound_after_end');
+  });
+});
+
+describe('an emitter spec', () => {
+  it('reads a trail offset written either way, and says when bursts leave rate unread', async () => {
+    const { normalizeEmitterSpec } = await import('../../types/code-generator.js');
+    expect(normalizeEmitterSpec({ mode: 'trail', offset: { x: 1, y: 2 } }).spec.offset).toEqual([1, 2]);
+    expect(normalizeEmitterSpec({ mode: 'trail', offset: [1, 2] }).spec.offset).toEqual([1, 2]);
+    expect(normalizeEmitterSpec({ bursts: [{ t: 0, count: 1 }], rate: 5 }).warnings.join(' ')).toContain('rate is not read by a burst emitter');
+    expect(normalizeEmitterSpec({ mode: 'trail', target: 'a', rate: 5 }).warnings.join(' ')).not.toContain('not read by a burst');
+  });
+
+  it('platform refuses with the list', async () => {
+    const { AgentExportInputSchema } = await import('../../types/schemas.js');
+    const r = AgentExportInputSchema.safeParse({ format: 'mp4', platform: 'myspace' });
+    expect(r.success).toBe(false);
+    expect(JSON.stringify(r.error!.issues)).toContain('youtube');
+    expect(AgentExportInputSchema.safeParse({ format: 'mp4', platform: 'auto' }).success).toBe(true);
+  });
+});

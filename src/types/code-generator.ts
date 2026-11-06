@@ -8,7 +8,7 @@
 import { compileChoreography } from '../tools/choreograph.js';
 import { compileBatchTimelines, emitTimelineOpBody, type TimelinePlan } from '../tools/timeline.js';
 import { normalizeSvgSize } from '../utils/svg-size.js';
-import { WORLD3D_COLOR_PATHS, PATTERN_KINDS, EXPRESSION_FUNCTION_ARITY, EXPRESSION_CONSTANTS, EXPRESSION_REJECTED, RELATION_PARAM_KEYS, RELATION_LOOP_PARAMS, ANIMATION_OPTION_KEYS } from '../tools/engine-lists.js';
+import { WORLD3D_COLOR_PATHS, PATTERN_KINDS, EXPRESSION_FUNCTION_ARITY, EXPRESSION_CONSTANTS, EXPRESSION_REJECTED, RELATION_PARAM_KEYS, RELATION_LOOP_PARAMS, ANIMATION_OPTION_KEYS, FILTER_TYPES, FILTER_PARAM_RANGES } from '../tools/engine-lists.js';
 import { expressionGrammarText } from '../tools/expression-grammar.js';
 import { REQUIRED_ENGINE_METHODS, OPTIONAL_ENGINE_METHODS } from '../tools/engine-methods.js';
 import { NORMALIZE_PARAM_READS, MODIFY_CHANGE_READS } from '../tools/shape-params.js';
@@ -1895,9 +1895,17 @@ export function normalizeEmitterSpec(spec: Record<string, unknown>, assumeDefaul
   const fix = (o: Record<string, unknown>): Record<string, unknown> => {
     const out = { ...o };
     for (const k of ['velocities', 'offsets']) if (out[k] !== undefined) out[k] = pairs(out[k]);
+    // A trail's single offset is one pair; the studio reads [x, y] and dropped {x, y} with nothing said (TRAILOFF31).
+    const off = out.offset as { x?: unknown; y?: unknown } | undefined;
+    if (off && typeof off === 'object' && !Array.isArray(off) && typeof off.x === 'number' && typeof off.y === 'number') out.offset = [off.x, off.y];
     return out;
   };
   const out = fix(spec);
+  // rate, start and end drive a trail. Beside bursts they drew nothing and said nothing (EMITCONT31).
+  const trailOnly = ['rate', 'start', 'end'].filter((k) => spec[k] !== undefined);
+  if (trailOnly.length && Array.isArray(spec.bursts) && spec.mode !== 'trail' && spec.target === undefined) {
+    warnings.push(`${trailOnly.join(', ')} ${trailOnly.length > 1 ? 'are' : 'is'} not read by a burst emitter, so ${trailOnly.length > 1 ? 'they had' : 'it had'} no effect: only the bursts' own count is drawn. For particles over time, add bursts, or use mode 'trail' with a target.`);
+  }
   if (Array.isArray(spec.bursts)) out.bursts = spec.bursts.map((b) => (b && typeof b === 'object' ? fix(b as Record<string, unknown>) : b));
   // The studio's default count per burst (ParticleEmitter DEFAULT_LOOK).
   const DEFAULT_COUNT = 12;
@@ -2305,6 +2313,24 @@ function unanimatedTextKeysJs(keys: readonly string[]): string {
   })()`;
 }
 
+/**
+ * An image filter's parameter as a key: keyframe_animate stores it, and a filter does not read a track, so the item
+ * never changes with success:true (FILTKEY31). Asked of the same list, so a studio that starts animating one is believed.
+ */
+const FILTER_PARAM_KEYS: ReadonlySet<string> = new Set<string>([...Object.values(FILTER_PARAM_RANGES).flatMap((p) => Object.keys(p)), ...FILTER_TYPES].filter((k) => !['color', 'opacity', 'scale', 'x', 'y', 'rotation', 'size', 'radius', 'width', 'height', 'value', 'amount'].includes(k)));
+function unanimatedFilterKeysJs(keys: readonly string[]): string {
+  const filterKeys = [...new Set(keys)].filter((k) => FILTER_PARAM_KEYS.has(k));
+  if (!filterKeys.length) return '[]';
+  return `(function() {
+    let __l = null;
+    try { __l = typeof app.listAnimatableProperties === 'function' ? app.listAnimatableProperties() : null; } catch (_) { __l = null; }
+    if (!__l || !__l.properties) return [];
+    const __names = __l.properties.map(function(p) { return p && p.name; });
+    return ${JSON.stringify(filterKeys)}.filter(function(k) { return __names.indexOf(k) < 0; });
+  })()`;
+}
+const UNANIMATED_FILTER_KEYS_SENTENCE = `' is an image filter setting and not an animatable property, so the key had no effect. Set a fixed value with pinepaper_image_filter or pinepaper_add_filter, and animate opacity or scale for a change over time.'`;
+
 /** The sentence for the keys unanimatedTextKeysJs found, built in the page. */
 const UNANIMATED_TEXT_KEYS_SENTENCE = `' is not an animatable property in this studio (app.listAnimatableProperties does not list it), so it had no effect: a key animates only where that list names it. Here, set a fixed value with pinepaper_modify_item, or animate fontSize or scaleX. For a skew, key skewX / skewY (degrees) where the studio lists them, else a transform matrix track.'`;
 
@@ -2331,12 +2357,6 @@ function keyframeResultNotes(keyframes: readonly Keyframe[], { loop = false, app
     ? `, propertyGaps: ${JSON.stringify(gaps.slice(0, 10))}, gapWarning: ${JSON.stringify(`${gaps.length} keyframe(s) leave out a property other keys animate (${[...new Set(gaps.flatMap((g) => g.missing))].join(', ')}). The engine can break that property's track at such a key; repeat the value on every key — hold it by repeating the previous value.`)}`
     : '';
   const first = [...keyframes].sort((a, b) => a.time - b.time)[0] as { easing?: string } | undefined;
-  // loop:true repeats in the editor; an export of the measured build played
-  // the keyframes ONCE and held (round 7, 2.24). Said where it is set, with
-  // the two ways that do export, until the engine's export clock wraps them.
-  const loopNote = loop
-    ? `, loopNote: ${JSON.stringify('loop:true repeats in the editor, but has been measured playing ONCE in an exported video and then holding the last keyframe. For an export longer than one cycle, check a frame in the second cycle — if it holds, write the keyframes out per cycle, or use a loop preset (pinepaper_animate), which does cycle in export.')}`
-    : '';
   // SIZEKEY-PAIR (mcp-cloud #28): on a studio before FxTool #262, x (or
   // position) keyed beside fontSize on one text item drifted in an export: the
   // size was applied after the position, and a text resizes around its anchor.
@@ -2348,7 +2368,7 @@ function keyframeResultNotes(keyframes: readonly Keyframe[], { loop = false, app
   const easingNote = easingAt !== 'departure' && first?.easing && first.easing !== 'linear'
     ? `, note: ${JSON.stringify(`easing '${first.easing}' is on the first keyframe, where it has no effect by default: easing shapes the segment ARRIVING at a keyframe. Put it on the keyframe you are moving to, or pass easingAt: 'departure' to read every easing as the move LEAVING its key (current studio).`)}`
     : '';
-  return `${easingNote}${sizekeyPairNote}${loopNote}${gapNote}`;
+  return `${easingNote}${sizekeyPairNote}${gapNote}`;
 }
 
 function generateKeyframeAnimateCode(
@@ -2415,9 +2435,12 @@ function generateKeyframeAnimateCode(
   const textKeyCheck = textKeysJs ? `
   const __ignored = ${textKeysJs};
   if (__ignored.length) __warn.push(__ignored.join(', ') + ${UNANIMATED_TEXT_KEYS_SENTENCE});` : '';
+  const filterKeyCheck = `
+  const __filterIgnored = ${unanimatedFilterKeysJs(keyframes.flatMap((k) => Object.keys((k as { properties?: object }).properties ?? {})))};
+  if (__filterIgnored.length) __warn.push(__filterIgnored.join(', ') + ${UNANIMATED_FILTER_KEYS_SENTENCE});`;
   const easingAtCheck = easingAt !== undefined ? `
   if (__opts && Object.prototype.hasOwnProperty.call(__opts, 'easingAt')) __warn.push('easingAt ' + ${JSON.stringify(JSON.stringify(easingAt))} + ' was not applied: this studio predates it, so every easing was read as the move ARRIVING at its key. Put each easing on the key the move goes to instead.');` : '';
-  const runtimeWarning = `${textKeysJs ? ', ...(__ignored.length ? { ignoredProperties: __ignored } : {})' : ''}, ...(__warn.length ? { warning: __warn.join(' ') } : {})`;
+  const runtimeWarning = `, ...(${textKeysJs ? '__ignored.length || ' : ''}__filterIgnored.length ? { ignoredProperties: ${textKeysJs ? '__ignored.concat(__filterIgnored)' : '__filterIgnored'} } : {}), ...(__warn.length ? { warning: __warn.join(' ') } : {})`;
 
   const addAnimTarget = itemId.startsWith('$') ? '_targetId' : `${ID}`;
 
@@ -2432,7 +2455,7 @@ function generateKeyframeAnimateCode(
   const __prev = (__ki && __ki.data && Array.isArray(__ki.data.keyframes)) ? __ki.data.keyframes.map(function(k) { return k && k.time; }) : [];
   const __opts = ${JSON.stringify(opts)};
   app.addAnimation(${addAnimTarget}, ${keyframesJson}, __opts);
-  const __warn = [];${easingAtCheck}${textKeyCheck}
+  const __warn = [];${easingAtCheck}${textKeyCheck}${filterKeyCheck}
   const __now = (__ki && __ki.data && Array.isArray(__ki.data.keyframes)) ? __ki.data.keyframes.map(function(k) { return k && k.time; }) : [];
   const __kept = __prev.every(function(t) { return __now.indexOf(t) >= 0; });${append ? `
   // Property gaps across the merged track (the same check a single call makes
@@ -3896,7 +3919,7 @@ export class PinePaperCodeGenerator {
     const code = stepNoTarget
       ? `(function() {
   if (!${STEP_ACTIVE_TARGETLESS_JS}) return { success: false, relationType: 'on_event_step_active', error: ${jsLiteral(stepNoTarget)} };
-  return ${built.trim().replace(/;$/, '')};
+  ${asReturningBody(built)}
 })();`
       : built;
     // NO TARGET (event reactions like on_event_play_sound, self-relations): the
@@ -5934,8 +5957,9 @@ return { itemId: ${batchRef(op.itemId)}, merged: true, mergedInto: ${foldTarget}
         if (kfUnits === 'seconds' || kfUnits === 'ms') kfExtra.push(`timeUnits: ${jsLiteral(kfUnits)}`);
         const kfExtraStr = kfExtra.length > 0 ? `, ${kfExtra.join(', ')}` : '';
         const kfTextKeysJs = unanimatedTextKeysJs(((kfSource || []) as any[]).flatMap((k) => Object.keys((k as { properties?: object }).properties ?? {})));
-        const kfTextCheck = kfTextKeysJs ? `\nconst _kfIgnored = ${kfTextKeysJs};` : '';
-        const kfIgnored = kfTextKeysJs ? `, ...(_kfIgnored.length ? { ignoredProperties: _kfIgnored, warning: _kfIgnored.join(', ') + ${UNANIMATED_TEXT_KEYS_SENTENCE} } : {})` : '';
+        const kfFilterKeysJs = unanimatedFilterKeysJs(((kfSource || []) as any[]).flatMap((k) => Object.keys((k as { properties?: object }).properties ?? {})));
+        const kfTextCheck = `\nconst _kfIgnored = ${kfTextKeysJs || '[]'};\nconst _kfFilterIgnored = ${kfFilterKeysJs};`;
+        const kfIgnored = `, ...(_kfIgnored.length || _kfFilterIgnored.length ? { ignoredProperties: _kfIgnored.concat(_kfFilterIgnored), warning: [_kfIgnored.length ? _kfIgnored.join(', ') + ${UNANIMATED_TEXT_KEYS_SENTENCE} : '', _kfFilterIgnored.length ? _kfFilterIgnored.join(', ') + ${UNANIMATED_FILTER_KEYS_SENTENCE} : ''].filter(Boolean).join(' ') } : {})`;
         return `
 const targetId = ${kfItemRef};
 const _target = (app.getItemById && app.getItemById(targetId))
@@ -7461,6 +7485,17 @@ ${(() => {
       if (__hud.length) {
         result.fidelity = result.fidelity || { warnings: [] };
         result.fidelity.warnings = (result.fidelity.warnings || []).concat([{ code: 'screen_space_ignored', message: __hud.length + ' screen-space (HUD) item(s) are written at their frame coordinates in world space: ${format} has no camera frame, so they do not stay fixed under the camera move. Export mp4, webm, gif or png to keep them fixed.' }]);
+      }
+    } catch (_) { /* the export stands */ }
+  }
+  // A SOUND PAST THE END (SNDTAIL31): placed, accepted, and not in the file. The video's length decides, as it should; it is said.
+  if (result && result.success && ['mp4', 'webm'].indexOf(${JSON.stringify(format)}) !== -1 && app.itemRegistry && typeof app.itemRegistry.getAll === 'function') {
+    try {
+      const __end = (result.video && result.video.durationS) || ${JSON.stringify(duration ?? null)};
+      const __late = __end ? app.itemRegistry.getAll().filter(function (e) { const d = (e.item || e).data; return d && d.isSoundChip && typeof d.clipStartTime === 'number' && d.clipStartTime >= __end; }) : [];
+      if (__late.length) {
+        result.fidelity = result.fidelity || { warnings: [] };
+        result.fidelity.warnings = (result.fidelity.warnings || []).concat([{ code: 'sound_after_end', message: __late.length + ' sound(s) start at or after the end of this ' + __end + ' s export, so they are not in the file: ' + __late.map(function (e) { return (e.item || e).data.registryId + ' at ' + (e.item || e).data.clipStartTime + ' s'; }).slice(0, 10).join(', ') + '.' }]);
       }
     } catch (_) { /* the export stands */ }
   }
@@ -9593,7 +9628,9 @@ ${(() => {
   }
 
   generateImportImage(input: ImportImageInput): string {
-    const { url, position, maxWidth, maxHeight, mask, smoothing, maxEdge, nativeSize, shadowColor, shadowBlur, shadowOffset, name } = input;
+    const { url, position, maxWidth, maxHeight, mask, smoothing, maxEdge, nativeSize, shadowColor, shadowBlur, shadowOffset, name, opacity, blendMode, scale } = input;
+    const look: Record<string, unknown> = { ...(opacity !== undefined ? { opacity } : {}), ...(blendMode !== undefined ? { blendMode } : {}), ...(scale !== undefined ? { scale } : {}) };
+    const hasLook = Object.keys(look).length > 0;
     // IMPORTSHADOW: the shadow keys, applied through the engine's own modify
     // door once the image is placed (and masked) — the route modify_item takes.
     const shadow: Record<string, unknown> = {};
@@ -9700,6 +9737,15 @@ ${mask ? `    // A MASK REPLACES THE RASTER (round 8 DD, 4.10). applyMask builds
     }
     if (app.itemRegistry && typeof app.itemRegistry.rebind === 'function') app.itemRegistry.rebind(itemId, masked);
     placed = masked;
+` : ''}${hasLook ? `    // opacity, blendMode, scale: read by modify, on what is drawn. They were not import arguments (OPACIMP31, BLENDIMP31, IMGSCALE31).
+    let __look = null;
+    {
+      let __ok = false;
+      try { __ok = app.modifyItem(itemId, ${JSON.stringify(look)}) !== false; } catch (_) { __ok = false; }
+      __look = __ok
+        ? { applied: true, opacity: placed.opacity, blendMode: placed.blendMode }
+        : { applied: false, warning: 'the image was imported but ' + ${jsLiteral(Object.keys(look).join(', '))} + ' was not applied: set it with pinepaper_modify_item on ' + itemId + '.' };
+    }
 ` : ''}${hasShadow ? `    // The shadow goes on what is DRAWN, after a mask has replaced the raster.
     let __shadow = null;
     {
@@ -9723,7 +9769,7 @@ ${mask ? `    // A MASK REPLACES THE RASTER (round 8 DD, 4.10). applyMask builds
       success: true,
       itemId: itemId,
       message: 'Image imported and placed on canvas.',${name ? `\n      name: ${JSON.stringify(name)},` : ''}
-      bounds: { x: b.x, y: b.y, width: b.width, height: b.height }${mask ? `,\n      mask: ${jsLiteral(mask)}` : ''}${hasShadow ? ',\n      shadow: __shadow' : ''},
+      bounds: { x: b.x, y: b.y, width: b.width, height: b.height }${mask ? `,\n      mask: ${jsLiteral(mask)}` : ''}${hasShadow ? ',\n      shadow: __shadow' : ''}${hasLook ? ',\n      look: __look' : ''},
       // Stored smaller than its source (the studio's cap): said, with the
       // way to keep every pixel. The studio reports native size where it can.
       ...((entry && entry.nativeWidth && entry.width && entry.nativeWidth > entry.width)

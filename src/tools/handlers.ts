@@ -342,11 +342,11 @@ function exportGovernorTimeoutMs(): number {
  * size cap. This reads the user's disk on their instruction, the same as the
  * export side writes to it, and neither should be a wildcard.
  */
-const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp', '.avif']);
+const IMAGE_EXTENSIONS = new Set(['.png', '.apng', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp', '.avif']);
 const MAX_LOCAL_IMAGE_BYTES = 32 * 1024 * 1024;
 const IMAGE_MIME: Record<string, string> = {
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif',
-  '.webp': 'image/webp', '.svg': 'image/svg+xml', '.bmp': 'image/bmp', '.avif': 'image/avif',
+  '.webp': 'image/webp', '.apng': 'image/apng', '.svg': 'image/svg+xml', '.bmp': 'image/bmp', '.avif': 'image/avif',
 };
 
 /**
@@ -2329,6 +2329,9 @@ export async function handleToolCall(
     ...(dropped.length ? { droppedArguments: dropped } : {}),
     ...(ignoredPaths.length ? { ignoredArguments: ignoredPaths } : {}),
     ...await renderingBuildField(toolName, args, result, options),
+    // The engine draws an APNG's first frame; a GIF plays. Said by name, since nothing about the reply would show it.
+    ...(toolName === 'pinepaper_import_image' && !result.isError && typeof args.url === 'string' && /\.apng([?#]|$)/i.test(args.url)
+      ? { animation: 'an APNG draws its first frame and does not play. Import a GIF to play it.' } : {}),
   });
   if (!folded) {
     const lines = [...(renamed.length ? [renamedArgumentsNote(renamed)] : []), ...(dropped.length ? [`Not sent to the studio, as its private state: ${dropped.join(', ')}.`] : [])];

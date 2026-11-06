@@ -292,9 +292,26 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   what traces a file, not the package version.
 - A saved export now has a structured reply: `filePath`, `fileSize`, `file` and
   the rest of its result, which used to be readable only in the text.
+- `pinepaper_import_image` takes `opacity`, `blendMode` and `scale`, and `.apng`
+  files. An APNG draws its first frame, and the reply says so.
+- An export names any sound that starts after its end (`sound_after_end`), since
+  that sound is not in the file.
 
 ### Fixed
 
+- `pinepaper_add_relation` runs a target-less `on_event_step_active` again. Since
+  1.6.31 it answered success and bound nothing, so nothing stepped.
+- `keyframe_animate` no longer warns that `loop: true` plays once in an export.
+  It cycles.
+- An invalid `platform` lists the valid ones.
+- An emitter's trail `offset` takes `{x, y}` as well as `[dx, dy]`, and an emitter
+  with bursts says that `rate`, `start` and `end` have no effect beside them.
+- Keying an image filter setting such as `brightness` is reported as having no
+  effect, in the warning and in `ignoredArguments`.
+- The docs now say how `fps` and file size relate, what each emitter shape draws,
+  that `drag` slows launch velocity only, what a trail's `window` does, that
+  rotation keys take no short way round, that `step` easing holds a whole key,
+  and how a linear gradient without `origin` and `destination` is placed.
 - A misspelt option is in `ignoredArguments`, with its path, not only in a
   sentence: `params.sped` on `pinepaper_add_relation`,
   `operations[0].relationOptions.sped` in a batch. The same goes for a batch
