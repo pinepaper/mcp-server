@@ -108,6 +108,29 @@ export function normalizeBatchOperationNames(args: Record<string, unknown>): { a
   return renamed.length || dropped.length ? { args: { ...args, operations }, renamed, dropped } : { args, renamed, dropped };
 }
 
+/** The same rule for the other tools that take a relation's parameters from the caller. */
+export function dropPrivateRelationParams(toolName: string, args: Record<string, unknown>): { args: Record<string, unknown>; dropped: string[] } {
+  const dropped: string[] = [];
+  const clean = (params: unknown, at: string): unknown => {
+    if (!isObj(params)) return params;
+    const kept = Object.entries(params).filter(([k]) => {
+      if (!k.startsWith('_')) return true;
+      dropped.push(`${at}.${k}`);
+      return false;
+    });
+    return kept.length === Object.keys(params).length ? params : Object.fromEntries(kept);
+  };
+  if (toolName === 'pinepaper_add_relation') {
+    const params = clean(args.params, 'params');
+    return dropped.length ? { args: { ...args, params }, dropped } : { args, dropped };
+  }
+  if (toolName === 'pinepaper_create_scene' && Array.isArray(args.relations)) {
+    const relations = (args.relations as unknown[]).map((r, i) => (isObj(r) && isObj(r.params) ? { ...r, params: clean(r.params, `relations[${i}].params`) } : r));
+    return dropped.length ? { args: { ...args, relations }, dropped } : { args, dropped };
+  }
+  return { args, dropped };
+}
+
 export const RENAMED_ARGUMENTS_META_KEY = 'pinepaper.studio/renamedArguments';
 
 /** The reply's line for what was translated, so a name that changed never changes in silence. */

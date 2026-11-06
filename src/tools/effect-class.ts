@@ -118,6 +118,13 @@ export const SIDE_EFFECT_TOOLS: ReadonlySet<string> = new Set([
 export const ACTION_CLASS: Readonly<Record<string, EffectClass>> = Object.freeze({
   'pinepaper_provenance:record': 'unchecked',
   'pinepaper_event:pulse': 'side-effect',
+  'pinepaper_event:add_contraption': 'unchecked',
+  'pinepaper_event:remove_contraption': 'unchecked',
+  'pinepaper_event:list_contraptions': 'read-only',
+  'pinepaper_event:set_variable': 'unchecked',
+  'pinepaper_event:get_variable': 'read-only',
+  'pinepaper_event:increment_variable': 'unchecked',
+  'pinepaper_event:bind_text': 'unchecked',
   'pinepaper_lasso:activate': 'side-effect',
   'pinepaper_sound:define_instrument': 'unchecked',
   'pinepaper_sound:define_percussion': 'unchecked',

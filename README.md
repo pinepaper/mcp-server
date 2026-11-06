@@ -295,6 +295,13 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   studio that draws them. They are no longer reported as ignored. The reply's
   `typography` reads back what the item holds, and says so where the studio
   does not draw them.
+- `pinepaper_event` adds rules, state variables and bound text, on a studio
+  with the contraption engine; any other studio refuses them by name. A rule
+  (`add_contraption`) runs when an event fires or a variable changes: it can set
+  variables, change an item and fire the next event. `bind_text` keeps a text
+  showing variables, such as `Score: {score}`. A rule's changes stay, so use
+  `on_event_*` relations for anything in a video. Variables live in the page's
+  storage and survive `pinepaper_clear_canvas`, which removes rules.
 - `pinepaper_agent_export` takes `audioCodec: 'aac'` for an MP4. Where the
   browser has no AAC encoder (Chromium on Linux), the export is refused before
   the first frame (`audio_codec_unavailable`) instead of writing a file whose
@@ -307,7 +314,8 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   parameters a relation was given. Before, a relation's params also carried the
   studio's internal state, which took most of an `only: 'edit'` reply and could
   overwrite live state when a ready-made op was sent back. A batch relation op
-  now drops `_`-prefixed keys and lists them in `droppedArguments`.
+  now drops `_`-prefixed keys and lists them in `droppedArguments`, as do
+  `pinepaper_add_relation` and the relations of `pinepaper_create_scene`.
 - The `pinepaper_register_custom_relation` call in `edit.customRelations` now
   works as given, with its parameter definitions in full.
 - Replies now list ignored arguments in their JSON as `ignoredArguments`, and a

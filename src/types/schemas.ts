@@ -815,8 +815,33 @@ export const OnEventSetVisibilityParamsSchema = z.object({
 // pinepaper_event tool — manage the pp:event channel.
 //   create → app.createEvent(name, {payloadType,x,y}) → returns eventId
 //   pulse  → app.pulseEvent(eventId, payload) → kicks off a chain
+const ContraptionScope = z.string().optional().describe("Variable namespace (default 'default')");
+const ContraptionRuleActionSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('setVariable'), key: z.string().min(1), value: z.unknown().optional().describe('Left out: the event payload'), scope: ContraptionScope }),
+  z.object({ type: z.literal('incrementVariable'), key: z.string().min(1), by: z.number().optional().describe('Default 1'), scope: ContraptionScope }),
+  z.object({ type: z.literal('toggleVariable'), key: z.string().min(1), scope: ContraptionScope }),
+  // Strict: the studio stores any other key in item.data, where it changes nothing on screen and says nothing.
+  z.object({
+    type: z.literal('modifyItem'),
+    targetId: z.string().min(1),
+    properties: z.object({
+      visible: z.boolean().optional(),
+      opacity: z.number().optional(),
+      fillColor: z.string().optional(),
+      strokeColor: z.string().optional(),
+      content: z.string().optional(),
+      position: z.union([z.tuple([z.number(), z.number()]), z.object({ x: z.number(), y: z.number() })]).optional(),
+    }).strict(),
+  }),
+]);
+const ContraptionTriggerSchema = z.object({
+  eventId: z.string().min(1),
+  delay: z.number().min(0).optional().describe('Seconds to wait before it fires'),
+  payload: z.unknown().optional(),
+});
+
 export const EventInputSchema = z.object({
-  action:      z.enum(['create', 'pulse']).describe("'create' a pp:event · 'pulse' it to fire listeners/chains"),
+  action:      z.enum(['create', 'pulse', 'add_contraption', 'remove_contraption', 'list_contraptions', 'set_variable', 'get_variable', 'increment_variable', 'bind_text']).describe("'create' a pp:event · 'pulse' it to fire listeners/chains · 'add_contraption' / 'remove_contraption' / 'list_contraptions' a rule that runs when an event fires · 'set_variable' / 'get_variable' / 'increment_variable' a state variable · 'bind_text' a text item to variables"),
   name:        z.string().optional().describe("Event name — required for action 'create'"),
   payloadType: z.string().optional().describe("Payload type label (default 'Pulse') — action 'create'"),
   x:           z.number().optional().describe('Canvas x for the event marker — action create'),
@@ -824,8 +849,35 @@ export const EventInputSchema = z.object({
   at:          z.union([z.number().min(0), z.array(z.number().min(0)).min(1)]).optional().describe('create: fire the event ITSELF at these scene times (seconds) — a timed trigger, so on_event_play_sound and every other reaction runs on the timeline and in video exports.'),
   eventId:     z.string().optional().describe("Event id to fire — required for action 'pulse'"),
   payload:     z.unknown().optional().describe("Optional value forwarded to listeners — action 'pulse'"),
+  contraptionId: z.string().optional().describe("The rule's id: optional for add_contraption, required for remove_contraption"),
+  sourceEvent: z.string().optional().describe("add_contraption: what runs the rule: an eventId, any name you pulse, or 'state:<key>' when that variable changes"),
+  condition: z.object({
+    key: z.string().optional(),
+    op: z.enum(['==', '===', '!=', '>', '>=', '<', '<=', 'eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'truthy', 'falsy', 'in']).optional().describe("Default '=='"),
+    value: z.unknown().optional(),
+    scope: ContraptionScope,
+    source: z.enum(['state', 'payload']).optional().describe("Read key from a variable (default) or from the event's payload"),
+  }).optional().describe('add_contraption: the rule runs its actions only when this holds'),
+  actions: z.array(ContraptionRuleActionSchema).min(1).optional().describe('add_contraption: what the rule does'),
+  thenTrigger: ContraptionTriggerSchema.optional().describe('add_contraption: the event to fire after the actions'),
+  elseTrigger: ContraptionTriggerSchema.optional().describe('add_contraption: the event to fire when the condition does not hold'),
+  enabled: z.boolean().optional().describe('add_contraption: false registers it switched off'),
+  key: z.string().optional().describe('The variable, for set_variable, get_variable and increment_variable'),
+  value: z.unknown().optional().describe('set_variable: its new value'),
+  by: z.number().optional().describe('increment_variable: default 1'),
+  fallback: z.unknown().optional().describe('get_variable: returned when the variable is not set'),
+  scope: ContraptionScope,
+  itemId: z.string().optional().describe('bind_text: the text item'),
+  template: z.string().optional().describe('bind_text: the text, with {variable} where a value goes: "Score: {score}"'),
 }).refine((v) => v.action !== 'create' || !!v.name, { message: "action 'create' requires name", path: ['name'] })
-  .refine((v) => v.action !== 'pulse' || !!v.eventId, { message: "action 'pulse' requires eventId", path: ['eventId'] });
+  .refine((v) => v.action !== 'pulse' || !!v.eventId, { message: "action 'pulse' requires eventId", path: ['eventId'] })
+  .refine((v) => v.action !== 'add_contraption' || !!v.sourceEvent, { message: "action 'add_contraption' requires sourceEvent", path: ['sourceEvent'] })
+  .refine((v) => v.action !== 'add_contraption' || !!v.actions, { message: "action 'add_contraption' requires actions", path: ['actions'] })
+  .refine((v) => v.action !== 'remove_contraption' || !!v.contraptionId, { message: "action 'remove_contraption' requires contraptionId", path: ['contraptionId'] })
+  .refine((v) => !['set_variable', 'get_variable', 'increment_variable'].includes(v.action) || !!v.key, { message: 'this action requires key', path: ['key'] })
+  .refine((v) => v.action !== 'set_variable' || v.value !== undefined, { message: "action 'set_variable' requires value", path: ['value'] })
+  .refine((v) => v.action !== 'bind_text' || !!v.itemId, { message: "action 'bind_text' requires itemId", path: ['itemId'] })
+  .refine((v) => v.action !== 'bind_text' || !!v.template, { message: "action 'bind_text' requires template", path: ['template'] });
 export type EventInput = z.infer<typeof EventInputSchema>;
 
 // =============================================================================
@@ -2768,7 +2820,7 @@ export type ExportStoreInput = z.infer<typeof ExportStoreInputSchema>;
 export const AgentExportInputSchema = z.object({
   platform: z.union([AgentPlatformSchema, z.literal('auto')]).optional().default('auto').describe('Target platform'),
   format: z.union([AgentExportFormatSchema, z.literal('auto')]).optional().default('auto').describe('Export format'),
-  quality: z.enum(['draft', 'standard', 'high']).optional().default('standard').describe('Export quality level'),
+  quality: z.enum(['draft', 'standard', 'high']).optional().default('standard').describe('Compression level, and the default frame rate unless fps is set: draft 15, standard 30, high 60. To control the size of an mp4 / webm, use scale or bitrate.'),
   includeRecommendations: z.boolean().optional().default(true).describe('Include alternative format recommendations'),
   framing: z.enum(['canvas', 'camera']).optional().default('canvas').describe('Output framing: "canvas" (full canvas, default) or "camera" (camera_animates first-keyframe viewport — fails if no walkthrough exists). Camera animation still drives motion within the fixed output frame.'),
   duration: z.number().min(0.5).max(VIDEO_MAX_DURATION_S).optional().default(5).describe(`Video duration in seconds for animated formats (mp4/webm/gif). Default 5. Max ${VIDEO_MAX_DURATION_S} for mp4/webm, max ${GIF_MAX_DURATION_S} for gif (GIF is not codec-bounded, so file size scales with frames × dimensions, and it cannot stream to the export store). Static formats (png/svg/pdf) ignore this. Past roughly a minute the export is held in the studio's export store and paged back to a file rather than returned inline; a studio without that store refuses by name and says so.`),

@@ -1753,12 +1753,22 @@ TYPICAL SCENE CHAIN:
 3. Give each beat reactions: on_event_add_relation (spawn an orbit/path), on_event_set_color, on_event_set_property, on_event_set_visibility (all via pinepaper_add_relation, sourceId=the event).
 4. pinepaper_event pulse e0 to start. Canvas-timed fires are scrub/loop/replay-stable.
 
-RETURNS: create → { success, action, eventId }; pulse → { success, action, eventId }.`,
+RULES (contraptions): a rule runs when an event fires: { action: 'add_contraption', sourceEvent, actions, condition?, thenTrigger?, elseTrigger?, contraptionId? }. sourceEvent is an eventId, any name you pulse, or 'state:<key>' when that variable changes. actions: setVariable { key, value? }, incrementVariable { key, by? }, toggleVariable { key }, modifyItem { targetId, properties: { visible, opacity, fillColor, strokeColor, content, position } }. list_contraptions shows each rule's fireCount, which is how to tell it ran; remove_contraption takes contraptionId.
+- For a video, use on_event_* relations (above): a rule's changes to an item stay, nothing rewinds them, so another export starts from the changed scene. Rules suit interactive state.
+- pinepaper_clear_canvas removes rules. They are not saved with the scene.
+
+VARIABLES: set_variable { key, value }, get_variable { key, fallback? }, increment_variable { key, by? }, each with an optional scope. They live in the page's storage, so they survive pinepaper_clear_canvas: set the ones a scene reads when it starts. Nothing private belongs in them.
+
+BOUND TEXT: bind_text { itemId, template: "Score: {score}" } keeps a text item showing the variables it names.
+
+A studio without the contraption engine refuses these actions, naming the method it lacks.
+
+RETURNS: create → { success, action, eventId }; pulse → { success, action, eventId }; add_contraption → { success, action, contraptionId, warning? }.`,
     inputSchema: {
       type: 'object',
       properties: {
         at: { description: 'create: fire this event at these scene times (seconds) — a timed trigger that runs on the timeline and in video exports. The widget player does not run timed triggers.', oneOf: [{ type: 'number' }, { type: 'array', items: { type: 'number' } }] },
-        action: { type: 'string', enum: ['create', 'pulse'], description: "'create' a pp:event · 'pulse' it to fire" },
+        action: { type: 'string', enum: ['create', 'pulse', 'add_contraption', 'remove_contraption', 'list_contraptions', 'set_variable', 'get_variable', 'increment_variable', 'bind_text'], description: "'create' a pp:event · 'pulse' it to fire · 'add_contraption' / 'remove_contraption' / 'list_contraptions' a rule · 'set_variable' / 'get_variable' / 'increment_variable' a variable · 'bind_text' a text item to variables" },
         name: { type: 'string', description: "Event name — required for action 'create'" },
         payloadType: { type: 'string', description: "Payload type label (default 'Pulse') — action 'create'" },
         x: { type: 'number', description: 'Canvas x for the event marker — action create' },
@@ -1768,6 +1778,57 @@ RETURNS: create → { success, action, eventId }; pulse → { success, action, e
           anyOf: [{ type: 'string' }, { type: 'number' }, { type: 'boolean' }, { type: 'object' }, { type: 'array' }],
           description: "Optional value forwarded to listeners — action 'pulse'",
         },
+        contraptionId: { type: 'string', description: "The rule's id: optional for add_contraption, required for remove_contraption" },
+        sourceEvent: { type: 'string', description: "add_contraption: what runs the rule: an eventId, any name you pulse, or 'state:<key>' when that variable changes" },
+        condition: {
+          type: 'object',
+          description: 'add_contraption: the rule runs its actions only when this holds',
+          properties: {
+            key: { type: 'string' },
+            op: { type: 'string', enum: ['==', '===', '!=', '>', '>=', '<', '<=', 'eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'truthy', 'falsy', 'in'], description: "Default '=='" },
+            value: { description: 'What to compare with' },
+            scope: { type: 'string' },
+            source: { type: 'string', enum: ['state', 'payload'], description: "Read key from a variable (default) or from the event's payload" },
+          },
+        },
+        actions: {
+          type: 'array',
+          description: 'add_contraption: what the rule does',
+          items: {
+            type: 'object',
+            properties: {
+              type: { type: 'string', enum: ['setVariable', 'incrementVariable', 'toggleVariable', 'modifyItem'] },
+              key: { type: 'string', description: 'The variable' },
+              value: { description: 'setVariable: left out, the event payload' },
+              by: { type: 'number', description: 'incrementVariable: default 1' },
+              scope: { type: 'string' },
+              targetId: { type: 'string', description: 'modifyItem: the item' },
+              properties: {
+                type: 'object',
+                description: 'modifyItem: only these',
+                properties: {
+                  visible: { type: 'boolean' },
+                  opacity: { type: 'number' },
+                  fillColor: { type: 'string' },
+                  strokeColor: { type: 'string' },
+                  content: { type: 'string' },
+                  position: { description: '[x, y] or {x, y}' },
+                },
+              },
+            },
+            required: ['type'],
+          },
+        },
+        thenTrigger: { type: 'object', description: 'add_contraption: the event to fire after the actions', properties: { eventId: { type: 'string' }, delay: { type: 'number', description: 'Seconds' }, payload: {} }, required: ['eventId'] },
+        elseTrigger: { type: 'object', description: 'add_contraption: the event to fire when the condition does not hold', properties: { eventId: { type: 'string' }, delay: { type: 'number', description: 'Seconds' }, payload: {} }, required: ['eventId'] },
+        enabled: { type: 'boolean', description: 'add_contraption: false registers it switched off' },
+        key: { type: 'string', description: 'The variable, for set_variable, get_variable and increment_variable' },
+        value: { description: 'set_variable: its new value' },
+        by: { type: 'number', description: 'increment_variable: default 1' },
+        fallback: { description: 'get_variable: returned when the variable is not set' },
+        scope: { type: 'string', description: "Variable namespace (default 'default')" },
+        itemId: { type: 'string', description: 'bind_text: the text item' },
+        template: { type: 'string', description: 'bind_text: the text, with {variable} where a value goes: "Score: {score}"' },
       },
       required: ['action'],
     },

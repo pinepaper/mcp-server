@@ -2935,12 +2935,17 @@ if (typeof app.clearCanvas === 'function') {
   if (app.relationRegistry) app.relationRegistry.clear();
 }
 ${ID_COUNTER_RESET}
+// A rule outlives app.clearCanvas, and would go on running in the next scene against its item ids.
+let __rulesRemoved = 0;
+if (typeof app.listContraptions === 'function' && typeof app.removeContraption === 'function') {
+  app.listContraptions().map((c) => c.id).forEach((id) => { if (app.removeContraption(id)) __rulesRemoved++; });
+}
 
 if (app.historyManager) app.historyManager.saveState();
 
 const remaining = app.itemRegistry ? app.itemRegistry.getAll().length : 0;
 
-({ success: true, removedCount: Math.max(0, before - remaining), remainingItems: remaining, mediaRemoved: __mediaRemoved });
+({ success: true, ...(__rulesRemoved ? { contraptionsRemoved: __rulesRemoved } : {}), removedCount: Math.max(0, before - remaining), remainingItems: remaining, mediaRemoved: __mediaRemoved });
 `.trim();
 }
 
@@ -16353,6 +16358,7 @@ ${guard('unlockAllItems')}${pass('app.unlockAllItems()')}
   return { success: true, action: 'create', eventId${input.at !== undefined ? `, at: ${JSON.stringify(input.at)}` : ''} };
 })();`.trim();
     }
+    if (input.action !== 'pulse') return generateContraptionCode(input);
     // pulse — a runtime fire, not a scene edit (no history save)
     const eventIdJson = JSON.stringify(input.eventId);
     const payloadJson = JSON.stringify(input.payload ?? null);
@@ -16366,6 +16372,75 @@ ${guard('unlockAllItems')}${pass('app.unlockAllItems()')}
   return { success: true, action: 'pulse', eventId: ${eventIdJson} };
 })();`.trim();
   }
+}
+
+/**
+ * Rules, variables and bound text (the studio's contraption engine). Each action asks for the method it calls, so a
+ * studio without it refuses by name instead of a TypeError. The engine's animateItem, playSound and custom actions are
+ * not offered: animateItem goes through app.modify, which acts on the selection and not on its target; playSound does
+ * not call app.playSound the way that method is written; custom needs a function, which JSON cannot carry. All three
+ * answer ok regardless, so a rule using them would report success for nothing.
+ */
+function generateContraptionCode(input: EventInput): string {
+  const refuse = (method: string) => `if (typeof app.${method} !== 'function') {
+    return { success: false, action: ${jsLiteral(input.action)}, error: 'this studio has no contraption engine (app.${method}): update PinePaper Studio' };
+  }`;
+  const scope = jsLiteral(input.scope ?? 'default');
+  const key = jsLiteral(input.key ?? '');
+  const body = (): string => {
+    switch (input.action) {
+      case 'add_contraption': {
+        const targets = [...new Set((input.actions ?? []).flatMap((a) => (a.type === 'modifyItem' ? [a.targetId] : [])))];
+        const config = {
+          ...(input.contraptionId ? { id: input.contraptionId } : {}),
+          sourceEvent: input.sourceEvent,
+          actions: input.actions,
+          ...(input.condition ? { condition: input.condition } : {}),
+          ...(input.thenTrigger ? { thenTrigger: input.thenTrigger } : {}),
+          ...(input.elseTrigger ? { elseTrigger: input.elseTrigger } : {}),
+          ...(input.enabled !== undefined ? { enabled: input.enabled } : {}),
+        };
+        return `${refuse('addContraption')}
+  const contraptionId = app.addContraption(${jsLiteral(config)});
+  const missing = ${jsLiteral(targets)}.filter((id) => !app.getItemById(id));
+  return { success: true, action: 'add_contraption', contraptionId,
+    ...(missing.length ? { warning: 'no item has the id ' + missing.join(', ') + ' yet: the rule does nothing to it until one does' } : {}),
+    ${targets.length ? "note: 'changes a rule makes to an item stay: nothing rewinds them, so another export starts from the changed scene'" : ''} };`;
+      }
+      case 'remove_contraption':
+        return `${refuse('removeContraption')}
+  const removed = app.removeContraption(${jsLiteral(input.contraptionId)});
+  return removed ? { success: true, action: 'remove_contraption', contraptionId: ${jsLiteral(input.contraptionId)} }
+    : { success: false, action: 'remove_contraption', error: 'no rule has the id ' + ${jsLiteral(input.contraptionId)} };`;
+      case 'list_contraptions':
+        return `${refuse('listContraptions')}
+  return { success: true, action: 'list_contraptions', contraptions: app.listContraptions() };`;
+      case 'set_variable':
+        return `${refuse('setVariable')}
+  app.setVariable(${key}, ${jsLiteral(input.value)}, ${scope});
+  return { success: true, action: 'set_variable', key: ${key}, value: app.getVariable(${key}, null, ${scope}) };`;
+      case 'get_variable':
+        return `${refuse('getVariable')}
+  return { success: true, action: 'get_variable', key: ${key}, value: app.getVariable(${key}, ${jsLiteral(input.fallback ?? null)}, ${scope}) };`;
+      case 'increment_variable':
+        return `${refuse('incrementVariable')}
+  return { success: true, action: 'increment_variable', key: ${key}, value: app.incrementVariable(${key}, ${input.by ?? 1}, ${scope}) };`;
+      default: {
+        const itemId = jsLiteral(input.itemId);
+        return `${refuse('bindTextToState')}
+  const item = app.getItemById(${itemId});
+  if (!item) return { success: false, action: 'bind_text', error: 'Item not found: ' + ${itemId} };
+  if (item.content === undefined) return { success: false, action: 'bind_text', error: ${itemId} + ' is not a text item, so it has no text to bind' };
+  app.bindTextToState(${itemId}, ${jsLiteral(input.template)}, ${scope});
+  return { success: true, action: 'bind_text', itemId: ${itemId}, text: item.content };`;
+      }
+    }
+  };
+  return `
+// Contraption engine: ${input.action}
+(function() {
+  ${body()}
+})();`.trim();
 }
 
 // Export singleton instance

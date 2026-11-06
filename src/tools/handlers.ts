@@ -6,7 +6,7 @@
  * Supports browser execution via Puppeteer.
  */
 
-import { normalizeBatchOperationNames, renamedArgumentsNote, RENAMED_ARGUMENTS_META_KEY } from './batch-op-names.js';
+import { dropPrivateRelationParams, normalizeBatchOperationNames, renamedArgumentsNote, RENAMED_ARGUMENTS_META_KEY } from './batch-op-names.js';
 import { nestedIgnoredPaths } from './nested-ignored.js';
 import {
   CRAFT_FRAME_JS,
@@ -2263,6 +2263,7 @@ export async function handleToolCall(
   let renamed: string[] = [];
   let dropped: string[] = [];
   if (toolName === 'pinepaper_agent_batch_execute') ({ args, renamed, dropped } = normalizeBatchOperationNames(args));
+  else ({ args, dropped } = dropPrivateRelationParams(toolName, args));
 
   // IDLE PAUSE (#45): the page is thawed before the call and the idle countdown restarts after it. A controller
   // made DURING the call (the first browser tool) has nothing to thaw; it only starts its countdown at the end.
@@ -2756,9 +2757,9 @@ async function handleToolCallInner(
       case 'pinepaper_event': {
         const input = EventInputSchema.parse(args);
         const code = codeGenerator.generateEvent(input);
-        const description = input.action === 'create'
-          ? `Create event "${input.name}"`
-          : `Pulse event ${input.eventId}`;
+        const description = input.action === 'create' ? `Create event "${input.name}"`
+          : input.action === 'pulse' ? `Pulse event ${input.eventId}`
+            : `Event rules: ${input.action}`;
         return executeOrGenerate(code, description, options, 'pinepaper_event');
       }
 
