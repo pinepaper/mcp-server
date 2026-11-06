@@ -8,7 +8,7 @@
 import { compileChoreography } from '../tools/choreograph.js';
 import { compileBatchTimelines, emitTimelineOpBody, type TimelinePlan } from '../tools/timeline.js';
 import { normalizeSvgSize } from '../utils/svg-size.js';
-import { WORLD3D_COLOR_PATHS, PATTERN_KINDS, EXPRESSION_FUNCTION_ARITY, EXPRESSION_CONSTANTS, EXPRESSION_REJECTED, RELATION_PARAM_KEYS, ANIMATION_OPTION_KEYS } from '../tools/engine-lists.js';
+import { WORLD3D_COLOR_PATHS, PATTERN_KINDS, EXPRESSION_FUNCTION_ARITY, EXPRESSION_CONSTANTS, EXPRESSION_REJECTED, RELATION_PARAM_KEYS, RELATION_LOOP_PARAMS, ANIMATION_OPTION_KEYS } from '../tools/engine-lists.js';
 import { expressionGrammarText } from '../tools/expression-grammar.js';
 import { REQUIRED_ENGINE_METHODS, OPTIONAL_ENGINE_METHODS } from '../tools/engine-methods.js';
 import { NORMALIZE_PARAM_READS, MODIFY_CHANGE_READS } from '../tools/shape-params.js';
@@ -1709,10 +1709,10 @@ function customOptionWarningJs(relationType: unknown, params: unknown, key: 'war
   return `, ...(function () { try {
     var cr = typeof window !== 'undefined' && window.__ppCustomRelations && window.__ppCustomRelations[${jsLiteral(relationType)}];
     if (!cr || !Array.isArray(cr.reads)) return {};
-    var skip = ${JSON.stringify(injected)};
+    var skip = ${JSON.stringify([...injected, ...RELATION_LOOP_PARAMS])};
     var un = ${JSON.stringify(keys)}.filter(function (k) { return cr.reads.indexOf(k) < 0 && skip.indexOf(k) < 0; });
     if (!un.length) return {};
-    return { ${key}: ${jsLiteral(relationType)} + ' does not read ' + un.join(', ') + ', so ' + (un.length > 1 ? 'they were' : 'it was') + ' ignored. ' + ${jsLiteral(relationType)} + ' reads: ' + cr.reads.join(', ') + '.' };
+    return { ignoredOptions: un, ${key}: ${jsLiteral(relationType)} + ' does not read ' + un.join(', ') + ', so ' + (un.length > 1 ? 'they were' : 'it was') + ' ignored. ' + ${jsLiteral(relationType)} + ' reads: ' + cr.reads.join(', ') + '.' };
   } catch (e) { return {}; } })()`;
 }
 
@@ -1735,9 +1735,28 @@ function equationFlipNote(relationType: unknown, params: unknown): string | null
   return 'params.equation is read with y UP (flipY defaults to true), so on screen the curve is mirrored about cy. If you wrote it in screen coordinates (y down), add flipY: false to the equation.';
 }
 
-function unreadOptionWarning(relationType: unknown, params: unknown, injected: readonly string[]): string | null {
+/** What a built-in relation reads: its rule's params, and what the relation loop reads on every relation. */
+function relationReads(relationType: unknown): readonly string[] | undefined {
   const keys = typeof relationType === 'string' ? RELATION_PARAM_KEYS[relationType] : undefined;
+  return keys ? [...keys, ...RELATION_LOOP_PARAMS] : undefined;
+}
+
+function unreadOptionWarning(relationType: unknown, params: unknown, injected: readonly string[]): string | null {
+  const keys = relationReads(relationType);
   return keys ? unreadKeysWarning(String(relationType), keys, params, injected) : null;
+}
+
+const unreadKeys = (keys: readonly string[] | undefined, params: unknown, injected: readonly string[] = []): string[] =>
+  keys && params && typeof params === 'object' ? Object.keys(params as Record<string, unknown>).filter((k) => !keys.includes(k) && !injected.includes(k)) : [];
+
+/**
+ * A relation reply's fields for its options: the unread keys as data (ignoredOptions, which the reply's
+ * ignoredArguments is built from) beside the sentence. Built-ins are known here, a custom relation only in the page.
+ */
+function relationOptionFields(relationType: unknown, params: unknown, key: 'warning' | 'optionWarning', injected: readonly string[] = []): string {
+  const unread = unreadKeys(relationReads(relationType), params, injected);
+  const warning = relationOptionWarning(relationType, params, injected);
+  return `${unread.length ? `, ignoredOptions: ${jsLiteral(unread)}` : ''}${warning ? `, ${key}: ${jsLiteral(warning)}` : ''}${customOptionWarningJs(relationType, params, key, injected)}`;
 }
 
 /** The keys of `params` outside `keys`, named with a "did you mean" and the list that is read; null when all are read. */
@@ -1800,7 +1819,7 @@ function generateAddRelationCode(
     return { success: false, relationType: ${jsLiteral(relationType)}, error: 'the studio refused the ' + ${jsLiteral(relationType)} + ' relation between ' + ${jsLiteral(sourceId)} + ' and ' + ${jsLiteral(targetId)} + (__why ? ': ' + __why : '.') };
   }
   app.historyManager.saveState();
-  return { success: true, sourceId: ${jsLiteral(sourceId)}, targetId: ${jsLiteral(targetId)}, relationType: ${jsLiteral(relationType)}${(() => { const w = relationOptionWarning(relationType, params); return w ? `, warning: ${jsLiteral(w)}` : ''; })()}${customOptionWarningJs(relationType, params, 'warning')} };
+  return { success: true, sourceId: ${jsLiteral(sourceId)}, targetId: ${jsLiteral(targetId)}, relationType: ${jsLiteral(relationType)}${relationOptionFields(relationType, params, 'warning')} };
 })();
 `.trim();
 }
@@ -4673,7 +4692,7 @@ if (typeof _gen === 'function') {
     }
 
     // Establish relations
-    for (const relation of relations) {
+    for (const [relationIndex, relation] of relations.entries()) {
       const { source, target, type, params = {} } = relation;
       const paramsStr = JSON.stringify(params);
       const specProblem = relationSpecProblem(type, params, target, 'no-page');
@@ -4696,6 +4715,9 @@ results.error = 'refused ' + results.relationsRefused.length + ' relation(s): ' 
     // A refused relation is not listed as made (owner rule 1).
     if (app.addRelation(sourceId, targetId, ${jsLiteral(type)}, params)) {
       results.relations.push({ source: ${jsLiteral(source)}, target: ${jsLiteral(target)}, type: ${jsLiteral(type)} });
+      const __o = { _: 0${relationOptionFields(type, params, 'warning')} };
+      if (__o.warning) (results.optionWarnings = results.optionWarnings || []).push(__o.warning);
+      if (__o.ignoredOptions) (results.ignoredOptions = results.ignoredOptions || []).push.apply(results.ignoredOptions, __o.ignoredOptions.map(function(k) { return 'relations[${relationIndex}].params.' + k; }));
     } else {
       const __why = ${relationRefusalReasonJs(jsLiteral(type))};
       (results.relationsRefused = results.relationsRefused || []).push({ source: ${jsLiteral(source)}, target: ${jsLiteral(target)}, type: ${jsLiteral(type)}, reason: __why || 'the studio refused it' });
@@ -5745,7 +5767,7 @@ const targetId = ${animItemRef};
 const item = app.getItemById(targetId);
 if (!item) throw new Error('Item not found: ' + targetId);
 app.animate(item, { animationType: ${JSON.stringify(String(op.animationType))}, ...${animOpts} });
-return { itemId: targetId, animationType: ${JSON.stringify(String(op.animationType))}${(() => { const w = animationOptionWarning(op.animationOptions); return w ? `, warning: ${jsLiteral(w)}` : ''; })()} };
+return { itemId: targetId, animationType: ${JSON.stringify(String(op.animationType))}${(() => { const w = animationOptionWarning(op.animationOptions); return w ? `, ignoredOptions: ${jsLiteral(unreadKeys(ANIMATION_OPTION_KEYS, op.animationOptions))}, warning: ${jsLiteral(w)}` : ''; })()} };
 `;
 
       case 'relation':
@@ -5798,7 +5820,7 @@ if (!__done.length) {
   const __why = ${op.update === true ? `'no ' + ${type} + ' relation is bound from ' + __failed.join(', ') + (targetId === null ? '' : ' to ' + targetId) + ' to change: bind it first (a relation op without update)'` : relationRefusalReasonJs(type)};
   return { success: false, relationType: ${type}, sourceIds: __failed, error: ${op.update === true ? '__why' : `'the studio refused the ' + ${type} + ' relation for ' + __failed.join(', ') + ' — nothing was bound' + (__why ? ': ' + __why : '.')`} };
 }
-return { success: true, relationType: ${type}, ${op.update === true ? 'updated' : 'bound'}: __done, targetId${glob ? ', count: __members.length' : ''}${(() => { const w = relationOptionWarning(op.relationType, op.relationOptions, ['index', 'count', 'pattern']); return w ? `, optionWarning: ${jsLiteral(w)}` : ''; })()}${customOptionWarningJs(op.relationType, op.relationOptions, 'optionWarning', ['index', 'count', 'pattern'])}, ...(__failed.length ? { failed: __failed, warning: __failed.length + ' of ' + __members.length + ' were not ${op.update === true ? 'changed' : 'bound'}: ' + __failed.join(', ') } : {}) };
+return { success: true, relationType: ${type}, ${op.update === true ? 'updated' : 'bound'}: __done, targetId${glob ? ', count: __members.length' : ''}${relationOptionFields(op.relationType, op.relationOptions, 'optionWarning', ['index', 'count', 'pattern'])}, ...(__failed.length ? { failed: __failed, warning: __failed.length + ' of ' + __members.length + ' were not ${op.update === true ? 'changed' : 'bound'}: ' + __failed.join(', ') } : {}) };
 `;
         }
         return `
@@ -5817,7 +5839,7 @@ if (!relationId) {
   return { success: false, relationId: false, sourceId, targetId, relationType: ${JSON.stringify(op.relationType)},
     error: 'the studio refused the ' + ${JSON.stringify(op.relationType)} + ' relation between ' + sourceId + ' and ' + targetId + ' — nothing was bound' + (__why ? ': ' + __why : '.') };
 }
-return { relationId, sourceId, targetId, relationType: ${JSON.stringify(String(op.relationType))}${(() => { const w = relationOptionWarning(op.relationType, op.relationOptions); return w ? `, warning: ${jsLiteral(w)}` : ''; })()}${customOptionWarningJs(op.relationType, op.relationOptions, 'warning')} };
+return { relationId, sourceId, targetId, relationType: ${JSON.stringify(String(op.relationType))}${relationOptionFields(op.relationType, op.relationOptions, 'warning')} };
 `;
 
       case 'delete':

@@ -20,6 +20,7 @@ import {
 } from './craft-tools.js';
 import { CallToolResult, TextContent, ImageContent } from '../mcp/index.js';
 import { exportPerScene } from './scene-cache-export.js';
+import { boundedStructured, reportedIgnoredPaths } from './reply-fields.js';
 import { codeGenerator, generateQueryMutationsCode, SHEET_RUBRIC } from '../types/code-generator.js';
 import { expandBatchMacros, BatchMacroError } from './batch-macros.js';
 import {
@@ -606,6 +607,7 @@ async function saveAdExport(r: AdExportResult, input: { ad?: { clickUrl?: string
     fidelity: { ...(r.fidelity ?? {}), warnings } };
   if (warnings.length && cleanResult.fidelity.note) delete cleanResult.fidelity.note;
   return {
+    structuredContent: boundedStructured(cleanResult as Record<string, unknown>),
     content: [{
       type: 'text' as const,
       text: `Ad saved:\n\n${Object.entries(files).map(([k, v]) => `${k}: ${v}`).join('\n')}\nFormat: ${r.format}\nSize: ${r.adSize.width}x${r.adSize.height}, upload ${(uploadBytes / 1024).toFixed(1)} KB\n\nResult: ${JSON.stringify(cleanResult, null, 2)}`,
@@ -2235,18 +2237,49 @@ export function batchOpIgnoredPaths(args: Record<string, unknown>): string[] {
 
 export const IGNORED_ARGUMENTS_META_KEY = 'pinepaper.studio/ignoredArguments';
 
-/** Adds fields to a reply whose first block is a JSON object; false when it is not one (or there is nothing to add). */
+/**
+ * Adds fields to a reply whose first block is a JSON object, and to its structuredContent when it already has one (a
+ * saved export: prose first, data beside it). False when neither took them (or nothing to add is true).
+ */
 function withReplyFields(result: CallToolResult, fields: Record<string, unknown>): boolean {
   if (!Object.keys(fields).length) return true;
+  const hadStructured = !!result.structuredContent;
+  if (result.structuredContent) result.structuredContent = { ...result.structuredContent, ...fields };
   const first = result.content?.[0];
-  if (first?.type !== 'text') return false;
+  if (first?.type !== 'text') return hadStructured;
   try {
     const obj = JSON.parse(first.text);
-    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false;
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return hadStructured;
     result.content = [{ ...first, text: JSON.stringify({ ...obj, ...fields }, null, 2) }, ...result.content.slice(1)];
     return true;
   } catch {
-    return false;
+    return hadStructured;
+  }
+}
+
+/** How many ops a written batch op becomes; a macro that does not expand is refused before anything runs. */
+function expandedOpCount(op: Record<string, unknown>): number {
+  try { return expandBatchMacros([op]).length; } catch { return 1; }
+}
+
+/**
+ * The tools that hand back something the studio rendered. Render behaviour follows the live studio, not this package,
+ * so a result is traced by the build that made it. agent_export's generated code says so itself; the rest are asked
+ * here, once, after the call.
+ */
+const RENDERING_TOOLS = new Set(['pinepaper_agent_export', 'pinepaper_capture_frames', 'pinepaper_export_scene', 'pinepaper_export_svg',
+  'pinepaper_export_training_data', 'pinepaper_export_widget', 'pinepaper_export_widget_html', 'pinepaper_render_batch', 'pinepaper_sprite_sheet']);
+
+async function renderingBuildField(toolName: string, args: Record<string, unknown>, result: CallToolResult, options: HandlerOptions): Promise<Record<string, unknown>> {
+  if (!RENDERING_TOOLS.has(toolName) || args.estimateOnly === true || result.isError || !options.executeInBrowser || result.structuredContent?.studioBuild) return {};
+  if ((options.executionMode ?? getExecutionMode()) === 'code') return {};
+  const controller = (options.browserController ?? peekBrowserController()) as { connected?: boolean; executeCode?: (c: string, s: boolean, o: { bypassGovernor: boolean }) => Promise<{ success: boolean; result?: unknown }> } | null;
+  if (!controller?.connected || typeof controller.executeCode !== 'function') return {};
+  try {
+    const r = await controller.executeCode(`(function () { return typeof app !== 'undefined' && app.buildId ? app.buildId : null; })();`, false, { bypassGovernor: true });
+    return r?.success && typeof r.result === 'string' ? { studioBuild: r.result } : {};
+  } catch {
+    return {}; // the export stands
   }
 }
 
@@ -2284,17 +2317,18 @@ export async function handleToolCall(
     }
   }
   const ignored = await ignoredArgumentsNoteFor(toolName, args);
-  if (ignored) {
-    result.content = [...(result.content ?? []), { type: 'text' as const, text: ignored.note }];
-    result._meta = { ...(result._meta ?? {}), [IGNORED_ARGUMENTS_META_KEY]: ignored.ignored };
-  }
+  if (ignored) result.content = [...(result.content ?? []), { type: 'text' as const, text: ignored.note }];
+  // What only the run can tell: an option or property the op's own warning named. Its sentence is already in the reply.
+  const ignoredPaths = [...new Set([...(ignored?.ignored ?? []), ...reportedIgnoredPaths(toolName, args, result, expandedOpCount)])];
+  if (ignoredPaths.length) result._meta = { ...(result._meta ?? {}), [IGNORED_ARGUMENTS_META_KEY]: ignoredPaths };
   if (renamed.length) result._meta = { ...(result._meta ?? {}), [RENAMED_ARGUMENTS_META_KEY]: renamed };
   // IN THE REPLY'S OWN JSON. A client that has structuredContent reads that, and it is built from the first block
   // alone, so a list riding only in a later block or in _meta never reached it. A reply that is not JSON keeps a line.
   const folded = withReplyFields(result, {
     ...(renamed.length ? { translatedArguments: renamed } : {}),
     ...(dropped.length ? { droppedArguments: dropped } : {}),
-    ...(ignored ? { ignoredArguments: ignored.ignored } : {}),
+    ...(ignoredPaths.length ? { ignoredArguments: ignoredPaths } : {}),
+    ...await renderingBuildField(toolName, args, result, options),
   });
   if (!folded) {
     const lines = [...(renamed.length ? [renamedArgumentsNote(renamed)] : []), ...(dropped.length ? [`Not sent to the studio, as its private state: ${dropped.join(', ')}.`] : [])];
@@ -4973,6 +5007,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
             const receipt = await exportFileReceiptOrReason(filePath, exportResult);
             const cleanResult = { ...exportResult, data: undefined, filePath, fileSize, chunks, file: receipt };
             return withEngineReport({
+              structuredContent: boundedStructured(cleanResult),
               content: [{
                 type: 'text' as const,
                 text: `Export saved to file:\n\nFile: ${filePath}\nFormat: ${format}\nSize: ${(fileSize / 1024).toFixed(1)} KB\nPlatform: ${input.platform}\nPaged out of the studio's export store in ${chunks} chunk${chunks === 1 ? '' : 's'}\n${receiptErrorLine(receipt)}${'receiptError' in receipt ? '' : probeLines(receipt)}${lintLines(exportResult)}\nResult: ${JSON.stringify(cleanResult, null, 2)}`,
@@ -5010,7 +5045,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
           const { sccCues: _c, ...rest } = exportResult as Record<string, unknown>;
           void _c;
           const cleanResult = { ...rest, filePath, fileSize, frameRate: '29.97 drop-frame', fidelity: { warnings } };
-          return withEngineReport({ content: [{ type: 'text' as const, text: `Export saved to file:\n\nFile: ${filePath}\nFormat: scc (CEA-608, CC1, pop-on)\nSize: ${fileSize} bytes\n\nResult: ${JSON.stringify(cleanResult, null, 2)}` }, exportFileLink(filePath, fileSize)] }, exportBrowserResult.report);
+          return withEngineReport({ structuredContent: boundedStructured(cleanResult), content: [{ type: 'text' as const, text: `Export saved to file:\n\nFile: ${filePath}\nFormat: scc (CEA-608, CC1, pop-on)\nSize: ${fileSize} bytes\n\nResult: ${JSON.stringify(cleanResult, null, 2)}` }, exportFileLink(filePath, fileSize)] }, exportBrowserResult.report);
         }
         if ((format === 'html5-ad' || format === 'playable') && typeof exportResult?.adPage === 'string') {
           try {
@@ -5046,6 +5081,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
             // it has to be said out loud here rather than left in the JSON.
             const dropNote = (exportResult as { incomplete?: string }).incomplete;
             return withEngineReport({
+              structuredContent: boundedStructured(cleanResult),
               content: [{
                 type: 'text' as const,
                 text: `Export saved to file:\n\nFile: ${filePath}\nFormat: ${format}\nSize: ${(fileSize / 1024).toFixed(1)} KB\nPlatform: ${input.platform}\n`

@@ -290,6 +290,15 @@ export const RELATION_PARAM_KEYS: Readonly<Record<string, readonly string[]>> = 
   wiggle: ['amplitude', 'dimensions', 'frequency', 'octaves', 'property', 'seed', 'signal'],
 });
 
+/** Read by RelationRegistry.js's relation loop on every relation, whatever its rule (assoc.params.X). */
+export const RELATION_LOOP_PARAMS = [
+  'autoRemove',
+  'endTime',
+  'paramKeyframes',
+  'startTime',
+  'window',
+] as const;
+
 /** Names the grammar refuses outright (expr-to-ir.js REJECT): not deterministic. */
 export const EXPRESSION_REJECTED = [
   'random',

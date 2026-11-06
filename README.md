@@ -279,6 +279,35 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - The npm package starts no process. Two export features use `ffprobe` and `ffmpeg`: checking a saved video against what the studio encoded, and joining the cached segments of a `perScene` export (`ffmpeg -f concat`). Only the Claude Desktop extension runs them, through a small runner it bundles that allows those two binaries alone, via `execFile` (no shell, argument lists the server writes, absolute paths). From npm, the check is skipped and said so, and a `perScene` export runs whole.
 - The server itself fetches the images, SVGs and media a tool call names by URL, and reads local files named by path. URLs that resolve to loopback, private, link-local or reserved addresses are refused, redirects included, and so are cloud metadata addresses. Local files are read only with `PINEPAPER_ALLOW_LOCAL_FILES=1`, and then only from the working directory, the export folder, and folders listed in `PINEPAPER_ASSET_DIRS` (the export folder is readable without the switch). `PINEPAPER_ALLOW_PRIVATE_NETWORK=1` allows local and LAN hosts. Metadata addresses stay refused even with it set.
 
+## What's new in 1.6.33
+
+### Added
+
+- Everything that renders says which studio build rendered it. `studioBuild`
+  (for example `0.5.4-beta+e67960d5`) is in the structured reply of
+  `pinepaper_agent_export`, `pinepaper_export_svg`, `pinepaper_export_scene`,
+  `pinepaper_export_widget`, `pinepaper_export_widget_html`,
+  `pinepaper_capture_frames`, `pinepaper_render_batch` and
+  `pinepaper_sprite_sheet`. Render behaviour follows the live studio, so this is
+  what traces a file, not the package version.
+- A saved export now has a structured reply: `filePath`, `fileSize`, `file` and
+  the rest of its result, which used to be readable only in the text.
+
+### Fixed
+
+- A misspelt option is in `ignoredArguments`, with its path, not only in a
+  sentence: `params.sped` on `pinepaper_add_relation`,
+  `operations[0].relationOptions.sped` in a batch. The same goes for a batch
+  animate op's options, custom relations, and an unknown property on create and
+  modify.
+- `pinepaper_create_scene` reports a relation option nothing reads. It used to
+  say nothing.
+- `params.window`, `startTime`, `endTime`, `autoRemove` and `paramKeyframes` are
+  no longer called ignored. The studio reads them on every relation.
+- A reply too long for structured content keeps its fields and lists what it
+  left out in `textOnly`, such as a widget's page. It used to have no structured
+  reply at all.
+
 ## What's new in 1.6.32
 
 ### Added

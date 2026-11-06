@@ -18,6 +18,7 @@
  * segments become ranges of the chain timeline and transitions stay in.
  */
 import { createHash } from 'node:crypto';
+import { boundedStructured } from './reply-fields.js';
 import { mkdir, stat, copyFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -222,5 +223,5 @@ export async function exportPerScene(args: Record<string, unknown>, format: stri
     scenes: segments.map((s) => ({ sceneId: s.sceneId, seconds: s.seconds, cached: s.cached })),
     note: reused ? `${reused} of ${segments.length} scenes came from the cache: only what changed was rendered.` : 'every scene was rendered and cached; an export after editing one scene renders only that one.',
   };
-  return { content: [{ type: 'text' as const, text: `Export saved to file:\nFile: ${out}\n\n${JSON.stringify(result, null, 2)}` }, exportFileLink(out, bytes)] };
+  return { structuredContent: boundedStructured(result), content: [{ type: 'text' as const, text: `Export saved to file:\nFile: ${out}\n\n${JSON.stringify(result, null, 2)}` }, exportFileLink(out, bytes)] };
 }

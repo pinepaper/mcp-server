@@ -11,6 +11,7 @@
  */
 
 import { Server } from './mcp/index.js';
+import { boundedStructured } from './tools/reply-fields.js';
 import { StdioServerTransport } from './mcp/index.js';
 import { exitWhenClientGone } from './utils/exit-when-client-gone.js';
 import {
@@ -6065,7 +6066,7 @@ The tools generate Paper.js/JavaScript code that executes on the PinePaper canva
           if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
             const compact = JSON.stringify(parsed);
             result.content = [{ ...first, text: compact }, ...result.content.slice(1)];
-            if (!result.structuredContent && compact.length <= 16_384) result.structuredContent = parsed;
+            if (!result.structuredContent) result.structuredContent = boundedStructured(parsed);
           }
         } catch { /* not JSON after all: text only */ }
       }

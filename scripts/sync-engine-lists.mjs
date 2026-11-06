@@ -55,6 +55,10 @@
  *   (benchmark: "warn on unknown relation options"). A rule whose block cannot
  *   be bounded cleanly, or that declares nothing (event reactions take opaque
  *   params), is left out: no list means no warning, never a wrong one.
+ * - RELATION_LOOP_PARAMS. The params RelationRegistry.js's relation loop reads on
+ *   every relation (assoc.params.X), before any rule runs: a time window and
+ *   its relatives. No rule's own block reads them, so RELATION_PARAM_KEYS alone
+ *   called params.window "ignored" on a relation it was gating.
  * - ANIMATION_TYPES / ANIMATION_WAVEFORMS / ANIMATION_ORIGINS. The loop
  *   animations core/AnimationDriver.js switches on, and the waveform and
  *   origin a field motion (ripple, undulate) reads. animationType was checked
@@ -298,6 +302,11 @@ function expressionGrammar(src) {
   return { functions, constants, rejected };
 }
 
+function relationLoopParams(src) {
+  const keys = [...src.matchAll(/\bassoc\.params(?:\s*&&\s*assoc\.params)?\??\.([A-Za-z][A-Za-z0-9_]*)/g)].map((m) => m[1]);
+  return [...new Set(keys)].sort();
+}
+
 function relationParamKeys(src) {
   const out = [];
   const re = /\n(\s*)this\.registerRule\('([a-z_0-9]+)'/g;
@@ -450,6 +459,11 @@ ${list(expr.constants)}
 export const RELATION_PARAM_KEYS: Readonly<Record<string, readonly string[]>> = Object.freeze({
 ${relKeys.map(([n, ks]) => `  ${n}: [${ks.map((k) => `'${k}'`).join(', ')}],`).join('\n')}
 });
+
+/** Read by RelationRegistry.js's relation loop on every relation, whatever its rule (assoc.params.X). */
+export const RELATION_LOOP_PARAMS = [
+${list(relationLoopParams(relSrc))}
+] as const;
 
 /** Names the grammar refuses outright (expr-to-ir.js REJECT): not deterministic. */
 export const EXPRESSION_REJECTED = [
