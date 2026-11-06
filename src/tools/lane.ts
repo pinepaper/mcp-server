@@ -291,7 +291,7 @@ export const EDIT_TOOL_NAMES = [
 ] as const;
 
 /** Read by an editing agent before any tool. */
-export const EDIT_INSTRUCTIONS = `PinePaper Studio, edit profile: four tools for changing a scene that is already on the canvas.
+export const EDIT_INSTRUCTIONS: string = `PinePaper Studio, edit profile: four tools for changing a scene that is already on the canvas.
 
 1. pinepaper_lint_scene { only: 'edit' } first. Its edit section lists every relation with the exact op that changes it, complete as given (you do not need the batch op schema to send it), every custom motion (add withSource: true for the complete call that redefines one), and for a group bound by a name pattern ("dot-*"), the ops that add or remove a member.
 2. Send those ops, with your values, in ONE pinepaper_agent_batch_execute call.
