@@ -6,6 +6,9 @@
  * -32700 reply, because the SDK sent none and clients were built against it.
  * Input is buffered up to 10 MB, and a longer unterminated line closes the
  * transport. send() waits for 'drain' when stdout is backed up.
+ *
+ * One rule of its own: the SDK ignored stdin closing, which is how a stdio client
+ * says goodbye and all a crashed one leaves behind. See onend.
  */
 import process from 'node:process';
 import type { Readable, Writable } from 'node:stream';
@@ -18,9 +21,12 @@ export class StdioServerTransport implements Transport {
   onmessage?: (message: JSONRPCMessage) => void;
   onclose?: () => void;
   onerror?: (error: Error) => void;
+  /** Stdin closed: no more requests can come, though calls already running may still answer. Without a listener, closes. */
+  onend?: () => void;
 
   private buffer?: Buffer;
   private started = false;
+  private ended = false;
 
   constructor(private readonly stdin: Readable = process.stdin, private readonly stdout: Writable = process.stdout) {}
 
@@ -41,11 +47,22 @@ export class StdioServerTransport implements Transport {
 
   private readonly onstreamerror = (error: Error): void => { this.onerror?.(error); };
 
+  private readonly oninputend = (): void => {
+    if (this.ended) return;
+    this.ended = true;
+    if (this.onend) this.onend();
+    else this.close().catch(() => {});
+  };
+
   async start(): Promise<void> {
     if (this.started) throw new Error('StdioServerTransport already started');
     this.started = true;
     this.stdin.on('data', this.ondata);
     this.stdin.on('error', this.onstreamerror);
+    this.stdin.on('end', this.oninputend);
+    this.stdin.on('close', this.oninputend);
+    // A reply written to a client that has gone is EPIPE: with no listener, that is an uncaught exception.
+    this.stdout.on('error', this.onstreamerror);
   }
 
   private drainLines(): void {
@@ -66,6 +83,9 @@ export class StdioServerTransport implements Transport {
   async close(): Promise<void> {
     this.stdin.off('data', this.ondata);
     this.stdin.off('error', this.onstreamerror);
+    this.stdin.off('end', this.oninputend);
+    this.stdin.off('close', this.oninputend);
+    this.stdout.off('error', this.onstreamerror);
     if (this.stdin.listenerCount('data') === 0) this.stdin.pause();
     this.buffer = undefined;
     this.onclose?.();

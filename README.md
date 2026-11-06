@@ -313,6 +313,9 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - Replies now list ignored arguments in their JSON as `ignoredArguments`, and a
   batch reply lists translated names as `translatedArguments`, so clients that
   read `structuredContent` see them too.
+- The server now exits when its client closes stdin or dies, and takes its
+  browser with it. Before, both kept running. A call already running gets up to
+  5 s to answer, and is then cancelled.
 - The `deterministic` docs state what a repeat export guarantees: identical
   frames into the encoder (compare `frameDigest`), and a container identical
   apart from the encoded samples. WebM is byte-identical; an MP4 is

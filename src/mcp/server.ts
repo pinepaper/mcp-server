@@ -37,8 +37,13 @@ export interface Transport {
   onmessage?: (message: JSONRPCMessage) => void;
   onclose?: () => void;
   onerror?: (error: Error) => void;
+  /** The client can send nothing more, but may still read: a stream transport's half-close. */
+  onend?: () => void;
   sessionId?: string;
 }
+
+/** How long a call already running may take to answer once the client has stopped sending. */
+const DRAIN_MS = 5_000;
 
 export interface Notification { method: string; params?: Record<string, unknown> }
 
@@ -55,6 +60,8 @@ export interface RequestHandlerExtra {
 type Handler = (request: JSONRPCRequest, extra: RequestHandlerExtra) => Promise<unknown>;
 
 export interface ServerOptions {
+  /** How long a running call may take to answer after the client stops sending (DRAIN_MS). */
+  drainMs?: number;
   capabilities?: ServerCapabilities;
   instructions?: string;
 }
@@ -67,6 +74,8 @@ export class Server {
   // unchanged, those tests check this server the way they checked the SDK's.
   private readonly _requestHandlers = new Map<string, Handler>();
   private readonly inFlight = new Map<RequestId, AbortController>();
+  private drained?: () => void;
+  private readonly drainMs: number;
   private clientVersion?: Implementation;
   private clientCapabilities?: Record<string, unknown>;
   private logLevel?: LoggingLevel;
@@ -80,6 +89,7 @@ export class Server {
 
   constructor(private readonly serverInfo: Implementation & Record<string, unknown>, options: ServerOptions = {}) {
     this._capabilities = options.capabilities ?? {};
+    this.drainMs = options.drainMs ?? DRAIN_MS;
     this.instructions = options.instructions;
     this.setRequestHandler(InitializeRequestSchema, (request) => this.initialize(request));
     this.setRequestHandler(PingRequestSchema, () => ({}));
@@ -110,6 +120,7 @@ export class Server {
   async connect(transport: Transport): Promise<void> {
     this.transport = transport;
     transport.onclose = () => this.closed();
+    transport.onend = () => this.drainThenClose();
     transport.onerror = (error) => this.onerror?.(error);
     transport.onmessage = (message) => this.receive(message);
     await transport.start();
@@ -201,7 +212,27 @@ export class Server {
         },
       )
       .catch((error) => this.onerror?.(new Error(`Failed to send response: ${error}`)))
-      .finally(() => { if (this.inFlight.get(request.id) === controller) this.inFlight.delete(request.id); });
+      .finally(() => {
+        if (this.inFlight.get(request.id) === controller) this.inFlight.delete(request.id);
+        if (this.inFlight.size === 0) this.drained?.();
+      });
+  }
+
+  /**
+   * The client stopped sending. A piped one-shot does that straight after its request and still reads the reply, so a
+   * running call gets DRAIN_MS to answer. A crashed client looks the same and will never read it, so the wait is short,
+   * and what is still running after it is aborted: that is what stops an export rendering for nobody.
+   */
+  private drainThenClose(): void {
+    const close = () => {
+      if (timer) clearTimeout(timer);
+      this.drained = undefined;
+      this.transport?.close().catch((error) => this.onerror?.(error as Error));
+    };
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    if (this.inFlight.size === 0) { close(); return; }
+    this.drained = close;
+    timer = setTimeout(close, this.drainMs);
   }
 
   private closed(): void {

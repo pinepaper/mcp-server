@@ -12,6 +12,7 @@
 
 import { Server } from './mcp/index.js';
 import { StdioServerTransport } from './mcp/index.js';
+import { exitWhenClientGone } from './utils/exit-when-client-gone.js';
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
@@ -6256,6 +6257,7 @@ async function main(): Promise<void> {
   console.error(`Tools: ${toolCount}/${PINEPAPER_TOOLS.length}`);
   console.error(`Resources: ${RESOURCES.length}`);
 
+  exitWhenClientGone(server);
   await server.connect(transport);
 
   console.error('PinePaper MCP Server running on stdio');

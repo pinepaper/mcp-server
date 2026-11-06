@@ -7,6 +7,7 @@
 
 import { createServer, ServerOptions } from './index.js';
 import { StdioServerTransport } from './mcp/index.js';
+import { exitWhenClientGone } from './utils/exit-when-client-gone.js';
 import { ExecutionMode } from './tools/handlers.js';
 import { TOOLKIT_PROFILES_LIST } from './tools/toolkits.js';
 import type { ToolkitProfile } from './tools/toolkits.js';
@@ -157,6 +158,7 @@ SUPPORT:
     console.error('');
     console.error('Server starting on stdio transport...');
 
+    exitWhenClientGone(server);
     await server.connect(transport);
 
     console.error('Server connected and ready');
