@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
  * Source:    mcp-cloud/src/services/content-recipes.ts (DesignStyle union only)
- * sha256:    4987265fc982ad8d7191733208ccf9c5fad8aa6149c457e23742f66223a1a677
+ * sha256:    de3358e9cc23a62d8ace2dcaebbd90a985d49ae1a3e7e5fa1d88321bf5fbac1d
  * Generator: scripts/sync-design-systems.mjs
  *
  * Edit the TypeScript upstream and re-run the generator. A hand edit here is
@@ -49,10 +49,13 @@ export type DesignStyle =
   | "synthwave_outrun"
   | "sumi_e_ink"
   | "flat_design"
-  | "blueprint_schematic";
+  | "blueprint_schematic"
+  | "stick_figure"
+  | "omni_flash_realism"
+  | "hybrid_mixed_media";
 
 
-/** The same 38 styles as DATA, so a runtime list cannot drift from the type. */
+/** The same 41 styles as DATA, so a runtime list cannot drift from the type. */
 export const DESIGN_STYLES: readonly DesignStyle[] = Object.freeze([
   'minimal',
   'editorial',
@@ -92,4 +95,7 @@ export const DESIGN_STYLES: readonly DesignStyle[] = Object.freeze([
   'sumi_e_ink',
   'flat_design',
   'blueprint_schematic',
+  'stick_figure',
+  'omni_flash_realism',
+  'hybrid_mixed_media',
 ]);

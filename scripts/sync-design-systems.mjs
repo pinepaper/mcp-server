@@ -115,6 +115,13 @@ export function isTracked(relPath) {
   }
 }
 
+/**
+ * Named like a style generator and not one. vector-generator is the cloud's
+ * text-to-SVG page service: nothing here calls it, and its import of
+ * timeline-draft-export would bring the service layer along and fail tsc.
+ */
+const NOT_STYLE_GENERATORS = new Set(['vector-generator']);
+
 /** Every *-generator.ts upstream, discovered rather than listed — a new style
  *  should arrive by being written, not by someone remembering to edit an array.
  *  Untracked files are skipped: unpublished work is not a style this ships. */
@@ -126,12 +133,14 @@ export function discoverGenerators() {
     return listed
       .filter((f) => f.endsWith('-generator.ts') && !f.startsWith('typesafe-'))
       .map((f) => basename(f, '.ts'))
+      .filter((n) => !NOT_STYLE_GENERATORS.has(n))
       .sort();
   }
   return readdirSync(UPSTREAM_DIR)
     .filter((f) => f.endsWith('-generator.ts') && !f.startsWith('typesafe-'))
     .filter((f) => isTracked(join('src', 'services', f)))
     .map((f) => basename(f, '.ts'))
+    .filter((n) => !NOT_STYLE_GENERATORS.has(n))
     .sort();
 }
 
