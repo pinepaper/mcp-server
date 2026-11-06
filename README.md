@@ -303,6 +303,16 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 
 ### Fixed
 
+- `pinepaper_lint_scene` and `pinepaper_query_relations` read back only the
+  parameters a relation was given. Before, a relation's params also carried the
+  studio's internal state, which took most of an `only: 'edit'` reply and could
+  overwrite live state when a ready-made op was sent back. A batch relation op
+  now drops `_`-prefixed keys and lists them in `droppedArguments`.
+- The `pinepaper_register_custom_relation` call in `edit.customRelations` now
+  works as given, with its parameter definitions in full.
+- Replies now list ignored arguments in their JSON as `ignoredArguments`, and a
+  batch reply lists translated names as `translatedArguments`, so clients that
+  read `structuredContent` see them too.
 - The `deterministic` docs state what a repeat export guarantees: identical
   frames into the encoder (compare `frameDigest`), and a container identical
   apart from the encoded samples. WebM is byte-identical; an MP4 is
@@ -328,6 +338,9 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 
 ### Changed
 
+- `edit.customRelations[]` offers the redefining `change` call only with
+  `withSource: true`, because that call needs the motion's source. Without it,
+  an entry lists the motion's name and parameters.
 - The server reads the environment in one place, and only for a variable on its
   fixed list (`src/utils/env.ts`), instead of one read per variable. The list
   and what it allows are unchanged. 1.6.31's separate reads each counted as

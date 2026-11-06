@@ -3512,7 +3512,7 @@ EXAMPLE doc: { "nodes": [ {"id":"bar","type":"pp:Rectangle","width":300,"height"
 RETURNS:
 - relations: every relation bound — [{ from, fromName?, to, type, params }], the first 200 (relationCount says how many when there are more). Relations bound by a name pattern ("dot-*") are listed once per group in edit.groups instead (groupedRelations counts them). Use it to find the relation to change, then a batch relation op with update: true.
 - customRelations: each pinepaper_register_custom_relation definition the scene uses (name, params; computeFunction / applyFunction with withSource: true). registeredUnused names any registered that no relation uses.
-- edit: the exact ops that change this scene (per relation, per group with add / remove member ops, per custom motion). With only: 'edit' the reply is just this section.
+- edit: the exact ops that change this scene (per relation, per group with add / remove member ops; per custom motion with withSource: true, since the call that redefines one needs its source). With only: 'edit' the reply is just this section.
 - density: { itemCount, relationalItemCount, relationalDensity (0..1 — fraction of items touching the relation graph), edgeCount, componentCount }. A low relationalDensity means items are placed by hardcoded coordinates and won't hold together if something moves.
 - suggestions: structural relations for unrelated item pairs that ALREADY sit in a structural configuration — [{ from, to, type (on_top_of/below/beside/inside/centered_on/aligned_with), params, confidence }], ranked by confidence. Apply the good ones with pinepaper_add_relation to make the layout robust.
 
@@ -8903,7 +8903,7 @@ WORKFLOW:
 After validation: user reviews screenshot → feedback → modify/recreate as needed.
 
 OPERATION TYPES (${AgentBatchOperationTypeSchema.options.length}) — use in this order:
-Each op also takes its standalone tool's names: params (relation, apply_effect, execute_generator), preset / options (apply_mask), region (execute_generator), intensity / speed / delay / waveform / origin (animate, at the top or in animationOptions), and a modify op's changes flat beside itemId. The reply lists what it translated.
+Each op also takes its standalone tool's names: params (relation, apply_effect, execute_generator), preset / options (apply_mask), region (execute_generator), intensity / speed / delay / waveform / origin (animate, at the top or in animationOptions), and a modify op's changes flat beside itemId. The reply lists what it translated in translatedArguments.
 
 CANVAS SETUP:
   set_canvas_size — {width, height} or {preset: "instagram-post"|"instagram-story"|"youtube-thumbnail"|"tiktok"|"full-hd-1080p"|...} (studio preset keys, not platform names; an unknown one is refused with the list)

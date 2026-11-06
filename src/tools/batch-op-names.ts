@@ -42,9 +42,10 @@ const MODIFY_NOT_PROPERTIES = new Set(['type', 'itemId', 'properties', 'position
 type Op = Record<string, unknown>;
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 
-export function normalizeBatchOperationNames(args: Record<string, unknown>): { args: Record<string, unknown>; renamed: string[] } {
-  if (!Array.isArray(args.operations)) return { args, renamed: [] };
+export function normalizeBatchOperationNames(args: Record<string, unknown>): { args: Record<string, unknown>; renamed: string[]; dropped: string[] } {
+  if (!Array.isArray(args.operations)) return { args, renamed: [], dropped: [] };
   const renamed: string[] = [];
+  const dropped: string[] = [];
   const operations = (args.operations as unknown[]).map((raw, i) => {
     if (!isObj(raw)) return raw;
     const op: Op = { ...raw };
@@ -57,6 +58,18 @@ export function normalizeBatchOperationNames(args: Record<string, unknown>): { a
       renamed.push(`${at}.${from} → ${to}`);
     };
     for (const [from, to] of Object.entries(BATCH_OP_RENAMES[type] ?? {})) move(from, to);
+
+    // A `_` key in a relation's parameters is the studio's working state, never a parameter (the engine drops them all at
+    // its own save boundary). An update op writes what it is given into the live relation, and the engine only fills an
+    // empty slot, so a copied snapshot of its registry would replace the live one for good.
+    if (type === 'relation' && isObj(op.relationOptions)) {
+      const kept = Object.entries(op.relationOptions).filter(([k]) => {
+        if (!k.startsWith('_')) return true;
+        dropped.push(`${at}.relationOptions.${k}`);
+        return false;
+      });
+      if (kept.length !== Object.keys(op.relationOptions).length) op.relationOptions = Object.fromEntries(kept);
+    }
 
     if (type === 'animate') {
       const opts: Record<string, unknown> = isObj(op.animationOptions) ? { ...op.animationOptions } : {};
@@ -92,7 +105,7 @@ export function normalizeBatchOperationNames(args: Record<string, unknown>): { a
     }
     return op;
   });
-  return renamed.length ? { args: { ...args, operations }, renamed } : { args, renamed };
+  return renamed.length || dropped.length ? { args: { ...args, operations }, renamed, dropped } : { args, renamed, dropped };
 }
 
 export const RENAMED_ARGUMENTS_META_KEY = 'pinepaper.studio/renamedArguments';

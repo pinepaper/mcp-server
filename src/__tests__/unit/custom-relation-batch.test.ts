@@ -128,7 +128,7 @@ describe('#43: lint_scene says how to change what it lists', () => {
     expect(g.change).toEqual({ type: 'relation', sourceId: 'dot-*', relationType: 'wave', relationOptions: { amp: 40 }, update: true });
     expect(g.addMember[0]).toMatchObject({ type: 'create', itemType: 'circle', properties: { name: 'dot-4' } });
     expect(g.removeMember[0]).toEqual({ type: 'delete', itemId: 'dot-3' });
-    expect(out.edit.customRelations[0].change.tool).toBe('pinepaper_register_custom_relation');
+    expect(lint(rels, [{ name: 'wave', computeFunction: 'return {};', applyFunction: '' }], { withSource: true }).edit.customRelations[0].change.tool).toBe('pinepaper_register_custom_relation');
     expect(out.edit.hint).toContain('ONE pinepaper_agent_batch_execute');
   });
 
@@ -153,10 +153,79 @@ describe('#43: lint_scene says how to change what it lists', () => {
       const out = lint(group, defs);
       expect(out.customRelations).toEqual([{ name: 'wave', params: { amp: { type: 'number' } } }]);
       expect(out.registeredUnused).toEqual(['old_motion']);
-      expect(out.edit.customRelations[0].change.args.computeFunction).toBeUndefined();
+      // Without its source the register call would be refused, so it is not offered as an op to send.
+      expect(out.edit.customRelations[0].change).toBeUndefined();
+      expect(out.edit.customRelations[0].params).toEqual({ amp: { type: 'number' } });
       expect(out.edit.customHint).toContain('withSource: true');
       const full = lint(group, defs, { withSource: true });
       expect(full.customRelations[0].computeFunction).toBe('return { y: params.amp };');
+    });
+
+    describe('what the studio keeps in a live relation stays in the studio', () => {
+      // The engine writes its registry into the stored params on the first frame (RelationRegistry: _itemRegistry), and
+      // rules cache live items and timers there. A registry reaches the page, so it is cyclic and holds functions.
+      const live = () => {
+        const registry: Record<string, unknown> = { nextId: 15, get: () => null };
+        registry.app = { registry, canvasEl: {}, _heavy: {} };
+        return registry;
+      };
+      const bound = () => [1, 2].map((i) => ({ from: `item_${i}`, name: `dot-${i}`, type: 'orbits', to: 'hub',
+        params: { radius: 80, index: i - 1, count: 2, pattern: 'dot-*', _itemRegistry: live(), _initialized: true, _startTime: 3, _keyOff: () => {}, onTick: () => {} } }));
+      const single = () => [{ from: 'item_9', name: 'solo', type: 'bob', to: null, params: { amp: 5, _itemRegistry: live(), _affectedItems: [{}] } }];
+      const underscoreKeys = (v: unknown, at = ''): string[] => (v && typeof v === 'object')
+        ? Object.entries(v as object).flatMap(([k, c]) => [...(k.startsWith('_') ? [`${at}.${k}`] : []), ...underscoreKeys(c, `${at}.${k}`)]) : [];
+
+      it('a group, its change op and its add-member op carry only the parameters given', () => {
+        const g = lint(bound(), [], { only: 'edit' }).edit.groups[0];
+        for (const opts of [g.relationOptions, g.change.relationOptions, g.addMember[1].relationOptions]) expect(opts).toEqual({ radius: 80 });
+      });
+
+      it('a single relation\'s change op sends back only its parameters', () => {
+        expect(lint(single(), [], { only: 'edit' }).edit.relations[0].change.relationOptions).toEqual({ amp: 5 });
+      });
+
+      it('the full reply has none of it, in relations or edit', () => {
+        const out = lint([...bound(), ...single()]);
+        expect(underscoreKeys(out)).toEqual([]);
+        expect(out.relations[0].params).toEqual({ amp: 5 });
+      });
+
+      // The predicate that matters: structuredClone is what the page bridge attempts. A reply it refuses goes through
+      // the walker instead, which is how an internal in one relation truncated another relation's definition to "[deep]".
+      it('the reply crosses the bridge whole, so a custom definition arrives as it was given', () => {
+        const def = { name: 'bob', params: { amp: { type: 'number', default: 20, min: 0 } }, reads: ['amp'], computeFunction: 'return {};', applyFunction: '' };
+        const out = lint(single().map((r) => ({ ...r, type: 'bob' })), [def], { only: 'edit', withSource: true });
+        expect(() => structuredClone(out)).not.toThrow();
+        expect(JSON.stringify(out)).not.toContain('[deep]');
+        expect(out.edit.customRelations[0].change.args.params).toEqual(def.params);
+      });
+
+      it('the redefining call is one the tool accepts, as given', () => {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { RegisterCustomRelationInputSchema } = require('../../types/schemas.js');
+        const def = { name: 'bob', params: { amp: { type: 'number', default: 20 } }, reads: ['amp'], computeFunction: 'return {};', applyFunction: '' };
+        const { args, tool } = lint(single().map((r) => ({ ...r, type: 'bob' })), [def], { only: 'edit', withSource: true }).edit.customRelations[0].change;
+        expect(tool).toBe('pinepaper_register_custom_relation');
+        expect(RegisterCustomRelationInputSchema.safeParse(args).success).toBe(true);
+        // reads is worked out by the server from the source: not an argument of the call, which would be reported as ignored.
+        expect(Object.keys(RegisterCustomRelationInputSchema.shape)).toEqual(expect.arrayContaining(Object.keys(args)));
+      });
+
+      it('leaves the live relation as it found it', () => {
+        const rels = single();
+        lint(rels, [], { only: 'edit' });
+        expect(Object.keys(rels[0].params).sort()).toEqual(['_affectedItems', '_itemRegistry', 'amp']);
+      });
+
+      it('query_relations reads back the same way, in both directions', () => {
+        const params = { amp: 5, _itemRegistry: live(), onTick: () => {} };
+        const run = (direction: string) => {
+          const r = codeGenerator.generateQueryRelations({ itemId: 'a', direction });
+          const app = { getRelations: () => [{ relation: 'bob', target: 'b', params }], queryByRelationTarget: () => [{ itemId: 'c', relation: 'bob', params }] };
+          return new Function('app', `${r.split('\n').filter((l: string) => !l.trim().startsWith('//')).join('\n').replace(/\(\{ relations(: formatted)? \}\);\s*$/, (m: string) => `return ${m}`)}`)(app);
+        };
+        for (const d of ['outgoing', 'incoming']) expect(run(d).relations[0].params).toEqual({ amp: 5 });
+      });
     });
 
     it("only: 'edit' returns the edit section alone", () => {

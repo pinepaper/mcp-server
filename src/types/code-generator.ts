@@ -19,6 +19,17 @@ import { jsLiteral } from '../utils/js-literal.js';
 /** How many relations pinepaper_lint_scene lists back; past it the result says how many there are. */
 const RELATIONS_READBACK_CAP = 200;
 
+/**
+ * A relation's parameters as a caller may read them: the engine's own rule for what leaves a relation
+ * (RelationRegistry.stripTransientParams, its save boundary), applied in the page because that is where the value is.
+ *
+ * The engine keeps its working state in the stored params: _itemRegistry (written on the first frame), _initialized,
+ * _startTime, _affectedItems, listeners as functions. Read back raw, a reply carried the registry, so it failed the page
+ * bridge's structured clone and took the walker's path, where the whole reply was truncated to fit. Sent back in an update
+ * op, the same keys overwrite live state: the engine fills those slots only when empty, so a stale copy stays for good.
+ */
+const RELATION_PUBLIC_PARAMS_JS = "((p) => Object.fromEntries(Object.entries(p || {}).filter(([k, v]) => k.charAt(0) !== '_' && typeof v !== 'function')))";
+
 function oneLine(v: unknown): string {
   return String(v).replace(/[\r\n\u2028\u2029]+/g, ' ');
 }
@@ -2090,7 +2101,7 @@ const formatted = relations.map(r => ({
   // this tool even though it was wired correctly on the canvas.
   targetId: r.target ?? r.targetId ?? null,
   relationType: r.relation || r.type,
-  params: r.params || {}
+  params: ${RELATION_PUBLIC_PARAMS_JS}(r.params)
 }));
 
 ({ relations: formatted });
@@ -2109,7 +2120,7 @@ const relations = results.map(r => ({
   // the filter string labelled every edge 'unknown' on an unfiltered query —
   // which is exactly the query you make when exploring an unfamiliar graph.
   relationType: r.relation || ${relationType ? jsLiteral(relationType) : "'unknown'"},
-  params: r.params || {}
+  params: ${RELATION_PUBLIC_PARAMS_JS}(r.params)
 }));
 
 ({ relations });
@@ -12965,7 +12976,7 @@ ${checks.includes('contrast') ? `  // SAMPLED OVER TIME (round 12, 12.9): text i
       __relCount++;
       if (__rels.length >= ${RELATIONS_READBACK_CAP}) return;
       const __name = e.item && e.item.data && e.item.data.name;
-      __rels.push({ from: e.itemId, ...(__name ? { fromName: __name } : {}), to: a.target === undefined ? null : a.target, type: a.relation, params: a.params || {} });
+      __rels.push({ from: e.itemId, ...(__name ? { fromName: __name } : {}), to: a.target === undefined ? null : a.target, type: a.relation, params: ${RELATION_PUBLIC_PARAMS_JS}(a.params) });
     }));
   } catch (e) { /* the relations are an addition; the lint stands without them */ }
   // CUSTOM RELATIONS THIS SCENE USES (#43): one registered before a clear_canvas stayed in the read-back of the scene
@@ -12980,7 +12991,7 @@ ${checks.includes('contrast') ? `  // SAMPLED OVER TIME (round 12, 12.9): text i
   // HOW TO CHANGE IT (#43): an editing agent needs the op, not the schemas. Each relation comes with the batch op that
   // changes it; a group bound by a name pattern ("dot-*", recorded in each member's params) comes once, with the ops
   // that add and remove a member; a custom motion with the call that redefines it.
-  const __edit = { hint: 'To change this scene, send the ops below (your values in relationOptions) in ONE pinepaper_agent_batch_execute call; a custom motion changes by sending its pinepaper_register_custom_relation call again.', groups: [], relations: [], customRelations: [] };
+  const __edit = { hint: 'To change this scene, send the ops below (your values in relationOptions) in ONE pinepaper_agent_batch_execute call; a custom motion changes by sending its pinepaper_register_custom_relation call again (withSource: true gives the complete call).', groups: [], relations: [], customRelations: [] };
   try {
     const __byPat = new Map();
     __rels.forEach((r) => {
@@ -13007,9 +13018,14 @@ ${checks.includes('contrast') ? `  // SAMPLED OVER TIME (round 12, 12.9): text i
         addMember: [{ type: 'create', itemType: (firstEntry && firstEntry.type) || 'circle', position: [0, 0], properties: { name: next } }, bind],
         ...(names.length ? { removeMember: [{ type: 'delete', itemId: names[names.length - 1] }, bind] } : {}) });
     });
-    __custom.forEach((d) => __edit.customRelations.push({ name: d.name, change: { tool: 'pinepaper_register_custom_relation', args: d } }));
+    // The register call requires its source, so without withSource there is no call to offer: an op that can only be
+    // refused is not one to send. reads is the server's own working-out from that source, not an argument of the call.
+    __custom.forEach((d) => {
+      const args = Object.assign({}, d); delete args.reads;
+      __edit.customRelations.push(${input.withSource === true ? "{ name: d.name, change: { tool: 'pinepaper_register_custom_relation', args } }" : "args"});
+    });
   } catch (e) { /* the read-back stands without the edit ops */ }
-  if (!${input.withSource === true ? 'true' : 'false'} && __custom.length) __edit.customHint = 'custom relation source is left out; pass withSource: true to read the current computeFunction / applyFunction before rewriting one.';
+  if (!${input.withSource === true ? 'true' : 'false'} && __custom.length) __edit.customHint = 'custom relations are listed without their source, and the call that redefines one needs it: pass withSource: true to get each complete pinepaper_register_custom_relation call.';
   // A GROUP IS LISTED ONCE (#43): members bound by a name pattern repeated the same relation once per item in
   // \`relations\`; they are in edit.groups, and counted here.
   const __loose = __rels.filter((r) => !(r.params && typeof r.params.pattern === 'string'));

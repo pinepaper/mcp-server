@@ -2235,6 +2235,21 @@ export function batchOpIgnoredPaths(args: Record<string, unknown>): string[] {
 
 export const IGNORED_ARGUMENTS_META_KEY = 'pinepaper.studio/ignoredArguments';
 
+/** Adds fields to a reply whose first block is a JSON object; false when it is not one (or there is nothing to add). */
+function withReplyFields(result: CallToolResult, fields: Record<string, unknown>): boolean {
+  if (!Object.keys(fields).length) return true;
+  const first = result.content?.[0];
+  if (first?.type !== 'text') return false;
+  try {
+    const obj = JSON.parse(first.text);
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false;
+    result.content = [{ ...first, text: JSON.stringify({ ...obj, ...fields }, null, 2) }, ...result.content.slice(1)];
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function handleToolCall(
   toolName: string,
   args: Record<string, unknown>,
@@ -2246,7 +2261,8 @@ export async function handleToolCall(
   // A batch op takes its standalone tool's names (params, preset, intensity …): translated here, before the handler
   // and the ignored-argument check see them, and listed in the reply (batch-op-names.ts).
   let renamed: string[] = [];
-  if (toolName === 'pinepaper_agent_batch_execute') ({ args, renamed } = normalizeBatchOperationNames(args));
+  let dropped: string[] = [];
+  if (toolName === 'pinepaper_agent_batch_execute') ({ args, renamed, dropped } = normalizeBatchOperationNames(args));
 
   // IDLE PAUSE (#45): the page is thawed before the call and the idle countdown restarts after it. A controller
   // made DURING the call (the first browser tool) has nothing to thaw; it only starts its countdown at the end.
@@ -2271,9 +2287,17 @@ export async function handleToolCall(
     result.content = [...(result.content ?? []), { type: 'text' as const, text: ignored.note }];
     result._meta = { ...(result._meta ?? {}), [IGNORED_ARGUMENTS_META_KEY]: ignored.ignored };
   }
-  if (renamed.length) {
-    result.content = [...(result.content ?? []), { type: 'text' as const, text: renamedArgumentsNote(renamed) }];
-    result._meta = { ...(result._meta ?? {}), [RENAMED_ARGUMENTS_META_KEY]: renamed };
+  if (renamed.length) result._meta = { ...(result._meta ?? {}), [RENAMED_ARGUMENTS_META_KEY]: renamed };
+  // IN THE REPLY'S OWN JSON. A client that has structuredContent reads that, and it is built from the first block
+  // alone, so a list riding only in a later block or in _meta never reached it. A reply that is not JSON keeps a line.
+  const folded = withReplyFields(result, {
+    ...(renamed.length ? { translatedArguments: renamed } : {}),
+    ...(dropped.length ? { droppedArguments: dropped } : {}),
+    ...(ignored ? { ignoredArguments: ignored.ignored } : {}),
+  });
+  if (!folded) {
+    const lines = [...(renamed.length ? [renamedArgumentsNote(renamed)] : []), ...(dropped.length ? [`Not sent to the studio, as its private state: ${dropped.join(', ')}.`] : [])];
+    if (lines.length) result.content = [...(result.content ?? []), { type: 'text' as const, text: lines.join(' ') }];
   }
 
   // Record response payload size for token estimation

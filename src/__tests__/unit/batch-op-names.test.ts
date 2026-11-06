@@ -73,7 +73,19 @@ describe('standalone names are read on batch ops', () => {
     normalizeBatchOperationNames(input);
     expect(input.operations[0]).toHaveProperty('params');
     const clean = { operations: [{ type: 'create', itemType: 'circle' }] };
-    expect(normalizeBatchOperationNames(clean)).toEqual({ args: clean, renamed: [] });
+    expect(normalizeBatchOperationNames(clean)).toEqual({ args: clean, renamed: [], dropped: [] });
+  });
+
+  // An op copied from an older lint reply carried a snapshot of the studio's registry, and an update op writes what it is
+  // given into the live relation: the snapshot then replaced the live registry for good, because the engine only fills an
+  // empty slot. A rule that resolves items through it (the collection family) was left reading a dead object.
+  it('studio-private keys in relationOptions do not reach the studio, and the reply says so', () => {
+    const r = norm([{ type: 'relation', sourceId: 'a', relationType: 'orbits', update: true, relationOptions: { radius: 5, _itemRegistry: { app: '[deep]' } } },
+      { type: 'relation', sourceId: 'b', relationType: 'orbits', params: { speed: 1, _startTime: 2 } }]);
+    const [first, second] = ops(r);
+    expect(first.relationOptions).toEqual({ radius: 5 });
+    expect(second.relationOptions).toEqual({ speed: 1 });
+    expect(r.dropped).toEqual(['operations[0].relationOptions._itemRegistry', 'operations[1].relationOptions._startTime']);
   });
 
   it('the reply line names each translation', () => {
@@ -90,5 +102,49 @@ describe('an animationOptions key app.animate never reads is named', () => {
     expect(w).toContain('animationIntensty → animationIntensity?');
     const code = codeGenerator.generateAgentBatchExecute({ operations: [{ type: 'animate', itemId: 'a', animationType: 'pulse', animationOptions: { glow: true } }] } as never);
     expect(code).toContain('warning:');
+  });
+});
+
+// A client that has structuredContent reads that and not the trailing text blocks, so a list that only rides in a later
+// block never reached it. The reply's own JSON is the one place every client reads.
+describe('the reply carries what was changed or ignored in its own JSON', () => {
+  const body = async (operations: unknown[]) => {
+    const { handleToolCall } = await import('../../tools/handlers.js');
+    const r = await handleToolCall('pinepaper_agent_batch_execute', { operations }, opts);
+    return { r, json: JSON.parse((r.content[0] as { text: string }).text) };
+  };
+  const controller = { connected: true, connect: async () => undefined, executeCode: async () => ({ success: true, result: { success: true, itemIds: [], results: [] } }) };
+  const opts = { executeInBrowser: true, browserController: controller as never, executionMode: 'puppeteer' as const };
+  const translated = [{ type: 'relation', sourceId: 'a', targetId: 'b', relationType: 'orbits', params: { radius: 5 } }];
+
+  it('a relation op given params', async () => {
+    const { json, r } = await body(translated);
+    expect(json.translatedArguments).toEqual(['operations[0].params → relationOptions']);
+    // Once: the same list as a second text block would only cost the reader tokens.
+    expect(r.content.filter((c) => (c as { text?: string }).text?.includes('Read under'))).toHaveLength(0);
+  });
+
+  it('an animate op given a top-level intensity and speed', async () => {
+    const { json } = await body([{ type: 'animate', itemId: 'a', animationType: 'pulse', intensity: 0.4, speed: 2 }]);
+    expect(json.translatedArguments).toEqual(['operations[0].speed → animationOptions.animationSpeed', 'operations[0].intensity → animationOptions.animationIntensity']);
+  });
+
+  it('a dropped private key and an ignored argument', async () => {
+    const { json } = await body([{ type: 'relation', sourceId: 'a', relationType: 'orbits', relationOptions: { _itemRegistry: {} }, wibble: 1 }]);
+    expect(json.droppedArguments).toEqual(['operations[0].relationOptions._itemRegistry']);
+    expect(json.ignoredArguments).toEqual(expect.arrayContaining(['operations[0].wibble']));
+  });
+
+  it('a reply that is not JSON keeps the list as a line of text', async () => {
+    const { handleToolCall } = await import('../../tools/handlers.js');
+    const r = await handleToolCall('pinepaper_agent_batch_execute', { operations: translated });
+    expect(r.content.map((c) => (c as { text?: string }).text ?? '').join('\n')).toContain('operations[0].params → relationOptions');
+  });
+
+  it('adds nothing when there is nothing to say', async () => {
+    const { json } = await body([{ type: 'create', itemType: 'circle' }]);
+    expect(Object.keys(json)).not.toEqual(expect.arrayContaining(['translatedArguments']));
+    expect(json.droppedArguments).toBeUndefined();
+    expect(json.ignoredArguments).toBeUndefined();
   });
 });

@@ -1041,21 +1041,43 @@ export class PinePaperBrowserController {
         // Fourteen emitters spread raw engine results, so this is fixed once
         // here rather than fourteen times. The probe is the real predicate —
         // attempt the clone, and only walk the value when it refuses.
+        //
+        // THE DEPTH LIMIT IS FOR LIVE OBJECTS, NOT FOR DATA. A Paper item's graph
+        // is effectively unbounded, so a class instance stops at depth 6. A plain
+        // object or array is data the caller may send straight back, and cutting
+        // it replaced a value with a string in a reply that looked complete: one
+        // unclonable value anywhere turned a custom relation's
+        // edit.customRelations[].change.args.params.amp, depth 7, into "[deep]",
+        // which the tool then refused. Plain data is walked whole; the path set
+        // stops a cycle, and PLAIN_LIMIT stops a pathological chain.
+        const PLAIN_LIMIT = 64;
+        const onPath = new Set<object>();
+        const isPlain = (v: object) => {
+          if (Array.isArray(v)) return true;
+          const proto = Object.getPrototypeOf(v);
+          return proto === null || proto === Object.prototype;
+        };
         const toBridgeSafe = (value: unknown, depth = 0): unknown => {
           if (value === null || typeof value !== 'object') {
             return typeof value === 'function' ? undefined : value;
           }
-          if (depth > 6) return '[deep]';
-          if (Array.isArray(value)) return value.map((v) => toBridgeSafe(v, depth + 1));
-          const out: Record<string, unknown> = {};
-          for (const key of Object.keys(value as Record<string, unknown>)) {
-            let v: unknown;
-            try { v = (value as Record<string, unknown>)[key]; } catch { continue; }
-            if (typeof v === 'function') continue;
-            const safe = toBridgeSafe(v, depth + 1);
-            if (safe !== undefined) out[key] = safe;
+          if (onPath.has(value)) return '[circular]';
+          if (depth > (isPlain(value) ? PLAIN_LIMIT : 6)) return '[deep]';
+          onPath.add(value);
+          try {
+            if (Array.isArray(value)) return value.map((v) => toBridgeSafe(v, depth + 1));
+            const out: Record<string, unknown> = {};
+            for (const key of Object.keys(value as Record<string, unknown>)) {
+              let v: unknown;
+              try { v = (value as Record<string, unknown>)[key]; } catch { continue; }
+              if (typeof v === 'function') continue;
+              const safe = toBridgeSafe(v, depth + 1);
+              if (safe !== undefined) out[key] = safe;
+            }
+            return out;
+          } finally {
+            onPath.delete(value);
           }
-          return out;
         };
         const bridgeSafe = (value: unknown): unknown => {
           try {
