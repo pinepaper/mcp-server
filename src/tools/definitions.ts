@@ -1250,6 +1250,7 @@ EXAMPLES:
         opacity: { type: 'number', minimum: 0, maximum: 1, description: 'Opacity, 0 to 1. The same as pinepaper_modify_item after the import.' },
         blendMode: { type: 'string', description: "How it composites over what is below: 'multiply', 'screen' and the other pinepaper_modify_item blend modes." },
         scale: { type: 'number', exclusiveMinimum: 0, description: 'Multiplies the size maxWidth / maxHeight / maxEdge gave it.' },
+        loop: { anyOf: [{ type: 'boolean' }, { type: 'integer', minimum: 1 }, { type: 'string', enum: ['forever'] }], description: "An animated GIF or WebP: true or 'forever' loops, false plays once and holds, n plays n times. Left out, the file's own loop count. Change it later with pinepaper_modify_item's loop, and its start time with imageStart." },
         url: {
           type: 'string',
           description: 'URL of the image to import',
@@ -1756,11 +1757,14 @@ TYPICAL SCENE CHAIN:
 3. Give each beat reactions: on_event_add_relation (spawn an orbit/path), on_event_set_color, on_event_set_property, on_event_set_visibility (all via pinepaper_add_relation, sourceId=the event).
 4. pinepaper_event pulse e0 to start. Canvas-timed fires are scrub/loop/replay-stable.
 
-RULES (contraptions): a rule runs when an event fires: { action: 'add_contraption', sourceEvent, actions, condition?, thenTrigger?, elseTrigger?, contraptionId? }. sourceEvent is an eventId, any name you pulse, or 'state:<key>' when that variable changes. actions: setVariable { key, value? }, incrementVariable { key, by? }, toggleVariable { key }, modifyItem { targetId, properties: { visible, opacity, fillColor, strokeColor, content, position } }. list_contraptions shows each rule's fireCount, which is how to tell it ran; remove_contraption takes contraptionId.
-- For a video, use on_event_* relations (above): a rule's changes to an item stay, nothing rewinds them, so another export starts from the changed scene. Rules suit interactive state.
-- pinepaper_clear_canvas removes rules. They are not saved with the scene.
+RULES (contraptions): a rule runs when an event fires: { action: 'add_contraption', sourceEvent, actions, condition?, thenTrigger?, elseTrigger?, contraptionId? }. sourceEvent is an eventId, any name you pulse, or 'state:<key>' when that variable changes. actions: setVariable { key, value? }, incrementVariable { key, by? }, toggleVariable { key }, modifyItem { targetId, properties: { visible, opacity, fillColor, strokeColor, content, position } }, toggleItemVisible { targetId }, animateItem { targetId, animation?, speed? }, playSound { preset?, note?, gain?, duration? }, playTimeline { duration?, loop? }. list_contraptions shows each rule's fireCount, which is how to tell it ran (a pulse runs its rules on the next frame); remove_contraption takes contraptionId.
+- In an export, what a rule changes is put back afterwards, so the next export starts from the same scene. animateItem cannot be put back, and the export warns. A change from a pulse outside an export stays.
+- An export is silent to playSound and refuses playTimeline, since it already steps the timeline. For sound in a video, use on_event_play_sound (above).
+- pinepaper_clear_canvas removes rules, and so does clear_contraptions. They are saved with the scene.
 
 VARIABLES: set_variable { key, value }, get_variable { key, fallback? }, increment_variable { key, by? }, each with an optional scope. They live in the page's storage, so they survive pinepaper_clear_canvas: set the ones a scene reads when it starts. Nothing private belongs in them.
+
+clear_variables { scope? } removes every variable in a scope, and no rule fires for it.
 
 BOUND TEXT: bind_text { itemId, template: "Score: {score}" } keeps a text item showing the variables it names.
 
@@ -1771,7 +1775,7 @@ RETURNS: create → { success, action, eventId }; pulse → { success, action, e
       type: 'object',
       properties: {
         at: { description: 'create: fire this event at these scene times (seconds) — a timed trigger that runs on the timeline and in video exports. The widget player does not run timed triggers.', oneOf: [{ type: 'number' }, { type: 'array', items: { type: 'number' } }] },
-        action: { type: 'string', enum: ['create', 'pulse', 'add_contraption', 'remove_contraption', 'list_contraptions', 'set_variable', 'get_variable', 'increment_variable', 'bind_text'], description: "'create' a pp:event · 'pulse' it to fire · 'add_contraption' / 'remove_contraption' / 'list_contraptions' a rule · 'set_variable' / 'get_variable' / 'increment_variable' a variable · 'bind_text' a text item to variables" },
+        action: { type: 'string', enum: ['create', 'pulse', 'add_contraption', 'remove_contraption', 'list_contraptions', 'set_variable', 'get_variable', 'increment_variable', 'bind_text', 'clear_contraptions', 'clear_variables'], description: "'create' a pp:event · 'pulse' it to fire · 'add_contraption' / 'remove_contraption' / 'list_contraptions' a rule · 'set_variable' / 'get_variable' / 'increment_variable' a variable · 'bind_text' a text item to variables" },
         name: { type: 'string', description: "Event name — required for action 'create'" },
         payloadType: { type: 'string', description: "Payload type label (default 'Pulse') — action 'create'" },
         x: { type: 'number', description: 'Canvas x for the event marker — action create' },
@@ -1800,12 +1804,19 @@ RETURNS: create → { success, action, eventId }; pulse → { success, action, e
           items: {
             type: 'object',
             properties: {
-              type: { type: 'string', enum: ['setVariable', 'incrementVariable', 'toggleVariable', 'modifyItem'] },
+              type: { type: 'string', enum: ['setVariable', 'incrementVariable', 'toggleVariable', 'modifyItem', 'toggleItemVisible', 'animateItem', 'playSound', 'playTimeline'] },
               key: { type: 'string', description: 'The variable' },
               value: { description: 'setVariable: left out, the event payload' },
               by: { type: 'number', description: 'incrementVariable: default 1' },
               scope: { type: 'string' },
-              targetId: { type: 'string', description: 'modifyItem: the item' },
+              targetId: { type: 'string', description: 'modifyItem, toggleItemVisible, animateItem: the item' },
+              animation: { type: 'string', description: "animateItem: an animationType. Default 'pulse'" },
+              speed: { type: 'number', description: 'animateItem: default 1' },
+              preset: { type: 'string', description: "playSound: default 'pop'" },
+              note: { type: 'string', description: 'playSound' },
+              gain: { type: 'number', description: 'playSound' },
+              duration: { type: 'number', description: 'playSound; playTimeline: seconds, default 5' },
+              loop: { type: 'boolean', description: 'playTimeline' },
               properties: {
                 type: 'object',
                 description: 'modifyItem: only these',
@@ -3683,7 +3694,7 @@ RELATION COMPATIBILITY:
 - morphs_to has type-specific behavior:
   Path→Path: point interpolation
   Circle→Circle: radius interpolation
-  Text→Text: font blend
+  Text→Text: glyph by glyph; shared glyphs travel, the rest cross-dissolve. params.mode: 'auto' (default), 'glyphs' (the same), 'dissolve' or 'particles' (the whole item cross-fades). Any other mode is refused.
   Cross-type: particle denoising transition
 - group_morphs_to: pair-by-index morph between two paper.Groups (any two — graph vertices+edges, letter collages, dashboard clusters). Path.Line children deform via endpoints; other children translate; excess children fade. Params: duration, hold, loop, easing (linear|easeIn|easeOut|easeInOut), deformLines.
 - moves_along_path: self-relation (targetId=null); item is driven along a path. Source the path EITHER from params.path (array of {x,y} or [x,y]) OR from params.equation (S10 B5) — a math curve the item TRAVERSES, sampled deterministically on the Expression IR: params.equation = { kind: function|parametric|fourier|preset, expr | xExpr/yExpr | harmonics | preset, min, max, samples, scale, cx, cy, flipY, warp } (same equation contract as pinepaper_equation_path, but origin is cx/cy, default 0). y is MATH-UP by default (flipY: true): on screen the curve is mirrored about cy, so a curve written in screen coordinates (y down) needs flipY: false. Params: path OR equation, speed, closed, phase, easing (linear|easeIn|easeOut|easeInOut|sine|bounce|pingpong).
@@ -9017,7 +9028,7 @@ VARIABLE REFERENCES: "$0", "$1" etc. reference the items this batch makes, in op
 
 ANIMATION NOTES:
 - keyframe_animate position accepts [x, y] or { x, y } (normalized). fillColor/strokeColor accept rgba() for alpha. The create "opacity" and "blendMode" props are applied to the item.
-- For MP4/GIF export the keyframe timeline is rendered once across the duration; author motion to fill the clip and use loop:false. Looping item-animations (loop:true) are not advanced by the exporter and render frozen.
+- For MP4/GIF export the keyframe timeline is rendered once across the duration; author motion to fill the clip and use loop:false. 
 
 EXAMPLE — Animated sky scene with timed reveals:
 {operations: [

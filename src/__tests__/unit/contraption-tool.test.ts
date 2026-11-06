@@ -41,19 +41,47 @@ describe('rules', () => {
     expect(app.rules.get('r')).toEqual({ id: 'r', sourceEvent: 'tap', actions: [{ type: 'incrementVariable', key: 'n' }], condition: { key: 'n', op: '>=', value: 3 }, thenTrigger: { eventId: 'next', delay: 1 } });
   });
 
-  it('says when a rule targets an item that does not exist, and that an item change stays', () => {
+  it('says when a rule targets an item that does not exist', () => {
     const out = run(rule({ actions: [{ type: 'modifyItem', targetId: 'gone', properties: { visible: false } }, { type: 'modifyItem', targetId: 'c', properties: { opacity: 0 } }] }), studio());
     expect(out.warning).toContain('gone');
     expect(out.warning).not.toContain('c,');
-    expect(out.note).toContain('another export');
+    expect(out.note).toBeUndefined();
   });
 
-  // Each of these answers ok in the engine while doing nothing a caller asked for.
-  for (const type of ['animateItem', 'playSound', 'custom']) {
-    it(`refuses the ${type} action`, () => {
-      expect(EventInputSchema.safeParse(rule({ actions: [{ type, targetId: 'c' }] })).success).toBe(false);
-    });
-  }
+  // A custom action needs a function, which JSON cannot carry.
+  it('refuses the custom action', () => {
+    expect(EventInputSchema.safeParse(rule({ actions: [{ type: 'custom', targetId: 'c' }] })).success).toBe(false);
+  });
+
+  it('accepts the actions the engine answers honestly for, and warns about any target that is missing', () => {
+    const actions = [
+      { type: 'toggleItemVisible', targetId: 'gone1' },
+      { type: 'animateItem', targetId: 'gone2', animation: 'pulse', speed: 2 },
+      { type: 'playSound', preset: 'pop', gain: 0.5 },
+      { type: 'playTimeline', duration: 3, loop: true },
+    ];
+    const parsed = EventInputSchema.parse(rule({ actions }));
+    expect(parsed.actions).toEqual(actions as never);
+    const out = run(rule({ actions }), studio());
+    expect(out.warning).toContain('gone1');
+    expect(out.warning).toContain('gone2');
+  });
+
+  it('requires a target on the actions that act on an item', () => {
+    for (const type of ['toggleItemVisible', 'animateItem']) {
+      expect(EventInputSchema.safeParse(rule({ actions: [{ type }] })).success).toBe(false);
+    }
+  });
+
+  it('clears rules and variables through the engine, and refuses on a studio without the methods', () => {
+    let cleared = 0;
+    const app = { ...studio(), clearContraptions: () => { cleared++; }, clearVariables: (scope: string) => (scope === 'game' ? 3 : 0) };
+    expect(run({ action: 'clear_contraptions' }, app).success).toBe(true);
+    expect(cleared).toBe(1);
+    expect(run({ action: 'clear_variables', scope: 'game' }, app).removed).toBe(3);
+    expect(run({ action: 'clear_contraptions' }, {}).error).toContain('clearContraptions');
+    expect(run({ action: 'clear_variables' }, {}).error).toContain('clearVariables');
+  });
 
   it('refuses a modifyItem property the studio would only file away in item.data', () => {
     expect(EventInputSchema.safeParse(rule({ actions: [{ type: 'modifyItem', targetId: 'c', properties: { x: 1 } }] })).success).toBe(false);

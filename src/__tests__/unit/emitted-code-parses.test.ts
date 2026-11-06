@@ -261,6 +261,16 @@ describe('every generator emits parseable JavaScript', () => {
     expect(() => parses(code)).not.toThrow();
   });
 
+  it('import_image sends loop to the studio and reports whether it took', () => {
+    for (const loop of [true, false, 3, 'forever']) {
+      const code = G.generateImportImage({ url: 'https://picsum.photos/a.gif', loop } as never);
+      expect(() => parses(code)).not.toThrow();
+      expect(code).toContain(`loop: ${JSON.stringify(loop)}`);
+      expect(code).toContain('playback:');
+    }
+    expect(G.generateImportImage({ url: 'https://picsum.photos/a.gif' } as never)).not.toContain('playback:');
+  });
+
   it('get_items parses for a filter object that matches no known key', () => {
     // `entries.filter(entry => )` — a filter with keys but no recognised ones
     // produced an empty predicate, which is a syntax error rather than a wrong

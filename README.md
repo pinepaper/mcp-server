@@ -296,6 +296,13 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   files. An APNG draws its first frame, and the reply says so.
 - An export names any sound that starts after its end (`sound_after_end`), since
   that sound is not in the file.
+- `pinepaper_event` rules can toggle an item (`toggleItemVisible`), animate it
+  (`animateItem`), play a sound (`playSound`) and play the timeline
+  (`playTimeline`). `clear_contraptions` and `clear_variables` reset them.
+- `pinepaper_import_image` takes `loop` for an animated GIF or WebP, and the reply
+  says in `playback` whether it took. `pinepaper_modify_item` takes `loop` and
+  `imageStart` on one. `morphs_to` takes `mode`; text to text now goes glyph by
+  glyph, and `'dissolve'` keeps the cross-fade.
 
 ### Fixed
 

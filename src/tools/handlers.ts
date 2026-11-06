@@ -2329,9 +2329,9 @@ export async function handleToolCall(
     ...(dropped.length ? { droppedArguments: dropped } : {}),
     ...(ignoredPaths.length ? { ignoredArguments: ignoredPaths } : {}),
     ...await renderingBuildField(toolName, args, result, options),
-    // The engine draws an APNG's first frame; a GIF plays. Said by name, since nothing about the reply would show it.
+    // The engine draws an APNG's first frame; a GIF or WebP plays. Said by name, since nothing about the reply would show it.
     ...(toolName === 'pinepaper_import_image' && !result.isError && typeof args.url === 'string' && /\.apng([?#]|$)/i.test(args.url)
-      ? { animation: 'an APNG draws its first frame and does not play. Import a GIF to play it.' } : {}),
+      ? { animation: 'an APNG draws its first frame and does not play. Import a GIF or WebP to play it.' } : {}),
   });
   if (!folded) {
     const lines = [...(renamed.length ? [renamedArgumentsNote(renamed)] : []), ...(dropped.length ? [`Not sent to the studio, as its private state: ${dropped.join(', ')}.`] : [])];

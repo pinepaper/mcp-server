@@ -833,6 +833,10 @@ const ContraptionRuleActionSchema = z.discriminatedUnion('type', [
       position: z.union([z.tuple([z.number(), z.number()]), z.object({ x: z.number(), y: z.number() })]).optional(),
     }).strict(),
   }),
+  z.object({ type: z.literal('toggleItemVisible'), targetId: z.string().min(1) }),
+  z.object({ type: z.literal('animateItem'), targetId: z.string().min(1), animation: z.string().optional().describe("An animationType. Default 'pulse'"), speed: z.number().optional().describe('Default 1') }),
+  z.object({ type: z.literal('playSound'), preset: z.string().optional().describe("Default 'pop'"), note: z.string().optional(), gain: z.number().optional(), duration: z.number().optional() }),
+  z.object({ type: z.literal('playTimeline'), duration: z.number().optional().describe('Seconds, default 5'), loop: z.boolean().optional() }),
 ]);
 const ContraptionTriggerSchema = z.object({
   eventId: z.string().min(1),
@@ -841,7 +845,7 @@ const ContraptionTriggerSchema = z.object({
 });
 
 export const EventInputSchema = z.object({
-  action:      z.enum(['create', 'pulse', 'add_contraption', 'remove_contraption', 'list_contraptions', 'set_variable', 'get_variable', 'increment_variable', 'bind_text']).describe("'create' a pp:event · 'pulse' it to fire listeners/chains · 'add_contraption' / 'remove_contraption' / 'list_contraptions' a rule that runs when an event fires · 'set_variable' / 'get_variable' / 'increment_variable' a state variable · 'bind_text' a text item to variables"),
+  action:      z.enum(['create', 'pulse', 'add_contraption', 'remove_contraption', 'list_contraptions', 'set_variable', 'get_variable', 'increment_variable', 'bind_text', 'clear_contraptions', 'clear_variables']).describe("'create' a pp:event · 'pulse' it to fire listeners/chains · 'add_contraption' / 'remove_contraption' / 'list_contraptions' a rule that runs when an event fires · 'set_variable' / 'get_variable' / 'increment_variable' a state variable · 'bind_text' a text item to variables"),
   name:        z.string().optional().describe("Event name — required for action 'create'"),
   payloadType: z.string().optional().describe("Payload type label (default 'Pulse') — action 'create'"),
   x:           z.number().optional().describe('Canvas x for the event marker — action create'),
@@ -3589,6 +3593,7 @@ export const ImportImageInputSchema = z.object({
   opacity: z.number().min(0).max(1).optional().describe('Opacity, 0 to 1. The same as pinepaper_modify_item after the import.'),
   blendMode: z.string().optional().describe("How it composites over what is below: 'multiply', 'screen' and the other pinepaper_modify_item blend modes."),
   scale: z.number().positive().optional().describe('Multiplies the size maxWidth / maxHeight / maxEdge gave it.'),
+  loop: z.union([z.boolean(), z.number().int().min(1), z.literal('forever')]).optional().describe("An animated GIF or WebP: true or 'forever' loops, false plays once and holds, n plays n times. Left out, the file's own loop count."),
 }).describe('Import image input');
 
 export type ImportImageInput = z.infer<typeof ImportImageInputSchema>;

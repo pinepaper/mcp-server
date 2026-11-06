@@ -9628,7 +9628,7 @@ ${(() => {
   }
 
   generateImportImage(input: ImportImageInput): string {
-    const { url, position, maxWidth, maxHeight, mask, smoothing, maxEdge, nativeSize, shadowColor, shadowBlur, shadowOffset, name, opacity, blendMode, scale } = input;
+    const { url, position, maxWidth, maxHeight, mask, smoothing, maxEdge, nativeSize, shadowColor, shadowBlur, shadowOffset, name, opacity, blendMode, scale, loop } = input;
     const look: Record<string, unknown> = { ...(opacity !== undefined ? { opacity } : {}), ...(blendMode !== undefined ? { blendMode } : {}), ...(scale !== undefined ? { scale } : {}) };
     const hasLook = Object.keys(look).length > 0;
     // IMPORTSHADOW: the shadow keys, applied through the engine's own modify
@@ -9650,6 +9650,7 @@ ${(() => {
       maxWidth !== undefined ? `maxWidth: ${maxWidth}` : '',
       maxHeight !== undefined ? `maxHeight: ${maxHeight}` : '',
       nativeSize ? 'nativeSize: true' : '',
+      loop !== undefined ? `loop: ${JSON.stringify(loop)}` : '',
     ].filter(Boolean);
     const optsLiteral = optParts.length ? `{ ${optParts.join(', ')} }` : '{}';
 
@@ -9769,7 +9770,7 @@ ${mask ? `    // A MASK REPLACES THE RASTER (round 8 DD, 4.10). applyMask builds
       success: true,
       itemId: itemId,
       message: 'Image imported and placed on canvas.',${name ? `\n      name: ${JSON.stringify(name)},` : ''}
-      bounds: { x: b.x, y: b.y, width: b.width, height: b.height }${mask ? `,\n      mask: ${jsLiteral(mask)}` : ''}${hasShadow ? ',\n      shadow: __shadow' : ''}${hasLook ? ',\n      look: __look' : ''},
+      bounds: { x: b.x, y: b.y, width: b.width, height: b.height }${mask ? `,\n      mask: ${jsLiteral(mask)}` : ''}${hasShadow ? ',\n      shadow: __shadow' : ''}${loop !== undefined ? ",\n      playback: (raster && raster.data && raster.data.animatedImage && raster.data.animatedImage.loop !== undefined) ? { applied: true, plays: raster.data.animatedImage.loop } : { applied: false, warning: 'loop was not applied: this image does not animate in this studio. Animated GIF and WebP do.' }" : ''}${hasLook ? ',\n      look: __look' : ''},
       // Stored smaller than its source (the studio's cap): said, with the
       // way to keep every pixel. The studio reports native size where it can.
       ...((entry && entry.nativeWidth && entry.width && entry.nativeWidth > entry.width)
@@ -16444,10 +16445,8 @@ ${guard('unlockAllItems')}${pass('app.unlockAllItems()')}
 
 /**
  * Rules, variables and bound text (the studio's contraption engine). Each action asks for the method it calls, so a
- * studio without it refuses by name instead of a TypeError. The engine's animateItem, playSound and custom actions are
- * not offered: animateItem goes through app.modify, which acts on the selection and not on its target; playSound does
- * not call app.playSound the way that method is written; custom needs a function, which JSON cannot carry. All three
- * answer ok regardless, so a rule using them would report success for nothing.
+ * studio without it refuses by name instead of a TypeError. The engine's custom action is not offered: it needs a
+ * function, which JSON cannot carry.
  */
 function generateContraptionCode(input: EventInput): string {
   const refuse = (method: string) => `if (typeof app.${method} !== 'function') {
@@ -16458,7 +16457,7 @@ function generateContraptionCode(input: EventInput): string {
   const body = (): string => {
     switch (input.action) {
       case 'add_contraption': {
-        const targets = [...new Set((input.actions ?? []).flatMap((a) => (a.type === 'modifyItem' ? [a.targetId] : [])))];
+        const targets = [...new Set((input.actions ?? []).flatMap((a) => ('targetId' in a ? [a.targetId] : [])))];
         const config = {
           ...(input.contraptionId ? { id: input.contraptionId } : {}),
           sourceEvent: input.sourceEvent,
@@ -16472,14 +16471,20 @@ function generateContraptionCode(input: EventInput): string {
   const contraptionId = app.addContraption(${jsLiteral(config)});
   const missing = ${jsLiteral(targets)}.filter((id) => !app.getItemById(id));
   return { success: true, action: 'add_contraption', contraptionId,
-    ...(missing.length ? { warning: 'no item has the id ' + missing.join(', ') + ' yet: the rule does nothing to it until one does' } : {}),
-    ${targets.length ? "note: 'changes a rule makes to an item stay: nothing rewinds them, so another export starts from the changed scene'" : ''} };`;
+    ...(missing.length ? { warning: 'no item has the id ' + missing.join(', ') + ' yet: the rule does nothing to it until one does' } : {}), };`;
       }
       case 'remove_contraption':
         return `${refuse('removeContraption')}
   const removed = app.removeContraption(${jsLiteral(input.contraptionId)});
   return removed ? { success: true, action: 'remove_contraption', contraptionId: ${jsLiteral(input.contraptionId)} }
     : { success: false, action: 'remove_contraption', error: 'no rule has the id ' + ${jsLiteral(input.contraptionId)} };`;
+      case 'clear_contraptions':
+        return `${refuse('clearContraptions')}
+  app.clearContraptions();
+  return { success: true, action: 'clear_contraptions' };`;
+      case 'clear_variables':
+        return `${refuse('clearVariables')}
+  return { success: true, action: 'clear_variables', scope: ${scope}, removed: app.clearVariables(${scope}) };`;
       case 'list_contraptions':
         return `${refuse('listContraptions')}
   return { success: true, action: 'list_contraptions', contraptions: app.listContraptions() };`;
