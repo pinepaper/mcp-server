@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 7381735c818d7f819cb85ee8a90a3610e040c79d
- * sha256:    de95df018289a9eb93b7de02623ed773aa1012db14281265850877c99429c52a   (of PinePaper.js as committed)
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 9af89750e640fb8e949b49354605224a99d982df
+ * sha256:    ffea9d8680046a492956518149f106e0d4872326f28561f196fed92baf4a6ef0   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on `window.app`, with how it gets there. The parity
@@ -16,7 +16,7 @@
 /** How a name lands on `app`. */
 export type EngineMemberKind = 'method' | 'accessor' | 'property' | 'lazy' | 'lazyHeavy' | 'bootstrap';
 
-/** 1559 names, from FxTool/js/PinePaper.js. */
+/** 1569 names, from FxTool/js/PinePaper.js. */
 export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object.freeze({
   __buildFreshness: 'property',
   _aboveHooksHeld: 'property',
@@ -541,6 +541,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   addAssociation: 'method',
   addAudioReactive: 'method',
   addComment: 'method',
+  addContraption: 'method',
   addCustomFont: 'bootstrap',
   addEventListener: 'method',
   addKeyframe: 'method',
@@ -653,6 +654,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   beginDrawOver: 'method',
   beginRenderHold: 'method',
   bindBarHeight: 'method',
+  bindTextToState: 'method',
   bindTimelineToScroll: 'method',
   blendingSystem: 'lazy',
   booleanOp: 'method',
@@ -723,6 +725,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   constructionSequence: 'lazy',
   continueErasing: 'method',
   continuePanDrag: 'method',
+  contraptionEngine: 'property',
   convertTextToCollage: 'method',
   copySelection: 'bootstrap',
   create: 'method',
@@ -987,6 +990,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   getTool: 'method',
   getUnitGridEnabled: 'method',
   getUsedRegion: 'method',
+  getVariable: 'method',
   getViewCenter: 'method',
   getViewPoint: 'method',
   getWordTimings: 'method',
@@ -1035,6 +1039,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   importSVG: 'method',
   importUSDA: 'method',
   importUSDAToWorld: 'method',
+  incrementVariable: 'method',
   initGPUFilters: 'method',
   initItemData: 'method',
   insertAsset: 'method',
@@ -1091,6 +1096,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   listCollagePatterns: 'method',
   listComments: 'method',
   listComponents: 'method',
+  listContraptions: 'method',
   listCursorStyles: 'method',
   listCutoutStyles: 'method',
   listDesignMedia: 'method',
@@ -1263,6 +1269,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   recordSegmentEdit: 'method',
   recoverLottieRig: 'method',
   redo: 'method',
+  reflowConstraints: 'method',
   refreshTextOutlines: 'method',
   regenerateStroke: 'method',
   registerArrowHead: 'method',
@@ -1288,6 +1295,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   removeAssociation: 'method',
   removeBrushStyle: 'method',
   removeCompositeMask: 'method',
+  removeContraption: 'method',
   removeDeform: 'method',
   removeDynamicContent: 'method',
   removeEventListener: 'method',
@@ -1399,6 +1407,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   setGlass: 'method',
   setGoo: 'method',
   setGrowth: 'method',
+  setItemConstraint: 'method',
   setItemConstraints: 'method',
   setItemLocked: 'method',
   setItemName: 'method',
@@ -1428,6 +1437,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   setupItemHoverCursor: 'method',
   setupMobileSupport: 'method',
   setupTools: 'method',
+  setVariable: 'method',
   setWordTimings: 'method',
   setWorldActorPose: 'method',
   setWorldCamera: 'method',
