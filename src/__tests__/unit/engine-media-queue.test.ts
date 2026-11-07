@@ -207,10 +207,20 @@ describe('17 RADIALOFFSET: a radial gradient is centred on the created item, not
     expect(s.item.fillColor.destination).toEqual([550, 400]);
   });
 
-  it('a linear gradient is unchanged', () => {
+  it('a linear gradient fits the item top to bottom, as app.create does (FIREFLY31)', () => {
     const code = codeGenerator.generateCreateItem(CreateItemInputSchema.parse({ itemType: 'rectangle', position: { x: 200, y: 200 }, properties: { fillColor: { ...G, type: 'linear' } } }) as never);
-    expect(code).toContain('origin: [150, 150]');
-    expect(code).toContain('destination: [250, 250]');
+    expect(code).not.toContain('[150, 150]');
+    const run = new Function('__stub', `const app = { create: () => __stub, historyManager: { saveState() {} } };\n${code}\nreturn item.fillColor;`);
+    const fill = run({ data: { registryId: 'r' }, bounds: { x: 100, y: 100, width: 400, height: 200 } });
+    expect(fill.origin).toEqual([300, 100]);
+    expect(fill.destination).toEqual([300, 300]);
+    expect(fill.gradient.radial).toBe(false);
+  });
+
+  it('a linear gradient keeps any end the caller gave', () => {
+    const code = codeGenerator.generateCreateItem(CreateItemInputSchema.parse({ itemType: 'rectangle', position: { x: 200, y: 200 }, properties: { fillColor: { ...G, type: 'linear', origin: [1, 2], destination: [3, 4] } } }));
+    expect(code).toContain('origin: [1, 2]');
+    expect(code).toContain('destination: [3, 4]');
   });
 });
 

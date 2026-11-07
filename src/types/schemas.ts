@@ -3593,7 +3593,7 @@ export const ImportImageInputSchema = z.object({
   opacity: z.number().min(0).max(1).optional().describe('Opacity, 0 to 1. The same as pinepaper_modify_item after the import.'),
   blendMode: z.string().optional().describe("How it composites over what is below: 'multiply', 'screen' and the other pinepaper_modify_item blend modes."),
   scale: z.number().positive().optional().describe('Multiplies the size maxWidth / maxHeight / maxEdge gave it.'),
-  loop: z.union([z.boolean(), z.number().int().min(1), z.literal('forever')]).optional().describe("An animated GIF or WebP: true or 'forever' loops, false plays once and holds, n plays n times. Left out, the file's own loop count."),
+  loop: z.union([z.boolean(), z.number().int().min(1), z.literal('forever')]).optional().describe("An animated GIF, WebP or APNG: true or 'forever' loops, false plays once and holds, n plays n times. Left out, the file's own loop count."),
 }).describe('Import image input');
 
 export type ImportImageInput = z.infer<typeof ImportImageInputSchema>;

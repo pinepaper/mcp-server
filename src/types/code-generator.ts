@@ -335,19 +335,29 @@ ${itemVarName}.${propertyName} = (function() {
 })();`;
   }
 
-  // Linear: a diagonal across a 100 px box at the requested position.
-  const defaultOrigin = origin || [position.x - 50, position.y - 50];
-  const defaultDestination = destination || [position.x + 50, position.y + 50];
-
+  // A LINEAR RAMP FITS THE ITEM, top to bottom, as the engine's own app.create does (FIREFLY31). This was a fixed
+  // 100 px diagonal at the requested position. Leaving the ends out is not enough here: this assigns straight to
+  // Paper, where a gradient with no ends is zero-length. An end the caller gave is kept as given.
+  const fx = position.x, fy = position.y;
+  const o = origin ? `[${origin[0]}, ${origin[1]}]`
+    : destination ? `[${destination[0]}, __gb ? __gb.y : ${fy - 50}]`
+    : `(__gb ? [__gb.x + __gb.width / 2, __gb.y] : [${fx}, ${fy - 50}])`;
+  const d = destination ? `[${destination[0]}, ${destination[1]}]`
+    : origin ? `[${origin[0]}, __gb ? __gb.y + __gb.height : ${fy + 50}]`
+    : `(__gb ? [__gb.x + __gb.width / 2, __gb.y + __gb.height] : [${fx}, ${fy + 50}])`;
   return `
-${itemVarName}.${propertyName} = {
-  gradient: {
-    stops: [${stopsCode}],
-    radial: false
-  },
-  origin: [${defaultOrigin[0]}, ${defaultOrigin[1]}],
-  destination: [${defaultDestination[0]}, ${defaultDestination[1]}]
-};`;
+${itemVarName}.${propertyName} = (function() {
+  const __b = ${itemVarName} && ${itemVarName}.bounds;
+  const __gb = __b && isFinite(__b.x) && isFinite(__b.y) && __b.width > 0 && __b.height > 0 ? __b : null;
+  return {
+    gradient: {
+      stops: [${stopsCode}],
+      radial: false
+    },
+    origin: ${o},
+    destination: ${d}
+  };
+})();`;
 }
 
 /**
@@ -9770,7 +9780,7 @@ ${mask ? `    // A MASK REPLACES THE RASTER (round 8 DD, 4.10). applyMask builds
       success: true,
       itemId: itemId,
       message: 'Image imported and placed on canvas.',${name ? `\n      name: ${JSON.stringify(name)},` : ''}
-      bounds: { x: b.x, y: b.y, width: b.width, height: b.height }${mask ? `,\n      mask: ${jsLiteral(mask)}` : ''}${hasShadow ? ',\n      shadow: __shadow' : ''}${loop !== undefined ? ",\n      playback: (raster && raster.data && raster.data.animatedImage && raster.data.animatedImage.loop !== undefined) ? { applied: true, plays: raster.data.animatedImage.loop } : { applied: false, warning: 'loop was not applied: this image does not animate in this studio. Animated GIF and WebP do.' }" : ''}${hasLook ? ',\n      look: __look' : ''},
+      bounds: { x: b.x, y: b.y, width: b.width, height: b.height }${mask ? `,\n      mask: ${jsLiteral(mask)}` : ''}${hasShadow ? ',\n      shadow: __shadow' : ''}${loop !== undefined ? ",\n      playback: (raster && raster.data && raster.data.animatedImage && raster.data.animatedImage.loop !== undefined) ? { applied: true, plays: raster.data.animatedImage.loop } : { applied: false, warning: 'loop was not applied: this image does not animate in this studio. Animated GIF, WebP and APNG do.' }" : ''}${hasLook ? ',\n      look: __look' : ''},
       // Stored smaller than its source (the studio's cap): said, with the
       // way to keep every pixel. The studio reports native size where it can.
       ...((entry && entry.nativeWidth && entry.width && entry.nativeWidth > entry.width)
