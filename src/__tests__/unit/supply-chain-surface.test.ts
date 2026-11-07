@@ -132,6 +132,16 @@ describe('supply-chain surface', () => {
     expect(addon).toMatch(/new Set\(\['ffmpeg', 'ffprobe'\]\)/);
   });
 
+  test('no package carries FFmpeg or an encoder, as the README tells users', () => {
+    const addonDir = join(ROOT, 'packages', 'mcp-ffmpeg');
+    const addonPkg = JSON.parse(readFileSync(join(addonDir, 'package.json'), 'utf8'));
+    const names = [pkg, addonPkg].flatMap((p) => Object.keys({ ...p.dependencies, ...p.optionalDependencies, ...p.peerDependencies }));
+    expect(names.filter((n) => /ffmpeg|ffprobe|x264|openh264|h\.?264/i.test(n))).toEqual([]);
+    expect(Object.keys(addonPkg.dependencies ?? {})).toEqual([]);
+    expect(readdirSync(addonDir).sort()).toEqual(['LICENSE', 'README.md', 'index.d.ts', 'index.js', 'package.json']);
+    expect(readFileSync(join(ROOT, 'README.md'), 'utf8')).toContain('PinePaper does not\nprovide an FFmpeg build');
+  });
+
   test('the add-on refuses any other binary before a process starts', async () => {
     const { run } = await import('../../../packages/mcp-ffmpeg/index.js');
     expect(await run('sh' as never, ['-c', 'echo hi'])).toMatchObject({ ok: false, stderr: expect.stringContaining('refused') });

@@ -3036,7 +3036,7 @@ EXPORT:
 - export_dotlottie: { options?: { fps?, duration? (s), id?, loop?, autoplay? } } → a .lottie file (the zipped Lottie plus manifest)
 - export_glb: { } → a .glb file of the PERSPECTIVE 3D objects (createObject3D). Refused when there are none. It does not export world3d meshes, which are a separate renderer.
 - export_bvh: { skeletonId (required), options?: { fps? } } → a .bvh file of that skeleton's motion. Refused when nothing is rigged.
-- export_png_sequence: { options?: { duration (s), fps, width?, height?, transparent? } } → a .zip of one PNG per frame. PASS duration and fps: the studio does not size the sequence to the scene, and the result's defaultsUsed says when its own default length was used.
+- export_png_sequence: { options?: { duration (s), fps, width?, height?, transparent? } } → a .zip of one PNG per frame. PASS duration and fps: the studio does not size the sequence to the scene, and the result's defaultsUsed says when its own default length was used. To encode the frames into an MP4 that repeats, use your own FFmpeg (the server does not provide it): ffmpeg -framerate <fps> -i frame_%05d.png -c:v libx264 -pix_fmt yuv420p -crf 18 -threads 1 out.mp4
 
 IMPORT:
 - import_lottie: { data (the Lottie JSON — an object or a JSON string), options?: { fitToCanvas?, autoPlay?, centerOnCanvas?, scale? } } → { itemId, itemIds, items, duration, bounds }; a failed import fails with the importer's errors. data is parsed as JSON, so a URL or a file path does not work; read the file and pass its contents. There is no .lottie, GLB or BVH import here: a glTF goes into a 3D world with the world3d tool's import_gltf, a BVH onto a rig with the rigging tool's import_bvh / retarget_bvh.`,
@@ -3731,7 +3731,7 @@ STRUCTURAL LAYOUT (S12) — express STATIC COMPOSITION as relations instead of h
 
 CURSOR / MOUSE AS TARGET — a relation can target the live pointer instead of an item by passing the reserved targetId 'cursor' (aliases 'mouse' / 'pointer'); collaborator cursors are 'cursor:<peerId>'. e.g. make an item flee the mouse: relationType 'repels', targetId 'cursor', params { returnSpeed: 0.08 }. The cursor is a virtual target (no canvas item) and its interactions are inspectable in FxTool's "Mouse / Cursor" registry section.
 
-TEMPORAL VALIDITY WINDOWS (temporal-model v1) — ANY relation may carry params.window = { start, end?, repeat? } (scene seconds) to gate WHEN it is active. The engine only applies the relation within [start, end) and feeds it window-relative local time (so an orbit/wave starts its phase at the window open, not at scene 0). repeat ∈ once (default) | loop | pingpong. Omit end for open-ended. Windowless relations are always active. An on_event_* reaction fires outside this check, so a window does not gate it. e.g. params: { ...relationParams, window: { start: 2, end: 5 } } makes the relation live only from 2s to 5s.
+TEMPORAL VALIDITY WINDOWS (temporal-model v1) — ANY relation may carry params.window = { start, end?, repeat? } (scene seconds) to gate WHEN it is active. The engine only applies the relation within [start, end) and feeds it window-relative local time (so an orbit/wave starts its phase at the window open, not at scene 0). repeat ∈ once (default) | loop | pingpong. Omit end for open-ended. Windowless relations are always active. A window gates on_event_* reactions too: outside it the event does not trigger the reaction. e.g. params: { ...relationParams, window: { start: 2, end: 5 } } makes the relation live only from 2s to 5s.
 
 VERIFYING ANIMATION WORKS:
 After adding a relation, verify the animation is running:
@@ -6451,7 +6451,7 @@ ACTION PARAMS: show / hide / stopAnimation: { items: [ids] } (itemId is accepted
     },
     description: `Export current scene as a PineWidget (pp:PinePaper ontology JSON v0.4.3).
 
-Returns portable scene data with items, relations, animations, masks, and interactions serialized in the pp:PinePaper semantic format. Includes embed code snippet for external sites.
+Returns portable scene data with items, relations, animations, masks, and interactions serialized in the pp:PinePaper semantic format. Includes embed code snippet for external sites. Contraption rules, bound text, layout constraints and relation windows run in the widget; a rule with a custom action function is left out, with a warning (widget-contraption-custom).
 
 Params: download (bool), filename, includeInteractions (bool, default true), minify (bool)`,
     inputSchema: {

@@ -78,6 +78,37 @@ question you can answer yourself rather than take on trust: a benchmark runs one
 prompt across several models and puts the results side by side, any run
 shareable. It is in invite-only beta.
 
+### FFmpeg is yours to install
+
+The MCP server does not include, download or install FFmpeg, and PinePaper does not
+provide an FFmpeg build. If you want it, install it yourself from
+[ffmpeg.org](https://ffmpeg.org/download.html) or your package manager. Your copy comes
+under FFmpeg's own licence and the licences of whatever codecs your build includes, and
+following those terms is up to you.
+
+Most exports don't need it: MP4, WebM and the other formats are made in your browser.
+You need your own FFmpeg for these:
+
+- **An MP4 that repeats byte for byte, on a machine where the browser's encoder won't.**
+  The export warns with `determinism_not_pinned` when that happens. Export the frames with
+  `pinepaper_interchange` (`export_png_sequence`, passing `duration` and `fps`), unzip
+  them, and encode:
+
+  ```bash
+  ffmpeg -framerate 30 -i frame_%05d.png -c:v libx264 -pix_fmt yuv420p -crf 18 -threads 1 out.mp4
+  ```
+
+  Match `-framerate` to the `fps` you exported, and use a build that includes `libx264`.
+  Keep `-threads 1`, because x264 can vary between runs when it uses several threads
+  under a bitrate cap. The file repeats when the browser build, the FFmpeg build and the
+  settings stay the same, but a different browser build can produce different frames. The
+  frames carry no audio, so add any sound in FFmpeg.
+- **Formats browsers can't encode,** such as ProRes and HAP, from the same frames.
+- **In the Claude Desktop extension,** joining a `perScene` export and checking a saved
+  video. These use the `ffmpeg` and `ffprobe` on your `PATH`; the extension bundles a small
+  script that starts them, not the programs themselves. Without them, a `perScene` export
+  runs whole and the check is skipped. The npm package never starts FFmpeg.
+
 ### Quick start
 
 **Claude Desktop:** download
@@ -298,7 +329,10 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - MP4 and WebM exports are deterministic by default, so every receipt says whether its
   file repeats. Pass `deterministic: false` to opt out. An encoder may be pinned, so a
   plain export's file size and pixels can differ from earlier releases. Where an MP4
-  still can't repeat on a machine, the reply warns with `determinism_not_pinned`.
+  still can't repeat on a machine, the reply warns with `determinism_not_pinned` and
+  points to [your own FFmpeg](#ffmpeg-is-yours-to-install), which PinePaper does not provide.
+- A relation's `params.window` now gates `on_event_*` reactions too. Exported widgets
+  run contraption rules and layout constraints, and they honour relation windows.
 - A linear gradient without `origin` and `destination` now fits the item, top to
   bottom. It used to be a fixed 100 px diagonal at the requested position, so this
   changes how such a fill looks in existing scripts.

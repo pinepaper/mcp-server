@@ -1,5 +1,7 @@
 # packages/mcp-ffmpeg (internal, not published)
 
+This package contains no FFmpeg: it starts the `ffmpeg` and `ffprobe` the user installed on `PATH`.
+
 The only code that runs `ffmpeg` / `ffprobe`. It is **not on npm** and is not a dependency of
 `@pinepaper.studio/mcp-server`: `scripts/build-mcpb.mjs` copies it into the Claude Desktop extension's
 `node_modules`, so the extension can
