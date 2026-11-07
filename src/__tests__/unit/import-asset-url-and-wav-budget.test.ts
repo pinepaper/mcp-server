@@ -74,6 +74,16 @@ describe('deterministic: pixels pinned only on the software encoder (FxTool e34a
     expect((await run({ bitrate: 2e6, hardwareAcceleration: 'prefer-software', bitExact: false })).codes).toContain('determinism_not_pinned');
   });
 
+  it('names the cause from where the studio reports it: determinism.cause, not the top of the report', async () => {
+    const { r } = await run({ bitrate: 2e6, hardwareAcceleration: 'prefer-software', bitExact: false, determinism: { bitExact: false, cause: 'h264-threaded' } });
+    const w = (r.fidelity.warnings as Array<{ code: string; cause?: string; message: string }>).find((x) => x.code === 'determinism_not_pinned')!;
+    expect(w.cause).toBe('h264-threaded');
+    expect(w.message).toContain('the software H.264 encoder varies run to run');
+    expect(w.message).toContain('your own FFmpeg');
+    const none = (await run({ bitrate: 2e6, hardwareAcceleration: 'prefer-software', bitExact: false, determinism: { bitExact: false } })).r;
+    expect((none.fidelity.warnings as Array<{ code: string; cause?: string }>).find((x) => x.code === 'determinism_not_pinned')).not.toHaveProperty('cause');
+  });
+
   it('hardware, or an engine that does not say: the pixels are not promised', async () => {
     expect((await run({ bitrate: 2e6, hardwareAcceleration: 'prefer-hardware' })).codes).toContain('determinism_not_pinned');
     expect((await run({ bitrate: 2e6 })).codes).toContain('determinism_not_pinned');

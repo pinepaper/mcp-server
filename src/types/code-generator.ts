@@ -7404,8 +7404,8 @@ ${deterministic ? `  // DETERMINISTIC: the container timestamps are pinned eithe
     if (__exact === false) {
       result.fidelity = result.fidelity || { warnings: [] };
       result.fidelity.warnings = (result.fidelity.warnings || []).concat([{ code: 'determinism_not_pinned',
-        ...(__vr && __vr.cause ? { cause: __vr.cause } : {}),
-        message: 'this file will not repeat byte for byte: no encoder on this machine repeats at this size (the studio test-encoded and checked' + (__vr && __vr.cause === 'h264-threaded' ? ': the software H.264 encoder is multi-threaded and takes no fixed quantizer' : '') + '). What still holds: the frames fed to the encoder are identical (compare frameDigest, not sha256), and the container is identical apart from the encoded samples. Do not cache this file by hash. For a byte-identical file, export WebM, or export_png_sequence (pinepaper_interchange) and encode the frames with your own FFmpeg, which the server does not provide.' }]);
+        ...(__vr && __vr.determinism && __vr.determinism.cause ? { cause: __vr.determinism.cause } : {}),
+        message: 'this file will not repeat byte for byte: no encoder on this machine repeats at this size (the studio test-encoded and checked' + (__vr && __vr.determinism && __vr.determinism.cause === 'h264-threaded' ? ': the software H.264 encoder varies run to run at this size on this many CPUs' : '') + '). What still holds: the frames fed to the encoder are identical (compare frameDigest, not sha256), and the container is identical apart from the encoded samples. Do not cache this file by hash. For a byte-identical file, export WebM, or export_png_sequence (pinepaper_interchange) and encode the frames with your own FFmpeg, which the server does not provide.' }]);
       if (result.fidelity.note) delete result.fidelity.note;
     } else if (__exact === null && __hw !== 'prefer-software') {
       result.fidelity = result.fidelity || { warnings: [] };
