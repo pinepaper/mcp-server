@@ -22,7 +22,7 @@ import { CallToolResult, TextContent, ImageContent } from '../mcp/index.js';
 import { exportPerScene } from './scene-cache-export.js';
 import { boundedStructured, reportedIgnoredPaths } from './reply-fields.js';
 import { codeGenerator, generateQueryMutationsCode, SHEET_RUBRIC } from '../types/code-generator.js';
-import { expandBatchMacros, BatchMacroError } from './batch-macros.js';
+import { expandBatchMacros, BatchMacroError, batchPreflightView, withKeyColumns } from './batch-macros.js';
 import {
   CreateItemInputSchema,
   ModifyItemInputSchema,
@@ -3388,6 +3388,13 @@ async function handleToolCallInner(
       }
 
       case 'pinepaper_keyframe_animate': {
+        // keys: the same keyframes by column; the rest of this path never sees them.
+        try {
+          args = withKeyColumns(args as Record<string, unknown>, 'pinepaper_keyframe_animate');
+        } catch (e) {
+          if (e instanceof BatchMacroError) return errorResult(ErrorCodes.VALIDATION_ERROR, e.message, {}, { toolName: 'pinepaper_keyframe_animate' });
+          throw e;
+        }
         const input = KeyframeAnimateInputSchema.parse(args);
         const code = codeGenerator.generateKeyframeAnimate(input);
         return executeOrGenerate(
@@ -4632,7 +4639,8 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
         // Opt-out via skipValidation: true when the caller knows what they're
         // doing (e.g. experimental vocabulary).
         if (!input.skipValidation) {
-          const ops = input.operations as ReadonlyArray<Record<string, unknown>>;
+          // A create_many item gets the checks a create gets, reported at its own path.
+          const { ops, paths } = batchPreflightView(input.operations as ReadonlyArray<Record<string, unknown>>);
           // A relation registered with register_custom_relation this session is a valid relationType, as in add_relation.
           const violations = validateBatchVocabulary(ops, { relationType: CUSTOM_RELATION_NAMES });
           if (violations.length > 0) {
@@ -4640,7 +4648,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
               ErrorCodes.VALIDATION_ERROR,
               `Batch preflight rejected ${violations.length} operation${violations.length > 1 ? 's' : ''} with unknown vocabulary value${violations.length > 1 ? 's' : ''}. Fix the offending fields and retry, or pass skipValidation: true to bypass.`,
               violations.map((v) => ({
-                path: `operations[${v.opIndex}].${v.field}`,
+                path: `${paths[v.opIndex]}.${v.field}`,
                 opType: v.opType,
                 vocabulary: v.hint,
               })),
@@ -4656,7 +4664,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
               ErrorCodes.VALIDATION_ERROR,
               `Batch preflight detected ${typos.length} likely property-key typo${typos.length > 1 ? 's' : ''}. Each suggestion is a Levenshtein-≤2 match against the schema for that itemType — fix and retry, or pass skipValidation: true to bypass.`,
               typos.map((t) => ({
-                path: `operations[${t.opIndex}].properties.${t.property}`,
+                path: `${paths[t.opIndex]}.properties.${t.property}`,
                 opType: t.opType,
                 itemType: t.itemType,
                 received: t.property,
@@ -4689,7 +4697,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
 
         const code = codeGenerator.generateAgentBatchExecute(input);
         const description = `Batch executed ${input.operations.length} operations${input.atomic !== false ? ' (atomic)' : ''}`
-          + (expanded.length !== input.operations.length ? ` (${expanded.length} after expanding ring / grid / orbit / stagger)` : '');
+          + (expanded.length !== input.operations.length ? ` (${expanded.length} after expanding ring / grid / orbit / stagger / create_many)` : '');
 
         // Check for out-of-bounds items before execution
         let boundsWarning = '';

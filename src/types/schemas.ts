@@ -1533,6 +1533,8 @@ export const KeyframeAnimateInputSchema = z.object({
   timeUnits: z.enum(['seconds', 'ms']).optional().describe("Explicit units for keyframe times/duration. 'seconds' disables the legacy >100→ms auto-detect — REQUIRED for long-form timelines with second values over 100."),
   clipInPoint: z.number().optional().describe('Skip the first N seconds of keyframe data — clip head trim.'),
   clipOutPoint: z.number().optional().describe('Stop at N seconds into the keyframe data — clip tail trim. Default: lastKeyframeTime.'),
+  // Turned into keyframes by the handler (batch-macros.ts), so it is declared here and never reaches the generator.
+  keys: z.unknown().optional().describe('The keyframes by column, instead of keyframes: {"time":[0,1],"x":[100,400],"easing":"easeOut"}. time may be {step, count} for evenly spaced keys.'),
   append: z.boolean().optional().describe('Add these keys to the item\'s existing track instead of replacing it (a key at the same time merges, the new values win). Without it, a second keyframe_animate on an item replaces its track. result.track says which happened.'),
   // B147: the studio's own keyframe_track_replaced warning says "Pass { mode:
   // 'merge' }" — the engine's spelling of append. Without this key zod stripped
@@ -1903,7 +1905,7 @@ export type ToolGuideInput = z.infer<typeof ToolGuideInputSchema>;
 // =============================================================================
 
 export const SetToolkitInputSchema = z.object({
-  toolkit: z.enum(['core', 'full', 'agent', 'diagram', 'map', 'font', 'minimal', 'lane', 'edit']).optional().describe('Toolkit profile to switch to'),
+  toolkit: z.enum(['core', 'full', 'agent', 'diagram', 'map', 'font', 'minimal', 'lane', 'edit', 'starter']).optional().describe('Toolkit profile to switch to'),
   verbosity: z.enum(['verbose', 'compact', 'minimal']).optional().describe('Verbosity level to switch to'),
   load: z.array(z.string()).optional().describe('Tool groups or tool names to add to the list for this session'),
 });
@@ -2582,7 +2584,7 @@ export const AgentBatchOperationTypeSchema = z.enum([
   'animate', 'keyframe_animate', 'relation',
   'apply_mask', 'apply_effect',
   'play_timeline',
-  'ring', 'grid', 'orbit', 'stagger', 'patch',
+  'ring', 'grid', 'orbit', 'stagger', 'patch', 'create_many',
   'timeline',
 ]).describe('Type of batch operation');
 
@@ -2647,6 +2649,9 @@ export const AgentBatchOperationSchema = z.object({
   // Play timeline fields
   action: z.string().optional().describe('Timeline action for play_timeline (play, stop, seek)'),
   time: z.number().optional().describe('Seek time for play_timeline'),
+  // The same keyframes by column (batch-macros.ts): checked there, so a malformed one is refused by name.
+  keys: z.unknown().optional().describe('keyframe_animate, ring, grid, stagger: the keyframes by column instead of keyframes: {"time":[0,1],"x":[100,400],"easing":"easeOut"}. A null means that key does not set that property. time may be {step, count, from?} for evenly spaced keys.'),
+  items: z.array(z.unknown()).optional().describe('create_many: each item, as [x, y] or {x, y, …what differs from properties}'),
   // Macros (batch-macros.ts): expanded into create / keyframe_animate / relation / modify ops.
   count: z.number().int().min(1).max(200).optional().describe('ring: how many items (default 12)'),
   center: PositionSchema.optional().describe('ring: the centre (default 400, 300)'),
@@ -2659,7 +2664,7 @@ export const AgentBatchOperationSchema = z.object({
   cols: z.number().int().min(1).optional().describe('grid: columns'),
   origin: PositionSchema.optional().describe('grid: the first item (default 100, 100)'),
   spacing: z.union([z.number(), z.tuple([z.number(), z.number()])]).optional().describe('grid: gap between centres, or [dx, dy] (default 50)'),
-  name: z.string().optional().describe('ring, grid: name prefix (items are name_0, name_1 … or name_row_col); orbit: the made item\'s name; patch: the item to change'),
+  name: z.string().optional().describe('ring, grid: name prefix (items are name_0, name_1 … or name_row_col); create_many: name prefix (name-0, name-1 …, unless an item names itself); orbit: the made item\'s name; patch: the item to change'),
   speed: z.number().optional().describe('orbit: the orbits relation\'s speed (its own units; omit for the studio default)'),
   phaseDegrees: z.number().optional().describe('orbit: starting angle in degrees'),
 }).passthrough().describe('Single batch operation');

@@ -1,5 +1,5 @@
 /**
- * THE AGENT LANE (PINEPAPER_TOOLKIT=lane): seven tools that build, animate, pattern, export and check a scene, give it
+ * THE AGENT LANE (PINEPAPER_TOOLKIT=lane): eight tools that build, animate, pattern, export and check a scene, give it
  * timed or clicked events, and start it over, with
  * the lessons an agent otherwise learns by failing folded into the descriptions of the tools they belong to.
  *
@@ -46,6 +46,7 @@ ORDER OF WORK:
 Use pinepaper_keyframe_animate to re-key one item afterwards, and pinepaper_pattern to move many named items with one declaration.
 Something that happens AT a time or ON a click (show, hide, recolour): make the event with pinepaper_event first, then bind it in the batch with relation ops.
 To start over, call pinepaper_clear_canvas: it empties the canvas and ids start again at item_1, so the same batch gives the same ids.
+MANY ITEMS OR A DENSE TRACK cost less to send in their compact forms: a create_many op (shared properties once, then what differs per item) and keys on keyframe_animate (one list per property under one time list). They run as the long forms do.
 MOTION THAT IS A FUNCTION OF TIME (a bob, a pulse, a sweep, a wave) is a relation, not keyframes: a track of hundreds of keys computed from a formula is the sign of the wrong route.
 - One item: a relation op {"type":"relation","sourceId":"$0","relationType":"time_expression","relationOptions":{"property":"y","expression":"360 + 40*sin(2*PI*t)"}} with no targetId; property is x, y, rotation, opacity or scale.
 - Many items, each offset (a wave across dots): define it once with pinepaper_register_custom_relation (on a server started with PINEPAPER_ALLOW_CODE=1), its formula reading params.index, and bind it to a name pattern (sourceId "dot-*"): each member gets index and count. Adding members later is the same op again.
@@ -79,6 +80,8 @@ const KEYFRAMES = {
   },
 };
 
+const KEYS = { type: 'object', description: 'keyframes by column, instead of keyframes' };
+
 export const LANE_TOOLS: Readonly<Record<(typeof LANE_TOOL_NAMES)[number], LaneTool>> = {
   pinepaper_agent_batch_execute: {
     description: `Build the scene in ONE call: canvas, background, items, keyframes, relations. Ops run in order. "$0", "$1", … are the items THIS call made, in op order (create and group ops are numbered; a group of "$0","$1" made next is "$2"). The result lists their ids in itemIds; use those ids in later calls.
@@ -93,6 +96,8 @@ Each line is a correct op:
 {"type":"keyframe_animate","itemId":"$1","keyframes":[{"time":1,"properties":{"x":300}},{"time":7,"properties":{"x":1620},"easing":"easeInOut"}]}
 {"type":"relation","sourceId":"$1","targetId":"$2","relationType":"orbits","relationOptions":{"radius":260,"speed":0.1667}}
 {"type":"modify","itemId":"item_3","properties":{"color":"#f472b6"}}
+{"type":"create_many","itemType":"circle","name":"dot","properties":{"radius":4},"items":[[10,60],{"x":18,"y":60,"color":"#f472b6"}]}
+{"type":"keyframe_animate","itemId":"$0","keys":{"time":[0,1],"x":[100,400],"y":[300,null],"easing":"easeOut"}}
 {"type":"timeline","defaults":{"ease":"power2.out"},"tweens":[{"to":"bar-*","from":{"scaleY":0},"vars":{"scaleY":1},"duration":0.8,"at":0.5,"stagger":0.15}]}
 {"type":"relation","sourceId":"item_9","targetId":"$0","relationType":"on_event_set_visibility","relationOptions":{"visible":true}}
 {"type":"relation","sourceId":"$1","targetId":"item_9","relationType":"on_click_fire"}
@@ -101,6 +106,8 @@ RULES (each one has cost a failed build):
 - position {x,y} goes at the op's top level. Everything else about the item goes INSIDE properties: a text's words are properties.content, and so are fontSize, color, radius, width, height, opacity, name and anchor.
 - position is the item's CENTRE. A text grows both ways from it, so a title whose centre sits near an edge runs off the frame and the video shows "IGNAL / NOISE". When a spec gives a corner ("top-left at (200, 130)"), pass properties.anchor: "top-left" (or top-right, bottom-left, bottom-right). A bar that grows up from a baseline: anchor "bottom-left" at the baseline, key height.
 - ${KEYFRAME_RULE}
+- keys is keyframes by column, for many keys: one list per property, as long as time; null means not set at that key; easing is a name or one per key. Evenly spaced: "time":{"step":0.033333,"count":180}.
+- create_many is one create per item: properties is what they share; an item is [x, y] or {x, y, …what differs}, each taking the next "$N"; name is a prefix (dot-0, dot-1). Slow past a few hundred (2000 took about a minute).
 - Two keyframe_animate ops on one item in a batch are merged into one track.
 - A timeline op is GSAP's timeline as JSON, compiled onto keyframe tracks: tweens [{to: a name, id, "$N", array or "bar-*"; vars: end values; from: start values; duration; at: seconds, "<", ">" or "+=0.2"; stagger; ease: "power2.out", "none", "back.out"…; repeat; yoyo}]. There x and y are OFFSETS from where the item was created, as in GSAP; scaleY on a bottom-anchored item holds its baseline; drawSVG "0%"→"100%" draws a path on. Every track lasts the whole timeline. What it cannot carry is refused by name; each tween gets a receipt. An item takes keys from a timeline or keyframe_animate ops, not both.
 - Name every item (properties.name). pinepaper_pattern selects members by name, e.g. "bar-*".
@@ -120,7 +127,7 @@ itemType: text, circle, rectangle, ellipse, star, triangle, polygon, line, arc, 
           items: {
             type: 'object',
             properties: {
-              type: { type: 'string', enum: ['set_canvas_size', 'set_background', 'create', 'modify', 'delete', 'group', 'keyframe_animate', 'relation', 'timeline'] },
+              type: { type: 'string', enum: ['set_canvas_size', 'set_background', 'create', 'create_many', 'modify', 'delete', 'group', 'keyframe_animate', 'relation', 'timeline'] },
               width: { type: 'number', description: 'set_canvas_size' },
               height: { type: 'number', description: 'set_canvas_size' },
               backgroundColor: { type: 'string', description: 'set_background' },
@@ -131,6 +138,9 @@ itemType: text, circle, rectangle, ellipse, star, triangle, polygon, line, arc, 
               itemIds: { type: 'array', items: { type: 'string' }, description: 'group: the parts of one object' },
               groupName: { type: 'string', description: 'group' },
               keyframes: { ...KEYFRAMES, description: 'keyframe_animate' },
+              keys: KEYS,
+              items: { type: 'array', description: 'create_many' },
+              name: { type: 'string', description: 'create_many: prefix' },
               append: { type: 'boolean', description: "keyframe_animate: add to the item's track instead of replacing it" },
               sourceId: { type: 'string', description: 'relation: the item that moves, or a name pattern ("dot-*")' },
               update: { type: 'boolean', description: 'relation: change the params of the relation already bound' },
@@ -155,15 +165,18 @@ itemType: text, circle, rectangle, ellipse, star, triangle, polygon, line, arc, 
 
 ${KEYFRAME_RULE}
 
+Many keys: send keys instead, by column: {"time":[0,1],"x":[100,400]}, or "time":{"step":0.033333,"count":180}; null means not set at that key.
+
 EXAMPLE: {"itemId":"item_2","keyframes":[{"time":1,"properties":{"x":300}},{"time":7,"properties":{"x":1620},"easing":"easeInOut"}]}`,
     inputSchema: {
       type: 'object',
       properties: {
         itemId: { type: 'string', description: 'item_N, from the batch result' },
         keyframes: KEYFRAMES,
+        keys: KEYS,
         append: { type: 'boolean', description: "add these keys to the item's track instead of replacing it" },
       },
-      required: ['itemId', 'keyframes'],
+      required: ['itemId'],
     },
   },
 
@@ -299,6 +312,38 @@ export const EDIT_INSTRUCTIONS: string = `PinePaper Studio, edit profile: four t
 Change a custom motion's formula by sending its pinepaper_register_custom_relation call again with the new body (the server must be started with PINEPAPER_ALLOW_CODE=1).
 Units: pixels, top-left origin, y down; seconds; degrees. Report a tool error as it is.`;
 
+/**
+ * The starter profile (PINEPAPER_TOOLKIT=starter): the five tools the lane shipped with, for a first scene. It shows
+ * only what these five can reach, so an agent is never told to call a tool it does not have.
+ */
+export const STARTER_TOOL_NAMES = LANE_TOOL_NAMES.slice(0, 5) as readonly (typeof LANE_TOOL_NAMES)[number][];
+
+/** Read by the model before any tool. */
+export const STARTER_INSTRUCTIONS: string = `PinePaper Studio, starter profile: five tools that build an animated scene on a live canvas and export it to a file.
+
+ORDER OF WORK:
+1. pinepaper_agent_batch_execute: ONE call with the canvas size, the background, every item, their keyframes and any relations.
+2. pinepaper_lint_scene: check the scene before exporting (text running off the frame, unrelated items).
+3. pinepaper_agent_export: format, duration and fps for a video. It returns the file path and the file's sha256 (a small SVG comes back inline).
+Use pinepaper_keyframe_animate to re-key one item afterwards, and pinepaper_pattern to move many named items with one declaration.
+MOTION THAT IS A FUNCTION OF TIME (a bob, a pulse, a sweep, a wave) is a time_expression relation op in the batch, not hundreds of keys.
+
+UNITS: pixels, top-left origin, y down; time in seconds; angles in degrees; colours as "#rrggbb".
+Every call acts on the live canvas at once: re-sending a batch ADDS its items again, so delete them first to replay it.
+Report a tool error as it is; do not write HTML or other code instead of these tools.
+Events, starting over and custom relations are in the eight-tool lane, PINEPAPER_TOOLKIT=lane. For characters, styled scenes, maps, diagrams or sound, the full surface is PINEPAPER_TOOLKIT=agent.`;
+
+/** The lane's batch and lint descriptions, without the tools this profile leaves out. */
+const STARTER_DESCRIPTIONS: Partial<Record<string, string>> = {
+  pinepaper_agent_batch_execute: LANE_TOOLS.pinepaper_agent_batch_execute.description
+    .split('\n')
+    .filter((line) => !/on_event_|on_click_fire|pinepaper_event/.test(line))
+    .join('\n')
+    .replace(/ after pinepaper_clear_canvas/g, ''),
+  pinepaper_lint_scene: LANE_TOOLS.pinepaper_lint_scene.description
+    .replace('each pinepaper_register_custom_relation definition the scene uses', 'each custom definition the scene uses'),
+};
+
 /** The lane (or another set of lane tools): in order, each shown with its lane description and schema. */
 /**
  * The edit profile's batch description (#43). The lane's is 6 KB of op examples for BUILDING a scene; an editing
@@ -319,12 +364,12 @@ const EDIT_DESCRIPTIONS: Partial<Record<string, string>> = { pinepaper_agent_bat
 
 export function applyLane<T extends ToolLike>(tools: T[], names: readonly string[] = LANE_TOOL_NAMES): T[] {
   const byName = new Map(tools.map((t) => [t.name, t]));
-  const edit = names === EDIT_TOOL_NAMES;
+  const overrides = names === EDIT_TOOL_NAMES ? EDIT_DESCRIPTIONS : names === STARTER_TOOL_NAMES ? STARTER_DESCRIPTIONS : {};
   const out: T[] = [];
   for (const name of names as readonly (typeof LANE_TOOL_NAMES)[number][]) {
     const tool = byName.get(name);
     if (!tool) continue;
-    const description = (edit && EDIT_DESCRIPTIONS[name]) || LANE_TOOLS[name].description;
+    const description = overrides[name] || LANE_TOOLS[name].description;
     out.push({ ...tool, description, inputSchema: LANE_TOOLS[name].inputSchema } as T);
   }
   return out;

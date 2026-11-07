@@ -119,7 +119,7 @@ The generated code is shown in tool responses and can be copied into PinePaper's
 
 ${CHOOSE_THE_DOOR}
 
-THE AGENT LANE — when the job is a scene of shapes, text, keyframes and relations exported to a file (a data animation, a title card, a motion test), and no craft tool above is wanted: PINEPAPER_TOOLKIT=lane (or pinepaper_set_toolkit {toolkit: "lane"}) serves seven tools — pinepaper_agent_batch_execute, pinepaper_keyframe_animate, pinepaper_pattern, pinepaper_agent_export, pinepaper_lint_scene, pinepaper_event (timed and clicked events), pinepaper_clear_canvas (start over) — whose descriptions carry the rules that otherwise cost a failed build (the keyframe shape, an item's words and look inside properties, position is the centre). The whole contract is under 10k tokens. Use the full surface for characters, styled scenes, maps, diagrams and sound.
+THE AGENT LANE — when the job is a scene of shapes, text, keyframes and relations exported to a file (a data animation, a title card, a motion test), and no craft tool above is wanted: PINEPAPER_TOOLKIT=lane (or pinepaper_set_toolkit {toolkit: "lane"}) serves eight tools — pinepaper_agent_batch_execute, pinepaper_keyframe_animate, pinepaper_pattern, pinepaper_agent_export, pinepaper_lint_scene, pinepaper_event (timed and clicked events), pinepaper_clear_canvas (start over), pinepaper_register_custom_relation (a motion of your own) — whose descriptions carry the rules that otherwise cost a failed build (the keyframe shape, an item's words and look inside properties, position is the centre). The whole contract is under 10k tokens. PINEPAPER_TOOLKIT=starter serves its first five, for a first scene. Use the full surface for characters, styled scenes, maps, diagrams and sound.
 
 WORKFLOW — Create → Validate → Iterate:
 
@@ -4174,13 +4174,17 @@ EXAMPLE — Reveal at 2s, skip first second of keyframe data, end at 4s of keyfr
           enum: ['replace', 'merge'],
           description: "The studio's spelling of append, accepted so its keyframe_track_replaced warning (\"Pass { mode: 'merge' }\") can be followed as written: 'merge' is append: true; 'replace' is the default. append and mode that disagree are refused as a contradiction.",
         },
+        keys: {
+          type: 'object',
+          description: 'The keyframes by column, instead of keyframes, and far cheaper to send for a track of many keys: {"time":[0,1,2],"x":[100,400,700],"y":[300,null,500],"easing":"easeOut"}. One list per property, each as long as time; a null means that key does not set that property; easing is one name, or a list with one per key. Evenly spaced keys take "time":{"step":0.033333,"count":180} (from defaults to 0). Passing both keys and keyframes is refused.',
+        },
         easingAt: {
           type: 'string',
           enum: ['arrival', 'departure'],
           description: "Which segment a key's easing shapes. 'arrival' (default): the move ARRIVING at the key, so the first key's easing has no effect. 'departure': the move LEAVING the key, so an ease placed where a motion starts applies there. Current studio; an older one reads arrival and the result says so.",
         },
       },
-      required: ['itemId', 'keyframes'],
+      required: ['itemId'],
     },
   },
 
@@ -9025,7 +9029,11 @@ EFFECTS:
 PLAYBACK:
   play_timeline — {action: "play"|"stop"|"seek", duration, loop}
 
-VARIABLE REFERENCES: "$0", "$1" etc. reference the items this batch makes, in op order: create and group ops each take the next number (a ring / grid / orbit that makes items takes one per item); no other op does. [create, create, group, …] makes the group "$2". Place the ops that make an item before any op that references it.
+COMPACT FORMS (they run as the long forms do, and cost a third as much to send on a dense scene):
+  create_many — {itemType, name, properties, items}: one create per item. properties is what they share; an item is [x, y] or {x, y, …what differs}. name is a prefix (name-0, name-1 …) unless an item names itself. Slow past a few hundred (2000 took about a minute).
+  keys on keyframe_animate — {"time":[0,1,2],"x":[100,400,700],"y":[300,null,500],"easing":"easeOut"} in place of keyframes: one list per property, each as long as time; a null means that key does not set that property; easing is a name or a list with one per key. Evenly spaced keys: "time":{"step":0.033333,"count":180}.
+
+VARIABLE REFERENCES: "$0", "$1" etc. reference the items this batch makes, in op order: create and group ops each take the next number (a ring / grid / orbit / create_many that makes items takes one per item); no other op does. [create, create, group, …] makes the group "$2". Place the ops that make an item before any op that references it.
 
 ANIMATION NOTES:
 - keyframe_animate position accepts [x, y] or { x, y } (normalized). fillColor/strokeColor accept rgba() for alpha. The create "opacity" and "blendMode" props are applied to the item.
@@ -9056,7 +9064,7 @@ EXAMPLE — Animated sky scene with timed reveals:
             properties: {
               type: {
                 type: 'string',
-                enum: ['set_canvas_size', 'set_background', 'execute_generator', 'create', 'modify', 'delete', 'group', 'animate', 'keyframe_animate', 'relation', 'apply_mask', 'apply_effect', 'play_timeline', 'ring', 'grid', 'orbit', 'stagger', 'patch', 'timeline'],
+                enum: ['set_canvas_size', 'set_background', 'execute_generator', 'create', 'modify', 'delete', 'group', 'animate', 'keyframe_animate', 'relation', 'apply_mask', 'apply_effect', 'play_timeline', 'ring', 'grid', 'orbit', 'stagger', 'patch', 'create_many', 'timeline'],
                 description: 'Operation type. timeline compiles a GSAP-shaped timeline onto keyframe tracks. ring / grid make many items in one op (each a create, so each fills a $N slot in order), orbit binds an orbits relation (making the orbiting item when itemType is given), stagger plays the same keyframes on itemIds one after another, patch changes the item with that name (refused when several items hold it).',
               },
               // Canvas setup
@@ -9107,8 +9115,10 @@ EXAMPLE — Animated sky scene with timed reveals:
                     easing: { type: 'string' },
                   },
                 },
-                description: 'For keyframe_animate: [{time, properties, easing}]',
+                description: 'For keyframe_animate: [{time, properties, easing}], or send keys instead',
               },
+              keys: { type: 'object', description: 'For keyframe_animate, ring, grid and stagger: the keyframes by column instead of keyframes: {"time":[0,1],"x":[100,400],"easing":"easeOut"}. One list per property, each as long as time; a null means that key does not set that property. time may be {step, count, from?} for evenly spaced keys.' },
+              items: { type: 'array', description: 'For create_many: each item, as [x, y] or {x, y, …what differs from properties}' },
               duration: { type: 'number', description: 'Duration in seconds for keyframe_animate or play_timeline' },
               loop: { type: 'boolean', description: 'Loop for keyframe_animate or play_timeline' },
               append: { type: 'boolean', description: "For keyframe_animate: add these keys to the item's existing track instead of replacing it (a key at the same time merges, the new values win). Without it the op replaces the track; the op's result says which happened." },
@@ -9873,7 +9883,9 @@ USE WHEN: You need full parameter docs, examples, or workflow guidance — espec
 
 PREFER RESOURCES WHERE POSSIBLE: The full AI Agent Guide is also available via the MCP resources API at pinepaper://docs/agent-guide — clients that support resources should pull it that way rather than calling this tool. Per-domain references live at pinepaper://docs/{generators,relations,masks,diagrams,maps,effects-and-filters,fonts,custom-paths,paperjs-in-pinepaper,templates,customization,getting-started}. Use this tool when the client doesn't support resources or when you want a specific tool's verbose description.
 
-THE AGENT LANE: for a scene built from shapes, text, keyframes and relations and exported to a file, a seven-tool lane carries the whole contract in its descriptions (no guide, no lessons file): start the server with PINEPAPER_TOOLKIT=lane, or pinepaper_set_toolkit {toolkit: "lane"}.
+THE AGENT LANE: for a scene built from shapes, text, keyframes and relations and exported to a file, an eight-tool lane carries the whole contract in its descriptions (no guide, no lessons file): start the server with PINEPAPER_TOOLKIT=lane, or pinepaper_set_toolkit {toolkit: "lane"}.
+
+THE STARTER: toolkit "starter" is the lane's first five tools, the fewest that make a first scene: the batch (create, with relations as ops), keyframes, patterns, export and lint. Events, starting over and custom relations need the lane.
 
 MODES:
 - No args → returns the full AI Agent Guide (same content as pinepaper://docs/agent-guide)
@@ -9927,7 +9939,8 @@ PROFILES:
 - map: Map/choropleth tools
 - font: Font creation tools
 - minimal: Bare essentials
-- lane: the agent lane — seven tools (batch_execute, keyframe_animate, pattern, agent_export, lint_scene, event, clear_canvas) whose descriptions carry everything needed to build and export a shape/text/keyframe scene; set it for a scripted build that needs nothing else. It lists no way back: set it last.
+- starter: the lane's first five tools (batch_execute, keyframe_animate, pattern, agent_export, lint_scene), for a first scene
+- lane: the agent lane — eight tools (batch_execute, keyframe_animate, pattern, agent_export, lint_scene, event, clear_canvas, register_custom_relation) whose descriptions carry everything needed to build and export a shape/text/keyframe scene; set it for a scripted build that needs nothing else. It lists no way back: set it last.
 
 VERBOSITY:
 - verbose: Full descriptions
@@ -9939,7 +9952,7 @@ VERBOSITY:
         toolkit: {
           type: 'string',
           description: 'Toolkit profile: core (default), full, agent, diagram, map, font, minimal, lane',
-          enum: ['core', 'full', 'agent', 'diagram', 'map', 'font', 'minimal', 'lane', 'edit'],
+          enum: ['core', 'full', 'agent', 'diagram', 'map', 'font', 'minimal', 'lane', 'edit', 'starter'],
         },
         load: {
           type: 'array',

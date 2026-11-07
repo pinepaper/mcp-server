@@ -102,11 +102,12 @@ describe('the agent lane', () => {
 
   // 13,441 before O10; ~15.9k after it; 17,715 with register_custom_relation (#36), its lane schema not its 3.4 KB full
   // one; 18,556 with name patterns, update and the lint read-back documented (#37); 19,068 with the time_expression
-  // grammar, generated from the engine (#39, #41): the line that stops Math.sin() succeeding with no motion.
-  it('the lane tools/list stays small: ≤ 20,000 bytes', async () => {
+  // grammar, generated from the engine (#39, #41): the line that stops Math.sin() succeeding with no motion; 21,124 with the compact forms (keys,
+  // create_many), which pay for themselves in one dense call. It stays well inside the 10k token contract.
+  it('the lane tools/list stays small: ≤ 21,500 bytes', async () => {
     const client = await connect('lane');
     const listed = await client.listTools();
-    expect(Buffer.byteLength(JSON.stringify(listed), 'utf8')).toBeLessThanOrEqual(20_000);
+    expect(Buffer.byteLength(JSON.stringify(listed), 'utf8')).toBeLessThanOrEqual(21_500);
     await client.close();
   });
 

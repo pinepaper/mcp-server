@@ -281,6 +281,18 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 
 ## What's new in 1.6.34
 
+### Added
+
+- `keys` on `keyframe_animate` sends a track by column instead of one object per key:
+  `{"time":[0,1,2],"x":[100,400,700],"easing":"easeOut"}`. Evenly spaced keys can use
+  `"time":{"step":0.033333,"count":180}`. A 180-key track of `x` and `y` is about three
+  times smaller to send, or four with even spacing, and renders the same.
+- `create_many` in `pinepaper_agent_batch_execute` makes many items of one type, with
+  what they share stated once. 300 items sharing five properties are about fifteen times smaller to send.
+- `PINEPAPER_TOOLKIT=starter` serves five tools, enough for a first scene: the batch,
+  keyframes, patterns, export and lint. The eight-tool lane adds events, starting over
+  and custom relations.
+
 ### Changed
 
 - A linear gradient without `origin` and `destination` now fits the item, top to
@@ -2295,7 +2307,8 @@ Fourteen new tools (121 → 135) and new actions across the surface — the rele
 | `map` | Canvas + map + query/export |
 | `font` | Canvas + font + letter collage + export |
 | `minimal` | Agent, browser, canvas, and guide only |
-| `lane` | **The agent lane**: exactly seven tools — `pinepaper_agent_batch_execute`, `pinepaper_keyframe_animate`, `pinepaper_pattern`, `pinepaper_agent_export`, `pinepaper_lint_scene`, `pinepaper_event`, `pinepaper_clear_canvas` — shown with descriptions that carry the rules an agent otherwise learns by failing (the keyframe shape, an item's words and look inside `properties`, a position being the item's centre, the export's 5 s default). The whole contract, instructions included, is ~4.3k tokens. For scripted builds of shapes, text, keyframes and relations; use `core` for characters, styled scenes, maps, diagrams and sound |
+| `starter` | The agent lane's first five tools, for a first scene: `pinepaper_agent_batch_execute`, `pinepaper_keyframe_animate`, `pinepaper_pattern`, `pinepaper_agent_export`, `pinepaper_lint_scene` |
+| `lane` | **The agent lane**: exactly eight tools — `pinepaper_agent_batch_execute`, `pinepaper_keyframe_animate`, `pinepaper_pattern`, `pinepaper_agent_export`, `pinepaper_lint_scene`, `pinepaper_event`, `pinepaper_clear_canvas`, `pinepaper_register_custom_relation` — shown with descriptions that carry the rules an agent otherwise learns by failing (the keyframe shape, an item's words and look inside `properties`, a position being the item's centre, the export's 5 s default). The whole contract, instructions included, is ~4.3k tokens. For scripted builds of shapes, text, keyframes and relations; use `core` for characters, styled scenes, maps, diagrams and sound |
 
 **Verbosity tiers** (`PINEPAPER_VERBOSITY`): `verbose`, `compact` (default), `minimal`.
 
