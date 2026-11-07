@@ -295,6 +295,10 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 
 ### Changed
 
+- MP4 and WebM exports are deterministic by default, so every receipt says whether its
+  file repeats. Pass `deterministic: false` to opt out. An encoder may be pinned, so a
+  plain export's file size and pixels can differ from earlier releases. Where an MP4
+  still can't repeat on a machine, the reply warns with `determinism_not_pinned`.
 - A linear gradient without `origin` and `destination` now fits the item, top to
   bottom. It used to be a fixed 100 px diagonal at the requested position, so this
   changes how such a fill looks in existing scripts.

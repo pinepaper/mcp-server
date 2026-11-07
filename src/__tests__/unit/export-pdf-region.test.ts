@@ -559,7 +559,7 @@ describe('broadcast luma is measured, and a legaliser named (8.35, FxTool 4f1ec3
   });
 
   it('clean luma raises nothing; a missed floor is still its own warning', async () => {
-    const { w } = await run({ broadcast: true }, { broadcast: true, bitrate: 8e6, achievedBitrate: 1.84e6, bitrateFloor: 8e6, luma: { ...luma, outOfRange: 0, outOfRangeFraction: 0 } });
+    const { w } = await run({ broadcast: true }, { broadcast: true, bitrate: 8e6, achievedBitrate: 1.84e6, bitrateFloor: 8e6, bitExact: true, luma: { ...luma, outOfRange: 0, outOfRangeFraction: 0 } });
     expect(w.map((x) => x.code)).toEqual(['bitrate_below_floor']);
   });
 

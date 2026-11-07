@@ -6114,7 +6114,9 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
 
   generateAgentExport(input: AgentExportInput): string {
     const validated = AgentExportInputSchema.parse(input);
-    const { platform, format, quality, framing, duration, estimateOnly, scale, fps, pdf: pdfOpts, region, time: stillTime, maxBytes, loop: gifLoop, broadcast, broadcastHeadroom, bitrate, minBitrate, bitrateMode, audioCodec, transparent, alphaQuantizer, deterministic, motionBlur, ad: adOpts, frames, startTime } = validated;
+    const { platform, format, quality, framing, duration, estimateOnly, scale, fps, pdf: pdfOpts, region, time: stillTime, maxBytes, loop: gifLoop, broadcast, broadcastHeadroom, bitrate, minBitrate, bitrateMode, audioCodec, transparent, alphaQuantizer, deterministic: askedDeterministic, motionBlur, ad: adOpts, frames, startTime } = validated;
+    // Every video is deterministic unless the caller opts out (owner, 2026-11-07), so every receipt says whether its file repeats.
+    const deterministic = askedDeterministic ?? (format === 'mp4' || format === 'webm');
   // Encoder options (FxTool 16719759); the schema keeps them to mp4 / webm.
   const videoEncodeOpts: Record<string, unknown> = {};
   // A RANGE of the timeline (FxTool #250): frames for t in [startTime, startTime + duration), each exactly the frame
@@ -7403,13 +7405,13 @@ ${deterministic ? `  // DETERMINISTIC: the container timestamps are pinned eithe
       result.fidelity = result.fidelity || { warnings: [] };
       result.fidelity.warnings = (result.fidelity.warnings || []).concat([{ code: 'determinism_not_pinned',
         ...(__vr && __vr.cause ? { cause: __vr.cause } : {}),
-        message: 'deterministic was asked for, but no encoder on this machine repeats byte for byte at this size (the studio test-encoded and checked' + (__vr && __vr.cause === 'h264-threaded' ? ': the software H.264 encoder is multi-threaded and takes no fixed quantizer' : '') + '). What still holds: the frames fed to the encoder are identical (compare frameDigest, not sha256), and the container is identical apart from the encoded samples. Do not cache this file by hash; export WebM for a byte-identical file.' }]);
+        message: 'this file will not repeat byte for byte: no encoder on this machine repeats at this size (the studio test-encoded and checked' + (__vr && __vr.cause === 'h264-threaded' ? ': the software H.264 encoder is multi-threaded and takes no fixed quantizer' : '') + '). What still holds: the frames fed to the encoder are identical (compare frameDigest, not sha256), and the container is identical apart from the encoded samples. Do not cache this file by hash; export WebM for a byte-identical file.' }]);
       if (result.fidelity.note) delete result.fidelity.note;
     } else if (__exact === null && __hw !== 'prefer-software') {
       result.fidelity = result.fidelity || { warnings: [] };
       result.fidelity.warnings = (result.fidelity.warnings || []).concat([{ code: 'determinism_not_pinned',
         message: __hw
-          ? 'deterministic was asked for, but the encoder ran with hardwareAcceleration ' + JSON.stringify(__hw) + ': the container is pinned, the pixels may still differ slightly between runs (hardware encoders vary). Do not cache this file by hash.'
+          ? 'this file may not repeat byte for byte: the encoder ran with hardwareAcceleration ' + JSON.stringify(__hw) + ': the container is pinned, the pixels may still differ slightly between runs (hardware encoders vary). Do not cache this file by hash.'
           : 'deterministic pinned the container timestamps, but this studio does not report which encoder backend ran, so the pixels may differ slightly between runs if the browser switches between hardware and software encoding. Do not rely on byte-identical files from this studio.' }]);
       if (result.fidelity.note) delete result.fidelity.note;
     }
