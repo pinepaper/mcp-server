@@ -3,9 +3,9 @@
  *
  * What each registry-backed shape reads, and how a caller reaches it.
  *
- * Source: FxTool origin/main b31d4236ebe7dc466ff976476e5e6ef62dae94e5
+ * Source: FxTool origin/main 64287c0b418d79a0be4d50ad6f70b0e76b4c2bdc
  *   js/PinePaper.js + 5 shape modules
- * sha256: f7729b4b5136f726
+ * sha256: 9ce14745bf131ab9
  *
  * A shape's `create` receives a `config`, never the caller's `params`.
  * PinePaper.js's registryConfig literal is the only bridge between the two, so
