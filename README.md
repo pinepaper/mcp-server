@@ -329,6 +329,8 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - A GIF with `maxBytes` reports the size of the file it delivers, read from the file, and
   never delivers a retry larger than the first file.
 - `morph_sequence` takes every easing the studio names, including back and elastic.
+- `visible: false` on create (and in a batch create) hides the item. It was reported as
+  ignored and the item was drawn.
 - A refused export carries the studio's reason as `cause` (for example
   `audio_codec_unavailable`) under the error code `EXPORT_FAILED`.
 

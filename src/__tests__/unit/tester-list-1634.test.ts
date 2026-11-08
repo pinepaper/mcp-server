@@ -248,3 +248,13 @@ describe('DBLEXP33: a rule bound to an event\'s name is named, with the id to us
     expect(r.warning).toBeUndefined();
   });
 });
+
+describe('visible at create is applied, not reported ignored', () => {
+  it('create_item and a batch create both hide the item', () => {
+    const one = codeGenerator.generateCreateItem({ itemType: 'rectangle', position: { x: 1, y: 1 }, properties: { width: 10, height: 10, visible: false } } as never);
+    expect(one).toContain('if (item) item.visible = false;');
+    expect(one).not.toMatch(/ignoredProperties[^\n]*"visible"/);
+    const batch = codeGenerator.generateAgentBatchExecute({ operations: [{ type: 'create', itemType: 'circle', position: { x: 1, y: 1 }, properties: { radius: 5, visible: false } }] } as never);
+    expect(batch).toContain('item.visible = false;');
+  });
+});

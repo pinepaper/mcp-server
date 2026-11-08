@@ -619,7 +619,10 @@ if (item && item.data) { item.data.renderAs = ${JSON.stringify(itemType)}; item.
   if (num(properties.scaleY) !== undefined) createScale.scaleY = num(properties.scaleY);
   const hasCreateScale = Object.keys(createScale).length > 0;
   const SCALE_KEYS = ['scale', 'scaleX', 'scaleY'];
-  const ignored = Object.keys(properties).filter((k) => !(hasCreateScale && SCALE_KEYS.includes(k) && num(properties[k]) !== undefined)).filter((k) => itemType === 'text'
+  // VISIBLE AT CREATE. create() does not read visible, so a shape made hidden (a morph target, a reveal) was
+  // drawn; it was reported ignored. A boolean is applied to the item right after create.
+  const createVisible = typeof properties.visible === 'boolean' ? properties.visible : undefined;
+  const ignored = Object.keys(properties).filter((k) => !(k === 'visible' && createVisible !== undefined)).filter((k) => !(hasCreateScale && SCALE_KEYS.includes(k) && num(properties[k]) !== undefined)).filter((k) => itemType === 'text'
     ? (!CREATE_KNOWN_KEYS.has(k) && !textOnly(k) && !(DIRECTION_KEYS as readonly string[]).includes(k))
       || (k === 'letterSpacing' && letterSpacingCss(properties[k]) === undefined)
     : !CREATE_KNOWN_KEYS.has(k) || textOnly(k));
@@ -673,6 +676,10 @@ const item = app.create(${jsLiteral(itemType)}, ${JSON.stringify(params, null, 2
   // Add opacity support
   if (opacity !== undefined) {
     code += `\nitem.opacity = ${opacity};`;
+  }
+  if (createVisible !== undefined) {
+    code += `
+if (item) item.visible = ${createVisible};`;
   }
   if (hasCreateScale) {
     code += `

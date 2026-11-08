@@ -1,5 +1,5 @@
 /* VENDORED from mcp-cloud/src/services/character-perform.ts.
- * sha256: 91737fa6410fbe24e7b969c9d1a97ca4c6694c117854ce3182606efa41e98db7
+ * sha256: 390d8c0825549441eede2aacb78dd5760b8e527097e130420d6a2b14cb4dcd59
  * Generator: scripts/sync-character-modules.mjs
  *
  * Do NOT edit here — change it in mcp-cloud and re-run the generator, or the
@@ -44,10 +44,25 @@ import { pathBBox, scalePath, shiftPath } from "./path-bbox.js";
 const nearestOnScale = (ms: number): number =>
   DURATION_SCALE_MS.reduce((best: number, d: number) => (Math.abs(d - ms) < Math.abs(best - ms) ? d : best), DURATION_SCALE_MS[0]!);
 
+/**
+ * A GRADIENT FILL, beside the flat `fill` (owner, 2026-11-08: the explainer look is soft gradients and rim light, and a
+ * part that could hold one colour faked them with stacked translucent shapes). `fill` stays the part's flat colour, so
+ * every reader that knows nothing of gradients (the graph's tables, /direction, the critics) still reads a true colour.
+ * Stops name a palette role or a colour. `from`/`to` are points in the part's own path space; without them the engine
+ * fits the gradient to the part (linear top to bottom, radial from the centre to the right edge).
+ */
+export interface PartGradient {
+  type: "linear" | "radial";
+  stops: Array<[string, number]>;
+  from?: [number, number];
+  to?: [number, number];
+}
+
 export interface CharacterPart {
   at: [number, number];
   path: string;
   fill?: string;
+  gradient?: PartGradient;
   /**
    * HOW MUCH OF THE STYLE'S INK THIS PART TAKES. 1 (default) is the full
    * silhouette weight; a fraction is interior linework; 0 is unlined.
@@ -331,9 +346,33 @@ export function performCharacter(input: PerformInput): { ops: Op[]; parts: strin
     // mouth is what the face wears at rest.
     for (const st of (c.states ?? []).slice(1)) alternates.add(st);
   }
+  const colourOf = (c: string): string => dep.palette[c] ?? c;
   const partFill = (pid: string): string => {
     const part = dep.parts[pid];
-    return dep.palette[part?.fill ?? ""] ?? part?.fill ?? "#1f2937";
+    const flat = part?.fill ?? part?.gradient?.stops[0]?.[0];
+    return dep.palette[flat ?? ""] ?? flat ?? "#1f2937";
+  };
+  /** The fill the engine is handed: the part's gradient, placed in the frame like its path, else its flat colour. */
+  const engineFill = (pid: string, ox: number, oy: number): string | Record<string, unknown> => {
+    const g = dep.parts[pid]?.gradient;
+    if (!g || !Array.isArray(g.stops) || g.stops.length < 2) return partFill(pid);
+    const pt = (q: [number, number]): [number, number] => [ox + q[0] * k, oy + q[1] * k];
+    // ALWAYS PLACED. Without end points a renderer guesses: the container's normaliser centres a radial on the item's
+    // position, which for a figure part is the frame's origin, not the part. So a drawing that names none gets the
+    // engine's own default, computed here from the part's box: linear top centre → bottom centre, radial centre →
+    // right edge.
+    let from = g.from, to = g.to;
+    if (!(from && to)) {
+      const b = pathBBox(dep.parts[pid]!.path);
+      if (!b) return partFill(pid);
+      const cx = (b.minX + b.maxX) / 2, cy = (b.minY + b.maxY) / 2;
+      [from, to] = g.type === "radial" ? [[cx, cy], [b.maxX, cy]] : [[cx, b.minY], [cx, b.maxY]];
+    }
+    return {
+      type: g.type === "radial" ? "radial" : "linear",
+      stops: g.stops.map(([c, o]) => ({ color: colourOf(c), offset: Math.max(0, Math.min(1, Number(o) || 0)) })),
+      origin: pt(from), destination: pt(to),
+    };
   };
   const hidden = (p: string) => [...alternates].some((a) => p === a || p.startsWith(`${a}_`));
   /**
@@ -402,7 +441,7 @@ export function performCharacter(input: PerformInput): { ops: Op[]; parts: strin
           groupId: id,
           pathData: shiftPath(scalePath(p.path, k), at.x + p.at[0] * k, at.y + p.at[1] * k),
           closed: true,
-          fillColor: partFill(pid),
+          fillColor: engineFill(pid, at.x + p.at[0] * k, at.y + p.at[1] * k),
           // Scaled with the figure: an outline that stays 4px while the drawing
           // grows is a hairline on a large one and a smear on a small one.
           //
