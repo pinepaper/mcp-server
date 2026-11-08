@@ -307,17 +307,10 @@ function relationLoopParams(src) {
   return [...new Set(keys)].sort();
 }
 
-function relationParamKeys(src) {
-  const out = [];
-  const re = /\n(\s*)this\.registerRule\('([a-z_0-9]+)'/g;
-  let m;
-  while ((m = re.exec(src))) {
-    const [, indent, name] = m;
-    const close = src.indexOf(`\n${indent}});`, m.index + 1);
-    if (close < 0 || close - m.index > 30000) continue;
-    const block = src.slice(m.index, close);
+/** The keys a rule block declares under params, plus every params.X it reads; null when it declares none. */
+function ruleParamKeys(block) {
     const at = /params:\s*\{/.exec(block);
-    if (!at) continue;
+    if (!at) return null;
     let depth = 1, i = at.index + at[0].length;
     const start = i;
     while (depth && i < block.length) { if (block[i] === '{') depth++; else if (block[i] === '}') depth--; i++; }
@@ -332,9 +325,45 @@ function relationParamKeys(src) {
         if (key) { declared.add(key[1]); k += key[0].length - 1; }
       }
     }
-    if (!declared.size) continue;
+    if (!declared.size) return null;
     const reads = [...block.matchAll(/params\??\.([A-Za-z][A-Za-z0-9_]*)/g)].map((x) => x[1]);
-    out.push([name, [...new Set([...declared, ...reads])].sort()]);
+    return [...new Set([...declared, ...reads])].sort();
+}
+
+/**
+ * A rule's params, by name. Two shapes: written inline, `this.registerRule('x', { params: {…} })`, and
+ * registered by reference, `this.registerRule('x', xRule)` where xRule is `export const xRule = { params }`
+ * in a js/relations module the registry imports. The second shape was not read, so phase_wave, ring_forming,
+ * flock, on_complete, at_beat, camera_tracks, soundtrack_cue, then and after had no key list, and a param
+ * they never read (flock duration) was stored with no warning (tester's 1.6.34 list).
+ */
+function relationParamKeys(src) {
+  const out = [];
+  const re = /\n(\s*)this\.registerRule\('([a-z_0-9]+)'/g;
+  let m;
+  while ((m = re.exec(src))) {
+    const [, indent, name] = m;
+    const close = src.indexOf(`\n${indent}});`, m.index + 1);
+    if (close < 0 || close - m.index > 30000) continue;
+    const keys = ruleParamKeys(src.slice(m.index, close));
+    if (keys) out.push([name, keys]);
+  }
+  const have = new Set(out.map(([n]) => n));
+  const modules = new Map();
+  for (const im of src.matchAll(/import\s*\{([^}]*)\}\s*from\s*'\.\/(relations\/[A-Za-z0-9_/-]+\.js)'/g)) {
+    for (const id of im[1].split(',').map((x) => x.trim().split(/\s+as\s+/).pop()).filter(Boolean)) modules.set(id, `js/${im[2]}`);
+  }
+  for (const r of src.matchAll(/this\.registerRule\('([a-z_0-9]+)',\s*(?:typeof\s+([A-Za-z_]\w*)\s*!==\s*'undefined'\s*\?\s*)?([A-Za-z_]\w*)\s*[,)]/g)) {
+    const [, name, , ident] = r;
+    if (have.has(name) || !modules.has(ident)) continue;
+    const mod = readCommitted(modules.get(ident));
+    if (!mod) throw new Error(`sync-engine-lists: cannot read ${modules.get(ident)} for ${name}`);
+    const at = new RegExp(`export const ${ident}\\s*=\\s*\\{`).exec(mod);
+    if (!at) throw new Error(`sync-engine-lists: ${ident} is not an object literal in ${modules.get(ident)}`);
+    let depth = 1, i = at.index + at[0].length;
+    while (depth && i < mod.length) { if (mod[i] === '{') depth++; else if (mod[i] === '}') depth--; i++; }
+    const keys = ruleParamKeys(mod.slice(at.index, i));
+    if (keys) { out.push([name, keys]); have.add(name); }
   }
   if (out.length < 20) throw new Error(`sync-engine-lists: only ${out.length} relation rules read from ${RELATIONS_REL}`);
   return out.sort((a, b) => a[0].localeCompare(b[0]));

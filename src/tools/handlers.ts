@@ -4978,14 +4978,17 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
           // one, and re-rendering is what evicts an earlier chunk's bytes.
           const looksLikeTransport = /data pipe/i.test(String(exportResult.error ?? ''));
           return errorResult(
-            ErrorCodes.EXECUTION_ERROR,
+            typeof exportResult.code === 'string' ? ErrorCodes.EXPORT_FAILED : ErrorCodes.EXECUTION_ERROR,
             `export failed: ${exportResult.error || 'the studio reported failure without naming a reason'}`
             + (looksLikeTransport
               ? ' — that is the browser transport failing to carry the result back, not necessarily the render failing.'
                 + " Call pinepaper_export_store action 'list' BEFORE re-rendering: the bytes may already be held, and a"
                 + ' fresh export can evict an earlier one to make room.'
               : ''),
-            { code, format: exportResult.format ?? input.format, result: exportResult },
+            // The studio's own code for the refusal (e.g. audio_codec_unavailable) is the cause; EXECUTION_ERROR
+            // said only that something threw (AACCODEC envelope nit).
+            { code, format: exportResult.format ?? input.format, result: exportResult,
+              ...(typeof exportResult.code === 'string' ? { cause: exportResult.code } : {}) },
             { toolName: 'pinepaper_agent_export', canvasState: canvasState || undefined }
           );
         }
@@ -5094,6 +5097,9 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
                 type: 'text' as const,
                 text: `Export saved to file:\n\nFile: ${filePath}\nFormat: ${format}\nSize: ${(fileSize / 1024).toFixed(1)} KB\nPlatform: ${input.platform}\n`
                   + (dropNote ? `DROPPED: ${dropNote}\n` : '')
+                  // The studio's own warning on a saved file (a GIF over its maxBytes budget, GIFMAX34) was only
+                  // inside the Result JSON below; a reader of the words missed it.
+                  + (typeof (exportResult as { warning?: unknown }).warning === 'string' ? `WARNING: ${(exportResult as { warning: string }).warning}\n` : '')
                   + receiptErrorLine(receipt)
                   + ('receiptError' in receipt ? '' : probeLines(receipt))
                   + lintLines(exportResult)

@@ -4,7 +4,7 @@
  * Name lists the engine owns and the tool surface must offer exactly. See
  * scripts/sync-engine-lists.mjs for why each is generated.
  *
- * Source: FxTool origin/main b31d4236ebe7dc466ff976476e5e6ef62dae94e5
+ * Source: FxTool origin/main 64287c0b418d79a0be4d50ad6f70b0e76b4c2bdc
  *   js/core/KeyframeInterpolator.js  sha256: 342034825a057d6d
  *   js/world3d/worlds.js  sha256: 0e0973f7587c06e1
  *   js/core/DesignMedia.js  sha256: ab07f330e4060cb7
@@ -13,9 +13,9 @@
  *   js/core/StyledScene.js  sha256: 550fd9b58b7f5d87
  *   js/core/Patterns.js  sha256: a04fe3805f4e9d4f
  *   js/relations/expr-to-ir.js  sha256: 4d92d2f42b3356e9
- *   js/RelationRegistry.js  sha256: 96fbd5f6d2bf6581
+ *   js/RelationRegistry.js  sha256: e5e19b64708cf0c3
  *   js/core/AnimationDriver.js  sha256: 6741a73f5f489355
- *   js/PinePaper.js  sha256: 9e910bb2e49d5f4f
+ *   js/PinePaper.js  sha256: 37261f8ffe568226
  */
 
 /** 39 names: EASING_NAMES, the keys of the engine's easing table. Keyframes, masks, relations and the camera all resolve through it. */
@@ -235,11 +235,13 @@ export const EXPRESSION_CONSTANTS = [
   'TAU',
 ] as const;
 
-/** 51 relation rules: the params each declares or reads (RelationRegistry.js). A key outside its list is never read. */
+/** 60 relation rules: the params each declares or reads (RelationRegistry.js). A key outside its list is never read. */
 export const RELATION_PARAM_KEYS: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  after: ['chainVisibility', 'delay', 'offset'],
   aligned_with: ['axis', 'offset', 'signal'],
   anchored_in_world: ['hideWhenBehind', 'offsetY', 'scaleWithDistance', 'screenOffsetX', 'screenOffsetY', 'target', 'x', 'y', 'z'],
   animates: ['autoplay', 'duration', 'keyframes', 'loop', 'pingPong', 'signal'],
+  at_beat: ['at', 'beat', 'bpm', 'delay', 'event', 'loop', 'payload'],
   attached_to: ['inherit_rotation', 'offset'],
   attached_to_tail: ['port'],
   attracts: ['force', 'maxDistance', 'maxSpeed', 'minDistance', 'returnSpeed'],
@@ -248,6 +250,7 @@ export const RELATION_PARAM_KEYS: Readonly<Record<string, readonly string[]>> = 
   bounds_to: ['bounce', 'padding', 'signal'],
   camera_animates: ['delay', 'duration', 'fov', 'keyframes', 'loop', 'pitch', 'yaw'],
   camera_follows: ['bounds', 'deadzone', 'offset', 'smoothing', 'zoom'],
+  camera_tracks: ['bounds', 'deadzone', 'framing', 'leadVelocity', 'letterbox', 'letterboxAspect', 'letterboxColor', 'letterboxFraction', 'offset', 'smoothing', 'zoom'],
   centered_on: ['offsetX', 'offsetY', 'signal'],
   circumscribes: ['color', 'delay', 'duration', 'fadeOut', 'padding', 'shape', 'strokeWidth'],
   connects_to: ['label', 'sourcePort', 'targetPort', 'via'],
@@ -257,6 +260,7 @@ export const RELATION_PARAM_KEYS: Readonly<Record<string, readonly string[]>> = 
   draws_figure: ['delay', 'duration', 'figure', 'loop'],
   driven_by: ['anchor', 'clamp', 'colorFrom', 'colorTo', 'multiplier', 'offset', 'signal', 'sourceProperty', 'targetProperty'],
   effect_: ['intensity', 'mode', 'offsetX', 'offsetY', 'padding', 'palette', 'radius', 'speed'],
+  flock: ['alignmentWeight', 'bounce', 'bounds', 'cohesionWeight', 'maxForce', 'maxSpeed', 'members', 'neighborDist', 'orient', 'seed', 'separationDist', 'separationWeight', 'speed', 'target', 'targetWeight'],
   follows: ['delay', 'offset', 'signal', 'smoothing', 'startOnTarget'],
   geo_adjacent_to: ['offset', 'regionId', 'side', 'signal'],
   geo_centers_on: ['animate', 'duration', 'padding', 'regionId'],
@@ -274,15 +278,20 @@ export const RELATION_PARAM_KEYS: Readonly<Record<string, readonly string[]>> = 
   localizes_sound: ['axis', 'distanceGain', 'reference', 'smoothing', 'spread'],
   maintains_distance: ['distance', 'signal', 'strength'],
   mirrors: ['axis', 'center'],
+  on_complete: ['delay', 'event', 'loop', 'offset', 'payload'],
   on_event_play_sound: ['gain', 'note', 'sound'],
   on_top_of: ['align', 'gap', 'overhang', 'signal'],
   orbits: ['direction', 'phase', 'phaseDegrees', 'radius', 'speed'],
   parallax: ['depth', 'origin'],
+  phase_wave: ['amplitude', 'decay', 'delay', 'delta', 'direction', 'duration', 'members', 'period', 'phase', 'phaseStep', 'property', 'wavelength'],
   points_at: ['offset_angle', 'signal', 'smoothing'],
   reacts_to_audio: ['attack', 'base', 'beatsPerBar', 'colorFrom', 'colorTo', 'decay', 'feature', 'gain', 'halfLife', 'inPoint', 'loop', 'onsets', 'outPoint', 'peak', 'property', 'source', 'start', 'threshold'],
   repels: ['force', 'maxDistance', 'minDistance', 'returnSpeed', 'signal'],
+  ring_forming: ['center', 'delay', 'duration', 'easing', 'hold', 'loop', 'members', 'phase', 'radius', 'radiusY', 'spin', 'spread', 'stagger'],
+  soundtrack_cue: ['anchor', 'beat', 'bpm', 'duration', 'gain', 'loop', 'note', 'offset', 'sound'],
   staggered_with: ['amount', 'axis', 'count', 'delay', 'distributeEase', 'duration', 'effect', 'from', 'grid', 'index', 'stagger'],
   syncs_with: ['offset', 'speedRatio'],
+  then: ['chainVisibility', 'delay', 'offset'],
   time_expression: ['baseValue', 'expression', 'property', 'signal'],
   tours: ['dwell', 'easing', 'loop', 'orient', 'stopEvent', 'travel', 'waypoints'],
   triggers_animation: ['atTime', 'delay', 'trigger'],

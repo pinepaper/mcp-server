@@ -269,6 +269,7 @@ export const OPTIONAL_ENGINE_METHODS: readonly string[] = [
   '_resolveId',
   '_resolveRaster',
   '_resolveRelationEndpoint',
+  '_restoreReactionJournal',
   'activeWindowOf',
   'animate',
   'applyHandDrawnJitter',

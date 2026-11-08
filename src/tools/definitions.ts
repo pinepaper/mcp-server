@@ -17,7 +17,7 @@ import { TOOL_TAGS } from './toolkits.js';
 import { STICK_GAITS, STICK_POSES, STICK_SEQUENCES, STICK_EXPRESSIONS, STICK_PROPS } from './stick-vocabulary.js';
 import { AgentBatchOperationTypeSchema, GeneratorNameSchema, ItemTypeSchema } from '../types/schemas.js';
 import { expressionGrammarText } from './expression-grammar.js';
-import { DESIGN_MEDIA, DESIGN_MEDIA_APPLY, FILTER_TYPES, FILTER_DOCS, LINEAGE_KINDS, STYLED_SCENE_STYLES, STYLED_SCENE_STYLE_INFO, PATTERN_KINDS, ANIMATION_TYPES, ANIMATION_WAVEFORMS, ANIMATION_ORIGINS } from './engine-lists.js';
+import { ENGINE_EASING_NAMES, DESIGN_MEDIA, DESIGN_MEDIA_APPLY, FILTER_TYPES, FILTER_DOCS, LINEAGE_KINDS, STYLED_SCENE_STYLES, STYLED_SCENE_STYLE_INFO, PATTERN_KINDS, ANIMATION_TYPES, ANIMATION_WAVEFORMS, ANIMATION_ORIGINS } from './engine-lists.js';
 import {
   EffectTypeSchema,
   AgentExportFormatSchema,
@@ -1757,7 +1757,7 @@ TYPICAL SCENE CHAIN:
 3. Give each beat reactions: on_event_add_relation (spawn an orbit/path), on_event_set_color, on_event_set_property, on_event_set_visibility (all via pinepaper_add_relation, sourceId=the event).
 4. pinepaper_event pulse e0 to start. Canvas-timed fires are scrub/loop/replay-stable.
 
-RULES (contraptions): a rule runs when an event fires: { action: 'add_contraption', sourceEvent, actions, condition?, thenTrigger?, elseTrigger?, contraptionId? }. sourceEvent is an eventId, any name you pulse, or 'state:<key>' when that variable changes. actions: setVariable { key, value? }, incrementVariable { key, by? }, toggleVariable { key }, modifyItem { targetId, properties: { visible, opacity, fillColor, strokeColor, content, position } }, toggleItemVisible { targetId }, animateItem { targetId, animation?, speed? }, playSound { preset?, note?, gain?, duration? }, playTimeline { duration?, loop? }. list_contraptions shows each rule's fireCount, which is how to tell it ran (a pulse runs its rules on the next frame); remove_contraption takes contraptionId.
+RULES (contraptions): a rule runs when an event fires: { action: 'add_contraption', sourceEvent, actions, condition?, thenTrigger?, elseTrigger?, contraptionId? }. sourceEvent is the eventId that create returned (e.g. item_3; its timer and pulse fire that id, NOT the event's name), any other channel name you pulse yourself, or 'state:<key>' when that variable changes. actions: setVariable { key, value? }, incrementVariable { key, by? }, toggleVariable { key }, modifyItem { targetId, properties: { visible, opacity, fillColor, strokeColor, content, position } }, toggleItemVisible { targetId }, animateItem { targetId, animation?, speed? }, playSound { preset?, note?, gain?, duration? }, playTimeline { duration?, loop? }. list_contraptions shows each rule's fireCount, which is how to tell a LIVE pulse ran it (a pulse runs its rules on the next frame); an export puts fireCount back with everything else, so after an export check the frames, not the count. remove_contraption takes contraptionId.
 - In an export, what a rule changes is put back afterwards, so the next export starts from the same scene. animateItem cannot be put back, and the export warns. A change from a pulse outside an export stays.
 - An export is silent to playSound and refuses playTimeline, since it already steps the timeline. For sound in a video, use on_event_play_sound (above).
 - pinepaper_clear_canvas removes rules, and so does clear_contraptions. They are saved with the scene.
@@ -1786,7 +1786,7 @@ RETURNS: create → { success, action, eventId }; pulse → { success, action, e
           description: "Optional value forwarded to listeners — action 'pulse'",
         },
         contraptionId: { type: 'string', description: "The rule's id: optional for add_contraption, required for remove_contraption" },
-        sourceEvent: { type: 'string', description: "add_contraption: what runs the rule: an eventId, any name you pulse, or 'state:<key>' when that variable changes" },
+        sourceEvent: { type: 'string', description: "add_contraption: what runs the rule: the eventId create returned (its timer and pulse fire the id, not the event's name), any other channel you pulse yourself, or 'state:<key>' when that variable changes" },
         condition: {
           type: 'object',
           description: 'add_contraption: the rule runs its actions only when this holds',
@@ -3648,7 +3648,7 @@ USE WHEN:
 
 RELATION TYPES:
 - orbits: Circular motion around target (params: radius, speed, direction, phaseDegrees). speed is REVOLUTIONS PER SECOND: 0.5 is one turn every 2 s, 0.1 one turn every 10 s (not radians, not a period). Use phaseDegrees. 'phase' is the one parameter in the whole relation vocabulary measured in RADIANS — the documented exception to "angles are DEGREES", kept only for scenes that already set it. phaseDegrees wins when both are given.
-- follows: Move toward target with smoothing (params: offset, smoothing, delay)
+- follows: Move toward target with smoothing (params: offset, smoothing, delay, startOnTarget). It starts where the follower was made and closes in; startOnTarget: true puts it on the target at t=0.
 - attached_to: Fixed offset from target (params: offset, inherit_rotation)
 - maintains_distance: Stay fixed distance from target (params: distance, strength)
 - points_at: Rotate to face target (params: offset_angle, smoothing)
@@ -3656,17 +3656,22 @@ RELATION TYPES:
 - parallax: Move relative by depth (params: depth, origin)
 - bounds_to: Stay within bounds (params: padding, bounce)
 - anchored_in_world: Pin the item to a 3D world position so it tracks the world camera.
-- spring_follow: Follow with spring dynamics rather than smoothing — it overshoots and settles.
+- spring_follow: Follow with spring dynamics rather than smoothing — it overshoots and settles. stiffness and damping shape it; with both at or below 1 (the usual range) mass cancels out and changes nothing.
 - repels: Move away from the target inside a radius and ease back when it leaves (params: force, maxDistance, minDistance, returnSpeed). Crowd avoidance, and reacting to a cursor without being dragged by it.
 - wiggle: Continuous procedural noise on the item. Richer than a sine: it does not repeat visibly.
 - syncs_with: Run the source's animation on the TARGET's timeline (params: offset, speedRatio) — they share a clock and stay in step even when the target's timing changes, which merely starting together does not give you.
-- triggers_animation: Start the target's animation on a condition (params: trigger, delay, atTime). The declarative "and then": sequencing in the graph instead of in a callback nobody can query.
+- triggers_animation: On a condition (params: trigger, delay, atTime) reveal a hidden target and pulse an event. It does not re-time the target's keyframes: to start B's track when A ends, use then / after.
 - tours / synced_to_audio: Move through a sequence of targets; bind playback to an audio track.
 - localizes_sound: a sound pans with an item. sourceId is the sound item (pinepaper_sound create's itemId), targetId the item it follows; the sound's stereo position follows the item across the frame, in the preview and in exported audio. params: axis (x | y, default x), spread (0..1: pan at the frame edge, default 0.85), reference (camera | canvas, default camera), distanceGain (true also quietens it away from the centre), smoothing (ms, default 80).
 - connects_to: Diagram edge from source to target (params: via = the connector's item id, sourcePort / targetPort = auto | top | bottom | left | right, label). A RECORD of the connection: it draws nothing itself.
 - attached_to_tail / head_points_to: source = the connector, target = the item; params: port (auto | top | bottom | left | right). They record which port each end belongs to; the diagram system is what moves a connector's ends when an item moves, and it does so only for connectors made with pinepaper_connect. On a plain line (create itemType 'line') they record the structure and move nothing: for a connector that follows the items, make it with pinepaper_connect.
 - expresses: Play a facial expression over a root's part_of children (params: expression — blink|smile|surprise…, interval, duration, easing). No interval means sustained. It walks part_of from the ROOT, so parts with roles but no parent are INERT: the relation applies to nothing and reports success, which is what makes an unparented pair of eyes look finished while being unable to blink.
 - part_of: Semantic membership with a named role (params: role, offset, structural). structural: true records the part WITHOUT driving its position — the right choice when the parent is a group that already transforms its children, since driving it too would fight the group.
+- then / after: re-time a follower's whole track to start when the source's ends (then: target after source; after: source after target), params delay, offset. Extending the source re-times the follower. A loop (a → b → a) is refused.
+- on_complete / at_beat: when the source's track ends (on_complete) or at a beat (at_beat: beat, bpm, or at in seconds, from the source's start) they pulse params.event (default: the target's id) and reveal the target if it is hidden (visible: false). They do NOT re-time the target's keyframes: for "B starts when A ends" use then. Bind reactions to the pulsed event for anything else.
+- phase_wave / ring_forming / flock: declared ONCE over a set: params.members { ids | names | tag } or a group as the source. Each member's phase, ring slot or boid comes from its rank in that set, so one relation per item gives every member slot 0. A batch relation op with a name pattern (sourceId "disc-*") binds them once over the matches. ring_forming centres on params.center or the target. flock runs for the whole scene: limit it with params.window { start, end }.
+- soundtrack_cue: a sound at a beat or at the source's start / end (params sound, anchor, beat, bpm, offset, gain). What an export plays depends on the studio build: check the exported audio, and use on_event_play_sound on a timed event for a sound you need exactly.
+- camera_tracks: the item→camera binding is accepted, but export framing is taken only from camera_animates, so check the frames. For a camera that moves in a video, use camera_animates or pinepaper_camera_director.
 - staggered_with: Delay an item's animation by its place in a sequence (params: index, stagger, effect). For a SHAPED stagger — outward from the centre, converging from the edges, across a grid — also pass count (required: without it there is no "end" to measure distance from), plus from (start|end|center|edges|random), amount (total seconds for the whole run, overrides stagger), grid ("rows,cols" or "auto"), axis (x|y) and distributeEase. Plain index x stagger still works and is taken first. To stagger items directly rather than through a relation, use pinepaper_stagger.
 
 INTERACTIVE RELATIONS — the state machine lives in the graph.
@@ -8281,7 +8286,7 @@ EXAMPLE — pill → field → dot:
         itemId: { type: 'string' },
         states: { type: 'array', items: { type: 'object', properties: { at: { type: 'number' }, duration: { type: 'number' }, to: { type: 'string' }, shape: { type: 'object', additionalProperties: true }, hideTarget: { type: 'boolean' } }, required: ['at'] } },
         hideTarget: { type: 'boolean', description: 'Default for every state; false keeps the reference items visible (default true).' },
-        easing: { type: 'string', enum: ['linear', 'easeIn', 'easeOut', 'easeInOut'] },
+        easing: { type: 'string', enum: [...ENGINE_EASING_NAMES], description: 'Default easeInOut; back and elastic easings work too.' },
         camera: { description: 'true, or {fill, easing}', oneOf: [{ type: 'boolean' }, { type: 'object', additionalProperties: true }] },
         sound: { description: 'true, or a catalogue sound name', oneOf: [{ type: 'boolean' }, { type: 'string' }] },
       },
@@ -9362,7 +9367,7 @@ VERIFY MOTION BEFORE YOU RENDER. An export takes seconds to minutes and shows yo
         },
         region: {
           type: 'object',
-          description: 'png / jpg / webp only: export just this part of the canvas (canvas coordinates, x/y = TOP-LEFT) — carousel slices, crops. Output is the region\'s own size unless outputWidth/outputHeight say otherwise; a different aspect is covered, not stretched. SMALL ASSETS (emotes, badges, favicons): design at 2-4x on a canvas of at least 100 px, then export the whole board as a region with the small outputWidth/outputHeight — e.g. a 112x112 canvas, region {x:0, y:0, width:112, height:112, outputWidth:28, outputHeight:28}.',
+          description: 'png / jpg / webp only: export just this part of the canvas (canvas coordinates, x/y = TOP-LEFT) — carousel slices, crops. Output is the region\'s own size unless outputWidth/outputHeight say otherwise; a different aspect is cropped about the region\'s centre (the reply\'s croppedTo says to what), never stretched and never filled from outside the region. SMALL ASSETS (emotes, badges, favicons): design at 2-4x on a canvas of at least 100 px, then export the whole board as a region with the small outputWidth/outputHeight — e.g. a 112x112 canvas, region {x:0, y:0, width:112, height:112, outputWidth:28, outputHeight:28}.',
           properties: {
             x: { type: 'number' }, y: { type: 'number' },
             width: { type: 'number', exclusiveMinimum: 0 }, height: { type: 'number', exclusiveMinimum: 0 },

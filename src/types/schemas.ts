@@ -854,7 +854,7 @@ export const EventInputSchema = z.object({
   eventId:     z.string().optional().describe("Event id to fire — required for action 'pulse'"),
   payload:     z.unknown().optional().describe("Optional value forwarded to listeners — action 'pulse'"),
   contraptionId: z.string().optional().describe("The rule's id: optional for add_contraption, required for remove_contraption"),
-  sourceEvent: z.string().optional().describe("add_contraption: what runs the rule: an eventId, any name you pulse, or 'state:<key>' when that variable changes"),
+  sourceEvent: z.string().optional().describe("add_contraption: what runs the rule: the eventId create returned (its timer and pulse fire the id, not the event's name), any other channel you pulse yourself, or 'state:<key>' when that variable changes"),
   condition: z.object({
     key: z.string().optional(),
     op: z.enum(['==', '===', '!=', '>', '>=', '<', '<=', 'eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'truthy', 'falsy', 'in']).optional().describe("Default '=='"),
@@ -2897,7 +2897,7 @@ export const AgentExportInputSchema = z.object({
     outputWidth: z.number().int().positive().max(16384).optional(),
     outputHeight: z.number().int().positive().max(16384).optional(),
     excludeForeign: z.boolean().optional().describe('Default true: an item that reaches into the region but is centred outside it (a neighbouring card\'s overflow) is left out of this image; result.excludedItems names them. false renders everything that touches the region.'),
-  }).optional().describe('png / jpg / webp only: export just this canvas region (canvas coordinates, top-left x/y) — carousel slices, crops. Output is the region\'s size unless outputWidth/outputHeight say otherwise; a different aspect is covered, not stretched.'),
+  }).optional().describe('png / jpg / webp only: export just this canvas region (canvas coordinates, top-left x/y) — carousel slices, crops. Output is the region\'s size unless outputWidth/outputHeight say otherwise; a different aspect is cropped about the region\'s centre, never stretched and never filled from outside the region.'),
 }).describe('Smart export options')
   .superRefine((val, ctx) => {
     if (val.time !== undefined && ['mp4', 'webm', 'gif', 'apng', 'wav', 'srt', 'vtt', 'scc'].includes(String(val.format))) {
@@ -4987,7 +4987,7 @@ export const MorphSequenceInputSchema = z.object({
     hideTarget: z.boolean().optional().describe('false keeps this state\'s reference item visible (default true: hidden).'),
   }).refine((s) => !!s.to !== !!s.shape, { message: 'each state takes exactly one of to or shape' })).min(1).max(40),
   hideTarget: z.boolean().optional().describe('Default for every state: false keeps the reference items visible (default true: hidden).'),
-  easing: z.enum(['linear', 'easeIn', 'easeOut', 'easeInOut']).optional().describe('Morph easing (default easeInOut) — the morph supports these four.'),
+  easing: z.enum(ENGINE_EASING_NAMES).optional().describe('Morph easing (default easeInOut): any easing the studio names, back and elastic ones included (MORPHBACK32: only four were accepted, though morphs_to renders them all).'),
   camera: z.union([z.boolean(), z.object({ fill: z.number().min(0.05).max(1).optional(), easing: z.string().optional() })]).optional()
     .describe('true: the camera rides every morph on the same timing, framing each state (fill = share of the frame the state fills, default 0.45).'),
   sound: z.union([z.boolean(), z.string().min(1)]).optional().describe("true: a whoosh at each morph start; or a catalogue sound name."),

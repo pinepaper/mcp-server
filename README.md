@@ -310,6 +310,37 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - The npm package starts no process. Two export features use `ffprobe` and `ffmpeg`: checking a saved video against what the studio encoded, and joining the cached segments of a `perScene` export (`ffmpeg -f concat`). Only the Claude Desktop extension runs them, through a small runner it bundles that allows those two binaries alone, via `execFile` (no shell, argument lists the server writes, absolute paths). From npm, the check is skipped and said so, and a `perScene` export runs whole.
 - The server itself fetches the images, SVGs and media a tool call names by URL, and reads local files named by path. URLs that resolve to loopback, private, link-local or reserved addresses are refused, redirects included, and so are cloud metadata addresses. Local files are read only with `PINEPAPER_ALLOW_LOCAL_FILES=1`, and then only from the working directory, the export folder, and folders listed in `PINEPAPER_ASSET_DIRS` (the export folder is readable without the switch). `PINEPAPER_ALLOW_PRIVATE_NETWORK=1` allows local and LAN hosts. Metadata addresses stay refused even with it set.
 
+## What's new in 1.6.35
+
+### Fixed
+
+- A batch `relation` op with a name pattern (`sourceId: "disc-*"`) binds `phase_wave`,
+  `ring_forming` and `flock` once over every match, so each member gets its own phase,
+  ring slot or boid. It used to bind one relation per item, and every member took the
+  first slot. `ring_forming` with no `center` or target centres on the members.
+- A PDF still honours `time` while the timeline is playing.
+- An export `region` whose output has a different shape is cropped about its centre.
+  It used to draw content from outside the region, and black past the canvas edge. The
+  reply's `croppedTo` says what was rendered.
+- A GIF with `maxBytes` reports the size of the file it delivers, read from the file, and
+  never delivers a retry larger than the first file.
+- `morph_sequence` takes every easing the studio names, including back and elastic.
+- A refused export carries the studio's reason as `cause` (for example
+  `audio_codec_unavailable`) under the error code `EXPORT_FAILED`.
+
+### Changed
+
+- Relation params a relation does not read are now named for the long-form relations
+  too (`then`, `after`, `phase_wave`, `ring_forming`, `flock`, `on_complete`, `at_beat`,
+  `camera_tracks`, `soundtrack_cue`). For example, `flock` has no `duration`; use
+  `window`.
+- `add_contraption` warns when `sourceEvent` is an event's name: a timed event and a
+  pulse fire the event's id, so pass the `eventId` that `create` returned.
+- An emitter `fade` other than `none`, `linear` or `{ in, out }` is named in a warning.
+- The relation docs say what `on_complete`, `at_beat` and `triggers_animation` do: reveal
+  a hidden target and pulse an event. They don't re-time a track; use `then`. A rule's
+  `fireCount` is put back after an export, like everything else the rule changed.
+
 ## What's new in 1.6.34
 
 ### Added

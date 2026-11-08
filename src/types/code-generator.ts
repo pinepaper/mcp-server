@@ -1959,6 +1959,11 @@ export function normalizeEmitterSpec(spec: Record<string, unknown>, assumeDefaul
     }
     const f = o.fade;
     if (f && typeof f === 'object' && !Array.isArray(f)) scalarRanges(`${where}.fade`, f as Record<string, unknown>, ['in', 'out']);
+    // fade takes 'none', 'linear' (or true / false) or { in, out }. Any other word is not read, so the
+    // particles keep the default linear fade over their life: fade 'out' looked like an option (EMITFADE34).
+    if (typeof f === 'string' && f !== 'none' && f !== 'linear') {
+      warnings.push(`${where}.fade ${JSON.stringify(f)} is not a fade the studio reads, so the particles keep the default linear fade over their whole life. Use 'none', 'linear', or { in, out } in seconds (or fadeIn / fadeOut).`);
+    }
   };
   scalarRanges('spec', out, [...SCALAR_ONLY, ...SPEC_ONLY]);
   bursts.forEach((b, i) => { if (b && typeof b === 'object') scalarRanges(`bursts[${i}]`, b as Record<string, unknown>, SCALAR_ONLY); });
@@ -2548,6 +2553,32 @@ function generateExecuteGeneratorCode(
  * at all and draws full-canvas). So the item is checked first and refused by
  * name, and the result says whether this studio clips to shapes.
  */
+/** Relations the studio declares ONCE over a set (multiInstance: false in js/relations/collection.js). */
+export const COLLECTION_RELATIONS: ReadonlySet<string> = new Set(['phase_wave', 'ring_forming', 'flock']);
+
+/**
+ * The part of an export region that is rendered: the region itself, or, when
+ * outputWidth / outputHeight have another aspect, the largest box of that aspect
+ * centred in it (a cover crop). Never larger than the region.
+ */
+export function regionCoverCrop(r: { x: number; y: number; width: number; height: number; outputWidth?: number; outputHeight?: number }):
+  { x: number; y: number; width: number; height: number; cropped: boolean } {
+  const outW = r.outputWidth ?? Math.round(r.width);
+  const outH = r.outputHeight ?? Math.round(r.height);
+  const want = outW / outH, have = r.width / r.height;
+  // Under half a source pixel of difference on either side is the same box.
+  if (!(outW > 0 && outH > 0) || Math.abs(r.width - r.height * want) < 0.5 && Math.abs(r.height - r.width / want) < 0.5) {
+    return { x: r.x, y: r.y, width: r.width, height: r.height, cropped: false };
+  }
+  const round = (v: number) => Math.round(v * 1000) / 1000;
+  if (want > have) {
+    const h = r.width / want;
+    return { x: r.x, y: round(r.y + (r.height - h) / 2), width: r.width, height: round(h), cropped: true };
+  }
+  const w = r.height * want;
+  return { x: round(r.x + (r.width - w) / 2), y: r.y, width: round(w), height: r.height, cropped: true };
+}
+
 function emitGeneratorRun(generatorName: string, paramsJson: string, region?: GeneratorRegion): string {
   const options = JSON.stringify(region ? { region } : {});
   const itemId = region && typeof region.shape === 'object' ? region.shape.itemId : null;
@@ -5832,6 +5863,40 @@ const __members = app.itemRegistry.getAll()
 if (!__members.length) throw new Error('no item is named like ' + ${jsLiteral(op.sourceId)} + ': name items with properties.name');`
             : `const __members = [{ id: ${srcRef} }];
 if (!app.getItemById(__members[0].id)) throw new Error('Source not found: ' + __members[0].id);`;
+          // A COLLECTION RULE IS DECLARED ONCE OVER THE SET (PHASEWAVE32, RINGFORM33). phase_wave, ring_forming
+          // and flock take their members from params.members (or a group's children) and space them by rank in
+          // that list; one relation per item gave each a set of one, so every disc took slot 0 (all at phase 0,
+          // all on the angle-0 point of the ring). Bound once, on the first match, with the matches as members.
+          const rel = String(op.relationType);
+          const relParams = (op.relationOptions ?? {}) as Record<string, unknown>;
+          if (glob && op.update !== true && COLLECTION_RELATIONS.has(rel)) {
+            // ring_forming centres on the source's own bounds by default, and the source is a member that
+            // moves: the centre is fixed at the members' centre as bound, unless a target or center was given.
+            const ringCentre = rel === 'ring_forming' && noTarget && relParams.center === undefined;
+            return `
+${members}
+const targetId = ${noTarget ? 'null' : tgtRef};
+const target = ${noTarget ? 'null' : 'app.getItemById(targetId)'};
+${noTarget ? '' : "if (!target) throw new Error('Target not found: ' + targetId);\n"}const __ids = __members.map((m) => m.id);
+const __p = Object.assign({}, ${relOpts}${relParams.members === undefined ? ', { members: { ids: __ids } }' : ''});
+${ringCentre ? `{
+  let __b = null;
+  __ids.forEach((id) => { const it = app.getItemById(id); if (it && it.bounds) __b = __b ? __b.unite(it.bounds) : it.bounds.clone(); });
+  if (__b) __p.center = { x: __b.center.x, y: __b.center.y };
+}
+` : ''}const __src = app.getItemById(__ids[0]);
+const __existing = app.relationRegistry && app.relationRegistry.getAssociations
+  && app.relationRegistry.getAssociations(__ids[0], ${type}).some((a) => a.target === targetId || (targetId === null && a.target == null));
+const ok = (__existing && typeof app.modifyRelationParams === 'function')
+  ? (app.modifyRelationParams(__ids[0], targetId, ${type}, __p) || (targetId === null && app.modifyRelationParams(__ids[0], undefined, ${type}, __p)))
+  : app.addRelation(__src, target, ${type}, __p);
+if (!ok) {
+  const __why = ${relationRefusalReasonJs(type)};
+  return { success: false, relationType: ${type}, sourceIds: [__ids[0]], error: 'the studio refused the ' + ${type} + ' relation over ' + __ids.length + ' members — nothing was bound' + (__why ? ': ' + __why : '.') };
+}
+return { success: true, relationType: ${type}, bound: [__ids[0]], members: __ids, count: __ids.length, targetId${ringCentre ? ', center: __p.center' : ''}${relationOptionFields(op.relationType, op.relationOptions, 'optionWarning', ['members'])} };
+`;
+          }
           return `
 ${stepGuard}${members}
 const targetId = ${noTarget ? 'null' : tgtRef};
@@ -6115,6 +6180,7 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
   generateAgentExport(input: AgentExportInput): string {
     const validated = AgentExportInputSchema.parse(input);
     const { platform, format, quality, framing, duration, estimateOnly, scale, fps, pdf: pdfOpts, region, time: stillTime, maxBytes, loop: gifLoop, broadcast, broadcastHeadroom, bitrate, minBitrate, bitrateMode, audioCodec, transparent, alphaQuantizer, deterministic: askedDeterministic, motionBlur, ad: adOpts, frames, startTime } = validated;
+    const regionSrc = region ? regionCoverCrop(region) : undefined;
     // Every video is deterministic unless the caller opts out (owner, 2026-11-07), so every receipt says whether its file repeats.
     const deterministic = askedDeterministic ?? (format === 'mp4' || format === 'webm');
   // Encoder options (FxTool 16719759); the schema keeps them to mp4 / webm.
@@ -6639,9 +6705,18 @@ ${stillTime === undefined ? `  if (['png', 'jpg', 'webp', 'svg', 'pdf'].indexOf(
   // differed in the animated streak while their MP4s were byte-identical.
   // Seek, render, and put the playhead back afterwards.
   const __prevT = typeof app.playbackTime === 'number' ? app.playbackTime : 0;
+  // A PDF STILL HOLDS ITS MOMENT (PDFEXP34 a). exportPDF awaits its PDF library
+  // and then captures the live view, so a playing timeline ran on past the seek
+  // and the page showed about t=1.3 s whatever time asked for. The timeline is
+  // paused for the PDF and resumed after it.
+  let __pausedForStill = false;
+  let __pdfEvaluated = false;
   if (__stillT !== null) {
     if (typeof app.setPlaybackTime !== 'function') {
       return { success: false, platform, format, error: 'app.setPlaybackTime unavailable — this studio cannot render a still at a chosen time.' };
+    }
+    if (format === 'pdf' && app.isPlayingKeyframes && !app.isAnimationPaused) {
+      try { app.pauseKeyframeTimeline(); __pausedForStill = true; } catch (_) { /* the seek below still applies */ }
     }
     app.setPlaybackTime(__stillT);
     if (typeof paper !== 'undefined' && paper.view && typeof paper.view.update === 'function') paper.view.update();
@@ -6667,7 +6742,7 @@ ${stillTime === undefined ? `  if (['png', 'jpg', 'webp', 'svg', 'pdf'].indexOf(
         ${region ? `// A REGION, not the whole board — carousel slices, crops. renderRegionToDataURL
         // re-renders that world rect offscreen without touching the live view;
         // it was reachable only from custom code. A differing output aspect is
-        // covered by the engine, not stretched.
+        // cropped here first (regionCoverCrop), so the engine only scales.
         if (typeof app.renderRegionToDataURL !== 'function') {
           result = { success: false, platform, format: 'png', error: 'app.renderRegionToDataURL unavailable — update PinePaper Studio to export a region.' };
           break;
@@ -6682,7 +6757,7 @@ ${stillTime === undefined ? `  if (['png', 'jpg', 'webp', 'svg', 'pdf'].indexOf(
           // A video in the region is waited for at this time (round 12, 12.5):
           // the render drew before the clip's seek landed.
           if (typeof app.awaitMediaAt === 'function') await app.awaitMediaAt(__stillT !== null ? __stillT : (typeof app.playbackTime === 'number' ? app.playbackTime : 0));
-          const regionUrl = app.renderRegionToDataURL(new paper.Rectangle(${region.x}, ${region.y}, ${region.width}, ${region.height}), rw, rh${region.excludeForeign === false ? '' : ', { excludeForeign: true }'});
+          const regionUrl = app.renderRegionToDataURL(new paper.Rectangle(${regionSrc!.x}, ${regionSrc!.y}, ${regionSrc!.width}, ${regionSrc!.height}), rw, rh${region.excludeForeign === false ? '' : ', { excludeForeign: true }'});
           const __excluded = Array.isArray(app.lastRegionExcluded) ? app.lastRegionExcluded.filter(function(id) { return id; }) : null;
           // ITEMS THAT CROSS THE REGION'S EDGE (round 9 II, 1.78). In the sheet
           // recipe — one big canvas, one region per card — text that overflows
@@ -6690,7 +6765,7 @@ ${stillTime === undefined ? `  if (['png', 'jpg', 'webp', 'svg', 'pdf'].indexOf(
           // silently. A region cannot know which card an item belongs to, so it
           // cannot clip per card; it can name every item that is only partly
           // inside it, which is exactly the overflow in either direction.
-          const __rx = ${region.x}, __ry = ${region.y}, __rr = ${region.x + region.width}, __rb = ${region.y + region.height};
+          const __rx = ${regionSrc!.x}, __ry = ${regionSrc!.y}, __rr = ${regionSrc!.x + regionSrc!.width}, __rb = ${regionSrc!.y + regionSrc!.height};
           const crossing = [], coveringExcluded = [];
           if (app.itemRegistry && typeof app.itemRegistry.getAll === 'function') {
             app.itemRegistry.getAll().forEach(function(e) {
@@ -6706,7 +6781,13 @@ ${stillTime === undefined ? `  if (['png', 'jpg', 'webp', 'svg', 'pdf'].indexOf(
           }
           result = { success: true, platform, format: 'png', data: regionUrl, mimeType: 'image/png',
             size: Math.round(String(regionUrl).length * 0.75), dimensions: { width: rw, height: rh },
-            region: ${JSON.stringify({ x: region.x, y: region.y, width: region.width, height: region.height })} };
+            region: ${JSON.stringify({ x: region.x, y: region.y, width: region.width, height: region.height })}${regionSrc!.cropped ? `,
+            // A DIFFERENT OUTPUT ASPECT IS A CROP (REGION34). The studio grew the box to
+            // the output's aspect instead, drawing content from outside the region and
+            // black past the canvas edge. The server now trims the region about its
+            // centre to the output's aspect, so the studio is only asked to scale.
+            croppedTo: ${JSON.stringify({ x: regionSrc!.x, y: regionSrc!.y, width: regionSrc!.width, height: regionSrc!.height })},
+            cropNote: ${JSON.stringify('the output aspect differs from the region\'s, so the region was cropped about its centre to fit (croppedTo); nothing outside the region is drawn.')}` : ''} };
           if (__excluded && __excluded.length) {
             result.excludedItems = __excluded;
             result.excludedNote = 'centred outside this region, so treated as belonging to a neighbouring region and left out of this image.';
@@ -6868,7 +6949,9 @@ ${stillTime === undefined ? `  if (['png', 'jpg', 'webp', 'svg', 'pdf'].indexOf(
             ${encodeOptsJs.slice(2)},` : ''}
           });
           if (!stored || stored.ok === false) {
-            result = { success: false, platform, format, error: (stored && stored.reason) || 'the export store refused the export without saying why' };
+            result = { success: false, platform, format, error: (stored && stored.reason) || 'the export store refused the export without saying why',
+              // The studio's code for a refusal (audio_codec_unavailable, B45), for a caller to branch on.
+              ...(stored && typeof stored.code === 'string' ? { code: stored.code } : {}) };
           } else {
             let chunkBytes = 4 * 1024 * 1024;
             try {
@@ -6970,25 +7053,46 @@ ${stillTime === undefined ? `  if (['png', 'jpg', 'webp', 'svg', 'pdf'].indexOf(
           // pixel count, so the frame is shrunk by sqrt(budget / size) with a
           // margin and re-encoded, at most twice. Every attempt is reported.
           if (format === 'gif' && result && result.success && result.size > ${maxBytes}) {
-            const attempts = [{ width: dimensions.width, height: dimensions.height, bytes: result.size }];
-            let w = dimensions.width, h = dimensions.height;
-            for (let k = 0; k < 2 && result.success && result.size > ${maxBytes}; k++) {
-              const f = Math.sqrt(${maxBytes} / result.size) * 0.9;
-              w = Math.max(16, Math.round(w * f / 2) * 2); h = Math.max(16, Math.round(h * f / 2) * 2);
+            // THE FILE'S OWN SIZE, from its header (GIFMAX34). The first GIF comes from _quickExportVideo, which
+            // may not render at the canvas size, so shrinking "the canvas" could ask for a LARGER frame: a
+            // 20 kB budget turned a 74 kB GIF into a 170 kB one. Each attempt is measured, a retry never asks for
+            // more pixels than the file it replaces, and the smallest file wins.
+            const __gifDims = async (b) => {
+              try {
+                const a = new Uint8Array(await (asBlob(b) || b).slice(0, 10).arrayBuffer());
+                if (a[0] === 0x47 && a[1] === 0x49 && a[2] === 0x46) return { width: a[6] | (a[7] << 8), height: a[8] | (a[9] << 8) };
+              } catch (_) { /* the canvas size stands in */ }
+              return null;
+            };
+            const __d0 = (videoResult && videoResult.blob && await __gifDims(videoResult.blob)) || { width: dimensions.width, height: dimensions.height };
+            const attempts = [{ width: __d0.width, height: __d0.height, bytes: result.size }];
+            let best = result, bestDims = __d0;
+            let w = __d0.width, h = __d0.height;
+            for (let k = 0; k < 2 && best.size > ${maxBytes}; k++) {
+              const f = Math.sqrt(${maxBytes} / best.size) * 0.9;
+              w = Math.max(16, Math.min(bestDims.width - 2, Math.round(bestDims.width * f / 2) * 2));
+              h = Math.max(16, Math.min(bestDims.height - 2, Math.round(bestDims.height * f / 2) * 2));
               // videoExporter.export, not _quickExportVideo: the latter rebuilds
               // its settings without width / height, so a "smaller" retry
               // through it came out the same size.
               if (!app.exportEngine.videoExporter || typeof app.exportEngine.videoExporter.export !== 'function') break;
               const again = await app.exportEngine.videoExporter.export(Object.assign({}, baseVideoSettings, { format: 'gif', width: w, height: h }${gifLoop !== undefined ? `, { loop: ${JSON.stringify(gifLoop)} }` : ''}));
               if (!again) break;
-              result = await deliver(again);
-              attempts.push({ width: w, height: h, bytes: result.size });
+              const r2 = await deliver(again);
+              const d2 = (await __gifDims(again)) || { width: w, height: h };
+              attempts.push({ width: d2.width, height: d2.height, bytes: r2.size });
+              if (r2.success && r2.size < best.size) { best = r2; bestDims = d2; }
             }
+            result = best;
             result.budget = { maxBytes: ${maxBytes}, met: !!(result.success && result.size <= ${maxBytes}), attempts: attempts };
+            // The file delivered is said by its own size, met or not (GIFMAX34: a missed budget kept the
+            // requested dimensions in the reply).
+            if (result.success) result.dimensions = { width: bestDims.width, height: bestDims.height };
+            if (result.success && (bestDims.width !== dimensions.width || bestDims.height !== dimensions.height)) {
+              result.downscaled = { from: { width: dimensions.width, height: dimensions.height }, to: { width: bestDims.width, height: bestDims.height }, reason: bestDims === __d0 ? 'studio' : 'maxBytes' };
+            }
             if (result.success && result.size > ${maxBytes}) {
-              result.warning = 'still ' + result.size + ' bytes after shrinking to ' + w + 'x' + h + ' — over the ' + ${maxBytes} + '-byte budget. Lower fps, shorten duration, or use quality "draft".';
-            } else if (result.success) {
-              result.dimensions = { width: w, height: h };
+              result.warning = 'still ' + result.size + ' bytes at ' + bestDims.width + 'x' + bestDims.height + ', the smallest of ' + attempts.length + ' tries — over the ' + ${maxBytes} + '-byte budget. Lower fps, shorten duration, or use quality "draft".';
             }
           }` : ''}
         } else if (app.exportEngine && app.exportEngine.videoExporter) {
@@ -7125,6 +7229,13 @@ ${stillTime === undefined ? `  if (['png', 'jpg', 'webp', 'svg', 'pdf'].indexOf(
           // when present.
           const __pee = app.exportEngine;
           if ('lastPdfReport' in __pee) __pee.lastPdfReport = null;
+          // exportPDF does not evaluate the scene at the playhead as exportPNG
+          // does (relations, timed events), so the same engine step runs here,
+          // and what its timed events changed is put back after the page.
+          if (__stillT !== null && typeof __pee._evaluateStillAt === 'function') {
+            try { __pee._evaluateStillAt(__stillT); __pdfEvaluated = true; } catch (_) { /* the page renders either way */ }
+            if (typeof paper !== 'undefined' && paper.view && typeof paper.view.update === 'function') paper.view.update();
+          }
           const pdfOut = await app.exportEngine.exportPDF({
             dpi: ${pdfOpts?.dpi ?? 'settings.dpi'},
             download: false,${pdfOpts?.searchableText === false ? '\n            searchableText: false,' : ''}${pdfOpts?.paperFormat ? `\n            format: ${JSON.stringify(pdfOpts.paperFormat)},` : ''}${pdfOpts?.orientation ? `\n            orientation: ${JSON.stringify(pdfOpts.orientation)},` : ''}${pdfOpts?.bleed !== undefined ? `\n            includeBleed: ${pdfOpts.bleed > 0}, bleed: ${pdfOpts.bleed},` : ''}${pdfOpts?.trimMarks !== undefined ? `\n            trimMarks: ${pdfOpts.trimMarks},` : ''}
@@ -7160,7 +7271,8 @@ ${stillTime === undefined ? `  if (['png', 'jpg', 'webp', 'svg', 'pdf'].indexOf(
         result = { success: false, error: 'Unknown format: ' + format };
     }
   } catch (e) {
-    result = { success: false, error: (e && typeof e.message === 'string' && e.message) || (typeof e === 'string' && e) || ('the ' + format + ' export threw with no message'), platform, format };
+    result = { success: false, error: (e && typeof e.message === 'string' && e.message) || (typeof e === 'string' && e) || ('the ' + format + ' export threw with no message'), platform, format,
+      ...(e && typeof e.code === 'string' ? { code: e.code } : {}) };
   }
 
   // One site, after every branch has set its result: a successful export says
@@ -7485,8 +7597,12 @@ ${(() => {
       warning: `${frames} frames at ${Math.round(fps * 1000) / 1000} fps is ${actual.toFixed(3)} s — ${((actual - videoDuration) * 1000).toFixed(1)} ms over the ${videoDuration} s asked for. For a hard cap (e.g. a 6 s bumper) use duration ${fit.toFixed(4)} (${Math.floor(videoDuration * fps)} frames).`,
     })};\n`;
   })()}
+  if (__pdfEvaluated && typeof app._restoreReactionJournal === 'function') {
+    try { app._restoreReactionJournal(); } catch (_) { /* the page is already rendered */ }
+  }
   if (__stillT !== null) {
     try { app.setPlaybackTime(__prevT); } catch (_) { /* the still is already rendered */ }
+    if (__pausedForStill) { try { app.resumeKeyframeTimeline(); } catch (_) { /* the still is already rendered */ } }
     if (result && result.success) { result.time = __stillT; if (__stillTimeNote) result.stillTimeNote = __stillTimeNote; }
   }
   // SCREEN-SPACE ITEMS (FxTool D20): SVG and Lottie write geometry, not the
@@ -16482,8 +16598,19 @@ function generateContraptionCode(input: EventInput): string {
         return `${refuse('addContraption')}
   const contraptionId = app.addContraption(${jsLiteral(config)});
   const missing = ${jsLiteral(targets)}.filter((id) => !app.getItemById(id));
+  // AN EVENT'S NAME IS NOT ITS CHANNEL (DBLEXP33). A timed event and a pulse by eventId both fire the id create
+  // returned; a rule on the event's name ran only when that literal name was pulsed, so it stayed at fireCount 0
+  // with no word said. Named here, with the id to use.
+  const __src = ${jsLiteral(input.sourceEvent ?? '')};
+  const __named = (app.itemRegistry && app.itemRegistry.getAll ? app.itemRegistry.getAll() : [])
+    .filter((e) => e && e.item && e.item.data && e.item.data.isEvent && e.item.data.eventName === __src && (e.id || e.itemId) !== __src)
+    .map((e) => e.id || e.itemId);
+  const __warnings = [];
+  if (missing.length) __warnings.push('no item has the id ' + missing.join(', ') + ' yet: the rule does nothing to it until one does');
+  if (__named.length) __warnings.push('sourceEvent ' + JSON.stringify(__src) + ' is the NAME of event ' + __named.join(', ') + ': its timer and a pulse of its id fire ' + __named[0] + ', not the name, so this rule runs only when the literal name ' + JSON.stringify(__src) + ' is pulsed. Use sourceEvent ' + JSON.stringify(__named[0]) + ' to run it when that event fires.');
   return { success: true, action: 'add_contraption', contraptionId,
-    ...(missing.length ? { warning: 'no item has the id ' + missing.join(', ') + ' yet: the rule does nothing to it until one does' } : {}), };`;
+    ...(__named.length ? { eventIdForName: __named[0] } : {}),
+    ...(__warnings.length ? { warning: __warnings.join(' ') } : {}), };`;
       }
       case 'remove_contraption':
         return `${refuse('removeContraption')}
