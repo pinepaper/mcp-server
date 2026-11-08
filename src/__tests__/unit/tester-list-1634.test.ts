@@ -219,8 +219,21 @@ describe('the long-form relations have param lists, so unread params warn', () =
 
 describe('DBLEXP33: a rule bound to an event\'s name is named, with the id to use', () => {
   const code = codeGenerator.generateEvent({ action: 'add_contraption', sourceEvent: 'hide', actions: [{ type: 'setVariable', key: 'k', value: 1 }] } as never);
-  const run = (entries: unknown[]) => new Function('app', body(code.replace(/^\(function\(\)/m, '(async function()')).replace(/^\s*\(async function\(\)/m, 'return (async function()'))({
+  const run = (entries: unknown[], stored?: string) => new Function('app', body(code.replace(/^\(function\(\)/m, '(async function()')).replace(/^\s*\(async function\(\)/m, 'return (async function()'))({
     addContraption: () => 'c1', getItemById: () => ({}), itemRegistry: { getAll: () => entries },
+    ...(stored ? { listContraptions: () => [{ id: 'c1', sourceEvent: stored }] } : {}),
+  });
+
+  it('a studio that resolved the name (FxTool #346) is believed: no warning, and the id it chose', async () => {
+    const r = await run([{ id: 'item_3', item: { data: { isEvent: true, eventName: 'hide' } } }], 'item_3');
+    expect(r.warning).toBeUndefined();
+    expect(r.sourceEventResolvedTo).toBe('item_3');
+  });
+
+  it('a name two events share is ambiguous, and says so', async () => {
+    const two = [{ id: 'item_3', item: { data: { isEvent: true, eventName: 'hide' } } }, { id: 'item_4', item: { data: { isEvent: true, eventName: 'hide' } } }];
+    const r = await run(two, 'hide');
+    expect(r.warning).toContain('2 events are named "hide"');
   });
 
   it('warns when sourceEvent is an event name, and names the id', async () => {

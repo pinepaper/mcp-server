@@ -16609,11 +16609,17 @@ function generateContraptionCode(input: EventInput): string {
   const __named = (app.itemRegistry && app.itemRegistry.getAll ? app.itemRegistry.getAll() : [])
     .filter((e) => e && e.item && e.item.data && e.item.data.isEvent && e.item.data.eventName === __src && (e.id || e.itemId) !== __src)
     .map((e) => e.id || e.itemId);
+  // A studio that resolves a name held by one event to its id (FxTool #346) stores the id: read the rule back
+  // rather than trust a flag, so the warning is true on every build.
+  const __stored = typeof app.listContraptions === 'function'
+    ? (app.listContraptions() || []).find((c) => c && c.id === contraptionId) : null;
+  const __resolved = !!(__stored && __named.indexOf(__stored.sourceEvent) >= 0);
   const __warnings = [];
   if (missing.length) __warnings.push('no item has the id ' + missing.join(', ') + ' yet: the rule does nothing to it until one does');
-  if (__named.length) __warnings.push('sourceEvent ' + JSON.stringify(__src) + ' is the NAME of event ' + __named.join(', ') + ': its timer and a pulse of its id fire ' + __named[0] + ', not the name, so this rule runs only when the literal name ' + JSON.stringify(__src) + ' is pulsed. Use sourceEvent ' + JSON.stringify(__named[0]) + ' to run it when that event fires.');
+  if (__named.length > 1 && !__resolved) __warnings.push(__named.length + ' events are named ' + JSON.stringify(__src) + ' (' + __named.join(', ') + '), so the rule cannot tell which one: it runs only when the literal name is pulsed. Pass one eventId as sourceEvent.');
+  else if (__named.length && !__resolved) __warnings.push('sourceEvent ' + JSON.stringify(__src) + ' is the NAME of event ' + __named[0] + ': its timer and a pulse of its id fire ' + __named[0] + ', not the name, so this rule runs only when the literal name ' + JSON.stringify(__src) + ' is pulsed. Use sourceEvent ' + JSON.stringify(__named[0]) + ' to run it when that event fires.');
   return { success: true, action: 'add_contraption', contraptionId,
-    ...(__named.length ? { eventIdForName: __named[0] } : {}),
+    ...(__resolved ? { sourceEventResolvedTo: __stored.sourceEvent } : __named.length === 1 ? { eventIdForName: __named[0] } : {}),
     ...(__warnings.length ? { warning: __warnings.join(' ') } : {}), };`;
       }
       case 'remove_contraption':

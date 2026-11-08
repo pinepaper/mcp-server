@@ -336,10 +336,10 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 
 - Relation params a relation does not read are now named for the long-form relations
   too (`then`, `after`, `phase_wave`, `ring_forming`, `flock`, `on_complete`, `at_beat`,
-  `camera_tracks`, `soundtrack_cue`). For example, `flock` has no `duration`; use
-  `window`.
-- `add_contraption` warns when `sourceEvent` is an event's name: a timed event and a
-  pulse fire the event's id, so pass the `eventId` that `create` returned.
+  `camera_tracks`, `soundtrack_cue`), against the params the current studio declares.
+- `add_contraption` warns when `sourceEvent` is an event's name and the studio kept it as
+  a literal channel: a timed event and a pulse fire the event's id, so pass the `eventId`
+  that `create` returned. A studio that resolves the name says so in `sourceEventResolvedTo`.
 - An emitter `fade` other than `none`, `linear` or `{ in, out }` is named in a warning.
 - The relation docs say what `on_complete`, `at_beat` and `triggers_animation` do: reveal
   a hidden target and pulse an event. They don't re-time a track; use `then`. A rule's
