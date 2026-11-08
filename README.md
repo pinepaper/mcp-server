@@ -319,6 +319,10 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   ring slot or boid. It used to bind one relation per item, and every member took the
   first slot. `ring_forming` with no `center` or target centres on the members.
 - A PDF still honours `time` while the timeline is playing.
+- A PDF with `bleed` on a named paper size no longer warns that the bleed was dropped: it
+  is applied (the page is the sheet plus the bleed). The warning now covers trim marks only,
+  and only when the studio didn't draw them. The result's `print` record, where the studio
+  sends one, says what the page carries.
 - An export `region` whose output has a different shape is cropped about its centre.
   It used to draw content from outside the region, and black past the canvas edge. The
   reply's `croppedTo` says what was rendered.

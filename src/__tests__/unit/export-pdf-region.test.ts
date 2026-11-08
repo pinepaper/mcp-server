@@ -83,12 +83,25 @@ describe('jpg / webp stills (1.35)', () => {
 });
 
 describe('round 6 retest follow-ups', () => {
-  it('bleed / trimMarks on a named paper size come back as a warning with the working recipe', () => {
-    const code = codeGenerator.generateAgentExport({ format: 'pdf', pdf: { paperFormat: 'a4', bleed: 3, trimMarks: true } } as never);
-    expect(code).toContain("applies them only to paperFormat 'custom'");
-    expect(code).toContain("canvasPreset 'print-a4'");
-    const custom = codeGenerator.generateAgentExport({ format: 'pdf', pdf: { paperFormat: 'custom', bleed: 3, trimMarks: true } } as never);
-    expect(custom).not.toContain("applies them only to paperFormat 'custom'");
+  it('trim marks on a named sheet warn only when the file does not say it drew them; bleed alone never warns', async () => {
+    const pdfApp = (record?: Record<string, unknown>) => ({
+      canvasSize: { width: 800, height: 600 }, canvasEl: { style: {} },
+      exportEngine: { exportFidelity: () => ({ warnings: [] }),
+        exportPDF: async () => (record ? { blob: { size: 10, type: 'application/pdf', slice() { return this; } }, print: record } : { size: 10, type: 'application/pdf', slice() { return this; } }) },
+    });
+    class FR { result = 'data:application/pdf;base64,AA'; onloadend: (() => void) | null = null; readAsDataURL() { this.onloadend?.(); } }
+    const run = (pdf: Record<string, unknown>, record?: Record<string, unknown>) =>
+      new Function('app', 'FileReader', 'document', body(codeGenerator.generateAgentExport({ format: 'pdf', pdf } as never)))(pdfApp(record), FR, {});
+    // Bleed on a named sheet is applied (page = sheet + 2 x bleed): nothing to warn about.
+    expect((await run({ paperFormat: 'a4', bleed: 3 })).warnings).toBeUndefined();
+    // Marks on a named sheet, on a studio with no print record: warned.
+    expect(String((await run({ paperFormat: 'a4', bleed: 3, trimMarks: true })).warnings)).toContain("draws trim marks only with paperFormat 'custom'");
+    // A studio that says it drew them: no warning, and its record comes back.
+    const drawn = await run({ paperFormat: 'a4', trimMarks: true }, { trimMarksDrawn: true, bleedApplied: false });
+    expect(drawn.warnings).toBeUndefined();
+    expect(drawn.print).toMatchObject({ trimMarksDrawn: true });
+    // custom never warns.
+    expect((await run({ paperFormat: 'custom', bleed: 3, trimMarks: true })).warnings).toBeUndefined();
   });
 
   it('jpg flattens onto the scene background when one is set', async () => {

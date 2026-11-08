@@ -7256,11 +7256,15 @@ ${stillTime === undefined ? `  if (['png', 'jpg', 'webp', 'svg', 'pdf'].indexOf(
             // The record carries the page geometry the engine chose; it is the
             // only place a caller can learn it.
             ...(pdfOut && pdfOut.width ? { dimensions: { width: pdfOut.width, height: pdfOut.height } } : {}),
-            ...(pdfOut && pdfOut.format ? { paperFormat: pdfOut.format } : {}),${pdfOpts?.paperFormat && pdfOpts.paperFormat !== 'custom' && ((pdfOpts.bleed ?? 0) > 0 || pdfOpts.trimMarks) ? `
-            // Bleed and trim marks on a NAMED paper size: the studio keeps the
-            // page at that size and centres the art, so neither appears (prod
-            // retest: MediaBox = TrimBox = A4, no marks). Said, not silent.
-            warnings: [${JSON.stringify(`bleed / trimMarks were passed with paperFormat '${pdfOpts.paperFormat}', and this studio applies them only to paperFormat 'custom' (page = canvas + bleed): the page stayed ${pdfOpts.paperFormat} with no bleed and no marks. For print with bleed, size the canvas with a PRINT preset (agent_start_job canvasPreset 'print-a4' / 'print-letter' / 'print-a4-landscape' / 'print-letter-landscape', which carry 300 dpi — a plain 2480x3508 canvas is read at 96 dpi and comes out ~656 mm wide) and pass paperFormat 'custom'.`)}],` : ''}
+            ...(pdfOut && pdfOut.format ? { paperFormat: pdfOut.format } : {}),
+            // What the page carries for print (FxTool #347): marks drawn, bleed applied, page and trim boxes.
+            ...(pdfOut && pdfOut.print && typeof pdfOut.print === 'object' ? { print: pdfOut.print } : {}),${pdfOpts?.paperFormat && pdfOpts.paperFormat !== 'custom' && pdfOpts.trimMarks ? `
+            // TRIM MARKS ON A NAMED SHEET. Bleed is applied there (page = sheet + 2 x bleed, TrimBox = sheet), but
+            // a studio before FxTool #347 draws no marks on a named sheet. Said unless the file's own record
+            // says it drew them.
+            ...((pdfOut && pdfOut.print && pdfOut.print.trimMarksDrawn) || (__pee.lastPdfReport && __pee.lastPdfReport.trimMarksDrawn) ? {} : {
+              warnings: [${JSON.stringify(`trimMarks were passed with paperFormat '${pdfOpts.paperFormat}', and this studio draws trim marks only with paperFormat 'custom' (the page is the canvas plus bleed), so this page has none. Any bleed was applied. For marks, pass paperFormat 'custom' on a canvas sized by a print preset (canvasPreset 'print-a4' etc., 300 dpi).`)}],
+            }),` : ''}
           };
         } else {
           result = { success: false, error: 'PDF export failed' };
