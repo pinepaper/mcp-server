@@ -258,3 +258,47 @@ describe('visible at create is applied, not reported ignored', () => {
     expect(batch).toContain('item.visible = false;');
   });
 });
+
+describe('ONCOMP34: on_complete / at_beat with an event\'s name pulses that event\'s id', () => {
+  const ev = (id: string, name: string) => ({ id, item: { data: { isEvent: true, eventName: name } } });
+  const studio = (entries: unknown[]) => {
+    const bound: Array<Record<string, unknown>> = [];
+    const app = {
+      _isKnownRelationEndpoint: () => true, getItemById: (id: string) => (id.startsWith('item_') ? {} : null),
+      itemRegistry: { getAll: () => entries }, historyManager: { saveState() {} },
+      addRelation: (_s: unknown, _t: unknown, _r: unknown, p: Record<string, unknown>) => { bound.push(p); return true; },
+    };
+    return { app, bound };
+  };
+  const run = (relationType: string, params: Record<string, unknown>, entries: unknown[]) => {
+    const { app, bound } = studio(entries);
+    const code = codeGenerator.generateAddRelation({ sourceId: 'item_1', targetId: 'item_2', relationType, params } as never);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const r: any = new Function('app', 'return ' + code.replace(/^\/\/.*\n/, '').replace(/;\s*$/, ''))(app);
+    return { r, bound };
+  };
+
+  it('a name one event holds is bound as that event\'s id, and the reply says so', () => {
+    const { r, bound } = run('on_complete', { event: 'done' }, [ev('item_4', 'done')]);
+    expect(bound[0].event).toBe('item_4');
+    expect(r.eventResolvedTo).toBe('item_4');
+    expect(r.eventResolvedFrom).toBe('done');
+    expect(r.warning).toBeUndefined();
+  });
+
+  it('an id is left alone; so is a name no event holds', () => {
+    expect(run('on_complete', { event: 'item_4' }, [ev('item_4', 'done')]).bound[0].event).toBe('item_4');
+    expect(run('at_beat', { event: 'go', beat: 1 }, [ev('item_4', 'done')]).bound[0].event).toBe('go');
+  });
+
+  it('a name two events share is kept and named', () => {
+    const { r, bound } = run('at_beat', { event: 'done', beat: 2 }, [ev('item_4', 'done'), ev('item_5', 'done')]);
+    expect(bound[0].event).toBe('done');
+    expect(r.warning).toContain('2 events are named "done"');
+  });
+
+  it('other relations are not touched', () => {
+    const code = codeGenerator.generateAddRelation({ sourceId: 'item_1', targetId: 'item_2', relationType: 'on_event_set_visibility', params: { visible: false } } as never);
+    expect(code).not.toContain('eventResolvedTo');
+  });
+});

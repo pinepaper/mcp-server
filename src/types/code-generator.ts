@@ -1797,6 +1797,33 @@ export function animationOptionWarning(options: unknown): string | null {
 
 const VISIBILITY_REACTION = /^on_(event|enter|exit)_set_visibility$/;
 
+/** The relations that PULSE params.event (FxTool js/relations/triggers.js dispatchTrigger). */
+const EVENT_PULSING_RELATIONS: ReadonlySet<string> = new Set(['on_complete', 'at_beat']);
+
+/**
+ * ONCOMP34: AN EVENT'S NAME IS NOT ITS CHANNEL, here as in DBLEXP33. on_complete / at_beat pulse params.event
+ * verbatim, and a reaction listens on its source's id, so {event: 'done'} (the name of event item_4) pulsed a
+ * channel nothing listens on: bound, stored, no warning, never seen. A name exactly one event holds, and that no
+ * item has as its id, is put back as that event's id before the bind; a name two events share is named instead.
+ * Statements, run in the page; `paramsVar` is mutated in place and `__ev` holds the reply fields.
+ */
+function eventNameResolveJs(relationType: unknown, paramsVar: string): string {
+  if (!EVENT_PULSING_RELATIONS.has(String(relationType))) return 'const __ev = {};';
+  return `const __ev = {};
+  (function(p) {
+    if (!p || typeof p.event !== 'string' || !p.event || app.getItemById(p.event)) return;
+    const ids = (app.itemRegistry && app.itemRegistry.getAll ? app.itemRegistry.getAll() : [])
+      .filter(function(e) { return e && e.item && e.item.data && e.item.data.isEvent && e.item.data.eventName === p.event; })
+      .map(function(e) { return e.id || e.itemId; });
+    if (ids.length === 1) { __ev.eventResolvedFrom = p.event; __ev.eventResolvedTo = ids[0]; p.event = ids[0]; }
+    else if (ids.length > 1) __ev.warning = ids.length + ' events are named ' + JSON.stringify(p.event) + ' (' + ids.join(', ') + '), so params.event cannot say which one: it pulses the literal name, which no reaction bound to an event hears. Pass one event id as params.event.';
+  })(${paramsVar});`;
+}
+
+/** Spread into a reply after its own fields: the resolve fields, with an event warning joined onto any warning. */
+const EV_MERGE_JS = (replyVar: string, key = 'warning') => `Object.keys(__ev).forEach(function(k) { if (k !== 'warning') ${replyVar}[k] = __ev[k]; });
+  if (__ev.warning) ${replyVar}.${key} = ${replyVar}.${key} ? ${replyVar}.${key} + ' ' + __ev.warning : __ev.warning;`;
+
 /**
  * A visibility reaction reads params.visible and nothing else: absent means show. `value`, which the other set_*
  * reactions take, was ignored, so {value: false} SHOWED the item and a hide did nothing (issue #29 O4).
@@ -1830,13 +1857,17 @@ function generateAddRelationCode(
         + ' ' + (bad.length > 1 ? 'are not items' : 'is not an item') + ' on the canvas, so the relation would be stored and skipped every frame. Check the id (pinepaper_get_items lists them).' };
     }
   }
-  const success = app.addRelation(${jsLiteral(sourceId)}, ${jsLiteral(targetId)}, ${jsLiteral(relationType)}, ${JSON.stringify(params, null, 2)});
+  const __params = ${JSON.stringify(params, null, 2)};
+  ${eventNameResolveJs(relationType, '__params')}
+  const success = app.addRelation(${jsLiteral(sourceId)}, ${jsLiteral(targetId)}, ${jsLiteral(relationType)}, __params);
   if (!success) {
     const __why = ${relationRefusalReasonJs(jsLiteral(relationType))};
     return { success: false, relationType: ${jsLiteral(relationType)}, error: 'the studio refused the ' + ${jsLiteral(relationType)} + ' relation between ' + ${jsLiteral(sourceId)} + ' and ' + ${jsLiteral(targetId)} + (__why ? ': ' + __why : '.') };
   }
   app.historyManager.saveState();
-  return { success: true, sourceId: ${jsLiteral(sourceId)}, targetId: ${jsLiteral(targetId)}, relationType: ${jsLiteral(relationType)}${relationOptionFields(relationType, params, 'warning')} };
+  const __reply = { success: true, sourceId: ${jsLiteral(sourceId)}, targetId: ${jsLiteral(targetId)}, relationType: ${jsLiteral(relationType)}${relationOptionFields(relationType, params, 'warning')} };
+  ${EV_MERGE_JS('__reply')}
+  return __reply;
 })();
 `.trim();
 }
@@ -3975,8 +4006,8 @@ export class PinePaperCodeGenerator {
     // "item_2 → item_2" — a model reads that as the event wired to itself.
     if (validated.targetId) return code;
     return code
-      .replace(`return { success: true, sourceId: ${jsLiteral(validated.sourceId)}, targetId: ${jsLiteral(validated.sourceId)},`,
-        `return { success: true, sourceId: ${jsLiteral(validated.sourceId)}, targetId: null,`)
+      .replace(`const __reply = { success: true, sourceId: ${jsLiteral(validated.sourceId)}, targetId: ${jsLiteral(validated.sourceId)},`,
+        `const __reply = { success: true, sourceId: ${jsLiteral(validated.sourceId)}, targetId: null,`)
       .replace(`relation between ${validated.sourceId} and ${validated.sourceId}.`, `relation on ${validated.sourceId} (no target).`);
   }
 
@@ -4783,9 +4814,11 @@ results.error = 'refused ' + results.relationsRefused.length + ' relation(s): ' 
   const targetId = nameToId[${jsLiteral(target)}];
   if (sourceId && targetId) {
     const params = ${paramsStr};
+    ${eventNameResolveJs(type, 'params')}
     // A refused relation is not listed as made (owner rule 1).
     if (app.addRelation(sourceId, targetId, ${jsLiteral(type)}, params)) {
-      results.relations.push({ source: ${jsLiteral(source)}, target: ${jsLiteral(target)}, type: ${jsLiteral(type)} });
+      results.relations.push(Object.assign({ source: ${jsLiteral(source)}, target: ${jsLiteral(target)}, type: ${jsLiteral(type)} }, __ev.eventResolvedTo ? { eventResolvedFrom: __ev.eventResolvedFrom, eventResolvedTo: __ev.eventResolvedTo } : {}));
+      if (__ev.warning) (results.optionWarnings = results.optionWarnings || []).push(__ev.warning);
       const __o = { _: 0${relationOptionFields(type, params, 'warning')} };
       if (__o.warning) (results.optionWarnings = results.optionWarnings || []).push(__o.warning);
       if (__o.ignoredOptions) (results.ignoredOptions = results.ignoredOptions || []).push.apply(results.ignoredOptions, __o.ignoredOptions.map(function(k) { return 'relations[${relationIndex}].params.' + k; }));
@@ -5934,7 +5967,9 @@ const targetId = ${noTarget ? 'null' : tgtRef};
 const source = app.getItemById(sourceId);
 const target = ${noTarget ? 'null' : 'app.getItemById(targetId)'};
 if (!source) throw new Error('Source not found: ' + sourceId);
-${noTarget ? '' : "if (!target) throw new Error('Target not found: ' + targetId);\n"}const relationId = app.addRelation(source, target, ${JSON.stringify(String(op.relationType))}, ${relOpts});
+${noTarget ? '' : "if (!target) throw new Error('Target not found: ' + targetId);\n"}const __relOpts = ${relOpts};
+${eventNameResolveJs(op.relationType, '__relOpts')}
+const relationId = app.addRelation(source, target, ${JSON.stringify(String(op.relationType))}, __relOpts);
 // NOT BOUND IS NOT A SUCCESS (owner rule 1, B119). addRelation answers false
 // when it refuses — spring_follow "not loaded yet" — and this op returned
 // { relationId: false } with nothing marking it failed, so the batch said
@@ -5944,7 +5979,9 @@ if (!relationId) {
   return { success: false, relationId: false, sourceId, targetId, relationType: ${JSON.stringify(op.relationType)},
     error: 'the studio refused the ' + ${JSON.stringify(op.relationType)} + ' relation between ' + sourceId + ' and ' + targetId + ' — nothing was bound' + (__why ? ': ' + __why : '.') };
 }
-return { relationId, sourceId, targetId, relationType: ${JSON.stringify(String(op.relationType))}${relationOptionFields(op.relationType, op.relationOptions, 'warning')} };
+const __reply = { relationId, sourceId, targetId, relationType: ${JSON.stringify(String(op.relationType))}${relationOptionFields(op.relationType, op.relationOptions, 'warning')} };
+${EV_MERGE_JS('__reply')}
+return __reply;
 `;
 
       case 'delete':
