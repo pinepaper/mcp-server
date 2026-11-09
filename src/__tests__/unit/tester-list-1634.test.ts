@@ -200,10 +200,9 @@ describe('PHASEWAVE32 / RINGFORM33: a collection relation over a name pattern is
     expect(gen({ sourceId: 'disc-*', relationType: 'orbits', targetId: 'item_1' })).toContain('{ index: i, count: __members.length');
   });
 
-  it('a param the rule never reads is named (FLOCKDUR33: flock has no duration)', () => {
-    expect(gen({ sourceId: 'bird-*', relationType: 'flock', relationOptions: { duration: 4 } })).toContain('duration');
-    const code = gen({ sourceId: 'bird-*', relationType: 'flock', relationOptions: { duration: 4 } });
-    expect(code).toMatch(/ignoredOptions[^;]*duration/);
+  it('a param the rule never reads is named; flock reads duration and delay (FLOCKDUR33, FxTool #344)', () => {
+    expect(gen({ sourceId: 'bird-*', relationType: 'flock', relationOptions: { wobble: 4 } })).toMatch(/ignoredOptions[^;]*wobble/);
+    expect(gen({ sourceId: 'bird-*', relationType: 'flock', relationOptions: { duration: 4, delay: 1 } })).not.toMatch(/ignoredOptions[^;]*(duration|delay)/);
   });
 });
 
@@ -213,7 +212,7 @@ describe('the long-form relations have param lists, so unread params warn', () =
     for (const r of ['phase_wave', 'ring_forming', 'flock', 'on_complete', 'at_beat', 'camera_tracks', 'soundtrack_cue', 'then', 'after']) {
       expect(Object.keys(RELATION_PARAM_KEYS)).toContain(r);
     }
-    expect((RELATION_PARAM_KEYS as Record<string, readonly string[]>).flock).not.toContain('duration');
+    expect((RELATION_PARAM_KEYS as Record<string, readonly string[]>).flock).toEqual(expect.arrayContaining(['duration', 'delay']));
   });
 });
 

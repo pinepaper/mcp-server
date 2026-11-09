@@ -4,7 +4,7 @@
  * Name lists the engine owns and the tool surface must offer exactly. See
  * scripts/sync-engine-lists.mjs for why each is generated.
  *
- * Source: FxTool origin/main 64287c0b418d79a0be4d50ad6f70b0e76b4c2bdc
+ * Source: FxTool origin/main 26f2c2c91cbb49238d49e18c95dbcda1fccada08
  *   js/core/KeyframeInterpolator.js  sha256: 342034825a057d6d
  *   js/world3d/worlds.js  sha256: 0e0973f7587c06e1
  *   js/core/DesignMedia.js  sha256: ab07f330e4060cb7
@@ -13,9 +13,9 @@
  *   js/core/StyledScene.js  sha256: 550fd9b58b7f5d87
  *   js/core/Patterns.js  sha256: a04fe3805f4e9d4f
  *   js/relations/expr-to-ir.js  sha256: 4d92d2f42b3356e9
- *   js/RelationRegistry.js  sha256: e5e19b64708cf0c3
+ *   js/RelationRegistry.js  sha256: 726af3b7b4b0d594
  *   js/core/AnimationDriver.js  sha256: 6741a73f5f489355
- *   js/PinePaper.js  sha256: 37261f8ffe568226
+ *   js/PinePaper.js  sha256: bea241249578b285
  */
 
 /** 39 names: EASING_NAMES, the keys of the engine's easing table. Keyframes, masks, relations and the camera all resolve through it. */
@@ -260,7 +260,7 @@ export const RELATION_PARAM_KEYS: Readonly<Record<string, readonly string[]>> = 
   draws_figure: ['delay', 'duration', 'figure', 'loop'],
   driven_by: ['anchor', 'clamp', 'colorFrom', 'colorTo', 'multiplier', 'offset', 'signal', 'sourceProperty', 'targetProperty'],
   effect_: ['intensity', 'mode', 'offsetX', 'offsetY', 'padding', 'palette', 'radius', 'speed'],
-  flock: ['alignmentWeight', 'bounce', 'bounds', 'cohesionWeight', 'maxForce', 'maxSpeed', 'members', 'neighborDist', 'orient', 'seed', 'separationDist', 'separationWeight', 'speed', 'target', 'targetWeight'],
+  flock: ['alignmentWeight', 'bounce', 'bounds', 'cohesionWeight', 'delay', 'duration', 'maxForce', 'maxSpeed', 'members', 'neighborDist', 'orient', 'seed', 'separationDist', 'separationWeight', 'speed', 'target', 'targetWeight'],
   follows: ['delay', 'offset', 'signal', 'smoothing', 'startOnTarget'],
   geo_adjacent_to: ['offset', 'regionId', 'side', 'signal'],
   geo_centers_on: ['animate', 'duration', 'padding', 'regionId'],
