@@ -1529,6 +1529,28 @@ async function craftFrame(options: HandlerOptions): Promise<CraftBounds | undefi
   }
 }
 
+/**
+ * B136: Chromium draws a raster's smoothing 'low', 'medium' and 'high' the same, so a call asking for 'medium' or
+ * 'high' is applied and looks like 'low'. Said in the reply's JSON, since the docs alone left it silent. Any
+ * `smoothing` set to one of those words, at any depth (import, modify, create, batch ops); numeric smoothing
+ * (relations, chroma key) is another parameter and is left alone.
+ */
+export function smoothingLevelField(args: unknown): Record<string, string> {
+  const seen = new Set<string>();
+  const walk = (v: unknown, depth: number): void => {
+    if (depth > 6 || !v || typeof v !== 'object') return;
+    if (Array.isArray(v)) { v.forEach((x) => walk(x, depth + 1)); return; }
+    for (const [k, x] of Object.entries(v as Record<string, unknown>)) {
+      if (k === 'smoothing' && (x === 'medium' || x === 'high')) seen.add(x);
+      else walk(x, depth + 1);
+    }
+  };
+  walk(args, 0);
+  if (!seen.size) return {};
+  const asked = [...seen].map((x) => `'${x}'`).join(' and ');
+  return { smoothingNote: `smoothing ${asked} was applied, but Chromium draws 'low', 'medium' and 'high' the same, so it looks like 'low'. The visible choice is 'off' (nearest-neighbour, hard pixel edges) or not.` };
+}
+
 export async function executeOrGenerate(
   code: string,
   description: string,
@@ -2329,6 +2351,7 @@ export async function handleToolCall(
     ...(dropped.length ? { droppedArguments: dropped } : {}),
     ...(ignoredPaths.length ? { ignoredArguments: ignoredPaths } : {}),
     ...await renderingBuildField(toolName, args, result, options),
+    ...smoothingLevelField(args),
   });
   if (!folded) {
     const lines = [...(renamed.length ? [renamedArgumentsNote(renamed)] : []), ...(dropped.length ? [`Not sent to the studio, as its private state: ${dropped.join(', ')}.`] : [])];
