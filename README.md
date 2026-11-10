@@ -329,6 +329,9 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - A GIF with `maxBytes` reports the size of the file it delivers, read from the file, and
   never delivers a retry larger than the first file.
 - `morph_sequence` takes every easing the studio names, including back and elastic.
+- `on_complete` and `at_beat` with an event's name in `params.event` fire that event. The
+  name is resolved to the event's id (the reply's `eventResolvedTo`); a name two events
+  share is named in a warning. It used to bind without a word and never fire.
 - `visible: false` on create (and in a batch create) hides the item. It was reported as
   ignored and the item was drawn.
 - A refused export carries the studio's reason as `cause` (for example
