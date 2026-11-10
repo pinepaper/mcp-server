@@ -125,6 +125,8 @@ export const ACTION_CLASS: Readonly<Record<string, EffectClass>> = Object.freeze
   'pinepaper_event:get_variable': 'read-only',
   'pinepaper_event:increment_variable': 'unchecked',
   'pinepaper_event:bind_text': 'unchecked',
+  'pinepaper_event:clear_contraptions': 'unchecked', // rules and variables are outside the scene fingerprint
+  'pinepaper_event:clear_variables': 'unchecked',
   'pinepaper_lasso:activate': 'side-effect',
   'pinepaper_sound:define_instrument': 'unchecked',
   'pinepaper_sound:define_percussion': 'unchecked',

@@ -52,3 +52,10 @@ describe('effect classes', () => {
     expect(mut.length).toBeGreaterThan(50);
   });
 });
+
+describe('pinepaper_event clear_variables / clear_contraptions', () => {
+  it('are not fingerprinted: what they clear is outside the scene fingerprint, so a no-change flag would be false', () => {
+    expect(effectClass('pinepaper_event', 'clear_variables', false)).toBe('unchecked');
+    expect(effectClass('pinepaper_event', 'clear_contraptions', false)).toBe('unchecked');
+  });
+});
