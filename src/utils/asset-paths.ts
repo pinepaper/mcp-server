@@ -66,6 +66,6 @@ function outside(path: string, folder: string): { error: string } {
   if (!capabilityAllowed('localFiles')) return { error: capabilityRefusal('localFiles', `Importing "${path}"`) + ` (Files in the export folder, ${getExportDir()}, are read without it.)` };
   return {
     error: `"${path}" is outside the allowed folders (cwd, the export folder, PINEPAPER_ASSET_DIRS). `
-      + `Add its folder (${folder}) to PINEPAPER_ASSET_DIRS to import it.`,
+      + `Add its folder (${folder}) to PINEPAPER_ASSET_DIRS in the server's environment and restart the server to import it.`,
   };
 }

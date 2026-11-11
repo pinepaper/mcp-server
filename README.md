@@ -3113,7 +3113,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 | `PINEPAPER_PROXY` | Chrome `--proxy-server` value; also ignores certificate errors, for an intercepting proxy | unset |
 | `PINEPAPER_EXPORT_TIMEOUT` | Governor budget for an export run, in ms (raise `PINEPAPER_TIMEOUT` alongside it) | `300000` |
 | `PINEPAPER_GOVERNOR` | `off` runs code by raw eval — no governor report, no error codes, no seeded determinism | on |
-| `PINEPAPER_ASSET_DIRS` | Extra folders local image and media imports may read from, separated by `:` (`;` on Windows). The working directory and the export folder are always allowed | unset |
+| `PINEPAPER_ASSET_DIRS` | Extra folders local image and media imports may read from, separated by `:` (`;` on Windows). Read only with `PINEPAPER_ALLOW_LOCAL_FILES=1`, which also opens the working directory. The export folder is always readable | unset |
 | `PINEPAPER_ALLOW_PRIVATE_NETWORK` | `1` lets URL imports reach loopback, private and LAN addresses, for a local dev server. Cloud metadata addresses stay refused | unset |
 | `PINEPAPER_FFPROBE` | `off` skips the ffprobe check of a saved video export. Without `ffprobe` on `PATH` the check is skipped and the result says so | on |
 
