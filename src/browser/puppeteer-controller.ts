@@ -726,6 +726,10 @@ export class PinePaperBrowserController {
       try {
         const s = await this.lifecycleSession();
         if (!s || this.activity > 0) return;
+        // Clear focus emulation enabled by a prior thaw(): in headless Chrome,
+        // Page.setWebLifecycleState({ state: 'frozen' }) is a silent no-op while
+        // document.hasFocus() is pinned true, which broke the 2nd+ idle pause.
+        await s.send('Emulation.setFocusEmulationEnabled', { enabled: false });
         await s.send('Page.setWebLifecycleState', { state: 'frozen' });
         this.frozen = true;
       } catch {

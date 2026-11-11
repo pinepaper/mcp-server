@@ -8,7 +8,15 @@ import { PinePaperBrowserController } from '../../browser/puppeteer-controller.j
 
 function rig() {
   const sent: string[] = [];
-  const page = { createCDPSession: async () => ({ send: async (m: string, p?: { state?: string; enabled?: boolean }) => { sent.push(p?.state ? `${m}:${p.state}` : m); } }) };
+  const page = {
+    createCDPSession: async () => ({
+      send: async (m: string, p?: { state?: string; enabled?: boolean }) => {
+        if (p?.state !== undefined) sent.push(`${m}:${p.state}`);
+        else if (p?.enabled !== undefined) sent.push(`${m}:${p.enabled}`);
+        else sent.push(m);
+      },
+    }),
+  };
   const c = new PinePaperBrowserController();
   Object.assign(c as unknown as Record<string, unknown>, { page, isConnected: true });
   return { c, sent };
@@ -25,18 +33,34 @@ describe('idle pause', () => {
     expect(PinePaperBrowserController.idlePauseMs()).toBe(0);
   });
 
-  it('freezes after the idle time, and the next call thaws with focus emulation first', async () => {
-    process.env.PINEPAPER_IDLE_PAUSE_SECONDS = '0.05';
+  it('freezes repeatedly across multiple idle/thaw cycles by clearing focus emulation before each freeze', async () => {
+    process.env.PINEPAPER_IDLE_PAUSE_SECONDS = '0.04';
     const { c, sent } = rig();
     await c.beginActivity();
     c.endActivity();
-    await wait(120);
+    await wait(100);
     expect(c.isIdlePaused).toBe(true);
-    expect(sent).toEqual(['Page.setWebLifecycleState:frozen']);
+    expect(sent).toEqual([
+      'Emulation.setFocusEmulationEnabled:false',
+      'Page.setWebLifecycleState:frozen',
+    ]);
+
+    // First thaw enables focus emulation so rAF resumes
     await c.beginActivity();
     expect(c.isIdlePaused).toBe(false);
-    expect(sent.slice(1)).toEqual(['Page.setWebLifecycleState:active', 'Emulation.setFocusEmulationEnabled']);
+    expect(sent.slice(2)).toEqual([
+      'Page.setWebLifecycleState:active',
+      'Emulation.setFocusEmulationEnabled:true',
+    ]);
     c.endActivity();
+
+    // Second idle cycle MUST disable focus emulation again before freezing
+    await wait(100);
+    expect(c.isIdlePaused).toBe(true);
+    expect(sent.slice(4)).toEqual([
+      'Emulation.setFocusEmulationEnabled:false',
+      'Page.setWebLifecycleState:frozen',
+    ]);
     await c.disconnect();
   });
 
@@ -50,7 +74,10 @@ describe('idle pause', () => {
     expect(sent).toEqual([]);
     c.endActivity();
     await wait(100);
-    expect(sent).toEqual(['Page.setWebLifecycleState:frozen']);
+    expect(sent).toEqual([
+      'Emulation.setFocusEmulationEnabled:false',
+      'Page.setWebLifecycleState:frozen',
+    ]);
     await c.disconnect();
   });
 
