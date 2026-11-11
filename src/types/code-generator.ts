@@ -15810,7 +15810,8 @@ ${guard('renderSoundtrackWav')}
       }
 
       case 'create': {
-        const v = (input.visual ?? {}) as Record<string, unknown>;
+        // visual: false means no drawing options. The chip is editor-only, and no export draws it.
+        const v = (input.visual || {}) as Record<string, unknown>;
         const { startTime, duration, ...visualOnly } = v;
         const placement = (startTime !== undefined || duration !== undefined)
           ? { ...(startTime !== undefined ? { startTime } : {}), ...(duration !== undefined ? { duration } : {}) }

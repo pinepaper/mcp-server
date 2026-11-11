@@ -5528,16 +5528,16 @@ export const SoundInputSchema = z.object({
     preset: z.string().optional().describe("A named instrument, percussion or sfx instead of a spec — whatever the list_* actions report."),
     note: z.string().optional().describe("Pitch for a preset instrument, e.g. 'A4'."),
     duration: z.number().positive().optional().describe('Seconds this cue lasts.'),
-    visual: z.record(z.string(), z.unknown()).optional().describe('Per-cue waveform drawing options, as create takes them.'),
+    visual: z.union([z.record(z.string(), z.unknown()), z.literal(false)]).optional().describe('Per-cue waveform drawing options, as create takes them. false = no drawing options: the chip is editor-only and never drawn in an export.'),
   })).optional().describe('sequence: every cue in one call. Each is created and placed at its own t, so a music bed is ONE call rather than one per cue — a pilot spent 112 calls on a bed this expresses in a single array.'),
-  visual: z.object({
+  visual: z.union([z.literal(false), z.object({
     width: z.number().optional().describe('Waveform path width in canvas units (default 220).'),
     height: z.number().optional().describe('Waveform path height in canvas units (default 64).'),
     position: z.object({ x: z.number(), y: z.number() }).optional(),
     color: z.string().optional(),
     startTime: z.number().optional().describe('When the cue sounds, in seconds. Applied at create, so a cue is ONE call: this used to be stripped here and every sound needed a second set_placement, which turned 80 cues into 160 calls.'),
     duration: z.number().optional().describe('How long the cue lasts, in seconds. Applied at create alongside startTime.'),
-  }).optional().describe('create: how the waveform path is drawn, and when it sounds. The sound IS this item — edit the path and the timbre changes with it.'),
+  })]).optional().describe('create: how the waveform path is drawn, and when it sounds. false = no drawing options: the waveform chip is an editor affordance that no export draws, so there is nothing to turn off. The sound IS this item — edit the path and the timbre changes with it.'),
 })
   .refine((v) => v.action !== 'play_tone' || !!v.note, { message: 'play_tone requires note', path: ['note'] })
   .refine((v) => !['play_chord', 'chord_frequencies'].includes(v.action) || !!v.root, { message: 'this action requires root', path: ['root'] })

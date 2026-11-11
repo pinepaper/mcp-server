@@ -3136,7 +3136,7 @@ render_soundtrack mixes every placed sound to a WAV and writes it to a file. It 
         itemId: { type: 'string', description: 'timbre_from_path: the path whose shape becomes the timbre. set_placement / remove: the sound item.' },
         samples: { type: 'number', description: 'timbre_from_path: points sampled along the path (default 256).' },
         placement: { type: 'object', description: 'set_placement: where and when the sound sits on the timeline.' },
-        visual: { type: 'object', description: 'create: { width?, height?, position?, color? } for the waveform path.' },
+        visual: { anyOf: [{ type: 'object' }, { type: 'boolean', const: false }], description: 'create: { width?, height?, position?, color?, startTime?, duration? } for the waveform path. false = no drawing options: the waveform chip is an editor affordance that no export draws, so there is nothing to turn off.' },
       },
       required: ['action'],
     },
