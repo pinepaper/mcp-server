@@ -5822,7 +5822,7 @@ this tool, so a control cannot exist that an agent cannot set.`,
     description: `Undo/redo and history state inspection.
 
 ACTIONS:
-- undo: Undo last canvas action. Creates made in quick succession can share one step, so one undo may remove more than one item; check pinepaper_get_items after an undo, or delete_item a single item instead.
+- undo: Undo last canvas action. Creates and animations made in quick succession can share one step, so one undo may take back more than one item or track; check pinepaper_get_items after an undo, or delete_item / remove the single thing instead.
 - redo: Redo last undone action
 - get_state: Get history stack state (canUndo, canRedo, count)`,
     inputSchema: {
