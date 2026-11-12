@@ -9076,7 +9076,7 @@ PLAYBACK:
   play_timeline — {action: "play"|"stop"|"seek", duration, loop}
 
 COMPACT FORMS (they run as the long forms do, and cost a third as much to send on a dense scene):
-  create_many — {itemType, name, properties, items}: one create per item. properties is what they share; an item is [x, y] or {x, y, …what differs}. name is a prefix (name-0, name-1 …) unless an item names itself. Slow past a few hundred (2000 took about a minute).
+  create_many — {itemType, name, properties, items}: one create per item. properties is what they share; an item is [x, y] or {x, y, …what differs}. name is a prefix (name-0, name-1 …) unless an item names itself. A batch saves and draws once, so thousands are fast (2,000 in under a second); past about 5,000 similar marks, pinepaper_instances is one item instead of thousands.
   keys on keyframe_animate — {"time":[0,1,2],"x":[100,400,700],"y":[300,null,500],"easing":"easeOut"} in place of keyframes: one list per property, each as long as time; a null means that key does not set that property; easing is a name or a list with one per key. Evenly spaced keys: "time":{"step":0.033333,"count":180}.
 
 VARIABLE REFERENCES: "$0", "$1" etc. reference the items this batch makes, in op order: create and group ops each take the next number (a ring / grid / orbit / create_many that makes items takes one per item); no other op does. [create, create, group, …] makes the group "$2". Place the ops that make an item before any op that references it.
