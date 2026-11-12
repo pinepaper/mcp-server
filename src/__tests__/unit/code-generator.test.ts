@@ -59,9 +59,20 @@ describe('PinePaperCodeGenerator', () => {
       expect(code).toContain('y: 300');
     });
 
-    it('should include historyManager.saveState', () => {
+    it('should save history, debounced where the studio has it', () => {
       const code = codeGenerator.generateCreateItem(mockTextItem);
-      expect(code).toContain('app.historyManager.saveState()');
+      expect(code).toContain("app.historyManager[app.historyManager.saveStateDebounced ? 'saveStateDebounced' : 'saveState']();");
+    });
+
+    it('a create inside a batch is a bulk create, and the batch saves and draws once', () => {
+      const ops = [{ type: 'create', itemType: 'circle', position: { x: 1, y: 2 }, properties: { radius: 3 } }, { type: 'create', itemType: 'circle', position: { x: 5, y: 2 }, properties: { radius: 3 } }];
+      const code = codeGenerator.generateAgentBatchExecute({ operations: ops } as never);
+      expect(code.match(/_bulkCreate: true/g)?.length).toBe(2);
+      expect(code).toContain('__hm.beginBatch()');
+      expect(code).toContain('paper.view.draw()');
+      const bc = codeGenerator.generateBatchCreate({ items: [{ type: 'circle', params: { x: 1, y: 2, radius: 3 } }, { type: 'circle', params: { x: 4, y: 2, radius: 3 } }] } as never);
+      expect(bc.match(/_bulkCreate: true/g)?.length).toBe(2);
+      expect(bc.match(/historyManager[^;\n]*save/g)?.length).toBe(1);
     });
 
     it('accepts position as [x, y] array and normalizes to {x, y}', () => {

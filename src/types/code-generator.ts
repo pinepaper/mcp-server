@@ -753,7 +753,8 @@ const __scale = (function(it) {
 
   code += `
 const itemId = item.data.registryId;
-app.historyManager.saveState();
+// Debounced where the studio has it: a full snapshot per create made one-call-per-item building O(items) a call.
+app.historyManager[app.historyManager.saveStateDebounced ? 'saveStateDebounced' : 'saveState']();
 
 // Return item info
 ({ itemId, type: ${jsLiteral(itemType)}${outlineOnly ? `, fill: ${JSON.stringify(OUTLINE_NOTE)}` : ''}${textFit ? ', textFit: __textFit' : ''}${textDirection ? ', direction: __direction' : ''}${textTabular ? ', tabularFigures: __tabular' : ''}${textTypography.length ? ', typography: __typography' : ''}${createFillOpacity ? ', fillOpacity: __fillOpacity' : ''}${textStrokePos ? ', strokePosition: __strokePos' : ''}${hasCreateScale ? ', scale: __scale' : ''}, position: ${reportActualPosition ? `(item.position ? { x: item.position.x, y: item.position.y } : null)` : `{ x: ${position.x}, y: ${position.y} }`}${hasLifetime ? ', lifetime: __lifetime' : ''}${loadsFont ? ', ...(__font ? { font: __font } : {})' : ''}${ignored.length > 0
@@ -3469,6 +3470,16 @@ function asReturningBody(snippet: string): string {
  * out, and the batch saves once at the end, which is what batchCreate was
  * for. An item that fails is reported by index; the rest are still created.
  */
+/**
+ * A create inside a batch skips the engine's per-item select, snapshot and redraw (`_bulkCreate`, the template
+ * loader's path); the batch saves and draws once at the end. A governed run gets this from the engine already, but a
+ * batch over the governor's size limit runs ungoverned, and there every create redrew the whole scene: 400 creates
+ * on 2,000 items spent 2 of 5 s in full redraws.
+ */
+function asBulkCreate(code: string): string {
+  return code.replace(/(const item = app\.create\((?:\x22[^\x22\n]*\x22|\x27[^\x27\n]*\x27), )\{/g, '$1{ _bulkCreate: true, ');
+}
+
 function generateBatchCreateCode(items: BatchCreateItem[]): string {
   const blocks = items.map((it, i) => {
     const { x, y, position, ...props } = (it.params || {}) as Record<string, unknown>;
@@ -3476,8 +3487,8 @@ function generateBatchCreateCode(items: BatchCreateItem[]): string {
       : (position && typeof position === 'object') ? { x: Number((position as { x: unknown }).x), y: Number((position as { y: unknown }).y) }
         : { x: typeof x === 'number' ? x : 400, y: typeof y === 'number' ? y : 300 };
     const given = position !== undefined || typeof x === 'number' || typeof y === 'number';
-    const body = asReturningBody(generateCreateItemCode(it.type as ItemType, p, props, undefined, given))
-      .replace(/app\.historyManager\.saveState\(\);/g, '');
+    const body = asBulkCreate(asReturningBody(generateCreateItemCode(it.type as ItemType, p, props, undefined, given)))
+      .replace(/app\.historyManager(?:\.saveState\(\)|\[app\.historyManager\.saveStateDebounced \? 'saveStateDebounced' : 'saveState'\]\(\));/g, '');
     return `
   try {
     const r${i} = await (async function() {
@@ -3494,6 +3505,8 @@ ${body}
   const errors = [];
 ${blocks.join('\n')}
   if (app.historyManager) app.historyManager.saveState();
+  // Bulk creates skipped their redraws: one for the batch.
+  try { if (typeof paper !== 'undefined' && paper.view) paper.view.draw(); } catch (_) { /* the frame loop draws */ }
   return { success: errors.length === 0, items: results, count: results.length, errors: errors };
 })();`.trim();
 }
@@ -5651,6 +5664,18 @@ throw new Error('Unknown diagram mode action: ' + ${jsLiteral(action)});
   };
   // Every failed op as { step, itemId, reason }, beside the per-op results.
   const _failures = () => results.filter((r) => !r.success).map((r) => ({ step: r.step, itemId: r.itemId, reason: r.reason }));
+  // ONE UNDO SNAPSHOT FOR THE BATCH, NOT ONE PER OP. Each create saved a full-project snapshot
+  // (exportJSON), so a batch on a big scene cost O(items) per op: 200 creates on 2,000 items took
+  // 14 s against 0.76 s for the bare creates. History batch mode skips the per-op saves; the batch
+  // saves once at the end, as it always did.
+  const __hm = app.historyManager && app.historyManager.beginBatch ? app.historyManager : null;
+  if (__hm) __hm.beginBatch();
+  let __hmOpen = !!__hm;
+  const __hmEnd = () => {
+    if (__hmOpen) { __hmOpen = false; __hm.endBatch(false); }
+    // Bulk creates skipped their redraws: one for the batch.
+    try { if (typeof paper !== 'undefined' && paper.view) paper.view.draw(); } catch (_) { /* the frame loop draws */ }
+  };
 
   try {
 `;
@@ -5711,6 +5736,7 @@ throw new Error('Unknown diagram mode action: ' + ${jsLiteral(action)});
 
     code += `
     // Save state
+    __hmEnd();
     if (app.historyManager) app.historyManager.saveState();
 
     const _cs = app.getCanvasSize ? app.getCanvasSize() : { width: 800, height: 600 };
@@ -5727,6 +5753,7 @@ throw new Error('Unknown diagram mode action: ' + ${jsLiteral(action)});
       ...(_failed.length ? { error: _failed.map((r) => 'op ' + r.index + ': ' + r.error).join('; '), failures: _failures() } : {}),
       canvasSize: { width: _cs.width || 800, height: _cs.height || 600 }, ...((function () { const l = __ppLintNow(); return l.length ? { __ppLint: l } : {}; })()) };
   } catch (e) {
+    __hmEnd();
     // A batch that created nothing keeps the previous batch's ids on record.
     if (typeof window !== 'undefined' && itemIds.length) {
       window.__pinepaper_batch_item_ids = itemIds;
@@ -5792,7 +5819,7 @@ throw new Error('Unknown diagram mode action: ' + ${jsLiteral(action)});
         const createProps = withRadiusAxes(opProps);
         const opBrand = { ...opProps };
         delete opProps.noBrand;
-        const returning = asReturningBody(withBrandDefaults(generateCreateItemCode(op.itemType as ItemType, pos, { ...opProps }, undefined, op.position !== undefined || typeof anyOp.x === 'number' || typeof anyOp.y === 'number'), op.itemType as string, opBrand));
+        const returning = asBulkCreate(asReturningBody(withBrandDefaults(generateCreateItemCode(op.itemType as ItemType, pos, { ...opProps }, undefined, op.position !== undefined || typeof anyOp.x === 'number' || typeof anyOp.y === 'number'), op.itemType as string, opBrand)));
         let createCode = `${hasItemSetters(opSetters) ? `\n${itemSettersPreflightJs(opSetters)}` : ''}
 const __created = await (async function() {
 ${returning}
