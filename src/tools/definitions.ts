@@ -5823,7 +5823,7 @@ this tool, so a control cannot exist that an agent cannot set.`,
     description: `Undo/redo and history state inspection.
 
 ACTIONS:
-- undo: Undo last canvas action. Creates and animations made in quick succession can share one step, so one undo may take back more than one item or track; check pinepaper_get_items after an undo, or delete_item / remove the single thing instead.
+- undo: Undo last canvas action. Creates and animations made in quick succession can share one step, so one undo may take back more than one item or track; check pinepaper_get_items after an undo, or delete_item / remove the single thing instead. On a very large scene the studio may stop taking undo steps (and stop saving the session) rather than run out of memory; the reply's receipts say so (history_snapshot_skipped, session_not_saved), and undo then cannot go back past that point.
 - redo: Redo last undone action
 - get_state: Get history stack state (canUndo, canRedo, count)`,
     inputSchema: {
