@@ -312,6 +312,14 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 
 ## What's new in 1.6.36
 
+### New
+
+- `pinepaper_instances`: thousands to a million similar marks (a crowd, a swarm, a
+  starfield, rain) as one item instead of one item per mark. `rules` lists the motion rules,
+  layouts and shapes the studio has; `create`, `modify` and `describe` take and report the
+  swarm. The reply says how many marks are drawn, so a studio that draws a subset of a very
+  large swarm says so. Past about 5,000 similar marks, use this instead of separate items.
+
 ### Fixed
 
 - Building a big scene in batches no longer slows down as it grows. A batch saves one undo
