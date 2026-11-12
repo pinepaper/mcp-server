@@ -235,6 +235,7 @@ import {
   SoundInput,
   InterchangeInput,
   StickInput,
+  InstancesInput,
   StoryInput,
   ChromaKeyInput,
   RiggingInput,
@@ -15418,6 +15419,65 @@ ${needWorld}
    * reassembled into it. Naming them individually is the point: the kit's
    * options were discoverable only by reading FxTool's source.
    */
+  /**
+   * pinepaper_instances — a swarm of up to a million marks as one item. Every field passes through to the
+   * engine, which validates it and names a bad one; the reply carries describeInstances, so a subsampled or
+   * capped swarm says so (drawn vs count) in the call that made it.
+   */
+  generateInstances(input: InstancesInput): string {
+    const S = (v: unknown) => JSON.stringify(v);
+    const { action, itemId, name, ...rest } = input;
+    const spec: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(rest)) if (v !== undefined) spec[k] = v;
+    const refuse = (m: string) => `if (typeof app.${m} !== 'function') { return { success: false, error: 'this studio has no instances (app.${m}): update PinePaper Studio' }; }`;
+    const why = `(app.lastReceipt && Array.isArray(app.lastReceipt.warnings) && app.lastReceipt.warnings.map(function (w) { return w && (w.message || w.reason); }).filter(Boolean).join(' ')) || ''`;
+    switch (action) {
+      case 'rules':
+        return `
+// Instances: the rules, layouts and shapes this studio has
+(function() {
+  // @engine-methods instanceRules
+  ${refuse('instanceRules')}
+  return Object.assign({ success: true }, app.instanceRules());
+})();`.trim();
+      case 'describe':
+        return `
+// Instances: describe ${oneLine(itemId ?? '')}
+(function() {
+  // @engine-methods describeInstances
+  ${refuse('describeInstances')}
+  const d = app.describeInstances(${S(itemId)});
+  if (!d || d.ok === false) { return { success: false, error: (d && (d.error || d.reason)) || 'no swarm has the id ' + ${S(itemId)} }; }
+  return Object.assign({ success: true, itemId: ${S(itemId)} }, d);
+})();`.trim();
+      case 'modify':
+        return `
+// Instances: modify ${oneLine(itemId ?? '')}
+(function() {
+  // @engine-methods setInstances describeInstances
+  ${refuse('setInstances')}
+  const r = app.setInstances(${S(itemId)}, ${S(spec)});
+  if (!r || r.ok === false) { return { success: false, error: (r && (r.error || r.reason)) || ${why} || 'the swarm was not changed' }; }
+  const d = app.describeInstances(${S(itemId)}) || {};
+  return { success: true, itemId: ${S(itemId)}, spec: r.spec, count: d.count, drawn: d.drawn, subsampled: d.subsampled, path: d.path, determinism: d.determinism };
+})();`.trim();
+      case 'create':
+      default:
+        return `
+// Instances: create a swarm${spec.count ? ` of ${oneLine(String(spec.count))}` : ''}
+(function() {
+  // @engine-methods describeInstances
+  ${refuse('describeInstances')}
+  const item = app.create('instances', ${S(spec)});
+  if (!item) { return { success: false, error: ${why} || 'the studio made no swarm from that spec' }; }
+  const itemId = item.data && (item.data.registryId || item.data.id);${name ? `
+  try { item.name = ${S(name)}; } catch (_) {}` : ''}
+  const d = app.describeInstances(itemId) || {};
+  return { success: true, itemId: itemId, count: d.count, drawn: d.drawn, subsampled: d.subsampled, path: d.path, rule: d.rule, determinism: d.determinism };
+})();`.trim();
+    }
+  }
+
   generateStick(input: StickInput): string {
     const S = (v: unknown) => JSON.stringify(v);
     const { action, ...rest } = input;

@@ -656,6 +656,10 @@
       "description": "Particles as a saved, deterministic item (cloud-safe). action: create|set {spec: bursts[{t,x,y,count}] | target+rate (trail), shape, palette, speed, gravity…}."
     },
     {
+      "name": "pinepaper_instances",
+      "description": "Thousands to a million similar marks as ONE item (swarm, starfield, rain, crowd). {action: rules|create|modify|describe, count, seed, palette, size, shape, init{layout}, motion{rule}}"
+    },
+    {
       "name": "pinepaper_render_hook",
       "description": "Per-frame drawing saved as source (survives save/load). action: register {id, source \"(ctx,t,info)=>{}\", layer}|unregister|list."
     },

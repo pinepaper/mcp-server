@@ -162,6 +162,8 @@ export const ACTION_CLASS: Readonly<Record<string, EffectClass>> = Object.freeze
   'pinepaper_flip:record': 'side-effect',          // snapshots the before-state only
   'pinepaper_path:set_locked': 'unchecked',        // a lock flag the fingerprint does not read
   'pinepaper_path:unlock_all': 'unchecked',
+  'pinepaper_instances:rules': 'read-only',
+  'pinepaper_instances:modify': 'unchecked',   // the swarm's spec lives in its data, outside the fingerprint
 });
 
 const READ_ONLY_ACTION = /^(list|get|describe|query|analyze|validate|check|resolve|catalogue|status|state|info|preview|estimate|lint|coverage|find|choose|node_types|from_text|chord_frequencies|timbre_from_path|lineage|dependents|history|version|hit_test|is_empty|source_info)(_|$)/;

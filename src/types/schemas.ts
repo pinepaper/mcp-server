@@ -5425,6 +5425,30 @@ export const StickInputSchema = z.object({
 export type StickInput = z.infer<typeof StickInputSchema>;
 
 /**
+ * pinepaper_instances — thousands to a million similar marks as ONE item (FxTool instances, Phase 1).
+ *
+ * The motion rules, layouts and shapes are the engine's (app.instanceRules()); this schema keeps
+ * `init` and `motion` open so a new rule needs no server release, and the engine refuses an
+ * unknown one by name with its list.
+ */
+export const InstancesInputSchema = z.object({
+  action: z.enum(['create', 'modify', 'describe', 'rules']).describe("'create' a swarm · 'modify' its spec (motion and init merge field by field) · 'describe' what it holds and how it draws · 'rules' the motion rules, layouts and shapes this studio has"),
+  itemId: z.string().optional().describe('modify / describe: the swarm item.'),
+  x: z.number().optional(), y: z.number().optional(),
+  count: z.number().int().positive().max(1_000_000).optional().describe('How many marks (up to 1,000,000).'),
+  seed: z.number().int().optional().describe('Seed for layout, colour and size: the same seed is the same swarm.'),
+  palette: z.array(z.string()).max(16).optional().describe('Up to 16 colours.'),
+  size: z.union([z.number(), z.tuple([z.number(), z.number()])]).optional().describe('Mark size in px (0.25-64), or [min, max].'),
+  shape: z.string().optional().describe("Mark shape, e.g. 'dot' or 'square' (rules lists them)."),
+  colorMode: z.enum(['random', 'gradient']).optional(),
+  opacity: z.number().min(0).max(1).optional(),
+  init: z.record(z.string(), z.unknown()).optional().describe('Where the marks start: { layout, width, height, radius, thickness, length, angle }. Layouts come from rules.'),
+  motion: z.record(z.string(), z.unknown()).optional().describe('How they move: { rule, ...params }. Rules and their params come from rules.'),
+  name: z.string().optional(),
+}).refine((v) => v.action === 'create' || v.action === 'rules' || !!v.itemId, { message: 'modify and describe need itemId', path: ['itemId'] });
+export type InstancesInput = z.infer<typeof InstancesInputSchema>;
+
+/**
  * pinepaper_story — a piece of prose becomes a scene.
  *
  * `distill` reduces an article to its beats WITHOUT drawing anything, which is

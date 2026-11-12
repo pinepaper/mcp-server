@@ -90,6 +90,7 @@ import {
   SoundInputSchema,
   InterchangeInputSchema,
   StickInputSchema,
+  InstancesInputSchema,
   DesignSystemInputSchema,
   StoryInputSchema,
   ChromaKeyInputSchema,
@@ -2972,6 +2973,11 @@ async function handleToolCallInner(
       case 'pinepaper_morph_sequence': {
         const input = MorphSequenceInputSchema.parse(args);
         return executeOrGenerate(codeGenerator.generateMorphSequence(input), `Morph sequence: ${input.states.length} states`, options, 'pinepaper_morph_sequence');
+      }
+
+      case 'pinepaper_instances': {
+        const input = InstancesInputSchema.parse(args);
+        return executeOrGenerate(codeGenerator.generateInstances(input), `Instances: ${input.action}`, options, 'pinepaper_instances');
       }
 
       case 'pinepaper_emitter': {

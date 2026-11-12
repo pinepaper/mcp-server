@@ -173,6 +173,7 @@ export const MINIMAL_DESCRIPTIONS: Record<string, string> = {
   pinepaper_look: "Restyle an item / subtree / the scene as a look (8-bit, blueprint, ink sketch…). action: list|describe (fidelity!)|apply {look, target}|remove|get|grid.",
   pinepaper_original_character: 'Original characters from a base (person|robot|cat|bird|blob) + variant. action: bases|describe (read first)|random {base, seed}|create {base, variant, at}.',
   pinepaper_morph_sequence: 'One element through N states, no cuts: {itemId, states:[{at, to | shape}], camera?: true (rides the morphs), sound?: true}.',
+  pinepaper_instances: "Thousands to a million similar marks as ONE item (swarm, starfield, rain, crowd). {action: rules|create|modify|describe, count, seed, palette, size, shape, init{layout}, motion{rule}}",
   pinepaper_emitter: "Particles as a saved, deterministic item (cloud-safe). action: create|set {spec: bursts[{t,x,y,count}] | target+rate (trail), shape, palette, speed, gravity…}.",
   pinepaper_render_hook: 'Per-frame drawing saved as source (survives save/load). action: register {id, source "(ctx,t,info)=>{}", layer}|unregister|list.',
   pinepaper_choreograph: 'Acting for any item: beats [{at, verb: pop|drop|hop|bounce|roll|fly|peek|shake|squash|enter|exit, to?}] → squash-and-stretch track; sound:true adds SFX on the action.',

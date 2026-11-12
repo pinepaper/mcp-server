@@ -30,7 +30,7 @@
 
 PinePaper MCP Server enables AI assistants to create and animate graphics in [PinePaper Studio](https://pinepaper.studio) via the Model Context Protocol (MCP). Works with any AI that supports MCP tool calling (Claude, GPT, Gemini, local models, etc.).
 
-The server exposes **178 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
+The server exposes **179 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
 
 - Create geometric shapes, text collages, diagrams, and data charts
 - Apply 37+ character-level text effects and 28+ vertex deformation presets
@@ -41,7 +41,7 @@ The server exposes **178 tools** across drawing, animation, diagrams, maps, typo
 
 ## Running it: local or hosted
 
-**Local is free and complete.** Every one of the 178 tools works when you run
+**Local is free and complete.** Every one of the 179 tools works when you run
 this server yourself. There is no reduced tier and nothing held back.
 
 What it needs:
@@ -844,7 +844,7 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   the context of the previous default, with every craft tool the server
   recommends. Other tools load when needed with `pinepaper_set_toolkit`
   `{"load": ["map"]}` (a group) or a tool's name, and the list updates at
-  once. Claude Desktop, Cursor and Windsurf used to get all 178 tools.
+  once. Claude Desktop, Cursor and Windsurf used to get every tool.
   `PINEPAPER_TOOLKIT=agent` or `full` restores a larger list.
 - Exports are saved to `~/Downloads/PinePaper` instead of a temporary folder,
   so Desktop users can find them (`PINEPAPER_EXPORT_DIR` still overrides it,
@@ -2401,7 +2401,7 @@ Fourteen new tools (121 → 135) and new actions across the surface — the rele
 
 ## Toolkits & Token Budget
 
-178 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
+179 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
 
 **Toolkit profiles** (`PINEPAPER_TOOLKIT`):
 
@@ -2599,7 +2599,7 @@ Generate instruction/code pairs for LLM fine-tuning:
 
 ## Tools Reference
 
-All 178 tools, grouped by the tag used for toolkit filtering.
+All 179 tools, grouped by the tag used for toolkit filtering.
 
 ### Canvas (`canvas`)
 | Tool | Description |
@@ -2717,6 +2717,7 @@ All 178 tools, grouped by the tag used for toolkit filtering.
 | `pinepaper_original_character` | Original characters from a base rig and a variant; a cast from seeds |
 | `pinepaper_morph_sequence` | One element through many states, with the camera riding the morphs |
 | `pinepaper_emitter` | Particles as a saved, deterministic item: bursts and trails |
+| `pinepaper_instances` | Thousands to a million similar marks as one item: swarms, starfields, rain |
 | `pinepaper_render_hook` | Custom per-frame drawing a saved scene carries |
 | `pinepaper_text_effect` | 37 character-level text animations; replaces the text with one keyframed item per character |
 | `pinepaper_add_filter` | Add an image filter |

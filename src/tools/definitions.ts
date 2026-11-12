@@ -74,6 +74,7 @@ const DOORS: Door[] = [
   { when: 'A painted, stitched, hatched, inked or cut-paper look on shapes or photos', doors: [{ tool: 'pinepaper_design_medium', text: 'pinepaper_design_medium' }, { tool: 'pinepaper_image_filter', text: 'photos also pinepaper_image_filter (watercolor, painterly)' }] },
   { when: 'A brand', doors: [{ tool: 'pinepaper_brand_kit', text: 'pinepaper_brand_kit set (first): every item made afterwards inherits it' }] },
   { when: 'Sound and music', doors: [{ tool: 'pinepaper_sound', text: 'pinepaper_sound' }, { tool: 'pinepaper_audio_beats', text: 'pinepaper_audio_beats' }, { tool: 'pinepaper_beat_cuts', text: 'pinepaper_beat_cuts' }] },
+  { when: 'Thousands to a million similar marks (a crowd, swarm, starfield, rain, sand, a confetti field)', doors: [{ tool: 'pinepaper_instances', text: 'pinepaper_instances (rules first): one item, not one per mark' }] },
   { when: 'Particles that must survive save, export and the cloud (confetti bursts, a trail), or custom per-frame drawing', doors: [{ tool: 'pinepaper_emitter', text: 'pinepaper_emitter' }, { tool: 'pinepaper_render_hook', text: 'custom drawing: pinepaper_render_hook' }] },
   { when: 'A camera move through the piece, or 3D', doors: [{ tool: 'pinepaper_camera_director', text: 'pinepaper_camera_director' }, { tool: 'pinepaper_world3d', text: '3D: pinepaper_world3d' }, { tool: 'pinepaper_relight', text: 'pinepaper_relight' }] },
 ];
@@ -8325,6 +8326,46 @@ EXAMPLE — confetti at 2 s:
         spec: { type: 'object', additionalProperties: true, description: 'create: the whole spec; set: the keys to change' },
       },
       required: ['action', 'spec'],
+    },
+  },
+  {
+    name: 'pinepaper_instances',
+    annotations: {
+      title: 'Instances (swarms)',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: `Thousands to a million similar marks as ONE item: a crowd, a swarm, a starfield, rain, sand, a confetti field. Reach for it past about 5,000 similar marks; ordinary items cost memory and time per item, and this costs one item. For bursts that are born and die, use pinepaper_emitter.
+
+ACTIONS:
+- rules: the motion rules (with their params and determinism), layouts and shapes this studio has. Read it before create; the lists are the studio's, not a copy.
+- create: { count, seed?, palette? (up to 16), size? (px or [min, max]), shape?, colorMode? ('random' | 'gradient'), opacity?, x?, y?, init?: { layout, width?, height?, radius?, thickness?, length?, angle? }, motion?: { rule, ...params } } → { itemId, count, drawn, subsampled, path, rule, determinism }.
+- modify: { itemId, ...the fields to change } — motion and init merge field by field.
+- describe: { itemId } → its spec, count, drawn, path and determinism.
+
+WHAT THE REPLY TELLS YOU: drawn is how many marks are actually drawn. When the studio draws a subset (a cap for its drawing path), drawn is less than count and subsampled is true: the same marks every frame, and the receipt says so. determinism.scope 'everywhere' means two exports anywhere give the same file; a rule whose scope is narrower says so in rules and in the export receipt.
+
+A rule, layout or shape the studio does not have is refused by name with its list.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['create', 'modify', 'describe', 'rules'], description: "'create' a swarm · 'modify' its spec · 'describe' it · 'rules' what this studio offers" },
+        itemId: { type: 'string', description: 'modify / describe: the swarm item.' },
+        x: { type: 'number' }, y: { type: 'number' },
+        count: { type: 'integer', minimum: 1, maximum: 1000000, description: 'How many marks (up to 1,000,000).' },
+        seed: { type: 'integer', description: 'The same seed is the same swarm.' },
+        palette: { type: 'array', items: { type: 'string' }, maxItems: 16, description: 'Up to 16 colours.' },
+        size: { anyOf: [{ type: 'number' }, { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2 }], description: 'Mark size in px (0.25-64), or [min, max].' },
+        shape: { type: 'string', description: "e.g. 'dot' or 'square'; rules lists them." },
+        colorMode: { type: 'string', enum: ['random', 'gradient'] },
+        opacity: { type: 'number', minimum: 0, maximum: 1 },
+        init: { type: 'object', additionalProperties: true, description: 'Where the marks start: { layout, width, height, radius, thickness, length, angle }. Layouts come from rules.' },
+        motion: { type: 'object', additionalProperties: true, description: 'How they move: { rule, ...params }. Rules and their params come from rules.' },
+        name: { type: 'string' },
+      },
+      required: ['action'],
     },
   },
   {

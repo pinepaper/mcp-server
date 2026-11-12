@@ -33,7 +33,7 @@ export const CRAFT_TOOLS: readonly string[] = [
   'pinepaper_original_character', 'pinepaper_character', 'pinepaper_stick', 'pinepaper_rigging', 'pinepaper_deform',
   'pinepaper_choreograph', 'pinepaper_morph_sequence', 'pinepaper_text_style', 'pinepaper_text_effect',
   'pinepaper_design_system', 'pinepaper_compose', 'pinepaper_design_medium', 'pinepaper_image_filter',
-  'pinepaper_brand_kit', 'pinepaper_sound', 'pinepaper_audio_beats', 'pinepaper_beat_cuts', 'pinepaper_emitter',
+  'pinepaper_brand_kit', 'pinepaper_sound', 'pinepaper_audio_beats', 'pinepaper_beat_cuts', 'pinepaper_emitter', 'pinepaper_instances',
   'pinepaper_render_hook', 'pinepaper_camera_director', 'pinepaper_world3d', 'pinepaper_relight',
   'pinepaper_agent_batch_execute', 'pinepaper_create_item',
 ];
@@ -170,6 +170,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
   effects: [
     'pinepaper_apply_effect',
     'pinepaper_emitter',
+    'pinepaper_instances',
     'pinepaper_render_hook',
     'pinepaper_text_effect',
   ],
