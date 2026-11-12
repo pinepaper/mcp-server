@@ -8345,7 +8345,7 @@ ACTIONS:
 - modify: { itemId, ...the fields to change } — motion and init merge field by field.
 - describe: { itemId } → its spec, count, drawn, path and determinism.
 
-WHAT THE REPLY TELLS YOU: drawn is how many marks are actually drawn. When the studio draws a subset (a cap for its drawing path), drawn is less than count and subsampled is true: the same marks every frame, and the receipt says so. determinism.scope 'everywhere' means two exports anywhere give the same file; a rule whose scope is narrower says so in rules and in the export receipt.
+WHAT THE REPLY TELLS YOU: drawn is how many marks are actually drawn. When the studio draws a subset (a cap for its drawing path), drawn is less than count and subsampled is true: the same marks every frame, and the receipt says so. determinism.scope 'everywhere' means every mark is in the same place at the same time on any machine, so two exports give the same frames (compare their frameDigest). Whether the encoded file is byte-identical is the encoder's business, not the swarm's: see the export's bitExact. A rule whose scope is narrower says so in rules and in the export receipt.
 
 A rule, layout or shape the studio does not have is refused by name with its list.`,
     inputSchema: {
