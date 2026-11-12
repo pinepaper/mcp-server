@@ -2935,7 +2935,7 @@ The geometry is vendored from mcp-cloud, which makes this a three-repo artifact:
         action: { type: 'string', enum: ['figure', 'set'], description: "'figure' or 'set'." },
         id: { type: 'string', description: 'Prefix for the created items.' },
         kind: { type: 'string', description: 'figure: which figure. set: room | tabletop | chair | table | counter | door | shelf | window (an unknown one is refused with the current list).' },
-        at: { type: 'object', description: '{ x?, y? } — where it goes.' },
+        at: { type: 'object', description: "{ x?, y? } — where it goes. For a figure, y is where its FEET stand, so at.y = a room's groundY stands it on the floor (travel points' y likewise); a figure in pose 'sit' is placed by its seat, so at = a chair's anchor seats it. The reply's anchor says which rule this studio used: 'feet', or 'hip' on an older studio that put the hip at y." },
         scale: { type: 'number', description: 'Size multiplier.' },
         facing: { type: 'string', enum: ['left', 'right'], description: "set: which way a CHAIR faces. A figure has none and passing it here is refused — a figure faces the way it travels." },
         pose: { type: 'string', enum: [...STICK_POSES], description: 'figure: ONE pose, held.' },

@@ -15440,7 +15440,7 @@ ${needWorld}
   if (typeof app.${fn} !== 'function') { return { success: false, error: 'app.${fn} unavailable — update FxTool (the stick kit is vendored from mcp-cloud)' }; }
   const r = await app.${fn}(${S(opts)});
   if (!r || r.ok === false) { return { success: false, error: (r && (r.reason || r.error)) || 'the stick kit produced nothing' }; }
-  return { success: true, ...r };
+  return { success: true, ...r${action === 'figure' ? ", anchor: app.stickFigureAnchorsFeet === true ? 'feet' : 'hip'" : ''} };
 })();`.trim();
   }
 
