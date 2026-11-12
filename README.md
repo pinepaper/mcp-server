@@ -310,6 +310,35 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - The npm package starts no process. Two export features use `ffprobe` and `ffmpeg`: checking a saved video against what the studio encoded, and joining the cached segments of a `perScene` export (`ffmpeg -f concat`). Only the Claude Desktop extension runs them, through a small runner it bundles that allows those two binaries alone, via `execFile` (no shell, argument lists the server writes, absolute paths). From npm, the check is skipped and said so, and a `perScene` export runs whole.
 - The server itself fetches the images, SVGs and media a tool call names by URL, and reads local files named by path. URLs that resolve to loopback, private, link-local or reserved addresses are refused, redirects included, and so are cloud metadata addresses. Local files are read only with `PINEPAPER_ALLOW_LOCAL_FILES=1`, and then only from the working directory, the export folder, and folders listed in `PINEPAPER_ASSET_DIRS` (the export folder is readable without the switch). `PINEPAPER_ALLOW_PRIVATE_NETWORK=1` allows local and LAN hosts. Metadata addresses stay refused even with it set.
 
+## What's new in 1.6.36
+
+### Fixed
+
+- Building a big scene in batches no longer slows down as it grows. A batch saves one undo
+  step and redraws once, instead of once per item: 400 circles on top of 2,000 take about
+  0.2 s, and 12,000 items in batches of 400 build in about 15 s. A single `create_item` call
+  is lighter too. For thousands of items, batch them: one call per item still slows as the
+  scene grows.
+- `pinepaper_sound` accepts `visual: false`, at create and per cue. The waveform chip is an
+  editor aid that no export draws, so there is nothing to turn off.
+- `clear_variables` and `clear_contraptions` are no longer reported as having changed nothing.
+- The idle pause engages every time the server goes idle, not only the first time.
+
+### Changed
+
+- `smoothing: 'medium'` or `'high'` on an image is named in the reply (`smoothingNote`):
+  Chromium draws them the same as `'low'`, so the visible choice is `'off'` or not.
+- A stick figure's `at.y` is where its feet stand, so `at.y` equal to a room's `groundY`
+  stands it on the floor; a figure in pose `sit` is placed by its seat. The reply's `anchor`
+  says which rule the studio used (`'feet'`, or `'hip'` on an older studio).
+- A font weight the font has no face for, and a weight keyframe that switches face instead
+  of blending, are named in `governor.engineWarnings` where the studio measures them
+  (`font_weight_no_face`, `font_weight_snap`).
+- Undo: creates and animations made in quick succession can share one undo step.
+- The docs for local files now match the error: the working folder and
+  `PINEPAPER_ASSET_DIRS` are read only with `PINEPAPER_ALLOW_LOCAL_FILES=1`, and a change to
+  `PINEPAPER_ASSET_DIRS` needs a server restart.
+
 ## What's new in 1.6.35
 
 ### Fixed
