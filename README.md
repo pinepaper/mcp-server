@@ -340,6 +340,12 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   encoder) is re-encoded to AAC by the Claude Desktop extension, video copied; the result says
   so, with the delivered file's own sha256. Without ffmpeg (the npm package), a social platform
   export is refused by name, and any other keeps the Opus file and says so.
+- `pinepaper_execute_generator` accepts every generator the studio has, including the
+  foreground ones (`drawChatThread`, `drawPhoneFrame`, `drawBrowserMockup`, `drawMetricCard`,
+  `drawFunnel`, `drawRoadmapTimeline` and more) and older ones that were refused (`drawMaze`,
+  `drawSpirograph`, `drawIsometricCity`, `drawTopography`). The list now comes from the studio.
+  Run a foreground generator with `params.interactive: true` and its output is editable items;
+  `pinepaper_group` `ungroup` releases the composition.
 - `pinepaper_apply_effect` accepts the studio's new effects: `aurora`, `glitch`, `orbit_swirl`
   (the particle swirl; `vortex` is the shader aura) and `petals`. The list of effects now comes
   from the studio, so a new one is accepted without waiting for a server release.
