@@ -93,6 +93,8 @@ type Runner = (cmd: 'ffprobe' | 'ffmpeg', args: string[], timeout?: number) => P
 let runner: Runner | null | undefined;
 /** Tests replace the runner; undefined goes back to loading the add-on. */
 export function setFfmpegRunner(r: Runner | null | undefined): void { runner = r; ffprobeAvailable = null; ffmpegAvailable = null; }
+/** Tests: the runner in place now, so one that installs a fake can put back exactly what was there. */
+export function currentFfmpegRunner(): Runner | null | undefined { return runner; }
 async function loadRunner(): Promise<Runner | null> {
   if (runner === undefined) {
     const spec = FFMPEG_ADDON;
@@ -260,4 +262,51 @@ export async function muxSilence(videoFile: string, outFile: string, opts: { for
   const r = await run('ffmpeg', ['-v', 'error', '-y', '-i', resolvePath(videoFile), '-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo', '-map', '0:v:0', '-map', '1:a:0',
     '-c:v', 'copy', ...codec, '-t', String(opts.seconds), ...(opts.format === 'webm' ? [] : ['-movflags', '+faststart']), resolvePath(outFile)], 300_000);
   return r.ok ? { ok: true } : { ok: false, reason: r.stderr.trim() || 'ffmpeg failed with no message' };
+}
+
+/**
+ * B45, option D (the owner's decision, FxTool #377): an MP4 whose soundtrack the browser could only encode as Opus
+ * (Chromium on Linux has no AAC encoder) is re-encoded to AAC here, video stream copied, wherever ffmpeg runs (the
+ * Claude Desktop extension's runner). Without ffmpeg, a share-ready request (a social platform) is refused by name
+ * rather than delivered as a file WhatsApp-class players reject; any other request keeps the Opus file and says so.
+ * The delivered file then has its own sha256: the studio's file hash, bitExact and provenance describe the bytes
+ * before this step, and its frameHashes still describe the video (copied unchanged).
+ */
+export const AAC_REMUX_BITRATE = '160k';
+const SHARE_READY_PLATFORMS: ReadonlySet<string> = new Set(['instagram', 'instagram-story', 'tiktok', 'twitter', 'linkedin', 'whatsapp', 'facebook']);
+
+export function isOpusMp4(format: string, exportResult: unknown): boolean {
+  if (format !== 'mp4') return false;
+  const probe = probeFromResult(exportResult);
+  if (probe && probe.audio && probe.audio.codec === 'opus') return true;
+  try { return JSON.stringify(exportResult ?? null).includes('"audio_codec_opus"'); } catch { return false; }
+}
+
+export type AudioDelivery =
+  | { action: 'none' }
+  | { action: 'transcoded'; audio: { codec: 'aac'; transcodedFrom: 'opus'; bitrate: string }; preRemux: { sha256: string; bytes: number } }
+  | { action: 'kept-opus'; note: string }
+  | { action: 'refuse'; message: string };
+
+export async function deliverAacIfOpus(filePath: string, format: string, exportResult: unknown, platform: string | undefined): Promise<AudioDelivery> {
+  if (!isOpusMp4(format, exportResult)) return { action: 'none' };
+  const shareReady = !!platform && SHARE_READY_PLATFORMS.has(platform);
+  if (await hasFfmpeg()) {
+    const before = await sha256OfFile(filePath);
+    const tmp = filePath.replace(/\.mp4$/i, '') + '.aac-remux.mp4';
+    const r = await run('ffmpeg', ['-v', 'error', '-y', '-i', resolvePath(filePath), '-map', '0', '-c:v', 'copy', '-c:a', 'aac', '-b:a', AAC_REMUX_BITRATE,
+      '-movflags', '+faststart', resolvePath(tmp)], 300_000);
+    if (r.ok) {
+      const { rename } = await import('node:fs/promises');
+      await rename(tmp, filePath);
+      return { action: 'transcoded', audio: { codec: 'aac', transcodedFrom: 'opus', bitrate: AAC_REMUX_BITRATE }, preRemux: before };
+    }
+    await (await import('node:fs/promises')).unlink(tmp).catch(() => undefined);
+    if (!shareReady) return { action: 'kept-opus', note: `the audio is Opus (this browser has no AAC encoder) and re-encoding it to AAC failed: ${r.stderr.trim() || 'ffmpeg gave no reason'}. The file plays in browsers; WhatsApp and many players reject it.` };
+    return { action: 'refuse', message: `refused for ${platform}: the audio could only be Opus and re-encoding it to AAC failed (${r.stderr.trim() || 'no reason'}), and ${platform} needs H.264 + AAC in MP4.` };
+  }
+  if (shareReady) {
+    return { action: 'refuse', message: `refused for ${platform}: this machine's browser has no AAC encoder (Chromium on Linux has none), so the soundtrack could only be Opus, which ${platform} and WhatsApp-class players reject, and this server cannot re-encode it (the npm package runs no external programs; the Claude Desktop extension re-encodes with ffmpeg). Export WebM (browsers play it; WhatsApp still wants H.264 + AAC in MP4), export without sound, or re-encode yourself: ffmpeg -i in.mp4 -c:v copy -c:a aac out.mp4.` };
+  }
+  return { action: 'kept-opus', note: 'the audio is Opus (this browser has no AAC encoder; Chromium on Linux has none). The file plays in browsers; WhatsApp and many players reject it. The Claude Desktop extension re-encodes it to AAC automatically; elsewhere: ffmpeg -i in.mp4 -c:v copy -c:a aac out.mp4.' };
 }

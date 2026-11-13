@@ -307,7 +307,7 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - Code an agent writes runs with whatever that browser page has. Give this server the same trust you would give anything else you let write and run code on your machine — which is the trust you already extend to an MCP client with tool access.
 - Puppeteer mode launches Chrome with `--no-sandbox` and `--disable-setuid-sandbox`. That is routine for headless automation and it does weaken Chrome's own process sandbox. If that matters where you are running it, use `code` mode or put the server in a container.
 - Puppeteer itself is not a dependency at all (it was an optional peer until 1.6.25), kept out of the tree precisely because a headless browser plus an install script is what scanners flag hardest. Install it only if you want the executing mode. The server loads it only from where its own dependencies would be found (the same `npx` call, a global install, a project install) or from a folder you name in `PINEPAPER_PUPPETEER_FROM`; never from the folder it happens to be started in. puppeteer 22 or newer is required.
-- The npm package starts no process. Two export features use `ffprobe` and `ffmpeg`: checking a saved video against what the studio encoded, and joining the cached segments of a `perScene` export (`ffmpeg -f concat`). Only the Claude Desktop extension runs them, through a small runner it bundles that allows those two binaries alone, via `execFile` (no shell, argument lists the server writes, absolute paths). From npm, the check is skipped and said so, and a `perScene` export runs whole.
+- The npm package starts no process. Three export features use `ffprobe` and `ffmpeg`: checking a saved video against what the studio encoded, joining the cached segments of a `perScene` export (`ffmpeg -f concat`), and re-encoding an MP4's Opus soundtrack to AAC (the browser on Linux has no AAC encoder; the video is copied). Only the Claude Desktop extension runs them, through a small runner it bundles that allows those two binaries alone, via `execFile` (no shell, argument lists the server writes, absolute paths). From npm, the check is skipped and said so, a `perScene` export runs whole, and an Opus MP4 is kept and named, or refused for a social platform.
 - The server itself fetches the images, SVGs and media a tool call names by URL, and reads local files named by path. URLs that resolve to loopback, private, link-local or reserved addresses are refused, redirects included, and so are cloud metadata addresses. Local files are read only with `PINEPAPER_ALLOW_LOCAL_FILES=1`, and then only from the working directory, the export folder, and folders listed in `PINEPAPER_ASSET_DIRS` (the export folder is readable without the switch). `PINEPAPER_ALLOW_PRIVATE_NETWORK=1` allows local and LAN hosts. Metadata addresses stay refused even with it set.
 
 ## What's new in 1.6.37
@@ -336,6 +336,10 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   pigeon is a bird), or refuses, naming the five. For walking, poses and actions, make
   characters with `pinepaper_original_character`; `pinepaper_character` directs a concept
   through its channels.
+- An MP4 whose soundtrack the browser could only encode as Opus (Chromium on Linux has no AAC
+  encoder) is re-encoded to AAC by the Claude Desktop extension, video copied; the result says
+  so, with the delivered file's own sha256. Without ffmpeg (the npm package), a social platform
+  export is refused by name, and any other keeps the Opus file and says so.
 - `pinepaper_apply_effect` accepts the studio's new effects: `aurora`, `glitch`, `orbit_swirl`
   (the particle swirl; `vortex` is the shader aura) and `petals`. The list of effects now comes
   from the studio, so a new one is accepted without waiting for a server release.

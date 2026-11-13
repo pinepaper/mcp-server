@@ -190,7 +190,7 @@ import { ZodError, z } from 'zod';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { effectClass } from './effect-class.js';
 import { capabilityAllowed, capabilityRefusal, CAPABILITY_SWITCH } from '../utils/capabilities.js';
-import { exportFileReceiptOrReason, receiptErrorLine } from './export-file-receipt.js';
+import { exportFileReceiptOrReason, receiptErrorLine, deliverAacIfOpus, type AudioDelivery } from './export-file-receipt.js';
 import { ExportStepError, errorText, verifySavedFile, writeStep, bytesForSave } from './export-file-check.js';
 import { EFFECT_BEFORE_JS, effectAfterJs, namedItemIds, idMayBeGone, NO_CHANGE_NOTE } from './effect-check.js';
 import { writeFile, mkdir, appendFile, unlink, readFile, stat } from 'node:fs/promises';
@@ -1017,6 +1017,19 @@ export function withEngineReport(result: CallToolResult, report: Record<string, 
     content: [...(result.content ?? []), { type: 'text' as const, text: `ENGINE RECEIPTS: ${JSON.stringify(body)}` }],
     _meta: { ...(result._meta ?? {}), [RECEIPTS_META_KEY]: body },
   };
+}
+
+
+/** B45 option D: the delivered file's audio, in the result and its words. */
+function audioDeliveryFields(d: AudioDelivery): Record<string, unknown> {
+  if (d.action === 'transcoded') return { audioDelivered: { ...d.audio, preRemux: d.preRemux, note: 'file.sha256 is the delivered file. The studio file hash, bitExact and provenance describe the bytes before the audio was re-encoded; its frameHashes still describe the video, which was copied unchanged.' } };
+  if (d.action === 'kept-opus') return { audioNote: d.note };
+  return {};
+}
+function audioDeliveryLine(d: AudioDelivery): string {
+  if (d.action === 'transcoded') return `Audio: re-encoded from Opus to AAC (${d.audio.bitrate}); the video is copied unchanged, and the file has a new sha256.\n`;
+  if (d.action === 'kept-opus') return `Audio: ${d.note}\n`;
+  return '';
 }
 
 function executedResult(
@@ -5044,14 +5057,20 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
               },
               input.platform || 'auto'
             );
+            const delivery = await deliverAacIfOpus(filePath, format, exportResult, input.platform);
+            if (delivery.action === 'refuse') {
+              await (await import('node:fs/promises')).unlink(filePath).catch(() => undefined);
+              return errorResult(ErrorCodes.EXECUTION_ERROR, delivery.message, { code: 'audio_codec_unavailable', format, platform: input.platform }, { toolName: 'pinepaper_agent_export' });
+            }
             const receipt = await exportFileReceiptOrReason(filePath, exportResult);
-            const cleanResult = { ...exportResult, data: undefined, filePath, fileSize, chunks, file: receipt };
+            const deliveredSize = 'bytes' in receipt ? receipt.bytes : fileSize;
+            const cleanResult = { ...exportResult, data: undefined, filePath, fileSize: deliveredSize, chunks, file: receipt, ...audioDeliveryFields(delivery) };
             return withEngineReport({
               structuredContent: boundedStructured(cleanResult),
               content: [{
                 type: 'text' as const,
-                text: `Export saved to file:\n\nFile: ${filePath}\nFormat: ${format}\nSize: ${(fileSize / 1024).toFixed(1)} KB\nPlatform: ${input.platform}\nPaged out of the studio's export store in ${chunks} chunk${chunks === 1 ? '' : 's'}\n${receiptErrorLine(receipt)}${'receiptError' in receipt ? '' : probeLines(receipt)}${lintLines(exportResult)}\nResult: ${JSON.stringify(cleanResult, null, 2)}`,
-              }, exportFileLink(filePath, fileSize)],
+                text: `Export saved to file:\n\nFile: ${filePath}\nFormat: ${format}\nSize: ${(deliveredSize / 1024).toFixed(1)} KB\nPlatform: ${input.platform}\nPaged out of the studio's export store in ${chunks} chunk${chunks === 1 ? '' : 's'}\n${audioDeliveryLine(delivery)}${receiptErrorLine(receipt)}${'receiptError' in receipt ? '' : probeLines(receipt)}${lintLines(exportResult)}\nResult: ${JSON.stringify(cleanResult, null, 2)}`,
+              }, exportFileLink(filePath, deliveredSize)],
             }, exportBrowserResult.report);
           } catch (streamError) {
             // The export is still held — the message says so and names the id,
@@ -5113,9 +5132,15 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
 
         if (shouldSaveToFile) {
           try {
-            const { filePath, fileSize } = await saveExportToFile(data, format, input.platform || 'auto');
+            const { filePath, fileSize: savedSize } = await saveExportToFile(data, format, input.platform || 'auto');
+            const delivery = await deliverAacIfOpus(filePath, format, exportResult, input.platform);
+            if (delivery.action === 'refuse') {
+              await (await import('node:fs/promises')).unlink(filePath).catch(() => undefined);
+              return errorResult(ErrorCodes.EXECUTION_ERROR, delivery.message, { code: 'audio_codec_unavailable', format, platform: input.platform }, { toolName: 'pinepaper_agent_export' });
+            }
             const receipt = await exportFileReceiptOrReason(filePath, exportResult);
-            const cleanResult = { ...exportResult, data: undefined, filePath, fileSize, file: receipt };
+            const fileSize = 'bytes' in receipt ? receipt.bytes : savedSize;
+            const cleanResult = { ...exportResult, data: undefined, filePath, fileSize, file: receipt, ...audioDeliveryFields(delivery) };
             // A mix that dropped sounds wrote a perfectly good file that is
             // missing tracks. It rides the SUCCESS path, which is exactly why
             // it has to be said out loud here rather than left in the JSON.
@@ -5125,7 +5150,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
               content: [{
                 type: 'text' as const,
                 text: `Export saved to file:\n\nFile: ${filePath}\nFormat: ${format}\nSize: ${(fileSize / 1024).toFixed(1)} KB\nPlatform: ${input.platform}\n`
-                  + (dropNote ? `DROPPED: ${dropNote}\n` : '')
+                  + (dropNote ? `DROPPED: ${dropNote}\n` : '') + audioDeliveryLine(delivery)
                   // The studio's own warning on a saved file (a GIF over its maxBytes budget, GIFMAX34) was only
                   // inside the Result JSON below; a reader of the words missed it.
                   + (typeof (exportResult as { warning?: unknown }).warning === 'string' ? `WARNING: ${(exportResult as { warning: string }).warning}\n` : '')
