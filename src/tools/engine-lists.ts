@@ -4,7 +4,7 @@
  * Name lists the engine owns and the tool surface must offer exactly. See
  * scripts/sync-engine-lists.mjs for why each is generated.
  *
- * Source: FxTool origin/main 5d30afd487bf7199a1cbf510a73ea576a005dbef
+ * Source: FxTool origin/main b4adb4684f47116c997a37b727bc2458f0fe52ad
  *   js/core/KeyframeInterpolator.js  sha256: 342034825a057d6d
  *   js/world3d/worlds.js  sha256: 0e0973f7587c06e1
  *   js/core/DesignMedia.js  sha256: ab07f330e4060cb7
@@ -434,7 +434,7 @@ export const RELATION_PARAM_KEYS: Readonly<Record<string, readonly string[]>> = 
   reacts_to_audio: ['attack', 'base', 'beatsPerBar', 'colorFrom', 'colorTo', 'decay', 'feature', 'gain', 'halfLife', 'inPoint', 'loop', 'onsets', 'outPoint', 'peak', 'property', 'source', 'start', 'threshold'],
   repels: ['force', 'maxDistance', 'minDistance', 'returnSpeed', 'signal'],
   ring_forming: ['center', 'delay', 'duration', 'easing', 'hold', 'loop', 'members', 'phase', 'radius', 'radiusY', 'spin', 'spread', 'stagger'],
-  soundtrack_cue: ['anchor', 'beat', 'bpm', 'duration', 'gain', 'loop', 'note', 'offset', 'sound'],
+  soundtrack_cue: ['anchor', 'at', 'beat', 'bpm', 'duration', 'gain', 'loop', 'note', 'offset', 'sound'],
   staggered_with: ['amount', 'axis', 'count', 'delay', 'distributeEase', 'duration', 'effect', 'from', 'grid', 'index', 'stagger'],
   syncs_with: ['offset', 'speedRatio'],
   then: ['chainVisibility', 'delay', 'offset'],
