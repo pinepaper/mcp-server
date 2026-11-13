@@ -14181,7 +14181,7 @@ ${cam ? `  // The camera rides the SAME timing: framing each state as its morph 
   }
 
   if (app._scheduleRepaint) app._scheduleRepaint();
-  const note = hasSkeleton ? null : 'this character has no skeleton (a concept character is parts and keyframes), so bone actions and rigging calls on it act on nothing' + (applied.length ? '; what ran: ' + applied.join(', ') : '') + '. For posed motion, build it with pinepaper_rigging or pinepaper_stick.';
+  const note = hasSkeleton ? null : 'this character has no skeleton (a concept character is parts and keyframes), so bone actions and rigging calls on it act on nothing' + (applied.length ? '; what ran: ' + applied.join(', ') : '') + '. For a figure that walks, poses and acts, make it with pinepaper_original_character (rigged); pinepaper_character directs a concept through its channels (beats).';
   if (!applied.length) return { success: false, characterId: targetId || itemId, action: act, error: note || ('nothing was applied for action ' + act) };
   return { success: true, characterId: targetId || itemId, action: act, applied: applied, skeleton: hasSkeleton, ...(note ? { warning: note } : {}) };
 })();`.trim();

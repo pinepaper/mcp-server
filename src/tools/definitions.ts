@@ -3363,6 +3363,8 @@ BEATS ARE INSTANTS OR SPANS. \`at\` is when it happens; \`until\` is how long fo
 
 WHAT YOU GET BACK: the items and keyframe tracks the beats compile to. They are ordinary scene items afterwards — modify, animate and relate them like anything else.
 
+WALKING, POSES, ACTIONS: a concept character moves through its channels and has no skeleton, so a walk, a pose or a rigging call acts on nothing (and the reply says so). For a figure that walks, poses and acts, make it with pinepaper_original_character, which is rigged.
+
 NOT LIP SYNC. \`say\` opens and closes a mouth for the length of a line. Matching phonemes needs the word timings a voice track carries; pass \`timings\` if you have them and each entry drives one mouth opening.`,
     inputSchema: {
       type: 'object',
