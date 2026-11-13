@@ -4,7 +4,7 @@
  * Name lists the engine owns and the tool surface must offer exactly. See
  * scripts/sync-engine-lists.mjs for why each is generated.
  *
- * Source: FxTool origin/main b4adb4684f47116c997a37b727bc2458f0fe52ad
+ * Source: FxTool origin/main 3f36271eb61aa091920e076b4434d491085d23ef
  *   js/core/KeyframeInterpolator.js  sha256: 342034825a057d6d
  *   js/world3d/worlds.js  sha256: 0e0973f7587c06e1
  *   js/core/DesignMedia.js  sha256: ab07f330e4060cb7
@@ -15,10 +15,123 @@
  *   js/relations/expr-to-ir.js  sha256: 4d92d2f42b3356e9
  *   js/RelationRegistry.js  sha256: 9925d4f389fc2d9b
  *   js/core/AnimationDriver.js  sha256: 6741a73f5f489355
- *   js/PinePaper.js  sha256: 804e1cb5b8ccc770
+ *   js/PinePaper.js  sha256: 9a900bd7bf104691
  *   js/ItemAuraSystem.js  sha256: fbd9b8d09fae0543
  *   js/GeneratorRegistry.js  sha256: 9bb2e38508482c8d
+ *   js/audio/SoundPresets.js  sha256: 713ef0d1e19dc128
  */
+
+/** 29 built-in instruments (SoundPresets.js INSTRUMENT_NAMES). A starting set: define_instrument adds to the same live table. */
+export const ENGINE_INSTRUMENTS = [
+  'sine',
+  'pad',
+  'pluck',
+  'bell',
+  'organ',
+  'strings',
+  'piano',
+  'guitar',
+  'harp',
+  'bass',
+  'violin',
+  'cello',
+  'flute',
+  'clarinet',
+  'trumpet',
+  'horn',
+  'marimba',
+  'rhodes',
+  'epiano',
+  'supersaw',
+  'sub_bass',
+  'kalimba_tine',
+  'celesta_plate',
+  'piano_natural',
+  'guitar_natural',
+  'harp_natural',
+  'bass_natural',
+  'trumpet_natural',
+  'marimba_natural',
+] as const;
+
+/** 55 built-in drums and percussion strokes (SoundPresets.js PERCUSSION_NAMES, world percussion included). */
+export const ENGINE_PERCUSSION = [
+  'kick',
+  'snare',
+  'tom',
+  'hat',
+  'clap',
+  'tabla-na',
+  'tabla-tin',
+  'tabla-tun',
+  'tabla-te',
+  'tabla-ge',
+  'tabla-ke',
+  'mridangam-tha',
+  'mridangam-thi',
+  'mridangam-thom',
+  'mridangam-nam',
+  'dhol-dagga',
+  'dhol-tilli',
+  'dholak-ge',
+  'dholak-na',
+  'ghatam',
+  'kanjira',
+  'darbuka-dum',
+  'darbuka-tek',
+  'darbuka-ka',
+  'riq',
+  'djembe-bass',
+  'djembe-tone',
+  'djembe-slap',
+  'dundun',
+  'dundun-bell',
+  'gankogui-low',
+  'gankogui-high',
+  'cajon-bass',
+  'cajon-snare',
+  'taiko',
+  'conga-open',
+  'conga-slap',
+  'conga-muff',
+  'surdo',
+  'tamborim',
+  'agogo-low',
+  'agogo-high',
+  'claves',
+  'cowbell',
+  'gamelan-saron',
+  'gamelan-peking',
+  'gamelan-bonang',
+  'gamelan-kenong',
+  'gamelan-kempul',
+  'gamelan-gong',
+  'gamelan-kendhang-dhah',
+  'gamelan-kendhang-tak',
+  'steel-pan',
+  'mbira-lamella',
+  'balafon',
+] as const;
+
+/** 16 built-in sound effects (SoundPresets.js SFX_NAMES). */
+export const ENGINE_SFX = [
+  'beep',
+  'pop',
+  'noise',
+  'wind',
+  'whoosh',
+  'zap',
+  'keystroke',
+  'mouse_click',
+  'pop_ui',
+  'camera_shutter',
+  'paper_swoosh',
+  'glass_shimmer',
+  'cinematic_braaam',
+  'notification_ding',
+  'coin_pickup',
+  'vinyl_crackle',
+] as const;
 
 /** 97 generators: every name GeneratorRegistry.js registers. */
 export const ENGINE_GENERATOR_NAMES = [

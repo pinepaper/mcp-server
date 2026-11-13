@@ -107,6 +107,7 @@ const ANIM_REL = 'js/core/AnimationDriver.js';
 const PINEPAPER_REL = 'js/PinePaper.js';
 const AURA_REL = 'js/ItemAuraSystem.js';
 const GENERATORS_REL = 'js/GeneratorRegistry.js';
+const SOUNDS_REL = 'js/audio/SoundPresets.js';
 
 /** The body of a method or function `head(...) {`, brace-matched; null when it cannot be found. */
 function blockAfter(src, head) {
@@ -144,6 +145,37 @@ function generatorNames(src) {
   const names = [...new Set([...src.matchAll(/this\.register\(\s*'([a-zA-Z0-9_]+)'/g)].map((m) => m[1]))];
   if (names.length < 50) throw new Error(`sync-engine-lists: only ${names.length} generators found in GeneratorRegistry.js`);
   return names;
+}
+
+/**
+ * SOUND CATALOGUE: INSTRUMENT_NAMES, PERCUSSION_NAMES and SFX_NAMES, read from SoundPresets.js by RUNNING it
+ * (a CommonJS module; its relative requires are served from the same committed tree). A scrape of the table
+ * literals missed the *_natural instruments, which are assigned after the literal. A stored fixture said
+ * 6 / 5 / 6 while the engine shipped 29 instruments and 16 SFX, and #376 then added 50 world-percussion strokes.
+ */
+function soundCatalogue() {
+  const cache = new Map();
+  const load = (rel) => {
+    if (cache.has(rel)) return cache.get(rel).exports;
+    const src = readCommitted(rel);
+    if (!src) throw new Error(`sync-engine-lists: cannot read ${rel}`);
+    const module = { exports: {} };
+    cache.set(rel, module);
+    const req = (spec) => {
+      if (!spec.startsWith('./')) throw new Error(`sync-engine-lists: ${rel} requires '${spec}', which this script cannot serve`);
+      return load(join(dirname(rel), spec).replace(/\\/g, '/'));
+    };
+    new Function('module', 'exports', 'require', src)(module, module.exports, req);
+    return module.exports;
+  };
+  const mod = load(SOUNDS_REL);
+  const out = { instruments: mod.INSTRUMENT_NAMES, percussion: mod.PERCUSSION_NAMES, sfx: mod.SFX_NAMES };
+  for (const [k, v] of Object.entries(out)) {
+    if (!Array.isArray(v) || v.length < 5 || !v.every((n) => typeof n === 'string')) {
+      throw new Error(`sync-engine-lists: ${SOUNDS_REL} did not export a usable ${k} name list`);
+    }
+  }
+  return out;
 }
 
 function animationOptionKeys(ppSrc, animSrc) {
@@ -459,6 +491,9 @@ async function generate() {
   const genSrc = readCommitted(GENERATORS_REL);
   if (!genSrc) throw new Error(`sync-engine-lists: cannot read ${GENERATORS_REL}`);
   const generators = generatorNames(genSrc);
+  const soundSrc = readCommitted(SOUNDS_REL);
+  if (!soundSrc) throw new Error(`sync-engine-lists: cannot read ${SOUNDS_REL}`);
+  const sounds = soundCatalogue();
 
   return `/**
  * GENERATED — DO NOT EDIT. Run \`bun run sync:engine-lists\`.
@@ -480,7 +515,23 @@ async function generate() {
  *   ${PINEPAPER_REL}  sha256: ${digest(ppSrc)}
  *   ${AURA_REL}  sha256: ${digest(auraSrc)}
  *   ${GENERATORS_REL}  sha256: ${digest(genSrc)}
+ *   ${SOUNDS_REL}  sha256: ${digest(soundSrc)}
  */
+
+/** ${sounds.instruments.length} built-in instruments (SoundPresets.js INSTRUMENT_NAMES). A starting set: define_instrument adds to the same live table. */
+export const ENGINE_INSTRUMENTS = [
+${list(sounds.instruments)}
+] as const;
+
+/** ${sounds.percussion.length} built-in drums and percussion strokes (SoundPresets.js PERCUSSION_NAMES, world percussion included). */
+export const ENGINE_PERCUSSION = [
+${list(sounds.percussion)}
+] as const;
+
+/** ${sounds.sfx.length} built-in sound effects (SoundPresets.js SFX_NAMES). */
+export const ENGINE_SFX = [
+${list(sounds.sfx)}
+] as const;
 
 /** ${generators.length} generators: every name GeneratorRegistry.js registers. */
 export const ENGINE_GENERATOR_NAMES = [

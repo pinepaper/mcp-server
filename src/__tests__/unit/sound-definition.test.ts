@@ -15,18 +15,13 @@
  * the same shape as an item list capped below its own itemCount.
  */
 import { describe, it, expect } from 'bun:test';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { PinePaperCodeGenerator } from '../../types/code-generator.js';
 import { SoundInputSchema } from '../../types/schemas.js';
 import { PINEPAPER_TOOLS } from '../../tools/definitions.js';
 import { enumValues, shapeOf } from '../zod-walk';
+import { ENGINE_INSTRUMENTS, ENGINE_PERCUSSION, ENGINE_SFX } from '../../tools/engine-lists.js';
 
 const gen = new PinePaperCodeGenerator();
-
-const CATALOGUE = readFileSync(join(import.meta.dir, '..', 'fixtures', 'engine-sound-catalogue.txt'), 'utf-8')
-  .split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'))
-  .map((l) => { const [kind, name] = l.split(/\s+/); return { kind: kind!, name: name! }; });
 
 /** Execute emitted browser code against a stub engine. */
 function run(code: string, app: Record<string, unknown>): any {
@@ -41,10 +36,15 @@ function run(code: string, app: Record<string, unknown>): any {
 const emit = (input: Record<string, unknown>) => gen.generateSound(SoundInputSchema.parse(input) as any);
 
 describe('defining a sound at runtime', () => {
-  it('the fixture holds the engine built-ins', () => {
-    expect(CATALOGUE.filter((c) => c.kind === 'instrument').length).toBe(6);
-    expect(CATALOGUE.filter((c) => c.kind === 'percussion').length).toBe(5);
-    expect(CATALOGUE.filter((c) => c.kind === 'sfx').length).toBe(6);
+  it('every sound the docs name as an example is one the engine ships', () => {
+    // The lists are generated from SoundPresets.js (scripts/sync-engine-lists.mjs). The docs name a few
+    // as examples and send the model to list_* for the rest; an example the engine dropped would mislead.
+    const known = new Set<string>([...ENGINE_INSTRUMENTS, ...ENGINE_PERCUSSION, ...ENGINE_SFX]);
+    for (const n of ['beep', 'pop', 'wind', 'whoosh', 'zap', 'kick', 'snare', 'tom', 'hat', 'clap', 'tabla-na', 'djembe-tone']) {
+      expect(known.has(n)).toBe(true);
+    }
+    // The world percussion (#376) is in the generated list, so a stale snapshot cannot hide it again.
+    expect(ENGINE_PERCUSSION.length).toBeGreaterThan(5);
   });
 
   it('reaches registerInstrument with the spec assembled from flat fields', () => {

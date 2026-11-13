@@ -348,8 +348,12 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   Run a foreground generator with `params.interactive: true` and its output is editable items;
   `pinepaper_group` `ungroup` releases the composition.
 - `pinepaper_apply_effect` accepts the studio's new effects: `aurora`, `glitch`, `orbit_swirl`
-  (the particle swirl; `vortex` is the shader aura) and `petals`. The list of effects now comes
-  from the studio, so a new one is accepted without waiting for a server release.
+  (the particle swirl; `vortex` is the shader aura) and `petals`. The list of effects is now
+  read from the studio's source at each release, so it no longer falls behind.
+- The sound docs name a few built-in sounds as examples, including the studio's world
+  percussion (`tabla-na`, `djembe-tone` and about fifty more strokes), and point to
+  `pinepaper_sound` `list_instruments`, `list_percussion` and `list_sfx` for the full lists. They
+  used to give five drums and six instruments as if that were all there was.
 
 ### Changed
 

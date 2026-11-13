@@ -3066,7 +3066,7 @@ IMPORT:
 The engine carries a full audio graph, and none of it was reachable. pinepaper_audio_beats ANALYSES audio that already exists; this MAKES audio.
 
 - Catalogues: list_instruments, list_percussion, list_sfx. Call one before naming a drum or effect — the names are the engine's.
-- Play: play_tone ('A4'), play_chord (root + kind: major, minor, maj7, dim…), play_percussion, play_sfx (beep, pop, wind, whoosh, zap), play_spec, play_from_text.
+- Play: play_tone ('A4'), play_chord (root + kind: major, minor, maj7, dim…), play_percussion, play_sfx (beep, pop, whoosh, zap, and more: list_sfx), play_spec, play_from_text.
 - Read without playing: chord_frequencies (the Hz a chord resolves to), from_text (a plain-language description — "a soft warm bell on A4" — resolved to a spec you can inspect or edit before committing), timbre_from_path.
 
 THE PART WORTH KNOWING: sound and drawing are the same object here, both ways.
@@ -8427,7 +8427,7 @@ WHAT IT RETURNS: keyframes written, the duration, and where the actor ends (and 
 
 ACTORS: a shape, a group, an imported SVG character, a photo cut-out — anything with one transform. Its own scale and rotation are kept (a beat squashes relative to them). A figure placed by pinepaper_character is several parts with their own tracks and no single transform, so choreograph its parts' group only if you grouped a STATIC figure; otherwise direct it with character beats.
 
-SOUND: sound: true puts a sound on every moment the motion makes — the pop, each launch, every landing (a bounce's landings get quieter as the bounces shrink), a shake — placed on the timeline and baked into the video. sound: { contact: 'kick', whoosh: false, gain: 0.6 } picks or silences them by catalogue name (SFX beep, pop, wind, whoosh, zap; drums kick, snare, tom, hat, clap; or your own from define_sfx). The reply lists the sounds placed. A sound due before 0.06 s is placed at 0.06 s (movedFrom says so): an MP4 encoder swallows the first ~50 ms of audio.
+SOUND: sound: true puts a sound on every moment the motion makes — the pop, each launch, every landing (a bounce's landings get quieter as the bounces shrink), a shake — placed on the timeline and baked into the video. sound: { contact: 'kick', whoosh: false, gain: 0.6 } picks or silences them by catalogue name (SFX such as beep, pop, whoosh, zap; drums such as kick, snare, clap, tabla-na, djembe-tone; or your own from define_sfx; pinepaper_sound list_percussion and list_sfx name them all). The reply lists the sounds placed. A sound due before 0.06 s is placed at 0.06 s (movedFrom says so): an MP4 encoder swallows the first ~50 ms of audio.
 
 MIX WITH: pinepaper_character / text expressions on top; pinepaper_apply_effect (confetti, shockwave) at a landing; pinepaper_sound at the same times. Call choreograph BEFORE keyframing the actor's other properties (colour, fill): the beat keys carry position, scale, rotation and opacity only, and the result warns if the actor already animates something else.
 
