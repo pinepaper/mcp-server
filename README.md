@@ -310,6 +310,27 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - The npm package starts no process. Two export features use `ffprobe` and `ffmpeg`: checking a saved video against what the studio encoded, and joining the cached segments of a `perScene` export (`ffmpeg -f concat`). Only the Claude Desktop extension runs them, through a small runner it bundles that allows those two binaries alone, via `execFile` (no shell, argument lists the server writes, absolute paths). From npm, the check is skipped and said so, and a `perScene` export runs whole.
 - The server itself fetches the images, SVGs and media a tool call names by URL, and reads local files named by path. URLs that resolve to loopback, private, link-local or reserved addresses are refused, redirects included, and so are cloud metadata addresses. Local files are read only with `PINEPAPER_ALLOW_LOCAL_FILES=1`, and then only from the working directory, the export folder, and folders listed in `PINEPAPER_ASSET_DIRS` (the export folder is readable without the switch). `PINEPAPER_ALLOW_PRIVATE_NETWORK=1` allows local and LAN hosts. Metadata addresses stay refused even with it set.
 
+## What's new in 1.6.37
+
+### Fixed
+
+- `on_complete` and `at_beat` with an event's name in `params.event` now fire that event on
+  the live studio. The name was read as an id and never resolved; the reply's
+  `eventResolvedTo` now shows the id it was bound to.
+- The broadcast luma warning now suggests a headroom above the one the export used (12 → 24,
+  up to 40) and says that more headroom narrows the luma range. It used to suggest 12 again.
+- An appended keyframe that lands on an existing key's time and changes its easing is named
+  in the reply (the time, and the easing before and after).
+
+### Changed
+
+- `pinepaper_instances`: `determinism.scope: 'everywhere'` means the same frames on any
+  machine. Whether an MP4 is byte-identical is the encoder's matter; compare exports by
+  `frameDigest`, and see the export's `bitExact`.
+- The relation docs state when `on_complete` reveals its target: only a target that starts
+  hidden. A target that starts shown stays hidden once something hides it, including a
+  reaction to the trigger's own event.
+
 ## What's new in 1.6.36
 
 ### New
