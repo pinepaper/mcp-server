@@ -290,6 +290,22 @@ describe('ONCOMP34: on_complete / at_beat with an event\'s name pulses that even
     expect(run('at_beat', { event: 'go', beat: 1 }, [ev('item_4', 'done')]).bound[0].event).toBe('go');
   });
 
+  it('ONCOMP35: resolved even where getItemById also finds an item by its NAME, as the real studio does', () => {
+    const entries = [ev('item_4', 'done')];
+    const bound: Array<Record<string, unknown>> = [];
+    const app = {
+      _isKnownRelationEndpoint: () => true,
+      getItemById: (q: string) => (q === 'item_4' || q === 'done' ? { data: { registryId: 'item_4' } } : null),
+      itemRegistry: { getAll: () => entries }, historyManager: { saveState() {} },
+      addRelation: (_s: unknown, _t: unknown, _r: unknown, p: Record<string, unknown>) => { bound.push(p); return true; },
+    };
+    const code = codeGenerator.generateAddRelation({ sourceId: 'item_1', targetId: 'item_2', relationType: 'on_complete', params: { event: 'done' } } as never);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const r: any = new Function('app', 'return ' + code.replace(/^\/\/.*\n/, '').replace(/;\s*$/, ''))(app);
+    expect(bound[0].event).toBe('item_4');
+    expect(r.eventResolvedTo).toBe('item_4');
+  });
+
   it('a name two events share is kept and named', () => {
     const { r, bound } = run('at_beat', { event: 'done', beat: 2 }, [ev('item_4', 'done'), ev('item_5', 'done')]);
     expect(bound[0].event).toBe('done');

@@ -1813,7 +1813,11 @@ function eventNameResolveJs(relationType: unknown, paramsVar: string): string {
   if (!EVENT_PULSING_RELATIONS.has(String(relationType))) return 'const __ev = {};';
   return `const __ev = {};
   (function(p) {
-    if (!p || typeof p.event !== 'string' || !p.event || app.getItemById(p.event)) return;
+    if (!p || typeof p.event !== 'string' || !p.event) return;
+    // An id, not a name: getItemById also finds an item by its NAME, so a hit alone said 'done' was an id and the
+    // name was never resolved (ONCOMP35: no eventResolvedTo in eight sessions). Only an exact registry id counts.
+    const __hit = app.getItemById(p.event);
+    if (__hit && __hit.data && (__hit.data.registryId === p.event || __hit.data.id === p.event)) return;
     const ids = (app.itemRegistry && app.itemRegistry.getAll ? app.itemRegistry.getAll() : [])
       .filter(function(e) { return e && e.item && e.item.data && e.item.data.isEvent && e.item.data.eventName === p.event; })
       .map(function(e) { return e.id || e.itemId; });
