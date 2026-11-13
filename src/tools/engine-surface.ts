@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main b4adb4684f47116c997a37b727bc2458f0fe52ad
- * sha256:    804e1cb5b8ccc7701e6f45c1ba7d3a4c3da77b8830957a7f59a760939e07c974   (of PinePaper.js as committed)
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 3f36271eb61aa091920e076b4434d491085d23ef
+ * sha256:    9a900bd7bf104691591e294d955b37cca6c13eb3af4e2a8a7d24c535f2ae2fd3   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on `window.app`, with how it gets there. The parity
@@ -16,7 +16,7 @@
 /** How a name lands on `app`. */
 export type EngineMemberKind = 'method' | 'accessor' | 'property' | 'lazy' | 'lazyHeavy' | 'bootstrap';
 
-/** 1594 names, from FxTool/js/PinePaper.js. */
+/** 1595 names, from FxTool/js/PinePaper.js. */
 export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object.freeze({
   __buildFreshness: 'property',
   _aboveHooksHeld: 'property',
@@ -839,6 +839,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   drawYeganehMountains: 'method',
   duplicateSelected: 'bootstrap',
   ease: 'property',
+  editAtPlayhead: 'method',
   editStyledText: 'method',
   effectSystem: 'lazy',
   emit: 'method',
