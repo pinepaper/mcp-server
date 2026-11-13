@@ -2512,6 +2512,9 @@ function generateKeyframeAnimateCode(
   // merge support — an older engine takes the option and replaces anyway.
   const __ki = _target && (_target.item || _target);
   const __prev = (__ki && __ki.data && Array.isArray(__ki.data.keyframes)) ? __ki.data.keyframes.map(function(k) { return k && k.time; }) : [];
+  // SQUASH35: a merge whose new key lands on an existing key's time takes the new key's easing, in silence. The
+  // earlier keys' easings, by time, so a collision that changed one can be named.
+  const __prevEase = (__ki && __ki.data && Array.isArray(__ki.data.keyframes)) ? __ki.data.keyframes.map(function(k) { return [k && k.time, (k && k.easing) || 'linear']; }) : [];
   const __opts = ${JSON.stringify(opts)};
   app.addAnimation(${addAnimTarget}, ${keyframesJson}, __opts);
   const __warn = [];${easingAtCheck}${textKeyCheck}${filterKeyCheck}
@@ -2521,6 +2524,12 @@ function generateKeyframeAnimateCode(
   // on its own keys at generation time).
   const __all = (__ki && __ki.data && Array.isArray(__ki.data.keyframes)) ? __ki.data.keyframes : [];
   const __props = __all.reduce(function(acc, k) { Object.keys((k && k.properties) || {}).forEach(function(p) { if (acc.indexOf(p) < 0) acc.push(p); }); return acc; }, []);
+  const __collide = __prevEase.map(function(pe) {
+    const k = __all.find(function(n) { return n && n.time === pe[0]; });
+    const ne = k ? (k.easing || 'linear') : null;
+    return (ne && ne !== pe[1]) ? { time: pe[0], was: pe[1], now: ne } : null;
+  }).filter(Boolean);
+  if (__collide.length) __warn.push('append: ' + __collide.length + ' new key(s) landed on the time of an existing key and replaced its easing (' + __collide.slice(0, 5).map(function(c) { return 't=' + c.time + ' ' + c.was + ' -> ' + c.now; }).join(', ') + '). Pass the easing you want on the colliding key, or move the new key off that time.');
   const __gaps = __all.length > 1 ? __all.map(function(k) { const have = Object.keys((k && k.properties) || {}); return { time: k && k.time, missing: __props.filter(function(p) { return have.indexOf(p) < 0; }) }; }).filter(function(g) { return g.missing.length; }) : [];` : ''}
   const __track = !__prev.length ? null
     : ${append ? `(__kept
