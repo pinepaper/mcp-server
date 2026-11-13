@@ -321,6 +321,12 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   up to 40) and says that more headroom narrows the luma range. It used to suggest 12 again.
 - An appended keyframe that lands on an existing key's time and changes its easing is named
   in the reply (the time, and the easing before and after).
+- `pinepaper_rigging` `interpolate_poses` applies the blended pose to the skeleton and returns
+  the angles. It used to compute the blend and discard it.
+- `pinepaper_deform` `apply` fails, with the studio's reason and code, when the studio refuses
+  the deform (an unknown preset, a missing item, an item with no path to deform).
+- A character action lists what it applied. On a character with no skeleton (one made with
+  `pinepaper_character`) it says so, and it fails when nothing ran.
 
 ### Changed
 
