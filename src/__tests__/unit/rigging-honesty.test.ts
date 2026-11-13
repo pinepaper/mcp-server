@@ -61,3 +61,16 @@ describe('a character action says what it applied, and fails when nothing was', 
     expect(r.warning).toBeUndefined();
   });
 });
+
+describe('auto_walk refusal: the studio reason first, a hint for non-walkers otherwise', () => {
+  const run2 = (warnings: unknown[]) => new Function('app', 'return ' + codeGenerator.generateRigging({ action: 'auto_walk', skeletonId: 'sk1' } as never).replace(/^\/\/.*\n/, '').replace(/;\s*$/, ''))({ riggingSystem: { autoWalk: () => null }, lastReceipt: { warnings } }) as any;
+  it('names how a bird moves when the studio says nothing', () => {
+    const r = run2([]);
+    expect(r.success).toBe(false);
+    expect(r.error).toContain("bird_flap");
+  });
+  it('passes the studio rig-aware reason through', () => {
+    const r = run2([{ kind: 'auto-walk-no-walk-poses', message: 'a bird has no walk cycle; use bird_flap' }]);
+    expect(r.error).toBe('a bird has no walk cycle; use bird_flap');
+  });
+});
