@@ -7,7 +7,7 @@ describe('interpolate_poses applies the blend it computed (it was discarded)', (
   it('applies the angles to the pose skeleton and returns them', () => {
     const applied: unknown[] = [];
     const R = {
-      poses: new Map([['a', { skeletonId: 'sk1' }]]),
+      getPose: (id: string) => (id === 'a' ? { skeletonId: 'sk1' } : null),
       interpolatePoses: () => ({ upperArm_L: 0.5 }),
       applyBoneAngles: (sk: string, angles: unknown) => applied.push([sk, angles]),
     };
@@ -17,7 +17,7 @@ describe('interpolate_poses applies the blend it computed (it was discarded)', (
     expect(r.boneAngles).toEqual({ upperArm_L: 0.5 });
   });
   it('a missing pose is still refused', () => {
-    const R = { poses: new Map(), interpolatePoses: () => null, applyBoneAngles() {} };
+    const R = { getPose: () => null, interpolatePoses: () => null, applyBoneAngles() {} };
     expect((run(codeGenerator.generateRigging({ action: 'interpolate_poses', poseIdA: 'a', poseIdB: 'b' } as never), { riggingSystem: R }) as any).success).toBe(false);
   });
 });

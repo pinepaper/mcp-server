@@ -16346,7 +16346,7 @@ ${guard('unlockAllItems')}${pass('app.unlockAllItems()')}
           `  // interpolatePoses RETURNS the blended angles and changes nothing; they were discarded and the call said success.
   const angles = R.interpolatePoses(${S(input.poseIdA)}, ${S(input.poseIdB)}, ${input.t ?? 0.5});
   if (!angles) { return { success: false, action: 'interpolate_poses', error: "one of the two poses does not exist, or they belong to DIFFERENT skeletons — blending across rigs is not defined. Call list_poses to see which skeleton each belongs to" }; }
-  const __pose = R.poses && R.poses.get ? R.poses.get(${S(input.poseIdA)}) : null;
+  const __pose = R.getPose(${S(input.poseIdA)});
   const skeletonId = __pose && __pose.skeletonId;
   if (!skeletonId || typeof R.applyBoneAngles !== 'function') { return { success: false, action: 'interpolate_poses', boneAngles: angles, error: 'the blend was computed but could not be applied: this studio does not say which skeleton pose ' + ${S(input.poseIdA)} + ' belongs to. Apply boneAngles yourself, or key them with add_pose_keyframe.' }; }
   R.applyBoneAngles(skeletonId, angles);
