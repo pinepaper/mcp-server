@@ -42,6 +42,7 @@ deform_wobble
 drag_to_turn
 draws_figure
 driven_by
+effect_aurora
 effect_blast
 effect_bubbles
 effect_caustics
@@ -52,10 +53,13 @@ effect_electric_arc
 effect_fire
 effect_fireflies
 effect_gem_smoke
+effect_glitch
 effect_glow
 effect_heatmap
 effect_ink_bleed
 effect_liquid_metal
+effect_orbit_swirl
+effect_petals
 effect_rain
 effect_rain_veil
 effect_ripple
