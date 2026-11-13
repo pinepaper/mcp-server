@@ -571,6 +571,15 @@ describe('broadcast luma is measured, and a legaliser named (8.35, FxTool 4f1ec3
     expect(w.map((x) => x.code)).not.toContain('bitrate_below_floor');
   });
 
+  it('BROADHEAD: the warning prescribes a headroom ABOVE the one used, never the one that just failed', async () => {
+    const at12 = (await run({ broadcast: true }, { broadcast: true, bitrate: 8e6, achievedBitrate: 8e6, headroom: 12, luma })).w.find((x) => x.code === 'luma_out_of_range')!;
+    expect(at12.message).toContain('broadcastHeadroom 24 (above the 12 this used');
+    expect(at12.message).not.toContain('12 measured clean');
+    const at40 = (await run({ broadcast: true, broadcastHeadroom: 40 }, { broadcast: true, bitrate: 8e6, achievedBitrate: 8e6, headroom: 40, luma })).w.find((x) => x.code === 'luma_out_of_range')!;
+    expect(at40.message).toContain('already at its most (40)');
+    expect(at40.message).toContain('REQUIRED');
+  });
+
   it('clean luma raises nothing; a missed floor is still its own warning', async () => {
     const { w } = await run({ broadcast: true }, { broadcast: true, bitrate: 8e6, achievedBitrate: 1.84e6, bitrateFloor: 8e6, bitExact: true, luma: { ...luma, outOfRange: 0, outOfRangeFraction: 0 } });
     expect(w.map((x) => x.code)).toEqual(['bitrate_below_floor']);
