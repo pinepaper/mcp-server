@@ -31,7 +31,7 @@
  */
 
 import { describe, it, expect } from 'bun:test';
-import { ENGINE_EFFECT_TYPES } from '../../tools/engine-lists.js';
+import { ENGINE_EFFECT_TYPES, ENGINE_GENERATOR_NAMES } from '../../tools/engine-lists.js';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { GeneratorNameSchema, EffectTypeSchema, RelationTypeSchema, ItemTypeSchema, THREAD_STITCHES } from '../../types/schemas.js';
@@ -41,7 +41,8 @@ const fixture = (name: string) =>
     .split('\n').map((l) => l.trim()).filter(Boolean);
 
 describe('generatorName ↔ the engine registry', () => {
-  const engine = fixture('engine-generators.txt');
+  // Generated from GeneratorRegistry.js by scripts/sync-engine-lists.mjs (the fixture went stale: 23 generators refused).
+  const engine: string[] = [...ENGINE_GENERATOR_NAMES];
 
   it('every registered generator is callable', () => {
     const missing = engine.filter((g) => !GeneratorNameSchema.options.includes(g as never));
@@ -204,8 +205,8 @@ describe('parity claims cite a guard that exists', () => {
 
   it('every cited fixture is on disk and non-empty', () => {
     const fixtures = [...SCHEMAS.matchAll(/fixture[s]?:\s+(engine-[a-z-]+\.txt)/g)].map((m) => m[1]!);
-    // 2 since effectType moved from a fixture to the generated ENGINE_EFFECT_TYPES (the fixture went stale).
-    expect(fixtures.length).toBeGreaterThanOrEqual(2);
+    // 1 since effectType and generatorName moved from fixtures to generated lists (both fixtures went stale).
+    expect(fixtures.length).toBeGreaterThanOrEqual(1);
     for (const f of new Set(fixtures)) {
       const rows = fixture(f);
       // An emptied fixture makes every parity test that reads it vacuous.

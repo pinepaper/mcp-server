@@ -9,7 +9,7 @@
  */
 
 import { z } from 'zod';
-import { ENGINE_EASING_NAMES, DESIGN_MEDIA, DESIGN_MEDIA_APPLY, FILTER_TYPES, LINEAGE_KINDS, STYLED_SCENE_STYLES, PATTERN_KINDS, ANIMATION_TYPES, ANIMATION_WAVEFORMS, ANIMATION_ORIGINS, ENGINE_EFFECT_TYPES } from '../tools/engine-lists.js';
+import { ENGINE_EASING_NAMES, DESIGN_MEDIA, DESIGN_MEDIA_APPLY, FILTER_TYPES, LINEAGE_KINDS, STYLED_SCENE_STYLES, PATTERN_KINDS, ANIMATION_TYPES, ANIMATION_WAVEFORMS, ANIMATION_ORIGINS, ENGINE_EFFECT_TYPES, ENGINE_GENERATOR_NAMES } from '../tools/engine-lists.js';
 
 // =============================================================================
 // COMMON SCHEMAS
@@ -983,101 +983,8 @@ export type ExecuteCustomCodeInput = z.infer<typeof ExecuteCustomCodeInputSchema
 // GENERATOR TYPES
 // =============================================================================
 
-/** Engine parity ENFORCED BY src/__tests__/unit/preflight-gate-parity.test.ts (fixture: engine-generators.txt). */
-export const GeneratorNameSchema = z.enum([
-  // Classic generators
-  'drawSunburst',
-  'drawSunsetScene',
-  'drawGrid',
-  'drawStackedCircles',
-  'drawCircuit',
-  'drawWaves',
-  'drawPattern',
-  // Visual generators
-  'drawBokeh',
-  'drawGradientMesh',
-  'drawGeometricAbstract',
-  'drawWindField',
-  'drawFluidFlow',
-  'drawOrganicFlow',
-  'drawNoiseTexture',
-  'drawGlobeWireframe',
-  // Scene generators
-  'drawPerspectiveGrid',
-  'drawPoissonDisk',
-  'drawPoissonShapesAsync',
-  'drawGoldenSpiral',
-  'drawFibonacci',
-  'createShape',
-  'createGradientCircle',
-  'drawStarfield',
-  'drawSolarSystem',
-  'drawDayNightCycle',
-  'drawCosmosSpace',
-  'drawTadpoles',
-  'drawMetaballs',
-  'drawKaleidoscope',
-  'drawFlowField',
-  'drawNeonGrid',
-  'drawConstellation',
-  'drawTessellation',
-  // Decorative generators
-  'drawSunburstLines',
-  'drawGlowOrbs',
-  'drawConcentricRings',
-  'drawCornerAccents',
-  'drawFlowCurves',
-  'drawFallingPetals',
-  'drawFireflies',
-  'drawFloatingLeaves',
-  'drawVoronoi',
-  // Map generators
-  'drawWorldMap',
-  'drawUSAMap',
-  'drawCountryMap',
-  'drawChoroplethMap',
-  // PineMath generators
-  'drawFunctionPlot',
-  'drawParametricCurve',
-  'drawSimulation',
-  'drawSpectrumAnalyzer',
-  'draw3DSurface',
-  // S6 seeded procedural generators (curated presets + Motion group)
-  'drawTruchet',
-  'drawHalftone',
-  'drawRibbons',
-  // GPU / GLSL math-art generators
-  'drawFormulaArt',
-  'drawParametricCollection',
-  'drawShaderArt',
-  'drawYeganehMountains',
-  // OKLCH seeded backgrounds + 3D parametric curve
-  'drawBlobs',
-  'drawLowPoly',
-  'drawPeaks',
-  'drawScatter',
-  'drawStackedWaves',
-  'draw3DParametricCurve',
-
-  // THE GATE WAS NARROWER THAN THE ENGINE, and generatorName is a hard
-  // preflight gate — an unlisted name is rejected before the browser sees
-  // it. The engine registers 74 generators and this offered 64, so these
-  // ten were live and uncallable. Seven are the GPU field generators, which
-  // is the expensive half: create_item's `field` type, design_medium's flow
-  // fields and the design graph's own recipe example all name drawGPUTunnel,
-  // so a captured scene recording `generator: 'drawGPUTunnel'` could not be
-  // replayed through the tool that exists to replay it.
-  'draw3DWorld',
-  'drawCharacterEyes',
-  'drawGPUCaustics',
-  'drawGPUClouds',
-  'drawGPUOcean',
-  'drawGPUPlasma',
-  'drawGPUStarfield',
-  'drawGPUTunnel',
-  'drawGPUVoronoi',
-  'drawRiggedCharacter',
-]).describe('Background generator name');
+/** Engine parity ENFORCED BY src/__tests__/unit/preflight-gate-parity.test.ts against the GENERATED list (scripts/sync-engine-lists.mjs ENGINE_GENERATOR_NAMES): every generator the studio registers. */
+export const GeneratorNameSchema = z.enum(ENGINE_GENERATOR_NAMES as unknown as [string, ...string[]]).describe('Background generator name');
 
 export type GeneratorName = z.infer<typeof GeneratorNameSchema>;
 

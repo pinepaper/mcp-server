@@ -106,6 +106,7 @@ const RELATIONS_REL = 'js/RelationRegistry.js';
 const ANIM_REL = 'js/core/AnimationDriver.js';
 const PINEPAPER_REL = 'js/PinePaper.js';
 const AURA_REL = 'js/ItemAuraSystem.js';
+const GENERATORS_REL = 'js/GeneratorRegistry.js';
 
 /** The body of a method or function `head(...) {`, brace-matched; null when it cannot be found. */
 function blockAfter(src, head) {
@@ -132,6 +133,17 @@ function effectTypes(relSrc, auraSrc) {
   const auras = [...reg.matchAll(/^  ([a-z_]+):\s*\{/gm)].map((m) => m[1]);
   if (particles.length < 10 || auras.length < 4) throw new Error(`sync-engine-lists: effect lists look wrong (${particles.length} particle, ${auras.length} aura)`);
   return { particles, auras };
+}
+
+/**
+ * GENERATOR NAMES: every this.register('drawX', …) in GeneratorRegistry.js. The hand enum and its stored fixture
+ * went stale together: 23 registered generators (the 14 foreground ones from #362, and older ones such as
+ * drawMaze and drawSpirograph) were refused at preflight.
+ */
+function generatorNames(src) {
+  const names = [...new Set([...src.matchAll(/this\.register\(\s*'([a-zA-Z0-9_]+)'/g)].map((m) => m[1]))];
+  if (names.length < 50) throw new Error(`sync-engine-lists: only ${names.length} generators found in GeneratorRegistry.js`);
+  return names;
 }
 
 function animationOptionKeys(ppSrc, animSrc) {
@@ -425,6 +437,9 @@ async function generate() {
   const auraSrc = readCommitted(AURA_REL);
   if (!auraSrc) throw new Error(`sync-engine-lists: cannot read ${AURA_REL}`);
   const effects = effectTypes(relSrc, auraSrc);
+  const genSrc = readCommitted(GENERATORS_REL);
+  if (!genSrc) throw new Error(`sync-engine-lists: cannot read ${GENERATORS_REL}`);
+  const generators = generatorNames(genSrc);
 
   return `/**
  * GENERATED — DO NOT EDIT. Run \`bun run sync:engine-lists\`.
@@ -445,7 +460,13 @@ async function generate() {
  *   ${ANIM_REL}  sha256: ${digest(animSrc)}
  *   ${PINEPAPER_REL}  sha256: ${digest(ppSrc)}
  *   ${AURA_REL}  sha256: ${digest(auraSrc)}
+ *   ${GENERATORS_REL}  sha256: ${digest(genSrc)}
  */
+
+/** ${generators.length} generators: every name GeneratorRegistry.js registers. */
+export const ENGINE_GENERATOR_NAMES = [
+${list(generators)}
+] as const;
 
 /** ${effects.particles.length} particle effects (RelationRegistry.registerEffectRelations) then ${effects.auras.length} shader auras (ItemAuraSystem AURA_REGISTRY): everything app.applyEffect applies. */
 export const ENGINE_EFFECT_TYPES = [
