@@ -327,6 +327,10 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   the deform (an unknown preset, a missing item, an item with no path to deform).
 - A character action lists what it applied. On a character with no skeleton (one made with
   `pinepaper_character`) it says so, and it fails when nothing ran.
+- An auto motion that a rig cannot do (`auto_walk` on a bird) is refused with the studio's
+  reason for that rig and what works instead (for a bird, `apply_pose_transition 'bird_flap'`).
+- An opacity track on a morphing item carries through the end of the morph (the studio's fix);
+  the `morphs_to` docs say it is rewritten every frame while the relation exists.
 - `pinepaper_create_character` no longer draws a placeholder circle when it has no concept to draw:
   it makes a rigged character whose base fits the request (person, robot, cat, bird or blob; a
   pigeon is a bird), or refuses, naming the five. For walking, poses and actions, make
