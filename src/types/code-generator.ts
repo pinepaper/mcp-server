@@ -16406,7 +16406,8 @@ ${guard('unlockAllItems')}${pass('app.unlockAllItems()')}
           auto_jump: "saved jump poses (idle, jump_anticipation, jump_apex, jump_land; load_pose_library 'humanoid' saves them). A bird has none: apply_pose_transition 'bird_flap' instead",
         };
         return wrap(`Rigging: ${input.action}`,
-          `  const res = R.${method}(${S(input.skeletonId)}, ${S(input.options ?? {})});
+          `  // Through the app's door where it has one: that is where the studio writes the rig-aware receipt (auto-* kinds).
+  const res = app.${method} ? app.${method}(${S(input.skeletonId)}, ${S(input.options ?? {})}) : R.${method}(${S(input.skeletonId)}, ${S(input.options ?? {})});
   // A refusal is null on older studios and { ok: false, reason, kind } on newer ones (rig-aware): both are refusals.
   const __refused = !res || res.ok === false;
   if (!__refused && app.historyManager) app.historyManager.saveState();
