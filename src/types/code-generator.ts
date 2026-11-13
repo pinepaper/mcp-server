@@ -16400,18 +16400,20 @@ ${guard('unlockAllItems')}${pass('app.unlockAllItems()')}
           // saves. It is not a procedural generator, it is a pose player, and
           // saying "needs a skeleton" when the skeleton is right there sends an
           // agent looking in the wrong place.
-          auto_walk: "at least 2 saved walk poses (walk_00…, or walk_contact_L / walk_passing_L / walk_contact_R / walk_passing_R). A person or robot rig: run load_pose_library with libraryName 'humanoid' (a cat: 'quadruped') first, which saves exactly those. A rig with no walk cycle (a bird, a fish) moves another way: apply_pose_transition 'bird_flap' or 'fish_swim' (they loop), auto_jump to hop, or move_root to carry it",
+          auto_walk: "at least 2 saved walk poses (walk_00…, or walk_contact_L / walk_passing_L / walk_contact_R / walk_passing_R). A person or robot rig: run load_pose_library with libraryName 'humanoid' (a cat: 'quadruped') first, which saves exactly those. A rig with no walk cycle (a bird, a fish) moves another way: apply_pose_transition 'bird_flap' or 'fish_swim' (they loop), or move_root to carry it",
           auto_breath: 'a bone named spine, chest, upper_spine or body',
           auto_idle: 'a bone named head, hip, upper_hub or spine',
-          auto_jump: 'a skeleton, and saved jump poses if you want a posed jump rather than a root arc',
+          auto_jump: "saved jump poses (idle, jump_anticipation, jump_apex, jump_land; load_pose_library 'humanoid' saves them). A bird has none: apply_pose_transition 'bird_flap' instead",
         };
         return wrap(`Rigging: ${input.action}`,
           `  const res = R.${method}(${S(input.skeletonId)}, ${S(input.options ?? {})});
-  if (res && app.historyManager) app.historyManager.saveState();
+  // A refusal is null on older studios and { ok: false, reason, kind } on newer ones (rig-aware): both are refusals.
+  const __refused = !res || res.ok === false;
+  if (!__refused && app.historyManager) app.historyManager.saveState();
   // The studio's own reason first, where it gives one (rig-aware: it knows the rig); this list otherwise.
   const __why = (app.lastReceipt && Array.isArray(app.lastReceipt.warnings) ? app.lastReceipt.warnings : [])
     .filter(function (w) { return w && /^auto-/.test(String(w.kind || w.code || '')); }).map(function (w) { return w.message || w.reason; }).filter(Boolean).join(' ');
-  if (!res) { return { success: false, action: ${S(input.action)}, error: __why || ${S(`refused — needs ${needs[input.action]}.`)} }; }
+  if (__refused) { return { success: false, action: ${S(input.action)}, error: (res && res.reason) || __why || ${S(`refused — needs ${needs[input.action]}.`)}, ...(res && res.kind ? { code: res.kind } : {}) }; }
   return { success: true, action: ${S(input.action)}, result: res };`);
       }
       case 'move_root':

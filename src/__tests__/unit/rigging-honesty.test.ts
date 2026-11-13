@@ -69,6 +69,12 @@ describe('auto_walk refusal: the studio reason first, a hint for non-walkers oth
     expect(r.success).toBe(false);
     expect(r.error).toContain("bird_flap");
   });
+  it('an { ok: false, reason, kind } return is a refusal, not a success', () => {
+    const r = new Function('app', 'return ' + codeGenerator.generateRigging({ action: 'auto_walk', skeletonId: 'sk1' } as never).replace(/^\/\/.*\n/, '').replace(/;\s*$/, ''))({ riggingSystem: { autoWalk: () => ({ ok: false, reason: 'no walk cycle. Instead: bird_flap', kind: 'auto-walk-no-walk-poses' }) }, lastReceipt: { warnings: [] } }) as any;
+    expect(r.success).toBe(false);
+    expect(r.error).toContain('Instead: bird_flap');
+    expect(r.code).toBe('auto-walk-no-walk-poses');
+  });
   it('passes the studio rig-aware reason through', () => {
     const r = run2([{ kind: 'auto-walk-no-walk-poses', message: 'a bird has no walk cycle; use bird_flap' }]);
     expect(r.error).toBe('a bird has no walk cycle; use bird_flap');
