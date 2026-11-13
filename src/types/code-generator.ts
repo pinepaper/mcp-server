@@ -12874,6 +12874,17 @@ if (!app.spriteSystem) return { error: 'SpriteSheetSystem not available' };`;
   const gid = ${idExpr};
   const group = app.getItemById(gid) || (app.groupManager.getGroupById ? app.groupManager.getGroupById(gid) : null);
   if (!group) return { success: false, error: 'Group not found: ' + gid };
+  // A FOREGROUND GENERATOR'S OUTPUT (a chat thread, a phone frame) is a generator composition, not a user group:
+  // the studio releases it into ordinary items through releaseParts (what Ungroup / app.ungroupSelection does).
+  // The group manager's ungroup does not know its parts.
+  const __gd = group.data || {};
+  if ((__gd.generatorParts === true || (__gd.generatorPart && __gd.generatorPart !== 'text')) && app.generatorRegistry && app.generatorRegistry.releaseParts) {
+    const r = app.generatorRegistry.releaseParts(group);
+    if (!r || !r.ok) return { success: false, error: (r && r.reason) || 'the studio did not release the generator composition' };
+    if (app.historyManager) app.historyManager.saveState();
+    const ids = (r.items || []).map(function (it) { return it && it.data && (it.data.registryId || it.data.id); }).filter(Boolean);
+    return { success: true, ungrouped: true, groupId: gid, generator: true, itemIds: ids, count: ids.length };
+  }
   app.groupManager.ungroupAll(group);
   if (app.historyManager) app.historyManager.saveState();
   return { success: true, ungrouped: true, groupId: gid };

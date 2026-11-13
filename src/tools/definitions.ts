@@ -7754,6 +7754,7 @@ USE WHEN:
 - Creating dynamic procedural backgrounds
 
 GENERATORS (highlights; all ${GeneratorNameSchema.options.length} are in the generatorName enum):
+- FOREGROUND (product and story content, drawn as editable items rather than a backdrop): drawChatThread, drawPhoneFrame, drawBrowserMockup, drawTerminalTyping, drawMetricCard, drawFunnel, drawRoadmapTimeline, drawComparisonSplit, drawBeatCaptions. Pass params.interactive: true to make the output editable: each text and card becomes an item, and pinepaper_group ungroup on the composition (pinepaper_get_items lists it, with the generator name as its type) releases it into separate items. Without it the output is one flat drawing.
 
 Classic:
 - drawSunburst: Radial rays from center (rayCount, colors, bgColor, opacity, rayGap, gradientRays)
