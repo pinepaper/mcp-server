@@ -11901,7 +11901,15 @@ case 'analyze_palette':
   ${guard}
   const entry = app.itemRegistry.get(${itemIdStr});
   if (!entry || !entry.item) return { error: 'Item not found: ' + ${itemIdStr} };
-  app.deformPresets.apply(entry.item, ${jsLiteral(input.preset)}, ${JSON.stringify(params)});
+  // The engine refuses by name (deform-unknown-preset, deform-no-item, deform-no-geometry), in its return and in the
+  // receipt. The return was ignored, so a refused deform said success.
+  const __r = app.deformPresets.apply(entry.item, ${jsLiteral(input.preset)}, ${JSON.stringify(params)});
+  const __rw = (app.lastReceipt && Array.isArray(app.lastReceipt.warnings) ? app.lastReceipt.warnings : [])
+    .filter(function (w) { return w && /^deform-/.test(String(w.kind || w.code || '')); });
+  if (__r === false || (__r && (__r.ok === false || __r.success === false)) || __rw.length) {
+    const __why = (__r && (__r.reason || __r.error)) || __rw.map(function (w) { return w.message || w.reason || w.kind || w.code; }).join(' ') || 'the studio did not apply the deform';
+    return { success: false, action: 'apply', itemId: ${itemIdStr}, preset: ${jsLiteral(input.preset)}, error: __why, ...(__rw.length ? { code: __rw[0].kind || __rw[0].code } : {}) };
+  }
   return { success: true, action: 'apply', itemId: ${itemIdStr}, preset: ${jsLiteral(input.preset)} };
 })();`.trim();
       }
@@ -14154,30 +14162,28 @@ ${cam ? `  // The camera rides the SAME timing: framing each state as its morph 
   const itemId = charItem.id || (charItem.data && charItem.data.id) || targetId;
   const skelId = (charItem.data && charItem.data.characterId) ? 'character_' + charItem.data.characterId : null;
 
+  // WHAT WAS APPLIED, NOT ASSUMED. A concept character (pinepaper_character) has parts and keyframes but no
+  // skeleton, so the skeleton branch did nothing and the call still said success.
+  const rs = app.riggingSystem;
+  const hasSkeleton = !!(skelId && rs && rs.skeletons && rs.skeletons.has(skelId));
+  const applied = [];
   if (act === 'walk' || act === 'run' || act === 'locomotion') {
-    if (typeof app.addRelation === 'function') {
-      app.addRelation(itemId, null, 'locomotion', {
-        skeletonId: skelId,
-        speed: speed,
-        cycleDistance: 150,
-      });
-    }
-  } else if (app.riggingSystem) {
-    const rs = app.riggingSystem;
-    if (skelId && rs.skeletons && rs.skeletons.has(skelId)) {
-      if (typeof rs.applyBoneAngles === 'function') {
-        rs.applyBoneAngles(skelId, { spine: 0.1, left_arm: -0.5, right_arm: 0.5 });
-        if (typeof rs.solveFK === 'function') rs.solveFK(skelId);
-      }
-    }
+    if (typeof app.addRelation === 'function' && app.addRelation(itemId, null, 'locomotion', { skeletonId: skelId, speed: speed, cycleDistance: 150 })) applied.push('locomotion relation');
+  } else if (hasSkeleton && typeof rs.applyBoneAngles === 'function') {
+    rs.applyBoneAngles(skelId, { spine: 0.1, left_arm: -0.5, right_arm: 0.5 });
+    if (typeof rs.solveFK === 'function') rs.solveFK(skelId);
+    applied.push('bone angles');
   }
 
   if (typeof app.animate === 'function' && (act === 'wave' || act === 'dance' || act === 'jump' || act === 'idle')) {
     app.animate(charItem, { animationType: act === 'jump' ? 'bounce' : (act === 'idle' ? 'breathe' : 'wobble') });
+    applied.push('whole-figure ' + (act === 'jump' ? 'bounce' : (act === 'idle' ? 'breathe' : 'wobble')));
   }
 
   if (app._scheduleRepaint) app._scheduleRepaint();
-  return { success: true, characterId: targetId || itemId, action: act };
+  const note = hasSkeleton ? null : 'this character has no skeleton (a concept character is parts and keyframes), so bone actions and rigging calls on it act on nothing' + (applied.length ? '; what ran: ' + applied.join(', ') : '') + '. For posed motion, build it with pinepaper_rigging or pinepaper_stick.';
+  if (!applied.length) return { success: false, characterId: targetId || itemId, action: act, error: note || ('nothing was applied for action ' + act) };
+  return { success: true, characterId: targetId || itemId, action: act, applied: applied, skeleton: hasSkeleton, ...(note ? { warning: note } : {}) };
 })();`.trim();
   }
 
@@ -16337,9 +16343,15 @@ ${guard('unlockAllItems')}${pass('app.unlockAllItems()')}
   return { success: true, action: 'load_pose', poseId: ${S(input.poseId)} };`);
       case 'interpolate_poses':
         return wrap('Rigging: interpolate poses',
-          `  const ok = R.interpolatePoses(${S(input.poseIdA)}, ${S(input.poseIdB)}, ${input.t ?? 0.5});
-  if (!ok) { return { success: false, action: 'interpolate_poses', error: "one of the two poses does not exist, or they belong to DIFFERENT skeletons — blending across rigs is not defined. Call list_poses to see which skeleton each belongs to" }; }
-  return { success: true, action: 'interpolate_poses', t: ${input.t ?? 0.5} };`);
+          `  // interpolatePoses RETURNS the blended angles and changes nothing; they were discarded and the call said success.
+  const angles = R.interpolatePoses(${S(input.poseIdA)}, ${S(input.poseIdB)}, ${input.t ?? 0.5});
+  if (!angles) { return { success: false, action: 'interpolate_poses', error: "one of the two poses does not exist, or they belong to DIFFERENT skeletons — blending across rigs is not defined. Call list_poses to see which skeleton each belongs to" }; }
+  const __pose = R.poses && R.poses.get ? R.poses.get(${S(input.poseIdA)}) : null;
+  const skeletonId = __pose && __pose.skeletonId;
+  if (!skeletonId || typeof R.applyBoneAngles !== 'function') { return { success: false, action: 'interpolate_poses', boneAngles: angles, error: 'the blend was computed but could not be applied: this studio does not say which skeleton pose ' + ${S(input.poseIdA)} + ' belongs to. Apply boneAngles yourself, or key them with add_pose_keyframe.' }; }
+  R.applyBoneAngles(skeletonId, angles);
+  if (app.historyManager) app.historyManager.saveState();
+  return { success: true, action: 'interpolate_poses', t: ${input.t ?? 0.5}, skeletonId: skeletonId, applied: true, boneAngles: angles };`);
       case 'play_pose_sequence': {
         const opts = S({
           ...(input.loop !== undefined ? { loop: input.loop } : {}),
