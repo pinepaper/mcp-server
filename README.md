@@ -327,6 +327,9 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   the deform (an unknown preset, a missing item, an item with no path to deform).
 - A character action lists what it applied. On a character with no skeleton (one made with
   `pinepaper_character`) it says so, and it fails when nothing ran.
+- `pinepaper_apply_effect` accepts the studio's new effects: `aurora`, `glitch`, `orbit_swirl`
+  (the particle swirl; `vortex` is the shader aura) and `petals`. The list of effects now comes
+  from the studio, so a new one is accepted without waiting for a server release.
 
 ### Changed
 
