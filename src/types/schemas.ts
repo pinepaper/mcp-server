@@ -352,7 +352,9 @@ export type SimpleAnimationType = z.infer<typeof SimpleAnimationTypeSchema>;
 export const KeyframeSchema = z.object({
   time: z.number().describe('Time in seconds for this keyframe'),
   properties: z.record(z.string(), z.unknown()).describe('Property values at this keyframe'),
-  easing: KeyframeEasingSchema.optional().default('linear'),
+  // NO DEFAULT HERE (SQUASH35): a filled-in 'linear' on a key the caller left without an easing overwrote the existing
+  // key's easing on append. The studio defaults a new key to linear itself, and on a merge keeps the existing easing.
+  easing: KeyframeEasingSchema.optional(),
   interpolation: z.literal('hold').optional().describe("'hold': this key holds ITS OWN value until the next key, then jumps (FxTool D11). Refused on a studio without hold keys."),
   hold: z.boolean().optional().describe("Same as interpolation: 'hold'."),
 });

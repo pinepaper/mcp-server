@@ -377,12 +377,12 @@ describe('Schema Validation', () => {
       expect(result.success).toBe(true);
     });
 
-    it('should use default easing if not provided', () => {
+    it('leaves easing unset when not provided, so an appended key keeps the existing easing (SQUASH35)', () => {
       const result = KeyframeSchema.parse({
         time: 0,
         properties: { opacity: 1 },
       });
-      expect(result.easing).toBe('linear');
+      expect(result.easing).toBeUndefined();
     });
 
     it('should reject invalid easing', () => {
