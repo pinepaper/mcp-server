@@ -17,7 +17,7 @@ import { TOOL_TAGS } from './toolkits.js';
 import { STICK_GAITS, STICK_POSES, STICK_SEQUENCES, STICK_EXPRESSIONS, STICK_PROPS } from './stick-vocabulary.js';
 import { AgentBatchOperationTypeSchema, GeneratorNameSchema, ItemTypeSchema } from '../types/schemas.js';
 import { expressionGrammarText } from './expression-grammar.js';
-import { ENGINE_EASING_NAMES, DESIGN_MEDIA, DESIGN_MEDIA_APPLY, FILTER_TYPES, FILTER_DOCS, LINEAGE_KINDS, STYLED_SCENE_STYLES, STYLED_SCENE_STYLE_INFO, PATTERN_KINDS, ANIMATION_TYPES, ANIMATION_WAVEFORMS, ANIMATION_ORIGINS } from './engine-lists.js';
+import { ENGINE_EASING_NAMES, DESIGN_MEDIA, DESIGN_MEDIA_APPLY, FILTER_TYPES, FILTER_DOCS, LINEAGE_KINDS, STYLED_SCENE_STYLES, STYLED_SCENE_STYLE_INFO, PATTERN_KINDS, ANIMATION_TYPES, ANIMATION_WAVEFORMS, ANIMATION_ORIGINS, ENGINE_EFFECT_TYPES } from './engine-lists.js';
 import {
   EffectTypeSchema,
   AgentExportFormatSchema,
@@ -7915,6 +7915,10 @@ EFFECTS (${EffectTypeSchema.options.length}: particles, then the shader auras fr
 - fireflies: Glowing wandering dots (color, count, speed, size, spread)
 - shockwave: Expanding concentric rings — burst type (speed, maxRadius, count, thickness)
 - trail: Fading afterimages following movement (speed, count, size, fadeRate)
+- aurora: Shimmering northern-lights curtain ribbons undulating around the item (color, speed, count, size, spread)
+- orbit_swirl: Small glowing orbs circling the item on spiralling elliptical orbits (color, speed, count, size, maxRadius). The particle swirl; vortex is the shader aura
+- glitch: RGB chromatic-aberration slices jittering across the item bounds (color, speed, count, size)
+- petals: Blossom petals tumbling and swaying across the item (color, speed, count, size, spread)
 
 SHADER AURAS (WebGL2, silhouette-clipped — same tool, routed to the aura system):
 - heatmap: Thermal shimmer aura (palette 0=Hot 1=Cool 2=Violet)
@@ -7937,7 +7941,7 @@ EXAMPLE — gold liquid-metal aura outside a logo:
         itemId: { type: 'string', description: 'Registry ID of the item' },
         effectType: {
           type: 'string',
-          enum: ['sparkle', 'blast', 'smoke', 'fire', 'rain', 'snow', 'confetti', 'ripple', 'glow', 'electric', 'bubbles', 'dust', 'fireflies', 'shockwave', 'trail', 'heatmap', 'liquid_metal', 'gem_smoke', 'electric_arc', 'vortex', 'rain_veil', 'caustics', 'ink_bleed'],
+          enum: [...ENGINE_EFFECT_TYPES],
           description: 'Type of effect',
         },
         params: {

@@ -31,6 +31,7 @@
  */
 
 import { describe, it, expect } from 'bun:test';
+import { ENGINE_EFFECT_TYPES } from '../../tools/engine-lists.js';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { GeneratorNameSchema, EffectTypeSchema, RelationTypeSchema, ItemTypeSchema, THREAD_STITCHES } from '../../types/schemas.js';
@@ -91,7 +92,8 @@ describe('effectType ↔ the engine, from a fixture rather than my own typing', 
    * would have passed for a seventh preset. Two repos, one mistake, neither
    * visible by inspection.)
    */
-  const engine = fixture('engine-effects.txt');
+  // Generated from the engine by scripts/sync-engine-lists.mjs (the fixture went stale: #362's four new effects).
+  const engine: string[] = [...ENGINE_EFFECT_TYPES];
 
   it('every effect the engine can apply is callable', () => {
     const missing = engine.filter((e) => !EffectTypeSchema.options.includes(e as never));
@@ -202,7 +204,8 @@ describe('parity claims cite a guard that exists', () => {
 
   it('every cited fixture is on disk and non-empty', () => {
     const fixtures = [...SCHEMAS.matchAll(/fixture[s]?:\s+(engine-[a-z-]+\.txt)/g)].map((m) => m[1]!);
-    expect(fixtures.length).toBeGreaterThanOrEqual(3);
+    // 2 since effectType moved from a fixture to the generated ENGINE_EFFECT_TYPES (the fixture went stale).
+    expect(fixtures.length).toBeGreaterThanOrEqual(2);
     for (const f of new Set(fixtures)) {
       const rows = fixture(f);
       // An emptied fixture makes every parity test that reads it vacuous.

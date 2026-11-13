@@ -9,7 +9,7 @@
  */
 
 import { z } from 'zod';
-import { ENGINE_EASING_NAMES, DESIGN_MEDIA, DESIGN_MEDIA_APPLY, FILTER_TYPES, LINEAGE_KINDS, STYLED_SCENE_STYLES, PATTERN_KINDS, ANIMATION_TYPES, ANIMATION_WAVEFORMS, ANIMATION_ORIGINS } from '../tools/engine-lists.js';
+import { ENGINE_EASING_NAMES, DESIGN_MEDIA, DESIGN_MEDIA_APPLY, FILTER_TYPES, LINEAGE_KINDS, STYLED_SCENE_STYLES, PATTERN_KINDS, ANIMATION_TYPES, ANIMATION_WAVEFORMS, ANIMATION_ORIGINS, ENGINE_EFFECT_TYPES } from '../tools/engine-lists.js';
 
 // =============================================================================
 // COMMON SCHEMAS
@@ -1249,41 +1249,8 @@ export const NoiseTextureParamsSchema = z.object({
 // EFFECT TYPES
 // =============================================================================
 
-/** Engine parity ENFORCED BY src/__tests__/unit/preflight-gate-parity.test.ts (fixture: engine-effects.txt). */
-export const EffectTypeSchema = z.enum([
-  'sparkle',
-  'blast',
-  'smoke',
-  'fire',
-  'rain',
-  'snow',
-  'confetti',
-  'ripple',
-  'glow',
-  'electric',
-  'bubbles',
-  'dust',
-  'fireflies',
-  'shockwave',
-  'trail',
-  // Shader auras (WebGL2 silhouette-clipped) — routed to ItemAuraSystem by
-  // the same app.applyEffect entry point as the particle types.
-  'heatmap',
-  'liquid_metal',
-  'gem_smoke',
-  'electric_arc',
-  'vortex',
-  'rain_veil',
-  'caustics',
-
-  // ink_bleed was the LAST aura and the gate rejected it. The engine's own
-  // comment says it 'has shipped unroutable through applyEffect since it was
-  // added' — past tense, describing a bug it then fixed: _publishNames()
-  // publishes every aura definition, and PinePaper.applyEffect warms the
-  // subsystem before routing, so all eight route now. Reading the comment
-  // would have kept it out; reading the mechanism put it in.
-  'ink_bleed',
-]).describe('Visual effect type (particle effects + shader auras)');
+/** Engine parity ENFORCED BY src/__tests__/unit/preflight-gate-parity.test.ts against the GENERATED list (scripts/sync-engine-lists.mjs ENGINE_EFFECT_TYPES): particle effects + shader auras. */
+export const EffectTypeSchema = z.enum(ENGINE_EFFECT_TYPES as unknown as [string, ...string[]]).describe('Visual effect type (particle effects + shader auras)');
 
 export const SparkleParamsSchema = z.object({
   color: ColorSchema.optional().default('#fbbf24').describe('Sparkle color'),

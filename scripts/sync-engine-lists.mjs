@@ -105,6 +105,7 @@ const EXPR_REL = 'js/relations/expr-to-ir.js';
 const RELATIONS_REL = 'js/RelationRegistry.js';
 const ANIM_REL = 'js/core/AnimationDriver.js';
 const PINEPAPER_REL = 'js/PinePaper.js';
+const AURA_REL = 'js/ItemAuraSystem.js';
 
 /** The body of a method or function `head(...) {`, brace-matched; null when it cannot be found. */
 function blockAfter(src, head) {
@@ -113,6 +114,24 @@ function blockAfter(src, head) {
   let i = src.indexOf('{', at) + 1, depth = 1;
   while (depth && i < src.length) { const c = src[i++]; if (c === '{') depth++; else if (c === '}') depth--; }
   return depth ? null : src.slice(at, i);
+}
+
+/**
+ * EFFECT TYPES: what app.applyEffect can apply. The particle effects are the effectDefs that
+ * RelationRegistry.registerEffectRelations binds; the shader auras are the keys of ItemAuraSystem's
+ * AURA_REGISTRY. A hand list and a stored fixture both went stale: #362 renamed the particle swirl
+ * to orbit_swirl and added aurora, glitch and petals, and the schema refused all four.
+ */
+function effectTypes(relSrc, auraSrc) {
+  const block = blockAfter(relSrc, /registerEffectRelations\s*\(/);
+  if (!block) throw new Error('sync-engine-lists: registerEffectRelations not found in RelationRegistry.js');
+  const particles = [...block.matchAll(/\{\s*name:\s*'([a-z_]+)'/g)].map((m) => m[1]);
+  const regAt = auraSrc.search(/^const AURA_REGISTRY = \{/m);
+  if (regAt < 0) throw new Error('sync-engine-lists: AURA_REGISTRY not found in ItemAuraSystem.js');
+  const reg = blockAfter(auraSrc.slice(regAt), /AURA_REGISTRY = /);
+  const auras = [...reg.matchAll(/^  ([a-z_]+):\s*\{/gm)].map((m) => m[1]);
+  if (particles.length < 10 || auras.length < 4) throw new Error(`sync-engine-lists: effect lists look wrong (${particles.length} particle, ${auras.length} aura)`);
+  return { particles, auras };
 }
 
 function animationOptionKeys(ppSrc, animSrc) {
@@ -403,6 +422,9 @@ async function generate() {
   const ppSrc = readCommitted(PINEPAPER_REL);
   if (!ppSrc) throw new Error(`sync-engine-lists: cannot read ${PINEPAPER_REL}`);
   const animKeys = animationOptionKeys(ppSrc, animSrc);
+  const auraSrc = readCommitted(AURA_REL);
+  if (!auraSrc) throw new Error(`sync-engine-lists: cannot read ${AURA_REL}`);
+  const effects = effectTypes(relSrc, auraSrc);
 
   return `/**
  * GENERATED — DO NOT EDIT. Run \`bun run sync:engine-lists\`.
@@ -422,7 +444,18 @@ async function generate() {
  *   ${RELATIONS_REL}  sha256: ${digest(relSrc)}
  *   ${ANIM_REL}  sha256: ${digest(animSrc)}
  *   ${PINEPAPER_REL}  sha256: ${digest(ppSrc)}
+ *   ${AURA_REL}  sha256: ${digest(auraSrc)}
  */
+
+/** ${effects.particles.length} particle effects (RelationRegistry.registerEffectRelations) then ${effects.auras.length} shader auras (ItemAuraSystem AURA_REGISTRY): everything app.applyEffect applies. */
+export const ENGINE_EFFECT_TYPES = [
+${list([...effects.particles, ...effects.auras])}
+] as const;
+
+/** The shader auras alone. */
+export const ENGINE_AURA_TYPES = [
+${list(effects.auras)}
+] as const;
 
 /** ${easings.length} names: EASING_NAMES, the keys of the engine's easing table. Keyframes, masks, relations and the camera all resolve through it. */
 export const ENGINE_EASING_NAMES = [

@@ -4,7 +4,7 @@
  * Name lists the engine owns and the tool surface must offer exactly. See
  * scripts/sync-engine-lists.mjs for why each is generated.
  *
- * Source: FxTool origin/main 65e41ce2c633688c6b8360829eb133de296b12ae
+ * Source: FxTool origin/main 01d609615ee5c4137e0a6a31995ad9715d73c49c
  *   js/core/KeyframeInterpolator.js  sha256: 342034825a057d6d
  *   js/world3d/worlds.js  sha256: 0e0973f7587c06e1
  *   js/core/DesignMedia.js  sha256: ab07f330e4060cb7
@@ -13,10 +13,54 @@
  *   js/core/StyledScene.js  sha256: 550fd9b58b7f5d87
  *   js/core/Patterns.js  sha256: a04fe3805f4e9d4f
  *   js/relations/expr-to-ir.js  sha256: 4d92d2f42b3356e9
- *   js/RelationRegistry.js  sha256: 726af3b7b4b0d594
+ *   js/RelationRegistry.js  sha256: 503913507cf9a0df
  *   js/core/AnimationDriver.js  sha256: 6741a73f5f489355
- *   js/PinePaper.js  sha256: 18dffe7f4d8fe51d
+ *   js/PinePaper.js  sha256: 4826f135f7feadf1
+ *   js/ItemAuraSystem.js  sha256: fbd9b8d09fae0543
  */
+
+/** 19 particle effects (RelationRegistry.registerEffectRelations) then 8 shader auras (ItemAuraSystem AURA_REGISTRY): everything app.applyEffect applies. */
+export const ENGINE_EFFECT_TYPES = [
+  'sparkle',
+  'blast',
+  'smoke',
+  'fire',
+  'rain',
+  'snow',
+  'confetti',
+  'ripple',
+  'glow',
+  'electric',
+  'bubbles',
+  'dust',
+  'fireflies',
+  'shockwave',
+  'trail',
+  'aurora',
+  'orbit_swirl',
+  'glitch',
+  'petals',
+  'electric_arc',
+  'vortex',
+  'rain_veil',
+  'caustics',
+  'heatmap',
+  'liquid_metal',
+  'gem_smoke',
+  'ink_bleed',
+] as const;
+
+/** The shader auras alone. */
+export const ENGINE_AURA_TYPES = [
+  'electric_arc',
+  'vortex',
+  'rain_veil',
+  'caustics',
+  'heatmap',
+  'liquid_metal',
+  'gem_smoke',
+  'ink_bleed',
+] as const;
 
 /** 39 names: EASING_NAMES, the keys of the engine's easing table. Keyframes, masks, relations and the camera all resolve through it. */
 export const ENGINE_EASING_NAMES = [
