@@ -14077,64 +14077,47 @@ ${cam ? `  // The camera rides the SAME timing: framing each state as its morph 
    * Character tool aliases (pinepaper_create_character, pinepaper_character_action, pinepaper_character_pose)
    * Routing on-device / local model calls cleanly to the engine.
    */
+  /**
+   * pinepaper_create_character's last door: no layered bundle, and no concept the design graph can draw. It used to
+   * draw a purple placeholder circle and say success. It now makes a RIGGED character (app.createCharacter), the
+   * owner's rule for anything that should move: a base named outright, or one mapped from the request (a pigeon is
+   * a bird, a kitten a cat, a hero a person). A request that maps to no rigged base is refused with the five, never
+   * fitted onto the nearest rig in silence (a dog on the cat rig is a product call, not this function's).
+   */
   generateCreateCharacter(input: CreateCharacterInput): string {
     const S = (v: unknown) => JSON.stringify(v);
-    const charId = S(input.characterId || input.name || `char_${Date.now()}`);
-    const posX = typeof input.x === 'number' ? input.x : 400;
-    const posY = typeof input.y === 'number' ? input.y : 300;
-    const scale = typeof input.scale === 'number' ? input.scale : 1;
-    const name = S(input.name || input.characterId || 'Character');
-    const base = input.base ? S(input.base) : 'null';
-    const preset = input.preset || input.concept ? S(input.preset || input.concept) : 'null';
-
+    const asked = String(input.base || input.preset || input.concept || '').trim();
+    const word = asked.replace(/^pp:/i, '').toLowerCase();
+    const MAP: Array<[RegExp, string]> = [
+      [/^(person|people|human|character|child|kid|hero|heroine|man|woman|boy|girl|figure|adult|player)$/, 'person'],
+      [/^(robot|bot|android|mech|droid|cyborg)$/, 'robot'],
+      [/^(cat|kitten|kitty|feline)$/, 'cat'],
+      [/^(bird|pigeon|crow|raven|sparrow|parrot|robin|owl|seagull|gull|finch|duck|chick)$/, 'bird'],
+      [/^(blob|slime|jelly)$/, 'blob'],
+    ];
+    // An explicit base goes to the studio as written (it refuses an unknown one with its list); a concept is mapped.
+    const base = input.base ? String(input.base) : (!word ? 'person' : (MAP.find(([re]) => re.test(word)) || [null, null])[1]);
+    if (!base) {
+      return `(function() { return { success: false, error: ${S(`no rigged character fits "${asked}": the rigged bases are person, robot, cat, bird and blob. Pass base: one of those (with variant for its look), or for a figure that does not need to move, a concept pinepaper_query_ontology lists.`)} }; })();`;
+    }
+    const spec: Record<string, unknown> = { base };
+    if (typeof input.x === 'number') spec.x = input.x;
+    if (typeof input.y === 'number') spec.y = input.y;
+    if (typeof input.scale === 'number') spec.scale = input.scale;
+    if (input.variant) spec.variant = input.variant;
+    if (input.name) spec.name = input.name;
+    const mapped = input.base ? null : (word ? { from: asked, to: base } : null);
     return `
-// Create Character
+// Create a rigged character (base ${oneLine(base)})
 (async function() {
-  const charId = ${charId};
-  const posX = ${posX};
-  const posY = ${posY};
-  const scale = ${scale};
-  const name = ${name};
-  const base = ${base};
-  const preset = ${preset};
-
-  // 1. If original character base is specified and app.createCharacter exists
-  if (base && typeof app.createCharacter === 'function') {
-    const r = await app.createCharacter({ base: base, at: { x: posX, y: posY }, scale: scale });
-    if (r && r.ok !== false) {
-      return { success: true, characterId: charId, itemId: r.id, parts: r.parts };
-    }
-  }
-
-  // 2. Try app.create
-  let groupId = null;
-  if (typeof app.create === 'function') {
-    const group = app.create('circle', { x: posX, y: posY, radius: 35 * scale, color: '#7C3AED' });
-    if (group) {
-      group.data = group.data || {};
-      group.data.ppType = 'pp:Character';
-      group.data.characterId = charId;
-      group.name = name;
-      groupId = group.id || (group.data && group.data.id) || charId;
-    }
-  } else {
-    const p = typeof paper !== 'undefined' ? paper : ((typeof window !== 'undefined' ? window : globalThis).paper);
-    if (p && p.Path) {
-      const body = new p.Path.Circle({ center: [posX, posY], radius: 35 * scale, fillColor: '#7C3AED' });
-      const head = new p.Path.Circle({ center: [posX, posY - 45 * scale], radius: 20 * scale, fillColor: '#EC4899' });
-      const group = new p.Group([body, head]);
-      group.name = name;
-      if (app.textItemGroup) group.parent = app.textItemGroup;
-      group.data = { isUserGroup: true, isLayeredCharacter: true, ppType: 'pp:Character', characterId: charId };
-      const reg = app.itemRegistry;
-      groupId = reg ? reg.register(group, 'group', { source: 'mcp_create_character' }, 'mcp') : charId;
-      group.data.id = groupId;
-    }
-  }
-
-  if (app._scheduleRepaint) app._scheduleRepaint();
+  // @engine-methods createCharacter
+  if (typeof app.createCharacter !== 'function') { return { success: false, error: 'this studio has no rigged characters (app.createCharacter): update PinePaper Studio' }; }
+  const r = await app.createCharacter(${S(spec)});
+  if (!r || r.ok === false) { return { success: false, error: (r && Array.isArray(r.errors) && r.errors.join('; ')) || (r && r.reason) || 'the studio made no character from that spec' }; }
   if (app.historyManager) app.historyManager.saveState();
-  return { success: true, characterId: charId, itemId: groupId };
+  return { success: true, characterId: ${S(input.characterId || input.name || null)} || r.id, itemId: r.id, rigId: r.rigId || null, base: r.base || ${S(base)}, parts: r.parts${mapped ? `, baseFrom: ${S(mapped)}` : ''},
+    ...(r.rigId ? {} : { warning: 'the character was drawn but its rig failed, so it cannot walk, pose or act: treat it as still artwork' }),
+    note: 'y is where the feet stand' };
 })();`.trim();
   }
 
