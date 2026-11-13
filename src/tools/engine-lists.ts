@@ -4,7 +4,7 @@
  * Name lists the engine owns and the tool surface must offer exactly. See
  * scripts/sync-engine-lists.mjs for why each is generated.
  *
- * Source: FxTool origin/main 3ca1ae6bf845ce949062640d39588682f405f211
+ * Source: FxTool origin/main 5d3a1a2935b249c8f0705bdffddc8cc6ad90d1bd
  *   js/core/KeyframeInterpolator.js  sha256: 342034825a057d6d
  *   js/world3d/worlds.js  sha256: 0e0973f7587c06e1
  *   js/core/DesignMedia.js  sha256: ab07f330e4060cb7
@@ -13,9 +13,9 @@
  *   js/core/StyledScene.js  sha256: 550fd9b58b7f5d87
  *   js/core/Patterns.js  sha256: a04fe3805f4e9d4f
  *   js/relations/expr-to-ir.js  sha256: 4d92d2f42b3356e9
- *   js/RelationRegistry.js  sha256: 503913507cf9a0df
+ *   js/RelationRegistry.js  sha256: 9925d4f389fc2d9b
  *   js/core/AnimationDriver.js  sha256: 6741a73f5f489355
- *   js/PinePaper.js  sha256: 4826f135f7feadf1
+ *   js/PinePaper.js  sha256: 788a827ce91e65bc
  *   js/ItemAuraSystem.js  sha256: fbd9b8d09fae0543
  */
 
