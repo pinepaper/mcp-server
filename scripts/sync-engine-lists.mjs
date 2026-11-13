@@ -339,13 +339,32 @@ function relationLoopParams(src) {
 }
 
 /** The keys a rule block declares under params, plus every params.X it reads; null when it declares none. */
+/** Same length, with comments and the insides of string literals replaced by spaces, so a scan sees only code. */
+function blankCommentsAndStrings(src) {
+  let out = '', i = 0;
+  while (i < src.length) {
+    const c = src[i], n = src[i + 1];
+    if (c === '/' && n === '/') { while (i < src.length && src[i] !== '\n') { out += ' '; i++; } continue; }
+    if (c === '/' && n === '*') { while (i < src.length && !(src[i] === '*' && src[i + 1] === '/')) { out += src[i] === '\n' ? '\n' : ' '; i++; } out += '  '; i += 2; continue; }
+    if (c === "'" || c === '"' || c === '`') {
+      out += c; i++;
+      while (i < src.length && src[i] !== c) { if (src[i] === '\\') { out += '  '; i += 2; continue; } out += src[i] === '\n' ? '\n' : ' '; i++; }
+      out += c; i++; continue;
+    }
+    out += c; i++;
+  }
+  return out;
+}
+
 function ruleParamKeys(block) {
     const at = /params:\s*\{/.exec(block);
     if (!at) return null;
     let depth = 1, i = at.index + at[0].length;
     const start = i;
     while (depth && i < block.length) { if (block[i] === '{') depth++; else if (block[i] === '}') depth--; i++; }
-    const body = block.slice(start, i - 1);
+    // Comments and string contents blanked first: a comment such as `// No default: …` read as a key named
+    // `default`, and a brace or colon inside a description could shift the depth count.
+    const body = blankCommentsAndStrings(block.slice(start, i - 1));
     const declared = new Set();
     for (let d = 0, k = 0; k < body.length; k++) {
       const c = body[k];
