@@ -242,8 +242,15 @@ describe('DBLEXP33: a rule bound to an event\'s name is named, with the id to us
     expect(r.warning).toContain('Use sourceEvent "item_3"');
   });
 
-  it('says nothing when no event has that name', async () => {
+  it('a source no event has, by id or name, is said (tester, 1.6.36), and the rule is still added', async () => {
     const r = await run([{ id: 'item_3', item: { data: { isEvent: true, eventName: 'show' } } }]);
+    expect(r.success).toBe(true);
+    expect(r.warning).toContain('no event has the id or name "hide" yet');
+    expect(r.warning).not.toContain('Use sourceEvent');
+  });
+
+  it('says nothing when the source is an event id', async () => {
+    const r = await run([{ id: 'hide', item: { data: { isEvent: true, eventName: 'x' } } }]);
     expect(r.warning).toBeUndefined();
   });
 });

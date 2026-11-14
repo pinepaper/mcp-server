@@ -941,8 +941,8 @@ describe('PinePaperCodeGenerator', () => {
 
     it('pulse emits app.pulseEvent with the id and payload', () => {
       const code = codeGenerator.generateEvent(EventInputSchema.parse({ action: 'pulse', eventId: 'e0', payload: { n: 1 } }));
-      expect(code).toContain('app.pulseEvent("e0"');
-      expect(code).toContain('{"n":1}');
+      expect(code).toContain('const __id = "e0"');
+      expect(code).toContain('app.pulseEvent(__id, {"n":1})');
       expect(code).toContain("typeof app.pulseEvent !== 'function'"); // guard
     });
 

@@ -16815,8 +16815,21 @@ ${guard('unlockAllItems')}${pass('app.unlockAllItems()')}
   if (typeof app.pulseEvent !== 'function') {
     return { success: false, error: 'app.pulseEvent unavailable — update FxTool to a build with the event system (S11)' };
   }
-  app.pulseEvent(${eventIdJson}, ${payloadJson});
-  return { success: true, action: 'pulse', eventId: ${eventIdJson} };
+  // A PULSE NOTHING HEARS IS NOT A SUCCESS (tester, 1.6.36: a pulse of an id no event has returned success:true).
+  // An event's channel is its id; a literal name is a channel only where a rule or relation listens on it.
+  const __id = ${eventIdJson};
+  const __all = app.itemRegistry && app.itemRegistry.getAll ? app.itemRegistry.getAll() : [];
+  const __isEvent = __all.some(function(e) { return e && e.item && e.item.data && e.item.data.isEvent && (e.id || e.itemId) === __id; });
+  const __heard = (app.listContraptions && (app.listContraptions() || []).some(function(c) { return c && c.sourceEvent === __id; }))
+    || !!(app.relationRegistry && app.relationRegistry.getAssociations && (app.relationRegistry.getAssociations(__id) || []).length);
+  if (!__isEvent && !__heard) {
+    const __named = __all.filter(function(e) { return e && e.item && e.item.data && e.item.data.isEvent && e.item.data.eventName === __id; }).map(function(e) { return e.id || e.itemId; });
+    return { success: false, action: 'pulse', eventId: __id, code: 'event_not_found',
+      error: 'no event has the id ' + JSON.stringify(__id) + ' and no rule or relation listens on it, so the pulse would reach nothing; nothing was fired.'
+        + (__named.length ? ' ' + JSON.stringify(__id) + ' is the name of event ' + __named.join(', ') + ': pulse its id.' : ' Create the event first (action: create), or pulse the id it returned.') };
+  }
+  app.pulseEvent(__id, ${payloadJson});
+  return { success: true, action: 'pulse', eventId: __id };
 })();`.trim();
   }
 }
@@ -16862,6 +16875,10 @@ function generateContraptionCode(input: EventInput): string {
   const __resolved = !!(__stored && __named.indexOf(__stored.sourceEvent) >= 0);
   const __warnings = [];
   if (missing.length) __warnings.push('no item has the id ' + missing.join(', ') + ' yet: the rule does nothing to it until one does');
+  // A source no event has, by id or by name (tester, 1.6.36: accepted with no word). A literal channel is allowed:
+  // the rule runs when that exact string is pulsed.
+  const __srcIsEvent = (app.itemRegistry && app.itemRegistry.getAll ? app.itemRegistry.getAll() : []).some((e) => e && e.item && e.item.data && e.item.data.isEvent && (e.id || e.itemId) === __src);
+  if (__src && !__srcIsEvent && !__named.length) __warnings.push('no event has the id or name ' + JSON.stringify(__src) + ' yet, so nothing fires this rule until an event with that id exists or that exact string is pulsed.');
   if (__named.length > 1 && !__resolved) __warnings.push(__named.length + ' events are named ' + JSON.stringify(__src) + ' (' + __named.join(', ') + '), so the rule cannot tell which one: it runs only when the literal name is pulsed. Pass one eventId as sourceEvent.');
   else if (__named.length && !__resolved) __warnings.push('sourceEvent ' + JSON.stringify(__src) + ' is the NAME of event ' + __named[0] + ': its timer and a pulse of its id fire ' + __named[0] + ', not the name, so this rule runs only when the literal name ' + JSON.stringify(__src) + ' is pulsed. Use sourceEvent ' + JSON.stringify(__named[0]) + ' to run it when that event fires.');
   return { success: true, action: 'add_contraption', contraptionId,

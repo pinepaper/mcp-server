@@ -350,6 +350,21 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - `pinepaper_apply_effect` accepts the studio's new effects: `aurora`, `glitch`, `orbit_swirl`
   (the particle swirl; `vortex` is the shader aura) and `petals`. The list of effects is now
   read from the studio's source at each release, so it no longer falls behind.
+- A keyframe track the studio did not store as asked is no longer reported as a success. The
+  current studio rescales every key of a track once any key is past 100 s, so a 120 s scene
+  exported frozen at its end state while every reply said success. Keyframe times are now always
+  sent as seconds, and each write is read back. A track whose keys span 100 s or less is
+  rewritten to start later (`timeOffset`) and plays at the times asked; the reply says `shifted`.
+  A longer track fails with `keyframe_times_not_kept`, the times asked and stored, and how to
+  split it, and the earlier track is put back.
+- An export's `bitrateCeilingHeld` is checked against the file's achieved bitrate. A file over its
+  target says `bitrateCeilingHeld: false`, with `bitrateOverPercent` and a warning; the studio
+  counted anything within 10% over as held.
+- `pinepaper_event` `pulse` of an id no event has, and that nothing listens on, fails with
+  `event_not_found` instead of answering success. When the id is an event's name, the error
+  gives the event's id.
+- `add_contraption` with a `sourceEvent` no event has, by id or by name, warns that nothing fires
+  the rule until such an event exists or that exact string is pulsed.
 - `pinepaper_emitter` `set` with `bursts` replaces the emitter's bursts, as it always did; the docs
   said it merged. They now say so, and the reply's `burstsReplaced` gives the burst counts before
   and after.
