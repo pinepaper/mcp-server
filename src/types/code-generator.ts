@@ -1981,6 +1981,17 @@ export function normalizeEmitterSpec(spec: Record<string, unknown>, assumeDefaul
     const own = (b && typeof b === 'object' ? b : {}) as Record<string, unknown>;
     if (own.count !== undefined || own.velocities !== undefined) mismatch(`bursts[${i}]`, own.count ?? out.count, own.velocities ?? out.velocities);
   });
+  // SPAWN IS A BOX ON THE CANVAS AXES (ParticleEmitter: x += (u - 0.5) * spawn[0], y += (u - 0.5) * spawn[1]), not a
+  // range and not along the burst's angle. spawn [0, 200] beside angle 0 drew a vertical column of particles that
+  // then flew right (SPAWNAX36). Said once, where a spawn box meets an aimed angle.
+  const fullCircle = (a: unknown) => a === undefined || (Array.isArray(a) && Number(a[1]) - Number(a[0]) >= 360);
+  const aimed = [{ where: 'spec', own: out }, ...bursts.map((b, i) => ({ where: `bursts[${i}]`, own: (b && typeof b === 'object' ? b : {}) as Record<string, unknown> }))]
+    .find(({ own }) => (own.spawn ?? out.spawn) !== undefined && !fullCircle(own.angle ?? out.angle));
+  if (aimed) {
+    const sp = aimed.own.spawn ?? out.spawn;
+    const box = Array.isArray(sp) ? `${sp[0]} wide and ${sp[1]} tall` : `${sp} by ${sp}`;
+    warnings.push(`${aimed.where}: spawn is a box on the canvas axes centred on the burst point (here ${box}), not a range and not turned to the burst's angle: particles start anywhere in it and fly along angle. To spread them across the direction of travel, size the box on that axis (spawn [w, 0] spreads along x, [0, h] along y).`);
+  }
   // A RANGE WHERE THE STUDIO READS ONE NUMBER is not drawn as a range (1.6.24
   // probe: count [a, b] → 0 on older studios, the middle on FxTool #228). Only
   // the keys that take one number on EVERY build are named here. gravity, drag,
@@ -14319,9 +14330,13 @@ ${cam ? `  // The camera rides the SAME timing: framing each state as its morph 
 // Emitter: change a spec
 (function() {
   if (typeof app.setEmitter !== 'function') { return { success: false, error: 'this studio has no emitter item (app.setEmitter) — it predates FxTool D29.' }; }${capFn}
+  // set merges the spec's TOP-LEVEL keys; an array it names (bursts) replaces the old one whole (EMSETBURST36).
+  const __b0 = (function () { try { const it = app.getItemById(${S(input.itemId)}); const b = it && it.data && it.data.emitter && it.data.emitter.bursts; return Array.isArray(b) ? b.length : null; } catch (_) { return null; } })();
   const r = app.setEmitter(${S(input.itemId)}, ${S(input.spec)});
   if (!r || r.ok === false) { return { success: false, error: (r && r.error) || 'the emitter change was refused' }; }
-  return { success: true, action: 'set', itemId: ${S(input.itemId)}, spec: r.spec${capJs('r.spec')} };
+  const __b1 = r.spec && Array.isArray(r.spec.bursts) ? r.spec.bursts.length : null;
+  return { success: true, action: 'set', itemId: ${S(input.itemId)}, spec: r.spec${capJs('r.spec')}${Array.isArray((input.spec as Record<string, unknown> | undefined)?.bursts) ? `,
+    burstsReplaced: { before: __b0, after: __b1, note: 'bursts replaces the whole array: the emitter now has only the bursts this call passed. To add one, pass the existing bursts with it.' }` : ''} };
 })();`.trim();
     }
     return `

@@ -350,6 +350,19 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - `pinepaper_apply_effect` accepts the studio's new effects: `aurora`, `glitch`, `orbit_swirl`
   (the particle swirl; `vortex` is the shader aura) and `petals`. The list of effects is now
   read from the studio's source at each release, so it no longer falls behind.
+- `pinepaper_emitter` `set` with `bursts` replaces the emitter's bursts, as it always did; the docs
+  said it merged. They now say so, and the reply's `burstsReplaced` gives the burst counts before
+  and after.
+- The emitter docs describe `spawn`: a `[width, height]` box of start points on the canvas axes, not
+  a range, and not turned to the burst's angle. A spawn box beside an aimed burst gets a warning
+  that says so.
+- The `pinepaper_design_medium` docs give the ink default colour, a near-black (`#16141c`), and how
+  to change it: on a dark background, pass `options.color` or `options.keepColor: true`.
+- Big batches send less code: 2,000 creates are about 2.2 MB of code instead of 4.8 MB, and a batch
+  too big for the studio's checker is sent to the page once instead of twice. Measured through MCP
+  at 40,000 items: a batch of 2,000 creates takes about 1.8 s (was 2.75 s), and building 40,000
+  items in batches of 2,000 takes about 19 s (was 29 s). The undo snapshot at the end of each batch
+  is most of what is left, and it grows with the scene.
 - The sound docs name a few built-in sounds as examples, including the studio's world
   percussion (`tabla-na`, `djembe-tone` and about fifty more strokes), and point to
   `pinepaper_sound` `list_instruments`, `list_percussion` and `list_sfx` for the full lists. They

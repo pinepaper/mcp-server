@@ -2573,6 +2573,7 @@ Call resolve before telling a user you will render in a medium. "yes, but as an 
 
 ACTIONS:
 - apply: { itemId, medium, options? } — on a PHOTO (an image item), watercolor and oil run as the watercolor / painterly image filters and report fidelity 'stylised' (an image filter, not paint simulated over geometry); other media are refused for photos, with the reason. On shapes — render an item in ANY medium the engine can make: ${Object.keys(DESIGN_MEDIA_APPLY).join(', ')}. One engine entry point; a medium this studio cannot apply is refused with the reason: pass it on. ink / charcoal (where the studio applies them) restyle a path, text, or group of them IN PLACE — same itemId, keyframes and relations kept — with a boiling hand-drawn line; raster and video exports boil, SVG/Lottie get the colour and width only. Their options: color, amplitude (px), wavelength (px), fps (boil rate, 12), seed, boil (default true), width (px, paths), keepColor. watercolor options: color, brush, water 0..1, opacity, edge 0..1 (the dark rim), angle, bleed, seed. oil (stylised): color, brush, length, density, toneRange, relief, angle, seed. cutPaper (vector: survives SVG/PDF/video): color, facet, jitter, shadow, shadowColor, shadowOpacity, shadowOffset [dx, dy], seed. The result replaces the source in the stacking order and hides it; applying again replaces; one undo step.
+- ink colour: unless options.color or options.keepColor is given, ink marks are drawn in the brush default, a near-black (#16141c), whatever the item's own colour. On a dark background they disappear: pass options.color (a light ink) or options.keepColor: true (the item's own colour).
 - list_media: every medium with fidelity, definition and limitation. Read it rather than assuming a fixed set — the catalogue grows (hatch and watercolor are recent additions).
 - resolve: { medium } → { ok, fidelity, reason, markMaker }. ok:false with a reason is a real answer — pass it on rather than trying anyway.
 - list_stitches: the thread stitches with their params.
@@ -8308,13 +8309,14 @@ EXAMPLE — pill → field → dot:
 
 ACTIONS:
 - create: { spec } → itemId
-- set: { itemId, spec } — merge a partial spec onto the emitter's.
+- set: { itemId, spec } — merges the spec's top-level keys onto the emitter's. An array it names replaces the old array whole: set with bursts: [one] leaves one burst. To add a burst, pass all of them; the reply's burstsReplaced gives the counts before and after.
 
 SPEC:
 - mode: 'burst' (default) — bursts: [{ t, x, y, count, …per-burst overrides }]: a pop of particles at scene time t.
 - mode: 'trail' (or give target) — target (an item id), rate (per second), emitWindows [[t0, t1], …] (when it sheds), window [t0, t1] (when the WHOLE trail shows: it switches on and off at those times, with what was shed before t0 already there), offset ([dx, dy] or {x, y}): particles shed from a moving item. rate, start and end are trail settings: a burst emitter does not read them.
 - look and physics (per emitter or per burst): shape ('circle' | 'rect' | 'dash' | 'star' | 'confetti', or an array; size is a circle's diameter, a rect's or confetti's width (height is half of it), and a star's extent is 0.8 of it; a dash is a thin line drawn forward from the particle along its velocity; confetti tumbles, with a seeded tilt and a darker back, and a rect does not), palette [colours], size / sizes / sizeEnd, speed + angle ranges or velocities ([[vx, vy], …] px/s, or [{x, y}, …]; particle i takes velocities[i % length], so give one per particle — the reply warns when count and the list differ), gravity (px/s², +down), drag (slows the launch velocity only: what gravity adds is not damped, so a falling particle has no terminal velocity), friction, lifetime, fadeIn / fadeOut, spin, opacity, jitter, jitterGrow, seed.
 UNITS (a number, or a [min, max] range picked per particle where it says range):
+- spawn: where particles start, as a box [width, height] in px on the canvas axes, centred on the burst point (one number is a square). It is not a range and does not turn with angle: spawn [0, 200] is a vertical line of start points whatever the angle. Default [0, 0], a single point.
 - count: particles per burst, at most 10000 on the current studio (2000 on older studios) — a larger count is drawn at the cap and the reply warns with the number drawn. For more, add a second burst at the same t.
 - speed: px/s (range). angle: degrees, 0 = right, 90 = down (range). gravity: px/s². lifetime: seconds (range, > 0). size: px (range).
 - gravity, drag, friction, opacity, sizeEnd and jitter also take a range on the current studio, sampled per particle; an older studio draws the midpoint and warns emitter-range-not-read.
