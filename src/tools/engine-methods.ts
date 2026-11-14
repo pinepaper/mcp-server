@@ -282,6 +282,7 @@ export const OPTIONAL_ENGINE_METHODS: readonly string[] = [
   'captureFramesAtAsync',
   'checkFont',
   'clearCanvas',
+  'clearKeyframes',
   'ensureFontsLoaded',
   'exportEngine.addTextLayer',
   'exportEngine.embedTextFonts',

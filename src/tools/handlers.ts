@@ -1139,6 +1139,24 @@ function redactGeneratedCode(details: unknown): unknown {
  * The studio's scene-lint warnings on an export (FxTool lintScene), one line each, so a centred title that runs
  * out of the frame ("IGNAL" for "SIGNAL") is read on the success path rather than left in the JSON. Empty when none.
  */
+/**
+ * A CLAIM THE NUMBERS NEXT TO IT CONTRADICT (tester, 1.6.36). The studio sets video.bitrateCeilingHeld: true
+ * whenever the file is within 10% OVER the target, and warns only past that, so a file 7% over its ceiling was
+ * reported as having held it. The flag is set from the file's own achievedBitrate and the target beside it.
+ */
+export function correctBitrateClaim(exportResult: unknown): void {
+  const r = exportResult as { video?: { bitrate?: unknown; achievedBitrate?: unknown; bitrateCeilingHeld?: unknown; bitrateOverPercent?: number }; warnings?: unknown } | null;
+  const v = r && typeof r === 'object' ? r.video : null;
+  if (!v || typeof v !== 'object' || v.bitrateCeilingHeld !== true) return;
+  const target = Number(v.bitrate), achieved = Number(v.achievedBitrate);
+  if (!(target > 0) || !(achieved > target)) return;
+  const over = Math.round((achieved / target - 1) * 1000) / 10;
+  v.bitrateCeilingHeld = false;
+  v.bitrateOverPercent = over;
+  const msg = `bitrate_exceeded: the ${(target / 1e6).toFixed(2)} Mbps target was not held: the file is ${(achieved / 1e6).toFixed(2)} Mbps (${over}% over). The browser encoder treats the target loosely on content it cannot compress; pass a lower bitrate, or bitrateMode 'constant', which held closer in measurement.`;
+  if (Array.isArray(r!.warnings)) (r!.warnings as unknown[]).push(msg); else r!.warnings = [msg];
+}
+
 export function lintLines(exportResult: unknown): string {
   const w = (exportResult as { lintWarnings?: unknown } | null)?.lintWarnings;
   if (!Array.isArray(w) || !w.length) return '';
@@ -4993,6 +5011,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
         }
 
         const exportResult = exportBrowserResult.result as Record<string, any>;
+        correctBitrateClaim(exportResult);
 
         // TWO VERDICTS, and only one of them was being read.
         //

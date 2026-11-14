@@ -297,9 +297,12 @@ describe('PinePaperCodeGenerator', () => {
           { time: 1, properties: { opacity: 1 } },
         ],
       });
-      expect(code).not.toContain('timeOffset');
-      expect(code).not.toContain('clipInPoint');
-      expect(code).not.toContain('clipOutPoint');
+      // The options addAnimation receives (the key-time guard's messages mention timeOffset as advice).
+      const opts = (code.match(/const __opts = (\{.*\});/) || [])[1] || '';
+      expect(opts).toContain('"duration"');
+      expect(opts).not.toContain('timeOffset');
+      expect(opts).not.toContain('clipInPoint');
+      expect(opts).not.toContain('clipOutPoint');
     });
 
     it('passes clip-window options through to app.addAnimation', () => {
@@ -1332,7 +1335,7 @@ describe('PinePaperCodeGenerator', () => {
           ],
         } as never);
 
-        const calls = code.match(/app\.addAnimation/g) || [];
+        const calls = code.match(/app\.addAnimation\([^,]+, (?!__prevKfs)/g) || []; // the writes, not the restore
         expect(calls.length).toBe(1);
         // both channels survive, merged per timestamp
         expect(code).toContain('rotation');
@@ -1347,7 +1350,7 @@ describe('PinePaperCodeGenerator', () => {
           ],
         } as never);
 
-        const calls = code.match(/app\.addAnimation/g) || [];
+        const calls = code.match(/app\.addAnimation\([^,]+, (?!__prevKfs)/g) || []; // the writes, not the restore
         expect(calls.length).toBe(2);
       });
 
@@ -1424,7 +1427,7 @@ describe('PinePaperCodeGenerator', () => {
           ],
         } as never);
 
-        const calls = code.match(/app\.addAnimation/g) || [];
+        const calls = code.match(/app\.addAnimation\([^,]+, (?!__prevKfs)/g) || []; // the writes, not the restore
         expect(calls.length).toBe(1);
       });
     });
@@ -1561,7 +1564,9 @@ describe('PinePaperCodeGenerator', () => {
         });
         expect(code).not.toContain('alert(1');
         expect(code).not.toContain('timeOffset:');
-        expect(code).not.toContain('timeUnits: ');
+        // A bad unit falls back to the documented one (seconds), never the caller text.
+        expect(code).toContain('timeUnits: "seconds"');
+        expect(code).not.toContain("timeUnits: 'x");
       });
 
       it('generateMorphSequence hides inline reference shapes immediately upon creation (B73)', () => {

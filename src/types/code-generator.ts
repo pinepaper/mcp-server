@@ -2441,6 +2441,59 @@ function keyframeResultNotes(keyframes: readonly Keyframe[], { loop = false, app
   return `${easingNote}${sizekeyPairNote}${gapNote}`;
 }
 
+/**
+ * READ BACK THE KEY TIMES (LONGKEY36). A studio that rescales keyframe times (one that reads any time over 100 as
+ * milliseconds, whatever timeUnits says) stored a 120 s track as 0.12 s, and the export froze at its end state from
+ * the first half second while every reply said success. After the write, each asked time must be on the stored
+ * track. If it is not: a track that spans 100 s or less is rewritten from 0 with its first key as the clip's
+ * timeOffset (which the studio keeps), so it plays at the asked times; otherwise the earlier track is put back and
+ * the call fails with the times asked and stored. A studio that keeps the times passes on the first read.
+ *
+ * `before` goes just before the addAnimation call, `after` just after it (it may `return` a failure), and `field`
+ * is spread into the success reply.
+ */
+function keyTimeGuard(a: {
+  target: string; item: string; keyframes: Keyframe[]; timeUnits?: 'seconds' | 'ms'; append: boolean;
+  timeOffsetGiven: boolean; loop: unknown; opts: Record<string, unknown>; duration: unknown;
+}): { before: string; after: string; field: string } {
+  const scale = a.timeUnits === 'ms' ? 0.001 : 1;
+  const asked = a.keyframes.map((k) => (Number(k.time) || 0) * scale).sort((x, y) => x - y);
+  const first = asked.length ? asked[0] : 0;
+  const end = asked.length ? asked[asked.length - 1] : 0;
+  const canShift = !a.append && !a.timeOffsetGiven && first > 0 && end - first <= 100;
+  const shiftedKfs = canShift ? normalizeKeyframePositions(a.keyframes.map((k) => ({ ...k, time: (Number(k.time) || 0) * scale - first })) as Keyframe[]) : [];
+  const shiftedOpts = canShift ? { ...a.opts, timeUnits: 'seconds', timeOffset: first, duration: Math.max(end - first, (Number(a.duration) || 0) * scale - first) } : {};
+  const advice = end - first > 100
+    ? 'This studio cannot hold a keyframe track whose keys span more than 100 s. Split the motion: key the first part on this item and the rest on a copy that starts later (timeOffset), or keep each track within 100 s.'
+    : a.append
+      ? 'This studio cannot hold a key past 100 s in a merged track. Key the late part on its own track with timeOffset instead of appending.'
+      : 'Keep each track within 100 s, or start it later with timeOffset.';
+  const it = a.item;
+  const before = `
+  // The whole earlier track, so a write the studio got wrong can be undone.
+  const __prevKfs = (${it} && ${it}.data && Array.isArray(${it}.data.keyframes)) ? ${it}.data.keyframes.map(function(k) { return Object.assign({}, k, { properties: Object.assign({}, k && k.properties) }); }) : [];`;
+  const after = `
+  const __asked = ${JSON.stringify(asked)};
+  const __storedTimes = function() { return (${it} && ${it}.data && Array.isArray(${it}.data.keyframes)) ? ${it}.data.keyframes.map(function(k) { return k && k.time; }) : []; };
+  const __landed = function(shift) { const st = __storedTimes(); return __asked.every(function(t) { return st.some(function(x) { return Math.abs(x + shift - t) < 1e-6; }); }); };
+  let __shifted = null;
+  // Only a track the studio wrote and this can read is checked; one stored elsewhere is not judged.
+  if (${it} && __storedTimes().length && !__landed(0)) {
+    const __wrong = __storedTimes();
+    ${canShift ? `app.addAnimation(${a.target}, ${JSON.stringify(shiftedKfs)}, ${JSON.stringify(shiftedOpts)});
+    if (__landed(${first}) && Math.abs((Number(${it}.data.timeOffset) || 0) - ${first}) < 1e-6) {
+      __shifted = { by: ${first}, note: 'this studio cannot hold a key past 100 s in one track, so the keys were written from 0 and the track starts at ${first} s (timeOffset). It plays at the times asked.' };
+    } else ` : ''}{
+      if (__prevKfs.length) app.addAnimation(${a.target}, __prevKfs, { timeUnits: 'seconds', loop: ${a.loop === true} });
+      else if (typeof app.clearKeyframes === 'function') app.clearKeyframes(${it});
+      return { success: false, itemId: ${a.target}, code: 'keyframe_times_not_kept',
+        error: 'the studio did not keep the key times: asked ' + __asked[0] + '..' + __asked[__asked.length - 1] + ' s, it stored ' + __wrong.slice(0, 3).join(', ') + (__wrong.length > 3 ? ', ...' : '') + ' s. ' + ${JSON.stringify(advice)} + (__prevKfs.length ? ' The earlier track was put back.' : ' The track was removed.'),
+        askedTimes: __asked.slice(0, 20), storedTimes: __wrong.slice(0, 20) };
+    }
+  }`;
+  return { before, after, field: ', ...(__shifted ? { shifted: __shifted } : {})' };
+}
+
 function generateKeyframeAnimateCode(
   itemId: string,
   keyframes: Keyframe[],
@@ -2461,7 +2514,10 @@ function generateKeyframeAnimateCode(
   if (timeOffset !== undefined) opts.timeOffset = timeOffset;
   if (clipInPoint !== undefined) opts.clipInPoint = clipInPoint;
   if (clipOutPoint !== undefined) opts.clipOutPoint = clipOutPoint;
-  if (timeUnits !== undefined) opts.timeUnits = timeUnits;
+  // TIMES ARE SECONDS UNLESS THE CALLER SAYS ms. Left unset, the studio guesses (TimeUnits.js): any time over 100
+  // made it read EVERY time as milliseconds, so a 120 s track ran in 0.12 s and the export showed its end state from
+  // the first half second, reported as a success (GRIEF). The tool documents seconds, so the server says seconds.
+  opts.timeUnits = timeUnits ?? 'seconds';
   // addAnimation SETS the item's track; mode 'merge' adds to it (FxTool
   // 2475333b). An engine without merge ignores the option and replaces.
   if (append) opts.mode = 'merge';
@@ -2512,7 +2568,13 @@ function generateKeyframeAnimateCode(
   if (__opts && Object.prototype.hasOwnProperty.call(__opts, 'easingAt')) __warn.push('easingAt ' + ${JSON.stringify(JSON.stringify(easingAt))} + ' was not applied: this studio predates it, so every easing was read as the move ARRIVING at its key. Put each easing on the key the move goes to instead.');` : '';
   const runtimeWarning = `, ...(${textKeysJs ? '__ignored.length || ' : ''}__filterIgnored.length ? { ignoredProperties: ${textKeysJs ? '__ignored.concat(__filterIgnored)' : '__filterIgnored'} } : {}), ...(__warn.length ? { warning: __warn.join(' ') } : {})`;
 
+  // Said where the old guess would have read this track differently: a time over 100 with no unit given.
+  const __lastTime = Math.max(0, ...keyframes.map((k) => Number(k.time) || 0), Number(duration) || 0);
+  const unitsNote = timeUnits === undefined && __lastTime > 100
+    ? `\n  __warn.push(${JSON.stringify(`times are read as seconds: the track ends at ${__lastTime} s (${(__lastTime / 60).toFixed(1)} min). If you meant milliseconds, pass timeUnits: 'ms'.`)});`
+    : '';
   const addAnimTarget = itemId.startsWith('$') ? '_targetId' : `${ID}`;
+  const guard = keyTimeGuard({ target: addAnimTarget, item: '__ki', keyframes, timeUnits, append, timeOffsetGiven: timeOffset !== undefined, loop, opts, duration: calculatedDuration });
 
   return `
 // Apply keyframe animation to ${ID}
@@ -2527,8 +2589,10 @@ function generateKeyframeAnimateCode(
   // earlier keys' easings, by time, so a collision that changed one can be named.
   const __prevEase = (__ki && __ki.data && Array.isArray(__ki.data.keyframes)) ? __ki.data.keyframes.map(function(k) { return [k && k.time, (k && k.easing) || 'linear']; }) : [];
   const __opts = ${JSON.stringify(opts)};
+${guard.before}
   app.addAnimation(${addAnimTarget}, ${keyframesJson}, __opts);
-  const __warn = [];${easingAtCheck}${textKeyCheck}${filterKeyCheck}
+  const __warn = [];${unitsNote}
+${guard.after}${easingAtCheck}${textKeyCheck}${filterKeyCheck}
   const __now = (__ki && __ki.data && Array.isArray(__ki.data.keyframes)) ? __ki.data.keyframes.map(function(k) { return k && k.time; }) : [];
   const __kept = __prev.every(function(t) { return __now.indexOf(t) >= 0; });${append ? `
   // Property gaps across the merged track (the same check a single call makes
@@ -2547,7 +2611,7 @@ function generateKeyframeAnimateCode(
       ? { appended: true, previousKeys: __prev.length, keys: __now.length }
       : { appended: false, replaced: true, previousKeys: __prev.length, warning: 'append was asked for, but this studio replaced the existing track (' + __prev.length + ' key(s)) instead of adding to it: it has no merge mode. Put every key in one keyframe_animate call.' })`
     : `{ replaced: true, previousKeys: __prev.length, note: 'the item already had a keyframe track (' + __prev.length + ' key(s)); this call replaced it. To add keys to it instead, pass append: true.' }`};
-  return { success: true, itemId: ${addAnimTarget}, duration: ${calculatedDuration}, loop: ${loop}${append ? ', append: true' : ''}, ...(__track ? { track: __track } : {})${append ? `, ...(__gaps.length ? { propertyGaps: __gaps.slice(0, 10), gapWarning: __gaps.length + ' key(s) of the merged track leave out a property other keys animate (' + __gaps.reduce(function(a, g) { g.missing.forEach(function(p) { if (a.indexOf(p) < 0) a.push(p); }); return a; }, []).join(', ') + '). The engine can break that property at such a key; give each key the full set — hold a value by repeating it.' } : {})` : ''}${timeOffset !== undefined ? `, timeOffset: ${timeOffset}` : ''}${clipInPoint !== undefined ? `, clipInPoint: ${clipInPoint}` : ''}${clipOutPoint !== undefined ? `, clipOutPoint: ${clipOutPoint}` : ''}${__notes}${runtimeWarning} };
+  return { success: true, itemId: ${addAnimTarget}, duration: ${calculatedDuration}, loop: ${loop}${append ? ', append: true' : ''}${guard.field}, ...(__track ? { track: __track } : {})${append ? `, ...(__gaps.length ? { propertyGaps: __gaps.slice(0, 10), gapWarning: __gaps.length + ' key(s) of the merged track leave out a property other keys animate (' + __gaps.reduce(function(a, g) { g.missing.forEach(function(p) { if (a.indexOf(p) < 0) a.push(p); }); return a; }, []).join(', ') + '). The engine can break that property at such a key; give each key the full set — hold a value by repeating it.' } : {})` : ''}${timeOffset !== undefined ? `, timeOffset: ${timeOffset}` : ''}${clipInPoint !== undefined ? `, clipInPoint: ${clipInPoint}` : ''}${clipOutPoint !== undefined ? `, clipOutPoint: ${clipOutPoint}` : ''}${__notes}${runtimeWarning} };
 })();
 `.trim();
 }
@@ -6124,9 +6188,18 @@ return { itemId: ${batchRef(op.itemId)}, merged: true, mergedInto: ${foldTarget}
           const v = Number((op as any)[key]);
           if ((op as any)[key] !== undefined && Number.isFinite(v)) kfExtra.push(`${key}: ${v}`);
         }
-        const kfUnits = (op as any).timeUnits;
-        if (kfUnits === 'seconds' || kfUnits === 'ms') kfExtra.push(`timeUnits: ${jsLiteral(kfUnits)}`);
+        // Seconds unless the op says ms: the studio's own guess read every time as ms once one passed 100 (GRIEF).
+        const kfUnitsGiven = (op as any).timeUnits === 'seconds' || (op as any).timeUnits === 'ms';
+        const kfUnits = kfUnitsGiven ? (op as any).timeUnits : 'seconds';
+        kfExtra.push(`timeUnits: ${jsLiteral(kfUnits)}`);
+        const kfLast = Math.max(0, ...((kfSource || []) as any[]).map((k) => Number(k && k.time) || 0), Number(kfDuration) || 0);
+        const kfUnitsNote = !kfUnitsGiven && kfLast > 100
+          ? `, timeUnitsNote: ${JSON.stringify(`times are read as seconds: the track ends at ${kfLast} s (${(kfLast / 60).toFixed(1)} min). If you meant milliseconds, pass timeUnits: 'ms'.`)}`
+          : '';
         const kfExtraStr = kfExtra.length > 0 ? `, ${kfExtra.join(', ')}` : '';
+        const kfGuard = keyTimeGuard({ target: 'targetId', item: '_kfItem', keyframes: (kfSource || []) as Keyframe[], timeUnits: kfUnits as 'seconds' | 'ms',
+          append: kfAppend, timeOffsetGiven: (op as any).timeOffset !== undefined, loop: kfLoop,
+          opts: { duration: kfDuration, loop: kfLoop, ...(kfAppend ? { mode: 'merge' } : {}) }, duration: kfDuration });
         const kfTextKeysJs = unanimatedTextKeysJs(((kfSource || []) as any[]).flatMap((k) => Object.keys((k as { properties?: object }).properties ?? {})));
         const kfFilterKeysJs = unanimatedFilterKeysJs(((kfSource || []) as any[]).flatMap((k) => Object.keys((k as { properties?: object }).properties ?? {})));
         const kfTextCheck = `\nconst _kfIgnored = ${kfTextKeysJs || '[]'};\nconst _kfFilterIgnored = ${kfFilterKeysJs};`;
@@ -6140,8 +6213,9 @@ if (!_target) {
 }
 const _kfItem = _target.item || _target;
 const _prevKeys = (_kfItem.data && Array.isArray(_kfItem.data.keyframes)) ? _kfItem.data.keyframes.length : 0;
-app.addAnimation(targetId, ${kfJson}, { duration: ${kfDuration}, loop: ${kfLoop}${kfAppend ? ", mode: 'merge'" : ''}${kfExtraStr} });${kfTextCheck}
-return { success: true, itemId: targetId, duration: ${kfDuration}, loop: ${kfLoop}${kfAppend ? ', append: true' : ''}${keyframeResultNotes(kfSource as never, { loop: kfLoop === true, append: kfAppend })}${kfAppend ? '' : `, ...(_prevKeys ? { track: { replaced: true, previousKeys: _prevKeys, note: 'the item already had a keyframe track; this op replaced it. To add keys to it instead, pass append: true.' } } : {})`}${kfIgnored} };
+${kfGuard.before}
+app.addAnimation(targetId, ${kfJson}, { duration: ${kfDuration}, loop: ${kfLoop}${kfAppend ? ", mode: 'merge'" : ''}${kfExtraStr} });${kfGuard.after}${kfTextCheck}
+return { success: true, itemId: targetId, duration: ${kfDuration}, loop: ${kfLoop}${kfAppend ? ', append: true' : ''}${kfGuard.field}${keyframeResultNotes(kfSource as never, { loop: kfLoop === true, append: kfAppend })}${kfAppend ? '' : `, ...(_prevKeys ? { track: { replaced: true, previousKeys: _prevKeys, note: 'the item already had a keyframe track; this op replaced it. To add keys to it instead, pass append: true.' } } : {})`}${kfUnitsNote}${kfIgnored} };
 `;
       }
 
@@ -13939,7 +14013,7 @@ ${guard}
   const __prevTimes = __prev.map(function (k) { return k && k.time; });
   const __ours = ['x', 'y', 'scaleX', 'scaleY', 'rotation', 'opacity'];
   const __other = __prev.reduce(function (acc, k) { Object.keys((k && k.properties) || {}).forEach(function (p) { if (__ours.indexOf(p) < 0 && acc.indexOf(p) < 0) acc.push(p); }); return acc; }, []);
-  app.addAnimation(${id}, __r.keyframes, { duration: Math.max(__r.end, __prev.reduce(function (m, k) { return Math.max(m, (k && k.time) || 0); }, 0)), loop: false, mode: 'merge' });
+  app.addAnimation(${id}, __r.keyframes, { duration: Math.max(__r.end, __prev.reduce(function (m, k) { return Math.max(m, (k && k.time) || 0); }, 0)), loop: false, mode: 'merge', timeUnits: 'seconds' });
   const __now = (__it.data && Array.isArray(__it.data.keyframes)) ? __it.data.keyframes.map(function (k) { return k && k.time; }) : [];
   const __warnings = __anchorWarnings.concat(__r.warnings || []);
   if (__prevTimes.length && !__prevTimes.every(function (t) { return __now.indexOf(t) >= 0; })) {
@@ -17016,7 +17090,7 @@ export function generateAutoKeyCode(itemId: string, props: Record<string, unknow
   Object.keys(NEW).forEach(function(p) { put(AT, p, NEW[p], ${JSON.stringify(easing ?? null)}); });
   const keys = Object.keys(byTime).map(function(t) { return byTime[t]; }).sort(function(a, b) { return a.time - b.time; });
   const beforeTimes = track.map(function(k) { return k.time; });
-  app.addAnimation(${JSON.stringify(itemId)}, keys, { mode: 'merge' });
+  app.addAnimation(${JSON.stringify(itemId)}, keys, { mode: 'merge', timeUnits: 'seconds' });
   const after = (item.data && Array.isArray(item.data.keyframes)) ? item.data.keyframes : [];
   const kept = beforeTimes.every(function(t) { return after.some(function(k) { return k.time === t; }); });
   if (!kept) return { success: false, error: 'this studio replaced the track instead of merging into it (no merge mode): the earlier keys are gone. Put every key in one keyframe_animate call.', atTime: AT };
