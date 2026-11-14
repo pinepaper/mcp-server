@@ -357,6 +357,11 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   rewritten to start later (`timeOffset`) and plays at the times asked; the reply says `shifted`.
   A longer track fails with `keyframe_times_not_kept`, the times asked and stored, and how to
   split it, and the earlier track is put back.
+- A video export whose picture stops changing while a keyframe track in the scene is still
+  moving says so: a `frozen_output` warning, and `frozenOutput` on the result, with the time the
+  picture froze and the track that should still be moving. It compares the studio's per-frame
+  hashes with the scene's tracks, so it catches a frozen film whatever the cause. Paged
+  (long-form) exports now print the studio's warnings too.
 - An export's `bitrateCeilingHeld` is checked against the file's achieved bitrate. A file over its
   target says `bitrateCeilingHeld: false`, with `bitrateOverPercent` and a warning; the studio
   counted anything within 10% over as held.

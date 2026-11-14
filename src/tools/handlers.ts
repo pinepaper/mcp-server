@@ -6,6 +6,7 @@
  * Supports browser execution via Puppeteer.
  */
 
+import { SCENE_MOTION_PROBE_JS, frozenOutputCheck } from './frozen-output.js';
 import { dropPrivateRelationParams, normalizeBatchOperationNames, renamedArgumentsNote, RENAMED_ARGUMENTS_META_KEY } from './batch-op-names.js';
 import { nestedIgnoredPaths } from './nested-ignored.js';
 import {
@@ -1139,6 +1140,17 @@ function redactGeneratedCode(details: unknown): unknown {
  * The studio's scene-lint warnings on an export (FxTool lintScene), one line each, so a centred title that runs
  * out of the frame ("IGNAL" for "SIGNAL") is read on the success path rather than left in the JSON. Empty when none.
  */
+/** Put a frozen-output finding on the result: in `warnings`, in the `warning` line the reply prints, and as `frozenOutput`. */
+export function noteFrozenOutput(exportResult: unknown, sceneMotion: unknown): void {
+  if (!exportResult || typeof exportResult !== 'object') return;
+  const f = frozenOutputCheck(exportResult, sceneMotion);
+  if (!f) return;
+  const r = exportResult as { warnings?: unknown; warning?: unknown; frozenOutput?: unknown };
+  r.frozenOutput = { frozenAt: f.frozenAt, exportEnd: f.exportEnd, itemId: f.track.id, trackUntil: f.track.until >= 1e8 ? 'loops' : f.track.until };
+  if (Array.isArray(r.warnings)) (r.warnings as unknown[]).push(f.warning); else r.warnings = [f.warning];
+  r.warning = typeof r.warning === 'string' && r.warning ? r.warning + ' ' + f.warning : f.warning;
+}
+
 /**
  * A CLAIM THE NUMBERS NEXT TO IT CONTRADICT (tester, 1.6.36). The studio sets video.bitrateCeilingHeld: true
  * whenever the file is within 10% OVER the target, and warns only past that, so a file 7% over its ceiling was
@@ -4996,6 +5008,11 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
           exportSessionManager.startJob({ name: 'auto_session', screenshotPolicy: 'on_complete' });
         }
 
+        // The scene's motion, read before a video export so the delivered frames can be checked against it
+        // (frozen-output.ts). A probe that cannot run gives no verdict, never a false one.
+        const sceneMotion = /^(mp4|webm|auto|)$/.test(String(input.format ?? ''))
+          ? await controller.executeCode(SCENE_MOTION_PROBE_JS, false).then((r) => (r.success ? r.result : null)).catch(() => null)
+          : null;
         const exportBrowserResult = await controller.executeCode(code, false, {
           governorTimeoutMs: exportGovernorTimeoutMs(),
         });
@@ -5012,6 +5029,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
 
         const exportResult = exportBrowserResult.result as Record<string, any>;
         correctBitrateClaim(exportResult);
+        noteFrozenOutput(exportResult, sceneMotion);
 
         // TWO VERDICTS, and only one of them was being read.
         //
@@ -5088,7 +5106,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
               structuredContent: boundedStructured(cleanResult),
               content: [{
                 type: 'text' as const,
-                text: `Export saved to file:\n\nFile: ${filePath}\nFormat: ${format}\nSize: ${(deliveredSize / 1024).toFixed(1)} KB\nPlatform: ${input.platform}\nPaged out of the studio's export store in ${chunks} chunk${chunks === 1 ? '' : 's'}\n${audioDeliveryLine(delivery)}${receiptErrorLine(receipt)}${'receiptError' in receipt ? '' : probeLines(receipt)}${lintLines(exportResult)}\nResult: ${JSON.stringify(cleanResult, null, 2)}`,
+                text: `Export saved to file:\n\nFile: ${filePath}\nFormat: ${format}\nSize: ${(deliveredSize / 1024).toFixed(1)} KB\nPlatform: ${input.platform}\nPaged out of the studio's export store in ${chunks} chunk${chunks === 1 ? '' : 's'}\n${typeof (exportResult as { warning?: unknown }).warning === 'string' ? `WARNING: ${(exportResult as { warning: string }).warning}\n` : ''}${audioDeliveryLine(delivery)}${receiptErrorLine(receipt)}${'receiptError' in receipt ? '' : probeLines(receipt)}${lintLines(exportResult)}\nResult: ${JSON.stringify(cleanResult, null, 2)}`,
               }, exportFileLink(filePath, deliveredSize)],
             }, exportBrowserResult.report);
           } catch (streamError) {
