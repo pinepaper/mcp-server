@@ -69,10 +69,13 @@ describe('execute_custom_code: the server', () => {
 });
 
 describe('agent_batch_execute', () => {
-  it('the emitted batch records each failed op as a step with its item and reason, and runs the lint', () => {
+  it('the emitted batch records each failed op as a step with its item and reason, and runs the lint', async () => {
     const code = codeGenerator.generateAgentBatchExecute({ operations: [{ type: 'modify', itemId: 'item_3', properties: { opacity: 0.5 } }], atomic: false } as never);
-    expect(code).toContain('step: "op 0 (modify)"');
-    expect(code).toContain(': "item_3"');
+    // Run it: the failure record is built by the shared __op wrapper at run time, so read what it records.
+    const app = { modifyItem: () => false, getCanvasSize: () => ({ width: 800, height: 600 }), historyManager: { saveState() {} } };
+    const body = code.split('\n').filter((l) => !l.startsWith('//')).join('\n');
+    const r = await (new Function('app', `return ${body}`)(app) as Promise<{ failures: unknown[] }>);
+    expect(r.failures).toEqual([{ step: 'op 0 (modify)', itemId: 'item_3', reason: 'no item item_3 — nothing was modified' }]);
     expect(code).toContain('failures: _failures()');
     expect(code).toContain('__ppLintNow()');
     expect(code).not.toContain('error: opError.message');

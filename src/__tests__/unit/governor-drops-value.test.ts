@@ -23,8 +23,8 @@ describe('code the governor would lose the value of runs ungoverned', () => {
     expect(GOVERNOR_MAX_CODE_CHARS).toBe(400_000);
   });
 
-  it('a 400-create batch, as in the measured failure, is past the limit', () => {
-    const code = batch(400);
+  it('a batch past the limit is detected (400 creates were, before the shared op wrapper shrank each op)', () => {
+    const code = batch(1500);
     expect(code.length).toBeGreaterThan(GOVERNOR_MAX_CODE_CHARS);
     expect(governorDropsValue(code)).toBe(true);
   });

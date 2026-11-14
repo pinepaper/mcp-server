@@ -1237,8 +1237,10 @@ describe('PinePaperCodeGenerator', () => {
         ],
       } as never);
 
-      const pushes = code.match(/itemIds\.push\(/g) || [];
-      expect(pushes.length).toBe(2); // exactly one per create op
+      // Each op passes its claim to the shared __op wrapper: only the creates take a $N slot.
+      const claims = [...code.matchAll(/await __op\(\d+, "(\w+)", "[^"]*", \(\) => [^,]+, (true|false), async/g)].map((m) => `${m[1]}:${m[2]}`);
+      expect(claims).toEqual(['create:true', 'keyframe_animate:false', 'create:true', 'keyframe_animate:false']);
+      expect((code.match(/itemIds\.push\(/g) || []).length).toBe(1); // once, in the wrapper
 
       // $1 must resolve to the SECOND create (itemIds[1]) — with the old
       // unconditional push, itemIds[1] was the first keyframe op's target.

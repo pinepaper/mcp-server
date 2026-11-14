@@ -5692,6 +5692,28 @@ throw new Error('Unknown diagram mode action: ' + ${jsLiteral(action)});
   };
 
   try {
+  // ONE WRAPPER FOR EVERY OP.
+  // Not throwing is not succeeding: an op that RETURNS { success: false } (a guard that found a facade missing, a
+  // preset the engine does not have) raises nothing, and was recorded as a success. Atomic: throw WITHOUT
+  // recording and let the catch record it once (doing both put two entries in for one failed op).
+  const __op = async (index, type, step, opItem, claims, fn) => {
+    try {
+      const result = await fn();
+      const failed = _opFailure(result);
+      if (failed) {
+        const itemId = (result && typeof result.itemId === 'string') ? result.itemId : opItem();
+        ${isAtomic ? "const e = new Error(failed); e.itemId = itemId; throw e;" : "results.push({ index, success: false, step, itemId, reason: failed, error: failed, result }); success = false;"}
+      } else {
+        results.push({ index, success: true, result });
+        if (claims && result && result.itemId) itemIds.push(result.itemId);
+      }
+    } catch (opError) {
+      const r = _why(opError, 'operation ' + index + ' (' + type + ') threw with no message');
+      results.push({ index, success: false, step, itemId: (opError && typeof opError.itemId === 'string') ? opError.itemId : opItem(), reason: r, error: r });
+      ${isAtomic ? 'throw opError;' : 'success = false;'}
+    }
+  };
+
 `;
 
     operations.forEach((op, index) => {
@@ -5716,35 +5738,13 @@ throw new Error('Unknown diagram mode action: ' + ${jsLiteral(action)});
       const opItem = [o.itemId, o.targetId, o.sourceId, o.id].find((v) => typeof v === 'string') ?? null;
       const opItemJs = typeof opItem === 'string' && /^\$\d+$/.test(opItem) ? `__refName(${opItem.slice(1)})` : JSON.stringify(opItem);
       const opStep = typeof o._step === 'string' ? `op ${index}: ${o._step}` : `op ${index} (${op.type})`;
+      // The wrapper is the shared __op helper (emitted once, below the history batch), not a copy per op: the
+      // copied try/catch and its comments were ~1.5 KB of every op, 4.8 MB of code for 2,000 creates.
       code += `
     // Operation ${oneLine(index)}: ${oneLine(op.type)}
-    try {
-      const result${index} = await (async () => {
+    await __op(${index}, ${JSON.stringify(op.type)}, ${JSON.stringify(opStep)}, () => ${opItemJs}, ${claimsItemSlot}, async () => {
         ${opCode}
-      })();
-      // NOT THROWING IS NOT SUCCEEDING. An op that RETURNS { success: false }
-      // — a guard that found a facade missing, a preset the engine does not
-      // have, a precondition unmet — raises nothing, so this recorded it as a
-      // success and the batch reported success over it. Measured on
-      // applyAnimatedMask(item, 'star'): the per-op error was perfectly good
-      // and the batch still said everything worked.
-      const failed${index} = _opFailure(result${index});
-      if (failed${index}) {
-        // ATOMIC: throw WITHOUT recording, and let the catch below record it
-        // once. Doing both put two entries in for one failed op.
-        ${isAtomic ? `const __e${index} = new Error(failed${index}); __e${index}.itemId = (result${index} && typeof result${index}.itemId === 'string') ? result${index}.itemId : ${opItemJs}; throw __e${index};` : `results.push({ index: ${index}, success: false, step: ${JSON.stringify(opStep)}, itemId: (result${index} && typeof result${index}.itemId === 'string') ? result${index}.itemId : ${opItemJs}, reason: failed${index}, error: failed${index}, result: result${index} });
-        success = false;`}
-      } else {
-        results.push({ index: ${index}, success: true, result: result${index} });
-        ${claimsItemSlot ? `if (result${index} && result${index}.itemId) {
-          itemIds.push(result${index}.itemId);
-        }` : ''}
-      }
-    } catch (opError) {
-      const __r${index} = _why(opError, 'operation ${index} (${op.type}) threw with no message');
-      results.push({ index: ${index}, success: false, step: ${JSON.stringify(opStep)}, itemId: (opError && typeof opError.itemId === 'string') ? opError.itemId : ${opItemJs}, reason: __r${index}, error: __r${index} });
-      ${isAtomic ? 'throw opError;' : 'success = false;'}
-    }
+    });
 `;
     });
 
