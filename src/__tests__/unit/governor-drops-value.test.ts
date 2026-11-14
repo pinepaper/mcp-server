@@ -33,3 +33,25 @@ describe('code the governor would lose the value of runs ungoverned', () => {
     expect(governorDropsValue(batch(12))).toBe(false);
   });
 });
+
+describe('a batch past the limit is sent to the page once', () => {
+  it('the governed call carries no code on a bypass; runUngoverned sends it', async () => {
+    const { PinePaperBrowserController } = await import('../../browser/puppeteer-controller.js');
+    const c = new PinePaperBrowserController({ headless: true }) as any;
+    const sent: Array<{ via: string; chars: number }> = [];
+    c.page = {
+      evaluate: async (fn: unknown, arg?: unknown) => {
+        if (typeof arg === 'string') { sent.push({ via: 'evaluate', chars: arg.length }); return { success: true, __ppRaw: true, executedVia: 'eval' }; }
+        return { success: true };
+      },
+      evaluateHandle: async (code: string) => { sent.push({ via: 'evaluateHandle', chars: code.length }); return { dispose: async () => {} }; },
+    };
+    c.isConnected = true;
+    c.ensureStudioPage = async () => 'ok';
+    c.rememberCanvasSize = async () => {};
+    const code = batch(1500);
+    expect(governorDropsValue(code)).toBe(true);
+    await c.executeCode(code, false);
+    expect(sent).toEqual([{ via: 'evaluate', chars: 0 }, { via: 'evaluateHandle', chars: code.length }]);
+  });
+});

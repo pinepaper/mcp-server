@@ -1031,6 +1031,8 @@ export class PinePaperBrowserController {
         stage: options.stage ?? null,
       };
       const __evalStart = Date.now();
+      // On a bypass this call does not read the code (runUngoverned sends it). Passing it anyway sent a 2 MB batch to
+      // the page twice.
       const evaluated = await this.page.evaluate(async (codeToRun: string, opts: { bypass: boolean; timeoutMs?: number; heavyClass: string | null; awaitBoot: boolean; stage: Record<string, string> | null }) => {
         // THE BRIDGE USES STRUCTURED CLONE, AND JSON.stringify DOES NOT PROVE IT.
         //
@@ -1154,7 +1156,7 @@ export class PinePaperBrowserController {
         // package contains no evaluating call of its own, in the page or in Node.
         (window as unknown as { __ppBridgeSafe?: (v: unknown) => unknown }).__ppBridgeSafe = bridgeSafe;
         return { success: true, __ppRaw: true, executedVia: 'eval' as const };
-      }, code, runOptions);
+      }, runOptions.bypass ? '' : code, runOptions);
       let result: typeof evaluated | { success: boolean; result?: unknown; error?: string; executedVia: 'eval' } = evaluated;
       if ((evaluated as { __ppRaw?: boolean }).__ppRaw) result = await this.runUngoverned(code);
       BROWSER_TIME.executeMs += Date.now() - __evalStart;
