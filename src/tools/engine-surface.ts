@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 745e89e04f6f4721932c5328d4a270d39294fa9e
- * sha256:    9a900bd7bf104691591e294d955b37cca6c13eb3af4e2a8a7d24c535f2ae2fd3   (of PinePaper.js as committed)
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main abe66c5957c26fc0443e753c00c21eb405a30689
+ * sha256:    48cba9d9d7fdff164a97612e2d6ff602140a063f2a267dd2e10625a6f8664e68   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on `window.app`, with how it gets there. The parity
@@ -16,7 +16,7 @@
 /** How a name lands on `app`. */
 export type EngineMemberKind = 'method' | 'accessor' | 'property' | 'lazy' | 'lazyHeavy' | 'bootstrap';
 
-/** 1595 names, from FxTool/js/PinePaper.js. */
+/** 1599 names, from FxTool/js/PinePaper.js. */
 export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object.freeze({
   __buildFreshness: 'property',
   _aboveHooksHeld: 'property',
@@ -118,6 +118,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _clearCursorScript: 'method',
   _clearHoverOutline: 'method',
   _clickTriggerTargetAt: 'method',
+  _cloudChrome: 'method',
   _collectDrawingCluster: 'method',
   _collectEventListenerCleanups: 'method',
   _collectKeyListenerCleanups: 'method',
@@ -163,6 +164,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _drainEventQueue: 'method',
   _drainParamTransforms: 'method',
   _drainSubsystemReadyHooks: 'method',
+  _drawCloudArtboard: 'method',
   _drawHeldHooksOverBake: 'method',
   _drawnSize: 'method',
   _drawOverMedia: 'property',
@@ -274,6 +276,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _lastBrushColorNotes: 'property',
   _lastDynamicUpdate: 'property',
   _lastElapsedTime: 'property',
+  _lastFitZoom: 'property',
   _lastFrameIdle: 'property',
   _lastMediumError: 'property',
   _lastPaintedError: 'property',
@@ -905,6 +908,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   extractStoryBeatTimes: 'method',
   extrudedTextAt: 'method',
   extrudeToMesh: 'method',
+  fillColor: 'property',
   filterSystem: 'lazy',
   findPath: 'method',
   findSelectableParent: 'method',
