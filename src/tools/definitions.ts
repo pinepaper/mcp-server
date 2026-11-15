@@ -2904,7 +2904,7 @@ A partial composition reports as a failure with the elements that did not create
         title: { type: 'string', description: 'compose: the headline most styles build around.' },
         subtitle: { type: 'string', description: 'compose: the supporting line.' },
         body: { type: 'string', description: 'compose: body copy, where the style has room for it.' },
-        width: { type: 'number', description: 'compose: canvas width. compose SETS the canvas to the size it laid out for. Most styles honour width/height; a few lay out at their own fixed size, and the result warns when the requested size was not used. canvasResized says when the canvas changed.' },
+        width: { type: 'number', description: 'compose: canvas width. Without width and height, compose lays out at the CURRENT canvas size, so your canvas is kept. compose sets the canvas to the size it laid out for: most styles honour the size; a few lay out at their own fixed size, and the result warns when the size was not used. canvasResized says when the canvas changed. With draw: false and no size, the scene comes back at the style\'s own default size.' },
         height: { type: 'number', description: 'compose: canvas height.' },
         variant: { type: 'string', description: "compose: a style-specific variant, e.g. art deco's 'emerald'." },
         draw: { type: 'boolean', description: 'compose: draw it (default true). false returns the scene and ops as data and draws nothing.' },

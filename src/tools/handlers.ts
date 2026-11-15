@@ -5261,11 +5261,24 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
           case 'list_styles':
             return dataResult({ styles: designSystems.listStyles() });
           case 'compose': {
+            // NO SIZE GIVEN MEANS YOUR CANVAS, not the style's own (RISO-RESIZE, owner 2026-11-14). A style laid out
+            // at its default size (1280x720 for most) and resized the canvas to it, so a 1080x1920 project became
+            // 1280x720. Where the studio is reachable, an unsized compose uses the current canvas size.
+            let width = input.width, height = input.height;
+            let sizeFrom: 'asked' | 'canvas' | 'style' = width !== undefined || height !== undefined ? 'asked' : 'style';
+            if (sizeFrom === 'style' && input.draw !== false && options.executeInBrowser) {
+              const ctl = options.browserController || getBrowserController();
+              if (ctl.connected) {
+                const cs = await ctl.executeCode('(function () { const s = app.getCanvasSize ? app.getCanvasSize() : null; return s && s.width > 0 && s.height > 0 ? { width: s.width, height: s.height } : null; })()', false)
+                  .then((r) => (r.success ? r.result as { width: number; height: number } | null : null)).catch(() => null);
+                if (cs) { width = cs.width; height = cs.height; sizeFrom = 'canvas'; }
+              }
+            }
             let scene;
             try {
               scene = designSystems.compose(input.style!, {
                 title: input.title!, subtitle: input.subtitle, body: input.body,
-                width: input.width, height: input.height, variant: input.variant,
+                width, height, variant: input.variant,
               });
             } catch (composeError) {
               return errorResult(
@@ -5288,10 +5301,12 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
             // Some vendored styles lay out at their OWN fixed size and ignore
             // width/height (swiss_typographic is always 1280x720), so a caller
             // asking for 1080x1080 got a resized canvas (gate run 3). Say so.
-            const sizeIgnored = (input.width !== undefined && input.width !== scene.width)
-              || (input.height !== undefined && input.height !== scene.height);
+            const sizeIgnored = (width !== undefined && width !== scene.width)
+              || (height !== undefined && height !== scene.height);
             const sizeWarning = sizeIgnored
-              ? `"${scene.style}" lays out at its own size, ${scene.width}x${scene.height}; the requested ${input.width ?? '?'}x${input.height ?? '?'} was not used`
+              ? (sizeFrom === 'canvas'
+                ? `"${scene.style}" lays out at its own size, ${scene.width}x${scene.height}, not your canvas's ${width}x${height}, so the canvas is resized to it`
+                : `"${scene.style}" lays out at its own size, ${scene.width}x${scene.height}; the requested ${input.width ?? '?'}x${input.height ?? '?'} was not used`)
               : undefined;
             // BAUHAUS-SUBTITLE: at a size the style was not laid out for, its
             // proportions can put text across a shape (bauhaus at 1920x1080
@@ -5299,18 +5314,20 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
             // the result names each collision rather than drawing it as intended.
             const collisions = designSystems.scalingCollisions(input.style!, {
               title: input.title!, subtitle: input.subtitle, body: input.body,
-              width: input.width, height: input.height, variant: input.variant,
+              width, height, variant: input.variant,
             }, scene);
             const layoutWarning = collisions.length
               ? `at ${scene.width}x${scene.height} the "${scene.style}" layout runs text onto a shape it does not touch at its own default size: `
                 + collisions.map((c) => `${c.text} over ${c.shape}`).join(', ')
-                + '. Compose without width/height (its default size) for the layout as designed, or move the text afterwards with pinepaper_modify_item.'
+                + '. For the layout as designed, compose at the style\'s own size (draw: false without width/height returns it), or move the text afterwards with pinepaper_modify_item.'
               : undefined;
             const collisionReport = collisions.length ? { layoutCollisions: collisions, layoutWarning } : {};
             if (input.draw === false) {
               return dataResult({ scene, ops, drawn: false, ...(sizeWarning ? { warning: sizeWarning } : {}), ...collisionReport });
             }
-            const code = codeGenerator.generateDesignCompose(scene, ops, scene.style, sizeWarning, collisionReport);
+            // A style that cannot lay out at your canvas size is fitted into it rather than resizing it.
+            const fitTo = sizeFrom === 'canvas' && sizeIgnored && width && height ? { width, height } : undefined;
+            const code = codeGenerator.generateDesignCompose(scene, ops, scene.style, sizeWarning, collisionReport, fitTo);
             return executeOrGenerate(code, `Composed a ${scene.style} scene (${ops.length} items)`, options, 'pinepaper_design_system');
           }
         }

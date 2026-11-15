@@ -5242,7 +5242,7 @@ export const DesignSystemInputSchema = z.object({
   title: z.string().optional().describe('compose: the headline. Most styles are poster-shaped and build around it.'),
   subtitle: z.string().optional().describe('compose: the supporting line.'),
   body: z.string().optional().describe('compose: optional body copy, where the style has somewhere to put it.'),
-  width: z.number().optional().describe('compose: canvas width (the style picks its own default otherwise).'),
+  width: z.number().optional().describe("compose: canvas width. Without width and height, compose lays out at the current canvas size, keeping your canvas (with draw: false, at the style's own default size)."),
   height: z.number().optional().describe('compose: canvas height.'),
   variant: z.string().optional().describe("compose: a style-specific variant where one exists, e.g. art deco's emerald colourway."),
   draw: z.boolean().optional().default(true)

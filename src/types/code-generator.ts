@@ -15480,7 +15480,7 @@ ${needWorld}
    * already decided by a pure function, so nothing is left for the page to
    * work out.
    */
-  generateDesignCompose(scene: { width: number; height: number; backgroundHex?: string }, ops: Array<Record<string, unknown>>, style: string, sizeWarning?: string, report: Record<string, unknown> = {}): string {
+  generateDesignCompose(scene: { width: number; height: number; backgroundHex?: string }, ops: Array<Record<string, unknown>>, style: string, sizeWarning?: string, report: Record<string, unknown> = {}, fitTo?: { width: number; height: number }): string {
     const S = (v: unknown) => JSON.stringify(v);
     return `
 // Design: compose a ${oneLine(style)} scene — ${oneLine(ops.length)} items, laid out server-side
@@ -15490,7 +15490,9 @@ ${needWorld}
   // The layout was computed for this size, so the canvas is set to it — and
   // the result SAYS so: a 1080x1080 canvas became 1280x720 silently (gate C).
   const __before = app.getCanvasSize ? app.getCanvasSize() : null;
-  if (typeof app.setCanvasSize === 'function') { try { app.setCanvasSize({ width: size.width, height: size.height }); } catch (_) { /* a fixed canvas is not a failure */ } }
+  ${fitTo ? `// FIT, NOT RESIZE (RISO-RESIZE): this style lays out only at its own size, and the canvas is the caller's, so the
+  // canvas is kept and the composition is scaled to fit it, centred, below.
+  const __fit = ${S(fitTo)};` : `if (typeof app.setCanvasSize === 'function') { try { app.setCanvasSize({ width: size.width, height: size.height }); } catch (_) { /* a fixed canvas is not a failure */ } }`}
   const __after = app.getCanvasSize ? app.getCanvasSize() : null;
   const canvasResized = __before && __after && (__before.width !== __after.width || __before.height !== __after.height)
     ? { from: { width: __before.width, height: __before.height }, to: { width: __after.width, height: __after.height } } : null;
@@ -15505,12 +15507,24 @@ ${needWorld}
       if (item) { ids.push(item.data && item.data.id); } else { failed.push({ name: name, type: type, reason: 'create returned nothing' }); }
     } catch (e) { failed.push({ name: name, type: type, reason: (e && e.message) || String(e) }); }
   }
-  if (app.historyManager) app.historyManager.saveState();
+${fitTo ? `  const __k = Math.min(__fit.width / size.width, __fit.height / size.height);
+  const __dx = (__fit.width - size.width * __k) / 2, __dy = (__fit.height - size.height * __k) / 2;
+  let __fitted = 0;
+  for (const id of ids) {
+    const it = id && app.getItemById ? app.getItemById(id) : null;
+    if (it && typeof it.scale === 'function' && typeof it.translate === 'function' && typeof paper !== 'undefined') {
+      it.scale(__k, new paper.Point(0, 0)); it.translate(new paper.Point(__dx, __dy)); __fitted++;
+    }
+  }
+  const __fitReport = { canvas: __fit.width + 'x' + __fit.height, layout: size.width + 'x' + size.height, scale: Math.round(__k * 1000) / 1000, itemsFitted: __fitted,
+    note: 'this style lays out only at ' + size.width + 'x' + size.height + ', so it was drawn at that size and scaled to fit your ' + __fit.width + 'x' + __fit.height + ' canvas, centred; the canvas was kept. Pass width and height for the style at its own size (the canvas is then resized).' };
+  if (typeof paper !== 'undefined' && paper.view) paper.view.draw();
+` : ''}  if (app.historyManager) app.historyManager.saveState();
   // A partial composition is reported as one. Half a poster that claims
   // success is worse than a poster that says which four elements are missing.
-  return { success: failed.length === 0, style: ${S(style)}, itemIds: ids, itemCount: ids.length, failed: failed,
+  return { success: failed.length === 0, style: ${S(style)}, itemIds: ids, itemCount: ids.length, failed: failed,${fitTo ? ' fittedToCanvas: __fitReport,' : ''}
     ...(canvasResized ? { canvasResized: canvasResized, note: 'the canvas was resized to the composition' + (${S(sizeWarning ?? '')} ? '' : '; pass width and height to compose at your canvas size') } : {}),
-    ...(${S(sizeWarning ?? '')} ? { warning: ${S(sizeWarning ?? '')} } : {}), ...${S(report)} };
+    ...(${S(fitTo ? '' : (sizeWarning ?? ''))} ? { warning: ${S(sizeWarning ?? '')} } : {}), ...${S(report)} };
 })();`.trim();
   }
 

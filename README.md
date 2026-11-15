@@ -370,6 +370,12 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   gives the event's id.
 - `add_contraption` with a `sourceEvent` no event has, by id or by name, warns that nothing fires
   the rule until such an event exists or that exact string is pulsed.
+- `pinepaper_design_system` `compose` keeps your canvas. With no `width` and `height` it lays out
+  at the current canvas size; it used to lay out at the style's own size (1280x720 for most) and
+  resize the canvas to that. A style that only lays out at its own size (`risograph_print`,
+  `swiss_typographic`, `neumorphic_glass`, `cyberpunk_neon`) is drawn at that size and scaled to
+  fit your canvas, centred, and the reply's `fittedToCanvas` says so. Pass `width` and `height`
+  to get a style at its own size.
 - `pinepaper_emitter` `set` with `bursts` replaces the emitter's bursts, as it always did; the docs
   said it merged. They now say so, and the reply's `burstsReplaced` gives the burst counts before
   and after.
