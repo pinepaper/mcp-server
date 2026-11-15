@@ -2718,9 +2718,20 @@ function emitGeneratorRun(generatorName: string, paramsJson: string, region?: Ge
     if (!__si) return { success: false, error: ${JSON.stringify(`region.shape names no item "${itemId}" — nothing was drawn. List items with pinepaper_get_items.`)} };
     if (__si.className !== 'Path' && __si.className !== 'CompoundPath') return { success: false, error: ${JSON.stringify(`region.shape item "${itemId}" is a `)} + __si.className + ', and a clip needs a path (a shape, not text, a group or an image) — nothing was drawn.' };
   }` : ''}
-  await app.executeGenerator(${jsLiteral(generatorName)}, ${paramsJson}, ${options});${shaped ? `
+  // FOREGROUND GENERATORS DEFAULT TO EDITABLE PARTS (owner, 2026-11-14). The studio files ui, infographics and
+  // captions generators as foreground; with interactive on, each part (a bubble, a button, a label) is its own item,
+  // which is what a phone frame or a chat thread is for, and what pinepaper_group ungroup releases. The studio's
+  // own default is false for every generator, so unless the caller says, a foreground one runs with true.
+  const __gp = ${paramsJson};
+  let __interactiveDefault = false;
+  if (__gp && __gp.interactive === undefined && app.generatorRegistry && app.generatorRegistry.get) {
+    const __gd = app.generatorRegistry.get(${jsLiteral(generatorName)});
+    const __gc = __gd && __gd.category;
+    if (__gc === 'ui' || __gc === 'infographics' || __gc === 'captions') { __gp.interactive = true; __interactiveDefault = true; }
+  }
+  await app.executeGenerator(${jsLiteral(generatorName)}, __gp, ${options});${shaped ? `
   const __shapes = !!(app.generatorRegistry && typeof app.generatorRegistry._regionClipPath === 'function');` : ''}
-  return { success: true, generator: ${jsLiteral(generatorName)}${region ? `, region: ${JSON.stringify(region)}` : ''}${shaped ? `, ...(__shapes ? {} : { regionShapeApplied: false, warning: ${JSON.stringify(`this studio does not clip generator regions to a shape, so ${typeof region!.shape === 'object' ? 'the region had no box and the generator drew across the whole canvas' : `the ${region!.shape} was drawn as a rectangle`}. It needs an engine with region shapes.`)} })` : ''} };`;
+  return { success: true, generator: ${jsLiteral(generatorName)}, ...(__interactiveDefault ? { interactive: true, interactiveNote: 'a foreground generator: its parts are editable items (interactive: true by default for ui, infographics and captions generators). Pass params.interactive: false for one flattened composition.' } : {})${region ? `, region: ${JSON.stringify(region)}` : ''}${shaped ? `, ...(__shapes ? {} : { regionShapeApplied: false, warning: ${JSON.stringify(`this studio does not clip generator regions to a shape, so ${typeof region!.shape === 'object' ? 'the region had no box and the generator drew across the whole canvas' : `the ${region!.shape} was drawn as a rectangle`}. It needs an engine with region shapes.`)} })` : ''} };`;
 }
 
 /**

@@ -570,7 +570,9 @@ describe('pinepaper_execute_generator — optional region (1.5.6)', () => {
       params: { bgColor: '#0b0f1a' },
     });
     // No region → options is {} but still positionally present.
-    expect(code).toMatch(/app\.executeGenerator\("drawBokeh",\s*\{[^}]*"bgColor":\s*"#0b0f1a"[^}]*\},\s*\{\}\)/);
+    // The params are built first (a foreground generator may get interactive: true), then passed.
+    expect(code).toMatch(/const __gp = \{[^}]*"bgColor":\s*"#0b0f1a"[^}]*\};/);
+    expect(code).toMatch(/app\.executeGenerator\("drawBokeh",\s*__gp,\s*\{\}\)/);
   });
 
   it('codegen routes region into options.region (FxTool reads it from arg #3)', () => {
@@ -579,7 +581,7 @@ describe('pinepaper_execute_generator — optional region (1.5.6)', () => {
       params: {},
       region: { x: 100, y: 200, width: 400, height: 300 },
     });
-    expect(code).toMatch(/app\.executeGenerator\("drawBokeh",\s*\{\},\s*\{"region":\{"x":100,"y":200,"width":400,"height":300\}\}\)/);
+    expect(code).toMatch(/app\.executeGenerator\("drawBokeh",\s*__gp,\s*\{"region":\{"x":100,"y":200,"width":400,"height":300\}\}\)/);
   });
 
   it('codegen surfaces region in the return payload for agent feedback', () => {
@@ -616,6 +618,6 @@ describe('pinepaper_execute_generator — optional region (1.5.6)', () => {
         generatorRegion: { x: 50, y: 50, width: 300, height: 150 },
       }],
     });
-    expect(code).toMatch(/app\.executeGenerator\("drawWaves",\s*\{\},\s*\{"region":\{"x":50,"y":50,"width":300,"height":150\}\}\)/);
+    expect(code).toMatch(/app\.executeGenerator\("drawWaves",\s*__gp,\s*\{"region":\{"x":50,"y":50,"width":300,"height":150\}\}\)/);
   });
 });

@@ -345,8 +345,9 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   foreground ones (`drawChatThread`, `drawPhoneFrame`, `drawBrowserMockup`, `drawMetricCard`,
   `drawFunnel`, `drawRoadmapTimeline` and more) and older ones that were refused (`drawMaze`,
   `drawSpirograph`, `drawIsometricCity`, `drawTopography`). The list now comes from the studio.
-  Run a foreground generator with `params.interactive: true` and its output is editable items;
-  `pinepaper_group` `ungroup` releases the composition.
+  A foreground generator (the studio's `ui`, `infographics` and `captions` categories) runs with
+  `params.interactive: true` unless you pass `false`, so its output is editable items, and
+  `pinepaper_group` `ungroup` releases the composition. The reply says when the default applied.
 - `pinepaper_apply_effect` accepts the studio's new effects: `aurora`, `glitch`, `orbit_swirl`
   (the particle swirl; `vortex` is the shader aura) and `petals`. The list of effects is now
   read from the studio's source at each release, so it no longer falls behind.
