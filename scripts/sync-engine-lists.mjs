@@ -82,11 +82,12 @@
  * memory and exits non-zero on any difference. With no FxTool checkout it
  * exits 0 and says so: an absent sibling is not drift.
  */
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, '..');
@@ -108,6 +109,10 @@ const PINEPAPER_REL = 'js/PinePaper.js';
 const AURA_REL = 'js/ItemAuraSystem.js';
 const GENERATORS_REL = 'js/GeneratorRegistry.js';
 const SOUNDS_REL = 'js/audio/SoundPresets.js';
+const PRESETS_REL = 'js/canvasPresets.js';
+const COLLAGE_REL = 'js/core/CollagePatterns.js';
+const THREAD_REL = 'js/core/ThreadPainting.js';
+const SHAPES_REL = 'js/shapes/index.js';
 
 /** The body of a method or function `head(...) {`, brace-matched; null when it cannot be found. */
 function blockAfter(src, head) {
@@ -176,6 +181,59 @@ function soundCatalogue() {
     }
   }
   return out;
+}
+
+/**
+ * An ES module from the COMMITTED tree, imported for real: the file and every relative module it imports (followed
+ * recursively) are written to a temp folder first, so `import './x.js'` resolves to the committed sibling, never to
+ * the shared working copy. Used where a list is the value of a module, not text that can be scraped safely.
+ */
+const _tmpRoot = { dir: null };
+async function importCommitted(rel) {
+  if (!_tmpRoot.dir) _tmpRoot.dir = mkdtempSync(join(tmpdir(), 'pp-sync-'));
+  const root = _tmpRoot.dir;
+  const seen = new Set();
+  const copy = (r) => {
+    if (seen.has(r)) return;
+    seen.add(r);
+    const src = readCommitted(r);
+    if (src === null || src === undefined) throw new Error(`sync-engine-lists: cannot read ${r} (imported by the module being loaded)`);
+    const out = join(root, r);
+    mkdirSync(dirname(out), { recursive: true });
+    writeFileSync(out, src);
+    for (const m of src.matchAll(/(?:^|\n)\s*(?:import|export)\s[^;]*?from\s*['"](\.{1,2}\/[^'"]+)['"]/g)) copy(join(dirname(r), m[1]).replace(/\\/g, '/'));
+  };
+  copy(rel);
+  writeFileSync(join(root, 'package.json'), '{"type":"module"}');
+  return import(pathToFileURL(join(root, rel)).href);
+}
+
+/**
+ * CANVAS PRESETS, COMPOSABLE MEDIA, STITCHES and SHAPES: four lists whose stored fixtures nothing compared with the
+ * engine (they matched on 2026-11-14; relationType, animationType and canvasPreset had each drifted silently before).
+ * - presets: the keys of canvasPresets.js's presets table (CanvasPresets.presets, what setCanvasSize looks up).
+ * - composable media: CollagePatterns.js's COMPOSABLE_MEDIA (not exported, so read from its frozen literal).
+ * - stitches: ThreadPainting.js's STITCH_OPS keys, what applyThreadPainting dispatches.
+ * - shapes: every id each register*Shapes(registry) in shapes/index.js registers, with its module, by running them
+ *   against a registry that records the ids.
+ */
+async function designLists() {
+  const presets = Object.keys(((await importCommitted(PRESETS_REL)).default || {}).presets || {});
+  const collageSrc = readCommitted(COLLAGE_REL);
+  const cm = collageSrc && /const COMPOSABLE_MEDIA\s*=\s*Object\.freeze\(\[([^\]]*)\]\)/.exec(collageSrc);
+  const composable = cm ? [...cm[1].matchAll(/'([a-zA-Z]+)'/g)].map((m) => m[1]) : [];
+  const stitches = Object.keys((await importCommitted(THREAD_REL)).STITCH_OPS || {});
+  const indexSrc = readCommitted(SHAPES_REL) || '';
+  const shapes = [];
+  for (const m of indexSrc.matchAll(/import\s*\{\s*(register\w+Shapes)\s*\}\s*from\s*'\.\/(\w+)\.js'/g)) {
+    const mod = await importCommitted(`js/shapes/${m[2]}.js`);
+    const record = { register: (id) => { shapes.push({ id: typeof id === 'object' && id ? id.id : id, module: m[2] }); } };
+    mod[m[1]](new Proxy(record, { get: (t, k) => (k in t ? t[k] : () => undefined) }));
+  }
+  if (presets.length < 10 || composable.length < 1 || stitches.length < 3 || shapes.length < 20) {
+    throw new Error(`sync-engine-lists: design lists look wrong (${presets.length} presets, ${composable.length} composable media, ${stitches.length} stitches, ${shapes.length} shapes)`);
+  }
+  return { presets, composable, stitches, shapes };
 }
 
 function animationOptionKeys(ppSrc, animSrc) {
@@ -494,6 +552,9 @@ async function generate() {
   const soundSrc = readCommitted(SOUNDS_REL);
   if (!soundSrc) throw new Error(`sync-engine-lists: cannot read ${SOUNDS_REL}`);
   const sounds = soundCatalogue();
+  const design = await designLists();
+  if (_tmpRoot.dir) rmSync(_tmpRoot.dir, { recursive: true, force: true });
+  const designDigest = digest([PRESETS_REL, COLLAGE_REL, THREAD_REL, SHAPES_REL].map((r) => readCommitted(r) || '').join('\n'));
 
   return `/**
  * GENERATED — DO NOT EDIT. Run \`bun run sync:engine-lists\`.
@@ -516,7 +577,28 @@ async function generate() {
  *   ${AURA_REL}  sha256: ${digest(auraSrc)}
  *   ${GENERATORS_REL}  sha256: ${digest(genSrc)}
  *   ${SOUNDS_REL}  sha256: ${digest(soundSrc)}
+ *   ${PRESETS_REL} + ${COLLAGE_REL} + ${THREAD_REL} + js/shapes/*  sha256: ${designDigest}
  */
+
+/** ${design.presets.length} canvas presets: the keys of canvasPresets.js's presets table, what setCanvasSize looks up. */
+export const ENGINE_CANVAS_PRESETS = [
+${list(design.presets)}
+] as const;
+
+/** The media a whole composition can be rendered in (CollagePatterns.js COMPOSABLE_MEDIA); the rest apply per item. */
+export const ENGINE_COMPOSABLE_MEDIA = [
+${list(design.composable)}
+] as const;
+
+/** ${design.stitches.length} thread stitches: ThreadPainting.js STITCH_OPS, what applyThreadPainting dispatches. */
+export const ENGINE_STITCHES = [
+${list(design.stitches)}
+] as const;
+
+/** ${design.shapes.length} shapes the ShapeRegistry registers (js/shapes/*), with the module that registers each. */
+export const ENGINE_SHAPES: ReadonlyArray<{ readonly id: string; readonly module: string }> = [
+${design.shapes.map((x) => `  { id: '${x.id}', module: '${x.module}' },`).join('\n')}
+];
 
 /** ${sounds.instruments.length} built-in instruments (SoundPresets.js INSTRUMENT_NAMES). A starting set: define_instrument adds to the same live table. */
 export const ENGINE_INSTRUMENTS = [

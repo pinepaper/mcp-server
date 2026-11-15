@@ -19,7 +19,100 @@
  *   js/ItemAuraSystem.js  sha256: fbd9b8d09fae0543
  *   js/GeneratorRegistry.js  sha256: 9bb2e38508482c8d
  *   js/audio/SoundPresets.js  sha256: 713ef0d1e19dc128
+ *   js/canvasPresets.js + js/core/CollagePatterns.js + js/core/ThreadPainting.js + js/shapes/*  sha256: d51e235b924ced1b
  */
+
+/** 34 canvas presets: the keys of canvasPresets.js's presets table, what setCanvasSize looks up. */
+export const ENGINE_CANVAS_PRESETS = [
+  'youtube-thumbnail',
+  'youtube-short',
+  'tiktok',
+  'youtube-banner',
+  'instagram-story',
+  'instagram-post',
+  'instagram-landscape',
+  'instagram-portrait',
+  'facebook-post',
+  'facebook-cover',
+  'facebook-story',
+  'twitter-post',
+  'twitter-header',
+  'linkedin-post',
+  'linkedin-banner',
+  'pinterest-pin',
+  'presentation-16x9',
+  'presentation-4x3',
+  'a3-portrait',
+  'a3-landscape',
+  'a4-portrait',
+  'a4-landscape',
+  'a5-portrait',
+  'a5-landscape',
+  'letter-portrait',
+  'letter-landscape',
+  'legal-portrait',
+  'tabloid',
+  'hd-720p',
+  'full-hd-1080p',
+  'default',
+  'custom',
+  'unbounded',
+  'unbounded-large',
+] as const;
+
+/** The media a whole composition can be rendered in (CollagePatterns.js COMPOSABLE_MEDIA); the rest apply per item. */
+export const ENGINE_COMPOSABLE_MEDIA = [
+  'vector',
+  'thread',
+] as const;
+
+/** 6 thread stitches: ThreadPainting.js STITCH_OPS, what applyThreadPainting dispatches. */
+export const ENGINE_STITCHES = [
+  'longAndShort',
+  'satin',
+  'seed',
+  'stem',
+  'runningSeam',
+  'crossStitch',
+] as const;
+
+/** 34 shapes the ShapeRegistry registers (js/shapes/*), with the module that registers each. */
+export const ENGINE_SHAPES: ReadonlyArray<{ readonly id: string; readonly module: string }> = [
+  { id: 'rectangle', module: 'basic' },
+  { id: 'circle', module: 'basic' },
+  { id: 'disk', module: 'basic' },
+  { id: 'circle-outline', module: 'basic' },
+  { id: 'triangle', module: 'basic' },
+  { id: 'star', module: 'basic' },
+  { id: 'polygon', module: 'basic' },
+  { id: 'ellipse', module: 'basic' },
+  { id: 'pentagon', module: 'basic' },
+  { id: 'hexagon', module: 'basic' },
+  { id: 'diamond', module: 'basic' },
+  { id: 'arrow', module: 'basic' },
+  { id: 'arrow-right', module: 'basic' },
+  { id: 'heart', module: 'basic' },
+  { id: 'process', module: 'flowchart' },
+  { id: 'decision', module: 'flowchart' },
+  { id: 'terminal', module: 'flowchart' },
+  { id: 'data', module: 'flowchart' },
+  { id: 'document', module: 'flowchart' },
+  { id: 'database', module: 'flowchart' },
+  { id: 'preparation', module: 'flowchart' },
+  { id: 'uml-class', module: 'uml' },
+  { id: 'uml-usecase', module: 'uml' },
+  { id: 'uml-actor', module: 'uml' },
+  { id: 'cloud', module: 'network' },
+  { id: 'server', module: 'network' },
+  { id: 'speech-bubble', module: 'comment' },
+  { id: 'speech-bubble-square', module: 'comment' },
+  { id: 'thought-bubble', module: 'comment' },
+  { id: 'comment-box', module: 'comment' },
+  { id: 'speech-bubble-pointed', module: 'comment' },
+  { id: 'double-bubble', module: 'comment' },
+  { id: 'quote-bubble', module: 'comment' },
+  { id: 'callout-box', module: 'comment' },
+];
 
 /** 29 built-in instruments (SoundPresets.js INSTRUMENT_NAMES). A starting set: define_instrument adds to the same live table. */
 export const ENGINE_INSTRUMENTS = [

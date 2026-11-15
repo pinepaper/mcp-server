@@ -9,7 +9,7 @@
  */
 
 import { z } from 'zod';
-import { ENGINE_EASING_NAMES, DESIGN_MEDIA, DESIGN_MEDIA_APPLY, FILTER_TYPES, LINEAGE_KINDS, STYLED_SCENE_STYLES, PATTERN_KINDS, ANIMATION_TYPES, ANIMATION_WAVEFORMS, ANIMATION_ORIGINS, ENGINE_EFFECT_TYPES, ENGINE_GENERATOR_NAMES } from '../tools/engine-lists.js';
+import { ENGINE_EASING_NAMES, DESIGN_MEDIA, DESIGN_MEDIA_APPLY, FILTER_TYPES, LINEAGE_KINDS, STYLED_SCENE_STYLES, PATTERN_KINDS, ANIMATION_TYPES, ANIMATION_WAVEFORMS, ANIMATION_ORIGINS, ENGINE_EFFECT_TYPES, ENGINE_GENERATOR_NAMES, ENGINE_STITCHES } from '../tools/engine-lists.js';
 
 // =============================================================================
 // COMMON SCHEMAS
@@ -3942,7 +3942,8 @@ export type ProvenanceInput = z.infer<typeof ProvenanceInputSchema>;
  * copies, one list, drifted the same direction on the same day — so it is
  * declared once here and spread everywhere it is needed.
  */
-export const THREAD_STITCHES = ['longAndShort', 'satin', 'seed', 'stem', 'runningSeam', 'crossStitch'] as const;
+// The stitches the studio dispatches: generated from ThreadPainting.js STITCH_OPS (scripts/sync-engine-lists.mjs).
+export const THREAD_STITCHES = ENGINE_STITCHES;
 
 export const SceneDiffInputSchema = z.object({
   /** 'history' compares two undo states; 'version' compares live vs a saved version. */

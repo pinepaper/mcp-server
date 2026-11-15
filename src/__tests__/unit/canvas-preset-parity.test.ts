@@ -15,15 +15,12 @@
  */
 
 import { describe, it, expect } from 'bun:test';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { ENGINE_CANVAS_PRESETS } from '../../tools/engine-lists.js';
 import { canvasPresetFor } from '../../types/code-generator.js';
 import { AgentPlatformSchema } from '../../types/schemas.js';
 
-const ENGINE = new Set(
-  readFileSync(join(import.meta.dir, '..', 'fixtures', 'engine-canvas-presets.txt'), 'utf-8')
-    .split('\n').map((l) => l.trim()).filter(Boolean),
-);
+// Generated from canvasPresets.js's presets table (scripts/sync-engine-lists.mjs), checked in prepublish.
+const ENGINE = new Set<string>(ENGINE_CANVAS_PRESETS);
 
 describe('platform → canvas preset', () => {
   it('every platform maps to a preset the engine actually has', () => {
@@ -55,5 +52,15 @@ describe('platform → canvas preset', () => {
     } as never);
     expect(code).toContain('app.setCanvasSize("instagram-post")');
     expect(code).not.toContain("app.setCanvasSize('instagram')");
+  });
+});
+
+describe('the presets the docs name', () => {
+  it('are all presets the studio has', async () => {
+    const { PINEPAPER_TOOLS } = await import('../../tools/definitions.js');
+    const text = JSON.stringify(PINEPAPER_TOOLS.find((t) => t.name === 'pinepaper_set_canvas_size'));
+    const named = ['instagram-post', 'instagram-story', 'youtube-thumbnail', 'tiktok', 'full-hd-1080p', 'hd-720p', 'a4-portrait', 'a4-landscape'].filter((p) => text.includes(p));
+    expect(named.length).toBeGreaterThan(3);
+    expect(named.filter((p) => !ENGINE.has(p))).toEqual([]);
   });
 });

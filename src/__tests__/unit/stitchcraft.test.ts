@@ -403,9 +403,9 @@ describe('the source-level scan', () => {
 
   it('the stitch list is written out exactly once in source', () => {
     const found = pureStitchArrays();
-    // One declaration: THREAD_STITCHES itself. Everything else spreads it.
+    // One declaration: the generated ENGINE_STITCHES (THREAD_STITCHES is it). Everything else spreads it.
     expect(found).toHaveLength(1);
-    expect(found[0]!.file).toContain('schemas.ts');
+    expect(found[0]!.file).toContain('engine-lists.ts');
     expect([...found[0]!.values].sort()).toEqual([...THREAD_STITCHES].sort());
   });
 

@@ -23,19 +23,15 @@
  * was one more copy to keep in step.
  */
 import { describe, it, expect } from 'bun:test';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { ENGINE_COMPOSABLE_MEDIA } from '../../tools/engine-lists.js';
 import { PINEPAPER_TOOLS } from '../../tools/definitions.js';
 import { DesignMediumInputSchema, ComposeInputSchema } from '../../types/schemas.js';
 import { DESIGN_MEDIA, DESIGN_MEDIA_APPLY } from '../../tools/engine-lists.js';
 import { descriptionOf } from '../zod-walk';
 
-const fixture = (name: string) =>
-  readFileSync(join(import.meta.dir, '..', 'fixtures', name), 'utf-8')
-    .split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
 
 const MEDIA = DESIGN_MEDIA.map((key) => ({ key }));
-const COMPOSABLE = fixture('engine-composable-media.txt');
+const COMPOSABLE = [...ENGINE_COMPOSABLE_MEDIA];
 
 const served = (tool: string, prop: string) => {
   const t = PINEPAPER_TOOLS.find((x) => x.name === tool);

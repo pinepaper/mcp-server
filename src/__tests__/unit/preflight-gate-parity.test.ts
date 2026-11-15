@@ -31,6 +31,7 @@
  */
 
 import { describe, it, expect } from 'bun:test';
+import { ENGINE_STITCHES } from '../../tools/engine-lists.js';
 import { ENGINE_EFFECT_TYPES, ENGINE_GENERATOR_NAMES } from '../../tools/engine-lists.js';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -136,7 +137,8 @@ describe('THREAD_STITCHES ↔ STITCH_OPS, which only a comment claimed', () => {
    * mirrored another function's condition, and it did not. "The doc says it
    * mirrors X" is worth zero as evidence.
    */
-  const engine = fixture('engine-stitches.txt');
+  // Generated from ThreadPainting.js STITCH_OPS (scripts/sync-engine-lists.mjs), checked in prepublish.
+  const engine = [...ENGINE_STITCHES];
 
   it('is exactly the engine-published table', () => {
     expect([...THREAD_STITCHES].sort()).toEqual([...engine].sort());
