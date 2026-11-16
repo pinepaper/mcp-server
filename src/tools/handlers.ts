@@ -1141,6 +1141,27 @@ function redactGeneratedCode(details: unknown): unknown {
  * out of the frame ("IGNAL" for "SIGNAL") is read on the success path rather than left in the JSON. Empty when none.
  */
 /** Put a frozen-output finding on the result: in `warnings`, in the `warning` line the reply prints, and as `frozenOutput`. */
+/**
+ * Chrome's HTML-in-Canvas (shipped in Chrome 157): a canvas with content="drawable" reflects it back, and the 2D context
+ * has drawElementImage. Both are checked; the browser's Chrome version is reported beside the verdict.
+ */
+export const HTML_IN_CANVAS_PROBE_JS: string = `(function () {
+  const m = (navigator.userAgent || '').match(/Chrome\\/(\\d+)/);
+  const chrome = m ? Number(m[1]) : null;
+  try {
+    const c = document.createElement('canvas');
+    c.setAttribute('content', 'drawable');
+    const ctx = c.getContext('2d');
+    const reflected = c.content === 'drawable';
+    const draws = !!(ctx && typeof ctx.drawElementImage === 'function');
+    const supported = reflected && draws;
+    return { supported: supported, chrome: chrome,
+      reason: supported ? null : 'this browser has no HTML-in-Canvas (canvas content="drawable" with drawElementImage); it shipped in Chrome 157' + (chrome ? ', and this is Chrome ' + chrome : '') + '. Everything draws the existing way.' };
+  } catch (e) {
+    return { supported: false, chrome: chrome, reason: 'the HTML-in-Canvas check threw: ' + ((e && e.message) || String(e)) };
+  }
+})()`;
+
 export function noteFrozenOutput(exportResult: unknown, sceneMotion: unknown): void {
   if (!exportResult || typeof exportResult !== 'object') return;
   const f = frozenOutputCheck(exportResult, sceneMotion);
@@ -3927,7 +3948,14 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
       }
 
       case 'pinepaper_browser_status': {
-        const controller = getBrowserController();
+        const controller = options.browserController || getBrowserController();
+        // HTML-IN-CANVAS (Chrome 157+): whether the connected browser can draw live HTML into a canvas, measured, not
+        // assumed from a version. The studio, widgets and exports may use it only where this is true.
+        const htmlInCanvas = controller.connected
+          ? await controller.executeCode(HTML_IN_CANVAS_PROBE_JS, false, { bypassGovernor: true })
+            .then((r) => (r.success ? r.result : { supported: false, reason: r.error || 'the probe could not run' }))
+            .catch((e: unknown) => ({ supported: false, reason: e instanceof Error ? e.message : 'the probe could not run' }))
+          : { supported: null, reason: 'not connected: call pinepaper_browser_connect first' };
 
         return {
           content: [
@@ -3938,6 +3966,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
                   connected: controller.connected,
                   studioUrl: controller.actualUrl,
                   agentMode: controller.agentMode,
+                  htmlInCanvas,
                 },
                 null,
                 2
