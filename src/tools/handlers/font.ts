@@ -40,6 +40,18 @@ async function dispatchFontAction(args: Record<string, unknown>, options: Handle
     return { success: false, error: 'app.checkFont unavailable — update the studio. document.fonts.check() is not a substitute: it returns true for a family that does not exist.' };
   }
   const r = app.checkFont(${JSON.stringify(name)}${text !== undefined ? `, ${JSON.stringify(text)}` : ''});
+  // LOADED, BUT DRAWS NONE OF THIS TEXT (CHECKCOVER37). The studio measures availability against the text given, so a
+  // loaded family (Anton) checked against characters it has no glyphs for came back available: false, which this tool
+  // calls "not loaded yet". Checked again without the text: if the family is loaded, that is what is said.
+  if (r && r.available === false && ${text !== undefined ? 'true' : 'false'} && typeof r.covered === 'string' && r.covered === '') {
+    const bare = app.checkFont(${JSON.stringify(name)});
+    if (bare && bare.available === true) {
+      r.available = true;
+      r.drawsText = false;
+      r.note = r.family + ' is loaded, but has no glyph for any of these characters (' + (r.missing || '') + '), so all of them render in the fallback face.';
+      delete r.reason;
+    }
+  }
   // "Unavailable" read as "cannot be used" — while create_item then loaded and
   // drew the same family (Caveat). Unavailable here means NOT LOADED YET; say
   // whether this studio can load it, and how.

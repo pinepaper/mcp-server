@@ -310,6 +310,32 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - The npm package starts no process. Three export features use `ffprobe` and `ffmpeg`: checking a saved video against what the studio encoded, joining the cached segments of a `perScene` export (`ffmpeg -f concat`), and re-encoding an MP4's Opus soundtrack to AAC (the browser on Linux has no AAC encoder; the video is copied). Only the Claude Desktop extension runs them, through a small runner it bundles that allows those two binaries alone, via `execFile` (no shell, argument lists the server writes, absolute paths). From npm, the check is skipped and said so, a `perScene` export runs whole, and an Opus MP4 is kept and named, or refused for a social platform.
 - The server itself fetches the images, SVGs and media a tool call names by URL, and reads local files named by path. URLs that resolve to loopback, private, link-local or reserved addresses are refused, redirects included, and so are cloud metadata addresses. Local files are read only with `PINEPAPER_ALLOW_LOCAL_FILES=1`, and then only from the working directory, the export folder, and folders listed in `PINEPAPER_ASSET_DIRS` (the export folder is readable without the switch). `PINEPAPER_ALLOW_PRIVATE_NETWORK=1` allows local and LAN hosts. Metadata addresses stay refused even with it set.
 
+## What's new in 1.6.38
+
+### New
+
+- `pinepaper_browser_status` says whether the connected browser can draw live HTML into a canvas
+  (Chrome's HTML-in-Canvas, from Chrome 157): `htmlInCanvas` with `supported`, the Chrome version
+  and the reason. It is measured in the page, not assumed from the version.
+
+### Fixed
+
+- A colour that is not a colour (`"#notacolor"`) is refused by name on create, modify, keyframes
+  and the background. It used to be accepted and drawn black.
+- `pinepaper_create_item` takes `shadowOffsetX` and `shadowOffsetY`, the names a keyframe animates.
+  It used to report them ignored.
+- An APNG, WebP or JPG export of a scene with a soundtrack says the soundtrack will be missing. It
+  used to say the scene lost nothing.
+- `loop: 0` plays an APNG once, as documented. It used to loop forever.
+- `estimateOnly` says what it does not model: a GIF's `maxBytes` budget, and a format the browser
+  cannot encode at that size.
+- `pinepaper_font` `check` on a loaded family that draws none of the given characters says it is
+  loaded and draws none of them. It used to say the family was not loaded.
+- An emitter whose `sizes` list is shorter than its `count` says the sizes repeat.
+- A keyframed `strokePosition` other than `outside` or `center` is refused, as on create.
+- The `pinepaper_choreograph` docs say `roll` and `fly` need `to`, and the `soundtrack_cue` docs say
+  `gain` is relative: the soundtrack is mastered to one loudness.
+
 ## What's new in 1.6.37
 
 ### Fixed

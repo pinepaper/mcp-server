@@ -9,6 +9,7 @@
  */
 
 import { z } from 'zod';
+import { isCssColor, colorProblems, COLOR_ERROR_HINT } from './css-color.js';
 import { ENGINE_EASING_NAMES, DESIGN_MEDIA, DESIGN_MEDIA_APPLY, FILTER_TYPES, LINEAGE_KINDS, STYLED_SCENE_STYLES, PATTERN_KINDS, ANIMATION_TYPES, ANIMATION_WAVEFORMS, ANIMATION_ORIGINS, ENGINE_EFFECT_TYPES, ENGINE_GENERATOR_NAMES, ENGINE_STITCHES } from '../tools/engine-lists.js';
 
 // =============================================================================
@@ -53,12 +54,13 @@ export type Gradient = z.infer<typeof GradientSchema>;
 
 // Color can be a simple string OR a gradient object
 export const ColorSchema = z.union([
-  z.string().describe('Solid color value (hex, rgb, or named color)'),
+  // COLORBAD37: a string that is not a colour was drawn black with no word; it is refused by name.
+  z.string().superRefine((v, ctx) => { if (!isCssColor(v)) ctx.addIssue({ code: z.ZodIssueCode.custom, message: `${JSON.stringify(v)} is not a colour, and the studio would draw it black. ${COLOR_ERROR_HINT}` }); }).describe('Solid color value (hex, rgb, or named color)'),
   GradientSchema,
 ]).describe('Color value - either a solid color string or a gradient object');
 
 // Simple color schema for cases where only solid colors are allowed
-export const SolidColorSchema = z.string().describe('Color value (hex, rgb, or named color)');
+export const SolidColorSchema = z.string().superRefine((v, ctx) => { if (!isCssColor(v)) ctx.addIssue({ code: z.ZodIssueCode.custom, message: `${JSON.stringify(v)} is not a colour, and the studio would draw it black. ${COLOR_ERROR_HINT}` }); }).describe('Color value (hex, rgb, or named color)');
 
 // =============================================================================
 // SHADOW SCHEMAS
@@ -348,10 +350,24 @@ export const SimpleAnimationTypeSchema = z.enum(ANIMATION_TYPES).describe('Simpl
 
 export type SimpleAnimationType = z.infer<typeof SimpleAnimationTypeSchema>;
 
+
+/** A properties record whose colour-keyed strings (color, fillColor, strokeColor, ...) must be colours (COLORBAD37). */
+const colorCheckedProps = () => z.record(z.string(), z.unknown()).superRefine((p, ctx) => {
+  for (const m of colorProblems(p)) ctx.addIssue({ code: z.ZodIssueCode.custom, message: m });
+});
+/** Keyframe properties: colours, and a strokePosition value (STROKEPOSKEY37: "inside" was accepted in silence here,
+ *  while create reports it; create and modify keep their own softer handling, which still makes the item). */
+const keyframeCheckedProps = () => colorCheckedProps().superRefine((p, ctx) => {
+  const sp = (p as Record<string, unknown>).strokePosition;
+  if (typeof sp === 'string' && !['outside', 'center', 'centre'].includes(sp.trim().toLowerCase())) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: `strokePosition ${JSON.stringify(sp)} is not 'outside' or 'center'.` });
+  }
+});
+
 // Keyframe schema
 export const KeyframeSchema = z.object({
   time: z.number().describe('Time in seconds for this keyframe'),
-  properties: z.record(z.string(), z.unknown()).describe('Property values at this keyframe'),
+  properties: keyframeCheckedProps().describe('Property values at this keyframe'),
   // NO DEFAULT HERE (SQUASH35): a filled-in 'linear' on a key the caller left without an easing overwrote the existing
   // key's easing on append. The studio defaults a new key to linear itself, and on a merge keeps the existing easing.
   easing: KeyframeEasingSchema.optional(),
@@ -1275,7 +1291,7 @@ export const CounterSchema = z.union([
 export const CreateItemInputSchema = z.object({
   itemType: ItemTypeSchema,
   position: PositionSchema.optional().default({ x: 400, y: 300 }),
-  properties: z.record(z.string(), z.unknown()).optional().default({}),
+  properties: colorCheckedProps().optional().default({}),
   animationType: z.string().optional().describe('Inline animation to apply on creation. Loop presets (bounce, breathe, fade, glow, jelly, path, pulse, rotate, scrollDown, scrollLeft, scrollRight, scrollUp, shake, slideLeftRight, slideUpDown, swing, typewriter, wobble) or "keyframe" with keyframes array. Equivalent to a follow-up pinepaper_animate / pinepaper_keyframe_animate call.'),
   animationSpeed: z.number().optional().describe('Speed multiplier for loop animations (default: 1.0). Ignored when animationType is "keyframe".'),
   animationIntensity: z.number().optional().describe('Loop animation amplitude (0.1 = ±10%, default 0.15). Drives pulse/wobble/bounce/breathe amplitude; honored by SVG/SMIL/widget export.'),
@@ -1334,7 +1350,7 @@ export type CreateDiagonalStripesInput = z.infer<typeof CreateDiagonalStripesInp
 // Modify Item
 export const ModifyItemInputSchema = z.object({
   itemId: z.string().describe('Registry ID of the item'),
-  properties: z.record(z.string(), z.unknown()).describe('Properties to update'),
+  properties: colorCheckedProps().describe('Properties to update'),
   data: ItemDataFlagsSchema.optional(),
   atTime: z.number().min(0).optional().describe('AUTO-KEY: write these properties as keyframes at this time (seconds) instead of a static edit — eased from the previous value, other keys kept.'),
   easing: z.string().optional().describe('atTime: easing of the segment arriving at the new key (default linear).'),
@@ -1843,7 +1859,7 @@ export const SceneItemSchema = z.object({
   /** Position on canvas */
   position: PositionSchema.optional(),
   /** Item-specific properties */
-  properties: z.record(z.string(), z.unknown()).optional().describe('Type-specific properties (color, radius, content, etc.)'),
+  properties: colorCheckedProps().optional().describe('Type-specific properties (color, radius, content, etc.)'),
 });
 
 export const SceneRelationSchema = z.object({

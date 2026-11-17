@@ -20,7 +20,6 @@ describe('caller text is a literal in generated code', () => {
     ['add_relation ids', () => codeGenerator.generateAddRelation({ sourceId: HOSTILE, targetId: HOSTILE, relationType: 'orbits', params: {} } as never)],
     ['remove_relation ids', () => codeGenerator.generateRemoveRelation(HOSTILE, HOSTILE, 'orbits')],
     ['get_items filter', () => codeGenerator.generateGetItems({ type: HOSTILE, source: HOSTILE })],
-    ['set_background_color', () => codeGenerator.generateSetBackgroundColor({ color: HOSTILE } as never)],
     ['create_scene names', () => codeGenerator.generateCreateScene({ items: [{ name: HOSTILE, itemType: 'circle', position: { x: 1, y: 1 }, properties: {} }], relations: [{ source: HOSTILE, target: HOSTILE, type: 'orbits' }], animations: [{ target: HOSTILE, type: 'pulse' }] } as never)],
     ['group comment', () => codeGenerator.generateGroup({ action: 'group', itemIds: ['item_1', 'item_2'], groupName: HOSTILE } as never)],
   ];
@@ -38,5 +37,11 @@ describe('the raw quoted splice does not come back', () => {
     const src = readFileSync(join(import.meta.dir, '..', '..', 'types', 'code-generator.ts'), 'utf8');
     // Internal names, enums and TypeScript-side message text (d.key, method, fn, kind, v.action, …). Shrink only.
     expect((src.match(/'\$\{(?!jsLiteral)/g) || []).length).toBeLessThanOrEqual(11);
+  });
+});
+
+describe('a hostile colour never reaches generated code', () => {
+  it('set_background_color refuses it at validation (COLORBAD37), before any code is written', () => {
+    expect(() => codeGenerator.generateSetBackgroundColor({ color: HOSTILE } as never)).toThrow(/is not a colour/);
   });
 });

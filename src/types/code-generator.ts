@@ -623,7 +623,12 @@ if (item && item.data) { item.data.renderAs = ${JSON.stringify(itemType)}; item.
   // VISIBLE AT CREATE. create() does not read visible, so a shape made hidden (a morph target, a reveal) was
   // drawn; it was reported ignored. A boolean is applied to the item right after create.
   const createVisible = typeof properties.visible === 'boolean' ? properties.visible : undefined;
-  const ignored = Object.keys(properties).filter((k) => !(k === 'visible' && createVisible !== undefined)).filter((k) => !(hasCreateScale && SCALE_KEYS.includes(k) && num(properties[k]) !== undefined)).filter((k) => itemType === 'text'
+  // SHADOW OFFSET PER AXIS (SHADOFFX37 / SHADOFFY37). shadowOffsetX / shadowOffsetY are the names a keyframe animates,
+  // and create reported them ignored ("check the spelling"), so a static offset at create was unobtainable. Applied
+  // to the item's shadowOffset right after create, merged with a shadowOffset pair if one is also given.
+  const finiteOf = (v: unknown) => (typeof v === 'number' || (typeof v === 'string' && v.trim() !== '')) && Number.isFinite(Number(v)) ? Number(v) : undefined;
+  const createShadowX = finiteOf(properties.shadowOffsetX), createShadowY = finiteOf(properties.shadowOffsetY);
+  const ignored = Object.keys(properties).filter((k) => !(k === 'shadowOffsetX' && createShadowX !== undefined) && !(k === 'shadowOffsetY' && createShadowY !== undefined)).filter((k) => !(k === 'visible' && createVisible !== undefined)).filter((k) => !(hasCreateScale && SCALE_KEYS.includes(k) && num(properties[k]) !== undefined)).filter((k) => itemType === 'text'
     ? (!CREATE_KNOWN_KEYS.has(k) && !textOnly(k) && !(DIRECTION_KEYS as readonly string[]).includes(k))
       || (k === 'letterSpacing' && letterSpacingCss(properties[k]) === undefined)
     : !CREATE_KNOWN_KEYS.has(k) || textOnly(k));
@@ -705,6 +710,9 @@ const __scale = (function(it) {
   if (textTabular) code += emitTabularCheck('item');
   if (textTypography.length) code += emitTypographyCheck('item', textTypography);
   if (createFillOpacity) code += emitFillOpacityCheck('item');
+  if (createShadowX !== undefined || createShadowY !== undefined) {
+    code += `\nif (item && typeof paper !== 'undefined') { const __so = item.shadowOffset || { x: 0, y: 0 }; item.shadowOffset = new paper.Point(${createShadowX ?? '__so.x'}, ${createShadowY ?? '__so.y'}); }`;
+  }
   if (textStrokePos) code += emitStrokePositionCheck('item', textStrokePos);
   if (textFit) code += `\nlet __textFit = null;${emitTextFit('item', textFit, JSON.stringify(anchorHold(properties.anchor ?? properties.origin) ?? null))}`;
 
@@ -1980,6 +1988,19 @@ export function normalizeEmitterSpec(spec: Record<string, unknown>, assumeDefaul
   bursts.forEach((b, i) => {
     const own = (b && typeof b === 'object' ? b : {}) as Record<string, unknown>;
     if (own.count !== undefined || own.velocities !== undefined) mismatch(`bursts[${i}]`, own.count ?? out.count, own.velocities ?? out.velocities);
+  });
+  // A SIZES LIST SHORTER THAN THE COUNT CYCLES (SIZESWARN37): particle i takes sizes[i % n] (ParticleEmitter), the same
+  // rule as velocities, which already warned. A list that cycles evenly is usually meant; one that does not is said.
+  const sizesShort = (where: string, count: unknown, sizes: unknown) => {
+    if (!Array.isArray(sizes) || !sizes.length || Array.isArray(count)) return;
+    const n = typeof count === 'number' && Number.isFinite(count) ? Math.round(count) : (assumeDefaultCount ? DEFAULT_COUNT : null);
+    if (n === null || n <= sizes.length) return;
+    warnings.push(`${where}: count ${n} with ${sizes.length} sizes: particle i takes sizes[i % ${sizes.length}], so the sizes repeat in that order across the ${n} particles. Give one size per particle for no repeat, or a size range ([min, max]) for a random size each.`);
+  };
+  if (out.sizes !== undefined && (out.count !== undefined || inherited)) sizesShort('spec', out.count, out.sizes);
+  bursts.forEach((b, i) => {
+    const own = (b && typeof b === 'object' ? b : {}) as Record<string, unknown>;
+    if (own.count !== undefined || own.sizes !== undefined) sizesShort(`bursts[${i}]`, own.count ?? out.count, own.sizes ?? out.sizes);
   });
   // SPAWN IS A BOX ON THE CANVAS AXES (ParticleEmitter: x += (u - 0.5) * spawn[0], y += (u - 0.5) * spawn[1]), not a
   // range and not along the burst's angle. spawn [0, 200] beside angle 0 drew a vertical column of particles that
@@ -6360,7 +6381,18 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
 
   generateAgentExport(input: AgentExportInput): string {
     const validated = AgentExportInputSchema.parse(input);
-    const { platform, format, quality, framing, duration, estimateOnly, scale, fps, pdf: pdfOpts, region, time: stillTime, maxBytes, loop: gifLoop, broadcast, broadcastHeadroom, bitrate, minBitrate, bitrateMode, audioCodec, transparent, alphaQuantizer, deterministic: askedDeterministic, motionBlur, ad: adOpts, frames, startTime } = validated;
+    const { platform, format, quality, framing, duration, estimateOnly, scale, fps, pdf: pdfOpts, region, time: stillTime, maxBytes, loop: gifLoopAsked, broadcast, broadcastHeadroom, bitrate, minBitrate, bitrateMode, audioCodec, transparent, alphaQuantizer, deterministic: askedDeterministic, motionBlur, ad: adOpts, frames, startTime } = validated;
+    // loop 0 PLAYS ONCE (the schema's promise: false / 0 / 1 = play once). The APNG writer reads a number as the
+    // file's num_plays, where 0 means forever, so 0 played for ever there (LOOPZERO37). Sent as false.
+    const gifLoop = gifLoopAsked === 0 ? false : gifLoopAsked;
+    // What an estimateOnly reply cannot know, said in it rather than implied away.
+    const estimateLimits: string[] = [];
+    if (format === 'gif' && maxBytes !== undefined) {
+      estimateLimits.push(`the ${maxBytes}-byte GIF budget: the export shrinks the GIF (smaller dimensions, up to three tries) until it fits or reports budget.met: false, so its size and dimensions can differ from this estimate`);
+    }
+    if (format === 'mp4' || format === 'webm' || format === undefined || format === 'auto') {
+      estimateLimits.push('encoder support: if this browser cannot encode the format at this size, the export delivers another one (format_substituted) and its size differs from this estimate');
+    }
     const regionSrc = region ? regionCoverCrop(region) : undefined;
     // Every video is deterministic unless the caller opts out (owner, 2026-11-07), so every receipt says whether its file repeats.
     const deterministic = askedDeterministic ?? (format === 'mp4' || format === 'webm');
@@ -6696,6 +6728,15 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
       const r = app.exportEngine.exportFidelity(fmt);
       if (!r) { return { fidelity: { available: false, reason: 'the fidelity check returned nothing.', ...(own.length ? { warnings: own } : {}) } }; }
       const warnings = (r.warnings || []).concat(own);
+      // A FORMAT WITH NO AUDIO TRACK DROPS THE SOUNDTRACK (AUDFALSE37). The studio says so for gif, png, pdf and svg;
+      // apng, webp and jpg came back "this scene loses nothing" for a scene with a soundtrack. Said once, by code.
+      try {
+        const __noAudio = ['gif', 'apng', 'webp', 'png', 'jpg', 'jpeg', 'pdf', 'svg'].indexOf(fmt) >= 0;
+        if (__noAudio && !warnings.some(function (w) { return w && w.code === 'audio'; })
+            && typeof app.exportEngine.sceneHasAudio === 'function' && app.exportEngine.sceneHasAudio()) {
+          warnings.push({ code: 'audio', message: 'A ' + fmt.toUpperCase() + ' carries no audio, so the soundtrack of this scene will be missing. Export mp4 or webm to keep it, or wav for the audio on its own.' });
+        }
+      } catch (_) { /* no verdict without the audio check */ }
       return {
         fidelity: {
           available: true,
@@ -6737,6 +6778,10 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
       fps: settings.fps,
       dimensions: dimensions.width + 'x' + dimensions.height,
       estimate: est,
+      // WHAT THE ESTIMATE DOES NOT RUN (ESTGIF37, ESTSUB37). It models the size; it does not run the encoder or the
+      // GIF budget, so a GIF with maxBytes (shrunk to fit, up to three tries) and an mp4 the browser cannot encode at
+      // this size (delivered as WebM, format_substituted) came back with a size and dimensions the export did not keep.
+      notModelled: ${JSON.stringify(estimateLimits)},
       ...fidelity(format),
     };
   }
