@@ -1177,6 +1177,34 @@ export function noteFrozenOutput(exportResult: unknown, sceneMotion: unknown): v
  * whenever the file is within 10% OVER the target, and warns only past that, so a file 7% over its ceiling was
  * reported as having held it. The flag is set from the file's own achievedBitrate and the target beside it.
  */
+/**
+ * WHICH ENCODER MADE THIS FILE (BITRATE34). A bitrate overshoot moved between releases because the encoder did: an
+ * export with no format became WebM (VP9), and a deterministic MP4 that software H.264 cannot repeat moves to the
+ * hardware one. The studio records each piece (video.encode.codec, video.hardwareAcceleration, video.bitrateMode) in
+ * different places; this puts them together as video.encoderRan, and names it in a bitrate_exceeded warning.
+ */
+export function noteEncoderRan(exportResult: unknown): void {
+  const r = exportResult as { video?: Record<string, any>; warnings?: unknown } | null;
+  const v = r && typeof r === 'object' ? r.video : null;
+  if (!v || typeof v !== 'object') return;
+  const codec = (v.encode && v.encode.codec) || (v.determinism && v.determinism.encoder && v.determinism.encoder.codec);
+  const hw = v.hardwareAcceleration ?? (v.determinism && v.determinism.encoder && v.determinism.encoder.hardwareAcceleration);
+  if (!codec && !hw) return;
+  v.encoderRan = { ...(codec ? { codec } : {}), ...(hw ? { hardwareAcceleration: hw } : {}), ...(v.bitrateMode ? { bitrateMode: v.bitrateMode } : {}) };
+  if (v.bitrateCeilingHeld === false) {
+    const who = `the encoder that ran: ${codec || 'codec not reported'}${hw ? `, hardwareAcceleration ${hw}` : ''}${v.bitrateMode ? `, bitrateMode ${v.bitrateMode}` : ''}.`;
+    const tag = (w: unknown) => (typeof w === 'string' && /^bitrate_exceeded/.test(w)) || (!!w && typeof w === 'object' && (w as { code?: unknown }).code === 'bitrate_exceeded');
+    for (const list of [r!.warnings, v.warnings]) {
+      if (!Array.isArray(list)) continue;
+      list.forEach((w, i) => {
+        if (!tag(w)) return;
+        if (typeof w === 'string') list[i] = `${w} ${who[0].toUpperCase()}${who.slice(1)}`;
+        else if (typeof (w as { message?: unknown }).message === 'string') (w as { message: string }).message += ` ${who[0].toUpperCase()}${who.slice(1)}`;
+      });
+    }
+  }
+}
+
 export function correctBitrateClaim(exportResult: unknown): void {
   const r = exportResult as { video?: { bitrate?: unknown; achievedBitrate?: unknown; bitrateCeilingHeld?: unknown; bitrateOverPercent?: number }; warnings?: unknown } | null;
   const v = r && typeof r === 'object' ? r.video : null;
@@ -5058,6 +5086,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
 
         const exportResult = exportBrowserResult.result as Record<string, any>;
         correctBitrateClaim(exportResult);
+        noteEncoderRan(exportResult);
         noteFrozenOutput(exportResult, sceneMotion);
 
         // TWO VERDICTS, and only one of them was being read.

@@ -337,8 +337,11 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   model: the budget, or a format the browser cannot encode at that size.
 - A PNG, WebP, JPG or PDF of a moving scene says the animation will not be in it. It used to say the
   scene lost nothing.
-- A GIF over its `maxBytes` budget gets one more, smaller try. The warning no longer recommends
+- A GIF over its `maxBytes` budget gets one more, smaller try, and then two lower frame rates at
+  the same duration. `fpsReduced` says when the rate came down. The warning no longer recommends
   `quality: "draft"`, which does not make a GIF smaller.
+- A video export says which encoder made the file (`video.encoderRan`: codec, hardware
+  acceleration, bitrate mode), and a missed bitrate target names it.
 - A shape or closed path with a gradient fill and no stroke has no stroke. It used to get the
   studio's default indigo outline, which also left a trail behind a moving shape.
 - `pinepaper_choreograph` sizes a rigged character by its whole figure, not its torso: default

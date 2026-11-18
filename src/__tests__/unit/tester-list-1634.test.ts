@@ -126,7 +126,7 @@ describe('GIFMAX34: a GIF shrunk for maxBytes says its new size, met or not', ()
     };
     const r = await runExport({ format: 'gif', duration: 1, maxBytes: 20_000 }, app);
     expect(r.budget.met).toBe(false);
-    expect(r.budget.attempts.length).toBe(4);
+    expect(r.budget.attempts.length).toBe(6);
     expect(r.dimensions).toEqual({ width: r.budget.attempts[2].width, height: r.budget.attempts[2].height });
     expect(r.downscaled.to).toEqual(r.dimensions);
     expect(r.warning).toContain('over the 20000-byte budget');
@@ -150,11 +150,13 @@ describe('GIFMAX34: sizes come from the GIF header, and a bigger retry never win
     };
     const r = await runExport({ format: 'gif', duration: 1, maxBytes: 20_000 }, app);
     expect(r.budget.attempts[0]).toEqual({ width: 480, height: 270, bytes: 74_000 });
-    for (const [w, h] of asked) { expect(w).toBeLessThan(480); expect(h).toBeLessThan(270); }
+    // Three size retries shrink from the measured file; the two fps steps run at the best size so far.
+    for (const [w, h] of asked.slice(0, 3)) { expect(w).toBeLessThan(480); expect(h).toBeLessThan(270); }
+    for (const [w, h] of asked.slice(3)) { expect([w, h]).toEqual([480, 270]); }
     expect(r.size).toBe(74_000);
     expect(r.dimensions).toEqual({ width: 480, height: 270 });
     expect(r.downscaled).toMatchObject({ to: { width: 480, height: 270 }, reason: 'studio' });
-    expect(r.warning).toContain('the smallest of 4 tries');
+    expect(r.warning).toContain('the smallest of 6 tries');
   });
 });
 
@@ -322,5 +324,25 @@ describe('ONCOMP34: on_complete / at_beat with an event\'s name pulses that even
   it('other relations are not touched', () => {
     const code = codeGenerator.generateAddRelation({ sourceId: 'item_1', targetId: 'item_2', relationType: 'on_event_set_visibility', params: { visible: false } } as never);
     expect(code).not.toContain('eventResolvedTo');
+  });
+});
+
+describe('GIFMAX34: fewer frames per second when smaller frames are not enough', () => {
+  it('meets the budget at a lower fps and says so', async () => {
+    const asked: Array<{ fps?: number }> = [];
+    const app = {
+      canvasSize: { width: 400, height: 400 }, canvasEl: { style: {} },
+      exportEngine: {
+        exportFidelity: () => ({ warnings: [] }),
+        _quickExportVideo: async () => ({ blob: blob(80_000) }),
+        videoExporter: { export: async (o: { fps?: number }) => { asked.push(o); return blob(o.fps === 20 ? 50_000 : 65_000); } },
+      },
+    };
+    const r = await runExport({ format: 'gif', duration: 1, fps: 30, maxBytes: 60_000 }, app);
+    expect(r.budget.met).toBe(true);
+    expect(r.size).toBe(50_000);
+    expect(r.fpsReduced).toEqual({ from: 30, to: 20, reason: 'maxBytes' });
+    expect(r.budget.attempts[r.budget.attempts.length - 1]).toMatchObject({ fps: 20, bytes: 50_000 });
+    expect(asked.some((o) => o.fps === 15)).toBe(false);
   });
 });

@@ -47,7 +47,7 @@ describe('GIFDRAFT37 / GIFMAXLAD37: the GIF budget loop', () => {
   const code = codeGenerator.generateAgentExport({ format: 'gif', maxBytes: 60000 } as never);
   it('does not prescribe quality draft, which does not shrink a GIF', () => {
     expect(code).not.toContain('use quality "draft"');
-    expect(code).toContain('Lower fps or shorten the duration');
+    expect(code).toContain('then fewer frames per second');
   });
   it('takes a third retry', () => expect(code).toContain('k < 3 && best.size > 60000'));
 });
@@ -63,5 +63,13 @@ describe('GRADTRAIL37 / GRADRIM36: a gradient fill gets no stroke it was not giv
     expect(create('circle', { radius: 20, color: grad, strokeColor: '#000' })).not.toContain('item.strokeColor = null');
     expect(create('circle', { radius: 20, color: grad, strokeWidth: 3 })).not.toContain('item.strokeColor = null');
     expect(create('path', { pathData: 'M0 0 L10 0', color: grad })).not.toContain('item.strokeColor = null');
+  });
+});
+
+describe('GIFMAX34: after smaller frames, fewer frames per second', () => {
+  const code = codeGenerator.generateAgentExport({ format: 'gif', maxBytes: 60000, fps: 30 } as never);
+  it('tries 20 and 15 fps at the best size, and says when the rate came down', () => {
+    expect(code).toContain('Math.round(__fps0 * 2 / 3), Math.round(__fps0 / 2)');
+    expect(code).toContain("fpsReduced = { from: __fps0, to: bestFps, reason: 'maxBytes' }");
   });
 });

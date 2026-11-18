@@ -25,3 +25,21 @@ describe('a held-ceiling claim is checked against the achieved bitrate', () => {
     correctBitrateClaim(null);
   });
 });
+
+describe('BITRATE34: the reply says which encoder made the file', () => {
+  it('puts codec, hardware acceleration and bitrate mode together, and names them in bitrate_exceeded', async () => {
+    const { noteEncoderRan } = await import('../../tools/handlers.js');
+    const r: any = { video: { encode: { codec: 'avc1.640028' }, hardwareAcceleration: 'prefer-hardware', bitrateMode: 'variable', bitrateCeilingHeld: false,
+      warnings: [{ code: 'bitrate_exceeded', message: 'the 1.00 Mbps target was exceeded.' }] }, warnings: ['bitrate_exceeded: over.'] };
+    noteEncoderRan(r);
+    expect(r.video.encoderRan).toEqual({ codec: 'avc1.640028', hardwareAcceleration: 'prefer-hardware', bitrateMode: 'variable' });
+    expect(r.video.warnings[0].message).toContain('The encoder that ran: avc1.640028, hardwareAcceleration prefer-hardware');
+    expect(r.warnings[0]).toContain('The encoder that ran');
+  });
+  it('leaves a result without encoder data alone', async () => {
+    const { noteEncoderRan } = await import('../../tools/handlers.js');
+    const r: any = { video: { bitrate: 1 } };
+    noteEncoderRan(r);
+    expect(r.video.encoderRan).toBeUndefined();
+  });
+});

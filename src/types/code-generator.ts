@@ -6417,7 +6417,7 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
     // What an estimateOnly reply cannot know, said in it rather than implied away.
     const estimateLimits: string[] = [];
     if (format === 'gif' && maxBytes !== undefined) {
-      estimateLimits.push(`the ${maxBytes}-byte GIF budget: the export shrinks the GIF (smaller dimensions, up to three retries) until it fits or reports budget.met: false, so its size and dimensions can differ from this estimate`);
+      estimateLimits.push(`the ${maxBytes}-byte GIF budget: the export shrinks the GIF (smaller dimensions, up to three retries, then two lower frame rates) until it fits or reports budget.met: false, so its size and dimensions can differ from this estimate`);
     }
     if (format === 'mp4' || format === 'webm' || format === undefined || format === 'auto') {
       estimateLimits.push('encoder support: if this browser cannot encode the format at this size, the export delivers another one (format_substituted) and its size differs from this estimate');
@@ -7357,7 +7357,24 @@ ${stillTime === undefined ? `  if (['png', 'jpg', 'webp', 'svg', 'pdf'].indexOf(
               attempts.push({ width: d2.width, height: d2.height, bytes: r2.size });
               if (r2.success && r2.size < best.size) { best = r2; bestDims = d2; }
             }
+            // THEN FEWER FRAMES (GIFMAX34, FxTool #402). Smaller frames stop paying once the palette and the frame
+            // count dominate. Two steps down in fps at the best size, same duration; quality is not a step, as a
+            // GIF's size does not follow it (GIFDRAFT37). Each is an attempt like the others.
+            const __fps0 = Number(settings.fps) || 30;
+            let bestFps = __fps0;
+            for (const __f of [Math.round(__fps0 * 2 / 3), Math.round(__fps0 / 2)]) {
+              if (best.size <= ${maxBytes}) break;
+              if (!(__f >= 5) || __f >= bestFps) continue;
+              if (!app.exportEngine.videoExporter || typeof app.exportEngine.videoExporter.export !== 'function') break;
+              const again = await app.exportEngine.videoExporter.export(Object.assign({}, baseVideoSettings, { format: 'gif', fps: __f, width: bestDims.width, height: bestDims.height }${gifLoop !== undefined ? `, { loop: ${JSON.stringify(gifLoop)} }` : ''}));
+              if (!again) break;
+              const r2 = await deliver(again);
+              const d2 = (await __gifDims(again)) || { width: bestDims.width, height: bestDims.height };
+              attempts.push({ width: d2.width, height: d2.height, fps: __f, bytes: r2.size });
+              if (r2.success && r2.size < best.size) { best = r2; bestDims = d2; bestFps = __f; }
+            }
             result = best;
+            if (result.success && bestFps !== __fps0) result.fpsReduced = { from: __fps0, to: bestFps, reason: 'maxBytes' };
             result.budget = { maxBytes: ${maxBytes}, met: !!(result.success && result.size <= ${maxBytes}), attempts: attempts };
             // The file delivered is said by its own size, met or not (GIFMAX34: a missed budget kept the
             // requested dimensions in the reply).
@@ -7366,7 +7383,7 @@ ${stillTime === undefined ? `  if (['png', 'jpg', 'webp', 'svg', 'pdf'].indexOf(
               result.downscaled = { from: { width: dimensions.width, height: dimensions.height }, to: { width: bestDims.width, height: bestDims.height }, reason: bestDims === __d0 ? 'studio' : 'maxBytes' };
             }
             if (result.success && result.size > ${maxBytes}) {
-              result.warning = 'still ' + result.size + ' bytes at ' + bestDims.width + 'x' + bestDims.height + ', the smallest of ' + attempts.length + ' tries — over the ' + ${maxBytes} + '-byte budget. Lower fps or shorten the duration; the size of a GIF does not follow quality (GIFDRAFT37: draft came out the same size as standard).';
+              result.warning = 'still ' + result.size + ' bytes at ' + bestDims.width + 'x' + bestDims.height + ', the smallest of ' + attempts.length + ' tries (smaller frames, then fewer frames per second) — over the ' + ${maxBytes} + '-byte budget. Shorten the duration, or simplify the scene (fewer colours, less moving detail); the size of a GIF does not follow quality (GIFDRAFT37: draft came out the same size as standard).';
             }
           }` : ''}
         } else if (app.exportEngine && app.exportEngine.videoExporter) {
