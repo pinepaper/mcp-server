@@ -84,7 +84,7 @@ describe('the argument: validated, opt-in, never a failure', () => {
     const props = (tool.inputSchema as { properties: Record<string, { type?: string }> }).properties;
     expect(props.enforceBitrate.type).toBe('boolean');
     expect(tool.description).toContain('enforceBitrate: true makes bitrate a hard cap');
-    expect(tool.description).toContain('quantizer is not available for H.264');
+    expect(tool.description).toContain('not every H.264 encoder takes a quantizer');
   });
   it('reencodeArgs refuses a cap that is not an integer in range', () => {
     for (const bad of [Number.NaN, 1.5, MIN_CAP_BPS - 1, MAX_CAP_BPS + 1, Infinity, '6000000' as unknown as number]) {
