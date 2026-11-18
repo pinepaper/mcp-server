@@ -318,8 +318,14 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   (Chrome's HTML-in-Canvas, from Chrome 157): `htmlInCanvas` with `supported`, the Chrome version
   and the reason. It is measured in the page, not assumed from the version.
 
+- `pinepaper_import_image` takes `imageStart`: the scene time an animated GIF, WebP or APNG
+  starts at. The reply's `playback` says what the studio stored, and `pinepaper_get_items` shows
+  an animated image's `playback`.
+
 ### Fixed
 
+- `pinepaper_keyframe_animate` and the batch keyframe op pass on the keys the studio stores but
+  does not draw (`notAnimated`), such as a keyed palette-map `amount`.
 - A colour that is not a colour (`"#notacolor"`) is refused by name on create, modify, keyframes
   and the background. It used to be accepted and drawn black.
 - `pinepaper_create_item` takes `shadowOffsetX` and `shadowOffsetY`, the names a keyframe animates.

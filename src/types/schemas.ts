@@ -3491,6 +3491,7 @@ export const ImportImageInputSchema = z.object({
   blendMode: z.string().optional().describe("How it composites over what is below: 'multiply', 'screen' and the other pinepaper_modify_item blend modes."),
   scale: z.number().positive().optional().describe('Multiplies the size maxWidth / maxHeight / maxEdge gave it.'),
   loop: z.union([z.boolean(), z.number().int().min(1), z.literal('forever')]).optional().describe("An animated GIF, WebP or APNG: true or 'forever' loops, false plays once and holds, n plays n times. Left out, the file's own loop count."),
+  imageStart: z.number().min(0).optional().describe("An animated GIF, WebP or APNG: the scene time, in seconds, at which its first frame shows. Left out, 0. The reply's playback says what the studio stored."),
 }).describe('Import image input');
 
 export type ImportImageInput = z.infer<typeof ImportImageInputSchema>;

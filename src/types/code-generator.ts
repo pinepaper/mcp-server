@@ -2398,6 +2398,8 @@ const TEXT_KEY_ENGINE_NAMES: Readonly<Record<string, readonly string[]>> = {
   skewX: ['skewX'],
   skewY: ['skewY'],
   shear: ['shear'],
+  // A studio before FxTool #400 stored a keyed strokePosition and drew nothing (STROKEPOSKEY37); the current one lists it.
+  strokePosition: ['strokePosition'],
 };
 
 /** A JS expression (run in the page) → the keys of `keys` this studio does not animate. '' when none are text keys. */
@@ -2468,6 +2470,19 @@ function keyframeResultNotes(keyframes: readonly Keyframe[], { loop = false, app
     ? `, note: ${JSON.stringify(`easing '${first.easing}' is on the first keyframe, where it has no effect by default: easing shapes the segment ARRIVING at a keyframe. Put it on the keyframe you are moving to, or pass easingAt: 'departure' to read every easing as the move LEAVING its key (current studio).`)}`
     : '';
   return `${easingNote}${sizekeyPairNote}${gapNote}`;
+}
+
+/**
+ * KEYS THE STUDIO STORES AND DOES NOT DRAW, IN ITS OWN WORDS (FILTKEY35, STROKEPOSKEY37). A current studio's addAnimation
+ * names them on its receipt (keyframe_property_not_animated, FxTool #400): a keyed paletteMap amount, which no list here
+ * caught, among them. Read right after the write, into the reply as notAnimated / notAnimatedWarning.
+ */
+function deadKeysJs(name: string): string {
+  return `const ${name} = (function () { try {
+    const __r = app.lastReceipt; const __ws = __r && Array.isArray(__r.warnings) ? __r.warnings : [];
+    const __d = __ws.filter(function (w) { return w && w.code === 'keyframe_property_not_animated'; });
+    return __d.length ? { notAnimated: __d.reduce(function (a, w) { return a.concat(w.properties || []); }, []), notAnimatedWarning: __d.map(function (w) { return w.message; }).join(' ') } : null;
+  } catch (_) { return null; } })();`;
 }
 
 /**
@@ -2621,7 +2636,8 @@ function generateKeyframeAnimateCode(
 ${guard.before}
   app.addAnimation(${addAnimTarget}, ${keyframesJson}, __opts);
   const __warn = [];${unitsNote}
-${guard.after}${easingAtCheck}${textKeyCheck}${filterKeyCheck}
+${guard.after}
+  ${deadKeysJs('__deadKeys')}${easingAtCheck}${textKeyCheck}${filterKeyCheck}
   const __now = (__ki && __ki.data && Array.isArray(__ki.data.keyframes)) ? __ki.data.keyframes.map(function(k) { return k && k.time; }) : [];
   const __kept = __prev.every(function(t) { return __now.indexOf(t) >= 0; });${append ? `
   // Property gaps across the merged track (the same check a single call makes
@@ -2640,7 +2656,7 @@ ${guard.after}${easingAtCheck}${textKeyCheck}${filterKeyCheck}
       ? { appended: true, previousKeys: __prev.length, keys: __now.length }
       : { appended: false, replaced: true, previousKeys: __prev.length, warning: 'append was asked for, but this studio replaced the existing track (' + __prev.length + ' key(s)) instead of adding to it: it has no merge mode. Put every key in one keyframe_animate call.' })`
     : `{ replaced: true, previousKeys: __prev.length, note: 'the item already had a keyframe track (' + __prev.length + ' key(s)); this call replaced it. To add keys to it instead, pass append: true.' }`};
-  return { success: true, itemId: ${addAnimTarget}, duration: ${calculatedDuration}, loop: ${loop}${append ? ', append: true' : ''}${guard.field}, ...(__track ? { track: __track } : {})${append ? `, ...(__gaps.length ? { propertyGaps: __gaps.slice(0, 10), gapWarning: __gaps.length + ' key(s) of the merged track leave out a property other keys animate (' + __gaps.reduce(function(a, g) { g.missing.forEach(function(p) { if (a.indexOf(p) < 0) a.push(p); }); return a; }, []).join(', ') + '). The engine can break that property at such a key; give each key the full set — hold a value by repeating it.' } : {})` : ''}${timeOffset !== undefined ? `, timeOffset: ${timeOffset}` : ''}${clipInPoint !== undefined ? `, clipInPoint: ${clipInPoint}` : ''}${clipOutPoint !== undefined ? `, clipOutPoint: ${clipOutPoint}` : ''}${__notes}${runtimeWarning} };
+  return { success: true, itemId: ${addAnimTarget}, duration: ${calculatedDuration}, loop: ${loop}${append ? ', append: true' : ''}${guard.field}, ...(__track ? { track: __track } : {})${append ? `, ...(__gaps.length ? { propertyGaps: __gaps.slice(0, 10), gapWarning: __gaps.length + ' key(s) of the merged track leave out a property other keys animate (' + __gaps.reduce(function(a, g) { g.missing.forEach(function(p) { if (a.indexOf(p) < 0) a.push(p); }); return a; }, []).join(', ') + '). The engine can break that property at such a key; give each key the full set — hold a value by repeating it.' } : {})` : ''}${timeOffset !== undefined ? `, timeOffset: ${timeOffset}` : ''}${clipInPoint !== undefined ? `, clipInPoint: ${clipInPoint}` : ''}${clipOutPoint !== undefined ? `, clipOutPoint: ${clipOutPoint}` : ''}${__notes}${runtimeWarning}, ...(__deadKeys || {}) };
 })();
 `.trim();
 }
@@ -2843,6 +2859,10 @@ const GET_ITEMS_ENTRY_JS = `entry => {
   if (it.scaling && (Math.abs(it.scaling.x - 1) > 1e-6 || Math.abs(it.scaling.y - 1) > 1e-6)) out.scale = { x: r2(it.scaling.x), y: r2(it.scaling.y) };
   if (typeof it.rotation === 'number' && Math.abs(it.rotation) > 1e-6) out.rotation = r2(it.rotation);
   if (typeof it.opacity === 'number' && it.opacity !== 1) out.opacity = r2(it.opacity);
+  // An animated image's playback as stored (IMAGESTART37: imageStart was nowhere to be read). Images only.
+  if ((entry.type === 'image' || it.className === 'Raster') && typeof app.getImagePlayback === 'function') {
+    try { const pb = app.getImagePlayback(it); if (pb) out.playback = pb; } catch (_) { /* a read never fails the list */ }
+  }
   return out;
 }`;
 
@@ -6254,8 +6274,9 @@ if (!_target) {
 const _kfItem = _target.item || _target;
 const _prevKeys = (_kfItem.data && Array.isArray(_kfItem.data.keyframes)) ? _kfItem.data.keyframes.length : 0;
 ${kfGuard.before}
-app.addAnimation(targetId, ${kfJson}, { duration: ${kfDuration}, loop: ${kfLoop}${kfAppend ? ", mode: 'merge'" : ''}${kfExtraStr} });${kfGuard.after}${kfTextCheck}
-return { success: true, itemId: targetId, duration: ${kfDuration}, loop: ${kfLoop}${kfAppend ? ', append: true' : ''}${kfGuard.field}${keyframeResultNotes(kfSource as never, { loop: kfLoop === true, append: kfAppend })}${kfAppend ? '' : `, ...(_prevKeys ? { track: { replaced: true, previousKeys: _prevKeys, note: 'the item already had a keyframe track; this op replaced it. To add keys to it instead, pass append: true.' } } : {})`}${kfUnitsNote}${kfIgnored} };
+app.addAnimation(targetId, ${kfJson}, { duration: ${kfDuration}, loop: ${kfLoop}${kfAppend ? ", mode: 'merge'" : ''}${kfExtraStr} });${kfGuard.after}
+${deadKeysJs('_deadKeys')}${kfTextCheck}
+return { success: true, itemId: targetId, duration: ${kfDuration}, loop: ${kfLoop}${kfAppend ? ', append: true' : ''}${kfGuard.field}${keyframeResultNotes(kfSource as never, { loop: kfLoop === true, append: kfAppend })}${kfAppend ? '' : `, ...(_prevKeys ? { track: { replaced: true, previousKeys: _prevKeys, note: 'the item already had a keyframe track; this op replaced it. To add keys to it instead, pass append: true.' } } : {})`}${kfUnitsNote}${kfIgnored}, ...(_deadKeys || {}) };
 `;
       }
 
@@ -10013,7 +10034,7 @@ ${(() => {
   }
 
   generateImportImage(input: ImportImageInput): string {
-    const { url, position, maxWidth, maxHeight, mask, smoothing, maxEdge, nativeSize, shadowColor, shadowBlur, shadowOffset, name, opacity, blendMode, scale, loop } = input;
+    const { url, position, maxWidth, maxHeight, mask, smoothing, maxEdge, nativeSize, shadowColor, shadowBlur, shadowOffset, name, opacity, blendMode, scale, loop, imageStart } = input;
     const look: Record<string, unknown> = { ...(opacity !== undefined ? { opacity } : {}), ...(blendMode !== undefined ? { blendMode } : {}), ...(scale !== undefined ? { scale } : {}) };
     const hasLook = Object.keys(look).length > 0;
     // IMPORTSHADOW: the shadow keys, applied through the engine's own modify
@@ -10036,6 +10057,7 @@ ${(() => {
       maxHeight !== undefined ? `maxHeight: ${maxHeight}` : '',
       nativeSize ? 'nativeSize: true' : '',
       loop !== undefined ? `loop: ${JSON.stringify(loop)}` : '',
+      imageStart !== undefined ? `imageStart: ${imageStart}` : '',
     ].filter(Boolean);
     const optsLiteral = optParts.length ? `{ ${optParts.join(', ')} }` : '{}';
 
@@ -10150,12 +10172,27 @@ ${mask ? `    // A MASK REPLACES THE RASTER (round 8 DD, 4.10). applyMask builds
 ` : ''}    const b = placed.bounds;
     if (!b || !(b.width > 0) || !(b.height > 0)) {
       return { success: false, itemId: itemId, error: 'the image was placed with no size (' + (b ? b.width + 'x' + b.height : 'no bounds') + ') — it may not have loaded. Nothing visible was drawn.' };
-    }
+    }${loop !== undefined || imageStart !== undefined ? `
+    // PLAYBACK AS STORED (IMAGESTART37): imageStart was never sent, and the reply could not say so. Read back from
+    // the studio (app.getImagePlayback, FxTool #410), else the raster's own record, and compared with the ask.
+    let __pb = null;
+    try { __pb = typeof app.getImagePlayback === 'function' ? app.getImagePlayback(itemId) : null; } catch (_) { __pb = null; }
+    const __anim = raster && raster.data && raster.data.animatedImage;
+    let __playback;
+    if (__pb || __anim) {
+      __playback = __pb ? Object.assign({ applied: true }, __pb) : { applied: true, plays: __anim.loop, imageStart: __anim.start || 0 };
+      ${imageStart !== undefined ? `if (Math.abs((Number(__playback.imageStart) || 0) - ${imageStart}) > 1e-6) {
+        __playback.applied = false;
+        __playback.warning = 'imageStart was not applied: asked ${imageStart} s, the studio stored ' + (Number(__playback.imageStart) || 0) + ' s, so the image starts at that time. Update the studio, or set it with pinepaper_modify_item imageStart.';
+      }` : ''}
+    } else {
+      __playback = { applied: false, warning: ${JSON.stringify(`${loop !== undefined && imageStart !== undefined ? 'loop and imageStart were' : loop !== undefined ? 'loop was' : 'imageStart was'} not applied: this image does not animate in this studio. Animated GIF, WebP and APNG do.`)} };
+    }` : ''}
     return {
       success: true,
       itemId: itemId,
       message: 'Image imported and placed on canvas.',${name ? `\n      name: ${JSON.stringify(name)},` : ''}
-      bounds: { x: b.x, y: b.y, width: b.width, height: b.height }${mask ? `,\n      mask: ${jsLiteral(mask)}` : ''}${hasShadow ? ',\n      shadow: __shadow' : ''}${loop !== undefined ? ",\n      playback: (raster && raster.data && raster.data.animatedImage && raster.data.animatedImage.loop !== undefined) ? { applied: true, plays: raster.data.animatedImage.loop } : { applied: false, warning: 'loop was not applied: this image does not animate in this studio. Animated GIF, WebP and APNG do.' }" : ''}${hasLook ? ',\n      look: __look' : ''},
+      bounds: { x: b.x, y: b.y, width: b.width, height: b.height }${mask ? `,\n      mask: ${jsLiteral(mask)}` : ''}${hasShadow ? ',\n      shadow: __shadow' : ''}${loop !== undefined || imageStart !== undefined ? `,\n      playback: __playback` : ''}${hasLook ? ',\n      look: __look' : ''},
       // Stored smaller than its source (the studio's cap): said, with the
       // way to keep every pixel. The studio reports native size where it can.
       ...((entry && entry.nativeWidth && entry.width && entry.nativeWidth > entry.width)

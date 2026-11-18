@@ -292,6 +292,7 @@ export const OPTIONAL_ENGINE_METHODS: readonly string[] = [
   'getCanvasSize',
   'getCutoutStylePresets',
   'getDPI',
+  'getImagePlayback',
   'getInterpolatedState',
   'getItemsByName',
   'getPattern',
