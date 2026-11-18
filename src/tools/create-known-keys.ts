@@ -21,4 +21,6 @@ export const CREATE_KNOWN_KEYS: ReadonlySet<string> = new Set([
   // A solid fill's own alpha (FxTool 12 STROKEFILL); confirmed per call by
   // emitFillOpacityCheck, since an older studio ignores it.
   'fillOpacity',
+  // Text wrap keys (TXTWRAP40): applied through app.wrapText after create, on text only (textOnly reports them elsewhere).
+  'maxWidth', 'wrapWidth', 'wordWrap',
 ]);

@@ -502,6 +502,10 @@ function generateCreateItemCode(
   const textFit = itemType === 'text' && baseProperties.fit && typeof baseProperties.fit === 'object' ? baseProperties.fit as Record<string, unknown> : null;
   const { fit: _fitDropped, ...createProps } = baseProperties;
   void _fitDropped;
+  // Wrap keys on text (TXTWRAP40): consumed here and applied through app.wrapText after create; never sent to create().
+  const textWrap = itemType === 'text' ? textWrapRequest(properties) : null;
+  // width alone stays in: create() records it on the item (data.width), it just does not size a text.
+  if (textWrap) for (const k of [...textWrap.consumed, ...Object.keys(textWrap.ignoredHints)]) if (!(k === 'width' && !textWrap.consumed.includes('width'))) delete createProps[k];
   let textDirection = itemType === 'text' ? takeDirection(createProps) : null;
   // RIGHT-TO-LEFT TEXT WITH NO DIRECTION GIVEN. The engine's default is auto,
   // but it records nothing, so nothing could confirm it. For content with any
@@ -633,7 +637,7 @@ if (item && item.data) { item.data.renderAs = ${JSON.stringify(itemType)}; item.
   // on another type they are reported whatever the list says. `direction` is
   // not among them: an arc reads it as its sweep.
   const textOnly = (k: string) => (TEXT_STYLE_KEYS as readonly string[]).includes(k) || k === 'fit' || k === 'textDirection' || k === 'dir'
-    || (TABULAR_KEYS as readonly string[]).includes(k) || k === 'strokePosition';
+    || (TABULAR_KEYS as readonly string[]).includes(k) || k === 'strokePosition' || k === 'maxWidth' || k === 'wrapWidth' || k === 'wordWrap';
   // SCALE AT CREATE (CROWMOON, mcp-cloud #25). create() reads no scale, so a
   // squashed circle (a crescent's cutter) came back round and the keys were
   // reported ignored. They are applied right after create through
@@ -659,7 +663,10 @@ if (item && item.data) { item.data.renderAs = ${JSON.stringify(itemType)}; item.
   const ignored = Object.keys(properties).filter((k) => !(k === 'shadowOffsetX' && createShadowX !== undefined) && !(k === 'shadowOffsetY' && createShadowY !== undefined)).filter((k) => !(k === 'visible' && createVisible !== undefined)).filter((k) => !(hasCreateScale && SCALE_KEYS.includes(k) && num(properties[k]) !== undefined)).filter((k) => itemType === 'text'
     ? (!CREATE_KNOWN_KEYS.has(k) && !textOnly(k) && !(DIRECTION_KEYS as readonly string[]).includes(k))
       || (k === 'letterSpacing' && letterSpacingCss(properties[k]) === undefined)
-    : !CREATE_KNOWN_KEYS.has(k) || textOnly(k));
+    : !CREATE_KNOWN_KEYS.has(k) || textOnly(k))
+    .filter((k) => !(textWrap && (textWrap.consumed.includes(k) || textWrap.ignoredHints[k])));
+  // Wrap keys on text that could not be applied: reported with the spelling that works (width was silent, TXTWRAP40).
+  const wrapIgnored = textWrap ? Object.keys(textWrap.ignoredHints) : [];
 
   // Build the code
   let code = `
@@ -751,6 +758,8 @@ const __scale = (function(it) {
   }
   if (textStrokePos) code += emitStrokePositionCheck('item', textStrokePos);
   if (textFit) code += `\nlet __textFit = null;${emitTextFit('item', textFit, JSON.stringify(anchorHold(properties.anchor ?? properties.origin) ?? null))}`;
+  const wrapWidth = textWrap?.width;
+  if (wrapWidth !== undefined && !textFit) code += emitTextWrap('item', wrapWidth, anchorHold(properties.anchor ?? properties.origin));
 
   // After opacity, so the "on" level of the lifetime is the item's own.
   // A numeric `lifetime` is the studio's alias of ttl on create (FxTool B125;
@@ -792,6 +801,8 @@ const __scale = (function(it) {
     warnings.push(`${ignored.join(', ')} ${ignored.length > 1 ? 'are' : 'is'} not read when creating an item, so ${ignored.length > 1 ? 'they had' : 'it had'} no effect. `
       + 'Check the spelling against this item type\'s documented properties.');
   }
+  for (const k of wrapIgnored) warnings.push(`${k} had no effect: ${textWrap!.ignoredHints[k]}.`);
+  if (wrapWidth !== undefined && textFit) warnings.push('maxWidth was not applied separately: fit wraps the text to fit.maxWidth, and the studio keeps the fit box on later refits.');
   if (lineIgnoresPosition) {
     warnings.push('a line runs from `from` to `to` in canvas coordinates, so position did not move it: position is where the line is now. Give the endpoints where the line goes.');
   }
@@ -802,8 +813,8 @@ const itemId = item.data.registryId;
 app.historyManager[app.historyManager.saveStateDebounced ? 'saveStateDebounced' : 'saveState']();
 
 // Return item info
-({ itemId, type: ${jsLiteral(itemType)}${outlineOnly ? `, fill: ${JSON.stringify(OUTLINE_NOTE)}` : ''}${textFit ? ', textFit: __textFit' : ''}${textDirection ? ', direction: __direction' : ''}${textTabular ? ', tabularFigures: __tabular' : ''}${textTypography.length ? ', typography: __typography' : ''}${createFillOpacity ? ', fillOpacity: __fillOpacity' : ''}${textStrokePos ? ', strokePosition: __strokePos' : ''}${hasCreateScale ? ', scale: __scale' : ''}, position: ${reportActualPosition ? `(item.position ? { x: item.position.x, y: item.position.y } : null)` : `{ x: ${position.x}, y: ${position.y} }`}${hasLifetime ? ', lifetime: __lifetime' : ''}${loadsFont ? ', ...(__font ? { font: __font } : {})' : ''}${ignored.length > 0
-    ? `, ignoredProperties: ${JSON.stringify(ignored)}` : ''}${warnings.length > 0 ? `, warning: ${JSON.stringify(warnings.join(' '))}` : ''} });`;
+({ itemId, type: ${jsLiteral(itemType)}${outlineOnly ? `, fill: ${JSON.stringify(OUTLINE_NOTE)}` : ''}${textFit ? ', textFit: __textFit' : ''}${wrapWidth !== undefined && !textFit ? ', textWrap: __textWrap' : ''}${textDirection ? ', direction: __direction' : ''}${textTabular ? ', tabularFigures: __tabular' : ''}${textTypography.length ? ', typography: __typography' : ''}${createFillOpacity ? ', fillOpacity: __fillOpacity' : ''}${textStrokePos ? ', strokePosition: __strokePos' : ''}${hasCreateScale ? ', scale: __scale' : ''}, position: ${reportActualPosition ? `(item.position ? { x: item.position.x, y: item.position.y } : null)` : `{ x: ${position.x}, y: ${position.y} }`}${hasLifetime ? ', lifetime: __lifetime' : ''}${loadsFont ? ', ...(__font ? { font: __font } : {})' : ''}${ignored.length + wrapIgnored.length > 0
+    ? `, ignoredProperties: ${JSON.stringify([...ignored, ...wrapIgnored])}` : ''}${warnings.length > 0 ? `, warning: ${JSON.stringify(warnings.join(' '))}` : ''} });`;
 
   // Loading a font is async, and it has to happen BEFORE create() measures the
   // text — so only this case becomes an async IIFE; every other create stays a
@@ -1115,6 +1126,92 @@ const __typography = (function(it, keys) {
 })(${itemExpr}, ${JSON.stringify(keys)});`;
 }
 
+/**
+ * WRAP A TEXT TO A WIDTH FROM create_item / modify_item (TXTWRAP40).
+ *
+ * A caption longer than a phone frame came out as one line clipped off both
+ * edges, and the three spellings an agent reaches for did nothing: maxWidth and
+ * wordWrap were reported ignored, and width was accepted silently (create()
+ * reads width for shapes, not for text). The studio has wrapped text all along
+ * (app.wrapText, reached through text_style wrap and fit.maxWidth); these keys
+ * now reach it:
+ *
+ * - maxWidth (or wrapWidth) on text: wrap to that width;
+ * - wordWrap: true with width: the CSS habit, the same thing;
+ * - width alone on text, or wordWrap: true with no width: reported ignored with
+ *   the spelling that works, because width on text is not a wrap box elsewhere
+ *   and guessing it into one would redefine it for one item type;
+ * - fit given as well: fit wraps to its own maxWidth and the studio prefers it
+ *   on every later refit, so the separate wrap is not applied and the reply
+ *   says so;
+ * - modify_item maxWidth: null unwraps (app.unwrapText), as fit: null stops
+ *   fitting.
+ *
+ * wrapText keeps the first line's baseline, so a centred caption grew
+ * downward and sat below where it was asked for. The edge the caller placed is
+ * held instead: horizontally by justification, vertically by the anchor (top /
+ * bottom), else the centre. The reply's textWrap gives lines, overflow (a single
+ * word wider than the width overruns its line) and the bounds after the wrap.
+ */
+export interface TextWrapRequest { width?: number; unwrap?: boolean; consumed: string[]; ignoredHints: Record<string, string> }
+
+export function textWrapRequest(properties: Record<string, unknown>, opts: { modify?: boolean } = {}): TextWrapRequest | null {
+  const pos = (v: unknown): number | undefined => (typeof v === 'number' || (typeof v === 'string' && v.trim() !== '')) && Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : undefined;
+  const has = (k: string) => Object.prototype.hasOwnProperty.call(properties, k);
+  if (!has('maxWidth') && !has('wrapWidth') && !has('wordWrap') && !(has('width') && !opts.modify)) return null;
+  const out: TextWrapRequest = { consumed: [], ignoredHints: {} };
+  const wrapKey = has('maxWidth') ? 'maxWidth' : has('wrapWidth') ? 'wrapWidth' : null;
+  const wordWrap = properties.wordWrap;
+  if (wrapKey) {
+    const v = properties[wrapKey];
+    if (opts.modify && v === null) { out.unwrap = true; out.consumed.push(wrapKey); }
+    else if (pos(v) !== undefined) { out.width = pos(v); out.consumed.push(wrapKey); }
+    else out.ignoredHints[wrapKey] = `${wrapKey} must be a positive number of canvas pixels${opts.modify ? ' (null unwraps)' : ''}`;
+    if (wrapKey === 'maxWidth' && has('wrapWidth')) out.consumed.push('wrapWidth');
+    if (has('wordWrap') && wordWrap !== false) out.consumed.push('wordWrap');
+  } else if (wordWrap === true) {
+    const w = opts.modify ? undefined : pos(properties.width);
+    if (w !== undefined) { out.width = w; out.consumed.push('wordWrap', 'width'); }
+    else out.ignoredHints.wordWrap = 'wordWrap: true needs a width to wrap to: pass maxWidth (canvas pixels)';
+  }
+  if (has('wordWrap') && wordWrap === false && !out.consumed.includes('wordWrap')) out.consumed.push('wordWrap');
+  if (has('wordWrap') && wordWrap !== true && wordWrap !== false && !out.consumed.includes('wordWrap')) out.ignoredHints.wordWrap = 'wordWrap takes true or false';
+  if (!opts.modify && has('width') && !out.consumed.includes('width')) {
+    out.ignoredHints.width = 'a text item is as wide as its words, so width does not size it (the studio records the value and draws the text unchanged): to wrap it to a width, pass maxWidth (or fit: {maxWidth} to also shrink the font to fit a box)';
+  }
+  return out;
+}
+
+/** The wrap itself, after the item exists: sets __textWrap. widthOrNull null unwraps. */
+export function emitTextWrap(itemExpr: string, widthOrNull: number | null, vHold: 'top' | 'bottom' | undefined): string {
+  const unwrap = widthOrNull === null;
+  return `
+let __textWrap = null;
+{
+  const __wi = ${itemExpr};
+  if (!__wi || typeof __wi.content !== 'string') { __textWrap = { applied: false, note: 'not a text item, so there is nothing to wrap' }; }
+  else if (typeof app.${unwrap ? 'unwrapText' : 'wrapText'} !== 'function') { __textWrap = { applied: false, ${unwrap ? '' : `maxWidth: ${widthOrNull}, `}note: 'this studio cannot ${unwrap ? 'unwrap' : 'wrap'} text (no app.${unwrap ? 'unwrapText' : 'wrapText'}): the text ${unwrap ? 'keeps its line breaks' : 'stays on one line and may run past the frame'}.' }; }
+  else {
+    const __j = String(__wi.justification || 'left');
+    const __b0 = __wi.bounds;
+    const __hx = __j === 'center' ? __b0.center.x : __j === 'right' ? __b0.right : __b0.left;
+    const __hy = ${vHold === 'top' ? '__b0.top' : vHold === 'bottom' ? '__b0.bottom' : '__b0.center.y'};
+    const __wr = app.${unwrap ? 'unwrapText(__wi)' : `wrapText(__wi, ${widthOrNull})`};
+    if (!__wr || __wr.ok === false) { __textWrap = { applied: false, ${unwrap ? '' : `maxWidth: ${widthOrNull}, `}note: (__wr && __wr.error) || 'the studio refused the ${unwrap ? 'unwrap' : 'wrap'}' }; }
+    else {
+      const __b1 = __wi.bounds;
+      const __nx = __j === 'center' ? __b1.center.x : __j === 'right' ? __b1.right : __b1.left;
+      const __ny = ${vHold === 'top' ? '__b1.top' : vHold === 'bottom' ? '__b1.bottom' : '__b1.center.y'};
+      __wi.position = __wi.position.add([__hx - __nx, __hy - __ny]);
+      const __b = __wi.bounds;
+      __textWrap = Object.assign({ applied: true, ${unwrap ? 'unwrapped: true' : `maxWidth: ${widthOrNull}, lines: __wr.lines, overflow: !!__wr.overflow`},
+        bounds: { x: Math.round(__b.x * 10) / 10, y: Math.round(__b.y * 10) / 10, width: Math.round(__b.width * 10) / 10, height: Math.round(__b.height * 10) / 10 } },
+        __wr.overflow ? { warning: 'a single word is wider than maxWidth, so it overruns its line: shorten it, widen maxWidth or lower fontSize.' } : {});
+    }
+  }
+}`;
+}
+
 function emitTextFit(itemExpr: string, box: Record<string, unknown>, holdFallback = 'undefined'): string {
   return `
 if (typeof app.fitText === 'function') {
@@ -1375,6 +1472,12 @@ function generateModifyItemCode(
   // the one this reads back. fit: null still goes through — that is the
   // engine's "stop fitting".
   if (restProperties.fit && typeof restProperties.fit === 'object') delete restProperties.fit;
+  // Wrap keys (TXTWRAP40): applied through app.wrapText / unwrapText below, never handed to modifyItem.
+  const modWrap = textWrapRequest(restProperties, { modify: true });
+  if (modWrap) {
+    for (const k of modWrap.consumed) { delete restProperties[k]; aliased.add(k); }
+    for (const k of Object.keys(modWrap.ignoredHints)) delete restProperties[k];
+  }
   const modDirection = takeDirection(restProperties);
   const modTabular = wantsTabular(restProperties) === true;
   const modTypography = typographyRequest(restProperties);
@@ -1490,6 +1593,13 @@ let __textFit = null;
 const _tf = app.itemRegistry.get(${ID});${emitTextFit('_tf && _tf.item', modFit, jsLiteral(anchorHold(properties.anchor ?? properties.origin) ?? null) + " || (_tf && _tf.item && _tf.item.data && _tf.item.data.fitBox && _tf.item.data.fitBox.hold)")}`;
   }
 
+  const modFitGiven = !!(properties.fit && typeof properties.fit === 'object');
+  const modWrapApplies = !!modWrap && (modWrap.unwrap || modWrap.width !== undefined) && !modFitGiven;
+  if (modWrapApplies) {
+    code += `
+const _tw = app.itemRegistry.get(${ID});${emitTextWrap('_tw && _tw.item', modWrap!.unwrap ? null : modWrap!.width!, anchorHold(properties.anchor ?? properties.origin))}`;
+  }
+
   const textStyle = emitTextStyle('_ts && _ts.item', properties);
   if (textStyle) {
     code += `
@@ -1515,10 +1625,17 @@ if (_flagged && _flagged.item && _flagged.item.data) Object.assign(_flagged.item
   // raster answered success and left it 16 px; the engine reads `scale`. Same
   // report create_item gives, against the engine's modify path (generated).
   if (textStyle && letterSpacingCss(properties.letterSpacing) !== undefined) aliased.add('letterSpacing');
-  const modIgnored = Object.keys(properties).filter((k) => !MODIFY_KNOWN_KEYS.has(k) && !aliased.has(k));
-  const modWarning = modIgnored.length === 0 ? '' : `, ignoredProperties: ${jsLiteral(modIgnored)}, warning: ${jsLiteral(
-    `${modIgnored.join(', ')} ${modIgnored.length > 1 ? 'are' : 'is'} not read when modifying an item, so ${modIgnored.length > 1 ? 'they had' : 'it had'} no effect.`
-    + modIgnored.filter((k) => MODIFY_DID_YOU_MEAN[k]).map((k) => ` Did you mean ${MODIFY_DID_YOU_MEAN[k]} (not ${k})?`).join(''),
+  const wrapHints = modWrap ? modWrap.ignoredHints : {};
+  const modIgnored = Object.keys(properties).filter((k) => !MODIFY_KNOWN_KEYS.has(k) && !aliased.has(k) && !wrapHints[k]);
+  const modWrapIgnored = Object.keys(wrapHints);
+  const modWrapNotes = [
+    ...modWrapIgnored.map((k) => ` ${k} had no effect: ${wrapHints[k]}.`),
+    ...(modWrap && modFitGiven && (modWrap.unwrap || modWrap.width !== undefined) ? [' maxWidth was not applied separately: fit wraps the text to fit.maxWidth, and the studio keeps the fit box on later refits.'] : []),
+  ];
+  const modWarning = modIgnored.length + modWrapIgnored.length === 0 && modWrapNotes.length === 0 ? '' : `${modIgnored.length + modWrapIgnored.length ? `, ignoredProperties: ${jsLiteral([...modIgnored, ...modWrapIgnored])}` : ''}, warning: ${jsLiteral(
+    ((modIgnored.length ? `${modIgnored.join(', ')} ${modIgnored.length > 1 ? 'are' : 'is'} not read when modifying an item, so ${modIgnored.length > 1 ? 'they had' : 'it had'} no effect.`
+    + modIgnored.filter((k) => MODIFY_DID_YOU_MEAN[k]).map((k) => ` Did you mean ${MODIFY_DID_YOU_MEAN[k]} (not ${k})?`).join('') : '')
+    + modWrapNotes.join('')).trim(),
   )}`;
   code += `
 app.historyManager.saveState();
@@ -1530,7 +1647,7 @@ const __ctItem = app.getItemById(${ID});
 const __ctKeys = (__ctItem && __ctItem.data && Array.isArray(__ctItem.data.keyframes))
   ? __ctItem.data.keyframes.filter(function(k) { return k && k.properties && Object.prototype.hasOwnProperty.call(k.properties, 'content'); }).length : 0;` : ''}
 ${modDirection ? emitDirectionCheck(`app.getItemById(${ID})`, modDirection) : ''}${modTabular ? emitTabularCheck(`app.getItemById(${ID})`) : ''}${modTypography.length ? emitTypographyCheck(`app.getItemById(${ID})`, modTypography) : ''}${modFillOpacity ? emitFillOpacityCheck(`app.getItemById(${ID})`) : ''}${modStrokePos ? emitStrokePositionCheck(`app.getItemById(${ID})`, modStrokePos) : ''}
-return { success: true, itemId: ${ID}${properties.content !== undefined ? `, ...(__ctKeys ? { contentTrackWarning: 'this text\\'s content is keyframed (' + __ctKeys + ' key(s)), so the track sets it on every frame and this edit does not show. Change the content keys with pinepaper_keyframe_animate (append: true replaces same-time keys), or animate another property.' } : {})` : ''}${modFit ? ', textFit: __textFit' : ''}${modDirection ? ', direction: __direction' : ''}${modTabular ? ', tabularFigures: __tabular' : ''}${modTypography.length ? ', typography: __typography' : ''}${modFillOpacity ? ', fillOpacity: __fillOpacity' : ''}${modStrokePos ? ', strokePosition: __strokePos' : ''}${affine ? `, affine: ${jsLiteral({ skewX, skewY, matrix, note: 'applied to the current shape: calling again compounds it. To undo, apply the inverse (negative skew, or the inverse matrix).' })}` : ''}${modLifetime ? ', lifetime: __lifetime' : ''}${modFont ? ', ...(__font ? { font: __font } : {})' : ''}${modWarning} };`;
+return { success: true, itemId: ${ID}${properties.content !== undefined ? `, ...(__ctKeys ? { contentTrackWarning: 'this text\\'s content is keyframed (' + __ctKeys + ' key(s)), so the track sets it on every frame and this edit does not show. Change the content keys with pinepaper_keyframe_animate (append: true replaces same-time keys), or animate another property.' } : {})` : ''}${modFit ? ', textFit: __textFit' : ''}${modWrapApplies ? ', textWrap: __textWrap' : ''}${modDirection ? ', direction: __direction' : ''}${modTabular ? ', tabularFigures: __tabular' : ''}${modTypography.length ? ', typography: __typography' : ''}${modFillOpacity ? ', fillOpacity: __fillOpacity' : ''}${modStrokePos ? ', strokePosition: __strokePos' : ''}${affine ? `, affine: ${jsLiteral({ skewX, skewY, matrix, note: 'applied to the current shape: calling again compounds it. To undo, apply the inverse (negative skew, or the inverse matrix).' })}` : ''}${modLifetime ? ', lifetime: __lifetime' : ''}${modFont ? ', ...(__font ? { font: __font } : {})' : ''}${modWarning} };`;
 
   // Wrapped, because the body now RETURNS early on a miss rather than falling
   // through to an unconditional success. Async only when a font must load

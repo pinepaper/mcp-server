@@ -310,6 +310,18 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - The npm package starts no process. Four export features use `ffprobe` and `ffmpeg`: checking a saved video against what the studio encoded, joining the cached segments of a `perScene` export (`ffmpeg -f concat`), re-encoding an MP4's Opus soundtrack to AAC (the browser on Linux has no AAC encoder; the video is copied), and, only when asked with `enforceBitrate: true`, re-encoding an MP4 that came out over its `bitrate`. Only the Claude Desktop extension runs them, through a small runner it bundles that allows those two binaries alone, via `execFile` (no shell, argument lists the server writes, absolute paths). From npm, the check is skipped and said so, a `perScene` export runs whole, and an Opus MP4 is kept and named, or refused for a social platform. With `enforceBitrate` the browser's file is delivered and a `bitrateCap` note says why nothing was capped.
 - The server itself fetches the images, SVGs and media a tool call names by URL, and reads local files named by path. URLs that resolve to loopback, private, link-local or reserved addresses are refused, redirects included, and so are cloud metadata addresses. Local files are read only with `PINEPAPER_ALLOW_LOCAL_FILES=1`, and then only from the working directory, the export folder, and folders listed in `PINEPAPER_ASSET_DIRS` (the export folder is readable without the switch). `PINEPAPER_ALLOW_PRIVATE_NETWORK=1` allows local and LAN hosts. Metadata addresses stay refused even with it set.
 
+## What's new in 1.6.41
+
+### Fixed
+
+- A text item wraps to a width from `pinepaper_create_item` and `pinepaper_modify_item`: pass
+  `maxWidth` in canvas pixels (`wrapWidth`, or `wordWrap: true` with `width`, mean the same). A
+  caption longer than a phone frame used to stay on one line, clipped at both edges. The wrapped
+  text keeps the edge it was placed by, and the reply's `textWrap` gives the line count, the
+  bounds, and `overflow` when a single word is wider than the width. `modify_item` with
+  `maxWidth: null` unwraps. `width` alone on a text does not size it, and the reply now says so
+  and names `maxWidth`.
+
 ## What's new in 1.6.40
 
 ### New

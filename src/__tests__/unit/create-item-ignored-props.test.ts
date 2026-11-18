@@ -45,7 +45,9 @@ describe('create_item reports unread properties', () => {
     const all = [...ACCEPTED_CREATE_PARAMS, ...NORMALIZE_PARAM_READS].filter((k) => !['anchor', 'origin', 'position'].includes(k)); // validated / consumed separately
     const circleProps = Object.fromEntries(all.filter((k) => !TEXT_ONLY.includes(k)).map((k) => [k, 1]));
     expect(gen.generateCreateItem({ itemType: 'circle', position: { x: 0, y: 0 }, properties: circleProps })).not.toContain('ignoredProperties');
-    const textProps = Object.fromEntries(all.map((k) => [k, 1]));
+    // width is read by create() for every type, but on text only into the item's authored record: it does not
+    // size the text (TXTWRAP40, measured on production), so text reports it and names maxWidth. text-wrap-40.test.ts.
+    const textProps = Object.fromEntries(all.filter((k) => k !== 'width').map((k) => [k, 1]));
     expect(gen.generateCreateItem({ itemType: 'text', position: { x: 0, y: 0 }, properties: textProps })).not.toContain('ignoredProperties');
   });
 
