@@ -327,8 +327,17 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - An APNG, WebP or JPG export of a scene with a soundtrack says the soundtrack will be missing. It
   used to say the scene lost nothing.
 - `loop: 0` plays an APNG once, as documented. It used to loop forever.
-- `estimateOnly` says what it does not model: a GIF's `maxBytes` budget, and a format the browser
-  cannot encode at that size.
+- `estimateOnly` passes a GIF's `maxBytes` budget to the studio, and says what the studio did not
+  model: the budget, or a format the browser cannot encode at that size.
+- A PNG, WebP, JPG or PDF of a moving scene says the animation will not be in it. It used to say the
+  scene lost nothing.
+- A GIF over its `maxBytes` budget gets one more, smaller try. The warning no longer recommends
+  `quality: "draft"`, which does not make a GIF smaller.
+- A shape or closed path with a gradient fill and no stroke has no stroke. It used to get the
+  studio's default indigo outline, which also left a trail behind a moving shape.
+- `pinepaper_choreograph` sizes a rigged character by its whole figure, not its torso: default
+  heights and arcs are no longer a third of what they should be, and a squash keeps the feet on the
+  ground. `pop` starts from 1% scale instead of 0, so a character's head and limbs come back.
 - `pinepaper_font` `check` on a loaded family that draws none of the given characters says it is
   loaded and draws none of them. It used to say the family was not loaded.
 - An emitter whose `sizes` list is shorter than its `count` says the sizes repeat.

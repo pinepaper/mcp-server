@@ -648,6 +648,14 @@ const item = app.create(${jsLiteral(itemType)}, ${JSON.stringify(params, null, 2
   if (strokeColor && isGradient(strokeColor)) {
     code += generateGradientCode(strokeColor as Gradient, 'item', position, 'strokeColor');
   }
+  // A GRADIENT FILL GETS NO STROKE IT WAS NOT GIVEN (GRADTRAIL37 / GRADRIM36). The gradient is assigned after
+  // create(), which therefore saw no fill, and the studio's path branch gives a path with no fill its default
+  // indigo stroke: a hairline round the shape, and a speckle trail behind it as it moved. Asked-for strokes stand.
+  if (((color && isGradient(color)) || (fillColor && isGradient(fillColor)))
+      && strokeColor === undefined && properties.strokeWidth === undefined && !(itemType === 'path' && !closedPath)) {
+    code += `
+if (item) item.strokeColor = null;`;
+  }
 
   // Add shadow support
   const shadowCode = generateShadowCode(
@@ -6388,7 +6396,7 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
     // What an estimateOnly reply cannot know, said in it rather than implied away.
     const estimateLimits: string[] = [];
     if (format === 'gif' && maxBytes !== undefined) {
-      estimateLimits.push(`the ${maxBytes}-byte GIF budget: the export shrinks the GIF (smaller dimensions, up to three tries) until it fits or reports budget.met: false, so its size and dimensions can differ from this estimate`);
+      estimateLimits.push(`the ${maxBytes}-byte GIF budget: the export shrinks the GIF (smaller dimensions, up to three retries) until it fits or reports budget.met: false, so its size and dimensions can differ from this estimate`);
     }
     if (format === 'mp4' || format === 'webm' || format === undefined || format === 'auto') {
       estimateLimits.push('encoder support: if this browser cannot encode the format at this size, the export delivers another one (format_substituted) and its size differs from this estimate');
@@ -6737,6 +6745,14 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
           warnings.push({ code: 'audio', message: 'A ' + fmt.toUpperCase() + ' carries no audio, so the soundtrack of this scene will be missing. Export mp4 or webm to keep it, or wav for the audio on its own.' });
         }
       } catch (_) { /* no verdict without the audio check */ }
+      // A STILL OF A MOVING SCENE (WEBPFID37). A studio before the fix left webp and jpg out of its still-format rule and
+      // said "loses nothing to webp" for a scene its own check had found animated. Said by code from that same check.
+      try {
+        const __still = ['png', 'webp', 'jpg', 'jpeg', 'pdf'].indexOf(fmt) >= 0;
+        if (__still && r.checked && r.checked.animated === true && !warnings.some(function (w) { return w && w.code === 'animation'; })) {
+          warnings.push({ code: 'animation', message: 'A ' + fmt.toUpperCase() + ' is a single frame, so the animation of this scene will not be in it. Export mp4 or webm for motion, gif or apng for a looping picture.' });
+        }
+      } catch (_) { /* no verdict without the animation check */ }
       return {
         fidelity: {
           available: true,
@@ -6766,7 +6782,9 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
       fps: settings.fps,
       quality,
       width: dimensions.width,
-      height: dimensions.height,${motionBlur ? `
+      height: dimensions.height,${format === 'gif' && maxBytes !== undefined ? `
+      // The studio runs the GIF budget rule over its size model when it is given the budget (ESTGIF37).
+      maxBytes: ${maxBytes},` : ''}${motionBlur ? `
       // The estimate reports renders (frames x subframes) and renderCost.
       motionBlur: ${JSON.stringify(motionBlur)},` : ''}
     });
@@ -6781,7 +6799,15 @@ ${usesCanvasSize ? `  // 'auto': the canvas's own size, with the preset only as 
       // WHAT THE ESTIMATE DOES NOT RUN (ESTGIF37, ESTSUB37). It models the size; it does not run the encoder or the
       // GIF budget, so a GIF with maxBytes (shrunk to fit, up to three tries) and an mp4 the browser cannot encode at
       // this size (delivered as WebM, format_substituted) came back with a size and dimensions the export did not keep.
-      notModelled: ${JSON.stringify(estimateLimits)},
+      // A studio that ran one (est.budget, est.delivery) answered it: only what it did not run is listed.
+      ...(function () {
+        const __nm = ${JSON.stringify(estimateLimits)}.filter(function (l) {
+          if (/GIF budget/.test(l) && est && est.budget) return false;
+          if (/^encoder support/.test(l) && est && est.delivery) return false;
+          return true;
+        });
+        return __nm.length ? { notModelled: __nm } : {};
+      })(),
       ...fidelity(format),
     };
   }
@@ -7277,7 +7303,7 @@ ${stillTime === undefined ? `  if (['png', 'jpg', 'webp', 'svg', 'pdf'].indexOf(
           ${maxBytes !== undefined ? `// A BYTE BUDGET (round 9 GG, 8.31 — email wants <= 1 MB). gif.js has no
           // colour-count knob, so size is the lever: GIF bytes scale roughly with
           // pixel count, so the frame is shrunk by sqrt(budget / size) with a
-          // margin and re-encoded, at most twice. Every attempt is reported.
+          // margin and re-encoded, at most three times. Every attempt is reported.
           if (format === 'gif' && result && result.success && result.size > ${maxBytes}) {
             // THE FILE'S OWN SIZE, from its header (GIFMAX34). The first GIF comes from _quickExportVideo, which
             // may not render at the canvas size, so shrinking "the canvas" could ask for a LARGER frame: a
@@ -7294,7 +7320,8 @@ ${stillTime === undefined ? `  if (['png', 'jpg', 'webp', 'svg', 'pdf'].indexOf(
             const attempts = [{ width: __d0.width, height: __d0.height, bytes: result.size }];
             let best = result, bestDims = __d0;
             let w = __d0.width, h = __d0.height;
-            for (let k = 0; k < 2 && best.size > ${maxBytes}; k++) {
+            // Three retries, not two (GIFMAXLAD37: at a 60 kB budget the third file came out 1.5% over and the loop stopped).
+            for (let k = 0; k < 3 && best.size > ${maxBytes}; k++) {
               const f = Math.sqrt(${maxBytes} / best.size) * 0.9;
               w = Math.max(16, Math.min(bestDims.width - 2, Math.round(bestDims.width * f / 2) * 2));
               h = Math.max(16, Math.min(bestDims.height - 2, Math.round(bestDims.height * f / 2) * 2));
@@ -7318,7 +7345,7 @@ ${stillTime === undefined ? `  if (['png', 'jpg', 'webp', 'svg', 'pdf'].indexOf(
               result.downscaled = { from: { width: dimensions.width, height: dimensions.height }, to: { width: bestDims.width, height: bestDims.height }, reason: bestDims === __d0 ? 'studio' : 'maxBytes' };
             }
             if (result.success && result.size > ${maxBytes}) {
-              result.warning = 'still ' + result.size + ' bytes at ' + bestDims.width + 'x' + bestDims.height + ', the smallest of ' + attempts.length + ' tries — over the ' + ${maxBytes} + '-byte budget. Lower fps, shorten duration, or use quality "draft".';
+              result.warning = 'still ' + result.size + ' bytes at ' + bestDims.width + 'x' + bestDims.height + ', the smallest of ' + attempts.length + ' tries — over the ' + ${maxBytes} + '-byte budget. Lower fps or shorten the duration; the size of a GIF does not follow quality (GIFDRAFT37: draft came out the same size as standard).';
             }
           }` : ''}
         } else if (app.exportEngine && app.exportEngine.videoExporter) {
@@ -14057,9 +14084,14 @@ ${guard}
     __anchorWarnings.push((__poseErr ? 'app.poseAt failed' : 'this studio has no app.poseAt')
       + ', so the roll turns on the picture\\'s half-box, not its drawn radius: a picture with a transparent margin slides as it rolls.');
   }
+  if (__it.data && __it.data.characterRig && !(__pose && __pose.feetBelow > 0)) {
+    __anchorWarnings.push('this studio does not report the character\\'s whole figure (app.poseAt feetBelow), so the beats are sized on the root item (the torso): default heights and arcs come out about a third of the figure\\'s, and a squash plants the torso, not the feet. Update the studio, or give height / arc in px.');
+  }
   const __actor = __pose
     ? { x: __pose.x, y: __pose.y, w: __pose.width, h: __pose.height, sx: __pose.scaleX || 1, sy: __pose.scaleY || 1, rot: isFinite(__pose.rotation) ? __pose.rotation : (__it.rotation || 0) + __baked, hasTrack: __hasTrack,
-        rollRadius: __pose.drawnHeight ? __pose.drawnHeight / 2 : undefined }
+        rollRadius: __pose.drawnHeight ? __pose.drawnHeight / 2 : undefined,
+        // A character root: the whole figure's reach (SQUASHRIG37 / CHOREOHEIGHT37). width/height are the torso's.
+        feetBelow: __pose.feetBelow, headAbove: __pose.headAbove, leftOf: __pose.leftOf, rightOf: __pose.rightOf }
     : { x: __it.position.x, y: __it.position.y,
       w: __b.width / (Math.abs(__sc.x) || 1), h: __b.height / (Math.abs(__sc.y) || 1),
       sx: __sc.x || 1, sy: __sc.y || 1, rot: (__it.rotation || 0) + __baked, hasTrack: __hasTrack };

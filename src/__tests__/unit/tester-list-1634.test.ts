@@ -126,7 +126,7 @@ describe('GIFMAX34: a GIF shrunk for maxBytes says its new size, met or not', ()
     };
     const r = await runExport({ format: 'gif', duration: 1, maxBytes: 20_000 }, app);
     expect(r.budget.met).toBe(false);
-    expect(r.budget.attempts.length).toBe(3);
+    expect(r.budget.attempts.length).toBe(4);
     expect(r.dimensions).toEqual({ width: r.budget.attempts[2].width, height: r.budget.attempts[2].height });
     expect(r.downscaled.to).toEqual(r.dimensions);
     expect(r.warning).toContain('over the 20000-byte budget');
@@ -154,7 +154,7 @@ describe('GIFMAX34: sizes come from the GIF header, and a bigger retry never win
     expect(r.size).toBe(74_000);
     expect(r.dimensions).toEqual({ width: 480, height: 270 });
     expect(r.downscaled).toMatchObject({ to: { width: 480, height: 270 }, reason: 'studio' });
-    expect(r.warning).toContain('the smallest of 3 tries');
+    expect(r.warning).toContain('the smallest of 4 tries');
   });
 });
 

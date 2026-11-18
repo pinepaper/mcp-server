@@ -33,6 +33,12 @@ export interface ChoreoActor {
   hasTrack?: boolean;
   /** The radius a roll turns on: the DRAWN radius of a picture, not its box (ROLLSLIP). */
   rollRadius?: number;
+  /**
+   * A CHARACTER's whole figure, from the root's centre (SQUASHRIG37 / CHOREOHEIGHT37): w/h are the root item's box
+   * (the torso), so a squash kept the torso's bottom planted and the feet sank, and "the actor's height" was a third
+   * of the figure. Absent for a plain item, where each defaults to half its box.
+   */
+  feetBelow?: number; headAbove?: number; leftOf?: number; rightOf?: number;
 }
 export interface ChoreoFrame { x: number; y: number; width: number; height: number }
 export interface ChoreoEvent { time: number; kind: 'pop' | 'whoosh' | 'contact' | 'shake'; strength: number }
@@ -51,6 +57,11 @@ export interface ChoreoResult {
 export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beats: Array<Record<string, any>>): ChoreoResult {
   const VERBS = ['pop', 'drop', 'hop', 'bounce', 'roll', 'fly', 'peek', 'shake', 'squash', 'enter', 'exit'];
   const h = actor.h, w = actor.w;
+  // How far the actor reaches from its centre: its box, or a character's whole figure.
+  const ext = (v: number | undefined, d: number) => (typeof v === 'number' && isFinite(v) && v > 0 ? v : d);
+  const below = ext(actor.feetBelow, h / 2), above = ext(actor.headAbove, h / 2);
+  const leftOf = ext(actor.leftOf, w / 2), rightOf = ext(actor.rightOf, w / 2);
+  const H = above + below, W = leftOf + rightOf;
   const warnings: string[] = [];
   const defaultsUsed: Array<{ beat: number; verb: string; setting: string; value: number; rule: string }> = [];
   const dflt = function (beat: number, verb: string, setting: string, value: number, rule: string) { defaultsUsed.push({ beat: beat, verb: verb, setting: setting, value: Math.round(value * 1000) / 1000, rule: rule }); return value; };
@@ -67,7 +78,7 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
       properties: {
         x: r3(s.x),
         // Keep the BOTTOM where it is while the body squashes or stretches.
-        y: r3(s.y + (h / 2) * (1 - s.fy)),
+        y: r3(s.y + below * (1 - s.fy)),
         scaleX: r3(actor.sx * s.fx),
         scaleY: r3(actor.sy * s.fy),
         rotation: r3(actor.rot + s.rot),
@@ -82,10 +93,10 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
     throw new Error(name + ' must be [x, y] or {x, y}');
   };
   const offEdge = (edge: string, at: { x: number; y: number }) => {
-    if (edge === 'left') return { x: frame.x - w / 2 - 2, y: at.y };
-    if (edge === 'right') return { x: frame.x + frame.width + w / 2 + 2, y: at.y };
-    if (edge === 'top') return { x: at.x, y: frame.y - h / 2 - 2 };
-    if (edge === 'bottom') return { x: at.x, y: frame.y + frame.height + h / 2 + 2 };
+    if (edge === 'left') return { x: frame.x - rightOf - 2, y: at.y };
+    if (edge === 'right') return { x: frame.x + frame.width + leftOf + 2, y: at.y };
+    if (edge === 'top') return { x: at.x, y: frame.y - below - 2 };
+    if (edge === 'bottom') return { x: at.x, y: frame.y + frame.height + above + 2 };
     throw new Error('edge must be left, right, top or bottom (got ' + JSON.stringify(edge) + ')');
   };
   const squashTo = (fy: number) => { s.fy = fy; s.fx = 1 / Math.sqrt(Math.max(fy, 0.05)); };
@@ -129,7 +140,10 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
       started = true;
       if (verb === 'pop') {
         const d = +b.duration || 0.5;
-        squashTo(1); s.fx = 0; s.fy = 0; s.op = 0; key(t, 'linear');
+        // From 1%, not 0 (POPRIG37): the studio passes a character root's scale on to its parts, and a part scaled to 0
+        // cannot be scaled back (its matrix is singular), so the head and limbs never came back. At opacity 0 the 1%
+        // start is invisible either way.
+        squashTo(1); s.fx = 0.01; s.fy = 0.01; s.op = 0; key(t, 'linear');
         ev(t, 'pop', 0.8);
         s.fx = 1.15; s.fy = 1.15; s.op = 1; key(t + d * 0.6, 'easeOut');
         s.fx = 1; s.fy = 1; key(t + d, 'easeInOut');
@@ -141,8 +155,8 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
         // actor at or below its landing line comes in from above the frame —
         // snapping an airborne actor up and off screen first was a visible jump
         // (prod retest, fly → drop).
-        const airborne = s.y < land.y - h / 4;
-        if (!airborne) { s.x = land.x; s.y = frame.y - h; }
+        const airborne = s.y < land.y - H / 4;
+        if (!airborne) { s.x = land.x; s.y = frame.y - below - H / 2; }
         squashTo(airborne ? 1 : 1.15); s.op = 1; key(t, 'linear');
         s.x = land.x; s.y = land.y; squashTo(1.15); key(t + d * 0.7, 'easeIn');
         ev(t + d * 0.72, 'contact', 1);
@@ -154,7 +168,7 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
         const d = +b.duration || 0.7;
         const from = { x: s.x, y: s.y };
         const dest = to || from;
-        const height = b.height !== undefined ? +b.height : dflt(i, verb, 'height', h * 1.2, "1.2 x the actor's height, in px");
+        const height = b.height !== undefined ? +b.height : dflt(i, verb, 'height', H * 1.2, "1.2 x the actor's height, in px");
         squashTo(1); key(t, 'linear');
         squashTo(0.8); key(t + d * 0.15, 'easeOut');                         // anticipation
         ev(t + d * 0.2, 'whoosh', 0.35);
@@ -162,14 +176,14 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
         s.x = (from.x + dest.x) / 2; s.y = Math.min(from.y, dest.y) - height; squashTo(1); key(t + d * 0.5, 'easeOut');  // apex
         s.x = from.x + (dest.x - from.x) * 0.8; s.y = dest.y - height * 0.45; squashTo(1.12); key(t + d * 0.7, 'easeIn');
         s.x = dest.x; s.y = dest.y; squashTo(0.75); key(t + d * 0.82, 'easeIn');   // contact
-        ev(t + d * 0.82, 'contact', Math.min(1, height / Math.max(1, h * 1.5)));
+        ev(t + d * 0.82, 'contact', Math.min(1, height / Math.max(1, H * 1.5)));
         squashTo(1.06); key(t + d * 0.92, 'easeOut');
         squashTo(1); key(t + d, 'easeInOut');                                 // settle
         t += d;
       } else if (verb === 'bounce') {
         const times = Math.max(1, Math.round(+b.times || 3));
         const decay = b.decay !== undefined ? Math.min(0.95, Math.max(0.1, +b.decay)) : 0.6;
-        let height = b.height !== undefined ? +b.height : dflt(i, verb, 'height', h * 1.5, "1.5 x the actor's height, in px");
+        let height = b.height !== undefined ? +b.height : dflt(i, verb, 'height', H * 1.5, "1.5 x the actor's height, in px");
         const per = (+b.duration || times * 0.5) / times;
         const from = { x: s.x, y: s.y };
         const dest = to || from;
@@ -183,7 +197,7 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
           s.x = gx(f0); s.y = gy(f0); squashTo(0.78); key(t + per * 0.08, 'easeOut');
           s.x = gx((f0 + f1) / 2); s.y = gy((f0 + f1) / 2) - height; squashTo(1.08); key(t + per * 0.5, 'easeOut');
           s.x = gx(f1); s.y = gy(f1); squashTo(1.1); key(t + per * 0.95, 'easeIn');
-          ev(t + per * 0.95, 'contact', Math.min(1, height / Math.max(1, h * 1.5)));
+          ev(t + per * 0.95, 'contact', Math.min(1, height / Math.max(1, H * 1.5)));
           t += per;
           height *= decay;
         }
@@ -199,7 +213,7 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
         // Rolling without slipping: angle = distance / radius; y-down, so rolling right turns clockwise (+).
         // The drawn radius when the studio measured one (a disc on a PNG with a
         // margin rolled by its half-box and slid 9.1%, ROLLSLIP); else the box.
-        const rr = actor.rollRadius && actor.rollRadius > 0 ? actor.rollRadius : h / 2;
+        const rr = actor.rollRadius && actor.rollRadius > 0 ? actor.rollRadius : below;
         s.rot += (dist / Math.max(1, rr)) * (180 / Math.PI);
         key(t + d, 'easeInOut');
         t += d;
@@ -207,7 +221,7 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
         const d = +b.duration || 1.2;
         if (!to) throw new Error('beat ' + i + ': fly needs to: [x, y]');
         const from = { x: s.x, y: s.y };
-        const arc = b.arc !== undefined ? +b.arc : dflt(i, verb, 'arc', h * 2, "2 x the actor's height, in px");
+        const arc = b.arc !== undefined ? +b.arc : dflt(i, verb, 'arc', H * 2, "2 x the actor's height, in px");
         const cx = (from.x + to.x) / 2, cy = Math.min(from.y, to.y) - arc;
         const tilt = Math.max(-18, Math.min(18, (to.x - from.x) / Math.max(1, frame.width) * 40));
         const r0 = s.rot;
@@ -231,8 +245,8 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
         const d = +b.duration || 0.5;
         const anchor = to || { x: s.x, y: s.y };
         const off = offEdge(edge, anchor);
-        const showX = edge === 'left' ? off.x + w * amount : edge === 'right' ? off.x - w * amount : off.x;
-        const showY = edge === 'top' ? off.y + h * amount : edge === 'bottom' ? off.y - h * amount : off.y;
+        const showX = edge === 'left' ? off.x + W * amount : edge === 'right' ? off.x - W * amount : off.x;
+        const showY = edge === 'top' ? off.y + H * amount : edge === 'bottom' ? off.y - H * amount : off.y;
         s.x = off.x; s.y = off.y; squashTo(1); s.op = 1; key(t, 'linear');
         s.x = showX; s.y = showY; key(t + d, 'easeOut');
         key(t + d + hold, 'linear');
@@ -240,7 +254,7 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
         t += d * 2 + hold;
       } else if (verb === 'shake') {
         const d = +b.duration || 0.4;
-        const amp = b.intensity !== undefined ? +b.intensity : dflt(i, verb, 'intensity', Math.max(2, w * 0.08), "8% of the actor's width, in px (at least 2)");
+        const amp = b.intensity !== undefined ? +b.intensity : dflt(i, verb, 'intensity', Math.max(2, W * 0.08), "8% of the actor's width, in px (at least 2)");
         const x0 = s.x;
         key(t, 'linear');
         ev(t, 'shake', 0.6);
