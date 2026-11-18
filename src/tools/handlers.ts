@@ -191,7 +191,7 @@ import { ZodError, z } from 'zod';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { effectClass } from './effect-class.js';
 import { capabilityAllowed, capabilityRefusal, CAPABILITY_SWITCH } from '../utils/capabilities.js';
-import { exportFileReceiptOrReason, receiptErrorLine, deliverAacIfOpus, type AudioDelivery } from './export-file-receipt.js';
+import { exportFileReceiptOrReason, receiptErrorLine, deliverAacIfOpus, hasFfmpeg, type AudioDelivery } from './export-file-receipt.js';
 import { enforceBitrateCap, relabelForReencode, bitrateCapFields, bitrateCapLine, bitrateCapNoFile } from './export-bitrate-cap.js';
 import { ExportStepError, errorText, verifySavedFile, writeStep, bytesForSave } from './export-file-check.js';
 import { EFFECT_BEFORE_JS, effectAfterJs, namedItemIds, idMayBeGone, NO_CHANGE_NOTE } from './effect-check.js';
@@ -5045,7 +5045,13 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
             });
           }
         }
-        const code = codeGenerator.generateAgentExport(input);
+        // audioCodec: 'aac' WITH ffmpeg here (B45): the studio is not told to refuse an Opus soundtrack; the saved
+        // file's audio is re-encoded to AAC (deliverAacIfOpus), and only a failed re-encode refuses. Without ffmpeg
+        // the studio refuses before its first frame, as before. Code mode keeps the studio's refusal: nothing here
+        // would run on its file.
+        const aacByFfmpeg = input.audioCodec === 'aac' && options.executeInBrowser === true
+          && (options.executionMode ?? getExecutionMode()) !== 'code' && await hasFfmpeg();
+        const code = codeGenerator.generateAgentExport(aacByFfmpeg ? { ...input, audioCodec: undefined } : input);
         const description = `Smart export for ${input.platform} as ${input.format || 'auto'}`;
 
         // In code mode, return generated code as usual
@@ -5161,7 +5167,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
               },
               input.platform || 'auto'
             );
-            const delivery = await deliverAacIfOpus(filePath, format, exportResult, input.platform);
+            const delivery = await deliverAacIfOpus(filePath, format, exportResult, input.platform, { requireAac: aacByFfmpeg });
             if (delivery.action === 'refuse') {
               await (await import('node:fs/promises')).unlink(filePath).catch(() => undefined);
               return errorResult(ErrorCodes.EXECUTION_ERROR, delivery.message, { code: 'audio_codec_unavailable', format, platform: input.platform }, { toolName: 'pinepaper_agent_export' });
@@ -5239,7 +5245,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
         if (shouldSaveToFile) {
           try {
             const { filePath, fileSize: savedSize } = await saveExportToFile(data, format, input.platform || 'auto');
-            const delivery = await deliverAacIfOpus(filePath, format, exportResult, input.platform);
+            const delivery = await deliverAacIfOpus(filePath, format, exportResult, input.platform, { requireAac: aacByFfmpeg });
             if (delivery.action === 'refuse') {
               await (await import('node:fs/promises')).unlink(filePath).catch(() => undefined);
               return errorResult(ErrorCodes.EXECUTION_ERROR, delivery.message, { code: 'audio_codec_unavailable', format, platform: input.platform }, { toolName: 'pinepaper_agent_export' });

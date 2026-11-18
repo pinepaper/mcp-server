@@ -59,4 +59,28 @@ describe('B45 option D: Opus-in-MP4 is re-encoded to AAC where ffmpeg runs, refu
     expect(readFileSync(f, 'utf8')).toBe('OPUS-BYTES');
     expect(existsSync(f.replace(/\.mp4$/, '.aac-remux.mp4'))).toBe(false);
   });
+
+  it("audioCodec: 'aac' met by the re-encode: transcoded on any platform, refused (by the ask, not a platform) if it fails", async () => {
+    setFfmpegRunner(async (_cmd, args) => {
+      if (args[0] === '-version') return { ok: true, stdout: 'ffmpeg', stderr: '' };
+      writeFileSync(args[args.length - 1], 'AAC-BYTES');
+      return { ok: true, stdout: '', stderr: '' };
+    });
+    expect((await deliverAacIfOpus(file(), 'mp4', opusResult, 'web', { requireAac: true })).action).toBe('transcoded');
+    setFfmpegRunner(async (_c, args) => (args[0] === '-version' ? { ok: true, stdout: '', stderr: '' } : { ok: false, stdout: '', stderr: 'boom' }));
+    const f = file();
+    const r = await deliverAacIfOpus(f, 'mp4', opusResult, 'web', { requireAac: true });
+    expect(r.action).toBe('refuse');
+    if (r.action === 'refuse') { expect(r.message).toContain("audioCodec: 'aac' was asked for"); expect(r.message).not.toContain('for web'); }
+    expect(readFileSync(f, 'utf8')).toBe('OPUS-BYTES');
+  });
+  it('without the add-on, the refusal and the kept-Opus note name the add-on that turns the re-encode on', async () => {
+    setFfmpegRunner(null);
+    const r = await deliverAacIfOpus(file(), 'mp4', opusResult, 'instagram');
+    if (r.action === 'refuse') expect(r.message).toContain('@pinepaper.studio/mcp-ffmpeg');
+    const k = await deliverAacIfOpus(file(), 'mp4', opusResult, 'web');
+    if (k.action === 'kept-opus') expect(k.note).toContain('npx -p @pinepaper.studio/mcp-server -p @pinepaper.studio/mcp-ffmpeg pinepaper-mcp');
+    expect(r.action).toBe('refuse');
+    expect(k.action).toBe('kept-opus');
+  });
 });

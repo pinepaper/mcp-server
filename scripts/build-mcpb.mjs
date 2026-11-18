@@ -15,7 +15,7 @@
  * (capability-footprint.test.ts), because the npm package is what supply-chain
  * scores read.
  *
- * THE FFMPEG RUNNER (packages/mcp-ffmpeg, never published) is copied into
+ * THE FFMPEG RUNNER (packages/mcp-ffmpeg; also on npm as an opt-in add-on, never a dependency) is copied into
  * the bundle's node_modules for the same reason: the npm package starts no
  * process, the bundle can.
  *

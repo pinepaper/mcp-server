@@ -1,8 +1,7 @@
 {
   "name": "@pinepaper.studio/mcp-ffmpeg",
   "version": "1.0.0",
-  "private": true,
-  "description": "Internal, never published: the ffmpeg / ffprobe runner the Claude Desktop extension (.mcpb) bundles beside @pinepaper.studio/mcp-server. The npm package runs no external programs.",
+  "description": "Optional add-on for @pinepaper.studio/mcp-server: the only code that starts ffmpeg / ffprobe (from PATH, via execFile, no shell). Install it beside the server to turn on AAC delivery for MP4s made on Linux, the saved-file check, per-scene caching and bitrate caps. Contains no FFmpeg.",
   "type": "module",
   "main": "index.js",
   "types": "index.d.ts",
@@ -32,6 +31,10 @@
   "keywords": [
     "pinepaper",
     "mcp",
-    "ffmpeg"
-  ]
+    "ffmpeg",
+    "ffprobe"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }
