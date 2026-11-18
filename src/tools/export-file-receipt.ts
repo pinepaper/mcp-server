@@ -113,6 +113,9 @@ async function run(cmd: 'ffprobe' | 'ffmpeg', args: string[], timeout = 30_000):
   return r(cmd, args, timeout);
 }
 
+/** The same runner, for the other files that start ffmpeg or ffprobe (export-bitrate-cap.ts): one door, one set of rules. */
+export const runFfmpegTool = run;
+
 /** ffprobe's codec_name for a studio codec string (avc1.* is h264, vp09.* is vp9). */
 function codecFamily(codec: string): string {
   const c = codec.toLowerCase();
