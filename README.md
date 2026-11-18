@@ -317,7 +317,8 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - `pinepaper_agent_export` takes `enforceBitrate: true` for mp4, used with `bitrate`. The browser's
   encoder treats `bitrate` as a target and exceeds it on dense scenes (a 100,000-mark swarm came out
   at 43 Mbps whatever was asked). With this on, a file over the cap is re-encoded with ffmpeg
-  (libx264, `maxrate` = the bitrate, yuv420p, `+faststart`; the audio is copied untouched) and
+  (libx264, `maxrate` = the bitrate, the browser file's colour range and tags kept (a full-range
+  `yuvj420p` file stays full range), `+faststart`; the audio is copied untouched) and
   replaces the browser's file only if the result is smaller, the same length and frame count, and
   has the same audio streams. It is opt-in because it costs quality on dense scenes: fine detail
   smears, and the reply's `bitrateCap` gives the bitrate before and after, the time taken, and an
@@ -326,7 +327,10 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   `bitrate`, without ffmpeg, or for another format the export is not failed: the browser's file is
   delivered and `bitrateCap` says why no cap was enforced. A re-encoded file is not the browser's
   encode: `file.sha256` is the delivered file's, and the browser encode's `bitExact`,
-  `determinism`, `frameHashes` and `achievedBitrate` move under `video.browserEncode`. The
+  `determinism`, `frameHashes` and `achievedBitrate` move under `video.browserEncode`, with the
+  browser's `encode`, `size` and probe; `video.encode`, `file.probe`, `size` and the `audio` block
+  describe the delivered file (the `audio` figures that were measured on the browser's mp4 say so).
+  Bitrate and determinism warnings are marked as being about the browser's file. The
   provenance comment is carried over unchanged and does not mention the re-encode.
 - A rendered soundtrack (`pinepaper_sound` `render_soundtrack`, or a `wav` export) says where its
   sound actually ends: `soundingEnd` for the whole mix and for each cue in `sounds`, on studios that
