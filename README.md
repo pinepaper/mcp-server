@@ -307,23 +307,10 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - Code an agent writes runs with whatever that browser page has. Give this server the same trust you would give anything else you let write and run code on your machine — which is the trust you already extend to an MCP client with tool access.
 - Puppeteer mode launches Chrome with `--no-sandbox` and `--disable-setuid-sandbox`. That is routine for headless automation and it does weaken Chrome's own process sandbox. If that matters where you are running it, use `code` mode or put the server in a container.
 - Puppeteer itself is not a dependency at all (it was an optional peer until 1.6.25), kept out of the tree precisely because a headless browser plus an install script is what scanners flag hardest. Install it only if you want the executing mode. The server loads it only from where its own dependencies would be found (the same `npx` call, a global install, a project install) or from a folder you name in `PINEPAPER_PUPPETEER_FROM`; never from the folder it happens to be started in. puppeteer 22 or newer is required.
-- The npm package starts no process. Four export features use `ffprobe` and `ffmpeg`: checking a saved video against what the studio encoded, joining the cached segments of a `perScene` export (`ffmpeg -f concat`), re-encoding an MP4's Opus soundtrack to AAC (the browser on Linux has no AAC encoder; the video is copied), and, only when asked with `enforceBitrate: true`, re-encoding an MP4 that came out over its `bitrate`. They run through a small runner, `@pinepaper.studio/mcp-ffmpeg`, that allows those two binaries alone, via `execFile` (no shell, argument lists the server writes, absolute paths). The Claude Desktop extension bundles it. The npm server does not depend on it: install it beside the server to opt in (`npx -p @pinepaper.studio/mcp-server -p @pinepaper.studio/mcp-ffmpeg pinepaper-mcp`, or `npm install @pinepaper.studio/mcp-ffmpeg` where the server is installed), with ffmpeg on PATH. Without it, the check is skipped and said so, a `perScene` export runs whole, and an Opus MP4 is kept and named, or refused for a social platform. With `enforceBitrate` the browser's file is delivered and a `bitrateCap` note says why nothing was capped.
+- The npm package starts no process. Four export features use `ffprobe` and `ffmpeg`: checking a saved video against what the studio encoded, joining the cached segments of a `perScene` export (`ffmpeg -f concat`), re-encoding an MP4's Opus soundtrack to AAC (the browser on Linux has no AAC encoder; the video is copied), and, only when asked with `enforceBitrate: true`, re-encoding an MP4 that came out over its `bitrate`. Only the Claude Desktop extension runs them, through a small runner it bundles that allows those two binaries alone, via `execFile` (no shell, argument lists the server writes, absolute paths). From npm, the check is skipped and said so, a `perScene` export runs whole, and an Opus MP4 is kept and named, or refused for a social platform. With `enforceBitrate` the browser's file is delivered and a `bitrateCap` note says why nothing was capped.
 - The server itself fetches the images, SVGs and media a tool call names by URL, and reads local files named by path. URLs that resolve to loopback, private, link-local or reserved addresses are refused, redirects included, and so are cloud metadata addresses. Local files are read only with `PINEPAPER_ALLOW_LOCAL_FILES=1`, and then only from the working directory, the export folder, and folders listed in `PINEPAPER_ASSET_DIRS` (the export folder is readable without the switch). `PINEPAPER_ALLOW_PRIVATE_NETWORK=1` allows local and LAN hosts. Metadata addresses stay refused even with it set.
 
 ## What's new in 1.6.41
-
-### New
-
-- An MP4 with sound exported on Linux can be delivered with AAC audio from the npm server, not only
-  from the Claude Desktop extension. Chromium on Linux has no AAC encoder, so the soundtrack comes
-  out as Opus, which WhatsApp, Instagram and many players reject. Install the optional add-on
-  `@pinepaper.studio/mcp-ffmpeg` beside the server
-  (`npx -p @pinepaper.studio/mcp-server -p @pinepaper.studio/mcp-ffmpeg pinepaper-mcp`), with ffmpeg
-  on PATH: the audio is then re-encoded to AAC with the video copied, `instagram` and the other
-  social platforms deliver instead of refusing, and `audioCodec: 'aac'` is met by the re-encode
-  (refused only if it fails). The add-on also turns on the saved-file check, `perScene` caching and
-  `enforceBitrate`. The server package itself still starts no programs; installing the add-on is
-  the opt-in.
 
 ### Fixed
 
@@ -348,8 +335,7 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   has the same audio streams. It is opt-in because it costs quality on dense scenes: fine detail
   smears, and the reply's `bitrateCap` gives the bitrate before and after, the time taken, and an
   SSIM figure against the browser's file (measured on the first 10 s; a warning below 0.9). It
-  needs ffmpeg: the Claude Desktop extension runs it, and the npm server does with the optional
-  `@pinepaper.studio/mcp-ffmpeg` add-on installed, when ffmpeg is on PATH. Without a
+  needs ffmpeg, so only the Claude Desktop extension runs it, when ffmpeg is on PATH. Without a
   `bitrate`, without ffmpeg, or for another format the export is not failed: the browser's file is
   delivered and `bitrateCap` says why no cap was enforced. A re-encoded file is not the browser's
   encode: `file.sha256` is the delivered file's, and the browser encode's `bitExact`,

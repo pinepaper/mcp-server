@@ -79,9 +79,8 @@ export function probeFromResult(exportResult: unknown): ProbeSummary | null {
 
 let ffprobeAvailable: boolean | null = null;
 /**
- * ffprobe and ffmpeg run through packages/mcp-ffmpeg (@pinepaper.studio/mcp-ffmpeg), an optional add-on that is not a
- * dependency: the Claude Desktop extension (.mcpb) bundles it, and an npm user opts in by installing it beside the
- * server (B45, 1.6.41). So the server package itself starts no process. The runner allows only those two
+ * ffprobe and ffmpeg run through packages/mcp-ffmpeg, which is never published: only the Claude Desktop extension
+ * (.mcpb) carries it, in its node_modules. So the npm package starts no process. The runner allows only those two
  * binaries, through execFile (no shell), with the arguments array this file writes; file paths are made absolute
  * first, so none can be read as an option (a leading `-`) or an ffmpeg protocol (`concat:`, `http:`). Without it both
  * are unavailable: the receipt says the file was not read back, and a per-scene export runs whole. Turn the
@@ -90,11 +89,6 @@ let ffprobeAvailable: boolean | null = null;
  * The specifier is a variable so a bundler does not try to resolve a package that is not a dependency.
  */
 export const FFMPEG_ADDON = '@pinepaper.studio/mcp-ffmpeg';
-/**
- * How a caller turns ffmpeg on outside the Desktop extension (B45): install the add-on beside the server. Installing it
- * IS the opt-in; the server package itself stays free of process code. One sentence, so every message names it alike.
- */
-export const FFMPEG_OPT_IN = `the Claude Desktop extension runs it, and so does the npm server once the optional add-on ${FFMPEG_ADDON} is installed beside it (npx -p @pinepaper.studio/mcp-server -p ${FFMPEG_ADDON} pinepaper-mcp, or npm install ${FFMPEG_ADDON} where the server is installed) with ffmpeg on PATH`;
 type Runner = (cmd: 'ffprobe' | 'ffmpeg', args: string[], timeout?: number) => Promise<{ ok: boolean; stdout: string; stderr: string }>;
 let runner: Runner | null | undefined;
 /** Tests replace the runner; undefined goes back to loading the add-on. */
@@ -115,7 +109,7 @@ async function loadRunner(): Promise<Runner | null> {
 export async function hasFfmpegAddon(): Promise<boolean> { return (await loadRunner()) !== null; }
 async function run(cmd: 'ffprobe' | 'ffmpeg', args: string[], timeout = 30_000): Promise<{ ok: boolean; stdout: string; stderr: string }> {
   const r = await loadRunner();
-  if (!r) return { ok: false, stdout: '', stderr: `${cmd} is not run by the npm package on its own (it starts no external programs); ${FFMPEG_OPT_IN}` };
+  if (!r) return { ok: false, stdout: '', stderr: `${cmd} is not run by the npm package (it starts no external programs); the Claude Desktop extension runs it` };
   return r(cmd, args, timeout);
 }
 
@@ -144,7 +138,7 @@ export async function verifyWithFfprobe(filePath: string, probe: ProbeSummary): 
   if (!ffprobeAvailable) {
     return { tool: null, reason: (await hasFfmpegAddon())
       ? 'ffprobe is not on PATH, so the file was not read back; the summary is what the studio encoded'
-      : `the file was not read back with ffprobe (the npm package on its own runs no external programs; ${FFMPEG_OPT_IN}); the summary is what the studio encoded` };
+      : 'the file was not read back: the npm package runs no external programs (the Claude Desktop extension checks a saved video with ffprobe); the summary is what the studio encoded' };
   }
   const r = await run('ffprobe', ['-v', 'error', '-show_entries',
     'format=format_name,duration:stream=codec_type,codec_name,width,height,r_frame_rate,nb_frames', '-of', 'json', resolvePath(filePath)]);
@@ -297,12 +291,9 @@ export type AudioDelivery =
   | { action: 'kept-opus'; note: string }
   | { action: 'refuse'; message: string };
 
-export async function deliverAacIfOpus(filePath: string, format: string, exportResult: unknown, platform: string | undefined, opts: { requireAac?: boolean } = {}): Promise<AudioDelivery> {
+export async function deliverAacIfOpus(filePath: string, format: string, exportResult: unknown, platform: string | undefined): Promise<AudioDelivery> {
   if (!isOpusMp4(format, exportResult)) return { action: 'none' };
-  // audioCodec: 'aac' met by this re-encode (B45): the studio was not told to refuse, so a failed re-encode refuses here.
-  const requireAac = opts.requireAac === true;
-  const shareReady = requireAac || (!!platform && SHARE_READY_PLATFORMS.has(platform));
-  const asked = requireAac ? "audioCodec: 'aac' was asked for" : `${platform} needs H.264 + AAC in MP4`;
+  const shareReady = !!platform && SHARE_READY_PLATFORMS.has(platform);
   if (await hasFfmpeg()) {
     const before = await sha256OfFile(filePath);
     const tmp = filePath.replace(/\.mp4$/i, '') + '.aac-remux.mp4';
@@ -315,10 +306,10 @@ export async function deliverAacIfOpus(filePath: string, format: string, exportR
     }
     await (await import('node:fs/promises')).unlink(tmp).catch(() => undefined);
     if (!shareReady) return { action: 'kept-opus', note: `the audio is Opus (this browser has no AAC encoder) and re-encoding it to AAC failed: ${r.stderr.trim() || 'ffmpeg gave no reason'}. The file plays in browsers; WhatsApp and many players reject it.` };
-    return { action: 'refuse', message: `refused${requireAac ? '' : ` for ${platform}`}: the audio could only be Opus and re-encoding it to AAC failed (${r.stderr.trim() || 'no reason'}), and ${asked}.` };
+    return { action: 'refuse', message: `refused for ${platform}: the audio could only be Opus and re-encoding it to AAC failed (${r.stderr.trim() || 'no reason'}), and ${platform} needs H.264 + AAC in MP4.` };
   }
   if (shareReady) {
-    return { action: 'refuse', message: `refused for ${platform}: this machine's browser has no AAC encoder (Chromium on Linux has none), so the soundtrack could only be Opus, which ${platform} and WhatsApp-class players reject, and this server cannot re-encode it here (the npm package on its own runs no external programs; ${FFMPEG_OPT_IN}). Export WebM (browsers play it; WhatsApp still wants H.264 + AAC in MP4), export without sound, or re-encode yourself: ffmpeg -i in.mp4 -c:v copy -c:a aac out.mp4.` };
+    return { action: 'refuse', message: `refused for ${platform}: this machine's browser has no AAC encoder (Chromium on Linux has none), so the soundtrack could only be Opus, which ${platform} and WhatsApp-class players reject, and this server cannot re-encode it (the npm package runs no external programs; the Claude Desktop extension re-encodes with ffmpeg). Export WebM (browsers play it; WhatsApp still wants H.264 + AAC in MP4), export without sound, or re-encode yourself: ffmpeg -i in.mp4 -c:v copy -c:a aac out.mp4.` };
   }
-  return { action: 'kept-opus', note: 'the audio is Opus (this browser has no AAC encoder; Chromium on Linux has none). The file plays in browsers; WhatsApp and many players reject it. To have it re-encoded to AAC automatically: ' + FFMPEG_OPT_IN + '. Or by hand: ffmpeg -i in.mp4 -c:v copy -c:a aac out.mp4.' };
+  return { action: 'kept-opus', note: 'the audio is Opus (this browser has no AAC encoder; Chromium on Linux has none). The file plays in browsers; WhatsApp and many players reject it. The Claude Desktop extension re-encodes it to AAC automatically; elsewhere: ffmpeg -i in.mp4 -c:v copy -c:a aac out.mp4.' };
 }

@@ -33,7 +33,7 @@
  */
 import { rename, unlink } from 'node:fs/promises';
 import { basename, dirname, extname, join, resolve as resolvePath } from 'node:path';
-import { FFMPEG_OPT_IN, hasFfmpeg, hasFfmpegAddon, runFfmpegTool, sha256OfFile } from './export-file-receipt.js';
+import { hasFfmpeg, hasFfmpegAddon, runFfmpegTool, sha256OfFile } from './export-file-receipt.js';
 
 export const MIN_CAP_BPS = 100_000;
 export const MAX_CAP_BPS = 200_000_000;
@@ -250,7 +250,7 @@ export async function enforceBitrateCap(filePath: string, format: string, req: B
     if (!(await hasFfmpeg())) {
       return skipped('ffmpeg_unavailable', (await hasFfmpegAddon())
         ? 'ffmpeg is not on PATH, and the re-encode needs it'
-        : `the re-encode needs ffmpeg, which the npm package does not run on its own (it starts no external programs); ${FFMPEG_OPT_IN}`);
+        : "the re-encode needs ffmpeg, which the npm package does not run (it starts no external programs); the Claude Desktop extension runs it when ffmpeg is on PATH");
     }
     const probed = await probeFile(filePath);
     if (!probed.ok) return skipped('file_unreadable', `ffprobe could not read the file (${probed.reason}), so it could not be measured against the cap`);

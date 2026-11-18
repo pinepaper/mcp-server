@@ -23,7 +23,7 @@ import { mkdir, stat, copyFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { CallToolResult } from '../mcp/index.js';
-import { FFMPEG_OPT_IN, hasFfmpeg, hasFfmpegAddon, segmentStreams, concatSegments, muxAudio, muxSilence } from './export-file-receipt.js';
+import { hasFfmpeg, hasFfmpegAddon, segmentStreams, concatSegments, muxAudio, muxSilence } from './export-file-receipt.js';
 import { exportFileLink } from '../utils/export-dir.js';
 
 interface ChainEntry { sceneId: string; duration: number; transition: string | null; cutSound: boolean }
@@ -129,7 +129,7 @@ export async function exportPerScene(args: Record<string, unknown>, format: stri
   if (!(await ff.available())) {
     return whole((deps.ffmpeg || await hasFfmpegAddon())
       ? 'ffmpeg is not on PATH, and the segments are joined with it (install ffmpeg to cache per scene)'
-      : `the segments are joined with ffmpeg, which the npm package does not run on its own (it starts no external programs); ${FFMPEG_OPT_IN}`);
+      : 'the segments are joined with ffmpeg, which the npm package does not run (it starts no external programs); the Claude Desktop extension caches per scene when ffmpeg is on PATH');
   }
 
   let scenesById = new Map<string, unknown>();

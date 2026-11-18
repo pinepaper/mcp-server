@@ -13,9 +13,9 @@
  * - Locale files load from a table of literal imports, so a locale name never becomes a module path.
  * - The environment is read only in utils/env.ts, once, for a name on its list (and one literal read in
  *   safe-fetch.ts). Not one literal read per name: Socket counts each read as a finding.
- * - The package starts no process. ffprobe and ffmpeg run through packages/mcp-ffmpeg (@pinepaper.studio/mcp-ffmpeg),
- *   which the .mcpb bundles and an npm user installs beside the server to opt in (published on its own since 1.6.41);
- *   it is never a dependency. The add-on runs those two binaries only, via execFile (no shell).
+ * - The package starts no process. ffprobe and ffmpeg run through packages/mcp-ffmpeg, which is never published
+ *   (private) and only the .mcpb bundles; it is never a dependency. The add-on runs those two binaries only, via
+ *   execFile (no shell).
  * - No eval, new Function, Function(), vm, inspector, debugger, Reflect, or require() in the source.
  */
 import { describe, expect, test } from 'bun:test';
@@ -124,12 +124,7 @@ describe('supply-chain surface', () => {
     expect(Object.keys(pkg.optionalDependencies ?? {})).not.toContain('@pinepaper.studio/mcp-ffmpeg');
     const receipt = readFileSync(join(ROOT, 'src', 'tools', 'export-file-receipt.ts'), 'utf8');
     expect(receipt).toMatch(/const spec = FFMPEG_ADDON;[\s\S]*await import\(spec\)/);
-    // Published on its own since 1.6.41 (B45): installing it beside the server is how an npm user opts in. It stays
-    // out of the server's dependencies (above), so the server package itself carries no process code.
-    const addonPkg = JSON.parse(readFileSync(join(ROOT, 'packages', 'mcp-ffmpeg', 'package.json'), 'utf8'));
-    expect(addonPkg.private).toBeUndefined();
-    expect(addonPkg.publishConfig).toEqual({ access: 'public' });
-    expect(Object.keys(pkg.peerDependencies ?? {})).not.toContain('@pinepaper.studio/mcp-ffmpeg');
+    expect(JSON.parse(readFileSync(join(ROOT, 'packages', 'mcp-ffmpeg', 'package.json'), 'utf8')).private).toBe(true);
     const addon = readFileSync(join(ROOT, 'packages', 'mcp-ffmpeg', 'index.js'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
     expect(addon).toMatch(/import \{ execFile \} from 'node:child_process'/);
     expect(addon).not.toMatch(/\b(exec|execSync|spawn|spawnSync|fork)\b\s*\(/);
