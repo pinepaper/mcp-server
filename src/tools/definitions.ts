@@ -3661,7 +3661,7 @@ RELATION TYPES:
 - parallax: Move relative by depth (params: depth, origin)
 - bounds_to: Stay within bounds (params: padding, bounce)
 - anchored_in_world: Pin the item to a 3D world position so it tracks the world camera.
-- spring_follow: Follow with spring dynamics rather than smoothing — it overshoots and settles. stiffness and damping shape it, and a heavier mass is slower and overshoots more. Some studio builds ignore mass when stiffness and damping are both at or below 1: check the motion if mass matters.
+- spring_follow: Follow with spring dynamics rather than smoothing — it can overshoot and settle. stiffness (0-1) sets how quick the spring is; damping is a damping ratio (1 = critical: at 1 or above it settles without overshooting, below 1 it overshoots more the lower it goes); a heavier mass is slower. Older studio builds differ: some let a heavy mass overshoot even at damping 1 or above, and some ignore mass: check the motion if it matters.
 - repels: Move away from the target inside a radius and ease back when it leaves (params: force, maxDistance, minDistance, returnSpeed). Crowd avoidance, and reacting to a cursor without being dragged by it.
 - wiggle: Continuous procedural noise on the item. Richer than a sine: it does not repeat visibly.
 - syncs_with: Run the source's animation on the TARGET's timeline (params: offset, speedRatio) — they share a clock and stay in step even when the target's timing changes, which merely starting together does not give you.

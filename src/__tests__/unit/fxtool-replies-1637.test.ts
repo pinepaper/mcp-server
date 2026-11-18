@@ -55,3 +55,13 @@ describe('FILTKEY35: a studio that reports its own dead keys judges filter setti
     expect(code).toContain("if (typeof app._reportUnanimatedKeys === 'function') return [];");
   });
 });
+
+describe('paletteMap swatches must be pairs', () => {
+  it('refuses a plain colour list on apply and chain, accepts pairs', async () => {
+    const { ImageFilterInputSchema } = await import('../../types/schemas.js');
+    expect(() => ImageFilterInputSchema.parse({ action: 'apply', itemId: 'i', filterName: 'paletteMap', params: { swatches: ['#f00', '#00f'] } })).toThrow(/from, to\} pairs/);
+    expect(() => ImageFilterInputSchema.parse({ action: 'chain', itemId: 'i', filters: [{ name: 'paletteMap', params: { swatches: ['#f00'] } }] })).toThrow(/from, to\} pairs/);
+    expect(ImageFilterInputSchema.parse({ action: 'apply', itemId: 'i', filterName: 'paletteMap', params: { swatches: [{ from: '#f00', to: '#0f0' }] } })).toBeTruthy();
+    expect(ImageFilterInputSchema.parse({ action: 'apply', itemId: 'i', filterName: 'brightness', params: { value: 10 } })).toBeTruthy();
+  });
+});

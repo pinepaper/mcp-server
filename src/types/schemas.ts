@@ -4102,6 +4102,17 @@ export const ImageFilterInputSchema = z.object({
   ]).optional().describe("recolor_palette: {from,to}[] or {'#old':'#new'} — colours swap, shading survives."),
   amount: z.number().min(0).max(1).optional().describe('recolor_palette: blend 0–1.'),
   preserveShading: z.number().min(0).max(1).optional().describe('recolor_palette: how much of the original luminance detail survives (default 1).'),
+}).superRefine((v, ctx) => {
+  // paletteMap's swatches are {from, to} pairs. A list of colours matched nothing, the studio passed the image
+  // through, and the reply said success (found verifying FILTKEY35 on prod 9dedbd1e).
+  const check = (name: string | undefined, params: Record<string, unknown> | undefined, path: (string | number)[]) => {
+    if (name !== 'paletteMap' || !params || params.swatches === undefined) return;
+    const sw = params.swatches;
+    const ok = Array.isArray(sw) && sw.length > 0 && sw.every((p) => !!p && typeof p === 'object' && typeof (p as { from?: unknown }).from === 'string' && typeof (p as { to?: unknown }).to === 'string');
+    if (!ok) ctx.addIssue({ code: 'custom', path: [...path, 'swatches'], message: 'paletteMap swatches are {from, to} pairs, e.g. [{ from: "#1e40af", to: "#16a34a" }]: a plain list of colours matches nothing and leaves the image unchanged. For a {"#old": "#new"} map use action recolor_palette with mapping.' });
+  };
+  if (v.action === 'apply') check(v.filterName, v.params, ['params']);
+  if (v.action === 'chain') (v.filters || []).forEach((f, i) => check(f.name, f.params, ['filters', i, 'params']));
 });
 export type ImageFilterInput = z.infer<typeof ImageFilterInputSchema>;
 
