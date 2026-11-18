@@ -4,8 +4,8 @@
  * Name lists the engine owns and the tool surface must offer exactly. See
  * scripts/sync-engine-lists.mjs for why each is generated.
  *
- * Source: FxTool origin/main fd4569390b5c64e27144ee8038f5be21cb97a808
- *   js/core/KeyframeInterpolator.js  sha256: 342034825a057d6d
+ * Source: FxTool origin/main dd3b917eac03eff316d73f2301110a251d776aae
+ *   js/core/KeyframeInterpolator.js  sha256: b4646b35ccd5549d
  *   js/world3d/worlds.js  sha256: 0e0973f7587c06e1
  *   js/core/DesignMedia.js  sha256: ab07f330e4060cb7
  *   js/FilterSystem.js  sha256: 2cf5c8ce2a737958
@@ -13,9 +13,9 @@
  *   js/core/StyledScene.js  sha256: 550fd9b58b7f5d87
  *   js/core/Patterns.js  sha256: a04fe3805f4e9d4f
  *   js/relations/expr-to-ir.js  sha256: 4d92d2f42b3356e9
- *   js/RelationRegistry.js  sha256: 308f649fa7f3a25b
+ *   js/RelationRegistry.js  sha256: 529894e33767b9ae
  *   js/core/AnimationDriver.js  sha256: 6741a73f5f489355
- *   js/PinePaper.js  sha256: 48cba9d9d7fdff16
+ *   js/PinePaper.js  sha256: aff0c37268c9774f
  *   js/ItemAuraSystem.js  sha256: fbd9b8d09fae0543
  *   js/GeneratorRegistry.js  sha256: 9bb2e38508482c8d
  *   js/audio/SoundPresets.js  sha256: 713ef0d1e19dc128
@@ -712,7 +712,7 @@ export const ANIMATION_ORIGINS = [
   'bottomRight',
 ] as const;
 
-/** 9 option keys app.animate reads (PinePaper.animate + checkAnimationOptions). */
+/** 11 option keys app.animate reads (PinePaper.animate + checkAnimationOptions). */
 export const ANIMATION_OPTION_KEYS: readonly string[] = Object.freeze([
   'animationDelay',
   'animationIntensity',
@@ -723,6 +723,8 @@ export const ANIMATION_OPTION_KEYS: readonly string[] = Object.freeze([
   'duration',
   'keyframes',
   'staggerDelay',
+  'timeUnits',
+  'units',
 ]);
 
 /** One line per filter: the engine's own description and parameter ranges. */

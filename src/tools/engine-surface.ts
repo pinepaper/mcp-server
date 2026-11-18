@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main fd4569390b5c64e27144ee8038f5be21cb97a808
- * sha256:    48cba9d9d7fdff164a97612e2d6ff602140a063f2a267dd2e10625a6f8664e68   (of PinePaper.js as committed)
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main dd3b917eac03eff316d73f2301110a251d776aae
+ * sha256:    aff0c37268c9774f6e3691b9d0a8ca4012b23f70a1ebbd690654c0e0ce848153   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on `window.app`, with how it gets there. The parity
@@ -16,7 +16,7 @@
 /** How a name lands on `app`. */
 export type EngineMemberKind = 'method' | 'accessor' | 'property' | 'lazy' | 'lazyHeavy' | 'bootstrap';
 
-/** 1599 names, from FxTool/js/PinePaper.js. */
+/** 1608 names, from FxTool/js/PinePaper.js. */
 export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object.freeze({
   __buildFreshness: 'property',
   _aboveHooksHeld: 'property',
@@ -45,6 +45,9 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _applyFillOpacity: 'method',
   _applyingRemote: 'property',
   _applyItemKeyframesAt: 'method',
+  _applyKeyedContent: 'method',
+  _applyKeyedStrokePosition: 'method',
+  _applyKeyedVisible: 'method',
   _applyLifetimesAt: 'method',
   _applyMediumToParts: 'method',
   _applyPaddedImageFilters: 'method',
@@ -106,12 +109,14 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _canvasDrawsLetterSpacing: 'method',
   _canvasDrawsWordSpacing: 'method',
   _canvasRevealed: 'property',
+  _capabilities: 'property',
   _captureTimedEvents: 'method',
   _characterDrag: 'property',
   _characterDragEnd: 'method',
   _characterDragMove: 'method',
   _characterDragStart: 'method',
   _characterExportFields: 'method',
+  _characterFigureExtent: 'method',
   _characterRelationSource: 'method',
   _characterStates: 'property',
   _clearCollageTextEffect: 'method',
@@ -270,6 +275,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _itemNamedLikePointer: 'method',
   _journalReaction: 'method',
   _keepMaskWithMove: 'method',
+  _keyedContentOverflow: 'method',
   _keyframesDrive: 'method',
   _keyframeStateAt: 'method',
   _killedFrameCallbacks: 'property',
@@ -382,7 +388,9 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _repaintScheduled: 'property',
   _repaintWithoutScreenSpace: 'method',
   _reportFontWeight: 'method',
+  _reportGlyphFallback: 'method',
   _reportRefusedColors: 'method',
+  _reportUnanimatedKeys: 'method',
   _requireHeavy: 'method',
   _rescaleRestBounds: 'method',
   _resizeDebounceTimer: 'property',
@@ -694,6 +702,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   canvasScale: 'property',
   canvasSize: 'property',
   canvasToGround: 'method',
+  capabilities: 'accessor',
   capabilityDetector: 'bootstrap',
   captureFrameDataURL: 'method',
   captureFramesAt: 'method',
