@@ -192,6 +192,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { effectClass } from './effect-class.js';
 import { capabilityAllowed, capabilityRefusal, CAPABILITY_SWITCH } from '../utils/capabilities.js';
 import { exportFileReceiptOrReason, receiptErrorLine, deliverAacIfOpus, type AudioDelivery } from './export-file-receipt.js';
+import { enforceBitrateCap, relabelForReencode, bitrateCapFields, bitrateCapLine, bitrateCapNoFile } from './export-bitrate-cap.js';
 import { ExportStepError, errorText, verifySavedFile, writeStep, bytesForSave } from './export-file-check.js';
 import { EFFECT_BEFORE_JS, effectAfterJs, namedItemIds, idMayBeGone, NO_CHANGE_NOTE } from './effect-check.js';
 import { writeFile, mkdir, appendFile, unlink, readFile, stat } from 'node:fs/promises';
@@ -5157,14 +5158,16 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
               await (await import('node:fs/promises')).unlink(filePath).catch(() => undefined);
               return errorResult(ErrorCodes.EXECUTION_ERROR, delivery.message, { code: 'audio_codec_unavailable', format, platform: input.platform }, { toolName: 'pinepaper_agent_export' });
             }
+            const cap = await enforceBitrateCap(filePath, format, { enforceBitrate: input.enforceBitrate, bitrate: input.bitrate });
             const receipt = await exportFileReceiptOrReason(filePath, exportResult);
+            relabelForReencode(exportResult, receipt as Record<string, unknown>, cap);
             const deliveredSize = 'bytes' in receipt ? receipt.bytes : fileSize;
-            const cleanResult = { ...exportResult, data: undefined, filePath, fileSize: deliveredSize, chunks, file: receipt, ...audioDeliveryFields(delivery) };
+            const cleanResult = { ...exportResult, data: undefined, filePath, fileSize: deliveredSize, chunks, file: receipt, ...audioDeliveryFields(delivery), ...bitrateCapFields(cap) };
             return withEngineReport({
               structuredContent: boundedStructured(cleanResult),
               content: [{
                 type: 'text' as const,
-                text: `Export saved to file:\n\nFile: ${filePath}\nFormat: ${format}\nSize: ${(deliveredSize / 1024).toFixed(1)} KB\nPlatform: ${input.platform}\nPaged out of the studio's export store in ${chunks} chunk${chunks === 1 ? '' : 's'}\n${typeof (exportResult as { warning?: unknown }).warning === 'string' ? `WARNING: ${(exportResult as { warning: string }).warning}\n` : ''}${audioDeliveryLine(delivery)}${receiptErrorLine(receipt)}${'receiptError' in receipt ? '' : probeLines(receipt)}${lintLines(exportResult)}\nResult: ${JSON.stringify(cleanResult, null, 2)}`,
+                text: `Export saved to file:\n\nFile: ${filePath}\nFormat: ${format}\nSize: ${(deliveredSize / 1024).toFixed(1)} KB\nPlatform: ${input.platform}\nPaged out of the studio's export store in ${chunks} chunk${chunks === 1 ? '' : 's'}\n${typeof (exportResult as { warning?: unknown }).warning === 'string' ? `WARNING: ${(exportResult as { warning: string }).warning}\n` : ''}${audioDeliveryLine(delivery)}${bitrateCapLine(cap)}${receiptErrorLine(receipt)}${'receiptError' in receipt ? '' : probeLines(receipt)}${lintLines(exportResult)}\nResult: ${JSON.stringify(cleanResult, null, 2)}`,
               }, exportFileLink(filePath, deliveredSize)],
             }, exportBrowserResult.report);
           } catch (streamError) {
@@ -5233,9 +5236,11 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
               await (await import('node:fs/promises')).unlink(filePath).catch(() => undefined);
               return errorResult(ErrorCodes.EXECUTION_ERROR, delivery.message, { code: 'audio_codec_unavailable', format, platform: input.platform }, { toolName: 'pinepaper_agent_export' });
             }
+            const cap = await enforceBitrateCap(filePath, format, { enforceBitrate: input.enforceBitrate, bitrate: input.bitrate });
             const receipt = await exportFileReceiptOrReason(filePath, exportResult);
+            relabelForReencode(exportResult, receipt as Record<string, unknown>, cap);
             const fileSize = 'bytes' in receipt ? receipt.bytes : savedSize;
-            const cleanResult = { ...exportResult, data: undefined, filePath, fileSize, file: receipt, ...audioDeliveryFields(delivery) };
+            const cleanResult = { ...exportResult, data: undefined, filePath, fileSize, file: receipt, ...audioDeliveryFields(delivery), ...bitrateCapFields(cap) };
             // A mix that dropped sounds wrote a perfectly good file that is
             // missing tracks. It rides the SUCCESS path, which is exactly why
             // it has to be said out loud here rather than left in the JSON.
@@ -5245,7 +5250,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
               content: [{
                 type: 'text' as const,
                 text: `Export saved to file:\n\nFile: ${filePath}\nFormat: ${format}\nSize: ${(fileSize / 1024).toFixed(1)} KB\nPlatform: ${input.platform}\n`
-                  + (dropNote ? `DROPPED: ${dropNote}\n` : '') + audioDeliveryLine(delivery)
+                  + (dropNote ? `DROPPED: ${dropNote}\n` : '') + audioDeliveryLine(delivery) + bitrateCapLine(cap)
                   // The studio's own warning on a saved file (a GIF over its maxBytes budget, GIFMAX34) was only
                   // inside the Result JSON below; a reader of the words missed it.
                   + (typeof (exportResult as { warning?: unknown }).warning === 'string' ? `WARNING: ${(exportResult as { warning: string }).warning}\n` : '')
@@ -5264,6 +5269,8 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
         }
 
         // Small export — return inline (existing behavior). The bytes are in the result, checked non-empty above.
+        // enforceBitrate on an export that is not a saved MP4 (a still, an estimate) is not an error: it says why nothing was capped.
+        if (input.enforceBitrate === true) Object.assign(exportResult, bitrateCapFields(bitrateCapNoFile(String(format))));
         return executedResult(code, exportResult, exportBrowserResult.screenshot, description, exportBrowserResult.report);
       }
 
