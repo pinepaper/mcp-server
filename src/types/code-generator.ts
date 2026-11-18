@@ -2469,11 +2469,11 @@ const UNANIMATED_TEXT_KEYS_SENTENCE = `' is not an animatable property in this s
 
 /**
  * The warnings a keyframe track's result carries, as object-literal fields (", key: value" …): keys that leave out a
- * property, loop in an export, x beside fontSize on an older studio, easing on the first key. One function for
+ * property, x beside fontSize on an older studio, easing on the first key. One function for
  * pinepaper_keyframe_animate and the batch keyframe_animate op: the batch had its own copy of the emitter and none
  * of these (SIZEKEY-PAIR: the same keys warned through the tool and not through the batch).
  */
-function keyframeResultNotes(keyframes: readonly Keyframe[], { loop = false, append = false, easingAt }: { loop?: boolean; append?: boolean; easingAt?: 'arrival' | 'departure' } = {}): string {
+function keyframeResultNotes(keyframes: readonly Keyframe[], { append = false, easingAt }: { append?: boolean; easingAt?: 'arrival' | 'departure' } = {}): string {
   // A KEY THAT LEAVES A PROPERTY OUT (round 9 HH, engine 2.30): the engine
   // treats the gap as a break in that property's track rather than holding or
   // interpolating across it, silently. Named here — which keys lack which
@@ -2632,7 +2632,7 @@ function generateKeyframeAnimateCode(
   // never applies — a Ken Burns eased only there rendered linear. Said in the
   // result rather than silently moved: moving it would change what the other
   // keys the caller wrote mean.
-  const __notes = keyframeResultNotes(keyframes, { loop, append, easingAt });
+  const __notes = keyframeResultNotes(keyframes, { append, easingAt });
   const textKeysJs = unanimatedTextKeysJs(keyframes.flatMap((k) => Object.keys((k as { properties?: object }).properties ?? {})));
   const textKeyCheck = textKeysJs ? `
   const __ignored = ${textKeysJs};
@@ -6308,7 +6308,7 @@ const _prevKeys = (_kfItem.data && Array.isArray(_kfItem.data.keyframes)) ? _kfI
 ${kfGuard.before}
 app.addAnimation(targetId, ${kfJson}, { duration: ${kfDuration}, loop: ${kfLoop}${kfAppend ? ", mode: 'merge'" : ''}${kfExtraStr} });${kfGuard.after}
 ${deadKeysJs('_deadKeys')}${kfTextCheck}
-return { success: true, itemId: targetId, duration: ${kfDuration}, loop: ${kfLoop}${kfAppend ? ', append: true' : ''}${kfGuard.field}${keyframeResultNotes(kfSource as never, { loop: kfLoop === true, append: kfAppend })}${kfAppend ? '' : `, ...(_prevKeys ? { track: { replaced: true, previousKeys: _prevKeys, note: 'the item already had a keyframe track; this op replaced it. To add keys to it instead, pass append: true.' } } : {})`}${kfUnitsNote}${kfIgnored}, ...(_deadKeys || {}) };
+return { success: true, itemId: targetId, duration: ${kfDuration}, loop: ${kfLoop}${kfAppend ? ', append: true' : ''}${kfGuard.field}${keyframeResultNotes(kfSource as never, { append: kfAppend })}${kfAppend ? '' : `, ...(_prevKeys ? { track: { replaced: true, previousKeys: _prevKeys, note: 'the item already had a keyframe track; this op replaced it. To add keys to it instead, pass append: true.' } } : {})`}${kfUnitsNote}${kfIgnored}, ...(_deadKeys || {}) };
 `;
       }
 
