@@ -335,7 +335,8 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   has the same audio streams. It is opt-in because it costs quality on dense scenes: fine detail
   smears, and the reply's `bitrateCap` gives the bitrate before and after, the time taken, and an
   SSIM figure against the browser's file (measured on the first 10 s; a warning below 0.9). It
-  needs ffmpeg, so only the Claude Desktop extension runs it, when ffmpeg is on PATH. Without a
+  runs only in the Claude Desktop extension, with ffmpeg on PATH; the npm package never runs ffmpeg,
+  so there the option is reported as not applied and the file is returned as exported. Without a
   `bitrate`, without ffmpeg, or for another format the export is not failed: the browser's file is
   delivered and `bitrateCap` says why no cap was enforced. A re-encoded file is not the browser's
   encode: `file.sha256` is the delivered file's, and the browser encode's `bitExact`,
