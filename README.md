@@ -307,13 +307,27 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - Code an agent writes runs with whatever that browser page has. Give this server the same trust you would give anything else you let write and run code on your machine — which is the trust you already extend to an MCP client with tool access.
 - Puppeteer mode launches Chrome with `--no-sandbox` and `--disable-setuid-sandbox`. That is routine for headless automation and it does weaken Chrome's own process sandbox. If that matters where you are running it, use `code` mode or put the server in a container.
 - Puppeteer itself is not a dependency at all (it was an optional peer until 1.6.25), kept out of the tree precisely because a headless browser plus an install script is what scanners flag hardest. Install it only if you want the executing mode. The server loads it only from where its own dependencies would be found (the same `npx` call, a global install, a project install) or from a folder you name in `PINEPAPER_PUPPETEER_FROM`; never from the folder it happens to be started in. puppeteer 22 or newer is required.
-- The npm package starts no process. Three export features use `ffprobe` and `ffmpeg`: checking a saved video against what the studio encoded, joining the cached segments of a `perScene` export (`ffmpeg -f concat`), and re-encoding an MP4's Opus soundtrack to AAC (the browser on Linux has no AAC encoder; the video is copied). Only the Claude Desktop extension runs them, through a small runner it bundles that allows those two binaries alone, via `execFile` (no shell, argument lists the server writes, absolute paths). From npm, the check is skipped and said so, a `perScene` export runs whole, and an Opus MP4 is kept and named, or refused for a social platform.
+- The npm package starts no process. Four export features use `ffprobe` and `ffmpeg`: checking a saved video against what the studio encoded, joining the cached segments of a `perScene` export (`ffmpeg -f concat`), re-encoding an MP4's Opus soundtrack to AAC (the browser on Linux has no AAC encoder; the video is copied), and, only when asked with `enforceBitrate: true`, re-encoding an MP4 that came out over its `bitrate`. Only the Claude Desktop extension runs them, through a small runner it bundles that allows those two binaries alone, via `execFile` (no shell, argument lists the server writes, absolute paths). From npm, the check is skipped and said so, a `perScene` export runs whole, and an Opus MP4 is kept and named, or refused for a social platform. With `enforceBitrate` the browser's file is delivered and a `bitrateCap` note says why nothing was capped.
 - The server itself fetches the images, SVGs and media a tool call names by URL, and reads local files named by path. URLs that resolve to loopback, private, link-local or reserved addresses are refused, redirects included, and so are cloud metadata addresses. Local files are read only with `PINEPAPER_ALLOW_LOCAL_FILES=1`, and then only from the working directory, the export folder, and folders listed in `PINEPAPER_ASSET_DIRS` (the export folder is readable without the switch). `PINEPAPER_ALLOW_PRIVATE_NETWORK=1` allows local and LAN hosts. Metadata addresses stay refused even with it set.
 
 ## What's new in 1.6.40
 
 ### New
 
+- `pinepaper_agent_export` takes `enforceBitrate: true` for mp4, used with `bitrate`. The browser's
+  encoder treats `bitrate` as a target and exceeds it on dense scenes (a 100,000-mark swarm came out
+  at 43 Mbps whatever was asked). With this on, a file over the cap is re-encoded with ffmpeg
+  (libx264, `maxrate` = the bitrate, yuv420p, `+faststart`; the audio is copied untouched) and
+  replaces the browser's file only if the result is smaller, the same length and frame count, and
+  has the same audio streams. It is opt-in because it costs quality on dense scenes: fine detail
+  smears, and the reply's `bitrateCap` gives the bitrate before and after, the time taken, and an
+  SSIM figure against the browser's file (measured on the first 10 s; a warning below 0.9). It
+  needs ffmpeg, so only the Claude Desktop extension runs it, when ffmpeg is on PATH. Without a
+  `bitrate`, without ffmpeg, or for another format the export is not failed: the browser's file is
+  delivered and `bitrateCap` says why no cap was enforced. A re-encoded file is not the browser's
+  encode: `file.sha256` is the delivered file's, and the browser encode's `bitExact`,
+  `determinism`, `frameHashes` and `achievedBitrate` move under `video.browserEncode`. The
+  provenance comment is carried over unchanged and does not mention the re-encode.
 - A rendered soundtrack (`pinepaper_sound` `render_soundtrack`, or a `wav` export) says where its
   sound actually ends: `soundingEnd` for the whole mix and for each cue in `sounds`, on studios that
   report it. The count of sounds is `soundCount`.
