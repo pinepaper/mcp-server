@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main dd3b917eac03eff316d73f2301110a251d776aae
- * sha256:    aff0c37268c9774f6e3691b9d0a8ca4012b23f70a1ebbd690654c0e0ce848153   (of PinePaper.js as committed)
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 8dc9496c813b04764674467f13702d21ca78ae96
+ * sha256:    a1d23eb7cd52e0524be869f0bf3daeb3da9201a108ec8cb845db75d2eb3f587a   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on `window.app`, with how it gets there. The parity
@@ -16,7 +16,7 @@
 /** How a name lands on `app`. */
 export type EngineMemberKind = 'method' | 'accessor' | 'property' | 'lazy' | 'lazyHeavy' | 'bootstrap';
 
-/** 1608 names, from FxTool/js/PinePaper.js. */
+/** 1612 names, from FxTool/js/PinePaper.js. */
 export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object.freeze({
   __buildFreshness: 'property',
   _aboveHooksHeld: 'property',
@@ -31,6 +31,8 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _affineReflowItem: 'method',
   _affineReflowItemData: 'method',
   _animateCamera: 'method',
+  _animatedImages: 'property',
+  _animatedImagesLost: 'property',
   _animatedRasterOf: 'method',
   _animationIntervalId: 'property',
   _announceItemEffect: 'method',
@@ -389,6 +391,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _repaintWithoutScreenSpace: 'method',
   _reportFontWeight: 'method',
   _reportGlyphFallback: 'method',
+  _reportImagePlayback: 'method',
   _reportRefusedColors: 'method',
   _reportUnanimatedKeys: 'method',
   _requireHeavy: 'method',
@@ -981,6 +984,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   getGeneratedElements: 'method',
   getGenerativeFont: 'method',
   getHistoryJournal: 'method',
+  getImagePlayback: 'method',
   getInterpolatedState: 'method',
   getItemById: 'method',
   getItemConstraints: 'method',
