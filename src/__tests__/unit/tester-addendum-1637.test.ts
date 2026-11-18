@@ -73,3 +73,20 @@ describe('GIFMAX34: after smaller frames, fewer frames per second', () => {
     expect(code).toContain("fpsReduced = { from: __fps0, to: bestFps, reason: 'maxBytes' }");
   });
 });
+
+describe('MILKYRIDGE36 re-run: gradient ends as {x, y}', () => {
+  const stops = [{ color: '#000000', offset: 0 }, { color: '#ffffff', offset: 1 }];
+  const create = (color: unknown) => codeGenerator.generateCreateItem({ itemType: 'rectangle', properties: { width: 100, height: 50, color } } as never);
+  it('reads {x, y} as [x, y]', () => {
+    const code = create({ type: 'linear', origin: { x: 960, y: 400 }, destination: { x: 960, y: 540 }, stops });
+    expect(code).toContain('origin: [960, 400]');
+    expect(code).toContain('destination: [960, 540]');
+    expect(code).not.toContain('undefined');
+  });
+  it('keeps [x, y], and refuses a point it cannot read', () => {
+    expect(create({ type: 'radial', origin: [10, 20], stops })).toContain('origin: [10, 20]');
+    const bad = create({ type: 'linear', origin: { x: 'a', y: 1 }, stops });
+    expect(bad).toContain('success: false');
+    expect(bad).toContain('is not a point');
+  });
+});

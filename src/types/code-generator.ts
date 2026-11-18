@@ -291,8 +291,21 @@ function normalizeGradientSpec(v: unknown, key: string): { gradient: Gradient } 
     if (!(offset >= 0 && offset <= 1)) return { error: `${key} stop ${i} has offset ${JSON.stringify((st as { offset?: unknown }).offset)}; offsets run 0 to 1. ${shape}` };
     stops.push({ color: color.trim(), offset });
   }
+  // THE ENDS AS [x, y] (MILKYRIDGE36 re-run). {x, y} was read as point[0] / point[1], both undefined: the studio
+  // stored a gradient with NaN ends, create said success, and every export then failed in createLinearGradient.
+  // {x, y} is read; anything else is refused by name.
+  const ends: Record<string, [number, number]> = {};
+  for (const end of ['origin', 'destination'] as const) {
+    const p = o[end] as unknown;
+    if (p === undefined || p === null) continue;
+    const xy: unknown[] | null = Array.isArray(p) ? p : (typeof p === 'object' ? [(p as { x?: unknown }).x, (p as { y?: unknown }).y] : null);
+    if (!xy || xy.length < 2 || !Number.isFinite(Number(xy[0])) || !Number.isFinite(Number(xy[1])) || typeof xy[0] === 'boolean' || typeof xy[1] === 'boolean' || xy[0] === '' || xy[1] === '') {
+      return { error: `${key} ${end} ${JSON.stringify(p)} is not a point: give [x, y] or {x, y} in canvas pixels. ${shape}` };
+    }
+    ends[end] = [Number(xy[0]), Number(xy[1])];
+  }
   const type = o.type === 'radial' ? 'radial' : 'linear';
-  return { gradient: { ...(o as object), type, stops } as unknown as Gradient };
+  return { gradient: { ...(o as object), ...ends, type, stops } as unknown as Gradient };
 }
 
 /**
