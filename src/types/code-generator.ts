@@ -6427,7 +6427,7 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
 
   generateAgentExport(input: AgentExportInput): string {
     const validated = AgentExportInputSchema.parse(input);
-    const { platform, format, quality, framing, duration, estimateOnly, scale, fps, pdf: pdfOpts, region, time: stillTime, maxBytes, loop: gifLoopAsked, broadcast, broadcastHeadroom, bitrate, minBitrate, bitrateMode, audioCodec, transparent, alphaQuantizer, deterministic: askedDeterministic, motionBlur, ad: adOpts, frames, startTime } = validated;
+    const { platform, format, quality, framing, duration, estimateOnly, scale, fps, pdf: pdfOpts, region, time: stillTime, maxBytes, loop: gifLoopAsked, broadcast, broadcastHeadroom, bitrate, minBitrate, bitrateMode, quantizer, audioCodec, transparent, alphaQuantizer, deterministic: askedDeterministic, motionBlur, ad: adOpts, frames, startTime } = validated;
     // loop 0 PLAYS ONCE (the schema's promise: false / 0 / 1 = play once). The APNG writer reads a number as the
     // file's num_plays, where 0 means forever, so 0 played for ever there (LOOPZERO37). Sent as false.
     const gifLoop = gifLoopAsked === 0 ? false : gifLoopAsked;
@@ -6457,6 +6457,8 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
   if (bitrate !== undefined) videoEncodeOpts.bitrate = bitrate;
   if (minBitrate !== undefined) videoEncodeOpts.minBitrate = minBitrate;
   if (bitrateMode !== undefined) videoEncodeOpts.bitrateMode = bitrateMode;
+  // A fixed quality (HOOKSTALL37: faint 1 px lines held between frames at the deterministic default 23).
+  if (quantizer !== undefined) { videoEncodeOpts.bitrateMode = 'quantizer'; videoEncodeOpts.quantizer = quantizer; }
   // B45 (FxTool #288): 'aac' makes the studio refuse an MP4 whose soundtrack would be Opus (code
   // audio_codec_unavailable) rather than write a file WhatsApp rejects. 'any' is the engine's default, so not sent.
   if (audioCodec === 'aac') videoEncodeOpts.audioCodec = 'aac';

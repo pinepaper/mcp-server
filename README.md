@@ -312,6 +312,12 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 
 ## What's new in 1.6.39
 
+### New
+
+- `pinepaper_agent_export` takes `quantizer` for mp4 and webm: a fixed quality instead of a bitrate
+  (lower is better and bigger). Use it when faint, fine detail, such as thin low-contrast lines,
+  holds between frames in the file at the default quality.
+
 ### Fixed
 
 - A gradient's `origin` and `destination` can be given as `{x, y}` as well as `[x, y]`. `{x, y}`

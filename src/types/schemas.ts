@@ -2781,6 +2781,7 @@ export const AgentExportInputSchema = z.object({
   bitrate: z.number().int().min(100_000).max(200_000_000).optional().describe('mp4 / webm: target bits per second, replacing the quality-derived one. The browser encoder treats it as a CEILING: simple content comes out lower, and result.video.achievedBitrate says what it was.'),
   minBitrate: z.number().int().min(100_000).max(200_000_000).optional().describe('mp4 / webm: a floor under the target. If the achieved bitrate misses it, fidelity warns and names the re-encode a delivery spec needs.'),
   bitrateMode: z.enum(['constant', 'variable']).optional().describe("mp4 / webm: 'constant' (the default with broadcast) or 'variable'."),
+  quantizer: z.number().int().min(0).max(63).optional().describe('mp4 / webm: a fixed quality instead of a bitrate (H.264 0-51, VP9 0-63; lower is better and bigger). A deterministic export already uses one (23 for H.264). Lower it when faint, fine detail (thin low-contrast lines, soft gradients) holds or freezes between frames in the file: the encoder skips blocks it judges unchanged at the default. The receipt\'s video.quantizer says what was used.'),
   audioCodec: z.enum(['any', 'aac']).optional().describe("mp4 only: 'aac' demands an AAC soundtrack. Where the browser has no AAC encoder (Chromium on Linux; macOS and Windows use the system encoder) the export is refused before its first frame with code audio_codec_unavailable instead of muxing Opus, which WhatsApp and many players reject. 'any' (the default) muxes Opus there and warns (audio_codec_opus, whatsappSafe: false). A silent MP4 is AAC everywhere. A current studio reads it; an older one ignores it."),
   time: z.number().min(0).optional().describe('Stills only (png / jpg / webp / svg / pdf): render the scene at this time in seconds. Without it a still is taken at wherever the playhead happens to be, so two identical runs can differ.'),
   region: z.object({
@@ -2804,7 +2805,10 @@ export const AgentExportInputSchema = z.object({
     if (val.frames !== undefined && !['mp4', 'webm', 'gif', 'apng'].includes(String(val.format))) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['frames'], message: 'frames applies to animated formats: mp4, webm, gif, apng.' });
     }
-    for (const k of ['bitrate', 'minBitrate', 'bitrateMode', 'deterministic', 'motionBlur'] as const) {
+    if (val.quantizer !== undefined && (val.bitrate !== undefined || val.bitrateMode !== undefined || val.minBitrate !== undefined || val.broadcast)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['quantizer'], message: 'quantizer sets a fixed quality, so it cannot go with bitrate, minBitrate, bitrateMode or broadcast, which set a bitrate. Give one or the other.' });
+    }
+    for (const k of ['bitrate', 'minBitrate', 'bitrateMode', 'quantizer', 'deterministic', 'motionBlur'] as const) {
       if (val[k] !== undefined && val.format !== 'mp4' && val.format !== 'webm') {
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: [k], message: `${k} is a video setting: mp4 or webm. A gif's size is set by maxBytes and scale.` });
       }
