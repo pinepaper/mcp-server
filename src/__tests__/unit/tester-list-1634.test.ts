@@ -346,3 +346,25 @@ describe('GIFMAX34: fewer frames per second when smaller frames are not enough',
     expect(asked.some((o) => o.fps === 15)).toBe(false);
   });
 });
+
+describe('GIFBUDGET38: a studio that runs the GIF budget itself gets the budget', () => {
+  it('passes maxBytes to _quickExportVideo, reports its budget, and does not run the loop', async () => {
+    let asked: any = null; let loopRan = false;
+    const app = {
+      canvasSize: { width: 400, height: 400 }, canvasEl: { style: {} },
+      exportEngine: {
+        supportsGifBudget: true,
+        exportFidelity: () => ({ warnings: [] }),
+        _quickExportVideo: async (_f: string, o: any) => { asked = o; return { blob: blob(58_000), budget: { maxBytes: 60_000, met: true, width: 200, height: 200, bytes: 58_000, fps: 20, fpsReduced: { from: 30, to: 20 }, attempts: [{}, {}, {}] }, dimensions: { width: 200, height: 200 }, fpsReduced: { from: 30, to: 20 } }; },
+        videoExporter: { export: async () => { loopRan = true; return blob(1); } },
+      },
+    };
+    const r = await runExport({ format: 'gif', duration: 1, maxBytes: 60_000 }, app);
+    expect(asked.maxBytes).toBe(60_000);
+    expect(loopRan).toBe(false);
+    expect(r.budget).toMatchObject({ met: true, by: 'studio', fps: 20 });
+    expect(r.dimensions).toEqual({ width: 200, height: 200 });
+    expect(r.fpsReduced).toEqual({ from: 30, to: 20 });
+    expect(r.downscaled).toMatchObject({ to: { width: 200, height: 200 }, reason: 'maxBytes' });
+  });
+});

@@ -7312,24 +7312,38 @@ ${stillTime === undefined ? `  if (['png', 'jpg', 'webp', 'svg', 'pdf'].indexOf(
           const blob = await app.exportEngine.videoExporter.export(baseVideoSettings);
           result = await deliver(blob);
         } else if (app.exportEngine && app.exportEngine._quickExportVideo) {
+          // THE STUDIO RUNS THE GIF BUDGET ITSELF where it says so (FxTool #418, GIFBUDGET38): the same size retries
+          // and fps steps as the loop below, in the exporter. The loop stays for a studio without the marker.
+          const __engineBudget = ${maxBytes !== undefined ? "format === 'gif' && app.exportEngine.supportsGifBudget === true" : 'false'};
           // GIF path (working): _quickExportVideo forwards gifQuality to
           // gif.js. Also serves as the fallback if videoExporter is absent.
           ${gifLoop !== undefined ? `// A LOOP COUNT (8.30): _quickExportVideo rebuilds its settings without
           // it, so a GIF with loop set goes straight to videoExporter.export.
           // true = forever, false / 0 / 1 = once, n = n plays (engine 952d6d35).
-          const videoResult = (format === 'gif' && app.exportEngine.videoExporter && typeof app.exportEngine.videoExporter.export === 'function')
+          const videoResult = __engineBudget ? await app.exportEngine._quickExportVideo('gif', Object.assign({}, baseVideoSettings, { maxBytes: ${maxBytes} }), false) : (format === 'gif' && app.exportEngine.videoExporter && typeof app.exportEngine.videoExporter.export === 'function')
             ? { blob: await app.exportEngine.videoExporter.export(Object.assign({}, baseVideoSettings, { format: 'gif', loop: ${JSON.stringify(gifLoop)} })) }
-            : await app.exportEngine._quickExportVideo(format, baseVideoSettings, false);` : `const videoResult = await app.exportEngine._quickExportVideo(format, baseVideoSettings, false);`}
+            : await app.exportEngine._quickExportVideo(format, baseVideoSettings, false);` : `const videoResult = __engineBudget ? await app.exportEngine._quickExportVideo('gif', Object.assign({}, baseVideoSettings, { maxBytes: ${maxBytes} }), false) : await app.exportEngine._quickExportVideo(format, baseVideoSettings, false);`}
           if (videoResult && videoResult.blob) {
             result = await deliver(videoResult.blob);
           } else {
             result = { success: false, error: format.toUpperCase() + ' export returned no data' };
           }
+          if (__engineBudget && result && result.success && videoResult && videoResult.budget) {
+            result.budget = videoResult.budget;
+            if (videoResult.dimensions) result.dimensions = videoResult.dimensions;
+            if (videoResult.fpsReduced) result.fpsReduced = videoResult.fpsReduced;
+            if (videoResult.warning) result.warning = videoResult.warning;
+            const __dd = videoResult.dimensions;
+            if (__dd && (__dd.width !== dimensions.width || __dd.height !== dimensions.height)) {
+              result.downscaled = { from: { width: dimensions.width, height: dimensions.height }, to: { width: __dd.width, height: __dd.height }, reason: (videoResult.budget.attempts || []).length > 1 ? 'maxBytes' : 'studio' };
+            }
+            result.budget.by = 'studio';
+          }
           ${maxBytes !== undefined ? `// A BYTE BUDGET (round 9 GG, 8.31 — email wants <= 1 MB). gif.js has no
           // colour-count knob, so size is the lever: GIF bytes scale roughly with
           // pixel count, so the frame is shrunk by sqrt(budget / size) with a
           // margin and re-encoded, at most three times. Every attempt is reported.
-          if (format === 'gif' && result && result.success && result.size > ${maxBytes}) {
+          if (format === 'gif' && !__engineBudget && result && result.success && result.size > ${maxBytes}) {
             // THE FILE'S OWN SIZE, from its header (GIFMAX34). The first GIF comes from _quickExportVideo, which
             // may not render at the canvas size, so shrinking "the canvas" could ask for a LARGER frame: a
             // 20 kB budget turned a 74 kB GIF into a 170 kB one. Each attempt is measured, a retry never asks for

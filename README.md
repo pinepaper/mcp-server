@@ -343,7 +343,8 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - A PNG, WebP, JPG or PDF of a moving scene says the animation will not be in it. It used to say the
   scene lost nothing.
 - A GIF over its `maxBytes` budget gets one more, smaller try, and then two lower frame rates at
-  the same duration. `fpsReduced` says when the rate came down. The warning no longer recommends
+  the same duration. `fpsReduced` says when the rate came down. On a studio that runs the
+  budget itself, the export hands it the budget and reports the studio's result (`budget.by: "studio"`). The warning no longer recommends
   `quality: "draft"`, which does not make a GIF smaller.
 - A video export says which encoder made the file (`video.encoderRan`: codec, hardware
   acceleration, bitrate mode), and a missed bitrate target names it.
