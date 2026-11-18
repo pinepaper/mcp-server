@@ -48,3 +48,10 @@ describe('EMITEND37 docs', () => {
     expect(d).toContain('opacityEnd');
   });
 });
+
+describe('FILTKEY35: a studio that reports its own dead keys judges filter settings', () => {
+  it('the list check stands down where app._reportUnanimatedKeys exists', () => {
+    const code = codeGenerator.generateKeyframeAnimate({ itemId: 'i', keyframes: [{ time: 0, properties: { brightness: 0 } }, { time: 1, properties: { brightness: 1 } }] } as never);
+    expect(code).toContain("if (typeof app._reportUnanimatedKeys === 'function') return [];");
+  });
+});

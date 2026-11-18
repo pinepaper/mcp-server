@@ -269,6 +269,7 @@ export const REQUIRED_ENGINE_METHODS: readonly string[] = [
 export const OPTIONAL_ENGINE_METHODS: readonly string[] = [
   '_frameCapture',
   '_isKnownRelationEndpoint',
+  '_reportUnanimatedKeys',
   '_resolveId',
   '_resolveRaster',
   '_resolveRelationEndpoint',

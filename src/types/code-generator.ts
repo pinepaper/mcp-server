@@ -2422,7 +2422,11 @@ const FILTER_PARAM_KEYS: ReadonlySet<string> = new Set<string>([...Object.values
 function unanimatedFilterKeysJs(keys: readonly string[]): string {
   const filterKeys = [...new Set(keys)].filter((k) => FILTER_PARAM_KEYS.has(k));
   if (!filterKeys.length) return '[]';
+  // A studio that reports its own dead keys (app._reportUnanimatedKeys, FxTool #400; read back as notAnimated) is
+  // the judge: since FILTKEY35 (FxTool f12ef274) a still image's scalar filter settings DO animate without being in
+  // listAnimatableProperties, so this list check would call a working key dead there.
   return `(function() {
+    if (typeof app._reportUnanimatedKeys === 'function') return [];
     let __l = null;
     try { __l = typeof app.listAnimatableProperties === 'function' ? app.listAnimatableProperties() : null; } catch (_) { __l = null; }
     if (!__l || !__l.properties) return [];

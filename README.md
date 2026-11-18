@@ -326,6 +326,7 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 
 - `pinepaper_keyframe_animate` and the batch keyframe op pass on the keys the studio stores but
   does not draw (`notAnimated`), such as a keyed palette-map `amount`.
+  A keyed filter setting that the studio animates is no longer reported as having no effect.
 - A colour that is not a colour (`"#notacolor"`) is refused by name on create, modify, keyframes
   and the background. It used to be accepted and drawn black.
 - `pinepaper_create_item` takes `shadowOffsetX` and `shadowOffsetY`, the names a keyframe animates.
