@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 8dc9496c813b04764674467f13702d21ca78ae96
- * sha256:    a1d23eb7cd52e0524be869f0bf3daeb3da9201a108ec8cb845db75d2eb3f587a   (of PinePaper.js as committed)
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 9dedbd1e12bf97b0473f0cc951eedfd28e03768d
+ * sha256:    8ce5a04efe9122a148f8a297672ea234222ebd67b97c34ccb86a837517f04bd0   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on `window.app`, with how it gets there. The parity
@@ -16,7 +16,7 @@
 /** How a name lands on `app`. */
 export type EngineMemberKind = 'method' | 'accessor' | 'property' | 'lazy' | 'lazyHeavy' | 'bootstrap';
 
-/** 1612 names, from FxTool/js/PinePaper.js. */
+/** 1623 names, from FxTool/js/PinePaper.js. */
 export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object.freeze({
   __buildFreshness: 'property',
   _aboveHooksHeld: 'property',
@@ -30,6 +30,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _adoptRenderSurface: 'method',
   _affineReflowItem: 'method',
   _affineReflowItemData: 'method',
+  _animatableNameSet: 'property',
   _animateCamera: 'method',
   _animatedImages: 'property',
   _animatedImagesLost: 'property',
@@ -48,6 +49,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _applyingRemote: 'property',
   _applyItemKeyframesAt: 'method',
   _applyKeyedContent: 'method',
+  _applyKeyedFilters: 'method',
   _applyKeyedStrokePosition: 'method',
   _applyKeyedVisible: 'method',
   _applyLifetimesAt: 'method',
@@ -278,6 +280,10 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _journalReaction: 'method',
   _keepMaskWithMove: 'method',
   _keyedContentOverflow: 'method',
+  _keyedFilterInfo: 'property',
+  _keyedFilterInfoOf: 'method',
+  _keyedFilterJobs: 'property',
+  _keyedFilterSource: 'method',
   _keyframesDrive: 'method',
   _keyframeStateAt: 'method',
   _killedFrameCallbacks: 'property',
@@ -342,6 +348,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _pausedForEditing: 'property',
   _pausedForTextEdit: 'bootstrap',
   _pendingTimedPulses: 'property',
+  _pinFilterSource: 'method',
   _pinnedExportFrame: 'property',
   _placeMediumGroup: 'method',
   _playElapsed: 'property',
@@ -394,6 +401,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _reportImagePlayback: 'method',
   _reportRefusedColors: 'method',
   _reportUnanimatedKeys: 'method',
+  _requestKeyedFilterPass: 'method',
   _requireHeavy: 'method',
   _rescaleRestBounds: 'method',
   _resizeDebounceTimer: 'property',
@@ -415,6 +423,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _restitchText: 'method',
   _restoreCharacterFields: 'method',
   _restoreCharacters: 'method',
+  _restoreKeyedFilterBase: 'method',
   _restoreMotionOntoMask: 'method',
   _restoreReactionJournal: 'method',
   _restoreSettled: 'property',
@@ -426,6 +435,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _rewriteCursive: 'method',
   _rigCharacter: 'method',
   _rlm: 'method',
+  _runKeyedFilterPass: 'method',
   _runRenderHook: 'method',
   _runUSDExport: 'method',
   _samplePointsFromItem: 'method',
@@ -668,6 +678,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   autoWalk: 'method',
   awaitAnimatedImages: 'method',
   awaitAudioReactive: 'method',
+  awaitKeyedFilters: 'method',
   awaitMediaAt: 'method',
   awaitSceneFonts: 'method',
   backgroundLayer: 'property',
