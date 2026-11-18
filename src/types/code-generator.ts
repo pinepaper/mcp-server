@@ -266,6 +266,21 @@ function isGradient(color: unknown): color is Gradient {
 }
 
 /**
+ * A soundtrack render's sounds as a reply carries them (SNDGAIN37, FxTool #423). `sounds` became the per-cue list
+ * ({id, start, end, soundingEnd, tailCut?}, one per placed occurrence, loops included) with the count moved to
+ * `soundCount`; an older studio's `sounds` is the count. The list is capped so a looping score cannot flood a reply.
+ */
+const SOUNDTRACK_SOUNDS_JS = `...(function (r) {
+      var list = Array.isArray(r.sounds) ? r.sounds : null;
+      var count = typeof r.soundCount === 'number' ? r.soundCount : (typeof r.sounds === 'number' ? r.sounds : (list ? list.length : undefined));
+      return Object.assign({},
+        count !== undefined ? { soundCount: count } : {},
+        typeof r.soundingEnd === 'number' ? { soundingEnd: r.soundingEnd } : {},
+        list ? { sounds: list.slice(0, 50) } : {},
+        list && list.length > 50 ? { soundsTruncated: list.length - 50 } : {});
+    })(r)`;
+
+/**
  * A colour OBJECT is a gradient spec, checked before it reaches the engine.
  *
  * {gradient: true, stops: ['#a', '#b']} — no type, bare-string stops, invalid
@@ -6652,7 +6667,7 @@ ${fmt === 'scc' ? `  return { success: true, format: 'scc', sccCues: cues, cues:
     success: true, format: 'wav', platform: ${jsLiteral(platform)},
     data: 'data:audio/wav;base64,' + btoa(bin),
     size: bytes.length,
-    duration: r.duration, sampleRate: r.sampleRate, sounds: r.sounds, placed: r.placed,
+    duration: r.duration, sampleRate: r.sampleRate, ${SOUNDTRACK_SOUNDS_JS}, placed: r.placed,
     // A mix that dropped sounds is a valid file quietly missing tracks.
     ...(r.dropped > 0 ? { dropped: r.dropped, incomplete:
       'mixed ' + r.placed + ' sound(s); ' + r.dropped + ' could not be rendered and are absent from this file' } : {}),
@@ -16175,7 +16190,7 @@ ${guard('renderSoundtrackWav')}
     byteLength: bytes.length,
     duration: r.duration,
     sampleRate: r.sampleRate,
-    sounds: r.sounds,
+    ${SOUNDTRACK_SOUNDS_JS},
     placed: r.placed,
     // DROPPED IS THE SECOND SILENT REFUSAL. A mix with placed > 0 and dropped
     // > 0 is a valid WAV that is quietly missing sounds — the same shape as an

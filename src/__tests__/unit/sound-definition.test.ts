@@ -128,6 +128,22 @@ describe('rendering the soundtrack', () => {
     expect(out.placed).toBe(3);
   });
 
+  it('SNDGAIN37: carries the cue list, the count and where the sound ends (FxTool #423), and reads an older count', () => {
+    const cues = Array.from({ length: 60 }, (_, i) => ({ id: 's' + i, start: i, end: i + 0.3, soundingEnd: i + 0.3 }));
+    const out = run(emit({ action: 'render_soundtrack' }), {
+      renderSoundtrackWav: () => ({ wav: WAV, duration: 61, sampleRate: 48000, sounds: cues, soundCount: 60, soundingEnd: 59.3, placed: 60, dropped: 0 }),
+    });
+    expect(out.soundCount).toBe(60);
+    expect(out.soundingEnd).toBe(59.3);
+    expect(out.sounds).toHaveLength(50);
+    expect(out.soundsTruncated).toBe(10);
+    const old = run(emit({ action: 'render_soundtrack' }), {
+      renderSoundtrackWav: () => ({ wav: WAV, duration: 4, sampleRate: 48000, sounds: 3, placed: 3, dropped: 0 }),
+    });
+    expect(old.soundCount).toBe(3);
+    expect(old.sounds).toBeUndefined();
+  });
+
   it('names the empty scene instead of reporting a failed export', () => {
     // renderSoundtrackWav returns bare null when nothing is placed. "The export
     // produced nothing" sends someone to debug the exporter; the real answer

@@ -5450,7 +5450,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
           }
           const soundtrack = wavResult.result as {
             success?: boolean; wavBase64?: string; byteLength?: number; duration?: number;
-            sampleRate?: number; placed?: number; dropped?: number; incomplete?: string;
+            sampleRate?: number; placed?: number; dropped?: number; incomplete?: string; soundingEnd?: number;
           } | undefined;
 
           // A refusal is a real answer — "no sounds are placed" travels intact
@@ -5469,6 +5469,8 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
                   + `Size: ${(fileSize / 1024).toFixed(1)} KB\n`
                   + `Duration: ${soundtrack.duration}s at ${soundtrack.sampleRate} Hz\n`
                   + `Mixed: ${soundtrack.placed} sound(s)\n`
+                  // Where the sound actually stops (SNDGAIN37), which the file's length does not say.
+                  + (typeof soundtrack.soundingEnd === 'number' ? `Sound ends: ${soundtrack.soundingEnd}s\n` : '')
                   // The drop count rides on the success path, because a file
                   // that wrote fine while missing sounds is the case nobody
                   // goes looking for.
