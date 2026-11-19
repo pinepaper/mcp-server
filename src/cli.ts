@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 /**
- * PinePaper MCP Server CLI
+ * PinePaper CLI & MCP Server
  *
- * Entry point for running the MCP server from command line.
+ * Entry point for both the stdio MCP server (default / `serve`) and the
+ * developer CLI subcommands (`doctor`, `info`, `browser`, `docs`, `tools`,
+ * `setup`, `init`, `check`, `preview`, `snapshot`, `render`, `benchmark`, `call`).
  */
 
 import { createServer, ServerOptions } from './index.js';
@@ -15,75 +17,37 @@ import type { ToolVerbosity } from './tools/definitions.js';
 import { getToolsForToolkit, getToolsForVerbosity } from './tools/index.js';
 import { SERVER_VERSION } from './version.js';
 import { env } from './utils/env.js';
+import { formatMainHelp, runCliCommand } from './cli/index.js';
 
 const VERSION = SERVER_VERSION;
 const VALID_VERBOSITIES: ToolVerbosity[] = ['verbose', 'compact', 'minimal'];
 
 async function main(): Promise<void> {
-  const args = process.argv.slice(2);
+  const rawArgs = process.argv.slice(2);
+  const first = rawArgs[0];
 
-  // Handle help flag
-  if (args.includes('--help') || args.includes('-h')) {
-    // Counted, not written down: "agent ~50" and "full 120+" both went stale.
-    const countFor = (p: ToolkitProfile) => `${getToolsForToolkit(getToolsForVerbosity('compact'), p).length} tools`;
-    console.log(`
-PinePaper MCP Server v${VERSION}
-
-Create animated graphics with AI using the Model Context Protocol.
-
-USAGE:
-  pinepaper-mcp [options]
-
-OPTIONS:
-  --help, -h              Show this help message
-  --version, -v           Show version number
-  --mode <mode>           Execution mode: 'puppeteer' or 'code'
-                          - puppeteer: Open browser and execute code (default)
-                          - code: Generate code only for manual paste
-  --toolkit <profile>     Tool visibility profile (default: core)
-                          - core: The craft tools and what they name, the agent workflow, canvas and query (${countFor('core')}); load more with pinepaper_set_toolkit {load}
-                          - full: Every tool (${countFor('full')})
-                          - agent: Every tool except the diagnostics and register_item (${countFor('agent')})
-                          - diagram: Diagram/flowchart tools
-                          - map: Map/choropleth tools
-                          - font: Font creation tools
-                          - minimal: Bare essentials
-  --verbosity <level>     Tool description detail level (default: compact)
-                          - verbose: Full descriptions (~42K tokens)
-                          - compact: Shorter descriptions (~37K tokens)
-                          - minimal: 1-line summaries (~22K tokens)
-
-ENVIRONMENT VARIABLES:
-  PINEPAPER_TOOLKIT           Tool visibility profile (same values as --toolkit)
-  PINEPAPER_VERBOSITY         Description verbosity (same values as --verbosity)
-  PINEPAPER_EXECUTION_MODE    Execution mode ('puppeteer' or 'code')
-  PINEPAPER_SCREENSHOT_MODE   Screenshot behavior ('on_request', 'always', 'never')
-  PINEPAPER_LOCALE            UI locale (e.g., 'en', 'ja', 'zh-CN')
-
-  Browser connection:
-  PINEPAPER_WAIT_UNTIL        What a navigation waits for: 'load',
-                              'domcontentloaded' (default), 'networkidle0',
-                              'networkidle2'
-  PINEPAPER_TIMEOUT           Navigation/readiness timeout in ms (default 30000)
-  PINEPAPER_PROXY             Chrome --proxy-server value; also ignores
-                              certificate errors, for an intercepting proxy
-  PINEPAPER_EXPORT_TIMEOUT    Governor budget for an export run in ms
-                              (default 300000)
-  PINEPAPER_GOVERNOR          'off' runs code by raw eval, giving up the
-                              governor report, error codes and seeding
-
-  Legacy: PINEPAPER_TOOL_VERBOSITY (use PINEPAPER_VERBOSITY instead)
-
-DOCUMENTATION:
-  https://pinepaper.studio/docs/mcp
-
-SUPPORT:
-  https://github.com/pinepaper/mcp-server/issues
-`);
+  // Top-level version / help when not routing into a subcommand
+  if (first === '--version' || first === '-v') {
+    console.log(VERSION);
+    process.exit(0);
+  }
+  if (first === '--help' || first === '-h') {
+    console.log(formatMainHelp());
     process.exit(0);
   }
 
-  // Handle version flag
+  // Dispatch CLI subcommands (everything except explicit `serve` and flag-only MCP startup)
+  if (first && !first.startsWith('-') && first.toLowerCase() !== 'serve') {
+    const code = await runCliCommand(rawArgs);
+    process.exit(code);
+  }
+
+  const args = first?.toLowerCase() === 'serve' ? rawArgs.slice(1) : rawArgs;
+
+  if (args.includes('--help') || args.includes('-h')) {
+    console.log(formatMainHelp());
+    process.exit(0);
+  }
   if (args.includes('--version') || args.includes('-v')) {
     console.log(VERSION);
     process.exit(0);
@@ -134,7 +98,7 @@ SUPPORT:
   if (toolkit) serverOptions.toolkit = toolkit;
   if (verbosity) serverOptions.verbosity = verbosity;
 
-  // Start the server
+  // Start the stdio MCP server
   try {
     const server = await createServer(serverOptions);
     const transport = new StdioServerTransport();

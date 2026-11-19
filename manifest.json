@@ -23,11 +23,17 @@
   ],
   "keywords": [
     "animation",
+    "motion-graphics",
+    "video",
+    "mp4",
+    "svg",
     "graphics",
     "canvas",
     "paper.js",
     "design",
-    "creative"
+    "creative",
+    "cli",
+    "ai-agents"
   ],
   "server": {
     "type": "node",

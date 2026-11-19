@@ -11,7 +11,7 @@ import { LAZY_HEAVY_SUBSYSTEMS, LAZY_HEAVY_CLASSES, ENGINE_SURFACE } from '../to
 import { env } from '../utils/env.js';
 import { jsLiteral } from '../utils/js-literal.js';
 import { createRequire } from 'node:module';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -301,7 +301,7 @@ const DRIVERS = {
 type DriverName = keyof typeof DRIVERS;
 
 /** Load a driver the user installed beside this package (or in PINEPAPER_PUPPETEER_FROM); null when absent. */
-async function importOptional(name: DriverName): Promise<{ mod: PuppeteerModule; version: string | null } | null> {
+async function importOptional(name: DriverName): Promise<{ mod: PuppeteerModule; version: string | null; source: 'package' | 'env' } | null> {
   const driver = DRIVERS[name];
   const versionFrom = (base: string): string | null => {
     try {
@@ -310,7 +310,7 @@ async function importOptional(name: DriverName): Promise<{ mod: PuppeteerModule;
     } catch { return null; /* no exported package.json: version unknown, not refused */ }
   };
   try {
-    return { mod: await driver.importHere() as PuppeteerModule, version: versionFrom(import.meta.url) };
+    return { mod: await driver.importHere() as PuppeteerModule, version: versionFrom(import.meta.url), source: 'package' };
   } catch { /* not beside this package (or present and failing to load: treated as absent, as before) */ }
   const from = env('PINEPAPER_PUPPETEER_FROM')?.trim();
   if (!from || !isAbsolute(from)) return null;
@@ -318,12 +318,87 @@ async function importOptional(name: DriverName): Promise<{ mod: PuppeteerModule;
   try {
     // require() of an ES module (Node ≥ 22.12 unflagged; engines says ≥ 22.13): the literal name, resolved from
     // the folder the user named, and no import() of a computed path anywhere in the package.
-    return { mod: driver.requireFrom(createRequire(base)) as PuppeteerModule, version: versionFrom(base) };
+    return { mod: driver.requireFrom(createRequire(base)) as PuppeteerModule, version: versionFrom(base), source: 'env' };
   } catch { return null; }
 }
 
+export interface DetectedBrowser {
+  name: string;
+  path: string;
+}
+
+export interface BrowserDriverProbe {
+  driver: DriverName | null;
+  version: string | null;
+  meetsMinVersion: boolean;
+  minMajor: number;
+  source: 'package' | 'env' | null;
+  puppeteerFromEnv: string | null;
+  chromePathEnv: string | null;
+  chromePathExists: boolean | null;
+  detectedBrowsers: DetectedBrowser[];
+}
+
+const KNOWN_BROWSER_PATHS: Readonly<Partial<Record<NodeJS.Platform, ReadonlyArray<readonly [string, string]>>>> = {
+  darwin: [
+    ['Google Chrome', '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'],
+    ['Chromium', '/Applications/Chromium.app/Contents/MacOS/Chromium'],
+    ['Brave', '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser'],
+    ['Microsoft Edge', '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge'],
+  ],
+  linux: [
+    ['Google Chrome', '/usr/bin/google-chrome'],
+    ['Google Chrome', '/usr/bin/google-chrome-stable'],
+    ['Chromium', '/usr/bin/chromium'],
+    ['Chromium', '/usr/bin/chromium-browser'],
+    ['Chromium (Snap)', '/snap/bin/chromium'],
+    ['Brave', '/usr/bin/brave-browser'],
+    ['Microsoft Edge', '/usr/bin/microsoft-edge'],
+  ],
+  win32: [
+    ['Google Chrome', 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'],
+    ['Google Chrome (x86)', 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe'],
+    ['Microsoft Edge', 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'],
+    ['Microsoft Edge (x64)', 'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe'],
+    ['Brave', 'C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe'],
+  ],
+};
+
+/** Inspect standard OS locations for Chromium-family binaries without spawning a shell. */
+export function detectInstalledBrowsers(platform: NodeJS.Platform = process.platform): DetectedBrowser[] {
+  const candidates = KNOWN_BROWSER_PATHS[platform] ?? [];
+  return candidates.filter(([, p]) => existsSync(p)).map(([name, path]) => ({ name, path }));
+}
+
+function majorVersionOf(version: string | null): number {
+  return version ? Number(version.split('.')[0]) : NaN;
+}
+
+/** Probe installed Puppeteer driver, env configuration, and local Chromium-family binaries. */
+export async function probeBrowserEnvironment(): Promise<BrowserDriverProbe> {
+  const full = await importOptional('puppeteer');
+  const loaded = full ? { name: 'puppeteer' as const, ...full } : null;
+  const fallback = !loaded ? await importOptional('puppeteer-core') : null;
+  const chosen = loaded ?? (fallback ? { name: 'puppeteer-core' as const, ...fallback } : null);
+  const puppeteerFromEnv = env('PINEPAPER_PUPPETEER_FROM')?.trim() || null;
+  const chromePathEnv = env('PINEPAPER_CHROME_PATH')?.trim() || null;
+  const version = chosen?.version ?? null;
+  const major = majorVersionOf(version);
+  return {
+    driver: chosen?.name ?? null,
+    version,
+    meetsMinVersion: chosen ? (!Number.isFinite(major) || major >= PUPPETEER_MIN_MAJOR) : false,
+    minMajor: PUPPETEER_MIN_MAJOR,
+    source: chosen?.source ?? null,
+    puppeteerFromEnv,
+    chromePathEnv,
+    chromePathExists: chromePathEnv ? existsSync(chromePathEnv) : null,
+    detectedBrowsers: detectInstalledBrowsers(),
+  };
+}
+
 function refuseOldPuppeteer(name: string, version: string | null): void {
-  const major = version ? Number(version.split('.')[0]) : NaN;
+  const major = majorVersionOf(version);
   if (Number.isFinite(major) && major < PUPPETEER_MIN_MAJOR) {
     throw new Error(`The browser tools need ${name} ${PUPPETEER_MIN_MAJOR} or newer; ${version} is installed. Run \`npm i ${name}@latest\` (or add -p ${name}@latest to the npx call), then retry.`);
   }
