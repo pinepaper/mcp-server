@@ -160,6 +160,52 @@ For code-only use (no Chrome, no 320 MB download), use
 `"env": { "PINEPAPER_EXECUTION_MODE": "code" }`. A global install works too:
 `npm i -g @pinepaper.studio/mcp-server puppeteer`, then `"command": "pinepaper-mcp"`.
 
+## CLI Commands
+
+In addition to running as an MCP server (default with no subcommand), `pinepaper-mcp` provides a full CLI workflow for diagnostics, browsing docs and tool schemas, scaffolding scenes, validating, previewing, rendering videos, and benchmarking. Every command supports `--json` (with a versioned `_meta` envelope) for scripting and AI coding agents:
+
+```bash
+# With a global install (`npm i -g @pinepaper.studio/mcp-server puppeteer`):
+pinepaper-mcp doctor
+pinepaper-mcp init my-video --template solar-system
+pinepaper-mcp check ./my-video
+pinepaper-mcp preview ./my-video --watch
+pinepaper-mcp snapshot ./my-video --times 0,1,2 --sheet
+pinepaper-mcp render ./my-video -f mp4 -o final.mp4
+pinepaper-mcp benchmark --preset wave --runs 2
+
+# Without installing globally (`npx`):
+npx -y @pinepaper.studio/mcp-server doctor
+npx -y -p puppeteer -p @pinepaper.studio/mcp-server pinepaper-mcp render ./my-video -f mp4
+```
+
+| Workflow | Command(s) | Description |
+|---|---|---|
+| **Setup & Diagnostics** | `doctor`, `info`, `browser`, `setup` | Check Node/Puppeteer/Chrome/Studio health (`doctor`), print active config (`info`), verify headless WebCodecs/WebGL (`browser verify`), and print client config snippets (`setup claude-code`). |
+| **Docs & Discovery** | `docs`, `tools` | Read built-in guides and workflow examples (`docs getting-started`, `docs relations`), or search and inspect schemas across every MCP tool (`tools search morph`, `tools show pinepaper_agent_export`). |
+| **Authoring & Preview** | `init`, `preview` | Scaffold `pinepaper.json` + `scene.batch.json` starters (`init`), or open a live visible Studio window with `--watch` hot-reload (`preview`). |
+| **Quality & Rendering** | `check` (`validate`, `lint`), `snapshot` (`frames`), `render`, `benchmark`, `call` | Validate schemas and relation graphs (`check`), capture deterministic PNG keyframes/contact sheets (`snapshot`), export MP4/WebM/GIF/APNG/SVG/PNG/PDF/HTML (`render`), profile throughput/determinism (`benchmark`), or invoke any MCP tool directly (`call`). |
+| **MCP Server** | `serve` (default), `help` | Start the stdio MCP server (`serve`, or omit subcommand) or show help for any command (`help <command>`). |
+
+Run `pinepaper-mcp help <command>` or `pinepaper-mcp <command> --help` to see all flags for any subcommand.
+
+### Agent Skills & Coding Agents
+
+Use PinePaper directly inside Claude Code, Claude Desktop, Cursor, Codex, or VS Code:
+
+```bash
+# Install the official Claude Code plugin & Design Knowledge Graph skills:
+/plugin marketplace add pinepaper/pinepaper-claude-marketplace
+/plugin install pinepaper
+
+# Print tailored MCP configs for your editor or CLI agent:
+npx -y @pinepaper.studio/mcp-server setup claude-code
+npx -y @pinepaper.studio/mcp-server setup cursor
+npx -y @pinepaper.studio/mcp-server setup codex
+```
+
+Studio also publishes an Agent Skills discovery manifest at `https://pinepaper.studio/.well-known/agent-skills/index.json` covering the Console API, `pp:` Design Knowledge Graph, Diagrams, DataViz, Maps, Rigging, Fonts, and SVG paths.
+
 ## Made with tool calls
 
 <p align="center"><img src="assets/hero.svg" width="720" alt="Animated vector graphics, made by tool calls — a tool call on the left runs and becomes a curve drawing itself on the right, composed with PinePaper Studio"></p>
@@ -311,6 +357,15 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - The server itself fetches the images, SVGs and media a tool call names by URL, and reads local files named by path. URLs that resolve to loopback, private, link-local or reserved addresses are refused, redirects included, and so are cloud metadata addresses. Local files are read only with `PINEPAPER_ALLOW_LOCAL_FILES=1`, and then only from the working directory, the export folder, and folders listed in `PINEPAPER_ASSET_DIRS` (the export folder is readable without the switch). `PINEPAPER_ALLOW_PRIVATE_NETWORK=1` allows local and LAN hosts. Metadata addresses stay refused even with it set.
 
 ## What's new in 1.6.41
+
+### Added
+
+- First-class CLI workflow on `pinepaper-mcp` (`serve`, `doctor`, `info`, `browser`,
+  `docs`, `tools`, `setup`, `init`, `check`/`validate`/`lint`, `preview`, `snapshot`/`frames`,
+  `render`, `benchmark`, `call`, `help`) with `--json` output and a versioned `_meta`
+  envelope on every command. Running with no subcommand continues to start the stdio MCP
+  server unchanged, with zero new runtime dependencies and no `child_process` calls in the
+  published package.
 
 ### Fixed
 
@@ -3406,7 +3461,24 @@ export PINEPAPER_METRICS_RETENTION=5000
 - [PinePaper API Docs](https://pinepaper.studio/api/)
 - [MCP Tools Specification](https://pinepaper.studio/api/mcp/tools-spec)
 - [MCP Server Installation](https://pinepaper.studio/api/mcp/installation)
+- [Agent Skills Guide](https://pinepaper.studio/api/guides/skills)
 - [User Guide](https://pinepaper.studio/guide/)
+
+### Programmatic Exports
+
+This package also exports clean TypeScript/ESM subpaths for Node 22+ and Bun integrations:
+
+- `@pinepaper.studio/mcp-server` — CLI (`pinepaper-mcp`), `createServer`, `PINEPAPER_TOOLS`, and handler entrypoints
+- `@pinepaper.studio/mcp-server/tools` — Tool definitions (`PINEPAPER_TOOLS`), Zod schemas, `codeGenerator`, and toolkit profiles
+- `@pinepaper.studio/mcp-server/browser` — `PinePaperBrowserController` browser automation driver and environment probes
+- `@pinepaper.studio/mcp-server/server` — MCP server factory and stdio transport
+
+### PinePaper Ecosystem
+
+- **[PinePaper Studio](https://pinepaper.studio)** — Interactive browser canvas, `pp:` design knowledge graph, relation-driven animation engine, and timeline editor
+- **[PinePaper Cloud](https://cloud.pinepaper.studio)** — Hosted HTTP MCP service, server-side FFmpeg video encoding, AI asset generation, and multi-model benchmarks
+- **[Claude Plugin & Skills Marketplace](https://github.com/pinepaper/pinepaper-claude-marketplace)** — Official Claude Code & `claude.ai` plugin bundling MCP connection + skills (`pp:` ontology, diagrams, charts, maps, rigging, fonts)
+- **[Claude Desktop Extension (.mcpb)](https://github.com/pinepaper/mcp-server/releases/latest/download/pinepaper-mcp-server.mcpb)** — One-click Desktop install with Chrome driver & bundled FFmpeg verification helpers
 
 ## Contributing
 
