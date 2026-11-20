@@ -3,13 +3,13 @@
  * and render throughput/determinism using built-in presets or a user scene.
  */
 
-import { mkdirSync, unlinkSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { sha256OfFile } from '../../tools/export-file-receipt.js';
 import { handleToolCall, type HandlerOptions } from '../../tools/handlers.js';
-import { numFlag, strFlag, suggestCommand } from '../args.js';
-import { emitJson, extractToolJson, resolveSceneInput, type ResolvedSceneInput } from '../output.js';
+import { boolFlag, numFlag, strFlag, suggestCommand } from '../args.js';
+import { emitJson, extractToolJson, failWith, resolveSceneInput, type ResolvedSceneInput } from '../output.js';
 import { loadSceneIntoStudio, withCliBrowser } from '../scene-runner.js';
 import { parseCommandArgs, type CliCommand } from '../types.js';
 
@@ -104,6 +104,7 @@ OPTIONS:
   -f, --format <fmt>    Output format: mp4 (default), webm, svg
   --duration <sec>      Video duration in seconds (default: 3)
   --fps <n>             Video FPS (default: 30)
+  --allow-local-files   Let the benchmark read local files (a saved .pinepaper.json project, image paths); off by default
   --studio-url <url>    Override Studio URL
   --json                Emit machine-readable JSON output
   -h, --help            Show help`;
@@ -114,6 +115,7 @@ async function runSingleIteration(
   format: string,
   duration: number,
   fps: number,
+  scratchDir: string,
 ): Promise<{ ok: boolean; buildMs: number; exportMs: number; totalMs: number; bytes?: number; sha256?: string; frameDigest?: string; bitrateKbps?: number; error?: string }> {
   const loaded = await loadSceneIntoStudio(input, handlerOpts, false);
   if (!loaded.ok) {
@@ -127,10 +129,10 @@ async function runSingleIteration(
     if (!ext.ok || typeof svg !== 'string') {
       return { ok: false, buildMs: loaded.loadMs, exportMs, totalMs: loaded.loadMs + exportMs, error: ext.text || 'SVG export failed' };
     }
-    const tmpSvg = join(tmpdir(), `pinepaper-bench-${Date.now()}.svg`);
+    // The scratch folder is private to this run (mkdtemp), so a predictable name in /tmp cannot be planted.
+    const tmpSvg = join(scratchDir, 'bench.svg');
     writeFileSync(tmpSvg, svg, 'utf-8');
     const { sha256, bytes } = await sha256OfFile(tmpSvg);
-    try { unlinkSync(tmpSvg); } catch { /* ignore */ }
     return { ok: true, buildMs: loaded.loadMs, exportMs, totalMs: loaded.loadMs + exportMs, bytes, sha256 };
   }
 
@@ -152,7 +154,7 @@ async function runSingleIteration(
     sha256 = (await sha256OfFile(d.filePath)).sha256;
   }
   if (d.filePath) {
-    try { unlinkSync(d.filePath); } catch { /* ignore */ }
+    try { rmSync(d.filePath, { force: true }); } catch { /* ignore */ }
   }
   const bitrateKbps = bytes > 0 && duration > 0 ? Math.round((bytes * 8) / (duration * 1000)) : undefined;
   return {
@@ -180,19 +182,20 @@ export const benchmarkCommand: CliCommand = {
       format: { type: 'string', short: 'f' },
       duration: { type: 'number' },
       fps: { type: 'number' },
+      'allow-local-files': { type: 'boolean' },
       'studio-url': { type: 'string' },
     });
     if (parsed.kind !== 'ok') return parsed.code;
 
     const format = (strFlag(parsed.parsed.flags, 'format') || 'mp4').toLowerCase();
     if (format !== 'mp4' && format !== 'webm' && format !== 'svg') {
-      console.error(`Unsupported benchmark format "${format}". Use mp4, webm, or svg.`);
-      return 2;
+      return failWith(parsed.json, 'benchmark', `Unsupported benchmark format "${format}". Use mp4, webm, or svg.`, 2);
     }
     const runs = Math.max(1, Math.min(20, Math.trunc(numFlag(parsed.parsed.flags, 'runs') ?? 1)));
     const duration = numFlag(parsed.parsed.flags, 'duration') ?? 3;
     const fps = numFlag(parsed.parsed.flags, 'fps') ?? 30;
     const studioUrl = strFlag(parsed.parsed.flags, 'studio-url');
+    const allowLocalFiles = boolFlag(parsed.parsed.flags, 'allow-local-files') === true;
     const targetPath = parsed.parsed.positionals[0];
 
     let input: ResolvedSceneInput;
@@ -202,24 +205,20 @@ export const benchmarkCommand: CliCommand = {
         input = resolveSceneInput(targetPath);
         label = input.filePath;
       } catch (e) {
-        console.error(`pinepaper-mcp benchmark: ${e instanceof Error ? e.message : String(e)}`);
-        return 1;
+        return failWith(parsed.json, 'benchmark', e instanceof Error ? e.message : String(e), 1);
       }
     } else {
       const presetName = (strFlag(parsed.parsed.flags, 'preset') || 'wave').toLowerCase();
       const preset = PRESETS[presetName];
       if (!preset) {
         const hint = suggestCommand(presetName, Object.keys(PRESETS));
-        console.error(`Unknown preset "${presetName}".${hint ? ` Did you mean "${hint}"?` : ''} Available: ${Object.keys(PRESETS).join(', ')}`);
-        return 1;
+        return failWith(parsed.json, 'benchmark', `Unknown preset "${presetName}".${hint ? ` Did you mean "${hint}"?` : ''} Available: ${Object.keys(PRESETS).join(', ')}`, 1);
       }
-      const scratchDir = join(tmpdir(), 'pinepaper-benchmark');
-      mkdirSync(scratchDir, { recursive: true });
       const rawText = JSON.stringify({ operations: preset.operations });
       input = {
         kind: 'batch',
         filePath: `<preset:${preset.name}>`,
-        dir: scratchDir,
+        dir: tmpdir(),
         rawText,
         parsed: { operations: preset.operations },
         projectConfig: { canvas: preset.canvas },
@@ -227,14 +226,15 @@ export const benchmarkCommand: CliCommand = {
       label = `preset:${preset.name} (${preset.description})`;
     }
 
+    const scratchDir = mkdtempSync(join(tmpdir(), 'pinepaper-benchmark-'));
     const connectStart = Date.now();
     let connectMs = 0;
     try {
-      const results = await withCliBrowser({ studioUrl, headless: true }, async (_ctl, handlerOpts) => {
+      const results = await withCliBrowser({ studioUrl, headless: true, allowLocalFiles }, async (_ctl, handlerOpts) => {
         connectMs = Date.now() - connectStart;
         const out = [];
         for (let i = 0; i < runs; i++) {
-          out.push(await runSingleIteration(input, handlerOpts, format, duration, fps));
+          out.push(await runSingleIteration(input, handlerOpts, format, duration, fps, scratchDir));
         }
         return out;
       });
@@ -268,9 +268,9 @@ export const benchmarkCommand: CliCommand = {
       return ok ? 0 : 1;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      if (parsed.json) emitJson('benchmark', { ok: false, error: msg });
-      else console.error(`pinepaper-mcp benchmark: ${msg}`);
-      return 1;
+      return failWith(parsed.json, 'benchmark', msg, 1);
+    } finally {
+      try { rmSync(scratchDir, { recursive: true, force: true }); } catch { /* ignore */ }
     }
   },
 };

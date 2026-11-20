@@ -17,7 +17,7 @@ import type { ToolVerbosity } from './tools/definitions.js';
 import { getToolsForToolkit, getToolsForVerbosity } from './tools/index.js';
 import { SERVER_VERSION } from './version.js';
 import { env } from './utils/env.js';
-import { formatMainHelp, runCliCommand } from './cli/index.js';
+import { formatMainHelp, routeFirstArg, runCliCommand } from './cli/index.js';
 
 const VERSION = SERVER_VERSION;
 const VALID_VERBOSITIES: ToolVerbosity[] = ['verbose', 'compact', 'minimal'];
@@ -36,10 +36,17 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
-  // Dispatch CLI subcommands (everything except explicit `serve` and flag-only MCP startup)
-  if (first && !first.startsWith('-') && first.toLowerCase() !== 'serve') {
+  // Dispatch CLI subcommands (everything except explicit `serve` and flag-only MCP startup).
+  // Before the CLI existed, a first argument that was not a flag was ignored and the server started, so a client
+  // config with a stray word still works: an unknown word only errors when a person typed it at a terminal.
+  const route = routeFirstArg(first, process.stdin.isTTY === true);
+  if (route === 'command' || route === 'unknown-command') {
     const code = await runCliCommand(rawArgs);
     process.exit(code);
+  }
+  if (route === 'unknown-serve') {
+    // stderr only: stdout carries nothing but MCP protocol on the server path.
+    console.error(`pinepaper-mcp: ignoring unknown argument "${first}" and starting the MCP server (run with a terminal on stdin to see the command list).`);
   }
 
   const args = first?.toLowerCase() === 'serve' ? rawArgs.slice(1) : rawArgs;

@@ -11,7 +11,7 @@ import { env } from '../../utils/env.js';
 import { getExportDir } from '../../utils/export-dir.js';
 import { trustedFetch } from '../../utils/safe-fetch.js';
 import { boolFlag, strFlag } from '../args.js';
-import { emitJson, formatCheckLine, type CheckStatus } from '../output.js';
+import { emitJson, formatCheckLine, redactUrl, type CheckStatus } from '../output.js';
 import { parseCommandArgs, type CliCommand } from '../types.js';
 
 export interface DoctorCheck {
@@ -70,8 +70,10 @@ function checkExportFolder(): DoctorCheck {
   }
 }
 
-async function checkStudioConnectivity(studioUrl: string): Promise<DoctorCheck> {
-  const buildUrl = studioUrl.replace(/\/$/, '') + '/build.json';
+async function checkStudioConnectivity(studioUrlRaw: string): Promise<DoctorCheck> {
+  // Fetched as given, printed without credentials (a thrown message may quote the URL too).
+  const studioUrl = redactUrl(studioUrlRaw);
+  const buildUrl = studioUrlRaw.replace(/\/$/, '') + '/build.json';
   const start = Date.now();
   try {
     const res = await trustedFetch(buildUrl, { signal: AbortSignal.timeout(5000) });
@@ -97,7 +99,7 @@ async function checkStudioConnectivity(studioUrl: string): Promise<DoctorCheck> 
       id: 'studio',
       status: 'WARN',
       label: 'PinePaper Studio',
-      detail: `Could not reach ${buildUrl}: ${e instanceof Error ? e.message : String(e)}`,
+      detail: `Could not reach ${redactUrl(buildUrl)}: ${redactUrl(e instanceof Error ? e.message : String(e))}`,
       fix: 'Check internet access or proxy, or run in code mode (PINEPAPER_EXECUTION_MODE=code).',
     };
   }
@@ -119,7 +121,9 @@ export const doctorCommand: CliCommand = {
 
     const offline = boolFlag(parsed.parsed.flags, 'offline') === true;
     const launch = boolFlag(parsed.parsed.flags, 'launch') === true;
-    const studioUrl = strFlag(parsed.parsed.flags, 'studio-url') || env('PINEPAPER_STUDIO_URL') || 'https://pinepaper.studio';
+    const studioUrlRaw = strFlag(parsed.parsed.flags, 'studio-url') || env('PINEPAPER_STUDIO_URL') || 'https://pinepaper.studio';
+    // The URL is only ever printed without credentials (user:token@host); studioUrlRaw is what is fetched.
+    const studioUrl = redactUrl(studioUrlRaw);
 
     const probe = await probeBrowserEnvironment();
     const checks: DoctorCheck[] = [checkNodeRuntime()];
@@ -165,7 +169,7 @@ export const doctorCommand: CliCommand = {
         status: 'PASS',
         label: 'Browser binary',
         detail: probe.detectedBrowsers.length
-          ? `Puppeteer managed Chrome + detected ${probe.detectedBrowsers.map((b) => b.name).join(', ')}`
+          ? `Puppeteer managed Chrome + detected ${[...new Set(probe.detectedBrowsers.map((b) => b.name))].join(', ')}`
           : 'Puppeteer managed Chrome',
       });
     } else if (probe.detectedBrowsers.length > 0) {
@@ -193,7 +197,7 @@ export const doctorCommand: CliCommand = {
         detail: `Skipped offline check (${studioUrl})`,
       });
     } else {
-      checks.push(await checkStudioConnectivity(studioUrl));
+      checks.push(await checkStudioConnectivity(studioUrlRaw));
     }
 
     checks.push(checkExportFolder());
@@ -209,7 +213,7 @@ export const doctorCommand: CliCommand = {
     });
 
     if (launch) {
-      const controller = new PinePaperBrowserController({ studioUrl, headless: true });
+      const controller = new PinePaperBrowserController({ studioUrl: studioUrlRaw, headless: true });
       const start = Date.now();
       try {
         await controller.connect();

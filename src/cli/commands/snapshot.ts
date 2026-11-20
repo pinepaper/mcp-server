@@ -7,7 +7,7 @@ import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { handleToolCall } from '../../tools/handlers.js';
 import { boolFlag, numFlag, strFlag } from '../args.js';
-import { emitJson, extractToolJson, resolveSceneInput, type ResolvedSceneInput } from '../output.js';
+import { emitJson, extractToolJson, failWith, resolveSceneInput, type ResolvedSceneInput } from '../output.js';
 import { loadSceneIntoStudio, withCliBrowser } from '../scene-runner.js';
 import { parseCommandArgs, type CliCommand } from '../types.js';
 
@@ -26,13 +26,16 @@ OPTIONS:
   --sheet               Render one tiled contact-sheet PNG instead of individual frame files
   -o, --output <path>   Output directory (for frames) or file path (for --sheet or single frame)
   --allow-code          Allow custom relations/hooks in loaded scene
+  --allow-local-files   Let the capture read local files (a saved .pinepaper.json project, image paths); off by default
   --studio-url <url>    Override Studio URL
   --json                Emit machine-readable JSON output
   -h, --help            Show help`;
 
-function parseTimes(raw?: string, count = 4, duration = 4): number[] {
-  if (raw) {
-    const nums = raw.split(',').map((s) => Number(s.trim()));
+export function parseTimes(raw?: string, count = 4, duration = 4): number[] {
+  if (raw !== undefined) {
+    const parts = raw.split(',').map((s) => s.trim());
+    // An empty entry ("1," or ",,") is a mistake, not time 0: Number('') is 0.
+    const nums = parts.map((s) => (s === '' ? NaN : Number(s)));
     if (!nums.length || nums.some((n) => !Number.isFinite(n) || n < 0)) {
       throw new Error(`Invalid --times list "${raw}". Expected comma-separated non-negative numbers.`);
     }
@@ -64,6 +67,7 @@ export const snapshotCommand: CliCommand = {
       sheet: { type: 'boolean' },
       output: { type: 'string', short: 'o' },
       'allow-code': { type: 'boolean' },
+      'allow-local-files': { type: 'boolean' },
       'studio-url': { type: 'string' },
     });
     if (parsed.kind !== 'ok') return parsed.code;
@@ -84,17 +88,17 @@ export const snapshotCommand: CliCommand = {
     try {
       times = parseTimes(strFlag(parsed.parsed.flags, 'times'), count, duration);
     } catch (e) {
-      console.error(e instanceof Error ? e.message : String(e));
-      return 2;
+      return failWith(parsed.json, 'snapshot', e instanceof Error ? e.message : String(e), 2);
     }
 
     const sheet = boolFlag(parsed.parsed.flags, 'sheet') === true;
     const explicitOut = strFlag(parsed.parsed.flags, 'output');
     const allowCode = boolFlag(parsed.parsed.flags, 'allow-code') === true;
+    const allowLocalFiles = boolFlag(parsed.parsed.flags, 'allow-local-files') === true;
     const studioUrl = strFlag(parsed.parsed.flags, 'studio-url');
 
     try {
-      const outcome = await withCliBrowser({ studioUrl, headless: true, allowCode }, async (_ctl, handlerOpts) => {
+      const outcome = await withCliBrowser({ studioUrl, headless: true, allowCode, allowLocalFiles }, async (_ctl, handlerOpts) => {
         const loaded = await loadSceneIntoStudio(input, handlerOpts, allowCode);
         if (!loaded.ok) return { ok: false as const, error: loaded.error || 'Scene load failed' };
 

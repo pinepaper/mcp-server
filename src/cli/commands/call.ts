@@ -8,7 +8,7 @@ import { PINEPAPER_TOOLS } from '../../tools/definitions.js';
 import { handleToolCall } from '../../tools/handlers.js';
 import { env } from '../../utils/env.js';
 import { boolFlag, strFlag, suggestCommand } from '../args.js';
-import { emitJson, extractToolJson } from '../output.js';
+import { emitJson, extractToolJson, failWith } from '../output.js';
 import { withCliBrowser, withScopedCapabilities } from '../scene-runner.js';
 import { parseCommandArgs, type CliCommand } from '../types.js';
 
@@ -80,29 +80,25 @@ export const callCommand: CliCommand = {
 
     const rawTool = parsed.parsed.positionals[0];
     if (!rawTool) {
-      console.error('Usage: pinepaper-mcp call <tool-name> [json-args|@file|-]');
-      return 2;
+      return failWith(parsed.json, 'call', 'Usage: pinepaper-mcp call <tool-name> [json-args|@file|-]', 2);
     }
 
     const tool = resolveToolName(rawTool);
     if (!tool) {
       const hint = suggestCommand(rawTool, PINEPAPER_TOOLS.map((t) => t.name));
-      console.error(`Unknown tool "${rawTool}".${hint ? ` Did you mean "${hint}"?` : ''}`);
-      return 1;
+      return failWith(parsed.json, 'call', `Unknown tool "${rawTool}".${hint ? ` Did you mean "${hint}"?` : ''}`, 1, { tool: rawTool });
     }
 
     let toolArgs: Record<string, unknown>;
     try {
       toolArgs = await parseCallArgs(parsed.parsed.positionals[1]);
     } catch (e) {
-      console.error(`Invalid tool arguments: ${e instanceof Error ? e.message : String(e)}`);
-      return 2;
+      return failWith(parsed.json, 'call', `Invalid tool arguments: ${e instanceof Error ? e.message : String(e)}`, 2, { tool: tool.name });
     }
 
     const mode = (strFlag(parsed.parsed.flags, 'mode') || env('PINEPAPER_EXECUTION_MODE') || 'puppeteer').toLowerCase();
     if (mode !== 'puppeteer' && mode !== 'code') {
-      console.error(`Invalid --mode "${mode}". Use "puppeteer" or "code".`);
-      return 2;
+      return failWith(parsed.json, 'call', `Invalid --mode "${mode}". Use "puppeteer" or "code".`, 2, { tool: tool.name });
     }
     const allowCode = boolFlag(parsed.parsed.flags, 'allow-code') === true;
     const allowLocalFiles = boolFlag(parsed.parsed.flags, 'allow-local-files') === true;

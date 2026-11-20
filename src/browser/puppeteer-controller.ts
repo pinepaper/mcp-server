@@ -10,6 +10,7 @@ import { mcpLog } from '../utils/mcp-log.js';
 import { LAZY_HEAVY_SUBSYSTEMS, LAZY_HEAVY_CLASSES, ENGINE_SURFACE } from '../tools/engine-surface.js';
 import { env } from '../utils/env.js';
 import { jsLiteral } from '../utils/js-literal.js';
+import { redactUrl } from '../utils/redact-url.js';
 import { createRequire } from 'node:module';
 import { existsSync, readFileSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
@@ -470,8 +471,8 @@ export class PinePaperBrowserController {
     };
 
     console.error(`[PinePaper] Controller initialized:`);
-    console.error(`[PinePaper]   Original URL: ${originalUrl}`);
-    console.error(`[PinePaper]   Agent URL: ${studioUrl}`);
+    console.error(`[PinePaper]   Original URL: ${redactUrl(originalUrl)}`);
+    console.error(`[PinePaper]   Agent URL: ${redactUrl(studioUrl)}`);
     console.error(`[PinePaper]   Headless: ${this.config.headless}`);
     console.error(`[PinePaper]   waitUntil: ${this.config.waitUntil}, timeout: ${this.config.timeout}ms`);
     if (this.config.proxy) {
@@ -706,7 +707,7 @@ export class PinePaperBrowserController {
         height: this.config.viewportHeight,
       });
 
-      console.error(`[PinePaper] Navigating to ${this.config.studioUrl}...`);
+      console.error(`[PinePaper] Navigating to ${redactUrl(this.config.studioUrl)}...`);
       await this.page.goto(this.config.studioUrl, {
         waitUntil: this.config.waitUntil,
         timeout: this.config.timeout,
@@ -1574,7 +1575,7 @@ export class PinePaperBrowserController {
         ? this.config.studioUrl
         : this.getAgentUrl(this.config.studioUrl);
 
-      console.error(`[PinePaper] Navigating to agent URL: ${targetUrl}`);
+      console.error(`[PinePaper] Navigating to agent URL: ${redactUrl(targetUrl)}`);
 
       // Navigate the existing page to PinePaper (converts about:blank to PinePaper)
       await this.page.goto(targetUrl, {

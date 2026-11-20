@@ -65,6 +65,24 @@ export function emitJson(command: string, payload: Record<string, unknown>): voi
   console.log(JSON.stringify({ _meta: cliMeta(command), ...payload }, null, 2));
 }
 
+/**
+ * Report a failure in the form the caller asked for and return the exit code: one line on stderr, or with `--json`
+ * a `{ ok: false, error }` envelope on stdout. Every error path goes through here so `--json` is honoured everywhere.
+ */
+export function failWith(
+  json: boolean,
+  command: string,
+  message: string,
+  code = 1,
+  extra: Record<string, unknown> = {},
+): number {
+  if (json) emitJson(command, { ok: false, error: message, ...extra });
+  else console.error(`pinepaper-mcp ${command}: ${message}`);
+  return code;
+}
+
+export { redactUrl } from '../utils/redact-url.js';
+
 /** Format a single status line for terminal diagnostics. */
 export function formatCheckLine(status: CheckStatus, label: string, detail: string, fix?: string): string {
   const tag = `[${status}]`.padEnd(6);
