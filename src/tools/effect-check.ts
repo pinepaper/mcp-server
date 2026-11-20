@@ -60,6 +60,19 @@ const FINGERPRINT_JS = `function __ppFingerprint() {
   // window moves no member, so the items alone read a real create or modify as
   // no change.
   try { if (app.listPatterns) o.patterns = S(app.listPatterns()); } catch (e) {}
+  // Deformations live in the engine's own registry, not on the item (DEFORMWARN40: a deform that rendered was
+  // reported NO CHANGE). Its preset, params and stack are what a deform call authors; the live geometry is not.
+  try {
+    // deformPresets is a lazy getter: read it only once something has made it, or every call would build it.
+    const dp = app._initialized && app._initialized.has('deformPresets') ? app.deformPresets : null;
+    if (dp && dp._active && typeof dp._active.forEach === 'function') {
+      const ds = [];
+      dp._active.forEach(function (st, id) {
+        ds.push([id, st && st.presetName, st && st.params, st && st.stack ? st.stack.map(function (l) { return [l.presetName, l.params]; }) : []]);
+      });
+      o.deforms = S(ds);
+    }
+  } catch (e) {}
   // SCENE-LEVEL STATE OUTSIDE ITEMS (sweep v2: add_filter and camera_animate
   // were real changes read as none). The camera's track is a relation on the
   // pseudo-source 'camera', which no registry item carries.

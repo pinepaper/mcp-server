@@ -2590,6 +2590,21 @@ const UNANIMATED_TEXT_KEYS_SENTENCE = `' is not an animatable property in this s
  * pinepaper_keyframe_animate and the batch keyframe_animate op: the batch had its own copy of the emitter and none
  * of these (SIZEKEY-PAIR: the same keys warned through the tool and not through the batch).
  */
+/**
+ * EASESTART40: easing on the first keyframe of a track does nothing by default (easing shapes the move ARRIVING at
+ * its key, and nothing arrives at the first). The reply said so in a note; a runner that reads only warnings saw a
+ * clean success. The sentence, or null when the first key's easing does apply (departure reading, hold / step, or an
+ * append, whose first new key may follow an existing one).
+ */
+export function firstKeyEasingNoEffect(keyframes: readonly Keyframe[], { append = false, easingAt }: { append?: boolean; easingAt?: 'arrival' | 'departure' } = {}): string | null {
+  if (append || easingAt === 'departure' || keyframes.length < 2) return null;
+  const first = [...keyframes].sort((a, b) => a.time - b.time)[0] as { easing?: unknown } | undefined;
+  const e = first?.easing;
+  if (e === undefined || e === null || e === 'linear' || e === 'hold' || e === 'step') return null;
+  const name = typeof e === 'string' ? `'${e}'` : JSON.stringify(e);
+  return `easing ${name} is on the first keyframe, where it has no effect by default: easing shapes the segment ARRIVING at a keyframe. Put it on the keyframe you are moving to, or pass easingAt: 'departure' to read every easing as the move LEAVING its key (current studio).`;
+}
+
 function keyframeResultNotes(keyframes: readonly Keyframe[], { append = false, easingAt }: { append?: boolean; easingAt?: 'arrival' | 'departure' } = {}): string {
   // A KEY THAT LEAVES A PROPERTY OUT (round 9 HH, engine 2.30): the engine
   // treats the gap as a break in that property's track rather than holding or
@@ -2606,7 +2621,6 @@ function keyframeResultNotes(keyframes: readonly Keyframe[], { append = false, e
   const gapNote = !append && gaps.length && keyframes.length > 1
     ? `, propertyGaps: ${JSON.stringify(gaps.slice(0, 10))}, gapWarning: ${JSON.stringify(`${gaps.length} keyframe(s) leave out a property other keys animate (${[...new Set(gaps.flatMap((g) => g.missing))].join(', ')}). The engine can break that property's track at such a key; repeat the value on every key — hold it by repeating the previous value.`)}`
     : '';
-  const first = [...keyframes].sort((a, b) => a.time - b.time)[0] as { easing?: string } | undefined;
   // SIZEKEY-PAIR (mcp-cloud #28): on a studio before FxTool #262, x (or
   // position) keyed beside fontSize on one text item drifted in an export: the
   // size was applied after the position, and a text resizes around its anchor.
@@ -2615,9 +2629,8 @@ function keyframeResultNotes(keyframes: readonly Keyframe[], { append = false, e
     // A studio that writes text size before position (FxTool #262, which also brought _applyScaleParams) holds x.
     ? `, ...(typeof app._applyScaleParams !== 'function' ? { sizekeyPairWarning: ${JSON.stringify('x (or position) and fontSize keyed on the same text item drift off the keyed position in an export on this studio (SIZEKEY-PAIR). Animate scaleX / scaleY instead of fontSize, or move a group that holds the text; or update the studio.')} } : {})`
     : '';
-  const easingNote = easingAt !== 'departure' && first?.easing && first.easing !== 'linear'
-    ? `, note: ${JSON.stringify(`easing '${first.easing}' is on the first keyframe, where it has no effect by default: easing shapes the segment ARRIVING at a keyframe. Put it on the keyframe you are moving to, or pass easingAt: 'departure' to read every easing as the move LEAVING its key (current studio).`)}`
-    : '';
+  const firstEase = firstKeyEasingNoEffect(keyframes, { append, easingAt });
+  const easingNote = firstEase ? `, note: ${JSON.stringify(firstEase)}` : '';
   return `${easingNote}${sizekeyPairNote}${gapNote}`;
 }
 
@@ -2757,6 +2770,9 @@ function generateKeyframeAnimateCode(
   const filterKeyCheck = `
   const __filterIgnored = ${unanimatedFilterKeysJs(keyframes.flatMap((k) => Object.keys((k as { properties?: object }).properties ?? {})))};
   if (__filterIgnored.length) __warn.push(__filterIgnored.join(', ') + ${UNANIMATED_FILTER_KEYS_SENTENCE});`;
+  const __firstEase = firstKeyEasingNoEffect(keyframes, { append, easingAt });
+  const firstEaseWarn = __firstEase ? `
+  __warn.push(${JSON.stringify(__firstEase)});` : '';
   const easingAtCheck = easingAt !== undefined ? `
   if (__opts && Object.prototype.hasOwnProperty.call(__opts, 'easingAt')) __warn.push('easingAt ' + ${JSON.stringify(JSON.stringify(easingAt))} + ' was not applied: this studio predates it, so every easing was read as the move ARRIVING at its key. Put each easing on the key the move goes to instead.');` : '';
   const runtimeWarning = `, ...(${textKeysJs ? '__ignored.length || ' : ''}__filterIgnored.length ? { ignoredProperties: ${textKeysJs ? '__ignored.concat(__filterIgnored)' : '__filterIgnored'} } : {}), ...(__warn.length ? { warning: __warn.join(' ') } : {})`;
@@ -2786,7 +2802,7 @@ ${guard.before}
   app.addAnimation(${addAnimTarget}, ${keyframesJson}, __opts);
   const __warn = [];${unitsNote}
 ${guard.after}
-  ${deadKeysJs('__deadKeys')}${easingAtCheck}${textKeyCheck}${filterKeyCheck}
+  ${deadKeysJs('__deadKeys')}${easingAtCheck}${firstEaseWarn}${textKeyCheck}${filterKeyCheck}
   const __now = (__ki && __ki.data && Array.isArray(__ki.data.keyframes)) ? __ki.data.keyframes.map(function(k) { return k && k.time; }) : [];
   const __kept = __prev.every(function(t) { return __now.indexOf(t) >= 0; });${append ? `
   // Property gaps across the merged track (the same check a single call makes

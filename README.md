@@ -378,6 +378,19 @@ terminal says `Unknown command ... Did you mean ...` and exits 2. When stdin is 
 client launched it), an unknown first word is ignored with one warning line on stderr and the stdio
 server starts as before; nothing but MCP protocol is written to stdout.
 
+### Fixed
+
+- A background colour that is not a colour (`"#notacolor"`) is refused on every background route
+  (`pinepaper_background`, a batch `set_background`, and `backgroundColor` on start_job, reset and
+  create_scene), as it already was on items. It used to be set with success and drawn black.
+- `pinepaper_deform` no longer reports "NO CHANGE" for a deformation that it applied.
+- Easing on the first keyframe of a track, which has no effect by default, is now a warning in
+  the reply, not only a note. Put the easing on the keyframe you are moving to, or pass
+  `easingAt: 'departure'`.
+- A remote URL whose host resolves into 198.18.0.0/15, the range a fake-IP DNS proxy hands out,
+  is refused with the route that works: download the file and import it by local path. This
+  server connects directly and does not go through `HTTPS_PROXY`.
+
 ## What's new in 1.6.41
 
 ### Fixed
