@@ -33,6 +33,7 @@ OPTIONS:
   --audio-codec <any|aac>   Require AAC audio for MP4 (fails fast if unavailable)
   --allow-code              Allow custom relations/hooks in loaded scene
   --allow-local-files       Let the render read local files (a saved .pinepaper.json project, image paths); off by default
+  --allow-stale-build       Export even if the studio page is on an old build (default: refused, nothing exported)
   --studio-url <url>        Override Studio URL
   --json                    Emit machine-readable JSON output
   -h, --help                Show help`;
@@ -86,6 +87,7 @@ export const renderCommand: CliCommand = {
       'audio-codec': { type: 'string' },
       'allow-code': { type: 'boolean' },
       'allow-local-files': { type: 'boolean' },
+      'allow-stale-build': { type: 'boolean' },
       'studio-url': { type: 'string' },
     });
     if (parsed.kind !== 'ok') return parsed.code;
@@ -126,6 +128,7 @@ export const renderCommand: CliCommand = {
     const allowCode = boolFlag(parsed.parsed.flags, 'allow-code') === true;
     const allowLocalFiles = boolFlag(parsed.parsed.flags, 'allow-local-files') === true;
     const studioUrl = strFlag(parsed.parsed.flags, 'studio-url');
+    const stale = boolFlag(parsed.parsed.flags, 'allow-stale-build') === true ? { allowStaleBuild: true } : {};
     const platform = strFlag(parsed.parsed.flags, 'platform') || cfg.platform || 'auto';
     // The manifest's fps and duration describe its video. A still (png, pdf) has neither, and the export refuses an
     // fps for one, so `render -f png` failed on every starter. Only a flag the person typed is passed for a still.
@@ -141,7 +144,7 @@ export const renderCommand: CliCommand = {
         const expStart = Date.now();
         if (format === 'svg' || format === 'html') {
           const toolName = format === 'svg' ? 'pinepaper_export_svg' : 'pinepaper_export_widget_html';
-          const extRes = extractToolJson(await handleToolCall(toolName, {}, handlerOpts));
+          const extRes = extractToolJson(await handleToolCall(toolName, { ...stale }, handlerOpts));
           const payloadObj = (extRes.data as { result?: Record<string, unknown> } | null)?.result;
           const contentStr = format === 'svg' ? payloadObj?.svgString : payloadObj?.html;
           if (!extRes.ok || typeof contentStr !== 'string' || !contentStr.length) {
@@ -170,6 +173,7 @@ export const renderCommand: CliCommand = {
           ...(quality ? { quality } : {}),
           ...(deterministic !== undefined ? { deterministic } : {}),
           ...(audioCodec ? { audioCodec } : {}),
+          ...stale,
         };
         const callRes = await handleToolCall('pinepaper_agent_export', exportArgs, { ...handlerOpts, saveToFile: true });
         const ext = extractToolJson(callRes);

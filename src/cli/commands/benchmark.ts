@@ -105,6 +105,7 @@ OPTIONS:
   --duration <sec>      Video duration in seconds (default: 3)
   --fps <n>             Video FPS (default: 30)
   --allow-local-files   Let the benchmark read local files (a saved .pinepaper.json project, image paths); off by default
+  --allow-stale-build   Run even if the studio page is on an old build (default: refused)
   --studio-url <url>    Override Studio URL
   --json                Emit machine-readable JSON output
   -h, --help            Show help`;
@@ -116,6 +117,7 @@ async function runSingleIteration(
   duration: number,
   fps: number,
   scratchDir: string,
+  stale: { allowStaleBuild?: true } = {},
 ): Promise<{ ok: boolean; buildMs: number; exportMs: number; totalMs: number; bytes?: number; sha256?: string; frameDigest?: string; bitrateKbps?: number; error?: string }> {
   const loaded = await loadSceneIntoStudio(input, handlerOpts, false);
   if (!loaded.ok) {
@@ -123,7 +125,7 @@ async function runSingleIteration(
   }
   const expStart = Date.now();
   if (format === 'svg') {
-    const ext = extractToolJson(await handleToolCall('pinepaper_export_svg', {}, handlerOpts));
+    const ext = extractToolJson(await handleToolCall('pinepaper_export_svg', { ...stale }, handlerOpts));
     const exportMs = Date.now() - expStart;
     const svg = (ext.data as { result?: { svgString?: string } } | null)?.result?.svgString;
     if (!ext.ok || typeof svg !== 'string') {
@@ -139,7 +141,7 @@ async function runSingleIteration(
   const ext = extractToolJson(
     await handleToolCall(
       'pinepaper_agent_export',
-      { platform: 'auto', format, duration, fps, quality: 'standard', deterministic: true },
+      { platform: 'auto', format, duration, fps, quality: 'standard', deterministic: true, ...stale },
       { ...handlerOpts, saveToFile: true },
     ),
   );
@@ -183,6 +185,7 @@ export const benchmarkCommand: CliCommand = {
       duration: { type: 'number' },
       fps: { type: 'number' },
       'allow-local-files': { type: 'boolean' },
+      'allow-stale-build': { type: 'boolean' },
       'studio-url': { type: 'string' },
     });
     if (parsed.kind !== 'ok') return parsed.code;
@@ -195,6 +198,7 @@ export const benchmarkCommand: CliCommand = {
     const duration = numFlag(parsed.parsed.flags, 'duration') ?? 3;
     const fps = numFlag(parsed.parsed.flags, 'fps') ?? 30;
     const studioUrl = strFlag(parsed.parsed.flags, 'studio-url');
+    const stale = boolFlag(parsed.parsed.flags, 'allow-stale-build') === true ? { allowStaleBuild: true as const } : {};
     const allowLocalFiles = boolFlag(parsed.parsed.flags, 'allow-local-files') === true;
     const targetPath = parsed.parsed.positionals[0];
 
@@ -234,7 +238,7 @@ export const benchmarkCommand: CliCommand = {
         connectMs = Date.now() - connectStart;
         const out = [];
         for (let i = 0; i < runs; i++) {
-          out.push(await runSingleIteration(input, handlerOpts, format, duration, fps, scratchDir));
+          out.push(await runSingleIteration(input, handlerOpts, format, duration, fps, scratchDir, stale));
         }
         return out;
       });

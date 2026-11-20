@@ -27,6 +27,7 @@ OPTIONS:
   -o, --output <path>   Output directory (for frames) or file path (for --sheet or single frame)
   --allow-code          Allow custom relations/hooks in loaded scene
   --allow-local-files   Let the capture read local files (a saved .pinepaper.json project, image paths); off by default
+  --allow-stale-build   Capture even if the studio page is on an old build (default: refused)
   --studio-url <url>    Override Studio URL
   --json                Emit machine-readable JSON output
   -h, --help            Show help`;
@@ -68,6 +69,7 @@ export const snapshotCommand: CliCommand = {
       output: { type: 'string', short: 'o' },
       'allow-code': { type: 'boolean' },
       'allow-local-files': { type: 'boolean' },
+      'allow-stale-build': { type: 'boolean' },
       'studio-url': { type: 'string' },
     });
     if (parsed.kind !== 'ok') return parsed.code;
@@ -96,6 +98,7 @@ export const snapshotCommand: CliCommand = {
     const allowCode = boolFlag(parsed.parsed.flags, 'allow-code') === true;
     const allowLocalFiles = boolFlag(parsed.parsed.flags, 'allow-local-files') === true;
     const studioUrl = strFlag(parsed.parsed.flags, 'studio-url');
+    const stale = boolFlag(parsed.parsed.flags, 'allow-stale-build') === true ? { allowStaleBuild: true } : {};
 
     try {
       const outcome = await withCliBrowser({ studioUrl, headless: true, allowCode, allowLocalFiles }, async (_ctl, handlerOpts) => {
@@ -104,7 +107,7 @@ export const snapshotCommand: CliCommand = {
 
         if (sheet) {
           const ext = extractToolJson(
-            await handleToolCall('pinepaper_capture_frames', { times, sheet: { format: 'png' } }, handlerOpts),
+            await handleToolCall('pinepaper_capture_frames', { times, sheet: { format: 'png' }, ...stale }, handlerOpts),
           );
           const dataObj = (ext.data ?? {}) as { filePath?: string; fileSize?: number; tiles?: number };
           if (!ext.ok || !dataObj.filePath) {
@@ -125,7 +128,7 @@ export const snapshotCommand: CliCommand = {
         }
 
         const ext = extractToolJson(
-          await handleToolCall('pinepaper_capture_frames', { times, includeDataUrls: true }, handlerOpts),
+          await handleToolCall('pinepaper_capture_frames', { times, includeDataUrls: true, ...stale }, handlerOpts),
         );
         const cap = (ext.data as { result?: { frames?: Array<{ time: number; hash?: string; dataUrl?: string }> } } | null)?.result;
         if (!ext.ok || !Array.isArray(cap?.frames)) {

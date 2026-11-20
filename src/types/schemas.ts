@@ -9,6 +9,12 @@
  */
 
 import { z } from 'zod';
+
+/**
+ * Read by the stale-build guard before the tool runs (tools/stale-build-guard.ts), so nothing here uses it: it is
+ * declared so the schema the handler parses with accepts what the published schema advertises.
+ */
+const allowStaleBuildField = z.boolean().optional().describe('Export even if the studio page is on an old build (default: refused, nothing exported).');
 import { isCssColor, colorProblems, COLOR_ERROR_HINT } from './css-color.js';
 import { ENGINE_EASING_NAMES, DESIGN_MEDIA, DESIGN_MEDIA_APPLY, FILTER_TYPES, LINEAGE_KINDS, STYLED_SCENE_STYLES, PATTERN_KINDS, ANIMATION_TYPES, ANIMATION_WAVEFORMS, ANIMATION_ORIGINS, ENGINE_EFFECT_TYPES, ENGINE_GENERATOR_NAMES, ENGINE_STITCHES } from '../tools/engine-lists.js';
 
@@ -1663,6 +1669,7 @@ export const ExportSVGInputSchema = z.object({
 });
 
 export const ExportTrainingDataInputSchema = z.object({
+  allowStaleBuild: allowStaleBuildField,
   format: z.enum(['json', 'jsonl']).optional().default('json'),
   includeMetadata: z.boolean().optional().default(true),
 });
@@ -2724,6 +2731,7 @@ export const ExportStoreInputSchema = z.object({
 export type ExportStoreInput = z.infer<typeof ExportStoreInputSchema>;
 
 export const AgentExportInputSchema = z.object({
+  allowStaleBuild: allowStaleBuildField,
   platform: z.enum([...AgentPlatformSchema.options, 'auto']).optional().default('auto').describe('Target platform'),
   format: z.union([AgentExportFormatSchema, z.literal('auto')]).optional().default('auto').describe('Export format'),
   quality: z.enum(['draft', 'standard', 'high']).optional().default('standard').describe('Compression level, and the default frame rate unless fps is set: draft 15, standard 30, high 60. To control the size of an mp4 / webm, use scale or bitrate.'),
@@ -4073,6 +4081,7 @@ export const RenderBatchRowSchema = z.object({
 }).refine((r) => r.changes !== undefined || r.template !== undefined, { message: 'a row needs changes and / or template.' });
 
 export const RenderBatchInputSchema = z.object({
+  allowStaleBuild: allowStaleBuildField,
   rows: z.array(RenderBatchRowSchema).min(1).max(100).describe('One entry per creative (max 100).'),
   export: z.record(z.string(), z.unknown()).describe('agent_export options used for every row (format, platform, quality, duration, ad, …).'),
   estimateOnly: z.boolean().optional().describe('Validate the rows and return the plan without rendering.'),
@@ -4245,6 +4254,7 @@ export type PenFigureInput = z.infer<typeof PenFigureInputSchema>;
 // =============================================================================
 
 export const SpriteSheetInputSchema = z.object({
+  allowStaleBuild: allowStaleBuildField,
   action: z.enum(['generate', 'play', 'export']),
   skeletonId: z.string().optional(),
   spriteSheetId: z.string().optional(),
@@ -4302,6 +4312,7 @@ export type InteractionInput = z.infer<typeof InteractionInputSchema>;
 // =============================================================================
 
 export const ExportWidgetInputSchema = z.object({
+  allowStaleBuild: allowStaleBuildField,
   download: z.boolean().optional(),
   filename: z.string().optional(),
   includeInteractions: z.boolean().optional(),
@@ -4310,6 +4321,7 @@ export const ExportWidgetInputSchema = z.object({
 export type ExportWidgetInput = z.infer<typeof ExportWidgetInputSchema>;
 
 export const ExportWidgetHtmlInputSchema = z.object({
+  allowStaleBuild: allowStaleBuildField,
   title: z.string().optional(),
   download: z.boolean().optional(),
   // Accessibility / localisation (round 8 EE, 8.20): the engine writes
@@ -4492,6 +4504,7 @@ export const PlaceOnSurfaceInputSchema = z.object({
 });
 
 export const ExportSceneInputSchema = z.object({
+  allowStaleBuild: allowStaleBuildField,
   full: z.boolean().optional().describe('Save a RESTORABLE project document to a file (keyframes, relations, rigging, scene chains), not the summary. Restore it with pinepaper_import_scene.'),
   name: z.string().optional().describe('full: a name recorded in the document.'),
 });
@@ -4519,6 +4532,7 @@ export const CaptureSheetSchema = z.object({
 export type CaptureSheet = z.infer<typeof CaptureSheetSchema>;
 
 export const CaptureFramesInputSchema = z.object({
+  allowStaleBuild: allowStaleBuildField,
   times: z.array(z.number()).min(1).optional().describe('Capture times in seconds, rendered in order. Required unless sheet gives every, strip or loopSeam.'),
   seed: z.number().optional().describe('Seed Math.random once around the whole sequence so random generators/particles are reproducible (default 0).'),
   includeDataUrls: z.boolean().optional().describe('Include each frame as a PNG data URL (large — token-heavy). Default false → returns a cheap per-frame hash + byte size only.'),
@@ -5398,6 +5412,7 @@ export type StoryInput = z.infer<typeof StoryInputSchema>;
  * Import is here too, because a format you can only write is half a bridge.
  */
 export const InterchangeInputSchema = z.object({
+  allowStaleBuild: allowStaleBuildField,
   action: z.enum(['export_lottie', 'export_dotlottie', 'import_lottie', 'export_glb', 'export_bvh', 'export_png_sequence'])
     .describe("'export_lottie' (JSON) · 'export_dotlottie' (the zipped .lottie) · 'import_lottie' (a Lottie or .lottie back onto the canvas) · 'export_glb' (the perspective 3D objects — needs some to exist) · 'export_bvh' (a skeleton's motion — needs a rig) · 'export_png_sequence' (one file per frame)."),
   options: z.record(z.string(), z.unknown()).optional().describe('Format options, passed through to the exporter: frame range, dimensions, fps, naming.'),
