@@ -366,6 +366,19 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   envelope on every command. Running with no subcommand continues to start the stdio MCP
   server unchanged, with zero new runtime dependencies and no `child_process` calls in the
   published package.
+- `pinepaper-mcp init` scaffolds five runnable starters; `check --offline` validates them (including
+  `$N` item references) without a browser; `render` keeps the manifest's `export.output` inside the
+  project directory (an explicit `-o` is yours to choose).
+- Reading local files is off for every CLI command until you pass `--allow-local-files` (or set
+  `PINEPAPER_ALLOW_LOCAL_FILES=1`), as for the server.
+
+**An unknown first word.** Before 1.7.0 a first argument that was not a flag was ignored and the
+server started, and a client config that passes one still works. `pinepaper-mcp frobnicate` run from a
+terminal says `Unknown command ... Did you mean ...` and exits 2. When stdin is not a terminal (an MCP
+client launched it), an unknown first word is ignored with one warning line on stderr and the stdio
+server starts as before; nothing but MCP protocol is written to stdout.
+
+## What's new in 1.6.41
 
 ### Fixed
 
