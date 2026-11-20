@@ -120,7 +120,10 @@ async function main() {
   const wanted = await generate();
   const current = existsSync(OUT) ? readFileSync(OUT, 'utf8') : null;
   const count = (wanted.match(/"pp:[A-Za-z]+": \{/g) || []).length;
-  if (current === wanted) {
+  // The Source line is provenance (the FxTool commit read), not content: a test-only FxTool commit moved it and
+  // failed `npm publish` for an unchanged engine. Compared without it, and not rewritten when it is the only change.
+  const SOURCE_LINE = /^ \* Source: .*$/m;
+  if (current !== null && current !== undefined && current.replace(SOURCE_LINE, '') === wanted.replace(SOURCE_LINE, '')) {
     console.log(`✅ ontology vocabulary in sync (${count} types)`);
     process.exit(0);
   }

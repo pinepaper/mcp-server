@@ -367,7 +367,10 @@ function main() {
   const wanted = generate();
   const current = existsSync(OUT) ? readFileSync(OUT, 'utf8') : null;
   const count = (wanted.match(/^  "[A-Za-z0-9-]+": Object\.freeze/gm) || []).length;
-  if (current === wanted) {
+  // The Source line is provenance (the FxTool commit read), not content: a test-only FxTool commit moved it and
+  // failed `npm publish` for an unchanged engine. Compared without it, and not rewritten when it is the only change.
+  const SOURCE_LINE = /^ \* Source: .*$/m;
+  if (current !== null && current !== undefined && current.replace(SOURCE_LINE, '') === wanted.replace(SOURCE_LINE, '')) {
     console.log(`✅ shape params in sync (${count} entries)`);
     process.exit(0);
   }

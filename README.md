@@ -397,6 +397,9 @@ server starts as before; nothing but MCP protocol is written to stdout.
 - A remote URL whose host resolves into 198.18.0.0/15, the range a fake-IP DNS proxy hands out,
   is refused with the route that works: download the file and import it by local path. This
   server connects directly and does not go through `HTTPS_PROXY`.
+- Closing the browser can no longer hang: after a PNG export it never finished, and
+  `pinepaper-mcp render -f png` stopped with the file already written. Close now gets five seconds,
+  then the browser process is stopped.
 
 ## What's new in 1.6.40
 

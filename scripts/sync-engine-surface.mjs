@@ -361,7 +361,12 @@ function main() {
 
   const wanted = generate();
   const current = existsSync(OUT) ? readFileSync(OUT, 'utf8') : null;
-  if (current === wanted) {
+  // The Source line records which FxTool commit the snapshot was read at. It is provenance, not surface: FxTool
+  // commits that leave PinePaper.js and app.js alone (a test, a doc) moved it, and every such commit failed
+  // `npm publish` for an engine that had not changed (three times on 2026-11-20). Compared without it, and not
+  // rewritten when it is the only difference. The sha256 line below it still pins the engine's content.
+  const SOURCE_LINE = /^ \* Source: .*$/m;
+  if (current !== null && current.replace(SOURCE_LINE, '') === wanted.replace(SOURCE_LINE, '')) {
     console.log(`✅ engine surface in sync (${(wanted.match(/^  \w+: '/gm) || []).length} names)`);
     process.exit(0);
   }
