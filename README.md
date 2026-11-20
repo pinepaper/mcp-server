@@ -3490,7 +3490,7 @@ This package also exports clean TypeScript/ESM subpaths for Node 22+ and Bun int
 - **[PinePaper Studio](https://pinepaper.studio)** — Interactive browser canvas, `pp:` design knowledge graph, relation-driven animation engine, and timeline editor
 - **[PinePaper Cloud](https://cloud.pinepaper.studio)** — Hosted HTTP MCP service, server-side FFmpeg video encoding, AI asset generation, and multi-model benchmarks
 - **[Claude Plugin & Skills Marketplace](https://github.com/pinepaper/pinepaper-claude-marketplace)** — Official Claude Code & `claude.ai` plugin bundling MCP connection + skills (`pp:` ontology, diagrams, charts, maps, rigging, fonts)
-- **[Claude Desktop Extension (.mcpb)](https://github.com/pinepaper/mcp-server/releases/latest/download/pinepaper-mcp-server.mcpb)** — One-click Desktop install with Chrome driver & bundled FFmpeg verification helpers
+- **[Claude Desktop Extension (.mcpb)](https://github.com/pinepaper/mcp-server/releases/latest/download/pinepaper-mcp-server.mcpb)** — One-click Desktop install with the Chrome driver; checks saved videos with your installed `ffprobe`/`ffmpeg` (FFmpeg is not bundled)
 
 ## Contributing
 

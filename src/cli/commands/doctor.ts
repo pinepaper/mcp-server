@@ -208,8 +208,8 @@ export const doctorCommand: CliCommand = {
       status: ffmpeg ? 'PASS' : 'INFO',
       label: 'FFmpeg add-on',
       detail: ffmpeg
-        ? 'Desktop extension runner bundled (.mcpb)'
-        : 'Not bundled (npm package starts no child processes by design; Desktop .mcpb bundles ffprobe/ffmpeg helpers)',
+        ? 'Desktop extension runner present (.mcpb); it runs the ffprobe/ffmpeg installed on PATH'
+        : 'Not present: the npm package starts no external programs by design; the Desktop extension (.mcpb) runs your installed ffprobe/ffmpeg',
     });
 
     if (launch) {
