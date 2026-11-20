@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 87c9fa9295824d1c70dfa5d7a0e68b7f0271a6fb
- * sha256:    af1675ed8b081883e4758303e845806f3fcd7233c99d4d19fa28c14bd9890683   (of PinePaper.js as committed)
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main fe37d999d5758c30ff889919c9089352f2eacf48
+ * sha256:    71748c7f0801bec8329a01563a663ea1a921bb4464b22ede161df40cf683b9fe   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on `window.app`, with how it gets there. The parity
@@ -16,7 +16,7 @@
 /** How a name lands on `app`. */
 export type EngineMemberKind = 'method' | 'accessor' | 'property' | 'lazy' | 'lazyHeavy' | 'bootstrap';
 
-/** 1639 names, from FxTool/js/PinePaper.js. */
+/** 1641 names, from FxTool/js/PinePaper.js. */
 export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object.freeze({
   __buildFreshness: 'property',
   _aboveHooksHeld: 'property',
@@ -254,6 +254,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _hoverOutlineFor: 'property',
   _imageDataFromURL: 'method',
   _importBVHUnrecorded: 'method',
+  _importPoseV2a: 'method',
   _importSpineUnrecorded: 'method',
   _inFrameCallbacks: 'property',
   _initCameraAPI: 'method',
@@ -668,6 +669,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   applyTextStyle: 'method',
   applyThreadPainting: 'method',
   applyTrackMatte: 'method',
+  applyVideoToAnimation: 'method',
   applyWatercolorWash: 'method',
   arrowSystem: 'lazy',
   attachToBone: 'method',
