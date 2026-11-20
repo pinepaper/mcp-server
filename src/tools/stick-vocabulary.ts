@@ -9,9 +9,9 @@
  * across five lists is exactly the shape that drifts, and every enum this repo
  * hand-maintained against FxTool drifted silently.
  *
- * Source: FxTool origin/main 82f9dec0b5575c3d43276566c36154fbd028cec3
+ * Source: FxTool origin/main 87c9fa9295824d1c70dfa5d7a0e68b7f0271a6fb
  *   js/vendor/stick/figure-rigged.js
- * sha256: 7f12d6cd71ab111f
+ * sha256: 3b3a55c8e6a381e1
  */
 
 /** 10 names — how a figure walks — gait. */
@@ -88,7 +88,7 @@ export const STICK_SEQUENCES: readonly string[] = Object.freeze([
   'groove',
 ]);
 
-/** 17 names — a face — expression, and the entries of `expressions`. */
+/** 31 names — a face — expression, and the entries of `expressions`. */
 export const STICK_EXPRESSIONS: readonly string[] = Object.freeze([
   'neutral',
   'pleased',
@@ -107,6 +107,20 @@ export const STICK_EXPRESSIONS: readonly string[] = Object.freeze([
   'mischievous',
   'curious',
   'panicked',
+  'silly',
+  'whistling',
+  'anxious',
+  'determined',
+  'yawning',
+  'sulking',
+  'shouting',
+  'kissy',
+  'disgusted',
+  'cute',
+  'nervous',
+  'crying',
+  'shy',
+  'shocked',
 ]);
 
 /** 7 names — something held in hand — prop. */

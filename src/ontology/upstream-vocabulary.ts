@@ -4,9 +4,9 @@
  * FxTool's ITEM_TYPE_MAP and type classes (anchor, description, parentType,
  * mcpTool, mcpAction), read from the loaded module.
  *
- * Source: FxTool origin/main 82f9dec0b5575c3d43276566c36154fbd028cec3
+ * Source: FxTool origin/main 87c9fa9295824d1c70dfa5d7a0e68b7f0271a6fb
  *   js/ontology/Vocabulary.js
- * sha256: 42d527167f3f58fd
+ * sha256: 78713631f01ea4d5
  *
  * vocabulary.ts merges these over its hand-written port: the engine's map
  * wins where the two disagree, and a class the port lacks is added.
@@ -357,6 +357,11 @@ export const UPSTREAM_TYPES: Readonly<Record<string, UpstreamTypeDef>> = Object.
     "description": "A fragment shader supplied by the author and rendered over an item's silhouette. Registered at runtime through registerShaderEffect, which COMPILES AND LINKS it first and refuses it with the driver log — a shader that fails otherwise renders nothing while appearing to apply, because the error goes to a console production strips.",
     "parentType": "pp:Concept"
   },
+  "pp:CutoutShape": {
+    "anchor": "schema:VisualArtwork",
+    "description": "Freehand Matisse-style closed cut-paper shape with optional paper drop shadow, created by the cutout brush or the on-device pinepaper_paint_stroke tool (not an MCP tool).",
+    "parentType": "pp:CanvasShape"
+  },
   "pp:DataConnector": {
     "anchor": null,
     "description": "A connector carrying DATA rather than control — what is passed, not what happens next. Drawn distinctly so the two can be told apart at a glance.",
@@ -497,6 +502,11 @@ export const UPSTREAM_TYPES: Readonly<Record<string, UpstreamTypeDef>> = Object.
   "pp:GroupedSeries": {
     "description": "Series placed side by side for comparison Keeps every series on a common baseline so all are comparable, at the cost of width — it degrades quickly past a handful of groups.",
     "parentType": "pp:CompositionMode"
+  },
+  "pp:GuideRegion": {
+    "anchor": "schema:CreativeWork",
+    "description": "Non-printing spatial co-creation region or directional curve carrying a natural-language prompt for human-AI continuation; excluded from all exports.",
+    "parentType": "pp:CanvasElement"
   },
   "pp:HandDrawnAnimation": {
     "anchor": "schema:VisualArtwork",
@@ -1027,6 +1037,11 @@ export const UPSTREAM_TYPES: Readonly<Record<string, UpstreamTypeDef>> = Object.
   "pp:Unclassified": {
     "anchor": null,
     "description": "Item type not expressible in current vocabulary. Enables vocabulary gap discovery — count and inspect unclassified items to identify missing types.",
+    "parentType": "pp:CanvasElement"
+  },
+  "pp:Underdrawing": {
+    "anchor": "schema:VisualArtwork",
+    "description": "Non-printing 25% cornflower blue-pencil construction scaffold toggled via app.toggleUnderdrawing() and excluded from exports.",
     "parentType": "pp:CanvasElement"
   },
   "pp:VideoClip": {
