@@ -76,6 +76,15 @@ for (const [net, bits] of [
   ['fe80::', 10], ['fec0::', 10], ['ff00::', 8],
 ] as const) PRIVATE.addSubnet(net, bits, 'ipv6');
 
+/**
+ * 198.18.0.0/15 is the benchmarking range (RFC 2544), and what a fake-IP DNS proxy answers with: every public name
+ * resolves into it and only the proxy knows where it goes (IMPURL40). Refused like any private address, but said as
+ * what it is, because the opt-in does not help there: this server connects directly and does not go through
+ * HTTPS_PROXY, so the connection fails anyway.
+ */
+const FAKE_IP = new BlockList();
+FAKE_IP.addSubnet('198.18.0.0', 15, 'ipv4');
+
 /** Refused even with the opt-in. */
 const METADATA = new BlockList();
 for (const a of ['169.254.169.254', '169.254.170.2', '100.100.100.200']) METADATA.addAddress(a, 'ipv4');
@@ -174,6 +183,9 @@ export async function checkUrl(input: string | URL): Promise<ResolvedAddress[]> 
     const kind = classifyAddress(address);
     if (kind === 'metadata') {
       throw new UnsafeUrlError(`refused ${url.href} — it resolves to ${address}, a cloud metadata address. This is refused even with PINEPAPER_ALLOW_PRIVATE_NETWORK=1.`);
+    }
+    if (kind === 'private' && !allowPrivate && !literal && isIP(address) === 4 && FAKE_IP.check(address, 'ipv4')) {
+      throw new UnsafeUrlError(`refused ${url.href} — ${host} resolves to ${address}, an address a fake-IP DNS proxy hands out (198.18.0.0/15), so the real host is known only to that proxy. This server connects directly and does not use HTTPS_PROXY. Download the file and import it by local path, or set PINEPAPER_ALLOW_PRIVATE_NETWORK=1 if this network routes those addresses itself.`);
     }
     if (kind === 'private' && !allowPrivate) {
       throw new UnsafeUrlError(`refused ${url.href} — it resolves to ${address}, a private address. Set PINEPAPER_ALLOW_PRIVATE_NETWORK=1 to allow local hosts.`);

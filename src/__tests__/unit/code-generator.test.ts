@@ -1672,15 +1672,18 @@ describe('emitted string literals are breakout-proof (CodeQL js/incomplete-sanit
   });
 
   it('batch item refs and background colours cannot escape their literal', () => {
+    // A hostile background colour no longer reaches the emitter: it is not a colour, so validation refuses it
+    // (COLORBAD37). The literal escaping is still checked on the colour that IS valid and on the ids.
+    expect(() => codeGenerator.generateAgentBatchExecute({ operations: [{ type: 'set_background', backgroundColor: HOSTILE }] } as never)).toThrow(/not a colour/);
     const code = codeGenerator.generateAgentBatchExecute({
       operations: [
-        { type: 'set_background', backgroundColor: HOSTILE },
+        { type: 'set_background', backgroundColor: 'rgb(1, 2, 3)' },
         { type: 'modify', itemId: HOSTILE, properties: { opacity: 1 } },
         // `$` followed by anything but digits is an id, not a ref: it used to be spliced as __ref(1);evil();().
         { type: 'delete', itemId: '$1);evil();(' },
       ],
     } as never);
-    expect(code).toContain(`app.setBackgroundColor(${JSON.stringify(HOSTILE)})`);
+    expect(code).toContain(`app.setBackgroundColor(${JSON.stringify('rgb(1, 2, 3)')})`);
     expect(code).toContain(JSON.stringify(HOSTILE));
     expect(code).not.toContain('__ref(1);evil()');
     expect(code).toContain(JSON.stringify('$1);evil();('));

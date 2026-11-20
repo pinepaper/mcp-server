@@ -1898,7 +1898,7 @@ export const CreateSceneInputSchema = z.object({
   /** Animations to apply */
   animations: z.array(SceneAnimationSchema).optional().describe('Array of animations to apply'),
   /** Background color (hex, rgb, or named) */
-  backgroundColor: z.string().optional().describe('Background color for the scene'),
+  backgroundColor: SolidColorSchema.optional().describe('Background color for the scene'),
   /** Background generator to use */
   backgroundGenerator: z.string().optional().describe('Name of generator to use for background'),
   /** Whether to clear canvas first (default: true) */
@@ -2434,7 +2434,7 @@ export const AgentStartJobInputSchema = z.object({
     width: z.number().positive(),
     height: z.number().positive(),
   }).optional().describe('Custom canvas dimensions'),
-  backgroundColor: z.string().optional().describe('Background color to set'),
+  backgroundColor: SolidColorSchema.optional().describe('Background color to set'),
   clearCanvas: z.boolean().optional().default(true).describe('Clear canvas when starting job'),
   includeOntology: z.boolean().optional().default(true).describe('Include canvas ontology snapshot in the result. Tiny payload when clearCanvas is true (empty canvas) — captures existing state when clearCanvas is false. Set false to skip; reset to true if rerunning against an older FxTool that lacks exportCanvasOntology.'),
 }).describe('Options for starting an agent job');
@@ -2462,7 +2462,7 @@ export const AgentResetInputSchema = z.object({
   preserveCanvasSize: z.boolean().optional().default(true).describe('Keep current canvas dimensions'),
   preserveBackground: z.boolean().optional().default(false).describe('Keep current background color'),
   canvasPreset: AgentPlatformSchema.optional().describe('New canvas preset to apply'),
-  backgroundColor: z.string().optional().describe('New background color'),
+  backgroundColor: SolidColorSchema.optional().describe('New background color'),
 }).describe('Options for resetting canvas between jobs');
 
 export type AgentResetInput = z.infer<typeof AgentResetInputSchema>;
@@ -2508,7 +2508,7 @@ export const AgentBatchOperationSchema = z.object({
   relationType: z.string().optional().describe('Relation type'),
   relationOptions: z.record(z.string(), z.unknown()).optional().describe('Relation options'),
   // Set background fields
-  backgroundColor: z.string().optional().describe('Background color for set_background'),
+  backgroundColor: SolidColorSchema.optional().describe('Background color for set_background'),
   color: z.string().optional().describe('Alias for backgroundColor in set_background, or color property'),
   // Execute generator fields
   generatorName: z.string().optional().describe('Generator name for execute_generator'),
@@ -2630,7 +2630,12 @@ export type ArrangeInput = z.infer<typeof ArrangeInputSchema>;
  * Batch execute input schema
  */
 export const AgentBatchExecuteInputSchema = z.object({
-  operations: z.array(AgentBatchOperationSchema).min(1).describe('Array of operations to execute'),
+  operations: z.array(AgentBatchOperationSchema.superRefine((op, ctx) => {
+    // COLORBAD37: on set_background, color is the background colour (an alias for backgroundColor) and must be one.
+    if (op.type === 'set_background' && typeof op.color === 'string' && !isCssColor(op.color)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['color'], message: `${JSON.stringify(op.color)} is not a colour, and the studio would draw it black. ${COLOR_ERROR_HINT}` });
+    }
+  })).min(1).describe('Array of operations to execute'),
   atomic: z.boolean().optional().default(true).describe('Rollback all operations on any failure'),
   verbose: z.boolean().optional().describe('Return one result entry per operation. By default an entry that only echoes the id, type and position you sent is left out (itemIds lists every id; resultsOmitted counts them); failures and anything with a note are kept.'),
   skipValidation: z.boolean().optional().default(false).describe('Skip the ontology preflight that catches typos in itemType/relationType/effectType/generatorName before browser execution. Use only when intentionally passing experimental vocabulary values.'),
@@ -4158,7 +4163,8 @@ export type PrecompInput = z.infer<typeof PrecompInputSchema>;
 export const BackgroundInputSchema = z.object({
   action: z.enum(['set', 'clear', 'get']),
   mode: z.enum(['color', 'pattern', 'generator']).optional(),
-  color: z.string().optional(),
+  // COLORBAD37 background route: "#notacolor" was set with success and drawn black.
+  color: SolidColorSchema.optional(),
   pattern: z.string().optional(),
   generator: z.string().optional(),
   generatorParams: z.record(z.string(), z.unknown()).optional(),
