@@ -380,6 +380,13 @@ server starts as before; nothing but MCP protocol is written to stdout.
 
 ### Fixed
 
+- A text item wraps to a width from `pinepaper_create_item` and `pinepaper_modify_item`: pass
+  `maxWidth` in canvas pixels (`wrapWidth`, or `wordWrap: true` with `width`, mean the same). A
+  caption longer than a phone frame used to stay on one line, clipped at both edges. The wrapped
+  text keeps the edge it was placed by, and the reply's `textWrap` gives the line count, the
+  bounds, and `overflow` when a single word is wider than the width. `modify_item` with
+  `maxWidth: null` unwraps. `width` alone on a text does not size it, and the reply now says so
+  and names `maxWidth`.
 - A background colour that is not a colour (`"#notacolor"`) is refused on every background route
   (`pinepaper_background`, a batch `set_background`, and `backgroundColor` on start_job, reset and
   create_scene), as it already was on items. It used to be set with success and drawn black.
@@ -390,18 +397,6 @@ server starts as before; nothing but MCP protocol is written to stdout.
 - A remote URL whose host resolves into 198.18.0.0/15, the range a fake-IP DNS proxy hands out,
   is refused with the route that works: download the file and import it by local path. This
   server connects directly and does not go through `HTTPS_PROXY`.
-
-## What's new in 1.6.41
-
-### Fixed
-
-- A text item wraps to a width from `pinepaper_create_item` and `pinepaper_modify_item`: pass
-  `maxWidth` in canvas pixels (`wrapWidth`, or `wordWrap: true` with `width`, mean the same). A
-  caption longer than a phone frame used to stay on one line, clipped at both edges. The wrapped
-  text keeps the edge it was placed by, and the reply's `textWrap` gives the line count, the
-  bounds, and `overflow` when a single word is wider than the width. `modify_item` with
-  `maxWidth: null` unwraps. `width` alone on a text does not size it, and the reply now says so
-  and names `maxWidth`.
 
 ## What's new in 1.6.40
 
