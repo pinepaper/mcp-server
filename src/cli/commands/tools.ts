@@ -4,7 +4,15 @@
  */
 
 import { getToolsForVerbosity, PINEPAPER_TOOLS, type ToolVerbosity } from '../../tools/definitions.js';
-import { getToolsForToolkit, TOOL_TAGS, TOOLKIT_PROFILES, TOOLKIT_PROFILES_LIST, type ToolkitProfile } from '../../tools/toolkits.js';
+import { getToolsForToolkit, detectVerbosityFromEnvironment, TOOL_TAGS, TOOLKIT_PROFILES, TOOLKIT_PROFILES_LIST, type ToolkitProfile } from '../../tools/toolkits.js';
+
+/**
+ * Which tools a toolkit holds depends on the descriptions the SERVER sends: core also takes every tool its listed
+ * tools name, and a longer description names more. So membership is computed at the server's verbosity
+ * (PINEPAPER_VERBOSITY, compact by default), and --verbosity here changes only the text shown. It used to compute
+ * it at the display verbosity, and `tools list --toolkit core` showed 57 tools where the server lists 71.
+ */
+const serverTools = () => getToolsForVerbosity(detectVerbosityFromEnvironment());
 import { strFlag, suggestCommand } from '../args.js';
 import { emitJson } from '../output.js';
 import { parseCommandArgs, type CliCommand } from '../types.js';
@@ -106,7 +114,7 @@ export const toolsCommand: CliCommand = {
       }
       const tags = tagsForTool(tool.name);
       const profiles = TOOLKIT_PROFILES_LIST.filter((p) =>
-        p === 'full' || getToolsForToolkit(PINEPAPER_TOOLS, p).some((x) => x.name === tool.name),
+        p === 'full' || getToolsForToolkit(serverTools(), p).some((x) => x.name === tool.name),
       );
       if (parsed.json) {
         emitJson('tools', {
@@ -140,7 +148,8 @@ export const toolsCommand: CliCommand = {
       return 0;
     }
 
-    const baseTools = getToolsForToolkit(getToolsForVerbosity(verbosityArg as ToolVerbosity), toolkit);
+    const members = new Set(getToolsForToolkit(serverTools(), toolkit).map((t) => t.name));
+    const baseTools = getToolsForVerbosity(verbosityArg as ToolVerbosity).filter((t) => members.has(t.name));
     const minimalMap = new Map(getToolsForVerbosity('minimal').map((t) => [t.name, t.description || '']));
     const fullMap = new Map(PINEPAPER_TOOLS.map((t) => [t.name, t.description || '']));
 

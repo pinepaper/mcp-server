@@ -15,7 +15,8 @@ import { parseCommandArgs, type CliCommand } from '../types.js';
 
 export interface CheckFinding {
   stage: 'offline' | 'validate' | 'lint';
-  severity: 'error' | 'warning';
+  /** suggestion: the studio's lint proposes a relation; nothing is wrong with the scene. */
+  severity: 'error' | 'warning' | 'suggestion';
   message: string;
   path?: string;
 }
@@ -112,6 +113,19 @@ function runOfflineChecks(input: ResolvedSceneInput): CheckFinding[] {
 }
 
 /** What the Studio ignored or rewrote while loading the scene, as warnings (ignoredOptions, translated arguments). */
+export type LintSuggestion = { message?: string; relation?: string; type?: string; from?: string; to?: string; params?: Record<string, unknown> };
+
+/** One relation the studio's lint proposes, as a finding: a suggestion, with what it relates to what. */
+export function lintSuggestionFinding(s: LintSuggestion): CheckFinding {
+  const rel = s.type || s.relation || 'relation';
+  const params = s.params && Object.keys(s.params).length ? ` ${JSON.stringify(s.params)}` : '';
+  return {
+    stage: 'lint',
+    severity: 'suggestion',
+    message: s.message || `consider ${rel}${s.from ? ` ${s.from}` : ''}${s.to ? ` -> ${s.to}` : ''}${params}`,
+  };
+}
+
 export function collectLoadNotes(summary: unknown): string[] {
   const notes: string[] = [];
   const seen = new Set<unknown>();
@@ -201,16 +215,13 @@ export const checkCommand: CliCommand = {
           }
 
           const lintRes = extractToolJson(await handleToolCall('pinepaper_lint_scene', {}, handlerOpts));
-          const lintInner = (lintRes.data as { result?: { suggestions?: Array<{ message?: string; relation?: string }> } } | null)?.result;
+          const lintInner = (lintRes.data as { result?: { suggestions?: LintSuggestion[] } } | null)?.result;
           liveLint = lintInner ?? lintRes.data;
           if (Array.isArray(lintInner?.suggestions)) {
-            for (const s of lintInner.suggestions) {
-              findings.push({
-                stage: 'lint',
-                severity: 'warning',
-                message: s.message || `Consider relation ${s.relation || 'constraint'}`,
-              });
-            }
+            // The studio's lint proposes relations ({ from, to, type, params }): suggestions, not problems. They were
+            // read as { message, relation }, which the studio does not send, so each printed as a bare
+            // "Consider relation constraint" WARN.
+            for (const s of lintInner.suggestions) findings.push(lintSuggestionFinding(s));
           }
         });
       } catch (e) {
@@ -220,6 +231,7 @@ export const checkCommand: CliCommand = {
 
     const errors = findings.filter((f) => f.severity === 'error');
     const warnings = findings.filter((f) => f.severity === 'warning');
+    const suggestions = findings.filter((f) => f.severity === 'suggestion');
     const ok = errors.length === 0;
 
     if (parsed.json) {
@@ -230,6 +242,7 @@ export const checkCommand: CliCommand = {
         offline,
         errorCount: errors.length,
         warningCount: warnings.length,
+        suggestionCount: suggestions.length,
         findings,
         ...(liveValidate ? { validate: liveValidate } : {}),
         ...(liveLint ? { lint: liveLint } : {}),
@@ -240,11 +253,11 @@ export const checkCommand: CliCommand = {
     console.log(`PinePaper Check: ${input.filePath} (${input.kind}${offline ? ', offline' : ''})\n`);
     console.log(formatCheckLine(ok ? 'PASS' : 'FAIL', 'Offline check', offlineErrors.length ? `${offlineErrors.length} error(s)` : 'valid schema, macros, and vocabulary'));
     if (!offline && offlineErrors.length === 0) {
-      console.log(formatCheckLine(ok ? 'PASS' : 'FAIL', 'Studio audit', `${errors.length} error(s), ${warnings.length} warning(s)`));
+      console.log(formatCheckLine(ok ? 'PASS' : 'FAIL', 'Studio audit', `${errors.length} error(s), ${warnings.length} warning(s)${suggestions.length ? `, ${suggestions.length} relation suggestion(s)` : ''}`));
     }
     for (const f of findings) {
       const loc = f.path ? `${f.path}: ` : '';
-      console.log(formatCheckLine(f.severity === 'error' ? 'FAIL' : 'WARN', f.stage, `${loc}${f.message}`));
+      console.log(formatCheckLine(f.severity === 'error' ? 'FAIL' : f.severity === 'suggestion' ? 'INFO' : 'WARN', f.stage, `${loc}${f.message}`));
     }
     return ok ? 0 : 1;
   },

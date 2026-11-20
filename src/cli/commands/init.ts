@@ -57,8 +57,9 @@ export const TEMPLATES: Readonly<Record<string, TemplateDef>> = {
         itemId: '$1',
         duration: 1.2,
         keyframes: [
-          { time: 0, properties: { opacity: 0, y: 425 }, easing: 'easeOutCubic' },
-          { time: 1.0, properties: { opacity: 1, y: 400 } },
+          // Easing shapes the move ARRIVING at a key, so it goes on the second one.
+          { time: 0, properties: { opacity: 0, y: 425 } },
+          { time: 1.0, properties: { opacity: 1, y: 400 }, easing: 'easeOutCubic' },
         ],
       },
     ],
@@ -95,8 +96,8 @@ export const TEMPLATES: Readonly<Record<string, TemplateDef>> = {
         itemId: '$2',
         duration: 1.4,
         keyframes: [
-          { time: 0, properties: { opacity: 0, scale: 0.92 }, easing: 'easeOutCubic' },
-          { time: 1.1, properties: { opacity: 1, scale: 1 } },
+          { time: 0, properties: { opacity: 0, scale: 0.92 } },
+          { time: 1.1, properties: { opacity: 1, scale: 1 }, easing: 'easeOutCubic' },
         ],
       },
     ],
@@ -116,18 +117,27 @@ export const TEMPLATES: Readonly<Record<string, TemplateDef>> = {
         position: { x: 640, y: 110 },
         properties: { name: 'chart_title', content: 'Quarterly Growth', fontSize: 44, fontWeight: 'bold', fillColor: '#f9fafb' },
       },
-      {
-        type: 'grid',
-        rows: 1,
-        cols: 4,
-        origin: { x: 370, y: 460 },
-        spacing: [180, 0],
-        itemType: 'rectangle',
-        name: 'bar',
-        properties: { width: 88, height: 260, cornerRadius: 8, fillColor: '#10b981' },
-        stagger: 0.15,
-        keys: { time: [0, 0.9], scaleY: [0.05, 1], opacity: [0.3, 1], easing: 'easeOutCubic' },
-      },
+      // Four bars of different heights standing on one baseline (y 600). A scale grows from the item's centre, so
+      // y is keyed with scaleY: centre = baseline - scaleY * height / 2 holds the bottom edge where it is.
+      ...[150, 210, 260, 320].flatMap((h, i) => {
+        const x = 370 + i * 180, base = 600, t0 = i * 0.15;
+        return [
+          {
+            type: 'create',
+            itemType: 'rectangle',
+            position: { x, y: base - h / 2 },
+            properties: { name: `bar_${i + 1}`, width: 88, height: h, cornerRadius: 8, fillColor: '#10b981' },
+          },
+          {
+            type: 'keyframe_animate',
+            itemId: `$${i + 1}`,
+            keyframes: [
+              { time: t0, properties: { scaleY: 0.05, y: base - (0.05 * h) / 2, opacity: 0.3 } },
+              { time: t0 + 0.9, properties: { scaleY: 1, y: base - h / 2, opacity: 1 }, easing: 'easeOutCubic' },
+            ],
+          },
+        ];
+      }),
     ],
   },
   diagram: {
