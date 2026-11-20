@@ -52,6 +52,22 @@ function defaultOutputPath(input: ResolvedSceneInput, format: string): string {
   return resolve(input.dir, 'renders', `${base}.${format}`);
 }
 
+const STILL_FORMATS = new Set(['png', 'pdf', 'jpg', 'jpeg', 'webp']);
+
+/**
+ * fps and duration for an export. The manifest's describe its video; a still (png, pdf) has neither, and the export
+ * refuses an fps for one, so `render -f png` failed on every starter. For a still only a flag the person typed is
+ * passed (and the export says why it is refused).
+ */
+export function timingFor(
+  format: string,
+  flags: { fps?: number; duration?: number },
+  cfg: { fps?: number; duration?: number },
+): { fps?: number; duration?: number } {
+  const still = STILL_FORMATS.has(format);
+  return { fps: flags.fps ?? (still ? undefined : cfg.fps), duration: flags.duration ?? (still ? undefined : cfg.duration) };
+}
+
 export const renderCommand: CliCommand = {
   name: 'render',
   category: 'Quality & Rendering',
@@ -111,8 +127,9 @@ export const renderCommand: CliCommand = {
     const allowLocalFiles = boolFlag(parsed.parsed.flags, 'allow-local-files') === true;
     const studioUrl = strFlag(parsed.parsed.flags, 'studio-url');
     const platform = strFlag(parsed.parsed.flags, 'platform') || cfg.platform || 'auto';
-    const fps = numFlag(parsed.parsed.flags, 'fps') ?? cfg.fps;
-    const duration = numFlag(parsed.parsed.flags, 'duration') ?? cfg.duration;
+    // The manifest's fps and duration describe its video. A still (png, pdf) has neither, and the export refuses an
+    // fps for one, so `render -f png` failed on every starter. Only a flag the person typed is passed for a still.
+    const { fps, duration } = timingFor(format, { fps: numFlag(parsed.parsed.flags, 'fps'), duration: numFlag(parsed.parsed.flags, 'duration') }, cfg);
     const deterministic = boolFlag(parsed.parsed.flags, 'deterministic') ?? cfg.deterministic;
     const audioCodec = strFlag(parsed.parsed.flags, 'audio-codec') || cfg.audioCodec;
 
