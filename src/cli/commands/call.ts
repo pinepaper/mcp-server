@@ -6,6 +6,7 @@
 import { readFileSync } from 'node:fs';
 import { PINEPAPER_TOOLS } from '../../tools/definitions.js';
 import { handleToolCall } from '../../tools/handlers.js';
+import { GUARDED_TOOLS } from '../../tools/stale-build-guard.js';
 import { env } from '../../utils/env.js';
 import { boolFlag, strFlag, suggestCommand } from '../args.js';
 import { emitJson, extractToolJson, failWith } from '../output.js';
@@ -23,6 +24,7 @@ OPTIONS:
   --mode <mode>         Execution mode: puppeteer (default) or code
   --allow-code          Enable PINEPAPER_ALLOW_CODE for this call
   --allow-local-files   Enable PINEPAPER_ALLOW_LOCAL_FILES for this call
+  --allow-stale-build   For a rendering tool: export even if the studio page is on an old build (default: refused)
   --studio-url <url>    Override Studio URL
   --json                Emit machine-readable JSON output
   -h, --help            Show help
@@ -74,6 +76,7 @@ export const callCommand: CliCommand = {
       mode: { type: 'string' },
       'allow-code': { type: 'boolean' },
       'allow-local-files': { type: 'boolean' },
+      'allow-stale-build': { type: 'boolean' },
       'studio-url': { type: 'string' },
     });
     if (parsed.kind !== 'ok') return parsed.code;
@@ -103,6 +106,7 @@ export const callCommand: CliCommand = {
     const allowCode = boolFlag(parsed.parsed.flags, 'allow-code') === true;
     const allowLocalFiles = boolFlag(parsed.parsed.flags, 'allow-local-files') === true;
     const studioUrl = strFlag(parsed.parsed.flags, 'studio-url');
+    if (boolFlag(parsed.parsed.flags, 'allow-stale-build') === true && GUARDED_TOOLS.has(tool.name)) toolArgs = { ...toolArgs, allowStaleBuild: true };
 
     try {
       let res;

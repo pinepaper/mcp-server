@@ -14,6 +14,7 @@ import { COMPACT_DESCRIPTIONS } from './compact-descriptions.js';
 import { MINIMAL_DESCRIPTIONS } from './minimal-descriptions.js';
 import { craftToolDefinitions } from './craft-tools.js';
 import { TOOL_TAGS } from './toolkits.js';
+import { GUARDED_TOOLS, ALLOW_STALE_BUILD_PROPERTY } from './stale-build-guard.js';
 import { STICK_GAITS, STICK_POSES, STICK_SEQUENCES, STICK_EXPRESSIONS, STICK_PROPS } from './stick-vocabulary.js';
 import { AgentBatchOperationTypeSchema, GeneratorNameSchema, ItemTypeSchema } from '../types/schemas.js';
 import { expressionGrammarText } from './expression-grammar.js';
@@ -10257,6 +10258,13 @@ ACTIONS:
   // ---------------------------------------------------------------------------
   ...craftToolDefinitions(),
 ];
+
+// Every tool that renders or exports from the studio page (and pinepaper_interchange's export actions) takes allowStaleBuild (stale-build-guard.ts).
+for (const tool of PINEPAPER_TOOLS) {
+  if (!GUARDED_TOOLS.has(tool.name)) continue;
+  const schema = tool.inputSchema as { properties?: Record<string, unknown> };
+  schema.properties = { ...(schema.properties ?? {}), allowStaleBuild: ALLOW_STALE_BUILD_PROPERTY };
+}
 
 /**
  * Get a tool definition by name

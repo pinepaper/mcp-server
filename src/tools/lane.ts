@@ -15,6 +15,7 @@
  */
 
 import { expressionGrammarText } from './expression-grammar.js';
+import { ALLOW_STALE_BUILD_PROPERTY } from './stale-build-guard.js';
 
 /**
  * The lane's tools. The first five are the lane as it shipped, in the order an agent uses them; O10 (mcp-server#29)
@@ -226,6 +227,7 @@ RETURNS "File: <path>", plus file {sha256, bytes}: the sha256 of the file on dis
         fps: { type: 'number', description: 'video: frames per second' },
         time: { type: 'number', description: 'still: the moment to render, in seconds' },
         deterministic: { type: 'boolean', description: 'mp4 / webm, on by default (false opts out). Identical frames, always; identical bytes where video.bitExact says true, and determinism_not_pinned warns where not' },
+        allowStaleBuild: ALLOW_STALE_BUILD_PROPERTY,
         perScene: { type: 'boolean', description: 'mp4 / webm of a scene chain: cached per scene, so an export after an edit renders only the changed scenes (needs ffmpeg)' },
       },
       required: ['format'],

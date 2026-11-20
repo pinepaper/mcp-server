@@ -230,6 +230,7 @@ import { buildHtml5Ad, buildPlayable, externalRequests, pinSceneBackground, type
 import { safeFetch, checkUrl, UnsafeUrlError } from '../utils/safe-fetch.js';
 import { confineAssetPath } from '../utils/asset-paths.js';
 import { env } from '../utils/env.js';
+import { RENDERING_TOOLS, staleBuildRefusal } from './stale-build-guard.js';
 import { getExportDir, exportFileLink } from '../utils/export-dir.js';
 
 /**
@@ -873,6 +874,10 @@ export interface HandlerOptions {
    * travels, in _meta (CODE_META_KEY), for the host to record.
    */
   deferred?: boolean;
+  /** Internal: the stale-build guard already judged the call this export belongs to (a batch row, a per-scene segment). */
+  staleBuildChecked?: boolean;
+  /** Test hook: the bound on the stale-build check, in ms (stale-build-guard.ts). */
+  staleCheckTimeoutMs?: number;
 }
 
 /** Where a generated script travels for a host to record, beside the agent-visible text. */
@@ -2387,13 +2392,10 @@ function expandedOpCount(op: Record<string, unknown>): number {
 }
 
 /**
- * The tools that hand back something the studio rendered. Render behaviour follows the live studio, not this package,
- * so a result is traced by the build that made it. agent_export's generated code says so itself; the rest are asked
+ * Render behaviour follows the live studio, not this package, so a result is traced by the build that made it (the
+ * tools are RENDERING_TOOLS, stale-build-guard.ts). agent_export's generated code says so itself; the rest are asked
  * here, once, after the call.
  */
-const RENDERING_TOOLS = new Set(['pinepaper_agent_export', 'pinepaper_capture_frames', 'pinepaper_export_scene', 'pinepaper_export_svg',
-  'pinepaper_export_training_data', 'pinepaper_export_widget', 'pinepaper_export_widget_html', 'pinepaper_render_batch', 'pinepaper_sprite_sheet']);
-
 async function renderingBuildField(toolName: string, args: Record<string, unknown>, result: CallToolResult, options: HandlerOptions): Promise<Record<string, unknown>> {
   if (!RENDERING_TOOLS.has(toolName) || args.estimateOnly === true || result.isError || !options.executeInBrowser || result.structuredContent?.studioBuild) return {};
   if ((options.executionMode ?? getExecutionMode()) === 'code') return {};
@@ -2405,6 +2407,27 @@ async function renderingBuildField(toolName: string, args: Record<string, unknow
   } catch {
     return {}; // the export stands
   }
+}
+
+/**
+ * A call its own schema refuses has nothing to export, and is answered by that validation error with the page untouched
+ * (render_batch's "refused before anything renders"). The stale-build check is for calls that would start an export.
+ */
+const STALE_GUARD_SCHEMAS: Readonly<Record<string, z.ZodTypeAny>> = {
+  pinepaper_agent_export: AgentExportInputSchema,
+  pinepaper_capture_frames: CaptureFramesInputSchema,
+  pinepaper_render_batch: RenderBatchInputSchema,
+  pinepaper_sprite_sheet: SpriteSheetInputSchema,
+  pinepaper_export_widget: ExportWidgetInputSchema,
+  pinepaper_export_widget_html: ExportWidgetHtmlInputSchema,
+  pinepaper_interchange: InterchangeInputSchema,
+};
+function staleGuardApplies(toolName: string, args: Record<string, unknown>): boolean {
+  const schema = STALE_GUARD_SCHEMAS[toolName];
+  if (!schema) return true;
+  if (!schema.safeParse(args ?? {}).success) return false;
+  if (toolName === 'pinepaper_render_batch') return AgentExportInputSchema.safeParse((args as { export?: unknown }).export).success;
+  return true;
 }
 
 export async function handleToolCall(
@@ -2429,7 +2452,11 @@ export async function handleToolCall(
   if (idleBefore && typeof idleBefore.beginActivity === 'function') await idleBefore.beginActivity();
   let result: CallToolResult;
   try {
-    result = await callContext.run(
+    // A rendering tool is not started while the page says it is on a stale build (stale-build-guard.ts).
+    const stale = staleGuardApplies(toolName, args)
+      ? await staleBuildRefusal(toolName, args, options, peekBrowserController, errorResult)
+      : null;
+    result = stale ?? await callContext.run(
       { toolName, action: typeof args.action === 'string' ? args.action : undefined },
       () => handleToolCallInner(toolName, args, options, tracker, baseTimerId),
     );
@@ -3339,7 +3366,7 @@ async function handleToolCallInner(
           if (!failed) {
             // saveToFile: a small still would otherwise come back inline, and a
             // batch row must name a file.
-            const r = await handleToolCall('pinepaper_agent_export', input.export, { ...options, saveToFile: true });
+            const r = await handleToolCall('pinepaper_agent_export', input.export, { ...options, saveToFile: true, staleBuildChecked: true });
             const text = toolText(r);
             if (r.isError) { fail('export', r); }
             else {
@@ -5022,7 +5049,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
           if (ctl.connected) {
             return exportPerScene(args as Record<string, unknown>, String(input.format), {
               exec: (c) => ctl.executeCode(c, false, { bypassGovernor: true }),
-              exportOnce: (a) => handleToolCall('pinepaper_agent_export', a, options),
+              exportOnce: (a) => handleToolCall('pinepaper_agent_export', a, { ...options, staleBuildChecked: true }),
               exportDir: getExportDir(),
               programAudio: async (seconds) => {
                 const r = await ctl.executeCode(`(async function () {
