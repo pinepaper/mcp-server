@@ -6,7 +6,7 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { boolFlag, strFlag, suggestCommand } from '../args.js';
-import { emitJson, type ProjectConfig } from '../output.js';
+import { emitJson, failWith, type ProjectConfig } from '../output.js';
 import { parseCommandArgs, type CliCommand } from '../types.js';
 
 interface TemplateDef {
@@ -16,7 +16,7 @@ interface TemplateDef {
   operations: Array<Record<string, unknown>>;
 }
 
-const TEMPLATES: Readonly<Record<string, TemplateDef>> = {
+export const TEMPLATES: Readonly<Record<string, TemplateDef>> = {
   minimal: {
     name: 'minimal',
     description: 'Clean 1280x720 scene with animated headline and pulsing accent dot',
@@ -36,7 +36,8 @@ const TEMPLATES: Readonly<Record<string, TemplateDef>> = {
         type: 'animate',
         itemId: '$0',
         animationType: 'pulse',
-        animationOptions: { speed: 1.5, scale: 1.18 },
+        // The Studio reads animationSpeed / animationIntensity (0.18 = +-18%); `speed` and `scale` are not keys it reads.
+        animationOptions: { animationSpeed: 1.5, animationIntensity: 0.18 },
       },
       {
         type: 'create',
@@ -52,7 +53,8 @@ const TEMPLATES: Readonly<Record<string, TemplateDef>> = {
       },
       {
         type: 'keyframe_animate',
-        itemId: '$2',
+        // $N counts create and group ops in order: hero_dot is $0, title is $1.
+        itemId: '$1',
         duration: 1.2,
         keyframes: [
           { time: 0, properties: { opacity: 0, y: 425 }, easing: 'easeOutCubic' },
@@ -208,7 +210,7 @@ const TEMPLATES: Readonly<Record<string, TemplateDef>> = {
         type: 'animate',
         itemId: '$0',
         animationType: 'pulse',
-        animationOptions: { speed: 1.2, scale: 1.08 },
+        animationOptions: { animationSpeed: 1.2, animationIntensity: 0.08 },
       },
       {
         type: 'orbit',
@@ -216,6 +218,9 @@ const TEMPLATES: Readonly<Record<string, TemplateDef>> = {
         name: 'inner_planet',
         radius: 135,
         speed: 0.7,
+        // Every orbit names its phase: the Studio stores an unset phaseDegrees as null and its live validator then
+        // reports "orbits.phaseDegrees should be number, got object" for the whole scene.
+        phaseDegrees: 0,
         itemType: 'circle',
         properties: { radius: 14, fillColor: '#38bdf8' },
       },
@@ -276,9 +281,11 @@ export const initCommand: CliCommand = {
     const tpl = TEMPLATES[templateName];
     if (!tpl) {
       const hint = suggestCommand(templateName, Object.keys(TEMPLATES));
-      console.error(`Unknown template "${templateName}".${hint ? ` Did you mean "${hint}"?` : ''}`);
-      console.error(`Available templates: ${Object.keys(TEMPLATES).join(', ')}`);
-      return 1;
+      return failWith(
+        parsed.json, 'init',
+        `Unknown template "${templateName}".${hint ? ` Did you mean "${hint}"?` : ''} Available templates: ${Object.keys(TEMPLATES).join(', ')}`,
+        1,
+      );
     }
 
     const targetDir = resolve(parsed.parsed.positionals[0] || '.');
@@ -287,14 +294,18 @@ export const initCommand: CliCommand = {
     const scenePath = join(targetDir, 'scene.batch.json');
 
     if (!force && (existsSync(configPath) || existsSync(scenePath))) {
-      console.error(`Target already has pinepaper.json or scene.batch.json in ${targetDir}. Pass --force to overwrite.`);
-      return 1;
+      return failWith(parsed.json, 'init', `Target already has pinepaper.json or scene.batch.json in ${targetDir}. Pass --force to overwrite.`, 1);
     }
 
-    mkdirSync(targetDir, { recursive: true });
     const config: ProjectConfig = { name: basename(targetDir), ...tpl.config };
-    writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf-8');
-    writeFileSync(scenePath, JSON.stringify({ atomic: true, operations: tpl.operations }, null, 2) + '\n', 'utf-8');
+    try {
+      mkdirSync(targetDir, { recursive: true });
+      writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf-8');
+      writeFileSync(scenePath, JSON.stringify({ atomic: true, operations: tpl.operations }, null, 2) + '\n', 'utf-8');
+    } catch (e) {
+      // A path that is a file, a read-only folder, a full disk: one line, not a stack trace.
+      return failWith(parsed.json, 'init', `Could not write the project to ${targetDir}: ${e instanceof Error ? e.message : String(e)}`, 1);
+    }
 
     const created = [configPath, scenePath];
     if (parsed.json) {

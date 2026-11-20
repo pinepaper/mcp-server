@@ -8,6 +8,7 @@ import { BatchMacroError, batchPreflightView, expandBatchMacros } from '../../to
 import { batchOpIgnoredPaths, CUSTOM_RELATION_NAMES, handleToolCall } from '../../tools/handlers.js';
 import { AgentBatchExecuteInputSchema } from '../../types/schemas.js';
 import { boolFlag, strFlag } from '../args.js';
+import { findBadItemRefs } from '../batch-refs.js';
 import { emitJson, extractToolJson, formatCheckLine, resolveSceneInput, type ResolvedSceneInput } from '../output.js';
 import { loadSceneIntoStudio, normalizeBatchPayload, withCliBrowser } from '../scene-runner.js';
 import { parseCommandArgs, type CliCommand } from '../types.js';
@@ -30,6 +31,7 @@ USAGE:
 OPTIONS:
   --offline             Run schema, macro, and ontology checks without launching Chrome
   --allow-code          Allow custom relations/hooks in loaded scene
+  --allow-local-files   Let the live check read local files (a saved .pinepaper.json project, image paths); off by default
   --studio-url <url>    Override Studio URL
   --json                Emit machine-readable JSON output
   -h, --help            Show help`;
@@ -83,6 +85,11 @@ function runOfflineChecks(input: ResolvedSceneInput): CheckFinding[] {
     }
   }
 
+  // $N must name an item this batch has already made, whether or not vocabulary checks were skipped.
+  for (const ref of findBadItemRefs(parsedBatch.data.operations as ReadonlyArray<Record<string, unknown>>)) {
+    findings.push({ stage: 'offline', severity: 'error', path: ref.path, message: ref.message });
+  }
+
   try {
     expandBatchMacros(parsedBatch.data.operations as Array<Record<string, unknown>>);
   } catch (e) {
@@ -104,6 +111,31 @@ function runOfflineChecks(input: ResolvedSceneInput): CheckFinding[] {
   return findings;
 }
 
+/** What the Studio ignored or rewrote while loading the scene, as warnings (ignoredOptions, translated arguments). */
+export function collectLoadNotes(summary: unknown): string[] {
+  const notes: string[] = [];
+  const seen = new Set<unknown>();
+  const walk = (v: unknown, depth: number): void => {
+    if (!v || typeof v !== 'object' || depth > 4 || seen.has(v)) return;
+    seen.add(v);
+    const o = v as Record<string, unknown>;
+    if (Array.isArray(o.translatedArguments)) {
+      for (const t of o.translatedArguments) if (typeof t === 'string') notes.push(`The Studio rewrote ${t}`);
+    }
+    if (Array.isArray(o.results)) {
+      o.results.forEach((r, i) => {
+        const rec = r && typeof r === 'object' ? (r as { index?: unknown; result?: { warning?: unknown } }) : undefined;
+        const inner = rec?.result;
+        const at = typeof rec?.index === 'number' ? rec.index : i;
+        if (inner && typeof inner.warning === 'string' && inner.warning) notes.push(`op ${at}: ${inner.warning}`);
+      });
+    }
+    for (const child of Object.values(o)) walk(child, depth + 1);
+  };
+  walk(summary, 0);
+  return [...new Set(notes)];
+}
+
 export const checkCommand: CliCommand = {
   name: 'check',
   aliases: ['validate', 'lint'],
@@ -115,12 +147,14 @@ export const checkCommand: CliCommand = {
     const parsed = parseCommandArgs(argv, checkCommand, {
       offline: { type: 'boolean' },
       'allow-code': { type: 'boolean' },
+      'allow-local-files': { type: 'boolean' },
       'studio-url': { type: 'string' },
     });
     if (parsed.kind !== 'ok') return parsed.code;
 
     const offline = boolFlag(parsed.parsed.flags, 'offline') === true;
     const allowCode = boolFlag(parsed.parsed.flags, 'allow-code') === true;
+    const allowLocalFiles = boolFlag(parsed.parsed.flags, 'allow-local-files') === true;
     const studioUrl = strFlag(parsed.parsed.flags, 'studio-url');
 
     let input: ResolvedSceneInput;
@@ -140,11 +174,15 @@ export const checkCommand: CliCommand = {
 
     if (!offline && offlineErrors.length === 0) {
       try {
-        await withCliBrowser({ studioUrl, headless: true, allowCode }, async (_ctl, handlerOpts) => {
+        await withCliBrowser({ studioUrl, headless: true, allowCode, allowLocalFiles }, async (_ctl, handlerOpts) => {
           const loaded = await loadSceneIntoStudio(input, handlerOpts, allowCode);
           if (!loaded.ok) {
             findings.push({ stage: 'validate', severity: 'error', message: loaded.error || 'Scene failed to load in Studio' });
             return;
+          }
+
+          for (const note of collectLoadNotes(loaded.summary)) {
+            findings.push({ stage: 'validate', severity: 'warning', message: note });
           }
 
           const valRes = extractToolJson(await handleToolCall('pinepaper_validate_scene', {}, handlerOpts));
