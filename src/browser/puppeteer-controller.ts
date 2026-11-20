@@ -833,15 +833,27 @@ export class PinePaperBrowserController {
   /**
    * Disconnect and close browser
    */
+  /** How long disconnect() waits for browser.close() before stopping the process. */
+  static CLOSE_TIMEOUT_MS = 5000;
+
   async disconnect(): Promise<void> {
     if (this.idleTimer) { clearTimeout(this.idleTimer); this.idleTimer = null; }
     this.frozen = false;
     this.idleSession = null;
     if (this.browser) {
-      try {
-        await this.browser.close();
-      } catch {
-        // Ignore errors during cleanup
+      // A BOUNDED CLOSE. After a PNG export, browser.close() never settled (2026-11-20): the file was written and the
+      // CLI's `render -f png` then hung until killed. Close is given a few seconds; past that the browser process is
+      // killed, since it is ours and nothing is left to save.
+      const browser = this.browser;
+      let timer: ReturnType<typeof setTimeout> | null = null;
+      const closed = await Promise.race([
+        browser.close().then(() => true, () => true),
+        new Promise<boolean>((r) => { timer = setTimeout(() => r(false), PinePaperBrowserController.CLOSE_TIMEOUT_MS); }),
+      ]);
+      if (timer) clearTimeout(timer);
+      if (!closed) {
+        try { browser.process()?.kill('SIGKILL'); } catch { /* already gone */ }
+        console.error(`[PinePaper] The browser did not close within ${PinePaperBrowserController.CLOSE_TIMEOUT_MS} ms; its process was stopped.`);
       }
     }
     this.browser = null;
