@@ -325,6 +325,16 @@ describe('error paths (item 8)', () => {
     }
     expect(redactUrl('Could not reach https://u:p@h.test/build.json: bad https://x:y@z.test')).toBe('Could not reach https://h.test/build.json: bad https://z.test');
     expect(redactUrl('https://pinepaper.studio')).toBe('https://pinepaper.studio');
+
+    // Same answers as the old regex on the edge cases, and linear on a long run of letters (CodeQL js/polynomial-redos).
+    expect(redactUrl('see (https://a:b@h.test) and ftp://c@d.test')).toBe('see (https://h.test) and ftp://d.test');
+    expect(redactUrl('https://a://b@h')).toBe('https://a://h');
+    expect(redactUrl('no creds: https://h.test/x@y and 9://u@h')).toBe('no creds: https://h.test/x@y and 9://u@h');
+    const long = 'a'.repeat(200_000);
+    const t0 = Date.now();
+    expect(redactUrl(long + '://u@h')).toBe(long + '://h');
+    expect(redactUrl(long)).toBe(long);
+    expect(Date.now() - t0).toBeLessThan(500);
   });
 
   it('info lists each local browser name once', async () => {
