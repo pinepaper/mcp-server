@@ -6,6 +6,7 @@ import { getToolsForToolkit, getToolsForVerbosity, PINEPAPER_TOOLS } from '../to
 import type { ToolkitProfile } from '../tools/toolkits.js';
 import { SERVER_VERSION } from '../version.js';
 import { suggestCommand } from './args.js';
+import { emitJson } from './output.js';
 import { benchmarkCommand } from './commands/benchmark.js';
 import { browserCommand } from './commands/browser.js';
 import { callCommand } from './commands/call.js';
@@ -87,6 +88,10 @@ USAGE:
   pinepaper-mcp <command> [args] [options]   Run a CLI command
   pinepaper-mcp help <command>               Show help for a specific command
 
+An unknown first word is a typo and exits 2 when run from a terminal. When stdin is not a terminal (an MCP client
+launched this as a server) it is ignored with one warning on stderr and the server starts, as before 1.7.0.
+Add --debug to a command to print the stack of an unexpected error.
+
 COMMANDS:
 ${commandSections.join('\n')}
 
@@ -128,7 +133,10 @@ SUPPORT:
 }
 
 /** Dispatch a non-server CLI invocation and return its process exit code. */
-export async function runCliCommand(argv: readonly string[]): Promise<number> {
+export async function runCliCommand(rawArgv: readonly string[]): Promise<number> {
+  // `--debug` (any position) prints the stack of an unexpected error; it is not a flag any command reads.
+  const debug = rawArgv.includes('--debug');
+  const argv = rawArgv.filter((a) => a !== '--debug');
   if (!argv.length) {
     console.log(formatMainHelp());
     return 0;
@@ -166,5 +174,37 @@ export async function runCliCommand(argv: readonly string[]): Promise<number> {
     return 2;
   }
 
-  return cmd.run(rest);
+  return guardedRun(cmd.name, () => cmd.run(rest), rest.includes('--json'), debug);
+}
+
+/**
+ * Run a command so that an unexpected error is one line (or one JSON error with `--json`) and exit code 1, never a
+ * stack trace; `--debug` adds the stack for people debugging the CLI itself.
+ */
+export async function guardedRun(name: string, run: () => Promise<number>, json: boolean, debug = false): Promise<number> {
+  try {
+    return await run();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (json) emitJson(name, { ok: false, error: msg });
+    else console.error(`pinepaper-mcp ${name}: ${msg}`);
+    if (debug && e instanceof Error && e.stack) console.error(e.stack);
+    return 1;
+  }
+}
+
+/**
+ * How the entry point treats its first argument.
+ * - `serve`: no first word, a flag, or `serve` (start the stdio MCP server).
+ * - `command`: a known subcommand or `help`.
+ * - `unknown-command`: an unknown word with a terminal on stdin (a person typed it: help them, exit 2).
+ * - `unknown-serve`: an unknown word with stdin NOT a terminal. A client launched this as a server, and before the
+ *   CLI existed any first word that was not a flag was ignored, so existing configs keep working: serve, warn on stderr.
+ */
+export type FirstArgRoute = 'serve' | 'command' | 'unknown-command' | 'unknown-serve';
+
+export function routeFirstArg(first: string | undefined, stdinIsTTY: boolean): FirstArgRoute {
+  if (!first || first.startsWith('-') || first.toLowerCase() === 'serve') return 'serve';
+  if (first.toLowerCase() === 'help' || resolveSubcommand(first)) return 'command';
+  return stdinIsTTY ? 'unknown-command' : 'unknown-serve';
 }

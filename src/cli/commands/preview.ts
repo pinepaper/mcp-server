@@ -8,7 +8,7 @@ import { PinePaperBrowserController } from '../../browser/puppeteer-controller.j
 import { handleToolCall, type HandlerOptions } from '../../tools/handlers.js';
 import { env } from '../../utils/env.js';
 import { boolFlag, strFlag } from '../args.js';
-import { emitJson, resolveSceneInput, type ResolvedSceneInput } from '../output.js';
+import { emitJson, failWith, redactUrl, resolveSceneInput, type ResolvedSceneInput } from '../output.js';
 import { loadSceneIntoStudio, withScopedCapabilities } from '../scene-runner.js';
 import { parseCommandArgs, type CliCommand } from '../types.js';
 
@@ -23,6 +23,7 @@ OPTIONS:
   --watch               Reload automatically whenever the scene file changes
   --play                Start timeline playback immediately after loading
   --allow-code          Allow custom relations/hooks in loaded scene
+  --allow-local-files   Let the preview read local files (a saved .pinepaper.json project, image paths); off by default
   --studio-url <url>    Override Studio URL
   --json                Emit initial load status as JSON (with --watch, stays open)
   -h, --help            Show help`;
@@ -38,6 +39,7 @@ export const previewCommand: CliCommand = {
       watch: { type: 'boolean', short: 'w' },
       play: { type: 'boolean' },
       'allow-code': { type: 'boolean' },
+      'allow-local-files': { type: 'boolean' },
       'studio-url': { type: 'string' },
     });
     if (parsed.kind !== 'ok') return parsed.code;
@@ -46,13 +48,13 @@ export const previewCommand: CliCommand = {
     try {
       input = resolveSceneInput(parsed.parsed.positionals[0] || '.');
     } catch (e) {
-      console.error(`pinepaper-mcp preview: ${e instanceof Error ? e.message : String(e)}`);
-      return 1;
+      return failWith(parsed.json, 'preview', e instanceof Error ? e.message : String(e), 1);
     }
 
     const doWatch = boolFlag(parsed.parsed.flags, 'watch') === true;
     const autoPlay = boolFlag(parsed.parsed.flags, 'play') === true;
     const allowCode = boolFlag(parsed.parsed.flags, 'allow-code') === true;
+    const allowLocalFiles = boolFlag(parsed.parsed.flags, 'allow-local-files') === true;
     const studioUrl = strFlag(parsed.parsed.flags, 'studio-url') || env('PINEPAPER_STUDIO_URL') || 'https://pinepaper.studio';
 
     const controller = new PinePaperBrowserController({
@@ -73,7 +75,7 @@ export const previewCommand: CliCommand = {
       await controller.disconnect().catch(() => {});
     };
 
-    return withScopedCapabilities({ localFiles: true, code: allowCode }, async () => {
+    return withScopedCapabilities({ localFiles: allowLocalFiles, code: allowCode }, async () => {
       try {
         await controller.connect();
         const handlerOpts: HandlerOptions = {
@@ -96,7 +98,7 @@ export const previewCommand: CliCommand = {
         }
 
         if (parsed.json) {
-          emitJson('preview', { ok: true, file: input.filePath, studioUrl, loadMs: initial.loadMs, watching: doWatch });
+          emitJson('preview', { ok: true, file: input.filePath, studioUrl: redactUrl(studioUrl), loadMs: initial.loadMs, watching: doWatch });
         } else {
           console.log(`Preview open in PinePaper Studio: ${input.filePath} (loaded in ${initial.loadMs} ms)`);
           if (doWatch) console.log(`Watching ${input.filePath} for changes...`);

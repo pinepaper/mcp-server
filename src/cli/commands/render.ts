@@ -8,7 +8,8 @@ import { basename, dirname, resolve } from 'node:path';
 import { sha256OfFile } from '../../tools/export-file-receipt.js';
 import { handleToolCall } from '../../tools/handlers.js';
 import { boolFlag, numFlag, strFlag } from '../args.js';
-import { emitJson, extractToolJson, resolveSceneInput, type ResolvedSceneInput } from '../output.js';
+import { emitJson, extractToolJson, failWith, resolveSceneInput, type ResolvedSceneInput } from '../output.js';
+import { confineManifestPath } from '../safe-path.js';
 import { loadSceneIntoStudio, withCliBrowser } from '../scene-runner.js';
 import { parseCommandArgs, type CliCommand } from '../types.js';
 
@@ -31,6 +32,7 @@ OPTIONS:
   --deterministic           Request deterministic frame timing & encode
   --audio-codec <any|aac>   Require AAC audio for MP4 (fails fast if unavailable)
   --allow-code              Allow custom relations/hooks in loaded scene
+  --allow-local-files       Let the render read local files (a saved .pinepaper.json project, image paths); off by default
   --studio-url <url>        Override Studio URL
   --json                    Emit machine-readable JSON output
   -h, --help                Show help`;
@@ -44,18 +46,10 @@ function mapQuality(raw?: string): 'draft' | 'standard' | 'high' | undefined {
   return undefined;
 }
 
+/** Where a render goes when neither -o nor the manifest names a file: renders/<scene name>.<ext> in the project. */
 function defaultOutputPath(input: ResolvedSceneInput, format: string): string {
-  const configured = input.projectConfig?.export?.output;
-  if (configured && !strExtMismatch(configured, format)) {
-    return resolve(input.dir, configured);
-  }
   const base = basename(input.filePath).replace(/\.(batch|pinepaper)\.json$|\.json$/i, '') || 'output';
   return resolve(input.dir, 'renders', `${base}.${format}`);
-}
-
-function strExtMismatch(filePath: string, format: string): boolean {
-  const lower = filePath.toLowerCase();
-  return !lower.endsWith(`.${format}`);
 }
 
 export const renderCommand: CliCommand = {
@@ -75,6 +69,7 @@ export const renderCommand: CliCommand = {
       deterministic: { type: 'boolean' },
       'audio-codec': { type: 'string' },
       'allow-code': { type: 'boolean' },
+      'allow-local-files': { type: 'boolean' },
       'studio-url': { type: 'string' },
     });
     if (parsed.kind !== 'ok') return parsed.code;
@@ -92,20 +87,28 @@ export const renderCommand: CliCommand = {
     const cfg = input.projectConfig?.export || {};
     const format = (strFlag(parsed.parsed.flags, 'format') || cfg.format || 'mp4').toLowerCase();
     if (!SUPPORTED_FORMATS.has(format)) {
-      console.error(`Unsupported format "${format}". Supported: ${[...SUPPORTED_FORMATS].join(', ')}.`);
-      return 2;
+      return failWith(parsed.json, 'render', `Unsupported format "${format}". Supported: ${[...SUPPORTED_FORMATS].join(', ')}.`, 2);
     }
 
     const qualityRaw = strFlag(parsed.parsed.flags, 'quality') || cfg.quality;
     const quality = mapQuality(qualityRaw);
     if (qualityRaw && !quality) {
-      console.error(`Invalid --quality "${qualityRaw}". Use draft (low), standard (medium), or high.`);
-      return 2;
+      return failWith(parsed.json, 'render', `Invalid --quality "${qualityRaw}". Use draft (low), standard (medium), or high.`, 2);
     }
 
+    // The manifest's export.output must stay inside the project (checked before anything runs or is written);
+    // an explicit -o is the person's own choice and is not restricted.
     const explicitOut = strFlag(parsed.parsed.flags, 'output');
-    const desiredOut = explicitOut ? resolve(explicitOut) : (cfg.output ? resolve(input.dir, cfg.output) : null);
+    let desiredOut: string | null = null;
+    if (explicitOut) {
+      desiredOut = resolve(explicitOut);
+    } else if (typeof cfg.output === 'string' && cfg.output) {
+      const confined = confineManifestPath(input.dir, cfg.output);
+      if (!confined.ok) return failWith(parsed.json, 'render', confined.error, 1);
+      desiredOut = confined.path;
+    }
     const allowCode = boolFlag(parsed.parsed.flags, 'allow-code') === true;
+    const allowLocalFiles = boolFlag(parsed.parsed.flags, 'allow-local-files') === true;
     const studioUrl = strFlag(parsed.parsed.flags, 'studio-url');
     const platform = strFlag(parsed.parsed.flags, 'platform') || cfg.platform || 'auto';
     const fps = numFlag(parsed.parsed.flags, 'fps') ?? cfg.fps;
@@ -114,7 +117,7 @@ export const renderCommand: CliCommand = {
     const audioCodec = strFlag(parsed.parsed.flags, 'audio-codec') || cfg.audioCodec;
 
     try {
-      const result = await withCliBrowser({ studioUrl, headless: true, allowCode }, async (_ctl, handlerOpts) => {
+      const result = await withCliBrowser({ studioUrl, headless: true, allowCode, allowLocalFiles }, async (_ctl, handlerOpts) => {
         const loaded = await loadSceneIntoStudio(input, handlerOpts, allowCode);
         if (!loaded.ok) return { ok: false as const, error: loaded.error || 'Scene load failed', loadMs: loaded.loadMs };
 

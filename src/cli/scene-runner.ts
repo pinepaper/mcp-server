@@ -38,6 +38,12 @@ export async function withScopedCapabilities<T>(
   }
 }
 
+/** The capabilities a CLI browser session turns on: only what the command was explicitly given. */
+export function cliCapabilities(opts: Pick<RunSessionOptions, 'allowLocalFiles' | 'allowCode'>): { localFiles: boolean; code: boolean } {
+  // Local files are off unless asked for (--allow-local-files or PINEPAPER_ALLOW_LOCAL_FILES=1), as the help text says.
+  return { localFiles: opts.allowLocalFiles === true, code: opts.allowCode === true };
+}
+
 /** Run `fn` against a dedicated browser controller and guarantee teardown. */
 export async function withCliBrowser<T>(
   opts: RunSessionOptions,
@@ -53,7 +59,7 @@ export async function withCliBrowser<T>(
   });
 
   return withScopedCapabilities(
-    { localFiles: opts.allowLocalFiles ?? true, code: opts.allowCode === true },
+    cliCapabilities(opts),
     async () => {
       try {
         await controller.connect();
@@ -75,6 +81,14 @@ export async function withCliBrowser<T>(
 export function normalizeBatchPayload(parsed: unknown): Record<string, unknown> {
   if (Array.isArray(parsed)) return { operations: parsed };
   return { ...(parsed as Record<string, unknown>) };
+}
+
+/** The words that name the CLI flag, appended wherever the server refused a local-file read. */
+export const LOCAL_FILES_HINT = 'Pass --allow-local-files (or set PINEPAPER_ALLOW_LOCAL_FILES=1) to let this command read local files.';
+
+/** An error from a load that was refused for lack of the local-files capability, naming the CLI flag that turns it on. */
+export function withLocalFilesHint(error: string): string {
+  return /PINEPAPER_ALLOW_LOCAL_FILES/.test(error) && !/--allow-local-files/.test(error) ? `${error}\n${LOCAL_FILES_HINT}` : error;
 }
 
 export interface LoadSceneResult {
@@ -123,7 +137,7 @@ export async function loadSceneIntoStudio(
   const extracted = extractToolJson(res);
   const loadMs = Date.now() - start;
   if (!extracted.ok) {
-    return { ok: false, loadMs, summary: extracted.data, error: extracted.text || 'Failed to load scene.' };
+    return { ok: false, loadMs, summary: extracted.data, error: withLocalFilesHint(extracted.text || 'Failed to load scene.') };
   }
   return { ok: true, loadMs, summary: extracted.data };
 }

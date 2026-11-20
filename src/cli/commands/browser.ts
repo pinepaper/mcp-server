@@ -6,7 +6,7 @@
 import { PinePaperBrowserController, probeBrowserEnvironment } from '../../browser/puppeteer-controller.js';
 import { env } from '../../utils/env.js';
 import { strFlag } from '../args.js';
-import { emitJson } from '../output.js';
+import { emitJson, redactUrl } from '../output.js';
 import { parseCommandArgs, type CliCommand } from '../types.js';
 
 const HELP = `PinePaper Browser Diagnostics
@@ -57,7 +57,7 @@ export const browserCommand: CliCommand = {
 
     if (action === 'status') {
       if (parsed.json) {
-        emitJson('browser', { action: 'status', studioUrl, probe, install: INSTALL_HINTS });
+        emitJson('browser', { action: 'status', studioUrl: redactUrl(studioUrl), probe, install: INSTALL_HINTS });
         return 0;
       }
       console.log('PinePaper Browser Environment\n');
@@ -98,7 +98,7 @@ export const browserCommand: CliCommand = {
       const ok = evalRes.success && details.ready === true;
 
       if (parsed.json) {
-        emitJson('browser', { action: 'verify', ok, studioUrl, elapsedMs, probe, capabilities: details, error: evalRes.error });
+        emitJson('browser', { action: 'verify', ok, studioUrl: redactUrl(studioUrl), elapsedMs, probe, capabilities: details, error: evalRes.error });
         return ok ? 0 : 1;
       }
       if (!ok) {
@@ -107,7 +107,7 @@ export const browserCommand: CliCommand = {
       }
       console.log([
         `Browser verification succeeded (${elapsedMs} ms)`,
-        `  Studio URL:   ${studioUrl}`,
+        `  Studio URL:   ${redactUrl(studioUrl)}`,
         `  Studio Build: ${details.buildId || 'unknown'}`,
         `  WebCodecs:    ${details.webCodecs ? 'available (MP4/WebM export ready)' : 'unavailable (SVG/GIF/PNG work; MP4 needs WebCodecs)'}`,
         `  WebGL:        ${details.webGL ? 'available' : 'unavailable'}`,
@@ -116,7 +116,7 @@ export const browserCommand: CliCommand = {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (parsed.json) {
-        emitJson('browser', { action: 'verify', ok: false, studioUrl, probe, error: msg });
+        emitJson('browser', { action: 'verify', ok: false, studioUrl: redactUrl(studioUrl), probe, error: msg });
       } else {
         console.error(`Browser launch failed: ${msg}`);
       }

@@ -11,7 +11,7 @@ import { env } from '../../utils/env.js';
 import { getExportDir } from '../../utils/export-dir.js';
 import { privateNetworkAllowed } from '../../utils/safe-fetch.js';
 import { SERVER_BUILD, SERVER_VERSION, SERVER_VERSION_WITH_BUILD } from '../../version.js';
-import { emitJson } from '../output.js';
+import { emitJson, redactUrl } from '../output.js';
 import { parseCommandArgs, type CliCommand } from '../types.js';
 
 const HELP = `PinePaper Info
@@ -59,7 +59,8 @@ export const infoCommand: CliCommand = {
         executionMode: env('PINEPAPER_EXECUTION_MODE') || 'puppeteer',
         toolkit: env('PINEPAPER_TOOLKIT') || 'core',
         verbosity: env('PINEPAPER_VERBOSITY') || env('PINEPAPER_TOOL_VERBOSITY') || 'compact',
-        studioUrl: env('PINEPAPER_STUDIO_URL') || 'https://pinepaper.studio',
+        // Never print credentials a URL may carry (https://user:token@host).
+        studioUrl: redactUrl(env('PINEPAPER_STUDIO_URL') || 'https://pinepaper.studio'),
         cloudUrl: env('PINEPAPER_CLOUD_URL') || 'https://cloud.pinepaper.studio',
         exportDir: getExportDir(),
       },
@@ -90,7 +91,7 @@ export const infoCommand: CliCommand = {
       `Studio URL:      ${payload.config.studioUrl}`,
       `Export folder:   ${payload.config.exportDir}`,
       `Browser driver:  ${driverText}`,
-      `Local browsers:  ${browser.detectedBrowsers.length ? browser.detectedBrowsers.map((b) => b.name).join(', ') : 'none detected in standard paths'}`,
+      `Local browsers:  ${browser.detectedBrowsers.length ? [...new Set(browser.detectedBrowsers.map((b) => b.name))].join(', ') : 'none detected in standard paths'}`,
       `FFmpeg runner:   ${ffmpegAddon ? 'bundled (.mcpb)' : 'not bundled (npm package starts no child processes)'}`,
       `Security flags:  allowCode=${payload.security.allowCode}, allowLocalFiles=${payload.security.allowLocalFiles}, allowPrivateNetwork=${payload.security.allowPrivateNetwork}`,
     ].join('\n'));
