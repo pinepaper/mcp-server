@@ -4,7 +4,7 @@
  * the studio then declined every further reload ("this tab already reloaded once ... a cache is still serving the old
  * build"). clear_canvas reported a plain success and the next export was refused with the same advice: a loop.
  */
-import { afterEach, describe, expect, it } from 'bun:test';
+import { describe, expect, it } from 'bun:test';
 import { handleToolCall } from '../../tools/handlers.js';
 import { STALE_BUILD_PROBE, staleAfterDeclinedMessage, stillStaleNote } from '../../tools/stale-build-guard.js';
 import { PinePaperBrowserController } from '../../browser/puppeteer-controller.js';
