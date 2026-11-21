@@ -1,6 +1,6 @@
 {
   "name": "@pinepaper.studio/mcp-server",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "mcpName": "io.github.pinepaper/mcp-server",
   "description": "CLI & MCP Server for PinePaper Studio — Create, preview, and render animated vector graphics and MP4/SVG videos with AI agents",
   "type": "module",

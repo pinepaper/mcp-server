@@ -1432,6 +1432,9 @@ export class PinePaperBrowserController {
     return {};
   }
 
+  /** Set when the last reloadIfStale found the page stale and the studio declined to reload it (see there). */
+  reloadDeclined: { buildId: string; liveBuildId: string; reason?: string } | null = null;
+
   /**
    * Put the studio on the live build when it is on an old one (FxTool D92: PinePaperAgent.reloadIfStale checks
    * /build.json, and when stale lets the new service worker activate and reloads the page). Everything on the canvas
@@ -1445,7 +1448,13 @@ export class PinePaperBrowserController {
   const A = typeof window !== 'undefined' ? window.PinePaperAgent : null;
   if (!A || typeof A.reloadIfStale !== 'function') return null;
   try { return await A.reloadIfStale(); } catch (e) { return null; }
-})()`) as { reloading?: boolean; fromBuild?: string; toBuild?: string } | null;
+})()`) as { reloading?: boolean; stale?: boolean; fromBuild?: string; toBuild?: string; buildId?: string; liveBuildId?: string; reason?: string } | null;
+    // A stale page the studio would not reload: it reloads a tab once per live build, and a cache that still serves
+    // the old build brings it back on the old one. Kept so clear_canvas and the export refusal can say a clear will not
+    // help (found live 2026-11-21: the refusal sent an agent to clear_canvas, which then succeeded silently, forever).
+    this.reloadDeclined = first && !first.reloading && first.stale === true && first.buildId && first.liveBuildId && first.buildId !== first.liveBuildId
+      ? { buildId: first.buildId, liveBuildId: first.liveBuildId, reason: first.reason }
+      : null;
     if (!first || !first.reloading) return null;
     // The page reloads ~100 ms after answering; wait for the new one to be the studio again.
     await new Promise((r) => setTimeout(r, 500));

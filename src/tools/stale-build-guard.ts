@@ -67,6 +67,7 @@ export const STALE_BUILD_PROBE = `(async function () {
 
 type ProbeController = {
   connected?: boolean;
+  reloadDeclined?: { buildId: string; liveBuildId: string; reason?: string } | null;
   executeCode?: (c: string, s: boolean, o: { bypassGovernor: boolean }) => Promise<{ success: boolean; result?: unknown }>;
 };
 
@@ -79,6 +80,22 @@ export interface StaleGuardOptions {
   staleBuildChecked?: boolean;
   /** Test hook: the bound on the check, in ms. */
   staleCheckTimeoutMs?: number;
+}
+
+/** Said by clear_canvas when the page is stale and the studio would not reload it. */
+export function stillStaleNote(d: { buildId: string; liveBuildId: string; reason?: string }): string {
+  return `The canvas is empty, but the studio page is still on build ${d.buildId} (live: ${d.liveBuildId}) and was not reloaded`
+    + (d.reason ? ` (${d.reason})` : '')
+    + '. Calling pinepaper_clear_canvas again will not change that, and exports stay refused on this build: '
+    + 'to export from it anyway, pass allowStaleBuild: true (--allow-stale-build on the command line).';
+}
+
+/** The refusal when a clear already tried to move this page to `liveBuildId` and the studio declined. */
+export function staleAfterDeclinedMessage(buildId: string, liveBuildId: string, reason?: string): string {
+  return `The studio page is on build ${buildId}, and the live build is ${liveBuildId}. Nothing was exported and nothing was changed. `
+    + `A reload to the live build was already tried and the studio declined it${reason ? ` (${reason})` : ''}, so pinepaper_clear_canvas will not help. `
+    + 'To export from this page anyway, on the old build, pass allowStaleBuild: true on this call (--allow-stale-build on the command line); '
+    + 'PINEPAPER_STALE_EXPORT=allow does that for every export.';
 }
 
 export function staleBuildMessage(buildId: string, liveBuildId: string): string {
@@ -130,11 +147,16 @@ export async function staleBuildRefusal(
   if (!controller?.connected || typeof controller.executeCode !== 'function') return null;
   const stale = await probeStaleBuild(controller, options.staleCheckTimeoutMs ?? STALE_CHECK_TIMEOUT_MS);
   if (!stale) return null;
-  const message = staleBuildMessage(stale.buildId, stale.liveBuildId);
+  const d = controller.reloadDeclined;
+  const declined = !!d && d.buildId === stale.buildId && d.liveBuildId === stale.liveBuildId;
+  const message = declined
+    ? staleAfterDeclinedMessage(stale.buildId, stale.liveBuildId, d!.reason)
+    : staleBuildMessage(stale.buildId, stale.liveBuildId);
+  const details = { code: STALE_BUILD_CODE, buildId: stale.buildId, liveBuildId: stale.liveBuildId, exported: false, changed: false, ...(declined ? { reloadDeclined: true } : {}) };
   const res = errorResult(STALE_BUILD_CODE, message, {
-    code: STALE_BUILD_CODE, buildId: stale.buildId, liveBuildId: stale.liveBuildId, exported: false, changed: false,
-    nextSteps: ['pinepaper_clear_canvas', 'allowStaleBuild: true'],
+    ...details,
+    nextSteps: declined ? ['allowStaleBuild: true'] : ['pinepaper_clear_canvas', 'allowStaleBuild: true'],
   });
-  res.structuredContent = { success: false, error: { code: STALE_BUILD_CODE, message, details: { code: STALE_BUILD_CODE, buildId: stale.buildId, liveBuildId: stale.liveBuildId, exported: false, changed: false } } };
+  res.structuredContent = { success: false, error: { code: STALE_BUILD_CODE, message, details } };
   return res;
 }
