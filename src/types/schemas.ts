@@ -5851,3 +5851,6 @@ export const UiKitInputSchema = z.object({
   action: z.enum(['phone_lock_screen', 'notification', 'prompt_box', 'toggle', 'ad_card', 'calendar_card']),
 }).passthrough();
 export type UiKitInput = z.infer<typeof UiKitInputSchema>;
+
+// pinepaper_video_to_animation lives with its generator (src/tools/video-to-animation.ts).
+export { VideoToAnimationInputSchema } from '../tools/video-to-animation.js';

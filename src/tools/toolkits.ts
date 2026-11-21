@@ -126,6 +126,7 @@ export const TOOL_TAGS: Record<string, string[]> = {
     'pinepaper_motion',
     'pinepaper_sound',
     'pinepaper_import_motion_capture',
+    'pinepaper_video_to_animation',
     'pinepaper_keyframe_animate',
     'pinepaper_choreograph',
     'pinepaper_morph_sequence',

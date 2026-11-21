@@ -142,6 +142,10 @@
       "description": "Import a BVH motion-capture clip (CMU, Mixamo) as an animated skeleton, or retarget one onto a rig that already exists."
     },
     {
+      "name": "pinepaper_video_to_animation",
+      "description": "Copy a person's movement from a video or pose landmarks onto a rigged character, in the studio."
+    },
+    {
       "name": "pinepaper_import_svg",
       "description": "Import SVG content onto the canvas"
     },
