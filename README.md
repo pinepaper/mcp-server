@@ -30,7 +30,7 @@
 
 PinePaper MCP Server enables AI assistants to create and animate graphics in [PinePaper Studio](https://pinepaper.studio) via the Model Context Protocol (MCP). Works with any AI that supports MCP tool calling (Claude, GPT, Gemini, local models, etc.).
 
-The server exposes **179 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
+The server exposes **180 tools** across drawing, animation, diagrams, maps, typography, physics, image editing, data visualization, and export. Using natural language, you can:
 
 - Create geometric shapes, text collages, diagrams, and data charts
 - Apply 37+ character-level text effects and 28+ vertex deformation presets
@@ -41,7 +41,7 @@ The server exposes **179 tools** across drawing, animation, diagrams, maps, typo
 
 ## Running it: local or hosted
 
-**Local is free and complete.** Every one of the 179 tools works when you run
+**Local is free and complete.** Every one of the 180 tools works when you run
 this server yourself. There is no reduced tier and nothing held back.
 
 What it needs:
@@ -357,6 +357,10 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - The server itself fetches the images, SVGs and media a tool call names by URL, and reads local files named by path. URLs that resolve to loopback, private, link-local or reserved addresses are refused, redirects included, and so are cloud metadata addresses. Local files are read only with `PINEPAPER_ALLOW_LOCAL_FILES=1`, and then only from the working directory, the export folder, and folders listed in `PINEPAPER_ASSET_DIRS` (the export folder is readable without the switch). `PINEPAPER_ALLOW_PRIVATE_NETWORK=1` allows local and LAN hosts. Metadata addresses stay refused even with it set.
 
 ## What's new in 1.7.1
+
+### Added
+
+- `pinepaper_video_to_animation` copies a person's movement onto a rigged character. Give it a clip uploaded with `pinepaper_media upload_video` (a URL or a local path), the 33 BlazePose landmarks per frame from another tool, or pre-extracted frames. The studio finds the pose on the device, fits a few pose keys per bone and applies them as one undo step; nothing is uploaded and this package runs no model of its own. By default the motion is faithful to the performance. `style` asks for a drawn one: exaggeration (`caricatureGain`), holds on twos or threes (`stepTiming`), a drawn `medium`, and pinned feet (`lockFootContacts`, also available on its own). A rig that already has pose keys is refused unless `replaceExisting: true`. The rig needs the 16 bones the tool description names; bones it lacks are skipped and listed. When a person is found in fewer than half the frames sampled, the result says so. Needs a studio build from 2026-11-20 or later.
 
 ### Changed
 
@@ -2692,7 +2696,7 @@ Fourteen new tools (121 → 135) and new actions across the surface — the rele
 
 ## Toolkits & Token Budget
 
-179 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
+180 tools is a lot of context. The server ships a **toolkit** system that serves only the tools a given client needs, plus a **verbosity** system that controls how long each tool description is.
 
 **Toolkit profiles** (`PINEPAPER_TOOLKIT`):
 
@@ -2890,7 +2894,7 @@ Generate instruction/code pairs for LLM fine-tuning:
 
 ## Tools Reference
 
-All 179 tools, grouped by the tag used for toolkit filtering.
+All 180 tools, grouped by the tag used for toolkit filtering.
 
 ### Canvas (`canvas`)
 | Tool | Description |
@@ -2926,6 +2930,7 @@ All 179 tools, grouped by the tag used for toolkit filtering.
 | Tool | Description |
 |------|-------------|
 | `pinepaper_import_motion_capture` | Import or retarget a BVH motion-capture clip |
+| `pinepaper_video_to_animation` | Copy a performance from a video or pose landmarks onto a rig |
 | `pinepaper_import_svg` | Import SVG markup |
 | `pinepaper_import_image` | Import a raster image |
 | `pinepaper_detect_objects` | Detect objects in an image (text queries, composite as nodes) |

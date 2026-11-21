@@ -18,6 +18,7 @@ import { GUARDED_TOOLS, ALLOW_STALE_BUILD_PROPERTY } from './stale-build-guard.j
 import { STICK_GAITS, STICK_POSES, STICK_SEQUENCES, STICK_EXPRESSIONS, STICK_PROPS } from './stick-vocabulary.js';
 import { AgentBatchOperationTypeSchema, GeneratorNameSchema, ItemTypeSchema } from '../types/schemas.js';
 import { expressionGrammarText } from './expression-grammar.js';
+import { VIDEO_TO_ANIMATION_DESCRIPTION, VIDEO_TO_ANIMATION_JSON_SCHEMA } from './video-to-animation.js';
 import { ENGINE_EASING_NAMES, DESIGN_MEDIA, DESIGN_MEDIA_APPLY, FILTER_TYPES, FILTER_DOCS, LINEAGE_KINDS, STYLED_SCENE_STYLES, STYLED_SCENE_STYLE_INFO, PATTERN_KINDS, ANIMATION_TYPES, ANIMATION_WAVEFORMS, ANIMATION_ORIGINS, ENGINE_EFFECT_TYPES } from './engine-lists.js';
 import {
   EffectTypeSchema,
@@ -1085,6 +1086,18 @@ SAMPLING: CMU records at 120fps. fps defaults to 15 because 120 poses per second
       },
       required: ['bvh'],
     },
+  },
+  {
+    name: 'pinepaper_video_to_animation',
+    annotations: {
+      title: 'Video to Animation (copy a performance onto a rig)',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    description: VIDEO_TO_ANIMATION_DESCRIPTION,
+    inputSchema: VIDEO_TO_ANIMATION_JSON_SCHEMA as unknown as Tool['inputSchema'],
   },
   {
     name: 'pinepaper_import_svg',

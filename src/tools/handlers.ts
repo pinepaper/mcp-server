@@ -231,6 +231,7 @@ import { safeFetch, checkUrl, UnsafeUrlError } from '../utils/safe-fetch.js';
 import { confineAssetPath } from '../utils/asset-paths.js';
 import { env } from '../utils/env.js';
 import { RENDERING_TOOLS, staleBuildRefusal, stillStaleNote } from './stale-build-guard.js';
+import { VideoToAnimationInputSchema, generateVideoToAnimationCode, v2aStagedPayload, V2A_STAGE_KEY } from './video-to-animation.js';
 import { getExportDir, exportFileLink } from '../utils/export-dir.js';
 
 /**
@@ -892,6 +893,9 @@ export const CUSTOM_RELATION_NAMES = new Set<string>();
 const LONG_GOVERNOR_BUDGET_MS: Record<string, number> = {
   pinepaper_detect_objects: 120_000,
   pinepaper_extract_object: 120_000,
+  // The pose model runs on every sampled frame of a video (up to maxFrames, default 600): the 10 s default timed out
+  // on a 3 s clip on prod (2026-11-21).
+  pinepaper_video_to_animation: 300_000,
 };
 
 export const CODE_META_KEY = 'pinepaper.studio/code';
@@ -3542,6 +3546,18 @@ async function handleToolCallInner(
             ? `Retargets a BVH clip onto rig ${input.skeletonId}`
             : 'Imports a BVH clip as a new animated skeleton';
         return executeOrGenerate(code, what, options, 'pinepaper_import_motion_capture');
+      }
+
+      case 'pinepaper_video_to_animation': {
+        const input = VideoToAnimationInputSchema.parse(args);
+        // The pose payload can be hundreds of KB: it goes beside the code (window.__ppStage), never inline.
+        const payload = v2aStagedPayload(input);
+        return executeOrGenerate(
+          generateVideoToAnimationCode(input),
+          `Copies a performance onto ${input.skeletonId ? `rig ${input.skeletonId}` : 'the rig'} (studio video-to-animation)`,
+          options, 'pinepaper_video_to_animation',
+          payload !== undefined ? { [V2A_STAGE_KEY]: payload } : undefined,
+        );
       }
 
       case 'pinepaper_keyframe_animate': {

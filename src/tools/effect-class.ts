@@ -32,6 +32,7 @@ export const TOOL_CLASS: Readonly<Record<string, EffectClass>> = Object.freeze({
   pinepaper_create_glossy_sphere: 'mutates',
   pinepaper_create_diagonal_stripes: 'mutates',
   pinepaper_import_motion_capture: 'unchecked',   // rig internals
+  pinepaper_video_to_animation: 'unchecked',      // rig internals (pose keys on a skeleton)
   pinepaper_import_svg: 'mutates',
   pinepaper_import_mermaid: 'mutates',
   pinepaper_import_image: 'mutates',
