@@ -233,7 +233,7 @@ import { env } from '../utils/env.js';
 import { RENDERING_TOOLS, staleBuildRefusal, stillStaleNote } from './stale-build-guard.js';
 import { VideoToAnimationInputSchema, generateVideoToAnimationCode, v2aStagedPayload, V2A_STAGE_KEY } from './video-to-animation.js';
 import { getExportDir, exportFileLink } from '../utils/export-dir.js';
-import { stripNonRenderedSvg } from '../utils/echo-safe.js';
+import { stripSvgForRecord, stripSvgForEcho, MAX_SVG_TEXT } from '../utils/echo-safe.js';
 
 /**
  * Registry of per-domain handler maps. Tools listed here short-circuit the
@@ -3855,9 +3855,16 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
         }
 
         // Only what is drawn travels on (a <title>, <desc>, comment… of a web-fetched file is not drawn and must not reach the model).
-        if (svgText) svgText = stripNonRenderedSvg(svgText);
+        if (svgText && svgText.length > MAX_SVG_TEXT) {
+          return errorResult(ErrorCodes.INVALID_PARAMS, `The SVG is ${svgText.length} characters; pinepaper_import_svg takes at most ${MAX_SVG_TEXT} (512 KB). Nothing was imported.`);
+        }
+        // What is DRAWN is the file with only its pure-text nodes (title, desc, metadata, script, comments, PIs, DOCTYPE subset)
+        // removed: every attribute, <style> and <foreignObject> stays, so no pixel changes. What a CODE-mode answer SHOWS the
+        // model is the fuller echo strip (attributes, foreign elements, long values). In browser mode the drawn copy is what runs.
+        if (svgText) svgText = stripSvgForRecord(svgText);
+        const codeSvg = svgText && (options.executionMode ?? getExecutionMode()) === 'code' ? stripSvgForEcho(svgText) : svgText;
         const code = codeGenerator.generateImportSVG(
-          svgText,
+          codeSvg,
           svgText ? undefined : input.url,
           input.position,
           input.scale,
