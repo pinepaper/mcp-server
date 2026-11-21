@@ -18,9 +18,9 @@
  */
 
 /** The largest SVG text a tool call may carry (bytes of UTF-16 units). One bound for the door, the library and the package. */
-export const MAX_SVG_TEXT = 512 * 1024;
+export const MAX_SVG_TEXT = 4 * 1024 * 1024;
 /** The largest Mermaid source a call may carry. */
-export const MAX_MERMAID_TEXT = 128 * 1024;
+export const MAX_MERMAID_TEXT = 1024 * 1024;
 
 type Mode = "record" | "echo";
 const PURE_TEXT = new Set(["title", "desc", "metadata", "script"]);

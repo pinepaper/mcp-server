@@ -3856,7 +3856,7 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
 
         // Only what is drawn travels on (a <title>, <desc>, comment… of a web-fetched file is not drawn and must not reach the model).
         if (svgText && svgText.length > MAX_SVG_TEXT) {
-          return errorResult(ErrorCodes.INVALID_PARAMS, `The SVG is ${svgText.length} characters; pinepaper_import_svg takes at most ${MAX_SVG_TEXT} (512 KB). Nothing was imported.`);
+          return errorResult(ErrorCodes.INVALID_PARAMS, `The SVG is ${svgText.length} characters; pinepaper_import_svg takes at most ${MAX_SVG_TEXT} (4 MB). Nothing was imported.`);
         }
         // The SVG is used as the RECORD-level copy: only its pure-text nodes (title, desc, metadata, script, comments, PIs, DOCTYPE
         // subset, stray CDATA) are removed; every attribute, <style> and <foreignObject> stays, so it draws exactly what the file
