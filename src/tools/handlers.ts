@@ -230,7 +230,7 @@ import { buildHtml5Ad, buildPlayable, externalRequests, pinSceneBackground, type
 import { safeFetch, checkUrl, UnsafeUrlError } from '../utils/safe-fetch.js';
 import { confineAssetPath } from '../utils/asset-paths.js';
 import { env } from '../utils/env.js';
-import { RENDERING_TOOLS, staleBuildRefusal } from './stale-build-guard.js';
+import { RENDERING_TOOLS, staleBuildRefusal, stillStaleNote } from './stale-build-guard.js';
 import { getExportDir, exportFileLink } from '../utils/export-dir.js';
 
 /**
@@ -3728,15 +3728,18 @@ async function handleToolCallInner(
         // Starting over is also the moment to leave an old build: everything on the canvas is going anyway, and the
         // lane has no start_job, which was the only other reload point (#40).
         let reloaded: { fromBuild?: string; toBuild?: string } | null = null;
+        let declined: { buildId: string; liveBuildId: string; reason?: string } | null = null;
         const mode = options.executionMode ?? getExecutionMode();
         if (mode !== 'code' && options.executeInBrowser && !options.deferred) {
           const controller = options.browserController || getBrowserController();
           if (controller.connected && typeof (controller as { reloadIfStale?: unknown }).reloadIfStale === 'function') {
             try { reloaded = await (controller as unknown as { reloadIfStale(): Promise<typeof reloaded> }).reloadIfStale(); } catch { reloaded = null; }
+            declined = reloaded ? null : ((controller as { reloadDeclined?: typeof declined }).reloadDeclined ?? null);
           }
         }
         const description = 'Clears all items from the canvas, including any welcome template items'
-          + (reloaded ? ` (the studio was on build ${reloaded.fromBuild} and was reloaded to the live build ${reloaded.toBuild} first)` : '');
+          + (reloaded ? ` (the studio was on build ${reloaded.fromBuild} and was reloaded to the live build ${reloaded.toBuild} first)` : '')
+          + (declined ? `. ${stillStaleNote(declined)}` : '');
         return executeOrGenerate(code, description, options, 'pinepaper_clear_canvas');
       }
 
