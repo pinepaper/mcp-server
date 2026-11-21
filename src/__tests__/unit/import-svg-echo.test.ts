@@ -31,10 +31,16 @@ describe('pinepaper_import_svg answers with what is drawn', () => {
     expect(stripSvgForEcho(`<svg ${NS}><!-- a <!-- B-INJECT --> C-INJECT --><rect/><title>D-INJECT`)).not.toMatch(/INJECT/);
     expect(stripSvgForEcho(HOSTILE)).not.toMatch(/INJECT/);
   });
-  it('a file over the bound is refused, nothing imported', async () => {
-    const r = await handleToolCall('pinepaper_import_svg', { svgString: `<svg ${NS}>${'x'.repeat(MAX_SVG_TEXT)}</svg>` }, { executionMode: 'code' } as never);
+  it('a file over the bound (4 MB) is refused, nothing imported; one at the bound is not refused for its size', async () => {
+    const over = `<svg ${NS}>${'x'.repeat(MAX_SVG_TEXT)}</svg>`;
+    const r = await handleToolCall('pinepaper_import_svg', { svgString: over }, { executionMode: 'code' } as never);
     expect(r.isError).toBe(true);
-    expect(JSON.stringify(r)).toContain('512 KB');
+    expect(JSON.stringify(r)).toContain('4 MB');
+    const head = `<svg ${NS}>`, tail = '</svg>';
+    const atBound = head + ' '.repeat(MAX_SVG_TEXT - head.length - tail.length) + tail;
+    expect(atBound.length).toBe(MAX_SVG_TEXT);
+    const ok = await handleToolCall('pinepaper_import_svg', { svgString: atBound }, { executionMode: 'code' } as never);
+    expect(JSON.stringify(ok)).not.toContain('Nothing was imported');
   });
 });
 
