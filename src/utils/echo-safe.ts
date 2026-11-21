@@ -19,6 +19,8 @@
 
 /** The largest SVG text a tool call may carry (bytes of UTF-16 units). One bound for the door, the library and the package. */
 export const MAX_SVG_TEXT = 512 * 1024;
+/** The largest Mermaid source a call may carry. */
+export const MAX_MERMAID_TEXT = 128 * 1024;
 
 type Mode = "record" | "echo";
 const PURE_TEXT = new Set(["title", "desc", "metadata", "script"]);
@@ -64,7 +66,7 @@ function readAttrs(body: string): Attr[] {
 
 const NUMERIC_GEOMETRY = /^[-+0-9.eE,\sMmLlHhVvCcSsQqTtAaZz]*$/;
 
-function echoAttrs(attrs: Attr[]): string {
+function echoAttrs(attrs: Attr[], budget: { left: number }): string {
   const keep: string[] = [];
   for (const a of attrs) {
     const lower = a.name.toLowerCase();
@@ -75,6 +77,10 @@ function echoAttrs(attrs: Attr[]): string {
     if (lower === "xmlns" || lower.startsWith("xmlns:")) { keep.push(a.raw); continue; }
     if ((lower === "d" || lower === "points") && !NUMERIC_GEOMETRY.test(a.value)) { keep.push(`${a.name}="[not geometry: ${a.value.length} chars omitted]"`); continue; }
     if (lower !== "d" && lower !== "points" && a.value.length > 80) { keep.push(`${a.name}="[${a.value.length} chars omitted]"`); continue; }
+    if (lower !== "d" && lower !== "points" && lower !== "xmlns") {
+      if (budget.left <= 0) { keep.push(`${a.name}="[omitted]"`); continue; }
+      budget.left -= a.value.length + a.name.length;
+    }
     keep.push(a.raw);
   }
   return keep.length ? " " + keep.join(" ") : "";
@@ -94,7 +100,14 @@ function stripCssComments(css: string): string {
   return out;
 }
 
+/** What a model is shown of one text node or style body: a bounded head. The RECORDED copy keeps it whole. */
+const MAX_ECHO_TEXT = 200;
+function capText(t: string): string { return t.length > MAX_ECHO_TEXT ? `${t.slice(0, MAX_ECHO_TEXT)}[${t.length - MAX_ECHO_TEXT} chars omitted]` : t; }
+/** The most attribute-value characters one echoed SVG carries (many short values must not add up to a payload). */
+const ECHO_ATTR_BUDGET = 4000;
+
 function strip(src: string, mode: Mode): string {
+  const budget = { left: ECHO_ATTR_BUDGET };
   const out: string[] = [];
   const n = src.length;
   let i = 0;
@@ -109,7 +122,7 @@ function strip(src: string, mode: Mode): string {
     if (skip) return;
     // Text that no element draws (between shapes, after the root, left over from a broken comment) is not part of a picture.
     if (mode === "echo" && textDepth === 0 && !inStyle && t.trim() !== "") return;
-    out.push(mode === "echo" && inStyle ? stripCssComments(t) : t);
+    out.push(mode === "echo" ? capText(inStyle ? stripCssComments(t) : t) : t);
   };
   while (i < n) {
     const lt = src.indexOf("<", i);
@@ -127,7 +140,8 @@ function strip(src: string, mode: Mode): string {
     if (bang && src.startsWith("<![CDATA[", lt)) {
       const e = src.indexOf("]]>", lt + 9);
       const end = e < 0 ? n : e + 3;
-      if (!skip) out.push(src.slice(lt, end));
+      // CDATA is drawn only inside <text>/<tspan>/<textPath> and read only inside <style>; anywhere else it is not part of a picture.
+      if (!skip && (textDepth > 0 || inStyle)) out.push(mode === "echo" ? capText(src.slice(lt, end)) : src.slice(lt, end));
       i = end; textStart = i; continue;
     }
     if (pi) { const e = src.indexOf("?>", lt + 2); i = e < 0 ? n : e + 2; textStart = i; continue; }
@@ -172,7 +186,7 @@ function strip(src: string, mode: Mode): string {
     if (local === "style" && !selfClosing) inStyle = true;
     if (bears && !selfClosing) textDepth++;
     if (mode === "record") { out.push(raw); continue; }
-    out.push(`<${qname}${echoAttrs(readAttrs(raw.slice(k, selfClosing ? -2 : -1)))}${selfClosing ? "/>" : ">"}`);
+    out.push(`<${qname}${echoAttrs(readAttrs(raw.slice(k, selfClosing ? -2 : -1)), budget)}${selfClosing ? "/>" : ">"}`);
   }
   return out.join("");
 }

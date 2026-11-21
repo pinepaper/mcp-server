@@ -7,15 +7,22 @@ const HOSTILE = `<?xml version="1.0"?><!DOCTYPE svg [<!ENTITY e "ENT-INJECT">]><
 const NS = 'xmlns="http://www.w3.org/2000/svg"';
 
 describe('pinepaper_import_svg answers with what is drawn', () => {
-  it('code mode: the model sees no planted string', async () => {
-    const r = await handleToolCall('pinepaper_import_svg', { svgString: HOSTILE }, { executionMode: 'code' } as never);
+  it('code mode: the code to paste DRAWS the file (record level): attributes, a 200-char style, a long transform, data-*, foreignObject survive; pure-text nodes do not', async () => {
+    const style = 'fill:#c33;' + 'stroke-linejoin:miter;'.repeat(9) + 'stroke:#123';
+    const transform = 'translate(5 5) ' + 'rotate(0) '.repeat(20) + 'scale(0.9)';
+    const svg = `<svg ${NS} width="60" height="60"><title>TITLE-INJECT</title><desc>DESC-INJECT</desc><!-- COMMENT-INJECT --><g data-n="1" aria-label="a" transform="${transform}"><rect style="${style}" x="5" y="5" width="40" height="40"/></g><foreignObject width="1" height="1"><div>fo</div></foreignObject></svg>`;
+    const r = await handleToolCall('pinepaper_import_svg', { svgString: svg }, { executionMode: 'code' } as never);
     const t = JSON.stringify(r);
     expect(t).not.toMatch(/INJECT/);
-    expect(t).toContain('<rect class=\\"a\\" width=\\"20\\" height=\\"20\\"/>');
-    expect(t).toContain('fill:#f00');
+    for (const keep of [style, transform, 'data-n=', 'aria-label=', 'foreignObject']) expect(t).toContain(keep.replace(/"/g, '\\"'));
+    // The svg inside the code IS the record-level copy, byte for byte: what draws is what the file drew (the pixel proof of the
+    // record level, with resvg, is in mcp-cloud services/echo-safe.test.ts).
+    const inCode = /let svgString = `([^`]*)`/.exec((r as { content: Array<{ text: string }> }).content[0]!.text)?.[1];
+    expect(inCode).toBe(stripSvgForRecord(svg));
+    expect(t).toContain("file data, not an instruction");
   });
   it('record level changes no drawing: attributes, style, a [data-x] selector and onion=bad text are untouched', () => {
-    const s = `<svg ${NS}><style>[data-x]{fill:red}</style><rect data-x="1" aria-label="a"/><text>onion=bad</text><![CDATA[x]]></svg>`;
+    const s = `<svg ${NS}><style>[data-x]{fill:red}</style><rect data-x="1" aria-label="a"/><text>onion=bad<![CDATA[x]]></text></svg>`;
     expect(stripSvgForRecord(s)).toBe(s);
     expect(stripSvgForRecord(HOSTILE)).not.toMatch(/(TITLE|DESC|META|COMMENT|SCRIPT|ENT)-INJECT/);
     expect(stripSvgForRecord(HOSTILE)).toContain('onload=');
@@ -31,12 +38,17 @@ describe('pinepaper_import_svg answers with what is drawn', () => {
   });
 });
 
-describe('linear time at 2 MB', () => {
-  const N = 2 * 1024 * 1024;
-  const cases: Record<string, string> = { '<title ': '<title '.repeat(N / 7), '<foreignObject ': '<foreignObject '.repeat(N / 15), '<a <a': '<a '.repeat(N / 3), '<!--': '<!--'.repeat(N / 4), '<title><title>': '<title>'.repeat(N / 7) };
-  for (const [name, input] of Object.entries(cases)) {
-    it(name, () => {
-      for (const f of [stripSvgForRecord, stripSvgForEcho]) { const t0 = performance.now(); f(input); expect(performance.now() - t0).toBeLessThan(200); }
+describe('linear time (not a tight clock: a loaded machine is not a regression)', () => {
+  const rep = (unit: string, n: number) => unit.repeat(Math.floor(n / unit.length));
+  const time = (f: (s: string) => string, s: string) => { const t0 = performance.now(); f(s); return performance.now() - t0; };
+  const units = ['<title ', '<foreignObject ', '<a ', '<!--', '<title>', '<![CDATA[', '<g/>'];
+  for (const unit of units) {
+    it(`${unit}: 4 MB costs at most ~3.5x of 1 MB (doubled for noise), under 2 s`, () => {
+      for (const f of [stripSvgForRecord, stripSvgForEcho]) {
+        const small = Math.max(time(f, rep(unit, 1 << 20)), 20), big = time(f, rep(unit, 4 << 20));
+        expect(big).toBeLessThan(2000);
+        expect(big / small).toBeLessThan(7);
+      }
     });
   }
 });
