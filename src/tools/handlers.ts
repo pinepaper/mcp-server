@@ -233,6 +233,7 @@ import { env } from '../utils/env.js';
 import { RENDERING_TOOLS, staleBuildRefusal, stillStaleNote } from './stale-build-guard.js';
 import { VideoToAnimationInputSchema, generateVideoToAnimationCode, v2aStagedPayload, V2A_STAGE_KEY } from './video-to-animation.js';
 import { getExportDir, exportFileLink } from '../utils/export-dir.js';
+import { stripNonRenderedSvg } from '../utils/echo-safe.js';
 
 /**
  * Registry of per-domain handler maps. Tools listed here short-circuit the
@@ -3853,6 +3854,8 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
           svgWarnings = inlined.warnings;
         }
 
+        // Only what is drawn travels on (a <title>, <desc>, comment… of a web-fetched file is not drawn and must not reach the model).
+        if (svgText) svgText = stripNonRenderedSvg(svgText);
         const code = codeGenerator.generateImportSVG(
           svgText,
           svgText ? undefined : input.url,
