@@ -103,6 +103,31 @@ describe('resolveImageSource', () => {
     expect('error' in wrong).toBe(true);
     if ('error' in wrong) expect(wrong.error).toContain('.png');
   });
+
+  it('reads a file in a subfolder of process.cwd() when localFiles is allowed, and names the switch when off (#669)', async () => {
+    const { mkdir } = await import('node:fs/promises');
+    const { setCapability } = await import('../../utils/capabilities.js');
+    const sub = join(process.cwd(), '.tmp-sub-' + Date.now());
+    const nested = join(sub, 'nested');
+    const file = join(nested, 'card.png');
+    await mkdir(nested, { recursive: true });
+    await writeFile(file, PNG_1PX);
+    try {
+      const rel = file.slice(process.cwd().length + 1);
+      const okRel = await resolveImageSource(rel);
+      const okAbs = await resolveImageSource(file);
+      expect('src' in okRel).toBe(true);
+      expect('src' in okAbs).toBe(true);
+
+      setCapability('localFiles', false);
+      const denied = await resolveImageSource(rel);
+      expect('error' in denied).toBe(true);
+      if ('error' in denied) expect(denied.error).toContain('PINEPAPER_ALLOW_LOCAL_FILES');
+    } finally {
+      setCapability('localFiles', undefined);
+      await rm(sub, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('the emitted import reports WHY a remote image failed', () => {
