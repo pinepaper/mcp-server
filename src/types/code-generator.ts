@@ -6575,7 +6575,7 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
 
   generateAgentExport(input: AgentExportInput): string {
     const validated = AgentExportInputSchema.parse(input);
-    const { platform, format, quality, framing, duration, estimateOnly, scale, fps, pdf: pdfOpts, region, time: stillTime, maxBytes, loop: gifLoopAsked, broadcast, broadcastHeadroom, bitrate, minBitrate, bitrateMode, quantizer, audioCodec, transparent, alphaQuantizer, deterministic: askedDeterministic, motionBlur, ad: adOpts, frames, startTime } = validated;
+    const { platform, format, quality, framing, duration, estimateOnly, scale, fps, pdf: pdfOpts, region, time: stillTime, maxBytes, loop: gifLoopAsked, broadcast, broadcastHeadroom, bitrate, minBitrate, bitrateMode, quantizer, enforceBitrate, boundedEffects, prerollDraw, audioCodec, transparent, alphaQuantizer, deterministic: askedDeterministic, motionBlur, ad: adOpts, frames, startTime } = validated;
     // loop 0 PLAYS ONCE (the schema's promise: false / 0 / 1 = play once). The APNG writer reads a number as the
     // file's num_plays, where 0 means forever, so 0 played for ever there (LOOPZERO37). Sent as false.
     const gifLoop = gifLoopAsked === 0 ? false : gifLoopAsked;
@@ -6593,8 +6593,11 @@ return { success: true, action: 'seek', time: ${op.time || 0} };
   // Encoder options (FxTool 16719759); the schema keeps them to mp4 / webm.
   const videoEncodeOpts: Record<string, unknown> = {};
   // A RANGE of the timeline (FxTool #250): frames for t in [startTime, startTime + duration), each exactly the frame
-  // a full export has at that time (the engine renders the frames before startTime without encoding them).
+  // a full export has at that time (compatible scenes skip painting pre-roll frames unless prerollDraw: 'always').
   if (startTime !== undefined) videoEncodeOpts.startTime = startTime;
+  if (prerollDraw !== undefined) videoEncodeOpts.prerollDraw = prerollDraw;
+  if (boundedEffects !== undefined) videoEncodeOpts.boundedEffects = boundedEffects;
+  if (enforceBitrate === true) videoEncodeOpts.enforceBitrate = true;
   if (broadcast) videoEncodeOpts.broadcast = true;
   // Headroom defaults to 12 with broadcast (retest of caa9560): on a
   // hard-edged white-on-black scene it measured 17-233 with nothing out of
