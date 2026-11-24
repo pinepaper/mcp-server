@@ -191,8 +191,10 @@ import { ZodError, z } from 'zod';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { effectClass } from './effect-class.js';
 import { capabilityAllowed, capabilityRefusal, CAPABILITY_SWITCH } from '../utils/capabilities.js';
-import { exportFileReceiptOrReason, receiptErrorLine, deliverAacIfOpus, type AudioDelivery } from './export-file-receipt.js';
+import { exportFileReceiptOrReason, receiptErrorLine, probeLines, deliverAacIfOpus, type AudioDelivery } from './export-file-receipt.js';
+export { probeLines } from './export-file-receipt.js';
 import { enforceBitrateCap, relabelForReencode, bitrateCapFields, bitrateCapLine, bitrateCapNoFile } from './export-bitrate-cap.js';
+import { exportParallelSegments } from './parallel-segment-export.js';
 import { ExportStepError, errorText, verifySavedFile, writeStep, bytesForSave } from './export-file-check.js';
 import { EFFECT_BEFORE_JS, effectAfterJs, namedItemIds, idMayBeGone, NO_CHANGE_NOTE } from './effect-check.js';
 import { writeFile, mkdir, appendFile, unlink, readFile, stat } from 'node:fs/promises';
@@ -624,7 +626,8 @@ async function saveAdExport(r: AdExportResult, input: { ad?: { clickUrl?: string
 async function saveExportToFile(
   data: string,
   format: string,
-  platform: string
+  platform: string,
+  saveOpts?: { filePath?: string }
 ): Promise<{ filePath: string; fileSize: number }> {
   const exportDir = getExportDir();
   await writeStep(exportDir, () => mkdir(exportDir, { recursive: true }));
@@ -632,7 +635,7 @@ async function saveExportToFile(
   const ext = getFileExtension(format);
   const timestamp = Date.now();
   const fileName = `pinepaper_${platform}_${timestamp}.${ext}`;
-  const filePath = join(exportDir, fileName);
+  const filePath = saveOpts?.filePath ?? join(exportDir, fileName);
 
   // A data URL is decoded (base64 or percent-encoded); plain text (SVG, captions) is written as UTF-8. Nothing to
   // write is the `export` or `save` step's failure, named — it used to write a 0-byte file and report it saved.
@@ -666,7 +669,8 @@ async function saveExportToFile(
 async function streamRetainedExportToFile(
   controller: { executeCode: (code: string, screenshot: boolean) => Promise<{ success: boolean; error?: string; result?: unknown }> },
   retained: { exportId: string; size: number; format: string; chunkBytes?: number },
-  platform: string
+  platform: string,
+  saveOpts?: { filePath?: string }
 ): Promise<{ filePath: string; fileSize: number; chunks: number }> {
   // Reassigned once if the store corrects the size below.
   let corrected = false;
@@ -675,7 +679,7 @@ async function streamRetainedExportToFile(
 
   const ext = getFileExtension(retained.format);
   const fileName = `pinepaper_${platform}_${Date.now()}.${ext}`;
-  const filePath = join(exportDir, fileName);
+  const filePath = saveOpts?.filePath ?? join(exportDir, fileName);
 
   const chunkBytes = retained.chunkBytes && retained.chunkBytes > 0 ? retained.chunkBytes : 4 * 1024 * 1024;
   let offset = 0;
@@ -1233,30 +1237,6 @@ export function lintLines(exportResult: unknown): string {
   const w = (exportResult as { lintWarnings?: unknown } | null)?.lintWarnings;
   if (!Array.isArray(w) || !w.length) return '';
   return w.map((x) => `LINT: ${String((x as { message?: unknown })?.message ?? (x as { code?: unknown })?.code ?? 'scene lint warning')}\n`).join('');
-}
-
-/**
- * The file as ffprobe read it, when it disagrees with what the studio encoded: one line per field. A summary
- * line when they agree; nothing when there is no summary.
- */
-export function probeLines(receipt: { probe?: { container: string; codec: string; width: number; height: number; fps: number | null; durationS: number; frames: number; profile?: string | null; pixelFormat?: string | null; colorRange?: string | null }; probeCheck?: { tool: string | null; ok?: boolean; mismatches?: Array<{ field: string; studio: unknown; file: unknown }>; reason?: string; comparedWith?: string } }): string {
-  const p = receipt.probe;
-  if (!p) return '';
-  const detail = p.profile || p.pixelFormat ? ` (${[p.profile, p.pixelFormat, p.colorRange ? `color_range ${p.colorRange}` : null].filter(Boolean).join(', ')})` : '';
-  const head = `Probe: ${p.container} ${p.codec}${detail} ${p.width}x${p.height}${p.fps ? ` @ ${p.fps} fps` : ''}, ${p.durationS} s, ${p.frames} frame${p.frames === 1 ? '' : 's'}`;
-  const c = receipt.probeCheck;
-  if (!c) return `${head}\n`;
-  if (c.tool === null) return `${head} (not read back: ${c.reason})\n`;
-  // After a bitrate-cap re-encode the summary above IS ffprobe's reading of the delivered file, so "agrees" is only
-  // said about what was compared: the browser's summary of its own file against the delivered file.
-  if (c.comparedWith) {
-    if (c.ok) return `${head} (read from the delivered file by ffprobe; container, codec family, size, frame rate, length, frame count and audio codec are the same as in ${c.comparedWith})\n`;
-    if (!c.mismatches?.length) return `${head}\nPROBE: ${c.reason ?? 'ffprobe could not confirm the file'}\n`;
-    return `${head}\n` + c.mismatches.map((m) => `PROBE MISMATCH: ${m.field} — ${c.comparedWith} says ${JSON.stringify(m.studio)}, the delivered file reads ${JSON.stringify(m.file)}\n`).join('');
-  }
-  if (c.ok) return `${head} (ffprobe agrees)\n`;
-  if (!c.mismatches?.length) return `${head}\nPROBE: ${c.reason ?? 'ffprobe could not confirm the file'}\n`;
-  return `${head}\n` + c.mismatches.map((m) => `PROBE MISMATCH: ${m.field} — the studio encoded ${JSON.stringify(m.studio)}, ffprobe reads ${JSON.stringify(m.file)}\n`).join('');
 }
 
 /**
@@ -5071,6 +5051,27 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
             + ' — or webm / apng for alpha in the browser.');
         }
         const input = AgentExportInputSchema.parse(args);
+        const renderProgramAudio = async (
+          ctl: Pick<PinePaperBrowserController, 'executeCode'>,
+          seconds: number
+        ): Promise<{ file: string } | { none: true } | { reason: string }> => {
+          const r = await ctl.executeCode(`(async function () {
+  const E = app.exportEngine;
+  if (!E || E.supportsProgramAudio !== true) return { ok: false, reason: 'this studio cannot render program audio' };
+  const r = await E.exportProgramAudio({ format: 'wav', sampleRate: 48000, duration: ${Number(seconds)} });
+  // A program with nothing that sounds is refused, not an empty WAV: code 'no-audio' (FxTool #252); an older studio
+  // gives only a reason, so there the scene's own answer decides.
+  if (r && r.ok === false && (r.code === 'no-audio' || (r.code === undefined && typeof E.sceneHasAudio === 'function' && !E.sceneHasAudio()))) return { ok: false, none: true };
+  return r;
+})();`, false, { bypassGovernor: true, governorTimeoutMs: 600_000 });
+          const v = (r.result ?? {}) as { ok?: boolean; none?: boolean; reason?: string; error?: string; exportId?: string; size?: number };
+          if (r.success && v.none) return { none: true as const };
+          if (!r.success || !v.ok || !v.exportId || !v.size) return { reason: v.reason || v.error || r.error || 'no program audio came back' };
+          try {
+            const saved = await streamRetainedExportToFile(ctl as never, { exportId: v.exportId, size: v.size, format: 'wav' }, 'program_audio');
+            return { file: saved.filePath };
+          } catch (e) { return { reason: e instanceof Error ? e.message : String(e) }; }
+        };
         // A chain as cached segments, joined (scene-cache-export.ts). Only where it can execute; in code mode the
         // flag has nothing to cache and the plain export code is returned.
         if (input.perScene === true && (options.executionMode ?? getExecutionMode()) !== 'code' && options.executeInBrowser) {
@@ -5081,24 +5082,24 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
               exec: (c) => ctl.executeCode(c, false, { bypassGovernor: true }),
               exportOnce: (a) => handleToolCall('pinepaper_agent_export', a, { ...options, staleBuildChecked: true }),
               exportDir: getExportDir(),
-              programAudio: async (seconds) => {
-                const r = await ctl.executeCode(`(async function () {
-  const E = app.exportEngine;
-  if (!E || E.supportsProgramAudio !== true) return { ok: false, reason: 'this studio cannot render program audio' };
-  const r = await E.exportProgramAudio({ format: 'wav', sampleRate: 48000, duration: ${Number(seconds)} });
-  // A program with nothing that sounds is refused, not an empty WAV: code 'no-audio' (FxTool #252); an older studio
-  // gives only a reason, so there the scene's own answer decides.
-  if (r && r.ok === false && (r.code === 'no-audio' || (r.code === undefined && typeof E.sceneHasAudio === 'function' && !E.sceneHasAudio()))) return { ok: false, none: true };
-  return r;
-})();`, false, { bypassGovernor: true, governorTimeoutMs: 600_000 });
-                const v = (r.result ?? {}) as { ok?: boolean; none?: boolean; reason?: string; error?: string; exportId?: string; size?: number };
-                if (r.success && v.none) return { none: true as const };
-                if (!r.success || !v.ok || !v.exportId || !v.size) return { reason: v.reason || v.error || r.error || 'no program audio came back' };
-                try {
-                  const saved = await streamRetainedExportToFile(ctl as never, { exportId: v.exportId, size: v.size, format: 'wav' }, 'program_audio');
-                  return { file: saved.filePath };
-                } catch (e) { return { reason: e instanceof Error ? e.message : String(e) }; }
-              },
+              programAudio: (seconds) => renderProgramAudio(ctl, seconds),
+            });
+          }
+        }
+        if ((input.parallel ?? 1) > 1 && (options.executionMode ?? getExecutionMode()) !== 'code' && options.executeInBrowser) {
+          const ctl = options.browserController || getBrowserController();
+          if (!ctl.connected) { try { await ctl.connect(); } catch { /* the plain export below reports it */ } }
+          if (ctl.connected && typeof (ctl as PinePaperBrowserController).withIsolatedStudioPage === 'function') {
+            return exportParallelSegments(args as Record<string, unknown>, String(input.format), {
+              exec: (c, takeShot = false, opts = {}) => ctl.executeCode(c, takeShot, opts),
+              runWorker: (fn) => (ctl as PinePaperBrowserController).withIsolatedStudioPage(fn),
+              generateSegmentCode: (segArgs) => codeGenerator.generateAgentExport(AgentExportInputSchema.parse(segArgs)),
+              exportOnce: (a) => handleToolCall('pinepaper_agent_export', a, { ...options, staleBuildChecked: true }),
+              saveRetained: (worker, retained, plat, filePath) => streamRetainedExportToFile(worker, retained, plat, { filePath }),
+              saveInline: (data, fmt, plat, filePath) => saveExportToFile(data, fmt, plat, { filePath }),
+              exportDir: getExportDir(),
+              governorTimeoutMs: exportGovernorTimeoutMs(),
+              programAudio: (seconds) => renderProgramAudio(ctl, seconds),
             });
           }
         }

@@ -213,6 +213,30 @@ export function receiptErrorLine(receipt: ExportFileReceipt | { receiptError: st
     : '';
 }
 
+/**
+ * The file as ffprobe read it, when it disagrees with what the studio encoded: one line per field. A summary
+ * line when they agree; nothing when there is no summary.
+ */
+export function probeLines(receipt: { probe?: { container: string; codec: string; width: number; height: number; fps: number | null; durationS: number; frames: number; profile?: string | null; pixelFormat?: string | null; colorRange?: string | null }; probeCheck?: { tool: string | null; ok?: boolean; mismatches?: Array<{ field: string; studio: unknown; file: unknown }>; reason?: string; comparedWith?: string } }): string {
+  const p = receipt.probe;
+  if (!p) return '';
+  const detail = p.profile || p.pixelFormat ? ` (${[p.profile, p.pixelFormat, p.colorRange ? `color_range ${p.colorRange}` : null].filter(Boolean).join(', ')})` : '';
+  const head = `Probe: ${p.container} ${p.codec}${detail} ${p.width}x${p.height}${p.fps ? ` @ ${p.fps} fps` : ''}, ${p.durationS} s, ${p.frames} frame${p.frames === 1 ? '' : 's'}`;
+  const c = receipt.probeCheck;
+  if (!c) return `${head}\n`;
+  if (c.tool === null) return `${head} (not read back: ${c.reason})\n`;
+  // After a bitrate-cap re-encode the summary above IS ffprobe's reading of the delivered file, so "agrees" is only
+  // said about what was compared: the browser's summary of its own file against the delivered file.
+  if (c.comparedWith) {
+    if (c.ok) return `${head} (read from the delivered file by ffprobe; container, codec family, size, frame rate, length, frame count and audio codec are the same as in ${c.comparedWith})\n`;
+    if (!c.mismatches?.length) return `${head}\nPROBE: ${c.reason ?? 'ffprobe could not confirm the file'}\n`;
+    return `${head}\n` + c.mismatches.map((m) => `PROBE MISMATCH: ${m.field} — ${c.comparedWith} says ${JSON.stringify(m.studio)}, the delivered file reads ${JSON.stringify(m.file)}\n`).join('');
+  }
+  if (c.ok) return `${head} (ffprobe agrees)\n`;
+  if (!c.mismatches?.length) return `${head}\nPROBE: ${c.reason ?? 'ffprobe could not confirm the file'}\n`;
+  return `${head}\n` + c.mismatches.map((m) => `PROBE MISMATCH: ${m.field} — the studio encoded ${JSON.stringify(m.studio)}, ffprobe reads ${JSON.stringify(m.file)}\n`).join('');
+}
+
 let ffmpegAvailable: boolean | null = null;
 /** Whether ffmpeg is on PATH (asked once). The per-scene export joins its segments with it. */
 export async function hasFfmpeg(): Promise<boolean> {
