@@ -597,6 +597,24 @@ export class PinePaperBrowserController {
   }
 
   /**
+   * Run `fn` on an isolated browser context navigated to PinePaper Studio in agent mode.
+   * Used by host-side parallel segment export so multiple segments can render concurrently
+   * without disturbing the primary canvas tab.
+   */
+  async withIsolatedStudioPage<T>(
+    fn: (worker: { executeCode: (code: string, takeScreenshot?: boolean, options?: ExecuteCodeOptions) => Promise<ExecuteResult> }) => Promise<T>
+  ): Promise<T> {
+    return this.withIsolatedPage(async (page) => {
+      await page.setViewport({ width: this.config.viewportWidth, height: this.config.viewportHeight });
+      await page.goto(this.studioTargetUrl(), { waitUntil: this.config.waitUntil, timeout: this.config.timeout });
+      await page.waitForFunction(pinePaperIsReady, { timeout: this.config.timeout });
+      return fn({
+        executeCode: (code, _takeScreenshot = false, opts = {}) => this.evaluateInStudioPage(page, code, opts),
+      });
+    });
+  }
+
+  /**
    * Get current studio URL (always includes agent parameters for MCP server)
    */
   get studioUrl(): string {
@@ -1035,12 +1053,11 @@ export class PinePaperBrowserController {
    * script's trailing value), then the in-page bridgeSafe the governed path uses, so a value holding live Paper items
    * still crosses. A throw comes back as { success: false, error }, as it did from eval.
    */
-  private async runUngoverned(code: string): Promise<{ success: boolean; result?: unknown; error?: string; executedVia: 'eval' }> {
-    if (!this.page) return { success: false, error: 'Browser not connected', executedVia: 'eval' };
+  private async evaluateRawOnPage(page: Page, code: string): Promise<{ success: boolean; result?: unknown; error?: string; executedVia: 'eval' }> {
     let handle: Awaited<ReturnType<Page['evaluateHandle']>> | null = null;
     try {
-      handle = await this.page.evaluateHandle(code);
-      const value = await this.page.evaluate((v: unknown) => {
+      handle = await page.evaluateHandle(code);
+      const value = await page.evaluate((v: unknown) => {
         const safe = (window as unknown as { __ppBridgeSafe?: (x: unknown) => unknown }).__ppBridgeSafe;
         return safe ? safe(v) : v;
       }, handle);
@@ -1050,6 +1067,135 @@ export class PinePaperBrowserController {
     } finally {
       if (handle) await handle.dispose().catch(() => {});
     }
+  }
+
+  /**
+   * Run code on a specific live PinePaper Studio page (either the primary page
+   * or an isolated parallel export worker page) using the governor when enabled.
+   */
+  private async evaluateInStudioPage(page: Page, code: string, options: ExecuteCodeOptions = {}): Promise<ExecuteResult> {
+    const heavyClass = LAZY_HEAVY_SUBSYSTEMS
+      .filter((name) => code.includes(`app.${name}`))
+      .map((name) => LAZY_HEAVY_CLASSES[name])
+      .find(Boolean);
+
+    const awaitBoot = BOOTSTRAP_SUBSYSTEMS.some((name) => code.includes(`app.${name}`));
+
+    const runOptions = {
+      bypass: options.bypassGovernor ?? (!this.config.governor || governorDropsValue(code)),
+      timeoutMs: options.governorTimeoutMs,
+      heavyClass: heavyClass ?? null,
+      awaitBoot,
+      stage: options.stage ?? null,
+    };
+    const __evalStart = Date.now();
+    // On a bypass this call does not read the code (evaluateRawOnPage sends it). Passing it anyway sent a 2 MB batch to
+    // the page twice.
+    const evaluated = await page.evaluate(async (codeToRun: string, opts: { bypass: boolean; timeoutMs?: number; heavyClass: string | null; awaitBoot: boolean; stage: Record<string, string> | null }) => {
+      // THE BRIDGE USES STRUCTURED CLONE, AND JSON.stringify DOES NOT PROVE IT.
+      //
+      // A result crosses CDP by structured clone, which refuses to carry a
+      // FUNCTION and throws DataCloneError. JSON.stringify drops functions
+      // silently and honours toJSON, so a value can serialise perfectly and
+      // still fail to cross — which is why `pinepaper_story from_text` came
+      // back with an EMPTY error string while the same call worked in-page.
+      // Its result holds live Paper Groups, and a Paper item's graph reaches
+      // the editor's event handlers.
+      //
+      // Fourteen emitters spread raw engine results, so this is fixed once
+      // here rather than fourteen times. The probe is the real predicate —
+      // attempt the clone, and only walk the value when it refuses.
+      //
+      // THE DEPTH LIMIT IS FOR LIVE OBJECTS, NOT FOR DATA. A Paper item's graph
+      // is effectively unbounded, so a class instance stops at depth 6. A plain
+      // object or array is data the caller may send straight back, and cutting
+      // it replaced a value with a string in a reply that looked complete: one
+      // unclonable value anywhere turned a custom relation's
+      // edit.customRelations[].change.args.params.amp, depth 7, into "[deep]",
+      // which the tool then refused. Plain data is walked whole; the path set
+      // stops a cycle, and PLAIN_LIMIT stops a pathological chain.
+      const PLAIN_LIMIT = 64;
+      const onPath = new Set<object>();
+      const isPlain = (v: object) => {
+        if (Array.isArray(v)) return true;
+        const proto = Object.getPrototypeOf(v);
+        return proto === null || proto === Object.prototype;
+      };
+      const toBridgeSafe = (value: unknown, depth = 0): unknown => {
+        if (value === null || typeof value !== 'object') {
+          return typeof value === 'function' ? undefined : value;
+        }
+        if (onPath.has(value)) return '[circular]';
+        if (depth > (isPlain(value) ? PLAIN_LIMIT : 6)) return '[deep]';
+        onPath.add(value);
+        try {
+          if (Array.isArray(value)) return value.map((v) => toBridgeSafe(v, depth + 1));
+          const out: Record<string, unknown> = {};
+          for (const key of Object.keys(value as Record<string, unknown>)) {
+            let v: unknown;
+            try { v = (value as Record<string, unknown>)[key]; } catch { continue; }
+            if (typeof v === 'function') continue;
+            const safe = toBridgeSafe(v, depth + 1);
+            if (safe !== undefined) out[key] = safe;
+          }
+          return out;
+        } finally {
+          onPath.delete(value);
+        }
+      };
+      const bridgeSafe = (value: unknown): unknown => {
+        try {
+          (globalThis as { structuredClone?: (v: unknown) => unknown }).structuredClone?.(value);
+          return value;
+        } catch {
+          return toBridgeSafe(value);
+        }
+      };
+
+      const app = (window as any).app || (window as any).PinePaper;
+      if (opts.stage) {
+        const w = window as unknown as { __ppStage?: Record<string, string> };
+        w.__ppStage = { ...(w.__ppStage ?? {}), ...opts.stage };
+      }
+
+      if (opts.awaitBoot && app && !app._appReady) {
+        await new Promise<void>((resolve) => {
+          const started = Date.now();
+          const tick = () => (app._appReady || Date.now() - started > 5000 ? resolve() : setTimeout(tick, 50));
+          tick();
+        });
+      }
+
+      if (opts.heavyClass && app) {
+        try {
+          if (typeof app.ensureHeavy === 'function') await app.ensureHeavy(opts.heavyClass);
+          else if (typeof app.ensureHeavyModules === 'function') await app.ensureHeavyModules();
+        } catch { /* fall through to the guard */ }
+      }
+      if (!opts.bypass && app && typeof app.runGenerated === 'function') {
+        try {
+          const run = await app.runGenerated(codeToRun, { source: 'agent', timeoutMs: opts.timeoutMs });
+          if (run && run.ok === false) {
+            return {
+              success: false,
+              error: run.error?.message || 'Execution error',
+              errorCode: run.error?.code || undefined,
+              report: run.report,
+              executedVia: 'governed' as const,
+            };
+          }
+          return { success: true, result: bridgeSafe(run?.value), report: run?.report, executedVia: 'governed' as const };
+        } catch (e) {
+          return { success: false, error: e instanceof Error ? e.message : 'Execution error', executedVia: 'governed' as const };
+        }
+      }
+      (window as unknown as { __ppBridgeSafe?: (v: unknown) => unknown }).__ppBridgeSafe = bridgeSafe;
+      return { success: true, __ppRaw: true, executedVia: 'eval' as const };
+    }, runOptions.bypass ? '' : code, runOptions);
+    let result: ExecuteResult = evaluated as ExecuteResult;
+    if ((evaluated as { __ppRaw?: boolean }).__ppRaw) result = await this.evaluateRawOnPage(page, code);
+    BROWSER_TIME.executeMs += Date.now() - __evalStart;
+    return result;
   }
 
   async executeCode(code: string, takeScreenshot = true, options: ExecuteCodeOptions = {}): Promise<ExecuteResult> {
@@ -1072,182 +1218,7 @@ export class PinePaperBrowserController {
     }
 
     try {
-      // Execute the code in page context. Prefer the FxTool governor
-      // (app.runGenerated → GeneratedCodeRunner): seeded determinism, loop/item
-      // budgets, bulk-create perf, and a machine-readable report. It returns the
-      // code's trailing-expression value as result.value (FxTool captures it).
-      // Fall back to raw eval on older builds that lack runGenerated.
-      // CODE-SPLIT SUBSYSTEMS, WAITED FOR ONCE, HERE.
-      //
-      // Eight of the engine's subsystems are `_defineLazyHeavy`: undefined
-      // until `ensureHeavyModules()` has run, which the engine idle-prefetches
-      // about 1.2s after boot. An agent that connects and immediately calls a
-      // tool beats that prefetch, and the tool's own guard then reports the
-      // studio as too old for a capability it has. 1.6.9 fixed that inside the
-      // export emitter; the guard added with this change found FORTY-EIGHT more
-      // emitted blocks with the same race, across map, physics and rigging.
-      //
-      // Forty-eight copies of an await is forty-eight chances to miss the
-      // forty-ninth. It belongs at the one place every emitted string passes
-      // through, and the list comes from the GENERATED engine surface, so a
-      // subsystem FxTool makes lazy tomorrow is covered by re-running the
-      // generator rather than by remembering.
-      //
-      // Only when the code actually reaches one: ensureHeavyModules memoises on
-      // its own promise, so this costs nothing after the first call, but an
-      // unrelated create has no reason to wait for the first one either.
-      // WHICH module, not just "some heavy module". ensureHeavyModules() never
-      // rejects by design — a chunk that fails is warned about, skipped and
-      // recorded, so one bad module cannot take the other eight down. Awaiting
-      // it therefore means "the prefetch settled", not "the thing I am about to
-      // call arrived". ensureHeavy(className) waits for the NAMED one and
-      // retries, so it answers the question actually being asked.
-      const heavyClass = LAZY_HEAVY_SUBSYSTEMS
-        .filter((name) => code.includes(`app.${name}`))
-        .map((name) => LAZY_HEAVY_CLASSES[name])
-        .find(Boolean);
-
-      // Subsystems the BOOTSTRAP attaches rather than the constructor: present
-      // only once app.js has finished, so an early caller races init itself.
-      const awaitBoot = BOOTSTRAP_SUBSYSTEMS.some((name) => code.includes(`app.${name}`));
-
-      const runOptions = {
-        bypass: options.bypassGovernor ?? (!this.config.governor || governorDropsValue(code)),
-        timeoutMs: options.governorTimeoutMs,
-        heavyClass: heavyClass ?? null,
-        awaitBoot,
-        stage: options.stage ?? null,
-      };
-      const __evalStart = Date.now();
-      // On a bypass this call does not read the code (runUngoverned sends it). Passing it anyway sent a 2 MB batch to
-      // the page twice.
-      const evaluated = await this.page.evaluate(async (codeToRun: string, opts: { bypass: boolean; timeoutMs?: number; heavyClass: string | null; awaitBoot: boolean; stage: Record<string, string> | null }) => {
-        // THE BRIDGE USES STRUCTURED CLONE, AND JSON.stringify DOES NOT PROVE IT.
-        //
-        // A result crosses CDP by structured clone, which refuses to carry a
-        // FUNCTION and throws DataCloneError. JSON.stringify drops functions
-        // silently and honours toJSON, so a value can serialise perfectly and
-        // still fail to cross — which is why `pinepaper_story from_text` came
-        // back with an EMPTY error string while the same call worked in-page.
-        // Its result holds live Paper Groups, and a Paper item's graph reaches
-        // the editor's event handlers.
-        //
-        // Fourteen emitters spread raw engine results, so this is fixed once
-        // here rather than fourteen times. The probe is the real predicate —
-        // attempt the clone, and only walk the value when it refuses.
-        //
-        // THE DEPTH LIMIT IS FOR LIVE OBJECTS, NOT FOR DATA. A Paper item's graph
-        // is effectively unbounded, so a class instance stops at depth 6. A plain
-        // object or array is data the caller may send straight back, and cutting
-        // it replaced a value with a string in a reply that looked complete: one
-        // unclonable value anywhere turned a custom relation's
-        // edit.customRelations[].change.args.params.amp, depth 7, into "[deep]",
-        // which the tool then refused. Plain data is walked whole; the path set
-        // stops a cycle, and PLAIN_LIMIT stops a pathological chain.
-        const PLAIN_LIMIT = 64;
-        const onPath = new Set<object>();
-        const isPlain = (v: object) => {
-          if (Array.isArray(v)) return true;
-          const proto = Object.getPrototypeOf(v);
-          return proto === null || proto === Object.prototype;
-        };
-        const toBridgeSafe = (value: unknown, depth = 0): unknown => {
-          if (value === null || typeof value !== 'object') {
-            return typeof value === 'function' ? undefined : value;
-          }
-          if (onPath.has(value)) return '[circular]';
-          if (depth > (isPlain(value) ? PLAIN_LIMIT : 6)) return '[deep]';
-          onPath.add(value);
-          try {
-            if (Array.isArray(value)) return value.map((v) => toBridgeSafe(v, depth + 1));
-            const out: Record<string, unknown> = {};
-            for (const key of Object.keys(value as Record<string, unknown>)) {
-              let v: unknown;
-              try { v = (value as Record<string, unknown>)[key]; } catch { continue; }
-              if (typeof v === 'function') continue;
-              const safe = toBridgeSafe(v, depth + 1);
-              if (safe !== undefined) out[key] = safe;
-            }
-            return out;
-          } finally {
-            onPath.delete(value);
-          }
-        };
-        const bridgeSafe = (value: unknown): unknown => {
-          try {
-            (globalThis as { structuredClone?: (v: unknown) => unknown }).structuredClone?.(value);
-            return value;
-          } catch {
-            return toBridgeSafe(value);
-          }
-        };
-
-        const app = (window as any).app || (window as any).PinePaper;
-        // BOOT, which is a different wait from the code-split one.
-        //
-        // app.fontStudio is NOT code-split: app.js constructs it synchronously
-        // during init, so a caller that arrives early is simply ahead of boot
-        // and ensureHeavy will never help. app._appReady is the flag init sets
-        // and the guard the rest of the agent surface uses.
-        //
-        // Bounded and gated: only for code that touches a subsystem the
-        // bootstrap attaches, and it gives up rather than hanging, because a
-        // build that never sets the flag must not make every call wait forever.
-        // Staged values land BEFORE the code runs, so the generated script can
-        // read megabytes by key while staying small enough for the governor's
-        // transform. See ExecuteCodeOptions.stage.
-        if (opts.stage) {
-          const w = window as unknown as { __ppStage?: Record<string, string> };
-          w.__ppStage = { ...(w.__ppStage ?? {}), ...opts.stage };
-        }
-
-        if (opts.awaitBoot && app && !app._appReady) {
-          await new Promise<void>((resolve) => {
-            const started = Date.now();
-            const tick = () => (app._appReady || Date.now() - started > 5000 ? resolve() : setTimeout(tick, 50));
-            tick();
-          });
-        }
-
-        if (opts.heavyClass && app) {
-          // Failure is not fatal here: the emitted code still carries its own
-          // guard, and that guard gives a better message than this could.
-          try {
-            if (typeof app.ensureHeavy === 'function') await app.ensureHeavy(opts.heavyClass);
-            else if (typeof app.ensureHeavyModules === 'function') await app.ensureHeavyModules();
-          } catch { /* fall through to the guard */ }
-        }
-        if (!opts.bypass && app && typeof app.runGenerated === 'function') {
-          try {
-            // timeoutMs is runGenerated's own option (RUN_DEFAULTS.timeoutMs,
-            // 10s) — passing undefined leaves the default in place.
-            const run = await app.runGenerated(codeToRun, { source: 'agent', timeoutMs: opts.timeoutMs });
-            if (run && run.ok === false) {
-              return {
-                success: false,
-                error: run.error?.message || 'Execution error',
-                errorCode: run.error?.code || undefined,
-                report: run.report,
-                executedVia: 'governed' as const,
-              };
-            }
-            return { success: true, result: bridgeSafe(run?.value), report: run?.report, executedVia: 'governed' as const };
-          } catch (e) {
-            return { success: false, error: e instanceof Error ? e.message : 'Execution error', executedVia: 'governed' as const };
-          }
-        }
-        // Fallback: run ungoverned — a pre-governor FxTool build, or an explicit
-        // bypass. The code is run from the Node side as a CDP Runtime.evaluate
-        // (below), which returns the script's trailing value exactly as eval did:
-        // both generated-code shapes are `(`-led expression statements. It used
-        // to be evaluated inside this callback; CDP already does that job, so this
-        // package contains no evaluating call of its own, in the page or in Node.
-        (window as unknown as { __ppBridgeSafe?: (v: unknown) => unknown }).__ppBridgeSafe = bridgeSafe;
-        return { success: true, __ppRaw: true, executedVia: 'eval' as const };
-      }, runOptions.bypass ? '' : code, runOptions);
-      let result: typeof evaluated | { success: boolean; result?: unknown; error?: string; executedVia: 'eval' } = evaluated;
-      if ((evaluated as { __ppRaw?: boolean }).__ppRaw) result = await this.runUngoverned(code);
-      BROWSER_TIME.executeMs += Date.now() - __evalStart;
+      const result = await this.evaluateInStudioPage(this.page, code, options);
 
       // Take screenshot if requested
       let screenshot: string | undefined;

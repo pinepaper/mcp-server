@@ -2741,6 +2741,7 @@ export const AgentExportInputSchema = z.object({
   startTime: z.number().min(0).optional().describe('mp4 / webm: start the video at this time (seconds) on the timeline, the chain\'s when there is one; duration is then the length of the range. Each frame matches the full export\'s frame at that time; compatible scenes step pre-roll state without painting skipped frames (see prerollDraw). Snapped to a frame (result.video.range says where).'),
   prerollDraw: z.enum(['auto', 'always']).optional().describe("mp4 / webm with startTime: 'auto' (default) skips painting compatible pre-roll frames before startTime while keeping stateful timeline timing exact; 'always' forces full painting for every pre-roll frame."),
   perScene: z.boolean().optional().describe('mp4 / webm of a scene chain: export it as one cached segment per scene, joined without re-encoding, so after an edit only the scenes that changed are rendered again. Needs ffmpeg on PATH; a chain this cannot cache (crossfades, cut sounds) is exported whole and the result says why.'),
+  parallel: z.number().int().min(1).max(8).optional().describe('mp4 / webm: split a long or heavy timeline into up to N contiguous whole-frame worker segments across isolated browser pages and join with ffmpeg (-c copy video, clean seam audio). Automatically clamped by host CPU cores and frame count; pairs with boundedEffects: "decompose" for heavy multi-card scenes. Requires ffmpeg (Claude Desktop extension or PATH); falls back to single-page export with a note when unavailable.'),
   estimateOnly: z.boolean().optional().default(false).describe('Preflight only: return the estimated file size AND what this scene would lose to this format, rendering nothing. Use before a long or high-quality export to check the size first. Modeled for mp4/webm/gif; png/pdf/svg return confidence "none" because no dimension-based model exists for them; wav is reported as "exact", because uncompressed PCM size is arithmetic rather than a guess.'),
   // NTSC rates (round 9 FF, 1.75): CTV / OTT spots require 29.97 and it was
   // refused as "Expected integer", though the engine exports true 30000/1001.
@@ -2833,6 +2834,9 @@ export const AgentExportInputSchema = z.object({
       if (val[k] !== undefined && val.format !== 'mp4' && val.format !== 'webm' && val.format !== 'auto') {
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: [k], message: `${k} is a video setting: mp4, webm, or auto.` });
       }
+    }
+    if (val.parallel !== undefined && val.parallel > 1 && val.format !== 'mp4' && val.format !== 'webm' && val.format !== 'auto') {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['parallel'], message: 'parallel is a video setting: mp4, webm, or auto.' });
     }
     if (val.audioCodec !== undefined && val.format !== 'mp4') {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['audioCodec'], message: "audioCodec is an mp4 setting. A webm's soundtrack is Opus, which WebM players expect." });
