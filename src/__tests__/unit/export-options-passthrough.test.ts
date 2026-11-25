@@ -50,3 +50,35 @@ describe('pinepaper_agent_export forwards PR #455 options and enforceBitrate (#6
     expect(boolCode).not.toContain('"enforceBitrate"');
   });
 });
+
+// A studio that predates boundedEffects ignores the option without a word (frames identical to a plain export,
+// measured on production 2026-11-25). The reply says so from the studio's own report, on any studio.
+describe('boundedEffects is confirmed from the studio report, not assumed', () => {
+  const gen = new PinePaperCodeGenerator();
+  const tail = (code: string) => {
+    const a = code.indexOf('// BOUNDED EFFECTS are confirmed');
+    expect(a).toBeGreaterThan(-1);
+    const b = code.indexOf('\n  }', code.indexOf('bounded_effects_not_applied'));
+    return code.slice(a, b + 4);
+  };
+  const run = (vr: unknown) => {
+    const code = gen.generateAgentExport({ format: 'mp4', boundedEffects: true } as any);
+    const result: any = { success: true, fidelity: { warnings: [], note: 'x' } };
+    new Function('result', '__vr', tail(code))(result, vr);
+    return result;
+  };
+  it('warns when the studio wrote no boundedEffects record', () => {
+    const r = run({ frames: { fed: 120 } });
+    expect(r.fidelity.warnings.map((w: any) => w.code)).toEqual(['bounded_effects_not_applied']);
+    expect(r.fidelity.note).toBeUndefined();
+    expect(run(null).fidelity.warnings.length).toBe(1);
+  });
+  it('says nothing when the studio reports it on', () => {
+    const r = run({ boundedEffects: { on: true, mode: 'bounded' } });
+    expect(r.fidelity.warnings).toEqual([]);
+  });
+  it('is not emitted when the option was not asked for, or asked false', () => {
+    expect(gen.generateAgentExport({ format: 'mp4' } as any)).not.toContain('bounded_effects_not_applied');
+    expect(gen.generateAgentExport({ format: 'mp4', boundedEffects: false } as any)).not.toContain('bounded_effects_not_applied');
+  });
+});

@@ -7936,6 +7936,13 @@ ${usesCanvasSize ? '' : `  // A PRESET SIZE IS NOT THE CANVAS SIZE, AND THAT IS 
       result.fidelity.warnings = (result.fidelity.warnings || []).concat(__aw);
       if (result.fidelity.note) delete result.fidelity.note;
     }
+  }` : ''}${boundedEffects === true || boundedEffects === 'decompose' ? `
+  // BOUNDED EFFECTS are confirmed from the studio's own record. A studio that predates the option ignores it
+  // without a word and writes the same frames as a plain export, which read as "applied, no faster".
+  if (result && result.success && !(__vr && __vr.boundedEffects && __vr.boundedEffects.on)) {
+    result.fidelity = result.fidelity || { warnings: [] };
+    result.fidelity.warnings = (result.fidelity.warnings || []).concat([{ code: 'bounded_effects_not_applied', message: 'boundedEffects was asked for, but this studio did not report applying it: the export is the ordinary full-buffer render, correct and no faster. The option needs a studio that has it.' }]);
+    if (result.fidelity.note) delete result.fidelity.note;
   }` : ''}${headroomDefaulted ? `
   // The applied value is the engine's own report where it gives one
   // (5adfcf1c: lastVideoReport.headroom), so the result and the report agree.
