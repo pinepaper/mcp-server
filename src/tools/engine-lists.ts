@@ -4,7 +4,7 @@
  * Name lists the engine owns and the tool surface must offer exactly. See
  * scripts/sync-engine-lists.mjs for why each is generated.
  *
- * Source: FxTool origin/main 60e0beff4926d639e9d75e7fd50598f34530aed8
+ * Source: FxTool origin/main 45743cb58b9bcbd76b6e466b3b4f317c656eea40
  *   js/core/KeyframeInterpolator.js  sha256: b4646b35ccd5549d
  *   js/world3d/worlds.js  sha256: 0e0973f7587c06e1
  *   js/core/DesignMedia.js  sha256: ab07f330e4060cb7
@@ -19,15 +19,34 @@
  *   js/ItemAuraSystem.js  sha256: fbd9b8d09fae0543
  *   js/GeneratorRegistry.js  sha256: b3e07ae29f58a11f
  *   js/audio/SoundPresets.js  sha256: 713ef0d1e19dc128
- *   js/canvasPresets.js + js/core/CollagePatterns.js + js/core/ThreadPainting.js + js/shapes/*  sha256: d51e235b924ced1b
+ *   js/canvasPresets.js + js/core/CollagePatterns.js + js/core/ThreadPainting.js + js/shapes/*  sha256: 07e812d0604bca46
  */
 
-/** 34 canvas presets: the keys of canvasPresets.js's presets table, what setCanvasSize looks up. */
+/** 53 canvas presets: the keys of canvasPresets.js's presets table, what setCanvasSize looks up. */
 export const ENGINE_CANVAS_PRESETS = [
+  'ctv-1080p',
+  'ctv-4k-uhd',
+  'ctv-4k-dci',
+  'ctv-pause-1080p',
+  'ctv-pause-4k',
+  'ctv-interactive-simid',
+  'ctv-lbar-squeezeback',
   'youtube-thumbnail',
   'youtube-short',
   'tiktok',
   'youtube-banner',
+  'qhd-1440p',
+  'uhd-4k-16x9',
+  'ultrawide-21x9',
+  'ultrawide-uwqhd',
+  'dooh-4k-portrait',
+  'dooh-billboard-4k',
+  'iab-medium-rect',
+  'iab-leaderboard',
+  'iab-billboard',
+  'iab-half-page',
+  'iab-wide-skyscraper',
+  'iab-mobile-banner',
   'instagram-story',
   'instagram-post',
   'instagram-landscape',
