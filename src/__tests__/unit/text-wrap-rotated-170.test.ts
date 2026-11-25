@@ -91,3 +91,45 @@ describe('WRAPROT170 create_item and modify_item', () => {
     expect(code).toMatch(/"rotation":\s*45/);
   });
 });
+
+// modify_item {content} on a wrapped text: the studio's modify writes the new words and the wrap source but does
+// not wrap again, so the text came back as one line with its wrap width still recorded (measured live 2026-11-24).
+describe('modify_item content keeps a maxWidth wrap', () => {
+  const NEW = 'THE QUICK BROWN FOX JUMPS OVER A LAZY DOG TODAY';
+  const setup = (deg: number, extra: Record<string, unknown> = {}) => {
+    const item = makeItem(deg);
+    wrap(item); item.data.wrapWidth = 280; Object.assign(item.data, extra);
+    const studio = { ...app, historyManager: { saveState() {}, saveStateDebounced() {} }, getItemById: () => item, itemRegistry: { get: () => ({ item }) },
+      modifyItem: (_id: string, ch: any) => { if (ch.content !== undefined) { item.content = ch.content; if (item.data._wrapSource !== undefined) item.data._wrapSource = ch.content; } return true; } };
+    return { item, studio };
+  };
+  const modify = (props: Record<string, unknown>) => gen.generateModifyItem({ itemId: 'item_1', properties: props } as never);
+  const exec = (code: string, studio: unknown) => new Function('app', `return ${code.trim().startsWith('(') ? code : `(function(){${code}})()`}`)(studio);
+  for (const deg of [0, 45]) {
+    it(`rotation ${deg}: new words are wrapped to the recorded width, centre held`, () => {
+      const { item, studio } = setup(deg);
+      const r = exec(modify({ content: NEW }), studio);
+      expect(r.success).toBe(true);
+      expect(item.content.split('\n').length).toBeGreaterThan(1);
+      expect(item.upright().w).toBeLessThanOrEqual(280);
+      expect(item.content.replace(/\n/g, ' ')).toBe(NEW);
+      expect(item.rotation).toBeCloseTo(deg, 9);
+      expect(item.bounds.center.x).toBeCloseTo(195, 6);
+      expect(item.bounds.center.y).toBeCloseTo(400, 6);
+      expect(r.textWrap.applied).toBe(true);
+      expect(r.textWrap.maxWidth).toBe(280);
+    });
+  }
+  it('a text that was never wrapped, or has a fit box, is left to the studio', () => {
+    const a = setup(0); a.item.content = SENT; delete a.item.data._wrapSource; delete a.item.data.wrapWidth;
+    const ra = exec(modify({ content: NEW }), a.studio);
+    expect(a.item.content).toBe(NEW);
+    expect(ra.textWrap).toBeUndefined();
+    const b = setup(0, { fitBox: { maxWidth: 280 } });
+    exec(modify({ content: NEW }), b.studio);
+    expect(b.item.content).toBe(NEW);
+  });
+  it('a modify without content emits no re-wrap', () => {
+    expect(modify({ opacity: 0.5 })).not.toContain('__rw');
+  });
+});

@@ -1611,6 +1611,22 @@ function generateModifyItemCode(
 // Modify item ${ID}
 let _modified = true;`;
 
+  // NEW WORDS KEEP THE WRAP. The studio's modify writes content and the wrap source but does not wrap again, so a
+  // maxWidth-wrapped text came back as one line with its width still recorded. What is needed to wrap the new
+  // words is read before the change: the recorded width and the point the block is held at. A studio that does
+  // re-wrap makes the second wrap a no-op. A fit box is the studio's own refit and is left to it.
+  const rewrapsContent = typeof restProperties.content === 'string';
+  if (rewrapsContent) {
+    code += `
+const __rw = (function () {
+  const it = app.getItemById(${ID}); const d = it && it.data;
+  if (!it || typeof it.content !== 'string' || !d || d.fitBox || d._wrapSource === undefined || !(Number(d.wrapWidth) > 0) || typeof app.wrapText !== 'function') return null;
+  const b = it.bounds, j = String(it.justification || 'left'), a = String(d.anchor || d.origin || '');
+  const v = a.indexOf('top') === 0 ? 'top' : a.indexOf('bottom') === 0 ? 'bottom' : 'center';
+  return { w: Number(d.wrapWidth), j: j, v: v, x: j === 'center' ? b.center.x : j === 'right' ? b.right : b.left, y: v === 'top' ? b.top : v === 'bottom' ? b.bottom : b.center.y };
+})();`;
+  }
+
   if (Object.keys(restProperties).length > 0) {
     code += `
 _modified = app.modifyItem(${ID}, ${jsLiteral(restProperties, 2)}) !== false;
@@ -1713,6 +1729,26 @@ const _tf = app.itemRegistry.get(${ID});${emitTextFit('_tf && _tf.item', modFit,
 const _tw = app.itemRegistry.get(${ID});${emitTextWrap('_tw && _tw.item', modWrap!.unwrap ? null : modWrap!.width!, anchorHold(properties.anchor ?? properties.origin))}`;
   }
 
+  const modRewrap = rewrapsContent && !modFitGiven && !modWrapApplies;
+  if (modRewrap) {
+    code += `
+let __textRewrap = null;
+if (__rw) {
+  const __ri = app.getItemById(${ID});
+  let __rr = null;
+  ${UPRIGHT_OPEN('__ri')}
+  try { __rr = app.wrapText(__ri, __rw.w); } finally { ${UPRIGHT_CLOSE('__ri')} }
+  if (__rr && __rr.ok !== false) {
+    const __b1 = __ri.bounds;
+    __ri.position = __ri.position.add([__rw.x - (__rw.j === 'center' ? __b1.center.x : __rw.j === 'right' ? __b1.right : __b1.left), __rw.y - (__rw.v === 'top' ? __b1.top : __rw.v === 'bottom' ? __b1.bottom : __b1.center.y)]);
+    const __b = __ri.bounds;
+    __textRewrap = Object.assign({ applied: true, maxWidth: __rw.w, lines: __rr.lines, overflow: !!__rr.overflow, kept: 'the text was wrapped to maxWidth, so the new words were wrapped to it too (maxWidth: null unwraps)',
+      bounds: { x: Math.round(__b.x * 10) / 10, y: Math.round(__b.y * 10) / 10, width: Math.round(__b.width * 10) / 10, height: Math.round(__b.height * 10) / 10 } },
+      __rr.overflow ? { warning: 'a single word is wider than maxWidth, so it overruns its line: shorten it, widen maxWidth or lower fontSize.' } : {});
+  }
+}`;
+  }
+
   const textStyle = emitTextStyle('_ts && _ts.item', properties);
   if (textStyle) {
     code += `
@@ -1760,7 +1796,7 @@ const __ctItem = app.getItemById(${ID});
 const __ctKeys = (__ctItem && __ctItem.data && Array.isArray(__ctItem.data.keyframes))
   ? __ctItem.data.keyframes.filter(function(k) { return k && k.properties && Object.prototype.hasOwnProperty.call(k.properties, 'content'); }).length : 0;` : ''}
 ${modDirection ? emitDirectionCheck(`app.getItemById(${ID})`, modDirection) : ''}${modTabular ? emitTabularCheck(`app.getItemById(${ID})`) : ''}${modTypography.length ? emitTypographyCheck(`app.getItemById(${ID})`, modTypography) : ''}${modFillOpacity ? emitFillOpacityCheck(`app.getItemById(${ID})`) : ''}${modStrokePos ? emitStrokePositionCheck(`app.getItemById(${ID})`, modStrokePos) : ''}
-return { success: true, itemId: ${ID}${properties.content !== undefined ? `, ...(__ctKeys ? { contentTrackWarning: 'this text\\'s content is keyframed (' + __ctKeys + ' key(s)), so the track sets it on every frame and this edit does not show. Change the content keys with pinepaper_keyframe_animate (append: true replaces same-time keys), or animate another property.' } : {})` : ''}${modFit ? ', textFit: __textFit' : ''}${modWrapApplies ? ', textWrap: __textWrap' : ''}${modDirection ? ', direction: __direction' : ''}${modTabular ? ', tabularFigures: __tabular' : ''}${modTypography.length ? ', typography: __typography' : ''}${modFillOpacity ? ', fillOpacity: __fillOpacity' : ''}${modStrokePos ? ', strokePosition: __strokePos' : ''}${affine ? `, affine: ${jsLiteral({ skewX, skewY, matrix, note: 'applied to the current shape: calling again compounds it. To undo, apply the inverse (negative skew, or the inverse matrix).' })}` : ''}${modLifetime ? ', lifetime: __lifetime' : ''}${modFont ? ', ...(__font ? { font: __font } : {})' : ''}${modWarning} };`;
+return { success: true, itemId: ${ID}${properties.content !== undefined ? `, ...(__ctKeys ? { contentTrackWarning: 'this text\\'s content is keyframed (' + __ctKeys + ' key(s)), so the track sets it on every frame and this edit does not show. Change the content keys with pinepaper_keyframe_animate (append: true replaces same-time keys), or animate another property.' } : {})` : ''}${modFit ? ', textFit: __textFit' : ''}${modWrapApplies ? ', textWrap: __textWrap' : ''}${modRewrap ? ', ...(__textRewrap ? { textWrap: __textRewrap } : {})' : ''}${modDirection ? ', direction: __direction' : ''}${modTabular ? ', tabularFigures: __tabular' : ''}${modTypography.length ? ', typography: __typography' : ''}${modFillOpacity ? ', fillOpacity: __fillOpacity' : ''}${modStrokePos ? ', strokePosition: __strokePos' : ''}${affine ? `, affine: ${jsLiteral({ skewX, skewY, matrix, note: 'applied to the current shape: calling again compounds it. To undo, apply the inverse (negative skew, or the inverse matrix).' })}` : ''}${modLifetime ? ', lifetime: __lifetime' : ''}${modFont ? ', ...(__font ? { font: __font } : {})' : ''}${modWarning} };`;
 
   // Wrapped, because the body now RETURNS early on a miss rather than falling
   // through to an unconditional success. Async only when a font must load
@@ -2134,7 +2170,9 @@ function generateAddRelationCode(
     const bad = [${JSON.stringify(sourceId)}, ${JSON.stringify(targetId)}].filter(function(id) { return !app._isKnownRelationEndpoint(norm(id)); });
     if (bad.length) {
       return { success: false, relationType: ${jsLiteral(relationType)}, error: bad.map(function(id) { return JSON.stringify(id); }).join(' and ')
-        + ' ' + (bad.length > 1 ? 'are not items' : 'is not an item') + ' on the canvas, so the relation would be stored and skipped every frame. Check the id (pinepaper_get_items lists them).' };
+        + ' ' + (bad.length > 1 ? 'are not items' : 'is not an item') + ' on the canvas, so the relation would be stored and skipped every frame. Check the id (pinepaper_get_items lists them).'
+        // A stick figure's id is the prefix of its parts, not an item (SPRINGSTICK40): name a part that is one.
+        + bad.filter(function(id) { return app._isKnownRelationEndpoint(norm(id + '_torso')); }).map(function(id) { return ' ' + JSON.stringify(id) + ' is the id of a stick figure, which is the prefix of its parts: relate to a part, such as ' + JSON.stringify(id + '_torso') + ' or ' + JSON.stringify(id + '_head') + '.'; }).join('') };
     }
   }
   const __params = ${JSON.stringify(params, null, 2)};
