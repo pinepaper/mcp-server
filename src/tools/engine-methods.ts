@@ -295,6 +295,7 @@ export const OPTIONAL_ENGINE_METHODS: readonly string[] = [
   'getDPI',
   'getImagePlayback',
   'getInterpolatedState',
+  'getItemById',
   'getItemsByName',
   'getPattern',
   'getRelight',

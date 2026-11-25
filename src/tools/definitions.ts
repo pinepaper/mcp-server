@@ -9477,7 +9477,7 @@ VERIFY MOTION BEFORE YOU RENDER. An export takes seconds to minutes and shows yo
           type: 'number',
           minimum: 0.5,
           maximum: 600,
-          description: 'Video duration in seconds for mp4/webm/gif (default 5). Max 600 for mp4/webm (past about a minute the file is paged back from the studio\'s export store); GIF is capped at 15 because it has no bitrate target, so size scales with frames × dimensions — use mp4/webm for longer clips. The file has ceil(duration × fps) frames — for an exact count use frames instead. Static formats ignore this. If you set play_timeline to N seconds, pass the same N here.',
+          description: 'Video duration in seconds for mp4/webm/gif (default 5). Max 600 for mp4/webm (past about a minute the file is paged back from the studio\'s export store); GIF is capped at 15 because it has no bitrate target, so size scales with frames × dimensions — use mp4/webm for longer clips. The file has ceil(duration × fps) frames — for an exact count use frames instead. Frame n shows time n / fps, so the last frame shows (frames − 1) / fps, one frame before duration, and a keyframe at exactly t = duration is never drawn (a loop does not repeat its first frame): to end ON a pose, key it one frame early or hold it and export a frame longer. Static formats ignore this. If you set play_timeline to N seconds, pass the same N here.',
         },
       },
       // Nothing is required: platform defaults to 'auto', which is the canvas's

@@ -30,7 +30,7 @@ describe('text operations', () => {
   });
 
   it('wrap is reversible and unwrap passes the engine\'s own refusal through', () => {
-    expect(text({ action: 'wrap', itemId: 't1', maxWidth: 300 })).toContain('app.wrapText("t1", 300)');
+    expect(text({ action: 'wrap', itemId: 't1', maxWidth: 300 })).toContain('app.wrapText(__ti || "t1", 300)');
     const un = text({ action: 'unwrap', itemId: 't1' });
     expect(un).toContain('app.unwrapText("t1")');
     // "not wrapped" is more specific than anything this layer could infer.

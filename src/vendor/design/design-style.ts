@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
  * Source:    mcp-cloud/src/services/content-recipes.ts (DesignStyle union only)
- * sha256:    de3358e9cc23a62d8ace2dcaebbd90a985d49ae1a3e7e5fa1d88321bf5fbac1d
+ * sha256:    8f041f7b2d42c476015097ee411e4ea50bdcad5c2de4171a9d41e5dd0f69aee6
  * Generator: scripts/sync-design-systems.mjs
  *
  * Edit the TypeScript upstream and re-run the generator. A hand edit here is
@@ -52,10 +52,11 @@ export type DesignStyle =
   | "blueprint_schematic"
   | "stick_figure"
   | "omni_flash_realism"
+  | "omni_flash_animation"
   | "hybrid_mixed_media";
 
 
-/** The same 41 styles as DATA, so a runtime list cannot drift from the type. */
+/** The same 42 styles as DATA, so a runtime list cannot drift from the type. */
 export const DESIGN_STYLES: readonly DesignStyle[] = Object.freeze([
   'minimal',
   'editorial',
@@ -97,5 +98,6 @@ export const DESIGN_STYLES: readonly DesignStyle[] = Object.freeze([
   'blueprint_schematic',
   'stick_figure',
   'omni_flash_realism',
+  'omni_flash_animation',
   'hybrid_mixed_media',
 ]);

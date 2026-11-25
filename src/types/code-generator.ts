@@ -1182,6 +1182,20 @@ export function textWrapRequest(properties: Record<string, unknown>, opts: { mod
   return out;
 }
 
+/**
+ * A TURNED TEXT IS WRAPPED AND FITTED UPRIGHT (WRAPROT170 / FONTFAMROT170).
+ *
+ * The studio's wrapText and fitText measure a line by the item's bounds, and the bounds of a turned text are the
+ * upright box round the slanted line: a 280 px limit at 45 degrees let a 316 px line through (two lines where
+ * the same text upright made three), and at 90 degrees nothing wrapped at all. Rotation given at create is
+ * already on the item when the wrap runs, so create with rotation laid the text out differently from create
+ * followed by a rotation. The text is stood upright about its centre for the wrap or fit and turned back about
+ * its centre afterwards, so maxWidth is always the width of the text's own lines, whatever the studio measures.
+ */
+const UPRIGHT_OPEN = (v: string) => `const __ur = (${v} && typeof ${v}.rotate === 'function' && Number.isFinite(Number(${v}.rotation)) && Math.abs(Number(${v}.rotation)) > 1e-9) ? Number(${v}.rotation) : 0;
+  if (__ur) ${v}.rotate(-__ur, ${v}.bounds.center);`;
+const UPRIGHT_CLOSE = (v: string) => `if (__ur) ${v}.rotate(__ur, ${v}.bounds.center);`;
+
 /** The wrap itself, after the item exists: sets __textWrap. widthOrNull null unwraps. */
 export function emitTextWrap(itemExpr: string, widthOrNull: number | null, vHold: 'top' | 'bottom' | undefined): string {
   const unwrap = widthOrNull === null;
@@ -1192,17 +1206,23 @@ let __textWrap = null;
   if (!__wi || typeof __wi.content !== 'string') { __textWrap = { applied: false, note: 'not a text item, so there is nothing to wrap' }; }
   else if (typeof app.${unwrap ? 'unwrapText' : 'wrapText'} !== 'function') { __textWrap = { applied: false, ${unwrap ? '' : `maxWidth: ${widthOrNull}, `}note: 'this studio cannot ${unwrap ? 'unwrap' : 'wrap'} text (no app.${unwrap ? 'unwrapText' : 'wrapText'}): the text ${unwrap ? 'keeps its line breaks' : 'stays on one line and may run past the frame'}.' }; }
   else {
+    // The edge held is read on the text as drawn, before and after: for a turned text that is the corner or centre
+    // of its drawn box, which is what the studio anchored at create.
+    let __wr = null;
     const __j = String(__wi.justification || 'left');
     const __b0 = __wi.bounds;
     const __hx = __j === 'center' ? __b0.center.x : __j === 'right' ? __b0.right : __b0.left;
     const __hy = ${vHold === 'top' ? '__b0.top' : vHold === 'bottom' ? '__b0.bottom' : '__b0.center.y'};
-    const __wr = app.${unwrap ? 'unwrapText(__wi)' : `wrapText(__wi, ${widthOrNull})`};
-    if (!__wr || __wr.ok === false) { __textWrap = { applied: false, ${unwrap ? '' : `maxWidth: ${widthOrNull}, `}note: (__wr && __wr.error) || 'the studio refused the ${unwrap ? 'unwrap' : 'wrap'}' }; }
-    else {
+    ${UPRIGHT_OPEN('__wi')}
+    try { __wr = app.${unwrap ? 'unwrapText(__wi)' : `wrapText(__wi, ${widthOrNull})`}; } finally { ${UPRIGHT_CLOSE('__wi')} }
+    if (__wr && __wr.ok !== false) {
       const __b1 = __wi.bounds;
       const __nx = __j === 'center' ? __b1.center.x : __j === 'right' ? __b1.right : __b1.left;
       const __ny = ${vHold === 'top' ? '__b1.top' : vHold === 'bottom' ? '__b1.bottom' : '__b1.center.y'};
       __wi.position = __wi.position.add([__hx - __nx, __hy - __ny]);
+    }
+    if (!__wr || __wr.ok === false) { __textWrap = { applied: false, ${unwrap ? '' : `maxWidth: ${widthOrNull}, `}note: (__wr && __wr.error) || 'the studio refused the ${unwrap ? 'unwrap' : 'wrap'}' }; }
+    else {
       const __b = __wi.bounds;
       __textWrap = Object.assign({ applied: true, ${unwrap ? 'unwrapped: true' : `maxWidth: ${widthOrNull}, lines: __wr.lines, overflow: !!__wr.overflow`},
         bounds: { x: Math.round(__b.x * 10) / 10, y: Math.round(__b.y * 10) / 10, width: Math.round(__b.width * 10) / 10, height: Math.round(__b.height * 10) / 10 } },
@@ -1212,12 +1232,15 @@ let __textWrap = null;
 }`;
 }
 
-function emitTextFit(itemExpr: string, box: Record<string, unknown>, holdFallback = 'undefined'): string {
+export function emitTextFit(itemExpr: string, box: Record<string, unknown>, holdFallback = 'undefined'): string {
   return `
 if (typeof app.fitText === 'function') {
   const __fbox = ${jsLiteral(box)};
   if (__fbox.hold === undefined) { const __h = ${holdFallback}; if (__h) __fbox.hold = __h; }
-  const __fr = app.fitText(${itemExpr}, __fbox);
+  const __fi = ${itemExpr};
+  let __fr = null;
+  ${UPRIGHT_OPEN('__fi')}
+  try { __fr = app.fitText(__fi, __fbox); } finally { ${UPRIGHT_CLOSE('__fi')} }
   __textFit = __fr && __fr.ok !== false
     ? Object.assign({ applied: true }, __fr, __fr.fits === false ? { warning: 'the text does not fit its box even at the minimum font size — shorten it or widen the box.' } : {})
     : { applied: false, error: (__fr && __fr.error) || 'the studio refused the fit box' };
@@ -14219,7 +14242,11 @@ ${guard}
 // Text: break to a width — reversibly
 (function() {
   if (typeof app.wrapText !== 'function') { return { success: false, error: 'app.wrapText unavailable — update FxTool' }; }
-  const r = app.wrapText(${S(input.itemId)}, ${S(input.maxWidth)});
+  // Upright for the measure, then turned back (WRAPROT170): see UPRIGHT_OPEN.
+  const __ti = typeof app.getItemById === 'function' ? app.getItemById(${S(input.itemId)}) : null;
+  ${UPRIGHT_OPEN('__ti')}
+  let r = null;
+  try { r = app.wrapText(__ti || ${S(input.itemId)}, ${S(input.maxWidth)}); } finally { ${UPRIGHT_CLOSE('__ti')} }
   if (!r || r.ok === false) { return { success: false, error: (r && r.error) || 'that item could not be wrapped' }; }
   return { success: true, ...r };
 })();`.trim();
