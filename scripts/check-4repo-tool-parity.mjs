@@ -500,7 +500,7 @@ function renderMarkdown(report) {
     `- **\`ToolCallExecutor\` tools not exposed in WebMCP editor (${g.execMissingFromWebmcp.length}):** ${g.execMissingFromWebmcp.map((x) => `\`${x}\``).join(', ') || 'none'}`,
     `- **WebMCP direct-only editor tools missing from \`mcp-server\` (${g.webmcpMissingFromMcp.length}):** ${g.webmcpMissingFromMcp.map((x) => `\`${x}\``).join(', ') || 'none'}`,
     `- **\`ToolCallExecutor\` tools missing from \`client-sft/train.jsonl\` (${g.execMissingFromSft.length}/${s.fxtoolExecutorCount}):** ${g.execMissingFromSft.map((x) => `\`${x}\``).join(', ') || 'none'}`,
-    `- **WebMCP readiness / Chrome PR #373 (\`waitForToolsUntil\`):** \`WebMCPBridge.js\` registers via \`document.modelContext.registerTool\` (with \`navigator.modelContext\` fallback) and handles async \`registerTool\` promise rejection + \`AbortController\` \`{ signal }\`, with \`waitForToolsUntil\` absent from \`FxTool\` (${s.webmcpHasWaitForToolsUntil ? 'present' : 'not present — page-side \`registerTool\` only'}).`,
+    `- **WebMCP readiness / Chrome PR #373 (\`waitForToolsUntil\`):** \`WebMCPBridge.js\` registers via \`document.modelContext.registerTool\` (with \`navigator.modelContext\` fallback) and handles async \`registerTool\` promise rejection + \`AbortController\` \`{ signal }\`; \`waitForToolsUntil\` is ${s.webmcpHasWaitForToolsUntil ? 'present in `FxTool` (`WebMCPBridge`, `app.js`, `landing-tools.js`)' : 'not present — page-side `registerTool` only'}.`,
     '',
     '## Client-Facing Tool Matrix',
     '',
