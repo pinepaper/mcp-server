@@ -6212,7 +6212,7 @@ ACTIONS:
 - trigger: One-shot deformation (auto-removes). Params: itemId, preset, amplitude, speed
 - remove: Restore original geometry. Params: itemId
 
-PRESETS: fold, squeeze, squash, pinch, bulge, twist, ripple, wave, breathe, melt, shear, inflate, wobble
+PRESETS: fold, squeeze, squash, pinch, bulge, twist, ripple, wave, breathe, melt, shear, inflate, wobble, fluid_bleed
 
 PHASES: sin, blink, linear, pingpong, once, elastic, heartbeat, stepped`,
     inputSchema: {
@@ -6226,7 +6226,7 @@ PHASES: sin, blink, linear, pingpong, once, elastic, heartbeat, stepped`,
         itemId: { type: 'string', description: 'Target item ID' },
         preset: {
           type: 'string',
-          enum: ['fold', 'squeeze', 'squash', 'pinch', 'bulge', 'twist', 'ripple', 'wave', 'breathe', 'melt', 'shear', 'inflate', 'wobble'],
+          enum: ['fold', 'squeeze', 'squash', 'pinch', 'bulge', 'twist', 'ripple', 'wave', 'breathe', 'melt', 'shear', 'inflate', 'wobble', 'fluid_bleed'],
           description: 'Deformation preset name',
         },
         frequency: { type: 'number', description: 'Oscillation speed (default: 1)' },
