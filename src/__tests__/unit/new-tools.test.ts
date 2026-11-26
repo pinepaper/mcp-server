@@ -708,6 +708,16 @@ describe('Deform code generation', () => {
     expect(code).not.toContain("itemId: 'test'inject'");
     expect(code).toContain(JSON.stringify("test'inject"));
   });
+
+  it('accepts fluid_bleed preset in schema, definition, and codegen', () => {
+    const parsed = DeformInputSchema.parse({ action: 'apply', itemId: 'item_1', preset: 'fluid_bleed' });
+    expect(parsed.preset).toBe('fluid_bleed');
+    const def = PINEPAPER_TOOLS.find((t) => t.name === 'pinepaper_deform')!;
+    const presetProp = (def.inputSchema as { properties?: { preset?: { enum?: string[] } } }).properties?.preset;
+    expect(presetProp?.enum).toContain('fluid_bleed');
+    const code = codeGenerator.generateDeform({ action: 'apply', itemId: 'item_1', preset: 'fluid_bleed' });
+    expect(code).toContain('"fluid_bleed"');
+  });
 });
 
 // =============================================================================

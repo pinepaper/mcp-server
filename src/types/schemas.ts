@@ -4214,7 +4214,7 @@ export const DeformInputSchema = z.object({
   itemId: z.string().optional(),
   preset: z.enum([
     'fold', 'squeeze', 'squash', 'pinch', 'bulge', 'twist',
-    'ripple', 'wave', 'breathe', 'melt', 'shear', 'inflate', 'wobble',
+    'ripple', 'wave', 'breathe', 'melt', 'shear', 'inflate', 'wobble', 'fluid_bleed',
   ]).optional(),
   frequency: z.number().optional(),
   amplitude: z.number().min(0).max(1).optional(),
