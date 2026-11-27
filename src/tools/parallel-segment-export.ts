@@ -159,6 +159,64 @@ export function effectiveWorkerCount(requested: number, totalFrames: number, ava
 }
 
 /**
+ * The frame count a single-pass export of this scene makes: `frames` exactly when given, else
+ * `ceil(duration x fps)` (the engine's own rule for mp4/webm; see `frames` in code-generator.ts).
+ * The segment plan must partition exactly this range, or the joined film differs in length
+ * from the single-pass one.
+ */
+export function singlePassFrameCount(opts: { duration: number; fps: number; frames?: number }): number {
+  if (typeof opts.frames === 'number' && opts.frames >= 1) return Math.max(1, Math.round(opts.frames));
+  const fps = Math.max(1, opts.fps);
+  const d = Number.isFinite(opts.duration) ? opts.duration : 5;
+  return Math.max(1, Math.ceil(d * fps));
+}
+
+/** One deduplicated warning from the segment exports, with the 0-based indexes of the segments that raised it. */
+export interface SegmentWarning {
+  message: string;
+  segments: number[];
+}
+
+function warningText(w: unknown): string | null {
+  if (typeof w === 'string') return w.trim() ? w : null;
+  if (w && typeof w === 'object') {
+    const o = w as { message?: unknown; code?: unknown };
+    if (typeof o.message === 'string' && o.message) return typeof o.code === 'string' && o.code ? `${o.code}: ${o.message}` : o.message;
+    if (typeof o.code === 'string' && o.code) return o.code;
+  }
+  return null;
+}
+
+/**
+ * Gather the warnings each segment reported (`warnings` and `video.warnings` on its payload),
+ * deduplicated by text and tagged with the segments that raised them.
+ * `payloads[i]` is segment i's payload.
+ */
+export function aggregateSegmentWarnings(payloads: Array<unknown>): SegmentWarning[] {
+  const byText = new Map<string, Set<number>>();
+  payloads.forEach((p, i) => {
+    if (!p || typeof p !== 'object') return;
+    const o = p as { warnings?: unknown; video?: { warnings?: unknown } };
+    for (const list of [o.warnings, o.video?.warnings]) {
+      if (!Array.isArray(list)) continue;
+      for (const w of list) {
+        const t = warningText(w);
+        if (!t) continue;
+        if (!byText.has(t)) byText.set(t, new Set());
+        byText.get(t)!.add(i);
+      }
+    }
+  });
+  return [...byText.entries()].map(([message, set]) => ({ message, segments: [...set].sort((a, b) => a - b) }));
+}
+
+/** "segment 2 of 3 failed: <cause>" (1-based for people). */
+export function describeSegmentFailure(index: number, total: number, cause: unknown): string {
+  const c = cause instanceof Error ? cause.message : String(cause);
+  return `segment ${index + 1} of ${total} failed: ${c}`;
+}
+
+/**
  * Split `[startTime, startTime + totalDuration)` into contiguous whole-frame windows
  * with zero gaps and zero overlapping frames (`sum(frameCount) === totalFrames`).
  */
@@ -172,9 +230,7 @@ export function splitExportWindows(opts: {
 }): ParallelWindow[] {
   const fps = Math.max(1, opts.fps);
   const baseStart = typeof opts.startTime === 'number' && opts.startTime > 0 ? opts.startTime : 0;
-  const totalFrames = typeof opts.frames === 'number' && opts.frames >= 1
-    ? Math.max(1, Math.round(opts.frames))
-    : Math.max(1, Math.round(Math.max(0.1, opts.duration) * fps));
+  const totalFrames = singlePassFrameCount({ duration: opts.duration, fps, frames: opts.frames });
   const workers = effectiveWorkerCount(opts.parallel, totalFrames, opts.availableCores);
   const windows: ParallelWindow[] = [];
   for (let i = 0; i < workers; i++) {
@@ -279,58 +335,94 @@ export async function exportParallelSegments(
   const snapshotJson = JSON.stringify({ project: probe.project, canvasSize: probe.canvasSize });
   const platform = String(args.platform || 'auto');
 
-  try {
-    const segmentFiles = await Promise.all(
-      windows.map(async (w) =>
-        deps.runWorker(async (worker) => {
-          const loadRes = await worker.executeCode(LOAD_PARALLEL_SNAPSHOT, false, {
-            bypassGovernor: true,
-            stage: { ppParallelDoc: snapshotJson },
-          });
-          const loadPayload = loadRes.result as { ok?: boolean; error?: string } | undefined;
-          if (!loadRes.success || !loadPayload?.ok) {
-            throw new Error(`worker ${w.index} failed to load scene: ${loadPayload?.error || loadRes.error || 'unknown error'}`);
-          }
+  const abort = new AbortController();
+  let firstFailure: { index: number; cause: unknown } | null = null;
+  const aborted = () => {
+    if (abort.signal.aborted) throw new Error('aborted: another segment failed');
+  };
+  const loadWarnings: unknown[][] = [];
+  const finalFileHolder: { path?: string } = {};
+  const segPathOf = (i: number) => join(tempDir, `seg_${String(i).padStart(2, '0')}.${format}`);
 
-          const segArgs: Record<string, unknown> = {
-            ...baseArgs,
-            format,
-            fps,
-            startTime: w.startTime,
-            frames: w.frameCount,
-          };
-          delete segArgs.duration;
-          const exportCode = deps.generateSegmentCode(segArgs);
-          const expRes = await worker.executeCode(exportCode, false, { governorTimeoutMs: deps.governorTimeoutMs });
-          if (!expRes.success) {
-            throw new Error(`worker ${w.index} export script failed: ${expRes.error || 'unknown error'}`);
+  try {
+    const settled = await Promise.allSettled(
+      windows.map(async (w) => {
+        const segPath = segPathOf(w.index);
+        try {
+          return await deps.runWorker(async (worker) => {
+            aborted();
+            const loadRes = await worker.executeCode(LOAD_PARALLEL_SNAPSHOT, false, {
+              bypassGovernor: true,
+              stage: { ppParallelDoc: snapshotJson },
+            });
+            aborted();
+            const loadPayload = loadRes.result as { ok?: boolean; error?: string; warnings?: unknown[] } | undefined;
+            if (!loadRes.success || !loadPayload?.ok) {
+              throw new Error(`could not load the scene: ${loadPayload?.error || loadRes.error || 'unknown error'}`);
+            }
+            if (Array.isArray(loadPayload.warnings) && loadPayload.warnings.length) loadWarnings[w.index] = loadPayload.warnings;
+
+            const segArgs: Record<string, unknown> = {
+              ...baseArgs,
+              format,
+              fps,
+              startTime: w.startTime,
+              frames: w.frameCount,
+            };
+            delete segArgs.duration;
+            const exportCode = deps.generateSegmentCode(segArgs);
+            const expRes = await worker.executeCode(exportCode, false, { governorTimeoutMs: deps.governorTimeoutMs });
+            aborted();
+            if (!expRes.success) {
+              throw new Error(`export script failed: ${expRes.error || 'unknown error'}`);
+            }
+            const payload = expRes.result as { success?: boolean; error?: string; retained?: boolean; exportId?: string; size?: number; chunkBytes?: number; data?: string; warnings?: unknown[]; video?: { warnings?: unknown[] } } | undefined;
+            if (!payload || payload.success === false) {
+              throw new Error(`studio refused the export: ${payload?.error || 'no reason given'}`);
+            }
+            if (payload.retained === true && typeof payload.exportId === 'string') {
+              await deps.saveRetained(
+                worker,
+                {
+                  exportId: payload.exportId,
+                  size: Number(payload.size) || 0,
+                  format,
+                  chunkBytes: Number(payload.chunkBytes) || undefined,
+                },
+                platform,
+                segPath
+              );
+            } else if (typeof payload.data === 'string' && payload.data.length > 0) {
+              await deps.saveInline(payload.data, format, platform, segPath);
+            } else {
+              throw new Error('no export data returned');
+            }
+            aborted();
+            return { file: segPath, payload };
+          });
+        } catch (cause) {
+          // the first real failure aborts the rest; later "aborted" errors are consequences, not causes
+          if (!firstFailure) {
+            firstFailure = { index: w.index, cause };
+            abort.abort();
           }
-          const payload = expRes.result as { success?: boolean; error?: string; retained?: boolean; exportId?: string; size?: number; chunkBytes?: number; data?: string } | undefined;
-          if (!payload || payload.success === false) {
-            throw new Error(`worker ${w.index} export failed: ${payload?.error || 'studio refused export'}`);
-          }
-          const segPath = join(tempDir, `seg_${String(w.index).padStart(2, '0')}.${format}`);
-          if (payload.retained === true && typeof payload.exportId === 'string') {
-            await deps.saveRetained(
-              worker,
-              {
-                exportId: payload.exportId,
-                size: Number(payload.size) || 0,
-                format,
-                chunkBytes: Number(payload.chunkBytes) || undefined,
-              },
-              platform,
-              segPath
-            );
-          } else if (typeof payload.data === 'string' && payload.data.length > 0) {
-            await deps.saveInline(payload.data, format, platform, segPath);
-          } else {
-            throw new Error(`worker ${w.index} returned no export data`);
-          }
-          return { file: segPath, payload };
-        })
-      )
+          throw cause;
+        }
+      })
     );
+
+    if (firstFailure) {
+      // every worker has settled, so no partial file can appear after this point
+      await Promise.all(windows.map((w) => unlink(segPathOf(w.index)).catch(() => undefined)));
+      const { index, cause } = firstFailure as { index: number; cause: unknown };
+      const text = `Parallel export failed and was stopped; no file was written. ${describeSegmentFailure(index, windows.length, cause)}`;
+      return {
+        isError: true,
+        structuredContent: { success: false, error: text, failedSegment: index, segments: windows.length },
+        content: [{ type: 'text' as const, text }],
+      };
+    }
+    const segmentFiles = settled.map((r) => (r as PromiseFulfilledResult<{ file: string; payload: Record<string, unknown> | undefined }>).value);
 
     const files = segmentFiles.map((s) => s.file);
     const sigs = await Promise.all(files.map((f) => ff.streams(f)));
@@ -344,6 +436,7 @@ export async function exportParallelSegments(
     const hasAudio = /"audio"/.test(sigs[0].signature ?? '');
     const useProgramAudio = probe.programAudio === true && !!deps.programAudio && !!ff.mux && hasAudio;
     const finalFile = join(deps.exportDir, `pinepaper_${platform}_parallel_${Date.now()}.${format}`);
+    finalFileHolder.path = finalFile;
     const listFile = join(tempDir, 'concat.txt');
 
     let audioNote: string | undefined;
@@ -404,6 +497,10 @@ export async function exportParallelSegments(
 
     const fileSize = 'bytes' in receipt ? receipt.bytes : (await stat(finalFile)).size;
     const wallMs = Date.now() - startedAt;
+    const warnings = aggregateSegmentWarnings(segmentFiles.map((sf, i) => {
+      const p = sf.payload as { warnings?: unknown[]; video?: { warnings?: unknown[] } } | undefined;
+      return { warnings: [...(loadWarnings[i] ?? []), ...(Array.isArray(p?.warnings) ? p!.warnings! : [])], video: { warnings: p?.video?.warnings } };
+    }));
     const cleanResult = {
       success: true,
       format,
@@ -416,6 +513,7 @@ export async function exportParallelSegments(
       file: receipt,
       ...(audioNote ? { audio: audioNote } : {}),
       ...bitrateCapFields(cap),
+      ...(warnings.length ? { warnings } : {}),
       parallel: {
         requested: requestedWorkers,
         workers: windows.length,
@@ -440,6 +538,7 @@ export async function exportParallelSegments(
             + `Parallel workers: ${windows.length} (${totalFrames} frames joined in ${(wallMs / 1000).toFixed(2)}s)\n`
             + (audioNote ? `Audio: ${audioNote}\n` : '')
             + bitrateCapLine(cap)
+            + warnings.map((w) => `Warning (segment ${w.segments.map((n) => n + 1).join(', ')}): ${w.message}\n`).join('')
             + receiptErrorLine(receipt)
             + ('receiptError' in receipt ? '' : probeLines(receipt))
             + `\nResult: ${JSON.stringify(cleanResult, null, 2)}`,
@@ -447,6 +546,9 @@ export async function exportParallelSegments(
         exportFileLink(finalFile, fileSize),
       ],
     };
+  } catch (e) {
+    if (finalFileHolder.path) await unlink(finalFileHolder.path).catch(() => undefined);
+    throw e;
   } finally {
     await rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
   }
