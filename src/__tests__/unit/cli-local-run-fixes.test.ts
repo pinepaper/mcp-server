@@ -10,6 +10,8 @@ import { describe, it, expect } from 'bun:test';
 import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { TEMPLATES } from '../../cli/commands/init.js';
+import { expandBatchMacros } from '../../tools/batch-macros.js';
+import { compileBatchTimelines } from '../../tools/timeline.js';
 import { timingFor } from '../../cli/commands/render.js';
 import { lintSuggestionFinding } from '../../cli/commands/check.js';
 import { getToolsForToolkit, detectVerbosityFromEnvironment } from '../../tools/toolkits.js';
@@ -19,22 +21,35 @@ import { firstKeyEasingNoEffect } from '../../types/code-generator.js';
 type Op = { type: string; itemType?: string; position?: { x: number; y: number }; properties?: Record<string, any>; itemId?: string; keyframes?: Array<{ time: number; properties: Record<string, number>; easing?: string }> };
 
 describe('chart starter', () => {
-  const ops = TEMPLATES.chart.operations as unknown as Op[];
-  const bars = ops.filter((o) => o.type === 'create' && o.itemType === 'rectangle');
+  const expanded = expandBatchMacros(TEMPLATES.chart.operations as Array<Record<string, unknown>>) as unknown as Op[];
+  const bars = expanded.filter((o) => o.type === 'create' && o.itemType === 'rectangle');
   it('has four bars of different heights', () => {
     expect(bars.length).toBe(4);
     expect(new Set(bars.map((b) => b.properties!.height)).size).toBe(4);
   });
   it('every bar keeps its bottom edge on one baseline at every key', () => {
-    const creates = ops.filter((o) => o.type === 'create');
-    const bottoms = new Set<number>();
-    for (const k of ops.filter((o) => o.type === 'keyframe_animate')) {
-      const bar = creates[Number(k.itemId!.slice(1))];
-      const h = bar.properties!.height as number;
-      for (const key of k.keyframes!) bottoms.add(Math.round((key.properties.y + (key.properties.scaleY * h) / 2) * 1000) / 1000);
-      expect(bar.position!.y + h / 2).toBe([...bottoms][0]);
+    const tl = compileBatchTimelines(expanded as never);
+    expect(tl.errors).toEqual([]);
+    const bottoms = new Set(bars.map((b) => b.position!.y));
+    expect(bottoms).toEqual(new Set([600]));
+    for (const b of bars) {
+      expect(b.properties!.anchor).toBe('bottom-left');
     }
-    expect(bottoms.size).toBe(1);
+    const plan = tl.plans.get(expanded.findIndex((o) => o.type === 'timeline'))!;
+    expect(plan.tracks.length).toBe(4);
+    const bottomSet = new Set<number>();
+    plan.tracks.forEach((track, idx) => {
+      const h = bars[idx].properties!.height as number;
+      const yCenter = 600 - h / 2;
+      for (const k of track.keyframes) {
+        const ySpec = k.properties.y as { pivot?: number; s?: number } | undefined;
+        expect(ySpec?.pivot).toBe(1);
+        const s = ySpec!.s!;
+        const yAtKey = yCenter + (ySpec!.pivot! * (h / 2) * (1 - s));
+        bottomSet.add(Math.round((yAtKey + (s * h) / 2) * 1000) / 1000);
+      }
+    });
+    expect(bottomSet).toEqual(new Set([600]));
   });
 });
 

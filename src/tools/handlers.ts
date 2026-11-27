@@ -210,9 +210,15 @@ import {
 import { sameStudioTarget, validateStudioUrl } from '../browser/url-target.js';
 import { getPerformanceTracker, MetricsExportFormat } from '../metrics/index.js';
 import { ErrorContext, formatErrorContext, captureCanvasState } from '../execution/index.js';
-import { FILTER_PARAM_RANGES } from './engine-lists.js';
+import { FILTER_PARAM_RANGES, PATTERN_KINDS } from './engine-lists.js';
 import { getSessionManager } from '../agent/session-manager.js';
-import { vocabularyHintForPath, validateBatchVocabulary, detectBatchPropertyTypos } from '../ontology/hints.js';
+import {
+  vocabularyHintForPath,
+  validateBatchVocabulary,
+  detectBatchPropertyTypos,
+  validateRelationOptionKeys,
+  detectBatchRelationOptionViolations,
+} from '../ontology/hints.js';
 import { compileBatchTimelines } from './timeline.js';
 import { cameraHandlers } from './handlers/camera.js';
 import { fontHandlers } from './handlers/font.js';
@@ -2299,7 +2305,7 @@ async function nestedIgnoredFor(toolName: string, args: Record<string, unknown>)
  * that is in neither list, so a working key is never reported. Shrink-only.
  */
 export const BATCH_OP_HIDDEN: Readonly<Record<string, readonly string[]>> = {
-  '*': ['_step', 'id'],
+  '*': ['_step'],
   keyframe_animate: ['params', 'timeUnits', 'timeOffset', 'clipInPoint', 'clipOutPoint'],
   timeline: ['repeat', 'yoyo', 'anchor'],
 };
@@ -2320,6 +2326,7 @@ export const BATCH_OP_READS: Readonly<Record<string, readonly string[]>> = {
   set_canvas_size: ['height', 'preset', 'width'],
   apply_mask: ['itemId', 'maskOptions', 'maskPreset', 'maskType'],
   apply_effect: ['effectParams', 'effectType', 'itemId'],
+  pattern: ['action', 'id', 'kind', 'members', 'params', 'window'],
 };
 /** Hints for the slips that land on a key another op type reads. */
 const BATCH_OP_HINTS: Readonly<Record<string, string>> = {
@@ -3439,6 +3446,23 @@ async function handleToolCallInner(
         const isCustom = typeof rt === 'string' && CUSTOM_RELATION_NAMES.has(rt);
         const input = AddRelationInputSchema.parse(isCustom ? { ...args, relationType: 'orbits' } : args);
         if (isCustom) (input as { relationType?: string }).relationType = rt as string;
+        if (!isCustom && input.relationType && input.params && typeof input.params === 'object') {
+          const isGlob = typeof input.sourceId === 'string' && input.sourceId.includes('*');
+          const optViolations = validateRelationOptionKeys(input.relationType, input.params as Record<string, unknown>, { isGlob });
+          if (optViolations.length > 0) {
+            return errorResult(
+              ErrorCodes.VALIDATION_ERROR,
+              optViolations.map((v) => v.message).join(' '),
+              optViolations.map((v) => ({
+                path: `params.${v.key}`,
+                relationType: input.relationType,
+                received: v.key,
+                suggestion: v.suggestion,
+                validKeys: v.validKeys,
+              })),
+            );
+          }
+        }
         const code = codeGenerator.generateAddRelation(input, isCustom);
         const description = getLocalizedSuccessMessage(i18n, 'relationAdded', {
           relationType: input.relationType ?? `preset:${input.presetId}`,
@@ -4847,6 +4871,40 @@ You can now start creating new items on a clean canvas.${sizeNote}`,
                 validKeys: t.validKeys,
               })),
             );
+          }
+          const relViolations = detectBatchRelationOptionViolations(ops);
+          if (relViolations.length > 0) {
+            return errorResult(
+              ErrorCodes.VALIDATION_ERROR,
+              `Batch preflight rejected ${relViolations.length} invalid relationOptions key${relViolations.length > 1 ? 's' : ''}: ${relViolations.map((v) => v.message).join(' ')}`,
+              relViolations.map((v) => ({
+                path: `${paths[v.opIndex]}.relationOptions.${v.key}`,
+                opType: 'relation',
+                relationType: v.relationType,
+                received: v.key,
+                suggestion: v.suggestion,
+                validKeys: v.validKeys,
+              })),
+            );
+          }
+          for (let i = 0; i < ops.length; i++) {
+            const pOp = ops[i];
+            if (pOp.type !== 'pattern') continue;
+            const act = typeof pOp.action === 'string' ? pOp.action : 'create';
+            if (!['create', 'modify', 'remove'].includes(act)) {
+              return errorResult(ErrorCodes.VALIDATION_ERROR, `Batch pattern op at ${paths[i]} has invalid action "${act}". Accepted: create, modify, remove.`, { path: `${paths[i]}.action` });
+            }
+            if (typeof pOp.id !== 'string' || !pOp.id.trim()) {
+              return errorResult(ErrorCodes.VALIDATION_ERROR, `Batch pattern op at ${paths[i]} requires a non-empty string "id".`, { path: `${paths[i]}.id` });
+            }
+            if (act === 'create') {
+              if (typeof pOp.kind !== 'string' || !(PATTERN_KINDS as readonly string[]).includes(pOp.kind)) {
+                return errorResult(ErrorCodes.VALIDATION_ERROR, `Batch pattern create at ${paths[i]} requires "kind" to be one of: ${PATTERN_KINDS.join(', ')}.`, { path: `${paths[i]}.kind` });
+              }
+              if (!pOp.members || (Array.isArray(pOp.members) && pOp.members.length === 0)) {
+                return errorResult(ErrorCodes.VALIDATION_ERROR, `Batch pattern create at ${paths[i]} requires non-empty "members" ({ names, ids, tag } or array).`, { path: `${paths[i]}.members` });
+              }
+            }
           }
         }
 

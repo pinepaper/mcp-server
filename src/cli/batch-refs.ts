@@ -51,6 +51,20 @@ function itemRefFields(op: Record<string, unknown>): Array<[string, unknown]> {
       else if (to !== undefined) out.push([`tweens[${ti}].to`, to]);
     });
   }
+  if (op.type === 'pattern') {
+    const m = op.members;
+    if (Array.isArray(m)) {
+      m.forEach((v, i) => out.push([`members[${i}]`, v]));
+    } else if (m && typeof m === 'object') {
+      const mo = m as { ids?: unknown; refs?: unknown };
+      if (Array.isArray(mo.ids)) mo.ids.forEach((v, i) => out.push([`members.ids[${i}]`, v]));
+      if (Array.isArray(mo.refs)) mo.refs.forEach((v, i) => out.push([`members.refs[${i}]`, v]));
+    }
+    const p = op.params;
+    if (p && typeof p === 'object' && (p as { target?: unknown }).target !== undefined) {
+      out.push(['params.target', (p as { target?: unknown }).target]);
+    }
+  }
   return out;
 }
 

@@ -138,7 +138,7 @@ describe("a refusal carries the engine's own reason (D78)", () => {
         : { success: true, result: { success: false, error: 'the studio refused the time_expression relation between item_1 and item_1.' },
             report: { warnings: ["unknown property 'opacty' — did you mean 'opacity'?"] } }),
     };
-    const r = await handleToolCall('pinepaper_add_relation', { sourceId: 'item_1', targetId: 'item_1', relationType: 'time_expression', params: { property: 'opacty', expr: 't' } }, opts(c));
+    const r = await handleToolCall('pinepaper_add_relation', { sourceId: 'item_1', targetId: 'item_1', relationType: 'time_expression', params: { property: 'opacty', expression: 't' } }, opts(c));
     expect(r.isError).toBe(true);
     expect(text(r)).toContain("did you mean 'opacity'");
   });

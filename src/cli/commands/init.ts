@@ -62,6 +62,28 @@ export const TEMPLATES: Readonly<Record<string, TemplateDef>> = {
           { time: 1.0, properties: { opacity: 1, y: 400 }, easing: 'easeOutCubic' },
         ],
       },
+      {
+        type: 'create_many',
+        itemType: 'circle',
+        name: 'accent',
+        properties: { radius: 8, fillColor: '#a855f7', opacity: 0.9 },
+        items: [[540, 500], [640, 500], [740, 500]],
+      },
+      {
+        type: 'timeline',
+        defaults: { ease: 'power2.out' },
+        tweens: [
+          { to: 'accent-*', from: { scale: 0.2, opacity: 0 }, vars: { scale: 1, opacity: 0.9 }, duration: 0.6, at: 0.6, stagger: 0.12 },
+        ],
+      },
+      {
+        type: 'pattern',
+        action: 'create',
+        id: 'accent_wave',
+        kind: 'phase_wave',
+        members: { names: 'accent-*' },
+        params: { property: 'y', amplitude: 10, period: 2, wavelength: 3 },
+      },
     ],
   },
   'social-post': {
@@ -104,7 +126,7 @@ export const TEMPLATES: Readonly<Record<string, TemplateDef>> = {
   },
   chart: {
     name: 'chart',
-    description: 'Animated 4-bar metric comparison with bottom-anchored growth keyframes',
+    description: 'Animated 4-bar metric comparison with bottom-left anchored create_many and timeline stagger',
     config: {
       entry: 'scene.batch.json',
       canvas: { width: 1280, height: 720, backgroundColor: '#111827' },
@@ -117,27 +139,20 @@ export const TEMPLATES: Readonly<Record<string, TemplateDef>> = {
         position: { x: 640, y: 110 },
         properties: { name: 'chart_title', content: 'Quarterly Growth', fontSize: 44, fontWeight: 'bold', fillColor: '#f9fafb' },
       },
-      // Four bars of different heights standing on one baseline (y 600). A scale grows from the item's centre, so
-      // y is keyed with scaleY: centre = baseline - scaleY * height / 2 holds the bottom edge where it is.
-      ...[150, 210, 260, 320].flatMap((h, i) => {
-        const x = 370 + i * 180, base = 600, t0 = i * 0.15;
-        return [
-          {
-            type: 'create',
-            itemType: 'rectangle',
-            position: { x, y: base - h / 2 },
-            properties: { name: `bar_${i + 1}`, width: 88, height: h, cornerRadius: 8, fillColor: '#10b981' },
-          },
-          {
-            type: 'keyframe_animate',
-            itemId: `$${i + 1}`,
-            keyframes: [
-              { time: t0, properties: { scaleY: 0.05, y: base - (0.05 * h) / 2, opacity: 0.3 } },
-              { time: t0 + 0.9, properties: { scaleY: 1, y: base - h / 2, opacity: 1 }, easing: 'easeOutCubic' },
-            ],
-          },
-        ];
-      }),
+      {
+        type: 'create_many',
+        itemType: 'rectangle',
+        name: 'bar',
+        properties: { width: 88, cornerRadius: 8, fillColor: '#10b981', anchor: 'bottom-left' },
+        items: [150, 210, 260, 320].map((height, i) => ({ x: 326 + i * 180, y: 600, height })),
+      },
+      {
+        type: 'timeline',
+        defaults: { ease: 'power2.out' },
+        tweens: [
+          { to: 'bar-*', from: { scaleY: 0.05, opacity: 0.3 }, vars: { scaleY: 1, opacity: 1 }, duration: 0.9, at: 0.1, stagger: 0.15 },
+        ],
+      },
     ],
   },
   diagram: {
@@ -260,7 +275,11 @@ OPTIONS:
   --list-templates        List built-in templates and exit
   --force                 Overwrite existing pinepaper.json / scene.batch.json
   --json                  Emit machine-readable JSON output
-  -h, --help              Show help`;
+  -h, --help              Show help
+
+TIP:
+  For token-efficient scripted/CI scenes using create_many, timeline, and pattern ops,
+  configure your MCP client with PINEPAPER_TOOLKIT=lane (pinepaper-mcp setup <client> --toolkit lane).`;
 
 export const initCommand: CliCommand = {
   name: 'init',
@@ -330,6 +349,7 @@ export const initCommand: CliCommand = {
     console.log(`  pinepaper-mcp preview ${targetDir}`);
     console.log(`  pinepaper-mcp snapshot ${targetDir} --times 0,1,2`);
     console.log(`  pinepaper-mcp render ${targetDir}`);
+    console.log('  Tip: PINEPAPER_TOOLKIT=lane enables the token-efficient 8-tool agent lane (create_many, timeline, pattern).');
     return 0;
   },
 };

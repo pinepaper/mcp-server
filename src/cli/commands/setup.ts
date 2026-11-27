@@ -28,11 +28,15 @@ USAGE:
 
 OPTIONS:
   --mode <mode>           Execution mode: puppeteer (default) or code
-  --toolkit <profile>     Toolkit profile (${TOOLKIT_PROFILES_LIST.join('|')})
+  --toolkit <profile>     Toolkit profile (${TOOLKIT_PROFILES_LIST.join('|')}; default: core; pass lane for token-efficient scripted scenes)
   --allow-code            Include PINEPAPER_ALLOW_CODE=1 in generated env
   --allow-local-files     Include PINEPAPER_ALLOW_LOCAL_FILES=1 in generated env
   --json                  Emit machine-readable JSON output
-  -h, --help              Show help`;
+  -h, --help              Show help
+
+EXAMPLES:
+  pinepaper-mcp setup claude-code --toolkit lane
+  PINEPAPER_TOOLKIT=lane npx -y @pinepaper.studio/mcp-server`;
 
 interface SetupSpec {
   target: ClientTarget;
@@ -80,6 +84,7 @@ function specFor(
           'Recommended for Claude Desktop: download the signed .mcpb extension (includes Chrome & FFmpeg support):',
           '  https://github.com/pinepaper/mcp-server/releases/latest/download/pinepaper-mcp-server.mcpb',
           'Or paste the JSON above into ~/Library/Application Support/Claude/claude_desktop_config.json (macOS).',
+          'Token-efficient scenes: add --toolkit lane (sets PINEPAPER_TOOLKIT=lane for create_many, timeline, pattern).',
         ],
       };
 
@@ -98,7 +103,10 @@ function specFor(
           '# OR add the MCP server directly:',
           addCmd,
         ].join('\n'),
-        notes: ['Plugin includes the pinepaper-studio skill and pp: design knowledge graph references.'],
+        notes: [
+          'Plugin includes the pinepaper-studio skill and pp: design knowledge graph references.',
+          'For token-efficient scripted scenes, pass --toolkit lane (PINEPAPER_TOOLKIT=lane).',
+        ],
       };
     }
 
@@ -108,7 +116,10 @@ function specFor(
         title: 'Cursor',
         location: '.cursor/mcp.json (project) or ~/.cursor/mcp.json (global)',
         snippet: JSON.stringify({ mcpServers: { pinepaper: mcpEntry } }, null, 2),
-        notes: ['Restart or reload Cursor MCP servers after saving.'],
+        notes: [
+          'Restart or reload Cursor MCP servers after saving.',
+          'For token-efficient scripted scenes, pass --toolkit lane (PINEPAPER_TOOLKIT=lane).',
+        ],
       };
 
     case 'codex': {
@@ -124,7 +135,10 @@ function specFor(
         title: 'OpenAI Codex CLI',
         location: '~/.codex/config.toml',
         snippet: toml,
-        notes: ['Append the block above to ~/.codex/config.toml.'],
+        notes: [
+          'Append the block above to ~/.codex/config.toml.',
+          'For token-efficient scripted scenes, pass --toolkit lane (PINEPAPER_TOOLKIT=lane).',
+        ],
       };
     }
 
@@ -134,7 +148,10 @@ function specFor(
         title: 'VS Code (GitHub Copilot / MCP)',
         location: '.vscode/mcp.json',
         snippet: JSON.stringify({ servers: { pinepaper: mcpEntry } }, null, 2),
-        notes: ['Open Command Palette -> "MCP: List Servers" to start PinePaper.'],
+        notes: [
+          'Open Command Palette -> "MCP: List Servers" to start PinePaper.',
+          'For token-efficient scripted scenes, pass --toolkit lane (PINEPAPER_TOOLKIT=lane).',
+        ],
       };
 
     case 'skills':

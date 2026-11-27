@@ -25,6 +25,7 @@ import {
 } from '../types/schemas.js';
 import { ITEM_TYPE_MAP, RELATION_TYPE_MAP, DIAGRAM_SHAPE_MAP } from './vocabulary.js';
 import { CREATE_KNOWN_KEYS } from '../tools/create-known-keys.js';
+import { RELATION_PARAM_KEYS, RELATION_LOOP_PARAMS } from '../tools/engine-lists.js';
 
 /**
  * Known vocabulary field names → canonical valid-value list.
@@ -241,6 +242,190 @@ export function validateBatchVocabulary(
       if (!hint) continue;
       const isValid = (hint.validValues as readonly string[]).includes(value) || !!sessionValues[field]?.has(value);
       if (!isValid) violations.push({ opIndex, opType, field, hint });
+    }
+  });
+  return violations;
+}
+
+/**
+ * Semantic alias suggestions for common LLM guesses on built-in relationOptions keys.
+ * Every suggested target is verified against the relation's allowed keys before emitting.
+ */
+export const RELATION_OPTION_SEMANTIC_ALIASES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  orbits: {
+    angle: 'phaseDegrees',
+    startAngle: 'phaseDegrees',
+    angleDegrees: 'phaseDegrees',
+    dir: 'direction',
+    dist: 'radius',
+    r: 'radius',
+  },
+  time_expression: {
+    expr: 'expression',
+    formula: 'expression',
+    prop: 'property',
+    base: 'baseValue',
+  },
+  phase_wave: {
+    amp: 'amplitude',
+    freq: 'period',
+    prop: 'property',
+    waveLength: 'wavelength',
+  },
+  follows: {
+    smooth: 'smoothing',
+    damping: 'smoothing',
+    distance: 'offset',
+    delaySeconds: 'delay',
+  },
+  attached_to: {
+    smooth: 'smoothing',
+    damping: 'smoothing',
+    distance: 'offset',
+    delaySeconds: 'delay',
+  },
+  points_at: {
+    angle: 'offset_angle',
+    angleOffset: 'offset_angle',
+    smooth: 'smoothing',
+  },
+  maintains_distance: {
+    dist: 'distance',
+  },
+  beside: {
+    spacing: 'gap',
+    margin: 'gap',
+  },
+  on_top_of: {
+    spacing: 'gap',
+    margin: 'gap',
+  },
+  below: {
+    spacing: 'gap',
+    margin: 'gap',
+  },
+  inside: {
+    inset: 'padding',
+    margin: 'padding',
+  },
+  centered_on: {
+    dx: 'offsetX',
+    dy: 'offsetY',
+    x: 'offsetX',
+    y: 'offsetY',
+  },
+  staggered_with: {
+    delay: 'stagger',
+    totalDuration: 'amount',
+  },
+  moves_along_path: {
+    points: 'path',
+    loop: 'closed',
+  },
+  driven_by: {
+    from: 'targetProperty',
+    to: 'sourceProperty',
+    scale: 'multiplier',
+    mult: 'multiplier',
+  },
+  bounds_to: {
+    margin: 'padding',
+  },
+  grows_from: {
+    anchor: 'origin',
+    dur: 'duration',
+  },
+  wave_through: {
+    amp: 'amplitude',
+    freq: 'frequency',
+    dur: 'duration',
+  },
+  wiggle: {
+    amp: 'amplitude',
+    freq: 'frequency',
+    prop: 'property',
+  },
+};
+
+const GLOBAL_RELATION_OPTION_ALIASES: Readonly<Record<string, string>> = {
+  start: 'startTime',
+  end: 'endTime',
+  dur: 'duration',
+  targetProperty: 'property',
+};
+
+export interface RelationOptionViolation {
+  key: string;
+  suggestion: string | null;
+  validKeys: readonly string[];
+  message: string;
+}
+
+export interface BatchRelationOptionViolation extends RelationOptionViolation {
+  opIndex: number;
+  relationType: string;
+}
+
+/**
+ * Validate relationOptions / params keys for a built-in relationType against
+ * RELATION_PARAM_KEYS[relationType] + RELATION_LOOP_PARAMS (+ glob-injected keys).
+ * Unknown / custom relationTypes return [] so custom relations pass through.
+ */
+export function validateRelationOptionKeys(
+  relationType: string,
+  options: Record<string, unknown> | undefined | null,
+  opts?: { isGlob?: boolean },
+): RelationOptionViolation[] {
+  if (!options || typeof options !== 'object' || Array.isArray(options)) return [];
+  const paramKeys = RELATION_PARAM_KEYS[relationType];
+  if (!paramKeys) return [];
+
+  const allowedKeys = [
+    ...paramKeys,
+    ...RELATION_LOOP_PARAMS,
+    ...(opts?.isGlob ? ['index', 'count', 'pattern'] : []),
+  ];
+  const allowedSet = new Set(allowedKeys);
+  const relAliases = RELATION_OPTION_SEMANTIC_ALIASES[relationType];
+  const violations: RelationOptionViolation[] = [];
+
+  for (const key of Object.keys(options)) {
+    if (key.startsWith('_') || allowedSet.has(key)) continue;
+    const semantic = relAliases?.[key] ?? GLOBAL_RELATION_OPTION_ALIASES[key];
+    const suggestion = (semantic && allowedSet.has(semantic))
+      ? semantic
+      : suggestTypo(key, allowedKeys);
+    violations.push({
+      key,
+      suggestion,
+      validKeys: allowedKeys,
+      message: `Unknown relation option "${key}" on "${relationType}"${suggestion ? ` — did you mean "${suggestion}"?` : ''}. Valid keys: ${allowedKeys.join(', ')}.`,
+    });
+  }
+
+  return violations;
+}
+
+/**
+ * Detect invalid relationOptions keys across batch `relation` operations.
+ */
+export function detectBatchRelationOptionViolations(
+  operations: ReadonlyArray<Record<string, unknown>>,
+): BatchRelationOptionViolation[] {
+  const violations: BatchRelationOptionViolation[] = [];
+  operations.forEach((op, opIndex) => {
+    if (op.type !== 'relation') return;
+    const relationType = typeof op.relationType === 'string' ? op.relationType : '';
+    if (!relationType) return;
+    const options = op.relationOptions;
+    if (!options || typeof options !== 'object' || Array.isArray(options)) return;
+    const isGlob = typeof op.sourceId === 'string' && op.sourceId.includes('*');
+    for (const v of validateRelationOptionKeys(relationType, options as Record<string, unknown>, { isGlob })) {
+      violations.push({
+        opIndex,
+        relationType,
+        ...v,
+      });
     }
   });
   return violations;

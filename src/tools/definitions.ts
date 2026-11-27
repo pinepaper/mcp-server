@@ -151,7 +151,7 @@ RULES:
 
 CANVAS:  set_canvas_size (width/height or preset) → set_background (color) → execute_generator (procedural art)
 ITEMS:   create (itemType, position, properties) → modify (itemId, properties) → delete (itemId) → group (itemIds → one entity)
-ANIMATE: animate (loop presets) → keyframe_animate (timed reveals) → relation (behavioral links)
+ANIMATE: animate (loop presets) → keyframe_animate (timed reveals) → timeline (GSAP-JSON tracks) → pattern (phase_wave/stagger/ring/orbit) → relation (behavioral links)
 EFFECTS: apply_mask (reveal animations) → apply_effect (sparkle/blast/bubbles/fireflies/trail...)
 PLAY:    play_timeline (start playback)
 
@@ -494,8 +494,8 @@ EVERY type below also takes an anchor, which says WHICH CORNER your x/y meant.
 Position is the bounding-box CENTRE by default. Anything that computed a layout
 box — a design system, or any CSS-shaped mental model — authored the TOP-LEFT
 instead, and passing those coordinates straight in displaces every item by half
-its own size. anchor: 'top-left' (also top-right, bottom-left, bottom-right,
-center; origin is an alias for the parameter) fixes that without you computing
+its own size. anchor: 'top-left' (also top, top-right, left, center, right, bottom-left, bottom,
+bottom-right; origin is an alias for the parameter) fixes that without you computing
 bounds you cannot know until the item exists. It is applied after size and
 rotation, so it uses the item's real box.
 PIXEL-EXACT SLOTS (a spec'd 615x345 end-screen box, a UI frame): use anchor
@@ -719,7 +719,7 @@ thousands of authored items.
         },
         anchor: {
           type: 'string',
-          enum: ['center', 'top-left', 'top-right', 'bottom-left', 'bottom-right'],
+          enum: ['center', 'top-left', 'top', 'top-right', 'left', 'right', 'bottom-left', 'bottom', 'bottom-right'],
           description: "Which point of the item `position` names (default center). Same as properties.anchor — for a pixel-exact slot use 'top-left' with whole numbers.",
         },
         data: {
@@ -5114,7 +5114,12 @@ EXAMPLE — a word waving, letter after letter:
         params: { type: 'object', description: 'phase_wave: property, amplitude, period, wavelength, phase · stagger: step, start, order · ring / orbit: center, target, radius, period, phase, direction' },
         window: {
           type: ['object', 'null'],
-          properties: { from: { type: 'number' }, to: { type: 'number' } },
+          properties: {
+            from: { type: 'number' },
+            to: { type: 'number' },
+            startTime: { type: 'number' },
+            endTime: { type: 'number' },
+          },
           description: 'phase_wave, ring, orbit: when it plays, in scene seconds',
         },
       },
@@ -9135,8 +9140,8 @@ EXAMPLE — Animated sky scene with timed reveals:
             properties: {
               type: {
                 type: 'string',
-                enum: ['set_canvas_size', 'set_background', 'execute_generator', 'create', 'modify', 'delete', 'group', 'animate', 'keyframe_animate', 'relation', 'apply_mask', 'apply_effect', 'play_timeline', 'ring', 'grid', 'orbit', 'stagger', 'patch', 'create_many', 'timeline'],
-                description: 'Operation type. timeline compiles a GSAP-shaped timeline onto keyframe tracks. ring / grid make many items in one op (each a create, so each fills a $N slot in order), orbit binds an orbits relation (making the orbiting item when itemType is given), stagger plays the same keyframes on itemIds one after another, patch changes the item with that name (refused when several items hold it).',
+                enum: ['set_canvas_size', 'set_background', 'execute_generator', 'create', 'modify', 'delete', 'group', 'animate', 'keyframe_animate', 'relation', 'apply_mask', 'apply_effect', 'play_timeline', 'ring', 'grid', 'orbit', 'stagger', 'patch', 'create_many', 'timeline', 'pattern'],
+                description: 'Operation type. timeline compiles a GSAP-shaped timeline onto keyframe tracks. pattern declares a phase_wave / stagger / ring / orbit motion across named items. ring / grid make many items in one op (each a create, so each fills a $N slot in order), orbit binds an orbits relation (making the orbiting item when itemType is given), stagger plays the same keyframes on itemIds one after another, patch changes the item with that name (refused when several items hold it).',
               },
               // Canvas setup
               width: { type: 'number', description: 'Canvas width for set_canvas_size (100-16384)' },
@@ -9219,11 +9224,11 @@ EXAMPLE — Animated sky scene with timed reveals:
                 description: 'For apply_effect: effect type',
               },
               effectParams: { type: 'object', description: 'For apply_effect: parameters' },
-              // Timeline
+              // Timeline & Pattern action
               action: {
                 type: 'string',
-                enum: ['play', 'stop', 'seek'],
-                description: 'For play_timeline: action',
+                enum: ['play', 'stop', 'seek', 'create', 'modify', 'remove'],
+                description: 'For play_timeline (play, stop, seek) or pattern (create, modify, remove; defaults to create)',
               },
               time: { type: 'number', description: 'For play_timeline seek: time in seconds' },
               // Macros
@@ -9245,6 +9250,34 @@ EXAMPLE — Animated sky scene with timed reveals:
               tweens: { type: 'array', items: { type: 'object' }, description: 'For timeline: [{to, vars, from, duration, delay, at, stagger, ease, repeat, yoyo, repeatDelay}]' },
               defaults: { type: 'object', description: 'For timeline: {ease, duration} for tweens that give none' },
               labels: { type: 'object', description: 'For timeline: {name: seconds}, for at: "name" or "name+=0.5"' },
+              // Declarative pattern (phase_wave | stagger | ring | orbit)
+              id: { type: 'string', description: 'For pattern: pattern identifier' },
+              kind: { type: 'string', enum: [...PATTERN_KINDS], description: 'For pattern create: ' + PATTERN_KINDS.join(', ') },
+              members: {
+                description: 'For pattern: array of ids/names, or { ids, names, tag }',
+                oneOf: [
+                  { type: 'array', items: { type: 'string' } },
+                  {
+                    type: 'object',
+                    properties: {
+                      ids: { type: 'array', items: { type: 'string' } },
+                      names: { oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }] },
+                      tag: { type: 'string' },
+                    },
+                  },
+                ],
+              },
+              params: { type: 'object', description: 'For pattern: kind-specific parameters' },
+              window: {
+                type: ['object', 'null'],
+                properties: {
+                  from: { type: 'number' },
+                  to: { type: 'number' },
+                  startTime: { type: 'number' },
+                  endTime: { type: 'number' },
+                },
+                description: 'For pattern: active time window in seconds',
+              },
             },
             required: ['type'],
             // Open, as the zod schema is (.passthrough()): a create op takes its

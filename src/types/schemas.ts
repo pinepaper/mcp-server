@@ -1307,7 +1307,7 @@ export const CreateItemInputSchema = z.object({
   // Also accepted at the top level: it names which point `position` is, so it
   // is read beside position as often as inside properties — and at the top
   // level it was stripped without a word (round 7 retest, 1.63).
-  anchor: z.string().optional().describe("Which point position names: 'center' (default), 'top-left', 'top-right', 'bottom-left', 'bottom-right'. Same as properties.anchor."),
+  anchor: z.string().optional().describe("Which point position names: 'center' (default), 'top-left', 'top', 'top-right', 'left', 'right', 'bottom-left', 'bottom', 'bottom-right'. Same as properties.anchor."),
   screenSpace: ScreenSpaceSchema.optional(),
   stepTiming: StepTimingSchema.optional(),
   counter: CounterSchema.optional(),
@@ -2484,7 +2484,7 @@ export const AgentBatchOperationTypeSchema = z.enum([
   'apply_mask', 'apply_effect',
   'play_timeline',
   'ring', 'grid', 'orbit', 'stagger', 'patch', 'create_many',
-  'timeline',
+  'timeline', 'pattern',
 ]).describe('Type of batch operation');
 
 /**
@@ -2566,6 +2566,17 @@ export const AgentBatchOperationSchema = z.object({
   name: z.string().optional().describe('ring, grid: name prefix (items are name_0, name_1 … or name_row_col); create_many: name prefix (name-0, name-1 …, unless an item names itself); orbit: the made item\'s name; patch: the item to change'),
   speed: z.number().optional().describe('orbit: the orbits relation\'s speed (its own units; omit for the studio default)'),
   phaseDegrees: z.number().optional().describe('orbit: starting angle in degrees'),
+  // Declarative pattern op (phase_wave | stagger | ring | orbit)
+  id: z.string().optional().describe('pattern: pattern identifier'),
+  kind: z.enum(PATTERN_KINDS).optional().describe('pattern: phase_wave | stagger | ring | orbit'),
+  members: z.lazy(() => PatternMembersSchema).optional().describe('pattern: member ids, names/glob, or tag'),
+  params: z.record(z.string(), z.unknown()).optional().describe('pattern: kind-specific parameters'),
+  window: z.object({
+    from: z.number().optional(),
+    to: z.number().optional(),
+    startTime: z.number().optional(),
+    endTime: z.number().optional(),
+  }).nullable().optional().describe('pattern: active time window in seconds'),
 }).passthrough().describe('Single batch operation');
 
 export type AgentBatchOperation = z.infer<typeof AgentBatchOperationSchema>;
@@ -3719,7 +3730,12 @@ export const PatternInputSchema = z.object({
   kind: z.enum(PATTERN_KINDS).optional().describe('create: phase_wave (members wave, each a phase later), stagger (each member\'s animationDelay, derived), ring / orbit (members spaced round a turning circle)'),
   members: PatternMembersSchema.optional().describe('create/modify: which items, by ids, names (globs) or a tag'),
   params: z.record(z.string(), z.unknown()).optional().describe("phase_wave: { property: 'y'|'x'|'rotation'|'opacity', amplitude, period (s per cycle), wavelength (members per cycle), phase } · stagger: { step (s), start (s), order: index|reverse|center|edges } · ring / orbit: { center: [x, y] or {x, y}, target (an item the centre follows), radius (px), period (s per turn), phase (radians), direction: 1|-1|'ccw' }"),
-  window: z.object({ from: z.number().optional(), to: z.number().optional() }).nullable().optional().describe('phase_wave, ring, orbit: when it plays, scene seconds; time counts from `from`'),
+  window: z.object({
+    from: z.number().optional(),
+    to: z.number().optional(),
+    startTime: z.number().optional(),
+    endTime: z.number().optional(),
+  }).nullable().optional().describe('phase_wave, ring, orbit: when it plays, scene seconds; time counts from `from` (or `startTime`)'),
 });
 export type PatternInput = z.infer<typeof PatternInputSchema>;
 
