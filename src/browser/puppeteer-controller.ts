@@ -1826,8 +1826,10 @@ export function getBrowserController(
       console.error(`[PinePaper] PINEPAPER_TIMEOUT="${env('PINEPAPER_TIMEOUT')}" is not a number — ignoring it.`);
     }
 
+    const envStudioUrl = env('PINEPAPER_STUDIO_URL')?.trim();
     const mcpConfig: BrowserControllerConfig = {
       ...config,
+      studioUrl: config?.studioUrl ?? (envStudioUrl || undefined),
       headless,
       waitUntil: config?.waitUntil ?? (envWaitUntil && PAGE_WAIT_UNTIL.includes(envWaitUntil) ? envWaitUntil : undefined),
       timeout: config?.timeout ?? (Number.isFinite(envTimeout) && envTimeout > 0 ? envTimeout : undefined),
