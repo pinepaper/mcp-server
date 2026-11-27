@@ -106,6 +106,20 @@ describe('Phase 1 CLI commands', () => {
     expect(data._meta.command).toBe('info');
     expect(data.tools.total).toBe(PINEPAPER_TOOLS.length);
     expect(typeof data.tools.toolkits.core).toBe('number');
+    expect(typeof data.cloud.keyConfigured).toBe('boolean');
+    expect(data.cloud.hostedMcpUrl).toContain('/mcp');
+
+    const prevKey = process.env.PINEPAPER_API_KEY;
+    try {
+      process.env.PINEPAPER_API_KEY = 'pp_sa_secret_should_never_leak';
+      const secretCheck = await captureCli(['info', '--json']);
+      expect(secretCheck.code).toBe(0);
+      expect(secretCheck.stdout).not.toContain('pp_sa_secret_should_never_leak');
+      expect(JSON.parse(secretCheck.stdout).cloud.keyConfigured).toBe(true);
+    } finally {
+      if (prevKey === undefined) delete process.env.PINEPAPER_API_KEY;
+      else process.env.PINEPAPER_API_KEY = prevKey;
+    }
   });
 
   it('doctor --offline --json reports core health checks', async () => {
@@ -162,7 +176,7 @@ describe('Phase 1 CLI commands', () => {
   });
 
   it('setup prints ready-to-paste client configs and marketplace instructions', async () => {
-    for (const target of ['claude-code', 'claude-desktop', 'cursor', 'codex', 'vscode', 'skills']) {
+    for (const target of ['claude-code', 'claude-desktop', 'cursor', 'codex', 'vscode', 'skills', 'cloud']) {
       const r = await captureCli(['setup', target, '--json']);
       expect(r.code).toBe(0);
       const d = JSON.parse(r.stdout);
@@ -171,6 +185,16 @@ describe('Phase 1 CLI commands', () => {
     }
     const cc = JSON.parse((await captureCli(['setup', 'claude-code', '--json'])).stdout);
     expect(cc.snippet).toContain('pinepaper/pinepaper-claude-marketplace');
+
+    const cloudSpec = JSON.parse((await captureCli(['setup', 'cloud', '--json'])).stdout);
+    expect(cloudSpec.snippet).toContain('https://cloud.pinepaper.studio/mcp');
+    const notes = (cloudSpec.notes as string[]).join('\n');
+    expect(notes).toContain('/auth.md');
+    expect(notes).toContain('/pricing');
+    expect(notes).toContain('/account#service-accounts');
+
+    const hostedAlias = JSON.parse((await captureCli(['setup', 'hosted', '--json'])).stdout);
+    expect(hostedAlias.target).toBe('cloud');
   });
 });
 

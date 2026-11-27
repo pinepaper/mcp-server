@@ -44,17 +44,52 @@ afterEach(() => {
 const req = { model: 'flux-pro-1.1', input: { prompt: 'a lighthouse at dusk', aspect: '16:9', n: 1 } };
 
 describe('pinepaper_generate', () => {
-  it('without a key: says how to configure it, calls nothing', async () => {
+  it('without a key: says how to configure it with sign-up, pricing, and OAuth links, calls nothing', async () => {
     delete process.env.PINEPAPER_API_KEY;
     const r = await handleToolCall('pinepaper_generate', req, {});
     expect(r.isError).toBe(true);
-    expect(out(r)).toContain('PINEPAPER_API_KEY');
+    const msg = out(r);
+    expect(msg).toContain('PINEPAPER_API_KEY');
+    expect(msg).toContain('https://cloud.test/account#service-accounts');
+    expect(msg).toContain('https://cloud.test/waitlist');
+    expect(msg).toContain('https://cloud.test/pricing');
+    expect(msg).toContain('https://cloud.test/auth.md');
+    expect(msg).toContain('Nothing was charged');
+    expect(calls).toHaveLength(0);
   });
 
-  it('403: not enabled for the organisation, nothing charged', async () => {
+  it('401: points to key management and says nothing was charged', async () => {
+    cloud({ 'POST /v1/generate': () => ({ status: 401, json: { error: 'invalid_token' } }) });
+    const r = await handleToolCall('pinepaper_generate', req, {});
+    expect(r.isError).toBe(true);
+    expect(out(r)).toContain('https://cloud.test/account#service-accounts');
+    expect(out(r)).toContain('Nothing was charged');
+  });
+
+  it('403 INSUFFICIENT_SCOPE: names render:create and points to key management', async () => {
+    cloud({ 'POST /v1/generate': () => ({ status: 403, json: { code: 'INSUFFICIENT_SCOPE', detail: 'Missing render:create.' } }) });
+    const r = await handleToolCall('pinepaper_generate', req, {});
+    expect(r.isError).toBe(true);
+    expect(out(r)).toContain('render:create');
+    expect(out(r)).toContain('https://cloud.test/account#service-accounts');
+    expect(out(r)).toContain('Nothing was charged');
+  });
+
+  it('403: not enabled for the organisation, points to waitlist & pricing, nothing charged', async () => {
     cloud({ 'POST /v1/generate': () => ({ status: 403, json: { type: 'waitlist_pending', detail: 'waitlisted' } }) });
     const r = await handleToolCall('pinepaper_generate', req, {});
     expect(out(r)).toContain('not enabled for your organisation');
+    expect(out(r)).toContain('https://cloud.test/waitlist');
+    expect(out(r)).toContain('https://cloud.test/pricing');
+    expect(out(r)).toContain('Nothing was charged');
+  });
+
+  it('402: points to billing credits & pricing, nothing charged', async () => {
+    cloud({ 'POST /v1/generate': () => ({ status: 402, json: { error: 'insufficient credits' } }) });
+    const r = await handleToolCall('pinepaper_generate', req, {});
+    expect(r.isError).toBe(true);
+    expect(out(r)).toContain('https://cloud.test/account#billing');
+    expect(out(r)).toContain('https://cloud.test/pricing');
     expect(out(r)).toContain('Nothing was charged');
   });
 
