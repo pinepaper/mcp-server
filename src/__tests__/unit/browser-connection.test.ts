@@ -28,6 +28,7 @@ import {
 } from '../../browser/puppeteer-controller.js';
 
 const ENV_KEYS = [
+  'PINEPAPER_STUDIO_URL',
   'PINEPAPER_WAIT_UNTIL',
   'PINEPAPER_TIMEOUT',
   'PINEPAPER_PROXY',
@@ -190,10 +191,17 @@ describe('connection settings', () => {
     expect(getBrowserController().connectionSettings.governor).toBe(true);
   });
 
+  test('PINEPAPER_STUDIO_URL routes getBrowserController to the configured Studio URL', () => {
+    process.env.PINEPAPER_STUDIO_URL = 'http://127.0.0.1:41234';
+    expect(getBrowserController().studioUrl).toBe('http://127.0.0.1:41234/editor?agent=1&mode=agent');
+  });
+
   test('explicit config beats the environment', () => {
+    process.env.PINEPAPER_STUDIO_URL = 'http://127.0.0.1:41234';
     process.env.PINEPAPER_WAIT_UNTIL = 'networkidle2';
     process.env.PINEPAPER_TIMEOUT = '120000';
-    const c = getBrowserController({ waitUntil: 'load', timeout: 5000 });
+    const c = getBrowserController({ studioUrl: 'http://127.0.0.1:45555', waitUntil: 'load', timeout: 5000 });
+    expect(c.studioUrl).toBe('http://127.0.0.1:45555/editor?agent=1&mode=agent');
     expect(c.connectionSettings.waitUntil).toBe('load');
     expect(c.connectionSettings.timeout).toBe(5000);
   });

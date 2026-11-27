@@ -29,9 +29,14 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { LANE_TOOL_NAMES, STARTER_TOOL_NAMES } from '../../src/tools/lane.js';
 import { serveStudio } from './serve-studio.js';
 
 const REPO = resolve(import.meta.dir, '..', '..');
+
+export function expectedToolCountForToolkit(toolkit: string): number {
+  return toolkit === 'starter' ? STARTER_TOOL_NAMES.length : LANE_TOOL_NAMES.length;
+}
 
 export const T1_PROMPT = `Make this video with PinePaper and give me the path of the MP4.
 
@@ -100,10 +105,15 @@ export function verifyT1(file: string): Check[] {
 // The server, one fresh process (and so one fresh studio page) per run.
 // ---------------------------------------------------------------------------
 
-async function startLane(studioUrl: string, log: string): Promise<Client> {
+async function startLane(studioUrl: string, log: string, toolkit = 'lane'): Promise<Client> {
   const env: Record<string, string> = {};
   for (const [k, v] of Object.entries(process.env)) if (v !== undefined && k !== 'ANTHROPIC_API_KEY') env[k] = v;
-  Object.assign(env, { PINEPAPER_TOOLKIT: 'lane', PINEPAPER_STUDIO_URL: studioUrl, PINEPAPER_HEADLESS: 'true' });
+  Object.assign(env, {
+    PINEPAPER_TOOLKIT: toolkit,
+    PINEPAPER_STUDIO_URL: studioUrl,
+    PINEPAPER_HEADLESS: 'true',
+    NODE_OPTIONS: env.NODE_OPTIONS || '--max-old-space-size=2048',
+  });
   const transport = new StdioClientTransport({ command: 'bun', args: [join(REPO, 'src', 'index.ts')], cwd: REPO, env, stderr: 'pipe' });
   const chunks: string[] = [];
   transport.stderr?.on('data', (d) => chunks.push(String(d)));
@@ -199,17 +209,18 @@ function scriptedCalls(naive: boolean): Array<[string, unknown]> {
   ];
 }
 
-async function oneRun(run: number, mode: string, studioUrl: string, outDir: string, prompt: string, model?: string): Promise<RunResult> {
+async function oneRun(run: number, mode: string, studioUrl: string, outDir: string, prompt: string, model?: string, toolkit = 'lane'): Promise<RunResult> {
   const t0 = Date.now();
   const calls: CallRecord[] = [];
   const transcript: unknown[] = [];
   const tpath = join(outDir, `run-${run}-${mode}.json`);
   let usage = { input_tokens: 0, output_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 };
   let turns = 0, stopReason: string | undefined, error: string | undefined;
-  const client = await startLane(studioUrl, tpath);
+  const expectedCount = expectedToolCountForToolkit(toolkit);
+  const client = await startLane(studioUrl, tpath, toolkit);
   try {
     const { tools } = await client.listTools();
-    if (tools.length !== 5) throw new Error(`HARNESS: the lane listed ${tools.length} tools, not 5: ${tools.map((t) => t.name).join(', ')}`);
+    if (tools.length !== expectedCount) throw new Error(`HARNESS: the ${toolkit} profile listed ${tools.length} tools, not ${expectedCount}: ${tools.map((t) => t.name).join(', ')}`);
     if (mode === 'model') {
       ({ usage, turns, stopReason } = await runModel(client, model as string, prompt, calls, transcript));
     } else {
@@ -250,13 +261,18 @@ async function main() {
     process.exit(checks.every((c) => c.ok) ? 0 : 1);
   }
   const mode = argv.includes('--scripted-naive') ? 'scripted-naive' : argv.includes('--scripted') ? 'scripted' : 'model';
+  const toolkit = opt('--toolkit') ?? 'lane';
+  if (toolkit !== 'lane' && toolkit !== 'starter') {
+    console.error(`BLOCKED: --toolkit must be "lane" or "starter" (got "${toolkit}").`);
+    process.exit(2);
+  }
   const runs = Number(opt('--runs') ?? (mode === 'model' ? 3 : 1));
   const outDir = opt('--out') ?? join(tmpdir(), `pinepaper-lane-t1-${Date.now()}`);
   mkdirSync(outDir, { recursive: true });
   const prompt = process.env.T1_PROMPT_FILE ? readFileSync(process.env.T1_PROMPT_FILE, 'utf8') : T1_PROMPT;
 
   const model = process.env.LANE_MODEL?.trim();
-  console.log(`ANTHROPIC_API_KEY: ${process.env.ANTHROPIC_API_KEY ? 'set' : 'unset'}; LANE_MODEL: ${model || 'unset'}; mode: ${mode}`);
+  console.log(`ANTHROPIC_API_KEY: ${process.env.ANTHROPIC_API_KEY ? 'set' : 'unset'}; LANE_MODEL: ${model || 'unset'}; mode: ${mode}; toolkit: ${toolkit}`);
   if (mode === 'model' && (!process.env.ANTHROPIC_API_KEY || !model)) {
     console.error('BLOCKED: model mode needs ANTHROPIC_API_KEY and LANE_MODEL (no default model is assumed). --scripted checks the route without a model.');
     process.exit(2);
@@ -271,7 +287,7 @@ async function main() {
   const results: RunResult[] = [];
   try {
     for (let i = 1; i <= runs; i++) {
-      const r = await oneRun(i, mode, studioUrl, outDir, prompt, model);
+      const r = await oneRun(i, mode, studioUrl, outDir, prompt, model, toolkit);
       results.push(r);
       console.log(`\nrun ${i} [${mode}${model ? ' ' + model : ''}]: ${r.firstTry ? 'FIRST-TRY PASS' : 'FAIL'} (verified=${r.verified}, clean=${r.clean}; ${r.toolCalls} tool calls, ${r.toolErrors} errors, ${r.turns} turns; in ${r.usage.input_tokens} / out ${r.usage.output_tokens} tok; ${(r.wallMs / 1000).toFixed(0)} s)`);
       if (r.error) console.log(`  error: ${r.error}`);
