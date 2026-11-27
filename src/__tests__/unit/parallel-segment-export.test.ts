@@ -14,6 +14,9 @@ import {
   formatConcatList,
   resolveEffectiveFps,
   exportParallelSegments,
+  singlePassFrameCount,
+  aggregateSegmentWarnings,
+  describeSegmentFailure,
 } from '../../tools/parallel-segment-export.js';
 
 function textOf(r: { content?: Array<{ text?: string }> }): string {
@@ -223,33 +226,183 @@ describe('exportParallelSegments orchestration', () => {
     }
   });
 
-  it('cleans up temp directory even when a worker throws mid-export', async () => {
+  it('a worker that throws is reported by segment and cause, and the temp dir is removed', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'pp-parallel-err-'));
     try {
-      await expect(
-        exportParallelSegments(
-          { format: 'mp4', duration: 6, parallel: 2 },
-          'mp4',
-          {
-            exportDir: dir,
-            availableCores: 4,
-            governorTimeoutMs: 60_000,
-            exec: async () => ({
-              success: true,
-              result: { ok: true, supportsTimeRange: true, project: { kind: 'pinepaper-project' } },
-            }),
-            runWorker: async () => { throw new Error('worker crashed'); },
-            generateSegmentCode: () => '',
-            exportOnce: async () => ({ content: [] }),
-            saveRetained: async () => { throw new Error('unused'); },
-            saveInline: async () => { throw new Error('unused'); },
-            ffmpeg: { available: async () => true, streams: async () => ({ ok: true }), concat: async () => ({ ok: true }) },
-          }
-        )
-      ).rejects.toThrow('worker crashed');
+      const res = await exportParallelSegments(
+        { format: 'mp4', duration: 6, parallel: 2 },
+        'mp4',
+        {
+          exportDir: dir,
+          availableCores: 4,
+          governorTimeoutMs: 60_000,
+          exec: async () => ({
+            success: true,
+            result: { ok: true, supportsTimeRange: true, project: { kind: 'pinepaper-project' } },
+          }),
+          runWorker: async () => { throw new Error('worker crashed'); },
+          generateSegmentCode: () => '',
+          exportOnce: async () => ({ content: [] }),
+          saveRetained: async () => { throw new Error('unused'); },
+          saveInline: async () => { throw new Error('unused'); },
+          ffmpeg: { available: async () => true, streams: async () => ({ ok: true }), concat: async () => ({ ok: true }) },
+        }
+      );
+      expect(res.isError).toBe(true);
+      expect(textOf(res)).toMatch(/segment 1 of 2 failed: worker crashed/);
       expect(readdirSync(dir).some((f) => f.startsWith('.parallel-'))).toBe(false);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  const okProbe = { success: true, result: { ok: true, supportsTimeRange: true, programAudio: false, world3d: false, unserializedCount: 0, canvasSize: { width: 64, height: 64 }, project: { kind: 'pinepaper-project' } } };
+  const baseDeps = (dir: string) => ({
+    exportDir: dir,
+    availableCores: 4,
+    governorTimeoutMs: 60_000,
+    exec: async () => okProbe,
+    generateSegmentCode: (a: Record<string, unknown>) => JSON.stringify(a),
+    exportOnce: async () => { throw new Error('fallback exportOnce should not be called'); },
+    saveRetained: async () => { throw new Error('not retained'); },
+    saveInline: async (_d: string, _f: string, _p: string, filePath: string) => { writeFileSync(filePath, 'seg'); return { filePath, fileSize: 3 }; },
+    ffmpeg: {
+      available: async () => true,
+      streams: async () => ({ ok: true, signature: '[["video","h264"]]' }),
+      concat: async (_f: string[], _l: string, out: string) => { writeFileSync(out, 'joined'); return { ok: true }; },
+    },
+    enforceBitrateCap: async () => ({ action: 'held', code: 'held_no_reencode', note: 'ok' }) as never,
+    receipt: async () => ({ sha256: 'x', bytes: 6, probe: {}, probeCheck: { tool: null, reason: 'mocked' } }) as never,
+  });
+
+  it('segment frames passed to workers sum to the single-pass count (ceil), not the rounded one', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pp-parallel-frames-'));
+    try {
+      const seen: number[] = [];
+      const res = await exportParallelSegments({ format: 'mp4', duration: 7.91667, fps: 24, parallel: 3 }, 'mp4', {
+        ...baseDeps(dir),
+        runWorker: async (fn) => fn({
+          executeCode: async (code) => code.includes('loadProject')
+            ? { success: true, result: { ok: true } }
+            : { success: true, result: { success: true, data: 'data:video/mp4;base64,AAA=' } },
+        }),
+        generateSegmentCode: (a) => { seen.push(a.frames as number); return JSON.stringify(a); },
+      });
+      expect(res.isError).not.toBe(true);
+      expect(seen.reduce((x, y) => x + y, 0)).toBe(191); // ceil(7.91667 * 24); round gave 190
+      expect((res.structuredContent as { frames: number }).frames).toBe(191);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('returns warnings from every segment once, tagged with the segments that raised them', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pp-parallel-warn-'));
+    try {
+      let n = 0;
+      const res = await exportParallelSegments({ format: 'mp4', duration: 6, fps: 30, parallel: 3 }, 'mp4', {
+        ...baseDeps(dir),
+        runWorker: async (fn) => {
+          const mine = n++;
+          return fn({
+            executeCode: async (code) => code.includes('loadProject')
+              ? { success: true, result: { ok: true } }
+              : { success: true, result: { success: true, data: 'data:video/mp4;base64,AAA=', warnings: ['font fallback', ...(mine === 1 ? ['only here'] : [])], video: { warnings: [{ code: 'bitrate_exceeded', message: 'over' }] } } },
+          });
+        },
+      });
+      const w = (res.structuredContent as { warnings: Array<{ message: string; segments: number[] }> }).warnings;
+      expect(w.find((x) => x.message === 'font fallback')!.segments).toEqual([0, 1, 2]);
+      expect(w.find((x) => x.message === 'only here')!.segments).toEqual([1]);
+      expect(w.filter((x) => x.message.startsWith('bitrate_exceeded')).length).toBe(1);
+      expect(textOf(res)).toContain('only here');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('when one segment fails the others are aborted, partial files removed, and the failing segment named', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pp-parallel-abort-'));
+    try {
+      let exportsStarted = 0;
+      let slowFinishedExport = false;
+      let n = 0;
+      const res = await exportParallelSegments({ format: 'mp4', duration: 6, fps: 30, parallel: 3 }, 'mp4', {
+        ...baseDeps(dir),
+        runWorker: async (fn) => {
+          const mine = n++;
+          return fn({
+            executeCode: async (code) => {
+              if (code.includes('loadProject')) return { success: true, result: { ok: true } };
+              exportsStarted++;
+              if (mine === 1) return { success: false, error: 'GPU lost' };
+              await new Promise((r) => setTimeout(r, 40));
+              slowFinishedExport = true;
+              return { success: true, result: { success: true, data: 'data:video/mp4;base64,AAA=' } };
+            },
+          });
+        },
+        saveInline: async (_d, _f, _p, filePath) => { writeFileSync(filePath, 'partial'); return { filePath, fileSize: 7 }; },
+      });
+      expect(res.isError).toBe(true);
+      expect(textOf(res)).toMatch(/segment 2 of 3 failed: export script failed: GPU lost/);
+      expect(exportsStarted).toBe(3);
+      expect(slowFinishedExport).toBe(true);
+      // nothing left behind: no temp dir, no partial segments, no joined file
+      expect(readdirSync(dir)).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('segment plan = single-pass frame range (pure)', () => {
+  const durations = [0.1, 0.5, 1, 1.01, 2.5, 3.3333, 5, 6, 7.91667, 10.04, 12.345, 29.97, 59.999, 60, 90.5, 600];
+  const fpsList = [24, 25, 30, 60];
+  const parallels = [1, 2, 3, 4, 5, 8];
+  it('segments partition exactly ceil(duration*fps) frames, contiguously, for every combination', () => {
+    let combos = 0;
+    for (const duration of durations) for (const fps of fpsList) for (const parallel of parallels) {
+      const total = Math.ceil(duration * fps);
+      expect(singlePassFrameCount({ duration, fps })).toBe(Math.max(1, total));
+      const ws = splitExportWindows({ duration, fps, parallel, availableCores: 16 });
+      expect(ws.reduce((a, w) => a + w.frameCount, 0)).toBe(Math.max(1, total));
+      expect(ws[0].startFrame).toBe(0);
+      expect(ws[ws.length - 1].endFrame).toBe(Math.max(1, total));
+      ws.forEach((w, i) => {
+        expect(w.frameCount).toBeGreaterThan(0);
+        expect(w.endFrame - w.startFrame).toBe(w.frameCount);
+        if (i > 0) expect(w.startFrame).toBe(ws[i - 1].endFrame);
+      });
+      combos++;
+    }
+    expect(combos).toBe(durations.length * fpsList.length * parallels.length);
+  });
+  it('an explicit frame count is used as is', () => {
+    const ws = splitExportWindows({ duration: 99, fps: 24, frames: 190, parallel: 3, availableCores: 8 });
+    expect(ws.reduce((a, w) => a + w.frameCount, 0)).toBe(190);
+  });
+  it('7.91667 s at 24 fps is 191 frames, not 190', () => {
+    expect(singlePassFrameCount({ duration: 7.91667, fps: 24 })).toBe(191);
+  });
+});
+
+describe('aggregateSegmentWarnings & describeSegmentFailure (pure)', () => {
+  it('dedupes by text, keeps strings and coded objects, tags segments', () => {
+    const out = aggregateSegmentWarnings([
+      { warnings: ['a', 'b'] },
+      { warnings: ['a'], video: { warnings: [{ code: 'c', message: 'm' }] } },
+      null,
+      { warnings: [] },
+    ]);
+    expect(out).toEqual([
+      { message: 'a', segments: [0, 1] },
+      { message: 'b', segments: [0] },
+      { message: 'c: m', segments: [1] },
+    ]);
+  });
+  it('names the segment 1-based with its cause', () => {
+    expect(describeSegmentFailure(1, 3, new Error('boom'))).toBe('segment 2 of 3 failed: boom');
+    expect(describeSegmentFailure(0, 2, 'x')).toBe('segment 1 of 2 failed: x');
   });
 });
