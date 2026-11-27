@@ -3,9 +3,11 @@
  * Run offline schema/macro/vocabulary validation and live Studio scene + lint checks.
  */
 
-import { detectBatchPropertyTypos, validateBatchVocabulary } from '../../ontology/hints.js';
+import { detectBatchPropertyTypos, detectBatchRelationOptionViolations, validateBatchVocabulary } from '../../ontology/hints.js';
 import { BatchMacroError, batchPreflightView, expandBatchMacros } from '../../tools/batch-macros.js';
+import { PATTERN_KINDS } from '../../tools/engine-lists.js';
 import { batchOpIgnoredPaths, CUSTOM_RELATION_NAMES, handleToolCall } from '../../tools/handlers.js';
+import { compileBatchTimelines } from '../../tools/timeline.js';
 import { AgentBatchExecuteInputSchema } from '../../types/schemas.js';
 import { boolFlag, strFlag } from '../args.js';
 import { findBadItemRefs } from '../batch-refs.js';
@@ -84,6 +86,33 @@ function runOfflineChecks(input: ResolvedSceneInput): CheckFinding[] {
         message: `Likely property typo "${t.property}" on ${t.itemType} (did you mean "${t.suggestion}"?)`,
       });
     }
+    for (const rv of detectBatchRelationOptionViolations(ops)) {
+      findings.push({
+        stage: 'offline',
+        severity: 'error',
+        path: `${paths[rv.opIndex]}.relationOptions.${rv.key}`,
+        message: rv.message,
+      });
+    }
+    for (let i = 0; i < ops.length; i++) {
+      const pOp = ops[i];
+      if (pOp.type !== 'pattern') continue;
+      const act = typeof pOp.action === 'string' ? pOp.action : 'create';
+      if (!['create', 'modify', 'remove'].includes(act)) {
+        findings.push({ stage: 'offline', severity: 'error', path: `${paths[i]}.action`, message: `Invalid pattern action "${act}". Accepted: create, modify, remove.` });
+      }
+      if (typeof pOp.id !== 'string' || !pOp.id.trim()) {
+        findings.push({ stage: 'offline', severity: 'error', path: `${paths[i]}.id`, message: 'Pattern op requires a non-empty string "id".' });
+      }
+      if (act === 'create') {
+        if (typeof pOp.kind !== 'string' || !(PATTERN_KINDS as readonly string[]).includes(pOp.kind)) {
+          findings.push({ stage: 'offline', severity: 'error', path: `${paths[i]}.kind`, message: `Pattern create requires "kind" to be one of: ${PATTERN_KINDS.join(', ')}.` });
+        }
+        if (!pOp.members || (Array.isArray(pOp.members) && pOp.members.length === 0)) {
+          findings.push({ stage: 'offline', severity: 'error', path: `${paths[i]}.members`, message: 'Pattern create requires non-empty "members" ({ names, ids, tag } or array).' });
+        }
+      }
+    }
   }
 
   // $N must name an item this batch has already made, whether or not vocabulary checks were skipped.
@@ -92,7 +121,13 @@ function runOfflineChecks(input: ResolvedSceneInput): CheckFinding[] {
   }
 
   try {
-    expandBatchMacros(parsedBatch.data.operations as Array<Record<string, unknown>>);
+    const expanded = expandBatchMacros(parsedBatch.data.operations as Array<Record<string, unknown>>);
+    if (expanded.some((op) => op.type === 'timeline')) {
+      const tl = compileBatchTimelines(expanded);
+      for (const e of tl.errors) {
+        findings.push({ stage: 'offline', severity: 'error', path: e.path, message: e.message });
+      }
+    }
   } catch (e) {
     findings.push({
       stage: 'offline',
@@ -114,6 +149,19 @@ function runOfflineChecks(input: ResolvedSceneInput): CheckFinding[] {
 
 /** What the Studio ignored or rewrote while loading the scene, as warnings (ignoredOptions, translated arguments). */
 export type LintSuggestion = { message?: string; relation?: string; type?: string; from?: string; to?: string; params?: Record<string, unknown> };
+
+/** One warning from Studio lintScene().warnings (COLLAPSED_GROUP, UNINTENDED_OVERLAP, TEXT_CLIPS_FRAME, etc.). */
+export type LintWarning = { code?: string; severity?: string; message?: string; itemId?: string };
+
+export function lintWarningFindings(warnings: readonly LintWarning[] | undefined): CheckFinding[] {
+  if (!Array.isArray(warnings)) return [];
+  return warnings.map((w) => ({
+    stage: 'lint' as const,
+    severity: w.severity === 'error' ? 'error' : 'warning',
+    ...(w.itemId ? { path: w.itemId } : {}),
+    message: w.code ? `[${w.code}] ${w.message || ''}` : (w.message || 'Scene lint warning'),
+  }));
+}
 
 /** One relation the studio's lint proposes, as a finding: a suggestion, with what it relates to what. */
 export function lintSuggestionFinding(s: LintSuggestion): CheckFinding {
@@ -215,8 +263,14 @@ export const checkCommand: CliCommand = {
           }
 
           const lintRes = extractToolJson(await handleToolCall('pinepaper_lint_scene', {}, handlerOpts));
-          const lintInner = (lintRes.data as { result?: { suggestions?: LintSuggestion[] } } | null)?.result;
+          const lintInner = (lintRes.data as {
+            result?: {
+              suggestions?: LintSuggestion[];
+              warnings?: LintWarning[];
+            };
+          } | null)?.result;
           liveLint = lintInner ?? lintRes.data;
+          findings.push(...lintWarningFindings(lintInner?.warnings));
           if (Array.isArray(lintInner?.suggestions)) {
             // The studio's lint proposes relations ({ from, to, type, params }): suggestions, not problems. They were
             // read as { message, relation }, which the studio does not send, so each printed as a bare

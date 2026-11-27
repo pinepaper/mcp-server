@@ -15,6 +15,7 @@
  */
 
 import { expressionGrammarText } from './expression-grammar.js';
+import { PATTERN_KINDS } from './engine-lists.js';
 import { ALLOW_STALE_BUILD_PROPERTY } from './stale-build-guard.js';
 
 /**
@@ -100,24 +101,24 @@ Each line is a correct op:
 {"type":"create_many","itemType":"circle","name":"dot","properties":{"radius":4},"items":[[10,60],{"x":18,"y":60,"color":"#f472b6"}]}
 {"type":"keyframe_animate","itemId":"$0","keys":{"time":[0,1],"x":[100,400],"y":[300,null],"easing":"easeOut"}}
 {"type":"timeline","defaults":{"ease":"power2.out"},"tweens":[{"to":"bar-*","from":{"scaleY":0},"vars":{"scaleY":1},"duration":0.8,"at":0.5,"stagger":0.15}]}
+{"type":"pattern","action":"create","id":"wave","kind":"phase_wave","members":{"names":"bar-*"},"params":{"amplitude":12,"period":1.2,"wavelength":5}}
 {"type":"relation","sourceId":"item_9","targetId":"$0","relationType":"on_event_set_visibility","relationOptions":{"visible":true}}
 {"type":"relation","sourceId":"$1","targetId":"item_9","relationType":"on_click_fire"}
 
 RULES (each one has cost a failed build):
-- position {x,y} goes at the op's top level. Everything else about the item goes INSIDE properties: a text's words are properties.content, and so are fontSize, color, radius, width, height, opacity, name and anchor.
-- position is the item's CENTRE. A text grows both ways from it, so a title whose centre sits near an edge runs off the frame and the video shows "IGNAL / NOISE". When a spec gives a corner ("top-left at (200, 130)"), pass properties.anchor: "top-left" (or top-right, bottom-left, bottom-right). A bar that grows up from a baseline: anchor "bottom-left" at the baseline, key height.
+- position {x,y} goes at the op's top level. content, fontSize, color, radius, width, height, opacity, name and anchor go inside properties.
+- position is the item's CENTRE. A text grows both ways from it, so a title near an edge runs off the frame ("IGNAL / NOISE"). For a corner/edge ("top-left at (200, 130)"), pass properties.anchor: "top-left" (or top, top-right, left, center, right, bottom-left, bottom, bottom-right). A bar growing up from a baseline: anchor "bottom-left" at baseline, key scaleY.
 - ${KEYFRAME_RULE}
-- keys is keyframes by column, for many keys: one list per property, as long as time; null means not set at that key; easing is a name or one per key. Evenly spaced: "time":{"step":0.033333,"count":180}.
-- create_many is one create per item: properties is what they share; an item is [x, y] or {x, y, …what differs}, each taking the next "$N"; name is a prefix (dot-0, dot-1). Slow past a few hundred (2000 took about a minute).
-- Two keyframe_animate ops on one item in a batch are merged into one track.
-- A timeline op is GSAP's timeline as JSON, compiled onto keyframe tracks: tweens [{to: a name, id, "$N", array or "bar-*"; vars: end values; from: start values; duration; at: seconds, "<", ">" or "+=0.2"; stagger; ease: "power2.out", "none", "back.out"…; repeat; yoyo}]. There x and y are OFFSETS from where the item was created, as in GSAP; scaleY on a bottom-anchored item holds its baseline; drawSVG "0%"→"100%" draws a path on. Every track lasts the whole timeline. What it cannot carry is refused by name; each tween gets a receipt. An item takes keys from a timeline or keyframe_animate ops, not both.
-- Name every item (properties.name). pinepaper_pattern selects members by name, e.g. "bar-*".
-- properties.id chooses an item's id ("dot"), so a replay after pinepaper_clear_canvas addresses the same ids.
-- A shape with a strokeColor and no color is an outline.
-- Relations: orbits {radius, speed (turns per second), direction, phaseDegrees}, follows {offset, smoothing}, attached_to {offset}, points_at, moves_along_path {path:[{x,y},…], speed}, time_expression {property, expression} (no targetId; the formula grammar: ${expressionGrammarText()}). sourceId moves; targetId is what it moves relative to. A name pattern as sourceId ("dot-*") binds every item named like it, in name order, each with index and count added to relationOptions; send the same op again after adding members and they join, with index and count updated. update: true changes the relationOptions of a relation already bound (same sourceId, targetId, relationType) instead of adding one.
-- Events (item_9 above is an eventId from pinepaper_event): an event → item relation is a reaction, run each time it fires: on_event_set_visibility {visible: true|false}, on_event_set_color {color}, on_event_set_property {property, value}. An item → event relation fires it: on_click_fire, on_pointer_enter_fire, on_key_fire {key}. An item a reaction reveals starts hidden: properties.visible false.
-- set_canvas_size comes first; a video exports at the canvas size.
-- The call is LIVE: sending it twice makes every item twice. atomic (default) stops at the first failure and removes every item the call created, so the canvas holds no half batch: fix the op it names and send it again. Edits to items that already existed are not undone; the result says what was removed.
+- keys is keyframes by column: one list per property matching time (or "time":{"step":0.033333,"count":180}); null skips a key.
+- create_many makes one item per entry: shared properties once, items as [x, y] or {x, y, …}; each takes the next "$N"; name is a prefix.
+- Two keyframe_animate ops on one item merge into one track.
+- timeline is GSAP JSON compiled onto keyframe tracks: tweens [{to: name/id/"$N"/array/"bar-*", vars, from, duration, at: s/"<"/">", stagger, ease, repeat, yoyo}]. x/y are offsets; scaleY on bottom-anchored holds baseline; drawSVG "0%"→"100%" draws a path. Do not mix timeline and keyframe_animate on one item.
+- pattern declares phase_wave, stagger, ring or orbit over named items ("bar-*") without per-item keys.
+- Name every item (properties.name). properties.id sets an item's id ("dot") for replay after pinepaper_clear_canvas.
+- A shape with strokeColor and no color is an outline.
+- Relations: orbits {radius, speed, direction, phaseDegrees}, follows {offset, smoothing}, attached_to {offset}, points_at, moves_along_path {path:[{x,y},…], speed}, time_expression {property, expression} (no targetId; grammar: ${expressionGrammarText()}). sourceId "dot-*" binds matching items with index and count; update: true edits an existing relation's relationOptions.
+- Events (item_9 from pinepaper_event): event → item reactions (on_event_set_visibility {visible: true|false}, on_event_set_color {color}, on_event_set_property {property, value}); item → event triggers (on_click_fire, on_pointer_enter_fire, on_key_fire {key}). Hidden targets start with properties.visible: false.
+- set_canvas_size first; video exports at canvas size. atomic (default) removes created items on first failure; edits to existing items stay.
 
 itemType: text, circle, rectangle, ellipse, star, triangle, polygon, line, arc, path, hexagon, diamond, arrow, heart.`,
     inputSchema: {
@@ -128,34 +129,40 @@ itemType: text, circle, rectangle, ellipse, star, triangle, polygon, line, arc, 
           items: {
             type: 'object',
             properties: {
-              type: { type: 'string', enum: ['set_canvas_size', 'set_background', 'create', 'create_many', 'modify', 'delete', 'group', 'keyframe_animate', 'relation', 'timeline'] },
+              type: { type: 'string', enum: ['set_canvas_size', 'set_background', 'create', 'create_many', 'modify', 'delete', 'group', 'keyframe_animate', 'relation', 'timeline', 'pattern'] },
               width: { type: 'number', description: 'set_canvas_size' },
               height: { type: 'number', description: 'set_canvas_size' },
               backgroundColor: { type: 'string', description: 'set_background' },
               itemType: { type: 'string', description: 'create' },
               position: POSITION,
-              properties: { type: 'object', description: 'create / modify: everything about the item except where it goes' },
-              itemId: { type: 'string', description: 'modify / delete / keyframe_animate: an id from itemIds, or "$N"' },
-              itemIds: { type: 'array', items: { type: 'string' }, description: 'group: the parts of one object' },
+              properties: { type: 'object', description: 'create / modify: item props' },
+              itemId: { type: 'string', description: 'modify / delete / keyframe_animate: id or "$N"' },
+              itemIds: { type: 'array', items: { type: 'string' }, description: 'group: member ids' },
               groupName: { type: 'string', description: 'group' },
               keyframes: { ...KEYFRAMES, description: 'keyframe_animate' },
               keys: KEYS,
               items: { type: 'array', description: 'create_many' },
               name: { type: 'string', description: 'create_many: prefix' },
-              append: { type: 'boolean', description: "keyframe_animate: add to the item's track instead of replacing it" },
-              sourceId: { type: 'string', description: 'relation: the item that moves, or a name pattern ("dot-*")' },
-              update: { type: 'boolean', description: 'relation: change the params of the relation already bound' },
-              targetId: { type: 'string', description: 'relation: what it moves relative to' },
+              append: { type: 'boolean', description: 'keyframe_animate: append to track' },
+              sourceId: { type: 'string', description: 'relation: source id or glob ("dot-*")' },
+              update: { type: 'boolean', description: 'relation: update existing params' },
+              targetId: { type: 'string', description: 'relation: target id' },
               relationType: { type: 'string', description: 'relation' },
-              relationOptions: { type: 'object', description: 'relation: its parameters' },
-              tweens: { type: 'array', items: { type: 'object' }, description: 'timeline: the tweens' },
+              relationOptions: { type: 'object', description: 'relation: params' },
+              tweens: { type: 'array', items: { type: 'object' }, description: 'timeline: tweens' },
               defaults: { type: 'object', description: 'timeline: {ease, duration}' },
-              duration: { type: 'number', description: 'timeline: the clip length (default: the last tween\'s end)' },
+              duration: { type: 'number', description: 'timeline: clip seconds' },
+              action: { type: 'string', enum: ['play', 'stop', 'seek', 'create', 'modify', 'remove'], description: 'pattern: create|modify|remove' },
+              id: { type: 'string', description: 'pattern: id' },
+              kind: { type: 'string', enum: [...PATTERN_KINDS], description: 'pattern: kind' },
+              members: { description: 'pattern: ids/names/tag' },
+              params: { type: 'object', description: 'pattern: params' },
+              window: { type: 'object', properties: { from: { type: 'number' }, to: { type: 'number' }, startTime: { type: 'number' }, endTime: { type: 'number' } }, description: 'pattern: active seconds' },
             },
             required: ['type'],
           },
         },
-        atomic: { type: 'boolean', description: 'default true: the first failure stops the call and removes the items it created (edits to existing items stay)' },
+        atomic: { type: 'boolean', description: 'default true: remove created items on first failure' },
       },
       required: ['operations'],
     },
@@ -182,31 +189,30 @@ EXAMPLE: {"itemId":"item_2","keyframes":[{"time":1,"properties":{"x":300}},{"tim
   },
 
   pinepaper_pattern: {
-    description: `Move many NAMED items with one stored declaration instead of a track on each. Change a parameter once and every member follows; remove it and they go back.
+    description: `Move many NAMED items with one stored declaration instead of per-item keyframes.
 
 KINDS:
-- phase_wave: members move on a sine, each a phase after the last. params: property ("y" default, "x", "rotation", "opacity"), amplitude (px, degrees or 0..1), period (seconds a cycle), wavelength (members a cycle). window {from, to} in seconds limits when it plays.
-- stagger: each member's start is delayed by its place. params: step (seconds between neighbours), start, order (index, reverse, center, edges).
-members: {"names": "bar-*"} ('*' matches any run), or an array of ids. A name that matches nothing is reported.
-A relation between two items (orbits, follows) is a relation op in pinepaper_agent_batch_execute, not a pattern.
-
-ACTIONS: create (id, kind, members, params) · modify (id + what changes) · remove (id) · list · get (id).
+- phase_wave: sine offset across members. params: property (y|x|rotation|opacity), amplitude, period (s), wavelength (members), phase. window {from, to} or {startTime, endTime}.
+- stagger: delayed starts. params: step (s), start (s), order (index|reverse|center|edges).
+- ring / orbit: space members round a turning circle. params: center ([x,y] or {x,y}), target (item id/name), radius (px), period (s/turn), phase (rad), direction (1|-1|'ccw'). window optional.
+members: {"names":"bar-*"}, {"ids":[...]}, {"tag":"..."}, or array of ids.
+ACTIONS: create (id, kind, members, params) · modify (id + changes) · remove (id) · list · get (id).
 EXAMPLE: {"action":"create","id":"wave","kind":"phase_wave","members":{"names":"bar-*"},"params":{"amplitude":12,"period":1.2,"wavelength":5}}`,
     inputSchema: {
       type: 'object',
       properties: {
         action: { type: 'string', enum: ['create', 'modify', 'remove', 'list', 'get'] },
         id: { type: 'string', description: "the pattern's name; required except for list" },
-        kind: { type: 'string', enum: ['phase_wave', 'stagger'] },
+        kind: { type: 'string', enum: [...PATTERN_KINDS] },
         members: {
-          description: 'an array of ids, or {"names": "bar-*"}',
+          description: 'array of ids, or {"names": "bar-*", "ids": [...], "tag": "..."}',
           oneOf: [
             { type: 'array', items: { type: 'string' } },
-            { type: 'object', properties: { names: { oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }] }, ids: { type: 'array', items: { type: 'string' } } } },
+            { type: 'object', properties: { names: { oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }] }, ids: { type: 'array', items: { type: 'string' } }, tag: { type: 'string' } } },
           ],
         },
         params: { type: 'object' },
-        window: { type: 'object', properties: { from: { type: 'number' }, to: { type: 'number' } } },
+        window: { type: 'object', properties: { from: { type: 'number' }, to: { type: 'number' }, startTime: { type: 'number' }, endTime: { type: 'number' } } },
       },
       required: ['action'],
     },

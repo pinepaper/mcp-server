@@ -33,6 +33,95 @@ const RELATION_PUBLIC_PARAMS_JS = "((p) => Object.fromEntries(Object.entries(p |
 function oneLine(v: unknown): string {
   return String(v).replace(/[\r\n\u2028\u2029]+/g, ' ');
 }
+
+function normalizePatternWindow(w: unknown): { from?: number; to?: number } | null | undefined {
+  if (w === null) return null;
+  if (!w || typeof w !== 'object') return undefined;
+  const o = w as { from?: unknown; to?: unknown; startTime?: unknown; endTime?: unknown };
+  const from = o.from ?? o.startTime;
+  const to = o.to ?? o.endTime;
+  const out: { from?: number; to?: number } = {};
+  if (typeof from === 'number') out.from = from;
+  if (typeof to === 'number') out.to = to;
+  return out;
+}
+
+function emitBatchPatternJs(p: {
+  action?: unknown;
+  id?: unknown;
+  kind?: unknown;
+  members?: unknown;
+  params?: unknown;
+  window?: unknown;
+}): string {
+  const S = (x: unknown) => JSON.stringify(x);
+  const action = String(p.action || 'create');
+  const id = typeof p.id === 'string' && p.id.trim() ? p.id.trim() : null;
+  const normWin = normalizePatternWindow(p.window);
+  const resolveHelpers = `
+const __resolvePatRef = (v) => (typeof v === 'string' && /^\\$\\d+$/.test(v) ? __ref(Number(v.slice(1))) : v);
+const __resolvePatMembers = (m) => {
+  if (Array.isArray(m)) return m.map(__resolvePatRef);
+  if (m && typeof m === 'object') {
+    const out = Object.assign({}, m);
+    if (Array.isArray(out.ids)) out.ids = out.ids.map(__resolvePatRef);
+    if (Array.isArray(out.refs)) out.refs = out.refs.map(__resolvePatRef);
+    return out;
+  }
+  return m;
+};
+const __resolvePatParams = (pr) => {
+  if (!pr || typeof pr !== 'object') return {};
+  const out = Object.assign({}, pr);
+  if (typeof out.target === 'string') out.target = __resolvePatRef(out.target);
+  return out;
+};`;
+
+  if (!id) {
+    return `return { success: false, error: ${S(`pattern ${action} needs an id`)} };`;
+  }
+
+  switch (action) {
+    case 'create': {
+      return `${resolveHelpers}
+if (typeof app.addPattern !== 'function') return { success: false, error: 'app.addPattern unavailable — update FxTool' };
+if (!${S(p.kind ?? null)}) return { success: false, error: ${S('pattern create needs kind: ' + PATTERN_KINDS.join(', '))} };
+if (!${S(p.members ?? null)}) return { success: false, error: 'pattern create needs members: { names: [...] }, { ids: [...] }, { tag } or an array' };
+const __patSpec = {
+  id: ${S(id)},
+  kind: ${S(p.kind)},
+  members: __resolvePatMembers(${S(p.members)}),
+  params: __resolvePatParams(${S(p.params || {})}),
+  ${normWin ? `window: ${S(normWin)},` : ''}
+};
+const __patRes = app.addPattern(__patSpec);
+if (__patRes && __patRes.ok) __createdPatterns.push(${S(id)});
+return Object.assign({ success: !!(__patRes && __patRes.ok) }, __patRes || {});`.trim();
+    }
+    case 'modify': {
+      return `${resolveHelpers}
+if (typeof app.modifyPattern !== 'function') return { success: false, error: 'app.modifyPattern unavailable — update FxTool' };
+const __patCh = {};
+if (${S(p.params !== undefined)}) __patCh.params = __resolvePatParams(${S(p.params || {})});
+if (${S(p.members !== undefined)}) __patCh.members = __resolvePatMembers(${S(p.members)});
+if (${S(normWin !== undefined)}) __patCh.window = ${S(normWin)};
+if (!__patCh.members) {
+  const __cur = typeof app.getPattern === 'function' ? app.getPattern(${S(id)}) : null;
+  const __m = __cur && __cur.spec && __cur.spec.members;
+  if (__m && Array.isArray(__m.refs)) __patCh.members = __m.refs.slice();
+}
+const __patRes = app.modifyPattern(${S(id)}, __patCh);
+return Object.assign({ success: !!(__patRes && __patRes.ok) }, __patRes || {});`.trim();
+    }
+    case 'remove':
+      return `
+if (typeof app.removePattern !== 'function') return { success: false, error: 'app.removePattern unavailable — update FxTool' };
+const __hadPat = app.removePattern(${S(id)});
+return __hadPat ? { success: true, removed: ${S(id)} } : { success: false, error: ${S(`no pattern "${id}"`)} };`.trim();
+    default:
+      return `return { success: false, error: ${S(`pattern batch op action "${action}" must be create, modify, or remove`)} };`;
+  }
+}
 import { generateP5DrawCode } from '../tools/p5-compat/p5-helpers.js';
 import { expandBatchMacros } from '../tools/batch-macros.js';
 import {
@@ -605,7 +694,8 @@ if (item && item.data) { item.data.renderAs = ${JSON.stringify(itemType)}; item.
   // the production build strips console.warn. A typo would therefore displace
   // the item by half its own size, which is the exact bug `anchor` exists to
   // remove, arriving silently. Checked before it is sent instead.
-  const ANCHORS = ['top-left', 'top-right', 'bottom-left', 'bottom-right', 'center', 'centre'];
+  const ANCHORS = ['top-left', 'top', 'top-right', 'left', 'center', 'centre', 'right', 'bottom-left', 'bottom', 'bottom-right'];
+  const ACCEPTED_ANCHORS = ['top-left', 'top', 'top-right', 'left', 'center', 'right', 'bottom-left', 'bottom', 'bottom-right'];
   const anchorGiven = params.anchor ?? params.origin;
   if (anchorGiven !== undefined) {
     const normalized = String(anchorGiven).toLowerCase().replace(/[\s_]+/g, '-');
@@ -613,7 +703,7 @@ if (item && item.data) { item.data.renderAs = ${JSON.stringify(itemType)}; item.
       return `
 // Create ${oneLine(itemType)} — refused, rather than silently centred
 ({ success: false, error: ${JSON.stringify(
-        `anchor ${JSON.stringify(String(anchorGiven))} is not one of ${ANCHORS.slice(0, 5).join(', ')}. `
+        `anchor ${JSON.stringify(String(anchorGiven))} is not one of ${ACCEPTED_ANCHORS.join(', ')}. `
         + 'The engine would leave x/y as the CENTRE and say so only in a console this tool cannot read, '
         + 'so the item would land half its own size away with nothing to explain it.',
       )} });`.trim();
@@ -5973,6 +6063,7 @@ throw new Error('Unknown diagram mode action: ' + ${jsLiteral(action)});
   // past what this batch has made: picking it silently shifted every $N in a
   // batch that also creates (B115 follow-up).
   const itemIds = [];
+  const __createdPatterns = [];
   const __prevBatchIds = ((typeof window !== 'undefined' && window.__pinepaper_batch_item_ids) || []).slice();
   const __ref = function (n) {
     if (itemIds[n] !== undefined) return itemIds[n];
@@ -6091,6 +6182,9 @@ throw new Error('Unknown diagram mode action: ' + ${jsLiteral(action)});
       canvasSize: { width: _cs.width || 800, height: _cs.height || 600 }, ...((function () { const l = __ppLintNow(); return l.length ? { __ppLint: l } : {}; })()) };
   } catch (e) {
     __hmEnd();
+    ${isAtomic ? `for (let __pi = __createdPatterns.length - 1; __pi >= 0; __pi--) {
+      try { if (typeof app.removePattern === 'function') app.removePattern(__createdPatterns[__pi]); } catch (_) {}
+    }` : ''}
     // A batch that created nothing keeps the previous batch's ids on record.
     if (typeof window !== 'undefined' && itemIds.length) {
       window.__pinepaper_batch_item_ids = itemIds;
@@ -6526,6 +6620,17 @@ app.setPlaybackTime(${op.time || 0});
 return { success: true, action: 'seek', time: ${op.time || 0} };
 `;
         }
+      }
+
+      case 'pattern': {
+        return emitBatchPatternJs({
+          action: op.action,
+          id: op.id,
+          kind: op.kind,
+          members: op.members,
+          params: op.params,
+          window: op.window,
+        });
       }
 
       default:
@@ -10810,7 +10915,8 @@ ${input.cutSound !== undefined ? `  const __cuts = (__cr && __cr.cuts) || (app.s
     let body: string;
     switch (v.action) {
       case 'create': {
-        const spec = { id: v.id, kind: v.kind, members: v.members, params: v.params || {}, ...(v.window ? { window: v.window } : {}) };
+        const normWin = normalizePatternWindow(v.window);
+        const spec = { id: v.id, kind: v.kind, members: v.members, params: v.params || {}, ...(normWin ? { window: normWin } : {}) };
         body = `${need('addPattern')}
   if (!${S(v.kind ?? null)}) return { success: false, error: ${S('create needs kind: ' + PATTERN_KINDS.join(', '))} };
   if (!${S(v.members ?? null)}) return { success: false, error: 'create needs members: { names: [...] }, { ids: [...] }, { tag } or an array' };
@@ -10819,7 +10925,8 @@ ${input.cutSound !== undefined ? `  const __cuts = (__cr && __cr.cuts) || (app.s
         break;
       }
       case 'modify': {
-        const ch = { ...(v.params ? { params: v.params } : {}), ...(v.members ? { members: v.members } : {}), ...(v.window !== undefined ? { window: v.window } : {}) };
+        const normWin = normalizePatternWindow(v.window);
+        const ch = { ...(v.params ? { params: v.params } : {}), ...(v.members ? { members: v.members } : {}), ...(normWin !== undefined ? { window: normWin } : {}) };
         // A pattern made with members as a plain array is stored as { refs }, a
         // shape the engine's own re-check does not accept, so a params-only
         // modify of it failed with "members is …" (PATIMG24). The stored refs
