@@ -8,7 +8,7 @@ import { boolFlag, strFlag, suggestCommand } from '../args.js';
 import { emitJson } from '../output.js';
 import { parseCommandArgs, type CliCommand } from '../types.js';
 
-const CLIENTS = ['claude-desktop', 'claude-code', 'cursor', 'codex', 'vscode', 'skills'] as const;
+const CLIENTS = ['claude-desktop', 'claude-code', 'cursor', 'codex', 'vscode', 'skills', 'cloud'] as const;
 type ClientTarget = (typeof CLIENTS)[number];
 
 const ALIASES: Readonly<Record<string, ClientTarget>> = {
@@ -16,6 +16,7 @@ const ALIASES: Readonly<Record<string, ClientTarget>> = {
   claude: 'claude-code',
   'vs-code': 'vscode',
   plugin: 'skills',
+  hosted: 'cloud',
 };
 
 const HELP = `PinePaper Client Setup
@@ -23,7 +24,7 @@ const HELP = `PinePaper Client Setup
 Print ready-to-paste MCP client configs and Claude plugin / Agent Skills commands.
 
 USAGE:
-  pinepaper-mcp setup [claude-desktop|claude-code|cursor|codex|vscode|skills] [options]
+  pinepaper-mcp setup [claude-desktop|claude-code|cursor|codex|vscode|skills|cloud] [options]
 
 OPTIONS:
   --mode <mode>           Execution mode: puppeteer (default) or code
@@ -153,6 +154,30 @@ function specFor(
           'Includes skills for Console API, Design Knowledge Graph (pp:), Diagrams, DataViz, Maps, Rigging, Fonts, and SVG paths.',
         ],
       };
+
+    case 'cloud':
+      return {
+        target,
+        title: 'PinePaper Cloud (Hosted Remote MCP — OAuth 2.1)',
+        location: 'https://cloud.pinepaper.studio/mcp (no local Chrome or FFmpeg required)',
+        snippet: [
+          '# 1. Hosted Remote MCP (OAuth 2.1 — sign in via browser, no local Chrome/FFmpeg):',
+          'claude mcp add --transport http pinepaper-cloud https://cloud.pinepaper.studio/mcp',
+          '',
+          '# Or in mcp.json / claude_desktop_config.json:',
+          JSON.stringify({ mcpServers: { 'pinepaper-cloud': { url: 'https://cloud.pinepaper.studio/mcp' } } }, null, 2),
+          '',
+          '# 2. Optional: keep local Studio free & add Cloud AI media (pinepaper_generate) via env:',
+          '#    export PINEPAPER_API_KEY="pp_sa_..."   # render:create scope',
+        ].join('\n'),
+        notes: [
+          'Local @pinepaper.studio/mcp-server tools (canvas, animation, SVG/PNG/MP4 export) are free and need no account.',
+          'Hosted Cloud MCP uses OAuth 2.1 + PKCE (or human-claimed agent keys with a default $20 spend cap): https://cloud.pinepaper.studio/auth.md',
+          'Service-account keys (pp_sa_...): https://cloud.pinepaper.studio/account#service-accounts',
+          'Transparent pay-as-you-go pricing & daily spend caps: https://cloud.pinepaper.studio/pricing',
+          'Closed beta access / waitlist: https://cloud.pinepaper.studio/waitlist',
+        ],
+      };
   }
 }
 
@@ -160,7 +185,7 @@ export const setupCommand: CliCommand = {
   name: 'setup',
   category: 'Setup & Diagnostics',
   summary: 'Print MCP client config snippets and Agent Skills install steps',
-  usage: 'pinepaper-mcp setup [claude-desktop|claude-code|cursor|codex|vscode|skills]',
+  usage: 'pinepaper-mcp setup [claude-desktop|claude-code|cursor|codex|vscode|skills|cloud]',
   helpText: HELP,
   async run(argv) {
     const parsed = parseCommandArgs(argv, setupCommand, {

@@ -41,6 +41,8 @@ export const infoCommand: CliCommand = {
 
     const browser = await probeBrowserEnvironment();
     const ffmpegAddon = await hasFfmpegAddon();
+    const cloudUrl = (env('PINEPAPER_CLOUD_URL') || 'https://cloud.pinepaper.studio').replace(/\/+$/, '');
+    const cloudKeyConfigured = Boolean((env('PINEPAPER_API_KEY') || '').trim());
     const payload = {
       package: '@pinepaper.studio/mcp-server',
       version: SERVER_VERSION,
@@ -61,8 +63,17 @@ export const infoCommand: CliCommand = {
         verbosity: env('PINEPAPER_VERBOSITY') || env('PINEPAPER_TOOL_VERBOSITY') || 'compact',
         // Never print credentials a URL may carry (https://user:token@host).
         studioUrl: redactUrl(env('PINEPAPER_STUDIO_URL') || 'https://pinepaper.studio'),
-        cloudUrl: env('PINEPAPER_CLOUD_URL') || 'https://cloud.pinepaper.studio',
+        cloudUrl,
+        cloudKeyConfigured,
         exportDir: getExportDir(),
+      },
+      cloud: {
+        url: cloudUrl,
+        keyConfigured: cloudKeyConfigured,
+        hostedMcpUrl: `${cloudUrl}/mcp`,
+        pricingUrl: `${cloudUrl}/pricing`,
+        keysUrl: `${cloudUrl}/account#service-accounts`,
+        authDocUrl: `${cloudUrl}/auth.md`,
       },
       security: {
         allowCode: capabilityAllowed('code'),
@@ -89,6 +100,7 @@ export const infoCommand: CliCommand = {
       `Execution mode:  ${payload.config.executionMode}`,
       `Toolkit / Detail:${' '}${payload.config.toolkit} / ${payload.config.verbosity}`,
       `Studio URL:      ${payload.config.studioUrl}`,
+      `Cloud (optional):${cloudKeyConfigured ? ` ${cloudUrl} (PINEPAPER_API_KEY set)` : ` not configured — local tools are free; hosted MCP & AI media: ${cloudUrl}/pricing`}`,
       `Export folder:   ${payload.config.exportDir}`,
       `Browser driver:  ${driverText}`,
       `Local browsers:  ${browser.detectedBrowsers.length ? [...new Set(browser.detectedBrowsers.map((b) => b.name))].join(', ') : 'none detected in standard paths'}`,

@@ -68,28 +68,78 @@ export const generateDeps = {
   now: () => Date.now(),
 };
 
-function cloudConfig(): { base: string; key: string } | { error: string } {
+function cloudLinks(base: string) {
+  return {
+    keys: `${base}/account#service-accounts`,
+    billing: `${base}/account#billing`,
+    signIn: `${base}/signin`,
+    waitlist: `${base}/waitlist`,
+    pricing: `${base}/pricing`,
+    authDoc: `${base}/auth.md`,
+    hostedMcp: `${base}/mcp`,
+  };
+}
+
+function cloudConfig(): { base: string; key: string } | { error: string; details: Record<string, unknown> } {
   const key = (env('PINEPAPER_API_KEY') || '').trim();
   const base = (env('PINEPAPER_CLOUD_URL') || 'https://cloud.pinepaper.studio').replace(/\/+$/, '');
   if (!key) {
-    return { error: 'generation runs in the PinePaper cloud and needs a service-account key: set PINEPAPER_API_KEY (pp_sa_…, with the render:create scope) in this server\'s environment. Generation is an internal beta, enabled per organisation (the ai-media feature).' };
+    const links = cloudLinks(base);
+    return {
+      error: `generation runs in the PinePaper cloud (${base}) and needs a service-account key: set PINEPAPER_API_KEY (pp_sa_…, with the render:create scope) in this server's environment. Mint a key at ${links.keys} (sign in or join the beta waitlist at ${links.waitlist}; agent OAuth/claim docs: ${links.authDoc}; pricing: ${links.pricing}). Generation (ai-media) is an internal beta enabled per organisation; local canvas and export tools in this server remain free without an account. Nothing was charged.`,
+      details: {
+        code: 'CLOUD_API_KEY_MISSING',
+        charged: false,
+        requiredEnv: 'PINEPAPER_API_KEY',
+        requiredScope: 'render:create',
+        cloudUrl: base,
+        links,
+      },
+    };
   }
   return { base, key };
 }
 
-type CloudResult = { ok: true; status: number; body: Record<string, any> } | { ok: false; message: string; status?: number; code?: string };
+type CloudResult =
+  | { ok: true; status: number; body: Record<string, any> }
+  | { ok: false; message: string; status?: number; code?: string; charged?: boolean; links?: Record<string, string> };
 
 /** What a refusal means, in the caller's terms. Every one says whether anything was charged. */
-function explain(status: number, body: Record<string, any>): string {
+function explain(status: number, body: Record<string, any>, base: string): { message: string; charged?: boolean; links?: Record<string, string> } {
   const said = String(body?.error || body?.detail || body?.title || '').trim();
   const code = String(body?.code || body?.type || '').toUpperCase();
-  if (status === 401) return 'the cloud did not accept PINEPAPER_API_KEY (invalid or revoked). Nothing was charged.';
-  if (status === 403 && /INSUFFICIENT_SCOPE/.test(code)) return `this key lacks the render:create scope that generation needs. ${said} Nothing was charged.`;
-  if (status === 403) return 'generation (ai-media) is not enabled for your organisation — it is an internal beta, granted per organisation. Ask the PinePaper team for access. Nothing was charged.';
-  if (status === 402) return `${said || 'not enough credits, or a spend cap was reached'}. Nothing was charged.`;
-  if (status === 422) return `the request was refused as invalid: ${said || 'check model, aspect, n and imageUrls'}.`;
-  if (status === 503) return said || 'generation is unavailable on this deployment right now. Nothing was charged.';
-  return `${said || 'the cloud refused the request'} (HTTP ${status}).`;
+  const links = cloudLinks(base);
+  if (status === 401) {
+    return {
+      message: `the cloud did not accept PINEPAPER_API_KEY (invalid or revoked). Verify or mint a key at ${links.keys}. Nothing was charged.`,
+      charged: false,
+      links: { keys: links.keys, authDoc: links.authDoc },
+    };
+  }
+  if (status === 403 && /INSUFFICIENT_SCOPE/.test(code)) {
+    return {
+      message: `this key lacks the render:create scope that generation needs. ${said} Update or mint a key with render:create at ${links.keys}. Nothing was charged.`,
+      charged: false,
+      links: { keys: links.keys, authDoc: links.authDoc },
+    };
+  }
+  if (status === 403) {
+    return {
+      message: `generation (ai-media) is not enabled for your organisation — it is an internal beta, granted per organisation. Request access at ${links.waitlist} (pricing: ${links.pricing}); local canvas and export tools remain free without it. Nothing was charged.`,
+      charged: false,
+      links: { waitlist: links.waitlist, pricing: links.pricing, authDoc: links.authDoc },
+    };
+  }
+  if (status === 402) {
+    return {
+      message: `${said || 'not enough credits, or a spend cap was reached'}. Top up credits or adjust your spend cap at ${links.billing} (pricing: ${links.pricing}). Nothing was charged.`,
+      charged: false,
+      links: { billing: links.billing, pricing: links.pricing },
+    };
+  }
+  if (status === 422) return { message: `the request was refused as invalid: ${said || 'check model, aspect, n and imageUrls'}.` };
+  if (status === 503) return { message: said || 'generation is unavailable on this deployment right now. Nothing was charged.', charged: false };
+  return { message: `${said || 'the cloud refused the request'} (HTTP ${status}).` };
 }
 
 async function call(cfg: { base: string; key: string }, method: 'GET' | 'POST', path: string, body?: unknown): Promise<CloudResult> {
@@ -105,13 +155,21 @@ async function call(cfg: { base: string; key: string }, method: 'GET' | 'POST', 
   }
   let json: Record<string, any> = {};
   try { json = await res.json() as Record<string, any>; } catch { /* a non-JSON body is described by its status */ }
-  if (!res.ok) return { ok: false, status: res.status, code: json?.code, message: explain(res.status, json) };
+  if (!res.ok) {
+    const exp = explain(res.status, json, cfg.base);
+    return { ok: false, status: res.status, code: json?.code, ...exp };
+  }
   return { ok: true, status: res.status, body: json };
 }
 
 const text = (v: unknown): CallToolResult => ({ content: [{ type: 'text' as const, text: JSON.stringify(v, null, 2) }] });
-const fail = (r: { message: string; status?: number; code?: string }): CallToolResult =>
-  errorResult(r.status === 422 ? ErrorCodes.INVALID_PARAMS : ErrorCodes.EXECUTION_ERROR, r.message, { ...(r.status ? { status: r.status } : {}), ...(r.code ? { code: r.code } : {}) });
+const fail = (r: { message: string; status?: number; code?: string; charged?: boolean; links?: Record<string, string> }): CallToolResult =>
+  errorResult(r.status === 422 ? ErrorCodes.INVALID_PARAMS : ErrorCodes.EXECUTION_ERROR, r.message, {
+    ...(r.status ? { status: r.status } : {}),
+    ...(r.code ? { code: r.code } : {}),
+    ...(r.charged !== undefined ? { charged: r.charged } : {}),
+    ...(r.links ? { links: r.links } : {}),
+  });
 
 const jobBody = (a: z.infer<typeof GenerateArgsSchema> | z.infer<typeof GenerateEstimateArgsSchema>) => ({
   ...(a.model ? { model: a.model } : {}), ...(a.useCase ? { useCase: a.useCase } : {}), input: a.input,
@@ -170,7 +228,7 @@ export const generateHandlers: Record<string, (args: Record<string, unknown>, op
   'pinepaper_generate_estimate': async (args) => {
     const a = GenerateEstimateArgsSchema.parse(args);
     const cfg = cloudConfig();
-    if ('error' in cfg) return errorResult(ErrorCodes.INVALID_PARAMS, cfg.error);
+    if ('error' in cfg) return errorResult(ErrorCodes.INVALID_PARAMS, cfg.error, cfg.details);
     const out: Record<string, unknown> = {};
     if (a.listModels) {
       const m = await call(cfg, 'GET', '/v1/generate/models');
@@ -188,7 +246,7 @@ export const generateHandlers: Record<string, (args: Record<string, unknown>, op
   'pinepaper_generate': async (args, options) => {
     const a = GenerateArgsSchema.parse(args);
     const cfg = cloudConfig();
-    if ('error' in cfg) return errorResult(ErrorCodes.INVALID_PARAMS, cfg.error);
+    if ('error' in cfg) return errorResult(ErrorCodes.INVALID_PARAMS, cfg.error, cfg.details);
     // brief and designRef always travel: the cloud records each generation as
     // a node in the design graph, and they are what tie it to the design.
     const submitted = await call(cfg, 'POST', '/v1/generate', { ...jobBody(a), ...(a.brief ? { brief: a.brief } : {}), ...(a.designRef ? { designRef: a.designRef } : {}) });
@@ -258,7 +316,7 @@ export const generateHandlers: Record<string, (args: Record<string, unknown>, op
   'pinepaper_generate_status': async (args, options) => {
     const a = z.object({ jobId: z.string().min(1), place: z.union([z.boolean(), z.enum(['cover', 'contain'])]).optional() }).parse(args);
     const cfg = cloudConfig();
-    if ('error' in cfg) return errorResult(ErrorCodes.INVALID_PARAMS, cfg.error);
+    if ('error' in cfg) return errorResult(ErrorCodes.INVALID_PARAMS, cfg.error, cfg.details);
     const polled = await call(cfg, 'GET', `/v1/generate/${encodeURIComponent(a.jobId)}`);
     if (!polled.ok) return fail(polled);
     const job = polled.body.job ?? {};
