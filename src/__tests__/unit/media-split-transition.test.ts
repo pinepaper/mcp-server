@@ -81,13 +81,21 @@ describe('sequence', () => {
     expect(args).toEqual([{ ids: ['b', 'a'], imageSeconds: 3 }]);
   });
   it('a refusal is an error with the studio\'s reason; an old studio says so', async () => {
-    expect(await run({ action: 'sequence' }, { sequenceMedia: async () => ({ ok: false, reason: 'no video or image to place' }) })).toMatchObject({ success: false, action: 'sequence', error: 'no video or image to place' });
+    expect(await run({ action: 'sequence' }, { sequenceMedia: async () => ({ ok: false, reason: 'Nothing to put in order — upload a video or a photo first.' }) })).toMatchObject({ success: false, action: 'sequence', error: 'Nothing to put in order — upload a video or a photo first.' });
     expect((await run({ action: 'sequence' }, {})).error).toContain('too old');
   });
   it('an id with a quote stays data in the generated code', async () => {
     let args: unknown[] = [];
     await run({ action: 'sequence', ids: ["it's \"one\"`${x}"] }, { sequenceMedia: async (...a: unknown[]) => { args = a; return { ok: true, placed: [], duration: 0 }; } });
     expect(args).toEqual([{ ids: ["it's \"one\"`${x}"] }]);
+  });
+  it('says how many ids were skipped when the studio placed fewer than asked', async () => {
+    const A = { sequenceMedia: async () => ({ ok: true, placed: [{ id: 'a', start: 0, end: 4 }], duration: 4 }) };
+    const r = await run({ action: 'sequence', ids: ['a', 'song', 'nope'] }, A);
+    expect(r).toMatchObject({ success: true, count: 1, skipped: 2 });
+    expect(r.warning).toContain('2 of the 3 ids');
+    expect((await run({ action: 'sequence', ids: ['a'] }, A)).warning).toBeUndefined();
+    expect((await run({ action: 'sequence' }, A)).skipped).toBeUndefined();
   });
   it('schema: ids cannot be empty, imageSeconds is positive', () => {
     expect(MediaInputSchema.safeParse({ action: 'sequence', ids: [] }).success).toBe(false);

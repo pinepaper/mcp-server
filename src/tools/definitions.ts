@@ -2446,7 +2446,7 @@ ACTIONS:
 - set_clip: { id, inPoint, outPoint (media-time s, outPoint > inPoint), timeOffset? (canvas s: also MOVE the clip to start there) } → re-trim an ALREADY-uploaded clip (video or audio). A studio that cannot move clips refuses timeOffset rather than ignoring it.
 - split: { id, at (canvas s) } → cut a clip in two: { leftId, rightId, leftMediaId, rightMediaId, at }. The first half keeps its id. Refused (not claimed) where the studio cannot split or the time is outside the clip.
 - add_transition: { fromItemId (ends at the cut), toItemId (starts at it), transition?: { type: 'crossfade'|'dip', seconds, color } } → the same in preview and export. Split a clip, then transition between its halves, or join two clips that meet.
-- sequence: { ids?, imageSeconds? } → put the uploaded videos and photos back to back from 0 s, in upload order or in the order of ids: { placed: [{ id, start, end }], duration }. Audio is left where it is. Export with that duration. Refused (not claimed) where the studio cannot sequence or there is nothing to place.
+- sequence: { ids?, imageSeconds? } → put the videos and images on the canvas back to back from 0 s, in the order of ids or, without ids, in their current timeline order (an image with no time window goes last): { placed: [{ id, start, end }], duration }. Each image is resized to fit the canvas and held for imageSeconds. Audio is left where it is. An id that names no video or image is skipped, and the result says how many were. Export with that duration. Refused (not claimed) where the studio cannot sequence, there is no video or image, or no id matches.
 - For an IMAGE on the timeline, import it with pinepaper_import_image, then give it bornAt / ttl (seconds on screen) with pinepaper_modify_item.
 
 NOTES:
@@ -2469,8 +2469,8 @@ EXAMPLE: { action: 'upload_video', url: 'https://…/clip.mp4', scale: 0.5, time
       type: 'object',
       properties: {
         action: { type: 'string', enum: ['upload_video', 'upload_audio', 'list', 'remove', 'set_playback_rate', 'set_clip', 'split', 'add_transition', 'sequence', 'set_time_remap', 'speed_ramp', 'match_cut', 'apply_track_matte', 'stop_live_matte', 'analyze_reference', 'remake_from_reference'], description: "Media action" },
-        ids: { type: 'array', items: { type: 'string' }, minItems: 1, description: 'sequence: the clips and photos to place, in this order (media ids, item ids or names). Default: every uploaded video and photo, in upload order.' },
-        imageSeconds: { type: 'number', exclusiveMinimum: 0, description: 'sequence: how long each photo holds, in seconds.' },
+        ids: { type: 'array', items: { type: 'string' }, minItems: 1, description: 'sequence: the videos and images to place, in this order (item ids, media ids or names). Default: every video and image, in their current timeline order.' },
+        imageSeconds: { type: 'number', exclusiveMinimum: 0, description: 'sequence: how long each image holds, in seconds.' },
         transition: { type: 'object', properties: { type: { type: 'string', enum: ['crossfade', 'dip'] }, seconds: { type: 'number', exclusiveMinimum: 0, maximum: 10 }, color: { type: 'string' } }, description: "add_transition: { type ('crossfade' default | 'dip'), seconds, color (dip) }." },
         atPlayhead: { type: 'boolean', description: 'upload_video / upload_audio: start at the current playback time (instead of timeOffset).' },
         remapTrack: { type: 'array', items: { type: 'object', properties: { time: { type: 'number' }, value: { type: 'number' }, easing: { type: 'string' } }, required: ['time', 'value'] }, description: 'set_time_remap: canvas-seconds → source-seconds curve (≥2 points). null clears the remap.' },

@@ -44,20 +44,21 @@ describe('timeline: eases', () => {
       'sine.inOut': 'easeInOutSine', 'expo.out': 'easeOutExpo', 'circ.in': 'easeInCirc',
       'back.out': 'easeOutBack', 'back.out(1.7)': 'easeOutBack', 'back.inOut': 'easeInOutBack',
       'elastic.out': 'easeOutElastic', 'elastic.out(1, 0.3)': 'easeOutElastic', 'bounce.out': 'easeOutBounce', 'bounce.in': 'easeInBounce',
+      'elastic.inOut': 'easeInOutElastic', 'bounce.inOut': 'easeInOutBounce',
       easeInOutCubic: 'easeInOutCubic', spring: 'spring',
     };
     for (const [gsap, engine] of Object.entries(cases)) expect(mapGsapEase(gsap), gsap).toEqual({ engine });
   });
 
   it('refuses a name with no equivalent, listing the accepted names — never linear', () => {
-    for (const bad of ['elastic.inOut', 'bounce.inOut', 'steps(5)', 'rough', 'back.out(3)', 'elastic.out(1.2, 0.4)', 'power9.out']) {
+    for (const bad of ['steps(5)', 'rough', 'back.out(3)', 'elastic.out(1.2, 0.4)', 'power9.out']) {
       const r = mapGsapEase(bad);
       expect('error' in r, bad).toBe(true);
       expect((r as { error: string }).error).toContain('power2.inOut');
     }
-    const errs = refused({ tweens: [{ to: 'item_1', vars: { x: 10 }, ease: 'elastic.inOut' }] });
+    const errs = refused({ tweens: [{ to: 'item_1', vars: { x: 10 }, ease: 'steps(5)' }] });
     expect(errs[0].path).toBe('tweens[0].ease');
-    expect(errs[0].message).toContain('elastic.in and elastic.out only');
+    expect(errs[0].message).toContain('hold');
   });
 
   it("uses GSAP's default ease (power1.out) when none is given, and says so", () => {
@@ -336,6 +337,29 @@ const studioItem = (id: string, x: number, y: number, h = 100, anchor?: string) 
 });
 
 describe('timeline: end to end', () => {
+  it('an easing the studio\'s own list lacks is refused before any track is written; the batch keyframe op does the same', async () => {
+    const run = async (op: Record<string, unknown>, easings?: string[]) => {
+      const code = codeGenerator.generateAgentBatchExecute(AgentBatchExecuteInputSchema.parse({ operations: [op] }));
+      const calls: unknown[] = [];
+      const body = code.split('\n').filter((l) => !l.startsWith('//')).join('\n');
+      const app = {
+        getItemById: (id: string) => (id === 'item_1' ? studioItem('item_1', 300, 500) : undefined), resolveRef: () => null,
+        addAnimation: (...a: unknown[]) => { calls.push(a); }, getCanvasSize: () => ({ width: 1920, height: 1080 }), historyManager: { saveState() {} },
+        ...(easings ? { listAnimatableProperties: () => ({ properties: [], easings }) } : {}),
+      };
+      const result = await new Function('app', `return ${body}`)(app);
+      return { result, calls };
+    };
+    const tl = { type: 'timeline', tweens: [{ to: 'item_1', vars: { x: 10 }, duration: 1, ease: 'elastic.inOut' }] };
+    const kf = { type: 'keyframe_animate', itemId: 'item_1', keyframes: [{ time: 0, properties: { x: 0 } }, { time: 1, properties: { x: 10 }, easing: 'easeInOutBounce' }] };
+    for (const [op, name] of [[tl, 'easeInOutElastic'], [kf, 'easeInOutBounce']] as const) {
+      const old = await run(op, ['linear', 'easeOut']);
+      expect(old.calls.length, name).toBe(0);
+      expect(JSON.stringify(old.result), name).toContain('this studio has no easing named ' + name);
+      expect((await run(op, ['linear', 'easeOut', name])).calls.length, name).toBe(1);
+      expect((await run(op)).calls.length, name).toBe(1);            // no list published: not second-guessed
+    }
+  });
   it('the batch writes one addAnimation per item, the rest values read from the item, names resolved by the studio', async () => {
     const code = codeGenerator.generateAgentBatchExecute(AgentBatchExecuteInputSchema.parse({ operations: [
       { type: 'timeline', tweens: [

@@ -3995,7 +3995,8 @@ export function batchRef(raw: string | undefined): string {
  * list in this package is the newest engine's, and the package ships without
  * the studio: a name the studio does not hold was accepted in silence
  * (measured: success, no warning). A studio that publishes no list is not
- * second-guessed. Empty when no key names an easing.
+ * second-guessed. Empty when no key names an easing. The batch timeline op makes the
+ * same check in emitTimelineOpBody (tools/timeline.ts).
  */
 function missingEasingsJs(keyframes: ReadonlyArray<unknown>, extra = ''): string {
   const named = [...new Set((keyframes || []).map((k) => (k as { easing?: unknown } | null)?.easing).filter((e): e is string => typeof e === 'string'))];
@@ -14231,7 +14232,11 @@ ${guard}
   if (typeof A.sequenceMedia !== 'function') { return { success: false, action: 'sequence', error: 'this studio is too old to sequence media (no sequenceMedia) — nothing was changed.' }; }
   const r = await A.sequenceMedia(${JSON.stringify(seqOpts)});
   if (!r || r.ok === false) return { success: false, action: 'sequence', error: (r && r.reason) || 'the studio refused the sequence' };
-  return { success: true, action: 'sequence', placed: r.placed, count: Array.isArray(r.placed) ? r.placed.length : 0, duration: r.duration };
+  const __n = Array.isArray(r.placed) ? r.placed.length : 0;
+  const __asked = ${input.ids ? input.ids.length : 0};
+  const __skipped = __asked > __n ? __asked - __n : 0;
+  return Object.assign({ success: true, action: 'sequence', placed: r.placed, count: __n, duration: r.duration },
+    __skipped ? { skipped: __skipped, warning: __skipped + ' of the ' + __asked + ' ids named no video or image on the canvas (audio is not placed) and were skipped; placed lists the ones that were.' } : {});
 })();`.trim();
       }
 

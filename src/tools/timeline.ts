@@ -25,7 +25,7 @@
  *
  * KNOWN GAPS (the engine cannot carry them, so they are refused rather than approximated): a scale pivot left or right
  * of centre, a percentage x/y, stagger from "random" or a grid, eased parameters (back(3), elastic(1.2, 0.4)),
- * elastic/bounce inOut, steps(), callbacks, and two tweens on one property that overlap in time.
+ * steps(), callbacks, and two tweens on one property that overlap in time.
  */
 
 import { ENGINE_EASING_NAMES } from './engine-lists.js';
@@ -147,9 +147,6 @@ export function mapGsapEase(name: string): { engine: string } | { error: string 
     const same = (family === 'back' && params.length === 1 && Math.abs(params[0] - 1.70158) < 0.01)
       || (family === 'elastic' && Math.abs(params[0] - 1) < 1e-9 && (params.length === 1 || Math.abs(params[1] - 0.3) < 1e-9));
     if (!same) return refuse(`has parameters (${m[3]}) the engine's ${family} cannot take: its curve is fixed (back 1.70158, elastic 1, 0.3); drop them`);
-  }
-  if ((suffix === 'Elastic' || suffix === 'Bounce') && dir === 'inout') {
-    return refuse(`has no equivalent: the engine has ${family}.in and ${family}.out only`);
   }
   const engine = dir === 'in' ? `easeIn${suffix}` : dir === 'inout' ? `easeInOut${suffix}` : `easeOut${suffix}`;
   return ENGINE_EASES.has(engine) ? { engine } : refuse('has no equivalent in the engine');
@@ -930,8 +927,17 @@ export function emitTimelineOpBody(plan: TimelinePlan, refExpr: (target: string)
     app.addAnimation(__id, __kfs, { duration: ${t.duration}, loop: ${t.loop}, timeUnits: 'seconds' });
     __ppTl.push(Object.assign({ ref: ${J(t.ref)}, itemId: __id, keys: __kfs.length, duration: ${t.duration}, loop: ${t.loop} }, __prev ? { replaced: __prev } : {}));
   }`).join('');
+  // The same refusal keyframe_animate makes: a name the running studio's easing table lacks was accepted in silence
+  // (measured), so its own list is read before any track is written. A studio that publishes no list is not
+  // second-guessed.
+  const named = [...new Set(plan.tracks.flatMap((t) => t.keyframes.map((k) => (k as { easing?: unknown }).easing)).filter((e): e is string => typeof e === 'string'))];
+  const easingCheck = named.length ? `
+let __ppLive = null;
+try { const __p = typeof app.listAnimatableProperties === 'function' ? app.listAnimatableProperties() : null; if (__p && Array.isArray(__p.easings) && __p.easings.length) __ppLive = __p.easings; } catch (e) { __ppLive = null; }
+const __ppMissing = __ppLive ? ${J(named)}.filter(function (n) { return __ppLive.indexOf(n) === -1; }) : [];
+if (__ppMissing.length) return { success: false, error: 'timeline: this studio has no easing named ' + __ppMissing.join(', ') + '; nothing was written. pinepaper_get_available_easings lists the ones it has.', missingEasings: __ppMissing };` : '';
   return `
-if (typeof app.addAnimation !== 'function') return { success: false, error: 'timeline: app.addAnimation unavailable in this studio' };
+if (typeof app.addAnimation !== 'function') return { success: false, error: 'timeline: app.addAnimation unavailable in this studio' };${easingCheck}
 const __ppNum = function (v) { return (typeof v === 'number' && isFinite(v)) ? v : undefined; };
 const __ppFirst = function () { for (let i = 0; i < arguments.length; i++) if (arguments[i] !== undefined) return arguments[i]; return undefined; };
 // An item's rest value: its authored state when it has a track, else what it is now.
