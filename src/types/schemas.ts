@@ -2511,7 +2511,8 @@ export const AgentBatchOperationSchema = z.object({
   // Relation operation fields
   sourceId: z.string().optional().describe('Source item ID for relations; a name pattern ("dot-*") binds every item named like it, in name order, each with index and count in its params'),
   update: z.boolean().optional().describe('relation: true changes the params of the relation already bound (same sourceId, targetId, relationType) instead of binding another'),
-  targetId: z.string().optional().describe('Target item ID for relations'),
+  // null is the standalone tool's spelling of "no target" (a self-relation), so it is taken here as omitted.
+  targetId: z.string().nullish().transform((v) => v ?? undefined).describe('Target item ID for relations; omit it (or null) for a self-relation'),
   relationType: z.string().optional().describe('Relation type'),
   relationOptions: z.record(z.string(), z.unknown()).optional().describe('Relation options'),
   // Set background fields
@@ -2849,8 +2850,14 @@ export const AgentExportInputSchema = z.object({
     if (val.parallel !== undefined && val.parallel > 1 && val.format !== 'mp4' && val.format !== 'webm' && val.format !== 'auto') {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['parallel'], message: 'parallel is a video setting: mp4, webm, or auto.' });
     }
-    if (val.audioCodec !== undefined && val.format !== 'mp4') {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['audioCodec'], message: "audioCodec is an mp4 setting. A webm's soundtrack is Opus, which WebM players expect." });
+    // 'any' is the default said aloud, so it is accepted on every format (AACWEBM170, GIFAUD170: a helper that
+    // always sets audioCodec had every webm and gif export refused). Only a demand, 'aac', needs an mp4, and the
+    // refusal names the format that was asked for. With 'auto' the platform picks, as for the other video settings.
+    if (val.audioCodec === 'aac' && val.format !== 'mp4' && val.format !== 'auto') {
+      const why = val.format === 'webm' ? "A webm's soundtrack is Opus, which WebM players expect."
+        : val.format === 'gif' || val.format === 'apng' ? `A ${val.format} has no soundtrack.`
+        : `This export's format is ${String(val.format)}.`;
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['audioCodec'], message: `audioCodec is an mp4 setting. ${why}` });
     }
     if (val.bitrate !== undefined && val.minBitrate !== undefined && val.minBitrate > val.bitrate) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['minBitrate'], message: 'minBitrate is above bitrate; the floor would override the target. Drop one, or lower minBitrate.' });

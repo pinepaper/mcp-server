@@ -123,6 +123,21 @@ describe('B45: audioCodec on an MP4 export', () => {
     expect(JSON.stringify(r.error?.issues)).toContain('audioCodec is an mp4 setting');
   });
 
+  it("'any', the default, is accepted on every format (AACWEBM170, GIFAUD170)", () => {
+    for (const format of ['webm', 'gif', 'png', 'mp4']) {
+      const r = AgentExportInputSchema.safeParse({ format, audioCodec: 'any' });
+      expect(r.success).toBe(true);
+      expect(codeGenerator.generateAgentExport(r.data as never)).not.toContain('"audioCodec"');
+    }
+  });
+
+  it("the refusal of 'aac' names the format that was asked for", () => {
+    const gif = JSON.stringify(AgentExportInputSchema.safeParse({ format: 'gif', audioCodec: 'aac' }).error?.issues);
+    expect(gif).toContain('A gif has no soundtrack');
+    expect(gif).not.toContain('webm');
+    expect(JSON.stringify(AgentExportInputSchema.safeParse({ format: 'webm', audioCodec: 'aac' }).error?.issues)).toContain("A webm's soundtrack is Opus");
+  });
+
   it('is published in the tool definition', () => {
     const t = PINEPAPER_TOOLS.find((d) => d.name === 'pinepaper_agent_export')!;
     const props = JSON.stringify(t.inputSchema);

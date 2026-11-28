@@ -362,3 +362,13 @@ describe('Track 1: T2 & N1-N4 token efficiency budgets', () => {
     }
   });
 });
+
+describe('batch relation: a null targetId is a self-relation (B64E170 detour)', () => {
+  it('parses null as omitted, the way pinepaper_add_relation takes it', async () => {
+    const { AgentBatchOperationSchema, AddRelationInputSchema } = await import('../../types/schemas.js');
+    const op = AgentBatchOperationSchema.parse({ type: 'relation', sourceId: '$0', targetId: null, relationType: 'time_expression', relationOptions: { property: 'y', expression: '100' } });
+    expect(op.targetId).toBeUndefined();
+    expect(AgentBatchOperationSchema.parse({ type: 'relation', sourceId: '$0', targetId: '$1', relationType: 'orbits' }).targetId).toBe('$1');
+    expect(AddRelationInputSchema.safeParse({ sourceId: 'item_1', targetId: null, relationType: 'time_expression', params: { property: 'y', expression: '100' } }).success).toBe(true);
+  });
+});
