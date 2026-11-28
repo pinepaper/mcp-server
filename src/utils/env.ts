@@ -12,6 +12,7 @@
  * fixed as a table of names, and a reviewer reads it in the same place.
  *
  * safe-fetch.ts reads PINEPAPER_ALLOW_PRIVATE_NETWORK itself: it is bundled on its own and takes no relative imports.
+ * It also reads the standard proxy variables (HTTPS_PROXY, HTTP_PROXY, ALL_PROXY, NO_PROXY, either case), in one place.
  */
 const NAMES = [
   // Browser (puppeteer) mode
@@ -31,7 +32,7 @@ const NAMES = [
   'PINEPAPER_LOCALE', 'LC_ALL', 'LC_MESSAGES', 'LANG',
 ] as const;
 
-/** Every environment variable the package reads (safe-fetch.ts also reads PINEPAPER_ALLOW_PRIVATE_NETWORK itself). */
+/** Every environment variable the package reads (safe-fetch.ts also reads PINEPAPER_ALLOW_PRIVATE_NETWORK and the standard proxy variables itself). */
 export type EnvVar = (typeof NAMES)[number];
 export const ENV_VARS: readonly EnvVar[] = Object.freeze([...NAMES]);
 const LISTED: ReadonlySet<string> = new Set(NAMES);

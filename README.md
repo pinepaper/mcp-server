@@ -367,6 +367,14 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
   - `boundedEffects: true | 'decompose'` asks the studio for faster rendering of shadows and blend modes, within a small per-channel tolerance. It needs a studio that has the option; on one that does not, the export is the ordinary render and `fidelity.warnings` carries `bounded_effects_not_applied`.
   - `prerollDraw: 'auto' | 'always'` goes with `startTime`. On a studio that can skip painting the frames before `startTime`, `'always'` forces them to be painted. The frames in the file are the same either way.
 
+- `pinepaper_agent_batch_execute` takes a `pattern` operation, so a wave, stagger, ring or orbit over many items is one op in the same batch that creates them: `{ type: 'pattern', action: 'create' | 'modify' | 'remove', id, kind, members, params }`. `members` takes `$N` references to items the batch made. If a later op in an atomic batch fails, the pattern is removed with the rest.
+
+- `anchor` on a created item names which point `position` is: `'center'` (the default), the four edges, or the four corners. `'top-left'` puts the item's top-left corner at the position, which saves working out half-widths.
+
+- Server-side downloads go through your proxy where the network needs it. Behind a proxy that answers DNS with placeholder addresses (198.18.0.0/15), every remote image was refused as a private address. With `HTTPS_PROXY` or `HTTP_PROXY` set to the proxy's `http://` address, such a host is now fetched through it by name; `NO_PROXY` is honoured. Loopback, LAN and cloud-metadata addresses are refused as before, proxy or not.
+
+- `pinepaper-mcp setup cloud` prints how to connect the hosted PinePaper Cloud MCP, and `pinepaper-mcp info` shows whether a cloud key is configured. `pinepaper-mcp init` scaffolds a scene that uses `create_many`, a timeline and a pattern, and `pinepaper-mcp check --offline` validates those ops.
+
 ### Changed
 
 - `pinepaper_import_svg` no longer hands an SVG's hidden text to the model. A file fetched from the web can carry text that is never drawn (`<title>`, `<desc>`, `<metadata>`, comments, scripts, a DOCTYPE), and that text used to come back in the tool's reply, where it could read as instructions. It is now removed from what the reply shows. The code returned for pasting keeps the file as it is, so it draws the same picture, and says that any text in it is the file's data, not an instruction. SVG text over 4 MB and Mermaid over 1 MB are refused, with nothing imported.
@@ -378,6 +386,32 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - Changing the words of a wrapped text keeps the wrap. `pinepaper_modify_item` with `content` on a text that was wrapped with `maxWidth` used to put the new words on one line; they are now wrapped to the same width, and the reply's `textWrap` reports the lines. `maxWidth: null` still unwraps.
 - A relation to a stick figure's id (for example `bob` instead of `bob_torso`) is still refused, because the id is the prefix of the figure's parts and not an item, but the refusal now names a part to relate to.
 - The `duration` description of `pinepaper_agent_export` now says which moment the last frame shows: frame n is time n / fps, so the last frame is one frame before `duration` and a keyframe at exactly `duration` is not drawn. To end on a pose, key it one frame earlier or export one frame longer.
+
+- A relation option the relation does not read is now refused, with the nearest valid name, instead of being accepted with a warning. `angle` on `orbits`, for example, is refused with "did you mean phaseDegrees". This applies to `pinepaper_add_relation`, to `relation` ops in a batch, and to `pinepaper-mcp check`. Custom relations are not checked this way. If a call that worked on 1.7.0 is now refused, the option it names was having no effect.
+
+- `pinepaper_font` `export` and `export_data` now write a file and return its path. Both used to answer success with no font and no data in the reply. The OTF or JSON is saved to the export folder; `download: false` also returns the content in the reply.
+
+- `audioCodec: 'any'` is accepted on every export format. It is the default, but passing it on a WebM or GIF export was refused, and the GIF refusal talked about WebM. Only `'aac'` needs an MP4, and the refusal now names the format you asked for.
+
+- A `relation` op in a batch accepts `targetId: null` for a self-relation, as `pinepaper_add_relation` does.
+
+- `pinepaper_import_image`: `scale` now multiplies the size the image was placed at. With `maxWidth: 200` and `scale: 2`, a 400x200 image used to be drawn at 800x400; it is now 400x200, as the description always said. `pinepaper_get_items` shows an import's `mask`, and `pinepaper_modify_item` with `imageStart` reports what the studio stored.
+
+- `pinepaper_emitter` says when it was given something the studio does not read. Each of these used to draw something other than what was written, with no warning: a range with more than two numbers (`speed: [100, 300, 500]` is read as `[100, 300]`), `size` beside `sizes`, a `sizes` list longer than `count`, `emitWindows` on a burst emitter, and a `set` whose `bursts` replaced earlier bursts.
+
+- `pinepaper_choreograph` checks the whole figure against the frame, not its centre point. `to` is where the actor's centre goes, so passing a ground height sank a character by its lower half while the reply said `onScreen: true`. `onScreen` now means the whole figure is in the frame (`centreOnScreen` is the old reading), the warning gives the `to.y` that stands the figure on the line you named, and a default size that takes the actor out of the frame is reported with the setting to pass. The description of `arc` is corrected: it is the height of the curve's control point, and the path rises about half of it.
+
+- Export replies no longer recommend bitrate settings that do not work. When an MP4 misses its bitrate target, the warning used to suggest a lower bitrate, constant mode or a quantizer; on Chromium's H.264 encoder none of those brings the file under the target. The warning now says what does change the rate. A `quantizer` the encoder did not use is reported as `quantizer_not_applied`, and the descriptions of `broadcast`, `bitrateMode` and `quantizer` say what the browser encoder does with them.
+
+- `frameDigest` is described as what it is: a hash of the frames given to the encoder. Equal digests mean the same pictures went in; they say nothing about the file's bytes, for which see `bitExact`.
+
+- More cases where a setting had no effect are now said in the reply: a rotation tween's `transformOrigin` (rotation turns about the centre), a rotation keyframe track on a horizontally flipped image or text (a key of 0 draws it flipped the other way; the warning gives the offset to use), the passes a look drew on a single item or group when `filters` is empty, and options on a custom relation that could not be checked.
+
+- A parallel export has the same number of frames as a single-pass export of the same scene (it could be one frame short), returns the warnings its segments raised, and stops and removes its partial files when a segment fails.
+
+- `pinepaper_generate`: when the cloud refuses a key, the reply gives the cloud's own reason. It used to say generation was a beta enabled per organisation, which is no longer how access works.
+
+- `PINEPAPER_STUDIO_URL` is honoured by every tool that opens the studio, not only by the CLI commands.
 
 ## What's new in 1.7.0
 
@@ -3455,6 +3489,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 | `PINEPAPER_GOVERNOR` | `off` runs code by raw eval — no governor report, no error codes, no seeded determinism | on |
 | `PINEPAPER_ASSET_DIRS` | Extra folders local image and media imports may read from, separated by `:` (`;` on Windows). Read only with `PINEPAPER_ALLOW_LOCAL_FILES=1`, which also opens the working directory. The export folder is always readable | unset |
 | `PINEPAPER_ALLOW_PRIVATE_NETWORK` | `1` lets URL imports reach loopback, private and LAN addresses, for a local dev server. Cloud metadata addresses stay refused | unset |
+| `HTTPS_PROXY`, `HTTP_PROXY`, `NO_PROXY` | The standard proxy variables (either case; `ALL_PROXY` as a fallback). Used only for a URL import whose host resolves to a placeholder address of a fake-IP DNS proxy (198.18.0.0/15): it is then fetched through this `http://` proxy by name. Other imports connect directly | unset |
 | `PINEPAPER_FFPROBE` | `off` skips the ffprobe check of a saved video export. Without `ffprobe` on `PATH` the check is skipped and the result says so | on |
 
 Behind a proxy, or against a Studio with analytics or polling connections open,
