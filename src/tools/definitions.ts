@@ -8440,7 +8440,7 @@ BEATS run one after another: [{ at, verb, ...params }]. Positions are the actor'
 - hop { to?, height? }: crouch, launch stretched, arc, land squashed, settle. Without to it hops in place.
 - bounce { times? (3), height?, decay? (0.6), to? }: bounces that lose height; with to it travels while bouncing.
 - roll { to }: rolls without slipping — it turns by the distance over its radius (right = clockwise).
-- fly { to, arc? }: an arc through the air, nose up on the rise and down on the fall.
+- fly { to, arc? }: an arc through the air, nose up on the rise and down on the fall. arc is the control point's height; the path rises about half of it.
 - peek { edge (left|right|top|bottom), amount? (0.5), hold? (1) }: slides partly in from a frame edge, waits, ducks back out.
 - shake { intensity? }: a startled shiver.   squash { amount? }: an in-place squash and recover (a reaction, a landing hit).
 - enter { from (edge), to? }: slides in from an edge with an overshoot.   exit { edge }: a small anticipation, then away off that edge.

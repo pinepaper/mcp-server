@@ -2054,7 +2054,10 @@ function customOptionWarningJs(relationType: unknown, params: unknown, key: 'war
   if (!keys.length) return '';
   return `, ...(function () { try {
     var cr = typeof window !== 'undefined' && window.__ppCustomRelations && window.__ppCustomRelations[${jsLiteral(relationType)}];
-    if (!cr || !Array.isArray(cr.reads)) return {};
+    if (!cr) return {};
+    // A custom relation whose compute takes params whole cannot be checked key by key. That is said: a bogus option
+    // was stored in silence, where a built-in relation would have named it (RELWARN27, custom leg).
+    if (!Array.isArray(cr.reads)) return { optionsNotChecked: ${JSON.stringify(keys)}, optionsNote: ${jsLiteral(relationType)} + ' is a custom relation whose code uses params as a whole, so which of these options it reads could not be checked. A misspelt option is stored and has no effect.' };
     var skip = ${JSON.stringify([...injected, ...RELATION_LOOP_PARAMS])};
     var un = ${JSON.stringify(keys)}.filter(function (k) { return cr.reads.indexOf(k) < 0 && skip.indexOf(k) < 0; });
     if (!un.length) return {};
@@ -2997,8 +3000,20 @@ function generateKeyframeAnimateCode(
   const __prevEase = (__ki && __ki.data && Array.isArray(__ki.data.keyframes)) ? __ki.data.keyframes.map(function(k) { return [k && k.time, (k && k.easing) || 'linear']; }) : [];
   const __opts = ${JSON.stringify(opts)};
 ${guard.before}
+  // A ROTATION TRACK ON A HORIZONTALLY FLIPPED ITEM (FLIPKEY0). The studio stores that flip as a vertical mirror plus
+  // a half turn, and a rotation key replaces rotation outright, so a key at 0 drew the item flipped vertically.
+  // Read before the keys are added. A vertical flip is stored with no rotation and is not affected.
+  const __flipRot = ${keyframes.some((k) => k && k.properties && Object.prototype.hasOwnProperty.call(k.properties, 'rotation')) ? `(function() {
+    try {
+      if (!__ki || !__ki.scaling || !(__ki.scaling.x * __ki.scaling.y < 0)) return null;
+      const rot = typeof app.authoredRotation === 'function' ? app.authoredRotation(__ki) : (((__ki.data && __ki.data._bakedRotation) || 0) + (__ki.rotation || 0));
+      const turn = ((rot % 360) + 360) % 360;
+      return Math.abs(turn - 180) < 1 ? Math.round(rot * 1000) / 1000 : null;
+    } catch (_) { return null; }
+  })()` : 'null'};
   app.addAnimation(${addAnimTarget}, ${keyframesJson}, __opts);
   const __warn = [];${unitsNote}
+  if (__flipRot !== null) __warn.push('this item is flipped horizontally, which the studio stores as a vertical mirror plus a rotation of ' + __flipRot + ' degrees. A rotation key replaces that rotation outright, so where a key is 0 the item is drawn flipped vertically, not horizontally. Add ' + __flipRot + ' to every rotation key (start the track at ' + __flipRot + ', not 0), or animate scale instead, which keeps the flip.');
 ${guard.after}
   ${deadKeysJs('__deadKeys')}${easingAtCheck}${firstEaseWarn}${textKeyCheck}${filterKeyCheck}
   const __now = (__ki && __ki.data && Array.isArray(__ki.data.keyframes)) ? __ki.data.keyframes.map(function(k) { return k && k.time; }) : [];
@@ -14924,6 +14939,17 @@ ${cam ? `  // The camera rides the SAME timing: framing each state as its morph 
   const res = { success: true, action: 'apply', target: ${target}, look: r.look && (r.look.id || r.look.name), fidelity: fidelity,
     restyled: r.restyled, texts: r.texts, images: r.images, brushed: r.brushed, keyframes: r.keyframes, filters: r.filters, ids: r.ids,
     approximations: r.approximations || [], warnings: r.warnings || [] };
+  // filters lists the SCENE filters a look added. On an item or subtree the same effects are drawn as passes over
+  // that item's own raster, which the reply left out: a subtree apply answered filters: [] while the frame was
+  // pixelated (LOOKFILT37). Both are passed on, with what a scene-only effect was skipped for.
+  if (r.scope) res.scope = r.scope;
+  if (Array.isArray(r.rasterPasses) && r.rasterPasses.length) {
+    res.rasterPasses = r.rasterPasses;
+    if (typeof r.rasterRoots === 'number') res.rasterRoots = r.rasterRoots;
+    if (!Array.isArray(res.filters) || !res.filters.length) res.filtersNote = 'filters lists scene-wide filters only. This look drew ' + r.rasterPasses.join(', ') + ' as passes over the raster of the target itself (rasterPasses), which is why filters is empty.';
+  }
+  if (Array.isArray(r.sceneOnlySkipped) && r.sceneOnlySkipped.length) res.sceneOnlySkipped = r.sceneOnlySkipped;
+  if (typeof r.figureParts === 'number') res.figureParts = r.figureParts;
   // The engine's grades: native (the medium itself), faithful (close, with
   // named approximations), impression (an evocation), custom (an ad-hoc spec).
   const __approx = (res.approximations && res.approximations.length) ? res.approximations.join('; ') : '';

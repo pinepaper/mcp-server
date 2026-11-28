@@ -126,7 +126,9 @@ describe('the tester package fixes', () => {
 
   it('import takes opacity, blendMode and scale through modify, on what is drawn', () => {
     const code = codeGenerator.generateImportImage({ url: 'https://x/y.png', opacity: 0.5, blendMode: 'screen', scale: 2 } as never);
-    expect(code).toContain('app.modifyItem(itemId, {"opacity":0.5,"blendMode":"screen","scale":2})');
+    // the look goes through modify; scale is first multiplied by the fit the placed raster has (SCALEWIDTH170)
+    expect(code).toContain('const __lk = {"opacity":0.5,"blendMode":"screen","scale":2};');
+    expect(code).toContain('app.modifyItem(itemId, __lk)');
     expect(codeGenerator.generateImportImage({ url: 'https://x/y.png' } as never)).not.toContain('__look');
   });
 

@@ -47,7 +47,8 @@ export interface ChoreoResult {
   /** The moments a sound belongs on (D68): pops, launches, contacts with their strength, shakes. */
   events?: ChoreoEvent[];
   end?: number;
-  final?: { x: number; y: number; onScreen: boolean };
+  /** onScreen: the whole figure is inside the frame at the end. centreOnScreen: its centre point is. */
+  final?: { x: number; y: number; onScreen: boolean; centreOnScreen?: boolean };
   warnings?: string[];
   /** Beats whose size was left out: the setting and the value the default came to, so a default is never silent. */
   defaultsUsed?: Array<{ beat: number; verb: string; setting: string; value: number; rule: string }>;
@@ -71,7 +72,22 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
   const r3 = (v: number) => Math.round(v * 1000) / 1000;
   // Live state: centre, scale factors, rotation delta, opacity.
   const s = { x: actor.x, y: actor.y, fx: 1, fy: 1, rot: 0, op: 1 };
+  // How far the figure's box reached past each frame edge during each beat, so a beat that leaves the frame can be
+  // named (the checks used to look at the centre point only: FLYTO40 landed a figure with its legs cut off and
+  // answered onScreen: true).
+  let beatNow = -1;
+  const overflow = new Map<number, { top: number; bottom: number; left: number; right: number }>();
+  const boxOver = () => ({
+    top: Math.max(0, frame.y - (s.y - above * s.fy)),
+    bottom: Math.max(0, s.y + below - (frame.y + frame.height)),
+    left: Math.max(0, frame.x - (s.x - leftOf * s.fx)),
+    right: Math.max(0, s.x + rightOf * s.fx - (frame.x + frame.width)),
+  });
   const key = (t: number, easing: string) => {
+    if (beatNow >= 0) {
+      const o = boxOver(), m = overflow.get(beatNow) || { top: 0, bottom: 0, left: 0, right: 0 };
+      overflow.set(beatNow, { top: Math.max(m.top, o.top), bottom: Math.max(m.bottom, o.bottom), left: Math.max(m.left, o.left), right: Math.max(m.right, o.right) });
+    }
     keys.push({
       time: r3(t),
       easing,
@@ -123,11 +139,21 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
     for (const { b, i } of sorted) {
       const at = +b.at || 0;
       const verb = b.verb;
+      beatNow = i;
       if (VERBS.indexOf(verb) < 0) throw new Error('beat ' + i + ': unknown verb ' + JSON.stringify(verb) + ' — one of ' + VERBS.join(', '));
       if (started && at < t - 1e-6) throw new Error('beat ' + i + ' (' + verb + ' at ' + at + ' s) starts before the previous beat ends at ' + r3(t) + ' s; beats run one after another');
       const to = pt(b.to, 'beat ' + i + ' to');
       if (to && (to.x < frame.x || to.x > frame.x + frame.width || to.y < frame.y || to.y > frame.y + frame.height)) {
         warnings.push('beat ' + i + ' (' + verb + '): to [' + to.x + ', ' + to.y + '] is outside the frame, so the actor ends off screen there');
+      } else if (to && verb !== 'exit') {
+        // to is where the CENTRE goes. A ground height passed as to.y sank the figure by its lower half (FLYTO40).
+        const lowBy = to.y + below - (frame.y + frame.height), highBy = frame.y - (to.y - above);
+        const leftBy = frame.x - (to.x - leftOf), rightBy = to.x + rightOf - (frame.x + frame.width);
+        const cut = lowBy > 1 ? Math.round(lowBy) + ' px of it below the frame' : highBy > 1 ? Math.round(highBy) + ' px of it above the frame' : leftBy > 1 ? Math.round(leftBy) + ' px of it past the left edge' : rightBy > 1 ? Math.round(rightBy) + ' px of it past the right edge' : '';
+        if (cut) {
+          warnings.push('beat ' + i + ' (' + verb + '): to [' + to.x + ', ' + to.y + "] is where the actor's CENTRE ends, and the actor reaches " + Math.round(above) + ' px above and ' + Math.round(below) + ' px below its centre, so it ends with ' + cut + '.'
+            + (lowBy > 1 ? ' To stand it on y = ' + to.y + ', pass to.y = ' + Math.round(to.y - below) + '.' : ''));
+        }
       }
       // intensity is shake's amplitude in px and nothing else reads it: on the
       // other ten verbs it was accepted and ignored (11/11 probed). Said, with
@@ -295,6 +321,21 @@ export function compileChoreography(actor: ChoreoActor, frame: ChoreoFrame, beat
     return { error: String(e && e.message || e) };
   }
   if (!keys.length) return { error: 'no beats' };
-  const onScreen = s.x >= frame.x && s.x <= frame.x + frame.width && s.y >= frame.y && s.y <= frame.y + frame.height;
-  return { keyframes: keys, events: events as ChoreoEvent[], end: r3(t), final: { x: r3(s.x), y: r3(s.y), onScreen }, warnings, ...(defaultsUsed.length ? { defaultsUsed } : {}) };
+  // onScreen is the whole figure inside the frame, not its centre point; centreOnScreen keeps the old reading.
+  const centreOnScreen = s.x >= frame.x && s.x <= frame.x + frame.width && s.y >= frame.y && s.y <= frame.y + frame.height;
+  const fin = boxOver();
+  const onScreen = centreOnScreen && fin.top <= 1 && fin.bottom <= 1 && fin.left <= 1 && fin.right <= 1;
+  // A DEFAULT THAT TAKES THE ACTOR OUT OF THE FRAME is said, with the setting to pass (a wrong knob warned, an
+  // omitted one did not, so an oversized default beat failed in silence).
+  const seenBeat = new Set<number>();
+  for (const d of defaultsUsed) {
+    const o = overflow.get(d.beat);
+    if (!o || seenBeat.has(d.beat) || d.verb === 'exit' || d.verb === 'enter' || d.verb === 'peek') continue;
+    const worst = ([['top', o.top], ['bottom', o.bottom], ['left', o.left], ['right', o.right]] as Array<[string, number]>).sort((a, z) => z[1] - a[1])[0];
+    if (worst[1] <= 1) continue;
+    seenBeat.add(d.beat);
+    const mine = defaultsUsed.filter((x) => x.beat === d.beat).map((x) => x.setting + ' ' + x.value).join(', ');
+    warnings.push('beat ' + d.beat + ' (' + d.verb + '): with the default ' + mine + ' the actor goes ' + Math.round(worst[1]) + ' px past the ' + worst[0] + ' of the frame during this beat. Pass ' + defaultsUsed.filter((x) => x.beat === d.beat).map((x) => x.setting).join(' / ') + ' to size it.');
+  }
+  return { keyframes: keys, events: events as ChoreoEvent[], end: r3(t), final: { x: r3(s.x), y: r3(s.y), onScreen, centreOnScreen }, warnings, ...(defaultsUsed.length ? { defaultsUsed } : {}) };
 }

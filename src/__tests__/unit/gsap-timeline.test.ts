@@ -281,6 +281,13 @@ describe('timeline: targets and the baseline', () => {
     const centre = track(plan({ tweens: [{ to: 'bar-2', from: { scaleY: 0 }, vars: { transformOrigin: '50% 50%' }, duration: 1 }] }, creates), '$1');
     expect(keysOf(centre, 'y')).toEqual([]);
   });
+  it('a rotation carrying transformOrigin says the origin was not applied (PIVOT34)', () => {
+    const p = plan({ tweens: [{ to: 'item_1', vars: { rotation: 90, transformOrigin: 'bottom' }, duration: 1 }] });
+    expect(p.tweens[0].dropped.join(' ')).toContain('transformOrigin was not applied to rotation');
+    // a centre origin, or no origin, drops nothing
+    expect(plan({ tweens: [{ to: 'item_1', vars: { rotation: 90, transformOrigin: '50% 50%' }, duration: 1 }] }).tweens[0].dropped).toEqual([]);
+    expect(plan({ tweens: [{ to: 'item_1', vars: { rotation: 90 }, duration: 1 }] }).tweens[0].dropped).toEqual([]);
+  });
   it('refuses a y tween on an item whose scale holds its edge', () => {
     expect(refused({ tweens: [{ to: 'bar-1', from: { scaleY: 0 }, vars: { scaleY: 1 } }, { to: 'bar-1', vars: { y: -20 } }] }, creates)[0].message).toContain('also tweens y');
   });

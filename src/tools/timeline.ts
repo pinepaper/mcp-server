@@ -654,6 +654,11 @@ export function compileTimeline(op: Record<string, unknown>, ctx: { creates: Tim
           segments.push({ ...base, prop: 'y', pivotOf: { scaleProp, pivot } });
         }
       }
+      // A ROTATION DOES NOT TAKE THE ORIGIN (PIVOT34): it turns about the item's centre, and the receipt said nothing,
+      // while a scale beside it did hold the named edge. Said once per tween.
+      if (i === 0 && originPivot !== undefined && originPivot !== 0 && enginesUsed.has('rotation')) {
+        dropped.push('transformOrigin was not applied to rotation: a rotation turns about the item\'s centre, whatever the origin (it is read for scale only). To swing an item about an edge, put it in a group whose centre is that edge and rotate the group, or key x and y along the arc.');
+      }
       receiptTargets.push({ ref: t.ref, item: t.target, start: t0, end: Number.isFinite(one) ? round(t0 + one) : 'forever' });
     });
 

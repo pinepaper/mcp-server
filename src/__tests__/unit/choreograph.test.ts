@@ -160,3 +160,37 @@ describe('intensity is shake\'s alone, and said elsewhere', () => {
     expect(Math.max(...r.keyframes!.map((k) => Math.abs(k.properties.x - 500)))).toBeGreaterThan(20);
   });
 });
+
+describe('the figure, not its centre, is checked against the frame (FLYTO40, omitted size knob)', () => {
+  const frame = { x: 0, y: 0, width: 1920, height: 1080 };
+  // A character 480 tall standing on y = 900: centre 660, reaching 240 above and below.
+  const actor = { x: 400, y: 660, w: 200, h: 480, sx: 1, sy: 1, rot: 0, feetBelow: 240, headAbove: 240, leftOf: 100, rightOf: 100 } as never;
+  it('fly to a ground height: the landing is not onScreen and the warning gives the y that stands it there', async () => {
+    const { compileChoreography } = await import('../../tools/choreograph.js');
+    const r = compileChoreography(actor, frame, [{ at: 0.2, verb: 'fly', to: [1560, 900], arc: 400, duration: 1.6 }]);
+    expect(r.final).toMatchObject({ onScreen: false, centreOnScreen: true });
+    const w = r.warnings!.join(' ');
+    expect(w).toContain("is where the actor's CENTRE ends");
+    expect(w).toContain('60 px of it below the frame');
+    expect(w).toContain('pass to.y = 660');
+  });
+  it('fly to the centre height lands on screen with no such warning', async () => {
+    const { compileChoreography } = await import('../../tools/choreograph.js');
+    const r = compileChoreography(actor, frame, [{ at: 0.2, verb: 'fly', to: [1560, 660], arc: 400, duration: 1.6 }]);
+    expect(r.final).toMatchObject({ onScreen: true, centreOnScreen: true });
+    expect(r.warnings!.join(' ')).not.toContain('CENTRE');
+  });
+  it('a default arc that takes the actor out of the top of the frame is said, naming the setting', async () => {
+    const { compileChoreography } = await import('../../tools/choreograph.js');
+    const r = compileChoreography(actor, frame, [{ at: 0.2, verb: 'fly', to: [1560, 660], duration: 1.6 }]);
+    expect(r.defaultsUsed!.some((d) => d.setting === 'arc')).toBe(true);
+    const w = r.warnings!.find((x) => x.includes('with the default'))!;
+    expect(w).toContain('past the top of the frame');
+    expect(w).toContain('Pass arc');
+  });
+  it('an explicit arc that leaves the frame is the caller\'s choice and is not called a default', async () => {
+    const { compileChoreography } = await import('../../tools/choreograph.js');
+    const r = compileChoreography(actor, frame, [{ at: 0.2, verb: 'fly', to: [1560, 660], arc: 2000, duration: 1.6 }]);
+    expect(r.warnings!.join(' ')).not.toContain('with the default');
+  });
+});

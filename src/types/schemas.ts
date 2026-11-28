@@ -4988,7 +4988,7 @@ export const ChoreographBeatSchema = z.object({
   height: z.number().positive().optional().describe('hop / bounce: jump height px (default 1.2× / 1.5× the actor).'),
   times: z.number().int().min(1).max(12).optional().describe('bounce: number of bounces (default 3).'),
   decay: z.number().min(0.1).max(0.95).optional().describe('bounce: each bounce is this fraction of the last (default 0.6).'),
-  arc: z.number().optional().describe('fly: how far above the higher end the path rises, px (default 2× the actor).'),
+  arc: z.number().optional().describe('fly: how far above the higher end the curve\'s control point sits, px; the path itself rises about half of that (default 2× the actor, so about one actor height). For a rise of R, pass 2R.'),
   edge: ChoreoEdgeSchema.optional().describe('peek: the frame edge it peeks from (default left). exit: the edge it leaves by (default right).'),
   from: ChoreoEdgeSchema.optional().describe('enter: the frame edge it comes in from (default left).'),
   amount: z.number().min(0).max(1).optional().describe('peek: how much of it shows, 0..1 (default 0.5). squash: depth (default 0.25).'),
