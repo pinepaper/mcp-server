@@ -101,3 +101,16 @@ describe('IMPURL40 a fake-IP DNS answer is named as one', () => {
     expect(String(err.message)).not.toContain('fake-IP');
   });
 });
+
+describe('EASELAST170 easing on the last key under departure', () => {
+  const kf = (first?: string, last?: string) => [{ time: 0.5, properties: { x: 200 }, ...(first ? { easing: first } : {}) }, { time: 2.5, properties: { x: 1400 }, ...(last ? { easing: last } : {}) }];
+  it('is said: nothing leaves the last key', () => {
+    expect(firstKeyEasingNoEffect(kf(undefined, 'easeInOut') as never, { easingAt: 'departure' })).toContain('on the last keyframe');
+  });
+  it('is not said on the first key, on a loop, or for an arrival reading', () => {
+    expect(firstKeyEasingNoEffect(kf('easeInOut') as never, { easingAt: 'departure' })).toBeNull();
+    expect(firstKeyEasingNoEffect(kf(undefined, 'easeInOut') as never, { easingAt: 'departure', loop: true })).toBeNull();
+    expect(firstKeyEasingNoEffect(kf(undefined, 'easeInOut') as never)).toBeNull();
+    expect(firstKeyEasingNoEffect(kf(undefined, 'hold') as never, { easingAt: 'departure' })).toBeNull();
+  });
+});

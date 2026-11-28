@@ -1207,12 +1207,14 @@ export function noteFrozenOutput(exportResult: unknown, sceneMotion: unknown): v
 /**
  * What to do about a bitrate the encoder did not hold, in terms that are true of the encoder that ran (BITREC170).
  * The studio's own advice (a lower bitrate, bitrateMode 'constant', a quantizer) was followed leg by leg on Chromium's
- * H.264 and none landed under the target: that encoder does not pad or hold a target and has no quantizer mode.
+ * SOFTWARE H.264 (the tester's Linux VM) and none landed under the target. The encoder differs by machine (a
+ * hardware H.264 encoder on macOS does take a quantizer), so the text says where it was measured and does not
+ * claim it for every machine.
  */
 export function bitrateAdvice(codec: unknown): string {
   const h264 = typeof codec !== 'string' || /^(avc|h264)/i.test(codec);
   return h264
-    ? "On this browser's H.264 encoder a lower bitrate, bitrateMode 'constant' and a quantizer do not bring the file under a target it missed. What changes the rate: fewer pixels (scale) or fewer frames (fps), simpler content, format 'webm' (its encoder takes a quantizer), or a re-encode outside the studio (ffmpeg -b:v with -maxrate and -bufsize; enforceBitrate does this where an ffmpeg runner exists, which is the Claude Desktop extension and not the npm package)."
+    ? "On this browser's H.264 encoder a missed target is rarely fixed by asking again: measured on Chromium's software H.264 encoder, a lower bitrate, bitrateMode 'constant' and a quantizer each still came out over. What does change the rate: fewer pixels (scale) or fewer frames (fps), simpler content, format 'webm' (its encoder takes a quantizer), or a re-encode outside the studio (ffmpeg -b:v with -maxrate and -bufsize; enforceBitrate does this where an ffmpeg runner exists, which is the Claude Desktop extension and not the npm package)."
     : "To land under it: a lower bitrate, a higher quantizer, a smaller scale or fps, or a re-encode outside the studio (ffmpeg -b:v with -maxrate and -bufsize).";
 }
 
@@ -1232,7 +1234,7 @@ export function noteEncoderRan(exportResult: unknown): void {
       list.forEach((w, i) => {
         if (!tag(w)) return;
         // The studio's "To land under it: …" list is replaced by what holds for the encoder that ran.
-        const fix = (text: string) => `${text.replace(/\s*(To land under it:|On this browser's H\.264 encoder a lower bitrate)[\s\S]*$/, '')} ${bitrateAdvice(codec)} ${who[0].toUpperCase()}${who.slice(1)}`;
+        const fix = (text: string) => `${text.replace(/\s*(To land under it:|On this browser's H\.264 encoder a missed target)[\s\S]*$/, '')} ${bitrateAdvice(codec)} ${who[0].toUpperCase()}${who.slice(1)}`;
         if (typeof w === 'string') list[i] = fix(w);
         else if (typeof (w as { message?: unknown }).message === 'string') (w as { message: string }).message = fix((w as { message: string }).message);
       });

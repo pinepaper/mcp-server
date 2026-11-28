@@ -387,7 +387,7 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 - A relation to a stick figure's id (for example `bob` instead of `bob_torso`) is still refused, because the id is the prefix of the figure's parts and not an item, but the refusal now names a part to relate to.
 - The `duration` description of `pinepaper_agent_export` now says which moment the last frame shows: frame n is time n / fps, so the last frame is one frame before `duration` and a keyframe at exactly `duration` is not drawn. To end on a pose, key it one frame earlier or export one frame longer.
 
-- A relation option the relation does not read is now refused, with the nearest valid name, instead of being accepted with a warning. `angle` on `orbits`, for example, is refused with "did you mean phaseDegrees". This applies to `pinepaper_add_relation`, to `relation` ops in a batch, and to `pinepaper-mcp check`. Custom relations are not checked this way. If a call that worked on 1.7.0 is now refused, the option it names was having no effect.
+- A relation option the relation does not read is now refused, with the nearest valid name, instead of being accepted with a warning. `angle` on `orbits`, for example, is refused with "did you mean phaseDegrees". This applies to `pinepaper_add_relation`, to `relation` ops in a batch, and to `pinepaper-mcp check`. Custom relations are not checked this way. An option refused this way is one the relation's code does not read, so on 1.7.0 it was accepted and, as far as the check can tell, ignored.
 
 - `pinepaper_font` `export` and `export_data` now write a file and return its path. Both used to answer success with no font and no data in the reply. The OTF or JSON is saved to the export folder; `download: false` also returns the content in the reply.
 
@@ -401,7 +401,7 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 
 - `pinepaper_choreograph` checks the whole figure against the frame, not its centre point. `to` is where the actor's centre goes, so passing a ground height sank a character by its lower half while the reply said `onScreen: true`. `onScreen` now means the whole figure is in the frame (`centreOnScreen` is the old reading), the warning gives the `to.y` that stands the figure on the line you named, and a default size that takes the actor out of the frame is reported with the setting to pass. The description of `arc` is corrected: it is the height of the curve's control point, and the path rises about half of it.
 
-- Export replies no longer recommend bitrate settings that do not work. When an MP4 misses its bitrate target, the warning used to suggest a lower bitrate, constant mode or a quantizer; on Chromium's H.264 encoder none of those brings the file under the target. The warning now says what does change the rate. A `quantizer` the encoder did not use is reported as `quantizer_not_applied`, and the descriptions of `broadcast`, `bitrateMode` and `quantizer` say what the browser encoder does with them.
+- Export replies no longer recommend bitrate settings that do not work. When an MP4 misses its bitrate target, the warning used to suggest a lower bitrate, constant mode or a quantizer; measured on Chromium's software H.264 encoder, none of those brought the file under the target. The warning now says what does change the rate. A `quantizer` the encoder did not use is reported as `quantizer_not_applied`, and the descriptions of `broadcast`, `bitrateMode` and `quantizer` say what the browser encoder does with them.
 
 - `frameDigest` is described as what it is: a hash of the frames given to the encoder. Equal digests mean the same pictures went in; they say nothing about the file's bytes, for which see `bitExact`.
 
@@ -409,7 +409,7 @@ If you do not want an agent executing anything, `code` mode is a first-class pat
 
 - A parallel export has the same number of frames as a single-pass export of the same scene (it could be one frame short), returns the warnings its segments raised, and stops and removes its partial files when a segment fails.
 
-- `pinepaper_generate`: when the cloud refuses a key, the reply gives the cloud's own reason. It used to say generation was a beta enabled per organisation, which is no longer how access works.
+- `pinepaper_generate`: when the cloud refuses a key, the reply gives the cloud's own reason. It used to state an access rule of its own (a beta enabled per organisation); who may generate is the cloud's rule, so the reply no longer states one.
 
 - `PINEPAPER_STUDIO_URL` is honoured by every tool that opens the studio, not only by the CLI commands.
 

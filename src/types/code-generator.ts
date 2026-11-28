@@ -2797,8 +2797,18 @@ const UNANIMATED_TEXT_KEYS_SENTENCE = `' is not an animatable property in this s
  * clean success. The sentence, or null when the first key's easing does apply (departure reading, hold / step, or an
  * append, whose first new key may follow an existing one).
  */
-export function firstKeyEasingNoEffect(keyframes: readonly Keyframe[], { append = false, easingAt }: { append?: boolean; easingAt?: 'arrival' | 'departure' } = {}): string | null {
-  if (append || easingAt === 'departure' || keyframes.length < 2) return null;
+export function firstKeyEasingNoEffect(keyframes: readonly Keyframe[], { append = false, easingAt, loop = false }: { append?: boolean; easingAt?: 'arrival' | 'departure'; loop?: boolean } = {}): string | null {
+  if (append || keyframes.length < 2) return null;
+  // EASELAST170, the mirror: read as DEPARTURE, an easing shapes the move leaving its key, and nothing leaves the
+  // last one. It drew linear with no word. A looping track is left alone: its last key may lead back to the first.
+  if (easingAt === 'departure') {
+    if (loop) return null;
+    const last = [...keyframes].sort((a, b) => a.time - b.time).pop() as { easing?: unknown } | undefined;
+    const le = last?.easing;
+    if (le === undefined || le === null || le === 'linear' || le === 'hold' || le === 'step') return null;
+    const lname = JSON.stringify(le);
+    return `easing ${lname} is on the last keyframe, where it has no effect with easingAt: 'departure': there an easing shapes the move LEAVING its key, and nothing leaves the last one (unless the track loops back to its first key). Put it on the keyframe the move starts from.`;
+  }
   const first = [...keyframes].sort((a, b) => a.time - b.time)[0] as { easing?: unknown } | undefined;
   const e = first?.easing;
   if (e === undefined || e === null || e === 'linear' || e === 'hold' || e === 'step') return null;
@@ -2971,7 +2981,7 @@ function generateKeyframeAnimateCode(
   const filterKeyCheck = `
   const __filterIgnored = ${unanimatedFilterKeysJs(keyframes.flatMap((k) => Object.keys((k as { properties?: object }).properties ?? {})))};
   if (__filterIgnored.length) __warn.push(__filterIgnored.join(', ') + ${UNANIMATED_FILTER_KEYS_SENTENCE});`;
-  const __firstEase = firstKeyEasingNoEffect(keyframes, { append, easingAt });
+  const __firstEase = firstKeyEasingNoEffect(keyframes, { append, easingAt, loop });
   const firstEaseWarn = __firstEase ? `
   __warn.push(${JSON.stringify(__firstEase)});` : '';
   const easingAtCheck = easingAt !== undefined ? `
@@ -8277,7 +8287,7 @@ ${Object.keys(videoEncodeOpts).length ? `  if (result && result.success) {
       if (__asked.bitrate !== undefined && typeof __vr.bitrate === 'number' && __vr.bitrate < __asked.bitrate * 0.99) __vw.push({ code: 'bitrate_not_applied', message: 'bitrate ' + __asked.bitrate + ' was asked for; the encoder was given ' + __vr.bitrate + '.' });
       // A quantizer the encoder has no mode for is kept out of the encode, and the receipt then showed a bitrate mode
       // and a target the caller never gave (BITREC170). video.quantizer is what the encoder was given.
-      if (__asked.quantizer !== undefined && __vr.quantizer !== __asked.quantizer) __vw.push({ code: 'quantizer_not_applied', message: 'quantizer ' + __asked.quantizer + ' was asked for and was not used' + (typeof __vr.quantizer === 'number' ? ' (the encoder was given ' + __vr.quantizer + ')' : '') + ': this encoder has no quantizer mode for the codec (Chromium has none for H.264). The file was encoded in bitrateMode ' + (__vr.bitrateMode || 'variable') + (typeof __vr.bitrate === 'number' ? ' at a target of ' + (__vr.bitrate / 1e6).toFixed(2) + ' Mbps that the studio chose, not one you gave' : '') + ". For a fixed quality use format 'webm'." });
+      if (__asked.quantizer !== undefined && __vr.quantizer !== __asked.quantizer) __vw.push({ code: 'quantizer_not_applied', message: 'quantizer ' + __asked.quantizer + ' was asked for and was not used' + (typeof __vr.quantizer === 'number' ? ' (the encoder was given ' + __vr.quantizer + ')' : '') + ': the encoder that ran has no quantizer mode for this codec (the software H.264 encoder in Chromium has none; a hardware one may). The file was encoded in bitrateMode ' + (__vr.bitrateMode || 'variable') + (typeof __vr.bitrate === 'number' ? ' at a target of ' + (__vr.bitrate / 1e6).toFixed(2) + ' Mbps that the studio chose, not one you gave' : '') + ". For a fixed quality use format 'webm'." });
     }
     // Said even where the studio sent no fidelity block: the warning was dropped with it.
     if (__vw.length) {
@@ -14608,7 +14618,8 @@ ${guard}
   if (__other.length) {
     __warnings.push('the actor already animates ' + __other.join(', ') + '; the beat keys leave those out, which the engine can break at the beat keys. Re-key ' + __other.join(', ') + ' with every key carrying them, after choreographing.');
   }
-  if (__r.final && !__r.final.onScreen) __warnings.push('after the last beat the actor is off screen at [' + __r.final.x + ', ' + __r.final.y + '].');
+  // The centre point: a figure that is only partly cut off is named by its own warning, with the fix.
+  if (__r.final && (__r.final.centreOnScreen === undefined ? !__r.final.onScreen : !__r.final.centreOnScreen)) __warnings.push('after the last beat the actor is off screen at [' + __r.final.x + ', ' + __r.final.y + '].');
   if (__fr.unbounded && __warnings.some(function (w) { return /off screen/.test(w); })) __warnings.push('the canvas is unbounded, so it has no fixed frame: on-screen was checked against its nominal ' + __fr.width + 'x' + __fr.height + ' artboard. Set a canvas size or preset to fix the frame.');
   const __res = { success: true, itemId: ${id}, beats: ${input.beats.length}, keyframes: __r.keyframes.length, duration: __r.end, final: __r.final, ...(__r.defaultsUsed ? { defaultsUsed: __r.defaultsUsed } : {}) };
 ${input.sound ? `  // SOUND ON THE ACTION (D68): one placed sound per moment the motion makes —
