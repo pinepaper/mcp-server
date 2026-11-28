@@ -43,3 +43,29 @@ describe('BITRATE34: the reply says which encoder made the file', () => {
     expect(r.video.encoderRan).toBeUndefined();
   });
 });
+
+describe('bitrate_exceeded advice is true of the encoder that ran (BITREC170)', () => {
+  const engine = "the 1.00 Mbps target was exceeded: the file is 1.50 Mbps (50% over). This browser's avc1 encoder does not hold its target on content it cannot compress (noise, grain, fine moving detail). To land under it: pass a bitrate about 67% of this one, or bitrateMode: 'constant', which held VP9 closer; or bitrateMode: 'quantizer' with a higher quantizer; or enforceBitrate: true (with deterministic: false), which asks the exporter to try to hold the cap from a probe of the first frames; or re-encode (e.g. ffmpeg -b:v with -maxrate/-bufsize).";
+  it("H.264: the studio's three prescriptions are replaced, once", async () => {
+    const { noteEncoderRan } = await import('../../tools/handlers.js');
+    const r: any = { video: { bitrateCeilingHeld: false, bitrateMode: 'variable', encode: { codec: 'avc1.640028' }, warnings: [{ code: 'bitrate_exceeded', message: engine }] } };
+    noteEncoderRan(r);
+    noteEncoderRan(r);
+    const m: string = r.video.warnings[0].message;
+    expect(m).toContain('the file is 1.50 Mbps (50% over)');
+    expect(m).not.toContain('To land under it');
+    expect(m).not.toContain("bitrateMode: 'quantizer'");
+    expect(m).not.toContain('which held VP9 closer');
+    expect(m.match(/On this browser's H\.264 encoder/g)).toHaveLength(1);
+    expect(m).toContain('fewer pixels (scale)');
+    expect(m.match(/The encoder that ran/g)).toHaveLength(1);
+  });
+  it('the server-made warning no longer recommends constant mode', async () => {
+    const { correctBitrateClaim, noteEncoderRan } = await import('../../tools/handlers.js');
+    const r: any = { video: { bitrate: 1_000_000, achievedBitrate: 1_078_000, bitrateCeilingHeld: true, encode: { codec: 'avc1.640028' } }, warnings: [] };
+    correctBitrateClaim(r);
+    noteEncoderRan(r);
+    expect(r.warnings[0]).not.toContain('held closer in measurement');
+    expect(r.warnings[0].match(/On this browser's H\.264 encoder/g)).toHaveLength(1);
+  });
+});

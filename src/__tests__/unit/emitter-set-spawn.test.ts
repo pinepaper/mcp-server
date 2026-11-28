@@ -24,6 +24,7 @@ describe('emitter set with bursts', () => {
     expect(r.success).toBe(true);
     expect(r.burstsReplaced).toMatchObject({ before: 2, after: 1 });
     expect(r.burstsReplaced.note).toContain('pass the existing bursts');
+    expect(r.warnings.join(' ')).toContain('bursts was replaced, not merged: the emitter had 2 bursts and now has 1');
   });
 
   it('a set that does not name bursts says nothing about them', () => {

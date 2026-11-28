@@ -2268,7 +2268,8 @@ export function normalizeEmitterSpec(spec: Record<string, unknown>, assumeDefaul
   };
   const out = fix(spec);
   // rate, start and end drive a trail. Beside bursts they drew nothing and said nothing (EMITCONT31).
-  const trailOnly = ['rate', 'start', 'end'].filter((k) => spec[k] !== undefined);
+  // emitWindows gates a trail's emission the same way and is as unread on a burst (TRAILBURST170).
+  const trailOnly = ['rate', 'start', 'end', 'emitWindows'].filter((k) => spec[k] !== undefined);
   if (trailOnly.length && Array.isArray(spec.bursts) && spec.mode !== 'trail' && spec.target === undefined) {
     warnings.push(`${trailOnly.join(', ')} ${trailOnly.length > 1 ? 'are' : 'is'} not read by a burst emitter, so ${trailOnly.length > 1 ? 'they had' : 'it had'} no effect: only the bursts' own count is drawn. For particles over time, add bursts, or use mode 'trail' with a target.`);
   }
@@ -2298,14 +2299,43 @@ export function normalizeEmitterSpec(spec: Record<string, unknown>, assumeDefaul
   const sizesShort = (where: string, count: unknown, sizes: unknown) => {
     if (!Array.isArray(sizes) || !sizes.length || Array.isArray(count)) return;
     const n = typeof count === 'number' && Number.isFinite(count) ? Math.round(count) : (assumeDefaultCount ? DEFAULT_COUNT : null);
-    if (n === null || n <= sizes.length) return;
-    warnings.push(`${where}: count ${n} with ${sizes.length} sizes: particle i takes sizes[i % ${sizes.length}], so the sizes repeat in that order across the ${n} particles. Give one size per particle for no repeat, or a size range ([min, max]) for a random size each.`);
+    if (n === null || n === sizes.length) return;
+    // LONGER than the count was silent while shorter warned (SIZELONG170): the extras are never drawn.
+    if (n < sizes.length) {
+      warnings.push(`${where}: count ${n} with ${sizes.length} sizes: only the first ${n} sizes are used, so the last ${sizes.length - n} draw nothing. Set count to ${sizes.length} to draw them all.`);
+      return;
+    }
+    warnings.push(`${where}: count ${n} with ${sizes.length} sizes: particle i takes sizes[i % ${sizes.length}], so the sizes repeat in that order across the ${n} particles. Give one size per particle for no repeat, or the key size (not sizes) as a range, size: [min, max], for a random size each.`);
   };
   if (out.sizes !== undefined && (out.count !== undefined || inherited)) sizesShort('spec', out.count, out.sizes);
   bursts.forEach((b, i) => {
     const own = (b && typeof b === 'object' ? b : {}) as Record<string, unknown>;
     if (own.count !== undefined || own.sizes !== undefined) sizesShort(`bursts[${i}]`, own.count ?? out.count, own.sizes ?? out.sizes);
   });
+  // sizes WINS OVER size (SIZELIST170): with both, the range was never drawn and nothing said so.
+  const sizeBeside = (where: string, size: unknown, sizes: unknown) => {
+    if (size === undefined || !Array.isArray(sizes) || !sizes.length) return;
+    warnings.push(`${where}: size ${JSON.stringify(size)} is not read beside sizes: sizes is the list each particle's size is taken from, so size had no effect. Keep one of the two: sizes for a size per particle, or size: [min, max] for a random size each.`);
+  };
+  sizeBeside('spec', out.size, out.sizes);
+  bursts.forEach((b, i) => {
+    const own = (b && typeof b === 'object' ? b : {}) as Record<string, unknown>;
+    if (own.size !== undefined || own.sizes !== undefined) {
+      if (!(own.size === undefined && own.sizes === undefined) && !(own.size === out.size && own.sizes === out.sizes)) sizeBeside(`bursts[${i}]`, own.size ?? out.size, own.sizes ?? out.sizes);
+    }
+  });
+  // A RANGE IS TWO NUMBERS (SIZEENDLIST170, SIZEENDDISC170, SPEED3EL170). The studio reads [min, max] from these keys
+  // and nothing after: speed [100, 300, 500] drew as [100, 300], and a four-value sizeEnd was not a list of sizes.
+  const RANGE_KEYS = ['size', 'sizeEnd', 'speed', 'angle', 'lifetime', 'spin', 'gravity', 'drag', 'friction', 'opacity', 'opacityEnd', 'jitter'];
+  const longRanges = (where: string, o: Record<string, unknown>) => {
+    for (const k of RANGE_KEYS) {
+      const v = o[k];
+      if (!Array.isArray(v) || v.length <= 2 || !v.every((x) => typeof x === 'number')) continue;
+      warnings.push(`${where}.${k} ${JSON.stringify(v)} has ${v.length} values, and ${k} is read as a range of two, [min, max]: only ${JSON.stringify(v.slice(0, 2))} is used and the other ${v.length - 2} ${v.length - 2 > 1 ? 'have' : 'has'} no effect.${k === 'size' ? ' For a size per particle, use sizes.' : k === 'sizeEnd' ? ' There is no per-particle list of end sizes; give [min, max] or one number.' : ''}`);
+    }
+  };
+  longRanges('spec', out);
+  bursts.forEach((b, i) => { if (b && typeof b === 'object') longRanges(`bursts[${i}]`, b as Record<string, unknown>); });
   // SPAWN IS A BOX ON THE CANVAS AXES (ParticleEmitter: x += (u - 0.5) * spawn[0], y += (u - 0.5) * spawn[1]), not a
   // range and not along the burst's angle. spawn [0, 200] beside angle 0 drew a vertical column of particles that
   // then flew right (SPAWNAX36). Said once, where a spawn box meets an aimed angle.
@@ -7671,7 +7701,13 @@ ${stillTime === undefined ? `  if (['png', 'jpg', 'webp', 'svg', 'pdf'].indexOf(
             }
             result.budget.by = 'studio';
           }
-          ${maxBytes !== undefined ? `// A BYTE BUDGET (round 9 GG, 8.31 — email wants <= 1 MB). gif.js has no
+          ${maxBytes !== undefined ? `// A studio that takes the budget but answers with no budget block left an over-budget GIF unsaid
+          // (GIFMAXBYTES23): neither rule had run, and the file was reported as an ordinary success.
+          if (format === 'gif' && __engineBudget && result && result.success && !(videoResult && videoResult.budget) && result.size > ${maxBytes}) {
+            result.budget = { maxBytes: ${maxBytes}, met: false, by: 'not reported' };
+            result.warning = 'the GIF is ' + result.size + ' bytes, over the ' + ${maxBytes} + '-byte budget, and the studio did not report shrinking it. Lower scale or fps, or shorten the duration.';
+          }
+          ` : ''}${maxBytes !== undefined ? `// A BYTE BUDGET (round 9 GG, 8.31 — email wants <= 1 MB). gif.js has no
           // colour-count knob, so size is the lever: GIF bytes scale roughly with
           // pixel count, so the frame is shrunk by sqrt(budget / size) with a
           // margin and re-encoded, at most three times. Every attempt is reported.
@@ -8205,8 +8241,13 @@ ${Object.keys(videoEncodeOpts).length ? `  if (result && result.success) {
     } else {
       if (__asked.broadcast && __vr.broadcast !== true) __vw.push({ code: 'broadcast_not_applied', message: 'broadcast was asked for but the encode was not broadcast-safe (the export route dropped the option): full-range, untagged colour.' });
       if (__asked.bitrate !== undefined && typeof __vr.bitrate === 'number' && __vr.bitrate < __asked.bitrate * 0.99) __vw.push({ code: 'bitrate_not_applied', message: 'bitrate ' + __asked.bitrate + ' was asked for; the encoder was given ' + __vr.bitrate + '.' });
+      // A quantizer the encoder has no mode for is kept out of the encode, and the receipt then showed a bitrate mode
+      // and a target the caller never gave (BITREC170). video.quantizer is what the encoder was given.
+      if (__asked.quantizer !== undefined && __vr.quantizer !== __asked.quantizer) __vw.push({ code: 'quantizer_not_applied', message: 'quantizer ' + __asked.quantizer + ' was asked for and was not used' + (typeof __vr.quantizer === 'number' ? ' (the encoder was given ' + __vr.quantizer + ')' : '') + ': this encoder has no quantizer mode for the codec (Chromium has none for H.264). The file was encoded in bitrateMode ' + (__vr.bitrateMode || 'variable') + (typeof __vr.bitrate === 'number' ? ' at a target of ' + (__vr.bitrate / 1e6).toFixed(2) + ' Mbps that the studio chose, not one you gave' : '') + ". For a fixed quality use format 'webm'." });
     }
-    if (__vw.length && result.fidelity) {
+    // Said even where the studio sent no fidelity block: the warning was dropped with it.
+    if (__vw.length) {
+      result.fidelity = result.fidelity || {};
       result.fidelity.warnings = (result.fidelity.warnings || []).concat(__vw);
       if (result.fidelity.note) delete result.fidelity.note;
     }
@@ -14914,8 +14955,13 @@ ${cam ? `  // The camera rides the SAME timing: framing each state as its morph 
   const r = app.setEmitter(${S(input.itemId)}, ${S(input.spec)});
   if (!r || r.ok === false) { return { success: false, error: (r && r.error) || 'the emitter change was refused' }; }
   const __b1 = r.spec && Array.isArray(r.spec.bursts) ? r.spec.bursts.length : null;
-  return { success: true, action: 'set', itemId: ${S(input.itemId)}, spec: r.spec${capJs('r.spec')}${Array.isArray((input.spec as Record<string, unknown> | undefined)?.bursts) ? `,
+  const __out = { success: true, action: 'set', itemId: ${S(input.itemId)}, spec: r.spec${capJs('r.spec')}${Array.isArray((input.spec as Record<string, unknown> | undefined)?.bursts) ? `,
     burstsReplaced: { before: __b0, after: __b1, note: 'bursts replaces the whole array: the emitter now has only the bursts this call passed. To add one, pass the existing bursts with it.' }` : ''} };
+  // Fewer bursts than before is a loss the caller may not have meant, so it is a warning as well as a field.
+  if (__b0 !== null && __b1 !== null && __b1 < __b0) {
+    __out.warnings = (__out.warnings || []).concat(['bursts was replaced, not merged: the emitter had ' + __b0 + ' burst' + (__b0 === 1 ? '' : 's') + ' and now has ' + __b1 + ', so ' + (__b0 - __b1) + ' earlier burst' + (__b0 - __b1 === 1 ? ' is' : 's are') + ' gone. To add a burst, pass the existing bursts together with the new one.']);
+  }
+  return __out;
 })();`.trim();
     }
     return `

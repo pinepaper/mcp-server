@@ -1204,6 +1204,18 @@ export function noteFrozenOutput(exportResult: unknown, sceneMotion: unknown): v
  * hardware one. The studio records each piece (video.encode.codec, video.hardwareAcceleration, video.bitrateMode) in
  * different places; this puts them together as video.encoderRan, and names it in a bitrate_exceeded warning.
  */
+/**
+ * What to do about a bitrate the encoder did not hold, in terms that are true of the encoder that ran (BITREC170).
+ * The studio's own advice (a lower bitrate, bitrateMode 'constant', a quantizer) was followed leg by leg on Chromium's
+ * H.264 and none landed under the target: that encoder does not pad or hold a target and has no quantizer mode.
+ */
+export function bitrateAdvice(codec: unknown): string {
+  const h264 = typeof codec !== 'string' || /^(avc|h264)/i.test(codec);
+  return h264
+    ? "On this browser's H.264 encoder a lower bitrate, bitrateMode 'constant' and a quantizer do not bring the file under a target it missed. What changes the rate: fewer pixels (scale) or fewer frames (fps), simpler content, format 'webm' (its encoder takes a quantizer), or a re-encode outside the studio (ffmpeg -b:v with -maxrate and -bufsize; enforceBitrate does this where an ffmpeg runner exists, which is the Claude Desktop extension and not the npm package)."
+    : "To land under it: a lower bitrate, a higher quantizer, a smaller scale or fps, or a re-encode outside the studio (ffmpeg -b:v with -maxrate and -bufsize).";
+}
+
 export function noteEncoderRan(exportResult: unknown): void {
   const r = exportResult as { video?: Record<string, any>; warnings?: unknown } | null;
   const v = r && typeof r === 'object' ? r.video : null;
@@ -1219,8 +1231,10 @@ export function noteEncoderRan(exportResult: unknown): void {
       if (!Array.isArray(list)) continue;
       list.forEach((w, i) => {
         if (!tag(w)) return;
-        if (typeof w === 'string') list[i] = `${w} ${who[0].toUpperCase()}${who.slice(1)}`;
-        else if (typeof (w as { message?: unknown }).message === 'string') (w as { message: string }).message += ` ${who[0].toUpperCase()}${who.slice(1)}`;
+        // The studio's "To land under it: …" list is replaced by what holds for the encoder that ran.
+        const fix = (text: string) => `${text.replace(/\s*(To land under it:|On this browser's H\.264 encoder a lower bitrate)[\s\S]*$/, '')} ${bitrateAdvice(codec)} ${who[0].toUpperCase()}${who.slice(1)}`;
+        if (typeof w === 'string') list[i] = fix(w);
+        else if (typeof (w as { message?: unknown }).message === 'string') (w as { message: string }).message = fix((w as { message: string }).message);
       });
     }
   }
@@ -1235,7 +1249,7 @@ export function correctBitrateClaim(exportResult: unknown): void {
   const over = Math.round((achieved / target - 1) * 1000) / 10;
   v.bitrateCeilingHeld = false;
   v.bitrateOverPercent = over;
-  const msg = `bitrate_exceeded: the ${(target / 1e6).toFixed(2)} Mbps target was not held: the file is ${(achieved / 1e6).toFixed(2)} Mbps (${over}% over). The browser encoder treats the target loosely on content it cannot compress; pass a lower bitrate, or bitrateMode 'constant', which held closer in measurement.`;
+  const msg = `bitrate_exceeded: the ${(target / 1e6).toFixed(2)} Mbps target was not held: the file is ${(achieved / 1e6).toFixed(2)} Mbps (${over}% over). The browser encoder treats the target loosely on content it cannot compress. ${bitrateAdvice((r as { video?: { encode?: { codec?: unknown } } }).video?.encode?.codec)}`;
   if (Array.isArray(r!.warnings)) (r!.warnings as unknown[]).push(msg); else r!.warnings = [msg];
 }
 
