@@ -75,11 +75,14 @@ describe('pinepaper_generate', () => {
     expect(out(r)).toContain('Nothing was charged');
   });
 
-  it('403: not enabled for the organisation, points to waitlist & pricing, nothing charged', async () => {
-    cloud({ 'POST /v1/generate': () => ({ status: 403, json: { type: 'waitlist_pending', detail: 'waitlisted' } }) });
+  it("403: says the cloud's own reason and states no access rule of its own, nothing charged", async () => {
+    const detail = 'Generated pictures and clips are open to accounts that have bought credits. Add credits at /add-credits (from $10), then try again; each one is quoted free before it is made.';
+    cloud({ 'POST /v1/generate': () => ({ status: 403, json: { type: 'waitlist_pending', detail } }) });
     const r = await handleToolCall('pinepaper_generate', req, {});
-    expect(out(r)).toContain('not enabled for your organisation');
-    expect(out(r)).toContain('https://cloud.test/waitlist');
+    expect(out(r)).toContain(detail);
+    expect(out(r)).not.toContain('internal beta');
+    expect(out(r)).not.toContain('per organisation');
+    expect(out(r)).not.toContain('/waitlist');
     expect(out(r)).toContain('https://cloud.test/pricing');
     expect(out(r)).toContain('Nothing was charged');
   });

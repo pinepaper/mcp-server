@@ -4,8 +4,9 @@
  *
  * This is the one place the local server calls the hosted API. It needs a
  * service-account key (PINEPAPER_API_KEY, `pp_sa_…`) with the render:create
- * scope, and the org must have the ai-media feature — an internal beta, so a
- * 403 is the ordinary answer for most keys and is said as such.
+ * scope. Who may generate is the cloud's rule and it changes there (a per-org
+ * beta once, accounts with bought credits since), so a 403 is reported in the
+ * cloud's own words and this file states no access rule of its own.
  *
  * The job shape is the cloud's (/v1/generate → 202 {job}, poll
  * /v1/generate/{id}), shared by stills now and video next; video only needs a
@@ -125,9 +126,9 @@ function explain(status: number, body: Record<string, any>, base: string): { mes
   }
   if (status === 403) {
     return {
-      message: `generation (ai-media) is not enabled for your organisation — it is an internal beta, granted per organisation. Request access at ${links.waitlist} (pricing: ${links.pricing}); local canvas and export tools remain free without it. Nothing was charged.`,
+      message: `the cloud refused generation for this key${said ? `: ${said}` : ' and gave no reason'} (cloud: ${base}, pricing: ${links.pricing}). Local canvas and export tools need no account. Nothing was charged.`,
       charged: false,
-      links: { waitlist: links.waitlist, pricing: links.pricing, authDoc: links.authDoc },
+      links: { pricing: links.pricing, billing: links.billing, authDoc: links.authDoc },
     };
   }
   if (status === 402) {
