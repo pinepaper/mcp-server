@@ -4,20 +4,20 @@
  * Name lists the engine owns and the tool surface must offer exactly. See
  * scripts/sync-engine-lists.mjs for why each is generated.
  *
- * Source: FxTool origin/main fc3c80c588947550a48d654470bf56b6fde33ce8
+ * Source: FxTool origin/main 219085523f22477d153f6f719c535be73859d68d
  *   js/core/KeyframeInterpolator.js  sha256: b4646b35ccd5549d
  *   js/world3d/worlds.js  sha256: 0e0973f7587c06e1
  *   js/core/DesignMedia.js  sha256: ab07f330e4060cb7
  *   js/FilterSystem.js  sha256: 09b003427995502c
  *   js/core/Provenance.js  sha256: 27e4d8becfa382c8
  *   js/core/StyledScene.js  sha256: 550fd9b58b7f5d87
- *   js/core/Patterns.js  sha256: a04fe3805f4e9d4f
+ *   js/core/Patterns.js  sha256: d73fca4e1732ff00
  *   js/relations/expr-to-ir.js  sha256: 4d92d2f42b3356e9
  *   js/RelationRegistry.js  sha256: 3c0b11eb5d32a488
  *   js/core/AnimationDriver.js  sha256: 6741a73f5f489355
- *   js/PinePaper.js  sha256: f09cdd9f109b021b
+ *   js/PinePaper.js  sha256: 036ffd3583173fe8
  *   js/ItemAuraSystem.js  sha256: 17b7a397cfbbdb9c
- *   js/GeneratorRegistry.js  sha256: d83bf11c8c532ac4
+ *   js/GeneratorRegistry.js  sha256: 9ffc650e32482431
  *   js/audio/SoundPresets.js  sha256: 713ef0d1e19dc128
  *   js/canvasPresets.js + js/core/CollagePatterns.js + js/core/ThreadPainting.js + js/shapes/*  sha256: 07e812d0604bca46
  */
