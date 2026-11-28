@@ -214,6 +214,30 @@ describe('keyframe_animate: text keys and easingAt (2, 5 EASEPLACE)', () => {
     expect(r.note).toContain("easingAt: 'departure'");
   });
 
+  it('an easing the studio\'s own list lacks is refused before anything is written', () => {
+    const keys = [{ time: 0, properties: { x: 0 } }, { time: 1, properties: { x: 100 }, easing: 'easeInOutElastic' }];
+    const lists = (easings: string[] | undefined) => {
+      const app = studio({ consumesEasingAt: true });
+      app.listAnimatableProperties = () => ({ properties: [], easings });
+      return app;
+    };
+    const old = lists(['linear', 'easeOut']);
+    const r = run({ itemId: 'a', keyframes: keys }, old);
+    expect(r).toMatchObject({ success: false, missingEasings: ['easeInOutElastic'] });
+    expect(r.error).toContain('easeInOutElastic');
+    expect(old.seen.length).toBe(0);
+    const now = lists(['linear', 'easeInOutElastic']);
+    expect(run({ itemId: 'a', keyframes: keys }, now).success).toBe(true);
+    expect(now.seen.length).toBe(1);
+    // A studio that publishes no list is not second-guessed.
+    const none = lists(undefined);
+    expect(run({ itemId: 'a', keyframes: keys }, none).success).toBe(true);
+    expect(run({ itemId: 'a', keyframes: keys }, studio({ consumesEasingAt: true })).success).toBe(true);
+    // A cubic-bezier array is not a name.
+    const bez = lists(['linear']);
+    expect(run({ itemId: 'a', keyframes: [keys[0], { time: 1, properties: { x: 1 }, easing: [0.2, 0, 0, 1] }] }, bez).success).toBe(true);
+  });
+
   it('letterSpacing (and the other text keys) are warned about only where the studio does not animate them', () => {
     const keys = [{ time: 0, properties: { letterSpacing: 0, lineHeight: 1.2 } }, { time: 1, properties: { letterSpacing: 8, lineHeight: 1.6 } }];
     const now = run({ itemId: 'a', keyframes: keys }, studio({ consumesEasingAt: true, animatable: ['letterSpacing', 'leading', 'x'] }));

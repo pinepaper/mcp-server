@@ -4,8 +4,8 @@
  * Name lists the engine owns and the tool surface must offer exactly. See
  * scripts/sync-engine-lists.mjs for why each is generated.
  *
- * Source: FxTool origin/main 219085523f22477d153f6f719c535be73859d68d
- *   js/core/KeyframeInterpolator.js  sha256: b4646b35ccd5549d
+ * Source: FxTool origin/main db24b70e2e56a8ebbe1bf74b6ddc8c75786a8a06
+ *   js/core/KeyframeInterpolator.js  sha256: cd14cee8d3da63f7
  *   js/world3d/worlds.js  sha256: 0e0973f7587c06e1
  *   js/core/DesignMedia.js  sha256: ab07f330e4060cb7
  *   js/FilterSystem.js  sha256: 09b003427995502c
@@ -13,9 +13,9 @@
  *   js/core/StyledScene.js  sha256: 550fd9b58b7f5d87
  *   js/core/Patterns.js  sha256: d73fca4e1732ff00
  *   js/relations/expr-to-ir.js  sha256: 4d92d2f42b3356e9
- *   js/RelationRegistry.js  sha256: 3c0b11eb5d32a488
+ *   js/RelationRegistry.js  sha256: 02fae7561ad649d3
  *   js/core/AnimationDriver.js  sha256: 6741a73f5f489355
- *   js/PinePaper.js  sha256: 036ffd3583173fe8
+ *   js/PinePaper.js  sha256: a24d0d000de95f38
  *   js/ItemAuraSystem.js  sha256: 17b7a397cfbbdb9c
  *   js/GeneratorRegistry.js  sha256: 9ffc650e32482431
  *   js/audio/SoundPresets.js  sha256: 713ef0d1e19dc128
@@ -389,7 +389,7 @@ export const ENGINE_AURA_TYPES = [
   'ink_bleed',
 ] as const;
 
-/** 39 names: EASING_NAMES, the keys of the engine's easing table. Keyframes, masks, relations and the camera all resolve through it. */
+/** 41 names: EASING_NAMES, the keys of the engine's easing table. Keyframes, masks, relations and the camera all resolve through it. */
 export const ENGINE_EASING_NAMES = [
   'linear',
   'easeIn',
@@ -404,6 +404,8 @@ export const ENGINE_EASING_NAMES = [
   'elastic',
   'easeOutElastic',
   'easeInElastic',
+  'easeInOutBounce',
+  'easeInOutElastic',
   'easeOutBack',
   'easeInBack',
   'easeInOutBack',

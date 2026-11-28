@@ -132,9 +132,11 @@ export const EASING_DESCRIPTIONS: Record<(typeof KEYFRAME_EASINGS)[number], stri
   bounce: 'Bounces to rest at the end (same as easeOutBounce)',
   easeOutBounce: 'Bounces to rest at the end',
   easeInBounce: 'Bounces at the start, then moves',
+  easeInOutBounce: 'Bounces at the start and again to rest at the end',
   elastic: 'Overshoots and oscillates at the end (same as easeOutElastic)',
   easeOutElastic: 'Overshoots and oscillates at the end',
   easeInElastic: 'Oscillates at the start, then moves',
+  easeInOutElastic: 'Oscillates at the start and again at the end',
   easeOutBack: 'Overshoots the target slightly, then settles',
   easeInBack: 'Pulls back first, then moves',
   easeInOutBack: 'Pulls back first and overshoots at the end',
@@ -4610,8 +4612,8 @@ export type LintSceneInput = z.infer<typeof LintSceneInputSchema>;
 // Media (video/audio) via window.PinePaperAgent. Agent-facing surface is URL-based
 // (the agent can't hand over a File). Uploaded media are first-class canvas items.
 export const MediaInputSchema = z.object({
-  action: z.enum(['upload_video', 'upload_audio', 'list', 'remove', 'set_playback_rate', 'set_clip', 'split', 'add_transition', 'set_time_remap', 'speed_ramp', 'match_cut', 'apply_track_matte', 'stop_live_matte', 'analyze_reference', 'remake_from_reference'])
-    .describe("'upload_video' / 'upload_audio' (from a URL) · 'list' media · 'remove' by id · 'set_playback_rate' · 'set_clip' (re-trim; with timeOffset also moves the clip) · 'split' (cut a clip in two at canvas time `at`; the first half keeps its id) · 'add_transition' (crossfade or dip between fromItemId, which ends at the cut, and toItemId, which starts there) · 'set_time_remap' (canvas-time→source-time curve: ramps, freezes, reverse) · 'speed_ramp' ({duration, speed} segments — the human way to say a remap) · 'match_cut' (cut between two shots aligning the SUBJECT via on-device detection) · 'apply_track_matte' (an item's alpha driven by another item's luma/alpha — type-filled-with-footage; live:true keeps it tracking as the matte animates) · 'stop_live_matte'"),
+  action: z.enum(['upload_video', 'upload_audio', 'list', 'remove', 'set_playback_rate', 'set_clip', 'split', 'add_transition', 'sequence', 'set_time_remap', 'speed_ramp', 'match_cut', 'apply_track_matte', 'stop_live_matte', 'analyze_reference', 'remake_from_reference'])
+    .describe("'upload_video' / 'upload_audio' (from a URL) · 'list' media · 'remove' by id · 'set_playback_rate' · 'set_clip' (re-trim; with timeOffset also moves the clip) · 'split' (cut a clip in two at canvas time `at`; the first half keeps its id) · 'add_transition' (crossfade or dip between fromItemId, which ends at the cut, and toItemId, which starts there) · 'sequence' (put the uploaded videos and photos back to back from 0 s) · 'set_time_remap' (canvas-time→source-time curve: ramps, freezes, reverse) · 'speed_ramp' ({duration, speed} segments — the human way to say a remap) · 'match_cut' (cut between two shots aligning the SUBJECT via on-device detection) · 'apply_track_matte' (an item's alpha driven by another item's luma/alpha — type-filled-with-footage; live:true keeps it tracking as the matte animates) · 'stop_live_matte'"),
   // Not .url(): a bare absolute path is not a URL, and 48f3a2a made the server
   // read local files — so `/Users/…/broll1.mp4` was advertised and then rejected
   // by the schema before anything could read it. resolveMediaSource validates
@@ -4671,6 +4673,9 @@ export const MediaInputSchema = z.object({
     color: z.string().optional().describe("dip: the colour dipped through (default black)."),
   }).optional().describe('add_transition: {type, seconds, color}.'),
   atPlayhead: z.boolean().optional().describe('upload_video / upload_audio: start the clip at the current playback time (instead of timeOffset).'),
+  // sequence
+  ids: z.array(z.string().min(1)).min(1).optional().describe('sequence: the clips and photos to place, in this order (media ids, item ids or names). Default: every uploaded video and photo, in upload order.'),
+  imageSeconds: z.number().positive().optional().describe('sequence: how long each photo holds, in seconds.'),
 })
   .refine((v) => !(v.action === 'upload_video' || v.action === 'upload_audio') || !!v.url, { message: 'upload requires url', path: ['url'] })
   .refine((v) => v.action !== 'analyze_reference' || !!v.id, { message: 'analyze_reference requires id: the uploaded reference clip (upload_video it first)', path: ['id'] })

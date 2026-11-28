@@ -3989,6 +3989,23 @@ export function batchRef(raw: string | undefined): string {
   return typeof raw === 'string' && /^\$\d+$/.test(raw) ? `__ref(${raw.slice(1)})` : JSON.stringify(String(raw));
 }
 
+/**
+ * Page statements that refuse an easing NAME the running studio's own table
+ * lacks (listAnimatableProperties().easings), before anything is written. The
+ * list in this package is the newest engine's, and the package ships without
+ * the studio: a name the studio does not hold was accepted in silence
+ * (measured: success, no warning). A studio that publishes no list is not
+ * second-guessed. Empty when no key names an easing.
+ */
+function missingEasingsJs(keyframes: ReadonlyArray<unknown>, extra = ''): string {
+  const named = [...new Set((keyframes || []).map((k) => (k as { easing?: unknown } | null)?.easing).filter((e): e is string => typeof e === 'string'))];
+  if (named.length === 0) return '';
+  return `  let __live = null;
+  try { const __p = typeof app.listAnimatableProperties === 'function' ? app.listAnimatableProperties() : null; if (__p && Array.isArray(__p.easings) && __p.easings.length) __live = __p.easings; } catch (e) { __live = null; }
+  const __missing = __live ? ${JSON.stringify(named)}.filter(function(n) { return __live.indexOf(n) === -1; }) : [];
+  if (__missing.length) { return { success: false${extra}, error: 'this studio has no easing named ' + __missing.join(', ') + '; nothing was written. pinepaper_get_available_easings lists the ones it has.', missingEasings: __missing }; }`;
+}
+
 function asReturningBody(snippet: string): string {
   const single = snippet.trim();
   if (single.startsWith('(async function()')) return `return await ${single.replace(/;\s*$/, '')};`;
@@ -4623,10 +4640,24 @@ export class PinePaperCodeGenerator {
       validated.append === true || validated.mode === 'merge',
       validated.easingAt
     );
-    if (!holds) return code;
-    return `(async function() {
-  if (!(typeof app.setStepTiming === 'function')) { return { success: false, error: 'this studio has no hold keys (interpolation: \\'hold\\') — it predates FxTool D11; nothing was written. Use two keys a frame apart for a cut.' }; }
+    const easingCheck = missingEasingsJs(validated.keyframes);
+    if (!holds && !easingCheck) return code;
+    const checks: string[] = [];
+    if (holds) checks.push(`  if (!(typeof app.setStepTiming === 'function')) { return { success: false, error: 'this studio has no hold keys (interpolation: \\'hold\\') — it predates FxTool D11; nothing was written. Use two keys a frame apart for a cut.' }; }`);
+    if (easingCheck) checks.push(easingCheck);
+    // The hold probe always answered a promise; an easing check alone keeps
+    // the call as synchronous as the code it wraps.
+    const isAsync = holds || code.trim().startsWith('(async function()');
+    return isAsync
+      ? `(async function() {
+${checks.join('\n')}
   return await (async function() {
+${asReturningBody(code)}
+  })();
+})();`
+      : `(function() {
+${checks.join('\n')}
+  return (function() {
 ${asReturningBody(code)}
   })();
 })();`;
@@ -6667,6 +6698,7 @@ if (!_target) {
 }
 const _kfItem = _target.item || _target;
 const _prevKeys = (_kfItem.data && Array.isArray(_kfItem.data.keyframes)) ? _kfItem.data.keyframes.length : 0;
+${missingEasingsJs((kfSource || []) as unknown[], ', itemId: targetId')}
 ${kfGuard.before}
 app.addAnimation(targetId, ${kfJson}, { duration: ${kfDuration}, loop: ${kfLoop}${kfAppend ? ", mode: 'merge'" : ''}${kfExtraStr} });${kfGuard.after}
 ${deadKeysJs('_deadKeys')}${kfTextCheck}
@@ -14185,6 +14217,23 @@ ${guard}
   if (!r || r.ok === false) return { success: false, action: 'split', error: (r && r.reason) || 'the studio refused the split' };
   return Object.assign({ success: true, action: 'split' }, r);
 })();`.trim();
+
+      // Back to back from 0 s. The studio owns the order and the timing; this
+      // only asks and reads the answer, so a refusal is an error here.
+      case 'sequence': {
+        const seqOpts: Record<string, unknown> = {};
+        if (input.ids) seqOpts.ids = input.ids;
+        if (input.imageSeconds !== undefined) seqOpts.imageSeconds = input.imageSeconds;
+        return `
+// Put the uploaded videos and photos back to back
+(async function() {
+${guard}
+  if (typeof A.sequenceMedia !== 'function') { return { success: false, action: 'sequence', error: 'this studio is too old to sequence media (no sequenceMedia) — nothing was changed.' }; }
+  const r = await A.sequenceMedia(${JSON.stringify(seqOpts)});
+  if (!r || r.ok === false) return { success: false, action: 'sequence', error: (r && r.reason) || 'the studio refused the sequence' };
+  return { success: true, action: 'sequence', placed: r.placed, count: Array.isArray(r.placed) ? r.placed.length : 0, duration: r.duration };
+})();`.trim();
+      }
 
       case 'add_transition':
         return `

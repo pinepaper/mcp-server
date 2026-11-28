@@ -69,3 +69,29 @@ describe('atPlayhead', () => {
     expect(MediaInputSchema.safeParse({ action: 'upload_audio', url: 'x', atPlayhead: true, timeOffset: 1 }).success).toBe(false);
   });
 });
+
+describe('sequence', () => {
+  it('asks the studio with only what was given and returns the placement', async () => {
+    let args: unknown[] = [];
+    const placed = [{ id: 'a', start: 0, end: 4 }, { id: 'b', start: 4, end: 7 }];
+    const A = { sequenceMedia: async (...a: unknown[]) => { args = a; return { ok: true, placed, duration: 7 }; } };
+    expect(await run({ action: 'sequence' }, A)).toEqual({ success: true, action: 'sequence', placed, count: 2, duration: 7 });
+    expect(args).toEqual([{}]);
+    await run({ action: 'sequence', ids: ['b', 'a'], imageSeconds: 3 }, A);
+    expect(args).toEqual([{ ids: ['b', 'a'], imageSeconds: 3 }]);
+  });
+  it('a refusal is an error with the studio\'s reason; an old studio says so', async () => {
+    expect(await run({ action: 'sequence' }, { sequenceMedia: async () => ({ ok: false, reason: 'no video or image to place' }) })).toMatchObject({ success: false, action: 'sequence', error: 'no video or image to place' });
+    expect((await run({ action: 'sequence' }, {})).error).toContain('too old');
+  });
+  it('an id with a quote stays data in the generated code', async () => {
+    let args: unknown[] = [];
+    await run({ action: 'sequence', ids: ["it's \"one\"`${x}"] }, { sequenceMedia: async (...a: unknown[]) => { args = a; return { ok: true, placed: [], duration: 0 }; } });
+    expect(args).toEqual([{ ids: ["it's \"one\"`${x}"] }]);
+  });
+  it('schema: ids cannot be empty, imageSeconds is positive', () => {
+    expect(MediaInputSchema.safeParse({ action: 'sequence', ids: [] }).success).toBe(false);
+    expect(MediaInputSchema.safeParse({ action: 'sequence', imageSeconds: 0 }).success).toBe(false);
+    expect(MediaInputSchema.safeParse({ action: 'sequence' }).success).toBe(true);
+  });
+});

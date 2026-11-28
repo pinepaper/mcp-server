@@ -1,7 +1,7 @@
 /* GENERATED — DO NOT EDIT.
  *
- * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main 219085523f22477d153f6f719c535be73859d68d
- * sha256:    036ffd3583173fe8c999ed8bf6e46add1300246faf4d8bf5f9622d98f6e8225b   (of PinePaper.js as committed)
+ * Source:    FxTool js/PinePaper.js + js/app.js, at commit origin/main db24b70e2e56a8ebbe1bf74b6ddc8c75786a8a06
+ * sha256:    a24d0d000de95f38404f58952270af4db785e91dea26e7597f15ec2d4e0a68b1   (of PinePaper.js as committed)
  * Generator: scripts/sync-engine-surface.mjs
  *
  * Every name reachable on `window.app`, with how it gets there. The parity
@@ -16,7 +16,7 @@
 /** How a name lands on `app`. */
 export type EngineMemberKind = 'method' | 'accessor' | 'property' | 'lazy' | 'lazyHeavy' | 'bootstrap';
 
-/** 1657 names, from FxTool/js/PinePaper.js. */
+/** 1658 names, from FxTool/js/PinePaper.js. */
 export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object.freeze({
   __buildFreshness: 'property',
   _aboveHooksHeld: 'property',
@@ -560,6 +560,7 @@ export const ENGINE_SURFACE: Readonly<Record<string, EngineMemberKind>> = Object
   _updateLabel: 'method',
   _updateMermaidDirection: 'method',
   _updateSelectionVisualsFast: 'method',
+  _uprightTextSize: 'method',
   _usdExportSource: 'method',
   _viewportBounds: 'property',
   _warnedNoMaterial: 'property',
