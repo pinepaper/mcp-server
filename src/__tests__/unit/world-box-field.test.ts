@@ -50,6 +50,17 @@ describe('cube_field', () => {
     expect(r).toMatchObject({ success: true, createdWorld: 'field', count: 4 });
   });
 
+  it('a spec it does not read is said: an object, or a name beside a world that already exists', async () => {
+    const withWorld = await run(gen({ action: 'cube_field', cols: 2, rows: 2, spec: 'forest' }), studio(true).app);
+    expect(withWorld.warning).toContain('a world already exists');
+    const object = await run(gen({ action: 'cube_field', cols: 2, rows: 2, spec: { env: {} } }), studio(false).app);
+    expect(object.warning).toContain('world NAME');
+    expect(object.createdWorld).toBe('field');
+    const named = await run(gen({ action: 'cube_field', cols: 2, rows: 2, spec: 'forest' }), studio(false).app);
+    expect(named.createdWorld).toBe('forest');
+    expect(named.warning).toBeUndefined();
+  });
+
   it('a refusal from the studio is a failure with the studio reason', async () => {
     const r = await run(gen({ action: 'cube_field', cols: 200, rows: 200 }), studio().app);
     expect(r.success).toBe(false);

@@ -16099,6 +16099,9 @@ ${needWorld}
           instances: input.instances, motion: input.motion, keyframes: input.keyframes, loop: input.loop,
         };
         const world = typeof input.spec === 'string' ? input.spec : 'field';
+        // spec only NAMES the world to make when there is none. A spec object, or a spec beside a world that
+        // already exists, is not read: said, not dropped in silence.
+        const specObject = input.spec !== undefined && typeof input.spec !== 'string';
         return `
 // World3D: a field of boxes drawn as one instanced mesh
 (async function() {
@@ -16109,11 +16112,14 @@ ${needWorld}
     createdWorld = ${S(world)};
     await app.createWorld3D(createdWorld);
   }
+  const specNote = ${specObject}
+    ? 'spec was not read: cube_field takes a world NAME there (the world to make when none exists). For a custom world, call create with the spec object first.'
+    : (${input.spec !== undefined} && !createdWorld ? 'spec was not read: a world already exists, so none was made. remove_world first to start a different one.' : null);
   const r = await app.addWorldBoxField(${S(field)});
   if (!r || r.ok === false) {
     return { success: false, action: 'cube_field', error: (r && (r.reason || r.error)) || 'the world refused the field', ...(r && r.id ? { meshId: r.id } : {}), ...(createdWorld ? { createdWorld } : {}) };
   }
-  return { success: true, action: 'cube_field', meshId: r.id, count: r.count, ...(r.cols ? { cols: r.cols, rows: r.rows, spacing: r.spacing } : {}), driver: r.driver || null, ...(createdWorld ? { createdWorld } : {}) };
+  return { success: true, action: 'cube_field', meshId: r.id, count: r.count, ...(r.cols ? { cols: r.cols, rows: r.rows, spacing: r.spacing } : {}), driver: r.driver || null, ...(createdWorld ? { createdWorld } : {}), ...(specNote ? { warning: specNote } : {}) };
 })();`.trim();
       }
 
