@@ -797,7 +797,7 @@ MODIFIABLE PROPERTIES:
 - opacity: Transparency (0-1)
 - rotation: Rotation in degrees
 - skewX / skewY: shear in degrees about the item's centre; matrix: [a, b, c, d, tx, ty] affine. For mockups (a box face, a screen at an angle). APPLIED to the current shape, so calling again compounds — the result's affine says so.
-- scale: Size multiplier
+- scale / scaleX / scaleY: an ABSOLUTE scale factor (1 = the item unscaled). It replaces any earlier scale, including the fit an imported image was given by maxWidth / maxHeight; a keyframed scale is different, it multiplies the scale the item already has
 - shadowColor: Shadow color
 - shadowBlur: Shadow blur radius
 - shadowOffset: Shadow offset [x, y]
@@ -1265,9 +1265,9 @@ EXAMPLES:
       properties: {
         opacity: { type: 'number', minimum: 0, maximum: 1, description: 'Opacity, 0 to 1. The same as pinepaper_modify_item after the import.' },
         blendMode: { type: 'string', description: "How it composites over what is below: 'multiply', 'screen' and the other pinepaper_modify_item blend modes." },
-        scale: { type: 'number', exclusiveMinimum: 0, description: 'Multiplies the size maxWidth / maxHeight / maxEdge gave it.' },
+        scale: { type: 'number', exclusiveMinimum: 0, description: 'Multiplies the size the image was placed at: scale 2 beside maxWidth 200 draws 400 wide.' },
         loop: { anyOf: [{ type: 'boolean' }, { type: 'integer', minimum: 1 }, { type: 'string', enum: ['forever'] }], description: "An animated GIF, WebP or APNG: true or 'forever' loops, false plays once and holds, n plays n times. Left out, the file's own loop count. Change it later with pinepaper_modify_item's loop, and its start time with imageStart. An APNG plays too, except a remote file named .png, which stays a still." },
-        imageStart: { type: 'number', minimum: 0, description: "An animated GIF, WebP or APNG: the scene time, in seconds, at which its first frame shows. Left out, 0. Change it later with pinepaper_modify_item's imageStart. The reply's playback says what the studio stored." },
+        imageStart: { type: 'number', minimum: 0, description: "An animated GIF, WebP or APNG: the scene time, in seconds, at which its first frame shows: a delay before it starts playing, not a seek into the file. Left out, 0. Change it later with pinepaper_modify_item's imageStart. The reply's playback says what the studio stored." },
         url: {
           type: 'string',
           description: 'URL of the image to import',
@@ -1288,7 +1288,7 @@ EXAMPLES:
           type: 'number',
           description: 'Maximum height constraint in pixels',
         },
-        maxEdge: { anyOf: [{ type: 'integer', minimum: 1 }, { type: 'string', enum: ['native'] }], description: "The longest edge the studio STORES the image at (px); 'native' keeps every pixel. Default: the studio's cap, which follows the canvas on desktop. The result says when the image was stored smaller than its source." },
+        maxEdge: { anyOf: [{ type: 'integer', minimum: 1 }, { type: 'string', enum: ['native'] }], description: "The longest edge the studio STORES the image at (px); 'native' keeps every pixel. Default: the studio's cap: the canvas's long edge on desktop, and never below a floor of 2560 px, so a small canvas does not lower it. The result says when the image was stored smaller than its source." },
         nativeSize: { type: 'boolean', description: 'Place the image at its source footprint even if it was stored smaller.' },
         name: { type: 'string', description: 'A name for the image, so a batch patch (or any tool that takes an item) can address it by name instead of its id.' },
         mask: {
@@ -2035,7 +2035,7 @@ PLAN FIRST; GENERATE ONLY WHAT THE EDIT USES. Every output is paid in full wheth
 - Video: choose each shot's length from the lengths the model allows (listModels; Veo takes 4, 6 or 8 s) and re-time the edit to them. Do not generate long and crop.
 - Music: the song is the backbone. Its length only loosely follows the request, so cut the picture to its beats and bars with pinepaper_beat_cuts and use the whole song, rather than trimming it to fit the picture.
 
-Needs a service-account key in PINEPAPER_API_KEY (pp_sa_…, render:create scope). It is an internal beta enabled per organisation: without it the result says "not enabled for your organisation", and nothing is charged. Every refusal says whether anything was charged.
+Needs a service-account key in PINEPAPER_API_KEY (pp_sa_…, render:create scope). The cloud decides which accounts may generate; when it refuses, the result gives the cloud's own reason and nothing is charged. Every refusal says whether anything was charged.
 
 - model or useCase: a model id from pinepaper_generate_estimate {listModels: true}, or a use case and the cloud picks its default (hero stills, plates, text in the image, character-consistent edits).
 - input: { prompt, aspect ('16:9' | '9:16' | '1:1' | '4:5'), n (1-4), seed?, negativePrompt?, imageUrls? (https references for edit models) }.
@@ -3773,7 +3773,7 @@ Relations are COMPOSITIONAL - an item can have multiple relations that work toge
           description: 'Registry ID of the source item (the item that will be affected)',
         },
         targetId: {
-          type: 'string',
+          type: ['string', 'null'],
           description: 'Registry ID of the target item (the item being related to, can be null for self-animations like animates)',
         },
         relationType: {
@@ -7508,9 +7508,9 @@ ACTIONS (authoring):
 - create_space         — { width? }                  create a space glyph
 - remove_glyph         — { character }
 - set_metrics          — { metrics: { unitsPerEm?, ascender?, descender?, xHeight?, capHeight? } } (or top-level keys)
-- export               — { download?: boolean }      export as OTF
+- export               — { download?: boolean }      write the font as an .otf file in the export folder; the reply gives its path (download: false also returns it as base64)
 - load_into_document   — {}                          load the font for use in this canvas
-- export_data          — { download?: boolean }      export as JSON
+- export_data          — { download?: boolean }      write the editable font data as a .json file in the export folder (download: false also returns it in the reply)
 - import_data          — { data: object }            import from JSON
 - clear                — {}                          reset everything
 - remove_overlap       — { pathId }                  path cleanup
@@ -9202,7 +9202,7 @@ EXAMPLE — Animated sky scene with timed reveals:
               // Relations
               sourceId: { type: 'string', description: 'For relation: source item ID or $N, or a name pattern ("dot-*"): every item named like it, in name order, each with index and count added to relationOptions; re-sending it after adding members binds the new ones and updates index and count' },
               update: { type: 'boolean', description: 'relation: true changes the relationOptions of the relation already bound (same sourceId, targetId, relationType) instead of binding another' },
-              targetId: { type: 'string', description: 'For relation: target item ID or $N' },
+              targetId: { type: ['string', 'null'], description: 'For relation: target item ID or $N; omit or null for a self-relation' },
               relationType: {
                 type: 'string',
                 enum: [...RelationTypeSchema.options],
@@ -9433,9 +9433,9 @@ VERIFY MOTION BEFORE YOU RENDER. An export takes seconds to minutes and shows yo
         transparent: { type: 'boolean', description: 'apng: keep the alpha channel (the default; false fills the background colour). webm: true writes a VP9 alpha channel where the studio supports it; result.video.alpha confirms it, and fidelity says when it did not. Not for mp4 / gif.' },
         alphaQuantizer: { type: 'integer', minimum: 0, maximum: 63, description: 'webm with transparent: alpha-stream quality, 0 = lossless … 63.' },
         loop: { anyOf: [{ type: 'boolean' }, { type: 'integer', minimum: 0, maximum: 1000 }], description: 'gif / apng: true = loop forever, false / 0 / 1 = play once, n = play n times (email clients often want a few plays, not forever). Refused on video formats — see SEAMLESS LOOPS.' },
-        broadcast: { type: 'boolean', description: 'mp4 only: broadcast-safe — BT.709, limited range (16-235), tagged bt709, constant bitrate with an 8 Mbps floor at 720p+ (4 below). result.video reports what the encoder did.' },
+        broadcast: { type: 'boolean', description: 'mp4 only: broadcast-safe — BT.709, limited range (16-235), tagged bt709, constant bitrate with an 8 Mbps floor at 720p+ (4 below). result.video reports what the encoder did. The floor is asked of the encoder, not guaranteed: the browser encoder does not pad, so simple content comes out far below it and the result says so (bitrate_below_floor). The 720 line is the OUTPUT height, so scale moves it. For a delivery bitrate, re-encode outside the studio.' },
         frames: { type: 'integer', minimum: 1, maximum: 36000, description: 'Animated formats: exactly this many frames instead of duration. A duration makes ceil(duration x fps) frames (7.91667 s at 24 fps is 191, not 190), so use frames for frame-exact segments.' },
-        deterministic: { type: 'boolean', description: 'mp4 / webm, on by default (false opts out): identical encoder input for the same scene, seed and settings (the receipt\'s frameHashes / frameDigest), and a container identical apart from the encoded samples. WebM is byte-identical. An MP4 is byte-identical only when result.video reports bitExact: true (same machine and browser build); a software H.264 MP4 at 640x480 and above is not, and warns determinism_not_pinned. Compare MP4s by frameDigest, not sha256.' },
+        deterministic: { type: 'boolean', description: 'mp4 / webm, on by default (false opts out): identical encoder input for the same scene, seed and settings (the receipt\'s frameHashes / frameDigest), and a container identical apart from the encoded samples. WebM is byte-identical. An MP4 is byte-identical only when result.video reports bitExact: true (same machine and browser build); a software H.264 MP4 at 640x480 and above is not, and warns determinism_not_pinned. To check two MP4s drew the same frames, compare frameDigest, not sha256. frameDigest hashes the pictures handed to the encoder, before encoding: equal digests mean the same pictures went in, and say nothing about the bytes of the file or about what a decoder gets back out. The claim about the bytes is bitExact.' },
         motionBlur: {
           type: 'object',
           description: 'mp4 / webm: real motion blur. Each frame is rendered `subframes` times across the shutter and averaged, so fast movement smears instead of strobing. Costs subframes× the render time: run estimateOnly first (it reports renders and renderCost). The result carries motionBlur (what the exporter applied).',
@@ -9449,10 +9449,10 @@ VERIFY MOTION BEFORE YOU RENDER. An export takes seconds to minutes and shows yo
         enforceBitrate: { type: 'boolean', description: "mp4 only, with bitrate: make bitrate a hard cap. Forwards browser-side quantizer ceiling probing where supported, and in the Claude Desktop extension (ffmpeg on PATH) re-encodes an over-cap MP4 with ffmpeg (libx264, audio copied). Opt-in; the npm package never runs ffmpeg and reports that in result.bitrateCap." },
         boundedEffects: { anyOf: [{ type: 'boolean' }, { type: 'string', enum: ['decompose'] }], description: "mp4 / webm: opt-in faster effects/4K rendering (up to ~4-6/255 channel tolerance). true tightens effect buffer bounds to item + shadow reach; 'decompose' also splits blend+shadow into two faster passes. Needs a studio that has it: on one that does not, the export is the ordinary render and fidelity.warnings carries bounded_effects_not_applied." },
         minBitrate: { type: 'integer', minimum: 100000, maximum: 200000000, description: 'mp4 / webm: a floor; a miss is a fidelity warning naming the re-encode a delivery spec needs.' },
-        bitrateMode: { type: 'string', enum: ['constant', 'variable'], description: "mp4 / webm: 'constant' (the default with broadcast) or 'variable'." },
-        quantizer: { type: 'integer', minimum: 0, maximum: 63, description: "mp4 / webm: a fixed quality instead of a bitrate (H.264 0-51, VP9 0-63; lower is better and bigger). A deterministic export already uses one (23 for H.264). Lower it when faint, fine detail (thin low-contrast lines, soft gradients) holds or freezes between frames in the file: the encoder skips blocks it judges unchanged at the default. Not with bitrate, minBitrate, bitrateMode or broadcast. The receipt's video.quantizer says what was used." },
+        bitrateMode: { type: 'string', enum: ['constant', 'variable'], description: "mp4 / webm: 'constant' (the default with broadcast) or 'variable'. Chromium's H.264 encoder does not hold 'constant': the file comes out as it does with 'variable', and the result says bitrate_not_honoured." },
+        quantizer: { type: 'integer', minimum: 0, maximum: 63, description: "mp4 / webm: a fixed quality instead of a bitrate (H.264 0-51, VP9 0-63; lower is better and bigger). A deterministic export already uses one (23 for H.264). Lower it when faint, fine detail (thin low-contrast lines, soft gradients) holds or freezes between frames in the file: the encoder skips blocks it judges unchanged at the default. Not with bitrate, minBitrate, bitrateMode or broadcast. The receipt's video.quantizer says what was used. Where the encoder has no quantizer mode for the codec it is not used, and the result says quantizer_not_applied." },
         audioCodec: { type: 'string', enum: ['any', 'aac'], description: "mp4 only: 'aac' refuses the export (code audio_codec_unavailable, no file) where the soundtrack could only be Opus — Chromium on Linux has no AAC encoder; macOS and Windows do. 'any' (default) muxes Opus there with the audio_codec_opus warning (whatsappSafe: false). Silent MP4s are AAC everywhere. Without it: where the browser could only make Opus (Chromium on Linux), the Claude Desktop extension re-encodes the audio to AAC (video copied; result.audioDelivered, and file.sha256 is the delivered file); without ffmpeg, a social platform (instagram, tiktok, twitter, linkedin) is refused by name and anything else keeps the Opus file with a note." },
-        maxBytes: { type: 'integer', minimum: 1, description: 'gif only: size budget in bytes (email: 1000000). Over it, the GIF is re-encoded at a smaller frame size, at most twice; result.budget reports each attempt.' },
+        maxBytes: { type: 'integer', minimum: 1, description: 'gif only: size budget in bytes (email: 1000000). Over it, the GIF is re-encoded smaller: up to three smaller frame sizes, then two lower frame rates. result.budget reports each attempt and met; met: false with a warning means the smallest try is still over.' },
         time: { type: 'number', minimum: 0, description: 'Stills only (png / jpg / webp / svg / pdf): render at this time in seconds; the playhead is put back afterwards. Without it a still is whatever frame the playhead is on, so repeated runs can differ.' },
         pdf: {
           type: 'object',

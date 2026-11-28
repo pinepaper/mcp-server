@@ -55,7 +55,7 @@ MODIFIABLE PROPERTIES:
 - content: Text content
 - opacity: Transparency (0-1)
 - rotation: Rotation in degrees
-- scale: Size multiplier`,
+- scale / scaleX / scaleY: an ABSOLUTE scale factor (1 = the item unscaled). It replaces any earlier scale, including the fit an imported image was given by maxWidth / maxHeight; a keyframed scale is different, it multiplies the scale the item already has`,
       params: {
         itemId: 'Registry ID of the item (e.g., "item_1")',
         properties: 'Properties to update',

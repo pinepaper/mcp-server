@@ -1796,7 +1796,24 @@ const __ctItem = app.getItemById(${ID});
 const __ctKeys = (__ctItem && __ctItem.data && Array.isArray(__ctItem.data.keyframes))
   ? __ctItem.data.keyframes.filter(function(k) { return k && k.properties && Object.prototype.hasOwnProperty.call(k.properties, 'content'); }).length : 0;` : ''}
 ${modDirection ? emitDirectionCheck(`app.getItemById(${ID})`, modDirection) : ''}${modTabular ? emitTabularCheck(`app.getItemById(${ID})`) : ''}${modTypography.length ? emitTypographyCheck(`app.getItemById(${ID})`, modTypography) : ''}${modFillOpacity ? emitFillOpacityCheck(`app.getItemById(${ID})`) : ''}${modStrokePos ? emitStrokePositionCheck(`app.getItemById(${ID})`, modStrokePos) : ''}
-return { success: true, itemId: ${ID}${properties.content !== undefined ? `, ...(__ctKeys ? { contentTrackWarning: 'this text\\'s content is keyframed (' + __ctKeys + ' key(s)), so the track sets it on every frame and this edit does not show. Change the content keys with pinepaper_keyframe_animate (append: true replaces same-time keys), or animate another property.' } : {})` : ''}${modFit ? ', textFit: __textFit' : ''}${modWrapApplies ? ', textWrap: __textWrap' : ''}${modRewrap ? ', ...(__textRewrap ? { textWrap: __textRewrap } : {})' : ''}${modDirection ? ', direction: __direction' : ''}${modTabular ? ', tabularFigures: __tabular' : ''}${modTypography.length ? ', typography: __typography' : ''}${modFillOpacity ? ', fillOpacity: __fillOpacity' : ''}${modStrokePos ? ', strokePosition: __strokePos' : ''}${affine ? `, affine: ${jsLiteral({ skewX, skewY, matrix, note: 'applied to the current shape: calling again compounds it. To undo, apply the inverse (negative skew, or the inverse matrix).' })}` : ''}${modLifetime ? ', lifetime: __lifetime' : ''}${modFont ? ', ...(__font ? { font: __font } : {})' : ''}${modWarning} };`;
+${typeof properties.imageStart === 'number' ? `
+// imageStart AS STORED (IMAGESTART37, modify route): the change answered success with nothing to read, and a studio
+// that kept 0 was not said. Read back the way the import reads it, and compared with the ask.
+let __mpb = null;
+{
+  let __pb = null;
+  try { __pb = typeof app.getImagePlayback === 'function' ? app.getImagePlayback(${ID}) : null; } catch (_) { __pb = null; }
+  if (__pb) {
+    __mpb = Object.assign({ applied: true }, __pb);
+    if (Math.abs((Number(__pb.imageStart) || 0) - ${properties.imageStart}) > 1e-6) {
+      __mpb.applied = false;
+      __mpb.warning = 'imageStart was not applied: asked ${properties.imageStart} s, the studio stored ' + (Number(__pb.imageStart) || 0) + ' s, so the image starts at that time.';
+    }
+  } else {
+    __mpb = { applied: false, warning: 'imageStart could not be confirmed: this item is not an animated image, or this studio does not report image playback (app.getImagePlayback).' };
+  }
+}` : ''}
+return { success: true, itemId: ${ID}${typeof properties.imageStart === 'number' ? ', playback: __mpb' : ''}${properties.content !== undefined ? `, ...(__ctKeys ? { contentTrackWarning: 'this text\\'s content is keyframed (' + __ctKeys + ' key(s)), so the track sets it on every frame and this edit does not show. Change the content keys with pinepaper_keyframe_animate (append: true replaces same-time keys), or animate another property.' } : {})` : ''}${modFit ? ', textFit: __textFit' : ''}${modWrapApplies ? ', textWrap: __textWrap' : ''}${modRewrap ? ', ...(__textRewrap ? { textWrap: __textRewrap } : {})' : ''}${modDirection ? ', direction: __direction' : ''}${modTabular ? ', tabularFigures: __tabular' : ''}${modTypography.length ? ', typography: __typography' : ''}${modFillOpacity ? ', fillOpacity: __fillOpacity' : ''}${modStrokePos ? ', strokePosition: __strokePos' : ''}${affine ? `, affine: ${jsLiteral({ skewX, skewY, matrix, note: 'applied to the current shape: calling again compounds it. To undo, apply the inverse (negative skew, or the inverse matrix).' })}` : ''}${modLifetime ? ', lifetime: __lifetime' : ''}${modFont ? ', ...(__font ? { font: __font } : {})' : ''}${modWarning} };`;
 
   // Wrapped, because the body now RETURNS early on a miss rather than falling
   // through to an unconditional success. Async only when a font must load
@@ -3205,6 +3222,8 @@ const GET_ITEMS_ENTRY_JS = `entry => {
   if (it.scaling && (Math.abs(it.scaling.x - 1) > 1e-6 || Math.abs(it.scaling.y - 1) > 1e-6)) out.scale = { x: r2(it.scaling.x), y: r2(it.scaling.y) };
   if (typeof it.rotation === 'number' && Math.abs(it.rotation) > 1e-6) out.rotation = r2(it.rotation);
   if (typeof it.opacity === 'number' && it.opacity !== 1) out.opacity = r2(it.opacity);
+  // The mask an import was given (MASKMASK170: the import's reply said it and the list did not).
+  if (it.data && it.data.masked && it.data.maskType) out.mask = it.data.maskType;
   // An animated image's playback as stored (IMAGESTART37: imageStart was nowhere to be read). Images only.
   if ((entry.type === 'image' || it.className === 'Raster') && typeof app.getImagePlayback === 'function') {
     try { const pb = app.getImagePlayback(it); if (pb) out.playback = pb; } catch (_) { /* a read never fails the list */ }
@@ -10564,9 +10583,15 @@ ${mask ? `    // A MASK REPLACES THE RASTER (round 8 DD, 4.10). applyMask builds
     let __look = null;
     {
       let __ok = false;
-      try { __ok = app.modifyItem(itemId, ${JSON.stringify(look)}) !== false; } catch (_) { __ok = false; }
+      const __lk = ${JSON.stringify(look)};
+      // scale MULTIPLIES THE PLACED SIZE (SCALEWIDTH170, SCALEMAX170). modify sets a raster's scaling outright, which
+      // threw away the fit maxWidth / maxHeight had given it: a 400x200 source with maxWidth 200 and scale 2 drew at
+      // 800x400, twice the source, not twice the 200 asked for. A masked image is a group at scaling 1 already.
+      const __fit = placed && placed.className === 'Raster' && placed.scaling && Number.isFinite(placed.scaling.x) && placed.scaling.x > 0 ? placed.scaling.x : 1;
+      if (typeof __lk.scale === 'number') __lk.scale = __lk.scale * __fit;
+      try { __ok = app.modifyItem(itemId, __lk) !== false; } catch (_) { __ok = false; }
       __look = __ok
-        ? { applied: true, opacity: placed.opacity, blendMode: placed.blendMode }
+        ? { applied: true, opacity: placed.opacity, blendMode: placed.blendMode${scale !== undefined ? `, scale: ${JSON.stringify(scale)}` : ''} }
         : { applied: false, warning: 'the image was imported but ' + ${jsLiteral(Object.keys(look).join(', '))} + ' was not applied: set it with pinepaper_modify_item on ' + itemId + '.' };
     }
 ` : ''}${hasShadow ? `    // The shadow goes on what is DRAWN, after a mask has replaced the raster.

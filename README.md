@@ -1272,7 +1272,8 @@ server starts as before; nothing but MCP protocol is written to stdout.
   with the path of the bad value. The result says what each tween became.
 - `pinepaper_agent_export` returns the saved file's `sha256` and size. When
   the studio reports per-frame hashes, it also returns a `frameDigest`, so two
-  renders can be compared in one field. When `ffprobe` is installed, the saved
+  renders can be compared in one field (it hashes the frames given to the
+  encoder, not the file's bytes or decoded pixels; for bytes see `bitExact`). When `ffprobe` is installed, the saved
   video is checked against what the studio encoded, and any field that
   disagrees is named (`PINEPAPER_FFPROBE=off` turns this off).
 - `pinepaper_execute_custom_code` and `pinepaper_agent_batch_execute` return
@@ -1743,8 +1744,8 @@ do one of these says so rather than reporting success.
 `pinepaper_generate` creates images with AI models in the PinePaper cloud and
 can place the first one on the canvas; `pinepaper_generate_estimate` prices a
 request and lists the models, free. It is charged per image, needs a service
-account key (`PINEPAPER_API_KEY`), and is enabled per organisation during the
-beta — without it the tools say so, and nothing is charged.
+account key (`PINEPAPER_API_KEY`), and the cloud decides which accounts may
+generate — when it refuses, the tools give its reason, and nothing is charged.
 
 Words are never drawn by the model: pass them as `input.text` (headline,
 subhead, caption, call to action, label) and they are added as real, editable
@@ -3012,7 +3013,7 @@ All 180 tools, grouped by the tag used for toolkit filtering.
 |------|-------------|
 | `pinepaper_execute_generator` | Run a background generator |
 | `pinepaper_list_generators` | List available generators |
-| `pinepaper_generate` | AI image generation in the PinePaper cloud (charged; beta, per organisation) |
+| `pinepaper_generate` | AI image generation in the PinePaper cloud (charged; needs a cloud key) |
 | `pinepaper_generate_estimate` | Free price check, and the model list |
 | `pinepaper_generate_status` | Collect a generation that outlived its timeout |
 | `pinepaper_styled_scene` | One composition drawn in a built-in style |
