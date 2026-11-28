@@ -28,6 +28,16 @@
  * LAN addresses, for a local dev server. Cloud metadata addresses stay
  * refused with it set: nothing a design tool does needs them.
  *
+ * A CONFIGURED PROXY (1.7.1, IMPURL40). Behind a fake-IP DNS proxy every public
+ * name resolves into 198.18.0.0/15 and only the proxy knows the real host, so a
+ * direct connection cannot work and the address tells nothing. When the
+ * operator has set HTTPS_PROXY / HTTP_PROXY (NO_PROXY is honoured), such a name
+ * is fetched through that proxy BY NAME: a CONNECT tunnel for https, with TLS
+ * still verified against the URL's host. Only that case uses the proxy. An
+ * address literal, a name that resolves to a loopback, LAN or metadata address,
+ * and every redirect hop are checked and refused exactly as before; a name
+ * with public addresses still connects directly, pinned.
+ *
  * node:http, node:https and node:dns are loaded lazily. This module is also
  * bundled into a Cloudflare Worker, which has none of them in the same form;
  * there, the literal address is still checked and the platform's own fetch
@@ -49,11 +59,13 @@ import { BlockList, isIP } from 'node:net';
 export const MAX_REDIRECTS = 5;
 
 export interface ResolvedAddress { address: string; family: 4 | 6 }
+/** What checkUrl returns: the checked addresses, and the proxy to reach the host through when it is known only by name. */
+export type CheckedAddresses = ResolvedAddress[] & { viaProxy?: URL };
 
 /** Seams for tests: DNS, and the pinned transport. */
 export const safeFetchDeps: {
   lookup: (host: string) => Promise<ResolvedAddress[]>;
-  request: (url: URL, addresses: ResolvedAddress[], init: RequestInit) => Promise<Response>;
+  request: (url: URL, addresses: CheckedAddresses, init: RequestInit) => Promise<Response>;
   /** The transport for trustedFetch: the same node request, unpinned. */
   trusted: (url: URL, init: RequestInit) => Promise<Response>;
 } = {
@@ -78,9 +90,9 @@ for (const [net, bits] of [
 
 /**
  * 198.18.0.0/15 is the benchmarking range (RFC 2544), and what a fake-IP DNS proxy answers with: every public name
- * resolves into it and only the proxy knows where it goes (IMPURL40). Refused like any private address, but said as
- * what it is, because the opt-in does not help there: this server connects directly and does not go through
- * HTTPS_PROXY, so the connection fails anyway.
+ * resolves into it and only the proxy knows where it goes (IMPURL40). With HTTPS_PROXY / HTTP_PROXY set, such a name is
+ * fetched through that proxy by name (proxyFor). Without one it is refused like any private address, but said as what
+ * it is, because a direct connection to that address goes nowhere.
  */
 const FAKE_IP = new BlockList();
 FAKE_IP.addSubnet('198.18.0.0', 15, 'ipv4');
@@ -94,6 +106,39 @@ METADATA.addAddress('fd00:ec2::254', 'ipv6');
 export function privateNetworkAllowed(): boolean {
   const value = typeof process !== 'undefined' ? process.env?.PINEPAPER_ALLOW_PRIVATE_NETWORK : undefined;
   return /^(1|true|yes)$/i.test(value ?? '');
+}
+
+/** The standard proxy variables, read in one place and only by these names. */
+const PROXY_VARS = ['HTTPS_PROXY', 'https_proxy', 'HTTP_PROXY', 'http_proxy', 'ALL_PROXY', 'all_proxy', 'NO_PROXY', 'no_proxy'] as const;
+function proxyVar(name: (typeof PROXY_VARS)[number]): string | undefined {
+  const vars = typeof process !== 'undefined' ? process.env : undefined;
+  const value = vars && PROXY_VARS.includes(name) ? vars[name] : undefined;
+  return value && value.trim() ? value.trim() : undefined;
+}
+
+/**
+ * The operator's HTTP proxy for this URL, or null: none set, the host is in NO_PROXY, or the proxy is of a kind this
+ * file cannot speak (only http:// proxies, which is what CONNECT needs; socks and https proxies are not used).
+ */
+export function proxyFor(url: URL): URL | null {
+  const host = url.hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  const exempt = (proxyVar('NO_PROXY') ?? proxyVar('no_proxy') ?? '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);
+  for (const entry of exempt) {
+    if (entry === '*') return null;
+    const bare = entry.replace(/^\*?\./, '').replace(/:\d+$/, '');
+    if (bare && (host === bare || host.endsWith(`.${bare}`))) return null;
+  }
+  const all = proxyVar('ALL_PROXY') ?? proxyVar('all_proxy');
+  const raw = url.protocol === 'https:'
+    ? proxyVar('HTTPS_PROXY') ?? proxyVar('https_proxy') ?? all
+    : proxyVar('HTTP_PROXY') ?? proxyVar('http_proxy') ?? all;
+  if (!raw) return null;
+  try {
+    const proxy = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `http://${raw}`);
+    return proxy.protocol === 'http:' && proxy.hostname ? proxy : null;
+  } catch {
+    return null;
+  }
 }
 
 /** The IPv4 address an IPv6 address carries, for NAT64 (64:ff9b::/96) and 6to4 (2002::/16). */
@@ -159,7 +204,7 @@ async function defaultLookup(host: string): Promise<ResolvedAddress[]> {
  * Resolve a URL's host and refuse it unless every address is public.
  * Returns the checked addresses, which the connection is then pinned to.
  */
-export async function checkUrl(input: string | URL): Promise<ResolvedAddress[]> {
+export async function checkUrl(input: string | URL): Promise<CheckedAddresses> {
   let url: URL;
   try {
     url = typeof input === 'string' ? new URL(input) : input;
@@ -171,7 +216,7 @@ export async function checkUrl(input: string | URL): Promise<ResolvedAddress[]> 
   }
   const host = url.hostname.replace(/^\[|\]$/g, '');
   const literal = isIP(host);
-  let addresses: ResolvedAddress[];
+  let addresses: CheckedAddresses;
   if (literal) {
     addresses = [{ address: host, family: literal === 6 ? 6 : 4 }];
   } else {
@@ -179,18 +224,23 @@ export async function checkUrl(input: string | URL): Promise<ResolvedAddress[]> 
     if (!addresses.length && /(^|\.)localhost$/i.test(host)) addresses = [{ address: '127.0.0.1', family: 4 }];
   }
   const allowPrivate = privateNetworkAllowed();
+  let viaProxy: URL | null = null;
   for (const { address } of addresses) {
     const kind = classifyAddress(address);
+    const fakeIp = kind === 'private' && !literal && isIP(address) === 4 && FAKE_IP.check(address, 'ipv4');
+    // Known only by name, and the operator has named a proxy: it is fetched through that, by name.
+    if (fakeIp && (viaProxy ??= proxyFor(url))) continue;
     if (kind === 'metadata') {
       throw new UnsafeUrlError(`refused ${url.href} — it resolves to ${address}, a cloud metadata address. This is refused even with PINEPAPER_ALLOW_PRIVATE_NETWORK=1.`);
     }
-    if (kind === 'private' && !allowPrivate && !literal && isIP(address) === 4 && FAKE_IP.check(address, 'ipv4')) {
-      throw new UnsafeUrlError(`refused ${url.href} — ${host} resolves to ${address}, an address a fake-IP DNS proxy hands out (198.18.0.0/15), so the real host is known only to that proxy. This server connects directly and does not use HTTPS_PROXY. Download the file and import it by local path, or set PINEPAPER_ALLOW_PRIVATE_NETWORK=1 if this network routes those addresses itself.`);
+    if (fakeIp && !allowPrivate) {
+      throw new UnsafeUrlError(`refused ${url.href} — ${host} resolves to ${address}, an address a fake-IP DNS proxy hands out (198.18.0.0/15), so the real host is known only to that proxy. Set ${url.protocol === 'https:' ? 'HTTPS_PROXY' : 'HTTP_PROXY'} to that proxy's http:// address in this server's environment and the file is fetched through it; or download the file and import it by local path; or set PINEPAPER_ALLOW_PRIVATE_NETWORK=1 if this network routes those addresses itself.`);
     }
     if (kind === 'private' && !allowPrivate) {
       throw new UnsafeUrlError(`refused ${url.href} — it resolves to ${address}, a private address. Set PINEPAPER_ALLOW_PRIVATE_NETWORK=1 to allow local hosts.`);
     }
   }
+  if (viaProxy) addresses.viaProxy = viaProxy;
   return addresses;
 }
 
@@ -245,7 +295,7 @@ const IDLE_TIMEOUT_MS = 120_000;
  * read before returning. Where node:http is missing (a Worker), the platform fetch, which cannot reach private
  * addresses.
  */
-async function nodeRequest(url: URL, addresses: ResolvedAddress[], init: RequestInit): Promise<Response> {
+async function nodeRequest(url: URL, addresses: ResolvedAddress[], init: RequestInit, proxy?: URL): Promise<Response> {
   // A Cloudflare Worker (mcp-cloud bundles this file) may offer a node:https shim over its own fetch; use the
   // platform fetch there directly, as before undici went: a Worker cannot open connections to private addresses.
   if (typeof navigator !== 'undefined' && (navigator as { userAgent?: string }).userAgent === 'Cloudflare-Workers') return fetch(url, init);
@@ -263,14 +313,30 @@ async function nodeRequest(url: URL, addresses: ResolvedAddress[], init: Request
       else cb(null, addresses[0].address, addresses[0].family);
     }
     : undefined;
+  // Through a proxy the host is reached by name: https over a CONNECT tunnel (TLS end to end, verified against the
+  // host), http by asking the proxy for the absolute URL.
+  const tunnel = proxy && secure ? await proxyTunnel(proxy, host, Number(url.port) || 443, init.signal ?? undefined) : null;
+  // The tunnel is handed over by a one-request agent: with `agent: false` node ignores a createConnection option and
+  // resolves the host itself.
+  const tunnelAgent = tunnel ? Object.assign(new mod.Agent({ keepAlive: false }), { createConnection: () => tunnel }) : null;
+  const viaProxy: Record<string, unknown> = !proxy ? {}
+    : tunnelAgent ? { agent: tunnelAgent }
+      : { host: proxy.hostname.replace(/^\[|\]$/g, ''), port: Number(proxy.port) || 80, path: url.href, setHost: false };
+  if (proxy && !secure) {
+    headers.host = url.host;
+    const auth = proxyAuthorization(proxy);
+    if (auth) headers['proxy-authorization'] = auth;
+  }
   return new Promise<Response>((resolve, reject) => {
-    const req = mod.request(url, {
+    const options = {
       method: (init.method || 'GET').toUpperCase(),
       headers,
-      ...(pinned ? { lookup: pinned as never } : {}),
+      ...(pinned && !proxy ? { lookup: pinned as never } : {}),
       ...(secure && !isIP(host) ? { servername: host } : {}),
-      agent: false,
-    }, (res) => {
+      agent: false as false | import('node:http').Agent,
+      ...viaProxy,
+    };
+    const onResponse = (res: import('node:http').IncomingMessage) => {
       const chunks: Buffer[] = [];
       res.on('data', (c: Buffer) => chunks.push(c));
       res.on('error', reject);
@@ -278,7 +344,9 @@ async function nodeRequest(url: URL, addresses: ResolvedAddress[], init: Request
         const status = res.statusCode || 0;
         resolve(new Response(NULL_BODY.has(status) ? null : Buffer.concat(chunks), { status, statusText: res.statusMessage || '', headers: toHeaders(res.headers) }));
       });
-    });
+    };
+    // A plain-http request through a proxy is addressed to the proxy; every other request to the URL itself.
+    const req = proxy && !secure ? mod.request(options, onResponse) : mod.request(url, options, onResponse);
     req.setTimeout(IDLE_TIMEOUT_MS, () => req.destroy(new Error(`no response from ${url.host} in ${IDLE_TIMEOUT_MS / 1000} s`)));
     req.on('error', reject);
     const signal = init.signal;
@@ -291,8 +359,48 @@ async function nodeRequest(url: URL, addresses: ResolvedAddress[], init: Request
   });
 }
 
-function pinnedRequest(url: URL, addresses: ResolvedAddress[], init: RequestInit): Promise<Response> {
-  return nodeRequest(url, addresses, init);
+function pinnedRequest(url: URL, addresses: CheckedAddresses, init: RequestInit): Promise<Response> {
+  return nodeRequest(url, addresses, init, addresses.viaProxy);
+}
+
+function proxyAuthorization(proxy: URL): string | null {
+  if (!proxy.username) return null;
+  return `Basic ${Buffer.from(`${decodeURIComponent(proxy.username)}:${decodeURIComponent(proxy.password)}`).toString('base64')}`;
+}
+
+/** A TLS socket to host:port through the proxy's CONNECT tunnel, the certificate verified against `host`. */
+async function proxyTunnel(proxy: URL, host: string, port: number, signal?: AbortSignal): Promise<import('node:tls').TLSSocket> {
+  const http = await import('node:http');
+  const tls = await import('node:tls');
+  const target = `${host.includes(':') ? `[${host}]` : host}:${port}`;
+  const auth = proxyAuthorization(proxy);
+  return new Promise((resolve, reject) => {
+    const req = http.request({
+      host: proxy.hostname.replace(/^\[|\]$/g, ''),
+      port: Number(proxy.port) || 80,
+      method: 'CONNECT',
+      path: target,
+      headers: { host: target, ...(auth ? { 'proxy-authorization': auth } : {}) },
+      agent: false,
+    });
+    req.setTimeout(IDLE_TIMEOUT_MS, () => req.destroy(new Error(`no answer from the proxy ${proxy.host} in ${IDLE_TIMEOUT_MS / 1000} s`)));
+    req.on('error', (e) => reject(new Error(`could not reach the proxy ${proxy.host}: ${e.message}`)));
+    req.on('connect', (res, socket) => {
+      if (res.statusCode !== 200) {
+        socket.destroy();
+        reject(new Error(`the proxy ${proxy.host} refused a tunnel to ${target} (${res.statusCode} ${res.statusMessage || ''})`.trim()));
+        return;
+      }
+      const secured = tls.connect({ socket, ...(isIP(host) ? {} : { servername: host }) });
+      secured.once('error', reject);
+      resolve(secured);
+    });
+    if (signal) {
+      if (signal.aborted) { req.destroy(new Error('aborted')); return; }
+      signal.addEventListener('abort', () => req.destroy(new Error('aborted')), { once: true });
+    }
+    req.end();
+  });
 }
 
 /**
