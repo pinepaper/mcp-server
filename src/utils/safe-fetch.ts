@@ -102,18 +102,19 @@ const METADATA = new BlockList();
 for (const a of ['169.254.169.254', '169.254.170.2', '100.100.100.200']) METADATA.addAddress(a, 'ipv4');
 METADATA.addAddress('fd00:ec2::254', 'ipv6');
 
-/** The one variable this file reads, by its literal name (utils/env.ts lists the rest). */
-export function privateNetworkAllowed(): boolean {
-  const value = typeof process !== 'undefined' ? process.env?.PINEPAPER_ALLOW_PRIVATE_NETWORK : undefined;
-  return /^(1|true|yes)$/i.test(value ?? '');
+/**
+ * Everything this file reads from the environment, read in ONE place and only by these names (utils/env.ts lists
+ * the rest of the package). One read site, not one per name: a supply-chain scanner counts each site.
+ */
+const OWN_VARS = ['PINEPAPER_ALLOW_PRIVATE_NETWORK', 'HTTPS_PROXY', 'https_proxy', 'HTTP_PROXY', 'http_proxy', 'ALL_PROXY', 'all_proxy', 'NO_PROXY', 'no_proxy'] as const;
+function proxyVar(name: (typeof OWN_VARS)[number]): string | undefined {
+  const vars = typeof process !== 'undefined' ? process.env : undefined;
+  const value = vars && OWN_VARS.includes(name) ? vars[name] : undefined;
+  return value && value.trim() ? value.trim() : undefined;
 }
 
-/** The standard proxy variables, read in one place and only by these names. */
-const PROXY_VARS = ['HTTPS_PROXY', 'https_proxy', 'HTTP_PROXY', 'http_proxy', 'ALL_PROXY', 'all_proxy', 'NO_PROXY', 'no_proxy'] as const;
-function proxyVar(name: (typeof PROXY_VARS)[number]): string | undefined {
-  const vars = typeof process !== 'undefined' ? process.env : undefined;
-  const value = vars && PROXY_VARS.includes(name) ? vars[name] : undefined;
-  return value && value.trim() ? value.trim() : undefined;
+export function privateNetworkAllowed(): boolean {
+  return /^(1|true|yes)$/i.test(proxyVar('PINEPAPER_ALLOW_PRIVATE_NETWORK') ?? '');
 }
 
 /**

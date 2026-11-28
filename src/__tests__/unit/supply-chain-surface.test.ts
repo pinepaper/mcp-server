@@ -101,8 +101,11 @@ describe('supply-chain surface', () => {
     expect(envSrc.match(/process\.env/g)?.length).toBe(1);
     expect(envSrc).toMatch(/vars && LISTED\.has\(name\) \? vars\[name\] : undefined/);
     for (const p of SRC) expect(code(p)).not.toMatch(/process\.env\s*(\?\.)?\s*\[/);
-    const fetchReads = [...code(join(ROOT, 'src', 'utils', 'safe-fetch.ts')).matchAll(/process\.env\??\.(\w+)/g)].map((m) => m[1]);
-    expect([...new Set(fetchReads)]).toEqual(['PINEPAPER_ALLOW_PRIVATE_NETWORK']);
+    // safe-fetch.ts: one read as well, gated on its own fixed list (the private-network switch and the proxy variables).
+    const fetchSrc = code(join(ROOT, 'src', 'utils', 'safe-fetch.ts'));
+    expect(fetchSrc.match(/process\.env/g)?.length).toBe(1);
+    expect(fetchSrc).toMatch(/vars && OWN_VARS\.includes\(name\) \? vars\[name\] : undefined/);
+    expect(fetchSrc).not.toMatch(/process\.env\??\.\w/);
     // Every env('NAME') call names a variable in the list, so the list is the whole list.
     const table = readFileSync(join(ROOT, 'src', 'utils', 'env.ts'), 'utf8');
     const list = table.slice(table.indexOf('const NAMES = ['), table.indexOf('] as const;'));

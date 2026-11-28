@@ -11,8 +11,8 @@
  * against 1 for the single read here, and the package's supply-chain score fell from 83 to 81. The list is just as
  * fixed as a table of names, and a reviewer reads it in the same place.
  *
- * safe-fetch.ts reads PINEPAPER_ALLOW_PRIVATE_NETWORK itself: it is bundled on its own and takes no relative imports.
- * It also reads the standard proxy variables (HTTPS_PROXY, HTTP_PROXY, ALL_PROXY, NO_PROXY, either case), in one place.
+ * safe-fetch.ts reads PINEPAPER_ALLOW_PRIVATE_NETWORK and the standard proxy variables (HTTPS_PROXY, HTTP_PROXY,
+ * ALL_PROXY, NO_PROXY, either case) itself, in one read of its own: it is bundled alone and takes no relative imports.
  */
 const NAMES = [
   // Browser (puppeteer) mode
