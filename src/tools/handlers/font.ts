@@ -7,7 +7,11 @@
  */
 
 import type { CallToolResult } from '../../mcp/index.js';
-import { errorResult, executeOrGenerate, type HandlerOptions } from '../handlers.js';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { errorResult, executeOrGenerate, getExecutionMode, type HandlerOptions } from '../handlers.js';
+import { getBrowserController } from '../../browser/puppeteer-controller.js';
+import { getExportDir, exportFileLink } from '../../utils/export-dir.js';
 import { ErrorCodes } from '../../types/schemas.js';
 import { emitEnsureFont } from '../../types/code-generator.js';
 import { jsLiteral } from '../../utils/js-literal.js';
@@ -16,6 +20,81 @@ export type FontHandler = (
   args: Record<string, unknown>,
   options: HandlerOptions,
 ) => Promise<CallToolResult>;
+
+/** The font as bytes the page can hand back: an ArrayBuffer does not survive the trip out of the page, base64 does. */
+const FONT_OTF_CODE = `(function() {
+  var fs = app.fontStudio;
+  if (!fs || typeof fs.exportAsOTF !== 'function') return { success: false, error: 'app.fontStudio.exportAsOTF unavailable — update the studio.' };
+  var buf = fs.exportAsOTF();
+  var u8 = new Uint8Array(buf && buf.buffer ? buf.buffer : buf);
+  if (!u8.length) return { success: false, error: 'the font compiled to no bytes — add glyphs with create_glyph first (see get_status).' };
+  var bin = '';
+  for (var i = 0; i < u8.length; i += 0x8000) bin += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+  return { success: true, fontName: fs.fontName || 'font', glyphs: fs.glyphs && typeof fs.glyphs.size === 'number' ? fs.glyphs.size : null, bytes: u8.length, base64: btoa(bin) };
+})();`;
+
+const FONT_JSON_CODE = `(function() {
+  var fs = app.fontStudio;
+  if (!fs || typeof fs.exportData !== 'function') return { success: false, error: 'app.fontStudio.exportData unavailable — update the studio.' };
+  var data = fs.exportData();
+  return { success: true, fontName: fs.fontName || 'font', glyphs: data && data.glyphs ? Object.keys(data.glyphs).length : null, json: JSON.stringify(data) };
+})();`;
+
+/** Largest font returned inline as well as on disk when the caller passes download: false. */
+const FONT_INLINE_MAX_BYTES = 256 * 1024;
+
+/**
+ * export / export_data (FACEEXPORT170). Both answered success with nothing in the reply: the generated code was a
+ * bare statement, so its value was dropped, and the default branch asked the browser for a download, which a headless
+ * studio sends nowhere. The font is now built in the page, carried out as text, and written to the export folder by
+ * the server, so the reply names a file that exists. `download: false` also returns the content in the reply.
+ */
+async function exportFontFile(kind: 'otf' | 'json', args: Record<string, unknown>, options: HandlerOptions): Promise<CallToolResult> {
+  const code = kind === 'otf' ? FONT_OTF_CODE : FONT_JSON_CODE;
+  const label = kind === 'otf' ? 'Export font as OTF' : 'Export font data as JSON';
+  if ((options.executionMode ?? getExecutionMode()) === 'code' || !options.executeInBrowser) {
+    return executeOrGenerate(code, label, options, 'pinepaper_font');
+  }
+  const controller = options.browserController || getBrowserController();
+  if (!controller.connected) {
+    try { await controller.connect(); } catch (e) {
+      return errorResult(ErrorCodes.BROWSER_NOT_CONNECTED, `could not start the browser: ${e instanceof Error ? e.message : String(e)}`, {}, { toolName: 'pinepaper_font' });
+    }
+  }
+  const run = await controller.executeCode(code, false);
+  const r = run.result as { success?: boolean; error?: string; fontName?: string; glyphs?: number | null; bytes?: number; base64?: string; json?: string } | undefined;
+  if (!run.success || !r || r.success !== true) {
+    return errorResult(ErrorCodes.EXECUTION_ERROR, `font ${kind === 'otf' ? 'export' : 'export_data'} failed: ${r?.error || run.error || 'the studio returned nothing'}`, {}, { toolName: 'pinepaper_font' });
+  }
+  const content = kind === 'otf' ? Buffer.from(r.base64 || '', 'base64') : Buffer.from(r.json || '', 'utf8');
+  if (!content.length || (kind === 'otf' && content.length !== r.bytes)) {
+    return errorResult(ErrorCodes.EXECUTION_ERROR, `font ${kind === 'otf' ? 'export' : 'export_data'} failed: ${content.length} bytes arrived from the studio${kind === 'otf' ? `, ${r.bytes} were built` : ''}. No file was written.`, {}, { toolName: 'pinepaper_font' });
+  }
+  const safe = String(r.fontName || 'font').replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^[._]+/, '').slice(0, 60) || 'font';
+  const dir = getExportDir();
+  await mkdir(dir, { recursive: true });
+  const filePath = join(dir, `${safe}_${Date.now()}.${kind}`);
+  await writeFile(filePath, content);
+  const inline = args.download === false && content.length <= FONT_INLINE_MAX_BYTES;
+  const result: Record<string, unknown> = {
+    success: true,
+    format: kind,
+    fontName: r.fontName,
+    ...(typeof r.glyphs === 'number' ? { glyphs: r.glyphs } : {}),
+    filePath,
+    fileSize: content.length,
+    ...(kind === 'otf' ? { signature: content.subarray(0, 4).toString('latin1') } : {}),
+    ...(inline ? (kind === 'otf' ? { base64: r.base64 } : { data: JSON.parse(r.json || 'null') }) : {}),
+    ...(args.download === false && !inline ? { note: `the content is over ${FONT_INLINE_MAX_BYTES} bytes, so it is in the file only` } : {}),
+  };
+  return {
+    structuredContent: result,
+    content: [
+      { type: 'text' as const, text: `${kind === 'otf' ? 'Font' : 'Font data'} saved to file:\n\nFile: ${filePath}\nFormat: ${kind}\nSize: ${content.length} bytes\n\nResult: ${JSON.stringify(result, null, 2)}` },
+      exportFileLink(filePath, content.length),
+    ],
+  };
+}
 
 async function dispatchFontAction(args: Record<string, unknown>, options: HandlerOptions): Promise<CallToolResult> {
   const action = args.action as string;
@@ -190,28 +269,14 @@ async function dispatchFontAction(args: Record<string, unknown>, options: Handle
       const code = `(function() { return app.fontStudio.setMetrics(${jsLiteral(cleanMetrics)}); })();`;
       return executeOrGenerate(code, 'Set font metrics', options, 'pinepaper_font');
     }
-    case 'export': {
-      const { download } = args as { download?: boolean };
-      // Two methods, not one with a flag: exportAsOTF() builds and RETURNS the
-      // font, downloadFont() builds and hands it to the browser. `export()` has
-      // never existed on FontStudio, so every export action failed with
-      // "Cannot read properties of undefined".
-      const code = download === false
-        ? `app.fontStudio.exportAsOTF();`
-        : `app.fontStudio.downloadFont('otf');`;
-      return executeOrGenerate(code, 'Export font as OTF', options, 'pinepaper_font');
-    }
+    case 'export':
+      return exportFontFile('otf', args, options);
     case 'load_into_document': {
       const code = `(function() { return app.fontStudio.loadIntoDocument(); })();`;
       return executeOrGenerate(code, 'Load font into document', options, 'pinepaper_font');
     }
-    case 'export_data': {
-      const { download } = args as { download?: boolean };
-      const code = download === false
-        ? `app.fontStudio.exportData({ download: false });`
-        : `app.fontStudio.exportData();`;
-      return executeOrGenerate(code, 'Export font data as JSON', options, 'pinepaper_font');
-    }
+    case 'export_data':
+      return exportFontFile('json', args, options);
     case 'import_data': {
       const { data } = args as { data: object };
       if (!data || typeof data !== 'object') return errorResult(ErrorCodes.INVALID_INPUT, 'font import_data requires { data: object }');

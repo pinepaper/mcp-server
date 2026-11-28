@@ -31,7 +31,7 @@ export function getExportDir(): string {
 const MIME: Readonly<Record<string, string>> = {
   mp4: 'video/mp4', webm: 'video/webm', gif: 'image/gif', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
   webp: 'image/webp', svg: 'image/svg+xml', pdf: 'application/pdf', wav: 'audio/wav', zip: 'application/zip',
-  html: 'text/html', json: 'application/json', srt: 'application/x-subrip', vtt: 'text/vtt', scc: 'text/plain',
+  html: 'text/html', json: 'application/json', otf: 'font/otf', srt: 'application/x-subrip', vtt: 'text/vtt', scc: 'text/plain',
 };
 
 export function mimeTypeFor(filePath: string): string | undefined {
