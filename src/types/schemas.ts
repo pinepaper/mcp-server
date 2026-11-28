@@ -5158,7 +5158,7 @@ export const World3DInputSchema = z.object({
     'set_nav_target', 'get_nav_target', 'ground_height', 'raycast',
     'dolly_camera', 'pan_camera', 'world_to_canvas', 'canvas_to_ground',
     'add_body', 'remove_body', 'list_bodies', 'step_physics', 'impulse', 'set_velocity', 'fire_projectile',
-    'line_of_sight', 'set_mesh_instances',
+    'line_of_sight', 'set_mesh_instances', 'cube_field', 'animate_mesh_instances',
   ])
     .describe("'create' (a preset world) · 'describe' (every parameter with type/range — CALL THIS before configure) · 'configure' (live deep-merge patch, schema-validated) · actor ops · 'set_camera' (follow|fixed|orbit) · object ops · 'remove_world' · MESH AUTHORING: 'extrude_path' / 'lathe_path' turn a canvas path into real geometry, 'list_meshes', 'remove_mesh' · 'add_light' / 'set_light' / 'remove_light' / 'list_lights' (at most 8 point lights) · 'add_material' / 'set_material' / 'remove_material' / 'list_materials'"),
   spec: z.union([z.string(), z.record(z.string(), z.unknown())]).optional().describe("create: a preset id ('forest', 'snowMountain', …) or a full world spec object."),
@@ -5205,7 +5205,7 @@ export const World3DInputSchema = z.object({
     scale: z.number().optional().describe('Uniform scale applied after the geometry is built.'),
     doubleSided: z.boolean().optional().describe('Draw back faces too. An uncapped extrude usually wants this.'),
   }).optional().describe("extrude_path / lathe_path options. These field names ARE the ones the engine records as the mesh's provenance, so a mesh captured in a design graph can be rebuilt by spreading its meshProvenance.opts straight back in here."),
-  meshId: z.string().optional().describe('remove_mesh: the mesh id.'),
+  meshId: z.string().optional().describe('The mesh id: remove_mesh, set_mesh_instances, animate_mesh_instances, mesh clips. On cube_field it names the new field (generated if omitted).'),
 
   // --- Lights ---------------------------------------------------------------
   light: z.object({
@@ -5259,8 +5259,25 @@ export const World3DInputSchema = z.object({
   from: z.array(z.number()).length(3).optional().describe('line_of_sight: the eye point, [x, y, z].'),
   to: z.array(z.number()).length(3).optional().describe('line_of_sight: the target point, [x, y, z].'),
   instances: z.array(z.array(z.number())).optional()
-    .describe('set_mesh_instances: one entry per copy, six numbers each — x, y, z, scale, rotY (RADIANS), and a free variant a shader may read for per-instance colour or phase.'),
+    .describe('set_mesh_instances / cube_field: one entry per copy, six numbers each — x, y, z, scale, rotY (RADIANS), and a free variant a shader may read for per-instance colour or phase. On cube_field it replaces the cols × rows grid.'),
+
+  // --- Instanced box fields --------------------------------------------------
+  cols: z.number().int().min(1).optional().describe('cube_field: boxes across. cols × rows is at most 10000.'),
+  rows: z.number().int().min(1).optional().describe('cube_field: boxes deep.'),
+  spacing: z.number().positive().optional().describe('cube_field: distance between box centres in world units (default size × 1.2).'),
+  size: z.number().positive().optional().describe('cube_field: the width and depth of each box in world units (default 1). height sets how tall (default the same as size).'),
+  color: z.union([z.string(), z.array(z.number())]).optional().describe('cube_field: one colour for the whole field, hex or [r, g, b].'),
+  y: z.number().optional().describe('cube_field: world-space y of the field (omit to let it sit where the terrain puts it).'),
+  motion: z.record(z.string(), z.string()).optional()
+    .describe('cube_field / animate_mesh_instances: an expression per channel (x, y, z, scale, rotY, variant), evaluated for every copy on the scene clock. Variables: t (seconds), i, n, col, row, cols, rows, u, v, d (distance from the field centre) and the base x, y, z, scale, rotY, variant. A ripple: { y: "0.6*sin(d*1.5 - t*3)" }. Give motion OR keyframes, not both.'),
+  keyframes: z.array(z.object({
+    t: z.number().min(0).describe('Seconds on the scene clock.'),
+    instances: z.array(z.array(z.number())).describe('Every copy at that time, six numbers each. Each key must describe the same number of copies as the mesh has.'),
+  })).optional().describe('cube_field / animate_mesh_instances: whole-field poses the copies move between.'),
+  loop: z.boolean().optional().describe('cube_field / animate_mesh_instances: repeat the keyframes.'),
 })
+  .refine((v) => v.action !== 'animate_mesh_instances' || !!v.meshId, { message: 'animate_mesh_instances requires meshId: the instanced mesh to drive (cube_field returns it)', path: ['meshId'] })
+  .refine((v) => !(v.motion && v.keyframes), { message: 'give motion OR keyframes, not both: they would write the same copies', path: ['keyframes'] })
   .refine((v) => v.action !== 'configure' || !!v.patch, { message: 'configure requires patch', path: ['patch'] })
   // ground_height reads a WORLD (x, z); y is accepted in z's place for older callers.
   .refine((v) => v.action !== 'ground_height' || (!!v.point && (v.point.z !== undefined || v.point.y !== undefined)), { message: 'ground_height requires point {x, z} (world coordinates)', path: ['point'] })

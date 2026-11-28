@@ -10663,6 +10663,12 @@ ${mask ? `    // A MASK REPLACES THE RASTER (round 8 DD, 4.10). applyMask builds
       ...((entry && entry.nativeWidth && entry.width && entry.nativeWidth > entry.width)
         ? { stored: { width: entry.width, height: entry.height }, native: { width: entry.nativeWidth, height: entry.nativeHeight },
             note: 'the studio stored this image at ' + entry.width + 'x' + entry.height + ' (its source is ' + entry.nativeWidth + 'x' + entry.nativeHeight + '). Pass maxEdge: "native" to keep every pixel.' }
+        : {}),
+      // IMGNOUPSCALE23, SVG leg: an SVG that comes in here is drawn ONCE into pixels at its own size and scaled as
+      // a bitmap from then on. Said when it is an SVG, with the door that keeps it a vector.
+      ...((typeof src === 'string' && src.slice(0, 14).toLowerCase() === 'data:image/svg')
+        ? { rasterized: true,
+            svgNote: 'this SVG was turned into pixels once' + (entry && entry.width ? ' at ' + entry.width + 'x' + entry.height : '') + ' and is a bitmap from here on: scaled past that size it goes soft. To keep it a vector that stays sharp at any size, bring it in with pinepaper_import_svg.' }
         : {})
     };
   } catch (e) {
@@ -16078,8 +16084,53 @@ ${needWorld}
   if (typeof app.setWorldMeshInstances !== 'function') { return { success: false, error: 'app.setWorldMeshInstances unavailable — update FxTool' }; }
 ${needWorld}
   // x, y, z, scale, rotY (RADIANS, as everywhere on this path), variant.
-  return { success: !!app.setWorldMeshInstances(${S(input.meshId)}, ${S(input.instances)}) };
+  // The engine answers { ok, error }: an object either way, so its ok is read.
+  const r = app.setWorldMeshInstances(${S(input.meshId)}, ${S(input.instances)});
+  if (!r || r.ok === false) { return { success: false, action: 'set_mesh_instances', meshId: ${S(input.meshId)}, error: (r && (r.error || r.reason)) || 'the world refused the instances' }; }
+  return { success: true, action: 'set_mesh_instances', meshId: ${S(input.meshId)}, count: r.count };
 })();`.trim();
+
+      case 'cube_field': {
+        const field: Record<string, unknown> = {
+          id: input.meshId, cols: input.cols, rows: input.rows, spacing: input.spacing,
+          size: input.size, height: input.height,
+          color: input.color !== undefined ? world3dColor(input.color) : undefined,
+          x: input.x, y: input.y, z: input.z,
+          instances: input.instances, motion: input.motion, keyframes: input.keyframes, loop: input.loop,
+        };
+        const world = typeof input.spec === 'string' ? input.spec : 'field';
+        return `
+// World3D: a field of boxes drawn as one instanced mesh
+(async function() {
+  if (typeof app.addWorldBoxField !== 'function') { return { success: false, error: 'this studio has no box fields (app.addWorldBoxField): update PinePaper Studio' }; }
+  let createdWorld = null;
+  if (!app._world3d) {
+    if (typeof app.createWorld3D !== 'function') { return { success: false, error: 'app.createWorld3D unavailable — update FxTool to a world3d-capable build' }; }
+    createdWorld = ${S(world)};
+    await app.createWorld3D(createdWorld);
+  }
+  const r = await app.addWorldBoxField(${S(field)});
+  if (!r || r.ok === false) {
+    return { success: false, action: 'cube_field', error: (r && (r.reason || r.error)) || 'the world refused the field', ...(r && r.id ? { meshId: r.id } : {}), ...(createdWorld ? { createdWorld } : {}) };
+  }
+  return { success: true, action: 'cube_field', meshId: r.id, count: r.count, ...(r.cols ? { cols: r.cols, rows: r.rows, spacing: r.spacing } : {}), driver: r.driver || null, ...(createdWorld ? { createdWorld } : {}) };
+})();`.trim();
+      }
+
+      case 'animate_mesh_instances': {
+        const driver = (input.motion === undefined && input.keyframes === undefined)
+          ? null
+          : { motion: input.motion, keyframes: input.keyframes, loop: input.loop };
+        return `
+// World3D: drive a mesh's instances on the scene clock (no motion and no keyframes stops it)
+(function() {
+  if (typeof app.setWorldMeshInstanceDriver !== 'function') { return { success: false, error: 'this studio cannot animate mesh instances (app.setWorldMeshInstanceDriver): update PinePaper Studio' }; }
+${needWorld}
+  const r = app.setWorldMeshInstanceDriver(${S(input.meshId)}, ${S(driver)});
+  if (!r || r.ok === false) { return { success: false, action: 'animate_mesh_instances', meshId: ${S(input.meshId)}, error: (r && (r.error || r.reason)) || 'the world refused the driver' }; }
+  return { success: true, action: 'animate_mesh_instances', meshId: ${S(input.meshId)}, mode: r.mode || null, count: r.count, cleared: !!r.cleared };
+})();`.trim();
+      }
     }
   }
 

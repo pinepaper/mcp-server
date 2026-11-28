@@ -81,3 +81,15 @@ describe('pinepaper_modify_item imageStart', () => {
     expect(codeGenerator.generateModifyItem({ itemId: 'item_1', properties: { opacity: 0.5 } } as never)).not.toContain('__mpb');
   });
 });
+
+describe('pinepaper_import_image of an SVG', () => {
+  it('says it became pixels and names the vector door; a PNG gets no such note', async () => {
+    const { app } = studio(1);
+    const svg = await run(codeGenerator.generateImportImage({ url: 'data:image/svg+xml;base64,PHN2Zy8+' } as any), app);
+    expect(svg.rasterized).toBe(true);
+    expect(svg.svgNote).toContain('pinepaper_import_svg');
+    const png = await run(codeGenerator.generateImportImage({ url: 'data:image/png;base64,AAAA' } as any), app);
+    expect(png.rasterized).toBeUndefined();
+    expect(png.svgNote).toBeUndefined();
+  });
+});
