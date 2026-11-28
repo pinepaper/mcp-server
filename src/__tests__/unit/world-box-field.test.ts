@@ -43,6 +43,20 @@ describe('cube_field', () => {
     expect(sent.color).toEqual([1, 0, 0]);
   });
 
+  it('gives the field an opacity of 1 where the studio left it unset, and leaves a set one alone', async () => {
+    const a = studio(); const setA: unknown[][] = [];
+    a.app.listWorldMeshes = () => [{ id: 'pins', uniforms: { diffuse: [1, 0, 0] } }];
+    a.app.setWorldMesh = (...x: unknown[]) => { setA.push(x); return true; };
+    await run(gen({ action: 'cube_field', meshId: 'pins', cols: 2, rows: 2 }), a.app);
+    expect(setA).toEqual([['pins', { uniforms: { opacity: 1 } }]]);
+    const b = studio(); const setB: unknown[][] = [];
+    b.app.listWorldMeshes = () => [{ id: 'pins', uniforms: { diffuse: [1, 0, 0], opacity: 0.5 } }];
+    b.app.setWorldMesh = (...x: unknown[]) => { setB.push(x); return true; };
+    const r = await run(gen({ action: 'cube_field', meshId: 'pins', cols: 2, rows: 2 }), b.app);
+    expect(setB).toEqual([]);
+    expect(r.success).toBe(true);
+  });
+
   it('makes a world when there is none, and says which', async () => {
     const { app, calls } = studio(false);
     const r = await run(gen({ action: 'cube_field', cols: 2, rows: 2 }), app);

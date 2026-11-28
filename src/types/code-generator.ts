@@ -16119,6 +16119,15 @@ ${needWorld}
   if (!r || r.ok === false) {
     return { success: false, action: 'cube_field', error: (r && (r.reason || r.error)) || 'the world refused the field', ...(r && r.id ? { meshId: r.id } : {}), ...(createdWorld ? { createdWorld } : {}) };
   }
+  // The mesh program writes its opacity uniform to alpha, and a studio that does not default it reads 0 there:
+  // the boxes then draw as whatever lies under the 3D canvas (white), whatever colour was asked. Set to 1 where
+  // the field has none. A studio that defaults it is unchanged by this.
+  try {
+    const __fm = typeof app.listWorldMeshes === 'function' ? app.listWorldMeshes().find(function(m) { return m.id === r.id; }) : null;
+    if (typeof app.setWorldMesh === 'function' && !(__fm && __fm.uniforms && __fm.uniforms.opacity !== undefined)) {
+      app.setWorldMesh(r.id, { uniforms: { opacity: 1 } });
+    }
+  } catch (_) { /* the field stands; only its colour is at stake */ }
   return { success: true, action: 'cube_field', meshId: r.id, count: r.count, ...(r.cols ? { cols: r.cols, rows: r.rows, spacing: r.spacing } : {}), driver: r.driver || null, ...(createdWorld ? { createdWorld } : {}), ...(specNote ? { warning: specNote } : {}) };
 })();`.trim();
       }

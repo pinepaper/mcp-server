@@ -329,6 +329,7 @@ export const OPTIONAL_ENGINE_METHODS: readonly string[] = [
   'setLifetime',
   'setStepTiming',
   'setUnitGridEnabled',
+  'setWorldMesh',
   'tabularFiguresReport',
   'textOverflowReport',
 ];
